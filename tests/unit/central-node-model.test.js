@@ -301,6 +301,45 @@ test('hides dismissed loops from the board and keeps two governance needs', () =
   assert.equal(model.needsYou[0].title, 'Second loop');
 });
 
+test('sweepMissedLine is set when Daily Sweep is stale', () => {
+  const log = [
+    '# Governance Log',
+    '',
+    '## 2026-07-26 — Daily Sweep',
+    '',
+    'Too old.',
+    ''
+  ].join('\n');
+  const model = buildCentralNodeModel({
+    events,
+    targetsConfig,
+    centralNodeMarkdown: markdown,
+    date: '2026-07-30',
+    governanceLogMarkdown: log
+  });
+  assert.match(model.sweepMissedLine, /Daily Sweep missed/);
+  assert.match(model.sweepMissedLine, /2026-07-26/);
+});
+
+test('sweepMissedLine is null when yesterday had a Daily Sweep', () => {
+  const log = [
+    '# Governance Log',
+    '',
+    '## 2026-07-29 — Daily Sweep',
+    '',
+    'Ran.',
+    ''
+  ].join('\n');
+  const model = buildCentralNodeModel({
+    events,
+    targetsConfig,
+    centralNodeMarkdown: markdown,
+    date: '2026-07-30',
+    governanceLogMarkdown: log
+  });
+  assert.equal(model.sweepMissedLine, null);
+});
+
 test('governanceHeat uses openGovernanceEntries and ignores resolved rows', () => {
   const log = [
     '# Governance Log',

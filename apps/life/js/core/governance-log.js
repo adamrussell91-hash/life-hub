@@ -321,6 +321,44 @@ export function formatHammondReviewLine(entry) {
   return label ? `Hammond: ${label}` : null;
 }
 
+const DAILY_SWEEP_TYPE = 'Daily Sweep';
+// Date-only sweep stamps: today or yesterday ≈ within ~36h of a morning run.
+export const DAILY_SWEEP_MAX_AGE_DAYS = 1;
+
+/** Newest governance entry headed `## {date} — Daily Sweep`, or null. */
+export function latestDailySweep(markdown) {
+  const sweeps = parseGovernanceEntries(markdown ?? '')
+    .filter(entry => entry.entryType === DAILY_SWEEP_TYPE && isCalendarDate(entry.dateKey))
+    .sort((a, b) => (a.dateKey < b.dateKey ? 1 : a.dateKey > b.dateKey ? -1 : 0));
+  return sweeps[0] ?? null;
+}
+
+/**
+ * True when there is no Daily Sweep from today or yesterday (≈ older than 36h),
+ * or the log has no parseable Daily Sweep at all.
+ * `markdown` must be a loaded string — null/undefined means "not loaded yet" (no warning).
+ */
+export function isDailySweepMissed(markdown, today, { maxAgeDays = DAILY_SWEEP_MAX_AGE_DAYS } = {}) {
+  if (typeof markdown !== 'string') return false;
+  if (!isCalendarDate(today)) return true;
+  const sweep = latestDailySweep(markdown);
+  if (!sweep) return true;
+  return daysBetween(sweep.dateKey, today) > maxAgeDays;
+}
+
+/** Fail-visible Home / CN line when the Daily Sweep heartbeat is stale. */
+export function formatDailySweepMissedLine(markdown, today) {
+  // Unloaded log is not a missed sweep — avoid false alarms while data is fetching.
+  if (typeof markdown !== 'string') return null;
+  const sweep = latestDailySweep(markdown);
+  if (isCalendarDate(today) && sweep && daysBetween(sweep.dateKey, today) <= DAILY_SWEEP_MAX_AGE_DAYS) {
+    return null;
+  }
+  return sweep
+    ? `Hammond: Daily Sweep missed — last ${sweep.dateKey}`
+    : 'Hammond: Daily Sweep missed — no sweep in the log';
+}
+
 /**
  * Unresolved open-loop entries annotated with ageDays when dateKey is valid.
  * Mind Insights, Weekly Reviews, and other notes are not loops.
