@@ -2,7 +2,7 @@ import { okResponse } from './_shared/http.mjs';
 import { runCareerScanPass } from './_shared/career-scan-service.mjs';
 
 /**
- * Hourly cron; Skills scan only fires Sunday 17:00 Sydney (shouldRunCareerScanNow).
+ * Hourly cron; Skills scan fires Sunday 17–19 Sydney (shouldRunCareerScanNow).
  */
 export const config = {
   schedule: '10 * * * *'
