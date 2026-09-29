@@ -754,6 +754,78 @@
         "governance_log"
       ],
       "tool_name": "propose_follow_up"
+    },
+    "professional.propose-meeting": {
+      "file": "professional/propose-meeting.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log",
+        "calendar"
+      ],
+      "tool_name": "propose_meeting"
+    },
+    "professional.propose-event": {
+      "file": "professional/propose-event.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log",
+        "calendar"
+      ],
+      "tool_name": "propose_event"
+    },
+    "people.propose-tie-decision": {
+      "file": "people/propose-tie-decision.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_tie_decision"
+    },
+    "career.propose-application": {
+      "file": "career/propose-application.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_application"
+    },
+    "career.propose-future": {
+      "file": "career/propose-future.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_future"
     }
   }
 }

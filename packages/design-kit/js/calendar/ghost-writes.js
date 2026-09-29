@@ -42,7 +42,8 @@ export const GHOST_AGENTS = Object.freeze({
 
 export const GHOST_KINDS = Object.freeze([
   'skip_workout', 'bedtime', 'protect_block', 'move_task', 'create_task', 'draft_message', 'split_task', 'goal_rest_weeks', 'book_comm',
-  'outing', 'meal_block', 'schedule_workout', 'reschedule_block', 'cancel_block', 'log_comm'
+  'outing', 'meal_block', 'schedule_workout', 'reschedule_block', 'cancel_block', 'log_comm',
+  'pro_meeting', 'pro_event'
 ]);
 
 const LOG_COMM_DIRECTIONS = new Set(['outbound', 'inbound']);
@@ -153,6 +154,12 @@ export function validateGhost(ghost) {
     if (ghost.person_refs != null && (!Array.isArray(ghost.person_refs) || ghost.person_refs.some(ref => typeof ref !== 'string' || !ref))) {
       throw new TypeError('log_comm person_refs must be an array of refs');
     }
+  }
+  if (ghost.kind === 'pro_meeting' || ghost.kind === 'pro_event') {
+    if (!HHMM.test(ghost.start ?? '') || !HHMM.test(ghost.end ?? '') || ghost.start >= ghost.end) {
+      throw new TypeError(`${ghost.kind} needs start < end (HH:MM)`);
+    }
+    if (!oneLine(ghost.title)) throw new TypeError(`${ghost.kind} needs a title`);
   }
   if (ghost.kind === 'move_task') {
     if (typeof ghost.taskId !== 'string' || !ghost.taskId) throw new TypeError('move_task needs taskId');
@@ -388,6 +395,51 @@ export function acceptPlan(ghost, { today = null } = {}) {
       });
       steps.push(recentAction(actedOn, who, `logged ${ghost.direction} ${ghost.channel} “${subject}” ${weekday(ghost.date)} ${short(ghost.date)}${why}`));
       receipt = `${who} → Comms: logged ${ghost.direction} ${ghost.channel} “${subject}” on ${formatDisplayDate(ghost.date)}.`;
+      break;
+    }
+    case 'pro_meeting': {
+      const title = oneLine(ghost.title);
+      const tz = ghost.time_zone || 'Australia/Sydney';
+      steps.push({
+        target: 'professional',
+        action: 'create_meeting',
+        title,
+        date: ghost.date,
+        start: ghost.start,
+        end: ghost.end,
+        time_zone: tz,
+        scheduled_start: ghost.scheduled_start || null,
+        scheduled_end: ghost.scheduled_end || null,
+        location_text: ghost.location_text ?? null,
+        agenda: ghost.agenda ?? null,
+        notes: ghost.notes ?? null,
+        attendee_refs: Array.isArray(ghost.attendee_refs) ? [...ghost.attendee_refs] : []
+      });
+      steps.push(recentAction(actedOn, who, `booked meeting “${title}” ${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}–${clock12(ghost.end)}${why}`));
+      receipt = `${who} → Meetings: “${title}”, ${weekday(ghost.date)} ${formatDisplayDate(ghost.date)} ${clock12(ghost.start)}–${clock12(ghost.end)}.`;
+      break;
+    }
+    case 'pro_event': {
+      const title = oneLine(ghost.title);
+      const tz = ghost.time_zone || 'Australia/Sydney';
+      steps.push({
+        target: 'professional',
+        action: 'create_event',
+        title,
+        date: ghost.date,
+        start: ghost.start,
+        end: ghost.end,
+        time_zone: tz,
+        start_iso: ghost.start_iso || null,
+        end_iso: ghost.end_iso || null,
+        event_type: ghost.event_type || 'professional_development',
+        all_day: ghost.all_day === true,
+        location_text: ghost.location_text ?? null,
+        hours: ghost.hours ?? null,
+        attendee_refs: Array.isArray(ghost.attendee_refs) ? [...ghost.attendee_refs] : []
+      });
+      steps.push(recentAction(actedOn, who, `booked event “${title}” ${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}–${clock12(ghost.end)}${why}`));
+      receipt = `${who} → Events: “${title}”, ${weekday(ghost.date)} ${formatDisplayDate(ghost.date)} ${clock12(ghost.start)}–${clock12(ghost.end)}.`;
       break;
     }
     default:

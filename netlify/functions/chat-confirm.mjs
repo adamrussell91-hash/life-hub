@@ -114,8 +114,11 @@ import {
 } from '../../apps/life/js/core/governance-log.js';
 import { runGhostDecision } from './calendar-ghosts.mjs';
 import { createCommunicationRepository } from './_shared/communication-repository.mjs';
+import { createMeetingRepository } from './_shared/meeting-repository.mjs';
+import { createEventRepository } from './_shared/event-repository.mjs';
 import { createUniversalLinkRepository } from './_shared/universal-link-repository.mjs';
 import { createAccessContext } from './_shared/entity-access.mjs';
+import { createProfessionalWriteExecutor } from './_shared/professional-write-executor.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
@@ -169,11 +172,15 @@ function githubOpenCommit(client) {
 async function professionalDepsForGhosts(env) {
   const professionalStore = await defaultGetProfessionalStore(env);
   const repo = createCommunicationRepository({ store: professionalStore, env });
+  const meetingRepo = createMeetingRepository({ store: professionalStore, env });
+  const eventRepo = createEventRepository({ store: professionalStore, env });
   const universalLinkStore = await defaultGetUniversalLinkStore(env);
   const links = createUniversalLinkRepository({ store: universalLinkStore });
   const accessContext = createAccessContext({ workflow: 'life' });
   return {
     createCommunication: (input) => repo.createCommunication(input),
+    createMeeting: (input) => meetingRepo.createMeeting(input),
+    createEvent: (input) => eventRepo.createEvent(input),
     createLink: (link) => links.createLink(link, accessContext)
   };
 }
@@ -1941,6 +1948,7 @@ async function loadBlobStoresForWrites(writes, {
   const needsPeople = writes.some(write => classifyWriteTarget(write.path).store === 'people');
   const needsTravel = writes.some(write => classifyWriteTarget(write.path).store === 'travel');
   const needsKnowledge = writes.some(write => classifyWriteTarget(write.path).store === 'knowledge');
+  const needsProfessionalWrites = writes.some(write => classifyWriteTarget(write.path).store === 'professional');
   const needsProfessional = writes.some(write => {
     const kind = classifyWriteTarget(write.path).kind;
     return kind === 'observation' || kind === 'remember';
@@ -1951,7 +1959,7 @@ async function loadBlobStoresForWrites(writes, {
     if (needsTasks) stores.tasks = await getTasksStore(env);
     if (needsTeaching) stores.teaching = await getTeachingStore(env);
     if (needsPeople) peopleStore = await getPeopleStore(env);
-    if (needsProfessional) professionalStore = await getProfessionalStore(env);
+    if (needsProfessional || needsProfessionalWrites) professionalStore = await getProfessionalStore(env);
   } catch {
     return { ok: false, error: 'blobs_unavailable' };
   }
@@ -1974,6 +1982,16 @@ async function loadBlobStoresForWrites(writes, {
       env,
       fetchImpl,
       now: () => new Date(now()).toISOString()
+    });
+  }
+  if (needsProfessionalWrites) {
+    if (!professionalStore) return { ok: false, error: 'professional_blobs_unbound' };
+    stores.professional = createProfessionalWriteExecutor({
+      store: professionalStore,
+      env,
+      fetchImpl,
+      now: () => new Date(now()).toISOString(),
+      resolveEntity: resolvePeopleEntity
     });
   }
   if (needsKnowledge) {

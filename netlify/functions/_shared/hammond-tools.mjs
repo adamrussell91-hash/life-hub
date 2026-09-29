@@ -131,6 +131,8 @@ const CALENDAR_GHOST_KIND_ENUM = [
   'reschedule_block',
   'cancel_block',
   'log_comm',
+  'pro_meeting',
+  'pro_event',
   'draft_message',
   'split_task',
   'goal_rest_weeks',

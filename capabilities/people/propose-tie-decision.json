@@ -1,0 +1,10 @@
+{
+  "id": "people.propose-tie-decision",
+  "tool_name": "propose_tie_decision",
+  "verb": "Ties",
+  "agents": ["clare", "hammond", "ann"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Accept or decline pending Ties link proposals. Saved only after Adam's Confirm.",
+  "surfaces": ["confirm_card", "governance_log"]
+}

@@ -28,6 +28,9 @@ import {
 import { proposeObservationSchema } from '../observation-agent.mjs';
 import { proposeRememberFactSchema } from '../remember-fact-agent.mjs';
 import { proposeLogCommunicationSchema } from '../log-comm-agent.mjs';
+import { proposeMeetingSchema, proposeEventSchema } from '../meeting-event-agent.mjs';
+import { proposeApplicationSchema, proposeFutureSchema } from '../career-agent.mjs';
+import { proposeTieDecisionSchema } from '../tie-decision-agent.mjs';
 import { saveWorkoutTemplateSchema } from '../workout-template-agent.mjs';
 import { proposeTravelCheckinSchema, proposeTravelItemSchema } from '../travel-agent.mjs';
 import { proposeKnowledgePageSchema } from '../knowledge-page-agent.mjs';
@@ -344,6 +347,11 @@ export function buildAgentTools({
   if (has('people.propose-organisation-changes')) tools.push(proposeOrganisationChangesSchema());
   if (has('people.propose-observation')) tools.push(proposeObservationSchema());
   if (has('people.propose-remember-fact')) tools.push(proposeRememberFactSchema());
+  if (has('people.propose-tie-decision')) tools.push(proposeTieDecisionSchema());
+  if (has('professional.propose-meeting')) tools.push(proposeMeetingSchema());
+  if (has('professional.propose-event')) tools.push(proposeEventSchema());
+  if (has('career.propose-application')) tools.push(proposeApplicationSchema());
+  if (has('career.propose-future')) tools.push(proposeFutureSchema());
   if (has('fitness.save-workout-template')) tools.push(saveWorkoutTemplateSchema());
   if (has('travel.propose-item')) tools.push(proposeTravelItemSchema());
   if (has('travel.propose-checkin')) tools.push(proposeTravelCheckinSchema());

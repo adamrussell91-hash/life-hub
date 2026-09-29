@@ -143,7 +143,8 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
     const writeTarget = classifyWriteTarget(path);
     if (writeTarget.store === 'people'
       || writeTarget.store === 'travel'
-      || writeTarget.store === 'knowledge') {
+      || writeTarget.store === 'knowledge'
+      || writeTarget.store === 'professional') {
       let body = null;
       try {
         body = JSON.parse(content);
@@ -157,7 +158,9 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
             ? 'invalid_people_write'
             : writeTarget.store === 'travel'
               ? 'invalid_travel_write'
-              : 'invalid_knowledge_write',
+              : writeTarget.store === 'knowledge'
+                ? 'invalid_knowledge_write'
+                : 'invalid_professional_write',
           detail: path
         };
       }
@@ -433,8 +436,15 @@ export function classifyWriteTarget(path) {
   if (store === 'knowledge' && kind === 'page' && BLOB_ID.test(id)) {
     return { store: 'knowledge', kind, id, path: raw };
   }
+  if (
+    store === 'professional'
+    && (kind === 'meeting' || kind === 'event' || kind === 'application' || kind === 'future' || kind === 'tie')
+    && BLOB_ID.test(id)
+  ) {
+    return { store: 'professional', kind, id, path: raw };
+  }
   if (store === 'tasks' || store === 'teaching' || store === 'people'
-    || store === 'travel' || store === 'knowledge') {
+    || store === 'travel' || store === 'knowledge' || store === 'professional') {
     return { store: 'unknown', path: raw };
   }
   return { store: 'github', path: raw };
@@ -763,6 +773,20 @@ export async function executeProposeActionWrites(client, proposal, {
         return { ok: false, error: 'knowledge_store_unbound', detail: write.path, results };
       }
       const applied = await knowledge.apply(write, target);
+      if (!applied.ok) return { ...applied, results };
+      results.push(applied.result);
+      continue;
+    }
+
+    if (target.store === 'professional') {
+      if (write.mode === 'delete') {
+        return { ok: false, error: 'professional_delete_unsupported', detail: write.path, results };
+      }
+      const professional = blobStores.professional;
+      if (!professional || typeof professional.apply !== 'function') {
+        return { ok: false, error: 'professional_store_unbound', detail: write.path, results };
+      }
+      const applied = await professional.apply(write, target);
       if (!applied.ok) return { ...applied, results };
       results.push(applied.result);
       continue;

@@ -1,0 +1,10 @@
+{
+  "id": "professional.propose-meeting",
+  "tool_name": "propose_meeting",
+  "verb": "Meetings",
+  "agents": ["clare", "hammond", "ann"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Propose booking a Professional meeting. Confirm card always; timed starts also queue a calendar ghost. Saved only after Confirm or Accept.",
+  "surfaces": ["confirm_card", "governance_log", "calendar"]
+}
