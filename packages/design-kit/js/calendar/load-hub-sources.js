@@ -17,13 +17,15 @@ import {
 import { knowledgeEventsFromPages } from './knowledge-calendar.js';
 import { loadLifeCalendarEvents } from './load-life-events.js';
 import { resolveSchoolTerms } from './school-terms.js';
+import { calendarFeedRange, eventsFromCalendarFeeds } from './ical-calendar.js';
 
 export const HUB_SOURCE_IDS = Object.freeze([
   'teaching',
   'tasks',
   'professional',
   'knowledge',
-  'life'
+  'life',
+  'feeds'
 ]);
 
 export const HUB_SOURCE_LABEL = Object.freeze({
@@ -31,7 +33,8 @@ export const HUB_SOURCE_LABEL = Object.freeze({
   tasks: 'Tasks',
   professional: 'Professional',
   knowledge: 'Knowledge',
-  life: 'Life'
+  life: 'Life',
+  feeds: 'iCloud calendars'
 });
 
 function emptyBucket() {
@@ -284,12 +287,38 @@ export function createHubSourceLoader(opts) {
     return inflight.life;
   }
 
+  /** Adam's iCloud calendars, read-only (server holds the feed secrets). */
+  async function loadFeeds() {
+    if (inflight.feeds) return inflight.feeds;
+    setBucket('feeds', { status: 'loading', error: null });
+    inflight.feeds = (async () => {
+      try {
+        const range = calendarFeedRange(today ?? sydneyTodayKey());
+        const payload = await readOkJson(apiFetch, `/api/calendar-feeds?from=${range.from}&to=${range.to}`);
+        const events = eventsFromCalendarFeeds(payload.data?.events ?? []);
+        setBucket('feeds', { status: 'live', events, error: null, meta: { feeds: payload.data?.feeds ?? [] } });
+      } catch (error) {
+        // 401/404 (signed out, or an older API deploy): not an error worth a banner.
+        const quiet = error?.status === 401 || error?.status === 403 || error?.status === 404;
+        setBucket('feeds', {
+          status: quiet ? 'unavailable' : 'error',
+          events: [],
+          error: quiet ? null : "Couldn't load your iCloud calendars"
+        });
+      } finally {
+        inflight.feeds = null;
+      }
+    })();
+    return inflight.feeds;
+  }
+
   const loaders = {
     teaching: loadTeaching,
     tasks: loadTasks,
     professional: loadProfessional,
     knowledge: loadKnowledge,
-    life: loadLifeSource
+    life: loadLifeSource,
+    feeds: loadFeeds
   };
 
   return {

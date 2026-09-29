@@ -136,6 +136,17 @@ function periodCopy(view) {
   };
 }
 
+/** "5:31 am" today, else "29/09 5:31 am". */
+function builtLabel(iso) {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return '';
+  const fmt = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', minute: '2-digit', hour12: true });
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+  const today = getSydneyDateKey(session?.options?.now ?? new Date());
+  const time = fmt.format(at).replace(/\s/g, ' ').toLowerCase();
+  return day === today ? time : `${day.slice(8, 10)}/${day.slice(5, 7)} ${time}`;
+}
+
 function whenText(opening) {
   const [start, end] = opening.dates;
   if (opening.held && start) {
@@ -171,7 +182,8 @@ function present(body) {
     series: (body.series ?? []).filter(point => point.date >= from && point.date <= horizon),
     openings: body.openings ?? [],
     world: (body.world ?? []).filter(entry => entry.date >= from && entry.date <= horizon),
-    tasked: body.tasked ?? []
+    tasked: body.tasked ?? [],
+    builtAt: typeof body.snapshot?.built_at === 'string' ? body.snapshot.built_at : null
   };
 }
 
@@ -262,7 +274,8 @@ async function postJson(path, body) {
 async function refetchView() {
   if (!session) return null;
   const today = getSydneyDateKey(session.options.now ?? new Date());
-  const response = await request()(`/api/almanac?from=${today}&to=${addDays(today, 365)}`, {
+  // After a write the repo head moved, so the server rebuilds anyway; fresh=1 makes that explicit.
+  const response = await request()(`/api/almanac?from=${today}&to=${addDays(today, 365)}&fresh=1`, {
     credentials: 'include'
   });
   if (!response.ok) throw new Error('almanac');
@@ -334,7 +347,11 @@ function openPop(stepId) {
     }
     html += `<p class="alm-pop__label">Add as task writes</p><p class="alm-pop__writes" data-part="write-preview">${receipt}</p>`;
     const taskBtn = state.tasked.has(stepId) ? '' : `<button type="button" class="btn btn--primary" data-task="${stepId}">Add as task</button>`;
-    html += `<div class="alm-pop__acts">${taskBtn}<button type="button" class="btn btn--secondary" data-done="${stepId}">Already done</button></div>`;
+    html += `<div class="alm-pop__acts">${taskBtn}<button type="button" class="btn btn--secondary" data-done="${stepId}">Already done</button><button type="button" class="btn btn--ghost" data-not-doing="${stepId}">Not doing</button></div>`;
+  }
+  const anchor = hit.line?.anchor;
+  if (anchor?.id && !isTermAnchor(anchor)) {
+    html += `<button type="button" class="alm-pop__link" data-anchor-open="${escapeAttr(anchor.id)}">${escapeText(anchor.title)}: not going, or a new date…</button>`;
   }
   pop.innerHTML = html;
   pop.hidden = false;
@@ -347,6 +364,75 @@ function openPop(stepId) {
   popFor = stepId;
   engine.place('__pop', { opacity: 0, y: ALM.popRise });
   engine.to('__pop', { opacity: 1, y: 0 }, { duration: ALM.popMs });
+}
+
+function escapeText(value) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function escapeAttr(value) {
+  return escapeText(value).replace(/"/g, '&quot;');
+}
+
+/** School terms come from Tools › Term dates, not the anchors file. */
+function isTermAnchor(anchor) {
+  return anchor?.kind === 'term';
+}
+
+function findAnchor(anchorId) {
+  return (current?.lines ?? []).map(line => line.anchor).find(anchor => anchor?.id === anchorId) ?? null;
+}
+
+/** Anchor card: "Not going" (drops it and everything hanging off it) or a new date. */
+function openAnchorPop(anchorId, from) {
+  const anchor = findAnchor(anchorId);
+  const pop = nodes.get('__pop');
+  if (!anchor || !pop || !engine || !rootEl || isTermAnchor(anchor)) return;
+  const when = anchor.date ? formatDisplayDate(anchor.date) : anchor.window ? `${formatDisplayDate(anchor.window.opens)} – ${formatDisplayDate(anchor.window.closes)}` : '';
+  const steps = (current.lines.find(line => line.anchor?.id === anchorId)?.steps ?? []).length;
+  let html = `<div class="alm-pop__head"><b>${escapeText(anchor.title)}</b></div><p class="alm-pop__meta">${escapeText([when, anchor.sub].filter(Boolean).join(' · '))}</p>`;
+  html += `<label class="alm-pop__field"><span>Why (optional)</span><input type="text" name="reason" maxlength="200" placeholder="e.g. not attending"></label>`;
+  html += `<div class="alm-pop__acts"><button type="button" class="btn btn--primary" data-not-going="${escapeAttr(anchorId)}">Not going</button></div>`;
+  html += `<p class="alm-pop__note">${steps ? `Removes it and its ${steps} step${steps === 1 ? '' : 's'}.` : 'Removes it from the Almanac.'} Kept on record, not deleted.</p>`;
+  if (anchor.date) {
+    html += `<label class="alm-pop__field"><span>New date</span><input type="date" name="date" value="${escapeAttr(anchor.date)}"></label>`;
+    html += `<div class="alm-pop__acts"><button type="button" class="btn btn--secondary" data-move-anchor="${escapeAttr(anchorId)}">Move</button></div>`;
+  }
+  pop.innerHTML = html;
+  pop.hidden = false;
+  const r = rootEl.getBoundingClientRect();
+  const b = (from ?? rootEl).getBoundingClientRect();
+  pop.style.left = `${Math.max(8, Math.min(b.left - r.left, r.width - ALM.popWidth - 8))}px`;
+  pop.style.top = `${b.bottom - r.top + 6}px`;
+  popFor = `anchor:${anchorId}`;
+  engine.place('__pop', { opacity: 0, y: ALM.popRise });
+  engine.to('__pop', { opacity: 1, y: 0 }, { duration: ALM.popMs });
+}
+
+async function decide(body, button, { savingLabel = 'Saving…', toast }) {
+  const pop = nodes.get('__pop');
+  const buttons = [...(pop?.querySelectorAll('button') ?? [])];
+  const labels = buttons.map(btn => btn.textContent);
+  for (const btn of buttons) btn.disabled = true;
+  if (button) button.textContent = savingLabel;
+  try {
+    const { response, payload } = await postJson('/api/almanac/done', body);
+    if (!response.ok || payload?.ok !== true) throw new Error(errorMessage(payload, 'Could not save that.'));
+    closePop();
+    // Saved. A failed redraw must not claim the save failed.
+    try {
+      await afterWrite();
+      showToast(toast);
+    } catch {
+      showToast(`${toast} <span>Saved; the view will update on the next open.</span>`);
+    }
+  } catch (error) {
+    buttons.forEach((btn, i) => {
+      btn.disabled = false;
+      btn.textContent = labels[i];
+    });
+    showToast(`<b>Not saved.</b> ${error instanceof Error ? escapeText(error.message) : 'Could not save that.'}`);
+  }
 }
 
 function closePop() {
@@ -530,6 +616,35 @@ function wire(root) {
     if (task) return void addTask(task.getAttribute('data-task'));
     const done = target.closest('[data-done]');
     if (done) return void markDone(done.getAttribute('data-done'));
+    if (target.closest('[data-almanac-refresh]')) return void refreshNow(target.closest('[data-almanac-refresh]'));
+    const notDoing = target.closest('[data-not-doing]');
+    if (notDoing) {
+      const stepId = notDoing.getAttribute('data-not-doing');
+      return void decide({ stepId, status: 'not_doing' }, notDoing, { toast: '<b>Not doing.</b> The Almanac stops asking about it.' });
+    }
+    const notGoing = target.closest('[data-not-going]');
+    if (notGoing) {
+      const anchorId = notGoing.getAttribute('data-not-going');
+      const reason = nodes.get('__pop')?.querySelector('input[name="reason"]')?.value?.trim() ?? '';
+      const title = findAnchor(anchorId)?.title ?? 'That';
+      return void decide({ anchorId, status: 'not_going', ...(reason ? { reason } : {}) }, notGoing, {
+        toast: `<b>${escapeText(title)}: not going.</b> Removed, with everything that hung off it.`
+      });
+    }
+    const move = target.closest('[data-move-anchor]');
+    if (move) {
+      const anchorId = move.getAttribute('data-move-anchor');
+      const date = nodes.get('__pop')?.querySelector('input[name="date"]')?.value ?? '';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+      return void decide({ anchorId, status: 'moved', date }, move, { toast: `<b>Moved to ${formatDisplayDate(date)}.</b> Its last safe days moved with it.` });
+    }
+    const anchorOpen = target.closest('[data-anchor-open]');
+    if (anchorOpen) return void openAnchorPop(anchorOpen.getAttribute('data-anchor-open'), anchorOpen);
+    const laneLabel = target.closest('[data-part="anchor-label"]');
+    if (laneLabel) {
+      const id = laneLabel.getAttribute('data-anchor');
+      return `anchor:${id}` === popFor ? closePop() : openAnchorPop(id, laneLabel);
+    }
     const act = target.closest('[data-open]');
     if (act instanceof HTMLButtonElement) {
       return void openingAction(act.getAttribute('data-open'), act.getAttribute('data-act'), act);
@@ -550,7 +665,26 @@ function wire(root) {
       openPop(target.getAttribute('data-step'));
       event.preventDefault();
     }
+    if ((event.key === 'Enter' || event.key === ' ') && target.getAttribute('data-part') === 'anchor-label') {
+      openAnchorPop(target.getAttribute('data-anchor'), target);
+      event.preventDefault();
+    }
   });
+}
+
+/** Rebuild the saved copy on demand (the "updated … · refresh" link). */
+async function refreshNow(button) {
+  if (!session || !button) return;
+  button.disabled = true;
+  button.textContent = 'rebuilding…';
+  try {
+    await afterWrite();
+    showToast('<b>Rebuilt.</b> The Almanac now reflects everything saved so far.');
+  } catch {
+    button.disabled = false;
+    button.textContent = 'refresh';
+    showToast('<b>Not rebuilt.</b> The saved copy is still showing. Try again.');
+  }
 }
 
 function publish(win) {
@@ -622,6 +756,16 @@ function paint(doc, host, view, options) {
   periodTitle.textContent = period.title;
   const periodSpan = el('span', '', periodNode);
   periodSpan.textContent = period.span;
+  if (view.builtAt) {
+    // The Almanac is a saved copy (rebuilt at 5:30 and after any change); say how fresh it is.
+    const fresh = el('button', 'alm__fresh', periodNode, {
+      type: 'button',
+      'data-almanac-refresh': '',
+      title: 'Rebuild the Almanac now',
+      'aria-label': `Updated ${builtLabel(view.builtAt)}. Rebuild now.`
+    });
+    fresh.textContent = `updated ${builtLabel(view.builtAt)} · refresh`;
+  }
   const later = el('button', 'alm__round', nav, { type: 'button', 'aria-label': 'Later' });
   later.innerHTML = '<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg>';
   const todayButton = el('button', 'btn btn--secondary', nav, { type: 'button' });
@@ -834,7 +978,12 @@ function paint(doc, host, view, options) {
       const cy = y + 22;
       const lane = s('g', { class: `alm-lane is-${anchor.kind}`, 'data-part': 'lead-line', 'data-anchor': anchor.id }, lanes);
       s('line', { class: 'alm-lane-rule', x1: 0, x2: ALM.width, y1: y + ALM.lanes.rowH - 2, y2: y + ALM.lanes.rowH - 2 }, lane);
-      s('text', { class: 'alm-t-lab', x: ALM.labelX, y: cy - 2 }, lane, anchor.title);
+      s('text', {
+        class: `alm-t-lab${isTermAnchor(anchor) ? '' : ' is-live'}`,
+        x: ALM.labelX,
+        y: cy - 2,
+        ...(isTermAnchor(anchor) ? {} : { 'data-part': 'anchor-label', 'data-anchor': anchor.id, role: 'button', tabindex: 0 })
+      }, lane, anchor.title);
       s('text', { class: 'alm-t-sub', x: ALM.labelX, y: cy + 13 }, lane, anchor.sub ?? '');
       if (anchor.window) {
         s('rect', {
@@ -937,7 +1086,7 @@ function paint(doc, host, view, options) {
     for (const lead of view.lines) {
       const anchor = lead.anchor;
       const item = el('section', `alm-list__line is-${lead.status}`, list, { 'data-part': 'lead-line', 'data-anchor': anchor.id });
-      const heading = el('h3', '', item);
+      const heading = el('h3', isTermAnchor(anchor) ? '' : 'is-live', item, isTermAnchor(anchor) ? {} : { 'data-part': 'anchor-label', 'data-anchor': anchor.id, role: 'button', tabindex: '0' });
       heading.textContent = anchor.title ?? '';
       const sub = el('p', '', item);
       sub.textContent = anchor.sub ?? '';

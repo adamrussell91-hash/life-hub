@@ -43,6 +43,8 @@ export function riverItemsFromHubEvents(events) {
     if (type === 'calendar_block' && (record.kind === 'wall' || record.kind === 'protected')) continue;
     if (type === 'calendar_block' && record.status === 'cancelled') continue;
     if (type === 'workout' && record.status === 'completed') continue;
+    // Social / family iCloud events are "just happening": no lane, no load.
+    if (record.ambient === true) continue;
 
     const id = record.id || event.path;
     if (!id) continue;

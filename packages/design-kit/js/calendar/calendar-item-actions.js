@@ -67,6 +67,9 @@ export function itemId(item) {
 
 /** @param {unknown} item */
 export function itemTypeLabel(item) {
+  const record = itemRecord(item);
+  // iCloud rows name their calendar ("Family", "Health appointments").
+  if (typeof record.source_calendar === 'string' && record.source_calendar) return record.source_calendar;
   return TYPE_LABEL[itemType(item)] || '';
 }
 

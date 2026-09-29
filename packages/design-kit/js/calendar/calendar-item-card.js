@@ -101,11 +101,13 @@ function contextRows(item, values) {
   const rows = [];
   const hub = hubDomainForItem(item) || hubDomainForItem({ source: itemType(item) });
   const type = itemTypeLabel(item) || (row.kind ? String(row.kind) : '');
-  const what = [type, hub ? HUB_NAME[hub] : ''].filter(Boolean);
+  const what = [type, hub && !record.feed ? HUB_NAME[hub] : ''].filter(Boolean);
   if (what.length) rows.push(['What', what.join(' · ')]);
   const when = whenLine(item, values);
   if (when) rows.push(['When', when]);
   if (record.class_title) rows.push(['Class', record.class_title]);
+  if (typeof record.location === 'string' && record.location) rows.push(['Where', record.location]);
+  if (record.feed) rows.push(['From', 'iCloud · read-only here']);
   if (typeof record.status === 'string' && record.status) rows.push(['Status', record.status.replace(/_/g, ' ')]);
   if (typeof record.priority === 'string' && record.priority) rows.push(['Priority', record.priority]);
   if (typeof record.project_title === 'string' && record.project_title) rows.push(['Project', record.project_title]);
@@ -113,7 +115,7 @@ function contextRows(item, values) {
   if (typeof record.channel === 'string' && record.channel) rows.push(['Channel', record.channel]);
   if (row.provider) rows.push(['With', row.provider]);
   if (row.mergedRecords) rows.push(['Records', `${row.mergedRecords} merged`]);
-  if (row.meta && !rows.some(([, text]) => text === row.meta) && !when.includes(String(row.meta))) {
+  if (row.meta && !record.feed && !rows.some(([, text]) => text === row.meta) && !when.includes(String(row.meta))) {
     rows.push(['Detail', row.meta]);
   }
   return rows;

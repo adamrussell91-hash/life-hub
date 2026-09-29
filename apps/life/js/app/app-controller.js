@@ -8,6 +8,7 @@ import { tasksEventsFromTasks, tasksEventsFromWorkBlocks, scheduleDiffActiveProp
 import { professionalEventsFromProjections } from '../shell/professional-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
 import { resolveSchoolTerms } from '../../../../packages/design-kit/js/calendar/school-terms.js';
+import { calendarFeedRange, eventsFromCalendarFeeds } from '../../../../packages/design-kit/js/calendar/ical-calendar.js';
 import { shiftYearMonth } from './calendar-model.js';
 import { deriveRiverZooms } from './term-river.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
@@ -191,6 +192,8 @@ export function createAppController(dependencies) {
   let cnHubSignalsInFlight = null;
   let tasksEvents = [];
   let calendarHubPrefs = null;
+  let feedEvents = [];
+  let feedsInFlight = null;
   let calendarHubPrefsInFlight = null;
   let tasksCalendarInFlight = null;
   let professionalEvents = [];
@@ -859,9 +862,29 @@ export function createAppController(dependencies) {
     return calendarHubPrefsInFlight;
   }
 
+  /** iCloud calendars (work, social, family, health), read-only via the server. */
+  function loadCalendarFeeds() {
+    if (feedsInFlight) return feedsInFlight;
+    const today = latestResult?.date ?? calendarSelectedDate;
+    if (!today) return Promise.resolve();
+    const range = calendarFeedRange(today);
+    feedsInFlight = apiFetch(`/api/calendar-feeds?from=${range.from}&to=${range.to}`)
+      .then(response => (response.ok ? response.json() : null))
+      .then(payload => {
+        if (payload?.ok && Array.isArray(payload.data?.events)) feedEvents = eventsFromCalendarFeeds(payload.data.events);
+      })
+      .catch(() => {})
+      .finally(() => {
+        feedsInFlight = null;
+        if (currentSection === 'calendar') renderCalendarSection();
+      });
+    return feedsInFlight;
+  }
+
   function loadHubCalendars() {
     return Promise.all([
       loadCalendarHubPrefs(),
+      loadCalendarFeeds(),
       loadTeachingCalendar(),
       loadKnowledgeCalendar(),
       loadTasksCalendar(),
@@ -1502,7 +1525,8 @@ export function createAppController(dependencies) {
         ...teachingEvents,
         ...knowledgeEvents,
         ...tasksEvents,
-        ...professionalEvents
+        ...professionalEvents,
+        ...feedEvents
       ],
       date,
       selectedDate: calendarSelectedDate,
@@ -1526,7 +1550,8 @@ export function createAppController(dependencies) {
       now: now(),
       events: [
         ...(latestResult.events ?? []),
-        ...tasksEvents
+        ...tasksEvents,
+        ...feedEvents
       ],
       calendarVisual: latestResult.calendarVisual ?? null,
       hubPrefs: calendarHubPrefs,

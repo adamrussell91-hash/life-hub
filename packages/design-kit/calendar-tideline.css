@@ -345,3 +345,19 @@ button.cal-src{appearance:none;-webkit-appearance:none}
   .cal-pop.cal-pop--card{position:fixed;left:var(--space-3)!important;right:var(--space-3);top:auto!important;bottom:var(--space-3);width:auto;max-height:70vh;overflow:auto}
   .cal-card__field input,.cal-card__field textarea{font-size:16px}
 }
+
+/* ---------- iCloud calendars (29/09/26) ---------- */
+/* Social + family are "just happening": a quiet wash and outline, never loud, never load. */
+.k-social{--k-bg:color-mix(in srgb,var(--pastel-lilac) 38%,var(--paper));--k-stripe:color-mix(in srgb,var(--pastel-lilac-ink) 45%,#fff)}
+.k-family{--k-bg:color-mix(in srgb,var(--pastel-gold) 34%,var(--paper));--k-stripe:color-mix(in srgb,var(--pastel-gold-ink) 45%,#fff)}
+.cal-src.k-social{--k-stripe:color-mix(in srgb,var(--pastel-lilac-ink) 60%,#fff)}
+.cal-src.k-family{--k-stripe:color-mix(in srgb,var(--pastel-gold-ink) 60%,#fff)}
+.cal-chip.is-ambient{box-shadow:none;border-style:dashed;border-color:color-mix(in srgb,var(--k-stripe) 70%,transparent)}
+.cal-chip.is-ambient .cal-chip__title{font-weight:var(--weight-medium);color:color-mix(in srgb,var(--ink) 78%,transparent)}
+.cal-due.is-allday{background:var(--k-bg,var(--paper));border:1px solid color-mix(in srgb,var(--k-stripe,var(--line)) 45%,transparent);cursor:pointer}
+.cal-due.is-allday.is-ambient{border-style:dashed}
+.cal-due.is-allday b{font-weight:var(--weight-medium)}
+.dd-arc.k-social{fill:color-mix(in srgb,var(--pastel-lilac) 45%,#fff);stroke:color-mix(in srgb,var(--pastel-lilac-ink) 45%,#fff);stroke-dasharray:3 2}
+.dd-arc.k-family{fill:color-mix(in srgb,var(--pastel-gold) 40%,#fff);stroke:color-mix(in srgb,var(--pastel-gold-ink) 45%,#fff);stroke-dasharray:3 2}
+.dd-arc.k-event{fill:var(--pastel-gold);stroke:var(--pastel-gold-ink);stroke-width:1.2}
+.cal-due.is-allday b{color:var(--ink)}

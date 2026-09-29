@@ -15,7 +15,7 @@ import {
 import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { parseDateRange } from './_shared/repo-policy.mjs';
-import { defaultGetTasksStore, getJSON, readTaskIndex, taskKey } from './_shared/tasks-blobs.mjs';
+import { defaultGetTasksStore, getJSON, readTaskIndex, setJSON, taskKey } from './_shared/tasks-blobs.mjs';
 import { defaultGetCognitiveStore } from './_shared/cognitive-store.mjs';
 import { lastCompletedRun, horizonCompletedDateKey, isHorizonReviewStepId } from './_shared/cognitive-horizon.mjs';
 import { parseEventDocument } from '../../apps/life/js/core/records.js';
@@ -147,21 +147,63 @@ export function parseAlmanacDone(text, { warn = console.warn } = {}) {
   }
   const rows = [];
   parsed.forEach((row, index) => {
-    const stepId = row && typeof row.stepId === 'string' ? row.stepId.trim() : '';
     const at = row && typeof row.at === 'string' ? row.at.trim() : '';
-    if (!stepId || !at) {
-      warn(`almanac: ignoring done row at index ${index}`);
+    const stepId = row && typeof row.stepId === 'string' ? row.stepId.trim() : '';
+    const anchorId = row && typeof row.anchorId === 'string' ? row.anchorId.trim() : '';
+    const status = row && typeof row.status === 'string' ? row.status : '';
+    if (at && stepId && (!status || status === 'done' || status === 'not_doing')) {
+      rows.push({ stepId, at, ...(status === 'not_doing' ? { status } : {}) });
       return;
     }
-    rows.push({ stepId, at });
+    if (at && anchorId && status === 'not_going') {
+      rows.push({ anchorId, at, status, ...(typeof row.reason === 'string' && row.reason.trim() ? { reason: row.reason.trim() } : {}) });
+      return;
+    }
+    if (at && anchorId && status === 'moved' && asDate(row.date)) {
+      rows.push({ anchorId, at, status, date: asDate(row.date) });
+      return;
+    }
+    warn(`almanac: ignoring done row at index ${index}`);
   });
   return rows;
 }
 
 export function appendAlmanacDone(text, stepId, at, { warn = console.warn } = {}) {
+  return appendAlmanacDecision(text, { stepId, at }, { warn });
+}
+
+/** Append one decision row (done, not_doing, not_going, moved) to almanac-done.json. */
+export function appendAlmanacDecision(text, row, { warn = console.warn } = {}) {
   const rows = parseAlmanacDone(typeof text === 'string' ? text : '', { warn });
-  rows.push({ stepId, at });
+  rows.push(row);
   return `${JSON.stringify(rows, null, 2)}\n`;
+}
+
+/**
+ * Apply Adam's anchor decisions: "not going" removes the anchor and every step
+ * hanging off it; "moved" re-dates it (latest move wins). Rows stay in the file
+ * as the record of why.
+ */
+export function applyAnchorDecisions(anchors, done = []) {
+  const gone = new Set();
+  const moved = new Map();
+  for (const row of done) {
+    if (!row.anchorId) continue;
+    if (row.status === 'not_going') gone.add(row.anchorId);
+    if (row.status === 'moved') moved.set(row.anchorId, row.date);
+  }
+  return anchors
+    .filter(anchor => !gone.has(anchor.id))
+    .map(anchor => {
+      const date = moved.get(anchor.id);
+      if (!date || !anchor.date) return anchor;
+      const shift = anchor.returns ? daysBetweenKeys(anchor.date, date) : 0;
+      return { ...anchor, date, ...(anchor.returns ? { returns: addDays(anchor.returns, shift) } : {}) };
+    });
+}
+
+function daysBetweenKeys(from, to) {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
 export function parseSchoolTerms(value, { warn = console.warn } = {}) {
@@ -194,6 +236,7 @@ export function parseSchoolTerms(value, { warn = console.warn } = {}) {
 
 /** Bounded Blob concurrency — a serial walk of every task was ~30s on real latency. */
 const TASKED_BATCH = 10;
+const LINE_ORDER = ['overdue', 'now', 'soon', 'later', 'done'];
 
 export async function readAlmanacTasked(tasksStore, { warn = console.warn } = {}) {
   if (typeof tasksStore !== 'function') return [];
@@ -228,13 +271,33 @@ export async function readSchoolTerms(tasksStore, { warn = console.warn } = {}) 
   }
 }
 
+const DECISION_KEYS = new Set(['stepId', 'anchorId', 'status', 'reason', 'date']);
+
+/**
+ * Accepted bodies: { stepId } (done) · { stepId, status: 'not_doing' } ·
+ * { anchorId, status: 'not_going', reason? } · { anchorId, status: 'moved', date }.
+ */
 export function readDoneRequest(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: 'invalid_request' };
   for (const key of Object.keys(body)) {
-    if (key !== 'stepId') return { error: 'client_write_rejected' };
+    if (!DECISION_KEYS.has(key)) return { error: 'client_write_rejected' };
+  }
+  if (body.anchorId !== undefined) {
+    if (typeof body.anchorId !== 'string' || !STEP_ID.test(body.anchorId) || body.stepId !== undefined) return { error: 'invalid_request' };
+    if (body.status === 'not_going') {
+      const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 200) : '';
+      return { anchorId: body.anchorId, status: 'not_going', ...(reason ? { reason } : {}) };
+    }
+    if (body.status === 'moved' && typeof body.date === 'string' && DATE.test(body.date)) {
+      return { anchorId: body.anchorId, status: 'moved', date: body.date };
+    }
+    return { error: 'invalid_request' };
   }
   if (typeof body.stepId !== 'string' || !STEP_ID.test(body.stepId)) return { error: 'invalid_request' };
-  return { stepId: body.stepId };
+  if (body.reason !== undefined || body.date !== undefined) return { error: 'invalid_request' };
+  if (body.status === undefined || body.status === 'done') return { stepId: body.stepId };
+  if (body.status === 'not_doing') return { stepId: body.stepId, status: 'not_doing' };
+  return { error: 'invalid_request' };
 }
 
 function dateKeys(from, to) {
@@ -463,7 +526,7 @@ export function buildAlmanac({
   const endYear = Number(to.slice(0, 4));
   for (let year = startYear; year <= endYear; year += 1) addTag(tags, dstStart(year), 'dst-start');
 
-  const merged = mergeAnchors(anchors, terms, extras);
+  const merged = applyAnchorDecisions(mergeAnchors(anchors, terms, extras), done);
   if (horizonCadence?.lastCompletedAt) {
     merged.push({
       id: 'horizon-council',
@@ -473,11 +536,17 @@ export function buildAlmanac({
       sub: 'Quarterly cognitive review'
     });
   }
-  const doneIds = new Set(done.map(row => row.stepId));
-  const lines = leadLines(merged, ALMANAC_RULES, { today, terms, done: doneIds, horizon: horizonCadence }).map(line => ({
-    ...line,
-    steps: line.steps.map(step => ({ ...step, actionId: `alm-${step.id}` }))
-  }));
+  const doneIds = new Set(done.filter(row => row.stepId && row.status !== 'not_doing').map(row => row.stepId));
+  const notDoing = new Set(done.filter(row => row.stepId && row.status === 'not_doing').map(row => row.stepId));
+  const lines = leadLines(merged, ALMANAC_RULES, { today, terms, done: doneIds, horizon: horizonCadence })
+    .map(line => {
+      const steps = line.steps.filter(step => !notDoing.has(step.id)).map(step => ({ ...step, actionId: `alm-${step.id}` }));
+      // "Not doing" steps leave the line, so its urgency comes from what is left.
+      const status = steps.length === line.steps.length
+        ? line.status
+        : steps.map(step => step.status).sort((a, b) => LINE_ORDER.indexOf(a) - LINE_ORDER.indexOf(b))[0] ?? 'later';
+      return { ...line, steps, status, from: steps[0]?.lastSafe ?? line.end ?? line.from };
+    });
   const computed = findOpenings(openingDays({ dates, series, terms, busy, takenEvenings: taken, walls, tags }), ALMANAC_WANTS);
   const openings = ALMANAC_WANTS.map(want => {
     const heldDates = heldDatesForWant(want.id, blocks, today);
@@ -714,6 +783,115 @@ export async function loadProfessionalEventsFromBlobs() {
   }
 }
 
+/* ---------- saved Almanac copy ---------- */
+
+export const ALMANAC_SNAPSHOT_KEY = 'meta/almanac_snapshot';
+/** Blob inputs (tasks, lessons, Professional) have no commit to watch; cap how stale they can get. */
+export const ALMANAC_SNAPSHOT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+export function snapshotKey(from, to) {
+  return `${from ?? ''}|${to ?? ''}`;
+}
+
+/**
+ * A saved copy is served only when it is for the same range, built today (Sydney),
+ * against the current repo head, and younger than the cap. Any repo write
+ * (a log, a calendar block, a done/not-going decision) changes the head.
+ */
+export function snapshotUsable(saved, { key, today, commitSha, nowMs }) {
+  if (!saved || typeof saved !== 'object' || !saved.view) return false;
+  if (saved.key !== key || saved.today !== today) return false;
+  if (!commitSha || saved.commitSha !== commitSha) return false;
+  const built = Date.parse(saved.built_at ?? '');
+  return Number.isFinite(built) && nowMs - built >= 0 && nowMs - built < ALMANAC_SNAPSHOT_MAX_AGE_MS;
+}
+
+export async function readAlmanacSnapshot(tasksStore) {
+  try {
+    return await getJSON(await tasksStore(), ALMANAC_SNAPSHOT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export async function writeAlmanacSnapshot(tasksStore, snapshot) {
+  try {
+    await setJSON(await tasksStore(), ALMANAC_SNAPSHOT_KEY, snapshot);
+  } catch (error) {
+    console.warn(`almanac: snapshot not saved (${error instanceof Error ? error.message : 'error'})`);
+  }
+}
+
+/** The full rebuild — what every open used to do. */
+export async function computeAlmanac({
+  opened, env, today, from, to, tasksStore, loadLessons, loadProfessionalEvents, getCognitiveStore
+}) {
+  const [terms, lessons, professionalEvents, tasked, horizon] = await Promise.all([
+    readSchoolTerms(tasksStore),
+    loadLessons(env),
+    loadProfessionalEvents(env),
+    readAlmanacTasked(tasksStore),
+    loadHorizonAlmanacContext(env, { getCognitiveStore })
+  ]);
+  const view = await readAlmanac({
+    readFile: path => opened.readFile(path),
+    listPaths: () => opened.listPaths(),
+    today,
+    from,
+    to,
+    terms,
+    lessons,
+    professionalEvents,
+    horizon
+  });
+  return { view, tasked };
+}
+
+/** Open the repo head for reading (tree once, blobs on demand). */
+export async function openAlmanacRepo(client) {
+  const resolved = await client.resolveTree();
+  const blobs = new Map(
+    (resolved.tree ?? [])
+      .filter(entry => entry?.type === 'blob' && typeof entry.path === 'string')
+      .map(entry => [entry.path, entry.sha])
+  );
+  return {
+    base: { commitSha: resolved.commitSha, treeSha: resolved.treeSha },
+    listPaths() { return [...blobs.keys()]; },
+    async readFile(path) {
+      const sha = blobs.get(path);
+      if (!sha) return null;
+      return decodeBlob(await client.readBlob(sha));
+    }
+  };
+}
+
+/**
+ * 5:30 sweep: rebuild the saved copy for the range the page asks for
+ * (today → a year out), so the first open of the day is instant.
+ */
+export async function refreshAlmanacSnapshot({
+  env = process.env,
+  client,
+  now = Date.now,
+  getTasksStore = defaultGetTasksStore,
+  getCognitiveStore = defaultGetCognitiveStore,
+  loadLessons = loadTeachingLessonsFromBlobs,
+  loadProfessionalEvents = loadProfessionalEventsFromBlobs
+} = {}) {
+  const today = getSydneyDateKey(new Date(now()));
+  const from = today;
+  const to = addDays(today, 365);
+  const tasksStore = () => getTasksStore(env);
+  const opened = await openAlmanacRepo(client);
+  const { view, tasked } = await computeAlmanac({
+    opened, env, today, from, to, tasksStore, loadLessons, loadProfessionalEvents, getCognitiveStore
+  });
+  const built_at = new Date(now()).toISOString();
+  await writeAlmanacSnapshot(tasksStore, { key: snapshotKey(from, to), today, commitSha: opened.base.commitSha, built_at, view, tasked });
+  return { built_at, lines: view.lines.length };
+}
+
 function fail(status, code, message) {
   return { status, payload: { ok: false, error: { code, message, retryable: false } } };
 }
@@ -786,23 +964,7 @@ export function createAlmanacHandler({
       return errorResponse(503, 'github_unavailable', 'The repository is temporarily unavailable.', true, PRIVATE_CACHE);
     }
 
-    const open = async () => {
-      const resolved = await client.resolveTree();
-      const blobs = new Map(
-        (resolved.tree ?? [])
-          .filter(entry => entry?.type === 'blob' && typeof entry.path === 'string')
-          .map(entry => [entry.path, entry.sha])
-      );
-      return {
-        base: { commitSha: resolved.commitSha, treeSha: resolved.treeSha },
-        listPaths() { return [...blobs.keys()]; },
-        async readFile(path) {
-          const sha = blobs.get(path);
-          if (!sha) return null;
-          return decodeBlob(await client.readBlob(sha));
-        }
-      };
-    };
+    const open = () => openAlmanacRepo(client);
     const commit = (changed, base, message) => client.commitFiles({
       files: [...changed.entries()].map(([path, content]) => ({ path, content })),
       message,
@@ -814,30 +976,37 @@ export function createAlmanacHandler({
     try {
       if (!done) {
         try {
-          parseDateRange(url);
+          // `fresh=1` (rebuild now) is the one extra parameter the range check allows.
+          const range = new URL(url);
+          if (range.searchParams.has('fresh') && range.searchParams.get('fresh') !== '1') throw new TypeError('fresh');
+          range.searchParams.delete('fresh');
+          parseDateRange(range);
         } catch {
           return jsonResponse(400, fail(400, 'invalid_date_range', 'Provide from and to as YYYY-MM-DD.').payload, PRIVATE_CACHE);
         }
         const opened = await open();
-        const [terms, lessons, professionalEvents, tasked, horizon] = await Promise.all([
-          readSchoolTerms(tasksStore),
-          loadLessons(env),
-          loadProfessionalEvents(env),
-          readAlmanacTasked(tasksStore),
-          loadHorizonAlmanacContext(env, { getCognitiveStore })
-        ]);
-        const view = await readAlmanac({
-          readFile: path => opened.readFile(path),
-          listPaths: () => opened.listPaths(),
-          today: getSydneyDateKey(new Date(now())),
-          from: url.searchParams.get('from'),
-          to: url.searchParams.get('to'),
-          terms,
-          lessons,
-          professionalEvents,
-          horizon
+        const today = getSydneyDateKey(new Date(now()));
+        const from = url.searchParams.get('from');
+        const to = url.searchParams.get('to');
+        const key = snapshotKey(from, to);
+        // Saved copy: one tree lookup + one Blob read instead of dozens of GitHub reads.
+        if (url.searchParams.get('fresh') !== '1') {
+          const saved = await readAlmanacSnapshot(tasksStore);
+          if (snapshotUsable(saved, { key, today, commitSha: opened.base.commitSha, nowMs: now() })) {
+            return jsonResponse(200, {
+              ok: true,
+              ...saved.view,
+              tasked: saved.tasked,
+              snapshot: { built_at: saved.built_at, cached: true }
+            }, PRIVATE_CACHE);
+          }
+        }
+        const { view, tasked } = await computeAlmanac({
+          opened, env, today, from, to, tasksStore, loadLessons, loadProfessionalEvents, getCognitiveStore
         });
-        return jsonResponse(200, { ok: true, ...view, tasked }, PRIVATE_CACHE);
+        const built_at = new Date(now()).toISOString();
+        await writeAlmanacSnapshot(tasksStore, { key, today, commitSha: opened.base.commitSha, built_at, view, tasked });
+        return jsonResponse(200, { ok: true, ...view, tasked, snapshot: { built_at, cached: false } }, PRIVATE_CACHE);
       }
 
       const text = await request.text();
@@ -858,12 +1027,17 @@ export function createAlmanacHandler({
         return jsonResponse(400, fail(400, 'invalid_request', 'Provide stepId.').payload, PRIVATE_CACHE);
       }
       const at = getSydneyTimestamp(new Date(now()));
+      const row = { ...body, at };
+      const message = body.anchorId
+        ? `chore(almanac): ${body.anchorId} ${body.status === 'moved' ? `moved to ${body.date}` : 'not going'}`
+        : `chore(almanac): mark ${body.stepId} ${body.status === 'not_doing' ? 'not doing' : 'done'}`;
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const opened = await open();
-        const next = appendAlmanacDone(await opened.readFile(ALMANAC_DONE_PATH) ?? '', body.stepId, at);
+        const next = appendAlmanacDecision(await opened.readFile(ALMANAC_DONE_PATH) ?? '', row);
         try {
-          await commit(new Map([[ALMANAC_DONE_PATH, next]]), opened.base, `chore(almanac): mark ${body.stepId} done`);
-          return jsonResponse(200, { ok: true, stepId: body.stepId, at }, PRIVATE_CACHE);
+          // The commit changes the repo head, so the saved copy is rebuilt on the next open.
+          await commit(new Map([[ALMANAC_DONE_PATH, next]]), opened.base, message);
+          return jsonResponse(200, { ok: true, ...row }, PRIVATE_CACHE);
         } catch (error) {
           if (error instanceof GitHubClientError && error.code === 'write_conflict' && attempt === 0) continue;
           throw error;

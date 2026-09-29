@@ -5,7 +5,8 @@ import { okResponse } from './_shared/http.mjs';
 import {
   loadProfessionalEventsFromBlobs,
   loadTeachingLessonsFromBlobs,
-  readSchoolTerms
+  readSchoolTerms,
+  refreshAlmanacSnapshot
 } from './almanac.mjs';
 import { createCalendarGhostsProposeHandler } from './_shared/calendar-ghosts-propose.mjs';
 
@@ -28,9 +29,21 @@ export function createCalendarGhostsProposeScheduledHandler(deps = {}) {
     readSchoolTerms,
     ...deps
   });
+  const refreshAlmanac = deps.refreshAlmanac ?? (async () => {
+    // Same sweep, no new cron: rebuild the saved Almanac so the first open of the day is instant.
+    const client = (deps.createGitHubClient ?? createGitHubClient)({ env: process.env, fetchImpl: fetch });
+    return refreshAlmanacSnapshot({ client });
+  });
   return async function calendarGhostsProposeScheduledHandler() {
     try {
       const result = await run();
+      if (result?.skipped !== 'outside_window') {
+        try {
+          result.almanac = await refreshAlmanac();
+        } catch (error) {
+          console.warn('calendar-ghosts-propose-scheduled: almanac snapshot failed', error);
+        }
+      }
       return okResponse(202, result);
     } catch (error) {
       if (error instanceof GitHubConfigurationError) {
