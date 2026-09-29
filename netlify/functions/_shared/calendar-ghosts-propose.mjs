@@ -19,6 +19,9 @@ import {
   readAlmanac,
   readSchoolTerms
 } from '../almanac.mjs';
+import { proposeDeadlineRunwayGhosts } from './deadline-runway-ghosts.mjs';
+import { proposeWaitingFollowUpGhosts } from './waiting-follow-up-ghosts.mjs';
+import { listJSON, TASK_PREFIX } from './tasks-blobs.mjs';
 
 const DAY_MS = 86_400_000;
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
@@ -181,7 +184,10 @@ export async function runCalendarGhostsPropose({
   planningProfile = null,
   trigger = 'scheduled',
   instant = null,
-  warn = console.warn
+  warn = console.warn,
+  tasks = null,
+  getTasksStore = null,
+  env = process.env
 } = {}) {
   if (typeof today !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(today)) {
     throw new TypeError('runCalendarGhostsPropose needs today (YYYY-MM-DD)');
@@ -256,12 +262,29 @@ export async function runCalendarGhostsPropose({
     profile: readProfile(visual, planningProfile)
   }).filter(ghost => !alreadyQueued(queue, ghost));
 
+  let taskList = Array.isArray(tasks) ? tasks : null;
+  if (!taskList && typeof getTasksStore === 'function') {
+    try {
+      const store = await getTasksStore(env);
+      taskList = await listJSON(store, TASK_PREFIX);
+    } catch (err) {
+      warn?.('calendar-ghosts-propose: tasks load failed', err);
+      taskList = [];
+    }
+  }
+  taskList = taskList ?? [];
+
+  const runwayGhosts = proposeDeadlineRunwayGhosts({ tasks: taskList, today, nowIso })
+    .filter(ghost => !alreadyQueued(queue, ghost) && !alreadyQueued(proposed, ghost));
+  const waitingGhosts = proposeWaitingFollowUpGhosts({ tasks: taskList, today, nowIso })
+    .filter(ghost => !alreadyQueued(queue, ghost) && !alreadyQueued(proposed, ghost) && !alreadyQueued(runwayGhosts, ghost));
+
   const via = trigger === 'refresh' || trigger === 'manual' ? trigger : 'scheduled';
-  const stamped = proposed.map(ghost => ({
+  const stamped = [...proposed, ...runwayGhosts, ...waitingGhosts].map(ghost => ({
     ...ghost,
-    created_at: nowIso,
-    status: 'pending',
-    via
+    created_at: ghost.created_at ?? nowIso,
+    status: ghost.status ?? 'pending',
+    via: ghost.via ?? via
   }));
   const next = [...queue, ...stamped];
   const last_run = {
@@ -269,13 +292,20 @@ export async function runCalendarGhostsPropose({
     at: nowIso,
     newest_record_at: newestRecordAt
   };
-  // Always record last_run — a run that proposes nothing still counts.
+  // Always record last_run — a run that proposes nothing still counts. One batched write.
   const changed = new Map([[PENDING_CALENDAR_GHOSTS_PATH, serializePendingCalendarGhosts(next, last_run)]]);
   await commit(changed, opened.base, stamped.length
     ? `chore(calendar): propose ${stamped.length} ghost${stamped.length === 1 ? '' : 's'}`
     : 'chore(calendar): propose run (none)');
   if (stamped.length) console.log(`calendar-ghosts-propose: proposed ${stamped.length}`);
-  return { ok: true, proposed: stamped.length, ghosts: stamped, last_run };
+  return {
+    ok: true,
+    proposed: stamped.length,
+    ghosts: stamped,
+    last_run,
+    runway: runwayGhosts.length,
+    waiting: waitingGhosts.length
+  };
 }
 
 /** Build open/commit for a GitHub client the same way calendar-ghosts does. */
@@ -345,7 +375,9 @@ export function createCalendarGhostsProposeHandler({
       terms,
       lessons,
       professionalEvents,
-      trigger
+      trigger,
+      getTasksStore: tasksStoreFn,
+      env
     });
   };
 }
