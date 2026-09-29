@@ -69,7 +69,7 @@ test('calendar ghost tool writes only the queue file', () => {
     reason: '5.4 h last night'
   }, { agent: 'sara', nowIso: '2026-09-24T05:30:00+10:00' });
 
-  assert.equal(entry.id, 'sara-bedtime-2026-09-24');
+  assert.match(entry.id, /^sara-bedtime-2026-09-24-[a-f0-9]{8}$/);
   assert.equal(entry.status, 'pending');
   assert.equal(entry.via, 'chat');
 
@@ -88,7 +88,7 @@ test('calendar ghost tool writes only the queue file', () => {
   assert.ok([...files.keys()].every(path => !path.startsWith('data/')));
   const queued = parsePendingCalendarGhosts(files.get(PENDING_CALENDAR_GHOSTS_PATH));
   assert.equal(queued.length, 1);
-  assert.equal(queued[0].id, 'sara-bedtime-2026-09-24');
+  assert.equal(queued[0].id, entry.id);
 
   const again = appendPendingCalendarGhost(files.get(PENDING_CALENDAR_GHOSTS_PATH), entry);
   assert.equal(again.added, false);
