@@ -23,7 +23,7 @@ import { loadAlmanacVisualSeed } from './almanac-visual-seed.mjs';
 import {
   ALMANAC_DONE_PATH,
   HUB_PREFS_KEY,
-  appendAlmanacDone,
+  appendAlmanacDecision,
   readAlmanac,
   readAlmanacTasked,
   readDoneRequest,
@@ -513,9 +513,9 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       }
       const opened = await openRepo();
       const at = getSydneyTimestamp(new Date(clock.now()));
-      const next = appendAlmanacDone(await opened.readFile(ALMANAC_DONE_PATH) ?? '', body.stepId, at);
+      const next = appendAlmanacDecision(await opened.readFile(ALMANAC_DONE_PATH) ?? '', { ...body, at });
       confirmedFiles.set(ALMANAC_DONE_PATH, next);
-      json(response, 200, { ok: true, stepId: body.stepId, at });
+      json(response, 200, { ok: true, ...body, at });
       return true;
     }
 
@@ -523,7 +523,9 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
       if (!readSession(request)) return unauthenticated(response);
       try {
-        parseDateRange(url);
+        const range = new URL(url);
+        range.searchParams.delete('fresh');
+        parseDateRange(range);
       } catch {
         error(response, 400, 'invalid_date_range', 'Provide from and to as YYYY-MM-DD.', false);
         return true;
@@ -542,7 +544,8 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
           professionalEvents: []
         });
         const tasked = await readAlmanacTasked(async () => taskStore);
-        json(response, 200, { ok: true, ...view, tasked });
+        // The mock always rebuilds; it reports that like a fresh server build.
+        json(response, 200, { ok: true, ...view, tasked, snapshot: { built_at: new Date(clock.now()).toISOString(), cached: false } });
       } catch (almanacError) {
         error(response, 500, 'almanac_failed', almanacError instanceof Error ? almanacError.message : 'Almanac could not be built.', true);
       }

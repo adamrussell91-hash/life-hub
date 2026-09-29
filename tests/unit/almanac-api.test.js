@@ -7,10 +7,16 @@ import { createSessionToken } from '../../netlify/functions/_shared/auth-securit
 import { taskKey, TASKS_INDEX_KEY } from '../../netlify/functions/_shared/tasks-blobs.mjs';
 import { createCalendarGhostsHandler, ghostTaskId } from '../../netlify/functions/calendar-ghosts.mjs';
 import {
+  ALMANAC_SNAPSHOT_KEY,
   HUB_PREFS_KEY,
+  applyAnchorDecisions,
   buildAlmanac,
+  createAlmanacHandler,
   parseAlmanacAnchors,
-  readSchoolTerms
+  parseAlmanacDone,
+  readDoneRequest,
+  readSchoolTerms,
+  snapshotUsable
 } from '../../netlify/functions/almanac.mjs';
 import { ALMANAC_WANTS } from '../../apps/life/js/app/almanac-rules.js';
 import { forecastSeries } from '../../apps/life/js/app/capacity-model.js';
@@ -379,4 +385,107 @@ test('accepting a draft writes nothing and returns the text', async () => {
   assert.equal(store.writes, 0);
   assert.equal(github.files.size, before.size);
   for (const [path, content] of before) assert.equal(github.files.get(path), content);
+});
+
+/* ---------- saved copy + not going / not doing / moved (29/09/26) ---------- */
+
+test('decision requests: done, not doing, not going, moved; anything else is rejected', () => {
+  assert.deepEqual(readDoneRequest({ stepId: 'a:b' }), { stepId: 'a:b' });
+  assert.deepEqual(readDoneRequest({ stepId: 'a:b', status: 'not_doing' }), { stepId: 'a:b', status: 'not_doing' });
+  assert.deepEqual(readDoneRequest({ anchorId: 'unsw', status: 'not_going', reason: ' not attending ' }), { anchorId: 'unsw', status: 'not_going', reason: 'not attending' });
+  assert.deepEqual(readDoneRequest({ anchorId: 'unsw', status: 'moved', date: '2026-10-02' }), { anchorId: 'unsw', status: 'moved', date: '2026-10-02' });
+  assert.deepEqual(readDoneRequest({ anchorId: 'unsw', status: 'moved' }), { error: 'invalid_request' });
+  assert.deepEqual(readDoneRequest({ stepId: 'a:b', title: 'x' }), { error: 'client_write_rejected' });
+  assert.deepEqual(readDoneRequest({ stepId: 'a:b', status: 'deleted' }), { error: 'invalid_request' });
+});
+
+test('decision rows parse alongside old done rows, and anchors honour not going / moved', () => {
+  const rows = parseAlmanacDone(JSON.stringify([
+    { stepId: 'x:y', at: 't1' },
+    { stepId: 'x:z', at: 't2', status: 'not_doing' },
+    { anchorId: 'unsw', at: 't3', status: 'not_going', reason: 'skipping it' },
+    { anchorId: 'korea', at: 't4', status: 'moved', date: '2026-12-26' },
+    { anchorId: 'bad', at: 't5', status: 'moved' }
+  ]), { warn: () => {} });
+  assert.equal(rows.length, 4);
+  const anchors = applyAnchorDecisions([
+    { id: 'unsw', title: 'UNSW conferral', kind: 'event', date: '2026-09-30', tags: [], sub: 'x' },
+    { id: 'korea', title: 'Korea', kind: 'trip', date: '2026-12-23', returns: '2027-01-06', tags: [], sub: 'x' }
+  ], rows);
+  assert.deepEqual(anchors.map(anchor => anchor.id), ['korea']);
+  assert.equal(anchors[0].date, '2026-12-26');
+  assert.equal(anchors[0].returns, '2027-01-09', 'a trip keeps its length when moved');
+});
+
+test('snapshot is served only for the same range, day and repo head, and under the age cap', () => {
+  const saved = { key: 'a|b', today: '2026-09-29', commitSha: 'c1', built_at: '2026-09-29T00:00:00.000Z', view: {} };
+  const at = Date.parse('2026-09-29T01:00:00Z');
+  assert.equal(snapshotUsable(saved, { key: 'a|b', today: '2026-09-29', commitSha: 'c1', nowMs: at }), true);
+  assert.equal(snapshotUsable(saved, { key: 'a|b', today: '2026-09-29', commitSha: 'c2', nowMs: at }), false, 'repo changed');
+  assert.equal(snapshotUsable(saved, { key: 'a|c', today: '2026-09-29', commitSha: 'c1', nowMs: at }), false, 'other range');
+  assert.equal(snapshotUsable(saved, { key: 'a|b', today: '2026-09-30', commitSha: 'c1', nowMs: at }), false, 'new day');
+  assert.equal(snapshotUsable(saved, { key: 'a|b', today: '2026-09-29', commitSha: 'c1', nowMs: at + 6 * 3600e3 }), false, 'too old');
+});
+
+function almanacHarness() {
+  const github = memoryGitHub(new Map([...SEEDED.files, ['central-node.md', CN]]));
+  let blobReads = 0;
+  const readBlob = github.readBlob.bind(github);
+  github.readBlob = async (value) => { blobReads += 1; return readBlob(value); };
+  const store = memoryTasks();
+  store.data.set(HUB_PREFS_KEY, { school_terms: SEEDED.terms });
+  const handler = createAlmanacHandler({
+    env: ENV,
+    now: () => NOW,
+    createGitHubClient: () => github,
+    getTasksStore: async () => store,
+    getCognitiveStore: async () => ({ async get() { return null; }, async list() { return { blobs: [] }; } })
+  });
+  const get = (query = 'from=2026-09-24&to=2027-01-10') => handler(new Request(`https://life.example/api/almanac?${query}`, {
+    headers: { cookie: `life_hub_session=${SESSION}` }
+  }));
+  const decide = body => handler(new Request('https://life.example/api/almanac/done', {
+    method: 'POST',
+    headers: { cookie: `life_hub_session=${SESSION}`, 'content-type': 'application/json' },
+    body: JSON.stringify(body)
+  }));
+  return { github, store, get, decide, reads: () => blobReads };
+}
+
+test('second open serves the saved copy with no GitHub blob reads; a decision rebuilds it', async () => {
+  const h = almanacHarness();
+  const first = await (await h.get()).json();
+  assert.equal(first.ok, true);
+  assert.equal(first.snapshot.cached, false);
+  assert.ok(h.store.data.get(ALMANAC_SNAPSHOT_KEY), 'snapshot saved');
+  const readsAfterFirst = h.reads();
+  assert.ok(readsAfterFirst > 0);
+
+  const second = await (await h.get()).json();
+  assert.equal(second.snapshot.cached, true);
+  assert.equal(h.reads(), readsAfterFirst, 'no blob reads for a cached open');
+  assert.deepEqual(second.summary, first.summary);
+
+  const anchorId = first.lines.find(line => line.steps.some(step => step.id === 'vitamin-d:book-recheck'))?.anchor.id;
+  assert.ok(anchorId);
+  const response = await h.decide({ anchorId, status: 'not_going', reason: 'not needed' });
+  assert.equal(response.status, 200);
+  const third = await (await h.get()).json();
+  assert.equal(third.snapshot.cached, false, 'repo head moved, so it rebuilt');
+  assert.equal(third.lines.some(line => line.anchor.id === anchorId), false, 'not going removes the anchor and its steps');
+
+  const fresh = await (await h.get('from=2026-09-24&to=2027-01-10&fresh=1')).json();
+  assert.equal(fresh.snapshot.cached, false, 'fresh=1 always rebuilds');
+});
+
+test('not doing drops one step but keeps the anchor', async () => {
+  const h = almanacHarness();
+  const first = await (await h.get()).json();
+  const line = first.lines.find(entry => entry.steps.length > 1);
+  const step = line.steps[0];
+  assert.equal((await h.decide({ stepId: step.id, status: 'not_doing' })).status, 200);
+  const after = await (await h.get()).json();
+  const again = after.lines.find(entry => entry.anchor.id === line.anchor.id);
+  assert.ok(again, 'anchor stays');
+  assert.equal(again.steps.some(entry => entry.id === step.id), false);
 });
