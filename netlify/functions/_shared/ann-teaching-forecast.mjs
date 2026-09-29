@@ -33,27 +33,38 @@ export function shouldRunAnnTeachingForecastNow(now = new Date(), state = {}) {
   return { run: true, dayKey, weekKey };
 }
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isIsoDate(value) {
+  return typeof value === 'string' && ISO_DATE_RE.test(value);
+}
+
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? '' : 's'}`;
+}
+
 function isCountableLesson(item, today, until) {
   if (!item || typeof item !== 'object') return false;
   if (item.delivery_status === 'cancelled') return false;
-  const date = typeof item.date === 'string' ? item.date : '';
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today && date <= until;
+  return isIsoDate(item.date) && item.date >= today && item.date <= until;
+}
+
+/** Prefer marking.return_by; fall back to task.due_date. */
+function markingDeadline(task) {
+  const marking = task?.marking;
+  if (!marking || typeof marking !== 'object' || Array.isArray(marking)) return '';
+  if (isIsoDate(marking.return_by)) return marking.return_by;
+  return isIsoDate(task.due_date) ? task.due_date : '';
 }
 
 /** Open marking-shadow tasks with return_by (or due_date) inside [today, until]. */
 export function countOpenMarkingInWindow(tasks = [], today, until) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(today ?? '') || !/^\d{4}-\d{2}-\d{2}$/.test(until ?? '')) {
-    return 0;
-  }
+  if (!isIsoDate(today) || !isIsoDate(until)) return 0;
   let count = 0;
   for (const task of tasks ?? []) {
     if (!task || typeof task !== 'object') continue;
     if (task.status === 'done' || task.status === 'dead') continue;
-    const marking = task.marking;
-    if (!marking || typeof marking !== 'object' || Array.isArray(marking)) continue;
-    const returnBy = typeof marking.return_by === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(marking.return_by)
-      ? marking.return_by
-      : (typeof task.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(task.due_date) ? task.due_date : '');
+    const returnBy = markingDeadline(task);
     if (!returnBy || returnBy < today || returnBy > until) continue;
     count += 1;
   }
@@ -70,22 +81,21 @@ export function buildAnnTeachingForecastLine({
   today,
   windowDays = ANN_FORECAST_WINDOW_DAYS
 } = {}) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(today ?? '')) return null;
+  if (!isIsoDate(today)) return null;
   const until = addCalendarDays(today, windowDays);
   const upcoming = (lessons ?? []).filter(item => isCountableLesson(item, today, until));
   const days = new Set(upcoming.map(item => item.date));
   const marking = countOpenMarkingInWindow(tasks, today, until);
   const range = `${today}–${until}`;
+  const markingLabel = plural(marking, 'open marking task');
   if (!upcoming.length && !marking) {
     return `Ann→Hammond: Teaching load ${range}: no scheduled lessons in the next ${windowDays} days.`;
   }
   if (!upcoming.length) {
-    return `Ann→Hammond: Teaching load ${range}: no scheduled lessons; ${marking} open marking task${marking === 1 ? '' : 's'}.`;
+    return `Ann→Hammond: Teaching load ${range}: no scheduled lessons; ${markingLabel}.`;
   }
-  const markingBit = marking
-    ? `; ${marking} open marking task${marking === 1 ? '' : 's'}`
-    : '';
-  return `Ann→Hammond: Teaching load ${range}: ${upcoming.length} lesson${upcoming.length === 1 ? '' : 's'} across ${days.size} day${days.size === 1 ? '' : 's'}${markingBit}.`;
+  const markingBit = marking ? `; ${markingLabel}` : '';
+  return `Ann→Hammond: Teaching load ${range}: ${plural(upcoming.length, 'lesson')} across ${plural(days.size, 'day')}${markingBit}.`;
 }
 
 export async function runAnnTeachingForecast({

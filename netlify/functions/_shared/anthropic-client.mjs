@@ -38,42 +38,52 @@ export async function completeMessage({
   if (typeof apiKey !== 'string' || apiKey.length === 0) {
     throw new TypeError('An Anthropic API key is required.');
   }
+
+  const url = `${String(baseUrl).replace(/\/$/, '')}/v1/messages`;
+  const body = JSON.stringify({
+    model,
+    max_tokens: Number(maxTokens) > 0 ? Number(maxTokens) : MAX_TOKENS,
+    thinking,
+    ...(system ? { system } : {}),
+    messages,
+    stream: false
+  });
+
   let response;
   try {
-    response = await fetchImpl(`${String(baseUrl).replace(/\/$/, '')}/v1/messages`, {
+    response = await fetchImpl(url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': API_VERSION
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: Number(maxTokens) > 0 ? Number(maxTokens) : MAX_TOKENS,
-        thinking,
-        ...(system ? { system } : {}),
-        messages,
-        stream: false
-      }),
+      body,
       signal
     });
   } catch {
     throw new AnthropicClientError('anthropic_unavailable', true);
   }
+
   if (!response.ok) {
     const retryable = response.status === 429 || response.status >= 500;
-    throw new AnthropicClientError(retryable ? 'anthropic_unavailable' : 'anthropic_request_failed', retryable);
+    throw new AnthropicClientError(
+      retryable ? 'anthropic_unavailable' : 'anthropic_request_failed',
+      retryable
+    );
   }
+
   let json;
   try {
     json = await response.json();
   } catch {
     throw new AnthropicClientError('anthropic_invalid_response', true);
   }
-  const text = Array.isArray(json?.content)
-    ? json.content.map(part => (typeof part?.text === 'string' ? part.text : '')).join('')
-    : '';
-  return text;
+
+  if (!Array.isArray(json?.content)) return '';
+  return json.content
+    .map(part => (typeof part?.text === 'string' ? part.text : ''))
+    .join('');
 }
 
 export function createAnthropicClient({ apiKey, fetchImpl = fetch, baseUrl = ANTHROPIC_ORIGIN } = {}) {

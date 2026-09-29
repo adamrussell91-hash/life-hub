@@ -11,15 +11,15 @@ export const config = {
   schedule: '0 8,9,10 * * 0'
 };
 
-const PRIMARY_START = 19 * 60;
-const PRIMARY_END = 19 * 60 + 25;
-const RETRY_START = 20 * 60;
-const RETRY_END = 20 * 60 + 25;
+/** Primary 19:00–19:25 and retry 20:00–20:25 Sydney. */
+const CLARE_JUDGMENT_WINDOWS = [
+  { start: 19 * 60, end: 19 * 60 + 25 },
+  { start: 20 * 60, end: 20 * 60 + 25 }
+];
 
 export function inSydneyClareJudgmentWindow(instant = new Date()) {
   const mins = getSydneyMinutesOfDay(instant instanceof Date ? instant : new Date(instant));
-  return (mins >= PRIMARY_START && mins <= PRIMARY_END)
-    || (mins >= RETRY_START && mins <= RETRY_END);
+  return CLARE_JUDGMENT_WINDOWS.some(({ start, end }) => mins >= start && mins <= end);
 }
 
 export function createClareWeeklyJudgmentScheduledHandler(deps = {}) {

@@ -154,30 +154,20 @@ export async function runClareWeeklyJudgment({
     ? await deps.fetchJudgment({ digest, apiKey })
     : await fetchClareWeeklyJudgment({ digest, apiKey, fetchImpl: deps.fetchImpl });
 
-  const needsClient = () => {
-    if (deps.client) return false;
-    if (!deps.writeState) return true;
-    if (!judgment) return false; // failure path only needs writeState
-    if (!deps.applyLine) return true;
-    if (judgment.status_note && !deps.queuePatch) return true;
-    return false;
-  };
-  const client = deps.client ?? (needsClient() ? createGitHubClient({ env }) : null);
-
   if (!judgment) {
-    // Persist the failure so it is not silent; leave last_success_week unset
-    // so the Sunday 20:00 slot can retry within the same ISO week.
-    const failState = {
-      ...state,
-      last_failure_week: gate.weekKey,
-      last_failure_at: now.toISOString(),
-      last_failure_reason: 'model_failed',
-      last_attempt_hour: gate.hour ?? null
-    };
+    // Persist failure so it is not silent; leave last_success_week unset so
+    // the Sunday 20:00 slot can retry within the same ISO week.
+    const failClient = deps.client ?? (deps.writeState ? null : createGitHubClient({ env }));
     await persistJudgmentState(
       deps,
-      client,
-      failState,
+      failClient,
+      {
+        ...state,
+        last_failure_week: gate.weekKey,
+        last_failure_at: now.toISOString(),
+        last_failure_reason: 'model_failed',
+        last_attempt_hour: gate.hour ?? null
+      },
       sha,
       `chore(clare): weekly judgment failed ${gate.weekKey}`
     );
@@ -189,6 +179,12 @@ export async function runClareWeeklyJudgment({
       will_retry: gate.hour === 19
     };
   }
+
+  // Need a GitHub client only for deps we did not inject.
+  const needsGithub = !deps.writeState
+    || !deps.applyLine
+    || (Boolean(judgment.status_note) && !deps.queuePatch);
+  const client = deps.client ?? (needsGithub ? createGitHubClient({ env }) : null);
 
   const apply = deps.applyLine
     ?? (args => applyScheduledCrossAgentLine({ client, ...args }));
@@ -219,20 +215,19 @@ export async function runClareWeeklyJudgment({
     });
   }
 
-  const nextState = {
-    ...state,
-    last_success_week: gate.weekKey,
-    last_run_at: now.toISOString(),
-    last_line: judgment.cross_agent_line,
-    last_failure_week: null,
-    last_failure_at: null,
-    last_failure_reason: null,
-    last_attempt_hour: gate.hour ?? null
-  };
   await persistJudgmentState(
     deps,
     client,
-    nextState,
+    {
+      ...state,
+      last_success_week: gate.weekKey,
+      last_run_at: now.toISOString(),
+      last_line: judgment.cross_agent_line,
+      last_failure_week: null,
+      last_failure_at: null,
+      last_failure_reason: null,
+      last_attempt_hour: gate.hour ?? null
+    },
     sha,
     `chore(clare): weekly judgment ${gate.weekKey}`
   );
