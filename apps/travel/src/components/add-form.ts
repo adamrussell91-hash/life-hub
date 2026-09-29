@@ -1,5 +1,6 @@
 import type { Currency, HopMode, Item, ItemDraft, Place, Status, Trip } from '@/types';
-import { addItem, editItem, parseEmail, removeItem, searchPlaces } from '@/api/travel';
+import { addItem, editItem, getTrip, parseEmail, removeItem, searchPlaces } from '@/api/travel';
+import { ApiClientError } from '@/api/client';
 import { daysForCity } from '@/model/day';
 
 type FormKind = 'do' | 'food' | 'stay' | 'flight' | 'train';
@@ -54,6 +55,7 @@ function field(labelText: string, control: HTMLElement, opts: { full?: boolean }
 /** The mockup's add/edit form (§5), TR-30 through TR-37. */
 export function renderAddForm(host: HTMLElement, options: AddFormOptions): void {
   const { trip, editing } = options;
+  let currentVersion = options.version;
   host.replaceChildren();
 
   const back = document.createElement('div');
@@ -86,15 +88,17 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
     btn.setAttribute('role', 'radio');
     btn.setAttribute('aria-checked', String(k === kind));
     btn.textContent = KIND_LABELS[k];
-    btn.addEventListener('click', () => {
-      kind = k;
-      segButtons.forEach((b, key) => b.setAttribute('aria-checked', String(key === k)));
-      syncType();
-    });
+    btn.addEventListener('click', () => setKind(k));
     segButtons.set(k, btn);
     seg.append(btn);
   });
   sheet.append(seg);
+
+  function setKind(k: FormKind): void {
+    kind = k;
+    segButtons.forEach((b, key) => b.setAttribute('aria-checked', String(key === k)));
+    syncType();
+  }
 
   const form = document.createElement('form');
   form.noValidate = true;
@@ -106,6 +110,7 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
   const titleInput = document.createElement('input');
   titleInput.type = 'text';
   titleInput.required = true;
+  titleInput.name = 'title';
   titleInput.value = editing?.title ?? '';
   grid.append(field('Title', titleInput, { full: true }));
 
@@ -127,6 +132,7 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
 
   const timeInput = document.createElement('input');
   timeInput.type = 'time';
+  timeInput.name = 'time';
   timeInput.value = editing?.time ?? '';
   grid.append(field('Time (leave blank for "Time to set")', timeInput));
 
@@ -201,6 +207,7 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
   // Stay fields
   const nightsInput = document.createElement('input');
   nightsInput.type = 'number';
+  nightsInput.name = 'nights';
   nightsInput.min = '1';
   nightsInput.value = String(editing?.kind === 'stay' ? editing.nights : 1);
   const nightsField = field('Nights', nightsInput);
@@ -225,21 +232,27 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
   // Ticket fields
   const carrierInput = document.createElement('input');
   carrierInput.type = 'text';
+  carrierInput.name = 'carrier';
   carrierInput.value = editing?.kind === 'flight' || editing?.kind === 'train' ? editing.carrier : '';
   const numberInput = document.createElement('input');
   numberInput.type = 'text';
+  numberInput.name = 'number';
   numberInput.value = editing?.kind === 'flight' || editing?.kind === 'train' ? editing.number : '';
   const fromCodeInput = document.createElement('input');
   fromCodeInput.type = 'text';
+  fromCodeInput.name = 'from_code';
   fromCodeInput.value = editing?.kind === 'flight' || editing?.kind === 'train' ? editing.from_code : '';
   const toCodeInput = document.createElement('input');
   toCodeInput.type = 'text';
+  toCodeInput.name = 'to_code';
   toCodeInput.value = editing?.kind === 'flight' || editing?.kind === 'train' ? editing.to_code : '';
   const arriveTimeInput = document.createElement('input');
   arriveTimeInput.type = 'time';
+  arriveTimeInput.name = 'arrive_time';
   arriveTimeInput.value = editing?.kind === 'flight' || editing?.kind === 'train' ? editing.arrive_time : '';
   const arriveDateInput = document.createElement('input');
   arriveDateInput.type = 'date';
+  arriveDateInput.name = 'arrive_date';
   arriveDateInput.value = editing?.kind === 'flight' || editing?.kind === 'train' ? editing.arrive_date : '';
   const arriveCitySelect = document.createElement('select');
   for (const c of trip.cities) {
@@ -295,6 +308,7 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
   });
   const amountInput = document.createElement('input');
   amountInput.type = 'number';
+  amountInput.name = 'cost.amount';
   amountInput.step = '0.01';
   if (editing?.cost) {
     amountInput.value = String(editing.cost.amount);
@@ -302,7 +316,7 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
     currencyTouched = true;
   }
   const costRow = document.createElement('div');
-  costRow.className = 'place-row';
+  costRow.className = 'place-row cost-row';
   costRow.append(amountInput, currencySelect);
   const audHint = document.createElement('p');
   audHint.className = 'aud hint';
@@ -326,6 +340,7 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
 
   const linkInput = document.createElement('input');
   linkInput.type = 'url';
+  linkInput.name = 'link';
   linkInput.value = editing?.link ?? '';
   grid.append(field('Link', linkInput));
 
@@ -362,6 +377,7 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
   }
   const hopMinutes = document.createElement('input');
   hopMinutes.type = 'number';
+  hopMinutes.name = 'hop.minutes';
   hopMinutes.min = '0';
   hopMinutes.value = editing?.hop ? String(editing.hop.minutes) : '';
   const hopNote = document.createElement('input');
@@ -389,27 +405,94 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
   errorNote.hidden = true;
   form.append(errorNote);
 
+  function fieldFor(path: string): HTMLElement | null {
+    const name = path.replace(/^item\./, '') === 'depart_time' ? 'time' : path.replace(/^item\./, '');
+    return form.querySelector<HTMLElement>(`[name="${name}"]`);
+  }
+
+  function clearInvalid(): void {
+    form.querySelectorAll('[aria-invalid="true"]').forEach((el) => el.removeAttribute('aria-invalid'));
+  }
+
+  function flagField(el: HTMLElement | null): void {
+    if (!el) return;
+    el.setAttribute('aria-invalid', 'true');
+    el.scrollIntoView?.({ block: 'center' });
+    el.focus();
+  }
+
+  function showError(message: string, el?: HTMLElement | null): void {
+    errorNote.hidden = false;
+    errorNote.textContent = message;
+    flagField(el ?? null);
+  }
+
+  function applyDraft(draft: Partial<Record<string, unknown>>): void {
+    const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v : undefined);
+    if (typeof draft.kind === 'string' && draft.kind in KIND_LABELS) setKind(draft.kind as FormKind);
+    const date = str(draft.date);
+    if (date) {
+      const currentCity = daySelect.value.split('|')[0];
+      const match =
+        cityOptions.find((o) => o.date === date && o.cityId === (str(draft.city_id) ?? currentCity)) ??
+        cityOptions.find((o) => o.date === date);
+      if (match) {
+        daySelect.value = `${match.cityId}|${match.date}`;
+        daySelect.dispatchEvent(new Event('change'));
+      }
+    }
+    if (str(draft.title)) titleInput.value = draft.title as string;
+    const time = str(draft.time) ?? str(draft.depart_time);
+    if (time) timeInput.value = time;
+    if (str(draft.note)) noteInput.value = draft.note as string;
+    if (typeof draft.status === 'string' && STATUS_OPTIONS.some((o) => o.value === draft.status)) {
+      statusSelect.value = draft.status;
+    }
+    const cost = draft.cost as { amount?: unknown; currency?: unknown } | undefined;
+    if (cost && typeof cost.amount === 'number' && cost.amount > 0 && typeof cost.currency === 'string') {
+      if (currencies.includes(cost.currency)) currencySelect.value = cost.currency;
+      amountInput.value = String(cost.amount);
+      currencyTouched = true;
+    }
+    if (str(draft.booking_ref)) bookingRefInput.value = draft.booking_ref as string;
+    if (str(draft.carrier)) carrierInput.value = draft.carrier as string;
+    if (str(draft.number)) numberInput.value = draft.number as string;
+    if (str(draft.from_code)) fromCodeInput.value = draft.from_code as string;
+    if (str(draft.to_code)) toCodeInput.value = draft.to_code as string;
+    if (str(draft.arrive_time)) arriveTimeInput.value = draft.arrive_time as string;
+    if (str(draft.arrive_date)) arriveDateInput.value = draft.arrive_date as string;
+    if (typeof draft.nights === 'number' && draft.nights >= 1) nightsInput.value = String(draft.nights);
+    if (str(draft.cancel_until)) cancelUntilInput.value = (draft.cancel_until as string).slice(0, 10);
+    const place = draft.place as Place | undefined;
+    if (place && typeof place.name === 'string' && place.name.trim()) {
+      if (place.address) addressInput.value = place.address;
+      // The parser returns 0,0 when it doesn't know the coordinates — don't pin that.
+      if (typeof place.lat === 'number' && typeof place.lon === 'number' && (place.lat !== 0 || place.lon !== 0)) {
+        placeDraft = place;
+        renderPinnedLabel();
+      }
+    }
+  }
+
   fillBtn.addEventListener('click', async () => {
+    clearInvalid();
+    fillBtn.disabled = true;
     try {
       const result = await parseEmail(pasteTextarea.value);
-      const draft = result.draft;
-      if (draft.title) titleInput.value = draft.title;
-      if (draft.time !== undefined) timeInput.value = draft.time ?? '';
-      if (draft.note) noteInput.value = draft.note;
-      if (draft.cost && 'currency' in draft.cost) {
-        currencySelect.value = draft.cost.currency;
-        amountInput.value = String(draft.cost.amount);
-        currencyTouched = true;
-      }
-      for (const path of result.missing) {
-        const el = form.querySelector<HTMLElement>(`[name="${path}"]`);
-        el?.setAttribute('aria-invalid', 'true');
-      }
+      applyDraft(result.draft as unknown as Record<string, unknown>);
+      const stillEmpty = result.missing
+        .map((path) => fieldFor(path))
+        .filter((el): el is HTMLInputElement => !!el && !(el as HTMLInputElement).value);
+      stillEmpty.forEach((el) => el.setAttribute('aria-invalid', 'true'));
       errorNote.hidden = false;
-      errorNote.textContent = 'Filled from the email. Check it, then add it.';
+      errorNote.textContent = stillEmpty.length
+        ? 'Filled from the email. The highlighted fields are still empty. Fill them, then add it.'
+        : 'Filled from the email. Check it, then add it.';
     } catch {
       errorNote.hidden = false;
       errorNote.textContent = 'Could not read that email. Fill the fields yourself.';
+    } finally {
+      fillBtn.disabled = false;
     }
   });
 
@@ -466,7 +549,7 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
         confirmBtn.disabled = true;
         keepBtn.disabled = true;
         try {
-          const saved = await removeItem(options.tripId, item.id, options.version);
+          const saved = await removeItem(options.tripId, item.id, currentVersion);
           options.onSaved(saved.trip, saved.version);
           host.replaceChildren();
         } catch {
@@ -492,9 +575,67 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
   }
   syncType();
 
+  /** Checks the server would reject, caught here so the message names the field. */
+  function checkBeforeSave(): { message: string; el: HTMLElement } | null {
+    if (!titleInput.value.trim()) return { message: 'Add a title.', el: titleInput };
+    if (kind === 'flight' || kind === 'train') {
+      const ticket = kind === 'flight' ? 'flight' : 'train';
+      if (!carrierInput.value.trim()) return { message: `Add the ${ticket} carrier.`, el: carrierInput };
+      if (kind === 'flight' && !numberInput.value.trim()) {
+        return { message: 'Add the flight number.', el: numberInput };
+      }
+      if (!fromCodeInput.value.trim()) return { message: 'Add where it departs from (From code).', el: fromCodeInput };
+      if (!toCodeInput.value.trim()) return { message: 'Add where it arrives (To code).', el: toCodeInput };
+      if (!timeInput.value) return { message: 'Add the departure time.', el: timeInput };
+      if (!arriveTimeInput.value) return { message: 'Add the arrival time.', el: arriveTimeInput };
+    }
+    if (hopMinutes.value && !hopMode) {
+      return {
+        message: 'Pick how you get to the next stop (Walk, Train…), or clear Minutes.',
+        el: hopSeg
+      };
+    }
+    const link = normalizeLink(linkInput.value);
+    if (link === null) return { message: 'Link must be a web address starting https://', el: linkInput };
+    linkInput.value = link;
+    return null;
+  }
+
+
+  function saveErrorMessage(err: unknown): { message: string; el?: HTMLElement | null } {
+    if (err instanceof ApiClientError) {
+      if (err.code === 'validation_error') {
+        const path = (err.details as { path?: string } | undefined)?.path ?? '';
+        return { message: `Not saved: ${err.message}. Your entries are still here.`, el: fieldFor(path) };
+      }
+      if (err.code === 'network_error' || err.code === 'timeout') {
+        return { message: 'Not saved: no connection. Your entries are still here. Try again.' };
+      }
+      if (err.code === 'unauthorized' || err.status === 401) {
+        return { message: 'Not saved: you are signed out. Sign in in another tab, then tap Add again.' };
+      }
+      if (err.code === 'not_found') {
+        return { message: 'Not saved: this item was removed elsewhere. Close and add it again.' };
+      }
+      return { message: `Not saved: ${err.message}. Your entries are still here. Try again.` };
+    }
+    return { message: 'Not saved. Your entries are still here. Try again.' };
+  }
+
+  function isConflict(err: unknown): boolean {
+    return err instanceof ApiClientError && (err.code === 'conflict' || err.status === 409);
+  }
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (saveBtn.disabled) return;
     errorNote.hidden = true;
+    clearInvalid();
+    const problem = checkBeforeSave();
+    if (problem) {
+      showError(problem.message, problem.el);
+      return;
+    }
     const [cityId, date] = daySelect.value.split('|');
     const amount = Number(amountInput.value);
     const cost = amount > 0 ? { amount, currency: currencySelect.value as Currency } : undefined;
@@ -549,15 +690,34 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
       } as ItemDraft;
     }
 
+    const send = (version: string) =>
+      editing
+        ? editItem(options.tripId, editing.id, version, draft)
+        : addItem(options.tripId, version, draft);
+
+    saveBtn.disabled = true;
+    const label = saveBtn.textContent;
+    saveBtn.textContent = 'Saving…';
     try {
-      const saved = editing
-        ? await editItem(options.tripId, editing.id, options.version, draft)
-        : await addItem(options.tripId, options.version, draft);
+      let saved;
+      try {
+        saved = await send(currentVersion);
+      } catch (err) {
+        // The trip changed elsewhere since this sheet opened (another tab, the agent,
+        // an earlier save). Fetch the latest version and send once more.
+        if (!isConflict(err)) throw err;
+        const fresh = await getTrip(options.tripId);
+        currentVersion = fresh.version;
+        saved = await send(currentVersion);
+      }
       options.onSaved(saved.trip, saved.version);
       host.replaceChildren();
-    } catch {
-      errorNote.hidden = false;
-      errorNote.textContent = 'Could not save. Try again.';
+    } catch (err) {
+      const { message, el } = saveErrorMessage(err);
+      showError(message, el);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = label;
     }
   });
 
@@ -588,4 +748,14 @@ function computeCheckOut(date: string, nights: number): string {
   const d = new Date(date + 'T00:00:00Z');
   d.setUTCDate(d.getUTCDate() + nights);
   return d.toISOString().slice(0, 10);
+}
+
+/** '' stays empty; a bare domain gains https://; http:// is upgraded; anything else is null (invalid). */
+export function normalizeLink(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return '';
+  if (/^https:\/\//i.test(v)) return v;
+  if (/^http:\/\//i.test(v)) return 'https://' + v.slice(7);
+  if (/^[a-z][a-z0-9+.-]*:/i.test(v)) return null;
+  return 'https://' + v.replace(/^\/+/, '');
 }
