@@ -7017,15 +7017,10 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 
   /*
    * Engaged phone Chat already has the Messenger who-header + Tools / New chat.
-   * Drop the redundant page title and date chip; keep refresh / sign-out.
+   * Drop the whole page-header (title, date chip, refresh / sign-out) so the
+   * who-header can sit at the top of the canvas.
    */
   .app-shell:has(#chat-view[data-chrome='engaged']:not([hidden]):not([data-panel-mode])) .page-header {
-    padding-block: 0.35rem;
-    align-items: center;
-  }
-
-  .app-shell:has(#chat-view[data-chrome='engaged']:not([hidden]):not([data-panel-mode])) .page-header__copy,
-  .app-shell:has(#chat-view[data-chrome='engaged']:not([hidden]):not([data-panel-mode])) .date-chip {
     display: none;
   }
 

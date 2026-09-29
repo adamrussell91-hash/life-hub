@@ -21,4 +21,15 @@
   body:has(.coach.chat .chat__composer:focus-within) .hub-mobile-nav {
     display: none;
   }
+
+  /*
+   * Full-page / rail chat owns the canvas. Refresh + sign-out sit above the
+   * Messenger who-header and waste a phone row; keep them on non-chat pages.
+   */
+  body:has(.chat-view:not([hidden]):not([data-panel-mode])) .hub-utilities,
+  body:has(.hub-layout[data-hub-view='clare']) .hub-utilities,
+  body:has(.coach.chat) .hub-utilities,
+  body:has(.teacher-chat) .hub-utilities {
+    display: none;
+  }
 }
