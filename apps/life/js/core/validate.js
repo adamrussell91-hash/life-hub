@@ -473,7 +473,7 @@ function validateMedical(record, errors) {
   }
 }
 
-const CALENDAR_BLOCK_KINDS = ['corey', 'rest', 'protected', 'wall', 'focus'];
+const CALENDAR_BLOCK_KINDS = ['corey', 'rest', 'protected', 'wall', 'focus', 'plan', 'workout'];
 const CALENDAR_BLOCK_STATUSES = ['tentative', 'confirmed', 'cancelled'];
 const CALENDAR_BLOCK_AGENTS = [
   'sara', 'hammond', 'clare', 'chadwick', 'brisket', 'penelope', 'vera',

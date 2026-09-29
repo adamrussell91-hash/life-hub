@@ -28,6 +28,7 @@ import {
 import { proposeObservationSchema } from '../observation-agent.mjs';
 import { proposeRememberFactSchema } from '../remember-fact-agent.mjs';
 import { proposeLogCommunicationSchema } from '../log-comm-agent.mjs';
+import { listCalendarBlocksSchema } from '../list-calendar-blocks.mjs';
 import { proposeMeetingSchema, proposeEventSchema } from '../meeting-event-agent.mjs';
 import { proposeApplicationSchema, proposeFutureSchema } from '../career-agent.mjs';
 import { proposeTieDecisionSchema } from '../tie-decision-agent.mjs';
@@ -337,6 +338,9 @@ export function buildAgentTools({
   }
   if (has('comms.propose-log-communication')) {
     tools.push(proposeLogCommunicationSchema());
+  }
+  if (has('calendar.list-blocks')) {
+    tools.push(listCalendarBlocksSchema());
   }
   if (has('publish.governance-log-entry') && needsHammondTools) {
     tools.push(appendGovernanceLogSchema());

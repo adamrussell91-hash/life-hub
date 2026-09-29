@@ -204,6 +204,7 @@ import {
   queueCalendarGhostDualPath
 } from './calendar-ghosts.mjs';
 import { buildLogCommGhostInput } from './_shared/log-comm-agent.mjs';
+import { executeListCalendarBlocks } from './_shared/list-calendar-blocks.mjs';
 import { buildAgentTools } from './_shared/capabilities/registry.mjs';
 import {
   buildPromotedShortcutToolSchemas,
@@ -1953,10 +1954,7 @@ export function createChatHandler({
                       agentSlug: slug,
                       proposeOsAction,
                       send,
-                      validateProposeActionInput,
-                      extraWrites: built.proposal.writes,
-                      intent: built.proposal.intent,
-                      surfaces: ['confirm_card', 'calendar', 'governance_log']
+                      validateProposeActionInput
                     }));
                   } catch (error) {
                     return JSON.stringify({
@@ -1982,7 +1980,8 @@ export function createChatHandler({
                 else if (event.name === 'propose_future') built = buildFutureProposal(event.input ?? {});
                 else built = buildTieDecisionProposal(event.input ?? {});
                 if (!built.ok) return respondConfirmProposal(built);
-                // Timed meetings/events: Confirm + calendar ghost (Accept creates via ghost plan).
+                // Timed meetings/events: Confirm + calendar ghost. Multi-day / overnight
+                // spans that fail validateGhost fall back to Confirm-only professional write.
                 if (built.ghostInput) {
                   try {
                     const entry = calendarGhostFromToolInput(built.ghostInput, {
@@ -1997,12 +1996,8 @@ export function createChatHandler({
                       send,
                       validateProposeActionInput
                     }));
-                  } catch (error) {
-                    return JSON.stringify({
-                      ok: false,
-                      error: 'invalid_ghost',
-                      detail: error instanceof Error ? error.message : 'invalid ghost'
-                    });
+                  } catch {
+                    return respondConfirmProposal(built);
                   }
                 }
                 return respondConfirmProposal(built);
@@ -2661,6 +2656,17 @@ export function createChatHandler({
                 }
               }
 
+              if (event.name === 'list_calendar_blocks') {
+                try {
+                  return JSON.stringify(await executeListCalendarBlocks(event.input ?? {}, {
+                    client,
+                    decodeBlob
+                  }));
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'list_calendar_blocks_failed' });
+                }
+              }
+
               if (event.name === 'propose_calendar_ghost' || event.name === 'propose_log_communication') {
                 let entry;
                 try {
@@ -2680,14 +2686,15 @@ export function createChatHandler({
                   });
                 }
                 try {
-                  return JSON.stringify(await queueCalendarGhostDualPath({
+                  const queued = await queueCalendarGhostDualPath({
                     client,
                     entry,
                     agentSlug: slug,
                     proposeOsAction,
                     send,
                     validateProposeActionInput
-                  }));
+                  });
+                  return JSON.stringify(queued);
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }

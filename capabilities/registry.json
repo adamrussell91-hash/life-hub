@@ -674,6 +674,17 @@
       ],
       "tool_name": "propose_log_communication"
     },
+    "calendar.list-blocks": {
+      "file": "calendar/list-blocks.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "calendar"
+      ],
+      "tool_name": "list_calendar_blocks"
+    },
     "fitness.save-workout-template": {
       "file": "fitness/save-workout-template.json",
       "agents": [

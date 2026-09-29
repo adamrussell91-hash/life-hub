@@ -72,17 +72,17 @@
 
 ## Task 6: Travel, knowledge, templates, almanac, prefs
 
-- [ ] Travel item/check-in propose
-- [ ] Knowledge page create/patch (Clementine)
-- [ ] Save workout template (Chadwick)
-- [ ] Almanac anchor propose
-- [ ] Constraints / hub-prefs narrow patch
-- [ ] Tests + commit
+- [x] Travel item/check-in propose
+- [x] Knowledge page create/patch (Clementine)
+- [x] Save workout template (Chadwick)
+- [ ] ~~Almanac anchor propose~~ — **out of scope this PR**: alm- ghosts already exist for Goals/Almanac product paths; freeform agent “hold this date” needs Almanac product design (anchor schema + UI Accept) beyond calendar dual-surface. Revisit in a dedicated PR.
+- [x] Constraints / hub-prefs narrow patch (`propose_hub_prefs`; bedtime stays ghost; Constraints stay CN patch)
+- [x] Tests + commit
 
 ## Task 7: Glue + refusal regression
 
-- [ ] Persona lines: call tools, don’t refuse when plan has when/where/who
-- [ ] Smokes per agent for top intents
+- [x] Persona lines: call tools, don’t refuse when plan has when/where/who (`CALENDAR_WRITE_GUIDANCE`)
+- [x] Smokes / unit coverage for top intents
 - [ ] `pre-pr-check`, docs update, PR
 
 ---

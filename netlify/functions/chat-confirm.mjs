@@ -45,7 +45,7 @@ import { createTravelWriteExecutor } from './_shared/travel-agent.mjs';
 import { createKnowledgeWriteExecutor } from './_shared/knowledge-page-agent.mjs';
 import { isCalendarGhostConfirmWrite } from './_shared/follow-up-agent.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
-import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
+import { defaultGetProfessionalStore, getJSON as getProfessionalJSON, setJSON as setProfessionalJSON } from './_shared/professional-blobs.mjs';
 import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolvers.mjs';
 import {
   PENDING_ACTIONS_PATH,
@@ -170,19 +170,24 @@ function githubOpenCommit(client) {
   return { open, commit };
 }
 
-async function professionalDepsForGhosts(env) {
-  const professionalStore = await defaultGetProfessionalStore(env);
+async function professionalDepsForGhosts(env, {
+  getProfessionalStore = defaultGetProfessionalStore,
+  getPeopleStore = defaultGetUniversalLinkStore
+} = {}) {
+  const professionalStore = await getProfessionalStore(env);
   const repo = createCommunicationRepository({ store: professionalStore, env });
   const meetingRepo = createMeetingRepository({ store: professionalStore, env });
   const eventRepo = createEventRepository({ store: professionalStore, env });
-  const universalLinkStore = await defaultGetUniversalLinkStore(env);
+  const universalLinkStore = await getPeopleStore(env);
   const links = createUniversalLinkRepository({ store: universalLinkStore });
   const accessContext = createAccessContext({ workflow: 'life' });
   return {
     createCommunication: (input) => repo.createCommunication(input),
     createMeeting: (input) => meetingRepo.createMeeting(input),
     createEvent: (input) => eventRepo.createEvent(input),
-    createLink: (link) => links.createLink(link, accessContext)
+    createLink: (link) => links.createLink(link, accessContext),
+    getJSON: (key) => getProfessionalJSON(professionalStore, key),
+    setJSON: (key, value) => setProfessionalJSON(professionalStore, key, value)
   };
 }
 
@@ -202,6 +207,11 @@ export function createChatConfirmHandler({
   getProfessionalStore = defaultGetProfessionalStore,
   resolvePeopleEntity = defaultResolveEntity
 } = {}) {
+  const ghostProfessionalDeps = () => professionalDepsForGhosts(env, {
+    getProfessionalStore,
+    getPeopleStore
+  });
+
   return async function chatConfirmHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
     return withCors(await handle(request), request, env);
@@ -821,7 +831,7 @@ export function createChatConfirmHandler({
           open,
           commit,
           tasksStore: () => getTasksStore(env),
-          professionalDeps: () => professionalDepsForGhosts(env),
+          professionalDeps: ghostProfessionalDeps,
           decision: { id: boundGhostId, decision: 'accept', reason: typeof parsed.reason === 'string' ? parsed.reason : null },
           today: getSydneyDateKey(instant),
           nowIso: getSydneyTimestamp(instant)
@@ -830,6 +840,15 @@ export function createChatConfirmHandler({
         return mapRepositoryError(error);
       }
       const ghostCode = ghostResult?.payload?.error?.code;
+      if (ghostResult?.payload?.writes === 'partial') {
+        return errorResponse(
+          503,
+          'ghost_partial',
+          'Saved to the calendar but the Professional record failed. Tap Confirm again.',
+          true,
+          PRIVATE_CACHE
+        );
+      }
       const ghostOk = ghostResult?.payload?.ok === true
         || ghostCode === 'already_accepted';
       if (!ghostOk) {
@@ -845,7 +864,8 @@ export function createChatConfirmHandler({
         }, PRIVATE_CACHE);
       }
 
-      // Companion writes (e.g. follow-up task) ride alongside the ghost marker.
+      // Follow-up tasks live on the ghost plan (acceptPlan), not companion writes.
+      // Companion writes are only for rare non-ghost extras; skip when already accepted.
       const companionWrites = (proposal.writes ?? []).filter(write => !isCalendarGhostConfirmWrite(write.path));
       let companionResults = null;
       if (companionWrites.length && ghostCode !== 'already_accepted') {
@@ -1602,7 +1622,7 @@ export function createChatConfirmHandler({
             open,
             commit,
             tasksStore: () => getTasksStore(env),
-            professionalDeps: () => professionalDepsForGhosts(env),
+            professionalDeps: ghostProfessionalDeps,
             decision: { id: boundGhostId, decision: 'dismiss', reason: typeof parsed.reason === 'string' ? parsed.reason : null },
             today: getSydneyDateKey(instant),
             nowIso: getSydneyTimestamp(instant)

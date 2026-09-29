@@ -124,6 +124,17 @@ export function validateGhost(ghost) {
     }
     if (!oneLine(ghost.title)) throw new TypeError(`${ghost.kind} needs a title`);
   }
+  if (ghost.follow_up_task != null) {
+    if (ghost.kind !== 'outing' && ghost.kind !== 'protect_block') {
+      throw new TypeError('follow_up_task is only allowed on outing or protect_block');
+    }
+    if (!ghost.follow_up_task || typeof ghost.follow_up_task !== 'object' || Array.isArray(ghost.follow_up_task)) {
+      throw new TypeError('follow_up_task must be an object');
+    }
+    if (!oneLine(ghost.follow_up_task.title) && !oneLine(ghost.title)) {
+      throw new TypeError('follow_up_task needs a title');
+    }
+  }
   if (ghost.kind === 'reschedule_block') {
     if (typeof ghost.path !== 'string' || !ghost.path) throw new TypeError('reschedule_block needs path');
     const hasChange = DATE_KEY.test(ghost.date ?? '')
@@ -240,6 +251,29 @@ export function acceptPlan(ghost, { today = null } = {}) {
           source_agent: ghost.agent
         }
       });
+      if (ghost.follow_up_task && typeof ghost.follow_up_task === 'object') {
+        const task = ghost.follow_up_task;
+        const taskTitle = oneLine(task.title) || title;
+        steps.push({
+          target: 'tasks',
+          method: 'POST',
+          body: {
+            title: taskTitle,
+            due_date: DATE_KEY.test(task.due ?? '') ? task.due : ghost.date,
+            status: 'open',
+            ...(oneLine(task.notes) || oneLine(task.person_ref)
+              ? {
+                notes: [oneLine(task.notes), oneLine(task.person_ref) ? `Person: ${oneLine(task.person_ref)}` : '']
+                  .filter(Boolean)
+                  .join('\n')
+              }
+              : {}),
+            ...(task.domain ? { domain: task.domain } : {}),
+            ...(HHMM.test(task.due_time ?? '') ? { due_time: task.due_time } : {}),
+            source: 'suggested_by_agent'
+          }
+        });
+      }
       steps.push(cn('this_week', 'append_line', { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withCorey ? ' with Corey' : ''} (protected).` }));
       steps.push(cn('cross_agent', 'append_line', { summary: `${who}→Clare: keep ${short(ghost.date)} clear`, text: `- ${who}→Clare: keep ${span} clear${withCorey ? ' (Corey)' : ''}.` }));
       receipt = `${who} → Life: “${title}”${withCorey ? ' with Corey' : ''}, ${span}, tentative and protected. ${who}→Clare: keep it clear. Nothing is booked or paid without you.`;
@@ -327,9 +361,11 @@ export function acceptPlan(ghost, { today = null } = {}) {
       const withCorey = ghost.with === 'corey';
       const title = oneLine(ghost.title);
       const span = `${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}–${clock12(ghost.end)}`;
+      // Display kinds: plan (outing/meal) and workout stay visible on Tideline.
+      // protect_block keeps kind 'protected' (hidden). protected:true still tells Clare to avoid the slot.
       const blockKind = ghost.kind === 'schedule_workout'
-        ? 'focus'
-        : (withCorey ? 'corey' : 'protected');
+        ? 'workout'
+        : (withCorey ? 'corey' : 'plan');
       const notes = oneLine(ghost.notes) || oneLine(ghost.place) || '';
       steps.push({
         target: 'life_record',
@@ -347,6 +383,29 @@ export function acceptPlan(ghost, { today = null } = {}) {
           ...(notes ? { notes } : {})
         }
       });
+      if (ghost.follow_up_task && typeof ghost.follow_up_task === 'object') {
+        const task = ghost.follow_up_task;
+        const taskTitle = oneLine(task.title) || title;
+        steps.push({
+          target: 'tasks',
+          method: 'POST',
+          body: {
+            title: taskTitle,
+            due_date: DATE_KEY.test(task.due ?? '') ? task.due : ghost.date,
+            status: 'open',
+            ...(oneLine(task.notes) || oneLine(task.person_ref)
+              ? {
+                notes: [oneLine(task.notes), oneLine(task.person_ref) ? `Person: ${oneLine(task.person_ref)}` : '']
+                  .filter(Boolean)
+                  .join('\n')
+              }
+              : {}),
+            ...(task.domain ? { domain: task.domain } : {}),
+            ...(HHMM.test(task.due_time ?? '') ? { due_time: task.due_time } : {}),
+            source: 'suggested_by_agent'
+          }
+        });
+      }
       steps.push(recentAction(actedOn, who, `${ghost.kind === 'outing' ? 'outing' : ghost.kind === 'meal_block' ? 'meal' : 'workout'} “${title}” ${span}${why}`));
       receipt = `${who} → Life: “${title}”, ${span}, tentative${ghost.kind === 'schedule_workout' ? '' : ' and protected'}.`;
       break;

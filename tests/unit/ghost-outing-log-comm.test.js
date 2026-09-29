@@ -92,8 +92,8 @@ test('outing / meal_block / schedule_workout create Life calendar_block plans', 
     assert.equal(life.record.title, ghost.title);
     assert.equal(life.record.status, 'tentative');
   }
-  assert.equal(acceptPlan(outing).steps.find(s => s.target === 'life_record').record.kind, 'protected');
-  assert.equal(acceptPlan(workout).steps.find(s => s.target === 'life_record').record.kind, 'focus');
+  assert.equal(acceptPlan(outing).steps.find(s => s.target === 'life_record').record.kind, 'plan');
+  assert.equal(acceptPlan(workout).steps.find(s => s.target === 'life_record').record.kind, 'workout');
   assert.throws(() => validateGhost({ ...outing, end: '08:00' }), /start < end/);
 });
 
