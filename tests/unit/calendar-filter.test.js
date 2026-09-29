@@ -72,7 +72,7 @@ test('sessionStorage read/write is per hub and survives try/catch failure', () =
 test('chips include Comms, Events and Promises for every hub', () => {
   const ids = FILTER_CHIPS.map((chip) => chip.id);
   assert.deepEqual(ids, [
-    'classes', 'comms', 'meetings', 'events', 'pd', 'promises', 'tasks', 'health', 'fitness', 'corey'
+    'classes', 'comms', 'meetings', 'events', 'pd', 'promises', 'tasks', 'health', 'fitness', 'corey', 'social', 'family'
   ]);
   for (const id of ['comms', 'events', 'promises']) {
     assert.equal(FILTER_CHIPS.find((chip) => chip.id === id).group, 'shared');

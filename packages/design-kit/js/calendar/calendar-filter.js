@@ -13,7 +13,9 @@ export const FILTER_CHIPS = Object.freeze([
   Object.freeze({ id: 'tasks', label: 'Tasks', group: 'tasks' }),
   Object.freeze({ id: 'health', label: 'Health', group: 'life' }),
   Object.freeze({ id: 'fitness', label: 'Fitness', group: 'life' }),
-  Object.freeze({ id: 'corey', label: 'Corey', group: 'life' })
+  Object.freeze({ id: 'corey', label: 'Corey', group: 'life' }),
+  Object.freeze({ id: 'social', label: 'Social', group: 'life' }),
+  Object.freeze({ id: 'family', label: 'Family', group: 'life' })
 ]);
 
 const ALL_IDS = FILTER_CHIPS.map((chip) => chip.id);
@@ -85,6 +87,12 @@ export function filterKeyForItem(item) {
   if (kind === 'health' || source === 'medical') return 'health';
   if (kind === 'fitness' || source === 'workout') return 'fitness';
   if (kind === 'corey') return 'corey';
+  if (kind === 'social' || kind === 'family') return kind;
+  if (source === 'ical_event') {
+    const feed = item.feed ?? item.record?.feed;
+    if (feed === 'social' || feed === 'family') return feed;
+    return 'events';
+  }
   if (item.ghost && item.chip) return filterKeyForItem(item.chip);
   return null;
 }

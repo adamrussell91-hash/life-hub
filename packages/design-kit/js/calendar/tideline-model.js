@@ -104,6 +104,7 @@ function eventKind(record) {
     return 'health';
   }
   if (record.type === 'work_block' || record.type === 'task') return 'task';
+  if (record.type === 'ical_event') return record.feed === 'social' || record.feed === 'family' ? record.feed : 'event';
   return 'task';
 }
 
@@ -148,9 +149,10 @@ function chipFromEvent(event) {
           ? (record.type === 'professional_meeting' ? 'meetings' : 'pd')
           : kind === 'task'
             ? 'tasks'
-            : kind === 'health' || kind === 'fitness' || kind === 'corey'
+            : kind === 'health' || kind === 'fitness' || kind === 'corey' || kind === 'social' || kind === 'family'
               ? kind
               : null;
+  const feedMeta = record.feed && record.location ? `${clockMeta(start, end)} · ${record.location}` : null;
   const classMeta = isClass
     ? record.period
       ? `P${record.period} · ${record.focus || record.title || ''}`.trim()
@@ -166,7 +168,7 @@ function chipFromEvent(event) {
     kind,
     // Prefer lesson title for class chips; class name stays in meta.
     title: isClass ? (record.title || record.class_title || 'Class') : (record.title || kind),
-    meta: workout?.meta ?? classMeta,
+    meta: workout?.meta ?? feedMeta ?? classMeta,
     isClass,
     protected: record.protected === true || kind === 'corey',
     provider: record.provider || record.clinician || '',
@@ -176,6 +178,9 @@ function chipFromEvent(event) {
     lesson_id: typeof record.lesson_id === 'string' ? record.lesson_id : undefined,
     class_id: typeof record.class_id === 'string' ? record.class_id : undefined,
     record,
+    ...(record.feed ? { feed: record.feed } : {}),
+    ...(record.ambient ? { ambient: true } : {}),
+    ...(record.location ? { location: record.location } : {}),
     ...(workout?.skipped ? { skipped: true } : {})
   };
 }
@@ -226,7 +231,8 @@ const HUB_OVERLAY_SOURCES = new Set([
   'scheduled_lesson',
   'task',
   'work_block',
-  'deadline'
+  'deadline',
+  'ical_event'
 ]);
 
 function chipsFromVisual(visual, date, events) {
@@ -248,7 +254,11 @@ function chipsFromVisual(visual, date, events) {
   for (const event of events ?? []) {
     const chip = chipFromEvent(event);
     if (!chip || chip.date !== date) continue;
-    if (!(HUB_OVERLAY_SOURCES.has(chip.source) || chip.source === 'calendar_block')) continue;
+    if (!(HUB_OVERLAY_SOURCES.has(chip.source) || chip.source === 'calendar_block' || chip.feed)) continue;
+    // A health appointment already in Life's own records: keep one.
+    if (chip.feed && chips.some(existing => existing.date === chip.date
+      && Math.abs(existing.start - chip.start) < 0.26
+      && similarity(existing.title, chip.title) >= 0.6)) continue;
     // Blocks also skip time-clashes with visual ITEMS; overlays only skip same id.
     if (chips.some(existing =>
       existing.id === chip.id
@@ -296,7 +306,34 @@ function promiseDuesFromEvents(events, date) {
     }));
 }
 
+/** All-day iCloud events (a birthday, a school event day) ride the all-day row, read-only. */
+function allDayFeedRows(events, date) {
+  return (events ?? [])
+    .filter(event => event.record?.feed && event.record.all_day && event.record.date === date)
+    .map(event => {
+      const feed = event.record.feed;
+      const kind = feed === 'health' ? 'health' : feed === 'work' ? 'event' : feed;
+      return {
+        id: event.record.id,
+        date,
+        title: event.record.title,
+        kind: 'allday',
+        feed,
+        filterKey: kind === 'event' ? 'events' : kind,
+        source: event.record.type,
+        meta: [event.record.source_calendar, event.record.span ? `day ${event.record.span}` : ''].filter(Boolean).join(' · '),
+        ambient: Boolean(event.record.ambient),
+        record: event.record
+      };
+    });
+}
+
 function dueFor(visual, events, date, useVisual) {
+  const allDay = allDayFeedRows(events, date);
+  return [...allDay, ...dueForHubs(visual, events, date, useVisual)];
+}
+
+function dueForHubs(visual, events, date, useVisual) {
   const promises = promiseDuesFromEvents(events, date);
   if (useVisual) {
     const visualDue = (visual.DUE ?? []).filter(item => item.date === date).map(item => {
@@ -390,7 +427,7 @@ function sourceCounts(days) {
   const counts = Object.fromEntries(SOURCE_ORDER.map(id => [id, 0]));
   for (const day of days) {
     for (const chip of day.chips) counts[chip.kind] = (counts[chip.kind] ?? 0) + 1;
-    for (const due of day.due) if (due.kind !== 'promise') counts.task += 1;
+    for (const due of day.due) if (due.kind !== 'promise' && due.kind !== 'allday') counts.task += 1;
   }
   return SOURCE_ORDER
     .filter(id => counts[id] > 0)
@@ -442,7 +479,7 @@ export function buildTidelineModel({
       (events ?? []).map(chipFromEvent).filter(chip => chip && chip.date === date)
     ), ghostList, date);
     const cap = capacity.get(date);
-    const load = dayLoadHours(chips.map(chip => ({
+    const load = dayLoadHours(chips.filter(chip => !chip.ambient).map(chip => ({
       start: chip.start,
       end: chip.end,
       kind: chip.kind,
