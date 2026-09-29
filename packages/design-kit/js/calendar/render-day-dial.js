@@ -30,6 +30,7 @@ import { presetBand } from './render-tideline.js';
 import { clock as medClock, doseCandidate, MEDICATION, toHHMM } from './medication-model.js';
 import { bookmarkMoment, tonightFit, trackedHours } from './day-sense.js';
 import { leaveByCandidate, legsLine, minutesLate, TRANSPORT, transportPath, wedgeFor, wedgeWidth } from './transport-model.js';
+import { opportunities } from './mio-model.js';
 import { openRescueSheet } from './rescue-sheet.js';
 import { openDayReview } from './day-review-sheet.js';
 import { disablePush, enablePush, pushState } from '../push-client.js';
@@ -177,7 +178,10 @@ function transportFor(candidate) {
       if (!response.ok || payload?.ok === false) {
         transportCache.set(key, { status: 'error', at: Date.now(), code: payload?.error?.code ?? 'transport_failed', message: payload?.error?.message ?? `Transport times unavailable (${response.status}).` });
       } else {
-        transportCache.set(key, { status: 'ok', at: Date.now(), plan: payload?.data?.plan ?? payload?.plan });
+        const plan = payload?.data?.plan ?? payload?.plan;
+        transportCache.set(key, plan?.leave && plan?.arrive
+          ? { status: 'ok', at: Date.now(), plan }
+          : { status: 'error', at: Date.now(), code: 'transport_failed', message: 'Transport for NSW sent no trip.' });
       }
     } catch {
       transportCache.set(key, { status: 'error', at: Date.now(), code: 'transport_failed', message: 'Could not reach the server.' });
@@ -275,6 +279,110 @@ function drawLeaveWedge(date) {
   s('path', { class: 'dd-leave is-go', d: arcPath(cx, cy, r1, r1 + width, wedge.leave, Math.max(wedge.board, wedge.leave + 1 / 60)) }, group);
   s('path', { class: 'dd-leave is-ride', d: arcPath(cx, cy, r1, r1 + width * 0.45, Math.max(wedge.board, wedge.leave), wedge.arrive) }, group);
   s('title', {}, group, `Get ready ${clock12(wedge.ready)} · leave ${clock12(wedge.leave)}${trip.plan.board ? ` · board ${clock12(wedge.board)}` : ''} · arrive ${clock12(wedge.arrive)}`);
+}
+
+/*
+ * Mio opportunities (step 11): the synced candidates, read once per 30 minutes.
+ * Offers are computed per paint from the model; "Not this time" is remembered server-side.
+ */
+let mioDoc = null; // { at, places, declined: Set } | { at, error }
+let mioLoading = false;
+
+function mioPlaces() {
+  if (typeof input?.apiFetch !== 'function') return null;
+  if (mioDoc && Date.now() - mioDoc.at < 30 * 60_000) return mioDoc;
+  if (!mioLoading) {
+    mioLoading = true;
+    void (async () => {
+      try {
+        const response = await input.apiFetch('/api/mio');
+        const payload = await response.json().catch(() => null);
+        mioDoc = response.ok && payload?.ok !== false
+          ? { at: Date.now(), places: payload?.data?.places ?? [], declined: new Set(payload?.data?.declined ?? []), synced: payload?.data?.synced_at ?? null }
+          : { at: Date.now(), places: [], declined: new Set(), error: true };
+      } catch {
+        mioDoc = { at: Date.now(), places: [], declined: new Set(), error: true };
+      }
+      mioLoading = false;
+      repaintAfter(0);
+    })();
+  }
+  return mioDoc;
+}
+
+function mioOffersFor(date) {
+  const doc = mioPlaces();
+  if (!doc?.places?.length || date < input.today) return [];
+  return opportunities(dayAt(date), doc.places, { today: input.today, nowHour, declined: doc.declined });
+}
+
+function drawMioGaps(date) {
+  const { cx, cy } = rings;
+  const [e1, e2] = rings.event;
+  for (const offer of mioOffersFor(date)) {
+    const path = s('path', { class: 'dd-mio', 'data-part': 'mio-gap', d: arcPath(cx, cy, e1 + 6, e2 - 6, offer.visit.start, offer.visit.end) }, svg);
+    s('title', {}, path, `Free near ${offer.commitment.title}: ${offer.place.name} (from your Mio saves)`);
+  }
+}
+
+function mountMio(side, date) {
+  const offers = mioOffersFor(date);
+  if (!offers.length) return;
+  const section = el('section', 'dd-mio-panel', undefined, side, { 'data-part': 'mio' });
+  el('h4', 'dd-h', 'On the way', section);
+  for (const offer of offers) {
+    const { place, commitment, visit } = offer;
+    const where = commitment.area.replace(/\b\w/g, (c) => c.toUpperCase());
+    const gapText = `${offer.when === 'after' ? 'After' : 'Before'} ${escapeHtml(commitment.title)} · ${clock12(offer.gap.start)} – ${clock12(offer.gap.end)} free in ${escapeHtml(where)}`;
+    const hours = offer.hours === 'open'
+      ? (offer.closes != null ? `open till ${clock12(offer.closes % 24)}` : 'open then')
+      : 'hours not checked yet';
+    const meta = [place.category, place.rating ? `★ ${place.rating}` : '', hours, place.creator ? `saved from ${escapeHtml(place.creator)}` : ''].filter(Boolean).join(' · ');
+    const card = el('div', 'dd-mio-offer', `<p class="dd-go__sub">${gapText}</p><b>${escapeHtml(place.name)}</b><p class="dd-go__sub">${meta}</p>${place.why ? `<p class="dd-mio-offer__why">${escapeHtml(place.why)}</p>` : ''}`, section, {
+      'data-save': place.id
+    });
+    const attrs = `data-save="${escapeHtml(place.id)}" data-date="${date}" data-start="${toHHMM(visit.start)}" data-end="${toHHMM(visit.end)}" data-after="${escapeHtml(commitment.title)}"`;
+    el('div', 'dd-acts', `<button type="button" class="btn btn--secondary" data-mio="plan" ${attrs}>Plan it ${clock12(visit.start)}</button>`
+      + `<button type="button" class="btn btn--ghost" data-mio="skip" ${attrs}>Not this time</button>`, card);
+  }
+}
+
+async function answerMio(button) {
+  const act = button.getAttribute('data-mio');
+  const saveId = button.getAttribute('data-save');
+  const date = button.getAttribute('data-date');
+  const card = button.closest('.dd-mio-offer');
+  card?.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+  const post = async (path, body) => {
+    const response = await input.apiFetch(path, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || payload?.ok === false) throw new Error(payload?.error?.message || `Not saved (${response.status}).`);
+    return payload;
+  };
+  try {
+    if (act === 'skip') {
+      await post('/api/mio', { decline: { save_id: saveId, date } });
+      mioDoc?.declined?.add(`${saveId}|${date}`);
+      card?.remove();
+      return;
+    }
+    // Plan it: Hammond queues an outing, then the tap accepts it through the usual path.
+    const queued = await post('/api/mio', { plan: { save_id: saveId, date, start: button.getAttribute('data-start'), end: button.getAttribute('data-end'), after: button.getAttribute('data-after') } });
+    const ghostId = queued?.data?.ghost?.id;
+    const accepted = await post('/api/calendar-ghosts', { id: ghostId, decision: 'accept' });
+    mioDoc?.declined?.add(`${saveId}|${date}`);
+    card?.remove();
+    showToast(`<b>Planned.</b> ${escapeHtml(accepted?.receipt || 'Added as a tentative plan.')}`);
+    void input?.onSourcesChanged?.();
+  } catch (error) {
+    card?.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+    showToast(`<b>Not saved.</b> ${escapeHtml(error?.message || 'Could not reach the server.')}`);
+  }
 }
 
 /** Tonight's overflow this paint (tonightFit), or null. */
@@ -739,6 +847,7 @@ function mountDial(size) {
   }
 
   drawLeaveWedge(date);
+  drawMioGaps(date);
 
   // Time left tonight: a lip outside the event ring.
   if (isToday) nodes.set('left', s('path', { class: 'dd-left', 'data-part': 'time-left' }, svg));
@@ -997,7 +1106,10 @@ function askedMoment(day, taskId) {
   return { blockId: chip.id, taskId, title: chip.title, previous: chip.bookmark?.note ?? '', reason: 'ending', at: chip.end };
 }
 
-function mountBookmarkPrompt(side, date, askedTask = null) {
+/** The task a tapped notification asked about: kept across repaints until answered. */
+let askedBookmark = null;
+
+function mountBookmarkPrompt(side, date, askedTask = askedBookmark) {
   if (date !== input.today || !side) return null;
   if (side.querySelector?.('[data-part="bookmark-prompt"]')) return null;
   const moment = askedTask ? askedMoment(dayAt(date), askedTask) : bookmarkMoment(dayAt(date), nowHour, { dismissed: bookmarkDismissed });
@@ -1025,6 +1137,7 @@ async function answerBookmark(button) {
   if (act !== 'save') {
     // Nothing to add / finished for now: never ask again for this block; nothing is written.
     bookmarkDismissed.add(blockId);
+    askedBookmark = null;
     section.remove();
     return;
   }
@@ -1037,6 +1150,7 @@ async function answerBookmark(button) {
   try {
     await saveCalendarItem(input?.apiFetch, { record: { type: 'task', id: taskId } }, { bookmark: note });
     bookmarkDismissed.add(blockId);
+    askedBookmark = null;
     section.remove();
     showToast('<b>Kept.</b> It will be waiting on the task next time.');
     void input?.onSourcesChanged?.();
@@ -1073,7 +1187,8 @@ function handleDeepLink(view, side) {
     queueMicrotask(() => openReview());
   } else if (query.get('bookmark')) {
     clean();
-    const prompt = doc.querySelector?.('[data-part="bookmark-prompt"]') ?? mountBookmarkPrompt(side, state.day, query.get('bookmark'));
+    askedBookmark = query.get('bookmark');
+    const prompt = doc.querySelector?.('[data-part="bookmark-prompt"]') ?? mountBookmarkPrompt(side, state.day, askedBookmark);
     prompt?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
     prompt?.querySelector?.('input')?.focus?.({ preventScroll: true });
   } else if (query.get('sheet') === 'dexy') {
@@ -1118,6 +1233,7 @@ function mountSide(side) {
   const ghosts = ghostsNow();
   mountBookmarkPrompt(side, date);
   mountTransport(side, date);
+  mountMio(side, date);
   mountReviewEntry(side, date);
   mountMedication(side, date);
   if (date === input.today) {
@@ -1507,6 +1623,8 @@ function wire(section) {
     if (target.closest?.('[data-review-open]')) return openReview();
     const bookmarkButton = target.closest?.('[data-bookmark-act]');
     if (bookmarkButton) return void answerBookmark(bookmarkButton);
+    const mioButton = target.closest?.('[data-mio]');
+    if (mioButton) return void answerMio(mioButton);
     const transportButton = target.closest?.('[data-transport]');
     if (transportButton) {
       const id = transportButton.closest('[data-part="getting-there"]')?.getAttribute('data-id');
@@ -1700,6 +1818,9 @@ export function unmountDayDial() {
   busy.clear();
   transportCache.clear();
   transportExtra.clear();
+  mioDoc = null;
+  mioLoading = false;
+  askedBookmark = null;
   state.accepted.clear();
   state.dismissed.clear();
   state.toast = null;
