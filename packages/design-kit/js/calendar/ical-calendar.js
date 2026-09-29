@@ -19,11 +19,22 @@ const AMBIENT = new Set(['social', 'family']);
 const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** @param {Array<Record<string, unknown>>} rows */
-export function eventsFromCalendarFeeds(rows) {
+/**
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {Array<Record<string, unknown>>} [freed] dropped recurring commitments (GET /api/calendar-feeds `freed`)
+ */
+export function eventsFromCalendarFeeds(rows, freed = []) {
   const out = [];
+  // A dropped series stops showing from the day it was dropped, even before Adam
+  // deletes it in iCloud. Earlier weeks stay: they happened.
+  const droppedFrom = new Map();
+  for (const row of freed ?? []) {
+    if (row && typeof row.series === 'string' && DATE.test(String(row.from))) droppedFrom.set(row.series, row.from);
+  }
   for (const row of rows ?? []) {
     if (!row || typeof row.id !== 'string' || !DATE.test(String(row.date))) continue;
+    const from = typeof row.series === 'string' ? droppedFrom.get(row.series) : null;
+    if (from && row.date >= from) continue;
     const feed = String(row.feed ?? '');
     if (!FEED_LABEL[feed]) continue;
     const timed = !row.all_day && TIME.test(String(row.time ?? ''));
@@ -41,8 +52,28 @@ export function eventsFromCalendarFeeds(rows) {
         ...(typeof row.location === 'string' && row.location ? { location: row.location } : {}),
         ...(typeof row.notes === 'string' && row.notes ? { notes: row.notes } : {}),
         ...(typeof row.span === 'string' ? { span: row.span } : {}),
+        ...(typeof row.series === 'string' ? { series: row.series } : {}),
         ...(AMBIENT.has(feed) ? { ambient: true } : {}),
         source_calendar: FEED_LABEL[feed]
+      },
+      body: ''
+    });
+  }
+  for (const row of freed ?? []) {
+    if (!row || typeof row.id !== 'string' || !DATE.test(String(row.from))) continue;
+    out.push({
+      path: `freed:${row.id}`,
+      record: {
+        type: 'freed_span',
+        id: row.id,
+        series: typeof row.series === 'string' ? row.series : null,
+        title: typeof row.title === 'string' ? row.title : 'Freed time',
+        weekday: Number(row.weekday),
+        start: row.start,
+        end: row.end,
+        from: row.from,
+        reason: typeof row.reason === 'string' ? row.reason : '',
+        term_end: typeof row.term_end === 'string' ? row.term_end : null
       },
       body: ''
     });

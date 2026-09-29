@@ -50,9 +50,11 @@ import {
   defaultGetTasksStore,
   getJSON,
   newTaskId,
+  readIndex,
   readTaskIndex,
   setJSON,
   taskKey,
+  writeIndex,
   writeTaskIndex
 } from './_shared/tasks-blobs.mjs';
 
@@ -667,6 +669,39 @@ export async function applyTaskStep(store, step, { ghostId } = {}) {
     if (typeof body.start_time === 'string') next.start_time = body.start_time;
     if (Number.isFinite(body.duration_minutes) && body.duration_minutes > 0) next.duration_minutes = body.duration_minutes;
     await setJSON(store, key, next);
+    return;
+  }
+  if (step.method === 'POST' && step.collection === 'work_blocks') {
+    const body = step.body ?? {};
+    const minutes = Number(body.duration_minutes);
+    if (typeof body.title !== 'string' || !body.title.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(body.date ?? '')
+      || !/^\d{2}:\d{2}$/.test(body.start_time ?? '') || !(minutes > 0)) {
+      throw Object.assign(new Error('title, date, start_time and duration are required'), { code: 'validation_error' });
+    }
+    // Idempotent on the ghost: a retried accept never makes a second block.
+    const id = ghostId ? `wblock-${String(ghostId).replace(/[^a-z0-9-]/gi, '-').slice(0, 80)}` : `wblock-${Date.now().toString(36)}`;
+    const key = `work_blocks/${id}`;
+    const stamp = new Date().toISOString();
+    if (!(await getJSON(store, key))) {
+      await setJSON(store, key, {
+        schema_version: 1,
+        id,
+        title: body.title.trim(),
+        date: body.date,
+        start_time: body.start_time,
+        duration_minutes: Math.round(minutes),
+        task_id: typeof body.task_id === 'string' ? body.task_id : null,
+        project_id: null,
+        depth: 'deep',
+        status: 'confirmed',
+        source: typeof body.source === 'string' ? body.source : 'agent',
+        locked: false,
+        created_at: stamp,
+        updated_at: stamp
+      });
+    }
+    const ids = await readIndex(store, 'work_blocks/_index');
+    if (!ids.includes(id)) await writeIndex(store, 'work_blocks/_index', [...ids, id]);
     return;
   }
   if (step.method === 'PATCH') {

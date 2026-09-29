@@ -16,6 +16,8 @@ import {
   newTabLabel
 } from './calendar-item-actions.js';
 import { hubDomainForItem } from './open-in-hub.js';
+import { AVAILABILITY, AVAILABILITY_NOTE } from './day-sense-plan.js';
+import { hoursText } from './duration-model.js';
 
 const NEW_TAB_ICON =
   '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5M12 9.5v3a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3"/></svg>';
@@ -76,7 +78,9 @@ export function itemCardValues(item) {
     end,
     duration,
     notes: typeof record.description === 'string' ? record.description : typeof record.notes === 'string' ? record.notes : '',
-    bookmark: record.bookmark?.note ?? row.bookmark?.note ?? ''
+    bookmark: record.bookmark?.note ?? row.bookmark?.note ?? '',
+    resumability: record.resumability === 'quick' || record.resumability === 'runup' ? record.resumability : '',
+    max_block: Number(record.max_block_minutes) > 0 ? String(record.max_block_minutes) : ''
   };
 }
 
@@ -117,6 +121,25 @@ function contextRows(item, values) {
   if (typeof record.priority === 'string' && record.priority) rows.push(['Priority', record.priority]);
   if (typeof record.project_title === 'string' && record.project_title) rows.push(['Project', record.project_title]);
   if (typeof record.waiting_on === 'string' && record.waiting_on) rows.push(['Waiting on', record.waiting_on]);
+  // Step 10: how long the rest really takes, whether it still fits, and what waits on what.
+  const range = row.range;
+  if (range) {
+    const lost = [range.blocked ? `${hoursText(range.blocked)} blocked` : '', range.interrupted ? `${hoursText(range.interrupted)} interrupted` : ''].filter(Boolean);
+    rows.push(['Left', `${range.text}${lost.length ? ` · ${lost.join(', ')}, not counted as pace` : ''}`]);
+  }
+  if (row.fragility && row.fragility.status !== 'fits') rows.push([row.fragility.status === 'short' ? 'Won’t fit' : 'Fragile', row.fragility.text]);
+  if (Array.isArray(record.blocked_by) && record.blocked_by.length) rows.push(['After', record.blocked_by.map((b) => b.title).join(', ')]);
+  if (record.unlocks) rows.push(['Unlocks', `${record.unlocks} task${record.unlocks === 1 ? '' : 's'} waiting on this`]);
+  if (row.texture && AVAILABILITY[row.texture] && row.texture !== 'fixed' && row.texture !== 'focus') {
+    rows.push(['Time', `${AVAILABILITY[row.texture]}. ${AVAILABILITY_NOTE[row.texture]}`]);
+  }
+  if (row.regained) {
+    const why = row.regained.reason ? ` (${row.regained.reason})` : '';
+    const term = row.regained.termHours != null
+      ? ` Every week to the end of term, that is about ${row.regained.termHours} h of it back in use.`
+      : '';
+    rows.push(['Freed time', `In the slot you freed from ${row.regained.title}${why}.${term}`]);
+  }
   if (typeof record.channel === 'string' && record.channel) rows.push(['Channel', record.channel]);
   if (row.provider) rows.push(['With', row.provider]);
   if (row.mergedRecords) rows.push(['Records', `${row.mergedRecords} merged`]);
@@ -141,6 +164,13 @@ function fieldHtml(field, values) {
   }
   if (field === 'bookmark') {
     return `<label class="cal-card__field cal-card__field--wide"><span>Way back in</span><input type="text" name="bookmark" maxlength="280" value="${escapeHtml(values.bookmark)}" placeholder="Where you left it, e.g. stopped at Q4 feedback"></label>`;
+  }
+  if (field === 'resumability') {
+    const option = (value, label) => `<option value="${value}"${values.resumability === value ? ' selected' : ''}>${label}</option>`;
+    return `<label class="cal-card__field"><span>Picking it back up</span><select name="resumability">${option('', 'Not sure')}${option('quick', 'Quick to restart')}${option('runup', 'Needs a run-up')}</select></label>`;
+  }
+  if (field === 'max_block') {
+    return `<label class="cal-card__field"><span>Longest stretch (min)</span><input type="number" name="max_block" inputmode="numeric" min="15" max="240" step="15" value="${escapeHtml(values.max_block)}" placeholder="90"></label>`;
   }
   if (field === 'notes') {
     return `<label class="cal-card__field cal-card__field--wide"><span>Notes</span><textarea name="notes" rows="3" placeholder="Add a note">${escapeHtml(values.notes)}</textarea></label>`;
@@ -167,17 +197,28 @@ export function itemCardHtml(item, opts = {}) {
   const context = rows.length
     ? `<dl class="cal-card__context" data-part="card-context">${rows.map(([term, text]) => `<div><dt>${escapeHtml(term)}</dt><dd>${escapeHtml(text)}</dd></div>`).join('')}</dl>`
     : '';
+  const record = itemRecord(item);
+  const inferred = record.inferred_after?.id
+    ? `<div class="cal-card__ask" data-part="card-infer"><span>Probably after “${escapeHtml(record.inferred_after.title)}”?</span>`
+      + `<button type="button" class="btn btn--secondary" data-infer="yes" data-after="${escapeHtml(record.inferred_after.id)}">Yes, after it</button>`
+      + `<button type="button" class="btn btn--ghost" data-infer="no" data-after="${escapeHtml(record.inferred_after.id)}">No</button></div>`
+    : '';
+  const drop = typeof record.series === 'string' && record.series && record.time && record.end_time
+    ? `<form class="cal-card__drop" data-part="card-drop" novalidate><label class="cal-card__field cal-card__field--wide"><span>Stopped going to this?</span>`
+      + `<input type="text" name="drop_reason" maxlength="160" placeholder="Why, so the time remembers (optional)"></label>`
+      + `<button type="submit" class="btn btn--secondary">I’ve dropped this</button><p class="cal-card__hint">Frees this weekly slot from ${escapeHtml(formatDisplayDate(record.date))}. Nothing changes in iCloud.</p></form>`
+    : '';
   const fields = editableFields(item);
   if (!fields.length) {
     const notes = values.notes ? `<p class="cal-card__notes">${escapeHtml(values.notes)}</p>` : '';
     const note = opts.readOnlyNote ? `<p class="cal-card__hint">${escapeHtml(opts.readOnlyNote)}</p>` : '';
-    return `${head}${context}${notes}${note}`;
+    return `${head}${context}${notes}${drop}${note}`;
   }
   const form =
     `<form class="cal-card__form" data-part="card-form" novalidate>${fields.map((field) => fieldHtml(field, values)).join('')}` +
     `<p class="cal-card__error" data-part="card-error" role="alert" hidden></p>` +
     `<div class="cal-pop__acts"><button type="submit" class="btn btn--primary" data-part="card-save">Save</button></div></form>`;
-  return `${head}${context}${form}`;
+  return `${head}${context}${inferred}${form}`;
 }
 
 function toMinutes(hhmm) {
@@ -212,6 +253,12 @@ export function itemCardPatch(item, form) {
   }
   if (fields.includes('notes') && typeof form.notes === 'string' && form.notes !== before.notes) patch.notes = form.notes;
   if (fields.includes('bookmark') && typeof form.bookmark === 'string' && form.bookmark.trim() !== before.bookmark) patch.bookmark = form.bookmark.trim();
+  if (fields.includes('resumability') && typeof form.resumability === 'string' && form.resumability !== before.resumability) {
+    patch.resumability = form.resumability || null;
+  }
+  if (fields.includes('max_block') && typeof form.max_block === 'string' && form.max_block.trim() !== before.max_block) {
+    patch.max_block_minutes = form.max_block.trim() ? Number(form.max_block) : null;
+  }
   if (patch.date === undefined && Object.keys(patch).length && fields.includes('date')) patch.date = before.date;
   return patch;
 }
@@ -232,13 +279,49 @@ export function bindItemCard(node, item, handlers = {}) {
     // Full navigation in a new tab. Never let a hub SPA router catch the click.
     event.stopPropagation();
   });
+  // One-tap answers ride the same save path as the form (confirm-first: nothing until tapped).
+  const record = itemRecord(item);
+  const once = async (button, patch) => {
+    button.disabled = true;
+    try {
+      await handlers.onSave?.(patch);
+      handlers.onClose?.();
+    } catch (cause) {
+      button.disabled = false;
+      const error = node.querySelector?.('[data-part="card-error"]');
+      if (error) {
+        error.textContent = cause?.message || 'Could not save.';
+        error.hidden = false;
+      } else {
+        button.textContent = cause?.message || 'Could not save.';
+      }
+    }
+  };
+  for (const button of node.querySelectorAll?.('[data-infer]') ?? []) {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const after = button.getAttribute('data-after');
+      const list = (key) => (Array.isArray(record[key]) ? record[key] : []);
+      void once(button, button.getAttribute('data-infer') === 'yes'
+        ? { depends_on: [...list('depends_on'), after] }
+        : { dismissed_inferred: [...list('dismissed_inferred'), after] });
+    });
+  }
+  const drop = node.querySelector?.('[data-part="card-drop"]');
+  drop?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const button = drop.querySelector('button[type="submit"]');
+    void once(button, { freed: { reason: drop.querySelector('input[name="drop_reason"]')?.value ?? '' } });
+  });
   const form = node.querySelector?.('[data-part="card-form"]');
   if (!form) return;
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     event.stopPropagation();
     const data = {};
-    for (const input of form.querySelectorAll('input[name],textarea[name]')) data[input.name] = input.value;
+    for (const input of form.querySelectorAll('input[name],textarea[name],select[name]')) data[input.name] = input.value;
     const error = form.querySelector('[data-part="card-error"]');
     const save = form.querySelector('[data-part="card-save"]');
     if (fieldsInvalid(item, data)) {

@@ -36,7 +36,7 @@ function task(partial) {
   };
 }
 
-test('deadline runway proposes protect_block for due-tomorrow open task', () => {
+test('deadline runway proposes a Tasks work block (task_block) for a due-tomorrow open task', () => {
   const ghosts = proposeDeadlineRunwayGhosts({
     tasks: [task({ id: 'task_due', due_date: '2026-09-30' })],
     today: TODAY,
@@ -44,7 +44,7 @@ test('deadline runway proposes protect_block for due-tomorrow open task', () => 
   });
   assert.equal(ghosts.length, 1);
   assert.equal(ghosts[0].id, 'clare-runway-task_due-2026-09-30');
-  assert.equal(ghosts[0].kind, 'protect_block');
+  assert.equal(ghosts[0].kind, 'task_block');
   assert.equal(ghosts[0].taskId, 'task_due');
   assert.equal(ghosts[0].agent, 'clare');
   assert.ok(ghosts[0].start >= SCHOOL_DAY_END, `expected after-school start, got ${ghosts[0].start}`);

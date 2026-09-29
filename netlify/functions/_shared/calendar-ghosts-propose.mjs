@@ -188,6 +188,7 @@ export async function runCalendarGhostsPropose({
   warn = console.warn,
   tasks = null,
   getTasksStore = null,
+  loadIcalRows = null,
   env = process.env
 } = {}) {
   if (typeof today !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(today)) {
@@ -275,6 +276,11 @@ export async function runCalendarGhostsPropose({
     }
   }
 
+  // iCloud events from the feed cache (never a fresh fetch here): busy time for placement.
+  let icalRows = [];
+  if (typeof loadIcalRows === 'function') {
+    icalRows = await loadIcalRows({ from: today, to: horizonTo }).catch(() => []);
+  }
   const prior = [...queue, ...proposed];
   const runwayGhosts = proposeDeadlineRunwayGhosts({
     tasks: taskList,
@@ -282,7 +288,14 @@ export async function runCalendarGhostsPropose({
     nowIso,
     workBlocks: Array.isArray(workBlocks) ? workBlocks : [],
     lessons,
-    events
+    events,
+    icalRows,
+    capacity,
+    isSchoolDay: date => {
+      const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
+      return dow !== 0 && dow !== 6 && !isHoliday(date);
+    },
+    pending: queue
   }).filter(ghost => !alreadyQueued(prior, ghost));
   const waitingGhosts = proposeWaitingFollowUpGhosts({ tasks: taskList, today, nowIso })
     .filter(ghost => !alreadyQueued(prior, ghost) && !alreadyQueued(runwayGhosts, ghost));
@@ -354,6 +367,7 @@ export function createCalendarGhostsProposeHandler({
   loadLessons,
   loadProfessionalEvents,
   readSchoolTerms: readTerms = readSchoolTerms,
+  loadIcalRows = null,
   trigger = 'scheduled'
 } = {}) {
   return async function calendarGhostsProposeHandler() {
@@ -385,6 +399,7 @@ export function createCalendarGhostsProposeHandler({
       professionalEvents,
       trigger,
       getTasksStore: tasksStoreFn,
+      loadIcalRows,
       env
     });
   };

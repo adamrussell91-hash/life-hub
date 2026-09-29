@@ -180,3 +180,11 @@
 .dd-bookmark__lead{margin:0;font-size:var(--text-sm);line-height:1.35}
 .dd-bookmark__field input{width:100%;box-sizing:border-box;min-height:2rem;padding:4px var(--space-2);border:1px solid color-mix(in srgb,var(--ink) 22%,transparent);border-radius:var(--radius-sm);font:inherit;font-size:var(--text-sm);background:#fff}
 .dd-bookmark .dd-acts{flex-wrap:wrap}
+/* Availability textures (step 8), matching the Week. */
+.dd-tex{pointer-events:none}
+.dd-tex.tx-interruptible{fill:url(#dd-speckle)}
+.dd-tex.tx-regained{fill:color-mix(in srgb,var(--pastel-sage) 55%,transparent);stroke:var(--pastel-sage-ink);stroke-width:1;stroke-dasharray:3 3}
+.dd-arc.tx-travel{stroke-dasharray:3 2}
+.dd-arc.tx-recovery{opacity:.75}
+.dd-arc.tx-callback_wait{stroke:var(--navy);stroke-dasharray:1 2}
+.dd-arc.is-regained{stroke:var(--pastel-sage-ink);stroke-width:2}

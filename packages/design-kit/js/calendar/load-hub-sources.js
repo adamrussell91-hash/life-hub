@@ -301,7 +301,7 @@ export function createHubSourceLoader(opts) {
       try {
         const range = calendarFeedRange(today ?? sydneyTodayKey());
         const payload = await readOkJson(apiFetch, `/api/calendar-feeds?from=${range.from}&to=${range.to}`);
-        const events = eventsFromCalendarFeeds(payload.data?.events ?? []);
+        const events = eventsFromCalendarFeeds(payload.data?.events ?? [], payload.data?.freed ?? []);
         setBucket('feeds', { status: 'live', events, error: null, meta: { feeds: payload.data?.feeds ?? [] } });
       } catch (error) {
         // 401/404 (signed out, or an older API deploy): not an error worth a banner.

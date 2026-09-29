@@ -871,7 +871,7 @@ export function createAppController(dependencies) {
     feedsInFlight = apiFetch(`/api/calendar-feeds?from=${range.from}&to=${range.to}`)
       .then(response => (response.ok ? response.json() : null))
       .then(payload => {
-        if (payload?.ok && Array.isArray(payload.data?.events)) feedEvents = eventsFromCalendarFeeds(payload.data.events);
+        if (payload?.ok && Array.isArray(payload.data?.events)) feedEvents = eventsFromCalendarFeeds(payload.data.events, payload.data.freed ?? []);
       })
       .catch(() => {})
       .finally(() => {

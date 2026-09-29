@@ -336,14 +336,14 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-card__form{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--line)}
 .cal-card__field{display:grid;gap:3px;font-size:var(--text-2xs);color:var(--muted);font-weight:var(--weight-medium);min-width:0}
 .cal-card__field--wide{grid-column:1/-1}
-.cal-card__field input,.cal-card__field textarea{font:inherit;font-size:var(--text-sm);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:5px 8px;min-width:0;width:100%;box-sizing:border-box}
+.cal-card__field input,.cal-card__field textarea,.cal-card__field select{font:inherit;font-size:var(--text-sm);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:5px 8px;min-width:0;width:100%;box-sizing:border-box}
 .cal-card__field textarea{resize:vertical;min-height:3.5rem}
-.cal-card__field input:focus-visible,.cal-card__field textarea:focus-visible{outline:2px solid var(--wave);outline-offset:0}
+.cal-card__field input:focus-visible,.cal-card__field textarea:focus-visible,.cal-card__field select:focus-visible{outline:2px solid var(--wave);outline-offset:0}
 .cal-card__error{grid-column:1/-1;margin:0;font-size:var(--text-xs);color:var(--high-sea-ink)}
 .cal-card__form .cal-pop__acts{grid-column:1/-1;margin-top:var(--space-1)}
 @media (max-width:719px){
   .cal-pop.cal-pop--card{position:fixed;left:var(--space-3)!important;right:var(--space-3);top:auto!important;bottom:var(--space-3);width:auto;max-height:70vh;overflow:auto}
-  .cal-card__field input,.cal-card__field textarea{font-size:16px}
+  .cal-card__field input,.cal-card__field textarea,.cal-card__field select{font-size:16px}
 }
 
 /* ---------- iCloud calendars (29/09/26) ---------- */
@@ -427,3 +427,23 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-rescue__bookmarks{display:grid;gap:var(--space-2);padding:var(--space-3);border-radius:var(--radius-sm);background:color-mix(in srgb,var(--pastel-gold) 40%,#fff)}
 .cal-rescue__bm{display:grid;gap:2px;font-size:var(--text-sm)}
 .cal-rescue__bm input{min-height:2.25rem;padding:4px var(--space-2);border:1px solid color-mix(in srgb,var(--ink) 22%,transparent);border-radius:var(--radius-sm);font:inherit;background:#fff}
+/* Availability textures (Day Sense §3.1): why 2 h is not 2 h of marking. Under the chips, never clickable. */
+.cal-tex{position:absolute;left:0;right:0;pointer-events:none}
+.cal-tex.tx-interruptible{background-image:radial-gradient(color-mix(in srgb,var(--navy) 22%,transparent) 0.9px,transparent 1.2px);background-size:7px 7px}
+.cal-tex.tx-regained{left:4px;right:4px;border:1px dashed color-mix(in srgb,var(--pastel-sage-ink) 55%,transparent);border-radius:8px;background:color-mix(in srgb,var(--pastel-sage) 45%,transparent);overflow:hidden}
+.cal-tex.tx-regained span{display:block;padding:2px 6px;font-size:var(--text-2xs);color:var(--pastel-sage-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-chip.tx-travel{background-image:repeating-linear-gradient(135deg,transparent 0 6px,color-mix(in srgb,var(--navy) 9%,transparent) 6px 8px)}
+.cal-chip.tx-recovery{filter:saturate(.6)}
+.cal-chip.tx-callback_wait{outline:1px dotted color-mix(in srgb,var(--navy) 45%,transparent);outline-offset:-2px}
+.cal-chip.is-regained{box-shadow:inset 3px 0 0 var(--pastel-sage-ink)}
+/* Step 10 on the Due row: fragile / won't fit, and what it waits on. */
+.cal-due__flag{display:inline-block;justify-self:start;width:max-content;margin:1px 0 0;padding:0 5px;border-radius:999px;font-size:var(--text-2xs);font-weight:var(--weight-semibold);line-height:1.5;vertical-align:1px}
+.cal-due__flag.is-fragile{background:var(--pastel-gold);color:var(--pastel-gold-ink)}
+.cal-due__flag.is-short{background:color-mix(in srgb,var(--high-sea) 18%,#fff);color:var(--high-sea-ink)}
+.cal-due__after{display:block;font-size:var(--text-2xs);color:var(--muted)}
+.cal-card__ask{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin-top:var(--space-2);padding:var(--space-2) var(--space-3);border-radius:8px;background:var(--pastel-blue);font-size:var(--text-xs);color:var(--pastel-blue-ink)}
+.cal-card__ask span{flex:1 1 12rem}
+.cal-card__ask .btn,.cal-card__drop .btn{min-height:2rem;padding:2px var(--space-3);font-size:var(--text-xs)}
+.cal-card__drop{display:grid;gap:var(--space-2);margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--line)}
+.cal-card__drop .btn{justify-self:start}
+.cal-card__drop .cal-card__hint{margin:0}
