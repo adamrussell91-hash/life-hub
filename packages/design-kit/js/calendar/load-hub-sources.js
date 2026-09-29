@@ -7,6 +7,7 @@ import { teachingEventsFromCurriculum } from './teaching-calendar.js';
 import {
   tasksEventsFromTasks,
   tasksEventsFromWorkBlocks,
+  tasksEventsFromWorkSessions,
   scheduleDiffActiveProposed
 } from './tasks-calendar.js';
 import {
@@ -148,7 +149,7 @@ export function createHubSourceLoader(opts) {
     setBucket('tasks', { status: 'loading', error: null });
     inflight.tasks = (async () => {
       try {
-        const [tasksPayload, blocksPayload, profilePayload, missionPayload, diffPayload] =
+        const [tasksPayload, blocksPayload, profilePayload, missionPayload, diffPayload, sessionsPayload] =
           await Promise.all([
             readOkJson(apiFetch, '/api/tasks'),
             readOkJson(apiFetch, '/api/work-blocks').catch(() => ({ data: { work_blocks: [] } })),
@@ -158,7 +159,8 @@ export function createHubSourceLoader(opts) {
             })),
             readOkJson(apiFetch, '/api/workflow-state?id=schedule_diff%3Acurrent').catch(() => ({
               data: null
-            }))
+            })),
+            readOkJson(apiFetch, '/api/work-sessions').catch(() => ({ data: { work_sessions: [] } }))
           ]);
         const ghostBlocks = scheduleDiffActiveProposed(diffPayload.data).map((block, index) => ({
           ...block,
@@ -170,7 +172,11 @@ export function createHubSourceLoader(opts) {
         const events = [
           ...tasksEventsFromTasks(tasksPayload.data?.tasks ?? []),
           ...tasksEventsFromWorkBlocks(blocksPayload.data?.work_blocks ?? []),
-          ...tasksEventsFromWorkBlocks(ghostBlocks)
+          ...tasksEventsFromWorkBlocks(ghostBlocks),
+          ...tasksEventsFromWorkSessions(
+            sessionsPayload.data?.work_sessions ?? [],
+            new Map((tasksPayload.data?.tasks ?? []).map((task) => [task.id, task.title]))
+          )
         ];
         setBucket('tasks', {
           status: 'live',

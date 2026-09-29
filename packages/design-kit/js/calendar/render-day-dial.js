@@ -27,6 +27,8 @@ import {
 import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
 import { saveCalendarItem } from './calendar-item-actions.js';
 import { presetBand } from './render-tideline.js';
+import { clock as medClock, doseCandidate, MEDICATION, toHHMM } from './medication-model.js';
+import { tonightFit, trackedHours } from './day-sense.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -90,6 +92,15 @@ let rings = null;
 let arcs = [];
 let nowHour = 12;
 let profileSleep = 22;
+/** Tonight's overflow this paint (tonightFit), or null. */
+let overflowNow = null;
+
+function formatHours(value) {
+  const minutes = Math.round(value * 60);
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h ? `${h} h${m ? ` ${m} m` : ''}` : `${m} m`;
+}
 let lightsOut = 22;
 let mountedFor = null;
 let observer = null;
@@ -443,6 +454,28 @@ function mountDial(size) {
     label(19.75, 'yours', 'is-yours');
   }
 
+  // Medication band: a thin ring between the day's bands and the events.
+  // Drawn only from a logged dose ("about 4 h"); a skipped or unlogged usual dose is a gap marker.
+  const med = day?.med ?? null;
+  if (med?.doses?.length) {
+    const r1 = R * 0.664;
+    const r2 = R * 0.696;
+    const medRing = s('g', { 'data-part': 'med-ring' }, svg);
+    for (const dose of med.doses) {
+      if (dose.status === 'taken') {
+        const band = s('path', { class: `dd-med${dose.late ? ' is-late' : ''}`, d: arcPath(cx, cy, r1, r2, dose.window[0], Math.min(24, dose.window[1])) }, medRing);
+        s('title', {}, band, `${MEDICATION.short} ${dose.slot === 'am' ? 'morning' : 'afternoon'} dose at ${medClock(dose.time)}${dose.late ? ' (later than usual)' : ''} · drawn as about ${MEDICATION.effectHours} h`);
+        const tick = point(cx, cy, (r1 + r2) / 2, dose.time);
+        s('circle', { class: 'dd-med-dot', cx: tick.x.toFixed(1), cy: tick.y.toFixed(1), r: 3.2 }, medRing);
+      } else if ((dose.status === 'skipped' || dose.status === 'unknown') && dose.usual != null) {
+        const gap = s('path', { class: `dd-med is-gap${dose.status === 'skipped' ? ' is-skipped' : ''}`, d: arcPath(cx, cy, r1, r2, dose.usual, dose.usual + 0.75) }, medRing);
+        s('title', {}, gap, dose.status === 'skipped'
+          ? `${MEDICATION.short} ${dose.slot === 'am' ? 'morning' : 'afternoon'} dose skipped today`
+          : `No ${dose.slot === 'am' ? 'morning' : 'afternoon'} dose logged (usually ${medClock(dose.usual)})`);
+      }
+    }
+  }
+
   // Event ring
   const [e1, e2] = rings.event;
   s('circle', { class: 'dd-track', cx, cy, r: (e1 + e2) / 2, 'stroke-width': e2 - e1 }, svg);
@@ -476,6 +509,33 @@ function mountDial(size) {
     }, ev));
     arcs.push({ id: ghost.id, h1: toHour(ghost.chip.start), h2: toHour(ghost.chip.end), r1: e1 + 4, r2: e2 - 4 });
   }
+  // What actually happened: a thin track just outside the events (tracked work, finished workouts).
+  const actual = date <= input.today ? (day?.actual ?? []) : [];
+  if (actual.length) {
+    const a1 = e2 + 3;
+    const a2 = e2 + 8;
+    const track = s('g', { 'data-part': 'actual-track' }, svg);
+    for (const span of actual) {
+      const end = span.open && date === input.today ? Math.max(span.start + 0.05, nowHour) : span.end;
+      const piece = s('path', { class: `dd-actual is-${span.kind}${span.open ? ' is-open' : ''}`, d: arcPath(cx, cy, a1, a2, span.start, end) }, track);
+      const result = span.result && span.result !== 'open' ? ` (${span.result})` : span.open ? ' (running)' : '';
+      s('title', {}, piece, `${span.kind === 'workout' ? 'Workout' : 'Worked on'} ${span.title} · ${medClock(span.start)} – ${medClock(end)}${result}`);
+    }
+  }
+
+  // Tonight's overflow: due work that no longer fits before lights-out spills past it.
+  const fit = date === input.today ? tonightFit({ day, nowHour, lightsOut: lightsOutFor(date, ghosts, profileSleep), events: input.events }) : null;
+  overflowNow = fit && fit.over >= 0.25 ? fit : null;
+  if (overflowNow) {
+    const lights = lightsOutFor(date, ghosts, profileSleep);
+    const spill = s('path', {
+      class: 'dd-overflow',
+      'data-part': 'overflow',
+      d: arcPath(cx, cy, e1 + 3, e2 - 3, lights, lights + Math.min(6, overflowNow.over))
+    }, svg);
+    s('title', {}, spill, `Doesn't fit before lights-out: ${overflowNow.spill.map(row => row.title).join(', ')} (${formatHours(overflowNow.over)} over)`);
+  }
+
   // Time left tonight: a lip outside the event ring.
   if (isToday) nodes.set('left', s('path', { class: 'dd-left', 'data-part': 'time-left' }, svg));
 
@@ -500,17 +560,27 @@ function mountDial(size) {
   if ((!isToday || nowHour > 15) && logs.length && !meals.some(hour => hour >= 11 && hour < 15)) {
     logDots.push({ id: 'log-nolunch', h: 12.75, cls: 'is-missing', label: 'no lunch' });
   }
+  for (const row of day?.med?.evening?.rows ?? []) {
+    const planned = row.at === MEDICATION.dinnerAt ? 'dinner' : 'snack';
+    if (logs.some(log => log.type === 'meal' && log.time && Math.abs(toHour(log.time) - row.at) < 1.25)) continue;
+    logDots.push({ id: `plan-${planned}`, h: row.at, cls: 'is-planned', label: `${planned}, planned` });
+  }
   logItems.clear();
   for (const dot of logDots) {
     const p = point(cx, cy, rings.log, dot.h);
     const record = logs.find(log => log.time && Math.abs(toHour(log.time) - dot.h) < 1e-6 && (log.type === 'meal' ? `log-${log.meal}` === dot.id : dot.id === 'log-symptom')) ?? null;
     const title = dot.id === 'log-nolunch' ? 'No lunch logged' : `${String(dot.label).charAt(0).toUpperCase()}${String(dot.label).slice(1)}`;
+    const plannedWhy = day?.med?.evening?.reason === 'skipped'
+      ? 'afternoon dexy skipped today'
+      : day?.med?.evening?.reason === 'late' ? 'afternoon dexy later than usual' : 'no afternoon dexy logged';
     logItems.set(dot.id, {
       id: dot.id,
       kind: 'health',
       date,
       title,
-      meta: dot.id === 'log-nolunch' ? 'Nothing logged between 11 am and 3 pm' : `Logged ${clock12(dot.h)}`,
+      meta: dot.id === 'log-nolunch'
+        ? 'Nothing logged between 11 am and 3 pm'
+        : dot.cls === 'is-planned' ? `Planned for ${clock12(dot.h)} · ${plannedWhy}` : `Logged ${clock12(dot.h)}`,
       source: record?.type ?? 'meal',
       ...(record ? { record } : {})
     });
@@ -559,6 +629,17 @@ function mountDial(size) {
       });
     }
     for (const dot of logDots) calls.push({ id: dot.id, hour: dot.h, height: 14, text: dot.label, cls: dot.cls === 'is-symptom' ? 'is-symptom' : 'is-meal' });
+    if (overflowNow) {
+      const lights = lightsOutFor(date, ghosts, profileSleep);
+      calls.push({
+        id: 'overflow',
+        hour: lights + Math.min(6, overflowNow.over) / 2,
+        height: 28,
+        text: `${formatHours(overflowNow.over)} doesn't fit`,
+        sub: overflowNow.spill.map(row => row.title).join(', '),
+        cls: 'is-overflow'
+      });
+    }
     const room = calloutRoom(size);
     const positions = layoutCallouts(calls.map(call => ({ id: call.id, hour: call.hour, height: call.height })), {
       cx, cy, r: room.r, gap: DD.calloutGap, top: 8, bottom: rings.height - 8, reach: room.reach
@@ -615,15 +696,109 @@ function mountDial(size) {
   }
 }
 
+/** Which dose "Taken now" means: morning until well before the usual afternoon dose. */
+function slotForNow(med, usual) {
+  const am = med?.doses?.find(dose => dose.slot === 'am');
+  if (am && (am.status === 'taken' || am.status === 'skipped')) return 'pm';
+  const pmAt = usual?.pm ?? 14;
+  return nowHour < pmAt - 1.5 ? 'am' : 'pm';
+}
+
+function mountMedication(side, date) {
+  const day = dayAt(date);
+  const med = day?.med;
+  if (!med || date !== input.today) {
+    if (med?.summary) {
+      const past = el('section', 'dd-med-panel', undefined, side, { 'data-part': 'medication' });
+      el('h4', 'dd-h', MEDICATION.short, past);
+      el('p', 'dd-med-panel__line', escapeHtml(med.summary), past);
+    }
+    return;
+  }
+  const section = el('section', `dd-med-panel${med.prompt ? ' is-prompt' : ''}`, undefined, side, { 'data-part': 'medication' });
+  el('h4', 'dd-h', MEDICATION.short, section);
+  const usual = Object.fromEntries(med.doses.filter(dose => dose.usual != null).map(dose => [dose.slot, dose.usual]));
+  const slot = med.prompt?.slot ?? slotForNow(med, usual);
+  const slotName = slot === 'am' ? 'morning' : 'afternoon';
+  if (med.prompt) {
+    el('p', 'dd-med-panel__ask', `No ${slotName} dose logged yet. You usually take it around ${medClock(med.prompt.usual)}.`, section);
+  } else if (med.summary) {
+    el('p', 'dd-med-panel__line', escapeHtml(med.summary), section);
+  } else {
+    el('p', 'dd-med-panel__line', 'Nothing logged today. Log a dose and the dial shows its window.', section);
+  }
+  const done = med.doses.find(dose => dose.slot === slot && (dose.status === 'taken' || dose.status === 'skipped'));
+  if (!done) {
+    el('div', 'dd-acts dd-med-panel__acts',
+      `<button type="button" class="btn btn--primary" data-med-act="taken" data-med-slot="${slot}">Taken now</button>`
+      + `<button type="button" class="btn btn--secondary" data-med-act="earlier" data-med-slot="${slot}">Earlier…</button>`
+      + `<button type="button" class="btn btn--ghost" data-med-act="skipped" data-med-slot="${slot}">Skipping today</button>`,
+      section);
+    el('div', 'dd-med-panel__earlier', `<label><span>Taken at</span><input type="time" name="med-time" step="300" value="${toHHMM(Math.max(0, nowHour - 0.5))}"></label><button type="button" class="btn btn--secondary" data-med-act="taken-at" data-med-slot="${slot}">Save</button>`, section, { hidden: '' });
+  }
+  if (med.evening) {
+    const why = med.prompt ? 'Tonight is planned early just in case' : med.evening.reason === 'skipped' ? 'Afternoon dose skipped, so tonight is planned' : med.evening.reason === 'late' ? 'Afternoon dose was late, so tonight is planned' : 'No afternoon dose logged, so tonight is planned';
+    el('p', 'dd-med-panel__plan', `${why}: ${med.evening.rows.map(row => `${row.title.split(',')[0].toLowerCase()} at ${medClock(row.at)}`).join(', ')}.`, section, { 'data-part': 'evening-plan' });
+  }
+}
+
+async function saveDose(button) {
+  const act = button.getAttribute('data-med-act');
+  const slot = button.getAttribute('data-med-slot') === 'pm' ? 'pm' : 'am';
+  const panel = button.closest('[data-part="medication"]');
+  if (act === 'earlier') {
+    const earlier = panel?.querySelector('.dd-med-panel__earlier');
+    if (earlier) {
+      earlier.hidden = false;
+      earlier.removeAttribute('hidden');
+      earlier.querySelector('input')?.focus();
+    }
+    return;
+  }
+  const time = act === 'taken' ? toHHMM(nowHour) : act === 'taken-at' ? panel?.querySelector('input[name="med-time"]')?.value : null;
+  if (act !== 'skipped' && !/^\d{2}:\d{2}$/.test(String(time ?? ''))) return;
+  const status = act === 'skipped' ? 'skipped' : 'taken';
+  const buttons = [...(panel?.querySelectorAll('button') ?? [])];
+  buttons.forEach(btn => { btn.disabled = true; });
+  const request = input?.apiFetch ?? globalThis.fetch;
+  try {
+    const response = await request('/api/chat/confirm', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ candidate: doseCandidate({ date: input.today, status, time, slot }), slug: 'sara', overwrite: true })
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || payload?.ok !== true) throw new Error(payload?.error?.message || 'Could not save that.');
+    showToast(status === 'skipped'
+      ? `<b>Noted: ${slot === 'am' ? 'morning' : 'afternoon'} dose skipped.</b> Tonight's meals are planned early.`
+      : `<b>Logged ${MEDICATION.short} at ${medClock(Number(time.slice(0, 2)) + Number(time.slice(3)) / 60)}.</b> The dial shows its window.`);
+    void input?.onSourcesChanged?.();
+  } catch (error) {
+    buttons.forEach(btn => { btn.disabled = false; });
+    showToast(`<b>Not saved.</b> ${escapeHtml(error?.message || 'Could not reach the server.')}`);
+  }
+}
+
 function mountSide(side) {
   const date = state.day;
   const ghosts = ghostsNow();
+  mountMedication(side, date);
   if (date === input.today) {
-    const brief = tonightBrief({ date, now: nowHour, chips: chipsFor(date), ghosts, logs: logsFor(date), profileSleep });
+    const plannedDinnerAt = dayAt(date)?.med?.evening?.rows?.find(row => row.at === MEDICATION.dinnerAt)?.at ?? null;
+    const brief = tonightBrief({ date, now: nowHour, chips: chipsFor(date), ghosts, logs: logsFor(date), profileSleep, plannedDinnerAt });
     const section = el('section', '', undefined, side, { 'data-part': 'tonight' });
     el('h4', 'dd-h', 'Tonight', section);
     const by = brief.timeLeft.by ? ` (${escapeHtml(brief.timeLeft.by)})` : '';
     el('div', 'dd-big', `${escapeHtml(brief.timeLeft.label)}<small>Now ${clock12(nowHour)} · lights out ${escapeHtml(brief.timeLeft.until)}${by}</small>`, section, { 'data-part': 'time-left-label' });
+    const tracked = trackedHours(dayAt(date)?.actual ?? []);
+    if (tracked >= 0.1) el('p', 'dd-tracked', `Tracked today: ${formatHours(tracked)}`, section, { 'data-part': 'tracked' });
+    if (overflowNow) {
+      const first = overflowNow.spill[0];
+      el('div', 'dd-overflow-note',
+        `<b>Doesn't fit tonight:</b> ${escapeHtml(overflowNow.spill.map(row => row.title).join(', '))} · ${formatHours(overflowNow.over)} over.`
+        + (first ? ` <button type="button" class="dd-link" data-row-item="${escapeHtml(first.id)}">Move ${escapeHtml(first.title)}…</button>` : ''),
+        section, { 'data-part': 'overflow-note' });
+    }
     renderRows(el('div', 'dd-rows', undefined, section), brief.rows, ghosts);
   }
   const next = model.week[model.week.indexOf(date) + 1];
@@ -982,6 +1157,8 @@ function step(delta) {
 function wire(section) {
   section.addEventListener('click', event => {
     const target = event.target;
+    const medButton = target.closest?.('[data-med-act]');
+    if (medButton) return void saveDose(medButton);
     const accept = target.closest?.('[data-accept]');
     if (accept) return void decide(accept.getAttribute('data-accept'), 'accept');
     const dismiss = target.closest?.('[data-dismiss]');
@@ -1012,7 +1189,7 @@ function wire(section) {
       return id === popFor ? closePop() : openPop(id, nodes.get(`arc:${id}`) ?? dot);
     }
     const row = target.closest?.('[data-row-item]');
-    if (row && !target.closest?.('button')) {
+    if (row && (!target.closest?.('button') || target.closest('button').hasAttribute('data-row-item'))) {
       const id = row.getAttribute('data-row-item');
       return id === popFor ? closePop() : openPop(id, row);
     }

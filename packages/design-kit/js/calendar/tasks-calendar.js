@@ -58,6 +58,54 @@ export function tasksEventsFromWorkBlocks(blocks) {
     }));
 }
 
+const SYDNEY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Australia/Sydney', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+});
+function sydneyParts(ms) {
+  const out = {};
+  for (const part of SYDNEY.formatToParts(new Date(ms))) out[part.type] = part.value;
+  return { date: `${out.year}-${out.month}-${out.day}`, time: `${out.hour === '24' ? '00' : out.hour}:${out.minute}` };
+}
+
+/**
+ * Tracked work sessions → "what actually happened" spans (never calendar chips).
+ * An open session runs to `now`; sessions over 12 h are ignored as stale timers.
+ * @param {Array<Record<string, unknown>>} sessions
+ * @param {Map<string, string>} [titles] task id → title
+ */
+export function tasksEventsFromWorkSessions(sessions, titles = new Map(), { now = Date.now(), sinceDays = 14 } = {}) {
+  const since = now - sinceDays * 86_400_000;
+  const out = [];
+  for (const session of sessions ?? []) {
+    if (!session || typeof session.id !== 'string') continue;
+    const start = Date.parse(String(session.started_at ?? ''));
+    if (!Number.isFinite(start) || start < since || start > now) continue;
+    const finished = Date.parse(String(session.finished_at ?? ''));
+    const end = Number.isFinite(finished) ? finished : now;
+    if (end <= start || end - start > 12 * 3_600_000) continue;
+    const a = sydneyParts(start);
+    const b = sydneyParts(end);
+    const taskId = typeof session.task_id === 'string' ? session.task_id : null;
+    out.push({
+      path: `work_session:${session.id}`,
+      record: {
+        type: 'work_session',
+        id: session.id,
+        date: a.date,
+        time: a.time,
+        end_time: b.date === a.date ? b.time : '23:59',
+        task_id: taskId,
+        title: (taskId && titles.get(taskId)) || (typeof session.notes === 'string' && session.notes.trim().slice(0, 60)) || 'Tracked work',
+        result: typeof session.result === 'string' ? session.result : 'open',
+        open: !Number.isFinite(finished),
+        ...(Number.isInteger(session.scripts_marked) ? { scripts_marked: session.scripts_marked } : {})
+      },
+      body: ''
+    });
+  }
+  return out;
+}
+
 /** Protected windows as background spans (not event chips). */
 export function protectedBackgroundFromWindows(date, windows = []) {
   return (windows ?? [])

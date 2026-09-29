@@ -27,6 +27,10 @@ export function createTasksApi(fetchImpl = fetch) {
       const payload = await readJson(fetchImpl, '/api/work-blocks');
       return payload.data?.work_blocks ?? [];
     },
+    async listWorkSessions() {
+      const payload = await readJson(fetchImpl, '/api/work-sessions');
+      return payload.data?.work_sessions ?? [];
+    },
     async getPlanningProfile() {
       const payload = await readJson(fetchImpl, '/api/planning-profile');
       return payload.data ?? null;

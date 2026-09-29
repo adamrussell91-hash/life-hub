@@ -76,6 +76,13 @@ export function describeRecordForLog(record, notes, { medicalAppend = false } = 
       return `Logged body composition${record.weight_kg != null ? ` (${record.weight_kg}kg${record.body_fat_pct != null ? `, ${record.body_fat_pct}% body fat` : ''})` : ''}.`;
     case 'measurements':
       return 'Logged body measurements.';
+    case 'medication': {
+      const name = record.medication || 'medication';
+      const slot = record.slot === 'pm' ? 'afternoon' : 'morning';
+      return record.status === 'skipped'
+        ? `${name}: ${slot} dose skipped today.`
+        : `${name}: ${slot} dose taken at ${record.time ?? 'an unlogged time'}.`;
+    }
     case 'medical':
       return medicalAppend
         ? `Updated medical visit: ${record.title || 'visit'}.`

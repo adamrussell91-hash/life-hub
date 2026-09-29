@@ -372,6 +372,17 @@ function validateHeart(record, errors) {
   finiteNumber(record, 'avg_hr', errors);
 }
 
+const MEDICATION_STATUSES = ['taken', 'skipped'];
+
+/** A dose log. `time` (common field) is when it was taken; missing log = unknown, never skipped. */
+function validateMedication(record, errors) {
+  requireString(record, 'medication', errors);
+  enumeration(record, 'status', MEDICATION_STATUSES, errors, true);
+  if (record.status === 'taken' && !isTime(record.time)) errors.push('time is required when status is taken');
+  finiteNumber(record, 'dose_mg', errors, { minimum: 0, maximum: 200 });
+  if (record.slot != null && !['am', 'pm'].includes(record.slot)) errors.push('slot must be am or pm');
+}
+
 function validateSkincare(record, errors) {
   enumeration(record, 'routine', ROUTINES, errors, true);
   booleanField(record, 'completed', errors, true);
@@ -529,6 +540,7 @@ const VALIDATORS = {
   sleep: validateSleep,
   heart: validateHeart,
   skincare: validateSkincare,
+  medication: validateMedication,
   fragrance: validateFragrance,
   bloods: validateBloods,
   medical: validateMedical,

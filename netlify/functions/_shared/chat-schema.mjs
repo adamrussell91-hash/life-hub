@@ -6,7 +6,7 @@ import { coerceCalendarDate, normalizeMedicalFields } from '../../../apps/life/j
 import { collapseSetSplitExercises } from './workout-history.mjs';
 import { slugifyWorkoutTitle } from './workout-templates.mjs';
 
-const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'bloods', 'skincare', 'mind_session', 'medical'];
+const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'bloods', 'skincare', 'mind_session', 'medical', 'medication'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const DOMAIN_PROPERTIES = {
@@ -201,6 +201,12 @@ const DOMAIN_PROPERTIES = {
       }
     }
   },
+  medication: {
+    medication: { type: 'string' },
+    status: { type: 'string', enum: ['taken', 'skipped'] },
+    slot: { type: 'string', enum: ['am', 'pm'] },
+    dose_mg: { type: 'number' }
+  },
   skincare: {
     routine: { type: 'string', enum: ['am', 'pm'] },
     completed: { type: 'boolean' },
@@ -372,6 +378,13 @@ export function buildRecordSlug(record) {
   }
   if (record.type === 'mind_session') return 'session';
   if (record.type === 'medical') return buildMedicalSlug(record.title, record.time);
+  if (record.type === 'medication') {
+    // dex-am-0740 / dex-pm-skipped: one file per dose slot per day, a correction overwrites it.
+    const stem = String(record.medication ?? 'med').toLowerCase().startsWith('dex') ? 'dex' : 'med';
+    const slot = record.slot === 'pm' ? 'pm' : 'am';
+    const when = record.status === 'skipped' ? 'skipped' : String(record.time ?? '0000').replace(':', '');
+    return `${stem}-${slot}-${when}`;
+  }
   const label = record.type === 'skincare' ? record.routine : record.type;
   if (typeof label !== 'string' || !SLUG.test(label)) {
     throw new TypeError(`Invalid slug label: ${label}`);
