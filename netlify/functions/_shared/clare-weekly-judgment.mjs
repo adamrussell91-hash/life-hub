@@ -4,6 +4,7 @@
  */
 import { loadHubAgentContext } from './hub-agent-context.mjs';
 import { createGitHubClient } from './github-client.mjs';
+import { completeMessage } from './anthropic-client.mjs';
 import { sydneyHourParts } from './remember-service.mjs';
 import { isoWeekKey } from './career-scan-service.mjs';
 import {
@@ -17,8 +18,10 @@ export const CLARE_WEEKLY_JUDGMENT_STATE_PATH = 'data/hammond/clare-weekly-judgm
 export const CLARE_JUDGMENT_MODEL = 'claude-haiku-4-5';
 export const CLARE_JUDGMENT_MAX_TOKENS = 400;
 const TIMEOUT_MS = 12_000;
+/** Sunday 19:00 Sydney primary; 20:00 retry if the model failed earlier. */
+const CLARE_JUDGMENT_HOURS = new Set([19, 20]);
 
-/** Sunday 19:00 Sydney, once per ISO week. */
+/** Sunday 19:00 / 20:00 Sydney, once per ISO week on success. */
 export function shouldRunClareWeeklyJudgmentNow(now = new Date(), state = {}) {
   const { hour, dayKey } = sydneyHourParts(now);
   const dow = new Intl.DateTimeFormat('en-AU', {
@@ -26,13 +29,13 @@ export function shouldRunClareWeeklyJudgmentNow(now = new Date(), state = {}) {
     weekday: 'short'
   }).format(now);
   const weekKey = isoWeekKey(now);
-  if (dow !== 'Sun' || hour !== 19) {
+  if (dow !== 'Sun' || !CLARE_JUDGMENT_HOURS.has(hour)) {
     return { run: false, dayKey, weekKey };
   }
   if (state?.last_success_week === weekKey) {
     return { run: false, dayKey, weekKey };
   }
-  return { run: true, dayKey, weekKey };
+  return { run: true, dayKey, weekKey, hour };
 }
 
 function extractJson(raw) {
@@ -102,32 +105,32 @@ export async function fetchClareWeeklyJudgment({
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const response = await fetchImpl('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: CLARE_JUDGMENT_MAX_TOKENS,
-        system: SYSTEM,
-        messages: [{ role: 'user', content: buildClareJudgmentUserPrompt(digest) }]
-      }),
+    const text = await completeMessage({
+      apiKey,
+      fetchImpl,
+      model,
+      maxTokens: CLARE_JUDGMENT_MAX_TOKENS,
+      system: SYSTEM,
+      messages: [{ role: 'user', content: buildClareJudgmentUserPrompt(digest) }],
       signal: ctrl.signal
     });
-    if (!response.ok) return null;
-    const json = await response.json();
-    const text = Array.isArray(json?.content)
-      ? json.content.map(part => part?.text ?? '').join('')
-      : '';
     return parseClareJudgment(text);
   } catch {
     return null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function persistJudgmentState(deps, client, nextState, sha, message) {
+  if (deps.writeState) {
+    await deps.writeState(nextState, { sha });
+    return;
+  }
+  await writeGithubJsonState(client, CLARE_WEEKLY_JUDGMENT_STATE_PATH, nextState, {
+    sha,
+    message
+  });
 }
 
 export async function runClareWeeklyJudgment({
@@ -151,13 +154,42 @@ export async function runClareWeeklyJudgment({
     ? await deps.fetchJudgment({ digest, apiKey })
     : await fetchClareWeeklyJudgment({ digest, apiKey, fetchImpl: deps.fetchImpl });
 
+  const needsClient = () => {
+    if (deps.client) return false;
+    if (!deps.writeState) return true;
+    if (!judgment) return false; // failure path only needs writeState
+    if (!deps.applyLine) return true;
+    if (judgment.status_note && !deps.queuePatch) return true;
+    return false;
+  };
+  const client = deps.client ?? (needsClient() ? createGitHubClient({ env }) : null);
+
   if (!judgment) {
-    return { ok: true, skipped: 'model_failed', weekKey: gate.weekKey };
+    // Persist the failure so it is not silent; leave last_success_week unset
+    // so the Sunday 20:00 slot can retry within the same ISO week.
+    const failState = {
+      ...state,
+      last_failure_week: gate.weekKey,
+      last_failure_at: now.toISOString(),
+      last_failure_reason: 'model_failed',
+      last_attempt_hour: gate.hour ?? null
+    };
+    await persistJudgmentState(
+      deps,
+      client,
+      failState,
+      sha,
+      `chore(clare): weekly judgment failed ${gate.weekKey}`
+    );
+    return {
+      ok: false,
+      skipped: 'model_failed',
+      weekKey: gate.weekKey,
+      hour: gate.hour,
+      will_retry: gate.hour === 19
+    };
   }
 
-  const client = deps.client ?? (deps.applyLine && deps.writeState && deps.queuePatch
-    ? null
-    : createGitHubClient({ env }));
   const apply = deps.applyLine
     ?? (args => applyScheduledCrossAgentLine({ client, ...args }));
   const applied = await apply({
@@ -191,16 +223,19 @@ export async function runClareWeeklyJudgment({
     ...state,
     last_success_week: gate.weekKey,
     last_run_at: now.toISOString(),
-    last_line: judgment.cross_agent_line
+    last_line: judgment.cross_agent_line,
+    last_failure_week: null,
+    last_failure_at: null,
+    last_failure_reason: null,
+    last_attempt_hour: gate.hour ?? null
   };
-  if (deps.writeState) {
-    await deps.writeState(nextState, { sha });
-  } else {
-    await writeGithubJsonState(client, CLARE_WEEKLY_JUDGMENT_STATE_PATH, nextState, {
-      sha,
-      message: `chore(clare): weekly judgment ${gate.weekKey}`
-    });
-  }
+  await persistJudgmentState(
+    deps,
+    client,
+    nextState,
+    sha,
+    `chore(clare): weekly judgment ${gate.weekKey}`
+  );
 
   return {
     ok: true,

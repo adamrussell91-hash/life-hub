@@ -1,11 +1,11 @@
 /**
  * Sunday Ann teaching-load one-liner → Ann→Hammond Cross-Agent (Tier 1).
- * Deterministic from Teaching scheduled lessons — no model call.
+ * Deterministic from Teaching scheduled lessons + Tasks marking shadows — no model call.
  */
 import { createGitHubClient } from './github-client.mjs';
 import { sydneyHourParts } from './remember-service.mjs';
 import { isoWeekKey } from './career-scan-service.mjs';
-import { defaultListScheduledLessons } from './hub-agent-context.mjs';
+import { defaultListScheduledLessons, defaultListTasks } from './hub-agent-context.mjs';
 import {
   applyScheduledCrossAgentLine,
   readGithubJsonState,
@@ -40,23 +40,33 @@ function isCountableLesson(item, today, until) {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today && date <= until;
 }
 
-function looksLikeMarking(item) {
-  const blob = [
-    item?.title,
-    item?.topic,
-    item?.focus,
-    item?.notes,
-    item?.kind,
-    item?.type
-  ].filter(Boolean).join(' ').toLowerCase();
-  return /\b(mark|marking|assess|assessment|moderat|feedback|grade)\b/.test(blob);
+/** Open marking-shadow tasks with return_by (or due_date) inside [today, until]. */
+export function countOpenMarkingInWindow(tasks = [], today, until) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(today ?? '') || !/^\d{4}-\d{2}-\d{2}$/.test(until ?? '')) {
+    return 0;
+  }
+  let count = 0;
+  for (const task of tasks ?? []) {
+    if (!task || typeof task !== 'object') continue;
+    if (task.status === 'done' || task.status === 'dead') continue;
+    const marking = task.marking;
+    if (!marking || typeof marking !== 'object' || Array.isArray(marking)) continue;
+    const returnBy = typeof marking.return_by === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(marking.return_by)
+      ? marking.return_by
+      : (typeof task.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(task.due_date) ? task.due_date : '');
+    if (!returnBy || returnBy < today || returnBy > until) continue;
+    count += 1;
+  }
+  return count;
 }
 
 /**
- * Build the Ann→Hammond teaching-load line from scheduled lessons in [today, today+window].
+ * Build the Ann→Hammond teaching-load line from scheduled lessons + marking tasks
+ * in [today, today+window].
  */
 export function buildAnnTeachingForecastLine({
   lessons = [],
+  tasks = [],
   today,
   windowDays = ANN_FORECAST_WINDOW_DAYS
 } = {}) {
@@ -64,13 +74,16 @@ export function buildAnnTeachingForecastLine({
   const until = addCalendarDays(today, windowDays);
   const upcoming = (lessons ?? []).filter(item => isCountableLesson(item, today, until));
   const days = new Set(upcoming.map(item => item.date));
-  const marking = upcoming.filter(looksLikeMarking).length;
+  const marking = countOpenMarkingInWindow(tasks, today, until);
   const range = `${today}–${until}`;
-  if (!upcoming.length) {
+  if (!upcoming.length && !marking) {
     return `Ann→Hammond: Teaching load ${range}: no scheduled lessons in the next ${windowDays} days.`;
   }
+  if (!upcoming.length) {
+    return `Ann→Hammond: Teaching load ${range}: no scheduled lessons; ${marking} open marking task${marking === 1 ? '' : 's'}.`;
+  }
   const markingBit = marking
-    ? `; ${marking} look assessment/marking-heavy`
+    ? `; ${marking} open marking task${marking === 1 ? '' : 's'}`
     : '';
   return `Ann→Hammond: Teaching load ${range}: ${upcoming.length} lesson${upcoming.length === 1 ? '' : 's'} across ${days.size} day${days.size === 1 ? '' : 's'}${markingBit}.`;
 }
@@ -92,8 +105,11 @@ export async function runAnnTeachingForecast({
   const today = getSydneyDateKey(now);
   const lessons = deps.lessons
     ?? await (deps.listScheduledLessons ?? defaultListScheduledLessons)(env);
+  const tasks = deps.tasks
+    ?? await (deps.listTasks ?? defaultListTasks)(env);
   const line = buildAnnTeachingForecastLine({
     lessons: Array.isArray(lessons) ? lessons : [],
+    tasks: Array.isArray(tasks) ? tasks : [],
     today
   });
   if (!line) return { ok: true, skipped: 'no_line', weekKey: gate.weekKey };

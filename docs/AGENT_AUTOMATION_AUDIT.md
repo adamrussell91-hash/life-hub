@@ -104,7 +104,7 @@ Principle from About Me: the season is comfortable, slow growth, and the hub fai
 | **Sun 18:00** | Hammond | **Weekly Review prep:** build the week pack, draft the recap and the forward lock, queue the Cross-Agent condense. Adam opens it Sunday night (it has only happened once) |
 | Sun 18:00 | Ann | Teaching forecast for the next 7–14 days (lessons, marking load) → `Ann→Hammond` line. Answers the open handoff |
 | Sun 18:00 | Ann | Teaching forecast → `Ann→Hammond:` load line (`ann-teaching-forecast-scheduled`) |
-| Sun 19:00 | Clare | Weekly judgment (Haiku) → `Clare→Hammond:` (+ optional Status Confirm); not Network flags |
+| Sun 19:00 | Clare | Weekly judgment (Haiku) → `Clare→Hammond:` (+ optional Status Confirm); retry 20:00 if model failed; not Network flags |
 | **Mon 06:30** | Sara | **Weekly health scan:** medical/body logs vs Constraints → Constraints patch into the Confirm queue; appointments from future-dated `data/body` files → Upcoming Appointments |
 | Mon 06:30 | Chadwick | Research freshness: list the areas past the 14-day `RESEARCH DUE` rule so the next session plan is fast (no web search unattended) |
 | Wed 20:00 | Hyaluronica | Nutrition→skin weekly check. If there's been no skincare log for 14+ days, one gentle Status flag, not a lecture |
@@ -154,8 +154,8 @@ Principle from About Me: the season is comfortable, slow growth, and the hub fai
 
 **Next up: app-side list (these need code because the data is in Netlify Blobs)**
 1. **Teaching lesson-panel AI runner** (§2.3). Run queued `/api/ai/jobs` lesson jobs in a background function through `runTeachingAnnTurn`. Delete the dead `/api/ai/chat` client in `apps/teaching/src/ai/client.ts`.
-2. **Clare weekly judgment (Tier 1).** **Built:** `clare-weekly-judgment-scheduled.mjs` (~19:00 Sydney Haiku) → `Clare→Hammond:` Cross-Agent (+ optional Status Confirm). Not a Network/flags restore; old intuitive-scan path stays deleted.
-3. **Ann Sunday teaching forecast.** **Built:** `ann-teaching-forecast-scheduled.mjs` (~18:00 Sydney) → deterministic `Ann→Hammond:` teaching-load line from Teaching Blobs.
+2. **Clare weekly judgment (Tier 1).** **Built:** `clare-weekly-judgment-scheduled.mjs` (~19:00 Sydney Haiku, ~20:00 retry on model failure; failure persisted in judgment state) → `Clare→Hammond:` Cross-Agent (+ optional Status Confirm). Uses shared `completeMessage` from `anthropic-client.mjs`. Not a Network/flags restore; old intuitive-scan path stays deleted.
+3. **Ann Sunday teaching forecast.** **Built:** `ann-teaching-forecast-scheduled.mjs` (~18:00 Sydney) → deterministic `Ann→Hammond:` teaching-load line from Teaching lessons + open Tasks `marking` shadows (not title guesswork).
 4. **Clementine reads Central Node** (§2.5). Load About Me, Constraints and her Cross-Agent lines in `knowledge-clementine-chat`, let her post `Clementine→` lines, and add her to the CN Agent Directory.
 5. **Knowledge URL-watch check.** Weekly scheduled run of the existing `url-watch.mjs` checker. It was last run by hand on 20 Sep.
 6. **In-app sweep heartbeat.** The Central Node page and Home show "Daily sweep missed" when the newest `Daily Sweep` governance entry is more than a day old. The automations check this weekly; the app would catch it the same morning.
