@@ -336,8 +336,10 @@ export function latestDailySweep(markdown) {
 /**
  * True when there is no Daily Sweep from today or yesterday (≈ older than 36h),
  * or the log has no parseable Daily Sweep at all.
+ * `markdown` must be a loaded string — null/undefined means "not loaded yet" (no warning).
  */
 export function isDailySweepMissed(markdown, today, { maxAgeDays = DAILY_SWEEP_MAX_AGE_DAYS } = {}) {
+  if (typeof markdown !== 'string') return false;
   if (!isCalendarDate(today)) return true;
   const sweep = latestDailySweep(markdown);
   if (!sweep) return true;
@@ -346,6 +348,8 @@ export function isDailySweepMissed(markdown, today, { maxAgeDays = DAILY_SWEEP_M
 
 /** Fail-visible Home / CN line when the Daily Sweep heartbeat is stale. */
 export function formatDailySweepMissedLine(markdown, today) {
+  // Unloaded log is not a missed sweep — avoid false alarms while data is fetching.
+  if (typeof markdown !== 'string') return null;
   const sweep = latestDailySweep(markdown);
   if (isCalendarDate(today) && sweep && daysBetween(sweep.dateKey, today) <= DAILY_SWEEP_MAX_AGE_DAYS) {
     return null;

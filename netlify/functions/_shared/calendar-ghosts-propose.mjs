@@ -23,6 +23,7 @@ import { proposeDeadlineRunwayGhosts } from './deadline-runway-ghosts.mjs';
 import { proposeWaitingFollowUpGhosts } from './waiting-follow-up-ghosts.mjs';
 import { listJSON, TASK_PREFIX } from './tasks-blobs.mjs';
 
+const WORK_BLOCK_PREFIX = 'work_blocks/';
 const DAY_MS = 86_400_000;
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const WINDOW_START_MIN = 5 * 60 + 25; // 05:25 Sydney
@@ -263,17 +264,26 @@ export async function runCalendarGhostsPropose({
   }).filter(ghost => !alreadyQueued(queue, ghost));
 
   let taskList = Array.isArray(tasks) ? tasks : [];
+  let workBlocks = [];
   if (!Array.isArray(tasks) && typeof getTasksStore === 'function') {
     try {
-      taskList = await listJSON(await getTasksStore(env), TASK_PREFIX);
+      const store = await getTasksStore(env);
+      taskList = await listJSON(store, TASK_PREFIX);
+      workBlocks = await listJSON(store, WORK_BLOCK_PREFIX).catch(() => []);
     } catch (err) {
       warn?.('calendar-ghosts-propose: tasks load failed', err);
     }
   }
 
   const prior = [...queue, ...proposed];
-  const runwayGhosts = proposeDeadlineRunwayGhosts({ tasks: taskList, today, nowIso })
-    .filter(ghost => !alreadyQueued(prior, ghost));
+  const runwayGhosts = proposeDeadlineRunwayGhosts({
+    tasks: taskList,
+    today,
+    nowIso,
+    workBlocks: Array.isArray(workBlocks) ? workBlocks : [],
+    lessons,
+    events
+  }).filter(ghost => !alreadyQueued(prior, ghost));
   const waitingGhosts = proposeWaitingFollowUpGhosts({ tasks: taskList, today, nowIso })
     .filter(ghost => !alreadyQueued(prior, ghost) && !alreadyQueued(runwayGhosts, ghost));
 

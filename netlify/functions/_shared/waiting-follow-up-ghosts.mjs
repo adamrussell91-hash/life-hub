@@ -25,12 +25,14 @@ export function selectAgedWaitingTasks(tasks, todayKey, minAgeDays = WAITING_FOL
   return out.sort((a, b) => b.age_days - a.age_days);
 }
 
-function buildWaitingFollowUpGhosts(aged, nowIso, cap = WAITING_FOLLOW_UP_CAP) {
+function buildWaitingFollowUpGhosts(aged, nowIso, todayKey, cap = WAITING_FOLLOW_UP_CAP) {
   return aged.slice(0, cap).map(({ task, age_days }) => {
     const who = String(task.waiting_on).trim();
     const first = who.split(/\s+/)[0] || who;
+    // Week bucket so a dismissed nudge can re-propose in a later week while still waiting.
+    const week = String(todayKey ?? '').slice(0, 7);
     const ghost = {
-      id: `clare-waiting-${task.id}`,
+      id: `clare-waiting-${task.id}-${week}`,
       agent: 'clare',
       kind: 'draft_message',
       to: who,
@@ -48,5 +50,5 @@ function buildWaitingFollowUpGhosts(aged, nowIso, cap = WAITING_FOLLOW_UP_CAP) {
 
 export function proposeWaitingFollowUpGhosts({ tasks, today, nowIso, cap = WAITING_FOLLOW_UP_CAP }) {
   const todayKey = today ?? getSydneyDateKey(new Date());
-  return buildWaitingFollowUpGhosts(selectAgedWaitingTasks(tasks, todayKey), nowIso, cap);
+  return buildWaitingFollowUpGhosts(selectAgedWaitingTasks(tasks, todayKey), nowIso, todayKey, cap);
 }

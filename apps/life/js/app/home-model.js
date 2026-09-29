@@ -51,7 +51,9 @@ export function buildHomeModel({
   const completeness = getLoggingCompleteness(events, date);
   const workoutStreak = calculateWorkoutStreak(events, date);
   const hammondLine = formatHammondReviewLine(latestHammondReview(governanceLogMarkdown, date));
-  const sweepMissedLine = formatDailySweepMissedLine(governanceLogMarkdown, date);
+  const sweepMissedLine = typeof governanceLogMarkdown === 'string'
+    ? formatDailySweepMissedLine(governanceLogMarkdown, date)
+    : null;
   const forecastCards = buildHomeForecastCards({ events, date, targetsConfig });
 
   return {

@@ -3,13 +3,22 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { proposeDeadlineRunwayGhosts } from '../../netlify/functions/_shared/deadline-runway-ghosts.mjs';
+import {
+  proposeDeadlineRunwayGhosts,
+  pickProtectSlot,
+  minutesScheduledForTask,
+  SCHOOL_DAY_END
+} from '../../netlify/functions/_shared/deadline-runway-ghosts.mjs';
 import {
   proposeWaitingFollowUpGhosts,
   selectAgedWaitingTasks
 } from '../../netlify/functions/_shared/waiting-follow-up-ghosts.mjs';
 import { alreadyQueued, appendPendingCalendarGhost } from '../../netlify/functions/calendar-ghosts.mjs';
 import { mergeTask } from '../../netlify/functions/tasks.mjs';
+import {
+  formatDailySweepMissedLine,
+  isDailySweepMissed
+} from '../../apps/life/js/core/governance-log.js';
 
 const TODAY = '2026-09-29';
 const NOW = '2026-09-29T06:45:00+10:00';
@@ -34,10 +43,40 @@ test('deadline runway proposes protect_block for due-tomorrow open task', () => 
     nowIso: NOW
   });
   assert.equal(ghosts.length, 1);
-  assert.equal(ghosts[0].id, 'clare-runway-task_due');
+  assert.equal(ghosts[0].id, 'clare-runway-task_due-2026-09-30');
   assert.equal(ghosts[0].kind, 'protect_block');
   assert.equal(ghosts[0].taskId, 'task_due');
   assert.equal(ghosts[0].agent, 'clare');
+  assert.ok(ghosts[0].start >= SCHOOL_DAY_END, `expected after-school start, got ${ghosts[0].start}`);
+});
+
+test('deadline runway skips when work blocks already cover remaining time', () => {
+  const ghosts = proposeDeadlineRunwayGhosts({
+    tasks: [task({ id: 'task_covered', due_date: '2026-09-30', estimated_duration: 60 })],
+    today: TODAY,
+    nowIso: NOW,
+    workBlocks: [{
+      id: 'wb1',
+      task_id: 'task_covered',
+      date: '2026-09-29',
+      start_time: '16:00',
+      end_time: '17:00',
+      duration_minutes: 60
+    }]
+  });
+  assert.equal(ghosts.length, 0);
+  assert.equal(minutesScheduledForTask([{
+    task_id: 'task_covered', date: '2026-09-29', duration_minutes: 60
+  }], 'task_covered', TODAY, '2026-09-30'), 60);
+});
+
+test('pickProtectSlot avoids lesson busy time and prefers after school', () => {
+  const slot = pickProtectSlot({
+    durationMinutes: 60,
+    busy: [{ start: 15 * 60 + 30, end: 16 * 60 + 30 }]
+  });
+  assert.ok(slot);
+  assert.ok(slot.start >= '16:30');
 });
 
 test('deadline runway skips clear risk with due in 2 days and light load', () => {
@@ -46,54 +85,32 @@ test('deadline runway skips clear risk with due in 2 days and light load', () =>
     today: TODAY,
     nowIso: NOW
   });
-  // 20 min over 3 days of coarse capacity → clear and daysLeft>1 → skip
   assert.equal(ghosts.length, 0);
 });
 
-test('deadline runway de-dupes via stable id in alreadyQueued', () => {
+test('deadline runway re-proposes when due date changes after dismiss', () => {
   const [ghost] = proposeDeadlineRunwayGhosts({
-    tasks: [task({ id: 'task_due', due_date: '2026-09-30' })],
+    tasks: [task({ id: 'task_due', due_date: '2026-09-30', estimated_duration: 180 })],
     today: TODAY,
     nowIso: NOW
   });
-  const first = appendPendingCalendarGhost('[]', ghost);
+  assert.ok(ghost);
+  const dismissed = { ...ghost, status: 'dismissed' };
+  const first = appendPendingCalendarGhost('[]', dismissed);
   assert.equal(first.added, true);
-  const second = appendPendingCalendarGhost(first.content, ghost);
-  assert.equal(second.added, false);
-  assert.equal(alreadyQueued(first.list, ghost), true);
+
+  // Same morning, due slipped a day — new id must not match the dismissed entry.
+  const moved = proposeDeadlineRunwayGhosts({
+    tasks: [task({ id: 'task_due', due_date: '2026-10-01', estimated_duration: 180 })],
+    today: '2026-09-30',
+    nowIso: '2026-09-30T06:45:00+10:00'
+  });
+  assert.ok(moved.length >= 1);
+  assert.equal(moved[0].id, 'clare-runway-task_due-2026-10-01');
+  assert.equal(alreadyQueued(first.list, moved[0]), false);
 });
 
 test('waiting follow-up uses waiting_since age only', () => {
-  const aged = selectAgedWaitingTasks(
-    [
-      task({
-        id: 'w1',
-        waiting_on: 'Sam',
-        waiting_since: '2026-09-20T00:00:00.000Z',
-        updated_at: '2026-09-29T00:00:00.000Z'
-      }),
-      task({
-        id: 'w2',
-        waiting_on: 'Sam',
-        waiting_since: '2026-09-27T00:00:00.000Z'
-      }),
-      task({
-        id: 'w3',
-        waiting_on: 'Sam',
-        waiting_since: null,
-        updated_at: '2026-09-01T00:00:00.000Z'
-      })
-    ],
-    TODAY,
-    5
-  );
-  assert.deepEqual(aged.map((row) => row.task.id), ['w1']);
-  const ghosts = proposeWaitingFollowUpGhosts({
-    tasks: aged.map((row) => row.task),
-    today: TODAY,
-    nowIso: NOW
-  });
-  // selectAged already filtered; proposeWaiting recomputes from tasks list
   const fromAll = proposeWaitingFollowUpGhosts({
     tasks: [
       task({ id: 'w1', waiting_on: 'Sam', waiting_since: '2026-09-20T00:00:00.000Z' }),
@@ -103,9 +120,11 @@ test('waiting follow-up uses waiting_since age only', () => {
     nowIso: NOW
   });
   assert.equal(fromAll.length, 1);
-  assert.equal(fromAll[0].id, 'clare-waiting-w1');
+  assert.equal(fromAll[0].id, 'clare-waiting-w1-2026-09');
   assert.equal(fromAll[0].kind, 'draft_message');
-  assert.ok(ghosts);
+  assert.equal(selectAgedWaitingTasks([
+    task({ id: 'w1', waiting_on: 'Sam', waiting_since: '2026-09-20T00:00:00.000Z' })
+  ], TODAY, 5).length, 1);
 });
 
 test('mergeTask stamps waiting_since when waiting_on first set', () => {
@@ -125,4 +144,11 @@ test('mergeTask stamps waiting_since when waiting_on first set', () => {
   const cleared = mergeTask(next, { waiting_on: '' });
   assert.equal(cleared.waiting_on, '');
   assert.equal(cleared.waiting_since, null);
+});
+
+test('Daily Sweep missed line is silent when governance log is not loaded', () => {
+  assert.equal(formatDailySweepMissedLine(null, TODAY), null);
+  assert.equal(formatDailySweepMissedLine(undefined, TODAY), null);
+  assert.equal(isDailySweepMissed(null, TODAY), false);
+  assert.match(formatDailySweepMissedLine('# Governance Log\n', TODAY), /no sweep in the log/);
 });

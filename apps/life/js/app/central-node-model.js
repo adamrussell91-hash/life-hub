@@ -161,10 +161,14 @@ export function buildCentralNodeModel({
   const eatingYear = yearDates.map(day => eatingTargetsForDay(events, day, targetsConfig));
   const domainWeekly = buildDomainWeekly(events, date);
   const crossAgent = parseCrossAgentEdges(extractCrossAgentCoordination(markdown));
-  const governanceMarkdown = typeof governanceLogMarkdown === 'string' ? governanceLogMarkdown : '';
-  const governanceOpen = openGovernanceEntries(governanceMarkdown, date);
+  const governanceOpen = openGovernanceEntries(
+    typeof governanceLogMarkdown === 'string' ? governanceLogMarkdown : '',
+    date
+  );
   const governanceHeat = buildGovernanceHeatSeries(governanceOpen, date);
-  const sweepMissedLine = formatDailySweepMissedLine(governanceMarkdown, date);
+  const sweepMissedLine = typeof governanceLogMarkdown === 'string'
+    ? formatDailySweepMissedLine(governanceLogMarkdown, date)
+    : null;
 
   const nutrition = aggregateNutrition(events, date);
   const completeness = getLoggingCompleteness(events, date);
