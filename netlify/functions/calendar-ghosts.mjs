@@ -35,6 +35,8 @@ import { defaultGetCognitiveStore } from './_shared/cognitive-store.mjs';
 import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { createCommunicationRepository } from './_shared/communication-repository.mjs';
+import { createMeetingRepository } from './_shared/meeting-repository.mjs';
+import { createEventRepository } from './_shared/event-repository.mjs';
 import { createUniversalLinkRepository } from './_shared/universal-link-repository.mjs';
 import { createAccessContext } from './_shared/entity-access.mjs';
 import { mergeTask } from './tasks.mjs';
@@ -303,7 +305,7 @@ export function ghostTaskId(ghostId) {
   return `ghost-${ghostId}`;
 }
 
-/** Accept of a book_comm / log_comm ghost: create the communication (and optional thread link). */
+/** Accept of a book_comm / log_comm / pro_meeting / pro_event ghost. */
 export async function applyProfessionalStep(deps, step) {
   if (step.action === 'log_communication') {
     const time = typeof step.time === 'string' && step.time ? step.time : '12:00';
@@ -320,6 +322,49 @@ export async function applyProfessionalStep(deps, step) {
       links: personRefs.map((ref) => ({ relationship_type: 'recipient', target_ref: ref }))
     });
     return communication;
+  }
+  if (step.action === 'create_meeting') {
+    if (typeof deps.createMeeting !== 'function') {
+      throw new TypeError('createMeeting is not available for this ghost accept');
+    }
+    const timeZone = step.time_zone || 'Australia/Sydney';
+    const scheduled_start = step.scheduled_start
+      || wallLocalToUtcIso(`${step.date}T${step.start}`, timeZone);
+    const scheduled_end = step.scheduled_end
+      || wallLocalToUtcIso(`${step.date}T${step.end}`, timeZone);
+    const attendeeRefs = Array.isArray(step.attendee_refs) ? step.attendee_refs : [];
+    const { meeting } = await deps.createMeeting({
+      title: step.title,
+      scheduled_start,
+      scheduled_end,
+      time_zone: timeZone,
+      location_text: step.location_text ?? null,
+      agenda: step.agenda ?? null,
+      notes: step.notes ?? null,
+      links: attendeeRefs.map((ref) => ({ relationship_type: 'attendee', target_ref: ref }))
+    });
+    return meeting;
+  }
+  if (step.action === 'create_event') {
+    if (typeof deps.createEvent !== 'function') {
+      throw new TypeError('createEvent is not available for this ghost accept');
+    }
+    const timeZone = step.time_zone || 'Australia/Sydney';
+    const start = step.start_iso || wallLocalToUtcIso(`${step.date}T${step.start}`, timeZone);
+    const end = step.end_iso || wallLocalToUtcIso(`${step.date}T${step.end}`, timeZone);
+    const attendeeRefs = Array.isArray(step.attendee_refs) ? step.attendee_refs : [];
+    const { event } = await deps.createEvent({
+      title: step.title,
+      start,
+      end,
+      time_zone: timeZone,
+      event_type: step.event_type || 'professional_development',
+      all_day: step.all_day === true,
+      location_text: step.location_text ?? null,
+      hours: step.hours ?? null,
+      links: attendeeRefs.map((ref) => ({ relationship_type: 'attendee', target_ref: ref }))
+    });
+    return event;
   }
   if (step.action !== 'create_communication') throw new TypeError(`Unknown professional step: ${step.action}`);
   const start = wallLocalToUtcIso(`${step.date}T${step.time}`, step.time_zone);
@@ -390,7 +435,10 @@ export async function queueCalendarGhostDualPath({
   agentSlug,
   proposeOsAction,
   send,
-  validateProposeActionInput
+  validateProposeActionInput,
+  extraWrites = null,
+  intent = null,
+  surfaces = null
 }) {
   const tree = await client.resolveTree();
   const blob = (tree.tree ?? []).find(item => item.path === PENDING_CALENDAR_GHOSTS_PATH && item.type === 'blob');
@@ -412,8 +460,19 @@ export async function queueCalendarGhostDualPath({
     });
   }
   const confirmInput = calendarGhostConfirmProposal(entry);
+  const companions = Array.isArray(extraWrites) ? extraWrites.filter(Boolean) : [];
+  const proposalInput = companions.length
+    ? {
+      ...confirmInput,
+      intent: (typeof intent === 'string' && intent.trim()) || confirmInput.intent,
+      surfaces: Array.isArray(surfaces) && surfaces.length
+        ? surfaces
+        : ['confirm_card', 'calendar', 'governance_log'],
+      writes: [...companions, ...confirmInput.writes]
+    }
+    : confirmInput;
   const validated = typeof validateProposeActionInput === 'function'
-    ? validateProposeActionInput(confirmInput, { agentSlug })
+    ? validateProposeActionInput(proposalInput, { agentSlug })
     : { ok: false };
   let pendingId = null;
   if (validated.ok && typeof proposeOsAction === 'function') {
@@ -421,13 +480,13 @@ export async function queueCalendarGhostDualPath({
   }
   const writes = validated.ok
     ? validated.proposal.writes
-    : confirmInput.writes;
+    : proposalInput.writes;
   return {
     ok: true,
     status: 'awaiting_confirm',
     id: entry.id,
     ghost_status: added ? 'queued' : 'already_queued',
-    intent: validated.ok ? validated.proposal.intent : confirmInput.intent,
+    intent: validated.ok ? validated.proposal.intent : proposalInput.intent,
     writes: writes.map(write => ({
       path: write.path,
       mode: write.mode,
@@ -1027,11 +1086,15 @@ export function createCalendarGhostsHandler({
         professionalDeps: async () => {
           const professionalStore = await defaultGetProfessionalStore(env);
           const repo = createCommunicationRepository({ store: professionalStore, env });
+          const meetingRepo = createMeetingRepository({ store: professionalStore, env });
+          const eventRepo = createEventRepository({ store: professionalStore, env });
           const universalLinkStore = await defaultGetUniversalLinkStore(env);
           const links = createUniversalLinkRepository({ store: universalLinkStore });
           const accessContext = createAccessContext({ workflow: 'life' });
           return {
             createCommunication: (input) => repo.createCommunication(input),
+            createMeeting: (input) => meetingRepo.createMeeting(input),
+            createEvent: (input) => eventRepo.createEvent(input),
             createLink: (link) => links.createLink(link, accessContext)
           };
         },

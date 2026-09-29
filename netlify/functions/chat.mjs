@@ -328,6 +328,24 @@ import {
 } from './_shared/people-agent.mjs';
 import { buildObservationProposal } from './_shared/observation-agent.mjs';
 import { buildRememberFactProposal } from './_shared/remember-fact-agent.mjs';
+import {
+  buildMeetingProposal,
+  buildEventProposal
+} from './_shared/meeting-event-agent.mjs';
+import {
+  buildApplicationProposal,
+  buildFutureProposal
+} from './_shared/career-agent.mjs';
+import { buildTieDecisionProposal } from './_shared/tie-decision-agent.mjs';
+import { buildWorkoutTemplateProposal } from './_shared/workout-template-agent.mjs';
+import {
+  buildTravelCheckinProposal,
+  buildTravelItemProposal
+} from './_shared/travel-agent.mjs';
+import { buildKnowledgePageProposal } from './_shared/knowledge-page-agent.mjs';
+import { buildHubPrefsProposal } from './_shared/hub-prefs-agent.mjs';
+import { buildFollowUpProposal } from './_shared/follow-up-agent.mjs';
+import { createTravelRepository } from './_shared/travel-repository.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolvers.mjs';
 import { buildBindingGoal } from '../../apps/life/js/app/binding-goal.js';
@@ -1865,6 +1883,218 @@ export function createChatHandler({
                 }
                 if (!built.ok) {
                   return JSON.stringify({ ok: false, error: built.error, ...(built.detail ? { detail: built.detail } : {}) });
+                }
+                const validated = validateProposeActionInput(built.proposal, { agentSlug: slug });
+                if (!validated.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: validated.error,
+                    ...(validated.detail ? { detail: validated.detail } : {})
+                  });
+                }
+                const pendingId = await proposeOsAction(validated.proposal);
+                return JSON.stringify({
+                  ok: true,
+                  status: 'awaiting_confirm',
+                  message: 'Waiting on Adam\'s Confirm. Nothing is saved yet.',
+                  changes: validated.proposal.writes.map(write => write.diff),
+                  ...(pendingId ? { pendingId } : {})
+                });
+              }
+              if (event.name === 'save_workout_template') {
+                const built = buildWorkoutTemplateProposal(event.input ?? {}, {
+                  workoutRecords
+                });
+                if (!built.ok) {
+                  return JSON.stringify({ ok: false, error: built.error, ...(built.detail ? { detail: built.detail } : {}) });
+                }
+                const validated = validateProposeActionInput(built.proposal, { agentSlug: slug });
+                if (!validated.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: validated.error,
+                    ...(validated.detail ? { detail: validated.detail } : {})
+                  });
+                }
+                const pendingId = await proposeOsAction(validated.proposal);
+                return JSON.stringify({
+                  ok: true,
+                  status: 'awaiting_confirm',
+                  message: 'Waiting on Adam\'s Confirm. Nothing is saved yet.',
+                  changes: validated.proposal.writes.map(write => write.diff),
+                  ...(pendingId ? { pendingId } : {})
+                });
+              }
+              if (event.name === 'propose_travel_item' || event.name === 'propose_travel_checkin') {
+                const loadTrip = async (tripId) => {
+                  const repo = createTravelRepository({ env, fetchImpl });
+                  return repo.getTrip(tripId);
+                };
+                const built = event.name === 'propose_travel_item'
+                  ? await buildTravelItemProposal(event.input ?? {}, { loadTrip })
+                  : await buildTravelCheckinProposal(event.input ?? {}, { loadTrip });
+                if (!built.ok) {
+                  return JSON.stringify({ ok: false, error: built.error, ...(built.detail ? { detail: built.detail } : {}) });
+                }
+                const validated = validateProposeActionInput(built.proposal, { agentSlug: slug });
+                if (!validated.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: validated.error,
+                    ...(validated.detail ? { detail: validated.detail } : {})
+                  });
+                }
+                const pendingId = await proposeOsAction(validated.proposal);
+                return JSON.stringify({
+                  ok: true,
+                  status: 'awaiting_confirm',
+                  message: 'Waiting on Adam\'s Confirm. Nothing is saved yet.',
+                  changes: validated.proposal.writes.map(write => write.diff),
+                  ...(pendingId ? { pendingId } : {})
+                });
+              }
+              if (event.name === 'propose_knowledge_page') {
+                const built = buildKnowledgePageProposal(event.input ?? {});
+                if (!built.ok) {
+                  return JSON.stringify({ ok: false, error: built.error, ...(built.detail ? { detail: built.detail } : {}) });
+                }
+                const validated = validateProposeActionInput(built.proposal, { agentSlug: slug });
+                if (!validated.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: validated.error,
+                    ...(validated.detail ? { detail: validated.detail } : {})
+                  });
+                }
+                const pendingId = await proposeOsAction(validated.proposal);
+                return JSON.stringify({
+                  ok: true,
+                  status: 'awaiting_confirm',
+                  message: 'Waiting on Adam\'s Confirm. Nothing is saved yet.',
+                  changes: validated.proposal.writes.map(write => write.diff),
+                  ...(pendingId ? { pendingId } : {})
+                });
+              }
+              if (event.name === 'propose_hub_prefs') {
+                const built = buildHubPrefsProposal(event.input ?? {});
+                if (!built.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: built.error,
+                    ...(built.detail ? { detail: built.detail } : {}),
+                    ...(built.notes ? { notes: built.notes } : {})
+                  });
+                }
+                const validated = validateProposeActionInput(built.proposal, { agentSlug: slug });
+                if (!validated.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: validated.error,
+                    ...(validated.detail ? { detail: validated.detail } : {})
+                  });
+                }
+                const pendingId = await proposeOsAction(validated.proposal);
+                return JSON.stringify({
+                  ok: true,
+                  status: 'awaiting_confirm',
+                  message: 'Waiting on Adam\'s Confirm. Nothing is saved yet.',
+                  changes: validated.proposal.writes.map(write => write.diff),
+                  notes: built.notes,
+                  ...(pendingId ? { pendingId } : {})
+                });
+              }
+              if (event.name === 'propose_follow_up') {
+                const built = buildFollowUpProposal(event.input ?? {}, {
+                  agent: slug,
+                  nowIso: () => getSydneyTimestamp(nowInstant)
+                });
+                if (!built.ok) {
+                  return JSON.stringify({ ok: false, error: built.error, ...(built.detail ? { detail: built.detail } : {}) });
+                }
+                if (built.ghostInput) {
+                  try {
+                    const entry = calendarGhostFromToolInput(built.ghostInput, {
+                      agent: slug,
+                      nowIso: getSydneyTimestamp(nowInstant)
+                    });
+                    return JSON.stringify(await queueCalendarGhostDualPath({
+                      client,
+                      entry,
+                      agentSlug: slug,
+                      proposeOsAction,
+                      send,
+                      validateProposeActionInput,
+                      extraWrites: built.proposal.writes,
+                      intent: built.proposal.intent,
+                      surfaces: ['confirm_card', 'calendar', 'governance_log']
+                    }));
+                  } catch (error) {
+                    return JSON.stringify({
+                      ok: false,
+                      error: 'invalid_follow_up_ghost',
+                      detail: error instanceof Error ? error.message : 'invalid ghost'
+                    });
+                  }
+                }
+                const validated = validateProposeActionInput(built.proposal, { agentSlug: slug });
+                if (!validated.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: validated.error,
+                    ...(validated.detail ? { detail: validated.detail } : {})
+                  });
+                }
+                const pendingId = await proposeOsAction(validated.proposal);
+                return JSON.stringify({
+                  ok: true,
+                  status: 'awaiting_confirm',
+                  message: 'Waiting on Adam\'s Confirm. Nothing is saved yet.',
+                  changes: validated.proposal.writes.map(write => write.diff),
+                  ...(pendingId ? { pendingId } : {})
+                });
+              }
+              if (
+                event.name === 'propose_meeting'
+                || event.name === 'propose_event'
+                || event.name === 'propose_application'
+                || event.name === 'propose_future'
+                || event.name === 'propose_tie_decision'
+              ) {
+                let built;
+                if (event.name === 'propose_meeting') built = buildMeetingProposal(event.input ?? {});
+                else if (event.name === 'propose_event') built = buildEventProposal(event.input ?? {});
+                else if (event.name === 'propose_application') built = buildApplicationProposal(event.input ?? {});
+                else if (event.name === 'propose_future') built = buildFutureProposal(event.input ?? {});
+                else built = buildTieDecisionProposal(event.input ?? {});
+                if (!built.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: built.error,
+                    ...(built.detail ? { detail: built.detail } : {})
+                  });
+                }
+                // Timed meetings/events: Confirm + calendar ghost (Accept creates via ghost plan).
+                if (built.ghostInput) {
+                  try {
+                    const entry = calendarGhostFromToolInput(built.ghostInput, {
+                      agent: slug,
+                      nowIso: getSydneyTimestamp(nowInstant)
+                    });
+                    return JSON.stringify(await queueCalendarGhostDualPath({
+                      client,
+                      entry,
+                      agentSlug: slug,
+                      proposeOsAction,
+                      send,
+                      validateProposeActionInput
+                    }));
+                  } catch (error) {
+                    return JSON.stringify({
+                      ok: false,
+                      error: 'invalid_ghost',
+                      detail: error instanceof Error ? error.message : 'invalid ghost'
+                    });
+                  }
                 }
                 const validated = validateProposeActionInput(built.proposal, { agentSlug: slug });
                 if (!validated.ok) {

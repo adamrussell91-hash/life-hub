@@ -673,6 +673,87 @@
         "calendar"
       ],
       "tool_name": "propose_log_communication"
+    },
+    "fitness.save-workout-template": {
+      "file": "fitness/save-workout-template.json",
+      "agents": [
+        "chadwick"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "fitness_tab",
+        "governance_log"
+      ],
+      "tool_name": "save_workout_template"
+    },
+    "travel.propose-item": {
+      "file": "travel/propose-item.json",
+      "agents": [
+        "clare",
+        "hammond"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "travel",
+        "governance_log"
+      ],
+      "tool_name": "propose_travel_item"
+    },
+    "travel.propose-checkin": {
+      "file": "travel/propose-checkin.json",
+      "agents": [
+        "clare",
+        "hammond"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "travel",
+        "governance_log"
+      ],
+      "tool_name": "propose_travel_checkin"
+    },
+    "knowledge.propose-page": {
+      "file": "knowledge/propose-page.json",
+      "agents": [
+        "clementine"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "knowledge",
+        "governance_log"
+      ],
+      "tool_name": "propose_knowledge_page"
+    },
+    "prefs.propose-hub-prefs": {
+      "file": "prefs/propose-hub-prefs.json",
+      "agents": [
+        "clare",
+        "hammond"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_hub_prefs"
+    },
+    "tasks.propose-follow-up": {
+      "file": "tasks/propose-follow-up.json",
+      "agents": [
+        "clare",
+        "hammond"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "calendar",
+        "governance_log"
+      ],
+      "tool_name": "propose_follow_up"
     }
   }
 }

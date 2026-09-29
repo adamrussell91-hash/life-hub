@@ -28,6 +28,11 @@ import {
 import { proposeObservationSchema } from '../observation-agent.mjs';
 import { proposeRememberFactSchema } from '../remember-fact-agent.mjs';
 import { proposeLogCommunicationSchema } from '../log-comm-agent.mjs';
+import { saveWorkoutTemplateSchema } from '../workout-template-agent.mjs';
+import { proposeTravelCheckinSchema, proposeTravelItemSchema } from '../travel-agent.mjs';
+import { proposeKnowledgePageSchema } from '../knowledge-page-agent.mjs';
+import { proposeHubPrefsSchema } from '../hub-prefs-agent.mjs';
+import { proposeFollowUpSchema } from '../follow-up-agent.mjs';
 import {
   searchMedicalRecordsSchema,
   briefMedicalAppointmentSchema
@@ -339,6 +344,12 @@ export function buildAgentTools({
   if (has('people.propose-organisation-changes')) tools.push(proposeOrganisationChangesSchema());
   if (has('people.propose-observation')) tools.push(proposeObservationSchema());
   if (has('people.propose-remember-fact')) tools.push(proposeRememberFactSchema());
+  if (has('fitness.save-workout-template')) tools.push(saveWorkoutTemplateSchema());
+  if (has('travel.propose-item')) tools.push(proposeTravelItemSchema());
+  if (has('travel.propose-checkin')) tools.push(proposeTravelCheckinSchema());
+  if (has('knowledge.propose-page')) tools.push(proposeKnowledgePageSchema());
+  if (has('prefs.propose-hub-prefs')) tools.push(proposeHubPrefsSchema());
+  if (has('tasks.propose-follow-up')) tools.push(proposeFollowUpSchema());
 
   // Domain retrieval parity tools (read-only). Skip names already attached.
   const attached = new Set(tools.map(tool => tool.name).filter(Boolean));

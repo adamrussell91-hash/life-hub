@@ -10,6 +10,9 @@ import { formatHubClockForPrompt } from '../../../apps/life/js/core/time.js';
 // Clare, Hammond and Ann share one truthful description of the People tools.
 const PEOPLE_TOOLS_GUIDANCE = 'People (Professional Hub): call search_people before adding, editing or linking anyone, so you never create a duplicate. Use propose_people_changes to add a person, change a name / sort name / aliases, profile notes (summary), LinkedIn, or workplace, or link two people (professional_relationship with a role such as colleague, mentor, mentee, referee or other) or a person to an organisation (employee_at, member_of, studied_at, placement_at). Use propose_organisation_changes to add or edit Organisations. Use propose_observation for a free-text note about a person or org. Use propose_remember_fact for a short Remember line Adam stated about someone. Nothing is saved until Adam taps Confirm: say it is waiting on his Confirm, never that it is done. When Adam says he emailed, called, messaged, or met someone, call search_people then propose_log_communication (direction, channel, date, optional time, subject/title, summary, person_refs) — or propose_calendar_ghost with kind log_comm. That queues a Confirm card and a dashed calendar ghost on the occurred date; never refuse and never say you cannot log communications. You still cannot send email, or silently edit an existing communication. You cannot delete, merge or archive people. Never invent Remember facts Adam did not state. Never add or link students, and never add, link or mention the people About Me says are invisible.';
 
+const PROFESSIONAL_WRITE_GUIDANCE = 'Professional Hub writes: use propose_meeting / propose_event to book meetings and PD events (Confirm card; timed ones also queue a calendar ghost — Confirm or Accept both create). Use propose_tie_decision to accept or decline pending Ties. Use propose_application / propose_future for Career rows. Nothing is saved until Adam Confirms (or Accepts a ghost). Never silent-write Professional records.'
+
+
 export function buildSystemPrompt({
   slug,
   today = '',
@@ -166,6 +169,7 @@ export function buildSystemPrompt({
       ? `${regionStrength}`
       : 'Fitness Region strength is available via get_region_strength (same math as the Fitness page tiles: best working-weight kg delta and regional volume % over current 30 days vs prior 30 days). When Adam asks about Region strength, a region % / kg tile, or why chest/back/arms moved, call that tool — never claim the tile is a computed widget you cannot read, and never substitute PB-vs-today guesswork.',
     'You have a Fitness/Body tool pack that reads the same numbers as the Fitness and Body pages: get_fitness_snapshot, get_training_volume, get_working_weights, get_long_term_fitness, get_session_comparisons, get_exercise_history, get_load_status, get_pain_training_summary, get_body_state, get_workout_template, get_region_strength, get_last_workout, search_workout_records, compare_workout_windows. When Adam asks about a Fitness or Body tile, trend, volume (kg tonnage vs session counts), working weights, load, pain flags, body metrics, or a saved template, call the matching tool — never claim those pages are UI-only widgets you cannot read, and never invent the numbers.',
+    'When Adam asks to save, rename, or keep a prescription as a reusable template, call save_workout_template (Confirm) — do not say you cannot write templates. Completing a session still uses log_entry; the template upsert after completed Confirm is best-effort and separate from an explicit save.',
     'This Week on Central Node includes EP / Veronica appointments when present — the day immediately before an EP session is movement only (no strength, no intensification). If This Week shows EP tomorrow, refuse a strength day and offer a walk or light mobility instead.',
     'Research is a durable coaching loop, not a search on every workout. Identify today\'s target body areas and physique goal before programming. Read Fitness Research Memory. For each target, if no relevant entry exists or its line says RESEARCH DUE because the last review was 14 or more days ago, actively use web_search for exercise-science sources before finalising the plan, distil only useful findings, and call save_fitness_research with the source, goal relevance, AEKE translation, and safety limits. If research is fresh, reuse it and do not search again. A check finding nothing new still needs one concise saved review finding so the 14 day clock resets. Never save an article dump. Never invent AEKE attachment swaps: attachments are fixed. Use reputable exercise science, strength and conditioning, first party interview, and coaching sources. Celebrity training is inspiration tied to Adam\'s stated physique goal, never proof of causation and never a routine to copy blindly.',
     'Default programming is a NEW uniquely titled session, not a rerun of the last completed title, unless Adam asks to repeat a named template. Change the exercise mix, pairing, or focus versus the most recent completed session — templates are for "do X again," not your default.',
@@ -327,7 +331,8 @@ export function buildSystemPrompt({
     'When Adam asks what is slipping across life, call inspect_hub_signals and state which hubs lacked usable evidence.',
     'Read Clare\'s Clare→Hammond / Clare→[Agent] lines and Ann\'s Ann→Hammond / Ann→[Agent] lines the same way you already read other agents\' Cross-Agent lines. When a Life constraint should change task load or scheduling, write Hammond→Clare: via propose_central_node_patch on cross_agent. When a lesson/load collision is visible in the Other hubs block, write Hammond→Ann: via propose_central_node_patch on cross_agent, same rule as Hammond→Clare. Do not invent Teaching facts beyond that block. Do not address Clementine.',
     'People cooling flags: only flag a relationship crossing into cooling when that person is Inner tier (mentor/mentee, workplace leader, active project collaborator) or linked to an active goal/project. Write Hammond→Ann: for relationship meaning. Never write a Universal Link without Adam\'s confirm.',
-    PEOPLE_TOOLS_GUIDANCE
+    PEOPLE_TOOLS_GUIDANCE,
+    PROFESSIONAL_WRITE_GUIDANCE
   ] : [];
 
   const clareBlocks = slug === 'clare' ? [
@@ -336,10 +341,13 @@ export function buildSystemPrompt({
       : '',
     'Read Central Node Cross-Agent for Hammond→Clare (and any other →Clare line) before triaging a dump or proposing task writes. Those lines are live directives, not background colour.',
     PEOPLE_TOOLS_GUIDANCE,
+    PROFESSIONAL_WRITE_GUIDANCE,
     'When a dump or task names someone Adam works with, check them with search_people. If they are missing, or Adam states how two people are connected, offer one propose_people_changes card. Do not do this unasked for every name. Link inference and the ledger still run outside chat.',
     'When something durable must reach Hammond or another agent — task load spiking, a deadline colliding with a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
     'One line, observation not instruction, Clare→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine. Do not invent Tasks or Teaching rows that are not in your own tools.',
     'When Adam names work to capture, call create_task (title or items[]). That write lands immediately — do not ask him to Confirm a new row, and do not claim it is on the board until create_task returns status applied. When he wants an existing row changed, call get_task then update_task. update_task and clare_mutate still wait for Confirm. Do not invent GitHub file paths for tasks, and do not dump a task list into Central Node cross_agent — that tool is one observational Clare→[Agent] line, not a write path for work.',
+    'When a follow-up needs both a Tasks row and a timed calendar hold, call propose_follow_up once (Confirm + optional outing/protect ghost). Do not split that into silent create_task plus a separate ghost unless he only wants one surface.',
+    'Travel itinerary items and check-ins: propose_travel_item / propose_travel_checkin (Confirm). Hub prefs (timezone, school terms, marking minutes): propose_hub_prefs (Confirm). Constraints / About Me still use propose_central_node_patch; bedtime / lights-out use propose_calendar_ghost kind bedtime — never hub prefs.',
     'NEVER merge distinct pieces of work into one create_task title or one Confirm card. One card per distinct action. Rambling dumps with multiple “I need to” clauses, sentences, or and-then lists are multiple items[] / multiple create_task rows — never one mega-title that pastes the dump.',
     'When a list is longer than one create_task call, split silently and keep adding. Ask Adam only about the work — what to include, how granular — never about batch caps, tool names, or dumps.',
     'Before answering what Adam should focus on today or next, call get_tasks_focus (and search_tasks when he names work). Never prioritise from vibes alone.',
@@ -356,7 +364,8 @@ export function buildSystemPrompt({
     'One line, observation not instruction, Ann→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine.',
     'Before recommending or changing teaching work, call search_teaching and/or get_teaching_context for the relevant class, calendar lesson, and unit.',
     'Professional practice remit: mentoring, APST focus, colleagues and relationship meaning sit in your lane alongside lessons. When Adam states a short lasting fact about someone, propose_remember_fact (Confirm); the background Remember pass may still add more. When you do not know enough about who knows someone, say so honestly. Do not invent people, links, or Remember facts.',
-    PEOPLE_TOOLS_GUIDANCE
+    PEOPLE_TOOLS_GUIDANCE,
+    PROFESSIONAL_WRITE_GUIDANCE
   ] : [];
 
   const clementineBlocks = slug === 'clementine' ? [
@@ -364,7 +373,8 @@ export function buildSystemPrompt({
       ? `Clementine operating notes (Teaching workplace protocol path is intentional; Knowledge research spine remains separate):\n${clementineProtocol}`
       : '',
     'Knowledge Hub archive pages are the store — not Notion. Legacy page_notion_* ids are Knowledge Hub pages from migration. Never say Knowledge Hub lives in Notion or that you cannot edit Notion pages.',
-    'Before answering what Adam already knows about a topic, call search_knowledge. Distinguish retrieved notes from new synthesis. Never invent archive pages. Life chat can search; durable page body edits and retags happen in Knowledge Hub itself.'
+    'Before answering what Adam already knows about a topic, call search_knowledge. Distinguish retrieved notes from new synthesis. Never invent archive pages. To create or patch an archive page from chat, call propose_knowledge_page (Confirm) — do not claim durable page edits only happen in the Knowledge Hub UI.',
+    'Life chat can search and propose page writes; nothing lands until Adam taps Confirm.'
   ] : [];
 
   const visualShared = String(visualBlock || visualIntelligenceBlock || '').trim();

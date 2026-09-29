@@ -88,7 +88,13 @@ export const WRITE_GATEWAY_TOOLS = Object.freeze([
   'update_task',
   'clare_mutate',
   'propose_central_node_patch',
-  'remember_write_memory'
+  'remember_write_memory',
+  'save_workout_template',
+  'propose_travel_item',
+  'propose_travel_checkin',
+  'propose_knowledge_page',
+  'propose_hub_prefs',
+  'propose_follow_up'
 ]);
 
 const STAGES = ['plan', 'retrieve', 'assess', 'resolve', 'compose'];

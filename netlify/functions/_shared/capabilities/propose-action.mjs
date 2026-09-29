@@ -8,6 +8,7 @@ import {
   writeIndex
 } from '../tasks-blobs.mjs';
 import { getJSON as getTeachingJSON, setJSON as setTeachingJSON } from '../teaching-blobs.mjs';
+import { mergeHubPrefsPatch } from '../hub-prefs-agent.mjs';
 
 const BLOB_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 const TASKS_PROJECTS_INDEX = 'projects/_index';
@@ -139,7 +140,10 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
     if (!isPathAllowedForAgent(agentSlug, path, { mode: 'write' })) {
       return { ok: false, error: 'write_path_denied', detail: path };
     }
-    if (classifyWriteTarget(path).store === 'people') {
+    const writeTarget = classifyWriteTarget(path);
+    if (writeTarget.store === 'people'
+      || writeTarget.store === 'travel'
+      || writeTarget.store === 'knowledge') {
       let body = null;
       try {
         body = JSON.parse(content);
@@ -147,7 +151,15 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
         body = null;
       }
       if (!body || typeof body !== 'object' || Array.isArray(body) || mode === 'delete' || mode === 'append') {
-        return { ok: false, error: 'invalid_people_write', detail: path };
+        return {
+          ok: false,
+          error: writeTarget.store === 'people'
+            ? 'invalid_people_write'
+            : writeTarget.store === 'travel'
+              ? 'invalid_travel_write'
+              : 'invalid_knowledge_write',
+          detail: path
+        };
       }
     }
 
@@ -389,6 +401,9 @@ export function classifyWriteTarget(path) {
   if (store === 'tasks' && kind === 'work_session' && BLOB_ID.test(id)) {
     return { store: 'tasks', kind, id, key: `work_sessions/${id}`, path: raw };
   }
+  if (store === 'tasks' && kind === 'meta' && id === 'hub_prefs') {
+    return { store: 'tasks', kind, id, key: 'meta/hub_prefs', path: raw };
+  }
   if (store === 'teaching' && kind === 'unit' && BLOB_ID.test(id)) {
     return { store: 'teaching', kind, id, key: `units/${id}`, path: raw };
   }
@@ -410,7 +425,16 @@ export function classifyWriteTarget(path) {
   if (store === 'people' && kind === 'remember' && /^new-[A-Za-z0-9_-]{1,40}$/.test(id)) {
     return { store: 'people', kind, id, path: raw };
   }
-  if (store === 'tasks' || store === 'teaching' || store === 'people') {
+  // Travel trips (life-data) and Knowledge pages (knowledge-hub-data) use
+  // dedicated Confirm executors — never raw Blob / life-data dumps.
+  if (store === 'travel' && kind === 'trip' && BLOB_ID.test(id)) {
+    return { store: 'travel', kind, id, path: raw };
+  }
+  if (store === 'knowledge' && kind === 'page' && BLOB_ID.test(id)) {
+    return { store: 'knowledge', kind, id, path: raw };
+  }
+  if (store === 'tasks' || store === 'teaching' || store === 'people'
+    || store === 'travel' || store === 'knowledge') {
     return { store: 'unknown', path: raw };
   }
   return { store: 'github', path: raw };
@@ -716,6 +740,34 @@ export async function executeProposeActionWrites(client, proposal, {
       continue;
     }
 
+    if (target.store === 'travel') {
+      if (write.mode === 'delete') {
+        return { ok: false, error: 'travel_delete_unsupported', detail: write.path, results };
+      }
+      const travel = blobStores.travel;
+      if (!travel || typeof travel.apply !== 'function') {
+        return { ok: false, error: 'travel_store_unbound', detail: write.path, results };
+      }
+      const applied = await travel.apply(write, target);
+      if (!applied.ok) return { ...applied, results };
+      results.push(applied.result);
+      continue;
+    }
+
+    if (target.store === 'knowledge') {
+      if (write.mode === 'delete') {
+        return { ok: false, error: 'knowledge_delete_unsupported', detail: write.path, results };
+      }
+      const knowledge = blobStores.knowledge;
+      if (!knowledge || typeof knowledge.apply !== 'function') {
+        return { ok: false, error: 'knowledge_store_unbound', detail: write.path, results };
+      }
+      const applied = await knowledge.apply(write, target);
+      if (!applied.ok) return { ...applied, results };
+      results.push(applied.result);
+      continue;
+    }
+
     if (target.store === 'tasks' || target.store === 'teaching') {
       if (write.mode === 'delete') {
         return { ok: false, error: 'blob_delete_unsupported', detail: write.path, results };
@@ -724,12 +776,22 @@ export async function executeProposeActionWrites(client, proposal, {
       if (!store) return { ok: false, error: `${target.store}_blobs_unbound`, detail: write.path, results };
       const existing = state[write.path]?.record
         ?? (typeof state[write.path]?.content === 'string' ? parseBlobRecord(state[write.path].content) : null);
+      if (target.store === 'tasks' && target.kind === 'meta' && target.id === 'hub_prefs') {
+        const incoming = parseBlobRecord(write.content);
+        if (!incoming) return { ok: false, error: 'invalid_blob_content', detail: write.path, results };
+        const record = mergeHubPrefsPatch(existing, incoming, { nowIso });
+        await setTasksJSON(store, target.key, record);
+        results.push({ path: write.path, mode: write.mode, id: target.id, updated_at: record.updated_at });
+        state[write.path] = { record };
+        continue;
+      }
       const applied = await executeBlobWrite(write, target, {
         existing,
         store,
         setJSON: target.store === 'tasks' ? setTasksJSON : setTeachingJSON,
         nowIso,
         touchIndex: target.store === 'tasks'
+          && ['task', 'project', 'work_block', 'work_session'].includes(target.kind)
       });
       if (!applied.ok) return { ...applied, results };
       results.push(applied.result);

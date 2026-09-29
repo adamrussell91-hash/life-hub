@@ -19,7 +19,14 @@
     "people:organisation:*",
     "people:link:*",
     "people:observation:*",
-    "people:remember:*"
+    "people:remember:*",
+    "travel:trip:*",
+    "tasks:meta:hub_prefs",
+    "professional:meeting:*",
+    "professional:event:*",
+    "professional:tie:*",
+    "professional:application:*",
+    "professional:future:*"
   ],
   "read_globs": [
     "central-node.md",
@@ -36,7 +43,14 @@
     "people:organisation:*",
     "people:link:*",
     "people:observation:*",
-    "people:remember:*"
+    "people:remember:*",
+    "travel:trip:*",
+    "tasks:meta:hub_prefs",
+    "professional:meeting:*",
+    "professional:event:*",
+    "professional:tie:*",
+    "professional:application:*",
+    "professional:future:*"
   ],
-  "notes": "Longitudinal owner. Full CN + governance write rights; can loan CN writes to specialists in Phase 1. May read/write Tasks work blocks when reconciling Clare schedules. People: search_people reads; propose_* tools queue `people:person:*` / `people:organisation:*` / `people:link:*` / `people:observation:*` / `people:remember:*` writes for Confirm."
+  "notes": "Longitudinal owner. Full CN + governance write rights; can loan CN writes to specialists in Phase 1. May read/write Tasks work blocks when reconciling Clare schedules. People: search_people reads; propose_* tools queue `people:person:*` / `people:organisation:*` / `people:link:*` / `people:observation:*` / `people:remember:*` writes for Confirm. Travel + hub prefs Confirm paths shared with Clare."
 }

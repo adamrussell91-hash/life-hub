@@ -41,6 +41,9 @@ import {
 } from './_shared/cn-patch-queue.mjs';
 import { isQueuedPatchStale } from '../../apps/life/js/core/central-node-patch.js';
 import { createPeopleWriteExecutor } from './_shared/people-agent.mjs';
+import { createTravelWriteExecutor } from './_shared/travel-agent.mjs';
+import { createKnowledgeWriteExecutor } from './_shared/knowledge-page-agent.mjs';
+import { isCalendarGhostConfirmWrite } from './_shared/follow-up-agent.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
 import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolvers.mjs';
@@ -110,7 +113,6 @@ import {
   emptyGovernanceLog
 } from '../../apps/life/js/core/governance-log.js';
 import { runGhostDecision } from './calendar-ghosts.mjs';
-import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
 import { createCommunicationRepository } from './_shared/communication-repository.mjs';
 import { createUniversalLinkRepository } from './_shared/universal-link-repository.mjs';
 import { createAccessContext } from './_shared/entity-access.mjs';
@@ -835,11 +837,51 @@ export function createChatConfirmHandler({
         }, PRIVATE_CACHE);
       }
 
+      // Companion writes (e.g. follow-up task) ride alongside the ghost marker.
+      const companionWrites = (proposal.writes ?? []).filter(write => !isCalendarGhostConfirmWrite(write.path));
+      let companionResults = null;
+      if (companionWrites.length && ghostCode !== 'already_accepted') {
+        const loaded = await loadBlobStoresForWrites(companionWrites, {
+          env,
+          fetchImpl,
+          now,
+          getTasksStore,
+          getTeachingStore,
+          getPeopleStore,
+          getProfessionalStore,
+          resolvePeopleEntity
+        });
+        if (!loaded.ok) {
+          return errorResponse(503, loaded.error, 'Companion stores unavailable for this Confirm.', true, PRIVATE_CACHE);
+        }
+        const applied = await executeProposeActionWrites(client, {
+          ...proposal,
+          writes: companionWrites
+        }, {
+          blobStores: loaded.stores,
+          nowIso: () => new Date(now()).toISOString()
+        });
+        if (!applied.ok) {
+          return errorResponse(
+            409,
+            applied.error || 'companion_write_failed',
+            'Calendar ghost accepted but a companion write failed. Do not re-confirm blindly.',
+            true,
+            PRIVATE_CACHE
+          );
+        }
+        companionResults = applied.results;
+      }
+
       if (parsed.id) {
         const consumedAt = new Date(now()).toISOString();
         const markedQueue = markPendingActionConsumed(queue, parsed.id, {
           consumedAt,
-          extra: { writesApplied: true, calendarGhostId: boundGhostId }
+          extra: {
+            writesApplied: true,
+            calendarGhostId: boundGhostId,
+            ...(companionResults ? { companionWrites: true } : {})
+          }
         });
         try {
           await client.writeFile({
@@ -862,7 +904,8 @@ export function createChatConfirmHandler({
           calendarGhostId: boundGhostId,
           receipt: ghostResult?.payload?.receipt || 'Accepted.',
           writes: ghostCode === 'already_accepted' ? 'already_applied' : (ghostResult?.payload?.writes || 'applied'),
-          alreadyAccepted: ghostCode === 'already_accepted' || undefined
+          alreadyAccepted: ghostCode === 'already_accepted' || undefined,
+          ...(companionResults ? { companionResults } : {})
         }
       }, PRIVATE_CACHE);
     }
@@ -1896,6 +1939,8 @@ async function loadBlobStoresForWrites(writes, {
   const needsTeaching = writes.some(write => classifyWriteTarget(write.path).store === 'teaching')
     || writes.some(write => classifyWriteTarget(write.path).kind === 'work_block');
   const needsPeople = writes.some(write => classifyWriteTarget(write.path).store === 'people');
+  const needsTravel = writes.some(write => classifyWriteTarget(write.path).store === 'travel');
+  const needsKnowledge = writes.some(write => classifyWriteTarget(write.path).store === 'knowledge');
   const needsProfessional = writes.some(write => {
     const kind = classifyWriteTarget(write.path).kind;
     return kind === 'observation' || kind === 'remember';
@@ -1922,6 +1967,20 @@ async function loadBlobStoresForWrites(writes, {
       fetchImpl,
       now: () => new Date(now()).toISOString(),
       resolveEntity: resolvePeopleEntity
+    });
+  }
+  if (needsTravel) {
+    stores.travel = createTravelWriteExecutor({
+      env,
+      fetchImpl,
+      now: () => new Date(now()).toISOString()
+    });
+  }
+  if (needsKnowledge) {
+    stores.knowledge = createKnowledgeWriteExecutor({
+      env,
+      fetchImpl,
+      nowIso: () => new Date(now()).toISOString()
     });
   }
   return { ok: true, stores };
