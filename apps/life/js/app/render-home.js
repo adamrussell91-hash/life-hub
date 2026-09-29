@@ -62,12 +62,20 @@ export function renderHome(root, model, options = {}) {
 
   const hammondLine = root.querySelector('[data-value="hammond-line"]');
   if (hammondLine) {
-    if (model.hammondLine) {
-      hammondLine.textContent = model.hammondLine;
+    // Sweep-missed heartbeat outranks the soft review line (fail-visible).
+    const line = model.sweepMissedLine || model.hammondLine;
+    const missed = Boolean(model.sweepMissedLine);
+    if (line) {
+      hammondLine.textContent = line;
       hammondLine.removeAttribute('hidden');
     } else {
       hammondLine.textContent = '';
       hammondLine.setAttribute('hidden', '');
+    }
+    if (hammondLine.classList?.toggle) {
+      hammondLine.classList.toggle('hammond-line--missed', missed);
+    } else {
+      hammondLine.className = missed ? 'hammond-line hammond-line--missed' : 'hammond-line';
     }
   }
 

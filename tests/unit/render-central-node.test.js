@@ -494,6 +494,16 @@ test('renderCentralNode writes collapsed About Me and constraints', () => {
   assert.match(root._supporting.textContent, /No new deposits/);
 });
 
+test('renderCentralNode supporting leads with Daily Sweep missed heartbeat', () => {
+  const root = fakeCentralNodeRoot();
+  renderCentralNode(root, baseModel({
+    sweepMissedLine: 'Hammond: Daily Sweep missed — last 2026-07-26.',
+    deposits: [{ from: 'Chadwick', to: 'Brisket', text: 'Session logged.' }]
+  }));
+  assert.match(root._supporting.textContent, /^Hammond: Daily Sweep missed/);
+  assert.match(root._supporting.textContent, /1 deposit/);
+});
+
 test('renderCentralNode shows Needs you cards and latest deposits', () => {
   const root = fakeCentralNodeRoot();
   renderCentralNode(root, baseModel({

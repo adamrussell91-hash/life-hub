@@ -5,7 +5,11 @@ import {
   hasRecoveryBonus,
   resolveDayType
 } from '../core/aggregate.js';
-import { formatHammondReviewLine, latestHammondReview } from '../core/governance-log.js';
+import {
+  formatDailySweepMissedLine,
+  formatHammondReviewLine,
+  latestHammondReview
+} from '../core/governance-log.js';
 import { getDayTargets } from '../core/targets.js';
 import { buildHomeForecastCards } from './home-forecast.js';
 
@@ -47,6 +51,7 @@ export function buildHomeModel({
   const completeness = getLoggingCompleteness(events, date);
   const workoutStreak = calculateWorkoutStreak(events, date);
   const hammondLine = formatHammondReviewLine(latestHammondReview(governanceLogMarkdown, date));
+  const sweepMissedLine = formatDailySweepMissedLine(governanceLogMarkdown, date);
   const forecastCards = buildHomeForecastCards({ events, date, targetsConfig });
 
   return {
@@ -58,6 +63,7 @@ export function buildHomeModel({
     workoutStreak,
     completeness,
     hammondLine,
+    sweepMissedLine,
     forecastCards,
     overFatCeiling: targets.fat_ceiling_g > 0 && nutrition.fat_g > targets.fat_ceiling_g,
     progress: {

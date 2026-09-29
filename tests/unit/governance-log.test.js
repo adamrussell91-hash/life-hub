@@ -12,6 +12,9 @@ import {
   oldestOpenGovernanceEntry,
   latestHammondReview,
   formatHammondReviewLine,
+  latestDailySweep,
+  isDailySweepMissed,
+  formatDailySweepMissedLine,
   isOpenLoopEntry,
   decisionTraces,
   tracesForRef
@@ -192,6 +195,64 @@ test('latestHammondReview returns the newest fresh review and ignores Pattern Re
   assert.equal(review.title, 'Lock is marking');
   assert.equal(formatHammondReviewLine(review), 'Hammond: Lock is marking');
   assert.equal(latestHammondReview(log, '2026-10-01'), null);
+});
+
+test('latestDailySweep picks the newest Daily Sweep heading (not a write-allowlist type)', () => {
+  const log = [
+    '# Governance Log',
+    '',
+    '## 2026-09-25 — Daily Sweep',
+    '',
+    'Older sweep.',
+    '',
+    '## 2026-09-28 — Daily Sweep',
+    '',
+    'Fresh sweep.',
+    '',
+    '## 2026-09-27 — Weekly Review',
+    '**Title:** Mid week',
+    '',
+    'Not a sweep.',
+    ''
+  ].join('\n');
+  const sweep = latestDailySweep(log);
+  assert.equal(sweep.dateKey, '2026-09-28');
+  assert.equal(sweep.entryType, 'Daily Sweep');
+  assert.equal(isDailySweepMissed(log, '2026-09-29'), false);
+  assert.equal(formatDailySweepMissedLine(log, '2026-09-29'), null);
+});
+
+test('isDailySweepMissed warns when newest sweep is older than ~36h (calendar yesterday window)', () => {
+  const threeDaysAgo = [
+    '# Governance Log',
+    '',
+    '## 2026-09-26 — Daily Sweep',
+    '',
+    'Stale.',
+    ''
+  ].join('\n');
+  assert.equal(isDailySweepMissed(threeDaysAgo, '2026-09-29'), true);
+  assert.match(formatDailySweepMissedLine(threeDaysAgo, '2026-09-29'), /last 2026-09-26/);
+});
+
+test('isDailySweepMissed warns on empty log and when no Daily Sweep exists', () => {
+  assert.equal(isDailySweepMissed('', '2026-09-29'), true);
+  assert.equal(isDailySweepMissed('# Governance Log\n', '2026-09-29'), true);
+  assert.match(formatDailySweepMissedLine('# Governance Log\n', '2026-09-29'), /no sweep in the log/);
+  assert.equal(latestDailySweep('# Governance Log\n'), null);
+});
+
+test('yesterday Daily Sweep is still fresh', () => {
+  const log = [
+    '# Governance Log',
+    '',
+    '## 2026-09-28 — Daily Sweep',
+    '',
+    'Yesterday morning.',
+    ''
+  ].join('\n');
+  assert.equal(isDailySweepMissed(log, '2026-09-29'), false);
+  assert.equal(formatDailySweepMissedLine(log, '2026-09-29'), null);
 });
 
 test('isOpenLoopEntry is only unresolved drift / tension / decision / escalation', () => {

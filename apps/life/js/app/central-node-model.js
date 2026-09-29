@@ -16,7 +16,7 @@ import {
   mergeLiveStatusOverMarkdown,
   sanitizeCentralNode
 } from '../core/central-node-write.js';
-import { openGovernanceEntries } from '../core/governance-log.js';
+import { formatDailySweepMissedLine, openGovernanceEntries } from '../core/governance-log.js';
 import { getDayTargets } from '../core/targets.js';
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
 import { buildBindingGoal } from './binding-goal.js';
@@ -161,11 +161,10 @@ export function buildCentralNodeModel({
   const eatingYear = yearDates.map(day => eatingTargetsForDay(events, day, targetsConfig));
   const domainWeekly = buildDomainWeekly(events, date);
   const crossAgent = parseCrossAgentEdges(extractCrossAgentCoordination(markdown));
-  const governanceOpen = openGovernanceEntries(
-    typeof governanceLogMarkdown === 'string' ? governanceLogMarkdown : '',
-    date
-  );
+  const governanceMarkdown = typeof governanceLogMarkdown === 'string' ? governanceLogMarkdown : '';
+  const governanceOpen = openGovernanceEntries(governanceMarkdown, date);
   const governanceHeat = buildGovernanceHeatSeries(governanceOpen, date);
+  const sweepMissedLine = formatDailySweepMissedLine(governanceMarkdown, date);
 
   const nutrition = aggregateNutrition(events, date);
   const completeness = getLoggingCompleteness(events, date);
@@ -220,6 +219,7 @@ export function buildCentralNodeModel({
     ],
     openLoops: boardLoops.loops,
     needsYou: boardLoops.needsYou,
+    sweepMissedLine,
     pendingPatches: buildPendingPatchCards(pendingCnPatches),
     completeness,
     liveStatus: {
