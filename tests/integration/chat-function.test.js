@@ -2188,6 +2188,77 @@ test('loads body state into Brisket\'s prompt too (Phase 3 extends body state be
   assert.match(receivedArgs.system, /your lane/i);
 });
 
+test('Sara body state prefers chat-logged HHMM composition over older bare Aug file', async () => {
+  // Regression: BODY_ENTRY_PATH used to require …-composition.md only, so
+  // …-composition-0923.md (19 Sep) was dropped and Sara swore 1 Aug was latest.
+  const augPath = 'data/body/2026/08/2026-08-01-composition.md';
+  const augSha = 'a'.repeat(40);
+  const sepPath = 'data/body/2026/09/2026-09-19-composition-0923.md';
+  const sepSha = 'b'.repeat(40);
+  const augContent = [
+    '---',
+    'schema_version: 1', 'id: "composition-aug"', 'type: "composition"', 'date: "2026-08-01"', 'time: "12:00"',
+    'created_at: "2026-08-01T12:00:00+10:00"', 'updated_at: "2026-08-01T12:00:00+10:00"', 'source: "notion_import"',
+    'weight_kg: 86.9', 'body_fat_pct: 20',
+    '---'
+  ].join('\n');
+  const sepContent = [
+    '---',
+    'schema_version: 1', 'id: "composition-sep"', 'type: "composition"', 'date: "2026-09-19"', 'time: "09:23"',
+    'created_at: "2026-09-19T09:24:00+10:00"', 'updated_at: "2026-09-19T09:24:00+10:00"', 'source: "chat"',
+    'weight_kg: 86.3', 'body_fat_pct: 18.9',
+    '---'
+  ].join('\n');
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: augPath, type: 'blob', sha: augSha, size: 200 },
+          { path: sepPath, type: 'blob', sha: sepSha, size: 200 }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${augSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(augContent, 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${sepSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(sepContent, 'utf8').toString('base64') });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    // Match module session mint time — a later `now` expires the cookie.
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Sara, what is my latest composition reading?' })));
+
+  assert.match(receivedArgs.system, /Body composition \(2026-09-19\)/);
+  assert.match(receivedArgs.system, /86\.3kg/);
+  assert.match(receivedArgs.system, /18\.9%/);
+  assert.doesNotMatch(receivedArgs.system, /Body composition \(2026-08-01\)/);
+
+  const trend = JSON.parse(await receivedArgs.executeTools({
+    name: 'get_weight_trend',
+    id: 'call_trend',
+    input: {}
+  }));
+  assert.equal(trend.latest?.date, '2026-09-19');
+  assert.equal(trend.latest?.weight_kg, 86.3);
+});
+
 test('non-chadwick, non-brisket, non-sara agents never receive body state in their prompt', async () => {
   // Sara intentionally receives body state (clinical context). Clare must not.
   const compositionPath = 'data/body/2026/07/2026-07-29-composition.md';
