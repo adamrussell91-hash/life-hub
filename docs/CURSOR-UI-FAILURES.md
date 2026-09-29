@@ -57,6 +57,8 @@
 
 **V4 · Different parts of the page disagree.** **Seen:** Medical v2: the episode card said "day 4", the band said "2 notes", and a loose minor line showed the third note; the strip said "2 planned" while Next showed 3. **Rule:** Derive summary counts and cards from **one** model function, never recompute them in the renderer. **Check:** a test builds the page model once and asserts every summary figure against the same source.
 
+**V5 · Save failure hides the reason.** **Seen:** Travel add-item sheet (2026-09): `catch {}` turned every server error (409 version conflict, missing ticket fields, bad link) into "Could not save. Try again." After a conflict, trying again could never succeed, so about 10 minutes of entries were lost. **Rule:** A save handler shows the server's message and highlights the field it names. It retries a 409 once against a freshly fetched version, checks the server's required fields before sending, and never drops typed input without saying so. **Check:** unit tests for a 409 followed by success, a validation error whose text reaches the UI with the form kept open, and each required field refused on the client.
+
 ## R: Responsive
 
 **R1 · Phone DOM at desktop, or desktop DOM at phone.** **Seen:** Goals runway (G-43). **Rule:** When JS renders different DOM per breakpoint, re-render via a `matchMedia` listener; CSS alone isn't enough. **Check:** resize 390 → 1440 → 390 without reloading.
@@ -64,6 +66,8 @@
 **R2 · Horizontal page scroll on phone.** **Rule:** Wide content (charts, strips) scrolls inside its own `overflow-x:auto` box. **Check:** `document.documentElement.scrollWidth === innerWidth` at 390.
 
 **R3 · A component that works on desktop but breaks at 390.** **Seen:** Medical v2 bloods rows (dot, value and status each on separate lines). **Rule:** The brief gives the phone layout explicitly (e.g. "2 rows: label+value / bar+status"). **Check:** a 390 screenshot of every new component, not just the page top.
+
+**R4 · Form sheet zooms and clips on iPhone.** **Seen:** Travel add/edit item sheet (2026-09): inputs at 14px made iOS Safari zoom in on focus and stay zoomed, and the sheet was an 85vh floating card with 16px padding, so Save/Cancel/Remove sat below the visible viewport; amount and currency wrapped onto two full-width rows. **Rule:** Every `input`, `select` and `textarea` has a computed `font-size` of at least 16px below 720px. On phones a form sheet is a bottom sheet: full width, flush to the bottom, `max-height` in `dvh`, with a sticky action row padded by `env(safe-area-inset-bottom)`. Short paired controls (amount + currency, search + button) stay on one row. **Check:** at 390, every form control's computed `font-size` is ≥ 16px, the action row's `getBoundingClientRect().bottom` is ≤ `innerHeight` both at the top of the sheet and after scrolling it to the bottom, and `scrollWidth === innerWidth`.
 
 ## D: Data shown truthfully
 

@@ -242,8 +242,17 @@ details.tobook[open] summary::after { content: "Hide"; }
 .sheet-back { position: fixed; inset: 0; background: rgba(10,21,54,.4); display: grid; place-items: end center; z-index: 50; padding: 16px; }
 .sheet { background: var(--paper); border-radius: var(--radius-lg); width: min(520px, 100%); padding: 20px; box-shadow: var(--elev-2); max-height: 85vh; overflow: auto; margin-bottom: env(safe-area-inset-bottom, 0px); }
 @media (max-width: 719px) {
-  .sheet-back { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
-  .sheet { max-height: min(85vh, calc(100dvh - 24px - env(safe-area-inset-bottom, 0px))); }
+  /* Phone: a real bottom sheet — full width, flush to the bottom, never taller than the visible viewport. */
+  .sheet-back { padding: 0; place-items: end stretch; }
+  .sheet {
+    width: 100%;
+    max-height: calc(100dvh - 48px);
+    margin: 0;
+    padding: 16px 16px 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    overscroll-behavior: contain;
+  }
+  .addform .row { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
 }
 @media (min-width: 700px) { .sheet-back { place-items: center; } }
 .sheet h3 { font-size: 1.125rem; }
@@ -350,7 +359,14 @@ body.map-open { overflow: hidden; }
 .btn.ghost.danger { background: var(--paper); color: #9b2c2c !important; box-shadow: inset 0 0 0 1px #9b2c2c; margin-left: auto; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 [hidden] { display: none !important; }
-@media (max-width: 480px) { .fgrid { grid-template-columns: 1fr; } .place-row { flex-wrap: wrap; } }
+@media (max-width: 480px) { .fgrid { grid-template-columns: 1fr; } }
+.place-row input { flex: 1 1 auto; }
+.cost-row select { flex: 0 0 6.5rem; width: 6.5rem; }
+.addform textarea { min-height: 3.25rem; resize: vertical; }
+/* iOS Safari zooms the page when a focused field's text is under 16px — and stays zoomed. */
+@media (max-width: 719px) {
+  .addform input:not([type=checkbox]), .addform select, .addform textarea { font-size: 16px; }
+}
 
 .mapbox.is-fullscreen {
   position: fixed;
