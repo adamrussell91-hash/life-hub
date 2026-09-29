@@ -717,6 +717,19 @@ function mountHead(grid, date) {
   css(cap, '--cap', capColour(day.cap?.pct ?? 0));
   el('div', 'cal-cap__bar', `<span class="cal-cap__fill" style="width:${day.cap?.pct ?? 0}%"></span>`, cap);
   el('div', 'cal-cap__text', `<b>${day.cap?.pct ?? ''}%</b> · ${day.cap?.note ?? ''}`, cap);
+  // What this day costs you: booked hours, and one concrete move when it is over.
+  if (day.cost?.text) {
+    const move = day.cost.move;
+    const cost = el('div', `cal-cost${day.cost.over ? ' is-over' : ''}`, escapeHtml(day.cost.text), head, { 'data-part': 'day-cost' });
+    if (move) {
+      el('button', 'cal-cost__move', `move ${escapeHtml(move.title)} to ${DOW(move.to).charAt(0)}${DOW(move.to).slice(1, 3).toLowerCase()} (${move.toPct}%)`, cost, {
+        type: 'button',
+        'data-cost-move': move.id,
+        'data-cost-to': move.to,
+        title: `Move ${move.title} to ${formatDisplayDate(move.to)}, the best day this week with room`
+      });
+    }
+  }
   const chips = el('div', 'cal-head__chips', undefined, head, { 'data-part': 'day-chips' });
   if (day.over) el('span', 'cal-over', 'over', chips, { 'data-part': 'over-flag' });
   if (tag) el('span', `cal-tag${tag.tone === 'term' ? ' cal-tag--term' : ''}`, tag.text, chips);
@@ -1305,6 +1318,11 @@ function wire(section) {
       input?.onQuickAdd?.();
       return;
     }
+    const costMove = target.closest('[data-cost-move]');
+    if (costMove) {
+      void moveFromCostLine(costMove.dataset.costMove, costMove.dataset.costTo, costMove);
+      return;
+    }
     // Every chip and Due row opens the item card (context, edit, ↗ new tab).
     const chip = target.closest('.cal-chip') || target.closest('.cal-due');
     if (chip && !target.closest('[data-part="chip-popover"]')) {
@@ -1604,6 +1622,25 @@ function applyOptimistic(current, target) {
       if (meta) meta.textContent = item.meta;
     }
   };
+}
+
+/** The "costs you" line's one-click move: same time, the suggested day. */
+async function moveFromCostLine(id, to, button) {
+  const item = chipById(id);
+  const node = nodes.get(`chip:${id}`);
+  if (!item || !node || !/^\d{4}-\d{2}-\d{2}$/.test(String(to))) return;
+  const target = { date: to, start: item.start, end: item.end, start_time: hoursToDueTime(item.start), end_time: hoursToDueTime(item.end) };
+  const patch = dragPatch(item, { date: to, start_time: target.start_time, end_time: target.end_time });
+  if (button) button.disabled = true;
+  const undo = applyOptimistic({ node, item, isDue: false }, target);
+  try {
+    await persistItem(item, patch);
+    showToast(`<b>Moved.</b> ${escapeHtml(item.title)} → ${escapeHtml(dayText(to))} · ${escapeHtml(nowLabel(item.start))}`);
+  } catch (error) {
+    undo();
+    if (button) button.disabled = false;
+    showToast(`<b>Not saved.</b> ${escapeHtml(error?.message || 'Could not reach the server.')}`);
+  }
 }
 
 async function onDragEnd() {

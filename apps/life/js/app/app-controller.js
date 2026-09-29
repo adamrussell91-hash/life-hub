@@ -4,7 +4,7 @@ import { formatHubPulseCount, renderHubPulse } from '../shell/render-hub-pulse.j
 import { renderTaskChecklist, renderTeachingAgenda } from '../shell/render-hub-widgets.js';
 import { nextLessonFromCurriculum, todaysLessonsFromCurriculum } from '../shell/teaching-today.js';
 import { knowledgeEventsFromPages } from '../shell/knowledge-calendar.js';
-import { tasksEventsFromTasks, tasksEventsFromWorkBlocks, scheduleDiffActiveProposed } from '../shell/tasks-calendar.js';
+import { tasksEventsFromTasks, tasksEventsFromWorkBlocks, tasksEventsFromWorkSessions, scheduleDiffActiveProposed } from '../shell/tasks-calendar.js';
 import { professionalEventsFromProjections } from '../shell/professional-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
 import { resolveSchoolTerms } from '../../../../packages/design-kit/js/calendar/school-terms.js';
@@ -954,14 +954,18 @@ export function createAppController(dependencies) {
     const scheduleDiffP = typeof tasksApi.getWorkflowState === 'function'
       ? tasksApi.getWorkflowState('schedule_diff:current').catch(() => null)
       : Promise.resolve(null);
+    const sessionsP = typeof tasksApi.listWorkSessions === 'function'
+      ? tasksApi.listWorkSessions().catch(() => [])
+      : Promise.resolve([]);
     tasksCalendarInFlight = Promise.all([
       tasksApi.listTasks(),
       listBlocks,
       profileP,
       missionP,
-      scheduleDiffP
+      scheduleDiffP,
+      sessionsP
     ])
-      .then(([tasks, blocks, profile, mission, scheduleDiff]) => {
+      .then(([tasks, blocks, profile, mission, scheduleDiff, sessions]) => {
         const ghostBlocks = scheduleDiffActiveProposed(scheduleDiff).map((block, index) => ({
               ...block,
               id: block.id || block.temp_id || `ghost_${index}`,
@@ -972,7 +976,9 @@ export function createAppController(dependencies) {
         tasksEvents = [
           ...tasksEventsFromTasks(tasks),
           ...tasksEventsFromWorkBlocks(blocks),
-          ...tasksEventsFromWorkBlocks(ghostBlocks)
+          ...tasksEventsFromWorkBlocks(ghostBlocks),
+          // What actually happened (tracked sessions) for the dial's actual track.
+          ...tasksEventsFromWorkSessions(sessions, new Map((tasks ?? []).map(task => [task.id, task.title])), { now: now().getTime() })
         ];
         calendarPlanningProfile = profile;
         calendarWeekMission = mission;

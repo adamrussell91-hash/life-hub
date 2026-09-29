@@ -362,3 +362,11 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .dd-arc.k-event{fill:var(--pastel-gold);stroke:var(--pastel-gold-ink);stroke-width:1.2}
 .cal-due.is-allday b{color:var(--ink)}
 .cal-vit__med.is-flag{color:var(--high-sea-ink)}
+
+/* What this day costs you (29/09/26) */
+.cal-cost{font-size:var(--text-2xs);color:var(--muted);line-height:1.3;display:flex;flex-wrap:wrap;gap:0 4px;min-width:0}
+.cal-cost.is-over{color:var(--high-sea-ink);font-weight:var(--weight-semibold)}
+.cal-cost__move{all:unset;cursor:pointer;color:var(--navy);font-weight:var(--weight-medium);text-decoration:underline;text-underline-offset:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.cal-cost__move:hover{color:var(--wave)}
+.cal-cost__move:focus-visible{outline:2px solid var(--wave);outline-offset:2px;border-radius:3px}
+.cal-cost__move:disabled{opacity:.5;cursor:progress}

@@ -28,6 +28,7 @@ import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
 import { saveCalendarItem } from './calendar-item-actions.js';
 import { presetBand } from './render-tideline.js';
 import { clock as medClock, doseCandidate, MEDICATION, toHHMM } from './medication-model.js';
+import { tonightFit, trackedHours } from './day-sense.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -91,6 +92,15 @@ let rings = null;
 let arcs = [];
 let nowHour = 12;
 let profileSleep = 22;
+/** Tonight's overflow this paint (tonightFit), or null. */
+let overflowNow = null;
+
+function formatHours(value) {
+  const minutes = Math.round(value * 60);
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h ? `${h} h${m ? ` ${m} m` : ''}` : `${m} m`;
+}
 let lightsOut = 22;
 let mountedFor = null;
 let observer = null;
@@ -499,6 +509,33 @@ function mountDial(size) {
     }, ev));
     arcs.push({ id: ghost.id, h1: toHour(ghost.chip.start), h2: toHour(ghost.chip.end), r1: e1 + 4, r2: e2 - 4 });
   }
+  // What actually happened: a thin track just outside the events (tracked work, finished workouts).
+  const actual = date <= input.today ? (day?.actual ?? []) : [];
+  if (actual.length) {
+    const a1 = e2 + 3;
+    const a2 = e2 + 8;
+    const track = s('g', { 'data-part': 'actual-track' }, svg);
+    for (const span of actual) {
+      const end = span.open && date === input.today ? Math.max(span.start + 0.05, nowHour) : span.end;
+      const piece = s('path', { class: `dd-actual is-${span.kind}${span.open ? ' is-open' : ''}`, d: arcPath(cx, cy, a1, a2, span.start, end) }, track);
+      const result = span.result && span.result !== 'open' ? ` (${span.result})` : span.open ? ' (running)' : '';
+      s('title', {}, piece, `${span.kind === 'workout' ? 'Workout' : 'Worked on'} ${span.title} · ${medClock(span.start)} – ${medClock(end)}${result}`);
+    }
+  }
+
+  // Tonight's overflow: due work that no longer fits before lights-out spills past it.
+  const fit = date === input.today ? tonightFit({ day, nowHour, lightsOut: lightsOutFor(date, ghosts, profileSleep), events: input.events }) : null;
+  overflowNow = fit && fit.over >= 0.25 ? fit : null;
+  if (overflowNow) {
+    const lights = lightsOutFor(date, ghosts, profileSleep);
+    const spill = s('path', {
+      class: 'dd-overflow',
+      'data-part': 'overflow',
+      d: arcPath(cx, cy, e1 + 3, e2 - 3, lights, lights + Math.min(6, overflowNow.over))
+    }, svg);
+    s('title', {}, spill, `Doesn't fit before lights-out: ${overflowNow.spill.map(row => row.title).join(', ')} (${formatHours(overflowNow.over)} over)`);
+  }
+
   // Time left tonight: a lip outside the event ring.
   if (isToday) nodes.set('left', s('path', { class: 'dd-left', 'data-part': 'time-left' }, svg));
 
@@ -592,6 +629,17 @@ function mountDial(size) {
       });
     }
     for (const dot of logDots) calls.push({ id: dot.id, hour: dot.h, height: 14, text: dot.label, cls: dot.cls === 'is-symptom' ? 'is-symptom' : 'is-meal' });
+    if (overflowNow) {
+      const lights = lightsOutFor(date, ghosts, profileSleep);
+      calls.push({
+        id: 'overflow',
+        hour: lights + Math.min(6, overflowNow.over) / 2,
+        height: 28,
+        text: `${formatHours(overflowNow.over)} doesn't fit`,
+        sub: overflowNow.spill.map(row => row.title).join(', '),
+        cls: 'is-overflow'
+      });
+    }
     const room = calloutRoom(size);
     const positions = layoutCallouts(calls.map(call => ({ id: call.id, hour: call.hour, height: call.height })), {
       cx, cy, r: room.r, gap: DD.calloutGap, top: 8, bottom: rings.height - 8, reach: room.reach
@@ -742,6 +790,15 @@ function mountSide(side) {
     el('h4', 'dd-h', 'Tonight', section);
     const by = brief.timeLeft.by ? ` (${escapeHtml(brief.timeLeft.by)})` : '';
     el('div', 'dd-big', `${escapeHtml(brief.timeLeft.label)}<small>Now ${clock12(nowHour)} · lights out ${escapeHtml(brief.timeLeft.until)}${by}</small>`, section, { 'data-part': 'time-left-label' });
+    const tracked = trackedHours(dayAt(date)?.actual ?? []);
+    if (tracked >= 0.1) el('p', 'dd-tracked', `Tracked today: ${formatHours(tracked)}`, section, { 'data-part': 'tracked' });
+    if (overflowNow) {
+      const first = overflowNow.spill[0];
+      el('div', 'dd-overflow-note',
+        `<b>Doesn't fit tonight:</b> ${escapeHtml(overflowNow.spill.map(row => row.title).join(', '))} · ${formatHours(overflowNow.over)} over.`
+        + (first ? ` <button type="button" class="dd-link" data-row-item="${escapeHtml(first.id)}">Move ${escapeHtml(first.title)}…</button>` : ''),
+        section, { 'data-part': 'overflow-note' });
+    }
     renderRows(el('div', 'dd-rows', undefined, section), brief.rows, ghosts);
   }
   const next = model.week[model.week.indexOf(date) + 1];
@@ -1132,7 +1189,7 @@ function wire(section) {
       return id === popFor ? closePop() : openPop(id, nodes.get(`arc:${id}`) ?? dot);
     }
     const row = target.closest?.('[data-row-item]');
-    if (row && !target.closest?.('button')) {
+    if (row && (!target.closest?.('button') || target.closest('button').hasAttribute('data-row-item'))) {
       const id = row.getAttribute('data-row-item');
       return id === popFor ? closePop() : openPop(id, row);
     }

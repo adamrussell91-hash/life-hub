@@ -8,9 +8,10 @@ import { formatDisplayDate, formatDisplayDateRange } from '../format-display-dat
 import { isHoliday, mondayOf, termAt, toMs, weekLabel } from '../school-time.js';
 import { capacityForDates, dayLoadHours, isOverCapacity, symptomsIn } from './capacity-model.js';
 import { medicationDay, medicationLogs, usualDoseTimes } from './medication-model.js';
+import { actualSpans, dayCost } from './day-sense.js';
 
 const DAY_MS = 86_400_000;
-const LOG_TYPES = new Set(['meal', 'diary', 'sleep', 'skincare', 'heart', 'weight', 'composition', 'measurements', 'bloods', 'fragrance', 'medication']);
+const LOG_TYPES = new Set(['meal', 'diary', 'sleep', 'skincare', 'heart', 'weight', 'composition', 'measurements', 'bloods', 'fragrance', 'medication', 'work_session']);
 const SOURCE_ORDER = ['teaching', 'professional', 'task', 'health', 'fitness', 'corey', 'study'];
 const SOURCE_LABEL = {
   teaching: 'Teaching',
@@ -508,9 +509,11 @@ export function buildTidelineModel({
       walls: wallsFor(visual, events, date, useVisual),
       free: freeFor(visual, date, chips, bands, schoolTerms, useVisual),
       sleepText: sleepLabel(date, week, events, today, schoolTerms),
-      med: date <= today ? medicationDay({ date, today, nowHour, logs: medLogs, usual: usualDoses }) : null
+      med: date <= today ? medicationDay({ date, today, nowHour, logs: medLogs, usual: usualDoses }) : null,
+      actual: date <= today ? actualSpans(events, date) : []
     };
   });
+  for (const day of days) day.cost = dayCost(day, days, today);
   const title = periodTitle(week, schoolTerms);
   return {
     week,
