@@ -406,3 +406,16 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 }
 @media (prefers-reduced-motion:no-preference){.cal-rescue__panel{animation:cal-rescue-in .18s ease-out}}
 @keyframes cal-rescue-in{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+
+/* Train-home pass questions (29/09/26) */
+.cal-review-q{display:grid;gap:6px}
+.cal-review-q p{margin:0;font-size:var(--text-sm)}
+.cal-review-q p span{color:var(--muted);font-size:var(--text-xs)}
+.cal-review-q__opts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.cal-review-q__opts button{all:unset;box-sizing:border-box;cursor:pointer;text-align:center;padding:10px 4px;min-height:2.75rem;border:1px solid var(--line);border-radius:10px;font-size:var(--text-xs);font-weight:var(--weight-medium);background:var(--glass);color:var(--ink)}
+.cal-review-q__opts button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.cal-review-q__opts button:focus-visible{outline:2px solid var(--wave);outline-offset:1px}
+.cal-review-err{margin:0;font-size:var(--text-xs);color:var(--high-sea-ink)}
+.cal-review-err[hidden]{display:none}
+.cal-rescue__tell input{font:inherit;font-size:var(--text-sm);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px}
+@media (max-width:719px){.cal-review-q__opts{grid-template-columns:1fr 1fr}.cal-rescue__tell input{font-size:16px}}

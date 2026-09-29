@@ -23,7 +23,8 @@ export function tasksEventsFromTasks(tasks) {
         priority: typeof task.priority === 'string' ? task.priority : undefined,
         description: typeof task.description === 'string' ? task.description : '',
         waiting_on: typeof task.waiting_on === 'string' && task.waiting_on ? task.waiting_on : undefined,
-        estimated_duration: Number.isFinite(task.estimated_duration) ? task.estimated_duration : undefined
+        estimated_duration: Number.isFinite(task.estimated_duration) ? task.estimated_duration : undefined,
+        ...(task.bookmark && typeof task.bookmark.note === 'string' ? { bookmark: { note: task.bookmark.note, at: task.bookmark.at ?? null } } : {})
       },
       body: ''
     }));
@@ -52,6 +53,7 @@ export function tasksEventsFromWorkBlocks(blocks) {
         status: typeof block.status === 'string' ? block.status : undefined,
         depth: block.depth,
         task_id: typeof block.task_id === 'string' && block.task_id ? block.task_id : undefined,
+        ...(typeof block.outcome === 'string' ? { outcome: block.outcome } : {}),
         ghost: block.status === 'proposed' || Boolean(block.ghost)
       },
       body: ''
