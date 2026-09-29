@@ -7,12 +7,9 @@ import {
   renderTemplateMarkdown,
   templatePathForTitle
 } from './workout-templates.mjs';
+import { clean, makeProposal } from './agent-propose-helpers.mjs';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function clean(value, max = 200) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
 
 function normalizeExercises(raw) {
   if (!Array.isArray(raw)) return [];
@@ -146,17 +143,15 @@ export function buildWorkoutTemplateProposal(input, { workoutRecords = [] } = {}
 
   return {
     ok: true,
-    proposal: {
-      intent: summary,
+    proposal: makeProposal(summary, [{
+      path,
+      mode: 'overwrite',
+      content,
+      diff: `Save workout template: ${title} (${session.exercises.length} exercises)`
+    }], {
       reads: ['data/fitness/templates'],
-      writes: [{
-        path,
-        mode: 'overwrite',
-        content,
-        diff: `Save workout template: ${title} (${session.exercises.length} exercises)`
-      }],
       surfaces: ['confirm_card', 'fitness_tab', 'governance_log']
-    },
+    }),
     path,
     template
   };

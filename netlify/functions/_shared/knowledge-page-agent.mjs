@@ -7,10 +7,7 @@ import {
   newKnowledgePageId,
   saveKnowledgePage
 } from './knowledge-data.mjs';
-
-function clean(value, max = 200) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
+import { clean, makeProposal } from './agent-propose-helpers.mjs';
 
 export function proposeKnowledgePageSchema() {
   return {
@@ -61,19 +58,17 @@ export function buildKnowledgePageProposal(input) {
 
   return {
     ok: true,
-    proposal: {
-      intent: summary,
+    proposal: makeProposal(summary, [{
+      path: `knowledge:page:${id}`,
+      mode: mode === 'create' ? 'create' : 'overwrite',
+      content: JSON.stringify(payload),
+      diff: mode === 'create'
+        ? `Create Knowledge page: ${title}`
+        : `Patch Knowledge page: ${title}`
+    }], {
       reads: [`knowledge:page:${id}`],
-      writes: [{
-        path: `knowledge:page:${id}`,
-        mode: mode === 'create' ? 'create' : 'overwrite',
-        content: JSON.stringify(payload),
-        diff: mode === 'create'
-          ? `Create Knowledge page: ${title}`
-          : `Patch Knowledge page: ${title}`
-      }],
       surfaces: ['confirm_card', 'knowledge', 'governance_log']
-    },
+    }),
     pageId: id
   };
 }

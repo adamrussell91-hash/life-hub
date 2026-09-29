@@ -4,13 +4,10 @@
 
 import { createTravelRepository } from './travel-repository.mjs';
 import { makeId, normalizeItem, validateTrip } from './travel-schema.mjs';
+import { clean, makeProposal } from './agent-propose-helpers.mjs';
 
 const TRIP_ID_RE = /^[a-z0-9_]{4,64}$/i;
 const KINDS = new Set(['do', 'food', 'transit', 'med', 'stay', 'flight', 'train', 'checkin_slot']);
-
-function clean(value, max = 200) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
 
 export function proposeTravelItemSchema() {
   return {
@@ -121,17 +118,15 @@ export async function buildTravelItemProposal(input, { loadTrip } = {}) {
   };
   return {
     ok: true,
-    proposal: {
-      intent: summary,
+    proposal: makeProposal(summary, [{
+      path: tripPath(tripId),
+      mode: 'overwrite',
+      content: JSON.stringify(body),
+      diff: `Travel item: ${normalized.title} (${normalized.kind}) on ${normalized.date}`
+    }], {
       reads: [tripPath(tripId)],
-      writes: [{
-        path: tripPath(tripId),
-        mode: 'overwrite',
-        content: JSON.stringify(body),
-        diff: `Travel item: ${normalized.title} (${normalized.kind}) on ${normalized.date}`
-      }],
       surfaces: ['confirm_card', 'travel', 'governance_log']
-    }
+    })
   };
 }
 
@@ -158,17 +153,15 @@ export async function buildTravelCheckinProposal(input, { loadTrip } = {}) {
   };
   return {
     ok: true,
-    proposal: {
-      intent: summary,
+    proposal: makeProposal(summary, [{
+      path: tripPath(tripId),
+      mode: 'overwrite',
+      content: JSON.stringify(body),
+      diff: `Travel check-in: ${label} (${cityId})`
+    }], {
       reads: [tripPath(tripId)],
-      writes: [{
-        path: tripPath(tripId),
-        mode: 'overwrite',
-        content: JSON.stringify(body),
-        diff: `Travel check-in: ${label} (${cityId})`
-      }],
       surfaces: ['confirm_card', 'travel', 'governance_log']
-    }
+    })
   };
 }
 

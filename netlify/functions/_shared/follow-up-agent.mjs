@@ -3,15 +3,12 @@
 // and calendar Accept share the ghost id; task write lands with Confirm.
 
 import { newTaskId } from './tasks-blobs.mjs';
+import { clean, makeProposal } from './agent-propose-helpers.mjs';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HHMM_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const DOMAINS = new Set(['teaching', 'life', 'wedding', 'health', 'other']);
 const GHOST_KINDS = new Set(['protect_block', 'outing']);
-
-function clean(value, max = 200) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
 
 function addMinutes(hhmm, minutes) {
   const [h, m] = hhmm.split(':').map(Number);
@@ -143,29 +140,29 @@ export function buildFollowUpProposal(input, { nowIso = () => new Date().toISOSt
       return { ok: false, error: 'invalid_calendar_span' };
     }
     const kind = GHOST_KINDS.has(input.calendar_kind) ? input.calendar_kind : 'protect_block';
+    const withWho = clean(input.with, 40);
+    const reason = clean(input.summary, 200);
     ghostInput = {
       kind,
       date: calDate,
       start,
       end,
       title,
-      ...(clean(input.with, 40) ? { with: clean(input.with, 40) } : {}),
+      ...(withWho ? { with: withWho } : {}),
       ...(notes ? { notes } : {}),
-      ...(clean(input.summary, 200) ? { reason: clean(input.summary, 200) } : {}),
+      ...(reason ? { reason } : {}),
       agent
     };
   }
 
   return {
     ok: true,
-    proposal: {
-      intent: summary,
+    proposal: makeProposal(summary, writes, {
       reads: ['tasks:task:*'],
-      writes,
       surfaces: ghostInput
         ? ['confirm_card', 'calendar', 'governance_log']
         : ['confirm_card', 'governance_log']
-    },
+    }),
     taskId: task.id,
     ...(ghostInput ? { ghostInput } : {})
   };

@@ -2,14 +2,11 @@
 // Paths: professional:tie:<proposal_id>
 
 import { acceptLinkProposal, declineLinkProposal } from './link-proposal-service.mjs';
+import { clean, makeProposal, parseWriteBody, writeError } from './agent-propose-helpers.mjs';
 
 export const TIE_DECISION_AGENT_SLUGS = new Set(['clare', 'hammond', 'ann']);
 
 const MAX_DECISIONS = 12;
-
-function clean(value, max = 200) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
 
 export function proposeTieDecisionSchema() {
   return {
@@ -72,26 +69,8 @@ export function buildTieDecisionProposal(input) {
 
   return {
     ok: true,
-    proposal: {
-      intent: summary,
-      reads: [],
-      writes,
-      surfaces: ['confirm_card', 'governance_log']
-    }
+    proposal: makeProposal(summary, writes)
   };
-}
-
-function parseBody(write) {
-  try {
-    const parsed = JSON.parse(write.content);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function proError(code, detail) {
-  return { ok: false, error: code, ...(detail ? { detail } : {}) };
 }
 
 export function createTieDecisionWriteExecutor({
@@ -104,10 +83,10 @@ export function createTieDecisionWriteExecutor({
   if (!professionalStore) throw new Error('createTieDecisionWriteExecutor requires a professional store.');
 
   async function apply(write, target) {
-    const body = parseBody(write);
-    if (!body) return proError('invalid_professional_write', write.path);
+    const body = parseWriteBody(write);
+    if (!body) return writeError('invalid_professional_write', write.path);
     const action = body.action;
-    if (action !== 'accept' && action !== 'decline') return proError('invalid_action', write.path);
+    if (action !== 'accept' && action !== 'decline') return writeError('invalid_action', write.path);
     const proposalId = target.id;
     const deps = {
       professionalStore,
@@ -155,7 +134,7 @@ export function createTieDecisionWriteExecutor({
           }
         };
       }
-      return proError(typeof error?.code === 'string' ? error.code : 'tie_decision_failed', error?.message);
+      return writeError(typeof error?.code === 'string' ? error.code : 'tie_decision_failed', error?.message);
     }
   }
 

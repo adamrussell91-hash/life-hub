@@ -2,6 +2,8 @@
 // Constraints / About Me stay on existing propose_central_node_patch (CN).
 // Sleep wall / lights-out: prefer propose_calendar_ghost kind bedtime — not prefs.
 
+import { clean, makeProposal } from './agent-propose-helpers.mjs';
+
 export const HUB_PREFS_PATH = 'tasks:meta:hub_prefs';
 export const HUB_PREFS_KEY = 'meta/hub_prefs';
 const DEFAULT_TZ = 'Australia/Sydney';
@@ -12,10 +14,6 @@ const NSW_2026_TERMS = [
   { term: 3, starts_on: '2026-07-21', ends_on: '2026-09-25' },
   { term: 4, starts_on: '2026-10-13', ends_on: '2026-12-17' }
 ];
-
-function clean(value, max = 200) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
 
 function parseTerm(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -135,17 +133,12 @@ export function buildHubPrefsProposal(input) {
 
   return {
     ok: true,
-    proposal: {
-      intent: summary,
-      reads: [HUB_PREFS_PATH],
-      writes: [{
-        path: HUB_PREFS_PATH,
-        mode: 'append',
-        content: JSON.stringify(patch),
-        diff: `Hub prefs: ${bits.join('; ')}`
-      }],
-      surfaces: ['confirm_card', 'governance_log']
-    },
+    proposal: makeProposal(summary, [{
+      path: HUB_PREFS_PATH,
+      mode: 'append',
+      content: JSON.stringify(patch),
+      diff: `Hub prefs: ${bits.join('; ')}`
+    }], { reads: [HUB_PREFS_PATH] }),
     notes: {
       constraints: 'Use propose_central_node_patch for Constraints / About Me (section constraints or about_me).',
       bedtime: 'Use propose_calendar_ghost kind bedtime with date, time, reason — not hub prefs.'

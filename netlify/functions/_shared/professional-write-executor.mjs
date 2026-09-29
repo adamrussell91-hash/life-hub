@@ -3,6 +3,7 @@
 import { createMeetingEventWriteExecutor } from './meeting-event-agent.mjs';
 import { createCareerWriteExecutor } from './career-agent.mjs';
 import { createTieDecisionWriteExecutor } from './tie-decision-agent.mjs';
+import { writeError } from './agent-propose-helpers.mjs';
 
 /**
  * Combined executor handed to executeProposeActionWrites as blobStores.professional.
@@ -35,7 +36,7 @@ export function createProfessionalWriteExecutor({
     if (target.kind === 'tie') {
       return ties.apply(write, target, created);
     }
-    return { ok: false, error: 'unknown_write_target', detail: write.path };
+    return writeError('unknown_write_target', write.path);
   }
 
   return { apply };

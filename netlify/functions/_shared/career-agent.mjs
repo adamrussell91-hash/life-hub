@@ -3,15 +3,12 @@
 
 import { createApplicationRepository } from './application-repository.mjs';
 import { createCareerRepository } from './career-repository.mjs';
+import { clean, makeProposal, parseWriteBody, writeError } from './agent-propose-helpers.mjs';
 
 export const CAREER_AGENT_SLUGS = new Set(['clare', 'hammond', 'ann']);
 
 const NEW_KEY_RE = /^[a-z0-9][a-z0-9_-]{0,30}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function clean(value, max = 200) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
 
 export function proposeApplicationSchema() {
   return {
@@ -96,17 +93,12 @@ export function buildApplicationProposal(input) {
 
   return {
     ok: true,
-    proposal: {
-      intent: summary,
-      reads: [],
-      writes: [{
-        path,
-        mode: 'create',
-        content: JSON.stringify(body),
-        diff: `Add application: ${position_title}`
-      }],
-      surfaces: ['confirm_card', 'governance_log']
-    }
+    proposal: makeProposal(summary, [{
+      path,
+      mode: 'create',
+      content: JSON.stringify(body),
+      diff: `Add application: ${position_title}`
+    }])
   };
 }
 
@@ -120,40 +112,24 @@ export function buildFutureProposal(input) {
   const key = clean(input.key, 31) || `f${Date.now().toString(36)}`;
   if (!NEW_KEY_RE.test(key)) return { ok: false, error: 'invalid_key' };
   const path = `professional:future:new-${key.toLowerCase()}`;
+  const where = clean(input.where, 200);
+  const status = clean(input.status, 40);
   const body = {
     title,
-    ...(clean(input.where, 200) ? { where: clean(input.where, 200) } : {}),
+    ...(where ? { where } : {}),
     ...(DATE_RE.test(input.target_date ?? '') ? { target_date: input.target_date } : {}),
-    ...(clean(input.status, 40) ? { status: clean(input.status, 40) } : {})
+    ...(status ? { status } : {})
   };
 
   return {
     ok: true,
-    proposal: {
-      intent: summary,
-      reads: [],
-      writes: [{
-        path,
-        mode: 'create',
-        content: JSON.stringify(body),
-        diff: `Add future: ${title}`
-      }],
-      surfaces: ['confirm_card', 'governance_log']
-    }
+    proposal: makeProposal(summary, [{
+      path,
+      mode: 'create',
+      content: JSON.stringify(body),
+      diff: `Add future: ${title}`
+    }])
   };
-}
-
-function parseBody(write) {
-  try {
-    const parsed = JSON.parse(write.content);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function proError(code, detail) {
-  return { ok: false, error: code, ...(detail ? { detail } : {}) };
 }
 
 export function createCareerWriteExecutor({ store, env, now } = {}) {
@@ -162,8 +138,8 @@ export function createCareerWriteExecutor({ store, env, now } = {}) {
   const careerRepo = createCareerRepository({ store, ...(now ? { now } : {}) });
 
   async function apply(write, target) {
-    const body = parseBody(write);
-    if (!body) return proError('invalid_professional_write', write.path);
+    const body = parseWriteBody(write);
+    if (!body) return writeError('invalid_professional_write', write.path);
     try {
       if (target.kind === 'application' && write.mode === 'create') {
         const { application } = await appRepo.createApplication(body);
@@ -176,9 +152,9 @@ export function createCareerWriteExecutor({ store, env, now } = {}) {
         const future = await careerRepo.createFuture(body);
         return { ok: true, result: { path: write.path, mode: 'create', id: future.id, title: future.title } };
       }
-      return proError('unknown_write_target', write.path);
+      return writeError('unknown_write_target', write.path);
     } catch (error) {
-      return proError(typeof error?.code === 'string' ? error.code : 'professional_write_failed', error?.message);
+      return writeError(typeof error?.code === 'string' ? error.code : 'professional_write_failed', error?.message);
     }
   }
 

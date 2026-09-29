@@ -2,16 +2,13 @@
 
 import { GOAL_INPUT_KEYS, normalizeGoalRecord } from './goal-record.mjs';
 import { getJSON, setJSON, readIndex, writeIndex, newRecordId } from './tasks-blobs.mjs';
+import { clean, makeProposal, parseWriteBody, writeError } from './agent-propose-helpers.mjs';
 
 export const GOAL_AGENT_SLUGS = new Set(['hammond', 'clare']);
 
 const NEW_KEY_RE = /^[a-z0-9][a-z0-9_-]{0,30}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SPHERES = new Set(['life', 'work', 'professional']);
-
-function clean(value, max = 200) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
 
 export function proposeGoalSchema() {
   return {
@@ -128,17 +125,12 @@ export function buildGoalProposal(input) {
 
   return {
     ok: true,
-    proposal: {
-      intent: summary,
-      reads: [],
-      writes: [{
-        path,
-        mode: 'create',
-        content: JSON.stringify(normalized),
-        diff: label
-      }],
-      surfaces: ['confirm_card', 'governance_log']
-    }
+    proposal: makeProposal(summary, [{
+      path,
+      mode: 'create',
+      content: JSON.stringify(normalized),
+      diff: label
+    }])
   };
 }
 
@@ -158,31 +150,13 @@ export function buildGoalCheckinProposal(input) {
 
   return {
     ok: true,
-    proposal: {
-      intent: summary,
-      reads: [],
-      writes: [{
-        path: `tasks:goal_checkin:${date}`,
-        mode: 'overwrite',
-        content: JSON.stringify(row),
-        diff: `Goal check-in ${date}`
-      }],
-      surfaces: ['confirm_card', 'governance_log']
-    }
+    proposal: makeProposal(summary, [{
+      path: `tasks:goal_checkin:${date}`,
+      mode: 'overwrite',
+      content: JSON.stringify(row),
+      diff: `Goal check-in ${date}`
+    }])
   };
-}
-
-function parseBody(write) {
-  try {
-    const parsed = JSON.parse(write.content);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function goalError(code, detail) {
-  return { ok: false, error: code, ...(detail ? { detail } : {}) };
 }
 
 /**
@@ -193,14 +167,14 @@ export function createGoalWriteExecutor({ store, nowIso = () => new Date().toISO
   if (!store) throw new Error('createGoalWriteExecutor requires a tasks store.');
 
   async function apply(write, target) {
-    const body = parseBody(write);
-    if (!body) return goalError('invalid_goal_write', write.path);
+    const body = parseWriteBody(write);
+    if (!body) return writeError('invalid_goal_write', write.path);
     const stamp = nowIso();
     try {
       if (target.kind === 'goal') {
         if (write.mode === 'create') {
           const existing = await getJSON(store, target.key);
-          if (existing) return goalError('already_exists', write.path);
+          if (existing) return writeError('already_exists', write.path);
           const record = normalizeGoalRecord({
             ...body,
             id: target.id,
@@ -213,7 +187,7 @@ export function createGoalWriteExecutor({ store, nowIso = () => new Date().toISO
           return { ok: true, result: { path: write.path, mode: 'create', id: target.id, updated_at: stamp } };
         }
         const existing = await getJSON(store, target.key);
-        if (!existing) return goalError('goal_not_found', write.path);
+        if (!existing) return writeError('goal_not_found', write.path);
         const record = normalizeGoalRecord({
           ...existing,
           ...body,
@@ -241,9 +215,9 @@ export function createGoalWriteExecutor({ store, nowIso = () => new Date().toISO
         }
         return { ok: true, result: { path: write.path, mode: write.mode, id: target.id, updated_at: stamp } };
       }
-      return goalError('unknown_write_target', write.path);
+      return writeError('unknown_write_target', write.path);
     } catch (error) {
-      return goalError(typeof error?.code === 'string' ? error.code : 'goal_write_failed', error?.message);
+      return writeError(typeof error?.code === 'string' ? error.code : 'goal_write_failed', error?.message);
     }
   }
 

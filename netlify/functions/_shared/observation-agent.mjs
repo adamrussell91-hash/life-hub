@@ -1,10 +1,7 @@
 // Propose a Professional Hub Observation (Confirm only).
 
 import { formatEntityRef, parseEntityRef } from './entity-ref.mjs';
-
-function clean(value, max = 200) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
+import { clean, makeProposal, nameFromRef } from './agent-propose-helpers.mjs';
 
 const SOURCES = new Set(['meeting', 'communication', 'manual', 'imported']);
 
@@ -50,15 +47,7 @@ export async function buildObservationProposal(input, { nameForRef, nowIso } = {
   if (!text) return { ok: false, error: 'text_required' };
   if (text.length > 8000) return { ok: false, error: 'text_too_long' };
 
-  let name = aboutRef;
-  if (typeof nameForRef === 'function') {
-    try {
-      name = (await nameForRef(aboutRef)) || aboutRef;
-    } catch {
-      name = aboutRef;
-    }
-  }
-
+  const name = await nameFromRef(aboutRef, nameForRef);
   const source = SOURCES.has(input.source) ? input.source : 'manual';
   let occurredAt = typeof input.occurred_at === 'string' ? input.occurred_at.trim() : '';
   if (!occurredAt || !Number.isFinite(Date.parse(occurredAt))) {
@@ -80,16 +69,11 @@ export async function buildObservationProposal(input, { nameForRef, nowIso } = {
   const preview = text.length > 80 ? `${text.slice(0, 77)}…` : text;
   return {
     ok: true,
-    proposal: {
-      intent: summary,
-      reads: [],
-      writes: [{
-        path: 'people:observation:new-1',
-        mode: 'create',
-        content: JSON.stringify(body),
-        diff: `Observation about ${name}: ${preview}`
-      }],
-      surfaces: ['confirm_card', 'governance_log']
-    }
+    proposal: makeProposal(summary, [{
+      path: 'people:observation:new-1',
+      mode: 'create',
+      content: JSON.stringify(body),
+      diff: `Observation about ${name}: ${preview}`
+    }])
   };
 }

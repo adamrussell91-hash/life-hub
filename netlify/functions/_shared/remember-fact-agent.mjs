@@ -2,10 +2,7 @@
 
 import { formatEntityRef, parseEntityRef } from './entity-ref.mjs';
 import { REMEMBER_TEXT_MAX } from './remember-schema.mjs';
-
-function clean(value, max = 200) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
+import { clean, makeProposal, nameFromRef } from './agent-propose-helpers.mjs';
 
 export function proposeRememberFactSchema() {
   return {
@@ -50,15 +47,7 @@ export async function buildRememberFactProposal(input, { nameForRef } = {}) {
   if (!text) return { ok: false, error: 'text_required' };
   if (text.length > REMEMBER_TEXT_MAX) return { ok: false, error: 'text_too_long' };
 
-  let name = personRef;
-  if (typeof nameForRef === 'function') {
-    try {
-      name = (await nameForRef(personRef)) || personRef;
-    } catch {
-      name = personRef;
-    }
-  }
-
+  const name = await nameFromRef(personRef, nameForRef);
   const body = {
     person_ref: personRef,
     text,
@@ -77,16 +66,11 @@ export async function buildRememberFactProposal(input, { nameForRef } = {}) {
 
   return {
     ok: true,
-    proposal: {
-      intent: summary,
-      reads: [],
-      writes: [{
-        path: 'people:remember:new-1',
-        mode: 'create',
-        content: JSON.stringify(body),
-        diff: `Remember about ${name}: ${text}`
-      }],
-      surfaces: ['confirm_card', 'governance_log']
-    }
+    proposal: makeProposal(summary, [{
+      path: 'people:remember:new-1',
+      mode: 'create',
+      content: JSON.stringify(body),
+      diff: `Remember about ${name}: ${text}`
+    }])
   };
 }

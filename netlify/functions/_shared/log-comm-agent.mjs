@@ -2,14 +2,12 @@
 // calendar ghost input (kind log_comm) so Confirm + dashed chip share one path
 // with propose_calendar_ghost.
 
+import { clean } from './agent-propose-helpers.mjs';
+
 const DIRECTIONS = new Set(['outbound', 'inbound']);
 const CHANNELS = new Set(['email', 'phone', 'message', 'in_person', 'video', 'other']);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HHMM_RE = /^\d{2}:\d{2}$/;
-
-function clean(value, max = 400) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
 
 export function proposeLogCommunicationSchema() {
   return {
@@ -72,6 +70,9 @@ export function buildLogCommGhostInput(input, { agent } = {}) {
   const personRefs = Array.isArray(input.person_refs)
     ? input.person_refs.map(ref => clean(ref, 120)).filter(Boolean)
     : [];
+  const summary = clean(input.summary, 2000);
+  const reason = clean(input.reason, 200);
+  const timeZone = clean(input.time_zone, 80);
 
   const out = {
     kind: 'log_comm',
@@ -82,9 +83,9 @@ export function buildLogCommGhostInput(input, { agent } = {}) {
     subject,
     ...(time ? { time } : {}),
     ...(personRefs.length ? { person_refs: personRefs } : {}),
-    ...(clean(input.summary, 2000) ? { summary: clean(input.summary, 2000) } : {}),
-    ...(clean(input.reason, 200) ? { reason: clean(input.reason, 200) } : {}),
-    ...(clean(input.time_zone, 80) ? { time_zone: clean(input.time_zone, 80) } : {})
+    ...(summary ? { summary } : {}),
+    ...(reason ? { reason } : {}),
+    ...(timeZone ? { time_zone: timeZone } : {})
   };
   if (agent) out.agent = agent;
   return out;

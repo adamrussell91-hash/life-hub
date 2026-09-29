@@ -5,6 +5,7 @@
 import { wallLocalToUtcIso } from './wall-time.mjs';
 import { createMeetingRepository } from './meeting-repository.mjs';
 import { createEventRepository } from './event-repository.mjs';
+import { clean, makeProposal, parseWriteBody, writeError } from './agent-propose-helpers.mjs';
 
 export const MEETING_EVENT_AGENT_SLUGS = new Set(['clare', 'hammond', 'ann']);
 
@@ -12,10 +13,6 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HHMM_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const NEW_KEY_RE = /^[a-z0-9][a-z0-9_-]{0,30}$/i;
 const DEFAULT_TZ = 'Australia/Sydney';
-
-function clean(value, max = 200) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
 
 function parseLocalParts(isoOrLocal) {
   const raw = clean(isoOrLocal, 40);
@@ -28,6 +25,26 @@ function parseLocalParts(isoOrLocal) {
 
 function toUtcIso(date, time, timeZone) {
   return wallLocalToUtcIso(`${date}T${time}`, timeZone || DEFAULT_TZ);
+}
+
+function resolveSchedule(startRaw, endRaw, timeZone) {
+  const startParts = parseLocalParts(startRaw);
+  const endParts = parseLocalParts(endRaw);
+  if (!startParts || !endParts) {
+    return { ok: false, error: 'invalid_schedule', detail: 'start/end need a date and time' };
+  }
+  let startIso;
+  let endIso;
+  try {
+    startIso = toUtcIso(startParts.date, startParts.time, timeZone);
+    endIso = toUtcIso(endParts.date, endParts.time, timeZone);
+  } catch (error) {
+    return { ok: false, error: 'invalid_time_zone', detail: error?.message };
+  }
+  if (Date.parse(endIso) < Date.parse(startIso)) {
+    return { ok: false, error: 'invalid_time_range' };
+  }
+  return { ok: true, startParts, endParts, startIso, endIso };
 }
 
 export function proposeMeetingSchema() {
@@ -107,21 +124,13 @@ export function buildMeetingProposal(input) {
   if (!title) return { ok: false, error: 'title_required' };
 
   const timeZone = clean(input.time_zone, 80) || DEFAULT_TZ;
-  const startParts = parseLocalParts(input.scheduled_start);
-  const endParts = parseLocalParts(input.scheduled_end);
-  if (!startParts || !endParts) return { ok: false, error: 'invalid_schedule', detail: 'scheduled_start/end need a date and time' };
-
-  let scheduled_start;
-  let scheduled_end;
-  try {
-    scheduled_start = toUtcIso(startParts.date, startParts.time, timeZone);
-    scheduled_end = toUtcIso(endParts.date, endParts.time, timeZone);
-  } catch (error) {
-    return { ok: false, error: 'invalid_time_zone', detail: error?.message };
+  const schedule = resolveSchedule(input.scheduled_start, input.scheduled_end, timeZone);
+  if (!schedule.ok) {
+    return schedule.error === 'invalid_schedule'
+      ? { ok: false, error: 'invalid_schedule', detail: 'scheduled_start/end need a date and time' }
+      : schedule;
   }
-  if (Date.parse(scheduled_end) < Date.parse(scheduled_start)) {
-    return { ok: false, error: 'invalid_time_range' };
-  }
+  const { startParts, endParts, startIso: scheduled_start, endIso: scheduled_end } = schedule;
 
   const key = clean(input.key, 31) || `m${Date.now().toString(36)}`;
   if (!NEW_KEY_RE.test(key)) return { ok: false, error: 'invalid_key' };
@@ -156,17 +165,12 @@ export function buildMeetingProposal(input) {
   return {
     ok: true,
     ghostInput,
-    proposal: {
-      intent: summary,
-      reads: [],
-      writes: [{
-        path,
-        mode: 'create',
-        content: JSON.stringify(body),
-        diff: `Book meeting: ${title} (${startParts.date} ${startParts.time})`
-      }],
-      surfaces: ['confirm_card', 'governance_log', 'calendar']
-    }
+    proposal: makeProposal(summary, [{
+      path,
+      mode: 'create',
+      content: JSON.stringify(body),
+      diff: `Book meeting: ${title} (${startParts.date} ${startParts.time})`
+    }], { surfaces: ['confirm_card', 'governance_log', 'calendar'] })
   };
 }
 
@@ -178,19 +182,9 @@ export function buildEventProposal(input) {
   if (!title) return { ok: false, error: 'title_required' };
 
   const timeZone = clean(input.time_zone, 80) || DEFAULT_TZ;
-  const startParts = parseLocalParts(input.start);
-  const endParts = parseLocalParts(input.end);
-  if (!startParts || !endParts) return { ok: false, error: 'invalid_schedule', detail: 'start/end need a date and time' };
-
-  let start;
-  let end;
-  try {
-    start = toUtcIso(startParts.date, startParts.time, timeZone);
-    end = toUtcIso(endParts.date, endParts.time, timeZone);
-  } catch (error) {
-    return { ok: false, error: 'invalid_time_zone', detail: error?.message };
-  }
-  if (Date.parse(end) < Date.parse(start)) return { ok: false, error: 'invalid_time_range' };
+  const schedule = resolveSchedule(input.start, input.end, timeZone);
+  if (!schedule.ok) return schedule;
+  const { startParts, endParts, startIso: start, endIso: end } = schedule;
 
   const key = clean(input.key, 31) || `e${Date.now().toString(36)}`;
   if (!NEW_KEY_RE.test(key)) return { ok: false, error: 'invalid_key' };
@@ -233,31 +227,13 @@ export function buildEventProposal(input) {
   return {
     ok: true,
     ghostInput,
-    proposal: {
-      intent: summary,
-      reads: [],
-      writes: [{
-        path,
-        mode: 'create',
-        content: JSON.stringify(body),
-        diff: `Book event: ${title} (${startParts.date} ${startParts.time})`
-      }],
-      surfaces: ['confirm_card', 'governance_log', 'calendar']
-    }
+    proposal: makeProposal(summary, [{
+      path,
+      mode: 'create',
+      content: JSON.stringify(body),
+      diff: `Book event: ${title} (${startParts.date} ${startParts.time})`
+    }], { surfaces: ['confirm_card', 'governance_log', 'calendar'] })
   };
-}
-
-function parseBody(write) {
-  try {
-    const parsed = JSON.parse(write.content);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function proError(code, detail) {
-  return { ok: false, error: code, ...(detail ? { detail } : {}) };
 }
 
 /** Confirm-time executor for professional:meeting / professional:event writes. */
@@ -267,8 +243,8 @@ export function createMeetingEventWriteExecutor({ store, env, now } = {}) {
   const eventRepo = createEventRepository({ store, env, ...(now ? { now } : {}) });
 
   async function apply(write, target) {
-    const body = parseBody(write);
-    if (!body) return proError('invalid_professional_write', write.path);
+    const body = parseWriteBody(write);
+    if (!body) return writeError('invalid_professional_write', write.path);
     try {
       if (target.kind === 'meeting' && write.mode === 'create') {
         const { meeting } = await meetingRepo.createMeeting(body);
@@ -278,9 +254,9 @@ export function createMeetingEventWriteExecutor({ store, env, now } = {}) {
         const { event } = await eventRepo.createEvent(body);
         return { ok: true, result: { path: write.path, mode: 'create', id: event.id, title: event.title } };
       }
-      return proError('unknown_write_target', write.path);
+      return writeError('unknown_write_target', write.path);
     } catch (error) {
-      return proError(typeof error?.code === 'string' ? error.code : 'professional_write_failed', error?.message);
+      return writeError(typeof error?.code === 'string' ? error.code : 'professional_write_failed', error?.message);
     }
   }
 
