@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v185';
+const CACHE_NAME = 'life-hub-shell-v186';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -187,6 +187,8 @@ const SHELL_FILES = [
   'packages/design-kit/js/calendar/ical-calendar.js',
   'packages/design-kit/js/calendar/medication-model.js',
   'packages/design-kit/js/calendar/day-sense.js',
+  'packages/design-kit/js/calendar/rescue-plan.js',
+  'packages/design-kit/js/calendar/rescue-sheet.js',
   'packages/design-kit/js/calendar/render-day-dial.js',
   'packages/design-kit/js/calendar/render-almanac.js',
   'packages/design-kit/js/calendar/render-term-river.js',

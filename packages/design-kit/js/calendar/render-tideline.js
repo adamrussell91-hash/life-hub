@@ -31,6 +31,7 @@ import {
 import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
 import { canMoveItem, canResizeItem, dragPatch, saveCalendarItem } from './calendar-item-actions.js';
 import { formatDisplayDate } from '../format-display-date.js';
+import { openRescueSheet } from './rescue-sheet.js';
 
 const AGENT_INITIAL = { sara: 'S', hammond: 'H', clare: 'C', chadwick: 'Ch' };
 /** Site-root portraits used across hubs (umbrella `dist/assets/agents/`). */
@@ -502,6 +503,7 @@ function mount({ entrance = false } = {}) {
   el('div', 'cal__period', `<b>${model.period.title}</b><span>${model.period.range}</span>`, nav, { 'data-part': 'period' });
   el('button', 'cal__round', ICON.next, nav, { type: 'button', 'aria-label': 'Next week', 'data-shift': '1' });
   el('button', 'btn btn--secondary', 'Today', nav, { type: 'button', 'data-today': '1' });
+  if (input.week.includes(input.today)) el('button', 'btn btn--secondary cal__rescue', 'Day changed', nav, { type: 'button', 'data-rescue-open': '', 'aria-haspopup': 'dialog' });
   if (typeof input.onQuickAdd === 'function') {
     el('button', 'icon-plus-btn cal__quick-add', '+', nav, {
       type: 'button',
@@ -1316,6 +1318,22 @@ function wire(section) {
     }
     if (target.closest('[data-part="quick-add"]')) {
       input?.onQuickAdd?.();
+      return;
+    }
+    if (target.closest('[data-rescue-open]')) {
+      openRescueSheet({
+        doc: root,
+        model,
+        today: input.today,
+        nowHour,
+        lightsOut: bands[bands.length - 1]?.to ?? 22,
+        apiFetch: input?.apiFetch,
+        onQueued: (queued) => {
+          input = { ...input, ghosts: [...(input.ghosts ?? []), ...queued] };
+          mount({ entrance: false });
+        },
+        onDone: () => { void input?.onSourcesChanged?.(); }
+      });
       return;
     }
     const costMove = target.closest('[data-cost-move]');
