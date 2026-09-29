@@ -20,6 +20,7 @@ import {
   readSchoolTerms
 } from '../almanac.mjs';
 import { proposeDeadlineRunwayGhosts } from './deadline-runway-ghosts.mjs';
+import { MIO, wantedAreas } from '../../../packages/design-kit/js/calendar/mio-model.js';
 import { proposeWaitingFollowUpGhosts } from './waiting-follow-up-ghosts.mjs';
 import { listJSON, TASK_PREFIX } from './tasks-blobs.mjs';
 
@@ -315,6 +316,21 @@ export async function runCalendarGhostsPropose({
   };
   // Always record last_run — a run that proposes nothing still counts. One batched write.
   const changed = new Map([[PENDING_CALENDAR_GHOSTS_PATH, serializePendingCalendarGhosts(next, last_run)]]);
+  // Suburbs of the next two weeks' commitments, for the on-request Mio sync (docs/MIO-SYNC.md).
+  // Written only when the areas change, in the same commit.
+  if (icalRows.length) {
+    const areas = wantedAreas(icalRows, { from: today, to: horizonTo });
+    const priorText = await opened.readFile(MIO.wantedPath).catch(() => null);
+    let priorAreas = null;
+    try {
+      priorAreas = priorText ? JSON.stringify(JSON.parse(priorText).areas) : null;
+    } catch {
+      priorAreas = null;
+    }
+    if (priorAreas !== JSON.stringify(areas)) {
+      changed.set(MIO.wantedPath, `${JSON.stringify({ generated_at: nowIso, from: today, to: horizonTo, areas }, null, 2)}\n`);
+    }
+  }
   await commit(changed, opened.base, stamped.length
     ? `chore(calendar): propose ${stamped.length} ghost${stamped.length === 1 ? '' : 's'}`
     : 'chore(calendar): propose run (none)');
