@@ -11,7 +11,8 @@ import {
 import { collapseSetSplitExercises } from './workout-history.mjs';
 import {
   computeShoulderWaistRatio,
-  formatBodyStateForPrompt
+  formatBodyStateForPrompt,
+  sortBodyRecordsNewestFirst
 } from './body-state.mjs';
 import {
   parseTemplateMarkdown,
@@ -416,20 +417,22 @@ export function getBodyState({
   if (!compositionRecords.length && !measurementRecords.length) {
     return { ok: true, store: 'life_hub_body', found: false, summary: '' };
   }
-  const latestMeasurements = measurementRecords[0] ?? null;
-  const ratio = latestMeasurements ? computeShoulderWaistRatio(latestMeasurements) : null;
+  const compositions = sortBodyRecordsNewestFirst(compositionRecords);
+  const measurements = sortBodyRecordsNewestFirst(measurementRecords);
   const summary = formatBodyStateForPrompt({
-    compositionRecords,
-    measurementRecords,
+    compositionRecords: compositions,
+    measurementRecords: measurements,
     targetRatio
   });
+  const latestMeasurements = measurements[0] ?? null;
+  const ratio = latestMeasurements ? computeShoulderWaistRatio(latestMeasurements) : null;
   return {
     ok: true,
     store: 'life_hub_body',
     found: true,
     same_as: 'Body page latest composition / tape / shoulder:waist',
     summary,
-    latest_composition: compositionRecords[0] ?? null,
+    latest_composition: compositions[0] ?? null,
     latest_measurements: latestMeasurements,
     shoulder_waist_ratio: ratio != null ? Math.round(ratio * 100) / 100 : null,
     target_ratio: typeof targetRatio === 'number' ? targetRatio : null

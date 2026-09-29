@@ -7,6 +7,7 @@ import { buildNutritionModel } from '../../../apps/life/js/app/nutrition-model.j
 import { TARGETS_CONFIG } from './targets-config.mjs';
 import { searchMindRecords } from './mind-session-read.mjs';
 import { getBodyState } from './fitness-tools.mjs';
+import { sortBodyRecordsNewestFirst } from './body-state.mjs';
 import { buildCapacitySnapshot } from './tasks-capacity.mjs';
 import {
   detectDensePinches,
@@ -247,7 +248,8 @@ export function getWeightTrend({ compositionRecords = [], measurementRecords = [
       message: 'No composition or measurement records loaded this turn.'
     };
   }
-  const weights = comps
+  // Sort by record date/time — never trust caller array order as "latest".
+  const weights = sortBodyRecordsNewestFirst(comps)
     .filter(r => typeof r.weight_kg === 'number')
     .map(r => ({ date: r.date, weight_kg: r.weight_kg, body_fat_pct: r.body_fat_pct ?? null }));
   const latest = weights[0] ?? null;
