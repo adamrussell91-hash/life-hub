@@ -43,7 +43,7 @@ export const GHOST_AGENTS = Object.freeze({
 export const GHOST_KINDS = Object.freeze([
   'skip_workout', 'bedtime', 'protect_block', 'move_task', 'create_task', 'draft_message', 'split_task', 'goal_rest_weeks', 'book_comm',
   'outing', 'meal_block', 'schedule_workout', 'reschedule_block', 'cancel_block', 'log_comm',
-  'pro_meeting', 'pro_event', 'move_block'
+  'pro_meeting', 'pro_event', 'move_block', 'task_block'
 ]);
 
 const LOG_COMM_DIRECTIONS = new Set(['outbound', 'inbound']);
@@ -172,6 +172,13 @@ export function validateGhost(ghost) {
     }
     if (!oneLine(ghost.title)) throw new TypeError(`${ghost.kind} needs a title`);
   }
+  if (ghost.kind === 'task_block') {
+    if (typeof ghost.taskId !== 'string' || !ghost.taskId) throw new TypeError('task_block needs taskId');
+    if (!HHMM.test(ghost.start ?? '') || !HHMM.test(ghost.end ?? '') || ghost.start >= ghost.end) {
+      throw new TypeError('task_block needs start < end (HH:MM)');
+    }
+    if (!oneLine(ghost.title)) throw new TypeError('task_block needs a title');
+  }
   if (ghost.kind === 'move_block') {
     if (typeof ghost.blockId !== 'string' || !ghost.blockId) throw new TypeError('move_block needs blockId');
     if (!DATE_KEY.test(ghost.from ?? '')) throw new TypeError('move_block needs from (YYYY-MM-DD)');
@@ -284,6 +291,24 @@ export function acceptPlan(ghost, { today = null } = {}) {
       steps.push(cn('this_week', 'append_line', { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withCorey ? ' with Corey' : ''} (protected).` }));
       steps.push(cn('cross_agent', 'append_line', { summary: `${who}→Clare: keep ${short(ghost.date)} clear`, text: `- ${who}→Clare: keep ${span} clear${withCorey ? ' (Corey)' : ''}.` }));
       receipt = `${who} → Life: “${title}”${withCorey ? ' with Corey' : ''}, ${span}, tentative and protected. ${who}→Clare: keep it clear. Nothing is booked or paid without you.`;
+      break;
+    }
+    case 'task_block': {
+      // Runway time-blocking: a real Tasks work block linked to the task, so Tasks,
+      // plan-vs-actual and bookmarks all see it. The ghost id makes the write idempotent.
+      const [sh, sm] = ghost.start.split(':').map(Number);
+      const [eh, em] = ghost.end.split(':').map(Number);
+      const minutes = eh * 60 + em - (sh * 60 + sm);
+      const title = oneLine(ghost.title);
+      steps.push({
+        target: 'tasks',
+        method: 'POST',
+        collection: 'work_blocks',
+        body: { title, date: ghost.date, start_time: ghost.start, duration_minutes: minutes, task_id: ghost.taskId, source: 'runway' }
+      });
+      const where = `${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}–${clock12(ghost.end)}`;
+      steps.push(recentAction(actedOn, who, `blocked out “${title}” ${where}${why}`));
+      receipt = `${who} → Tasks: “${title}”, ${where}.`;
       break;
     }
     case 'move_block': {

@@ -763,9 +763,14 @@ function mountAllDay(grid, date) {
     const kindLabel = due.kind === 'promise' ? 'Promise' : due.kind === 'allday' ? 'All day' : 'Task';
     const hint = [kindLabel, due.meta].filter(Boolean).join(' · ');
     const progress = due.progress ? `${due.progress.done} of ${due.progress.total} ${due.progress.unit}` : '';
-    const dueMeta = [due.meta, progress].filter(Boolean).join(' · ');
+    const left = due.range?.kind === 'range' ? due.range.text.replace(/ \(.*\)$/, '') : '';
+    const dueMeta = [due.meta, progress, left].filter(Boolean).join(' · ');
     const bookmarkHtml = due.bookmark?.note ? `<span class="cal-due__bm" title="Where you left it">↳ ${escapeHtml(due.bookmark.note)}</span>` : '';
-    const chip = el('div', `cal-due${promiseClass}`, `<b>${escapeHtml(due.title)}</b>${dueMeta ? `<span class="cal-due__meta">${escapeHtml(dueMeta)}</span>` : ''}${bookmarkHtml}`, cell, {
+    const after = due.record?.blocked_by?.length ? `<span class="cal-due__after">after ${escapeHtml(due.record.blocked_by.map(b => b.title).join(', '))}</span>` : '';
+    const frag = due.fragility && due.fragility.status !== 'fits'
+      ? `<span class="cal-due__flag is-${due.fragility.status}" title="${escapeHtml(due.fragility.text)}">${due.fragility.status === 'short' ? 'won’t fit' : 'fragile'}</span>`
+      : '';
+    const chip = el('div', `cal-due${promiseClass}`, `<b>${escapeHtml(due.title)}</b>${frag}${dueMeta ? `<span class="cal-due__meta">${escapeHtml(dueMeta)}</span>` : ''}${after}${bookmarkHtml}`, cell, {
       'data-part': 'due',
       'data-id': due.id,
       tabindex: '0',
@@ -834,6 +839,24 @@ function mountBody(grid, date) {
     });
     nodes.set(`free:${date}`, node);
   }
+  // Availability textures under the chips: interruptible school time, freed slots.
+  (day.textures ?? []).forEach((span, index) => {
+    nodes.set(`tex:${date}:${index}`, el('div', `cal-tex tx-${span.kind}`, undefined, body, {
+      'data-part': 'texture',
+      'data-start': String(span.start),
+      'data-end': String(span.end),
+      title: 'Interruptible: school time between classes'
+    }));
+  });
+  (day.freed ?? []).forEach((span, index) => {
+    const label = `Freed: ${span.title}${span.reason ? ` (${span.reason})` : ''}`;
+    nodes.set(`tex:${date}:f${index}`, el('div', 'cal-tex tx-regained', `<span>${escapeHtml(label)}</span>`, body, {
+      'data-part': 'freed',
+      'data-start': String(span.start),
+      'data-end': String(span.end),
+      title: label
+    }));
+  });
   for (const chip of day.chips) mountChip(body, chip);
   if (date === model.today) nodes.set('now', el('div', 'cal-now', `<span>${nowLabel(nowHour)}</span>`, body, { 'data-part': 'now-line' }));
   for (const wall of day.walls) {
@@ -858,6 +881,8 @@ function mountChip(body, chip) {
   if (chip.kind === 'corey') classes.push('is-corey');
   if (chip.pin) classes.push('is-pin');
   if (chip.ambient) classes.push('is-ambient');
+  if (chip.texture && !['fixed', 'focus', 'protected'].includes(chip.texture)) classes.push(`tx-${chip.texture}`);
+  if (chip.regained) classes.push('is-regained');
   if (ghost) classes.push('is-ghost');
   if (chip.ghost?.settled === 'accepted') classes.push('is-accepted');
   const title = `${chip.kind === 'corey' ? '<span class="cal-mark"></span>' : ''}${chip.title}`;
@@ -914,6 +939,9 @@ export function layout(nextHeights) {
       out.set(id, type === 'bg' ? { top, height: yForHour(bands, nextHeights, band.to) - top } : { top });
     } else if (type === 'chip') {
       out.set(id, blockGeometry(bands, nextHeights, Number(node.dataset.start), Number(node.dataset.end)));
+    } else if (type === 'tex') {
+      const top = yForHour(bands, nextHeights, Number(node.dataset.start));
+      out.set(id, { top, height: Math.max(0, yForHour(bands, nextHeights, Number(node.dataset.end)) - top) });
     } else if (type === 'free') {
       const top = yForHour(bands, nextHeights, Number(node.dataset.start));
       const raw = yForHour(bands, nextHeights, Number(node.dataset.end)) - top;

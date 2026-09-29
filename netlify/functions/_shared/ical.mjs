@@ -307,11 +307,13 @@ export function icalOccurrences(textBody, { feed, from, to }) {
   const toMs = Date.parse(`${to}T00:00:00Z`);
   const rows = [];
 
-  const emit = (event, start, durationMs, uid) => {
+  const emit = (event, start, durationMs, uid, recurring = false) => {
     if (text(event, 'STATUS').toUpperCase() === 'CANCELLED') return;
     const base = {
       uid,
       feed,
+      // A repeating event names its series, so "I've dropped this" can free every week of it.
+      ...(recurring ? { series: `${feed}:${uid}` } : {}),
       title: text(event, 'SUMMARY') || 'Busy',
       location: text(event, 'LOCATION') || undefined,
       notes: text(event, 'DESCRIPTION').slice(0, 500) || undefined
@@ -376,12 +378,12 @@ export function icalOccurrences(textBody, { feed, from, to }) {
         const movedDuration = movedEnd
           ? (moved.allDay ? Date.parse(`${movedEnd.date}T00:00:00Z`) - Date.parse(`${moved.date}T00:00:00Z`) : movedEnd.utc - moved.utc)
           : durationMs;
-        emit(override, moved, movedDuration, uid);
+        emit(override, moved, movedDuration, uid, true);
         overrides.delete(`${uid}|${key}`);
         continue;
       }
       if (!occurrence.allDay && occurrence.utc + Math.max(durationMs, 0) < fromMs - DAY_MS) continue;
-      emit(event, occurrence, durationMs, uid);
+      emit(event, occurrence, durationMs, uid, true);
     }
   }
   // Overrides whose original slot fell outside the rule (moved in from elsewhere).

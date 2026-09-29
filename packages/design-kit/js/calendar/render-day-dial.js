@@ -328,6 +328,9 @@ function ensureHatch(target) {
   const pattern = s('pattern', { id: 'dd-hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
   s('rect', { width: 6, height: 6, fill: 'color-mix(in srgb, var(--navy) 5%, transparent)' }, pattern);
   s('rect', { width: 2, height: 6, fill: 'color-mix(in srgb, var(--navy) 16%, transparent)' }, pattern);
+  // Interruptible time: speckled, same as the Week.
+  const speckle = s('pattern', { id: 'dd-speckle', width: 7, height: 7, patternUnits: 'userSpaceOnUse' }, defs);
+  s('circle', { cx: 3.5, cy: 3.5, r: 1, fill: 'color-mix(in srgb, var(--navy) 28%, transparent)' }, speckle);
 }
 
 function mount({ entrance = false } = {}) {
@@ -528,13 +531,24 @@ function mountDial(size) {
   // Event ring
   const [e1, e2] = rings.event;
   s('circle', { class: 'dd-track', cx, cy, r: (e1 + e2) / 2, 'stroke-width': e2 - e1 }, svg);
+  // What kind of time it is, under the events: interruptible school gaps, freed slots.
+  const tex = s('g', { 'data-part': 'texture-ring', 'aria-hidden': 'true' }, svg);
+  for (const span of day?.textures ?? []) {
+    const path = s('path', { class: `dd-tex tx-${span.kind}`, d: arcPath(cx, cy, e1, e2, span.start, span.end) }, tex);
+    s('title', {}, path, `Interruptible: school time between classes, ${clock12(span.start)} – ${clock12(span.end)}`);
+  }
+  for (const span of day?.freed ?? []) {
+    const path = s('path', { class: 'dd-tex tx-regained', d: arcPath(cx, cy, e1 - 3, e2 + 3, span.start, span.end) }, tex);
+    s('title', {}, path, `Freed: ${span.title}${span.reason ? ` (${span.reason})` : ''}`);
+  }
   const ev = s('g', { 'data-part': 'event-ring' }, svg);
   const ghosts = ghostsNow();
   const chips = chipsFor(date);
   for (const chip of chips) {
     const proposal = ghosts.find(ghost => ghost.overItem === chip.id && ghost.status === 'pending');
     const inset = chip.isClass ? 4 : 2;
-    const cls = ['dd-arc', `k-${chip.kind}`, chip.isClass ? 'is-class' : '', proposal ? 'is-proposal' : '', chip.skipped ? 'is-skipped' : ''].filter(Boolean).join(' ');
+    const texture = chip.texture && !['fixed', 'focus', 'protected'].includes(chip.texture) ? `tx-${chip.texture}` : '';
+    const cls = ['dd-arc', `k-${chip.kind}`, chip.isClass ? 'is-class' : '', proposal ? 'is-proposal' : '', chip.skipped ? 'is-skipped' : '', texture, chip.regained ? 'is-regained' : ''].filter(Boolean).join(' ');
     nodes.set(`arc:${chip.id}`, s('path', {
       class: cls,
       tabindex: 0,

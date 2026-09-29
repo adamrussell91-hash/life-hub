@@ -1,3 +1,5 @@
+import { dependencyIndex } from './duration-model.js';
+
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_KEY = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
@@ -16,6 +18,23 @@ export function taskProgress(task, steps = []) {
   return null;
 }
 
+const RESUMABILITY = new Set(['quick', 'runup']);
+
+/** Planning context the calendar needs on every task record (Day Sense steps 8 and 10). */
+function planningOf(task, deps) {
+  const row = deps.get(task.id);
+  return {
+    ...(RESUMABILITY.has(task.resumability) ? { resumability: task.resumability } : {}),
+    ...(Number.isFinite(task.max_block_minutes) && task.max_block_minutes > 0 ? { max_block_minutes: task.max_block_minutes } : {}),
+    ...(Number.isFinite(task.estimated_duration) ? { estimated_duration: task.estimated_duration } : {}),
+    ...(Array.isArray(task.depends_on) && task.depends_on.length ? { depends_on: task.depends_on.filter(id => typeof id === 'string') } : {}),
+    ...(Array.isArray(task.dismissed_inferred) && task.dismissed_inferred.length ? { dismissed_inferred: task.dismissed_inferred } : {}),
+    ...(row?.blockedBy.length ? { blocked_by: row.blockedBy } : {}),
+    ...(row?.unlocks ? { unlocks: row.unlocks } : {}),
+    ...(row?.inferredAfter ? { inferred_after: row.inferredAfter } : {})
+  };
+}
+
 function bookmarkOf(task) {
   return task?.bookmark && typeof task.bookmark.note === 'string' && task.bookmark.note.trim()
     ? { note: task.bookmark.note.trim(), at: task.bookmark.at ?? null }
@@ -23,6 +42,7 @@ function bookmarkOf(task) {
 }
 
 export function tasksEventsFromTasks(tasks) {
+  const deps = dependencyIndex(tasks);
   const stepsOf = new Map();
   for (const task of tasks ?? []) {
     if (typeof task?.parent_task_id === 'string' && task.parent_task_id) {
@@ -34,15 +54,17 @@ export function tasksEventsFromTasks(tasks) {
   const context = (tasks ?? [])
     .filter(task => task && typeof task.id === 'string' && !DATE_KEY.test(task.due_date) && task.status !== 'done' && task.status !== 'dead')
     .map(task => ({ task, bookmark: bookmarkOf(task), progress: taskProgress(task, stepsOf.get(task.id)) }))
-    .filter(row => row.bookmark || row.progress)
-    .map(({ task, bookmark, progress }) => ({
+    .map(row => ({ ...row, planning: planningOf(row.task, deps) }))
+    .filter(row => row.bookmark || row.progress || Object.keys(row.planning).length)
+    .map(({ task, bookmark, progress, planning }) => ({
       path: `task_context:${task.id}`,
       record: {
         type: 'task_context',
         id: task.id,
         title: typeof task.title === 'string' && task.title ? task.title : task.id,
         ...(bookmark ? { bookmark } : {}),
-        ...(progress ? { progress } : {})
+        ...(progress ? { progress } : {}),
+        ...planning
       },
       body: ''
     }));
@@ -68,6 +90,7 @@ export function tasksEventsFromTasks(tasks) {
         description: typeof task.description === 'string' ? task.description : '',
         waiting_on: typeof task.waiting_on === 'string' && task.waiting_on ? task.waiting_on : undefined,
         estimated_duration: Number.isFinite(task.estimated_duration) ? task.estimated_duration : undefined,
+        ...planningOf(task, deps),
         ...(bookmarkOf(task) ? { bookmark: bookmarkOf(task) } : {}),
         ...(taskProgress(task, stepsOf.get(task.id)) ? { progress: taskProgress(task, stepsOf.get(task.id)) } : {})
       },

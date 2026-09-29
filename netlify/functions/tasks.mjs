@@ -62,6 +62,13 @@ function isTaskDomainRecord(item) {
   return !kind || kind === 'task' || kind === 'step';
 }
 
+/** Task ids (dependencies): strings only, no self-links, at most 20. */
+export function coerceIdList(value, selfId) {
+  const list = typeof value === 'string' ? [value] : value;
+  if (!Array.isArray(list)) return [];
+  return [...new Set(list.filter((id) => typeof id === 'string' && id && id !== selfId))].slice(0, 20);
+}
+
 /** A way back in: { note ≤280, at, source } or null. Anything else clears it. */
 export function coerceBookmark(value) {
   if (!value || typeof value !== 'object') return null;
@@ -86,6 +93,19 @@ export function mergeTask(existing, patch) {
     }
     if (key === 'bookmark') {
       next.bookmark = coerceBookmark(value);
+      continue;
+    }
+    if (key === 'resumability') {
+      next.resumability = value === 'quick' || value === 'runup' ? value : null;
+      continue;
+    }
+    if (key === 'max_block_minutes') {
+      const minutes = Math.round(Number(value));
+      next.max_block_minutes = Number.isFinite(minutes) && minutes >= 15 && minutes <= 240 ? minutes : null;
+      continue;
+    }
+    if (key === 'depends_on' || key === 'dismissed_inferred') {
+      next[key] = coerceIdList(value, existing.id);
       continue;
     }
     next[key] = value;

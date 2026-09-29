@@ -94,6 +94,23 @@ export async function loadFeedText({ feed, env, store, fetchImpl, nowMs, fresh }
   }
 }
 
+/**
+ * iCloud rows from the cache only (no fetch, no secrets touched): for the 05:30 planner,
+ * which needs busy time but must never wait on iCloud. Missing cache → [].
+ */
+export async function cachedFeedRows({ store, from, to }) {
+  const rows = [];
+  for (const feed of CALENDAR_FEEDS) {
+    try {
+      const cached = await getJSON(store, cacheKey(feed.id));
+      if (cached?.text) rows.push(...icalOccurrences(cached.text, { feed: feed.id, from, to }));
+    } catch {
+      /* one unreadable feed never blocks the rest */
+    }
+  }
+  return rows;
+}
+
 export function createCalendarFeedsHandler(deps = {}) {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const now = deps.now ?? Date.now;
@@ -118,9 +135,11 @@ export function createCalendarFeedsHandler(deps = {}) {
       }
       return { feed: { id: feed.id, status: loaded.status, fetched_at: loaded.fetched_at }, events };
     }));
+    const freed = await getJSON(store, 'meta/freed_spans').catch(() => null);
     return withCors(okResponse(200, {
       feeds: results.map((row) => row.feed),
-      events: results.flatMap((row) => row.events)
+      events: results.flatMap((row) => row.events),
+      freed: Array.isArray(freed) ? freed : []
     }), request, env);
   }, deps);
 }

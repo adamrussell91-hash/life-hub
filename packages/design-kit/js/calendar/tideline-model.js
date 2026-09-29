@@ -4,6 +4,7 @@
  * become grid chips.
  */
 import { bandsFromProfile, baseHeights, totalHeight } from '../calendar-bands.js';
+import { annotateDurations, freedSpansFor, interruptibleSpans, regainedCost, textureFor } from './day-sense-plan.js';
 import { formatDisplayDate, formatDisplayDateRange } from '../format-display-date.js';
 import { isHoliday, mondayOf, termAt, toMs, weekLabel } from '../school-time.js';
 import { capacityForDates, dayLoadHours, isOverCapacity, symptomsIn } from './capacity-model.js';
@@ -535,6 +536,25 @@ export function buildTidelineModel({
       if (ctx?.progress) due.progress = ctx.progress;
     }
   }
+  // Steps 8 and 10: what kind of time each span is, freed time, ranges and fragility.
+  const schoolBand = bands.find(band => band.id === 'school') ?? null;
+  const freed = (events ?? []).map(event => event?.record).filter(record => record?.type === 'freed_span');
+  for (const day of days) {
+    for (const chip of day.chips) {
+      const texture = textureFor(chip);
+      if (texture) chip.texture = texture;
+    }
+    day.textures = interruptibleSpans(day, schoolBand);
+    day.freed = freedSpansFor(day.date, freed);
+    for (const span of day.freed) {
+      for (const chip of day.chips) {
+        if (chip.ambient || chip.isClass) continue;
+        const cost = regainedCost(chip, span, day.date);
+        if (cost) chip.regained = cost;
+      }
+    }
+  }
+  annotateDurations(days, events, { today, nowHour });
   const title = periodTitle(week, schoolTerms);
   return {
     week,
