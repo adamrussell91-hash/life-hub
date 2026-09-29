@@ -53,4 +53,10 @@ describe('parked Clare chat', () => {
       /\.chat-view:not\(\[data-panel-mode\]\):not\(\[data-chrome='engaged'\]\)\s+#chat-who\s*\{\s*display:\s*none/
     );
   });
+
+  it('engaged phone Clare drops the page header so the who-header can rise', () => {
+    expect(viewsCss).toMatch(
+      /\[data-hub-view='clare'\]:has\(\.chat-view\[data-chrome='engaged'\]:not\(\[hidden\]\)\)\s+\.page-header\s*\{\s*display:\s*none/
+    );
+  });
 });

@@ -286,17 +286,32 @@ test('Messenger assistant bubbles keep the avatar beside the bubble, not stacked
   );
 });
 
-test('engaged phone Chat drops the page title stack and assistant left bar', async () => {
+test('phone chat canvases hide refresh / sign-out utilities in the design kit', async () => {
+  const kit = await readFile(
+    new URL('../../packages/design-kit/hub-chat-viewport.css', import.meta.url),
+    'utf8'
+  );
+  assert.match(
+    kit,
+    /body:has\(\.chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+\.hub-utilities/
+  );
+  assert.match(kit, /body:has\(\.hub-layout\[data-hub-view='clare'\]\)\s+\.hub-utilities/);
+  assert.match(kit, /body:has\(\.coach\.chat\)\s+\.hub-utilities/);
+  assert.match(kit, /body:has\(\.teacher-chat\)\s+\.hub-utilities/);
+  assert.match(kit, /\.hub-utilities\s*\{\s*display:\s*none/);
+});
+
+test('engaged phone Chat drops the page header stack and assistant left bar', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
   const phoneChat = css.slice(css.indexOf('Engaged phone Chat already has the Messenger who-header'));
   assert.ok(phoneChat.length > 80, 'engaged phone Chat chrome block exists');
   assert.match(
     phoneChat,
-    /#chat-view\[data-chrome='engaged'\][\s\S]*\.page-header__copy[\s\S]*display:\s*none/
+    /#chat-view\[data-chrome='engaged'\][\s\S]*\.page-header\s*\{\s*display:\s*none/
   );
-  assert.match(
+  assert.doesNotMatch(
     phoneChat,
-    /#chat-view\[data-chrome='engaged'\][\s\S]*\.date-chip[\s\S]*display:\s*none/
+    /keep refresh\s*\/\s*sign-out/
   );
   assert.match(
     css,
