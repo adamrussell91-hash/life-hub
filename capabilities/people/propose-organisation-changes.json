@@ -1,0 +1,10 @@
+{
+  "id": "people.propose-organisation-changes",
+  "tool_name": "propose_organisation_changes",
+  "verb": "People",
+  "agents": ["clare", "hammond", "ann"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Add or edit Organisations. Saved only after Adam's Confirm.",
+  "surfaces": ["confirm_card", "governance_log"]
+}

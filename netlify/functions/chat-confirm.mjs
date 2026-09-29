@@ -42,6 +42,7 @@ import {
 import { isQueuedPatchStale } from '../../apps/life/js/core/central-node-patch.js';
 import { createPeopleWriteExecutor } from './_shared/people-agent.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
+import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
 import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolvers.mjs';
 import {
   PENDING_ACTIONS_PATH,
@@ -188,6 +189,7 @@ export function createChatConfirmHandler({
   getTeachingStore = defaultGetTeachingStore,
   getLifeEvents = null,
   getPeopleStore = defaultGetUniversalLinkStore,
+  getProfessionalStore = defaultGetProfessionalStore,
   resolvePeopleEntity = defaultResolveEntity
 } = {}) {
   return async function chatConfirmHandler(request) {
@@ -900,6 +902,7 @@ export function createChatConfirmHandler({
       getTasksStore,
       getTeachingStore,
       getPeopleStore,
+      getProfessionalStore,
       resolvePeopleEntity
     });
     if (!blobStoresResult.ok) {
@@ -1885,6 +1888,7 @@ async function loadBlobStoresForWrites(writes, {
   getTasksStore,
   getTeachingStore,
   getPeopleStore,
+  getProfessionalStore,
   resolvePeopleEntity
 }) {
   const stores = {};
@@ -1892,11 +1896,17 @@ async function loadBlobStoresForWrites(writes, {
   const needsTeaching = writes.some(write => classifyWriteTarget(write.path).store === 'teaching')
     || writes.some(write => classifyWriteTarget(write.path).kind === 'work_block');
   const needsPeople = writes.some(write => classifyWriteTarget(write.path).store === 'people');
+  const needsProfessional = writes.some(write => {
+    const kind = classifyWriteTarget(write.path).kind;
+    return kind === 'observation' || kind === 'remember';
+  });
   let peopleStore = null;
+  let professionalStore = null;
   try {
     if (needsTasks) stores.tasks = await getTasksStore(env);
     if (needsTeaching) stores.teaching = await getTeachingStore(env);
     if (needsPeople) peopleStore = await getPeopleStore(env);
+    if (needsProfessional) professionalStore = await getProfessionalStore(env);
   } catch {
     return { ok: false, error: 'blobs_unavailable' };
   }
@@ -1904,8 +1914,10 @@ async function loadBlobStoresForWrites(writes, {
   if (needsTeaching && !stores.teaching) return { ok: false, error: 'teaching_blobs_unbound' };
   if (needsPeople) {
     if (!peopleStore) return { ok: false, error: 'people_blobs_unbound' };
+    if (needsProfessional && !professionalStore) return { ok: false, error: 'professional_blobs_unbound' };
     stores.people = createPeopleWriteExecutor({
       store: peopleStore,
+      professionalStore,
       env,
       fetchImpl,
       now: () => new Date(now()).toISOString(),

@@ -392,12 +392,22 @@ export function classifyWriteTarget(path) {
   if (store === 'teaching' && kind === 'unit' && BLOB_ID.test(id)) {
     return { store: 'teaching', kind, id, key: `units/${id}`, path: raw };
   }
-  // Professional People: writes run through the identity and Universal Link
-  // repositories at Confirm (people-agent.mjs), never as raw Blob JSON.
+  // Professional People: writes run through the identity / Universal Link /
+  // observation / remember repositories at Confirm (people-agent.mjs), never
+  // as raw Blob JSON.
   if (store === 'people' && kind === 'person' && BLOB_ID.test(id)) {
     return { store: 'people', kind, id, path: raw };
   }
+  if (store === 'people' && kind === 'organisation' && BLOB_ID.test(id)) {
+    return { store: 'people', kind, id, path: raw };
+  }
   if (store === 'people' && kind === 'link' && /^new-[A-Za-z0-9_-]{1,40}$/.test(id)) {
+    return { store: 'people', kind, id, path: raw };
+  }
+  if (store === 'people' && kind === 'observation' && /^new-[A-Za-z0-9_-]{1,40}$/.test(id)) {
+    return { store: 'people', kind, id, path: raw };
+  }
+  if (store === 'people' && kind === 'remember' && /^new-[A-Za-z0-9_-]{1,40}$/.test(id)) {
     return { store: 'people', kind, id, path: raw };
   }
   if (store === 'tasks' || store === 'teaching' || store === 'people') {

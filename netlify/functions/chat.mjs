@@ -320,7 +320,14 @@ import {
 import { promptOneLinersForAgent } from './_shared/capabilities/registry.mjs';
 import { buildCentralNodeModel } from '../../apps/life/js/app/central-node-model.js';
 import { readCentralNodeSectionBody } from '../../apps/life/js/core/central-node-patch.js';
-import { buildPeopleProposal, createPeopleNameLookup, searchPeopleForAgent } from './_shared/people-agent.mjs';
+import {
+  buildOrganisationProposal,
+  buildPeopleProposal,
+  createPeopleNameLookup,
+  searchPeopleForAgent
+} from './_shared/people-agent.mjs';
+import { buildObservationProposal } from './_shared/observation-agent.mjs';
+import { buildRememberFactProposal } from './_shared/remember-fact-agent.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolvers.mjs';
 import { buildBindingGoal } from '../../apps/life/js/app/binding-goal.js';
@@ -1836,10 +1843,26 @@ export function createChatHandler({
                   return JSON.stringify({ ok: false, error: 'people_unavailable' });
                 }
               }
-              if (event.name === 'propose_people_changes') {
-                const built = await buildPeopleProposal(event.input ?? {}, {
-                  nameForRef: createPeopleNameLookup({ env, fetchImpl, resolveEntity: resolvePeopleEntity })
-                });
+              if (
+                event.name === 'propose_people_changes'
+                || event.name === 'propose_organisation_changes'
+                || event.name === 'propose_observation'
+                || event.name === 'propose_remember_fact'
+              ) {
+                const nameForRef = createPeopleNameLookup({ env, fetchImpl, resolveEntity: resolvePeopleEntity });
+                let built;
+                if (event.name === 'propose_people_changes') {
+                  built = await buildPeopleProposal(event.input ?? {}, { nameForRef });
+                } else if (event.name === 'propose_organisation_changes') {
+                  built = await buildOrganisationProposal(event.input ?? {}, { nameForRef });
+                } else if (event.name === 'propose_observation') {
+                  built = await buildObservationProposal(event.input ?? {}, {
+                    nameForRef,
+                    nowIso: new Date(nowInstant).toISOString()
+                  });
+                } else {
+                  built = await buildRememberFactProposal(event.input ?? {}, { nameForRef });
+                }
                 if (!built.ok) {
                   return JSON.stringify({ ok: false, error: built.error, ...(built.detail ? { detail: built.detail } : {}) });
                 }

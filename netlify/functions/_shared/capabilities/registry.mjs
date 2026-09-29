@@ -20,7 +20,13 @@ import {
   setSkincareRoutineMembershipSchema
 } from '../skincare-library-tools.mjs';
 import { getMindSessionSchema, searchMindRecordsSchema } from '../mind-session-read.mjs';
-import { proposePeopleChangesSchema, searchPeopleSchema } from '../people-agent.mjs';
+import {
+  proposeOrganisationChangesSchema,
+  proposePeopleChangesSchema,
+  searchPeopleSchema
+} from '../people-agent.mjs';
+import { proposeObservationSchema } from '../observation-agent.mjs';
+import { proposeRememberFactSchema } from '../remember-fact-agent.mjs';
 import { proposeLogCommunicationSchema } from '../log-comm-agent.mjs';
 import {
   searchMedicalRecordsSchema,
@@ -330,6 +336,9 @@ export function buildAgentTools({
   // Professional People: search is read-only; changes are Confirm cards.
   if (has('people.search')) tools.push(searchPeopleSchema());
   if (has('people.propose-changes')) tools.push(proposePeopleChangesSchema());
+  if (has('people.propose-organisation-changes')) tools.push(proposeOrganisationChangesSchema());
+  if (has('people.propose-observation')) tools.push(proposeObservationSchema());
+  if (has('people.propose-remember-fact')) tools.push(proposeRememberFactSchema());
 
   // Domain retrieval parity tools (read-only). Skip names already attached.
   const attached = new Set(tools.map(tool => tool.name).filter(Boolean));

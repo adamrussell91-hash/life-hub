@@ -68,11 +68,21 @@ export function searchPeopleSchema() {
   };
 }
 
+const PERSON_PROFILE_PROPS = {
+  summary: { type: 'string', description: 'Profile notes (professional_profile.summary).' },
+  linkedin_url: { type: 'string', description: 'https LinkedIn URL, or empty to clear.' },
+  current_workplace: {
+    type: 'array',
+    items: { type: 'string' },
+    description: 'Workplace label(s) shown on the profile. Pass one string in a single-element array when needed.'
+  }
+};
+
 export function proposePeopleChangesSchema() {
   return {
     name: 'propose_people_changes',
     description:
-      'Propose adding People, editing People, and linking People to each other or to Organisations. Nothing is saved until Adam taps Confirm on the card, and he can untick single items. Search first. Editable fields are display_name, sort_name and aliases only. To link a person you are adding in the same call, use "new:<key>" as the ref.',
+      'Propose adding People, editing People (name, aliases, profile notes, LinkedIn, workplace), and linking People to each other or to Organisations. Nothing is saved until Adam taps Confirm on the card, and he can untick single items. Search first. To link a person you are adding in the same call, use "new:<key>" as the ref.',
     input_schema: {
       type: 'object',
       properties: {
@@ -85,7 +95,8 @@ export function proposePeopleChangesSchema() {
               key: { type: 'string', description: 'Short handle for this new person, used as "new:<key>" in links.' },
               display_name: { type: 'string' },
               sort_name: { type: 'string' },
-              aliases: { type: 'array', items: { type: 'string' } }
+              aliases: { type: 'array', items: { type: 'string' } },
+              ...PERSON_PROFILE_PROPS
             },
             required: ['key', 'display_name'],
             additionalProperties: false
@@ -99,7 +110,8 @@ export function proposePeopleChangesSchema() {
               ref: { type: 'string', description: 'shared:person:<id> from search_people.' },
               display_name: { type: 'string' },
               sort_name: { type: 'string' },
-              aliases: { type: 'array', items: { type: 'string' }, description: 'The full new alias list.' }
+              aliases: { type: 'array', items: { type: 'string' }, description: 'The full new alias list.' },
+              ...PERSON_PROFILE_PROPS
             },
             required: ['ref'],
             additionalProperties: false
@@ -128,6 +140,81 @@ export function proposePeopleChangesSchema() {
       additionalProperties: false
     }
   };
+}
+
+export function proposeOrganisationChangesSchema() {
+  return {
+    name: 'propose_organisation_changes',
+    description:
+      'Propose adding or editing Organisations in Professional Hub. Search with search_people (kinds organisation) first. Nothing is saved until Adam taps Confirm. Cannot set logos from chat.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        summary: { type: 'string', description: 'One line for the Confirm card.' },
+        add_organisations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              key: { type: 'string', description: 'Short handle for this new org.' },
+              display_name: { type: 'string' },
+              legal_name: { type: 'string' },
+              aliases: { type: 'array', items: { type: 'string' } }
+            },
+            required: ['key', 'display_name'],
+            additionalProperties: false
+          }
+        },
+        update_organisations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              ref: { type: 'string', description: 'shared:organisation:<id> from search_people.' },
+              display_name: { type: 'string' },
+              legal_name: { type: 'string' },
+              aliases: { type: 'array', items: { type: 'string' } }
+            },
+            required: ['ref'],
+            additionalProperties: false
+          }
+        }
+      },
+      required: ['summary'],
+      additionalProperties: false
+    }
+  };
+}
+
+function professionalProfileFromItem(item) {
+  if (!item || typeof item !== 'object') return null;
+  const profile = {};
+  if (typeof item.summary === 'string') {
+    profile.summary = clean(item.summary, 4000) || null;
+  }
+  if (typeof item.linkedin_url === 'string') {
+    const url = item.linkedin_url.trim();
+    profile.linkedin_url = url || null;
+  }
+  if (item.current_workplace !== undefined) {
+    if (typeof item.current_workplace === 'string') {
+      const label = clean(item.current_workplace, 200);
+      profile.current_workplace = label ? [label] : [];
+    } else if (Array.isArray(item.current_workplace)) {
+      profile.current_workplace = item.current_workplace
+        .map(value => clean(value, 200))
+        .filter(Boolean)
+        .slice(0, 8);
+    } else if (item.current_workplace === null) {
+      profile.current_workplace = [];
+    }
+  }
+  return Object.keys(profile).length ? profile : null;
+}
+
+function organisationRefOrNull(value) {
+  const ref = typeof value === 'string' ? parseEntityRef(value.trim()) : null;
+  return ref && ref.namespace === 'shared' && ref.kind === 'organisation' ? ref : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +307,16 @@ export async function buildPeopleProposal(input, { nameForRef } = {}) {
     if (sortName) body.sort_name = sortName;
     const aliases = cleanAliases(add?.aliases);
     if (aliases?.length) body.aliases = aliases;
-    writes.push({ path, mode: 'create', content: JSON.stringify(body), diff: `Add person: ${displayName}` });
+    const profile = professionalProfileFromItem(add);
+    if (profile) body.professional_profile = profile;
+    const profileBit = profile
+      ? ` (${[
+        profile.summary != null ? 'notes' : null,
+        profile.linkedin_url != null ? 'LinkedIn' : null,
+        profile.current_workplace ? 'workplace' : null
+      ].filter(Boolean).join(', ')})`
+      : '';
+    writes.push({ path, mode: 'create', content: JSON.stringify(body), diff: `Add person: ${displayName}${profileBit}` });
   }
 
   for (const [index, update] of updates.entries()) {
@@ -244,6 +340,19 @@ export async function buildPeopleProposal(input, { nameForRef } = {}) {
     if (aliases) {
       patch.aliases = aliases;
       bits.push(`aliases → ${aliases.length ? aliases.join(', ') : '(none)'}`);
+    }
+    const profile = professionalProfileFromItem(update);
+    if (profile) {
+      patch.professional_profile = profile;
+      if (profile.summary !== undefined) bits.push(profile.summary ? 'notes updated' : 'notes cleared');
+      if (profile.linkedin_url !== undefined) bits.push(profile.linkedin_url ? 'LinkedIn set' : 'LinkedIn cleared');
+      if (profile.current_workplace !== undefined) {
+        bits.push(
+          profile.current_workplace.length
+            ? `workplace → ${profile.current_workplace.join(', ')}`
+            : 'workplace cleared'
+        );
+      }
     }
     if (!bits.length) return { ok: false, error: 'no_fields_to_update', detail: canonical };
     writes.push({
@@ -320,6 +429,94 @@ export async function buildPeopleProposal(input, { nameForRef } = {}) {
   };
 }
 
+/**
+ * Turn propose_organisation_changes input into os_propose_action writes.
+ */
+export async function buildOrganisationProposal(input, { nameForRef } = {}) {
+  if (!input || typeof input !== 'object') return { ok: false, error: 'invalid_input' };
+  const summary = clean(input.summary, 160);
+  if (!summary) return { ok: false, error: 'summary_required' };
+  const adds = Array.isArray(input.add_organisations) ? input.add_organisations : [];
+  const updates = Array.isArray(input.update_organisations) ? input.update_organisations : [];
+  if (adds.length + updates.length === 0) return { ok: false, error: 'no_changes' };
+  if (adds.length + updates.length > MAX_CHANGES) {
+    return { ok: false, error: 'too_many_changes', detail: `At most ${MAX_CHANGES} per card.` };
+  }
+
+  const lookupName = async ref => {
+    if (typeof nameForRef !== 'function') return null;
+    try {
+      return await nameForRef(ref);
+    } catch {
+      return null;
+    }
+  };
+
+  const writes = [];
+  const seenKeys = new Set();
+
+  for (const [index, add] of adds.entries()) {
+    const key = clean(add?.key, 31);
+    const displayName = clean(add?.display_name, 160);
+    if (!key || !NEW_KEY_RE.test(key)) return { ok: false, error: 'invalid_new_key', detail: `add_organisations[${index}].key` };
+    if (seenKeys.has(key.toLowerCase())) return { ok: false, error: 'duplicate_new_key', detail: key };
+    if (!displayName) return { ok: false, error: 'display_name_required', detail: `add_organisations[${index}]` };
+    seenKeys.add(key.toLowerCase());
+    const body = { display_name: displayName };
+    const legalName = clean(add?.legal_name, 200);
+    if (legalName) body.legal_name = legalName;
+    const aliases = cleanAliases(add?.aliases);
+    if (aliases?.length) body.aliases = aliases;
+    writes.push({
+      path: `people:organisation:new-${key.toLowerCase()}`,
+      mode: 'create',
+      content: JSON.stringify(body),
+      diff: `Add organisation: ${displayName}`
+    });
+  }
+
+  for (const [index, update] of updates.entries()) {
+    const ref = organisationRefOrNull(update?.ref);
+    if (!ref) return { ok: false, error: 'invalid_organisation_ref', detail: `update_organisations[${index}].ref` };
+    const canonical = formatEntityRef(ref);
+    const current = await lookupName(canonical);
+    if (!current) return { ok: false, error: 'organisation_not_found', detail: canonical };
+    const patch = {};
+    const bits = [];
+    const displayName = clean(update?.display_name, 160);
+    if (displayName && displayName !== current) {
+      patch.display_name = displayName;
+      bits.push(`name → ${displayName}`);
+    }
+    if (typeof update?.legal_name === 'string') {
+      patch.legal_name = clean(update.legal_name, 200) || null;
+      bits.push(`legal name → ${patch.legal_name ?? '(none)'}`);
+    }
+    const aliases = cleanAliases(update?.aliases);
+    if (aliases) {
+      patch.aliases = aliases;
+      bits.push(`aliases → ${aliases.length ? aliases.join(', ') : '(none)'}`);
+    }
+    if (!bits.length) return { ok: false, error: 'no_fields_to_update', detail: canonical };
+    writes.push({
+      path: `people:organisation:${ref.id}`,
+      mode: 'overwrite',
+      content: JSON.stringify(patch),
+      diff: `Edit ${current}: ${bits.join('; ')}`
+    });
+  }
+
+  return {
+    ok: true,
+    proposal: {
+      intent: summary,
+      reads: [],
+      writes,
+      surfaces: ['confirm_card', 'governance_log']
+    }
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Confirm-time execution
 
@@ -343,11 +540,14 @@ function parseBody(write) {
  */
 export function createPeopleWriteExecutor({
   store,
+  professionalStore = null,
   env,
   fetchImpl,
   now,
   resolveEntity = defaultResolveEntity,
-  getImportedPerson = getGithubPerson
+  getImportedPerson = getGithubPerson,
+  createObservation = null,
+  createRememberFact = null
 } = {}) {
   if (!store) throw new Error('createPeopleWriteExecutor requires a store.');
   const github = { env, ...(fetchImpl ? { fetchImpl } : {}) };
@@ -377,17 +577,41 @@ export function createPeopleWriteExecutor({
     if (!body) return peopleError('invalid_people_write', write.path);
     try {
       if (target.kind === 'person' && write.mode === 'create') {
-        const { record, ref } = await identityRepo.createIdentity({ kind: 'person', input: body });
+        const { professional_profile: profilePatch, ...createInput } = body;
+        const { record, ref } = await identityRepo.createIdentity({ kind: 'person', input: createInput });
         created.set(write.path, ref);
-        return { ok: true, result: { path: write.path, mode: 'create', ref, name: record.display_name } };
+        let name = record.display_name;
+        if (profilePatch && typeof profilePatch === 'object') {
+          const parsed = typeof ref === 'string' ? parseEntityRef(ref) : ref;
+          const updated = await identityRepo.updateFields({
+            ref: parsed,
+            patch: { professional_profile: profilePatch }
+          });
+          name = updated.display_name;
+        }
+        return { ok: true, result: { path: write.path, mode: 'create', ref, name } };
       }
       if (target.kind === 'person') {
         const ref = { namespace: 'shared', kind: 'person', id: target.id };
         const updated = await updatePerson(ref, body);
         return { ok: true, result: { path: write.path, mode: 'overwrite', ref: formatEntityRef(ref), name: updated.display_name } };
       }
+      if (target.kind === 'organisation' && write.mode === 'create') {
+        const { record, ref } = await identityRepo.createIdentity({ kind: 'organisation', input: body });
+        created.set(write.path, ref);
+        return { ok: true, result: { path: write.path, mode: 'create', ref, name: record.display_name } };
+      }
+      if (target.kind === 'organisation') {
+        const ref = { namespace: 'shared', kind: 'organisation', id: target.id };
+        const updated = await identityRepo.updateFields({ ref, patch: body });
+        return { ok: true, result: { path: write.path, mode: 'overwrite', ref: formatEntityRef(ref), name: updated.display_name } };
+      }
       if (target.kind === 'link') {
-        const endpoint = value => (typeof value === 'string' && value.startsWith('people:person:new-') ? created.get(value) : value);
+        const endpoint = value => (
+          typeof value === 'string' && (value.startsWith('people:person:new-') || value.startsWith('people:organisation:new-'))
+            ? created.get(value)
+            : value
+        );
         const sourceRef = endpoint(body.source_ref);
         const targetRef = endpoint(body.target_ref);
         if (!sourceRef || !targetRef) {
@@ -398,6 +622,57 @@ export function createPeopleWriteExecutor({
           createAccessContext({ workflow: 'life' })
         );
         return { ok: true, result: { path: write.path, mode: 'create', link_id: link.id, created: wasCreated } };
+      }
+      if (target.kind === 'observation') {
+        if (typeof createObservation !== 'function' && !professionalStore) {
+          return peopleError('professional_store_unbound', write.path);
+        }
+        let result;
+        if (typeof createObservation === 'function') {
+          result = await createObservation(body);
+        } else {
+          const { createObservationRepository } = await import('./observation-repository.mjs');
+          const repo = createObservationRepository({
+            store: professionalStore,
+            ...(now ? { now } : {})
+          });
+          result = await repo.createObservation(body);
+        }
+        return {
+          ok: true,
+          result: {
+            path: write.path,
+            mode: 'create',
+            observation_id: result.observation?.id ?? result.id,
+            about_ref: body.about_ref
+          }
+        };
+      }
+      if (target.kind === 'remember') {
+        if (typeof createRememberFact !== 'function' && !professionalStore) {
+          return peopleError('professional_store_unbound', write.path);
+        }
+        let result;
+        if (typeof createRememberFact === 'function') {
+          result = await createRememberFact(body);
+        } else {
+          const { createRememberFactRepository } = await import('./remember-repository.mjs');
+          const repo = createRememberFactRepository({
+            store: professionalStore,
+            ...(now ? { now } : {})
+          });
+          result = await repo.createFact({ ...body, author: body.author || 'adam' });
+        }
+        return {
+          ok: true,
+          result: {
+            path: write.path,
+            mode: 'create',
+            remember_id: result.fact?.id ?? result.id,
+            created: result.created !== false,
+            ...(result.skipped ? { skipped: result.skipped } : {})
+          }
+        };
       }
       return peopleError('unknown_write_target', write.path);
     } catch (error) {
