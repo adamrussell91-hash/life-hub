@@ -103,7 +103,7 @@
 
 ## T: Typography
 
-**T1 · Uncontrolled font sizes.** **Seen:** Medical detail sheet notes at about 22px. **Rule:** Every text node uses a kit size token. **Check:** no computed `font-size` above the brief's stated maximums.
+**T1 · Uncontrolled font sizes.** **Seen:** Medical detail sheet notes at about 22px; calendar filter chips (29/09/26) — `.cal-src` set `font-size:var(--text-2xs)` then `font:inherit` later in the same rule, so the shorthand reset every chip to the page size in all hubs. **Rule:** Every text node uses a kit size token. A `font` shorthand goes first in a rule, never after `font-size`/`font-weight`. **Check:** no computed `font-size` above the brief's stated maximums; `grep -n "font-size[^}]*font:inherit"` over changed CSS returns nothing.
 
 ## I: Interaction
 
@@ -111,7 +111,7 @@
 
 **I2 · Fake links.** **Seen:** G-22. **Rule:** Clickable things are `<a href>` or `<button>` and work with the keyboard. **Check:** Tab + Enter.
 
-**I3 · Dead buttons and silent empty states.** **Seen:** G-16. **Rule:** Every control does something visible in every data state, including empty. **Check:** run with an empty store.
+**I3 · Dead buttons and silent empty states.** **Seen:** G-16; calendar Due rows (29/09/26) — rendered as plain `div`s with no click, hover or keyboard handler in every hub; timed chips only offered drag when the hub passed `onReschedule` (never in Life). **Rule:** Every control does something visible in every data state, including empty. **Check:** run with an empty store.
 
 **I4 · Cramped action rows.** **Seen:** Medical Next "MRCP… action [Add to Tasks]" squeezing the title onto 2 lines. **Rule:** A secondary action goes on its own line or becomes an icon button. **Check:** titles don't wrap because of controls.
 

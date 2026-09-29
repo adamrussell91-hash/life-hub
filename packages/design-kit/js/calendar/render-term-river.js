@@ -34,7 +34,8 @@ import {
   readFilterState,
   writeFilterState
 } from './calendar-filter.js';
-import { isOwnHubItem, openInHubHref, openInHubLinkHtml } from './open-in-hub.js';
+import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
+import { saveCalendarItem } from './calendar-item-actions.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -145,6 +146,9 @@ let ALL_DAYS = [];
 let CAP = new Map();
 let LOADS = [];
 let GROUPED = {};
+/** Lead point id → every item on that lane-day; ids folded into a lead. Rebuilt each mount. */
+const STACKS = new Map();
+const STACKED = new Set();
 let SCHOOL_WEEK = '';
 let lastLogged = null;
 
@@ -327,6 +331,8 @@ function buildModel() {
 
   LOADS = weeklyLoad({ from: YEAR.from, to: YEAR.to, terms: TERMS, commitments: COMMITMENTS, capacityFor: capFor });
   GROUPED = byLane(ITEMS);
+  STACKS.clear();
+  STACKED.clear();
   TIERS = buildTiers(ITEMS);
   MONTHS = monthFirsts();
   // Weeks vs months is decided on a school week: today's week can run into compressed holidays.
@@ -714,8 +720,23 @@ function mountLaneItems(group, laneId, top, h) {
     .filter(item => item.shape !== 'bar')
     .sort((a, b) => String(a.date ?? a.from ?? '').localeCompare(String(b.date ?? b.from ?? '')));
   const cy = top + (bars.length ? 12 + bars.length * (TR.bar.h + TR.bar.gap) + 22 : h / 2 + 2);
-  const labelled = points.filter(point => !point.sample && point.shape !== 'hum');
+  // Same lane, same day: one dot and one label ("title +1"). Two dots drawn on one spot
+  // used to carry two labels (one above, one below) and cut each other to "Re…".
+  const leadByDate = new Map();
+  for (const point of points) {
+    if (point.sample || point.shape === 'hum' || !point.date) continue;
+    const lead = leadByDate.get(point.date);
+    if (!lead) {
+      leadByDate.set(point.date, point);
+      STACKS.set(point.id, [point]);
+    } else {
+      STACKS.get(lead.id).push(point);
+      STACKED.add(point.id);
+    }
+  }
+  const labelled = points.filter(point => !point.sample && point.shape !== 'hum' && !STACKED.has(point.id));
   points.forEach(item => {
+    if (STACKED.has(item.id)) return;
     if (item.shape === 'hum') {
       const line = s('line', { class: 'tr-hum', y1: cy, y2: cy }, group);
       const text = s('text', { class: 'tr-t-hum', y: cy + 18 }, group);
@@ -796,7 +817,9 @@ function mountLaneItems(group, laneId, top, h) {
         // Labels above sit higher than the agent badge, so a badge never cuts a label.
         const limit = next?.date ? X(next.date) - 10 : W - TR.padR;
         set(label, { x: x + (item.shape === 'marker' ? 5 : 9) });
-        label.textContent = fitText(item.title, limit - (x + 9));
+        const more = (STACKS.get(item.id)?.length ?? 1) - 1;
+        const tail = more ? ` +${more}` : '';
+        label.textContent = `${fitText(item.title, limit - (x + 9) - (more ? 22 : 0))}${tail}`;
       }
     });
   });
@@ -1032,11 +1055,20 @@ function writePreview(ghost) {
   }
 }
 
-function openPop(itemId) {
+function openPop(itemId, anchorId = itemId) {
   const item = itemById(itemId);
   const pop = nodes.get('__pop');
-  const target = root?.querySelector(`[data-id="${itemId}"]`);
+  const target = root?.querySelector(`[data-id="${anchorId}"]`);
   if (!item || !pop || !target || !engine) return;
+  const stack = anchorId === itemId ? STACKS.get(itemId) ?? [] : [];
+  if (stack.length > 1) {
+    // Several items share this day: list them, each opens its own card.
+    pop.innerHTML = `<b>${escapeHtml(dd(item.date))} · ${stack.length} items</b>`
+      + `<ul class="tr-stack">${stack.map(entry => `<li><button type="button" class="tr-stack__item" data-stack-item="${escapeHtml(entry.id)}" data-stack-anchor="${escapeHtml(itemId)}">${escapeHtml(entry.title)}</button></li>`).join('')}</ul>`;
+    pop.classList.remove('cal-pop--card');
+    showPopAt(pop, target, itemId);
+    return;
+  }
   const when = item.date ? dd(item.date) : `${dd(item.from)} – ${dd(item.to)}`;
   const lane = LANES.find(entry => (GROUPED[entry.id] ?? []).includes(item));
   const sub = item.sub && item.sub !== 'held' ? ` · ${item.sub}` : '';
@@ -1050,9 +1082,23 @@ function openPop(itemId) {
       + `<button type="button" class="btn btn--primary" data-accept="${escapeHtml(item.id)}" data-label="Accept">Accept</button>`
       + `<button type="button" class="btn btn--ghost" data-dismiss="${escapeHtml(item.id)}">Dismiss</button></div>`;
   } else {
-    html += openInHubLinkHtml(item, { hub: input?.hub || 'life', routeFor: input?.routeFor });
+    html = itemCardHtml(item, { kind: item.kind, routeFor: input?.routeFor, location: root?.ownerDocument?.defaultView?.location ?? null });
   }
   pop.innerHTML = html;
+  pop.classList.toggle('cal-pop--card', !(ghost && receipt));
+  if (!(ghost && receipt)) {
+    bindItemCard(pop, item, {
+      onSave: async (patch) => {
+        await saveCalendarItem(input?.apiFetch, item, patch);
+        void input?.onSourcesChanged?.();
+      },
+      onClose: () => closePop()
+    });
+  }
+  showPopAt(pop, target, itemId);
+}
+
+function showPopAt(pop, target, itemId) {
   pop.hidden = false;
   pop.removeAttribute('hidden');
   const bounds = root.getBoundingClientRect();
@@ -1175,24 +1221,15 @@ function wire(section) {
     const stepper = target.closest?.('[data-step]');
     if (stepper) return void stepRiver(Number(stepper.getAttribute('data-step')));
     if (target.closest?.('[data-today]')) return void riverToday();
+    const stacked = target.closest?.('[data-stack-item]');
+    if (stacked) {
+      openPop(stacked.getAttribute('data-stack-item'), stacked.getAttribute('data-stack-anchor'));
+      return;
+    }
     const item = target.closest?.('[data-part="item"],[data-part="ghost"]');
     if (item && !item.classList?.contains?.('is-sample')) {
       const id = item.getAttribute('data-id');
-      const row = itemById(id);
-      const hub = input?.hub || 'life';
-      if (row && !ghostFor(row) && isOwnHubItem(row, hub) && typeof input?.routeFor === 'function') {
-        const href = openInHubHref(row, input.routeFor);
-        if (href) {
-          closePop();
-          const loc = doc?.defaultView?.location;
-          if (href.startsWith('#')) {
-            if (loc) loc.hash = href;
-          } else if (loc) {
-            loc.assign(href);
-          }
-          return;
-        }
-      }
+      // Every item opens the item card (context, ↗ new tab) — never a silent jump.
       return id === popFor ? closePop() : openPop(id);
     }
     if (!target.closest?.('[data-part="popover"]')) closePop();

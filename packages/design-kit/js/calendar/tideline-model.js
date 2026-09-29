@@ -175,6 +175,7 @@ function chipFromEvent(event) {
     pin,
     lesson_id: typeof record.lesson_id === 'string' ? record.lesson_id : undefined,
     class_id: typeof record.class_id === 'string' ? record.class_id : undefined,
+    record,
     ...(workout?.skipped ? { skipped: true } : {})
   };
 }
@@ -234,8 +235,10 @@ function chipsFromVisual(visual, date, events) {
     if (item.date !== date) continue;
     const workout = workoutOnGrid(recordForItem(events, item) ?? {});
     if (workout === 'omit') continue;
+    const record = recordForItem(events, item);
     chips.push({
       ...item,
+      ...(record ? { record } : {}),
       start: toHour(item.start),
       end: toHour(item.end),
       ...(workout?.skipped ? { skipped: true, meta: workout.meta } : {})
@@ -286,7 +289,10 @@ function promiseDuesFromEvents(events, date) {
       kind: 'promise',
       filterKey: 'promises',
       direction: event.record.direction,
-      late: event.record.late === true
+      late: event.record.late === true,
+      source: 'ledger_item',
+      meta: event.record.late ? `${event.record.days_late ?? ''} day${event.record.days_late === 1 ? '' : 's'} late`.trim() : '',
+      record: event.record
     }));
 }
 
@@ -296,14 +302,27 @@ function dueFor(visual, events, date, useVisual) {
     const visualDue = (visual.DUE ?? []).filter(item => item.date === date).map(item => {
       const task = (events ?? []).find(event => event.record?.type === 'task' && event.record.id === item.id);
       const actual = task?.record?.date;
-      if (typeof actual === 'string' && actual !== item.date) return { ...item, moved: true, movedTo: actual };
-      return item;
+      const withRecord = task?.record ? { ...item, source: 'task', record: task.record } : item;
+      if (typeof actual === 'string' && actual !== item.date) return { ...withRecord, moved: true, movedTo: actual };
+      return withRecord;
     });
     return [...visualDue, ...promises.filter(item => !visualDue.some(due => due.id === item.id))];
   }
+  // Untimed tasks, and timed tasks with no end (a due time is a deadline, not a block).
   const tasks = (events ?? [])
-    .filter(event => event.record?.type === 'task' && event.record.date === date && !event.record.time)
-    .map(event => ({ id: event.record.id || event.path, date, title: event.record.title || 'Task', kind: 'task', filterKey: 'tasks' }));
+    .filter(event => event.record?.type === 'task' && event.record.date === date && !(event.record.time && event.record.end_time))
+    .map(event => ({
+      id: event.record.id || event.path,
+      date,
+      title: event.record.title || 'Task',
+      kind: 'task',
+      filterKey: 'tasks',
+      source: 'task',
+      time: event.record.time || undefined,
+      meta: event.record.time ? `due ${clockMeta(toHour(event.record.time))}` : '',
+      record: event.record
+    }))
+    .sort((a, b) => String(a.time ?? '').localeCompare(String(b.time ?? '')));
   return [...tasks, ...promises];
 }
 

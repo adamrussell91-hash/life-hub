@@ -62,6 +62,7 @@ export function tonight({ date, now, chips = [], ghosts = [], logs = [], profile
       time: clock12(c.start),
       title: c.title,
       kind: c.kind,
+      itemId: c.id,
       note: c.skipped ? 'Skipped' : c.protected ? `Protected · ${formatDuration((c.end - c.start) * 60)} · nothing else can book here` : c.meta ?? '',
       struck: !!c.skipped,
       ghostId: proposal?.id ?? null,
@@ -119,10 +120,10 @@ export function tomorrow({ date, chips = [], due = [], ghosts = [], capacity, ta
   const rows = chips
     .filter(c => !c.isClass)
     .sort((a, b) => a.start - b.start)
-    .map(c => ({ at: c.start, time: clock12(c.start), title: c.title, kind: c.kind, note: c.meta ?? '', ghostId: null, suggestion: null }));
+    .map(c => ({ at: c.start, time: clock12(c.start), title: c.title, kind: c.kind, itemId: c.id, note: c.meta ?? '', ghostId: null, suggestion: null }));
   for (const d of due) {
     const move = ghosts.find(g => g.kind === 'move_task' && g.taskId === d.id && g.status !== 'dismissed' && g.status !== 'accepted');
-    rows.push({ at: 99, time: 'Due', title: d.title, kind: 'task', note: 'Tasks · open', ghostId: move?.id ?? null, suggestion: move ? `${agentName(move.agent)}: move to ${move.label.replace(/^→\s*/, '')}` : null });
+    rows.push({ at: 99, time: 'Due', title: d.title, kind: 'task', itemId: d.id, note: 'Tasks · open', ghostId: move?.id ?? null, suggestion: move ? `${agentName(move.agent)}: move to ${move.label.replace(/^→\s*/, '')}` : null });
   }
   const classes = chips.filter(c => c.isClass).length;
   const big = rows.filter(r => r.at !== 99).length;

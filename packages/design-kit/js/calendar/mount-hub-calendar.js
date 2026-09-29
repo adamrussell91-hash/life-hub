@@ -27,7 +27,7 @@ import { calendarZoomHref, normalizeCalendarZoom, parseCalendarZoom } from './hu
  *   now?: Date,
  *   rootClass?: string,
  *   onNavigate?: (href: string) => void,
- *   onReschedule?: (item: unknown, patch: { date: string, start_time?: string | null }) => void | Promise<void>,
+ *   onReschedule?: (item: unknown, patch: { date?: string, start_time?: string | null, duration_min?: number }) => void | Promise<void>,
  *   onQuickAdd?: () => void,
  *   quickAddLabel?: string,
  *   classId?: string,

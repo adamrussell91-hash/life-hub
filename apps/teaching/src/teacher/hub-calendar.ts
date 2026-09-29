@@ -5,6 +5,7 @@
 import { defaultFilterForHub } from '../../design-kit/js/calendar/calendar-filter.js';
 import { calendarZoomHref, normalizeCalendarZoom, parseCalendarZoom } from '../../design-kit/js/calendar/hub-calendar-zoom.js';
 import { mountHubCalendar, type HubCalendarHandle } from '../../design-kit/js/calendar/mount-hub-calendar.js';
+import { itemType, saveCalendarItem } from '../../design-kit/js/calendar/calendar-item-actions.js';
 import { getApiBaseUrl } from '@/api/config';
 import { withAppBase } from '@/app/base-path';
 import { navigate } from '@/app/router';
@@ -66,9 +67,7 @@ export function mountTeachingCalendar(
   let localZoom = 'week';
   const reschedule =
     options.onReschedule ??
-    ((scheduledId, patch) => {
-      void patchScheduledLesson(scheduledId, patch);
-    });
+    ((scheduledId, patch) => patchScheduledLesson(scheduledId, patch).then(() => undefined));
 
   handle = mountHubCalendar(host, {
     hub: 'teaching',
@@ -82,9 +81,11 @@ export function mountTeachingCalendar(
     onQuickAdd: options.onQuickAdd,
     quickAddLabel: options.quickAddLabel,
     onReschedule: (item, patch) => {
+      // Only lessons go through the Teaching schedule API; tasks and blocks save to their own hub.
+      if (itemType(item) !== 'scheduled_lesson') return saveCalendarItem(apiFetch, item, patch).then(() => undefined);
       const id = item && typeof item === 'object' ? String((item as { id?: string }).id || '') : '';
-      if (!id) return;
-      return reschedule(id, patch);
+      if (!id || !patch.date) return;
+      return reschedule(id, { date: patch.date, start_time: patch.start_time });
     },
     getZoom: () =>
       routeZoom

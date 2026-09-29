@@ -18,7 +18,12 @@ export function tasksEventsFromTasks(tasks) {
         date: task.due_date,
         time: typeof task.due_time === 'string' && TIME_KEY.test(task.due_time) ? task.due_time : undefined,
         title: typeof task.title === 'string' && task.title ? task.title : task.id,
-        status: typeof task.status === 'string' ? task.status : undefined
+        status: typeof task.status === 'string' ? task.status : undefined,
+        // Context for the calendar item card (click a Due row or chip).
+        priority: typeof task.priority === 'string' ? task.priority : undefined,
+        description: typeof task.description === 'string' ? task.description : '',
+        waiting_on: typeof task.waiting_on === 'string' && task.waiting_on ? task.waiting_on : undefined,
+        estimated_duration: Number.isFinite(task.estimated_duration) ? task.estimated_duration : undefined
       },
       body: ''
     }));
@@ -46,6 +51,7 @@ export function tasksEventsFromWorkBlocks(blocks) {
         title: typeof block.title === 'string' && block.title ? block.title : block.id,
         status: typeof block.status === 'string' ? block.status : undefined,
         depth: block.depth,
+        task_id: typeof block.task_id === 'string' && block.task_id ? block.task_id : undefined,
         ghost: block.status === 'proposed' || Boolean(block.ghost)
       },
       body: ''

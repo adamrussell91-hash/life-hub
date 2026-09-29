@@ -13,7 +13,7 @@ export type HubCalendarAdapter = {
   onNavigate?: (href: string) => void;
   onReschedule?: (
     item: unknown,
-    patch: { date: string; start_time?: string | null }
+    patch: { date?: string; start_time?: string | null; duration_min?: number }
   ) => void | Promise<void>;
   onQuickAdd?: () => void;
   quickAddLabel?: string;

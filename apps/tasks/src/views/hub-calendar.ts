@@ -5,6 +5,7 @@
 import { defaultFilterForHub } from '../../design-kit/js/calendar/calendar-filter.js';
 import { calendarZoomHref, normalizeCalendarZoom, parseCalendarZoom } from '../../design-kit/js/calendar/hub-calendar-zoom.js';
 import { mountHubCalendar, type HubCalendarHandle } from '../../design-kit/js/calendar/mount-hub-calendar.js';
+import { saveCalendarItem } from '../../design-kit/js/calendar/calendar-item-actions.js';
 import { getApiBaseUrl } from '@/api/config';
 import { taskPageHash } from '@/domain/cards';
 import { tasksApi } from '@/services/client-api';
@@ -63,7 +64,7 @@ function itemId(item: unknown): string {
 
 async function rescheduleItem(
   item: unknown,
-  patch: { date: string; start_time?: string | null }
+  patch: { date?: string; start_time?: string | null; duration_min?: number }
 ): Promise<void> {
   const id = itemId(item);
   if (!id || !patch.date) return;
@@ -85,7 +86,8 @@ async function rescheduleItem(
   if (type === 'work_block') {
     await tasksApi.updateWorkBlock(id, {
       date: patch.date,
-      ...(patch.start_time !== undefined ? { start_time: patch.start_time } : {})
+      ...(patch.start_time !== undefined ? { start_time: patch.start_time } : {}),
+      ...(patch.duration_min ? { duration_minutes: patch.duration_min } : {})
     });
     return;
   }
@@ -94,7 +96,10 @@ async function rescheduleItem(
       due_date: patch.date,
       ...(patch.start_time !== undefined ? { due_time: patch.start_time } : {})
     });
+    return;
   }
+  // Lessons and other hubs' records save through the kit writer.
+  await saveCalendarItem(apiFetch, item, patch);
 }
 
 let handle: HubCalendarHandle | null = null;
