@@ -29,6 +29,7 @@ import { saveCalendarItem } from './calendar-item-actions.js';
 import { presetBand } from './render-tideline.js';
 import { clock as medClock, doseCandidate, MEDICATION, toHHMM } from './medication-model.js';
 import { tonightFit, trackedHours } from './day-sense.js';
+import { openRescueSheet } from './rescue-sheet.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -310,6 +311,7 @@ function mount({ entrance = false } = {}) {
   el('div', 'dd__period', `<b>${escapeHtml(period.title)}</b><span>${escapeHtml(period.note)}</span>`, nav, { 'data-part': 'period' });
   el('button', 'dd__round', ICON.next, nav, { type: 'button', 'aria-label': 'Next day', 'data-step': '1' });
   el('button', 'btn btn--secondary', 'Today', nav, { type: 'button', 'data-today': '' });
+  if (state.day === input.today) el('button', 'btn btn--secondary dd__rescue', 'Day changed', nav, { type: 'button', 'data-rescue-open': '', 'aria-haspopup': 'dialog' });
   const zoom = el('div', 'hub-pills', '<span class="hub-pills__thumb"></span>', nav, { role: 'group', 'aria-label': 'Zoom', 'data-part': 'zoom-pills' });
   for (const name of ZOOMS) {
     el('button', `hub-pills__btn${name === 'Day' ? ' is-active' : ''}`, name, zoom, {
@@ -1167,6 +1169,21 @@ function wire(section) {
     if (day) return setDay(day.getAttribute('data-day'));
     const stepper = target.closest?.('[data-step]');
     if (stepper) return step(Number(stepper.getAttribute('data-step')));
+    if (target.closest?.('[data-rescue-open]')) {
+      return openRescueSheet({
+        doc,
+        model,
+        today: input.today,
+        nowHour,
+        lightsOut: lightsOutFor(input.today, ghostsNow(), profileSleep),
+        apiFetch: input?.apiFetch,
+        onQueued: (queued) => {
+          input.ghosts = [...(input.ghosts ?? []), ...queued];
+          mount({ entrance: false });
+        },
+        onDone: () => { void input?.onSourcesChanged?.(); }
+      });
+    }
     if (target.closest?.('[data-today]')) return setDay(input.today);
     if (target.closest?.('[data-linear]')) return void input?.onLinear?.();
     const zoom = target.closest?.('[data-zoom]');
