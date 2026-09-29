@@ -323,7 +323,8 @@ export function dashboardHeatDays(
   });
 }
 
-function completionStamp(task: Task): Date | null {
+/** Completion instant for trends and Board Done retention — shared, do not duplicate. */
+export function completionStamp(task: Task): Date | null {
   return parseDue(task.completed_at) ?? (task.status === 'done' ? parseDue(task.updated_at) : null);
 }
 

@@ -91,6 +91,7 @@ function renderSupporting(root, model) {
   const needs = (model.needsYou?.length ?? 0) + (model.pendingPatches?.length ?? 0);
   const loops = model.openLoops?.length ?? 0;
   const bits = [];
+  if (model.sweepMissedLine) bits.push(model.sweepMissedLine);
   if (deposits) bits.push(`${deposits} deposit${deposits === 1 ? '' : 's'} since the last sweep`);
   if (needs) bits.push(`${needs} thing${needs === 1 ? '' : 's'} need you`);
   else if (loops) bits.push(`${loops} open loop${loops === 1 ? '' : 's'}`);

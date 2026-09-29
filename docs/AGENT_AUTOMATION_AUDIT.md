@@ -1,5 +1,9 @@
 # Agent runtime + automation audit (27 Sep 2026)
 
+**Related:** Clare / Done-column retention / cost-aware PA — assumption tests **and detailed build plan** (Docs → Slice A → Slice B) in [`docs/CLARE-TASKS-PA-ASSUMPTIONS.md`](CLARE-TASKS-PA-ASSUMPTIONS.md). Claude Code entry: root `CLAUDE.md` → “Clare / Tasks PA assumptions audit”.
+
+**29 Sep update:** Network / intuitive-scan code is **deleted** (not merely unscheduled). Morning Sweep cache is **deprioritised** (deterministic, already free). Prefer Board Done retention + runway/waiting ghosts, then sweep heartbeat — see that brief’s build plan (B2 → B3 → B1). Build-plan decisions locked 29 Sep evening (rolling 7d, export `completionStamp`, ghost-file de-dupe, `waiting_since` only).
+
 Question: after the page rebuilds, can every agent still (1) read Central Node for context, (2) write the relevant stuff back, (3) use web search — and what should the daily / weekly / hook-driven auto runs be?
 
 Evidence: code on `main` @ `da7c7c8`, `npm test` (4,546 pass / 0 fail), and the commit history + governance log of the private `life-hub-data` repo (read only, no personal data copied here — this repo is public).
@@ -52,8 +56,10 @@ Every agent has this tool. For auto-risk patches it only appends a "loan" to `da
 ### 2.3 Teaching lesson-editor AI jobs have no runner
 `apps/teaching/src/teacher/ai-panel.ts` → `POST /api/ai/jobs` creates `status: working, phase: queued` and nothing processes it. `ai-jobs-tick` just expires it after 10 min. `runTeachingAnnTurn` (`_shared/teaching-ann-turn.mjs`) exists but is only called from tests. `apps/teaching/src/ai/client.ts` still points at a non-existent `/api/ai/chat` (dead code).
 
-### 2.4 Clare's "scheduled Haiku intuitive pass" no longer exists
-`apps/tasks/config/clare-protocol.md` says a scheduled Haiku pass flags the week. `apps/tasks/src/{ai/intuitive-judge,domain/intuitive-scan,domain/intuitive-digest}.ts` are imported by tests only, and there is no cron on the umbrella. The protocol promises something that never runs.
+### 2.4 Clare's scheduled Haiku / Network flags path is deleted
+The Network tab, `stress-flags` API, hourly `intuitive-scan` cron, and `apps/tasks/src/{ai/intuitive-judge,domain/intuitive-scan,domain/intuitive-digest}.ts` were removed with the Network retirement (plan: `docs/superpowers/plans/2026-09-26-retire-network-tab.md`). There is nothing to “restore” or schedule.
+
+**Docs debt (clear in Step 0 of `CLARE-TASKS-PA-ASSUMPTIONS.md`):** any remaining protocol / `AGENTS.md` lines that still describe StressFlags or hourly intuitive-scan are lies. If Adam later wants weekly Clare judgment, that is a **new** capped Haiku job whose output should be Confirm cards / CN Status — not a resurrected flags page.
 
 ### 2.5 Clementine is cut off from Central Node
 Knowledge-hub Clementine never sees About Me, Constraints, or Cross-Agent. It also has no way to leave a `Clementine→X` line. It is missing from the CN Agent Directory.
@@ -74,7 +80,7 @@ Knowledge-hub Clementine never sees About Me, Constraints, or Cross-Agent. It al
 | `career-scan-tick-scheduled` | `10 * * * *` | Sun 17:00 gate | Only one attempt per week. If that tick fails, the week is skipped |
 | `ai-jobs-tick-scheduled` | `17 14 * * *` | 00:17 / 01:17 | Knowledge midnight tidy (20 pages) + job expiry |
 
-Nothing schedules: Knowledge URL watches (last checked 20 Sep, on request only), Hammond Weekly Review / Goal Audit, Sara weekly scan, Clare intuitive pass, the Ann teaching forecast.
+Nothing schedules: Knowledge URL watches (last checked 20 Sep, on request only), Hammond Weekly Review / Goal Audit, Sara weekly scan, the Ann teaching forecast. (Clare Network intuitive-scan was deleted — see §2.4.)
 
 ---
 
@@ -90,7 +96,7 @@ Principle from About Me: the season is comfortable, slow growth, and the hub fai
 |---|---|---|---|
 | **04:30** | Hammond | **Move the sweep here** (DST-safe gate). Close out *yesterday* with final totals, then open today's Status. Condense Cross-Agent. Queue confirm-class items into `pending-cn-patches.json` | CN auto sections + governance entry + Confirm cards |
 | 05:30 | (existing) | Calendar ghosts | unchanged |
-| 06:45 | Clare | Pre-build the Morning Sweep so the desk opens instantly (read-only, no writes) | cached briefing |
+| ~~06:45~~ | ~~Clare~~ | ~~Pre-build Morning Sweep cache~~ — **dropped 29 Sep**: `buildMorningSweep` is already deterministic / free; cache is not a priority (see `CLARE-TASKS-PA-ASSUMPTIONS.md` C2) | — |
 | 07:00 / 16:00 | (existing) | People Remember | unchanged |
 | 07:00 | (existing) | Promise nudges; gate on Sydney hour so DST doesn't move it | unchanged |
 | 21:30 | Brisket | **Only if a challenge is active:** mark today from the logs; if nothing is logged, put one flag in Status | challenge tracker + Status flag |
@@ -103,7 +109,7 @@ Principle from About Me: the season is comfortable, slow growth, and the hub fai
 | Sun 17:00 | (existing) | Career skills scan. Retry on the 18:00 and 19:00 ticks if it failed |
 | **Sun 18:00** | Hammond | **Weekly Review prep:** build the week pack, draft the recap and the forward lock, queue the Cross-Agent condense. Adam opens it Sunday night (it has only happened once) |
 | Sun 18:00 | Ann | Teaching forecast for the next 7–14 days (lessons, marking load) → `Ann→Hammond` line. Answers the open handoff |
-| Sun 19:00 | Clare | Restore the **intuitive flags pass** (existing code in `apps/tasks/src`), flags only |
+| ~~Sun 19:00~~ | ~~Clare~~ | ~~Restore intuitive flags~~ — **invalid 29 Sep**: code deleted with Network tab. Optional later: **new** weekly judgment → Confirm/Status only |
 | **Mon 06:30** | Sara | **Weekly health scan:** medical/body logs vs Constraints → Constraints patch into the Confirm queue; appointments from future-dated `data/body` files → Upcoming Appointments |
 | Mon 06:30 | Chadwick | Research freshness: list the areas past the 14-day `RESEARCH DUE` rule so the next session plan is fast (no web search unattended) |
 | Wed 20:00 | Hyaluronica | Nutrition→skin weekly check. If there's been no skincare log for 14+ days, one gentle Status flag, not a lecture |
@@ -153,38 +159,40 @@ Principle from About Me: the season is comfortable, slow growth, and the hub fai
 
 **Next up: app-side list (these need code because the data is in Netlify Blobs)**
 1. **Teaching lesson-panel AI runner** (§2.3). Run queued `/api/ai/jobs` lesson jobs in a background function through `runTeachingAnnTurn`. Delete the dead `/api/ai/chat` client in `apps/teaching/src/ai/client.ts`.
-2. **Clare intuitive pass** (§2.4). Schedule the existing `apps/tasks/src/{ai/intuitive-judge,domain/intuitive-scan,domain/intuitive-digest}.ts` as a Netlify scheduled function (Sun ~19:00 Sydney, flags only), or remove the promise from `clare-protocol.md`.
+2. **Clare Network / intuitive docs cleanup** (§2.4) — **done on PR #590** (protocol, AGENTS, stress-test, live-test runbooks). Optional later: new weekly judgment → Confirm/Status (Step 0.2).
 3. **Ann Sunday teaching forecast.** A scheduled function reads the next 7–14 days of scheduled lessons and marking load from the Teaching store and posts one `Ann→Hammond:` line. That closes the open July handoff.
 4. **Clementine reads Central Node** (§2.5). Load About Me, Constraints and her Cross-Agent lines in `knowledge-clementine-chat`, let her post `Clementine→` lines, and add her to the CN Agent Directory.
 5. **Knowledge URL-watch check.** Weekly scheduled run of the existing `url-watch.mjs` checker. It was last run by hand on 20 Sep.
-6. **In-app sweep heartbeat.** The Central Node page and Home show "Daily sweep missed" when the newest `Daily Sweep` governance entry is more than a day old. The automations check this weekly; the app would catch it the same morning.
-7. **Small cron fixes.** Gate `promise-nudges-scheduled` on the Sydney hour so it stays at 07:00 after daylight saving. Let `career-scan` retry on the 18:00 and 19:00 ticks when the 17:00 run fails.
+6. **In-app sweep heartbeat** (Slice B1 — after B2/B3). Home + Central Node warn when newest governance heading `## {date} — Daily Sweep` in `life-hub-data/data/governance/governance-log.md` is older than ~36h. Parse via `apps/life/js/core/governance-log.js`; surface via `home-model.js` / `central-node-model.js`. See `CLARE-TASKS-PA-ASSUMPTIONS.md` B1.
+7. **Small cron fixes.** Gate `promise-nudges-scheduled` on the Sydney hour so it stays at 07:00 after daylight saving (bundle with B3). Let `career-scan` retry on the 18:00 and 19:00 ticks when the 17:00 run fails.
 
-**Clare / Tasks (Netlify scheduled functions; Tasks data is in Blobs)**
+**Clare / Tasks (see detailed build plan in `CLARE-TASKS-PA-ASSUMPTIONS.md`)**
 
-8. **Morning Sweep ready at 06:45.** Precompute Clare's Morning Sweep and store it, so the Tasks desk opens instantly. Read-only.
-9. **Deadline runway (daily).** A task due within 48 hours with no work block gets a proposed calendar ghost through the existing ghost queue. Adam accepts or dismisses it.
-10. **Waiting-on follow-ups (daily).** An item waiting on someone for more than N days gets a follow-up draft on the calendar, the same pattern as `promise-nudges`. Never sent automatically.
+8. **Board Done retention (Slice A) — first.** Rolling 7d via exported `completionStamp`; “Show N older”; API unchanged.
+9. **Deadline runway ghosts (Slice B2).** Extend existing morning `calendar-ghosts-propose` pass; reuse `computeDeadlineRunway`; queue `pending-calendar-ghosts.json` with id de-dupe. No new cron.
+10. **Waiting-on follow-ups (Slice B3).** Age from `waiting_since` only; stamp missing `waiting_since` in `mergeTask`; prefer one batched ghost-file commit per run.
+11. ~~Morning Sweep cache at 06:45~~ — **dropped** (deterministic briefing already free; C2).
+12. **Sweep heartbeat (B1)** — after B2/B3 (named paths above).
 
 **Professional / People (app-side; people edits, links, ledger and Remember live in Blobs. `data/professional/*.json` is only the original Notion import, so Cursor must not edit it)**
 
 Already running: tie inference 13:20 daily, Remember 07:00 and 16:00, promise nudges 07:00, career skills scan Sun 17:00.
 
-11. **Nightly link inference.** `runLinkInferencePass` (person ↔ task / meeting / comms link proposals) only runs when the People page asks for it. Schedule it nightly, only for people with new material since the last run. The output is proposals in "Links to confirm" and nothing auto-links. Clare's "people sweep" in `persona.mjs` is prompt text only and gets replaced by this.
-12. **Weekly profile refresh (people research).** For the ~10 most active contacts whose profile has not been checked in 90 days, search public professional information (current role, organisation, recent publications or appointments) and propose profile updates as confirm cards with sources. Guardrails:
+13. **Nightly link inference.** `runLinkInferencePass` (person ↔ task / meeting / comms link proposals) only runs when the People page asks for it. Schedule it nightly, only for people with new material since the last run. The output is proposals in "Links to confirm" and nothing auto-links. Clare's "people sweep" in `persona.mjs` is prompt text only and gets replaced by this.
+14. **Weekly profile refresh (people research).** For the ~10 most active contacts whose profile has not been checked in 90 days, search public professional information (current role, organisation, recent publications or appointments) and propose profile updates as confirm cards with sources. Guardrails:
     - never students (reuse the Communications-students exclusion);
     - never the people About Me says are invisible;
     - public professional information only, no personal life;
     - nothing auto-applied.
-13. **Search** needs no automation. It stays on demand in the People / relational search pages.
+15. **Search** needs no automation. It stays on demand in the People / relational search pages.
 
 **Event triggers (write-hooks in app code, not crons)**
 
-14. **Task created or edited that names a person:** run link inference for that person only, which gives a proposal.
-15. **Meeting or communication logged:** run the Remember pass for its attendees and extract promises into the ledger.
-16. **Medical log that conflicts with Constraints:** queue `cnp_auto_constraints` immediately rather than waiting for Monday's Sara scan.
-17. **Task done that belongs to a Hammond goal:** add a goal check-in entry.
-18. **Term start or end (Almanac):** Ann and Clare term-setup brief and a teaching-load line to Hammond.
+16. **Task created or edited that names a person:** run link inference for that person only, which gives a proposal.
+17. **Meeting or communication logged:** run the Remember pass for its attendees and extract promises into the ledger.
+18. **Medical log that conflicts with Constraints:** queue `cnp_auto_constraints` immediately rather than waiting for Monday's Sara scan.
+19. **Task done that belongs to a Hammond goal:** add a goal check-in entry.
+20. **Term start or end (Almanac):** Ann and Clare term-setup brief and a teaching-load line to Hammond.
 
 Dropped: Hyaluronica's weekly skin check (Adam, 27 Sep).
 

@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Task } from '@/schemas/task';
 import { columnForTask, statusForColumn } from '@/domain/board';
+import {
+  countOlderDone,
+  DONE_RETENTION_MS,
+  filterDoneColumnTasks,
+  isRecentDone,
+  showOlderDoneLabel
+} from '@/domain/done-retention';
+import { completionStamp } from '@/domain/dashboard-overview';
 import { DRAG_THRESHOLD, boardPointerDragEnabled, dragThresholdFor, initBoard } from '@/views/sprint-board';
 
 const baseTask = (partial: Partial<Task> & Pick<Task, 'id' | 'title'>): Task => ({
@@ -63,6 +71,65 @@ describe('board columns', () => {
   it('treats a missing depends_on as unblocked', () => {
     const dirty = { ...baseTask({ id: 'raw', title: 'Breakfast' }), depends_on: undefined } as Task;
     expect(columnForTask(dirty, new Map([[dirty.id, dirty]]))).toBe('todo');
+  });
+});
+
+describe('Board Done retention', () => {
+  const now = new Date('2026-09-29T12:00:00.000Z');
+
+  it('uses completionStamp with completed_at then updated_at fallback', () => {
+    const stamped = baseTask({
+      id: 'a',
+      title: 'A',
+      status: 'done',
+      completed_at: '2026-09-28T10:00:00.000Z',
+      updated_at: '2026-09-01T00:00:00.000Z'
+    });
+    const fallback = baseTask({
+      id: 'b',
+      title: 'B',
+      status: 'done',
+      completed_at: null,
+      updated_at: '2026-09-28T10:00:00.000Z'
+    });
+    expect(completionStamp(stamped)?.toISOString()).toBe('2026-09-28T10:00:00.000Z');
+    expect(completionStamp(fallback)?.toISOString()).toBe('2026-09-28T10:00:00.000Z');
+  });
+
+  it('keeps recent done and hides older than 7 days unless showOlder', () => {
+    const recent = baseTask({
+      id: 'r',
+      title: 'Recent',
+      status: 'done',
+      completed_at: new Date(now.getTime() - 2 * 86_400_000).toISOString()
+    });
+    const older = baseTask({
+      id: 'o',
+      title: 'Older',
+      status: 'done',
+      completed_at: new Date(now.getTime() - DONE_RETENTION_MS - 86_400_000).toISOString()
+    });
+    const missing = baseTask({
+      id: 'm',
+      title: 'No stamp',
+      status: 'done',
+      completed_at: null,
+      updated_at: ''
+    });
+    expect(isRecentDone(recent, now)).toBe(true);
+    expect(isRecentDone(older, now)).toBe(false);
+    expect(isRecentDone(missing, now)).toBe(false);
+    expect(filterDoneColumnTasks([recent, older, missing], { now, showOlder: false }).map((t) => t.id)).toEqual([
+      'r'
+    ]);
+    expect(filterDoneColumnTasks([recent, older, missing], { now, showOlder: true }).map((t) => t.id)).toEqual([
+      'r',
+      'o',
+      'm'
+    ]);
+    expect(countOlderDone([recent, older, missing], now)).toBe(2);
+    expect(showOlderDoneLabel(2, false)).toBe('Show 2 older');
+    expect(showOlderDoneLabel(2, true)).toBe('Hide older');
   });
 });
 

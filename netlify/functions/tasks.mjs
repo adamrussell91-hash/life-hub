@@ -82,6 +82,15 @@ export function mergeTask(existing, patch) {
   } else if (patch.status && patch.status !== 'done') {
     next.completed_at = null;
   }
+  // Stamp waiting_since when waiting_on first becomes set (Clare already stamps; UI may not).
+  const prevWait = typeof existing.waiting_on === 'string' ? existing.waiting_on.trim() : '';
+  const nextWait = typeof next.waiting_on === 'string' ? next.waiting_on.trim() : '';
+  if (nextWait && !prevWait && !next.waiting_since) {
+    next.waiting_since = next.updated_at;
+  }
+  if (!nextWait && prevWait) {
+    next.waiting_since = null;
+  }
   return next;
 }
 

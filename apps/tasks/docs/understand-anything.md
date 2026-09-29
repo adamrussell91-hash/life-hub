@@ -62,7 +62,7 @@ First graph (2026-08-29): 250 files, 1,286 nodes, 2,623 edges, 0 validator issue
 
 App Shell → Client Data & API → Domain Logic → Schemas → Views & Visualization → Page Blocks & Lesson Canvas → AI Judges → Netlify Functions → Tooling & Deploy → Documentation.
 
-Tour starts at README / `AGENTS.md`, then `src/app/main.ts`, the sign-in gate, the client store, task schemas, Board/Calendar, Clare, Network Look with judgment, Maps/Universe/pipes, then production Functions.
+Tour starts at README / `AGENTS.md`, then `src/app/main.ts`, the sign-in gate, the client store, task schemas, Board/Calendar, Clare, Maps/Universe/pipes, then production Functions. (Network “Look with judgment” / StressFlags were retired — see `docs/superpowers/plans/2026-09-26-retire-network-tab.md`.)
 
 ## Product rule
 

@@ -105,6 +105,7 @@ const baseModel = {
   overFatCeiling: false,
   progress: { calories: 0, protein: 0, fat: 0 },
   hammondLine: null,
+  sweepMissedLine: null,
   forecastCards: {
     paths: {
       headline: 'Forecast needs more data.',
@@ -131,4 +132,17 @@ test('renderHome hides hammondLine when absent', () => {
   renderHome(root, { ...baseModel, hammondLine: null });
   assert.equal(hammondLine.textContent, '');
   assert.equal(hammondLine.getAttribute('hidden'), '');
+});
+
+test('renderHome prefers sweepMissedLine over hammondLine', () => {
+  const { root, hammondLine } = fakeHomeRoot();
+  hammondLine.className = 'hammond-line';
+  renderHome(root, {
+    ...baseModel,
+    hammondLine: 'Hammond: Lock is marking',
+    sweepMissedLine: 'Hammond: Daily Sweep missed — last 2026-08-08.'
+  });
+  assert.equal(hammondLine.textContent, 'Hammond: Daily Sweep missed — last 2026-08-08.');
+  assert.equal(hammondLine.getAttribute('hidden'), null);
+  assert.match(hammondLine.className, /hammond-line--missed/);
 });

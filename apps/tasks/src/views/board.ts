@@ -3,6 +3,12 @@ import type { Project } from '@/schemas/project';
 import { tasksApi } from '@/services/client-api';
 import { openTasks } from '@/domain/queries';
 import { BOARD_COLUMNS, columnForTask, statusForColumn, type BoardColumnId } from '@/domain/board';
+import {
+  countOlderDone,
+  filterDoneColumnTasks,
+  isRecentDone,
+  showOlderDoneLabel
+} from '@/domain/done-retention';
 import { boardTasks, isBoardTask } from '@/domain/hierarchy';
 import { errorMessage } from '@/views/feedback';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
@@ -32,9 +38,18 @@ import { createPriorityAssessControls, maybeApplyPriorityFloors } from '@/views/
 let boardProjectFilter: string | 'all' = 'all';
 let boardDomainFilter: TaskDomain | 'all' = 'all';
 let boardRunningOnly = false;
+/** Session-scoped: reveal done older than the 7-day Done retention window. */
+let boardShowOlderDone = false;
 let teardownBoard: (() => void) | null = null;
 let teardownColumnNav: (() => void) | null = null;
 let showBoardColumn: ((colId: BoardColumnId) => void) | null = null;
+
+export function resetBoardViewStateForTests(): void {
+  boardProjectFilter = 'all';
+  boardDomainFilter = 'all';
+  boardRunningOnly = false;
+  boardShowOlderDone = false;
+}
 
 function boardLedeSuffix(): string {
   const coarse =
@@ -404,6 +419,19 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
       return;
     }
 
+    if (
+      column === 'done' &&
+      task.status === 'done' &&
+      !boardShowOlderDone &&
+      !isRecentDone(task)
+    ) {
+      existing?.remove();
+      syncChrome();
+      paintOverview();
+      restoreViewport(saved);
+      return;
+    }
+
     const alreadyThere = existing?.closest('.card-list') === list;
     existing?.remove();
     const card = remountBoardCard(task, column, list);
@@ -448,7 +476,13 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
     list.className = 'card-list board-col__stack';
     list.dataset.col = col.id;
 
-    const items = scoped().filter((t) => columnForTask(t, byId) === col.id);
+    const columnTasks = scoped().filter((t) => columnForTask(t, byId) === col.id);
+    const items =
+      col.id === 'done'
+        ? filterDoneColumnTasks(columnTasks, { showOlder: boardShowOlderDone })
+        : columnTasks;
+    const olderDoneCount =
+      col.id === 'done' ? countOlderDone(columnTasks.filter((t) => t.status === 'done')) : 0;
     const reload = () => void renderBoardView(canvas);
     const handlers = boardCardHandlers(reload);
     for (const task of items) {
@@ -469,10 +503,28 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
       );
       card.dataset.col = col.id;
     }
-    const hint = el('li', 'empty-hint', col.empty);
+    const emptyCopy =
+      col.id === 'done' && items.length === 0 && olderDoneCount > 0 && !boardShowOlderDone
+        ? 'Nothing done in the last 7 days'
+        : col.empty;
+    const hint = el('li', 'empty-hint', emptyCopy);
     hint.hidden = items.length > 0;
     list.append(hint);
     body.append(list);
+    if (col.id === 'done' && olderDoneCount > 0) {
+      const reveal = el('button', 'btn btn--secondary board-done-reveal') as HTMLButtonElement;
+      reveal.type = 'button';
+      reveal.textContent = showOlderDoneLabel(olderDoneCount, boardShowOlderDone);
+      reveal.setAttribute(
+        'aria-label',
+        boardShowOlderDone ? 'Hide older completed tasks' : `Show ${olderDoneCount} older completed tasks`
+      );
+      reveal.addEventListener('click', () => {
+        boardShowOlderDone = !boardShowOlderDone;
+        void renderBoardView(canvas);
+      });
+      body.append(reveal);
+    }
     section.append(body);
     board.append(section);
   }

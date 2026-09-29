@@ -128,6 +128,10 @@ test('hammondLine surfaces the latest Hammond review note', () => {
     '**Title:** Lock is marking',
     '',
     'Protein held; one lock.',
+    '',
+    '## 2026-08-11 — Daily Sweep',
+    '',
+    'Sweep ran.',
     ''
   ].join('\n');
   const model = buildHomeModel({
@@ -137,6 +141,7 @@ test('hammondLine surfaces the latest Hammond review note', () => {
     governanceLogMarkdown: log
   });
   assert.equal(model.hammondLine, 'Hammond: Lock is marking');
+  assert.equal(model.sweepMissedLine, null);
 });
 
 test('hammondLine is null when there is no recent Hammond review', () => {
@@ -144,9 +149,17 @@ test('hammondLine is null when there is no recent Hammond review', () => {
     events: [],
     targetsConfig,
     date: '2026-08-11',
-    governanceLogMarkdown: '# Governance Log\n'
+    governanceLogMarkdown: [
+      '# Governance Log',
+      '',
+      '## 2026-08-11 — Daily Sweep',
+      '',
+      'Sweep ran.',
+      ''
+    ].join('\n')
   });
   assert.equal(model.hammondLine, null);
+  assert.equal(model.sweepMissedLine, null);
 });
 
 test('hammondLine ignores a rotting Pattern Review and a stale review', () => {
@@ -168,6 +181,10 @@ test('hammondLine ignores a rotting Pattern Review and a stale review', () => {
     '**Title:** Old week',
     '',
     'Too old to show on Home.',
+    '',
+    '## 2026-08-11 — Daily Sweep',
+    '',
+    'Sweep ran.',
     ''
   ].join('\n');
   const model = buildHomeModel({
@@ -177,6 +194,36 @@ test('hammondLine ignores a rotting Pattern Review and a stale review', () => {
     governanceLogMarkdown: log
   });
   assert.equal(model.hammondLine, null);
+  assert.equal(model.sweepMissedLine, null);
+});
+
+test('sweepMissedLine warns when Daily Sweep is stale', () => {
+  const log = [
+    '# Governance Log',
+    '',
+    '## 2026-08-08 — Daily Sweep',
+    '',
+    'Three days ago.',
+    ''
+  ].join('\n');
+  const model = buildHomeModel({
+    events: [],
+    targetsConfig,
+    date: '2026-08-11',
+    governanceLogMarkdown: log
+  });
+  assert.match(model.sweepMissedLine, /Daily Sweep missed/);
+  assert.match(model.sweepMissedLine, /2026-08-08/);
+});
+
+test('sweepMissedLine warns on empty governance log', () => {
+  const model = buildHomeModel({
+    events: [],
+    targetsConfig,
+    date: '2026-08-11',
+    governanceLogMarkdown: '# Governance Log\n'
+  });
+  assert.match(model.sweepMissedLine, /no sweep in the log/);
 });
 
 function meal(date, calories = 1700, protein_g = 145) {

@@ -3,7 +3,7 @@ import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { tasksApi } from '@/services/client-api';
 import { notifyTasksChanged, resetTaskCache } from '@/services/task-cache';
-import { renderBoardView } from '@/views/board';
+import { renderBoardView, resetBoardViewStateForTests } from '@/views/board';
 
 vi.mock('@/services/client-api', () => ({
   tasksApi: {
@@ -72,6 +72,7 @@ describe('board view mutations', () => {
   });
 
   afterEach(() => {
+    resetBoardViewStateForTests();
     resetTaskCache();
     document.body.replaceChildren();
     vi.restoreAllMocks();
@@ -205,7 +206,13 @@ describe('board view mutations', () => {
 
   it('completes an overview task without remounting the board', async () => {
     const open = task({ id: 'task_tick', title: 'Tick me', status: 'open', due_date: '2026-08-27' });
-    const done = task({ id: 'task_tick', title: 'Tick me', status: 'done', due_date: '2026-08-27' });
+    const done = task({
+      id: 'task_tick',
+      title: 'Tick me',
+      status: 'done',
+      due_date: '2026-08-27',
+      completed_at: new Date().toISOString()
+    });
     vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
     vi.mocked(tasksApi.updateTask).mockResolvedValue(done);
     vi.mocked(tasksApi.getTask).mockResolvedValue(done);
@@ -258,6 +265,7 @@ describe('board view mutations', () => {
       title: 'First tick',
       status: 'done',
       due_date: '2026-08-27',
+      completed_at: new Date().toISOString(),
       updated_at: '2026-09-11T00:00:01.000Z'
     });
     const secondDone = task({
@@ -265,6 +273,7 @@ describe('board view mutations', () => {
       title: 'Second tick',
       status: 'done',
       due_date: '2026-08-27',
+      completed_at: new Date().toISOString(),
       updated_at: '2026-09-11T00:00:02.000Z'
     });
     vi.mocked(tasksApi.listTasks).mockResolvedValue([first, second]);
@@ -309,7 +318,13 @@ describe('board view mutations', () => {
 
   it('does not scroll the page to the board card when ticking Today', async () => {
     const open = task({ id: 'task_tick', title: 'Tick me', status: 'open', due_date: '2026-08-27' });
-    const done = task({ id: 'task_tick', title: 'Tick me', status: 'done', due_date: '2026-08-27' });
+    const done = task({
+      id: 'task_tick',
+      title: 'Tick me',
+      status: 'done',
+      due_date: '2026-08-27',
+      completed_at: new Date().toISOString()
+    });
     vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
     vi.mocked(tasksApi.updateTask).mockResolvedValue(done);
     vi.mocked(tasksApi.getTask).mockResolvedValue(done);
@@ -332,7 +347,13 @@ describe('board view mutations', () => {
 
   it('removes a Today row when the board card is marked Done', async () => {
     const open = task({ id: 'task_board', title: 'Board done', status: 'open', due_date: '2026-08-27' });
-    const done = task({ id: 'task_board', title: 'Board done', status: 'done', due_date: '2026-08-27' });
+    const done = task({
+      id: 'task_board',
+      title: 'Board done',
+      status: 'done',
+      due_date: '2026-08-27',
+      completed_at: new Date().toISOString()
+    });
     vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
     vi.mocked(tasksApi.updateTask).mockResolvedValue(done);
 
@@ -356,7 +377,13 @@ describe('board view mutations', () => {
 
   it('removes a Today row when a card is dropped on Done', async () => {
     const open = task({ id: 'task_drop', title: 'Drop done', status: 'open', due_date: '2026-08-27' });
-    const done = task({ id: 'task_drop', title: 'Drop done', status: 'done', due_date: '2026-08-27' });
+    const done = task({
+      id: 'task_drop',
+      title: 'Drop done',
+      status: 'done',
+      due_date: '2026-08-27',
+      completed_at: new Date().toISOString()
+    });
     vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
     vi.mocked(tasksApi.updateTask).mockResolvedValue(done);
 
@@ -554,5 +581,39 @@ describe('board view mutations', () => {
     expect(canvas.querySelector('[data-id="task_move_day"] .date-badge')?.textContent).toContain(
       `${day}/${month}/${year.slice(-2)}`
     );
+  });
+
+  it('hides done older than 7 days behind Show N older', async () => {
+    const now = Date.now();
+    const recent = task({
+      id: 'task_done_recent',
+      title: 'Done recently',
+      status: 'done',
+      completed_at: new Date(now - 2 * 86_400_000).toISOString()
+    });
+    const older = task({
+      id: 'task_done_old',
+      title: 'Done ages ago',
+      status: 'done',
+      completed_at: new Date(now - 20 * 86_400_000).toISOString()
+    });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([recent, older]);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderBoardView(canvas);
+
+    const doneCol = canvas.querySelector('.column[data-col="done"]');
+    expect(doneCol?.querySelector('[data-id="task_done_recent"]')).toBeTruthy();
+    expect(doneCol?.querySelector('[data-id="task_done_old"]')).toBeNull();
+    const reveal = doneCol?.querySelector<HTMLButtonElement>('.board-done-reveal');
+    expect(reveal?.textContent).toBe('Show 1 older');
+    expect(doneCol?.querySelector('.empty-hint')?.textContent).not.toBe('Nothing done in the last 7 days');
+
+    reveal?.click();
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-id="task_done_old"]')).toBeTruthy();
+    });
+    expect(canvas.querySelector('.board-done-reveal')?.textContent).toBe('Hide older');
   });
 });
