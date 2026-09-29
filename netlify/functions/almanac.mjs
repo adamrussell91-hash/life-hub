@@ -24,6 +24,7 @@ import { addDays, almanacSummary, leadLines } from '../../packages/design-kit/js
 import { findOpenings } from '../../packages/design-kit/js/openings.js';
 import { ALMANAC_RULES, ALMANAC_WANTS } from '../../apps/life/js/app/almanac-rules.js';
 import { CAPACITY, capacityForDates, forecastSeries } from '../../apps/life/js/app/capacity-model.js';
+import { medicationContext } from '../../packages/design-kit/js/calendar/medication-model.js';
 
 export const ALMANAC_ANCHORS_PATH = 'almanac-anchors.yml';
 export const ALMANAC_DONE_PATH = 'almanac-done.json';
@@ -35,6 +36,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const STEP_ID = /^[a-z0-9][a-z0-9:-]*$/i;
 const KINDS = new Set(['trip', 'medical', 'event', 'term', 'dream']);
 const LOG_PATH = /^data\/(?:sleep|mind)\/\d{4}\/\d{2}\/(\d{4}-\d{2}-\d{2})-[a-z0-9-]+\.md$/;
+const DEX_PATH = /^data\/body\/\d{4}\/\d{2}\/(\d{4}-\d{2}-\d{2})-dex-[a-z0-9-]+\.md$/;
 const BLOCK_PATH = /^data\/calendar\/\d{4}\/\d{2}\/(\d{4}-\d{2}-\d{2})-[a-z0-9-]+\.md$/;
 const DAY_START = 8 * 60;
 const DAY_END = 17 * 60;
@@ -468,7 +470,8 @@ export function buildAlmanac({
   blocks = [],
   lessons = [],
   professionalEvents = [],
-  horizonCadence = null
+  horizonCadence = null,
+  medicationLogs = []
 }) {
   const dates = dateKeys(from, to);
   const logEvents = (logs ?? []).filter(event => event?.record && (event.record.type === 'sleep' || event.record.type === 'diary') && event.record.date <= today);
@@ -581,7 +584,9 @@ export function buildAlmanac({
   const summary = { ...almanacSummary(lines), openings: openings.filter(opening => opening.dates.length).length };
   const world = EXAMPLE_WORLD.filter(entry => entry.date >= from && entry.date <= to);
   const horizon = horizonEnd(today, merged);
-  return { lines, summary, series, openings, world, terms, today, from, to, horizon };
+  // Dexy context: an overlay on the forecast band, never a lower number (§3.1).
+  const medication = medicationLogs.length ? medicationContext(medicationLogs, { today, from, to }) : null;
+  return { lines, summary, series, openings, world, terms, today, from, to, horizon, ...(medication ? { medication } : {}) };
 }
 
 /** Future calendar_block from an Almanac hold — keeps that opening until its date passes. */
@@ -663,6 +668,11 @@ export async function readAlmanac({
     kept.push(item.path);
   }
   const logs = await readMatching(kept, readFile, () => true, warn);
+  const dexSince = new Date(Date.parse(`${today}T00:00:00Z`) - 13 * 86_400_000).toISOString().slice(0, 10);
+  const medicationLogs = (await readMatching(paths, readFile, path => {
+    const date = pathDate(path, DEX_PATH);
+    return date && date >= dexSince && date <= today;
+  }, warn)).map(event => event.record).filter(record => record?.type === 'medication');
   const blocks = (await readMatching(
     paths,
     readFile,
@@ -684,7 +694,8 @@ export async function readAlmanac({
     blocks,
     lessons,
     professionalEvents,
-    horizonCadence: horizon
+    horizonCadence: horizon,
+    medicationLogs
   });
 }
 

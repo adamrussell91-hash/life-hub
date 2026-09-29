@@ -32,6 +32,7 @@ import { bookmarkMoment, tonightFit, trackedHours } from './day-sense.js';
 import { leaveByCandidate, legsLine, minutesLate, TRANSPORT, transportPath, wedgeFor, wedgeWidth } from './transport-model.js';
 import { opportunities } from './mio-model.js';
 import { openRescueSheet } from './rescue-sheet.js';
+import { morphPairs, playArcs } from './rescue-morph.js';
 import { openDayReview } from './day-review-sheet.js';
 import { disablePush, enablePush, pushState } from '../push-client.js';
 
@@ -1648,8 +1649,21 @@ function wire(section) {
         lightsOut: lightsOutFor(input.today, ghostsNow(), profileSleep),
         apiFetch: input?.apiFetch,
         onQueued: (queued) => {
+          const pairs = morphPairs(queued);
+          const before = new Map(chipsFor(state.day).map((chip) => [chip.id, chip.start]));
           input.ghosts = [...(input.ghosts ?? []), ...queued];
           mount({ entrance: false });
+          // Rescue morph on the dial: each arc turns from its old time to the proposed one.
+          playArcs(svg, pairs, {
+            cx: rings.cx,
+            cy: rings.cy,
+            hourOf: (id) => {
+              if (before.has(id)) return before.get(id);
+              const ghost = queued.find((row) => row.id === id);
+              return ghost && ghost.date === state.day ? toHour(ghost.start) : null;
+            },
+            view: doc.defaultView
+          });
         },
         onDone: () => { void input?.onSourcesChanged?.(); }
       });
