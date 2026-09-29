@@ -72,11 +72,7 @@ export function renderHome(root, model, options = {}) {
       hammondLine.textContent = '';
       hammondLine.setAttribute('hidden', '');
     }
-    if (hammondLine.classList?.toggle) {
-      hammondLine.classList.toggle('hammond-line--missed', missed);
-    } else {
-      hammondLine.className = missed ? 'hammond-line hammond-line--missed' : 'hammond-line';
-    }
+    hammondLine.className = missed ? 'hammond-line hammond-line--missed' : 'hammond-line';
   }
 
   const openBody = root.querySelector('[data-home="open-body"]');

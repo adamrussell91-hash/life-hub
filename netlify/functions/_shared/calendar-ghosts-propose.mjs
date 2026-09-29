@@ -262,22 +262,20 @@ export async function runCalendarGhostsPropose({
     profile: readProfile(visual, planningProfile)
   }).filter(ghost => !alreadyQueued(queue, ghost));
 
-  let taskList = Array.isArray(tasks) ? tasks : null;
-  if (!taskList && typeof getTasksStore === 'function') {
+  let taskList = Array.isArray(tasks) ? tasks : [];
+  if (!Array.isArray(tasks) && typeof getTasksStore === 'function') {
     try {
-      const store = await getTasksStore(env);
-      taskList = await listJSON(store, TASK_PREFIX);
+      taskList = await listJSON(await getTasksStore(env), TASK_PREFIX);
     } catch (err) {
       warn?.('calendar-ghosts-propose: tasks load failed', err);
-      taskList = [];
     }
   }
-  taskList = taskList ?? [];
 
+  const prior = [...queue, ...proposed];
   const runwayGhosts = proposeDeadlineRunwayGhosts({ tasks: taskList, today, nowIso })
-    .filter(ghost => !alreadyQueued(queue, ghost) && !alreadyQueued(proposed, ghost));
+    .filter(ghost => !alreadyQueued(prior, ghost));
   const waitingGhosts = proposeWaitingFollowUpGhosts({ tasks: taskList, today, nowIso })
-    .filter(ghost => !alreadyQueued(queue, ghost) && !alreadyQueued(proposed, ghost) && !alreadyQueued(runwayGhosts, ghost));
+    .filter(ghost => !alreadyQueued(prior, ghost) && !alreadyQueued(runwayGhosts, ghost));
 
   const via = trigger === 'refresh' || trigger === 'manual' ? trigger : 'scheduled';
   const stamped = [...proposed, ...runwayGhosts, ...waitingGhosts].map(ghost => ({

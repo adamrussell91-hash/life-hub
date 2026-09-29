@@ -346,10 +346,13 @@ export function isDailySweepMissed(markdown, today, { maxAgeDays = DAILY_SWEEP_M
 
 /** Fail-visible Home / CN line when the Daily Sweep heartbeat is stale. */
 export function formatDailySweepMissedLine(markdown, today) {
-  if (!isDailySweepMissed(markdown, today)) return null;
   const sweep = latestDailySweep(markdown);
-  if (!sweep) return 'Hammond: Daily Sweep missed — no sweep in the log';
-  return `Hammond: Daily Sweep missed — last ${sweep.dateKey}`;
+  if (isCalendarDate(today) && sweep && daysBetween(sweep.dateKey, today) <= DAILY_SWEEP_MAX_AGE_DAYS) {
+    return null;
+  }
+  return sweep
+    ? `Hammond: Daily Sweep missed — last ${sweep.dateKey}`
+    : 'Hammond: Daily Sweep missed — no sweep in the log';
 }
 
 /**
