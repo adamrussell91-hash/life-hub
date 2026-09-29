@@ -1,5 +1,7 @@
 # Agent runtime + automation audit (27 Sep 2026)
 
+**Related:** Clare / completed-task archive / cost-aware PA framing (assumption tests, not a build brief) — [`docs/CLARE-TASKS-PA-ASSUMPTIONS.md`](CLARE-TASKS-PA-ASSUMPTIONS.md). Claude Code entry: root `CLAUDE.md` → “Clare / Tasks PA assumptions audit”.
+
 Question: after the page rebuilds, can every agent still (1) read Central Node for context, (2) write the relevant stuff back, (3) use web search — and what should the daily / weekly / hook-driven auto runs be?
 
 Evidence: code on `main` @ `da7c7c8`, `npm test` (4,546 pass / 0 fail), and the commit history + governance log of the private `life-hub-data` repo (read only, no personal data copied here — this repo is public).

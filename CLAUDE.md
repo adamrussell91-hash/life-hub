@@ -47,6 +47,17 @@ Checkpoint reports **only**:
 
 Do not guess the overseer role from chat memory — **read `docs/consolidation/OVERSEER.md` every time** before critiquing or checkpointing.
 
+## Clare / Tasks PA assumptions audit
+
+When Adam asks you to **audit Clare**, **completed-task archiving**, **proactive PA automation**, or **whether Clare should run holistic forecasting across hubs**, read this first:
+
+| File | Purpose |
+|------|---------|
+| [`docs/CLARE-TASKS-PA-ASSUMPTIONS.md`](docs/CLARE-TASKS-PA-ASSUMPTIONS.md) | Assumption tests, SWOT, corrections, slice A vs B — **audit before building** |
+| [`docs/AGENT_AUTOMATION_AUDIT.md`](docs/AGENT_AUTOMATION_AUDIT.md) | What already runs, gaps, cheap daily/weekly schedule |
+
+Do not invent a daily full-agent Sonnet “PA” cron from first principles. Re-verify claims against current `main`. Do not implement from the assumptions brief alone unless Adam picks slice A (task lifecycle) or B (proactive MVP) and asks for a build.
+
 ## Cursor UI failure register
 
 When you **write a build brief for Cursor** or **review Cursor's UI work**, use [`docs/CURSOR-UI-FAILURES.md`](docs/CURSOR-UI-FAILURES.md):
