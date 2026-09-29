@@ -132,3 +132,22 @@
 .dd-row.is-live:hover{background:color-mix(in srgb,var(--navy) 4%,transparent)}
 .dd-row.is-live:focus-visible{outline:2px solid var(--wave);outline-offset:-2px}
 @media (prefers-reduced-motion:reduce){.dd-ctx.is-zoomable{transition:none}}
+
+/* Dexy (29/09/26): a thin band between the day's bands and the events, drawn only from a logged dose. */
+.dd-med{fill:color-mix(in srgb,var(--pastel-sage-ink) 42%,transparent);stroke:none}
+.dd-med.is-late{fill:color-mix(in srgb,var(--pastel-gold-ink) 45%,transparent)}
+.dd-med.is-gap{fill:none;stroke:var(--high-sea);stroke-width:1.4;stroke-dasharray:3 3}
+.dd-med.is-gap.is-skipped{stroke-dasharray:none;fill:color-mix(in srgb,var(--high-sea) 14%,transparent)}
+.dd-med-dot{fill:var(--pastel-sage-ink);stroke:#fff;stroke-width:1.2}
+.dd-log.is-planned{fill:#fff;stroke:var(--pastel-sage-ink);stroke-dasharray:2 2}
+.dd-med-panel{display:grid;gap:var(--space-2);padding:var(--space-3);margin:calc(-1 * var(--space-1)) calc(-1 * var(--space-2)) 0;border-radius:var(--radius-sm)}
+.dd-med-panel.is-prompt{background:color-mix(in srgb,var(--high-sea) 7%,transparent);border:1px solid color-mix(in srgb,var(--high-sea) 30%,transparent)}
+.dd-med-panel__line,.dd-med-panel__ask,.dd-med-panel__plan{margin:0;font-size:var(--text-sm);line-height:1.4}
+.dd-med-panel__ask{font-weight:var(--weight-semibold);color:var(--ink)}
+.dd-med-panel__plan{font-size:var(--text-xs);color:var(--muted)}
+.dd-med-panel__acts{flex-wrap:wrap;margin-top:0}
+.dd-med-panel__earlier{display:flex;align-items:flex-end;gap:var(--space-2)}
+.dd-med-panel__earlier[hidden]{display:none}
+.dd-med-panel__earlier label{display:grid;gap:3px;font-size:var(--text-2xs);color:var(--muted)}
+.dd-med-panel__earlier input{font:inherit;font-size:var(--text-sm);border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:var(--paper);color:var(--ink)}
+@media (max-width:719px){.dd-med-panel__earlier input{font-size:16px}}

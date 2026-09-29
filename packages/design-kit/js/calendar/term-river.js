@@ -26,7 +26,7 @@ import { filterKeyForItem } from './calendar-filter.js';
 /** Life log types never become river points (same set as Tideline chips). */
 const LOG_TYPES = new Set([
   'meal', 'diary', 'sleep', 'skincare', 'heart', 'weight',
-  'composition', 'measurements', 'bloods', 'fragrance'
+  'composition', 'measurements', 'bloods', 'fragrance', 'medication'
 ]);
 
 /**

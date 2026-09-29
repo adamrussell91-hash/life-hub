@@ -49,7 +49,8 @@ const ICON = {
   bolt: '<svg viewBox="0 0 12 12"><path d="M6.8 1 3 7h3l-.8 4L9 5H6z"/></svg>',
   fork: '<svg viewBox="0 0 12 12"><path d="M3.5 1v4a1.5 1.5 0 0 0 3 0V1M5 5.5V11M9 1c-1 .5-1.5 2-1.5 3.5S8 6.5 9 6.5V11"/></svg>',
   lock: '<svg viewBox="0 0 10 10"><rect x="1.5" y="4.5" width="7" height="5" rx="1"/><path d="M3 4.5V3a2 2 0 0 1 4 0v1.5"/></svg>',
-  chev: '<svg viewBox="0 0 10 10"><path d="M2.5 4 5 6.5 7.5 4"/></svg>'
+  chev: '<svg viewBox="0 0 10 10"><path d="M2.5 4 5 6.5 7.5 4"/></svg>',
+  pill: '<svg viewBox="0 0 12 12"><rect x="1.5" y="4" width="9" height="4" rx="2" transform="rotate(-35 6 6)"/><path d="M6 3.6 4.9 7.9" transform="rotate(-35 6 6)"/></svg>'
 };
 
 function readBandSession() {
@@ -724,6 +725,10 @@ function mountHead(grid, date) {
   if (day.energy) bits.push(`<span class="${day.energy === 'low' ? 'is-low' : ''}">${ICON.bolt}${day.energy}</span>`);
   if (day.meals) bits.push(`<span>${ICON.fork}${day.meals}</span>`);
   if (day.symptom) bits.push(`<span class="is-symptom">● ${day.symptom}</span>`);
+  if (day.med?.summary) {
+    const flagged = day.med.doses.some((dose) => dose.status === 'skipped' || dose.late);
+    bits.push(`<span class="cal-vit__med${flagged ? ' is-flag' : ''}" title="Dexy · ${escapeHtml(day.med.summary)}">${ICON.pill}${escapeHtml(day.med.summary)}</span>`);
+  }
   el('div', 'cal-vit', bits.join('') || '<span>nothing logged yet</span>', chips, { 'data-part': 'vitals' });
   nodes.set(`colhead:${date}`, head);
 }

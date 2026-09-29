@@ -49,7 +49,7 @@ export function lightsOutFor(date, ghosts, profileSleep = BRIEF.lightsOut) {
  * can offer Accept), a Dinner row when nothing's been logged since the afternoon, and
  * lights out.
  */
-export function tonight({ date, now, chips = [], ghosts = [], logs = [], profileSleep = BRIEF.lightsOut }) {
+export function tonight({ date, now, chips = [], ghosts = [], logs = [], profileSleep = BRIEF.lightsOut, plannedDinnerAt = null }) {
   const lightsOut = lightsOutFor(date, ghosts, profileSleep);
   const bedGhost = ghosts.find(g => g.kind === 'bedtime' && g.date === date && g.status !== 'dismissed');
   const minutes = Math.max(0, (lightsOut - now) * 60);
@@ -91,7 +91,9 @@ export function tonight({ date, now, chips = [], ghosts = [], logs = [], profile
   const hadLunch = meals.some(m => m.h >= BRIEF.lunchWindow[0] && m.h < BRIEF.lunchWindow[1]);
   if (now >= BRIEF.eveningFrom && !meals.some(m => m.h >= BRIEF.lunchWindow[1])) {
     const since = lastMeal ? `Nothing logged since ${lastMeal.meal ?? 'your last meal'}` : 'Nothing logged today';
-    rows.push({ at: Math.max(now, BRIEF.dinnerAt), time: clock12(Math.max(now, BRIEF.dinnerAt)), title: 'Dinner', kind: 'log', note: hadLunch ? since : `${since} (no lunch)`, struck: false, ghostId: null, suggestion: null });
+    // A missed / late afternoon dose plans dinner early (medication-model); otherwise the usual slot.
+    const dinnerAt = Math.max(now, plannedDinnerAt ?? BRIEF.dinnerAt);
+    rows.push({ at: dinnerAt, time: clock12(dinnerAt), title: plannedDinnerAt != null ? 'Dinner, planned' : 'Dinner', kind: 'log', note: hadLunch ? since : `${since} (no lunch)`, struck: false, ghostId: null, suggestion: null });
   }
   rows.sort((a, b) => a.at - b.at);
   return {

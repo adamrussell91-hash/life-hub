@@ -7,9 +7,10 @@ import { bandsFromProfile, baseHeights, totalHeight } from '../calendar-bands.js
 import { formatDisplayDate, formatDisplayDateRange } from '../format-display-date.js';
 import { isHoliday, mondayOf, termAt, toMs, weekLabel } from '../school-time.js';
 import { capacityForDates, dayLoadHours, isOverCapacity, symptomsIn } from './capacity-model.js';
+import { medicationDay, medicationLogs, usualDoseTimes } from './medication-model.js';
 
 const DAY_MS = 86_400_000;
-const LOG_TYPES = new Set(['meal', 'diary', 'sleep', 'skincare', 'heart', 'weight', 'composition', 'measurements', 'bloods', 'fragrance']);
+const LOG_TYPES = new Set(['meal', 'diary', 'sleep', 'skincare', 'heart', 'weight', 'composition', 'measurements', 'bloods', 'fragrance', 'medication']);
 const SOURCE_ORDER = ['teaching', 'professional', 'task', 'health', 'fitness', 'corey', 'study'];
 const SOURCE_LABEL = {
   teaching: 'Teaching',
@@ -474,6 +475,8 @@ export function buildTidelineModel({
   const ghostList = Array.isArray(ghosts) ? ghosts : (useVisual ? (visual?.GHOSTS ?? []) : []);
   const holiday = date => isSchoolHoliday(date, schoolTerms);
   const capacity = capacityForDates(events, week, { isHoliday: holiday });
+  const medLogs = medicationLogs(events);
+  const usualDoses = usualDoseTimes(medLogs, today);
   const days = week.map(date => {
     const chips = appendGhostChips(useVisual ? chipsFromVisual(visual, date, events) : mergeMedical(
       (events ?? []).map(chipFromEvent).filter(chip => chip && chip.date === date)
@@ -504,7 +507,8 @@ export function buildTidelineModel({
       due: dueFor(visual, events, date, useVisual),
       walls: wallsFor(visual, events, date, useVisual),
       free: freeFor(visual, date, chips, bands, schoolTerms, useVisual),
-      sleepText: sleepLabel(date, week, events, today, schoolTerms)
+      sleepText: sleepLabel(date, week, events, today, schoolTerms),
+      med: date <= today ? medicationDay({ date, today, nowHour, logs: medLogs, usual: usualDoses }) : null
     };
   });
   const title = periodTitle(week, schoolTerms);

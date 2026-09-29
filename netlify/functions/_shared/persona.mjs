@@ -147,6 +147,14 @@ export function buildSystemPrompt({
       : ''
   ].filter(Boolean).join(' ');
 
+  // Dexamphetamine timing is shared with every agent (Adam's choice, 29/09/26).
+  const MEDICATION_GUIDANCE = {
+    brisket: 'Adam takes dexamphetamine (morning and afternoon doses, logged as medication records and shown in the Central Node). A missed or late afternoon dose makes night-time binge eating much more likely for him. When today shows a missed or late dose, plan dinner and one evening snack early and concretely (what, when), with no judgement and no calorie lecture. A missing log means unknown, never skipped.',
+    sara: 'Dexamphetamine doses are logged as medication records (taken / skipped, morning or afternoon). You may log them. Never give dose or timing advice beyond what his prescriber set, and never treat a missing log as a skipped dose.',
+    hammond: 'Dexamphetamine timing is in the Central Node. A missed or waning dose lowers what a plan can ask of the afternoon and evening: shorten, reorder or protect, never shame. A missing log means unknown.'
+  };
+  const medicationBlock = MEDICATION_GUIDANCE[slug] ?? '';
+
   const capacityBlock = capacities
     ? `Your capacities this turn (prefer these named tools; os_propose_action covers anything else allowlisted):\n${String(capacities).trim()}`
     : '';
@@ -391,6 +399,7 @@ export function buildSystemPrompt({
     sampleBlock,
     protocolSteer,
     capability,
+    medicationBlock,
     capacityBlock,
     activationCatalogue,
     activationDirective,

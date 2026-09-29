@@ -361,3 +361,4 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .dd-arc.k-family{fill:color-mix(in srgb,var(--pastel-gold) 40%,#fff);stroke:color-mix(in srgb,var(--pastel-gold-ink) 45%,#fff);stroke-dasharray:3 2}
 .dd-arc.k-event{fill:var(--pastel-gold);stroke:var(--pastel-gold-ink);stroke-width:1.2}
 .cal-due.is-allday b{color:var(--ink)}
+.cal-vit__med.is-flag{color:var(--high-sea-ink)}
