@@ -31,6 +31,10 @@ function input(host: ParentNode, name: string): HTMLInputElement {
   return host.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
 }
 
+function pinDefaultPlace(host: ParentNode): void {
+  button(host, 'Pick on map').click();
+}
+
 function open() {
   const host = document.createElement('div');
   document.body.append(host);
@@ -53,6 +57,7 @@ describe('add form save', () => {
   it('retries once with the latest version when the trip changed elsewhere', async () => {
     const { host, onSaved, submit } = open();
     input(host, 'title').value = 'Dinner';
+    pinDefaultPlace(host);
     addItem
       .mockRejectedValueOnce(new ApiClientError({ code: 'conflict', message: 'Conflict.' }, 409))
       .mockResolvedValueOnce({ trip, version: 'sha-v3' });
@@ -77,15 +82,25 @@ describe('add form save', () => {
   it('refuses hop minutes without a mode rather than dropping them silently', () => {
     const { host, submit, note } = open();
     input(host, 'title').value = 'Museum';
+    pinDefaultPlace(host);
     input(host, 'hop.minutes').value = '30';
     submit();
     expect(addItem).not.toHaveBeenCalled();
     expect(note()).toContain('next stop');
   });
 
+  it('requires a selected place for a physical stop before sending it', () => {
+    const { host, submit, note } = open();
+    input(host, 'title').value = 'Museum';
+    submit();
+    expect(addItem).not.toHaveBeenCalled();
+    expect(note()).toContain('place');
+  });
+
   it('shows the server reason and keeps the form open', async () => {
     const { host, onSaved, submit, note } = open();
     input(host, 'title').value = 'Museum';
+    pinDefaultPlace(host);
     addItem.mockRejectedValueOnce(
       new ApiClientError({ code: 'validation_error', message: 'unknown currency', details: { path: 'item.cost.currency' } }, 400)
     );

@@ -46,6 +46,19 @@ test('normalizeItem accepts https link and HH:MM', () => {
   assert.equal(item.link, 'https://example.com/a');
 });
 
+test('normalizeItem keeps locationless itinerary tasks valid', () => {
+  const remoteTask = normalizeItem({
+    kind: 'do',
+    title: 'Apply for an ETA',
+    city_id: 'lis',
+    date: '2027-03-03',
+    time: null,
+    note: '',
+    status: 'planned'
+  });
+  assert.equal(remoteTask.title, 'Apply for an ETA');
+});
+
 const ticketBase = {
   title: 'ScotRail',
   city_id: 'lis',

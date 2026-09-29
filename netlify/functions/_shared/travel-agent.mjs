@@ -13,7 +13,7 @@ export function proposeTravelItemSchema() {
   return {
     name: 'propose_travel_item',
     description:
-      'Propose adding an itinerary item to a Travel trip (do/food/transit/stay/flight/train/…). Nothing is saved until Adam taps Confirm. Requires trip_id and the current if_version from the trip (load the trip first when unsure).',
+      'Propose adding an itinerary item to a Travel trip (do/food/transit/stay/flight/train/…). Nothing is saved until Adam taps Confirm. Requires trip_id and the current if_version from the trip (load the trip first when unsure). Physical do, food and transit stops require a place with name, latitude and longitude; use a clear off_map_label only when the stop genuinely has no fixed location.',
     input_schema: {
       type: 'object',
       properties: {
@@ -105,6 +105,14 @@ export async function buildTravelItemProposal(input, { loadTrip } = {}) {
     normalized = normalizeItem(input.item, { id: makeId('itm'), now: '1970-01-01T00:00:00.000Z' });
   } catch (error) {
     return { ok: false, error: 'invalid_item', detail: error?.message || 'item failed validation' };
+  }
+
+  const requiresPinnedPlace =
+    ['do', 'food', 'transit'].includes(normalized.kind) &&
+    !normalized.place &&
+    !clean(normalized.off_map_label, 160);
+  if (requiresPinnedPlace) {
+    return { ok: false, error: 'invalid_item', detail: 'item.place required for physical stops' };
   }
 
   const version = await resolveTravelVersion(tripId, input.if_version, { loadTrip });

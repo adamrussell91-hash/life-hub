@@ -69,7 +69,10 @@ test('buildTravelItemProposal + executor appends item with if_version', async ()
     summary: 'Add cafe',
     trip_id: 'trip_korea2026',
     if_version: 'sha_abc',
-    item: { kind: 'food', title: 'Cafe', date: '2026-09-02', city_id: 'sel' }
+    item: {
+      kind: 'food', title: 'Cafe', date: '2026-09-02', city_id: 'sel',
+      place: { name: 'Test Cafe', lat: 37.5, lon: 127 }
+    }
   });
   assert.equal(built.ok, true);
   const validated = validateProposeActionInput(built.proposal, { agentSlug: 'clare' });
@@ -92,6 +95,20 @@ test('buildTravelItemProposal + executor appends item with if_version', async ()
   assert.equal(saved.trip.items.length, 1);
   assert.equal(saved.trip.items[0].title, 'Cafe');
   assert.equal(saved.version, 'sha_abc');
+});
+
+test('travel agents cannot propose an unlocated physical stop', async () => {
+  const built = await buildTravelItemProposal({
+    summary: 'Add cafe',
+    trip_id: 'trip_korea2026',
+    if_version: 'sha_abc',
+    item: { kind: 'food', title: 'Cafe', date: '2026-09-02', city_id: 'sel' }
+  });
+  assert.deepEqual(built, {
+    ok: false,
+    error: 'invalid_item',
+    detail: 'item.place required for physical stops'
+  });
 });
 
 test('buildTravelCheckinProposal requires city + label', async () => {

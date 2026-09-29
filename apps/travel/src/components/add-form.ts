@@ -578,6 +578,9 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
   /** Checks the server would reject, caught here so the message names the field. */
   function checkBeforeSave(): { message: string; el: HTMLElement } | null {
     if (!titleInput.value.trim()) return { message: 'Add a title.', el: titleInput };
+    if ((kind === 'do' || kind === 'food') && !placeDraft) {
+      return { message: 'Choose a place from the search results or Pick on map before saving this stop.', el: placeSearch };
+    }
     if (kind === 'flight' || kind === 'train') {
       const ticket = kind === 'flight' ? 'flight' : 'train';
       if (!carrierInput.value.trim()) return { message: `Add the ${ticket} carrier.`, el: carrierInput };
