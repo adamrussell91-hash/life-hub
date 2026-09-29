@@ -9,6 +9,8 @@ import {
   refreshAlmanacSnapshot
 } from './almanac.mjs';
 import { createCalendarGhostsProposeHandler } from './_shared/calendar-ghosts-propose.mjs';
+import { cachedFeedRows } from './calendar-feeds.mjs';
+import { defaultGetContentStore } from './_shared/teaching-blobs.mjs';
 
 /**
  * 05:30 Australia/Sydney. AEST = 19:30 UTC, AEDT = 18:30 UTC.
@@ -27,6 +29,7 @@ export function createCalendarGhostsProposeScheduledHandler(deps = {}) {
     loadLessons: loadTeachingLessonsFromBlobs,
     loadProfessionalEvents: loadProfessionalEventsFromBlobs,
     readSchoolTerms,
+    loadIcalRows: async ({ from, to }) => cachedFeedRows({ store: await defaultGetContentStore(process.env), from, to }),
     ...deps
   });
   const refreshAlmanac = deps.refreshAlmanac ?? (async () => {

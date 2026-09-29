@@ -73,7 +73,7 @@ test('capabilities: tasks and lessons move, only work blocks resize, other hubs 
   assert.equal(canMoveItem({ record: { type: 'work_block', id: 'w' }, ghost: {} }), false);
   assert.equal(canResizeItem({ record: { type: 'work_block', id: 'w' } }), true);
   assert.equal(canResizeItem({ record: { type: 'scheduled_lesson', id: 's' } }), false);
-  assert.deepEqual(editableFields({ record: { type: 'task', id: 't' } }), ['title', 'date', 'time', 'bookmark', 'notes']);
+  assert.deepEqual(editableFields({ record: { type: 'task', id: 't' } }), ['title', 'date', 'time', 'bookmark', 'resumability', 'max_block', 'notes']);
 });
 
 test('patch requests map to each owning API', () => {

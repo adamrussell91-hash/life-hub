@@ -88,12 +88,12 @@ export function canResizeItem(item) {
 
 /**
  * Fields the item card may edit. Order is display order.
- * @returns {Array<'title'|'date'|'time'|'duration'|'notes'>}
+ * @returns {Array<'title'|'date'|'time'|'duration'|'bookmark'|'resumability'|'max_block'|'notes'>}
  */
 export function editableFields(item) {
   if (!canMoveItem(item)) return [];
   const type = itemType(item);
-  if (type === 'task') return ['title', 'date', 'time', 'bookmark', 'notes'];
+  if (type === 'task') return ['title', 'date', 'time', 'bookmark', 'resumability', 'max_block', 'notes'];
   if (type === 'work_block') return ['title', 'date', 'time', 'duration'];
   if (type === 'scheduled_lesson') return ['date', 'time'];
   return [];
@@ -165,6 +165,26 @@ export function newTabLabel(item) {
 export function itemPatchRequest(item, patch) {
   const type = itemType(item);
   const id = itemId(item);
+  // "I've dropped this" on a repeating iCloud event: frees its weekly slot (advisory).
+  if (patch?.freed && typeof itemRecord(item).series === 'string') {
+    const record = itemRecord(item);
+    const row = /** @type {Record<string, any>} */ (item);
+    const start = TIME_KEY.test(record.time ?? '') ? record.time : null;
+    const end = TIME_KEY.test(record.end_time ?? '') ? record.end_time : null;
+    if (!start || !end || !DATE_KEY.test(record.date ?? row.date ?? '')) return null;
+    return {
+      path: '/api/calendar-freed',
+      method: 'POST',
+      body: {
+        series: record.series,
+        title: String(record.title || row.title || 'Dropped'),
+        date: record.date ?? row.date,
+        start,
+        end,
+        reason: typeof patch.freed.reason === 'string' ? patch.freed.reason.trim().slice(0, 160) : ''
+      }
+    };
+  }
   if (!id || !canMoveItem(item)) return null;
   const body = {};
   const date = typeof patch.date === 'string' && DATE_KEY.test(patch.date) ? patch.date : undefined;
@@ -179,6 +199,14 @@ export function itemPatchRequest(item, patch) {
     if (typeof patch.bookmark === 'string') {
       const note = patch.bookmark.replace(/\s+/g, ' ').trim().slice(0, 280);
       body.bookmark = note ? { note, at: new Date().toISOString(), source: 'calendar' } : null;
+    }
+    if (patch.resumability !== undefined) body.resumability = patch.resumability === 'quick' || patch.resumability === 'runup' ? patch.resumability : null;
+    if (patch.max_block_minutes !== undefined) {
+      const minutes = Math.round(Number(patch.max_block_minutes));
+      body.max_block_minutes = patch.max_block_minutes === null || !Number.isFinite(minutes) ? null : Math.min(240, Math.max(15, minutes));
+    }
+    for (const key of ['depends_on', 'dismissed_inferred']) {
+      if (Array.isArray(patch[key])) body[key] = [...new Set(patch[key].filter((value) => typeof value === 'string' && value && value !== id))].slice(0, 20);
     }
     if (!Object.keys(body).length) return null;
     return { path: `/api/tasks?id=${encodeURIComponent(id)}`, method: 'PATCH', body };
