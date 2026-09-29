@@ -71,7 +71,7 @@ Knowledge-hub Clementine never sees About Me, Constraints, or Cross-Agent. It al
 | `people-remember-tick-scheduled` | `5 * * * *` | 07:00 + 16:00 gate | DST-safe |
 | `promise-nudges-scheduled` | `0 21 * * *` | 07:00 → **08:00 from 4 Oct** | Not DST-gated |
 | `ties-infer-tick-scheduled` | `20 3 * * *` | 13:20 / 14:20 | fine |
-| `career-scan-tick-scheduled` | `10 * * * *` | Sun 17:00 gate | Only one attempt per week. If that tick fails, the week is skipped |
+| `career-scan-tick-scheduled` | `10 * * * *` | Sun 17–19:00 gate | Retries 18/19 if the week has not succeeded yet |
 | `ai-jobs-tick-scheduled` | `17 14 * * *` | 00:17 / 01:17 | Knowledge midnight tidy (20 pages) + job expiry |
 
 Nothing schedules: Knowledge URL watches (last checked 20 Sep, on request only), Hammond Weekly Review / Goal Audit, Sara weekly scan, Clare intuitive pass, the Ann teaching forecast.
@@ -103,7 +103,8 @@ Principle from About Me: the season is comfortable, slow growth, and the hub fai
 | Sun 17:00 | (existing) | Career skills scan. Retry on the 18:00 and 19:00 ticks if it failed |
 | **Sun 18:00** | Hammond | **Weekly Review prep:** build the week pack, draft the recap and the forward lock, queue the Cross-Agent condense. Adam opens it Sunday night (it has only happened once) |
 | Sun 18:00 | Ann | Teaching forecast for the next 7–14 days (lessons, marking load) → `Ann→Hammond` line. Answers the open handoff |
-| Sun 19:00 | Clare | Restore the **intuitive flags pass** (existing code in `apps/tasks/src`), flags only |
+| Sun 18:00 | Ann | Teaching forecast → `Ann→Hammond:` load line (`ann-teaching-forecast-scheduled`) |
+| Sun 19:00 | Clare | Weekly judgment (Haiku) → `Clare→Hammond:` (+ optional Status Confirm); not Network flags |
 | **Mon 06:30** | Sara | **Weekly health scan:** medical/body logs vs Constraints → Constraints patch into the Confirm queue; appointments from future-dated `data/body` files → Upcoming Appointments |
 | Mon 06:30 | Chadwick | Research freshness: list the areas past the 14-day `RESEARCH DUE` rule so the next session plan is fast (no web search unattended) |
 | Wed 20:00 | Hyaluronica | Nutrition→skin weekly check. If there's been no skincare log for 14+ days, one gentle Status flag, not a lecture |
@@ -153,12 +154,12 @@ Principle from About Me: the season is comfortable, slow growth, and the hub fai
 
 **Next up: app-side list (these need code because the data is in Netlify Blobs)**
 1. **Teaching lesson-panel AI runner** (§2.3). Run queued `/api/ai/jobs` lesson jobs in a background function through `runTeachingAnnTurn`. Delete the dead `/api/ai/chat` client in `apps/teaching/src/ai/client.ts`.
-2. **Clare intuitive pass** (§2.4). Schedule the existing `apps/tasks/src/{ai/intuitive-judge,domain/intuitive-scan,domain/intuitive-digest}.ts` as a Netlify scheduled function (Sun ~19:00 Sydney, flags only), or remove the promise from `clare-protocol.md`.
-3. **Ann Sunday teaching forecast.** A scheduled function reads the next 7–14 days of scheduled lessons and marking load from the Teaching store and posts one `Ann→Hammond:` line. That closes the open July handoff.
+2. **Clare weekly judgment (Tier 1).** **Built:** `clare-weekly-judgment-scheduled.mjs` (~19:00 Sydney Haiku) → `Clare→Hammond:` Cross-Agent (+ optional Status Confirm). Not a Network/flags restore; old intuitive-scan path stays deleted.
+3. **Ann Sunday teaching forecast.** **Built:** `ann-teaching-forecast-scheduled.mjs` (~18:00 Sydney) → deterministic `Ann→Hammond:` teaching-load line from Teaching Blobs.
 4. **Clementine reads Central Node** (§2.5). Load About Me, Constraints and her Cross-Agent lines in `knowledge-clementine-chat`, let her post `Clementine→` lines, and add her to the CN Agent Directory.
 5. **Knowledge URL-watch check.** Weekly scheduled run of the existing `url-watch.mjs` checker. It was last run by hand on 20 Sep.
 6. **In-app sweep heartbeat.** The Central Node page and Home show "Daily sweep missed" when the newest `Daily Sweep` governance entry is more than a day old. The automations check this weekly; the app would catch it the same morning.
-7. **Small cron fixes.** Gate `promise-nudges-scheduled` on the Sydney hour so it stays at 07:00 after daylight saving. Let `career-scan` retry on the 18:00 and 19:00 ticks when the 17:00 run fails.
+7. **Small cron fixes.** Gate `promise-nudges-scheduled` on the Sydney hour so it stays at 07:00 after daylight saving. **Career scan** retries Sunday 18:00–19:00 when 17:00 failed (`shouldRunCareerScanNow`).
 
 **Clare / Tasks (Netlify scheduled functions; Tasks data is in Blobs)**
 
