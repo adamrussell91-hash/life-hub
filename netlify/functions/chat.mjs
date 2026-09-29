@@ -337,6 +337,7 @@ import {
   buildFutureProposal
 } from './_shared/career-agent.mjs';
 import { buildTieDecisionProposal } from './_shared/tie-decision-agent.mjs';
+import { buildGoalProposal, buildGoalCheckinProposal } from './_shared/goal-agent.mjs';
 import { buildWorkoutTemplateProposal } from './_shared/workout-template-agent.mjs';
 import {
   buildTravelCheckinProposal,
@@ -2095,6 +2096,34 @@ export function createChatHandler({
                       detail: error instanceof Error ? error.message : 'invalid ghost'
                     });
                   }
+                }
+                const validated = validateProposeActionInput(built.proposal, { agentSlug: slug });
+                if (!validated.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: validated.error,
+                    ...(validated.detail ? { detail: validated.detail } : {})
+                  });
+                }
+                const pendingId = await proposeOsAction(validated.proposal);
+                return JSON.stringify({
+                  ok: true,
+                  status: 'awaiting_confirm',
+                  message: 'Waiting on Adam\'s Confirm. Nothing is saved yet.',
+                  changes: validated.proposal.writes.map(write => write.diff),
+                  ...(pendingId ? { pendingId } : {})
+                });
+              }
+              if (event.name === 'propose_goal' || event.name === 'propose_goal_checkin') {
+                const built = event.name === 'propose_goal'
+                  ? buildGoalProposal(event.input ?? {})
+                  : buildGoalCheckinProposal(event.input ?? {});
+                if (!built.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: built.error,
+                    ...(built.detail ? { detail: built.detail } : {})
+                  });
                 }
                 const validated = validateProposeActionInput(built.proposal, { agentSlug: slug });
                 if (!validated.ok) {

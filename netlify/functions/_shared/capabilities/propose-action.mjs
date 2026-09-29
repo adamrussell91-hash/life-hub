@@ -407,6 +407,12 @@ export function classifyWriteTarget(path) {
   if (store === 'tasks' && kind === 'meta' && id === 'hub_prefs') {
     return { store: 'tasks', kind, id, key: 'meta/hub_prefs', path: raw };
   }
+  if (store === 'tasks' && kind === 'goal' && BLOB_ID.test(id)) {
+    return { store: 'tasks', kind, id, key: `goals/${id}`, path: raw };
+  }
+  if (store === 'tasks' && kind === 'goal_checkin' && BLOB_ID.test(id)) {
+    return { store: 'tasks', kind, id, key: `goal_checkins/${id}`, path: raw };
+  }
   if (store === 'teaching' && kind === 'unit' && BLOB_ID.test(id)) {
     return { store: 'teaching', kind, id, key: `units/${id}`, path: raw };
   }
@@ -787,6 +793,20 @@ export async function executeProposeActionWrites(client, proposal, {
         return { ok: false, error: 'professional_store_unbound', detail: write.path, results };
       }
       const applied = await professional.apply(write, target);
+      if (!applied.ok) return { ...applied, results };
+      results.push(applied.result);
+      continue;
+    }
+
+    if (target.store === 'tasks' && (target.kind === 'goal' || target.kind === 'goal_checkin')) {
+      if (write.mode === 'delete') {
+        return { ok: false, error: 'blob_delete_unsupported', detail: write.path, results };
+      }
+      const goals = blobStores.goals;
+      if (!goals || typeof goals.apply !== 'function') {
+        return { ok: false, error: 'goals_store_unbound', detail: write.path, results };
+      }
+      const applied = await goals.apply(write, target);
       if (!applied.ok) return { ...applied, results };
       results.push(applied.result);
       continue;

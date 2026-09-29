@@ -24,7 +24,9 @@
     "professional:event:*",
     "professional:tie:*",
     "professional:application:*",
-    "professional:future:*"
+    "professional:future:*",
+    "tasks:goal:*",
+    "tasks:goal_checkin:*"
   ],
   "read_globs": [
     "data/challenges/**",
@@ -50,7 +52,9 @@
     "professional:event:*",
     "professional:tie:*",
     "professional:application:*",
-    "professional:future:*"
+    "professional:future:*",
+    "tasks:goal:*",
+    "tasks:goal_checkin:*"
   ],
   "notes": "Tasks specialist on the shared OS floor. Ordinary create uses create_task and writes immediately; edits use update_task (Confirm). Other chat workbench writes use clare_mutate and wait for Confirm. Paths are propose-action `tasks:task:<id>` / `tasks:project:<id>`. Work blocks/sessions use `tasks:work_block:*` / `tasks:work_session:*`. Life remember/track/research use propose-action. People: search_people reads; propose_* tools queue `people:person:*` / `people:organisation:*` / `people:link:*` / `people:observation:*` / `people:remember:*` writes for Confirm. Travel: propose_travel_item / propose_travel_checkin \u2192 `travel:trip:*`. Hub prefs: propose_hub_prefs \u2192 `tasks:meta:hub_prefs` (Constraints still CN patch; bedtime still calendar ghost)."
 }

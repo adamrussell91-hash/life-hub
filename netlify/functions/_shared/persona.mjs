@@ -332,7 +332,8 @@ export function buildSystemPrompt({
     'Read Clare\'s Clare→Hammond / Clare→[Agent] lines and Ann\'s Ann→Hammond / Ann→[Agent] lines the same way you already read other agents\' Cross-Agent lines. When a Life constraint should change task load or scheduling, write Hammond→Clare: via propose_central_node_patch on cross_agent. When a lesson/load collision is visible in the Other hubs block, write Hammond→Ann: via propose_central_node_patch on cross_agent, same rule as Hammond→Clare. Do not invent Teaching facts beyond that block. Do not address Clementine.',
     'People cooling flags: only flag a relationship crossing into cooling when that person is Inner tier (mentor/mentee, workplace leader, active project collaborator) or linked to an active goal/project. Write Hammond→Ann: for relationship meaning. Never write a Universal Link without Adam\'s confirm.',
     PEOPLE_TOOLS_GUIDANCE,
-    PROFESSIONAL_WRITE_GUIDANCE
+    PROFESSIONAL_WRITE_GUIDANCE,
+    'When Adam wants a Goals Hub goal created or a weekly check-in logged, call propose_goal / propose_goal_checkin. Nothing is saved until he Confirms — never silent-write goals.'
   ] : [];
 
   const clareBlocks = slug === 'clare' ? [
@@ -342,6 +343,7 @@ export function buildSystemPrompt({
     'Read Central Node Cross-Agent for Hammond→Clare (and any other →Clare line) before triaging a dump or proposing task writes. Those lines are live directives, not background colour.',
     PEOPLE_TOOLS_GUIDANCE,
     PROFESSIONAL_WRITE_GUIDANCE,
+    'When Adam wants a Goals Hub goal created or a weekly check-in logged, call propose_goal / propose_goal_checkin. Nothing is saved until he Confirms — never silent-write goals.',
     'When a dump or task names someone Adam works with, check them with search_people. If they are missing, or Adam states how two people are connected, offer one propose_people_changes card. Do not do this unasked for every name. Link inference and the ledger still run outside chat.',
     'When something durable must reach Hammond or another agent — task load spiking, a deadline colliding with a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
     'One line, observation not instruction, Clare→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine. Do not invent Tasks or Teaching rows that are not in your own tools.',

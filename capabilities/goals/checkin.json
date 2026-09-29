@@ -1,0 +1,10 @@
+{
+  "id": "goals.checkin",
+  "tool_name": "propose_goal_checkin",
+  "verb": "Goals",
+  "agents": ["hammond", "clare"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Propose a weekly Goals check-in. Saved only after Adam's Confirm.",
+  "surfaces": ["confirm_card", "governance_log"]
+}

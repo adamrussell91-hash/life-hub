@@ -119,6 +119,7 @@ import { createEventRepository } from './_shared/event-repository.mjs';
 import { createUniversalLinkRepository } from './_shared/universal-link-repository.mjs';
 import { createAccessContext } from './_shared/entity-access.mjs';
 import { createProfessionalWriteExecutor } from './_shared/professional-write-executor.mjs';
+import { createGoalWriteExecutor } from './_shared/goal-agent.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
@@ -1943,6 +1944,10 @@ async function loadBlobStoresForWrites(writes, {
 }) {
   const stores = {};
   const needsTasks = writes.some(write => classifyWriteTarget(write.path).store === 'tasks');
+  const needsGoals = writes.some(write => {
+    const kind = classifyWriteTarget(write.path).kind;
+    return kind === 'goal' || kind === 'goal_checkin';
+  });
   const needsTeaching = writes.some(write => classifyWriteTarget(write.path).store === 'teaching')
     || writes.some(write => classifyWriteTarget(write.path).kind === 'work_block');
   const needsPeople = writes.some(write => classifyWriteTarget(write.path).store === 'people');
@@ -1964,6 +1969,13 @@ async function loadBlobStoresForWrites(writes, {
     return { ok: false, error: 'blobs_unavailable' };
   }
   if (needsTasks && !stores.tasks) return { ok: false, error: 'tasks_blobs_unbound' };
+  if (needsGoals) {
+    if (!stores.tasks) return { ok: false, error: 'tasks_blobs_unbound' };
+    stores.goals = createGoalWriteExecutor({
+      store: stores.tasks,
+      nowIso: () => new Date(now()).toISOString()
+    });
+  }
   if (needsTeaching && !stores.teaching) return { ok: false, error: 'teaching_blobs_unbound' };
   if (needsPeople) {
     if (!peopleStore) return { ok: false, error: 'people_blobs_unbound' };

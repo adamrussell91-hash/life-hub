@@ -31,6 +31,7 @@ import { proposeLogCommunicationSchema } from '../log-comm-agent.mjs';
 import { proposeMeetingSchema, proposeEventSchema } from '../meeting-event-agent.mjs';
 import { proposeApplicationSchema, proposeFutureSchema } from '../career-agent.mjs';
 import { proposeTieDecisionSchema } from '../tie-decision-agent.mjs';
+import { proposeGoalSchema, proposeGoalCheckinSchema } from '../goal-agent.mjs';
 import { saveWorkoutTemplateSchema } from '../workout-template-agent.mjs';
 import { proposeTravelCheckinSchema, proposeTravelItemSchema } from '../travel-agent.mjs';
 import { proposeKnowledgePageSchema } from '../knowledge-page-agent.mjs';
@@ -352,6 +353,8 @@ export function buildAgentTools({
   if (has('professional.propose-event')) tools.push(proposeEventSchema());
   if (has('career.propose-application')) tools.push(proposeApplicationSchema());
   if (has('career.propose-future')) tools.push(proposeFutureSchema());
+  if (has('goals.propose')) tools.push(proposeGoalSchema());
+  if (has('goals.checkin')) tools.push(proposeGoalCheckinSchema());
   if (has('fitness.save-workout-template')) tools.push(saveWorkoutTemplateSchema());
   if (has('travel.propose-item')) tools.push(proposeTravelItemSchema());
   if (has('travel.propose-checkin')) tools.push(proposeTravelCheckinSchema());

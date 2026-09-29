@@ -26,7 +26,9 @@
     "professional:event:*",
     "professional:tie:*",
     "professional:application:*",
-    "professional:future:*"
+    "professional:future:*",
+    "tasks:goal:*",
+    "tasks:goal_checkin:*"
   ],
   "read_globs": [
     "central-node.md",
@@ -50,7 +52,9 @@
     "professional:event:*",
     "professional:tie:*",
     "professional:application:*",
-    "professional:future:*"
+    "professional:future:*",
+    "tasks:goal:*",
+    "tasks:goal_checkin:*"
   ],
   "notes": "Longitudinal owner. Full CN + governance write rights; can loan CN writes to specialists in Phase 1. May read/write Tasks work blocks when reconciling Clare schedules. People: search_people reads; propose_* tools queue `people:person:*` / `people:organisation:*` / `people:link:*` / `people:observation:*` / `people:remember:*` writes for Confirm. Travel + hub prefs Confirm paths shared with Clare."
 }

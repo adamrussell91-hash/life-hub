@@ -826,6 +826,32 @@
         "governance_log"
       ],
       "tool_name": "propose_future"
+    },
+    "goals.propose": {
+      "file": "goals/propose.json",
+      "agents": [
+        "hammond",
+        "clare"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_goal"
+    },
+    "goals.checkin": {
+      "file": "goals/checkin.json",
+      "agents": [
+        "hammond",
+        "clare"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_goal_checkin"
     }
   }
 }
