@@ -409,7 +409,10 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
   }
 
   async function loadEntity({ kind, id }) {
-    const raw = await getJSON(store, entityKeyFor(kind, id));
+    // Strong read: a transition decides from this record's current status,
+    // and an eventually consistent read straight after a write can still
+    // return the old one (active → deidentified → deleted refused).
+    const raw = await getJSON(store, entityKeyFor(kind, id), STRONG);
     const record = kind === 'person' ? parsePersonRecord(raw) : parseOrganisationRecord(raw);
     if (!record) throw identityNotFoundError();
     return record;

@@ -32,7 +32,11 @@ import { parseEventRecord } from './_shared/event-schema.mjs';
 import { parseMeetingRecord, meetingDisplayLabel } from './_shared/meeting-schema.mjs';
 import { defaultGetContentStore as defaultGetTeachingStore, listJSON as listTeachingJSON } from './_shared/teaching-blobs.mjs';
 import { listKnowledgePages, rankKnowledgePages } from './_shared/knowledge-data.mjs';
-import { listGithubOrganisationCandidates, listGithubPersonCandidates } from './_shared/github-professional-data.mjs';
+import {
+  listGithubImportedStudentPeople,
+  listGithubOrganisationCandidates,
+  listGithubPersonCandidates
+} from './_shared/github-professional-data.mjs';
 
 export const config = { path: '/api/entities/search' };
 
@@ -168,8 +172,11 @@ export function mergeNativeFirst(native, githubMatches) {
 }
 
 export async function searchGithubIdentityKind(kind, query, includeArchived, github) {
+  // Imported students are searchable too: the meeting picker and global
+  // search find people only through this route, and students have no
+  // Blob record of their own once duplicate copies are merged away.
   const candidates = kind === 'person'
-    ? await listGithubPersonCandidates(github)
+    ? [...await listGithubPersonCandidates(github), ...await listGithubImportedStudentPeople(github)]
     : await listGithubOrganisationCandidates(github);
 
   const out = [];
