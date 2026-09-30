@@ -878,7 +878,7 @@ function roomCard(room: RoomCluster[], attendees: Attendee[], onRemove: (attende
       const attendee = attendees.find((entry) => entry.ref === person.ref);
       const row = el('div', 'room__person');
       row.dataset.warmth = String(person.warmthDots);
-      row.append(el('span', 'room__initials', person.initials), el('span', 'room__name', person.name));
+      row.append(el('span', `room__initials${person.student ? ' room__initials--student' : ''}`, person.initials), el('span', 'room__name', person.name));
       const role = roleLabel(person.role);
       if (role) row.append(el('span', 'muted', role));
       if (person.isNew) row.append(el('span', 'chip chip--warn', 'New to you'));

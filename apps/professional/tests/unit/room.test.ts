@@ -54,4 +54,19 @@ describe('groupRoom', () => {
     const room = groupRoom([{ ref: 'shared:person:blob-twin', role: null, name: 'Rohan Arianayagam' }], students, new Date('2026-09-24T08:00:00.000Z'));
     expect(room[0]!.people[0]).toMatchObject({ name: 'Rohan Arianayagam', warmthDots: 3, known: true });
   });
+
+  it('marks students so the room can colour their initials apart from colleagues', () => {
+    const withStudent = [...directory, { ...row('shared:person:student-rohan', 'Rohan Arianayagam', null, 'warm'), person_type: 'student' as const }];
+    const room = groupRoom(
+      [
+        { ref: 'shared:person:student-rohan', role: null },
+        { ref: directory[0]!.ref, role: null }
+      ],
+      withStudent,
+      new Date('2026-09-24T08:00:00.000Z')
+    );
+    const people = room.flatMap((cluster) => cluster.people);
+    expect(people.find((p) => p.ref === 'shared:person:student-rohan')?.student).toBe(true);
+    expect(people.find((p) => p.ref === directory[0]!.ref)?.student).toBe(false);
+  });
 });

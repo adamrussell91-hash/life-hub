@@ -4,6 +4,10 @@ import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { createAccessContext } from './_shared/entity-access.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { createIdentityRepository } from './_shared/identity-repository.mjs';
+import { createUniversalLinkRepository } from './_shared/universal-link-repository.mjs';
+import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolvers.mjs';
+import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
+import { applyPeopleDedupe, buildPeopleDedupePlan } from './_shared/people-dedupe.mjs';
 
 export const config = { path: '/api/entities/admin' };
 
@@ -53,7 +57,13 @@ export const config = { path: '/api/entities/admin' };
 // all. This route adds no UI and is never called from an ordinary Life
 // workflow — only from this explicit administration action; `entities.mjs`
 // exposes neither action.
-const ACTIONS = new Set(['repair_operation', 'reconcile_self_identity']);
+//   Body: { "action": "plan_people_dedupe" }
+//     -> 200 { ok: true, data: { ready, kept, unresolved } } — read-only preview of
+//        Blob Person copies of imported people, combined-name students and hermit twins
+//   Body: { "action": "apply_people_dedupe", "confirm_ids": ["person_<uuid>", ...] }
+//     -> 200 { ok: true, data: { done, failed, skipped } } — re-plans on the server,
+//        moves each confirmed copy's links to the record it copies, then deletes it
+const ACTIONS = new Set(['repair_operation', 'reconcile_self_identity', 'plan_people_dedupe', 'apply_people_dedupe']);
 const FORBIDDEN_ACCESS_FIELDS = ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds'];
 
 function assertNoAccessFields(value) {
@@ -102,7 +112,7 @@ export function createEntitiesAdminHandler(deps = {}) {
       const action = parsed.value.action;
       if (!ACTIONS.has(action)) {
         return withCors(
-          errorResponse(400, 'invalid_action', 'action must be one of repair_operation, reconcile_self_identity.', false),
+          errorResponse(400, 'invalid_action', `action must be one of ${[...ACTIONS].join(', ')}.`, false),
           request,
           env
         );
@@ -122,6 +132,22 @@ export function createEntitiesAdminHandler(deps = {}) {
         // collapse to the same non-disclosing 404 (correction Job 4); the
         // route no longer pre-checks and returns a different status.
         const result = await repo.repairIdentityOperation(parsed.value.operation_id, accessContext);
+        return withCors(okResponse(200, result), request, env);
+      }
+
+      if (action === 'plan_people_dedupe' || action === 'apply_people_dedupe') {
+        const github = { env, fetchImpl: deps.fetchImpl };
+        const resolve = (ref, ctx, options = {}) =>
+          (deps.resolveEntity ?? defaultResolveEntity)(ref, ctx, { ...github, ...options });
+        const planDeps = {
+          store,
+          professionalStore: await (deps.getProfessionalStore ?? defaultGetProfessionalStore)(),
+          linkRepo: (deps.createUniversalLinkRepository ?? createUniversalLinkRepository)({ store, resolveEntity: resolve }),
+          ...github
+        };
+        const result = action === 'plan_people_dedupe'
+          ? await buildPeopleDedupePlan(planDeps)
+          : await applyPeopleDedupe({ ...planDeps, identityRepo: repo, confirmIds: parsed.value.confirm_ids });
         return withCors(okResponse(200, result), request, env);
       }
 

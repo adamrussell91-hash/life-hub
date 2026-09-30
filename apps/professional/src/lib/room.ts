@@ -9,10 +9,11 @@ export type RoomPerson = {
   isNew: boolean;
   /** False when neither the People directory nor its Students list knows this person. */
   known: boolean;
+  student: boolean;
 };
 export type RoomCluster = { organisation: string | null; monogram: string | null; people: RoomPerson[] };
 
-type DirectoryLike = Pick<DirectoryPersonRow, 'ref' | 'display_name' | 'initials' | 'organisation' | 'warmth_band' | 'created_at'>;
+type DirectoryLike = Pick<DirectoryPersonRow, 'ref' | 'display_name' | 'initials' | 'organisation' | 'warmth_band' | 'created_at'> & Partial<Pick<DirectoryPersonRow, 'person_type'>>;
 
 const DOTS: Record<DirectoryPersonRow['warmth_band'], 1 | 2 | 3> = { warm: 3, cooling: 2, cold: 1 };
 const NEW_MS = 14 * 86_400_000;
@@ -81,7 +82,8 @@ export function groupRoom(
       role: attendee.role,
       warmthDots: row ? DOTS[row.warmth_band] : 1,
       isNew: row ? now.getTime() - Date.parse(row.created_at) <= NEW_MS : false,
-      known: Boolean(row)
+      known: Boolean(row),
+      student: row?.person_type === 'student'
     });
   }
   const rolesFirst = (person: RoomPerson) => (person.role === 'chair' ? 0 : person.role ? 1 : 2);

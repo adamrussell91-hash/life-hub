@@ -5,6 +5,7 @@ import { createEntitiesHandler } from '../../netlify/functions/entities.mjs';
 import { createEntitiesAdminHandler } from '../../netlify/functions/entities-admin.mjs';
 import { createEntitySearchHandler } from '../../netlify/functions/entity-search.mjs';
 import { SELF_POINTER_KEY } from '../../netlify/functions/_shared/identity-repository.mjs';
+import { resolveEntity } from '../../netlify/functions/_shared/entity-resolvers.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -473,4 +474,40 @@ test('Job3: a repository call that somehow reached without an administration con
     repo.repairIdentityOperation(`op_${'4'.repeat(32)}`, { workflow: 'life' }),
     error => error.status === 403 && error.code === 'administration_required'
   );
+});
+
+test('plan_people_dedupe previews a hermit name twin; apply_people_dedupe deletes only the confirmed copy', async () => {
+  const store = memoryStore();
+  const professional = memoryStore();
+  const deps = baseDeps(store, {
+    getProfessionalStore: async () => professional,
+    // Only person endpoints here; the real resolvers read each kind's own store.
+    resolveEntity: (ref, ctx, options) => resolveEntity(ref, ctx, { ...options, getStore: async () => store })
+  });
+  const entities = createEntitiesHandler(deps);
+  const first = (await (await entities(entitiesRequest({ body: { kind: 'person', display_name: 'Sam Lee' } }))).json()).data;
+  const second = (await (await entities(entitiesRequest({ body: { kind: 'person', display_name: 'Sam Lee' } }))).json()).data;
+  const admin = createEntitiesAdminHandler(deps);
+
+  const planResponse = await admin(request({ body: { action: 'plan_people_dedupe' } }));
+  assert.equal(planResponse.status, 200);
+  const plan = (await planResponse.json()).data;
+  assert.equal(plan.ready.length, 1);
+  assert.equal(plan.ready[0].kind, 'twin');
+  const copyId = plan.ready[0].remove.id;
+  assert.ok([first.id, second.id].includes(copyId));
+  // The preview writes nothing.
+  assert.equal(store._raw(`entities/person/${copyId}`).lifecycle_status, 'active');
+
+  const applyResponse = await admin(request({ body: { action: 'apply_people_dedupe', confirm_ids: [copyId] } }));
+  assert.equal(applyResponse.status, 200);
+  const result = (await applyResponse.json()).data;
+  assert.equal(result.done.length, 1);
+  assert.deepEqual(result.failed, []);
+  assert.equal(store._raw(`entities/person/${copyId}`).lifecycle_status, 'deleted');
+  const keptId = copyId === first.id ? second.id : first.id;
+  assert.equal(store._raw(`entities/person/${keptId}`).lifecycle_status, 'active');
+
+  const again = (await (await admin(request({ body: { action: 'plan_people_dedupe' } }))).json()).data;
+  assert.deepEqual(again.ready, []);
 });
