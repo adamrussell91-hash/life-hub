@@ -607,7 +607,61 @@ function catalogSignature(definitions: Definition[]) {
   return definitions.map(d => `${d.id}\0${d.name}\0${d.description}`).join("\n");
 }
 
-export function renderProtocols({ host }: { host: HTMLElement }) {
+export function parseProtocolsDeepLink(hash = typeof location !== "undefined" ? location.hash : ""): {
+  id: string;
+  mode?: string;
+  fields: Record<string, string>;
+  prompt?: string;
+} | null {
+  const raw = String(hash || "").replace(/^#/, "");
+  if (!raw.startsWith("protocols")) return null;
+  const qIndex = raw.indexOf("?");
+  const query = qIndex >= 0 ? raw.slice(qIndex + 1) : "";
+  if (!query && raw === "protocols") return { id: "", fields: {} };
+  const params = new URLSearchParams(query);
+  const id = String(params.get("id") || "").trim();
+  const mode = String(params.get("mode") || "").trim() || undefined;
+  const fields: Record<string, string> = {};
+  let prompt = "";
+  for (const [key, value] of params.entries()) {
+    if (key === "id" || key === "mode") continue;
+    const text = String(value || "").trim();
+    if (!text) continue;
+    fields[key] = text;
+    if (key === "prompt") prompt = text;
+  }
+  if (!prompt) {
+    const preferred = ["conflict", "task", "focus", "claim", "problem", "dilemma", "instance", "topic"];
+    for (const key of preferred) {
+      if (fields[key]) { prompt = fields[key]; break; }
+    }
+  }
+  if (!prompt && Object.keys(fields).length) prompt = Object.values(fields).join("\n");
+  return { id, mode, fields, prompt: prompt || undefined };
+}
+
+export type ProtocolsDeepLink = NonNullable<ReturnType<typeof parseProtocolsDeepLink>>;
+
+/** Build Knowledge Thinking deep-link hash (#protocols?id=&mode=&field=). */
+export function protocolsDeepLinkHash(opts: {
+  id: string;
+  mode?: string;
+  fields?: Record<string, string>;
+}): string {
+  const params = new URLSearchParams();
+  const id = String(opts.id || "").trim();
+  if (id) params.set("id", id);
+  const mode = String(opts.mode || "").trim();
+  if (mode) params.set("mode", mode);
+  for (const [key, value] of Object.entries(opts.fields || {})) {
+    const text = String(value || "").trim();
+    if (key && text) params.set(key, text);
+  }
+  const query = params.toString();
+  return query ? `#protocols?${query}` : "#protocols";
+}
+
+export function renderProtocols({ host, deepLink = null }: { host: HTMLElement; deepLink?: ReturnType<typeof parseProtocolsDeepLink> }) {
   let definitions = localCatalog;
   let selected: Definition | null = null;
   let currentSession: Session | null = null;
@@ -628,6 +682,20 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     return viewingIndex === null ? total - 1 : clamp(viewingIndex, 0, total - 1);
   };
   const stopPolling = () => { if (pollTimer !== null) window.clearTimeout(pollTimer); pollTimer = null; };
+  const applyDeepLink = (link: ReturnType<typeof parseProtocolsDeepLink>) => {
+    if (!link?.id) return false;
+    const def = definitions.find(d => d.id === link.id);
+    if (!def) return false;
+    // Don't yank Adam out of a live run.
+    if (currentSession) return false;
+    selected = def;
+    lastMode = link.mode && def.modes.some(m => m.id === link.mode) ? link.mode : def.defaultMode;
+    lastPrompt = link.prompt || "";
+    frequencyGate = null;
+    viewingIndex = null;
+    paint();
+    return true;
+  };
   const paintPastRuns = () => {
     const library = host.querySelector(".protocol-library");
     if (!library) {
@@ -847,14 +915,19 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       paint();
     }
   };
-  paint();
+  if (deepLink?.id) applyDeepLink(deepLink);
+  else paint();
   const paintedCatalog = catalogSignature(definitions);
   void catalog().then(next => {
     const changed = catalogSignature(next) !== paintedCatalog;
     definitions = next;
+    if (deepLink?.id && !currentSession) {
+      applyDeepLink(deepLink);
+      return;
+    }
     if (selected || currentSession || !changed) return;
     paint();
   }).catch(() => undefined);
   void refreshPastRuns().catch(() => undefined);
-  return stopPolling;
+  return { teardown: stopPolling, applyDeepLink };
 }
