@@ -10,6 +10,12 @@ import {
 } from '../../../apps/life/js/app/fitness-model.js';
 import { collapseSetSplitExercises } from './workout-history.mjs';
 import {
+  bestSetPerformance,
+  performanceUnit,
+  resolveCountsAs,
+  resolveTrackingType
+} from '../../../apps/life/js/core/exercise-tracking.js';
+import {
   computeShoulderWaistRatio,
   formatBodyStateForPrompt,
   sortBodyRecordsNewestFirst
@@ -273,6 +279,8 @@ export function getExerciseHistory(records, today, { query, limit = 5 } = {}) {
         sets: (exercise.sets ?? []).map(set => ({
           reps: set.reps,
           weight_kg: set.weight_kg,
+          ...(set.duration_sec != null ? { duration_sec: set.duration_sec } : {}),
+          ...(set.time_cap_sec != null ? { time_cap_sec: set.time_cap_sec } : {}),
           ...(set.cable_type != null ? { cable_type: set.cable_type } : {})
         })),
         volume_kg: roundKg(sessionVolume({ status: 'completed', exercises: [exercise] }))
@@ -300,6 +308,138 @@ export function getExerciseHistorySchema() {
       properties: {
         query: { type: 'string', description: 'Exercise name fragment (required).' },
         limit: { type: 'number', description: 'Max sessions to return (default 5, max 12).' }
+      },
+      required: ['query']
+    }
+  };
+}
+
+function findLibraryEntry(library, name) {
+  const key = normalizeExerciseName(name).toLowerCase();
+  return (Array.isArray(library) ? library : []).find(entry => (
+    normalizeExerciseName(entry?.name).toLowerCase() === key
+  )) ?? null;
+}
+
+function sessionMetric(exercise, tracking) {
+  const sets = Array.isArray(exercise?.sets) ? exercise.sets : [];
+  if (tracking === 'weighted') {
+    let topWeight = null;
+    let bestE1rm = null;
+    for (const set of sets) {
+      const weight = Number(set?.weight_kg);
+      const reps = Number(set?.reps);
+      if (!Number.isFinite(weight) || weight <= 0 || !Number.isFinite(reps) || reps <= 0) continue;
+      if (topWeight == null || weight > topWeight) topWeight = weight;
+      const e1rm = reps === 1 ? weight : weight * (1 + reps / 30);
+      if (bestE1rm == null || e1rm > bestE1rm) bestE1rm = e1rm;
+    }
+    if (topWeight == null) return null;
+    return { value: topWeight, e1rm: roundKg(bestE1rm), sets: sets.length };
+  }
+  const best = bestSetPerformance(sets, tracking);
+  if (!best) return null;
+  const total = sets.reduce((sum, set) => {
+    const value = Number(tracking === 'timed' ? set?.duration_sec : set?.reps);
+    return Number.isFinite(value) && value > 0 ? sum + value : sum;
+  }, 0);
+  return {
+    value: best.value,
+    total,
+    sets: sets.length,
+    ...(tracking === 'reps_in_time' ? { time_cap_sec: Number(best.set.time_cap_sec) } : {})
+  };
+}
+
+/**
+ * Progress for one move in whatever it is measured by: top kg / e1RM for K1
+ * weighted work, best reps for bodyweight, longest hold for timed moves, and
+ * most reps inside the same window for reps-in-time.
+ */
+export function getExerciseProgress(records, today, { query, limit = 10 } = {}, library = []) {
+  if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date' };
+  const needle = String(query ?? '').trim().toLowerCase();
+  if (!needle) return { ok: false, error: 'empty_query' };
+  const cap = Math.min(Math.max(Number(limit) || 10, 2), 20);
+  const sessions = (Array.isArray(records) ? records : [])
+    .filter(record => (record?.type === 'workout' || record?.type == null) && record.status === 'completed' && record.date)
+    .slice()
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+  const hits = [];
+  let matchedName = null;
+  for (const record of sessions) {
+    const exercise = collapseSetSplitExercises(record.exercises).find(item => {
+      const name = String(item.name ?? '').toLowerCase();
+      return name.includes(needle) || normalizeExerciseName(item.name).toLowerCase().includes(needle);
+    });
+    if (!exercise) continue;
+    matchedName ??= exercise.name;
+    hits.push({ date: record.date, exercise });
+    if (hits.length >= cap) break;
+  }
+
+  const entry = findLibraryEntry(library, matchedName ?? query);
+  if (hits.length === 0) {
+    return {
+      ...baseMeta(today, 'Completed workout files + Exercise Library'),
+      query: String(query).trim(),
+      found: false,
+      ...(entry ? { library: { name: entry.name, tracking_type: entry.tracking_type ?? 'weighted' } } : {})
+    };
+  }
+
+  const tracking = resolveTrackingType(hits[0].exercise, entry);
+  const unit = performanceUnit(tracking);
+  let timeline = hits
+    .map(hit => ({ date: hit.date, ...sessionMetric(hit.exercise, tracking) }))
+    .filter(point => point.value != null)
+    .reverse();
+  // Reps-in-time only compares like with like: keep the most recent window.
+  const windowSec = tracking === 'reps_in_time' ? timeline.at(-1)?.time_cap_sec ?? null : null;
+  if (windowSec != null) timeline = timeline.filter(point => point.time_cap_sec === windowSec);
+
+  const first = timeline[0] ?? null;
+  const latest = timeline.at(-1) ?? null;
+  const best = timeline.reduce((top, point) => (!top || point.value > top.value ? point : top), null);
+  const change = first && latest ? Math.round((latest.value - first.value) * 10) / 10 : null;
+  const trend = change == null || timeline.length < 2 ? 'not_enough_data' : change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
+
+  return {
+    ...baseMeta(today, 'Completed workout files + Exercise Library'),
+    query: String(query).trim(),
+    found: true,
+    exercise: entry?.name ?? matchedName,
+    tracking_type: tracking,
+    counts_as: resolveCountsAs(tracking, entry),
+    unit,
+    ...(windowSec != null ? { time_cap_sec: windowSec } : {}),
+    how_to_read: {
+      weighted: 'value = top working kg that session; e1rm = best estimated 1RM.',
+      bodyweight_reps: 'value = best reps in one set; total = all reps that session.',
+      timed: 'value = longest hold / work time in seconds; total = seconds across all sets.',
+      reps_in_time: 'value = most reps inside the same time window; other windows are excluded.'
+    }[tracking],
+    sessions: timeline.length,
+    first,
+    latest,
+    best,
+    change,
+    trend,
+    timeline
+  };
+}
+
+export function getExerciseProgressSchema() {
+  return {
+    name: 'get_exercise_progress',
+    description:
+      'Progress over time for one exercise, measured the right way for that move: kg / e1RM for K1 weighted work, best reps for bodyweight (push-ups, pull-ups), longest hold for timed moves (planks, yoga poses), most reps in the same window for reps-in-time. Use when Adam asks if he is getting better at a move, or before progressing a bodyweight/timed move.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Exercise name fragment (required).' },
+        limit: { type: 'number', description: 'Max sessions to include (default 10, max 20).' }
       },
       required: ['query']
     }
@@ -739,6 +879,7 @@ export function chadwickFitnessToolSchemas() {
     getLongTermFitnessSchema(),
     getSessionComparisonsSchema(),
     getExerciseHistorySchema(),
+    getExerciseProgressSchema(),
     getLoadStatusSchema(),
     getPainTrainingSummarySchema(),
     getBodyStateSchema(),
@@ -760,6 +901,7 @@ export function executeFitnessReadTool(name, {
   measurementRecords = [],
   templates = [],
   targetRatio,
+  library = [],
   input = {}
 } = {}) {
   if (name === 'get_fitness_snapshot') return getFitnessSnapshot(workouts, today);
@@ -768,6 +910,7 @@ export function executeFitnessReadTool(name, {
   if (name === 'get_long_term_fitness') return getLongTermFitness(workouts, today);
   if (name === 'get_session_comparisons') return getSessionComparisons(workouts, today);
   if (name === 'get_exercise_history') return getExerciseHistory(workouts, today, input);
+  if (name === 'get_exercise_progress') return getExerciseProgress(workouts, today, input, library);
   if (name === 'get_load_status') return getLoadStatus(workouts, today);
   if (name === 'get_pain_training_summary') return getPainTrainingSummary(workouts, today, input);
   if (name === 'get_body_state') {

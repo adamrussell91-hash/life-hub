@@ -1454,7 +1454,7 @@ test('clearUnread notifies listeners that chat is read, independent of any send'
   assert.deepEqual(calls, [false]);
 });
 
-test('nudge when Chadwick dumps a numbered plan with no record_proposal', async () => {
+test('a draft plan in chat renders as a workout with no nudge while Adam is still deciding', async () => {
   const root = new FakeDocument();
   const chatApi = {
     async *send() {
@@ -1478,8 +1478,8 @@ test('nudge when Chadwick dumps a numbered plan with no record_proposal', async 
 
   const bubbles = messageBubbles(root);
   assert.ok(
-    bubbles.some(bubble => /lock it onto Fitness/i.test(bubbleText(bubble)) && /Confirm card/i.test(bubbleText(bubble))),
-    'expected a nudge when Chadwick listed a plan in chat only'
+    bubbles.every(bubble => !/Confirm card/i.test(bubbleText(bubble))),
+    'a plan still being discussed must not nag for a Confirm card'
   );
 
   const planBody = bubbles
@@ -1519,23 +1519,82 @@ function findNestedClass(node, name) {
   return null;
 }
 
-test('nudge when exercise library saved but no record_proposal in the turn', async () => {
+test('a plan written in chat collapses once the Confirm card for it arrives in the same turn', async () => {
   const root = new FakeDocument();
   const chatApi = {
     async *send() {
       yield { type: 'agent', slug: 'chadwick' };
-      yield { type: 'exercise_library_saved', name: 'Bar Press' };
+      yield {
+        type: 'text',
+        delta: [
+          "Here's the plan:",
+          '1. Bar Press — Set 1: 10 reps x 30kg (cable: constant force)',
+          '2. Bar Row — Set 1: 10 reps x 27kg (cable: constant force)',
+          '3. Bar Squat — Set 1: 10 reps x 25kg (cable: none)'
+        ].join('\n')
+      };
+      yield {
+        type: 'record_proposal',
+        path: '2026/2026-08-02-chadwick-workout.md',
+        record: {
+          type: 'workout',
+          date: '2026-08-02',
+          status: 'planned',
+          title: 'Push Pull',
+          exercises: [{ name: 'Bar Press', sets: [{ reps: 10, weight_kg: 30, cable_type: 'constant_force' }] }]
+        }
+      };
       yield { type: 'done' };
     }
   };
   const controller = createChatController({ root, chatApi });
 
-  await controller.send('build chest');
+  await controller.send('lock it in');
 
-  const bubbles = messageBubbles(root);
+  const planBody = messageBubbles(root)
+    .map(bubble => bubble.children.find(child => child.className === 'chat-message__body'))
+    .find(body => findNestedClass(body, 'chat-workout'));
+  assert.ok(planBody, 'expected the plan text to render');
+  assert.equal(findNestedClass(planBody, 'chat-workout__exercises'), null, 'exercise list must collapse');
+  assert.ok(findNestedClass(planBody, 'chat-workout__collapsed'));
+});
+
+test('no nudge when Chadwick only saves a learned exercise to the library', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'exercise_library_saved', name: 'Downward Dog' };
+      yield { type: 'text', delta: 'Downward Dog is in the library now, bro.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('go learn some yoga moves');
+
   assert.ok(
-    bubbles.some(bubble => /lock it onto Fitness/i.test(bubbleText(bubble)) && /Confirm card/i.test(bubbleText(bubble))),
-    'expected a nudge bubble mentioning locking onto Fitness for a Confirm card'
+    messageBubbles(root).every(bubble => !/Confirm card/i.test(bubbleText(bubble))),
+    'learning an exercise is not a plan and must not nag for a Confirm card'
+  );
+});
+
+test('nudge when Adam locks in a plan and no Confirm card came back', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'text', delta: 'Alright king, LOCKED IN.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('lock it in');
+
+  assert.ok(
+    messageBubbles(root).some(bubble => /lock it in/i.test(bubbleText(bubble)) && /Confirm card/i.test(bubbleText(bubble))),
+    'expected a nudge when Adam approved but no card arrived'
   );
 });
 

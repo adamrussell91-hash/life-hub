@@ -51,6 +51,7 @@ test('chadwickFitnessToolSchemas registers the Fitness/Body pack under stable na
     'get_long_term_fitness',
     'get_session_comparisons',
     'get_exercise_history',
+    'get_exercise_progress',
     'get_load_status',
     'get_pain_training_summary',
     'get_body_state',

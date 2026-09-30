@@ -2367,6 +2367,71 @@ test('save_exercise_library_entry writes the cache to GitHub, emits exercise_lib
   assert.ok(written[0].updated_at);
 });
 
+test('save_exercise_library_entry learns a researched batch of moves in one GitHub write', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  let toolResult;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        toolResult = await executeTools({
+          id: 'call_1',
+          name: 'save_exercise_library_entry',
+          input: {
+            entries: [
+              {
+                name: 'Spider-Man Push Up',
+                target_area: 'chest',
+                primary_muscles: ['chest', 'obliques'],
+                difficulty: 'intermediate',
+                tracking_type: 'bodyweight_reps',
+                source_program: 'Tom Holland Spider-Man: Brand New Day'
+              },
+              { name: 'Pigeon Pose', target_area: 'mobility', tracking_type: 'timed', default_duration_sec: 45 },
+              { name: 'Nonsense', difficulty: 'godlike' }
+            ]
+          }
+        });
+        yield { type: 'text', delta: 'Learned the Spidey moves.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const response = await handler(request({ message: 'Chadwick, go learn the Tom Holland Spider-Man workout' }));
+  const events = contentEvents(await readSse(response));
+
+  assert.deepEqual(events[1], {
+    type: 'exercise_library_saved',
+    name: '2 moves',
+    names: ['Spider-Man Push Up', 'Pigeon Pose']
+  });
+  assert.deepEqual(JSON.parse(toolResult), {
+    ok: true,
+    saved: ['Spider-Man Push Up', 'Pigeon Pose'],
+    rejected: ['Nonsense']
+  });
+  const puts = calls.filter(call => call.options?.method === 'PUT');
+  assert.equal(puts.length, 1, 'a batch is one write, not one per move');
+  const written = JSON.parse(Buffer.from(JSON.parse(puts[0].options.body).content, 'base64').toString('utf8'));
+  assert.deepEqual(written.map(entry => entry.name), ['Spider-Man Push Up', 'Pigeon Pose']);
+  assert.equal(written[0].learned_on, '2026-08-01');
+  assert.equal(written[1].tracking_type, 'timed');
+});
+
 test('an invalid save_exercise_library_entry call returns an error tool result without writing to GitHub', async () => {
   const calls = [];
   const fetchImpl = async (url, options) => {

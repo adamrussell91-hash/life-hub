@@ -88,19 +88,26 @@ const DOMAIN_PROPERTIES = {
               final_set: { type: 'string', description: 'Shown on the last set, e.g. "1-2 reps in the tank, this is the one that counts."' }
             }
           },
+          tracking: {
+            type: 'string',
+            enum: ['weighted', 'bodyweight_reps', 'timed', 'reps_in_time'],
+            description: 'How this exercise is measured — copy the Exercise Library tracking_type. Omit for normal K1 weighted work. bodyweight_reps: reps (+ optional weight_kg as added load). timed: duration_sec per set (holds, yoga poses, flows). reps_in_time: time_cap_sec per set, reps = how many he got.'
+          },
           sets: {
             type: 'array',
             items: {
               type: 'object',
               properties: {
-                reps: { type: 'number' },
-                weight_kg: { type: 'number' },
+                reps: { type: 'number', description: 'Required for weighted and bodyweight_reps sets. For reps_in_time, the reps achieved (omit on a plan to mean max).' },
+                weight_kg: { type: 'number', description: 'Load in kg. Required for weighted sets; optional added load otherwise.' },
+                duration_sec: { type: 'number', description: 'timed sets: hold / work time in seconds.' },
+                time_cap_sec: { type: 'number', description: 'reps_in_time sets: the window in seconds (e.g. 60).' },
                 cable_type: {
                   type: 'string',
-                  enum: ['constant_force', 'concentric', 'eccentric', 'elastic', 'rowing', 'none']
+                  enum: ['constant_force', 'concentric', 'eccentric', 'elastic', 'rowing', 'none'],
+                  description: 'Required on weighted K1 sets. Use none for bodyweight / timed work.'
                 }
-              },
-              required: ['reps', 'weight_kg', 'cable_type']
+              }
             }
           }
         },

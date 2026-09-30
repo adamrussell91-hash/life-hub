@@ -1,3 +1,9 @@
+import {
+  copyWorkoutSet,
+  describeSet,
+  resolveTrackingType
+} from '../../../apps/life/js/core/exercise-tracking.js';
+
 export const TEMPLATES_PREFIX = 'data/fitness/templates/';
 export const TEMPLATE_PATH = /^data\/fitness\/templates\/[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 export const MAX_PROMPT_TEMPLATES = 50;
@@ -34,13 +40,10 @@ export function buildTemplateRecord(session, sourceSessionDate) {
     source_session_date: sourceSessionDate,
     exercises: (Array.isArray(source.exercises) ? source.exercises : []).map(exercise => ({
       name: exercise?.name,
+      ...(exercise?.tracking != null ? { tracking: exercise.tracking } : {}),
       ...(exercise?.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
       ...(exercise?.intensification != null ? { intensification: exercise.intensification } : {}),
-      sets: (Array.isArray(exercise?.sets) ? exercise.sets : []).map(set => ({
-        reps: set?.reps,
-        weight_kg: set?.weight_kg,
-        cable_type: set?.cable_type
-      }))
+      sets: (Array.isArray(exercise?.sets) ? exercise.sets : []).map(set => copyWorkoutSet(set))
     }))
   };
 }
@@ -82,7 +85,9 @@ function templateSummaryLine(template) {
   return `- ${template.title} (${template.session_kind ?? 'unknown'}, last actuals from ${template.source_session_date ?? 'n/a'})`;
 }
 
-function formatTemplateSet(set) {
+function formatTemplateSet(set, tracking = 'weighted') {
+  const described = describeSet(set, tracking);
+  if (described) return described;
   const reps = set?.reps ?? '?';
   const weight = set?.weight_kg ?? '?';
   const cableType = set?.cable_type ?? 'n/a';
@@ -93,7 +98,8 @@ function templateDetailLines(template) {
   const exercises = Array.isArray(template.exercises) ? template.exercises : [];
   const exerciseLines = exercises.map(exercise => {
     const sets = Array.isArray(exercise?.sets) ? exercise.sets : [];
-    const setSummary = sets.length ? sets.map(formatTemplateSet).join(', ') : 'no logged sets';
+    const tracking = resolveTrackingType(exercise);
+    const setSummary = sets.length ? sets.map(set => formatTemplateSet(set, tracking)).join(', ') : 'no logged sets';
     const intensification = exercise?.intensification ? ` [${exercise.intensification}]` : '';
     return `    · ${exercise?.name ?? 'unnamed move'}${intensification}: ${setSummary}`;
   });

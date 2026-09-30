@@ -28,12 +28,27 @@ test('buildPlannedCandidateFromTemplate copies prescription into a planned worko
   assert.equal(built.slug, 'workout-chest-and-curls');
 });
 
-test('buildPlannedCandidateFromTemplate coerces none cable_type to constant force', () => {
+test('buildPlannedCandidateFromTemplate coerces none cable_type to constant force on loaded K1 work', () => {
   const built = buildPlannedCandidateFromTemplate({
     title: 'Pull',
-    exercises: [{ name: 'Pull Up', sets: [{ reps: 8, weight_kg: 0, cable_type: 'none' }] }]
+    exercises: [{ name: 'Bar Row', sets: [{ reps: 8, weight_kg: 25, cable_type: 'none' }] }]
   }, { date: '2026-08-07' });
   assert.equal(built.candidate.fields.exercises[0].sets[0].cable_type, 'constant_force');
+});
+
+test('buildPlannedCandidateFromTemplate keeps bodyweight and timed moves off the cable', () => {
+  const built = buildPlannedCandidateFromTemplate({
+    title: 'Pull',
+    exercises: [
+      { name: 'Pull Up', sets: [{ reps: 8, weight_kg: 0, cable_type: 'none' }] },
+      { name: 'Dead Hang', tracking: 'timed', sets: [{ duration_sec: 40, weight_kg: 0 }] }
+    ]
+  }, { date: '2026-08-07' });
+  const [pullUp, hang] = built.candidate.fields.exercises;
+  assert.equal(pullUp.sets[0].cable_type, 'none');
+  assert.equal(hang.tracking, 'timed');
+  assert.equal(hang.sets[0].duration_sec, 40);
+  assert.equal(hang.sets[0].cable_type, 'none');
 });
 
 test('buildPlannedCandidateFromTemplate uses workout-planned for empty titles', () => {

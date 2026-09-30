@@ -40,7 +40,7 @@ import { appendChatThreadItem, beginChatTurnAnchor, clearChatTurnAnchors } from 
 import { lockConfirmCardReceipt } from './confirm-card-receipt.js';
 
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
-const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it onto Fitness so you get a Confirm card.';
+const LIBRARY_SAVE_NUDGE_TEXT = 'No Confirm card came through for that plan — say "lock it in" again and I’ll send it.';
 const EMPTY_TURN_RECOVERY = 'That reply got cut off before it finished (usually a timeout while looking things up). Send the same message again and I’ll continue.';
 const CANCEL_AUDIT_RE = /cancel audit|stop audit/i;
 const SKIP_INTAKE_RE = /skip intake|continue audit|\bgo on\b/i;
@@ -514,7 +514,6 @@ export function createChatController({
     let gotUsefulOutput = false;
     let sawDone = false;
     let sawIncompleteTurn = false;
-    let sawExerciseLibrarySaved = false;
     let sawRecordProposal = false;
     let sawGovernanceLogAppended = false;
     const history = recentHistory();
@@ -818,9 +817,14 @@ export function createChatController({
           appendMessage(root, { role: 'assistant', text: `📚 Saved "${event.name}" to the Food Library for next time.` });
           rotateWorkingStatus();
         } else if (event.type === 'exercise_library_saved') {
-          sawExerciseLibrarySaved = true;
           endTextTurn();
-          appendMessage(root, { role: 'assistant', text: `Saved "${event.name}" to the Exercise Library.` });
+          const savedNames = Array.isArray(event.names) ? event.names : [];
+          appendMessage(root, {
+            role: 'assistant',
+            text: savedNames.length > 1
+              ? `Saved ${savedNames.length} moves to the Exercise Library: ${savedNames.join(', ')}.`
+              : `Saved "${event.name}" to the Exercise Library.`
+          });
           rotateWorkingStatus();
         } else if (event.type === 'governance_log_appended') {
           sawGovernanceLogAppended = true;
@@ -830,9 +834,9 @@ export function createChatController({
       remember('assistant', assistantFullText);
       if (shouldNudgeUnsavedWorkoutPlan({
         agentSlug: assistantSlug,
+        userMessage: hiddenUser ? '' : message,
         assistantText: assistantFullText,
-        sawRecordProposal,
-        sawExerciseLibrarySaved
+        sawRecordProposal
       })) {
         turnSignaled = true;
         gotUsefulOutput = true;
@@ -1116,6 +1120,14 @@ function toCandidate(record) {
 
 // Deterministic, not model-generated -- see the call site in confirmProposal for why.
 function personalBestHypeLine(pb) {
+  if (pb?.tracking_type && pb.tracking_type !== 'weighted') {
+    const unit = pb.unit === 'sec' ? 's' : ' reps';
+    const window = pb.time_cap_sec ? ` in ${pb.time_cap_sec}s` : '';
+    const gain = typeof pb.previous_best_value === 'number'
+      ? ` — that's +${pb.best_value - pb.previous_best_value}${unit} over your old best`
+      : '';
+    return `NEW PB, bro. ${pb.name ?? 'that move'} — ${pb.best_value}${unit}${window}${gain}. Absolute unit behavior — write that one down.`;
+  }
   const hasDelta = typeof pb?.previous_best_weight_kg === 'number';
   const delta = hasDelta ? Math.round((pb.best_weight_kg - pb.previous_best_weight_kg) * 10) / 10 : null;
   const deltaText = hasDelta ? ` — that's +${delta}kg over your old best` : '';

@@ -341,10 +341,45 @@ test('applyCompletedWorkoutToLibrary handles bodyweight-only sets (weight_kg 0) 
 
   const { entries, pbs } = applyCompletedWorkoutToLibrary(library, record, '2026-08-05T18:00:00+10:00');
 
+  // Bodyweight work tracks reps, not a meaningless 0 kg best.
   assert.equal(entries[0].best_weight_kg, 0);
-  assert.equal(entries[0].working_weight_kg, 0);
+  assert.equal(entries[0].tracking_type, 'bodyweight_reps');
+  assert.equal(entries[0].best_reps, 10);
   assert.equal(entries[0].times_performed, 6);
-  assert.deepEqual(pbs, []);
+  assert.deepEqual(pbs, [], 'a first reps reading is a baseline, not a PB');
+
+  const next = applyCompletedWorkoutToLibrary(entries, workoutRecord([
+    { name: 'Pull Up', sets: [{ reps: 12, weight_kg: 0, cable_type: 'none' }] }
+  ]), '2026-08-07T18:00:00+10:00');
+  assert.equal(next.entries[0].best_reps, 12);
+  assert.equal(next.pbs.length, 1);
+  assert.equal(next.pbs[0].best_value, 12);
+  assert.equal(next.pbs[0].previous_best_value, 10);
+  assert.equal(next.pbs[0].unit, 'reps');
+});
+
+test('applyCompletedWorkoutToLibrary tracks timed holds and reps-in-time within the same window', () => {
+  const library = [
+    { name: 'Pigeon Pose', target_area: 'mobility', tracking_type: 'timed', best_duration_sec: 45 },
+    { name: 'Push Up', target_area: 'chest', tracking_type: 'reps_in_time', best_reps_in_time: 25, best_time_cap_sec: 60 }
+  ];
+  const record = workoutRecord([
+    { name: 'Pigeon Pose', sets: [{ duration_sec: 60 }, { duration_sec: 50 }] },
+    { name: 'Push Up', sets: [{ reps: 30, time_cap_sec: 30 }] },
+    { name: 'Hollow Hold', tracking: 'timed', sets: [{ duration_sec: 20 }] }
+  ]);
+  const { entries, pbs } = applyCompletedWorkoutToLibrary(library, record, '2026-08-05T18:00:00+10:00');
+
+  assert.equal(entries[0].best_duration_sec, 60);
+  assert.equal(pbs.find(pb => pb.name === 'Pigeon Pose').unit, 'sec');
+  // 30 reps in 30 s is a different test from 25 in 60 s — not a PB, best untouched.
+  assert.equal(entries[1].best_reps_in_time, 25);
+  assert.equal(entries[1].last_reps_in_time, 30);
+  assert.equal(pbs.some(pb => pb.name === 'Push Up'), false);
+  const hollow = entries.find(entry => entry.name === 'Hollow Hold');
+  assert.equal(hollow.tracking_type, 'timed');
+  assert.equal(hollow.best_duration_sec, 20);
+  assert.equal(hollow.times_performed, 1);
 });
 
 test('applyCompletedWorkoutToLibrary matches case/whitespace variants without creating duplicate rows', () => {

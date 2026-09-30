@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v192';
+const CACHE_NAME = 'life-hub-shell-v193';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -240,6 +240,7 @@ const SHELL_FILES = [
   'js/core/chat-turn-limits.js',
   'js/core/constraints.js',
   'js/core/workout-plan-detect.js',
+  'js/core/exercise-tracking.js',
   'js/core/governance-log.js',
   'js/core/open-loops.js',
   'js/core/pending-cn-patches.js',
