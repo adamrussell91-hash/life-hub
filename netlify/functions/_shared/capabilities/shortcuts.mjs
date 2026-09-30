@@ -69,7 +69,9 @@ import {
 } from '../cn-patch-queue.mjs';
 import { applyIntuitionEdit } from './intuition.mjs';
 import { executeProposeActionWrites, validateProposeActionInput } from './propose-action.mjs';
-import { newTaskId } from '../tasks-blobs.mjs';
+import { listJSON as listTasksJSON, newTaskId, TASK_PREFIX } from '../tasks-blobs.mjs';
+import { isOpenTask } from '../task-liveness.mjs';
+import { findTaskTwin } from '../task-duplicates.mjs';
 import {
   addMemory,
   applyReflection,
@@ -1894,24 +1896,62 @@ async function handleCreateTask(ctx, input) {
     if (bad) return deny('Sara create_task is restricted to domain: health');
     for (const item of items) item.domain = 'health';
   }
+  // Twins guard: the same work captured twice (a second dump, a re-run turn, re-worded
+  // titles) must never land as a second open task.
+  const openTasks = Array.isArray(ctx.openTasks)
+    ? ctx.openTasks.filter(isOpenTask)
+    : ctx.tasksStore
+      ? (await listTasksJSON(ctx.tasksStore, TASK_PREFIX).catch(() => [])).filter(isOpenTask)
+      : [];
+  const skipped = [];
+  const flagged = new Map();
+  const kept = [];
+  for (const item of items) {
+    const twin = findTaskTwin(item.title, [...openTasks, ...kept]);
+    if (twin?.match === 'same_title') {
+      skipped.push({ title: item.title, existing_task_id: twin.task.id ?? null, existing_title: twin.task.title });
+      continue;
+    }
+    if (twin?.match === 'same_person') flagged.set(item, twin.task);
+    kept.push(item);
+  }
+  const skippedMeta = skipped.length
+    ? {
+        skipped_duplicates: skipped,
+        note: 'Already on the board — not created again. Use get_task + update_task to change the existing task.'
+      }
+    : {};
+  if (!kept.length) {
+    return ok(
+      skipped.length === 1 ? `Already on the board: ${skipped[0].existing_title}` : `All ${skipped.length} already on the board`,
+      { status: 'skipped_duplicates', ...skippedMeta }
+    );
+  }
+
   const now = new Date().toISOString();
   const today = typeof ctx.today === 'string' && ctx.today.trim() ? ctx.today.trim() : null;
-  const writes = items.map(item => {
+  const writes = kept.map(item => {
     const id = newTaskId();
+    const twin = flagged.get(item);
     return {
       path: `tasks:task:${id}`,
       mode: 'create',
       content: serializeJson(buildTaskRecord(item, { id, now, today })),
-      diff: `new task: ${item.title}`
+      diff: twin
+        ? `new task: ${item.title} (possible duplicate of open task “${twin.title}”)`
+        : `new task: ${item.title}`
     };
   });
   const proposal = buildProposal({
     agentSlug: ctx.agentSlug,
-    intent: items.length === 1 ? `Create task: ${items[0].title}` : `Create ${items.length} tasks`,
+    intent: kept.length === 1 ? `Create task: ${kept[0].title}` : `Create ${kept.length} tasks`,
     surfaces: ['confirm_card', 'governance_log'],
     writes
   });
-  if (ctx.tasksStore) {
+  // Only a single, unflagged capture writes straight away. A dump (2+ tasks) or anything
+  // that may duplicate open work waits for Adam's Confirm.
+  const writeNow = kept.length === 1 && flagged.size === 0;
+  if (ctx.tasksStore && writeNow) {
     const applied = await executeProposeActionWrites({}, proposal, {
       blobStores: { tasks: ctx.tasksStore }
     });
@@ -1925,12 +1965,9 @@ async function handleCreateTask(ctx, input) {
       }
       return record;
     });
-    return ok(
-      items.length === 1 ? `Created ${items[0].title}` : `Created ${items.length} tasks`,
-      { status: 'applied', tasks, ids: tasks.map(task => task.id) }
-    );
+    return ok(`Created ${kept[0].title}`, { status: 'applied', tasks, ids: tasks.map(task => task.id), ...skippedMeta });
   }
-  return propose(proposal);
+  return { ...propose(proposal), ...skippedMeta };
 }
 
 function handleUpdateTask(ctx, input) {
