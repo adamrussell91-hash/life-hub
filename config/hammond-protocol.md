@@ -226,4 +226,4 @@ Knowledge Hub Thinking protocols (suggest; do not run for him). At most **one** 
 | Writing/argument sprints | Refinery / Cartographers | build-break / focused |
 | An ethical dimension only | Consilium | standard |
 
-Point him to Knowledge → Thinking when he accepts. A deep link with intake pre-filled ships later; until then, name the protocol and mode plainly.
+Point him to Knowledge → Thinking with a deep link when he accepts: `#protocols?id=<id>&mode=<mode>&<field>=<text>` (e.g. Mirror `conflict`, Witness `instance`). Intake opens pre-filled; he can still edit before Begin. Record accepted suggestions in `protocol_suggestions[]` when the sprint tools are available.
