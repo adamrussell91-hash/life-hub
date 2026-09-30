@@ -16,6 +16,8 @@ import {
   hubContextTruncationLine,
   hubLessonsWindowLine
 } from '../../../apps/life/js/core/context-integrity.js';
+import { isOpenTask } from './task-liveness.mjs';
+import { withoutDeleted } from './record-liveness.mjs';
 
 const HUB_TZ = 'Australia/Sydney';
 const TASK_CAP = 12;
@@ -36,12 +38,6 @@ function addDays(ymd, days) {
   const [year, month, day] = ymd.split('-').map(Number);
   const next = new Date(Date.UTC(year, month - 1, day + days));
   return next.toISOString().slice(0, 10);
-}
-
-function isOpenTask(task) {
-  if (!task || typeof task !== 'object' || Array.isArray(task)) return false;
-  if (task.status === 'done' || task.bucket === 'done' || task.completed_at) return false;
-  return typeof task.title === 'string' && task.title.trim().length > 0;
 }
 
 function isActiveClass(cls) {
@@ -167,17 +163,17 @@ async function safeList(listFn, env) {
 
 export async function defaultListTasks(env = process.env) {
   const store = await defaultGetTasksStore(env);
-  return listTasksJSON(store, TASK_PREFIX);
+  return withoutDeleted(await listTasksJSON(store, TASK_PREFIX));
 }
 
 export async function defaultListClasses(env = process.env) {
   const store = await defaultGetContentStore(env);
-  return listTeachingJSON(store, CLASS_PREFIX);
+  return withoutDeleted(await listTeachingJSON(store, CLASS_PREFIX));
 }
 
 export async function defaultListScheduledLessons(env = process.env) {
   const store = await defaultGetContentStore(env);
-  return listTeachingJSON(store, SCHEDULED_LESSON_PREFIX);
+  return withoutDeleted(await listTeachingJSON(store, SCHEDULED_LESSON_PREFIX));
 }
 
 export async function loadHubAgentContext({

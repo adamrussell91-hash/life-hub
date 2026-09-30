@@ -256,6 +256,45 @@ describe('Weekly Review durable mutations W1–W12', () => {
     assert.equal(task.follow_up_at, null);
   });
 
+  it('W6b: someday remove trashes the task so it cannot resurface on the board', async () => {
+    const idea = {
+      id: 'task_idea',
+      title: 'Learn the cello',
+      status: 'open',
+      bucket: 'someday',
+      review_at: '2026-09-01'
+    };
+    let state = createWeeklyReview('wr_w6b');
+    state = advanceTo(state, 'confirm', {
+      dump_text: '',
+      tasks: [idea],
+      projects: [],
+      someday_decisions: { task_idea: { action: 'remove' } },
+      schedule: { proposed: [] }
+    });
+    const result = await executeClareWork(
+      'weekly_review',
+      {
+        review_id: 'wr_w6b',
+        state,
+        advance: false,
+        confirm: true,
+        selected_changes: ['someday:task_idea:remove']
+      },
+      {
+        now: new Date('2026-09-08T12:00:00Z'),
+        tasks: [idea],
+        projects: [],
+        lessons: [],
+        workBlocks: [],
+        tasksStore: memoryTasksStore()
+      }
+    );
+    const task = JSON.parse(result.proposal.writes[0].content);
+    assert.equal(task.bucket, 'trash');
+    assert.equal(task.status, 'dead');
+  });
+
   it('W7: multiple selected changes write only those kinds', async () => {
     const waitingTask = {
       id: 'task_wait3',

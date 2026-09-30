@@ -5,6 +5,7 @@
  */
 import { getSydneyDateKey } from '../../../apps/life/js/core/time.js';
 import { addDays, daysBetween } from '../../../packages/design-kit/js/lead-lines.js';
+import { isClosedTask } from './task-liveness.mjs';
 
 export const SPHERE_DOMAIN = Object.freeze({ life: 'life', work: 'teaching', professional: 'other' });
 const MAX_GHOSTS = 3;
@@ -39,10 +40,6 @@ function shortDate(key) {
   return `${Number(key.slice(8, 10))}/${Number(key.slice(5, 7))}`;
 }
 
-function isOpen(task) {
-  return task.status !== 'done' && task.status !== 'dead';
-}
-
 function median(values) {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -74,7 +71,7 @@ export function crunchWeeks(tasks, terms, today) {
   const load = new Map();
   for (let monday = mondayOfKey(term.starts_on); monday <= term.ends_on; monday = addDays(monday, 7)) load.set(monday, 0);
   for (const task of tasks) {
-    if (!task || task.bucket === 'someday' || !isOpen(task) || !DATE_KEY.test(task.due_date ?? '')) continue;
+    if (!task || task.bucket === 'someday' || isClosedTask(task) || !DATE_KEY.test(task.due_date ?? '')) continue;
     const monday = mondayOfKey(task.due_date);
     if (load.has(monday)) load.set(monday, load.get(monday) + 1);
   }
@@ -96,7 +93,7 @@ function nextCalmWeekday(today, crunch) {
 function proposals({ goal, hostedTasks, tasks, today, crunch, domain }) {
   const prefix = `goal-${goal.id}-`;
   const out = [];
-  const open = hostedTasks.filter(t => isOpen(t) && t.kind !== 'step');
+  const open = hostedTasks.filter(t => !isClosedTask(t) && t.kind !== 'step');
   const byDue = [...open].sort((a, b) => (a.due_date ?? '9999-12-31').localeCompare(b.due_date ?? '9999-12-31'));
 
   if (!open.length) {
@@ -156,7 +153,7 @@ export function protectBlockProposal({ goal, hostedTasks, today, slots = [], cou
   const slot = slots.find(s => s && DATE_KEY.test(s.date ?? '') && s.date >= today && s.date <= sunday)
     ?? slots.find(s => s && DATE_KEY.test(s.date ?? '') && s.date >= today);
   if (!slot) return null;
-  const open = hostedTasks.filter(t => isOpen(t) && t.kind !== 'step');
+  const open = hostedTasks.filter(t => !isClosedTask(t) && t.kind !== 'step');
   const move = open.sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999'))[0];
   const title = move?.title || goal.next_start || `Work on ${goal.title}`;
   const minutes = typeof move?.estimated_duration === 'number' && move.estimated_duration > 0
@@ -186,7 +183,7 @@ export function stuckReasonGhost({
 }) {
   if (!stuck_reason || typeof stuck_reason !== 'string') return null;
   const prefix = `goal-${goal.id}-`;
-  const open = hostedTasks.filter(t => isOpen(t) && t.kind !== 'step');
+  const open = hostedTasks.filter(t => !isClosedTask(t) && t.kind !== 'step');
   const byDue = [...open].sort((a, b) => (a.due_date ?? '9999-12-31').localeCompare(b.due_date ?? '9999-12-31'));
   const candidate = byDue.find(t => !t.due_date || t.due_date >= today) ?? byDue[0];
 

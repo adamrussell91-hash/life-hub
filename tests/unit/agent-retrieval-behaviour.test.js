@@ -176,6 +176,20 @@ test('domain tools: tasks focus and teaching context', () => {
   assert.ok(hits.count >= 1);
 });
 
+test('domain tools: trashed (dead) tasks are not reported as open to Clare', () => {
+  const tasks = [
+    { id: 'task_live', title: 'Rohan Arianayagam — Mock Exam', status: 'open', due_date: '2026-09-01', domain: 'teaching' },
+    { id: 'task_dead', title: 'Reply to Rohan', status: 'dead', bucket: 'trash', due_date: '2026-09-01', domain: 'teaching' },
+    { id: 'task_trash', title: 'Reply to Rohan again', status: 'open', bucket: 'trash', domain: 'teaching' },
+    { id: 'task_done', title: 'Rohan reference', status: 'done', domain: 'teaching' }
+  ];
+  const found = searchTasks(tasks, { query: 'rohan' });
+  assert.deepEqual(found.results.map(t => t.id), ['task_live']);
+  const focus = getTasksFocus(tasks, [], { now: new Date('2026-09-30T00:00:00Z') });
+  assert.equal(focus.open_count, 1);
+  assert.deepEqual(focus.overdue.map(t => t.id), ['task_live']);
+});
+
 test('domain tools: knowledge search distinguishes corpus hits', () => {
   const pages = [
     { id: 'page_hub_1', title: 'Cognitive load theory', tags: ['clt'], excerpt: 'Working memory limits' },

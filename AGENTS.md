@@ -20,6 +20,14 @@ Exit 0 required. Do not open/update the PR if the gate is red.
 
 Docs-only PRs with zero runtime/test/type impact may use `node scripts/pre-pr-check.mjs --docs-only` (still runs `npm test` + static guards).
 
+## Deleted means gone (every hub)
+
+Anything dead, trashed, deleted or removed must never reach an agent, tool, or live view. Archiving is the only soft state that stays readable.
+
+- Server code: filter hub lists with `withoutDeleted` / `isDeletedRecord` from `netlify/functions/_shared/record-liveness.mjs`, and tasks with `isOpenTask` / `isClosedTask` from `_shared/task-liveness.mjs`. Never hand-write your own status check. `tests/unit/task-liveness.test.js` fails if a module redefines one.
+- A new deleted state (e.g. `status: 'discarded'`) goes into `record-liveness.mjs`, not into one caller.
+- Only Trash / restore screens read deleted records on purpose.
+
 ## Read also
 
 - Root `CLAUDE.md` (stress test / consolidation overseer roles)

@@ -367,6 +367,7 @@ import { keepNewestHistory } from '../../apps/life/js/core/chat-history.js';
 import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays, daysBetween } from '../../apps/life/js/core/time.js';
 import { parseEventDocument } from '../../apps/life/js/core/records.js';
 import { load as loadYaml } from 'js-yaml';
+import { withoutDeleted } from './_shared/record-liveness.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 // Phone photos ship as base64 data URLs (≈4/3 of raw). Cap under Netlify's ~6MB
@@ -938,24 +939,24 @@ export function createChatHandler({
                   return [];
                 })
               ]);
-              hubTasks = Array.isArray(tasks) ? tasks : [];
-              hubProjects = Array.isArray(projects) ? projects : [];
-              hubAreas = Array.isArray(areas) ? areas : [];
-              hubGoals = Array.isArray(goals) ? goals : [];
-              hubWorkBlocks = Array.isArray(workBlocks) ? workBlocks : [];
-              hubWorkSessions = Array.isArray(workSessions) ? workSessions : [];
+              hubTasks = withoutDeleted(tasks);
+              hubProjects = withoutDeleted(projects);
+              hubAreas = withoutDeleted(areas);
+              hubGoals = withoutDeleted(goals);
+              hubWorkBlocks = withoutDeleted(workBlocks);
+              hubWorkSessions = withoutDeleted(workSessions);
               hubPlanningProfile =
                 planningProfile && typeof planningProfile === 'object' ? planningProfile : null;
               hubPlanningDirection =
                 planningDirection && typeof planningDirection === 'object'
                   ? planningDirection
                   : null;
-              hubClasses = Array.isArray(classes) ? classes : [];
+              hubClasses = withoutDeleted(classes);
               hubLessons = [
-                ...(Array.isArray(lessons) ? lessons : []),
-                ...(Array.isArray(scheduled) ? scheduled : [])
+                ...withoutDeleted(lessons),
+                ...withoutDeleted(scheduled)
               ];
-              hubUnits = Array.isArray(units) ? units : [];
+              hubUnits = withoutDeleted(units);
             } catch (err) {
               hubLoadErrors.hub = err?.code || 'load_failed';
             }

@@ -21,6 +21,7 @@ import {
   UNIT_PREFIX,
   YEAR_PREFIX
 } from './_shared/teaching-blobs.mjs';
+import { isDeletedRecord, withoutDeleted } from './_shared/record-liveness.mjs';
 
 export const config = { path: '/api/curriculum' };
 
@@ -85,13 +86,23 @@ export async function buildCurriculum(store) {
     (publishedList?.blobs ?? []).map(blob => blob.key.slice(PUBLISHED_LESSON_PREFIX.length)).filter(Boolean)
   );
 
+  // Trashed lessons/units/classes stay in the payload (the Trash view restores them), but
+  // their calendar rows must not: a schedule row pointing at deleted work is gone too.
+  // Computed per request, so restoring the parent brings its schedule back.
+  const deletedIds = new Set(
+    [...units, ...lessons, ...classes].filter(isDeletedRecord).map(row => row.id)
+  );
+  const liveScheduled = withoutDeleted(scheduled_lessons).filter(row =>
+    !deletedIds.has(row.lesson_id) && !deletedIds.has(row.unit_id) && !deletedIds.has(row.class_id)
+  );
+
   return {
     years,
     subjects,
     units,
     lessons: lessons.filter(lesson => lesson.id).map(lesson => lessonSummary(lesson, publishedIds)),
     classes,
-    scheduled_lessons,
+    scheduled_lessons: liveScheduled,
     scope_sequences,
     media: mediaRaw.filter(item => item.status === 'active'),
     outcomes,

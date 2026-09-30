@@ -120,6 +120,7 @@ import { createUniversalLinkRepository } from './_shared/universal-link-reposito
 import { createAccessContext } from './_shared/entity-access.mjs';
 import { createProfessionalWriteExecutor } from './_shared/professional-write-executor.mjs';
 import { createGoalWriteExecutor } from './_shared/goal-agent.mjs';
+import { withoutDeleted } from './_shared/record-liveness.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
@@ -2080,10 +2081,10 @@ async function checkStaleWorkBlockCollisions(writes, blobStores, {
   let lifeEvents = [];
   try {
     if (teachingStore) {
-      lessons = await listTeachingJSON(teachingStore, SCHEDULED_LESSON_PREFIX);
+      lessons = withoutDeleted(await listTeachingJSON(teachingStore, SCHEDULED_LESSON_PREFIX));
     }
     if (tasksStore) {
-      workBlocks = await listTasksJSON(tasksStore, 'work_blocks/');
+      workBlocks = withoutDeleted(await listTasksJSON(tasksStore, 'work_blocks/'));
       profile = await getTasksMetaJSON(tasksStore, 'meta/planning_profile');
     }
     const loadLife = typeof getLifeEvents === 'function'

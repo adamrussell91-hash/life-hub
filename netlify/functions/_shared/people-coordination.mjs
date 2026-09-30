@@ -8,6 +8,7 @@ import { defaultGetProfessionalStore } from './professional-blobs.mjs';
 import { defaultGetUniversalLinkStore } from './universal-link-blobs.mjs';
 import { defaultGetTasksStore, listJSON as listTasksJSON, TASK_PREFIX } from './tasks-blobs.mjs';
 import { runRememberScheduledPass } from './remember-service.mjs';
+import { withoutDeleted } from './record-liveness.mjs';
 
 /**
  * Phase 8 — Clare's People sweep step: deterministic link pass + ledger refresh
@@ -46,7 +47,7 @@ export async function runClarePeopleSweep(deps = {}) {
   const observationRepo =
     deps.observationRepo ?? createObservationRepository({ store: professionalStore, now: () => nowIso });
 
-  const allTasks = tasksStore ? await listTasksJSON(tasksStore, TASK_PREFIX).catch(() => []) : [];
+  const allTasks = tasksStore ? withoutDeleted(await listTasksJSON(tasksStore, TASK_PREFIX).catch(() => [])) : [];
   let ledgerCreated = 0;
   const touched = [];
 

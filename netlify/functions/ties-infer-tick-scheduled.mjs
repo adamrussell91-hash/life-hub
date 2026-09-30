@@ -21,6 +21,7 @@ import {
 } from './_shared/tasks-blobs.mjs';
 import { runTieInference } from './_shared/tie-inference/run.mjs';
 import { TIE_NIGHTLY_CALL_CAP } from './_shared/tie-inference/constants.mjs';
+import { withoutDeleted } from './_shared/record-liveness.mjs';
 
 /**
  * Nightly tie inference — new/grown pairs only, capped Claude calls.
@@ -83,13 +84,13 @@ export function createTiesInferTickScheduledHandler(deps = {}) {
       if (!tasks || !projects) {
         try {
           const tasksStore = await (deps.getTasksStore ?? defaultGetTasksStore)(env);
-          tasks = (await listTasksJSON(tasksStore, TASK_PREFIX).catch(() => [])).map((t) => ({
+          tasks = withoutDeleted(await listTasksJSON(tasksStore, TASK_PREFIX).catch(() => [])).map((t) => ({
             id: t.id,
             ref: t.ref ?? (t.id ? `tasks:task:${t.id}` : null),
             title: t.title ?? t.name ?? '',
             body: t.notes ?? t.body ?? t.description ?? ''
           }));
-          projects = (await listTasksJSON(tasksStore, PROJECT_PREFIX).catch(() => [])).map((p) => ({
+          projects = withoutDeleted(await listTasksJSON(tasksStore, PROJECT_PREFIX).catch(() => [])).map((p) => ({
             id: p.id,
             ref: p.ref ?? (p.id ? `tasks:project:${p.id}` : null),
             title: p.title ?? p.name ?? '',
