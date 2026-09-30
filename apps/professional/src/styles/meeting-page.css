@@ -396,6 +396,13 @@
     font-size: var(--text-sm);
   }
 
+  /* Whole meeting surface: compact kit buttons (head + Brief me + Clare + panels). */
+  .meeting-page .btn {
+    min-height: 2rem;
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+  }
+
   /* 2×2 compact kit buttons — same type as .btn, denser padding (not 40px wrap pile). */
   .meeting-page__head-actions {
     margin-left: 0;
@@ -408,9 +415,10 @@
   .meeting-page__head-actions .btn {
     width: 100%;
     min-width: 0;
-    min-height: 2rem;
-    padding: var(--space-1) var(--space-3);
-    font-size: var(--text-sm);
+  }
+
+  .meeting-page .clare-row {
+    gap: var(--space-2);
   }
 
   .meeting-page__editor .event-form .event-compose__title {
@@ -429,4 +437,14 @@
 .task-link-panel__row .btn {
   flex: 0 0 auto;
   white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .meeting-page .task-link-panel__row {
+    align-items: center;
+  }
+
+  .meeting-page .task-link-panel__row .btn {
+    align-self: center;
+  }
 }
