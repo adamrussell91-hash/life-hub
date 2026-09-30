@@ -46,9 +46,9 @@ Backwards compatible: a challenge with no `lanes` is a plain challenge and behav
   lead_agent: "hammond",                            # NEW; any roster slug. Hammond always oversees.
   headline: {                                       # NEW; Adam's chosen motivating metric
     label: "Midsection",
-    metric: { label: "Waist at navel", unit: "cm", direction: "down",
+    metric: { label: "Waist", unit: "cm", direction: "down",
               source: "body.measurements.waist", baseline?: 0, target?: 0 },
-    secondary?: [{ label: "Hips (widest)", unit: "cm", source: "body.measurements.hips" }]
+    secondary?: [{ label: "Hips", unit: "cm", direction: "down", source: "body.measurements.hips" }]   # blitz: always set
   },
   cadence: {                                        # NEW; defaults by length, see §3
     daily_check: true, daily_nudge_time: "19:30",
@@ -104,7 +104,7 @@ Block content, capped at ~700 chars per sprint:
 
 ```text
 OPEN SPRINT — Belly Flab Blitz · day 4 of 12 (ends 12/10/26) · lead: Hammond
-Headline: Waist at navel 96.0 → 94.5 cm (3 readings) · Hips 104.0 → 103.5
+Headline: Waist 89.0 → 88.0 cm (3 readings) · Hips 94.0 → 93.5 cm   (illustrative; baseline = real tape on day 1)
 YOUR LANE (Brisket · Eating): protein ≥ target — met 3/3 days · meals logged — 2/3 yesterday
 Other lanes: Chadwick on track · Sara no evidence today · Penelope on track
 Today's check-in: not yet done
@@ -199,7 +199,7 @@ For a 12-day sprint starting Thu 1 Oct, that's the review on Sun 4 Oct (short) a
 | `nutrition.kcal_within_target` | Brisket | day totals | |
 | `fitness.workout_completed` | Chadwick | workout logs (completed only) | |
 | `fitness.steps` | Chadwick | if a steps source exists; else **don't register** | no stub adapters (P4) |
-| `body.measurements.waist` / `.hips` | Sara | `type: measurements` records (`forecast-inputs.js` `dedupeTapeMeasurements`) | **Verify first that a hips field exists.** Only `waist`/`shoulders` are confirmed in code. If there's no hips field, add it to Sara's measurement log schema in the same PR, or leave `hips` out of the headline. |
+| `body.measurements.waist` / `.hips` | Sara | `type: measurements` records (`forecast-inputs.js` `dedupeTapeMeasurements`) | Both fields already exist on the same record and on the Body → Tape card (`render-body.js` `LABEL_ANCHORS`: `waist`, `hips`). Reuse that record and those deltas; don't add a new field. |
 | `body.weight` | Sara | weight records | |
 | `mind.diary_entry` | Penelope | diary records for the date | |
 | `mind.session` | Vera | mind_session records | |
@@ -216,7 +216,7 @@ For a 12-day sprint starting Thu 1 Oct, that's the review on Sun 4 Oct (short) a
 
 Adam knows fat isn't lost from one spot. **The midsection focus is a deliberate motivational frame, and agents respect it:**
 
-- The headline is the waist (and hips, if the field exists) tape trend, shown first on the card and in every prompt block.
+- The headline is the waist + hips tape trend (both already on the Tape card), shown first on the Home card and in every prompt block. The sprint delta is **since the sprint baseline**, not the Tape card's all-time "Overall".
 - Agents use Adam's frame. Hammond may say **once**, in the opening plan, that the plan drives overall fat loss and the tape is the scoreboard. After that, **no agent repeats the "spot reduction" caveat.** Add this to Hammond's and Sara's protocol text.
 - **Measurement protocol (Sara's lane):**
   - Waist at the navel and hips at the widest point.
@@ -258,7 +258,7 @@ The Knowledge hub's **Thinking** protocols (`config/knowledge/cognitive/definiti
 - **Read:** `GET /api/challenges/active` → `computeSprintState` for each open sprint. Use `apiGet` + `getApiBaseUrl()`, never a relative `fetch('/…')`.
 - **Card, one per sprint:**
   1. Title · "Day 4 of 12" · ends dd/mm/yy.
-  2. **Headline:** the latest value, the change since baseline, and a small trend of **real readings only**. With fewer than 2 readings it says "Baseline 96.0 cm — next reading Sun"; there's no line.
+  2. **Headline:** the latest value, the change since baseline, and a small trend of **real readings only**. With fewer than 2 readings it says "Baseline 89.0 cm — next reading Sun"; there's no line.
   3. **Lanes (1–8):** agent name · role · a lead-measure summary ("protein 3/3") · status chip (on track / stalled / no evidence / unavailable). Each row links to that agent's chat.
   4. **Today:** "Check-in done ✓", or a **Check in** button (deep link to the Hammond pill).
   5. Ended state: "Ended — final review" button.
@@ -272,7 +272,7 @@ The Knowledge hub's **Thinking** protocols (`config/knowledge/cognitive/definiti
 | Phase | Work | Size |
 |---|---|---|
 | **0** | Hammond protocol text for Phase-0 behaviour (§Phase 0 + §5 framing). **No code.** Ship first, today. | XS |
-| **A** | Model (§1), `computeSprintState` + core adapters (§4: nutrition ×2, fitness workout, body waist[/hips], mind diary, self_report), context block on **every** entrypoint including Clementine's (§2.1), tools with server-side lane ownership (§2.2), roster card (§2.3), Phase-0 upgrade path | **Medium** |
+| **A** | Model (§1), `computeSprintState` + core adapters (§4: nutrition ×2, fitness workout, body waist + hips, mind diary, self_report), context block on **every** entrypoint including Clementine's (§2.1), tools with server-side lane ownership (§2.2), roster card (§2.3), Phase-0 upgrade path | **Medium** |
 | **B** | Cadence (§3): check-in pill, daily nudge via day-sense-notify, weekly/midpoint sprint section, end state + final review | **Small–Medium** |
 | **C** | Home card (§7) | **Small** |
 | **D** | Thinking-protocol awareness + deep link (§6) | **Small** |
@@ -344,4 +344,4 @@ The Knowledge hub's **Thinking** protocols (`config/knowledge/cognitive/definiti
 - Phone nudges: `netlify/functions/day-sense-notify-scheduled.mjs` (deterministic, ≤ 4/day).
 - Protocol pills: `apps/life/js/app/agent-protocols.js`.
 - Thinking protocols: `config/knowledge/cognitive/definitions.mjs`; Knowledge `protocols` view in `apps/knowledge/src/main.ts` (no deep-link route).
-- Tape: `apps/life/js/core/forecast-inputs.js` `dedupeTapeMeasurements` (`type: measurements`; `waist`, `shoulders` confirmed).
+- Tape: `type: measurements` records with `waist` and `hips` (and neck, chest, arms, thighs, calves). See `apps/life/js/app/render-body.js` `LABEL_ANCHORS`, and `apps/life/js/core/forecast-inputs.js` `dedupeTapeMeasurements` for same-day de-duplication.
