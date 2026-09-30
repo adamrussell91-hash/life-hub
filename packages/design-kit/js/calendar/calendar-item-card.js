@@ -264,6 +264,16 @@ export function itemCardPatch(item, form) {
 }
 
 /**
+ * True when the page runs as an installed Home Screen app (no browser tabs).
+ * @param {{ navigator?: { standalone?: boolean }, matchMedia?: (query: string) => { matches: boolean } } | null | undefined} view
+ */
+export function isStandaloneApp(view) {
+  if (!view) return false;
+  if (view.navigator?.standalone === true) return true;
+  return view.matchMedia?.('(display-mode: standalone)')?.matches === true;
+}
+
+/**
  * Wire a rendered card. `onSave(patch)` persists; resolve to close, throw to show the error.
  * @param {HTMLElement} node container holding itemCardHtml output
  * @param {Record<string, any>} item
@@ -275,9 +285,16 @@ export function bindItemCard(node, item, handlers = {}) {
     event.stopPropagation();
     handlers.onClose?.();
   });
-  node.querySelector?.('[data-part="open-in-hub"]')?.addEventListener('click', (event) => {
+  const openLink = node.querySelector?.('[data-part="open-in-hub"]');
+  openLink?.addEventListener('click', (event) => {
     // Full navigation in a new tab. Never let a hub SPA router catch the click.
     event.stopPropagation();
+    // A Home Screen app has no tabs: iOS sends target=_blank out to Safari, which has
+    // none of the app's cookies, so the hub asks for the passphrase. Stay in the app.
+    const view = openLink.ownerDocument?.defaultView;
+    if (!isStandaloneApp(view) || !openLink.href) return;
+    event.preventDefault();
+    view.location.assign(openLink.href);
   });
   // One-tap answers ride the same save path as the form (confirm-first: nothing until tapped).
   const record = itemRecord(item);

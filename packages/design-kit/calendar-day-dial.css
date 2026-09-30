@@ -115,7 +115,6 @@
 @container (max-width:780px){ .dd__body{grid-template-columns:minmax(0,1fr)} .dd__side{border-left:0;border-top:1px solid var(--line)} }
 .dd__card{container-type:inline-size}
 @media (max-width:719px){
-  .dd__nav .hub-pills[data-part="zoom-pills"]{display:none}
   .dd-toast{left:var(--space-3);right:var(--space-3);bottom:var(--space-3)}
   .dd-pop{left:var(--space-3)!important;right:var(--space-3);width:auto}
   .dd-wd span{display:none}

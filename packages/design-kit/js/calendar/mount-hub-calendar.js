@@ -280,6 +280,7 @@ export function mountHubCalendar(host, adapter) {
         unmountDayDial();
         renderTideline(doc, calendarHost, {
           ...input,
+          zoom: 'day',
           week: [selectedDate]
         });
         return;

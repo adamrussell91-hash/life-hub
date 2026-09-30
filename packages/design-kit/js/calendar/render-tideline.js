@@ -6,6 +6,7 @@
 import { createMotion, EASE } from '../hub-motion-engine.js';
 import { CAL } from '../calendar-tideline-geometry.js';
 import { applyHubPillsThumb } from '../hub-motion.js';
+import { buildZoomPills, settleZoomPills } from './zoom-pills.js';
 import {
   bandTargets,
   baseHeights,
@@ -515,14 +516,9 @@ function mount({ entrance = false } = {}) {
   }
   // Zoom and Focus are one matched pair: same size, same row, wrap together.
   const views = el('div', 'cal__views', undefined, nav, { 'data-part': 'view-controls' });
-  const zoom = el('div', 'hub-pills', '<span class="hub-pills__thumb"></span>', views, { role: 'group', 'aria-label': 'Zoom', 'data-part': 'zoom-pills' });
-  for (const name of ['Day', 'Week', 'Term', 'Year', 'Almanac']) {
-    el('button', `hub-pills__btn${name === 'Week' ? ' is-active' : ''}`, name, zoom, {
-      type: 'button',
-      'aria-pressed': String(name === 'Week'),
-      'data-zoom': name.toLowerCase()
-    });
-  }
+  // The one-day Linear layout is the Day zoom, not Week.
+  const zoom = buildZoomPills(root, input.zoom === 'day' ? 'day' : 'week');
+  views.append(zoom);
   const focusWrap = el('div', 'cal__focus', '<span class="cal__focus-label">Focus</span>', views);
   const focus = el('div', 'hub-pills', '<span class="hub-pills__thumb"></span>', focusWrap, { role: 'group', 'aria-label': 'Focus band', 'data-part': 'focus-pills' });
   if (state.expanded != null && (state.expanded < 0 || state.expanded >= bands.length)) {
@@ -556,8 +552,11 @@ function mount({ entrance = false } = {}) {
     el('button', 'btn btn--ghost', 'Dismiss', tray, { type: 'button', 'data-action': 'dismiss-all', 'data-part': 'dismiss-all' });
   }
 
-  const strip = el('div', 'cal-strip', undefined, section, { 'data-part': 'day-strip', role: 'group', 'aria-label': 'Day' });
-  for (const day of model.days) {
+  // Phone week strip. One-day (Linear) has nothing to pick between.
+  const strip = model.days.length > 1
+    ? el('div', 'cal-strip', undefined, section, { 'data-part': 'day-strip', role: 'group', 'aria-label': 'Day' })
+    : null;
+  for (const day of strip ? model.days : []) {
     const button = el('button', '', `<small>${DOW(day.date)}</small><b>${DOM_NUM(day.date)}</b><i></i>`, strip, {
       type: 'button',
       'data-day': day.date,
@@ -609,7 +608,7 @@ function mount({ entrance = false } = {}) {
     days.forEach((date) => engine.place(`col:${date}`, { opacity: 1, y: 0 }));
   }
   const raf = view?.requestAnimationFrame;
-  if (typeof raf === 'function') raf(() => { applyHubPillsThumb(zoom); applyHubPillsThumb(focus); });
+  if (typeof raf === 'function') raf(() => { settleZoomPills(zoom); applyHubPillsThumb(focus); });
   if (!wired) {
     wired = true;
     wire(section);

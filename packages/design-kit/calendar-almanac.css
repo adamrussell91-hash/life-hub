@@ -156,10 +156,8 @@
 @media (prefers-reduced-motion:reduce){.alm__skeleton{animation:none}}
 @media (max-width:719px){
   .page{padding:var(--space-4) var(--space-4) var(--space-12)}
-  .alm__nav{flex-wrap:nowrap;gap:var(--space-2)}
-  .alm__nav .hub-pills,.alm__ask,.alm__nav .btn,.alm__spacer{display:none}
-  .alm__period{flex:1;min-width:0;order:-1}
-  .alm__period b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:var(--text-base)}
+  /* Nav rows: calendar-zoom-bar.css. */
+  .alm__ask,.alm__spacer{display:none}
   .alm-top{grid-template-columns:repeat(3,1fr)}
   .alm-top > div:first-child{grid-column:1/-1;border-bottom:1px solid var(--line)}
   .alm-top > div:nth-child(2){border-left:0}

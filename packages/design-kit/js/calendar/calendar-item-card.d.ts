@@ -21,3 +21,9 @@ export function bindItemCard(
   item: unknown,
   handlers?: { onSave?: (patch: Record<string, unknown>) => unknown; onClose?: () => void }
 ): void;
+export function isStandaloneApp(
+  view:
+    | { navigator?: { standalone?: boolean }; matchMedia?: (query: string) => { matches: boolean } }
+    | null
+    | undefined
+): boolean;

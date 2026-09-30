@@ -8,6 +8,7 @@ import '../../design-kit/calendar-tideline.css';
 import '../../design-kit/calendar-day-dial.css';
 import '../../design-kit/calendar-almanac.css';
 import '../../design-kit/calendar-term-river.css';
+import '../../design-kit/calendar-zoom-bar.css';
 import '../../design-kit/sign-in.css';
 import '../../design-kit/motion.css';
 import '../../design-kit/view-on-map.css';

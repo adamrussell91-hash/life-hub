@@ -249,7 +249,8 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-strip{display:none}
 @media (max-width:719px){
   .cal{--cal-label:72px}
-  .cal__nav .cal__focus,.cal__nav .hub-pills[data-part="zoom-pills"]{display:none}
+  /* Zoom stays: calendar-zoom-bar.css makes it the full-width first row. */
+  .cal__nav .cal__focus{display:none}
   .cal__tray{flex-wrap:wrap}
   .cal__tray .cal__tray-detail{display:none}
   .cal-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:var(--space-3)}
@@ -342,7 +343,8 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-card__error{grid-column:1/-1;margin:0;font-size:var(--text-xs);color:var(--high-sea-ink)}
 .cal-card__form .cal-pop__acts{grid-column:1/-1;margin-top:var(--space-1)}
 @media (max-width:719px){
-  .cal-pop.cal-pop--card{position:fixed;left:var(--space-3)!important;right:var(--space-3);top:auto!important;bottom:var(--space-3);width:auto;max-height:70vh;overflow:auto}
+  /* Sheet sits above the fixed bottom bar (mobile.css .hub-mobile-nav: 4.65rem + safe area), not under it. */
+  .cal-pop.cal-pop--card{position:fixed;z-index:40;left:var(--space-3)!important;right:var(--space-3);top:auto!important;bottom:calc(4.65rem + env(safe-area-inset-bottom,0px) + var(--space-2));width:auto;max-height:min(70vh,calc(100dvh - 4.65rem - env(safe-area-inset-bottom,0px) - var(--space-8)));overflow:auto;overscroll-behavior:contain}
   .cal-card__field input,.cal-card__field textarea,.cal-card__field select{font-size:16px}
 }
 

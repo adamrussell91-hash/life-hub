@@ -108,10 +108,7 @@
 .tr-list__item.is-ghost .tr-list__t::before{content:"H";display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;background:var(--navy);color:#fff;font-size:9px;font-weight:600;margin-right:6px;vertical-align:1px}
 .tr-list__d{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 @media (max-width:719px){
-  .tr__nav{gap:var(--space-2)}
-  .tr__nav .btn,.tr__round{display:none}
-  .tr__period{flex:1 0 100%}
-  .tr__nav .hub-pills{width:100%;justify-content:space-between}
+  /* Nav rows: calendar-zoom-bar.css. */
   .tr-legend{display:none}
   .tr-toast{left:var(--space-3);right:var(--space-3);bottom:var(--space-3)}
   .tr-pop{left:var(--space-3)!important;right:var(--space-3);width:auto}

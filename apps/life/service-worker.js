@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v193';
+const CACHE_NAME = 'life-hub-shell-v194';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -33,6 +33,7 @@ const SHELL_FILES = [
   'packages/design-kit/calendar-almanac.css',
   'packages/design-kit/calendar-day-dial.css',
   'packages/design-kit/calendar-term-river.css',
+  'packages/design-kit/calendar-zoom-bar.css',
   'packages/design-kit/js/hub-motion-engine.js',
   'packages/design-kit/js/calendar-tideline-geometry.js',
   'packages/design-kit/js/almanac-geometry.js',
@@ -180,6 +181,7 @@ const SHELL_FILES = [
   'packages/design-kit/js/calendar/term-river.js',
   'packages/design-kit/js/calendar/ghost-writes.js',
   'packages/design-kit/js/calendar/render-tideline.js',
+  'packages/design-kit/js/calendar/zoom-pills.js',
   'packages/design-kit/js/calendar/calendar-item-actions.js',
   'packages/design-kit/js/calendar/calendar-item-card.js',
   'packages/design-kit/js/calendar/open-in-hub.js',

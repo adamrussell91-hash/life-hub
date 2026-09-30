@@ -13,7 +13,7 @@ import { createMotion, EASE } from '../hub-motion-engine.js';
 import { TR } from '../term-river-geometry.js';
 import { addDaysKey, buildTimeScale } from '../school-time.js';
 import { formatDisplayDate } from '../format-display-date.js';
-import { applyHubPillsThumb } from '../hub-motion.js';
+import { buildZoomPills, settleZoomPills } from './zoom-pills.js';
 import {
   LANES,
   byLane,
@@ -40,7 +40,6 @@ import { saveCalendarItem } from './calendar-item-actions.js';
 /* ======================================================================== 1. Constants */
 
 const NS = 'http://www.w3.org/2000/svg';
-const ZOOM_PILLS = ['Day', 'Week', 'Term', 'Year', 'Almanac'];
 const ICON = {
   prev: '<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>',
   next: '<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg>'
@@ -417,15 +416,8 @@ function mount({ entrance = false } = {}) {
   nodes.set('period', el('div', 'tr__period', '', nav, { 'data-part': 'period' }));
   el('button', 'tr__round', ICON.next, nav, { type: 'button', 'aria-label': 'Later', 'data-step': '1' });
   el('button', 'btn btn--secondary', 'Today', nav, { type: 'button', 'data-today': '' });
-  const zoom = el('div', 'hub-pills', '<span class="hub-pills__thumb"></span>', nav, { role: 'group', 'aria-label': 'Zoom', 'data-part': 'zoom-pills' });
-  for (const name of ZOOM_PILLS) {
-    const on = name.toLowerCase() === state.zoom;
-    el('button', `hub-pills__btn${on ? ' is-active' : ''}`, name, zoom, {
-      type: 'button',
-      'aria-pressed': String(on),
-      'data-zoom': name.toLowerCase()
-    });
-  }
+  const zoom = buildZoomPills(doc, state.zoom);
+  nav.append(zoom);
   nodes.set('zoom', zoom);
 
   const filterState = readFilterState(input?.hub || 'life');
@@ -515,7 +507,7 @@ function mount({ entrance = false } = {}) {
   const settle = () => {
     skipResize = false;
     lastHostW = Math.round(host.getBoundingClientRect?.().width || lastHostW);
-    applyHubPillsThumb(zoom);
+    settleZoomPills(zoom);
   };
   if (typeof view?.requestAnimationFrame === 'function') view.requestAnimationFrame(settle);
   else settle();
@@ -963,8 +955,7 @@ function setZoom(next) {
       button.classList.toggle('is-active', on);
       button.setAttribute('aria-pressed', String(on));
     }
-    zoom.classList.add('is-animated');
-    applyHubPillsThumb(zoom);
+    settleZoomPills(zoom);
   }
   root?.setAttribute('aria-label', next === 'year' ? 'Year' : 'Term');
   if (state.phone) {
