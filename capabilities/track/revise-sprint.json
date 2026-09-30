@@ -5,6 +5,6 @@
   "agents": ["*"],
   "risk": "confirm",
   "kind": "capacity",
-  "prompt_one_liner": "Revise sprint lanes, cadence, dates or headline. Confirm before writing.",
+  "prompt_one_liner": "Revise sprint lanes, cadence, dates, headline or Home-card viz. Confirm before writing.",
   "surfaces": ["confirm_card", "governance_log"]
 }

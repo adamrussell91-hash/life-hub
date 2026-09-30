@@ -1,10 +1,27 @@
 /**
  * Life Home challenge-sprint cards (#home-sprints).
  * Reads GET /api/challenges/active → computeSprintState (same source as prompts/nudges).
- * Presentation reuses Home metric-card / progress-track / agent-avatar patterns.
+ * Presentation reuses Home metric-card / progress-track / agent-avatar patterns
+ * plus allowlisted chart-kit mounts from sprint.viz.
  */
 import { formatDisplayDate } from '../core/time.js';
+import { resolveSprintViz, vizPlainName } from '../core/sprint-viz.js';
 import { avatarForSlug } from './agent-avatars.js';
+import { buildAreaLine } from './chart-kit/area-line.js';
+import { buildCarvedAway } from './chart-kit/carved-away.js';
+import { buildGateRings } from './chart-kit/gate-rings.js';
+import { buildGlideSlope } from './chart-kit/glide-slope.js';
+import { buildStairsDown } from './chart-kit/stairs-down.js';
+import { applyRingTarget } from './chart-kit/apply-ring.js';
+import { mountSceneChart } from './render-scene-chart.js';
+import {
+  buildSprintAreaSeries,
+  buildSprintCarvedChart,
+  buildSprintGateKeys,
+  buildSprintGlideChart,
+  buildSprintStairsChart,
+  headlineRingTarget
+} from './sprint-viz-charts.js';
 
 const STATUS_LABEL = {
   on_track: 'On track',
@@ -157,7 +174,136 @@ function appendProgressTrack(root, parent, {
   return wrap;
 }
 
-function renderTrend(root, state) {
+function renderSparkArea(root, state, labelText) {
+  const geo = sparkGeometry(state.headline?.readings);
+  if (!geo) return null;
+  const trendHost = createEl(root, 'div');
+  trendHost.className = 'home-sprint-card__trend';
+  const svg = createSvg(root, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${geo.w} ${geo.h}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `${labelText} trend`);
+  const area = createSvg(root, 'polygon');
+  area.setAttribute('class', 'home-sprint-card__trend-area');
+  area.setAttribute('points', geo.area);
+  const poly = createSvg(root, 'polyline');
+  poly.setAttribute('class', 'home-sprint-card__trend-line');
+  poly.setAttribute('fill', 'none');
+  poly.setAttribute('stroke-width', '2.5');
+  poly.setAttribute('stroke-linecap', 'round');
+  poly.setAttribute('stroke-linejoin', 'round');
+  poly.setAttribute('points', geo.line);
+  const dot = createSvg(root, 'circle');
+  dot.setAttribute('class', 'home-sprint-card__trend-dot');
+  dot.setAttribute('cx', String(geo.latest.x));
+  dot.setAttribute('cy', String(geo.latest.y));
+  dot.setAttribute('r', '3.5');
+  svg.append(area, poly, dot);
+  trendHost.append(svg);
+  return trendHost;
+}
+
+function renderAreaLineChart(root, state, labelText) {
+  const series = buildSprintAreaSeries(state.headline);
+  if (series.length < 2) return renderSparkArea(root, state, labelText);
+  const built = buildAreaLine(series, {
+    width: 320,
+    height: 88,
+    padding: 8,
+    yDomain: 'padded'
+  });
+  const trendHost = createEl(root, 'div');
+  trendHost.className = 'home-sprint-card__trend home-sprint-card__trend--kit';
+  trendHost.dataset.viz = 'area-line';
+  const svg = createSvg(root, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${built.width} ${built.height}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `${labelText} area-line`);
+  svg.setAttribute('class', 'home-sprint-card__area-line');
+  if (built.areaPath) {
+    const area = createSvg(root, 'path');
+    area.setAttribute('d', built.areaPath);
+    area.setAttribute('class', 'home-sprint-card__trend-area');
+    svg.append(area);
+  }
+  if (built.linePath) {
+    const line = createSvg(root, 'path');
+    line.setAttribute('d', built.linePath);
+    line.setAttribute('class', 'home-sprint-card__trend-line');
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke-width', '2');
+    svg.append(line);
+  }
+  trendHost.append(svg);
+  return trendHost;
+}
+
+function mountHeadlineScene(root, host, build, data, vizId) {
+  if (!host || !data || !host.ownerDocument) return false;
+  host.className = 'home-sprint-card__chart hc-host';
+  host.dataset.viz = vizId;
+  try {
+    mountSceneChart(host, build, data, { quiet: true, maxWidth: 560 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function renderHeadlineChart(root, state, vizId, labelText) {
+  const wrap = createEl(root, 'div');
+  wrap.className = 'home-sprint-card__viz';
+  wrap.dataset.viz = vizId;
+
+  if (vizId === 'glide-slope') {
+    const data = buildSprintGlideChart(state.headline);
+    if (data && mountHeadlineScene(root, wrap, buildGlideSlope, data, vizId)) return wrap;
+    return renderAreaLineChart(root, state, labelText);
+  }
+  if (vizId === 'carved-away') {
+    const data = buildSprintCarvedChart(state.headline);
+    if (data?.status === 'ready' && mountHeadlineScene(root, wrap, buildCarvedAway, data, vizId)) return wrap;
+    return renderAreaLineChart(root, state, labelText);
+  }
+  if (vizId === 'stairs-down') {
+    const data = buildSprintStairsChart(state.headline);
+    if (data?.status === 'ready' && mountHeadlineScene(root, wrap, buildStairsDown, data, vizId)) return wrap;
+    return renderAreaLineChart(root, state, labelText);
+  }
+  if (vizId === 'ring') {
+    const target = headlineRingTarget(state.headline);
+    if (target) {
+      wrap.className = 'home-sprint-card__viz home-sprint-card__viz--ring';
+      const svg = createSvg(root, 'svg');
+      svg.className = 'metric-ring home-sprint-card__ring';
+      svg.setAttribute('class', 'metric-ring home-sprint-card__ring');
+      svg.setAttribute('viewBox', '0 0 64 64');
+      svg.setAttribute('role', 'img');
+      svg.setAttribute('aria-label', `${labelText} progress ring`);
+      const track = createSvg(root, 'circle');
+      track.setAttribute('data-role', 'track');
+      track.setAttribute('class', 'metric-ring-track');
+      track.setAttribute('fill', 'none');
+      const fill = createSvg(root, 'circle');
+      fill.setAttribute('data-role', 'fill');
+      fill.setAttribute('class', 'metric-ring-fill');
+      fill.setAttribute('fill', 'none');
+      svg.append(track, fill);
+      wrap.append(svg);
+      if (typeof applyRingTarget === 'function') {
+        try { applyRingTarget(svg, target, { size: 64, strokeWidth: 8, reducedMotion: true }); } catch { /* unit fake DOM */ }
+      }
+      return wrap;
+    }
+    return renderSparkArea(root, state, labelText);
+  }
+  if (vizId === 'area-line') return renderAreaLineChart(root, state, labelText);
+  return renderSparkArea(root, state, labelText);
+}
+
+function renderTrend(root, state, vizResolution) {
   const block = createEl(root, 'section');
   block.className = 'home-sprint-card__headline-block';
 
@@ -196,41 +342,49 @@ function renderTrend(root, state) {
   caption.className = 'metric-caption home-sprint-card__headline-caption';
   caption.textContent = fmtDelta(state);
 
-  block.append(head, valueRow, caption);
+  const vizHint = createEl(root, 'p');
+  vizHint.className = 'metric-caption home-sprint-card__viz-label';
+  vizHint.textContent = vizPlainName(vizResolution.headline, 'headline');
 
-  const geo = sparkGeometry(state.headline?.readings);
-  if (geo) {
-    const trendHost = createEl(root, 'div');
-    trendHost.className = 'home-sprint-card__trend';
-    const svg = createSvg(root, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${geo.w} ${geo.h}`);
-    svg.setAttribute('preserveAspectRatio', 'none');
-    svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', `${label.textContent} trend`);
-    const area = createSvg(root, 'polygon');
-    area.setAttribute('class', 'home-sprint-card__trend-area');
-    area.setAttribute('points', geo.area);
-    const poly = createSvg(root, 'polyline');
-    poly.setAttribute('class', 'home-sprint-card__trend-line');
-    poly.setAttribute('fill', 'none');
-    poly.setAttribute('stroke-width', '2.5');
-    poly.setAttribute('stroke-linecap', 'round');
-    poly.setAttribute('stroke-linejoin', 'round');
-    poly.setAttribute('points', geo.line);
-    const dot = createSvg(root, 'circle');
-    dot.setAttribute('class', 'home-sprint-card__trend-dot');
-    dot.setAttribute('cx', String(geo.latest.x));
-    dot.setAttribute('cy', String(geo.latest.y));
-    dot.setAttribute('r', '3.5');
-    svg.append(area, poly, dot);
-    trendHost.append(svg);
-    block.append(trendHost);
-  }
+  block.append(head, valueRow, caption, vizHint);
+
+  const chart = renderHeadlineChart(root, state, vizResolution.headline, label.textContent);
+  if (chart) block.append(chart);
 
   return block;
 }
 
-function renderLane(root, lane, options) {
+function appendMeasureRing(root, parent, { pct, label, status = null } = {}) {
+  const wrap = createEl(root, 'div');
+  wrap.className = 'home-sprint-card__measure home-sprint-card__measure--ring';
+  if (status) wrap.dataset.status = status;
+  const caption = createEl(root, 'p');
+  caption.className = 'home-sprint-card__measure-label';
+  caption.textContent = label;
+  const svg = createSvg(root, 'svg');
+  svg.className = 'metric-ring home-sprint-card__lane-ring';
+  svg.setAttribute('class', 'metric-ring home-sprint-card__lane-ring');
+  svg.setAttribute('viewBox', '0 0 48 48');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', label);
+  const track = createSvg(root, 'circle');
+  track.setAttribute('data-role', 'track');
+  track.setAttribute('class', 'metric-ring-track');
+  track.setAttribute('fill', 'none');
+  const fill = createSvg(root, 'circle');
+  fill.setAttribute('data-role', 'fill');
+  fill.setAttribute('class', 'metric-ring-fill');
+  fill.setAttribute('fill', 'none');
+  svg.append(track, fill);
+  wrap.append(caption, svg);
+  parent.append(wrap);
+  try {
+    applyRingTarget(svg, { value: pct, target: 100 }, { size: 48, strokeWidth: 6, reducedMotion: true });
+  } catch { /* fake DOM */ }
+  return wrap;
+}
+
+function renderLane(root, lane, options, laneViz = 'progress-track') {
   const agent = agentDisplay(lane.agent);
   const li = createEl(root, 'li');
   li.className = 'home-sprint-card__lane';
@@ -306,12 +460,17 @@ function renderLane(root, lane, options) {
         : (lane.status === 'unavailable'
           ? `${measure.label || 'Measure'} · unavailable`
           : `${measure.label || 'Measure'} · no evidence yet`);
-      appendProgressTrack(root, measures, {
-        pct: judged > 0 ? measureProgressPct(measure) : 0,
-        label,
-        variant,
-        status: lane.status
-      });
+      const pct = judged > 0 ? measureProgressPct(measure) : 0;
+      if (laneViz === 'ring') {
+        appendMeasureRing(root, measures, { pct, label, status: lane.status });
+      } else {
+        appendProgressTrack(root, measures, {
+          pct,
+          label,
+          variant,
+          status: lane.status
+        });
+      }
     }
   } else {
     const detail = createEl(root, 'p');
@@ -323,6 +482,20 @@ function renderLane(root, lane, options) {
   link.append(top, measures);
   li.append(link);
   return li;
+}
+
+function renderLaneGateRings(root, state) {
+  const keys = buildSprintGateKeys(state.lanes);
+  if (!keys.length) return null;
+  const host = createEl(root, 'div');
+  host.className = 'home-sprint-card__gate';
+  host.dataset.viz = 'gate-rings';
+  if (host.ownerDocument) {
+    try {
+      mountSceneChart(host, buildGateRings, { keys }, { quiet: true, maxWidth: 420 });
+    } catch { /* ignore */ }
+  }
+  return host;
 }
 
 function renderActions(root, state, options) {
@@ -441,15 +614,31 @@ export async function renderHomeSprints(root, options = {}) {
     countEl.textContent = n === 1 ? '1 open' : `${n} open`;
   }
 
+  // Section title leads with the challenge name when one sprint is open.
+  const heading = host.querySelector('#home-sprints-heading');
+  if (heading) {
+    if (visible.length === 1) {
+      heading.textContent = visible[0].state?.title || 'Challenge sprint';
+    } else {
+      heading.textContent = 'Challenge sprints';
+    }
+  }
+
   const frag = typeof root.createDocumentFragment === 'function'
     ? root.createDocumentFragment()
     : { children: [], append(...nodes) { this.children.push(...nodes); } };
 
   for (const row of visible) {
     const state = row.state;
+    const viz = resolveSprintViz({
+      ...state,
+      viz: state.viz || row.sprint?.viz || null
+    });
     const card = createEl(root, 'article');
     card.className = 'home-sprint-card metric-card';
     card.dataset.sprintId = state.id;
+    card.dataset.vizHeadline = viz.headline;
+    card.dataset.vizLanes = viz.lanes;
     if (state.ended_awaiting_review) card.dataset.state = 'ended';
     else if (state.checkin_done_today) card.dataset.state = 'checked-in';
     else card.dataset.state = 'open';
@@ -491,17 +680,32 @@ export async function renderHomeSprints(root, options = {}) {
       variant: 'marine'
     });
 
-    const headline = renderTrend(root, state);
+    const headline = renderTrend(root, state, viz);
 
-    const lanes = createEl(root, 'ul');
-    lanes.className = 'home-sprint-card__lanes';
-    lanes.setAttribute('aria-label', 'Sprint lanes');
-    for (const lane of state.lanes || []) {
-      lanes.append(renderLane(root, lane, options));
+    let lanesBlock;
+    if (viz.lanes === 'gate-rings') {
+      lanesBlock = createEl(root, 'div');
+      lanesBlock.className = 'home-sprint-card__lanes-wrap';
+      const gate = renderLaneGateRings(root, state);
+      if (gate) lanesBlock.append(gate);
+      const lanes = createEl(root, 'ul');
+      lanes.className = 'home-sprint-card__lanes';
+      lanes.setAttribute('aria-label', 'Sprint lanes');
+      for (const lane of state.lanes || []) {
+        lanes.append(renderLane(root, lane, options, 'progress-track'));
+      }
+      lanesBlock.append(lanes);
+    } else {
+      lanesBlock = createEl(root, 'ul');
+      lanesBlock.className = 'home-sprint-card__lanes';
+      lanesBlock.setAttribute('aria-label', 'Sprint lanes');
+      for (const lane of state.lanes || []) {
+        lanesBlock.append(renderLane(root, lane, options, viz.lanes));
+      }
     }
 
     const actions = renderActions(root, state, options);
-    card.append(head, sprintProgress, headline, lanes, actions);
+    card.append(head, sprintProgress, headline, lanesBlock, actions);
     frag.append(card);
   }
 

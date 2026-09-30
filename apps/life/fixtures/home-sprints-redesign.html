@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <base href="/">
+  <!-- Life app root so assets/, css/, js/ resolve like production Life Pages. -->
+  <base href="/apps/life/">
   <title>Life Hub · Home sprints redesign fixture</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +15,7 @@
   <link rel="stylesheet" href="/packages/design-kit/hub-interactions.css">
   <link rel="stylesheet" href="/packages/design-kit/rail.css">
   <link rel="stylesheet" href="/packages/design-kit/mobile.css">
-  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="css/app.css">
   <style>
     /* Fixture: keep Home chrome honest without full app boot */
     body { margin: 0; }
@@ -72,7 +73,7 @@
   </div>
 
   <script type="module">
-    import { renderHomeSprints } from '/js/app/render-home-sprints.js';
+    import { renderHomeSprints } from '/apps/life/js/app/render-home-sprints.js';
 
     const host = document.getElementById('fixture-sprints-host');
     host.innerHTML = `
@@ -80,7 +81,7 @@
         <div class="section-heading home-sprints__heading">
           <div>
             <p class="section-kicker">Challenge sprints</p>
-            <h2 id="home-sprints-heading">Open sprints</h2>
+            <h2 id="home-sprints-heading">Challenge sprint</h2>
           </div>
           <p class="home-sprints__count" data-home-sprints-count></p>
         </div>
@@ -91,7 +92,11 @@
 
     const fixture = {
       sprints: [{
-        sprint: { id: 'blitz', kind: 'sprint' },
+        sprint: {
+          id: 'blitz',
+          kind: 'sprint',
+          viz: { headline: 'glide-slope', lanes: 'progress-track' }
+        },
         state: {
           id: 'blitz',
           title: 'Belly Flab Blitz',
@@ -103,6 +108,7 @@
           end_date: '2026-10-12',
           checkin_done_today: false,
           lead_agent: 'hammond',
+          viz: { headline: 'glide-slope', lanes: 'progress-track' },
           headline: {
             label: 'Midsection',
             metricLabel: 'Waist',
@@ -111,9 +117,11 @@
             direction: 'down',
             latest: { value: 88 },
             delta: -1,
+            target_band: { low: 84, high: 86 },
             readings: [
               { date: '2026-10-01', value: 89 },
               { date: '2026-10-02', value: 88.6 },
+              { date: '2026-10-03', value: 88.3 },
               { date: '2026-10-04', value: 88 }
             ]
           },
@@ -129,6 +137,12 @@
               role: 'Training',
               status: 'unavailable',
               measureSummaries: [{ label: 'Workout logged', met: 0, judged: 0 }]
+            },
+            {
+              agent: 'sara',
+              role: 'Tape',
+              status: 'on_track',
+              measureSummaries: [{ label: 'Waist logged', met: 2, judged: 3 }]
             }
           ]
         }

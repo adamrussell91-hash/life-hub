@@ -90,16 +90,21 @@ function hostTree() {
   const status = new FakeElement('p');
   const rail = new FakeElement('div');
   const count = new FakeElement('p');
+  const heading = new FakeElement('h2');
+  heading.id = 'home-sprints-heading';
+  heading.textContent = 'Challenge sprint';
   host.nodes = new Map([
     ['[data-home-sprints-status]', status],
     ['[data-home-sprints-rail]', rail],
-    ['[data-home-sprints-count]', count]
+    ['[data-home-sprints-count]', count],
+    ['#home-sprints-heading', heading]
   ]);
   root.nodes = new Map([['#home-sprints', host]]);
   root._host = host;
   root._status = status;
   root._rail = rail;
   root._count = count;
+  root._heading = heading;
   const origReplace = rail.replaceChildren.bind(rail);
   rail.replaceChildren = (...nodes) => {
     const flat = [];
@@ -261,4 +266,36 @@ test('home sprints check-in done uses intentional done chip and secondary lead l
   assert.match(secondary?.textContent || '', /Message Hammond/);
   secondary.listeners.find(l => l.type === 'click')?.fn({ preventDefault() {} });
   assert.match(opened, /#\/chat\/hammond/);
+});
+
+test('home sprints section heading leads with challenge name; defaults viz to glide-slope for down headline', async () => {
+  const root = hostTree();
+  await renderHomeSprints(root, {
+    api: { list: async () => ({ sprints: [sprintRow], flags: { anyOpen: true } }) }
+  });
+  assert.equal(root._heading.textContent, 'Belly Flab Blitz');
+  const card = root._rail.children[0];
+  assert.equal(card.dataset.vizHeadline, 'glide-slope');
+  assert.equal(card.dataset.vizLanes, 'progress-track');
+  const blob = walkTexts(card).join(' | ');
+  assert.match(blob, /Glide slope/);
+});
+
+test('home sprints respects explicit viz and falls back safely without ownerDocument mounts', async () => {
+  const root = hostTree();
+  const row = {
+    ...sprintRow,
+    sprint: { id: 'blitz', kind: 'sprint', viz: { headline: 'area-line', lanes: 'ring' } },
+    state: {
+      ...sprintRow.state,
+      viz: { headline: 'area-line', lanes: 'ring' }
+    }
+  };
+  await renderHomeSprints(root, {
+    api: { list: async () => ({ sprints: [row], flags: {} }) }
+  });
+  const card = root._rail.children[0];
+  assert.equal(card.dataset.vizHeadline, 'area-line');
+  assert.equal(card.dataset.vizLanes, 'ring');
+  assert.ok(findAllByClass(card, 'home-sprint-card__lane-ring').length >= 1);
 });

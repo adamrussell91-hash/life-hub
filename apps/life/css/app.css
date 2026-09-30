@@ -2395,10 +2395,52 @@ main { max-width: 76rem; margin: 0 auto; }
   overflow: hidden;
   margin-top: 0.15rem;
 }
-.home-sprint-card__trend svg {
+.home-sprint-card__trend svg,
+.home-sprint-card__chart.hc-host,
+.home-sprint-card__viz {
   display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.home-sprint-card__trend svg {
   height: 3.25rem;
+}
+.home-sprint-card__chart.hc-host,
+.home-sprint-card__viz:not(.home-sprint-card__viz--ring) {
+  margin-top: 0.35rem;
+  overflow-x: auto;
+}
+.home-sprint-card__chart .hc-chart {
+  width: 100%;
+  height: auto;
+  max-height: 12rem;
+}
+.home-sprint-card__viz-label {
+  margin: 0.15rem 0 0;
+  color: var(--ink-muted, #5c6b7a);
+}
+.home-sprint-card__viz--ring {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 0.35rem;
+}
+.home-sprint-card__ring,
+.home-sprint-card__lane-ring {
+  width: 3rem;
+  height: 3rem;
+  flex: 0 0 auto;
+}
+.home-sprint-card__measure--ring {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+.home-sprint-card__gate {
+  margin: 0 0 0.55rem;
+  width: 100%;
+  overflow-x: auto;
 }
 .home-sprint-card__trend-area {
   fill: color-mix(in srgb, var(--wave) 18%, transparent);
