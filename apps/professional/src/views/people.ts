@@ -3,7 +3,7 @@
  * Remember / Ask / Today / Clare–Hammond coordination fill the agent slots (I3).
  */
 
-import { fetchEntityOverview } from '@/api/entities';
+import { applyPeopleDedupe, fetchEntityOverview, fetchPeopleDedupePlan, type DedupeAction } from '@/api/entities';
 import { fetchPersonBrief } from '@/api/people-brief';
 import {
   acceptLinkProposal,
@@ -265,11 +265,13 @@ function warmthRing(
   warmth: number,
   initials: string,
   size: 'sm' | 'lg' = 'sm',
-  badge?: { monogram: string | null; orgRef?: string | null; logoKey?: string | null }
+  badge?: { monogram: string | null; orgRef?: string | null; logoKey?: string | null },
+  student = false
 ): HTMLElement {
   const wrap = el('span', `people-ring people-ring--${size}${warmth < 30 ? ' people-ring--cool' : ''}`);
   wrap.style.setProperty('--w', String(Math.max(0, Math.min(100, warmth))));
-  const av = el('span', 'people-avatar', initials);
+  // Students get their own colour so they never read as colleagues.
+  const av = el('span', `people-avatar${student ? ' people-avatar--student' : ''}`, initials);
   wrap.append(av);
   if (badge) {
     const badgeEl = crestNode(badge.monogram, 'sm', {
@@ -373,7 +375,9 @@ export async function renderPeoplePage(
   const addIcon = el('button', 'people-page__add-icon btn btn--primary', '+') as HTMLButtonElement;
   addIcon.type = 'button';
   addIcon.setAttribute('aria-label', 'Add person');
-  tools.append(filterBtn, sortBtn, groupBtn, phoneFiltersBtn, addIcon);
+  const dupesBtn = el('button', 'people-page__tool people-page__dupes', 'Duplicates') as HTMLButtonElement;
+  dupesBtn.type = 'button';
+  tools.append(filterBtn, sortBtn, groupBtn, phoneFiltersBtn, dupesBtn, addIcon);
   const whoSwitch = el('div', 'people-page__who');
   whoSwitch.setAttribute('role', 'group');
   whoSwitch.setAttribute('aria-label', 'Show colleagues or students');
@@ -574,7 +578,7 @@ export async function renderPeoplePage(
         a.append(
           warmthRing(warmth, row.initials, 'sm', org
             ? { monogram: org.monogram, orgRef: org.ref, logoKey: org.logo_key }
-            : undefined)
+            : undefined, row.person_type === 'student')
         );
         const stack = el('div', 'people-page__row-stack');
         const nameLine = el('span', 'people-page__row-name', row.display_name);
@@ -734,7 +738,8 @@ export async function renderPeoplePage(
                   directory?.organisations.find((o) => o.ref === model.organisation?.ref)?.logo_key ??
                   null
               }
-            : undefined
+            : undefined,
+          findRow(id)?.person_type === 'student'
         );
         ring.title = `${model.warmth} · ${model.warmthFeedNote}`;
         row.append(ring);
@@ -1298,6 +1303,7 @@ export async function renderPeoplePage(
   function openFilterSheet(): void {
     const onPhone = isPhone();
     sheet.hidden = false;
+    sheet.setAttribute('aria-label', 'Filters');
     sheetInner.replaceChildren();
     sheetInner.append(el('h2', 'people-pane__name', 'Filters'));
 
@@ -1414,6 +1420,121 @@ export async function renderPeoplePage(
     sheetInner.scrollTop = 0;
   }
 
+  const DEDUPE_KEPT_REASON: Record<string, string> = {
+    has_own_links: 'Both have their own links, so they may be two people',
+    has_teaching_links: 'Has Teaching links',
+    has_promises: 'Has promises',
+    has_remembered_facts: 'Has remembered facts',
+    has_link_proposals: 'Has suggested links waiting',
+    has_observations: 'Has observations'
+  };
+
+  function dedupeLine(action: DedupeAction): string {
+    const into = action.into.map((p) => p.name).join(' and ');
+    const kind = action.kind === 'combined' ? 'split into' : 'merge into';
+    const links = action.links ? ` · ${action.links} link${action.links === 1 ? '' : 's'} move` : '';
+    return `${action.remove.name} → ${kind} ${into}${action.student ? ' (student)' : ''}${links}`;
+  }
+
+  async function openDedupeSheet(): Promise<void> {
+    sheet.hidden = false;
+    sheet.setAttribute('aria-label', 'Duplicate people');
+    sheetInner.replaceChildren(el('h2', 'people-pane__name', 'Duplicate people'), el('p', 'people-pane__loading', 'Checking…'));
+    const close = el('button', 'btn btn--ghost', 'Close') as HTMLButtonElement;
+    close.type = 'button';
+    close.addEventListener('click', () => {
+      sheet.hidden = true;
+      sheet.setAttribute('aria-label', 'Filters');
+    });
+    let plan;
+    try {
+      plan = await fetchPeopleDedupePlan();
+    } catch (err) {
+      sheetInner.replaceChildren(
+        el('h2', 'people-pane__name', 'Duplicate people'),
+        el('p', 'people-pane__error', err instanceof Error ? err.message : 'Could not check for duplicates.'),
+        close
+      );
+      return;
+    }
+    const body: HTMLElement[] = [el('h2', 'people-pane__name', 'Duplicate people')];
+    if (!plan.ready.length && !plan.kept.length && !plan.unresolved.length) {
+      body.push(el('p', 'people-pane__empty', 'No duplicates. Everyone is in once.'), close);
+      sheetInner.replaceChildren(...body);
+      return;
+    }
+    const boxes: Array<{ box: HTMLInputElement; id: string }> = [];
+    if (plan.ready.length) {
+      body.push(el('div', 'people-pane__h2', `Ready to merge · ${plan.ready.length}`));
+      body.push(el('p', 'people-page__row-sub', 'Links move to the record that stays. The copy is then deleted.'));
+      for (const action of plan.ready) {
+        const label = el('label', 'people-page__dedupe-row');
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = true;
+        label.append(box, el('span', undefined, dedupeLine(action)));
+        boxes.push({ box, id: action.remove.id });
+        body.push(label);
+      }
+    }
+    if (plan.unresolved.length) {
+      body.push(el('div', 'people-pane__h2', `Can't split yet · ${plan.unresolved.length}`));
+      for (const row of plan.unresolved) {
+        body.push(el('p', 'people-page__row-sub', `${row.remove.name}: no record yet for ${row.missing.join(', ')}`));
+      }
+    }
+    if (plan.kept.length) {
+      body.push(el('div', 'people-pane__h2', `Left alone · ${plan.kept.length}`));
+      for (const action of plan.kept) {
+        const why = DEDUPE_KEPT_REASON[action.blocked ?? ''] ?? 'Needs a look';
+        body.push(el('p', 'people-page__row-sub', `${dedupeLine(action)}. ${why}.`));
+      }
+    }
+    const status = el('p', 'people-page__row-sub');
+    status.setAttribute('role', 'status');
+    body.push(status);
+    if (boxes.length) {
+      const merge = el('button', 'btn btn--primary', 'Merge selected') as HTMLButtonElement;
+      merge.type = 'button';
+      merge.addEventListener('click', async () => {
+        const ids = boxes.filter((b) => b.box.checked).map((b) => b.id);
+        if (!ids.length) {
+          status.textContent = 'Nothing selected.';
+          return;
+        }
+        merge.disabled = true;
+        status.textContent = `Merging ${ids.length}…`;
+        try {
+          let pending = ids;
+          const done: string[] = [];
+          const failed: string[] = [];
+          let skipped = 0;
+          while (pending.length) {
+            const result = await applyPeopleDedupe(pending);
+            done.push(...result.done.map((d) => d.remove.name));
+            failed.push(...result.failed.map((f) => f.remove.name));
+            skipped += result.skipped.length;
+            pending = result.remaining;
+            status.textContent = `Merged ${done.length} of ${ids.length}…`;
+          }
+          const parts = [`Merged ${done.length}.`];
+          if (failed.length) parts.push(`${failed.length} failed: ${failed.join(', ')}.`);
+          if (skipped) parts.push(`${skipped} changed since this list and were skipped.`);
+          status.textContent = parts.join(' ');
+          await reloadDirectory();
+        } catch (err) {
+          status.textContent = err instanceof Error ? err.message : 'Merge failed.';
+          merge.disabled = false;
+        }
+      });
+      body.push(merge);
+    }
+    body.push(close);
+    sheetInner.replaceChildren(...body);
+    sheetInner.scrollTop = 0;
+  }
+
+  dupesBtn.addEventListener('click', () => void openDedupeSheet());
   filterBtn.addEventListener('click', openFilterSheet);
   phoneFiltersBtn.addEventListener('click', openFilterSheet);
 

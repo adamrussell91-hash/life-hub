@@ -62,3 +62,42 @@ export function fetchEntityOverview(ref: string, options: SearchOptions = {}): P
     signal: options.signal
   });
 }
+
+export interface DedupePersonRef {
+  ref: string;
+  id: string;
+  name: string;
+}
+
+export interface DedupeAction {
+  kind: 'copy' | 'combined' | 'twin';
+  remove: DedupePersonRef;
+  into: DedupePersonRef[];
+  student: boolean;
+  links: number;
+  blocked: string | null;
+}
+
+export interface DedupePlan {
+  ready: DedupeAction[];
+  kept: DedupeAction[];
+  unresolved: Array<{ kind: 'combined'; remove: DedupePersonRef; names: string[]; missing: string[]; links: number }>;
+}
+
+export interface DedupeResult {
+  done: Array<DedupeAction & { moved: number }>;
+  failed: Array<DedupeAction & { error: string }>;
+  skipped: string[];
+  /** Confirmed ids not reached in this call; send them again. */
+  remaining: string[];
+}
+
+/** Read-only preview of duplicate Person records in the store. */
+export function fetchPeopleDedupePlan(): Promise<DedupePlan> {
+  return apiPost<DedupePlan>('/api/entities/admin', { action: 'plan_people_dedupe' });
+}
+
+/** Merges the confirmed copies: links move to the kept record, the copy is deleted. */
+export function applyPeopleDedupe(confirmIds: string[]): Promise<DedupeResult> {
+  return apiPost<DedupeResult>('/api/entities/admin', { action: 'apply_people_dedupe', confirm_ids: confirmIds });
+}
