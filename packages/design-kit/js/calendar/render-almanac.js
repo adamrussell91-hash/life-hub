@@ -7,7 +7,7 @@ import { createMotion, EASE, OVERSHOOT } from '../hub-motion-engine.js';
 import { ALM } from '../almanac-geometry.js';
 import { addDays, addMonths, almanacSummary, daysBetween } from '../lead-lines.js';
 import { formatDisplayDate } from '../format-display-date.js';
-import { applyHubPillsThumb } from '../hub-motion.js';
+import { buildZoomPills, settleZoomPills } from './zoom-pills.js';
 import { acceptPlan } from './ghost-writes.js';
 import { ALMANAC_RULES, ALMANAC_WANTS } from './almanac-rules.js';
 import { getSydneyDateKey } from '../sydney-clock.js';
@@ -771,17 +771,8 @@ function paint(doc, host, view, options) {
   later.innerHTML = '<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg>';
   const todayButton = el('button', 'btn btn--secondary', nav, { type: 'button' });
   todayButton.textContent = 'Today';
-  const zoom = el('div', 'hub-pills', nav, { role: 'group', 'aria-label': 'Zoom', 'data-part': 'zoom-pills' });
-  zoom.innerHTML = '<span class="hub-pills__thumb"></span>';
-  for (const name of ['Day', 'Week', 'Term', 'Year', 'Almanac']) {
-    const pressed = name === 'Almanac';
-    const button = el('button', `hub-pills__btn${pressed ? ' is-active' : ''}`, zoom, {
-      type: 'button',
-      'aria-pressed': String(pressed),
-      'data-zoom': name.toLowerCase()
-    });
-    button.textContent = name;
-  }
+  const zoom = buildZoomPills(doc, 'almanac');
+  nav.append(zoom);
   el('div', 'alm__spacer', nav);
   const ask = el('div', 'alm__ask', nav);
   const askMark = el('span', 'alm-av', ask);
@@ -850,7 +841,7 @@ function paint(doc, host, view, options) {
   win?.requestAnimationFrame?.(() => {
     skipResize = false;
     lastHostW = Math.round(host.getBoundingClientRect?.().width || lastHostW);
-    applyHubPillsThumb(zoom);
+    settleZoomPills(zoom);
   });
   root.addEventListener('click', event => {
     const button = event.target.closest?.('[data-zoom]');
@@ -1381,26 +1372,11 @@ function showLoading(doc, host, options) {
   const span = doc.createElement('span');
   span.textContent = 'Loading…';
   period.append(title, span);
-  const zoom = doc.createElement('div');
-  zoom.className = 'hub-pills';
-  zoom.setAttribute('role', 'group');
-  zoom.setAttribute('aria-label', 'Zoom');
-  zoom.dataset.part = 'zoom-pills';
-  const thumb = doc.createElement('span');
-  thumb.className = 'hub-pills__thumb';
-  zoom.append(thumb);
-  for (const name of ['Day', 'Week', 'Term', 'Year', 'Almanac']) {
-    const button = doc.createElement('button');
-    button.type = 'button';
-    button.className = `hub-pills__btn${name === 'Almanac' ? ' is-active' : ''}`;
-    button.setAttribute('aria-pressed', String(name === 'Almanac'));
-    button.dataset.zoom = name.toLowerCase();
-    button.textContent = name;
-    button.addEventListener('click', () => {
-      options?.onSwitchView?.(name.toLowerCase());
-    });
-    zoom.append(button);
-  }
+  const zoom = buildZoomPills(doc, 'almanac');
+  zoom.addEventListener('click', (event) => {
+    const zoomTo = event.target.closest?.('[data-zoom]')?.getAttribute('data-zoom');
+    if (zoomTo && zoomTo !== 'almanac') options?.onSwitchView?.(zoomTo);
+  });
   nav.append(period, zoom);
   const note = doc.createElement('p');
   note.className = 'alm__loading';
@@ -1412,7 +1388,7 @@ function showLoading(doc, host, options) {
   card.setAttribute('aria-hidden', 'true');
   root.append(nav, note, card);
   host.append(root);
-  applyHubPillsThumb(zoom);
+  settleZoomPills(zoom);
 }
 
 async function load(token, doc, host, options) {

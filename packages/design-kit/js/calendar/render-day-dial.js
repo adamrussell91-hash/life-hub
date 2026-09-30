@@ -13,6 +13,7 @@ import { DD } from '../day-dial-geometry.js';
 import { bandsFromProfile } from '../calendar-bands.js';
 import { formatDisplayDate } from '../format-display-date.js';
 import { applyHubPillsThumb } from '../hub-motion.js';
+import { buildZoomPills, settleZoomPills } from './zoom-pills.js';
 import { clock12, holidayRun, lightsOutFor, tomorrow as tomorrowBrief, tonight as tonightBrief } from './day-brief.js';
 import { acceptPlan, GHOST_AGENTS } from './ghost-writes.js';
 import { buildTidelineModel, isSchoolHoliday, toHour } from './tideline-model.js';
@@ -41,7 +42,6 @@ import { disablePush, enablePush, pushState } from '../push-client.js';
 const NS = 'http://www.w3.org/2000/svg';
 const AGENT_INITIAL = { sara: 'S', hammond: 'H', clare: 'C', chadwick: 'Ch' };
 const NOTE_FONT = '400 12px Inter, ui-sans-serif, sans-serif';
-const ZOOMS = ['Day', 'Week', 'Term', 'Year', 'Almanac'];
 const ICON = {
   prev: '<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>',
   next: '<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg>'
@@ -608,14 +608,8 @@ function mount({ entrance = false } = {}) {
   el('button', 'dd__round', ICON.next, nav, { type: 'button', 'aria-label': 'Next day', 'data-step': '1' });
   el('button', 'btn btn--secondary', 'Today', nav, { type: 'button', 'data-today': '' });
   if (state.day === input.today) el('button', 'btn btn--secondary dd__rescue', 'Day changed', nav, { type: 'button', 'data-rescue-open': '', 'aria-haspopup': 'dialog' });
-  const zoom = el('div', 'hub-pills', '<span class="hub-pills__thumb"></span>', nav, { role: 'group', 'aria-label': 'Zoom', 'data-part': 'zoom-pills' });
-  for (const name of ZOOMS) {
-    el('button', `hub-pills__btn${name === 'Day' ? ' is-active' : ''}`, name, zoom, {
-      type: 'button',
-      'aria-pressed': String(name === 'Day'),
-      'data-zoom': name.toLowerCase()
-    });
-  }
+  const zoom = buildZoomPills(doc, 'day');
+  nav.append(zoom);
   el('div', 'dd__spacer', undefined, nav);
   const viewPills = el('div', 'hub-pills', '<span class="hub-pills__thumb"></span>', nav, { role: 'group', 'aria-label': 'View', 'data-part': 'view-pills' });
   el('button', 'hub-pills__btn is-active', 'Dial', viewPills, { type: 'button', 'aria-pressed': 'true' });
@@ -706,7 +700,7 @@ function mount({ entrance = false } = {}) {
   const settle = () => {
     skipResize = false;
     lastHostW = Math.round(host.getBoundingClientRect?.().width || lastHostW);
-    applyHubPillsThumb(zoom);
+    settleZoomPills(zoom);
     applyHubPillsThumb(viewPills);
   };
   if (typeof view?.requestAnimationFrame === 'function') view.requestAnimationFrame(settle);
