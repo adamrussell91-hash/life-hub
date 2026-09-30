@@ -17,6 +17,7 @@ import {
   TASK_PREFIX
 } from './_shared/tasks-blobs.mjs';
 import { parseEntityRef } from './_shared/entity-ref.mjs';
+import { withoutDeleted } from './_shared/record-liveness.mjs';
 
 export const config = { path: '/api/people/ledger' };
 
@@ -93,7 +94,7 @@ export function createPeopleLedgerHandler(deps = {}) {
           const tasksStore =
             deps.tasksStore ?? (await (deps.getTasksStore ?? defaultGetTasksStore)(env).catch(() => null));
           const allTasks = tasksStore
-            ? await listTasksJSON(tasksStore, TASK_PREFIX).catch(() => [])
+            ? withoutDeleted(await listTasksJSON(tasksStore, TASK_PREFIX).catch(() => []))
             : [];
 
           const person = {
@@ -149,7 +150,7 @@ export function createPeopleLedgerHandler(deps = {}) {
             const tasksStore =
               deps.tasksStore ?? (await (deps.getTasksStore ?? defaultGetTasksStore)(env).catch(() => null));
             const allTasks = tasksStore
-              ? await listTasksJSON(tasksStore, TASK_PREFIX).catch(() => [])
+              ? withoutDeleted(await listTasksJSON(tasksStore, TASK_PREFIX).catch(() => []))
               : [];
 
             const personName = body?.display_name ?? '';

@@ -17,6 +17,7 @@ import {
   hubLessonsWindowLine
 } from '../../../apps/life/js/core/context-integrity.js';
 import { isOpenTask } from './task-liveness.mjs';
+import { withoutDeleted } from './record-liveness.mjs';
 
 const HUB_TZ = 'Australia/Sydney';
 const TASK_CAP = 12;
@@ -162,17 +163,17 @@ async function safeList(listFn, env) {
 
 export async function defaultListTasks(env = process.env) {
   const store = await defaultGetTasksStore(env);
-  return listTasksJSON(store, TASK_PREFIX);
+  return withoutDeleted(await listTasksJSON(store, TASK_PREFIX));
 }
 
 export async function defaultListClasses(env = process.env) {
   const store = await defaultGetContentStore(env);
-  return listTeachingJSON(store, CLASS_PREFIX);
+  return withoutDeleted(await listTeachingJSON(store, CLASS_PREFIX));
 }
 
 export async function defaultListScheduledLessons(env = process.env) {
   const store = await defaultGetContentStore(env);
-  return listTeachingJSON(store, SCHEDULED_LESSON_PREFIX);
+  return withoutDeleted(await listTeachingJSON(store, SCHEDULED_LESSON_PREFIX));
 }
 
 export async function loadHubAgentContext({

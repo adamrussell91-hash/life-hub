@@ -16,6 +16,7 @@ import {
 import { getRelationshipDeclaration } from './relationship-registry.mjs';
 import { recordDeclinedPair } from './tie-inference/state.mjs';
 import { pairKey } from './tie-inference/candidates.mjs';
+import { withoutDeleted } from './record-liveness.mjs';
 
 function selfRefOf(self) {
   if (!self) return null;
@@ -65,7 +66,7 @@ export async function runLinkInferencePass(deps = {}) {
     return { created: 0, skipped: 0, proposals: [], error: 'no_self_person' };
   }
 
-  const tasks = (deps.tasks ?? (await listTasksJSON(tasksStore, TASK_PREFIX).catch(() => []))).map(
+  const tasks = withoutDeleted(deps.tasks ?? (await listTasksJSON(tasksStore, TASK_PREFIX).catch(() => []))).map(
     (t) => ({
       id: t.id,
       ref: t.ref ?? (t.id ? `tasks:task:${t.id}` : null),
@@ -75,7 +76,7 @@ export async function runLinkInferencePass(deps = {}) {
     })
   );
 
-  const projects = (
+  const projects = withoutDeleted(
     deps.projects ?? (await listTasksJSON(tasksStore, PROJECT_PREFIX).catch(() => []))
   ).map((p) => ({
     id: p.id,
