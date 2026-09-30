@@ -5,6 +5,6 @@
   "agents": ["*"],
   "risk": "confirm",
   "kind": "capacity",
-  "prompt_one_liner": "Open a multi-agent challenge sprint (or upgrade a Phase-0 challenge). Confirm before writing.",
+  "prompt_one_liner": "Open a multi-agent challenge sprint (or upgrade a Phase-0 challenge), including Home-card viz. Confirm before writing.",
   "surfaces": ["confirm_card", "governance_log"]
 }

@@ -472,6 +472,7 @@ export function computeSprintState(sprint, records, today) {
     day_label: dayN != null && length != null ? `day ${dayN} of ${length}` : null,
     cadence,
     headline: headlineSeries(sprint, records),
+    viz: sprint.viz && typeof sprint.viz === 'object' ? sprint.viz : null,
     lanes,
     checkin_done_today: Boolean(todayCheckin),
     today_checkin: todayCheckin,

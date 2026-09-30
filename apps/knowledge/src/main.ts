@@ -125,7 +125,7 @@ import { applyTopicTags, toggleTopicTag } from "./tidy/applyTags";
 import { remainingTopicTags, topicTagPickerHtml } from "./tidy/tagPicker";
 import { filterPickerOptions, optionPickerListHtml } from "./ui/optionPicker";
 import { syncKnowledgeMobileChrome } from "./mobile-chrome";
-import { renderProtocols } from "./protocols/view";
+import { parseProtocolsDeepLink, renderProtocols } from "./protocols/view";
 import { notebookCards, notesForNotebook } from "./notebooks/catalog";
 import { bindNotebooksGrid, notebooksGridHtml } from "./notebooks/view";
 import { getQuizSchedule, saveQuiz } from "./api/quizClient";
@@ -235,6 +235,7 @@ let entries: PageManifestEntry[] = [];
 let visible: PageManifestEntry[] = [];
 let view: View = "notebooks";
 let protocolTeardown: (() => void) | null = null;
+let protocolApplyDeepLink: ((link: ReturnType<typeof parseProtocolsDeepLink>) => boolean) | null = null;
 let pageReturnView: View = "notebooks";
 let query = "";
 let keywordFilter = "";
@@ -1358,6 +1359,18 @@ async function applyPageHash(): Promise<boolean> {
   }
 }
 
+/** #protocols?id=&mode=&field= — open Thinking with intake pre-filled. */
+function applyProtocolsHash(): boolean {
+  const deepLink = parseProtocolsDeepLink(location.hash);
+  if (!deepLink) return false;
+  leaveSpecialRails();
+  view = "protocols";
+  activePage = null;
+  compose = null;
+  render();
+  return true;
+}
+
 function findingCards(findings: ResearchFinding[]): string {
   return findings
     .map(
@@ -2064,6 +2077,7 @@ function render() {
   if (view !== "protocols" && protocolTeardown) {
     protocolTeardown();
     protocolTeardown = null;
+    protocolApplyDeepLink = null;
   }
   if (view !== "compose") composeVoice.stopMic();
   if (view === "compose" && compose) renderCompose(compose);
@@ -2107,14 +2121,21 @@ function render() {
     // Keep Thinking mounted across shell re-renders — remounting wiped the
     // library and replayed protocol-deal (opacity 0) as a load flash.
     const existing = app.querySelector<HTMLElement>(".protocols-root");
+    const deepLink = parseProtocolsDeepLink(location.hash);
     if (protocolTeardown && existing?.isConnected) {
+      if (deepLink?.id) protocolApplyDeepLink?.(deepLink);
       afterSignedInPaint();
       return;
     }
     protocolTeardown?.();
+    protocolApplyDeepLink = null;
     shell("<div class=\"protocols-root\"></div>");
     const root = app.querySelector<HTMLElement>(".protocols-root");
-    if (root) protocolTeardown = renderProtocols({ host: root });
+    if (root) {
+      const handle = renderProtocols({ host: root, deepLink });
+      protocolTeardown = handle.teardown;
+      protocolApplyDeepLink = handle.applyDeepLink;
+    }
   } else {
     renderList();
   }
@@ -2230,13 +2251,14 @@ async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean 
     await ensurePageReviews();
     await refreshVisible();
     view = "notebooks";
-    if (!(await applyPageHash())) render();
+    if (!(await applyPageHash()) && !applyProtocolsHash()) render();
     if (!(window as Window & { __khPageHashBound?: boolean }).__khPageHashBound) {
       (window as Window & { __khPageHashBound?: boolean }).__khPageHashBound = true;
       window.addEventListener("hashchange", () => {
         void (async () => {
-          const opened = await applyPageHash();
-          if (!opened && view === "page") {
+          if (await applyPageHash()) return;
+          if (applyProtocolsHash()) return;
+          if (view === "page") {
             view = pageReturnView === "notebooks" ? "notebooks" : "list";
             activePage = null;
             render();

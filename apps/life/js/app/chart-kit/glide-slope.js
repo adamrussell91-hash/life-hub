@@ -29,6 +29,8 @@ export function buildGlideSlope(chart, { width = 520, height = 236 } = {}) {
   const band = chart.band;
   const obs = chart.points ?? [];
   const proj = chart.projection;
+  const unit = chart.unit || 'kg';
+  const sampleWord = chart.sampleWord || 'weigh-in';
 
   const latestEntry = proj?.entry_range?.latest ?? proj?.entry_date ?? null;
   const futureDays = Math.min(MAX_FUTURE_DAYS, latestEntry ? dayIndex(date, latestEntry) + 21 : 21);
@@ -57,14 +59,14 @@ export function buildGlideSlope(chart, { width = 520, height = 236 } = {}) {
     nodes.push(node('rect', {
       x: plotL, y: fx(y(band.high)), width: fx(plotR - plotL), height: fx(y(band.low) - y(band.high))
     }, { cls: 'hc-band', hit: 'glide-band', anim: 'fade' }));
-    nodes.push(text(plotL + 6, y(band.low) - 6, `${band.low}–${band.high} kg`, {
+    nodes.push(text(plotL + 6, y(band.low) - 6, `${band.low}–${band.high} ${unit}`, {
       size: 11, weight: 600, cls: 'hc-text hc-text--band'
     }));
     hits['glide-band'] = {
       id: 'glide-band',
-      title: 'Target weight band',
-      lines: [`${band.low}–${band.high} kg`],
-      detail: `The weight half of the recomp box: ${band.low} to ${band.high} kg.`
+      title: 'Target band',
+      lines: [`${band.low}–${band.high} ${unit}`],
+      detail: `Target band: ${band.low} to ${band.high} ${unit}.`
     };
   }
 
@@ -100,7 +102,7 @@ export function buildGlideSlope(chart, { width = 520, height = 236 } = {}) {
     hits['glide-wedge'] = {
       id: 'glide-wedge',
       title: '95% slope range',
-      lines: [`${signed(proj.slope_ci_95_per_week?.[0], 2)} to ${signed(proj.slope_ci_95_per_week?.[1], 2)} kg/week`],
+      lines: [`${signed(proj.slope_ci_95_per_week?.[0], 2)} to ${signed(proj.slope_ci_95_per_week?.[1], 2)} ${unit}/week`],
       detail: 'The shaded wedge is where the trend could plausibly run, from the Sen 95% slope interval.'
     };
     nodes.push(node('line', {
@@ -158,16 +160,16 @@ export function buildGlideSlope(chart, { width = 520, height = 236 } = {}) {
     }));
     const split = p.split_kg == null
       ? 'Trend not ready yet'
-      : `${signed(p.split_kg, 2, ' kg')} ${p.split_kg > 0 ? 'above' : p.split_kg < 0 ? 'below' : 'on'} trend`;
+      : `${signed(p.split_kg, 2, ` ${unit}`)} ${p.split_kg > 0 ? 'above' : p.split_kg < 0 ? 'below' : 'on'} trend`;
     hits[id] = {
       id,
       title: formatDisplayDate(p.date),
       lines: [
-        `Measured ${formatNumber(p.weight_kg, 1)} kg`,
-        p.trend_kg == null ? null : `Trend ${formatNumber(p.trend_kg, 1)} kg`,
+        `Measured ${formatNumber(p.weight_kg, 1)} ${unit}`,
+        p.trend_kg == null ? null : `Trend ${formatNumber(p.trend_kg, 1)} ${unit}`,
         split
       ].filter(Boolean),
-      detail: `${formatDisplayDate(p.date)}: measured ${formatNumber(p.weight_kg, 1)} kg. ${split}. The split is day-to-day noise such as water, food and timing.`,
+      detail: `${formatDisplayDate(p.date)}: measured ${formatNumber(p.weight_kg, 1)} ${unit}. ${split}. The split is day-to-day noise.`,
       guide: { x: fx(xs[i]), y1: plotT, y2: plotB }
     };
   });
@@ -198,9 +200,9 @@ export function buildGlideSlope(chart, { width = 520, height = 236 } = {}) {
         proj.entry_range
           ? `Range ${formatDisplayDate(proj.entry_range.earliest)} to ${formatDisplayDate(proj.entry_range.latest)}`
           : null,
-        `At ${signed(proj.slope_per_week, 2)} kg/week`
+        `At ${signed(proj.slope_per_week, 2)} ${unit}/week`
       ].filter(Boolean),
-      detail: `If the trend holds at ${signed(proj.slope_per_week, 2)} kg a week, weight enters ${band.low}–${band.high} kg around ${formatDisplayDate(proj.entry_date)}.`
+      detail: `If the trend holds at ${signed(proj.slope_per_week, 2)} ${unit} a week, the series enters ${band.low}–${band.high} ${unit} around ${formatDisplayDate(proj.entry_date)}.`
     };
   }
 
@@ -213,14 +215,14 @@ export function buildGlideSlope(chart, { width = 520, height = 236 } = {}) {
   ], { x: plotL, y: 10, width: width - plotL - 4, swatch: [14, 4] }).nodes);
 
   let readout;
-  if (!obs.length) readout = 'No weigh-ins in the last 8 weeks.';
-  else if (!chart.trendReady) readout = `Measured line only. The trend appears after ${chart.trendNeeds} more weigh-in${chart.trendNeeds === 1 ? '' : 's'}.`;
-  else readout = `Typical split from trend: ±${formatNumber(chart.residualMadKg, 2)} kg. Tap a weigh-in for its split.`;
+  if (!obs.length) readout = `No ${sampleWord}s in range yet.`;
+  else if (!chart.trendReady) readout = `Measured line only. The trend appears after ${chart.trendNeeds} more ${sampleWord}${chart.trendNeeds === 1 ? '' : 's'}.`;
+  else readout = `Typical split from trend: ±${formatNumber(chart.residualMadKg, 2)} ${unit}. Tap a point for its split.`;
 
   return {
     width,
     height,
-    label: `Weigh-ins over the last ${chart.historyDays} days against the robust trend.`,
+    label: chart.label || `Series over the last ${chart.historyDays} days against the robust trend.`,
     readout,
     nodes,
     hits
