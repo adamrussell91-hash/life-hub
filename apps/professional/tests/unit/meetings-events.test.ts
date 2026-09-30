@@ -60,12 +60,13 @@ describe('renderMeetingsView', () => {
     vi.restoreAllMocks();
   });
 
-  it('lists meetings and exposes Schedule at desktop width', async () => {
+  it('lists meetings and exposes New meeting at desktop width', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
     const canvas = document.createElement('div');
     await renderMeetingsView(canvas);
     expect(canvas.textContent).toMatch(/Seth planning/);
     expect(canvas.querySelector('a.btn--primary')?.getAttribute('href')).toBe('#/meeting/new');
+    expect(canvas.querySelector('a.btn--primary')?.textContent).toBe('New meeting');
     expect(canvas.querySelector('.schedule-db__row')).toBeTruthy();
   });
 
@@ -150,11 +151,30 @@ describe('renderMeetingNewView', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders create form with attendee role control', async () => {
+  it('renders the composer with sections, a day grid and attendee role pills (no native select)', async () => {
     const canvas = document.createElement('div');
     await renderMeetingNewView(canvas);
-    expect(canvas.querySelector('form.meeting-form')).toBeTruthy();
-    expect(canvas.querySelector('select[aria-label="Attendee role"]')).toBeTruthy();
+    const form = canvas.querySelector('form.meeting-compose')!;
+    expect(form).toBeTruthy();
+    expect([...form.querySelectorAll('.event-detail__section-title')].map((node) => node.textContent)).toEqual([
+      'Meeting',
+      'When',
+      'People'
+    ]);
+    expect(form.querySelector('.event-compose__cal .event-compose__cal-day.is-on')).toBeTruthy();
+    const role = form.querySelector('.hub-pills[aria-label="Attendee role"]')!;
+    expect([...role.querySelectorAll('button')].map((node) => node.textContent)).toEqual(['No role', 'Chair', 'Minute taker']);
+    expect(form.querySelector('select')).toBeNull();
+    expect(form.querySelector('button[type="submit"]')?.textContent).toBe('Create meeting');
+  });
+
+  it('refuses to save without a title and says why', async () => {
+    const canvas = document.createElement('div');
+    await renderMeetingNewView(canvas);
+    const form = canvas.querySelector<HTMLFormElement>('form.meeting-compose')!;
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await vi.waitFor(() => expect(form.querySelector('.meeting-form__status')?.textContent).toBe('Give the meeting a title.'));
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/meetings'), expect.objectContaining({ method: 'POST' }));
   });
 });
 

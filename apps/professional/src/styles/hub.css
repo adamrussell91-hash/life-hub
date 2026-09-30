@@ -2941,7 +2941,8 @@
   display: none !important;
 }
 
-.event-detail .task-link-panel h2 {
+.event-detail .task-link-panel h2,
+.event-detail .task-link-panel h3 {
   margin: 0 0 var(--space-2);
   font-size: var(--text-2xs);
   font-weight: var(--weight-bold);

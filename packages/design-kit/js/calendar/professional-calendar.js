@@ -65,7 +65,9 @@ function lifeEventFromProjection(projection) {
       all_day: Boolean(projection.all_day),
       event_type: projection.event_type ?? null,
       pin: projection.pin === true,
-      channel: projection.channel ?? null
+      channel: projection.channel ?? null,
+      ...(projection.location ? { location: projection.location } : {}),
+      ...(Array.isArray(projection.with) && projection.with.length ? { with: projection.with } : {})
     },
     body: ''
   };

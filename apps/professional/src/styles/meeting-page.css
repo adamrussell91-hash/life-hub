@@ -194,3 +194,181 @@
   font-size: var(--text-sm);
   color: var(--muted);
 }
+
+/* ── Header facts, state, actions ── */
+.meeting-page__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.meeting-page__facts span + span::before {
+  content: "·";
+  margin-right: var(--space-3);
+  color: var(--shallow);
+}
+
+.meeting-page__head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.meeting-page__state.is-completed {
+  background: var(--success-surface);
+  color: var(--success);
+}
+
+.meeting-page__state.is-cancelled,
+.meeting-page__state.is-no_show {
+  background: var(--warning-surface);
+  color: var(--high-sea-ink);
+}
+
+.meeting-page__editor[hidden] {
+  display: none;
+}
+
+.meeting-page__editor > .event-compose {
+  gap: var(--space-4);
+}
+
+.meeting-page__hint {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.meeting-page__notes-card h3 {
+  margin-bottom: var(--space-1);
+}
+
+.meeting-page__decisions {
+  margin-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ledger__text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Room: add / remove ── */
+.room__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room__remove {
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: var(--text-sm);
+  line-height: 1;
+}
+
+.room__add {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.room__add-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.5rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+/* ── Task links as rail cards ── */
+.meeting-page .meeting-detail__task-panels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.meeting-page .task-link-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  box-shadow: var(--elev-1);
+}
+
+.meeting-page .task-link-panel[hidden],
+.meeting-page .task-link-panel [hidden] {
+  display: none !important;
+}
+
+.meeting-page .task-link-panel h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--depth);
+}
+
+.task-link-panel__row {
+  display: flex;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.meeting-page .task-link-panel__row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.meeting-page .task-link-panel .meeting-form__status {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 720px) {
+  .meeting-page__head-actions {
+    margin-left: 0;
+  }
+}
+
+.meeting-page .card p.muted {
+  font-size: var(--text-sm);
+}
+
+/* Closed-choice pills hug their labels inside column forms. */
+.meeting-compose .hub-pills,
+.meeting-page .hub-pills {
+  align-self: flex-start;
+}
+
+.meeting-page__editor .event-form .event-compose__title {
+  min-width: 0;
+  font-size: var(--text-lg);
+}
+
+.task-link-panel__row .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}

@@ -248,7 +248,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'meeting-new') {
-      renderPageHeader(shell, { eyebrow: 'Meetings', title: 'Schedule' });
+      renderPageHeader(shell, { eyebrow: 'Meetings', title: 'New meeting' });
       await renderMeetingNewView(shell.canvas);
       return;
     }

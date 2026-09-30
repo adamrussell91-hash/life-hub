@@ -44,10 +44,12 @@ export function communicationSourceRef(id) {
  *   time_zone: string,
  *   all_day: boolean,
  *   status: string,
+ *   location: string|null,
+ *   with: string[],
  *   href?: string|null
  * }}
  */
-export function projectMeetingSchedule(record) {
+export function projectMeetingSchedule(record, attendeeNames = []) {
   const source_ref = meetingSourceRef(record.id);
   return {
     projection_id: deriveProjectionId(source_ref),
@@ -59,6 +61,8 @@ export function projectMeetingSchedule(record) {
     time_zone: record.time_zone,
     all_day: false,
     status: record.state,
+    location: record.location_text ?? null,
+    with: attendeeNames,
     href: `/professional/#/meeting/${encodeURIComponent(record.id)}`
   };
 }
@@ -230,7 +234,7 @@ export function parseNotionCommunicationBounds(row) {
  * later end is a pin at its time. No date → null (not placed). Opens the
  * Notion page, since there is no hub comm page for it.
  */
-export function projectNotionCommunicationSchedule(row) {
+export function projectNotionCommunicationSchedule(row, { selfName = null } = {}) {
   const notionId = notionIdFromRow(row);
   if (!notionId) return null;
   const bounds = parseNotionCommunicationBounds(row);
@@ -250,8 +254,24 @@ export function projectNotionCommunicationSchedule(row) {
     status: 'completed',
     channel,
     pin: bounds.pin,
+    location: typeof row.location === 'string' && row.location.trim() ? row.location.trim() : null,
+    with: notionRowPeople(row, selfName),
     href: `https://www.notion.so/${notionId}`
   };
+}
+
+/**
+ * Attendee and student names on a Notion Communications row, without the
+ * Notion person emoji. The operator (`selfName`) is never "with" themselves.
+ */
+export function notionRowPeople(row, selfName = null) {
+  const names = [];
+  for (const attendee of Array.isArray(row?.attendees) ? row.attendees : []) {
+    const name = typeof attendee?.name === 'string' ? attendee.name.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '').trim() : '';
+    if (name && name !== selfName) names.push(name);
+  }
+  if (typeof row?.student_name === 'string' && row.student_name.trim()) names.push(row.student_name.trim());
+  return [...new Set(names)];
 }
 
 /**
@@ -418,7 +438,9 @@ export function lifeCalendarEventFromProjection(projection) {
       source_ref: projection.source_ref,
       href: projection.href ?? null,
       all_day: Boolean(projection.all_day),
-      event_type: projection.event_type ?? null
+      event_type: projection.event_type ?? null,
+      ...(projection.location ? { location: projection.location } : {}),
+      ...(projection.with?.length ? { with: projection.with } : {})
     },
     body: ''
   };

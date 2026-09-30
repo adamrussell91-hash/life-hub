@@ -14,13 +14,15 @@ import {
   retryMeetingTaskLink,
   updateMeeting
 } from '@/api/meetings';
-import { searchEntities } from '@/api/entities';
 import { ApiClientError } from '@/api/client';
 import { meetingRoute } from '@/app/router';
 import type { MeetingRecord } from '@/domain/types';
 import { renderScheduleDbPage, type ScheduleDbRow } from '@/components/schedule-db-page';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { utcIsoToWallLocal, wallLocalToUtcIso, isValidTimeZone } from '@/lib/wall-time';
+import { createPillGroup } from '@/lib/pills';
+import { searchPickerPeople } from '@/lib/person-picker';
+import { mountComposeWhen } from '@/components/compose-when';
 import {
   loadEntityRelationships,
   mountTaskLinkPanel,
@@ -55,7 +57,7 @@ export function buildMeetingTaskLinks(record: MeetingRecord, reload: () => Promi
         : null,
     statusMessage:
       record.preparation_operation?.status === 'committed'
-        ? `Preparation Task ${record.preparation_operation.task_id}`
+        ? `✓ Linked · ${record.preparation_operation.title || 'task'}`
         : record.preparation_operation?.status === 'incomplete'
           ? 'Preparation link incomplete.'
           : null,
@@ -89,7 +91,7 @@ export function buildMeetingTaskLinks(record: MeetingRecord, reload: () => Promi
         : null,
     statusMessage:
       record.follow_up_operation?.status === 'committed'
-        ? `Follow-up Task ${record.follow_up_operation.task_id}`
+        ? `✓ Linked · ${record.follow_up_operation.title || 'task'}`
         : record.follow_up_operation?.status === 'incomplete'
           ? 'Follow-up link incomplete.'
           : null,
@@ -149,7 +151,7 @@ export async function renderMeetingsView(
     searchPlaceholder: 'Search title or place',
     searchAriaLabel: 'Search meetings',
     emptyMessage: 'No meetings yet.',
-    primaryAction: { label: 'Schedule', href: '#/meeting/new' },
+    primaryAction: { label: 'New meeting', href: '#/meeting/new' },
     listHash: '#/meetings',
     isCurrent: options.isCurrent,
     loadRows: async () => {
@@ -159,33 +161,53 @@ export async function renderMeetingsView(
   });
 }
 
+function nextHalfHour(now: Date): Date {
+  const next = new Date(now.getTime());
+  next.setSeconds(0, 0);
+  next.setMinutes(next.getMinutes() < 30 ? 30 : 60);
+  return next;
+}
+
+const ATTENDEE_ROLES = [
+  ['', 'No role'],
+  ['chair', 'Chair'],
+  ['minute_taker', 'Minute taker']
+] as const;
+
+export function roleLabel(role: string | null | undefined): string | null {
+  return ATTENDEE_ROLES.find(([value]) => value && value === role)?.[1] ?? role ?? null;
+}
+
 export async function renderMeetingNewView(canvas: HTMLElement): Promise<void> {
   canvas.replaceChildren();
   const form = document.createElement('form');
-  form.className = 'meeting-form';
+  form.className = 'event-form event-compose meeting-compose';
   form.noValidate = true;
 
   const title = document.createElement('input');
   title.type = 'text';
   title.name = 'title';
   title.required = true;
-  title.placeholder = 'Title';
+  title.className = 'event-compose__title';
+  title.placeholder = 'Name this meeting';
   title.setAttribute('aria-label', 'Title');
 
-  const start = document.createElement('input');
-  start.type = 'datetime-local';
-  start.name = 'scheduled_start';
-  start.required = true;
-  start.setAttribute('aria-label', 'Starts');
-  const end = document.createElement('input');
-  end.type = 'datetime-local';
-  end.name = 'scheduled_end';
-  end.required = true;
-  end.setAttribute('aria-label', 'Ends');
-  const now = new Date();
+  const purpose = document.createElement('textarea');
+  purpose.rows = 2;
+  purpose.placeholder = 'What you want out of it';
+  purpose.setAttribute('aria-label', 'Why you’re there');
+
+  const agenda = document.createElement('textarea');
+  agenda.rows = 4;
+  agenda.placeholder = 'One item per line';
+  agenda.setAttribute('aria-label', 'Agenda');
+
   const zone = defaultZone();
-  start.value = utcIsoToWallLocal(now.toISOString(), zone);
-  end.value = utcIsoToWallLocal(new Date(now.getTime() + 60 * 60_000).toISOString(), zone);
+  const startAt = nextHalfHour(new Date());
+  const when = mountComposeWhen({
+    start: utcIsoToWallLocal(startAt.toISOString(), zone),
+    end: utcIsoToWallLocal(new Date(startAt.getTime() + 60 * 60_000).toISOString(), zone)
+  });
 
   const timeZone = document.createElement('input');
   timeZone.type = 'text';
@@ -195,31 +217,24 @@ export async function renderMeetingNewView(canvas: HTMLElement): Promise<void> {
 
   const locationField = document.createElement('input');
   locationField.type = 'text';
-  locationField.placeholder = 'Location';
+  locationField.placeholder = 'Room, school or link';
   locationField.setAttribute('aria-label', 'Location');
 
-  const agenda = document.createElement('textarea');
-  agenda.rows = 3;
-  agenda.placeholder = 'Agenda';
-  agenda.setAttribute('aria-label', 'Agenda');
+  function field(label: string, control: HTMLElement, hint?: string): HTMLElement {
+    const wrap = el('div', 'event-compose__field');
+    wrap.append(el('span', 'event-compose__label', label));
+    if (hint) wrap.append(el('p', 'event-compose__hint', hint));
+    wrap.append(control);
+    return wrap;
+  }
+  when.times.append(field('Where', locationField), field('Time zone', timeZone));
+
+  const role = createPillGroup({ label: 'Attendee role', choices: ATTENDEE_ROLES, value: '' });
 
   const attendeeInput = document.createElement('input');
   attendeeInput.type = 'text';
-  attendeeInput.placeholder = 'Type @ to add an attendee';
+  attendeeInput.placeholder = 'Type a name';
   attendeeInput.setAttribute('aria-label', 'Attendee');
-
-  const roleSelect = document.createElement('select');
-  roleSelect.setAttribute('aria-label', 'Attendee role');
-  for (const [value, label] of [
-    ['', 'No role'],
-    ['chair', 'Chair'],
-    ['minute_taker', 'Minute taker']
-  ] as const) {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    roleSelect.append(option);
-  }
 
   const chipsHost = el('div', 'meeting-form__chips');
   const chipList = createEntityChipList({
@@ -232,82 +247,77 @@ export async function renderMeetingNewView(canvas: HTMLElement): Promise<void> {
     input: attendeeInput,
     allowedKinds: ['person'],
     emptyText: 'No matching people.',
-    search: async (query, signal) => {
-      const result = await searchEntities(query, 'person', { signal });
-      return {
-        groups: {
-          person: result.groups.person,
-          organisation: result.groups.organisation,
-          task: result.groups.task
-        }
-      };
-    },
+    mode: 'field',
+      search: (query, signal) => searchPickerPeople(query, signal),
     onSelect: (item) => {
-      const role = roleSelect.value || null;
+      const picked = role.get() || null;
+      const label = roleLabel(picked);
       chipList.addPending({
-        id: `pending:${item.ref}:attendee:${role ?? ''}`,
+        id: `pending:${item.ref}:attendee:${picked ?? ''}`,
         ref: item.ref,
-        label: role ? `${item.display_label} (${role})` : item.display_label,
+        label: label ? `${item.display_label} (${label})` : item.display_label,
         relationshipType: 'attendee',
         state: 'pending',
-        supportingLabel: role,
+        supportingLabel: picked,
         href: item.href ?? null
       });
+      attendeeInput.value = '';
     }
   });
 
   const status = el('p', 'meeting-form__status');
   status.hidden = true;
-  const save = el('button', 'btn btn--primary', 'Save') as HTMLButtonElement;
+  const save = el('button', 'btn btn--primary', 'Create meeting') as HTMLButtonElement;
   save.type = 'submit';
   const cancel = el('a', 'btn btn--ghost', 'Cancel');
   cancel.href = '#/meetings';
 
+  function section(heading: string, ...nodes: HTMLElement[]): HTMLElement {
+    const card = el('section', 'event-detail__card event-compose__section');
+    card.append(el('h2', 'event-detail__section-title', heading), ...nodes);
+    return card;
+  }
+
+  const roleField = el('div', 'event-compose__field');
+  roleField.append(el('span', 'event-compose__label', 'Role for the next person you add'), role.root);
+  const actions = el('div', 'event-compose__actions');
+  actions.append(save);
+  const footer = el('div', 'event-compose__footer');
+  footer.append(cancel, status, actions);
+
   form.append(
-    el('label', undefined, 'Title'),
-    title,
-    el('label', undefined, 'Starts'),
-    start,
-    el('label', undefined, 'Ends'),
-    end,
-    el('label', undefined, 'Time zone'),
-    timeZone,
-    el('label', undefined, 'Location'),
-    locationField,
-    el('label', undefined, 'Agenda'),
-    agenda,
-    el('label', undefined, 'Attendee role for next pick'),
-    roleSelect,
-    el('label', undefined, 'Attendees'),
-    attendeeInput,
-    picker.root,
-    chipsHost,
-    status,
-    save,
-    cancel
+    section(
+      'Meeting',
+      field('Title', title),
+      field('Why you’re there', purpose, 'Clare checks the outcome against this afterwards.'),
+      field('Agenda', agenda, 'Each line becomes a heading in your notes.')
+    ),
+    section('When', when.root),
+    section('People', roleField, field('Who’s coming', attendeeInput), picker.root, chipsHost),
+    footer
   );
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     status.hidden = true;
-    save.disabled = true;
-    if (!isValidTimeZone(timeZone.value)) {
+    const fail = (message: string) => {
       status.hidden = false;
-      status.textContent = 'Enter a valid IANA time zone.';
+      status.textContent = message;
       save.disabled = false;
-      return;
-    }
+    };
+    save.disabled = true;
+    if (!title.value.trim()) return fail('Give the meeting a title.');
+    if (!isValidTimeZone(timeZone.value)) return fail('Enter a valid IANA time zone.');
     let scheduledStart: string;
     let scheduledEnd: string;
     try {
-      scheduledStart = wallLocalToUtcIso(start.value, timeZone.value);
-      scheduledEnd = wallLocalToUtcIso(end.value, timeZone.value);
+      const wall = when.value();
+      scheduledStart = wallLocalToUtcIso(wall.start, timeZone.value);
+      scheduledEnd = wallLocalToUtcIso(wall.end, timeZone.value);
     } catch (err) {
-      status.hidden = false;
-      status.textContent = err instanceof Error ? err.message : 'Invalid date.';
-      save.disabled = false;
-      return;
+      return fail(err instanceof Error ? err.message : 'Invalid date.');
     }
+    if (Date.parse(scheduledEnd) <= Date.parse(scheduledStart)) return fail('The meeting has to end after it starts.');
     const pending = chipList.getChips().filter((chip) => chip.state === 'pending');
     const links = pending.map((chip) => ({
       target_ref: chip.ref,
@@ -315,26 +325,28 @@ export async function renderMeetingNewView(canvas: HTMLElement): Promise<void> {
       occurred_at: scheduledStart,
       role: chip.supportingLabel || null
     }));
+    let meetingId: string;
     try {
       const result = await createMeeting({
-        title: title.value,
+        title: title.value.trim(),
         scheduled_start: scheduledStart,
         scheduled_end: scheduledEnd,
         time_zone: timeZone.value,
-        location_text: locationField.value || null,
-        agenda: agenda.value || null,
+        location_text: locationField.value.trim() || null,
+        agenda: agenda.value.trim() || null,
         links
       });
-      window.location.hash = meetingRoute(result.meeting.id);
+      meetingId = result.meeting.id;
     } catch (err) {
-      if (isMeetingIncompleteLinksError(err)) {
-        window.location.hash = meetingRoute(err.data.meeting_id);
-        return;
+      if (!isMeetingIncompleteLinksError(err)) {
+        return fail(err instanceof ApiClientError ? err.message : 'Save failed.');
       }
-      status.hidden = false;
-      status.textContent = err instanceof ApiClientError ? err.message : 'Save failed.';
-      save.disabled = false;
+      meetingId = err.data.meeting_id;
     }
+    if (purpose.value.trim()) {
+      await updateMeeting(meetingId, { purpose: purpose.value.trim() }).catch(() => undefined);
+    }
+    window.location.hash = meetingRoute(meetingId);
   });
 
   canvas.append(form);
