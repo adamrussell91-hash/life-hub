@@ -223,6 +223,10 @@ function assembledSystem(input, archive) {
   } catch {
     evidenceBlock = '';
   }
+  const sprintBlock = String(input.openSprintsText || '').trim();
+  const sprintToolsNote = sprintBlock
+    ? 'Open sprint tools: you may call track_checkin_lane / track_log_progress on YOUR lane only (server enforces ownership). Prefer Life Hub chat (/api/chat as Clementine) when you need those tools; this Knowledge sitting still shows your lane.'
+    : '';
   return {
     coverage,
     system: assembleClementinePrompt({
@@ -243,6 +247,9 @@ function assembledSystem(input, archive) {
           : '',
         interpretationBlock
           ? interpretationBlock
+          : '',
+        sprintBlock
+          ? `Open challenge sprints:\n${sprintBlock}\n${sprintToolsNote}`
           : ''
       ].filter(Boolean).join('\n\n'),
       quality: formatKnowledgeQualityBlock()

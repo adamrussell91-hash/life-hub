@@ -167,6 +167,24 @@ export function createChatController({
     return null;
   }
 
+  let sprintFlags = null;
+
+  async function refreshSprintFlags() {
+    try {
+      const response = await fetch('/api/challenges/active', {
+        method: 'GET',
+        headers: { accept: 'application/json' }
+      });
+      const payload = await response.json().catch(() => null);
+      if (response.ok && payload?.ok !== false) {
+        const data = payload?.data ?? payload;
+        sprintFlags = data?.flags ?? null;
+      }
+    } catch {
+      /* keep prior flags */
+    }
+  }
+
   function stickyAgentSlug() {
     return lockedAgentSlug() ?? getDefaultAgentSlug?.();
   }
@@ -182,7 +200,8 @@ export function createChatController({
     renderProtocolPills(root, {
       slug,
       selectedId: selectedProtocolId,
-      onSelect: selectProtocol
+      onSelect: selectProtocol,
+      sprintFlags
     });
     renderChatEmpty(root, slug);
     syncChatChrome(root);
@@ -1077,6 +1096,7 @@ export function createChatController({
     const slug = stickyAgentSlug() ?? null;
     if (slug) applyAgentAccent(slug);
     paintRoster();
+    refreshSprintFlags().then(() => paintRoster());
   }
 
   return {

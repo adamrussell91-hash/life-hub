@@ -2,8 +2,8 @@ import { capabilityIdsForAgent, loadCapability } from './registry.mjs';
 
 const KEYWORD_HINTS = [
   {
-    ids: ['track.open-challenge', 'track.log-progress', 'track.close-challenge'],
-    patterns: [/challenge/i, /tracker/i, /streak/i, /no sugar/i, /sugar[- ]free/i, /week of/i]
+    ids: ['track.open-challenge', 'track.log-progress', 'track.close-challenge', 'track.open-sprint', 'track.checkin-lane', 'track.link-lane', 'track.revise-sprint'],
+    patterns: [/challenge/i, /tracker/i, /streak/i, /no sugar/i, /sugar[- ]free/i, /week of/i, /\bsprint\b/i, /\bblitz\b/i, /check-?in/i]
   },
   {
     ids: ['remember.set-week-flag', 'remember.note-context', 'remember.write-memory'],

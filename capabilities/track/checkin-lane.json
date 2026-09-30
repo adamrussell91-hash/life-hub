@@ -1,0 +1,10 @@
+{
+  "id": "track.checkin-lane",
+  "tool_name": "track_checkin_lane",
+  "verb": "Track",
+  "agents": ["*"],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Log today's status on your own sprint lane only. Writing another agent's lane is denied.",
+  "surfaces": ["governance_log"]
+}

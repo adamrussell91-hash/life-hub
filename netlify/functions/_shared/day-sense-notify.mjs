@@ -56,10 +56,14 @@ export function isSchoolDay(date, terms) {
  * Pure: which notifications are due now.
  * @returns {Array<{ key: string, title: string, body: string, url: string }>}
  */
-export function decideNotifications({ today, nowHour, med, schoolDay, leave, reviewDone, log, blocks = [] }) {
+export function decideNotifications({ today, nowHour, med, schoolDay, leave, reviewDone, log, blocks = [], sprintNudges = [] }) {
   const out = [];
   const sentCount = Object.keys(log?.sent ?? {}).length;
   const unsent = (key) => !log?.sent?.[key];
+  // Sprint nudges first (priority over nice-to-haves); no AI.
+  for (const nudge of sprintNudges) {
+    if (nudge?.key && unsent(nudge.key)) out.push(nudge);
+  }
   if (med?.prompt && nowHour < med.prompt.usual + 1) {
     const key = `dex-${med.prompt.slot}`;
     if (unsent(key)) {
@@ -193,6 +197,33 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
   const profile = await loadProfile().catch(() => null);
   const terms = await loadTerms().catch(() => []);
   const review = await getJSON(store, `${DAY_REVIEW_PREFIX}${today}`).catch(() => null);
+  let sprintNudges = [];
+  try {
+    if (typeof openRepo === 'function') {
+      const { decideSprintNudges } = await import('./sprint-evidence.mjs');
+      const { listChallengePaths, parseJsonBlob } = await import('./capabilities/stores.mjs');
+      const repo = await openRepo();
+      const tree = (await repo.client.resolveTree())?.tree ?? [];
+      const paths = listChallengePaths(tree);
+      const sprints = [];
+      for (const path of paths) {
+        const entry = tree.find(item => item.path === path);
+        if (!entry?.sha) continue;
+        const raw = await repo.decodeBlob(await repo.client.readBlob(entry.sha));
+        const doc = parseJsonBlob(raw, null);
+        if (doc?.kind === 'sprint' && doc.status !== 'closed') sprints.push(doc);
+      }
+      sprintNudges = decideSprintNudges({
+        sprints,
+        records: [],
+        today,
+        nowHour,
+        log
+      });
+    }
+  } catch {
+    sprintNudges = [];
+  }
   const due = decideNotifications({
     today,
     nowHour,
@@ -201,8 +232,10 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
     leave: leaveHour(profile),
     reviewDone: Boolean(review),
     log,
-    blocks: log.blocks ?? []
+    blocks: log.blocks ?? [],
+    sprintNudges
   });
+  // Assert: scheduled path never calls AI — only deterministic decide* helpers above.
   const sent = [];
   for (const message of due) {
     const result = await send(store, message, { env });

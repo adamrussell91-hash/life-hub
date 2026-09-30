@@ -25,9 +25,19 @@ import {
   parseJsonBlob,
   serializeJson,
   findChallengePath,
+  listChallengePaths,
   isCalendarDate,
   addCalendarDays
 } from './stores.mjs';
+import {
+  defaultCadenceForLength,
+  resolveCadence,
+  sprintLengthDays,
+  validateEvidenceSource,
+  validateLaneAgent,
+  SPRINT_ROSTER,
+  computeSprintState
+} from '../sprint-evidence.mjs';
 import {
   isPathAllowedForAgent,
   capabilityIdsForAgent,
@@ -227,6 +237,85 @@ export function shortcutSchemas() {
           revised: { type: 'boolean', description: 'True when revising after a dispute' }
         },
         required: ['challenge_id', 'verdict', 'summary'],
+        additionalProperties: false
+      }
+    },
+    track_open_sprint: {
+      name: 'track_open_sprint',
+      description:
+        'Open a multi-agent challenge sprint, or upgrade an existing Phase-0 challenge_id to a sprint (Confirm). Lists lanes, headline, cadence and dates.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          challenge_id: { type: 'string', description: 'Existing challenge to upgrade in place' },
+          title: { type: 'string' },
+          goal: { type: 'string' },
+          start_date: { type: 'string' },
+          end_date: { type: 'string' },
+          lead_agent: { type: 'string' },
+          notes: { type: 'string' },
+          headline: { type: 'object' },
+          cadence: { type: 'object' },
+          lanes: { type: 'array' }
+        },
+        required: ['title', 'goal', 'lanes'],
+        additionalProperties: false
+      }
+    },
+    track_checkin_lane: {
+      name: 'track_checkin_lane',
+      description: 'Append today\'s lane status/note on your own sprint lane only (auto).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          challenge_id: { type: 'string' },
+          status: { type: 'string', enum: ['on_track', 'stalled', 'no_evidence'] },
+          note: { type: 'string' },
+          date: { type: 'string' },
+          kind: { type: 'string', enum: ['daily', 'weekly', 'final'] },
+          adam_rating: { type: 'number' },
+          adam_win: { type: 'string' },
+          adam_snag: { type: 'string' },
+          adam_note: { type: 'string' },
+          protocol_session_id: { type: 'string' }
+        },
+        required: ['challenge_id', 'status'],
+        additionalProperties: false
+      }
+    },
+    track_link_lane: {
+      name: 'track_link_lane',
+      description: 'Add a goal_id or task_id to a sprint lane (auto, additive).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          challenge_id: { type: 'string' },
+          agent: { type: 'string' },
+          goal_id: { type: 'string' },
+          task_id: { type: 'string' }
+        },
+        required: ['challenge_id', 'agent'],
+        additionalProperties: false
+      }
+    },
+    track_revise_sprint: {
+      name: 'track_revise_sprint',
+      description: 'Revise sprint lanes, lead measures, cadence, dates or headline (Confirm).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          challenge_id: { type: 'string' },
+          title: { type: 'string' },
+          goal: { type: 'string' },
+          start_date: { type: 'string' },
+          end_date: { type: 'string' },
+          lead_agent: { type: 'string' },
+          notes: { type: 'string' },
+          headline: { type: 'object' },
+          cadence: { type: 'object' },
+          lanes: { type: 'array' }
+        },
+        required: ['challenge_id'],
         additionalProperties: false
       }
     },
@@ -696,9 +785,9 @@ async function handleTrackLogProgress(ctx, input) {
   const challengeId = String(input.challenge_id || '').trim();
   const entry = String(input.entry || '').trim();
   if (!challengeId || !entry) return deny('challenge_id and entry are required');
-  const path = findChallengePath(repoTreeOf(ctx), challengeId);
-  if (!path) return deny(`Challenge not found: ${challengeId}`);
-  const { value: challenge, sha } = await readJson(ctx, path, null);
+  const resolved = await resolveChallengeRecord(ctx, challengeId);
+  if (!resolved) return deny(`Challenge not found: ${challengeId}`);
+  const { path, challenge, sha } = resolved;
   if (!challenge || challenge.status === 'closed') return deny('Challenge is closed or missing');
   if (!Array.isArray(challenge.progress)) challenge.progress = [];
   challenge.progress.push({
@@ -727,15 +816,23 @@ async function handleTrackCloseChallenge(ctx, input) {
   if (!challengeId || !verdict || !summary) {
     return deny('challenge_id, verdict, and summary are required');
   }
-  const path = findChallengePath(repoTreeOf(ctx), challengeId);
-  if (!path) return deny(`Challenge not found: ${challengeId}`);
-  const { value: challenge } = await readJson(ctx, path, null);
+  const resolved = await resolveChallengeRecord(ctx, challengeId);
+  if (!resolved) return deny(`Challenge not found: ${challengeId}`);
+  const { path, challenge } = resolved;
   if (!challenge) return deny('Challenge missing');
+  const state = challenge.kind === 'sprint'
+    ? computeSprintState(challenge, [], ctx.today || getSydneyDateKey())
+    : null;
+  const closeSummary = state?.ended_awaiting_review || challenge.kind === 'sprint'
+    ? `${summary}${state?.headline?.baseline != null && state?.headline?.latest
+      ? ` | headline ${state.headline.baseline} → ${state.headline.latest.value}${state.headline.unit || ''}`
+      : ''}`
+    : summary;
   const closed = {
     ...challenge,
     status: 'closed',
     verdict,
-    close_summary: summary,
+    close_summary: closeSummary,
     closed_at: new Date().toISOString(),
     closed_by: ctx.agentSlug,
     revised_verdict: Boolean(input.revised)
@@ -751,7 +848,358 @@ async function handleTrackCloseChallenge(ctx, input) {
         path,
         mode: 'overwrite',
         content: serializeJson(closed),
-        diff: `${verdict} — ${summary}`
+        diff: `${verdict} — ${closeSummary}`
+      }]
+    })
+  );
+}
+
+async function resolveChallengeRecord(ctx, challengeId) {
+  const id = String(challengeId || '').trim();
+  if (!id) return null;
+  const tree = repoTreeOf(ctx);
+  const pathHint = findChallengePath(tree, id);
+  if (pathHint) {
+    const { value, sha } = await readJson(ctx, pathHint, null);
+    if (value) return { path: pathHint, challenge: value, sha };
+  }
+  for (const path of listChallengePaths(tree)) {
+    const { value, sha } = await readJson(ctx, path, null);
+    if (value?.id === id) return { path, challenge: value, sha };
+  }
+  return null;
+}
+
+async function countOpenSprints(ctx) {
+  let n = 0;
+  for (const path of listChallengePaths(repoTreeOf(ctx))) {
+    const { value } = await readJson(ctx, path, null);
+    if (value?.kind === 'sprint' && value.status === 'open') n += 1;
+  }
+  return n;
+}
+
+function normalizeSprintLanes(lanes) {
+  if (!Array.isArray(lanes) || lanes.length < 1) return { ok: false, reason: 'lanes must include 1–8 entries' };
+  if (lanes.length > 8) return { ok: false, reason: 'max 8 lanes' };
+  const seen = new Set();
+  const out = [];
+  for (const raw of lanes) {
+    const check = validateLaneAgent(raw?.agent);
+    if (!check.ok) return check;
+    if (seen.has(check.slug)) return { ok: false, reason: `Duplicate lane for ${check.slug}` };
+    seen.add(check.slug);
+    const lead_measures = Array.isArray(raw.lead_measures) ? raw.lead_measures : [];
+    for (const m of lead_measures) {
+      const source = m?.evidence?.source || 'self_report';
+      const srcCheck = validateEvidenceSource(source);
+      if (!srcCheck.ok) return srcCheck;
+    }
+    out.push({
+      agent: check.slug,
+      role: String(raw.role || '').trim() || SPRINT_ROSTER[check.slug],
+      lead_measures: lead_measures.map(m => ({
+        id: String(m.id || m.label || 'measure').trim(),
+        label: String(m.label || m.id || 'measure').trim(),
+        per: m.per || 'day',
+        target: m.target ?? 1,
+        evidence: {
+          source: m?.evidence?.source || 'self_report',
+          ...(m?.evidence?.min != null ? { min: m.evidence.min } : {}),
+          ...(m?.evidence?.target != null ? { target: m.evidence.target } : {}),
+          ...(m?.evidence?.protein_g != null ? { protein_g: m.evidence.protein_g } : {}),
+          ...(m?.evidence?.calories != null ? { calories: m.evidence.calories } : {})
+        }
+      })),
+      goal_ids: Array.isArray(raw.goal_ids) ? raw.goal_ids.map(String) : [],
+      task_ids: Array.isArray(raw.task_ids) ? raw.task_ids.map(String) : [],
+      status: raw.status === 'paused' ? 'paused' : 'active',
+      note: String(raw.note || '')
+    });
+  }
+  return { ok: true, lanes: out };
+}
+
+function normalizeHeadline(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const metric = raw.metric && typeof raw.metric === 'object' ? raw.metric : null;
+  if (!metric?.label) return { ok: false, reason: 'headline.metric.label is required' };
+  if (metric.source) {
+    const src = validateEvidenceSource(metric.source);
+    if (!src.ok) return src;
+  }
+  return {
+    ok: true,
+    headline: {
+      label: String(raw.label || metric.label).trim(),
+      metric: {
+        label: String(metric.label).trim(),
+        unit: metric.unit || '',
+        direction: metric.direction === 'up' ? 'up' : 'down',
+        source: metric.source || 'self_report',
+        ...(metric.baseline != null ? { baseline: Number(metric.baseline) } : {}),
+        ...(metric.target != null ? { target: Number(metric.target) } : {})
+      },
+      ...(Array.isArray(raw.secondary) ? { secondary: raw.secondary } : {})
+    }
+  };
+}
+
+function canLeadSprint(ctx, leadAgent) {
+  const slug = ctx.agentSlug;
+  if (slug === 'hammond' || slug === 'clare') return true;
+  if (leadAgent && slug === leadAgent) return true;
+  return false;
+}
+
+async function handleTrackOpenSprint(ctx, input) {
+  const title = String(input.title || '').trim();
+  const goal = String(input.goal || '').trim();
+  if (!title || !goal) return deny('title and goal are required');
+  const lanesNorm = normalizeSprintLanes(input.lanes);
+  if (!lanesNorm.ok) return deny(lanesNorm.reason);
+  const lead = String(input.lead_agent || 'hammond').trim().toLowerCase() || 'hammond';
+  const leadCheck = validateLaneAgent(lead);
+  if (!leadCheck.ok) return deny(leadCheck.reason);
+  if (!canLeadSprint(ctx, lead)) {
+    return deny('Only Hammond, Clare, or the lead agent may open a sprint');
+  }
+  const headlineNorm = input.headline != null ? normalizeHeadline(input.headline) : { ok: true, headline: null };
+  if (!headlineNorm.ok) return deny(headlineNorm.reason);
+
+  const existingId = String(input.challenge_id || '').trim();
+  if (existingId) {
+    const resolved = await resolveChallengeRecord(ctx, existingId);
+    if (!resolved) return deny(`Challenge not found: ${existingId}`);
+    const { path, challenge, sha } = resolved;
+    if (challenge.kind === 'sprint' && challenge.status === 'open') {
+      return deny('Challenge is already a sprint');
+    }
+    const start = isCalendarDate(input.start_date) ? input.start_date : challenge.start_date;
+    const end = isCalendarDate(input.end_date) ? input.end_date : challenge.end_date;
+    const length = sprintLengthDays({ start_date: start, end_date: end });
+    const cadence = { ...defaultCadenceForLength(length), ...(input.cadence || {}) };
+    const upgraded = {
+      ...challenge,
+      title,
+      goal,
+      start_date: start,
+      end_date: end,
+      notes: input.notes != null ? String(input.notes) : challenge.notes,
+      kind: 'sprint',
+      lead_agent: lead,
+      headline: headlineNorm.headline,
+      cadence: resolveCadence({ start_date: start, end_date: end, cadence }),
+      lanes: lanesNorm.lanes,
+      checkins: Array.isArray(challenge.checkins) ? challenge.checkins : [],
+      protocol_suggestions: Array.isArray(challenge.protocol_suggestions) ? challenge.protocol_suggestions : [],
+      progress: Array.isArray(challenge.progress) ? challenge.progress : [],
+      status: 'open',
+      updated_at: new Date().toISOString(),
+      upgraded_at: new Date().toISOString()
+    };
+    return propose(
+      buildProposal({
+        agentSlug: ctx.agentSlug,
+        intent: `Upgrade to sprint: ${title}`,
+        surfaces: ['confirm_card', 'governance_log'],
+        writes: [{
+          path,
+          mode: 'overwrite',
+          content: serializeJson(upgraded),
+          diff: `upgrade ${existingId} → sprint, ${lanesNorm.lanes.length} lanes (${start} → ${end})`
+        }]
+      })
+    );
+  }
+
+  const openCount = await countOpenSprints(ctx);
+  if (openCount >= 3) return deny('Max 3 open sprints — close or finish one first');
+
+  const start = isCalendarDate(input.start_date) ? input.start_date : ctx.today;
+  const end = isCalendarDate(input.end_date) ? input.end_date : addCalendarDays(start, 11);
+  const length = sprintLengthDays({ start_date: start, end_date: end });
+  const cadence = resolveCadence({ start_date: start, end_date: end, cadence: input.cadence || {} });
+  const id = newId('ch');
+  const path = challengePath(start, title);
+  const body = {
+    id,
+    title,
+    goal,
+    metric: headlineNorm.headline?.metric?.label || null,
+    start_date: start,
+    end_date: end,
+    notes: input.notes || '',
+    status: 'open',
+    owner_agent: ctx.agentSlug,
+    progress: [],
+    kind: 'sprint',
+    lead_agent: lead,
+    headline: headlineNorm.headline,
+    cadence,
+    lanes: lanesNorm.lanes,
+    checkins: [],
+    protocol_suggestions: [],
+    created_at: new Date().toISOString()
+  };
+  const laneList = lanesNorm.lanes.map(l => `${SPRINT_ROSTER[l.agent]} (${l.role})`).join(', ');
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Open sprint: ${title}`,
+      surfaces: ['confirm_card', 'governance_log'],
+      writes: [{
+        path,
+        mode: 'create',
+        content: serializeJson(body),
+        diff: `sprint ${title}: ${laneList}; ${start} → ${end}; daily_check=${cadence.daily_check}`
+      }]
+    })
+  );
+}
+
+async function handleTrackCheckinLane(ctx, input) {
+  const challengeId = String(input.challenge_id || '').trim();
+  const status = String(input.status || '').trim();
+  if (!challengeId || !status) return deny('challenge_id and status are required');
+  if (!['on_track', 'stalled', 'no_evidence'].includes(status)) {
+    return deny('status must be on_track, stalled, or no_evidence');
+  }
+  const resolved = await resolveChallengeRecord(ctx, challengeId);
+  if (!resolved) return deny(`Challenge not found: ${challengeId}`);
+  const { path, challenge, sha } = resolved;
+  if (challenge.status === 'closed') return deny('Sprint is closed');
+  if (challenge.kind !== 'sprint') return deny('Not a sprint — open or upgrade first');
+  const lane = (challenge.lanes || []).find(l => l.agent === ctx.agentSlug);
+  const isLead = ctx.agentSlug === 'hammond' || ctx.agentSlug === challenge.lead_agent;
+  if (!lane && !isLead) {
+    return deny(`You do not own a lane on this sprint (own lane only)`);
+  }
+  // Hammond/lead writing without their own lane still records adam fields + optional named lane via note only
+  const date = isCalendarDate(input.date) ? input.date : ctx.today;
+  const kind = ['daily', 'weekly', 'final'].includes(input.kind) ? input.kind : 'daily';
+  if (!Array.isArray(challenge.checkins)) challenge.checkins = [];
+  let entry = challenge.checkins.find(c => c.date === date && c.kind === kind);
+  if (!entry) {
+    entry = { date, kind, by: ctx.agentSlug, lanes: {} };
+    challenge.checkins.push(entry);
+  }
+  if (lane) {
+    entry.lanes = entry.lanes || {};
+    entry.lanes[ctx.agentSlug] = {
+      status,
+      note: String(input.note || '')
+    };
+  } else if (isLead && input.note) {
+    entry.note = String(input.note);
+  }
+  if (isLead) {
+    const adam = {};
+    if (input.adam_rating != null) adam.rating = Number(input.adam_rating);
+    if (input.adam_win) adam.win = String(input.adam_win);
+    if (input.adam_snag) adam.snag = String(input.adam_snag);
+    if (input.adam_note) adam.note = String(input.adam_note);
+    if (Object.keys(adam).length) entry.adam = { ...(entry.adam || {}), ...adam };
+    if (input.protocol_session_id) entry.protocol_session_id = String(input.protocol_session_id);
+  }
+  entry.by = ctx.agentSlug;
+  challenge.updated_at = new Date().toISOString();
+  await writeAllowlisted(
+    ctx.client,
+    ctx.agentSlug,
+    path,
+    serializeJson(challenge),
+    `track: lane check-in ${challengeId}`,
+    sha
+  );
+  return ok('Lane check-in saved', { path, challenge_id: challengeId, date, checkin_kind: kind });
+}
+
+async function handleTrackLinkLane(ctx, input) {
+  const challengeId = String(input.challenge_id || '').trim();
+  const agent = String(input.agent || '').trim().toLowerCase();
+  const goalId = input.goal_id != null ? String(input.goal_id).trim() : '';
+  const taskId = input.task_id != null ? String(input.task_id).trim() : '';
+  if (!challengeId || !agent) return deny('challenge_id and agent are required');
+  if (!goalId && !taskId) return deny('goal_id or task_id required');
+  const agentCheck = validateLaneAgent(agent);
+  if (!agentCheck.ok) return deny(agentCheck.reason);
+  const resolved = await resolveChallengeRecord(ctx, challengeId);
+  if (!resolved) return deny(`Challenge not found: ${challengeId}`);
+  const { path, challenge, sha } = resolved;
+  if (challenge.kind !== 'sprint') return deny('Not a sprint');
+  const lane = (challenge.lanes || []).find(l => l.agent === agent);
+  if (!lane) return deny(`No lane for ${agent}`);
+  const allowed = ctx.agentSlug === agent
+    || ctx.agentSlug === 'hammond'
+    || ctx.agentSlug === 'clare'
+    || ctx.agentSlug === challenge.lead_agent;
+  if (!allowed) return deny('Only the lane owner, Hammond, or Clare may link');
+  if (goalId) {
+    lane.goal_ids = Array.isArray(lane.goal_ids) ? lane.goal_ids : [];
+    if (!lane.goal_ids.includes(goalId)) lane.goal_ids.push(goalId);
+  }
+  if (taskId) {
+    lane.task_ids = Array.isArray(lane.task_ids) ? lane.task_ids : [];
+    if (!lane.task_ids.includes(taskId)) lane.task_ids.push(taskId);
+  }
+  challenge.updated_at = new Date().toISOString();
+  await writeAllowlisted(
+    ctx.client,
+    ctx.agentSlug,
+    path,
+    serializeJson(challenge),
+    `track: link lane ${challengeId}`,
+    sha
+  );
+  return ok('Lane linked', { path, challenge_id: challengeId, agent });
+}
+
+async function handleTrackReviseSprint(ctx, input) {
+  const challengeId = String(input.challenge_id || '').trim();
+  if (!challengeId) return deny('challenge_id is required');
+  const resolved = await resolveChallengeRecord(ctx, challengeId);
+  if (!resolved) return deny(`Challenge not found: ${challengeId}`);
+  const { path, challenge } = resolved;
+  if (challenge.kind !== 'sprint') return deny('Not a sprint');
+  if (!canLeadSprint(ctx, challenge.lead_agent)) {
+    return deny('Only Hammond, Clare, or the lead agent may revise a sprint');
+  }
+  const next = { ...challenge };
+  if (input.title) next.title = String(input.title).trim();
+  if (input.goal) next.goal = String(input.goal).trim();
+  if (isCalendarDate(input.start_date)) next.start_date = input.start_date;
+  if (isCalendarDate(input.end_date)) next.end_date = input.end_date;
+  if (input.notes != null) next.notes = String(input.notes);
+  if (input.lead_agent) {
+    const leadCheck = validateLaneAgent(input.lead_agent);
+    if (!leadCheck.ok) return deny(leadCheck.reason);
+    next.lead_agent = leadCheck.slug;
+  }
+  if (input.lanes) {
+    const lanesNorm = normalizeSprintLanes(input.lanes);
+    if (!lanesNorm.ok) return deny(lanesNorm.reason);
+    next.lanes = lanesNorm.lanes;
+  }
+  if (input.headline != null) {
+    const headlineNorm = normalizeHeadline(input.headline);
+    if (!headlineNorm.ok) return deny(headlineNorm.reason);
+    next.headline = headlineNorm.headline;
+  }
+  if (input.cadence) {
+    next.cadence = resolveCadence({ ...next, cadence: { ...resolveCadence(next), ...input.cadence } });
+  }
+  next.updated_at = new Date().toISOString();
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Revise sprint: ${next.title || challengeId}`,
+      surfaces: ['confirm_card', 'governance_log'],
+      writes: [{
+        path,
+        mode: 'overwrite',
+        content: serializeJson(next),
+        diff: `revise sprint ${challengeId}`
       }]
     })
   );
@@ -1512,6 +1960,14 @@ export async function executeShortcut(toolName, input, ctx) {
         return await handleTrackLogProgress(ctx, input);
       case 'track_close_challenge':
         return await handleTrackCloseChallenge(ctx, input);
+      case 'track_open_sprint':
+        return await handleTrackOpenSprint(ctx, input);
+      case 'track_checkin_lane':
+        return await handleTrackCheckinLane(ctx, input);
+      case 'track_link_lane':
+        return await handleTrackLinkLane(ctx, input);
+      case 'track_revise_sprint':
+        return await handleTrackReviseSprint(ctx, input);
       case 'coordinate_request_cn_write':
         return await handleCoordinateRequestCnWrite(ctx, input);
       case 'research_save_brief':

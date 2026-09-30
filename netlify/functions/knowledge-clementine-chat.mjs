@@ -20,11 +20,54 @@ import {
 } from './_shared/http.mjs';
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
+import { getSydneyDateKey } from '../../apps/life/js/core/time.js';
+import { formatOpenSprintsForPrompt } from './_shared/sprint-prompt.mjs';
+import { listActiveSprints } from './_shared/sprint-evidence.mjs';
+import { listChallengePaths, parseJsonBlob } from './_shared/capabilities/stores.mjs';
+import { executeShortcut } from './_shared/capabilities/shortcuts.mjs';
+import { createGitHubClient } from './_shared/github-client.mjs';
+import { decodeBlob } from './_shared/decode-blob.mjs';
 
 export const config = {
   path: '/api/knowledge/clementine-chat',
   timeout: 26
 };
+
+async function loadOpenSprintsTextForClementine({ env, fetchImpl, deps }) {
+  if (typeof deps.loadOpenSprintsText === 'function') {
+    return deps.loadOpenSprintsText();
+  }
+  try {
+    const client = createGitHubClient({ env, fetchImpl });
+    const tree = (await client.resolveTree())?.tree ?? [];
+    const today = getSydneyDateKey(new Date());
+    const docs = [];
+    for (const path of listChallengePaths(tree)) {
+      const entry = tree.find(item => item.path === path && item.type === 'blob');
+      if (!entry?.sha) continue;
+      const raw = decodeBlob(await client.readBlob(entry.sha));
+      const doc = parseJsonBlob(raw, null);
+      if (doc) docs.push(doc);
+    }
+    const active = listActiveSprints(docs, today);
+    return formatOpenSprintsForPrompt(active, { slug: 'clementine', today, records: [] });
+  } catch {
+    return '';
+  }
+}
+
+async function defaultRunSprintTool(toolName, input, { agentSlug, env, fetchImpl }) {
+  const client = createGitHubClient({ env, fetchImpl });
+  const tree = (await client.resolveTree())?.tree ?? [];
+  const today = getSydneyDateKey(new Date());
+  return executeShortcut(toolName, input, {
+    agentSlug,
+    today,
+    client,
+    repoTree: tree,
+    readBlob: (sha) => client.readBlob(sha).then(decodeBlob)
+  });
+}
 
 function parseMessages(value) {
   if (!Array.isArray(value)) return [];
@@ -51,6 +94,28 @@ export function createKnowledgeClementineChatHandler(deps = {}) {
     if (request.method !== 'POST') {
       return withCors(methodNotAllowed('POST, OPTIONS'), request, env);
     }
+    const parsed = await readJsonObject(request);
+    if (parsed.error) return withCors(parsed.error, request, env);
+    const body = parsed.value ?? {};
+
+    // Sprint lane tools do not need the research kernel (W2).
+    if (body.sprint_tool && typeof body.sprint_tool === 'object') {
+      const who = personalityById(typeof body.personality === 'string' ? body.personality : 'clementine')
+        ?? personalityById('clementine');
+      const fetchImpl = deps.fetchImpl ?? fetch;
+      const toolName = String(body.sprint_tool.name || '').trim();
+      if (toolName !== 'track_checkin_lane' && toolName !== 'track_log_progress') {
+        return withCors(errorResponse(400, 'validation_error', 'sprint_tool.name must be track_checkin_lane or track_log_progress', false), request, env);
+      }
+      const runSprintTool = deps.runSprintTool ?? defaultRunSprintTool;
+      const toolResult = await runSprintTool(toolName, body.sprint_tool.input || {}, {
+        agentSlug: who.id === 'clementine' ? 'clementine' : who.id,
+        env,
+        fetchImpl
+      });
+      return withCors(okResponse(200, { status: 'done', sprint_tool: toolResult }), request, env);
+    }
+
     if (!knowledgeKernelSecret(env)) {
       return withCors(errorResponse(
         503,
@@ -59,9 +124,6 @@ export function createKnowledgeClementineChatHandler(deps = {}) {
         true
       ), request, env);
     }
-    const parsed = await readJsonObject(request);
-    if (parsed.error) return withCors(parsed.error, request, env);
-    const body = parsed.value ?? {};
     const messages = parseMessages(body.messages);
     if (!messages.length) {
       return withCors(errorResponse(400, 'validation_error', 'messages are required', false), request, env);
@@ -76,6 +138,10 @@ export function createKnowledgeClementineChatHandler(deps = {}) {
       ?? personalityById('clementine');
     const fetchImpl = deps.fetchImpl ?? fetch;
     try {
+      const openSprintsText = typeof deps.openSprintsText === 'string'
+        ? deps.openSprintsText
+        : (typeof body.openSprintsText === 'string' ? body.openSprintsText : await loadOpenSprintsTextForClementine({ env, fetchImpl, deps }));
+
       const result = await runChatTurn({
         voice: loadKnowledgePrompt(who.voiceFile, deps.cwd),
         universityJob: loadKnowledgePrompt('clementine-university.md', deps.cwd),
@@ -99,6 +165,7 @@ export function createKnowledgeClementineChatHandler(deps = {}) {
         priorResearch: parseResearchResult(body.priorResearch) ?? undefined,
         sittingLibrary: parseResearchResult(body.sittingLibrary) ?? undefined,
         archiveFailed: body.archiveFailed === true,
+        openSprintsText,
         env,
         fetchImpl,
         cwd: deps.cwd,

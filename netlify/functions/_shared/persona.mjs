@@ -30,6 +30,8 @@ export function buildSystemPrompt({
   pendingCnPatches = '',
   foodLibrary = '',
   nutritionChallenges = '',
+  openSprints = '',
+  sprintRoster = '',
   chadwickProtocol = '',
   hyaluronicaProtocol = '',
   penelopeProtocol = '',
@@ -401,6 +403,12 @@ export function buildSystemPrompt({
     capability,
     medicationBlock,
     capacityBlock,
+    openSprints
+      ? `Open challenge sprints (computed evidence — never invent missed from unavailable):\n${openSprints}`
+      : '',
+    sprintRoster
+      ? sprintRoster
+      : '',
     activationCatalogue,
     activationDirective,
     visualShared,

@@ -4,11 +4,12 @@ export function renderProtocolPills(root, {
   slug = null,
   selectedId = null,
   onSelect,
-  hostSelector = '#agent-protocol-pills'
+  hostSelector = '#agent-protocol-pills',
+  sprintFlags = null
 } = {}) {
   const host = root.querySelector?.(hostSelector);
   if (!host) return;
-  const pack = protocolsForSlug(slug);
+  const pack = protocolsForSlug(slug, { sprintFlags });
   if (!pack) {
     hideHost(host);
     host.replaceChildren?.();
