@@ -26,6 +26,9 @@ import { buildSystemPrompt } from './_shared/persona.mjs';
 import { CENTRAL_NODE_UNAVAILABLE_MARKER, HUB_CONTEXT_UNAVAILABLE_MARKER } from '../../apps/life/js/core/context-integrity.js';
 import { loadHubAgentContext } from './_shared/hub-agent-context.mjs';
 import { normalizeProtocolId, protocolSteerBlock } from '../../apps/life/js/app/agent-protocols.js';
+import { formatOpenSprintsForPrompt, formatSprintRosterBlock } from './_shared/sprint-prompt.mjs';
+import { listActiveSprints } from './_shared/sprint-evidence.mjs';
+import { CHALLENGES_DIR, parseJsonBlob } from './_shared/capabilities/stores.mjs';
 import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
 import { loadHyaluronicaProtocol } from './_shared/load-hyaluronica-protocol.mjs';
 import { loadPenelopeProtocol } from './_shared/load-penelope-protocol.mjs';
@@ -597,6 +600,9 @@ export function createChatHandler({
         let nutritionChallenges = emptyNutritionChallenges();
         let nutritionChallengesText = '';
         let nutritionChallengesSha;
+        let openSprintsText = '';
+        let sprintRosterText = '';
+        let openSprintRecords = [];
         let exerciseLibraryEntries = [];
         let exerciseLibrary = '';
         let exerciseLibrarySha;
@@ -697,6 +703,12 @@ export function createChatHandler({
             ? current.tree.find(entry => entry.path === NUTRITION_CHALLENGES_PATH && entry.type === 'blob')
             : null;
           nutritionChallengesSha = nutritionChallengesEntry?.sha;
+          const challengeEntries = current.tree.filter(
+            entry => entry.type === 'blob'
+              && typeof entry.path === 'string'
+              && entry.path.startsWith(`${CHALLENGES_DIR}/`)
+              && entry.path.endsWith('.json')
+          );
           const exerciseLibraryEntry = needsExerciseLibrary
             ? current.tree.find(entry => entry.path === EXERCISE_LIBRARY_PATH && entry.type === 'blob')
             : null;
@@ -796,6 +808,7 @@ export function createChatHandler({
             pendingActionsBlob,
             foodLibraryBlob,
             nutritionChallengesBlob,
+            challengeBlobs,
             exerciseLibraryBlob,
             fitnessResearchBlob,
             fitnessCoachingProfileBlob,
@@ -821,6 +834,7 @@ export function createChatHandler({
             pendingActionsEntry ? client.readBlob(pendingActionsEntry.sha) : null,
             foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
             nutritionChallengesEntry ? client.readBlob(nutritionChallengesEntry.sha) : null,
+            Promise.all(challengeEntries.map(entry => client.readBlob(entry.sha))),
             exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
             fitnessResearchEntry ? client.readBlob(fitnessResearchEntry.sha) : null,
             fitnessCoachingProfileEntry ? client.readBlob(fitnessCoachingProfileEntry.sha) : null,
@@ -1020,6 +1034,34 @@ export function createChatHandler({
               ? parseNutritionChallenges(decodedChallenges)
               : emptyNutritionChallenges();
             nutritionChallengesText = formatNutritionChallengesForPrompt(nutritionChallenges, { today });
+          }
+          {
+            const challengeDocs = (challengeBlobs || [])
+              .map((blob, index) => {
+                const raw = blob ? decodeBlob(blob) : null;
+                return raw != null ? parseJsonBlob(raw, null) : null;
+              })
+              .filter(Boolean);
+            openSprintRecords = listActiveSprints(challengeDocs, today);
+            const evidenceRecords = [];
+            for (const file of files) {
+              try {
+                const { record } = parseEventDocument(file.content, file.path, loadYaml);
+                if (record) evidenceRecords.push(record);
+              } catch {
+                /* skip */
+              }
+            }
+            openSprintsText = formatOpenSprintsForPrompt(openSprintRecords, {
+              slug,
+              today,
+              records: evidenceRecords
+            });
+            const designing = /\b(sprint|blitz|challenge)\b/i.test(String(parsed.message || ''))
+              || openSprintRecords.some(s => s.lead_agent === slug || slug === 'hammond');
+            sprintRosterText = (slug === 'hammond' || designing)
+              ? formatSprintRosterBlock(Boolean(openSprintRecords.length) || /\b(sprint|blitz|open a challenge)\b/i.test(String(parsed.message || '')))
+              : '';
           }
           if (needsHammondTools) {
             const decodedGovernanceLog = governanceLogBlob ? decodeBlob(governanceLogBlob) : null;
@@ -1597,6 +1639,8 @@ export function createChatHandler({
           pendingCnPatches: needsHammondTools ? formatPendingCnPatchesForPrompt(pendingCnPatches) : '',
           foodLibrary,
           nutritionChallenges: nutritionChallengesText,
+          openSprints: openSprintsText,
+          sprintRoster: sprintRosterText,
           chadwickProtocol,
           hyaluronicaProtocol,
           penelopeProtocol,

@@ -72,6 +72,20 @@ export const AGENT_PROTOCOLS = {
       { id: 'whats-running', label: "What's running", steer: 'Session Triage (gateway)', explain: 'Triage what’s live across the hubs.' },
       { id: 'decision', label: 'Decision help', steer: 'Decision Priority Hierarchy (provisional)', explain: 'Work a choice through the priority hierarchy.' },
       { id: 'weekly-review', label: 'Week recap + plan', steer: 'Follow-on protocols — Weekly Review', explain: 'Recap the week that happened, then plan the next one.' },
+      {
+        id: 'sprint-checkin',
+        label: 'Sprint check-in',
+        steer: 'Challenge sprints — daily check-in: ≤4 exchanges; read evidence; ask rating 1–5, one win, one snag; write checkins[] via track_checkin_lane; at most one Cross-Agent relay; no governance log for daily noise; suggest at most one thinking protocol if a lane stalled 2 days.',
+        explain: 'Sixty-second blitz check-in while a sprint is open.',
+        when: 'sprint-daily'
+      },
+      {
+        id: 'sprint-final',
+        label: 'Sprint final review',
+        steer: 'Challenge sprints — final review: headline start→end; lead-measure hit-rate; keep/drop proposals; verdict via track_close_challenge (Confirm); Governance Log entry.',
+        explain: 'Close the sprint with an honest final review.',
+        when: 'sprint-ended'
+      },
       { id: 'drifting', label: "Something's drifting", steer: 'Follow-on protocols — Drift', explain: 'Name a drift before it becomes a problem.' },
       { id: 'specialist', label: 'Talk to a specialist', steer: 'Specialist pattern relay', explain: 'Hand the pattern to the right specialist.' }
     ]
@@ -270,13 +284,32 @@ const GENERIC_STATUS_COPY = new Set([
   'Wrapping up…'
 ]);
 
-export function protocolsForSlug(slug) {
-  return AGENT_PROTOCOLS[slug] ?? null;
+export function protocolsForSlug(slug, { sprintFlags } = {}) {
+  const pack = AGENT_PROTOCOLS[slug] ?? null;
+  if (!pack) return null;
+  if (!sprintFlags) return pack;
+  const pills = pack.pills.filter(pill => {
+    if (!pill.when) return true;
+    if (pill.when === 'sprint-daily') return Boolean(sprintFlags.dailyCheckOpen);
+    if (pill.when === 'sprint-ended') return Boolean(sprintFlags.endedAwaitingReview);
+    return true;
+  });
+  // Enrich weekly review steer while a sprint is open
+  const enriched = pills.map(pill => {
+    if (pill.id === 'weekly-review' && sprintFlags.anyOpen) {
+      return {
+        ...pill,
+        steer: `${pill.steer} — while a sprint is open: lane-by-lane recap from checkins + evidence, headline trend, revise only if needed via track_revise_sprint, one relay per lane or record nothing to relay, Governance Log Weekly Review with sprint subsection, at most one protocol suggestion.`
+      };
+    }
+    return pill;
+  });
+  return { ...pack, pills: enriched };
 }
 
-export function findProtocol(slug, protocolId) {
+export function findProtocol(slug, protocolId, opts) {
   if (!slug || !protocolId) return null;
-  return protocolsForSlug(slug)?.pills.find(pill => pill.id === protocolId) ?? null;
+  return protocolsForSlug(slug, opts)?.pills.find(pill => pill.id === protocolId) ?? null;
 }
 
 export function protocolSteerBlock(slug, protocolId) {

@@ -56,10 +56,14 @@ export function isSchoolDay(date, terms) {
  * Pure: which notifications are due now.
  * @returns {Array<{ key: string, title: string, body: string, url: string }>}
  */
-export function decideNotifications({ today, nowHour, med, schoolDay, leave, reviewDone, log, blocks = [] }) {
+export function decideNotifications({ today, nowHour, med, schoolDay, leave, reviewDone, log, blocks = [], sprintNudges = [] }) {
   const out = [];
   const sentCount = Object.keys(log?.sent ?? {}).length;
   const unsent = (key) => !log?.sent?.[key];
+  // Sprint nudges first (priority over nice-to-haves); no AI.
+  for (const nudge of sprintNudges) {
+    if (nudge?.key && unsent(nudge.key)) out.push(nudge);
+  }
   if (med?.prompt && nowHour < med.prompt.usual + 1) {
     const key = `dex-${med.prompt.slot}`;
     if (unsent(key)) {
@@ -149,10 +153,16 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
   if (Object.keys(log.sent).length >= PUSH_DAILY_CAP) return { sent: [], skipped: 'cap' };
 
   // Usual dose times: computed once a day (reads the dex files), then reused.
+  // Sprint challenge docs: same — one GitHub open shared across dose + sprints.
+  let repoHandle = null;
+  const ensureRepo = async () => {
+    if (!repoHandle && typeof openRepo === 'function') repoHandle = await openRepo();
+    return repoHandle;
+  };
   let med = null;
   if (!log.usual) {
     try {
-      const repo = await openRepo();
+      const repo = await ensureRepo();
       const logs = await loadDoseLogs(repo.client, repo.decodeBlob, today);
       log.usual = usualDoseTimes(logs, today);
       log.todayLogs = logs.filter((row) => row.date === today);
@@ -165,7 +175,7 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
   if (inDoseWindow) {
     // Only now is today's own log worth re-reading.
     try {
-      const repo = await openRepo();
+      const repo = await ensureRepo();
       const logs = await loadDoseLogs(repo.client, repo.decodeBlob, today);
       log.todayLogs = logs.filter((row) => row.date === today);
     } catch {
@@ -193,6 +203,38 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
   const profile = await loadProfile().catch(() => null);
   const terms = await loadTerms().catch(() => []);
   const review = await getJSON(store, `${DAY_REVIEW_PREFIX}${today}`).catch(() => null);
+  let sprintNudges = [];
+  try {
+    if (!Array.isArray(log.sprintDocs)) {
+      const repo = await ensureRepo();
+      if (repo) {
+        const { listChallengePaths, parseJsonBlob } = await import('./capabilities/stores.mjs');
+        const tree = (await repo.client.resolveTree())?.tree ?? [];
+        const paths = listChallengePaths(tree);
+        const sprints = [];
+        for (const path of paths) {
+          const entry = tree.find(item => item.path === path);
+          if (!entry?.sha) continue;
+          const raw = await repo.decodeBlob(await repo.client.readBlob(entry.sha));
+          const doc = parseJsonBlob(raw, null);
+          if (doc?.kind === 'sprint' && doc.status !== 'closed') sprints.push(doc);
+        }
+        log.sprintDocs = sprints;
+      } else {
+        log.sprintDocs = [];
+      }
+    }
+    const { decideSprintNudges } = await import('./sprint-evidence.mjs');
+    sprintNudges = decideSprintNudges({
+      sprints: log.sprintDocs,
+      records: [],
+      today,
+      nowHour,
+      log
+    });
+  } catch {
+    sprintNudges = [];
+  }
   const due = decideNotifications({
     today,
     nowHour,
@@ -201,8 +243,10 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
     leave: leaveHour(profile),
     reviewDone: Boolean(review),
     log,
-    blocks: log.blocks ?? []
+    blocks: log.blocks ?? [],
+    sprintNudges
   });
+  // Assert: scheduled path never calls AI — only deterministic decide* helpers above.
   const sent = [];
   for (const message of due) {
     const result = await send(store, message, { env });

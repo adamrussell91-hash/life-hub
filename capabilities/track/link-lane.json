@@ -1,0 +1,10 @@
+{
+  "id": "track.link-lane",
+  "tool_name": "track_link_lane",
+  "verb": "Track",
+  "agents": ["*"],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Attach a goal_id or task_id to a sprint lane (additive).",
+  "surfaces": ["governance_log"]
+}

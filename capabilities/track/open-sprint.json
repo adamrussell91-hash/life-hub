@@ -1,0 +1,10 @@
+{
+  "id": "track.open-sprint",
+  "tool_name": "track_open_sprint",
+  "verb": "Track",
+  "agents": ["*"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Open a multi-agent challenge sprint (or upgrade a Phase-0 challenge). Confirm before writing.",
+  "surfaces": ["confirm_card", "governance_log"]
+}

@@ -185,6 +185,52 @@
       ],
       "tool_name": "track_close_challenge"
     },
+    "track.open-sprint": {
+      "file": "track/open-sprint.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "track_open_sprint"
+    },
+    "track.checkin-lane": {
+      "file": "track/checkin-lane.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "governance_log"
+      ],
+      "tool_name": "track_checkin_lane"
+    },
+    "track.link-lane": {
+      "file": "track/link-lane.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "governance_log"
+      ],
+      "tool_name": "track_link_lane"
+    },
+    "track.revise-sprint": {
+      "file": "track/revise-sprint.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "track_revise_sprint"
+    },
     "coordinate.request-cn-write": {
       "file": "coordinate/request-cn-write.json",
       "agents": [
