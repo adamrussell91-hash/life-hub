@@ -352,12 +352,6 @@
   font-size: var(--text-sm);
 }
 
-@media (max-width: 720px) {
-  .meeting-page__head-actions {
-    margin-left: 0;
-  }
-}
-
 .meeting-page .card p.muted {
   font-size: var(--text-sm);
 }
@@ -371,6 +365,65 @@
 .meeting-page__editor .event-form .event-compose__title {
   min-width: 0;
   font-size: var(--text-lg);
+}
+
+@media (max-width: 720px) {
+  /* Meeting / new-meeting canvas: page title steps to section size (R3/T1).
+     Kit default phone title is --text-xl (32px); that still dominates here. */
+  body:has(.meeting-page) .page-header__title,
+  body:has(.meeting-compose) .page-header__title {
+    font-size: var(--text-lg);
+    overflow-wrap: anywhere;
+  }
+
+  .meeting-page__head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .meeting-page .comm-page__phase {
+    width: 100%;
+    box-sizing: border-box;
+    padding: var(--space-px);
+  }
+
+  .meeting-page .comm-page__phase-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 2rem;
+    padding: 0.25rem 0.5rem;
+    font-size: var(--text-sm);
+  }
+
+  /* 2×2 compact kit buttons — same type as .btn, denser padding (not 40px wrap pile). */
+  .meeting-page__head-actions {
+    margin-left: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+    width: 100%;
+  }
+
+  .meeting-page__head-actions .btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 2rem;
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .meeting-page__editor .event-form .event-compose__title {
+    font-size: max(1rem, var(--text-base));
+    font-weight: var(--weight-semibold);
+    letter-spacing: normal;
+    line-height: var(--leading-snug);
+    min-height: 2.5rem;
+    padding: var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
 }
 
 .task-link-panel__row .btn {
