@@ -206,3 +206,25 @@ test('does not force a second round once log_entry already ran', async () => {
   }));
   assert.equal(calls, 1);
 });
+
+test('a bare approval with no plan in the conversation never forces a workout round', async () => {
+  let calls = 0;
+  const anthropic = {
+    async *streamMessage() {
+      calls += 1;
+      yield { type: 'text', delta: 'On it — digging into yoga for your hips now.' };
+      yield { type: 'done' };
+    }
+  };
+  const events = await collect(streamWithChadwickPlanForce(anthropic, {
+    slug: 'chadwick',
+    userMessage: 'go ahead',
+    today: '2026-09-30',
+    messages: [
+      { role: 'assistant', content: 'Want me to research some yoga moves for your hips?' },
+      { role: 'user', content: 'go ahead' }
+    ]
+  }));
+  assert.equal(calls, 1);
+  assert.equal(events.some(event => event.type === 'tool_call'), false);
+});

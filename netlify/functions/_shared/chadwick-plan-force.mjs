@@ -1,5 +1,9 @@
 import {
   CHADWICK_FORCE_PLAN_NUDGE,
+  claimedPlanLocked,
+  isPureWorkoutLockIn,
+  looksLikeSupersetPairing,
+  looksLikeWorkoutPlan,
   shouldForceChadwickPlanProposal
 } from '../../../apps/life/js/core/workout-plan-detect.js';
 import {
@@ -7,7 +11,9 @@ import {
   findLatestWorkoutPlanText
 } from '../../../apps/life/js/core/parse-workout-chat.js';
 
-export { CHADWICK_FORCE_PLAN_NUDGE, shouldForceChadwickPlanProposal };
+export { CHADWICK_FORCE_PLAN_NUDGE, isPureWorkoutLockIn, shouldForceChadwickPlanProposal };
+
+export const FORCED_PLAN_TEXT = 'Confirm below to put this plan on Fitness.';
 
 function latestPlanSource({ assistantText, messages, userMessage }) {
   const texts = [];
@@ -19,15 +25,27 @@ function latestPlanSource({ assistantText, messages, userMessage }) {
   return findLatestWorkoutPlanText(texts);
 }
 
+function conversationHasPlan(messages, assistantText) {
+  const texts = (messages ?? [])
+    .slice(-8)
+    .map(entry => (typeof entry?.content === 'string' ? entry.content : ''))
+    .concat(assistantText ?? '');
+  return texts.some(text => looksLikeWorkoutPlan(text) || looksLikeSupersetPairing(text));
+}
+
 export function resolveForcedChadwickPlan({
   slug,
   userMessage,
   today,
   messages,
   assistantText = '',
-  sawLogEntry = false
+  sawLogEntry = false,
+  pureLockInOnly = false
 } = {}) {
   if (slug !== 'chadwick' || sawLogEntry) return null;
+  // Pre-model shortcut: only a bare "go" may skip the model. An approval that
+  // also asks for a change needs the model to apply it first.
+  if (pureLockInOnly && !isPureWorkoutLockIn(userMessage)) return null;
   if (!shouldForceChadwickPlanProposal({ userMessage, assistantText, sawLogEntry })) {
     return null;
   }
@@ -38,7 +56,7 @@ export function resolveForcedChadwickPlan({
 function forcedPlanEvents(input) {
   return [
     { type: 'status', text: 'Locking the plan onto Fitness…' },
-    { type: 'text', delta: 'On Fitness — confirm to save the plan.' },
+    { type: 'text', delta: FORCED_PLAN_TEXT },
     { type: 'tool_call', id: 'forced_plan', name: 'log_entry', input }
   ];
 }
@@ -93,6 +111,9 @@ export async function* streamWithChadwickPlanForce(anthropic, {
 
   if (slug !== 'chadwick') return;
   if (!shouldForceChadwickPlanProposal({ userMessage, assistantText, sawLogEntry })) return;
+  // "go" / "looks good" with no plan anywhere in the conversation is agreement
+  // to something else (a research idea, a tip) — never manufacture a workout.
+  if (!claimedPlanLocked(assistantText) && !conversationHasPlan(streamOpts.messages, assistantText)) return;
 
   yield { type: 'status', text: 'Locking the plan onto Fitness…' };
 

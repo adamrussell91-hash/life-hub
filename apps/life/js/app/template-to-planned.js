@@ -5,6 +5,7 @@
  * Functions into Pages, and a missing import kills the whole main.js graph
  * (sign-in never binds → native POST to action="#" → GitHub Pages 405).
  */
+import { copyWorkoutSet, resolveTrackingType } from '../core/exercise-tracking.js';
 import { normalizeLoggerCableType, slugifyWorkoutTitle } from './fitness-logger-draft.js';
 
 /** Matches netlify chat-schema buildPlannedWorkoutSlug (client-safe copy). */
@@ -41,13 +42,14 @@ export function buildPlannedCandidateFromTemplate(template, { date, time = '07:3
         focus: Array.isArray(template.focus) ? template.focus : [],
         exercises: (Array.isArray(template.exercises) ? template.exercises : []).map(exercise => ({
           name: exercise?.name,
+          ...(exercise?.tracking != null ? { tracking: exercise.tracking } : {}),
           ...(exercise?.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
           ...(exercise?.intensification != null ? { intensification: exercise.intensification } : {}),
           ...(exercise?.equipment != null ? { equipment: exercise.equipment } : {}),
-          sets: (Array.isArray(exercise?.sets) ? exercise.sets : []).map(set => ({
-            reps: set?.reps,
-            weight_kg: set?.weight_kg,
-            cable_type: normalizeLoggerCableType(set?.cable_type)
+          sets: (Array.isArray(exercise?.sets) ? exercise.sets : []).map(set => copyWorkoutSet(set, {
+            cableType: resolveTrackingType(exercise) === 'weighted'
+              ? normalizeLoggerCableType(set?.cable_type)
+              : (set?.cable_type ?? 'none')
           }))
         }))
       }

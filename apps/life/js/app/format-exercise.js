@@ -1,4 +1,5 @@
 /** Shared display strings for workout exercises (Fitness hero + chat proposals). */
+import { describeSet, resolveTrackingType } from '../core/exercise-tracking.js';
 
 const CABLE_LABELS = {
   constant_force: 'constant force',
@@ -27,8 +28,11 @@ export function formatExerciseSetCount(exercise) {
 }
 
 export function formatExerciseSets(exercise) {
+  const tracking = resolveTrackingType(exercise);
   return (exercise?.sets ?? [])
     .map((set, index) => {
+      const described = describeSet(set, tracking);
+      if (described) return `Set ${index + 1}: ${described}`;
       const reps = set.reps != null ? `${set.reps} reps` : '— reps';
       const weight = set.weight_kg != null ? `${set.weight_kg} kg` : 'bodyweight';
       const cable = set.cable_type

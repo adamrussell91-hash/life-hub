@@ -1,5 +1,6 @@
 import { isCalendarDate } from './time.js';
 import { laneFor, locationKindFor } from '../app/medical-normalize.js';
+import { TRACKING_TYPES, resolveTrackingType } from './exercise-tracking.js';
 
 const COMMON_FIELDS = [
   'schema_version', 'id', 'type', 'date', 'time', 'created_at', 'updated_at', 'source'
@@ -219,6 +220,7 @@ function validateWorkout(record, errors) {
         errors.push(`${prefix}.name must be a non-empty string`);
       }
       optionalString(exercise, 'equipment', errors);
+      if (exercise.tracking != null) enumeration(exercise, 'tracking', TRACKING_TYPES, errors);
       finiteNumber(exercise, 'bench_angle_deg', errors, { minimum: 0, maximum: 90 });
       if (exercise.intensification != null) {
         enumeration(exercise, 'intensification', INTENSIFICATIONS, errors);
@@ -269,15 +271,30 @@ function validateWorkout(record, errors) {
       if (exercise.sets.length === 0 && strengthLike && record.status === 'completed') {
         errors.push(`${prefix}.sets must not be empty`);
       }
+      // Weighted (K1 cable) sets keep the strict reps / kg / cable shape. Bodyweight,
+      // timed and reps-in-time sets carry what they are measured by instead:
+      // weight_kg becomes optional added load and cable_type optional (none).
+      const tracking = resolveTrackingType(exercise);
+      const weighted = tracking === 'weighted';
       exercise.sets.forEach((set, setIndex) => {
         const setPrefix = `${prefix}.sets[${setIndex}]`;
         if (!isObject(set)) {
           errors.push(`${setPrefix} must be an object`);
           return;
         }
-        finiteNumber(set, 'reps', errors, { required: true });
-        finiteNumber(set, 'weight_kg', errors, { required: true, minimum: 0 });
-        enumeration(set, 'cable_type', CABLE_TYPES, errors, true);
+        finiteNumber(set, 'duration_sec', errors, { minimum: 0, maximum: 86400 });
+        finiteNumber(set, 'time_cap_sec', errors, { minimum: 1, maximum: 3600 });
+        if (tracking === 'timed') {
+          if (set.duration_sec == null && set.reps == null) errors.push(`${setPrefix}.duration_sec is required for a timed set`);
+          finiteNumber(set, 'reps', errors);
+        } else if (tracking === 'reps_in_time') {
+          if (set.time_cap_sec == null) errors.push(`${setPrefix}.time_cap_sec is required for a reps-in-time set`);
+          finiteNumber(set, 'reps', errors, { required: record.status === 'completed' });
+        } else {
+          finiteNumber(set, 'reps', errors, { required: true });
+        }
+        finiteNumber(set, 'weight_kg', errors, { required: weighted, minimum: 0 });
+        enumeration(set, 'cable_type', CABLE_TYPES, errors, weighted);
       });
     });
   }

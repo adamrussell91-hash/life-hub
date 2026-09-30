@@ -1,3 +1,5 @@
+import { resolveTrackingType } from '../core/exercise-tracking.js';
+
 export const DEFAULT_CABLE_TYPE = 'constant_force';
 
 /** Modes shown in the logger. `none` is not a mode — treat it as constant. */
@@ -47,6 +49,23 @@ export function finishLabel(sessionKind) {
   return sessionKind === 'strength' ? 'Pump finished' : 'Session finished';
 }
 
+/**
+ * K1 weighted sets keep the reps / kg / cable-mode shape. Bodyweight, timed and
+ * reps-in-time sets keep their seconds and stay cable "none" — coercing them to
+ * constant force would claim a cable that was never used.
+ */
+function cloneLoggerSet(set, tracking) {
+  const weighted = tracking === 'weighted';
+  const out = {
+    reps: Number(set?.reps) || 0,
+    weight_kg: Number(set?.weight_kg) || 0,
+    cable_type: weighted ? normalizeLoggerCableType(set?.cable_type) : 'none'
+  };
+  if (tracking === 'timed') out.duration_sec = Number(set?.duration_sec) || 0;
+  if (tracking === 'reps_in_time') out.time_cap_sec = Number(set?.time_cap_sec) || 60;
+  return out;
+}
+
 export function cloneLoggerDraft(session) {
   const source = session ?? {};
   return {
@@ -66,18 +85,18 @@ export function cloneLoggerDraft(session) {
     pain_flags: Array.isArray(source.pain_flags)
       ? source.pain_flags.map(flag => (typeof flag === 'object' ? { ...flag } : flag))
       : [],
-    exercises: (source.exercises ?? []).map(exercise => ({
-      name: exercise.name,
-      ...(exercise.equipment != null ? { equipment: exercise.equipment } : {}),
-      ...(exercise.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
-      ...(exercise.intensification != null ? { intensification: exercise.intensification } : {}),
-      ...(exercise.coach_cues != null ? { coach_cues: { ...exercise.coach_cues } } : {}),
-      sets: (exercise.sets ?? []).map(set => ({
-        reps: Number(set.reps) || 0,
-        weight_kg: Number(set.weight_kg) || 0,
-        cable_type: normalizeLoggerCableType(set.cable_type)
-      }))
-    })),
+    exercises: (source.exercises ?? []).map(exercise => {
+      const tracking = resolveTrackingType(exercise);
+      return {
+        name: exercise.name,
+        ...(exercise.tracking != null ? { tracking: exercise.tracking } : {}),
+        ...(exercise.equipment != null ? { equipment: exercise.equipment } : {}),
+        ...(exercise.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
+        ...(exercise.intensification != null ? { intensification: exercise.intensification } : {}),
+        ...(exercise.coach_cues != null ? { coach_cues: { ...exercise.coach_cues } } : {}),
+        sets: (exercise.sets ?? []).map(set => cloneLoggerSet(set, tracking))
+      };
+    }),
     notes: typeof source.notes === 'string' ? source.notes : '',
     path: source.path ?? null
   };
@@ -203,11 +222,14 @@ export function ensureCompletedNotes(draft) {
 
 export function appendSet(exercise) {
   const last = exercise.sets?.at(-1);
-  const next = {
+  const tracking = resolveTrackingType(exercise);
+  const next = cloneLoggerSet({
     reps: last?.reps ?? 10,
     weight_kg: last?.weight_kg ?? 0,
-    cable_type: normalizeLoggerCableType(last?.cable_type)
-  };
+    cable_type: last?.cable_type,
+    duration_sec: last?.duration_sec ?? 30,
+    time_cap_sec: last?.time_cap_sec ?? 60
+  }, tracking);
   return {
     ...exercise,
     sets: [...(exercise.sets ?? []), next]

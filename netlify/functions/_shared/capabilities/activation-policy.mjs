@@ -208,9 +208,9 @@ const INTENT_RULES = [
 
 const CATALOGUES = {
   chadwick: [
-    'Fitness sessions (data/fitness) — get_fitness_snapshot, get_last_workout, search_workout_records, compare_workout_windows, get_training_volume, get_working_weights, get_long_term_fitness, get_session_comparisons, get_exercise_history, get_load_status, get_pain_training_summary, get_region_strength, get_workout_template',
+    'Fitness sessions (data/fitness) — get_fitness_snapshot, get_last_workout, search_workout_records, compare_workout_windows, get_training_volume, get_working_weights, get_long_term_fitness, get_session_comparisons, get_exercise_history, get_exercise_progress, get_load_status, get_pain_training_summary, get_region_strength, get_workout_template',
     'Body composition/tape (data/body) — get_body_state',
-    'Exercise library — search_exercise_library',
+    'Exercise library — search_exercise_library, save_exercise_library_entry (single or batch of learned moves)',
     'Prompt may include a bounded Recent sessions list; that is metadata, not a substitute for calling tools when Adam asks how training is going, about decline, load, pain, volume, or comparisons.'
   ],
   brisket: [

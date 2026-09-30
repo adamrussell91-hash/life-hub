@@ -8,6 +8,8 @@
 // rule is skipped -- the plan marks it explicitly optional, and checking it would need
 // a target_area cross-reference against the exercise library that isn't loaded here.
 
+import { resolveTrackingType } from '../../../apps/life/js/core/exercise-tracking.js';
+
 const MIN_EXERCISES = 5;
 const MAX_EXERCISES = 9;
 const MAX_INTENSIFICATION_EXERCISES = 2;
@@ -35,7 +37,8 @@ export function lintWorkoutProposal(record) {
   }
 
   const missingCableType = exercises.some(exercise => (
-    Array.isArray(exercise?.sets) && exercise.sets.some(set => !set?.cable_type)
+    resolveTrackingType(exercise) === 'weighted'
+    && Array.isArray(exercise?.sets) && exercise.sets.some(set => !set?.cable_type)
   ));
   if (missingCableType) {
     warnings.push('At least one strength set is missing cable_type.');

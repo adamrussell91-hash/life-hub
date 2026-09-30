@@ -2,16 +2,29 @@
   "id": "lookup.save-exercise-library",
   "tool_name": "save_exercise_library_entry",
   "verb": "Lookup",
-  "agents": ["chadwick"],
+  "agents": [
+    "chadwick"
+  ],
   "risk": "auto",
   "kind": "capacity",
   "legacy_tool": "save_exercise_library_entry",
   "inputs": {
     "name": "string",
-    "target_area": "string"
+    "target_area": "string",
+    "primary_muscles": "string[]",
+    "difficulty": "string",
+    "tracking_type": "string",
+    "source_program": "string",
+    "entries": "object[]"
   },
-  "side_effects": ["Upserts an Exercise Library entry"],
-  "surfaces": ["exercise_library"],
-  "prompt_one_liner": "Save or refine an Exercise Library entry after researching a move.",
-  "reads": ["exercise_library"]
+  "side_effects": [
+    "Upserts one or more Exercise Library entries"
+  ],
+  "surfaces": [
+    "exercise_library"
+  ],
+  "prompt_one_liner": "Save, learn, or refine Exercise Library entries (muscles, difficulty, tracking type, source) — one move or a researched batch.",
+  "reads": [
+    "exercise_library"
+  ]
 }
