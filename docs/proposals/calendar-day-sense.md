@@ -91,8 +91,9 @@ night-time binge eating. So:
 - **iCloud calendars (4):** work, social, family, health appointments. They are
   published webcal feeds: the URL is the password. They are stored only as server
   secrets (`ICAL_FEED_WORK`, `ICAL_FEED_SOCIAL`, `ICAL_FEED_FAMILY`, `ICAL_FEED_HEALTH`),
-  never in the repo, the client or logs. The server fetches them in the 05:30 sweep and
-  on demand (at most every 15 minutes), expands repeats, converts to Sydney time, and
+  never in the repo, the client or logs. The server fetches them on demand when a signed-in
+  calendar opens (at most every 15 minutes; Blob cache). The 05:30 sweep reads that cache
+  only — it does not hit iCloud. Expands repeats, converts to Sydney time, and
   feeds them to every hub calendar as a read-only source with its own filter chip. Health
   appointments map to the Health lane; social and family become fixed commitments for
   Rescue and the leave-by planner. (Read-only: Life Hub never writes back to iCloud.)

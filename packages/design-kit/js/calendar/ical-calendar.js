@@ -87,3 +87,44 @@ export function calendarFeedRange(today) {
   const key = (ms) => new Date(ms).toISOString().slice(0, 10);
   return { from: key(at - 35 * 86_400_000), to: key(at + 400 * 86_400_000) };
 }
+
+const FEED_IDS = Object.freeze(['work', 'social', 'family', 'health']);
+const PROBLEM_STATUSES = new Set(['unconfigured', 'error', 'stale']);
+
+/**
+ * Fail-visible summary of GET /api/calendar-feeds `data.feeds`.
+ * Never treat "HTTP 200 + all unconfigured" as a healthy empty calendar.
+ *
+ * @param {Array<{ id?: string, status?: string }>|null|undefined} feeds
+ * @returns {{ severity: 'ok'|'degraded'|'error', line: string|null, problems: Array<{ id: string, status: string }> }}
+ */
+export function summarizeIcalFeedStatuses(feeds) {
+  const rows = Array.isArray(feeds) ? feeds : [];
+  const byId = new Map(rows.map((row) => [String(row?.id ?? ''), String(row?.status ?? '')]));
+  const problems = FEED_IDS
+    .map((id) => ({ id, status: byId.get(id) || 'unconfigured' }))
+    .filter((row) => PROBLEM_STATUSES.has(row.status));
+  if (!problems.length) return { severity: 'ok', line: null, problems };
+
+  const idsFor = (status) => problems.filter((p) => p.status === status).map((p) => p.id);
+  const unconfigured = idsFor('unconfigured');
+  const errored = idsFor('error');
+  const stale = idsFor('stale');
+
+  const parts = [];
+  if (unconfigured.length === FEED_IDS.length) {
+    parts.push(`iCloud calendars not linked in Netlify (${FEED_IDS.join(', ')})`);
+  } else if (unconfigured.length) {
+    parts.push(`iCloud not linked: ${unconfigured.join(', ')}`);
+  }
+  if (errored.length) parts.push(`iCloud unreachable: ${errored.join(', ')}`);
+  if (stale.length) parts.push(`iCloud stale copy: ${stale.join(', ')}`);
+
+  // `error` = a configured feed failed to fetch. Missing Netlify secrets are `degraded`
+  // (Retry cannot create ICAL_FEED_* vars).
+  return {
+    severity: errored.length ? 'error' : 'degraded',
+    line: parts.join(' · '),
+    problems
+  };
+}

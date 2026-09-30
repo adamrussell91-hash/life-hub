@@ -460,6 +460,7 @@ function mount({ entrance = false } = {}) {
       state: next,
       counts: countByFilterKey(filterItems),
       hidden: countHidden(filterItems, next),
+      feedNote: input?.icalFeedNote ?? null,
       onChange: applyRiverFilter
     });
   }
@@ -469,6 +470,7 @@ function mount({ entrance = false } = {}) {
     state: filterState,
     counts: countByFilterKey(filterItems),
     hidden: countHidden(filterItems, filterState),
+    feedNote: input?.icalFeedNote ?? null,
     onChange: applyRiverFilter
   });
 

@@ -801,6 +801,7 @@ function paint(doc, host, view, options) {
     state: filterState,
     counts: countByFilterKey(filterItems),
     hidden: countHidden(filterItems, filterState),
+    feedNote: options?.icalFeedNote ?? null,
     onChange: () => {
       if (session) paint(doc, host, current ?? view, { ...options, hub: options?.hub || 'life' });
     }
