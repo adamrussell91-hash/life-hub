@@ -393,7 +393,16 @@ test('search results interleave native Blob-backed people/organisations with the
       };
     };
     if (href.endsWith('/data/professional/people.json')) {
-      return body([{ legacy_id: 'leg-person-1', display_name: 'Example Import Person', sort_name: null, aliases: [] }]);
+      return body([
+        { legacy_id: 'leg-person-1', display_name: 'Example Import Person', sort_name: null, aliases: [] },
+        {
+          legacy_id: 'derived:person:example-student',
+          display_name: 'Example Student',
+          sort_name: null,
+          aliases: [],
+          original_category: 'Student (Communications database)'
+        }
+      ]);
     }
     if (href.endsWith('/data/professional/organisations.json')) {
       return body([{ legacy_id: 'leg-org-1', display_name: 'Example Import College', legal_name: null, aliases: [] }]);
@@ -409,6 +418,8 @@ test('search results interleave native Blob-backed people/organisations with the
     const organisationLabels = response.data.groups.organisation.map(r => r.display_label);
     assert.ok(personLabels.includes('Seth Example'), 'native person still matches');
     assert.ok(personLabels.includes('Example Import Person'), 'GitHub-imported person is merged in');
+    // The meeting picker finds students only through search.
+    assert.ok(personLabels.includes('Example Student'), 'imported Communications student is searchable');
     assert.ok(organisationLabels.includes('Example University'), 'native organisation still matches');
     assert.ok(organisationLabels.includes('Example Import College'), 'GitHub-imported organisation is merged in');
   } finally {
