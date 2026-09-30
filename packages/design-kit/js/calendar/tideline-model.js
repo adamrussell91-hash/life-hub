@@ -125,6 +125,16 @@ function workoutOnGrid(record) {
   return null;
 }
 
+/** `9:00–10:00 · with Rohan, Tania +2 · Library` for meetings, events and comms. */
+export function withMeta(clock, record) {
+  const names = Array.isArray(record?.with) ? record.with.filter(Boolean) : [];
+  const who = names.length
+    ? `with ${names.slice(0, 2).join(', ')}${names.length > 2 ? ` +${names.length - 2}` : ''}`
+    : '';
+  const where = typeof record?.location === 'string' ? record.location.trim() : '';
+  return [clock, who, where].filter(Boolean).join(' · ');
+}
+
 function chipFromEvent(event) {
   const record = event.record ?? {};
   if (!record.time || LOG_TYPES.has(record.type) || record.type === 'knowledge_page') return null;
@@ -156,6 +166,7 @@ function chipFromEvent(event) {
               ? kind
               : null;
   const feedMeta = record.feed && record.location ? `${clockMeta(start, end)} · ${record.location}` : null;
+  const peopleMeta = kind === 'professional' || kind === 'comm' ? withMeta(clockMeta(start, end), record) : null;
   const classMeta = isClass
     ? record.period
       ? `P${record.period} · ${record.focus || record.title || ''}`.trim()
@@ -171,7 +182,7 @@ function chipFromEvent(event) {
     kind,
     // Prefer lesson title for class chips; class name stays in meta.
     title: isClass ? (record.title || record.class_title || 'Class') : (record.title || kind),
-    meta: workout?.meta ?? feedMeta ?? classMeta,
+    meta: workout?.meta ?? feedMeta ?? peopleMeta ?? classMeta,
     isClass,
     protected: record.protected === true || kind === 'corey',
     provider: record.provider || record.clinician || '',

@@ -7,6 +7,7 @@ import {
 } from '@/api/universal-links';
 import { ApiClientError } from '@/api/client';
 import { createAutoRetry } from '@/lib/auto-retry';
+import { createPillGroup } from '@/lib/pills';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -81,19 +82,8 @@ export function mountTaskLinkPanel(options: {
   suggestTitle?: () => Promise<string>;
 }): { root: HTMLElement } {
   const root = el('section', 'task-link-panel');
-  root.append(el('h2', undefined, options.heading));
-
-  const mode = document.createElement('select');
-  mode.setAttribute('aria-label', `${options.heading} mode`);
-  for (const [value, label] of [
-    ['create', 'Create new Task'],
-    ['select', 'Select existing Task']
-  ] as const) {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    mode.append(option);
-  }
+  root.dataset.part = `task-link-${options.relationshipType}`;
+  root.append(el('h3', undefined, options.heading));
 
   const title = document.createElement('input');
   title.type = 'text';
@@ -152,26 +142,37 @@ export function mountTaskLinkPanel(options: {
     }
   });
 
-  mode.addEventListener('change', () => {
-    const select = mode.value === 'select';
-    title.hidden = select;
-    taskInput.hidden = !select;
-    picker.root.hidden = !select;
-    chipsHost.hidden = !select;
+  picker.root.hidden = true;
+  chipsHost.hidden = true;
+  const mode = createPillGroup({
+    label: `${options.heading} mode`,
+    choices: [
+      ['create', 'New task'],
+      ['select', 'Existing task']
+    ],
+    value: 'create',
+    onChange: (value) => {
+      const select = value === 'select';
+      title.hidden = select;
+      taskInput.hidden = !select;
+      picker.root.hidden = !select;
+      chipsHost.hidden = !select;
+      submit.textContent = select ? 'Link task' : 'Create task';
+    }
   });
 
   const status = el('p', 'meeting-form__status');
   status.hidden = !options.statusMessage;
   if (options.statusMessage) status.textContent = options.statusMessage;
 
-  const submit = el('button', 'btn btn--secondary', 'Save link') as HTMLButtonElement;
+  const submit = el('button', 'btn btn--secondary', 'Create task') as HTMLButtonElement;
   submit.type = 'button';
   submit.dataset.taskLinkSubmit = options.relationshipType;
   submit.addEventListener('click', async () => {
     status.hidden = true;
     submit.disabled = true;
     try {
-      if (mode.value === 'select') {
+      if (mode.get() === 'select') {
         if (!selectedTaskId) throw new Error('Select a Task first.');
         await options.onSubmit({ task_id: selectedTaskId });
       } else {
@@ -185,14 +186,16 @@ export function mountTaskLinkPanel(options: {
     }
   });
 
-  root.append(mode, title, taskInput, picker.root, chipsHost, submit, status);
+  const row = el('div', 'task-link-panel__row');
+  row.append(title, taskInput, submit);
+  root.append(mode.root, row, picker.root, chipsHost, status);
 
   if (options.incompleteOperationId && options.onRetry) {
     const operationId = options.incompleteOperationId;
     const onRetry = options.onRetry;
     // One link at a time: no second task while this one is still landing.
     submit.disabled = true;
-    mode.disabled = true;
+    for (const button of mode.root.querySelectorAll('button')) button.disabled = true;
     title.disabled = true;
 
     const linkState = el('p', 'task-link-panel__state', 'Linking…');
