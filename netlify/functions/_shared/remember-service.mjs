@@ -6,6 +6,7 @@ import { defaultGetProfessionalStore, getJSON, setJSON, REMEMBER_RUN_STATE_KEY }
 import { defaultGetTasksStore, listJSON as listTasksJSON, PROJECT_PREFIX, TASK_PREFIX } from './tasks-blobs.mjs';
 import { loadAllPeopleWithRelationships } from './people-collection.mjs';
 import { defaultGetUniversalLinkStore } from './universal-link-blobs.mjs';
+import { withoutDeleted } from './record-liveness.mjs';
 
 /**
  * Run Ann's Remember pass for one person (or all people with new material).
@@ -24,8 +25,8 @@ export async function runRememberScanForPerson(personRef, deps = {}) {
     deps.observationRepo ?? createObservationRepository({ store: professionalStore, now: deps.now });
 
   const observations = await observationRepo.listObservationsForAboutRef(personRef).catch(() => []);
-  const allTasks = tasksStore ? await listTasksJSON(tasksStore, TASK_PREFIX).catch(() => []) : [];
-  const allProjects = tasksStore ? await listTasksJSON(tasksStore, PROJECT_PREFIX).catch(() => []) : [];
+  const allTasks = tasksStore ? withoutDeleted(await listTasksJSON(tasksStore, TASK_PREFIX).catch(() => [])) : [];
+  const allProjects = tasksStore ? withoutDeleted(await listTasksJSON(tasksStore, PROJECT_PREFIX).catch(() => [])) : [];
 
   const displayName = deps.displayName ?? '';
   const nameNeedle = displayName.toLowerCase();

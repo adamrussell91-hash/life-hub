@@ -11,6 +11,7 @@ import {
   isCalendarDate
 } from '../../../apps/life/js/core/time.js';
 import { extractThisWeek } from '../../../apps/life/js/core/constraints.js';
+import { isOpenTask } from './task-liveness.mjs';
 
 export const WEEK_PACK_UNAVAILABLE_MARKER =
   'Week pack UNAVAILABLE — Life week files failed to load. Do not invent last week. Say the inventory is unavailable.';
@@ -70,12 +71,6 @@ function recordsOf(events, type, start, end) {
     .map(asRecord)
     .filter(record => record?.type === type && inRange(record.date, start, end))
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-}
-
-function isOpenTask(task) {
-  if (!task || typeof task !== 'object') return false;
-  if (task.status === 'done' || task.bucket === 'done' || task.completed_at) return false;
-  return typeof task.title === 'string' && task.title.trim().length > 0;
 }
 
 function formatRange(start, end) {

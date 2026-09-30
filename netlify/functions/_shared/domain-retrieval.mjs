@@ -19,6 +19,8 @@ import { formatHubAgentContext } from './hub-agent-context.mjs';
 import { getWeekReviewSchema } from './hammond-week.mjs';
 import { rankKnowledgePages } from './knowledge-data.mjs';
 import { NUTRITION_LOG_PATH, SKINCARE_LOG_PATH } from './treatment-state.mjs';
+import { isOpenTask } from './task-liveness.mjs';
+import { withoutDeleted } from './record-liveness.mjs';
 
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 20;
@@ -418,12 +420,6 @@ export function getSkincareAdherence(records, today, { lookbackDays = 14 } = {})
   };
 }
 
-function isOpenTask(task) {
-  if (!task || typeof task !== 'object') return false;
-  if (task.status === 'done' || task.bucket === 'done' || task.completed_at) return false;
-  return typeof task.title === 'string' && task.title.trim().length > 0;
-}
-
 export function getTasksFocus(tasks = [], projects = [], { now = new Date() } = {}) {
   const open = (Array.isArray(tasks) ? tasks : []).filter(isOpenTask);
   const capacity = buildCapacitySnapshot(open, now, 7);
@@ -511,8 +507,7 @@ export function getTask(tasks = [], { task_id } = {}) {
 export function partitionTeachingLessons(records = []) {
   const drafts = [];
   const scheduled = [];
-  for (const item of records ?? []) {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+  for (const item of withoutDeleted(records)) {
     if (item.type === 'scheduled_lesson') {
       scheduled.push(item);
       continue;
@@ -694,8 +689,10 @@ export function searchTeaching({ query, classes = [], lessons = [], units = [], 
   const q = String(query ?? '').trim();
   if (q.length < 2) return { ok: false, error: 'empty_query', store: 'teaching_hub' };
   const cap = capLimit(limit);
-  const { drafts } = partitionTeachingLessons(lessons);
-  const lessonPool = drafts.length ? drafts : lessons;
+  classes = withoutDeleted(classes);
+  units = withoutDeleted(units);
+  const { drafts, scheduled } = partitionTeachingLessons(lessons);
+  const lessonPool = drafts.length ? drafts : scheduled;
   let hits = [
     ...searchTeachingRecords(q, classes, 'class'),
     ...searchTeachingRecords(q, lessonPool, 'lesson'),
@@ -757,7 +754,8 @@ export function getTeachingContext({
   const until = addCalendarDays(today, 14);
   const stated = statedTeachingConstraints(message || query);
   stated.today = today;
-  const activeClasses = (classes ?? []).filter(c => c && c.status !== 'trashed' && c.status !== 'archived');
+  const activeClasses = withoutDeleted(classes).filter(c => c.status !== 'archived');
+  units = withoutDeleted(units);
   const { drafts } = partitionTeachingLessons(lessons);
   const upcoming = hydrateTeachingSchedule(lessons, { now, windowDays: 14 });
   const matchedClass = matchTeachingClass(activeClasses, query, stated);
@@ -1070,7 +1068,8 @@ export function domainRetrievalSchemasFor(slug) {
       },
       {
         name: 'search_tasks',
-        description: 'Search open tasks by text.',
+        description:
+          'Search open tasks by text. Done and trashed (dead) tasks are never returned. A task is only the same task if the id matches — never treat a differently titled task as already handled.',
         input_schema: {
           type: 'object',
           properties: {

@@ -19,6 +19,7 @@ import {
 } from './clare-work.mjs';
 import { listJSON as listTasksJSON, TASK_PREFIX } from './tasks-blobs.mjs';
 import { decodeBlob } from './decode-blob.mjs';
+import { withoutDeleted } from './record-liveness.mjs';
 
 const ALLOWED_TOOLS = new Set(['weekly_review']);
 
@@ -71,9 +72,9 @@ export async function invokeWeeklyReviewProposal({
   let workBlocks = [];
   if (tasksStore) {
     [tasks, projects, workBlocks] = await Promise.all([
-      listTasksJSON(tasksStore, TASK_PREFIX).catch(() => []),
-      listTasksJSON(tasksStore, 'projects/').catch(() => []),
-      listTasksJSON(tasksStore, 'work_blocks/').catch(() => [])
+      listTasksJSON(tasksStore, TASK_PREFIX).catch(() => []).then(withoutDeleted),
+      listTasksJSON(tasksStore, 'projects/').catch(() => []).then(withoutDeleted),
+      listTasksJSON(tasksStore, 'work_blocks/').catch(() => []).then(withoutDeleted)
     ]);
   }
 

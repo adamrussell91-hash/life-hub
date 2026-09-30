@@ -27,6 +27,7 @@ import {
 import { searchMindRecords } from './mind-session-read.mjs';
 import { topicQuery, researchFromDocs, coverageFromResearch } from './knowledge-research.mjs';
 import { rankKnowledgePages } from './knowledge-data.mjs';
+import { isOpenTask } from './task-liveness.mjs';
 
 function mealEvents(records) {
   return (Array.isArray(records) ? records : [])
@@ -918,12 +919,6 @@ export function analyseMindEvidence(events, today, { message = '', query = '' } 
       + 'Do not diagnose. Do not convert therapist notes into current clinical state. '
       + 'Do not invent therapist conclusions. Current-turn themes are user_stated_current_turn only.'
   };
-}
-
-function isOpenTask(task) {
-  if (!task || typeof task !== 'object') return false;
-  if (task.status === 'done' || task.bucket === 'done' || task.completed_at) return false;
-  return typeof task.title === 'string' && task.title.trim().length > 0;
 }
 
 export function getTasksOpenLoops(
