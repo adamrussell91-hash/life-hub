@@ -58,6 +58,8 @@ async function loadNotionListCaches(): Promise<NotionListCaches | null> {
 }
 
 const LOCAL_PASSPHRASE = 'professional-hub-local';
+/** Local-only: Blob copies the Duplicates sheet has merged this session. */
+const mockDedupeDone = new Set<string>();
 
 interface PersonRecord {
   id: string;
@@ -1592,6 +1594,35 @@ export function createMockApi() {
       }
       record.updated_at = new Date().toISOString();
       return json(200, { ok: true, data: { ref: refFor(record), ...record } });
+    }
+
+    if (path === '/api/entities/admin' && method === 'POST') {
+      const input = (body ?? {}) as { action?: string; confirm_ids?: string[] };
+      const p = (n: number, name: string) => ({
+        id: `person_00000000-0000-4000-8000-00000000090${n}`,
+        ref: `shared:person:person_00000000-0000-4000-8000-00000000090${n}`,
+        name
+      });
+      const ready = [
+        { kind: 'copy', remove: p(1, 'Rohan'), into: [p(2, 'Rohan Arianayagam')], student: true, links: 2, blocked: null },
+        { kind: 'combined', remove: p(3, 'Joseph Histon, Thierry King'), into: [p(4, 'Joseph Histon'), p(5, 'Thierry King')], student: true, links: 1, blocked: null }
+      ].filter((a) => !mockDedupeDone.has(a.remove.id));
+      if (input.action === 'plan_people_dedupe') {
+        return json(200, {
+          ok: true,
+          data: {
+            ready,
+            kept: [{ kind: 'copy', remove: p(6, 'Max Ziazaras'), into: [p(7, 'Max Ziaziaris')], student: true, links: 0, blocked: 'has_promises' }],
+            unresolved: [{ kind: 'combined', remove: p(8, 'Hector and Hugo Standen'), names: ['Hector Standen', 'Hugo Standen'], missing: ['Hector Standen', 'Hugo Standen'], links: 0 }]
+          }
+        });
+      }
+      if (input.action === 'apply_people_dedupe') {
+        const ids = new Set(input.confirm_ids ?? []);
+        const done = ready.filter((a) => ids.has(a.remove.id)).map((a) => ({ ...a, moved: a.links }));
+        for (const a of done) mockDedupeDone.add(a.remove.id);
+        return json(200, { ok: true, data: { done, failed: [], skipped: [], remaining: [] } });
+      }
     }
 
     if (path === '/api/entities' && method === 'POST') {
