@@ -82,7 +82,8 @@ export function renderCalendar(root, model, {
   planningProfile = null,
   calendarGhosts = null,
   apiFetch = null,
-  onSourcesChanged = null
+  onSourcesChanged = null,
+  icalFeedNote = null
 } = {}) {
   const dashboard = root.querySelector('#calendar-dashboard');
   if (!dashboard || !model) return;
@@ -99,7 +100,8 @@ export function renderCalendar(root, model, {
       hub: 'life',
       now,
       apiFetch,
-      onSwitchView
+      onSwitchView,
+      icalFeedNote
     });
     return;
   }
@@ -117,6 +119,7 @@ export function renderCalendar(root, model, {
     ghosts: calendarGhosts,
     apiFetch,
     onSourcesChanged,
+    icalFeedNote,
     week: weekDates,
     today: model.date,
     now,

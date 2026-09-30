@@ -641,6 +641,7 @@ function paintTidelineSources(host = nodes.get('__sources')) {
     counts,
     hidden,
     ambient: model.ambient,
+    feedNote: input?.icalFeedNote ?? null,
     onChange: (next) => {
       filterState = next;
       applyTidelineFilter({ replay: true });
