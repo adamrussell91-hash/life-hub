@@ -4,9 +4,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { icalOccurrences, parseDuration, wallToUtc, sydneyWall } from '../../netlify/functions/_shared/ical.mjs';
-import { createCalendarFeedsHandler, feedUrl } from '../../netlify/functions/calendar-feeds.mjs';
+import { createCalendarFeedsHandler, feedUrl, readRange } from '../../netlify/functions/calendar-feeds.mjs';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
-import { eventsFromCalendarFeeds, summarizeIcalFeedStatuses } from '../../packages/design-kit/js/calendar/ical-calendar.js';
+import { calendarFeedRange, eventsFromCalendarFeeds, summarizeIcalFeedStatuses } from '../../packages/design-kit/js/calendar/ical-calendar.js';
 import { buildTidelineModel } from '../../packages/design-kit/js/calendar/tideline-model.js';
 import { filterKeyForItem, paintSourceFilter } from '../../packages/design-kit/js/calendar/calendar-filter.js';
 import { paintSourceErrors } from '../../packages/design-kit/js/calendar/load-hub-sources.js';
@@ -365,4 +365,12 @@ test('paintSourceErrors: degraded iCloud config shows without a useless Retry', 
   assert.equal(line.dataset.severity, 'degraded');
   assert.match(line.childNodes[0].textContent, /family/);
   assert.equal(line.childNodes.some((n) => n.textContent === 'Retry'), false);
+});
+
+test('server accepts the exact range the client asks for (regression: 435-day window vs 430 cap)', () => {
+  for (const today of ['2026-09-30', '2026-01-01', '2027-02-28', '2028-02-29']) {
+    const { from, to } = calendarFeedRange(today);
+    const range = readRange(new URL(`https://x/api/calendar-feeds?from=${from}&to=${to}`));
+    assert.ok(range, `client range ${from}..${to} rejected by server`);
+  }
 });
