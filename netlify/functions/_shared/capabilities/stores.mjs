@@ -71,6 +71,18 @@ export function serializeJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+export function listChallengePaths(tree) {
+  if (!Array.isArray(tree)) return [];
+  return tree
+    .filter(item =>
+      item?.type === 'blob'
+      && typeof item.path === 'string'
+      && item.path.startsWith(`${CHALLENGES_DIR}/`)
+      && item.path.endsWith('.json')
+    )
+    .map(item => item.path);
+}
+
 export function findChallengePath(tree, challengeId) {
   if (!Array.isArray(tree) || typeof challengeId !== 'string' || !challengeId.trim()) return null;
   const id = challengeId.trim();
