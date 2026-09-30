@@ -235,6 +235,29 @@ export function eventsForDate(events, date) {
     });
 }
 
+/**
+ * One list for Life Calendar model + Tideline/Day Dial.
+ * Day/Week/Term rebuild from this array — omitting a hub here makes its
+ * filter chips read 0 even when schedule-projections loaded (Meetings 0 bug).
+ */
+export function mergeLifeCalendarEvents({
+  lifeEvents = [],
+  teachingEvents = [],
+  knowledgeEvents = [],
+  tasksEvents = [],
+  professionalEvents = [],
+  feedEvents = []
+} = {}) {
+  return [
+    ...(lifeEvents ?? []),
+    ...(teachingEvents ?? []),
+    ...(knowledgeEvents ?? []),
+    ...(tasksEvents ?? []),
+    ...(professionalEvents ?? []),
+    ...(feedEvents ?? [])
+  ];
+}
+
 export function buildCalendarModel({
   events,
   date,

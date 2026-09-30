@@ -13,7 +13,7 @@ import {
   eventsFromCalendarFeeds,
   summarizeIcalFeedStatuses
 } from '../../../../packages/design-kit/js/calendar/ical-calendar.js';
-import { shiftYearMonth } from './calendar-model.js';
+import { mergeLifeCalendarEvents, shiftYearMonth } from './calendar-model.js';
 import { deriveRiverZooms } from './term-river.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
@@ -1573,15 +1573,18 @@ export function createAppController(dependencies) {
     if (!calendarSelectedDate) calendarSelectedDate = date;
     if (!calendarViewMonth) calendarViewMonth = calendarSelectedDate.slice(0, 7);
     if (!calendarCompose.date) calendarCompose = { ...calendarCompose, date: calendarSelectedDate };
+    // Same list for month model and Day/Week Tideline — dropping a hub here
+    // zeroes its filter chips even when the API loaded (Meetings 0 with filters off).
+    const calendarEvents = mergeLifeCalendarEvents({
+      lifeEvents: latestResult.events,
+      teachingEvents,
+      knowledgeEvents,
+      tasksEvents,
+      professionalEvents,
+      feedEvents
+    });
     const model = buildCalendarModel({
-      events: [
-        ...(latestResult.events ?? []),
-        ...teachingEvents,
-        ...knowledgeEvents,
-        ...tasksEvents,
-        ...professionalEvents,
-        ...feedEvents
-      ],
+      events: calendarEvents,
       date,
       selectedDate: calendarSelectedDate,
       viewMonth: calendarViewMonth,
@@ -1602,11 +1605,7 @@ export function createAppController(dependencies) {
       selectedEventId: calendarSelectedEventId,
       focusCompose,
       now: now(),
-      events: [
-        ...(latestResult.events ?? []),
-        ...tasksEvents,
-        ...feedEvents
-      ],
+      events: calendarEvents,
       icalFeedNote,
       calendarVisual: latestResult.calendarVisual ?? null,
       hubPrefs: calendarHubPrefs,
