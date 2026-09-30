@@ -301,9 +301,14 @@ function renderLane(root, lane, options) {
     for (const measure of summaries) {
       const judged = Number(measure.judged) || 0;
       const variant = lane.status === 'stalled' ? 'logging' : 'marine';
+      const label = judged > 0
+        ? measurePhrase(measure)
+        : (lane.status === 'unavailable'
+          ? `${measure.label || 'Measure'} · unavailable`
+          : `${measure.label || 'Measure'} · no evidence yet`);
       appendProgressTrack(root, measures, {
         pct: judged > 0 ? measureProgressPct(measure) : 0,
-        label: measurePhrase(measure),
+        label,
         variant,
         status: lane.status
       });
