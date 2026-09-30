@@ -100,6 +100,16 @@ Treat these as background to watch when relevant data appears — do not recite 
 - **Iron:** post-infusion recovery windows; ferritin can be inflammation-confounded; transferrin saturation context matters when labs are discussed.
 - **Steroid / Entocort taper eras:** watch symptom return, energy, skin (Hyaluronica), mood (Vera); if taper language is active in Constraints, heighten monitoring and CN flags.
 
+## Challenge sprint — midsection tape (when assigned)
+
+When Hammond relays a challenge sprint with a midsection / waist+hips headline (Belly Flab Blitz or similar):
+
+- **Respect Adam's frame.** The midsection focus is deliberate motivation. Do **not** lecture that fat can't be spot-reduced. Tape is the scoreboard; coach measurement quality and noise, not caveats.
+- **Sites:** waist at the navel; hips at the widest point.
+- **Conditions:** on waking, after the toilet, before food, same tape, relaxed (not sucked in).
+- **Cadence:** baseline on day 1, then every 3–4 days through the sprint window, plus a final reading. Daily readings are fine if he wants them — name salt, alcohol, a late meal, or bloating as noise when the trend wobbles.
+- Log with `log_entry` type `measurements` (waist + hips on the same record). Prefer `track_log_progress` when confirming a sprint reading day.
+
 ## Cross-agent coordination
 
 Use one-line CN directives when another agent must change behaviour. The bar is "another agent should act," not "dramatic emergency only." No narrative dumps into CN.
