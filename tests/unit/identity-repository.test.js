@@ -1484,3 +1484,19 @@ test('Job1/R4 #17: unsafe stored identifiers never reach a Blob key lookup (no i
   const reconciled = await repo.reconcileSelfIdentity(admin);
   assert.equal(reconciled.status, 'reconciled');
 });
+
+test('a transition straight after another reads the record strongly (stale eventual reads cannot block active → deidentified → deleted)', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { record: person } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Copy Of Someone' } });
+  // Eventual reads keep serving the record as it was before any transition.
+  const stale = await store.get(personKey(person.id), { type: 'json' });
+  const realGet = store.get.bind(store);
+  store.get = async (key, options = {}) =>
+    key === personKey(person.id) && options.consistency !== 'strong' ? stale : realGet(key, options);
+
+  const ref = { kind: 'person', id: person.id };
+  await repo.transitionLifecycle({ ref, toStatus: 'deidentified' });
+  const deleted = await repo.transitionLifecycle({ ref, toStatus: 'deleted' });
+  assert.equal(deleted.lifecycle_status, 'deleted');
+});
