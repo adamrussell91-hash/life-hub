@@ -26,7 +26,10 @@ export const CALENDAR_FEEDS = Object.freeze([
 export const FEED_CACHE_MS = 15 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_FEED_BYTES = 5 * 1024 * 1024;
-const MAX_RANGE_DAYS = 430;
+// Must cover the client's calendarFeedRange (35 days back + 400 ahead = 435),
+// with headroom. It was 430, so every client request got a 400 and the banner
+// "Couldn't load your iCloud calendars". tests/unit/calendar-feeds.test.js pins this.
+export const MAX_RANGE_DAYS = 450;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const cacheKey = (id) => `meta/ical_cache/${id}`;
@@ -119,7 +122,7 @@ export function createCalendarFeedsHandler(deps = {}) {
     if (request.method !== 'GET') return withCors(methodNotAllowed('GET, OPTIONS'), request, env);
     const range = readRange(new URL(request.url));
     if (!range) {
-      return withCors(errorResponse(400, 'invalid_date_range', 'Provide from and to as YYYY-MM-DD (at most 430 days).', false), request, env);
+      return withCors(errorResponse(400, 'invalid_date_range', `Provide from and to as YYYY-MM-DD (at most ${MAX_RANGE_DAYS} days).`, false), request, env);
     }
     const nowMs = now();
     const results = await Promise.all(CALENDAR_FEEDS.map(async (feed) => {
