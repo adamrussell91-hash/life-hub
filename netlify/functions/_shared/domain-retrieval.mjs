@@ -420,7 +420,10 @@ export function getSkincareAdherence(records, today, { lookbackDays = 14 } = {})
 
 function isOpenTask(task) {
   if (!task || typeof task !== 'object') return false;
-  if (task.status === 'done' || task.bucket === 'done' || task.completed_at) return false;
+  // Trashed tasks are status 'dead' / bucket 'trash' (clare_mutate trash_task). They are
+  // hidden from every Tasks view, so they must not come back as "open" to Clare either.
+  if (task.status === 'done' || task.status === 'dead' || task.completed_at) return false;
+  if (task.bucket === 'done' || task.bucket === 'trash' || task.bucket === 'trashed') return false;
   return typeof task.title === 'string' && task.title.trim().length > 0;
 }
 
@@ -1070,7 +1073,8 @@ export function domainRetrievalSchemasFor(slug) {
       },
       {
         name: 'search_tasks',
-        description: 'Search open tasks by text.',
+        description:
+          'Search open tasks by text. Done and trashed (dead) tasks are never returned. A task is only the same task if the id matches — never treat a differently titled task as already handled.',
         input_schema: {
           type: 'object',
           properties: {
