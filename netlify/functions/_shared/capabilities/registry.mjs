@@ -30,6 +30,7 @@ import { proposeRememberFactSchema } from '../remember-fact-agent.mjs';
 import { proposeLogCommunicationSchema } from '../log-comm-agent.mjs';
 import { listCalendarBlocksSchema } from '../list-calendar-blocks.mjs';
 import { proposeMeetingSchema, proposeEventSchema } from '../meeting-event-agent.mjs';
+import { checkCalendarsSchema } from '../agent-calendar-merge.mjs';
 import { proposeApplicationSchema, proposeFutureSchema } from '../career-agent.mjs';
 import { proposeTieDecisionSchema } from '../tie-decision-agent.mjs';
 import { proposeGoalSchema, proposeGoalCheckinSchema } from '../goal-agent.mjs';
@@ -363,6 +364,16 @@ export function buildAgentTools({
   if (has('people.propose-tie-decision')) tools.push(proposeTieDecisionSchema());
   if (has('professional.propose-meeting')) tools.push(proposeMeetingSchema());
   if (has('professional.propose-event')) tools.push(proposeEventSchema());
+  // Full multi-hub calendar read for every agent that can propose calendar items.
+  // Clare already gets check_calendars via her workbench — skip the duplicate.
+  if (
+    slug !== 'clare'
+    && (has('publish.calendar-ghost')
+      || has('professional.propose-meeting')
+      || has('professional.propose-event'))
+  ) {
+    tools.push(checkCalendarsSchema());
+  }
   if (has('career.propose-application')) tools.push(proposeApplicationSchema());
   if (has('career.propose-future')) tools.push(proposeFutureSchema());
   if (has('goals.propose')) tools.push(proposeGoalSchema());
