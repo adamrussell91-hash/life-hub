@@ -45,6 +45,7 @@ import {
   updateProjectPlanStage,
   lessonToBusySpan
 } from './productivity-os.mjs';
+import { isOpenTask as isOpen } from './task-liveness.mjs';
 const MAX_PROTOCOL_CHARS = 24_000;
 
 function applyProtocolUpdate(current, input) {
@@ -479,7 +480,6 @@ export function selectClareWorkSchemas(_opts = {}) {
   return clareWorkSchemas();
 }
 
-
 function deny(error, extra = {}) {
   return { ok: false, error, ...extra };
 }
@@ -519,12 +519,6 @@ function findProject(projects, id) {
   const projectId = String(id ?? '').trim();
   if (!projectId) return null;
   return (projects ?? []).find(project => project?.id === projectId) ?? null;
-}
-
-function isOpen(task) {
-  if (!task || typeof task !== 'object') return false;
-  if (task.status === 'done' || task.status === 'dead' || task.bucket === 'done') return false;
-  return typeof task.title === 'string' && task.title.trim().length > 0;
 }
 
 function compact(task) {
@@ -1728,8 +1722,6 @@ export function formatClareDraft({ task, audience, intent, points }) {
   ].filter(line => line !== null).join('\n');
 }
 
-
-
 function selectWeeklyPendingChanges(pending, input) {
   const selectedIds = new Set(
     (Array.isArray(input.selected_changes) ? input.selected_changes : [])
@@ -1795,7 +1787,7 @@ function writesFromWeeklyPendingChanges(selected, state, tasks, stamp) {
       } else if (change.action === 'activate') {
         patch = { bucket: 'active', review_at: null };
       } else if (change.action === 'remove') {
-        patch = { bucket: 'trash' };
+        patch = { bucket: 'trash', status: 'dead' };
       } else {
         return { ok: false, error: 'invalid_someday_action', detail: change.action };
       }

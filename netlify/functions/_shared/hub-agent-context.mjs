@@ -16,6 +16,7 @@ import {
   hubContextTruncationLine,
   hubLessonsWindowLine
 } from '../../../apps/life/js/core/context-integrity.js';
+import { isOpenTask } from './task-liveness.mjs';
 
 const HUB_TZ = 'Australia/Sydney';
 const TASK_CAP = 12;
@@ -36,12 +37,6 @@ function addDays(ymd, days) {
   const [year, month, day] = ymd.split('-').map(Number);
   const next = new Date(Date.UTC(year, month - 1, day + days));
   return next.toISOString().slice(0, 10);
-}
-
-function isOpenTask(task) {
-  if (!task || typeof task !== 'object' || Array.isArray(task)) return false;
-  if (task.status === 'done' || task.bucket === 'done' || task.completed_at) return false;
-  return typeof task.title === 'string' && task.title.trim().length > 0;
 }
 
 function isActiveClass(cls) {

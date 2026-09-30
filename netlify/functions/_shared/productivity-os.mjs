@@ -1,8 +1,9 @@
 /**
  * Clare / Hammond Productivity OS — deterministic processors (plain JS).
  * Ported from apps/tasks/src/domain/* for Netlify chat tools.
- * No TypeScript imports. No dependencies.
+ * No TypeScript imports. No package dependencies.
  */
+import { isOpenTask } from './task-liveness.mjs';
 
 // ─── Date truth ──────────────────────────────────────────────────────────────
 
@@ -307,8 +308,9 @@ export function waitingPatch(action, input) {
 
 // ─── Context match ───────────────────────────────────────────────────────────
 
-function isOpenTask(task) {
-  return task.status === 'open' || task.status === 'in_progress';
+/** Open (shared liveness rule) and startable right now — deferred work is not. */
+function isActionableNow(task) {
+  return isOpenTask(task) && (task.status === 'open' || task.status === 'in_progress');
 }
 
 function blockedForMatch(task) {
@@ -319,7 +321,7 @@ export function matchActionsNow(tasks, constraints = {}) {
   const energy = constraints.energy_level ?? null;
   const load = constraints.cognitive_load ?? null;
   const minutes = constraints.available_minutes ?? null;
-  const open = tasks.filter((t) => isOpenTask(t) && t.bucket !== 'someday' && !blockedForMatch(t));
+  const open = tasks.filter((t) => isActionableNow(t) && t.bucket !== 'someday' && !blockedForMatch(t));
 
   const scored = [];
   for (const task of open) {

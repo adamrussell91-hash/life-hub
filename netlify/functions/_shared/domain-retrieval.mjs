@@ -19,6 +19,7 @@ import { formatHubAgentContext } from './hub-agent-context.mjs';
 import { getWeekReviewSchema } from './hammond-week.mjs';
 import { rankKnowledgePages } from './knowledge-data.mjs';
 import { NUTRITION_LOG_PATH, SKINCARE_LOG_PATH } from './treatment-state.mjs';
+import { isOpenTask } from './task-liveness.mjs';
 
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 20;
@@ -416,15 +417,6 @@ export function getSkincareAdherence(records, today, { lookbackDays = 14 } = {})
     })),
     ...truncatedMeta(inWindow.length, Math.min(inWindow.length, 12))
   };
-}
-
-function isOpenTask(task) {
-  if (!task || typeof task !== 'object') return false;
-  // Trashed tasks are status 'dead' / bucket 'trash' (clare_mutate trash_task). They are
-  // hidden from every Tasks view, so they must not come back as "open" to Clare either.
-  if (task.status === 'done' || task.status === 'dead' || task.completed_at) return false;
-  if (task.bucket === 'done' || task.bucket === 'trash' || task.bucket === 'trashed') return false;
-  return typeof task.title === 'string' && task.title.trim().length > 0;
 }
 
 export function getTasksFocus(tasks = [], projects = [], { now = new Date() } = {}) {
