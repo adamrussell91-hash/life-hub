@@ -465,6 +465,60 @@ test('create_task writes immediately when a Tasks store is bound', async () => {
   assert.ok((store.data.get('tasks/_index') ?? []).includes(result.ids[0]));
 });
 
+function boundTasksStore(records = []) {
+  const data = new Map(records.map(record => [`tasks/${record.id}`, record]));
+  return {
+    data,
+    async setJSON(key, value) { data.set(key, value); },
+    async get(key) { return data.get(key) ?? null; },
+    async list({ prefix }) { return { blobs: [...data.keys()].filter(k => k.startsWith(prefix)).map(key => ({ key })) }; }
+  };
+}
+
+test('create_task: a dump of several tasks waits for Confirm even with a store bound', async () => {
+  resetCapabilityCaches();
+  const { ctx } = mockCtx('clare');
+  ctx.tasksStore = boundTasksStore();
+  const result = await executeShortcut('create_task', {
+    items: [{ title: 'Joseph Histon — Notes from meeting' }, { title: 'Ewan McElroy — revised module A essay' }]
+  }, ctx);
+  assert.equal(result.kind, 'propose');
+  assert.equal(result.proposal.writes.length, 2);
+  assert.equal([...ctx.tasksStore.data.keys()].length, 0, 'nothing written before Confirm');
+});
+
+test('create_task: never re-creates an open task, even re-worded; dead tasks do not block', async () => {
+  resetCapabilityCaches();
+  const { ctx } = mockCtx('clare');
+  ctx.tasksStore = boundTasksStore([
+    { id: 'task_open', title: 'Joseph Histon — Notes from meeting', status: 'open' },
+    { id: 'task_dead', title: 'Buy bread', status: 'dead' }
+  ]);
+  const same = await executeShortcut('create_task', { title: 'Joseph Histon: notes from meeting' }, ctx);
+  assert.equal(same.status, 'skipped_duplicates');
+  assert.equal(same.skipped_duplicates[0].existing_task_id, 'task_open');
+
+  // Same person, different wording → not blocked, but never auto-written: Confirm with a flag.
+  const twin = await executeShortcut('create_task', { title: 'Reply to Joseph' }, ctx);
+  assert.equal(twin.kind, 'propose');
+  assert.match(twin.proposal.writes[0].diff, /possible duplicate of open task “Joseph Histon — Notes from meeting”/);
+
+  const revived = await executeShortcut('create_task', { title: 'Buy bread' }, ctx);
+  assert.equal(revived.status, 'applied');
+});
+
+test('create_task: two genuine tasks for one student both survive (flagged, not dropped)', async () => {
+  resetCapabilityCaches();
+  const { ctx } = mockCtx('clare');
+  ctx.tasksStore = boundTasksStore();
+  const result = await executeShortcut('create_task', {
+    items: [{ title: 'James Blair — Mod A + Mod C Feedback' }, { title: 'James Blair — Common Mod + Mod B 1' }]
+  }, ctx);
+  assert.equal(result.kind, 'propose');
+  assert.equal(result.proposal.writes.length, 2);
+  assert.equal(result.skipped_duplicates, undefined);
+});
+
 test('Sara create_task is health-domain only; other agents are not', async () => {
   resetCapabilityCaches();
   const sara = mockCtx('sara');
