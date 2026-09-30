@@ -245,6 +245,15 @@ import { executeClareWork, isClareWorkTool, statedPlannerInputs, markWeeklyRevie
 import { buildProductivityCardEvent } from './_shared/productivity-card-map.mjs';
 import { loadTimedLifeEventsFromTree, LifeEventSourceUnavailableError } from './_shared/life-schedule-events.mjs';
 import {
+  loadAgentCalendarMerge,
+  describeMergedCalendarWindow,
+  findSlotConflicts,
+  conflictToolError,
+  unavailableCalendarToolError,
+  mergeHasUnavailableSources
+} from './_shared/agent-calendar-merge.mjs';
+import { createAgentCalendarLoaders } from './_shared/agent-calendar-loaders.mjs';
+import {
   executeHammondProductivity,
   isHammondProductivityTool
 } from './_shared/hammond-productivity.mjs';
@@ -382,6 +391,54 @@ const MAX_BODY_BYTES = Math.min(
 );
 const MAX_MESSAGE_LENGTH = 4000;
 const BODY_TOO_LARGE = Symbol('body_too_large');
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Full multi-hub merge for agent scheduling / conflict checks. */
+async function loadTurnCalendarMerge({
+  from,
+  to,
+  client,
+  repoTree,
+  env,
+  fetchImpl,
+  hubLessons = [],
+  hubClasses = [],
+  hubTasks = [],
+  hubWorkBlocks = [],
+  getLifeEvents = null,
+  getTasksStore = null
+}) {
+  const loaders = createAgentCalendarLoaders({
+    client,
+    repoTree,
+    env,
+    fetchImpl,
+    hubLessons,
+    hubClasses,
+    hubTasks,
+    hubWorkBlocks,
+    getLifeEvents,
+    getTasksStore
+  });
+  return loadAgentCalendarMerge({ from, to, ...loaders });
+}
+
+/** null = free; otherwise a tool-error payload. */
+function slotConflictOrUnavailable(merge, { date, start, end }) {
+  if (!merge) {
+    return {
+      ok: false,
+      error: 'calendar_sources_unavailable',
+      message: 'Calendar could not be loaded. Refusing to treat the slot as free.'
+    };
+  }
+  if (mergeHasUnavailableSources(merge.sourceStatus)) {
+    return unavailableCalendarToolError(merge.sourceStatus);
+  }
+  const conflicts = findSlotConflicts(merge.slots, { date, start, end });
+  if (conflicts.length) return conflictToolError(conflicts, { sourceStatus: merge.sourceStatus });
+  return null;
+}
 
 export const config = { path: '/api/chat' };
 
@@ -2026,6 +2083,37 @@ export function createChatHandler({
                 else if (event.name === 'propose_future') built = buildFutureProposal(event.input ?? {});
                 else built = buildTieDecisionProposal(event.input ?? {});
                 if (!built.ok) return respondConfirmProposal(built);
+                // Timed meetings/events: conflict-check against full multi-hub merge before queueing.
+                if (built.ghostInput?.date && built.ghostInput?.start && built.ghostInput?.end) {
+                  try {
+                    const merge = await loadTurnCalendarMerge({
+                      from: built.ghostInput.date,
+                      to: built.ghostInput.date,
+                      client,
+                      repoTree,
+                      env,
+                      fetchImpl,
+                      hubLessons,
+                      hubClasses,
+                      hubTasks,
+                      hubWorkBlocks,
+                      getLifeEvents,
+                      getTasksStore
+                    });
+                    const blocked = slotConflictOrUnavailable(merge, {
+                      date: built.ghostInput.date,
+                      start: built.ghostInput.start,
+                      end: built.ghostInput.end
+                    });
+                    if (blocked) return JSON.stringify(blocked);
+                  } catch {
+                    return JSON.stringify({
+                      ok: false,
+                      error: 'calendar_sources_unavailable',
+                      message: 'Calendar could not be loaded. Refusing to treat the slot as free.'
+                    });
+                  }
+                }
                 // Timed meetings/events: Confirm + calendar ghost. Multi-day / overnight
                 // spans that fail validateGhost fall back to Confirm-only professional write.
                 if (built.ghostInput) {
@@ -2729,6 +2817,44 @@ export function createChatHandler({
                 }
               }
 
+              if (event.name === 'check_calendars') {
+                send({ type: 'status', text: 'Checking calendars…' });
+                try {
+                  const from = typeof event.input?.from === 'string' && DATE_KEY_RE.test(event.input.from)
+                    ? event.input.from
+                    : today;
+                  const days = Math.min(14, Math.max(1, Number(event.input?.days) || 3));
+                  const to = addCalendarDays(from, days - 1);
+                  const merge = await loadTurnCalendarMerge({
+                    from,
+                    to,
+                    client,
+                    repoTree,
+                    env,
+                    fetchImpl,
+                    hubLessons,
+                    hubClasses,
+                    hubTasks,
+                    hubWorkBlocks,
+                    getLifeEvents,
+                    getTasksStore
+                  });
+                  return JSON.stringify(describeMergedCalendarWindow({
+                    slots: merge.slots,
+                    sourceStatus: merge.sourceStatus,
+                    from,
+                    days,
+                    tasks: hubTasks
+                  }));
+                } catch {
+                  return JSON.stringify({
+                    ok: false,
+                    error: 'calendar_sources_unavailable',
+                    message: 'Full calendar merge could not be loaded.'
+                  });
+                }
+              }
+
               if (event.name === 'propose_calendar_ghost' || event.name === 'propose_log_communication') {
                 let entry;
                 try {
@@ -2746,6 +2872,37 @@ export function createChatHandler({
                     error: event.name === 'propose_log_communication' ? 'invalid_log_comm' : 'invalid_ghost',
                     detail: error instanceof Error ? error.message : 'invalid input'
                   });
+                }
+                // Timed ghosts: block stacking over occupied multi-hub slots.
+                if (entry?.date && entry?.start && entry?.end && event.name === 'propose_calendar_ghost') {
+                  try {
+                    const merge = await loadTurnCalendarMerge({
+                      from: entry.date,
+                      to: entry.date,
+                      client,
+                      repoTree,
+                      env,
+                      fetchImpl,
+                      hubLessons,
+                      hubClasses,
+                      hubTasks,
+                      hubWorkBlocks,
+                      getLifeEvents,
+                      getTasksStore
+                    });
+                    const blocked = slotConflictOrUnavailable(merge, {
+                      date: entry.date,
+                      start: entry.start,
+                      end: entry.end
+                    });
+                    if (blocked) return JSON.stringify(blocked);
+                  } catch {
+                    return JSON.stringify({
+                      ok: false,
+                      error: 'calendar_sources_unavailable',
+                      message: 'Calendar could not be loaded. Refusing to treat the slot as free.'
+                    });
+                  }
                 }
                 try {
                   const queued = await queueCalendarGhostDualPath({
@@ -2844,6 +3001,7 @@ export function createChatHandler({
                 send({ type: 'status', text: 'Working…' });
                 const stated = statedPlannerInputs(parsed.message);
                 let hubLifeEvents = [];
+                let calendarMerge = null;
                 if (event.name === 'compose_schedule' || event.name === 'plan_work') {
                   try {
                     const dateHint = typeof event.input?.date === 'string'
@@ -2861,6 +3019,22 @@ export function createChatHandler({
                       client,
                       tree: repoTree
                     });
+                    if (DATE_KEY_RE.test(dateHint ?? '')) {
+                      calendarMerge = await loadTurnCalendarMerge({
+                        from: dateHint,
+                        to: dateHint,
+                        client,
+                        repoTree,
+                        env,
+                        fetchImpl,
+                        hubLessons,
+                        hubClasses,
+                        hubTasks,
+                        hubWorkBlocks,
+                        getLifeEvents,
+                        getTasksStore
+                      });
+                    }
                   } catch (error) {
                     // Fail closed: incomplete calendar truth must not produce a Schedule Diff proposal.
                     const code = error instanceof LifeEventSourceUnavailableError
@@ -2884,6 +3058,7 @@ export function createChatHandler({
                   planning_profile: hubPlanningProfile,
                   lifeEvents: hubLifeEvents,
                   events: hubLifeEvents,
+                  calendarMerge,
                   protocol: clareProtocol,
                   now: nowInstant,
                   energy: stated.energy,

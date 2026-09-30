@@ -905,7 +905,9 @@ export function buildAuthoritativeHardBusy({
   planningProfile = null,
   protected_windows = null,
   extraProtectedWindows = null,
-  events = null
+  events = null,
+  /** Extra timed busy from full multi-hub merge (Professional + iCal + …). */
+  extraBusySpans = null
 }) {
   const lessonSpans = (lessons ?? [])
     .filter((lesson) => {
@@ -945,8 +947,9 @@ export function buildAuthoritativeHardBusy({
 
   const lifeSpans = lifeEventsToBusySpans(events, date);
   const gaps = workWindowGapSpans(date, planningProfile);
+  const extra = Array.isArray(extraBusySpans) ? extraBusySpans.filter(Boolean) : [];
 
-  return [...lessonSpans, ...confirmed, ...protectedSpans, ...lifeSpans, ...gaps];
+  return [...lessonSpans, ...confirmed, ...protectedSpans, ...lifeSpans, ...gaps, ...extra];
 }
 
 /**

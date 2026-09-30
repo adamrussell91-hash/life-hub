@@ -440,10 +440,9 @@ export function clareWorkSchemas() {
       intent: { type: 'string' },
       points: { type: 'string' }
     }, ['intent']),
-    tool('check_calendars', 'List Teaching lessons and task due dates for a date window.', {
+    tool('check_calendars', 'List Adam’s full multi-hub calendar for a date window (Life + Teaching + Knowledge + Tasks + Professional + iCloud). Use before scheduling. incomplete=true means a source failed — do not treat gaps as free.', {
       from: { type: 'string' },
-      days: { type: 'number' },
-      source: { type: 'string', enum: ['teaching', 'life', 'both'] }
+      days: { type: 'number' }
     }),
     tool('check_clock', 'Read Adam\'s current calendar day and local time in the hub timezone. Never invent a date.', {
       reason: { type: 'string' }
@@ -2332,13 +2331,25 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       : workBlocks.filter(b => b.status === 'confirmed' || b.status === 'in_progress');
     const lifeEvents = ctx.lifeEvents ?? ctx.events ?? [];
     const explicitProtected = normalizeProtectedWindowSpans(input.protected_windows);
+    // Professional + iCal (+ other merge sources) as hard busy — same completeness as Tideline.
+    let extraBusySpans = Array.isArray(ctx.extraBusySpans) ? ctx.extraBusySpans : [];
+    if (!extraBusySpans.length && ctx.calendarMerge?.slots) {
+      const { busySpansFromMergedSlots } = await import('./agent-calendar-merge.mjs');
+      extraBusySpans = busySpansFromMergedSlots(
+        ctx.calendarMerge.slots.filter((s) =>
+          s.source === 'professional' || s.source === 'feeds' || s.source === 'knowledge'
+        ),
+        dateKey
+      );
+    }
     const hardBusy = buildAuthoritativeHardBusy({
       date: dateKey,
       lessons: lessons ?? [],
       workBlocks: authoritativeBlocks,
       planningProfile,
       extraProtectedWindows: explicitProtected,
-      events: lifeEvents
+      events: lifeEvents,
+      extraBusySpans
     });
 
     if (Array.isArray(input.validate_proposed) && input.validate_proposed.length) {
@@ -2572,22 +2583,57 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     }));
   }
   if (name === 'check_calendars') {
+    const { describeMergedCalendarWindow } = await import('./agent-calendar-merge.mjs');
     const from = dayKey(input.from, now);
     const days = Math.min(14, Math.max(1, Number(input.days) || 3));
-    const start = parseDue(from) ?? startOfDay(now);
-    const source = input.source || 'both';
-    const window = [];
-    for (let i = 0; i < days; i += 1) {
-      const day = addDays(start, i);
-      const key = toDateKey(day);
-      const dayTasks = source === 'teaching' ? [] : tasksForDay(tasks, day).map(compact);
-      const dayLessons = source === 'life' ? [] : (lessons ?? [])
-        .filter(lesson => String(lessonDate(lesson) ?? '') === key)
-        .slice(0, 8)
-        .map(lesson => ({ id: lesson.id, title: lesson.title, date: key, class_id: lesson.class_id ?? null }));
-      window.push({ date: key, tasks: dayTasks, lessons: dayLessons });
+    // Prefer the full multi-hub merge from chat; fall back to Teaching+Tasks only is incomplete.
+    if (ctx.calendarMerge?.slots) {
+      return describeMergedCalendarWindow({
+        slots: ctx.calendarMerge.slots,
+        sourceStatus: ctx.calendarMerge.sourceStatus,
+        from,
+        days,
+        tasks
+      });
     }
-    return ok({ from, days, source, window });
+    const { mergeAgentCalendarSlots } = await import('./agent-calendar-merge.mjs');
+    const teachingEvents = (lessons ?? []).map((lesson) => ({
+      path: `teaching:${lesson.id || 'x'}`,
+      record: {
+        type: 'scheduled_lesson',
+        id: lesson.id,
+        date: lessonDate(lesson),
+        start_time: lesson.start_time || lesson.start || '09:00',
+        duration_min: Number(lesson.duration_minutes) || 60,
+        title: lesson.title || 'Lesson'
+      }
+    }));
+    const tasksEvents = (tasks ?? [])
+      .filter((t) => t?.due_date)
+      .map((t) => ({
+        path: `tasks:${t.id}`,
+        record: { type: 'task', id: t.id, date: t.due_date, title: t.title || 'Task', all_day: true }
+      }));
+    const merged = mergeAgentCalendarSlots({
+      teachingEvents,
+      tasksEvents,
+      sourceStatus: {
+        life: { status: 'unavailable', count: 0, error: 'not_loaded_in_clare_fallback' },
+        teaching: { status: 'live', count: teachingEvents.length, error: null },
+        knowledge: { status: 'unavailable', count: 0, error: 'not_loaded_in_clare_fallback' },
+        tasks: { status: 'live', count: tasksEvents.length, error: null },
+        professional: { status: 'unavailable', count: 0, error: 'not_loaded_in_clare_fallback' },
+        feeds: { status: 'unavailable', count: 0, error: 'not_loaded_in_clare_fallback' }
+      }
+    });
+    // Mark incomplete so agents never treat this thin fallback as free.
+    return describeMergedCalendarWindow({
+      slots: merged.slots,
+      sourceStatus: merged.sourceStatus,
+      from,
+      days,
+      tasks
+    });
   }
   if (name === 'draft_comms') {
     const task = findTask(tasks, input.task_id);
