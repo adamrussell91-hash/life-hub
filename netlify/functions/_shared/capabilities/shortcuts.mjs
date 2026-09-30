@@ -39,6 +39,11 @@ import {
   computeSprintState
 } from '../sprint-evidence.mjs';
 import {
+  normalizeSprintViz,
+  formatVizForConfirm,
+  resolveSprintViz
+} from '../sprint-viz.mjs';
+import {
   isPathAllowedForAgent,
   capabilityIdsForAgent,
   loadCapability,
@@ -64,9 +69,7 @@ import {
 } from '../cn-patch-queue.mjs';
 import { applyIntuitionEdit } from './intuition.mjs';
 import { executeProposeActionWrites, validateProposeActionInput } from './propose-action.mjs';
-import { listJSON as listTasksJSON, newTaskId, TASK_PREFIX } from '../tasks-blobs.mjs';
-import { isOpenTask } from '../task-liveness.mjs';
-import { findTaskTwin } from '../task-duplicates.mjs';
+import { newTaskId } from '../tasks-blobs.mjs';
 import {
   addMemory,
   applyReflection,
@@ -245,7 +248,7 @@ export function shortcutSchemas() {
     track_open_sprint: {
       name: 'track_open_sprint',
       description:
-        'Open a multi-agent challenge sprint, or upgrade an existing Phase-0 challenge_id to a sprint (Confirm). Lists lanes, headline, cadence and dates.',
+        'Open a multi-agent challenge sprint, or upgrade an existing Phase-0 challenge_id to a sprint (Confirm). Lists lanes, headline, cadence, dates and Home-card viz (chart-kit ids from the Sprint viz picker).',
       input_schema: {
         type: 'object',
         properties: {
@@ -258,7 +261,16 @@ export function shortcutSchemas() {
           notes: { type: 'string' },
           headline: { type: 'object' },
           cadence: { type: 'object' },
-          lanes: { type: 'array' }
+          lanes: { type: 'array' },
+          viz: {
+            type: 'object',
+            description: 'Home card charts: { headline, lanes } from Sprint viz picker allowlist (e.g. glide-slope + progress-track)',
+            properties: {
+              headline: { type: 'string' },
+              lanes: { type: 'string' }
+            },
+            additionalProperties: false
+          }
         },
         required: ['title', 'goal', 'lanes'],
         additionalProperties: false
@@ -302,7 +314,7 @@ export function shortcutSchemas() {
     },
     track_revise_sprint: {
       name: 'track_revise_sprint',
-      description: 'Revise sprint lanes, lead measures, cadence, dates or headline (Confirm).',
+      description: 'Revise sprint lanes, lead measures, cadence, dates, headline or Home-card viz (Confirm).',
       input_schema: {
         type: 'object',
         properties: {
@@ -315,7 +327,16 @@ export function shortcutSchemas() {
           notes: { type: 'string' },
           headline: { type: 'object' },
           cadence: { type: 'object' },
-          lanes: { type: 'array' }
+          lanes: { type: 'array' },
+          viz: {
+            type: 'object',
+            description: 'Home card charts: { headline, lanes } from Sprint viz picker allowlist',
+            properties: {
+              headline: { type: 'string' },
+              lanes: { type: 'string' }
+            },
+            additionalProperties: false
+          }
         },
         required: ['challenge_id'],
         additionalProperties: false
@@ -968,6 +989,8 @@ async function handleTrackOpenSprint(ctx, input) {
   }
   const headlineNorm = input.headline != null ? normalizeHeadline(input.headline) : { ok: true, headline: null };
   if (!headlineNorm.ok) return deny(headlineNorm.reason);
+  const vizNorm = normalizeSprintViz(input.viz);
+  if (!vizNorm.ok) return deny(vizNorm.reason);
 
   const existingId = String(input.challenge_id || '').trim();
   if (existingId) {
@@ -1000,6 +1023,8 @@ async function handleTrackOpenSprint(ctx, input) {
       updated_at: new Date().toISOString(),
       upgraded_at: new Date().toISOString()
     };
+    if (vizNorm.viz) upgraded.viz = vizNorm.viz;
+    const vizBit = formatVizForConfirm(vizNorm.viz || resolveSprintViz(upgraded));
     return propose(
       buildProposal({
         agentSlug: ctx.agentSlug,
@@ -1009,7 +1034,7 @@ async function handleTrackOpenSprint(ctx, input) {
           path,
           mode: 'overwrite',
           content: serializeJson(upgraded),
-          diff: `upgrade ${existingId} → sprint, ${lanesNorm.lanes.length} lanes (${start} → ${end})`
+          diff: `upgrade ${existingId} → sprint, ${lanesNorm.lanes.length} lanes (${start} → ${end})${vizBit ? `; ${vizBit}` : ''}`
         }]
       })
     );
@@ -1044,7 +1069,9 @@ async function handleTrackOpenSprint(ctx, input) {
     protocol_suggestions: [],
     created_at: new Date().toISOString()
   };
+  if (vizNorm.viz) body.viz = vizNorm.viz;
   const laneList = lanesNorm.lanes.map(l => `${SPRINT_ROSTER[l.agent]} (${l.role})`).join(', ');
+  const vizBit = formatVizForConfirm(vizNorm.viz || resolveSprintViz(body));
   return propose(
     buildProposal({
       agentSlug: ctx.agentSlug,
@@ -1054,7 +1081,7 @@ async function handleTrackOpenSprint(ctx, input) {
         path,
         mode: 'create',
         content: serializeJson(body),
-        diff: `sprint ${title}: ${laneList}; ${start} → ${end}; daily_check=${cadence.daily_check}`
+        diff: `sprint ${title}: ${laneList}; ${start} → ${end}; daily_check=${cadence.daily_check}${vizBit ? `; ${vizBit}` : ''}`
       }]
     })
   );
@@ -1188,10 +1215,18 @@ async function handleTrackReviseSprint(ctx, input) {
     if (!headlineNorm.ok) return deny(headlineNorm.reason);
     next.headline = headlineNorm.headline;
   }
+  if (input.viz != null) {
+    const vizNorm = normalizeSprintViz(input.viz);
+    if (!vizNorm.ok) return deny(vizNorm.reason);
+    next.viz = vizNorm.viz
+      ? { ...(typeof challenge.viz === 'object' && challenge.viz ? challenge.viz : {}), ...vizNorm.viz }
+      : challenge.viz;
+  }
   if (input.cadence) {
     next.cadence = resolveCadence({ ...next, cadence: { ...resolveCadence(next), ...input.cadence } });
   }
   next.updated_at = new Date().toISOString();
+  const vizBit = formatVizForConfirm(next.viz || resolveSprintViz(next));
   return propose(
     buildProposal({
       agentSlug: ctx.agentSlug,
@@ -1201,7 +1236,7 @@ async function handleTrackReviseSprint(ctx, input) {
         path,
         mode: 'overwrite',
         content: serializeJson(next),
-        diff: `revise sprint ${challengeId}`
+        diff: `revise sprint ${challengeId}${vizBit ? `; ${vizBit}` : ''}`
       }]
     })
   );
@@ -1859,62 +1894,24 @@ async function handleCreateTask(ctx, input) {
     if (bad) return deny('Sara create_task is restricted to domain: health');
     for (const item of items) item.domain = 'health';
   }
-  // Twins guard: the same work captured twice (a second dump, a re-run turn, re-worded
-  // titles) must never land as a second open task.
-  const openTasks = Array.isArray(ctx.openTasks)
-    ? ctx.openTasks.filter(isOpenTask)
-    : ctx.tasksStore
-      ? (await listTasksJSON(ctx.tasksStore, TASK_PREFIX).catch(() => [])).filter(isOpenTask)
-      : [];
-  const skipped = [];
-  const flagged = new Map();
-  const kept = [];
-  for (const item of items) {
-    const twin = findTaskTwin(item.title, [...openTasks, ...kept]);
-    if (twin?.match === 'same_title') {
-      skipped.push({ title: item.title, existing_task_id: twin.task.id ?? null, existing_title: twin.task.title });
-      continue;
-    }
-    if (twin?.match === 'same_person') flagged.set(item, twin.task);
-    kept.push(item);
-  }
-  const skippedMeta = skipped.length
-    ? {
-        skipped_duplicates: skipped,
-        note: 'Already on the board — not created again. Use get_task + update_task to change the existing task.'
-      }
-    : {};
-  if (!kept.length) {
-    return ok(
-      skipped.length === 1 ? `Already on the board: ${skipped[0].existing_title}` : `All ${skipped.length} already on the board`,
-      { status: 'skipped_duplicates', ...skippedMeta }
-    );
-  }
-
   const now = new Date().toISOString();
   const today = typeof ctx.today === 'string' && ctx.today.trim() ? ctx.today.trim() : null;
-  const writes = kept.map(item => {
+  const writes = items.map(item => {
     const id = newTaskId();
-    const twin = flagged.get(item);
     return {
       path: `tasks:task:${id}`,
       mode: 'create',
       content: serializeJson(buildTaskRecord(item, { id, now, today })),
-      diff: twin
-        ? `new task: ${item.title} (possible duplicate of open task “${twin.title}”)`
-        : `new task: ${item.title}`
+      diff: `new task: ${item.title}`
     };
   });
   const proposal = buildProposal({
     agentSlug: ctx.agentSlug,
-    intent: kept.length === 1 ? `Create task: ${kept[0].title}` : `Create ${kept.length} tasks`,
+    intent: items.length === 1 ? `Create task: ${items[0].title}` : `Create ${items.length} tasks`,
     surfaces: ['confirm_card', 'governance_log'],
     writes
   });
-  // Only a single, unflagged capture writes straight away. A dump (2+ tasks) or anything
-  // that may duplicate open work waits for Adam's Confirm.
-  const writeNow = kept.length === 1 && flagged.size === 0;
-  if (ctx.tasksStore && writeNow) {
+  if (ctx.tasksStore) {
     const applied = await executeProposeActionWrites({}, proposal, {
       blobStores: { tasks: ctx.tasksStore }
     });
@@ -1928,9 +1925,12 @@ async function handleCreateTask(ctx, input) {
       }
       return record;
     });
-    return ok(`Created ${kept[0].title}`, { status: 'applied', tasks, ids: tasks.map(task => task.id), ...skippedMeta });
+    return ok(
+      items.length === 1 ? `Created ${items[0].title}` : `Created ${items.length} tasks`,
+      { status: 'applied', tasks, ids: tasks.map(task => task.id) }
+    );
   }
-  return { ...propose(proposal), ...skippedMeta };
+  return propose(proposal);
 }
 
 function handleUpdateTask(ctx, input) {

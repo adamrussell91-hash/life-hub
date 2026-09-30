@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en-AU" data-hub="life">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Life app root so assets/, css/, js/ resolve like production Life Pages. -->
+  <base href="/apps/life/">
+  <title>Life Hub · Home sprints redesign fixture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/packages/design-kit/tokens.css">
+  <link rel="stylesheet" href="/packages/design-kit/overlays.css">
+  <link rel="stylesheet" href="/packages/design-kit/actions.css">
+  <link rel="stylesheet" href="/packages/design-kit/hub-interactions.css">
+  <link rel="stylesheet" href="/packages/design-kit/rail.css">
+  <link rel="stylesheet" href="/packages/design-kit/mobile.css">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    /* Fixture: keep Home chrome honest without full app boot */
+    body { margin: 0; }
+    #app-shell { display: block !important; }
+    .sign-in { display: none !important; }
+    .hub-mobile-nav { display: none; }
+    @media (max-width: 720px) {
+      .desktop-rail { display: none; }
+      .page-frame { margin-left: 0; padding: 0 1rem 5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app-shell">
+  <div class="app-shell" id="app" data-state="ready">
+    <aside class="desktop-rail hub-rail" aria-label="Life Hub navigation">
+      <header class="brand">
+        <span class="brand-copy">
+          <a class="hub-rail__brand" href="#">Life Hub</a>
+          <span class="hub-rail__tagline">Private dashboard</span>
+        </span>
+      </header>
+      <nav class="rail-nav" aria-label="Primary">
+        <div class="hub-rail__majors">
+          <button class="nav-item hub-rail__link is-active" type="button" aria-current="page">
+            <span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg></span><span>Home</span>
+          </button>
+          <button class="nav-item hub-rail__link" type="button">
+            <span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z"/></svg></span><span>Chat</span>
+          </button>
+        </div>
+      </nav>
+    </aside>
+
+    <div class="page-frame">
+      <header class="page-header">
+        <div>
+          <p class="page-header__eyebrow">Life Hub</p>
+          <div class="page-header__title-row"><h1 class="page-header__title">Home</h1></div>
+        </div>
+      </header>
+      <main id="main-content">
+        <div class="dashboard" data-section="home">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Daily pulse</p>
+              <h2>Today</h2>
+            </div>
+          </div>
+          <div id="fixture-sprints-host"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+  </div>
+
+  <script type="module">
+    import { renderHomeSprints } from '/apps/life/js/app/render-home-sprints.js';
+
+    const host = document.getElementById('fixture-sprints-host');
+    host.innerHTML = `
+      <section id="home-sprints" class="home-sprints" aria-labelledby="home-sprints-heading">
+        <div class="section-heading home-sprints__heading">
+          <div>
+            <p class="section-kicker">Challenge sprints</p>
+            <h2 id="home-sprints-heading">Challenge sprint</h2>
+          </div>
+          <p class="home-sprints__count" data-home-sprints-count></p>
+        </div>
+        <p class="metric-caption home-sprints__status" data-home-sprints-status aria-live="polite"></p>
+        <div class="home-sprints__rail" data-home-sprints-rail></div>
+      </section>
+    `;
+
+    const fixture = {
+      sprints: [{
+        sprint: {
+          id: 'blitz',
+          kind: 'sprint',
+          viz: { headline: 'glide-slope', lanes: 'progress-track' }
+        },
+        state: {
+          id: 'blitz',
+          title: 'Belly Flab Blitz',
+          open: true,
+          ended_awaiting_review: false,
+          day_label: 'day 4 of 12',
+          day_n: 4,
+          length_days: 12,
+          end_date: '2026-10-12',
+          checkin_done_today: false,
+          lead_agent: 'hammond',
+          viz: { headline: 'glide-slope', lanes: 'progress-track' },
+          headline: {
+            label: 'Midsection',
+            metricLabel: 'Waist',
+            unit: 'cm',
+            baseline: 89,
+            direction: 'down',
+            latest: { value: 88 },
+            delta: -1,
+            target_band: { low: 84, high: 86 },
+            readings: [
+              { date: '2026-10-01', value: 89 },
+              { date: '2026-10-02', value: 88.6 },
+              { date: '2026-10-03', value: 88.3 },
+              { date: '2026-10-04', value: 88 }
+            ]
+          },
+          lanes: [
+            {
+              agent: 'brisket',
+              role: 'Eating',
+              status: 'on_track',
+              measureSummaries: [{ label: 'Protein ≥ target', met: 3, judged: 3 }]
+            },
+            {
+              agent: 'chadwick',
+              role: 'Training',
+              status: 'unavailable',
+              measureSummaries: [{ label: 'Workout logged', met: 0, judged: 0 }]
+            },
+            {
+              agent: 'sara',
+              role: 'Tape',
+              status: 'on_track',
+              measureSummaries: [{ label: 'Waist logged', met: 2, judged: 3 }]
+            }
+          ]
+        }
+      }],
+      flags: { anyOpen: true }
+    };
+
+    await renderHomeSprints(document, {
+      api: { list: async () => fixture },
+      onOpenChat: () => {}
+    });
+
+    document.documentElement.dataset.fixtureReady = '1';
+  </script>
+</body>
+</html>
