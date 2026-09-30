@@ -193,6 +193,11 @@ export function mountHubCalendar(host, adapter) {
     const tasksMeta = loader.getMeta('tasks');
     const terms = loader.getTerms?.() ?? [];
     const visual = loader.getVisual?.() ?? null;
+    const feedStatus = loader.getStatuses?.()?.feeds;
+    const icalFeedNote =
+      feedStatus && (feedStatus.status === 'error' || feedStatus.status === 'degraded')
+        ? feedStatus.error
+        : null;
     return {
       hub,
       fills: adapter.fills ?? {},
@@ -211,6 +216,7 @@ export function mountHubCalendar(host, adapter) {
       dayProfile: tasksMeta?.planningProfile?.day_profile ?? null,
       terms: terms.length ? terms : null,
       visual,
+      icalFeedNote,
       onShiftRange: (delta) => {
         const step = zoom === 'day' ? delta : delta * 7;
         selectedDate = addDaysKey(selectedDate, step);
@@ -252,7 +258,8 @@ export function mountHubCalendar(host, adapter) {
         onSwitchView: input.onSwitchView,
         routeFor: adapter.routeFor,
         events: input.events,
-        ghosts: input.ghosts
+        ghosts: input.ghosts,
+        icalFeedNote: input.icalFeedNote
       });
       return;
     }

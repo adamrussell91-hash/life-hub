@@ -127,7 +127,7 @@ export function countByFilterKey(items) {
  * Paint the shared source strip into `host`.
  * @param {Document} doc
  * @param {HTMLElement} host
- * @param {{ hub?: string, state: Record<string, boolean>, counts: Record<string, number>, hidden: number, ambient?: string, onChange: (next: Record<string, boolean>) => void }} opts
+ * @param {{ hub?: string, state: Record<string, boolean>, counts: Record<string, number>, hidden: number, ambient?: string, feedNote?: string|null, onChange: (next: Record<string, boolean>) => void }} opts
  */
 function attach(parent, ...nodes) {
   if (typeof parent?.append === 'function') parent.append(...nodes);
@@ -135,7 +135,7 @@ function attach(parent, ...nodes) {
 }
 
 export function paintSourceFilter(doc, host, opts) {
-  const { hub = 'life', state, counts, hidden, ambient, onChange } = opts;
+  const { hub = 'life', state, counts, hidden, ambient, feedNote = null, onChange } = opts;
   if (typeof host.replaceChildren === 'function') host.replaceChildren();
   else host.children = [];
   host.classList?.add?.('cal__sources');
@@ -224,6 +224,23 @@ export function paintSourceFilter(doc, host, opts) {
     line.textContent = '';
   }
   attach(host, line);
+
+  // Fail-visible: missing / broken iCloud feeds must not look like an empty week.
+  let feedLine = host.querySelector?.(':scope > [data-part="ical-feed-note"]') ?? null;
+  if (feedNote) {
+    if (!feedLine) {
+      feedLine = doc.createElement('p');
+      feedLine.className = 'cal-source-errors__line';
+      if (feedLine.dataset) feedLine.dataset.part = 'ical-feed-note';
+      else feedLine.setAttribute?.('data-part', 'ical-feed-note');
+      feedLine.setAttribute('role', 'status');
+      attach(host, feedLine);
+    }
+    feedLine.hidden = false;
+    feedLine.textContent = feedNote;
+  } else if (feedLine) {
+    feedLine.remove?.();
+  }
 }
 
 /**

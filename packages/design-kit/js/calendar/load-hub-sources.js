@@ -18,7 +18,7 @@ import {
 import { knowledgeEventsFromPages } from './knowledge-calendar.js';
 import { loadLifeCalendarEvents } from './load-life-events.js';
 import { resolveSchoolTerms } from './school-terms.js';
-import { calendarFeedRange, eventsFromCalendarFeeds } from './ical-calendar.js';
+import { calendarFeedRange, eventsFromCalendarFeeds, summarizeIcalFeedStatuses } from './ical-calendar.js';
 
 export const HUB_SOURCE_IDS = Object.freeze([
   'teaching',
@@ -301,8 +301,15 @@ export function createHubSourceLoader(opts) {
       try {
         const range = calendarFeedRange(today ?? sydneyTodayKey());
         const payload = await readOkJson(apiFetch, `/api/calendar-feeds?from=${range.from}&to=${range.to}`);
+        const feedMeta = payload.data?.feeds ?? [];
         const events = eventsFromCalendarFeeds(payload.data?.events ?? [], payload.data?.freed ?? []);
-        setBucket('feeds', { status: 'live', events, error: null, meta: { feeds: payload.data?.feeds ?? [] } });
+        const summary = summarizeIcalFeedStatuses(feedMeta);
+        setBucket('feeds', {
+          status: summary.severity === 'ok' ? 'live' : summary.severity,
+          events,
+          error: summary.line,
+          meta: { feeds: feedMeta }
+        });
       } catch (error) {
         // 401/404 (signed out, or an older API deploy): not an error worth a banner.
         const quiet = error?.status === 401 || error?.status === 403 || error?.status === 404;
@@ -386,7 +393,9 @@ export function createHubSourceLoader(opts) {
  */
 export function paintSourceErrors(doc, host, statuses, onRetry) {
   let strip = host.querySelector(':scope > [data-part="source-errors"]');
-  const errors = Object.entries(statuses || {}).filter(([, row]) => row?.status === 'error');
+  const errors = Object.entries(statuses || {}).filter(
+    ([, row]) => row?.status === 'error' || row?.status === 'degraded'
+  );
   if (!errors.length) {
     strip?.remove();
     return;
@@ -403,15 +412,20 @@ export function paintSourceErrors(doc, host, statuses, onRetry) {
     const line = doc.createElement('p');
     line.className = 'cal-source-errors__line';
     line.dataset.source = id;
+    if (row.status === 'degraded') line.dataset.severity = 'degraded';
     const msg = doc.createElement('span');
     msg.textContent = row.error || `Couldn't load ${row.label || id} events`;
-    const retry = doc.createElement('button');
-    retry.type = 'button';
-    retry.className = 'btn btn--ghost';
-    retry.textContent = 'Retry';
-    retry.dataset.retrySource = id;
-    retry.addEventListener('click', () => onRetry?.(id));
-    line.append(msg, doc.createTextNode(' · '), retry);
+    line.append(msg);
+    // Retry helps a transport failure, not a missing Netlify secret.
+    if (row.status === 'error') {
+      const retry = doc.createElement('button');
+      retry.type = 'button';
+      retry.className = 'btn btn--ghost';
+      retry.textContent = 'Retry';
+      retry.dataset.retrySource = id;
+      retry.addEventListener('click', () => onRetry?.(id));
+      line.append(doc.createTextNode(' · '), retry);
+    }
     strip.append(line);
   }
 }

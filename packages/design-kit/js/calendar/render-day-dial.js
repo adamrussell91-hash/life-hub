@@ -632,6 +632,7 @@ function mount({ entrance = false } = {}) {
     counts: countByFilterKey(dayChips),
     hidden: countHidden(dayChips, filterState),
     ambient: model.ambient,
+    feedNote: input?.icalFeedNote ?? null,
     onChange: () => mount({ entrance: false })
   });
 

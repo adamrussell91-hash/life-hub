@@ -6,9 +6,10 @@ import assert from 'node:assert/strict';
 import { icalOccurrences, parseDuration, wallToUtc, sydneyWall } from '../../netlify/functions/_shared/ical.mjs';
 import { createCalendarFeedsHandler, feedUrl } from '../../netlify/functions/calendar-feeds.mjs';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
-import { eventsFromCalendarFeeds } from '../../packages/design-kit/js/calendar/ical-calendar.js';
+import { eventsFromCalendarFeeds, summarizeIcalFeedStatuses } from '../../packages/design-kit/js/calendar/ical-calendar.js';
 import { buildTidelineModel } from '../../packages/design-kit/js/calendar/tideline-model.js';
-import { filterKeyForItem } from '../../packages/design-kit/js/calendar/calendar-filter.js';
+import { filterKeyForItem, paintSourceFilter } from '../../packages/design-kit/js/calendar/calendar-filter.js';
+import { paintSourceErrors } from '../../packages/design-kit/js/calendar/load-hub-sources.js';
 
 const ICS = [
   'BEGIN:VCALENDAR',
@@ -209,4 +210,149 @@ test('mapping: health → medical (Health), work → Events, social/family → q
     week: ['2026-09-30'], today: '2026-09-30', nowHour: 9
   });
   assert.equal(day.cap?.pct, without.days[0].cap?.pct, 'social/family never change capacity');
+});
+
+test('summarizeIcalFeedStatuses: all unconfigured is fail-visible, not a healthy empty week', () => {
+  const allMissing = summarizeIcalFeedStatuses([
+    { id: 'work', status: 'unconfigured' },
+    { id: 'social', status: 'unconfigured' },
+    { id: 'family', status: 'unconfigured' },
+    { id: 'health', status: 'unconfigured' }
+  ]);
+  assert.equal(allMissing.severity, 'degraded');
+  assert.match(allMissing.line, /not linked/i);
+  assert.match(allMissing.line, /family/i);
+
+  const emptyPayload = summarizeIcalFeedStatuses([]);
+  assert.equal(emptyPayload.severity, 'degraded');
+  assert.match(emptyPayload.line, /not linked/i);
+
+  const fetchFailed = summarizeIcalFeedStatuses([
+    { id: 'work', status: 'error' },
+    { id: 'social', status: 'live' },
+    { id: 'family', status: 'live' },
+    { id: 'health', status: 'live' }
+  ]);
+  assert.equal(fetchFailed.severity, 'error');
+  assert.match(fetchFailed.line, /unreachable/i);
+
+  const partial = summarizeIcalFeedStatuses([
+    { id: 'work', status: 'live' },
+    { id: 'social', status: 'unconfigured' },
+    { id: 'family', status: 'unconfigured' },
+    { id: 'health', status: 'live' }
+  ]);
+  assert.equal(partial.severity, 'degraded');
+  assert.match(partial.line, /family/);
+  assert.doesNotMatch(partial.line, /work/);
+
+  const healthy = summarizeIcalFeedStatuses([
+    { id: 'work', status: 'live' },
+    { id: 'social', status: 'live' },
+    { id: 'family', status: 'live' },
+    { id: 'health', status: 'live' }
+  ]);
+  assert.equal(healthy.severity, 'ok');
+  assert.equal(healthy.line, null);
+});
+
+test('paintSourceFilter: ical feed note is fail-visible under the filter chips', () => {
+  const kids = [];
+  const host = {
+    children: kids,
+    querySelector(sel) {
+      if (String(sel).includes('ical-feed-note')) {
+        return kids.find((n) => n.dataset?.part === 'ical-feed-note') ?? null;
+      }
+      return null;
+    },
+    append(...nodes) { kids.push(...nodes); },
+    replaceChildren(...nodes) {
+      kids.length = 0;
+      kids.push(...nodes);
+    }
+  };
+  const doc = {
+    createElement(tag) {
+      return {
+        tagName: tag.toUpperCase(),
+        className: '',
+        type: '',
+        textContent: '',
+        hidden: false,
+        dataset: {},
+        attrs: {},
+        listeners: {},
+        childNodes: [],
+        setAttribute(name, value) { this.attrs[name] = value; },
+        addEventListener(type, fn) { this.listeners[type] = fn; },
+        append(...nodes) { this.childNodes.push(...nodes); },
+        remove() {
+          const i = kids.indexOf(this);
+          if (i >= 0) kids.splice(i, 1);
+        }
+      };
+    }
+  };
+  const note = 'iCloud calendars not linked in Netlify (work, social, family, health)';
+  paintSourceFilter(doc, host, {
+    hub: 'life',
+    state: Object.fromEntries(['classes', 'comms', 'meetings', 'events', 'pd', 'promises', 'tasks', 'health', 'fitness', 'corey', 'social', 'family'].map((id) => [id, true])),
+    counts: {},
+    hidden: 0,
+    feedNote: note,
+    onChange() {}
+  });
+  const line = kids.find((n) => n.dataset?.part === 'ical-feed-note');
+  assert.ok(line, 'feed note must paint');
+  assert.equal(line.textContent, note);
+  assert.equal(line.attrs.role, 'status');
+});
+
+test('paintSourceErrors: degraded iCloud config shows without a useless Retry', () => {
+  let strip = null;
+  const host = {
+    childNodes: [],
+    querySelector(sel) {
+      if (String(sel).includes('source-errors')) return strip;
+      return null;
+    },
+    prepend(node) {
+      strip = node;
+      this.childNodes.unshift(node);
+    }
+  };
+  const doc = {
+    createElement(tag) {
+      return {
+        tagName: tag.toUpperCase(),
+        className: '',
+        type: '',
+        textContent: '',
+        dataset: {},
+        childNodes: [],
+        listeners: {},
+        setAttribute() {},
+        addEventListener(type, fn) { this.listeners[type] = fn; },
+        append(...nodes) { this.childNodes.push(...nodes); },
+        replaceChildren(...nodes) { this.childNodes = nodes; },
+        remove() { strip = null; host.childNodes = []; },
+        querySelector() { return null; }
+      };
+    },
+    createTextNode(text) { return { textContent: text }; }
+  };
+  paintSourceErrors(doc, host, {
+    feeds: {
+      status: 'degraded',
+      error: 'iCloud not linked: family',
+      label: 'iCloud calendars'
+    }
+  });
+  assert.equal(strip.dataset.part, 'source-errors');
+  const line = strip.childNodes[0];
+  assert.equal(line.dataset.source, 'feeds');
+  assert.equal(line.dataset.severity, 'degraded');
+  assert.match(line.childNodes[0].textContent, /family/);
+  assert.equal(line.childNodes.some((n) => n.textContent === 'Retry'), false);
 });

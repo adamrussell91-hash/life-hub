@@ -87,3 +87,46 @@ export function calendarFeedRange(today) {
   const key = (ms) => new Date(ms).toISOString().slice(0, 10);
   return { from: key(at - 35 * 86_400_000), to: key(at + 400 * 86_400_000) };
 }
+
+const FEED_IDS = Object.freeze(['work', 'social', 'family', 'health']);
+const SHORT_LABEL = Object.freeze({
+  work: 'work',
+  social: 'social',
+  family: 'family',
+  health: 'health'
+});
+
+/**
+ * Fail-visible summary of GET /api/calendar-feeds `data.feeds`.
+ * Never treat "HTTP 200 + all unconfigured" as a healthy empty calendar.
+ *
+ * @param {Array<{ id?: string, status?: string }>|null|undefined} feeds
+ * @returns {{ severity: 'ok'|'degraded'|'error', line: string|null, problems: Array<{ id: string, status: string }> }}
+ */
+export function summarizeIcalFeedStatuses(feeds) {
+  const rows = Array.isArray(feeds) ? feeds : [];
+  const byId = new Map(rows.map((row) => [String(row?.id ?? ''), String(row?.status ?? '')]));
+  const problems = [];
+  for (const id of FEED_IDS) {
+    const status = byId.get(id) || 'unconfigured';
+    if (status === 'unconfigured' || status === 'error' || status === 'stale') {
+      problems.push({ id, status });
+    }
+  }
+  if (!problems.length) return { severity: 'ok', line: null, problems };
+  const unconfigured = problems.filter((p) => p.status === 'unconfigured').map((p) => SHORT_LABEL[p.id]);
+  const errored = problems.filter((p) => p.status === 'error').map((p) => SHORT_LABEL[p.id]);
+  const stale = problems.filter((p) => p.status === 'stale').map((p) => SHORT_LABEL[p.id]);
+  const parts = [];
+  if (unconfigured.length === FEED_IDS.length) {
+    parts.push('iCloud calendars not linked in Netlify (work, social, family, health)');
+  } else if (unconfigured.length) {
+    parts.push(`iCloud not linked: ${unconfigured.join(', ')}`);
+  }
+  if (errored.length) parts.push(`iCloud unreachable: ${errored.join(', ')}`);
+  if (stale.length) parts.push(`iCloud stale copy: ${stale.join(', ')}`);
+  // `error` = a configured feed failed to fetch. Missing Netlify secrets are `degraded`
+  // (Retry cannot create ICAL_FEED_* vars).
+  const severity = errored.length ? 'error' : 'degraded';
+  return { severity, line: parts.join(' · '), problems };
+}

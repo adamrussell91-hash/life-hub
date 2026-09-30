@@ -8,7 +8,11 @@ import { tasksEventsFromTasks, tasksEventsFromWorkBlocks, tasksEventsFromWorkSes
 import { professionalEventsFromProjections } from '../shell/professional-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
 import { resolveSchoolTerms } from '../../../../packages/design-kit/js/calendar/school-terms.js';
-import { calendarFeedRange, eventsFromCalendarFeeds } from '../../../../packages/design-kit/js/calendar/ical-calendar.js';
+import {
+  calendarFeedRange,
+  eventsFromCalendarFeeds,
+  summarizeIcalFeedStatuses
+} from '../../../../packages/design-kit/js/calendar/ical-calendar.js';
 import { shiftYearMonth } from './calendar-model.js';
 import { deriveRiverZooms } from './term-river.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
@@ -193,6 +197,7 @@ export function createAppController(dependencies) {
   let tasksEvents = [];
   let calendarHubPrefs = null;
   let feedEvents = [];
+  let icalFeedNote = null;
   let feedsInFlight = null;
   let calendarHubPrefsInFlight = null;
   let tasksCalendarInFlight = null;
@@ -869,11 +874,27 @@ export function createAppController(dependencies) {
     if (!today) return Promise.resolve();
     const range = calendarFeedRange(today);
     feedsInFlight = apiFetch(`/api/calendar-feeds?from=${range.from}&to=${range.to}`)
-      .then(response => (response.ok ? response.json() : null))
-      .then(payload => {
-        if (payload?.ok && Array.isArray(payload.data?.events)) feedEvents = eventsFromCalendarFeeds(payload.data.events, payload.data.freed ?? []);
+      .then(async response => {
+        if (!response.ok) {
+          feedEvents = [];
+          icalFeedNote = response.status === 401 || response.status === 403
+            ? null
+            : "Couldn't load your iCloud calendars";
+          return;
+        }
+        const payload = await response.json();
+        if (!payload?.ok || !Array.isArray(payload.data?.events)) {
+          feedEvents = [];
+          icalFeedNote = "Couldn't load your iCloud calendars";
+          return;
+        }
+        feedEvents = eventsFromCalendarFeeds(payload.data.events, payload.data.freed ?? []);
+        icalFeedNote = summarizeIcalFeedStatuses(payload.data.feeds ?? []).line;
       })
-      .catch(() => {})
+      .catch(() => {
+        feedEvents = [];
+        icalFeedNote = "Couldn't load your iCloud calendars";
+      })
       .finally(() => {
         feedsInFlight = null;
         if (currentSection === 'calendar') renderCalendarSection();
@@ -1559,6 +1580,7 @@ export function createAppController(dependencies) {
         ...tasksEvents,
         ...feedEvents
       ],
+      icalFeedNote,
       calendarVisual: latestResult.calendarVisual ?? null,
       hubPrefs: calendarHubPrefs,
       calendarGhosts,
