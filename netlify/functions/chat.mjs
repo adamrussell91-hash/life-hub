@@ -2738,7 +2738,10 @@ export function createChatHandler({
                       mode: write.mode,
                       diff: write.diff
                     })),
-                    ...(pendingId ? { pendingId } : {})
+                    ...(pendingId ? { pendingId } : {}),
+                    ...(shortcutResult.skipped_duplicates
+                      ? { skipped_duplicates: shortcutResult.skipped_duplicates, note: shortcutResult.note }
+                      : {})
                   });
                 }
                 if (shortcutResult.kind === 'ok' && Array.isArray(shortcutResult.tasks) && shortcutResult.tasks.length) {
