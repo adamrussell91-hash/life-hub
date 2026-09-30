@@ -197,8 +197,10 @@ test('river phase 2: phone is the lanes as lists, and never scrolls sideways', a
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     const p = await page.locator('[data-part="period"]').boundingBox();
     const z = await page.locator('[data-part="zoom-pills"]').boundingBox();
-    assert.ok(z.y >= p.y + p.height - 1, 'the zoom pills sit under the period, not beside it');
-    assert.ok(p.width > 300, 'the period title has the full width');
+    // Zoom is its own full-width first row on phones, at the same place in every view (calendar-zoom-bar.css).
+    assert.ok(z.y + z.height <= p.y + 1, 'the zoom pills sit on their own row above the period, not beside it');
+    // The title shares its row only with ‹ › (2 × 40px + gaps), so paging works on a phone too.
+    assert.ok(p.width >= z.width - 104, 'the period title has the full width beside the two arrows');
     await shot(page, 'river-390');
   } finally { await context.close(); }
 });
