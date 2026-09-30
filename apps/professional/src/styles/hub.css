@@ -2810,6 +2810,22 @@
     flex: none;
     width: 100%;
   }
+
+  /* Form-field size on phone — not page-hero --text-2xl (R3/R4/T1). */
+  .event-form .event-compose__title {
+    min-width: 0;
+    min-height: 2.5rem;
+    width: 100%;
+    box-sizing: border-box;
+    padding: var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    font-size: max(1rem, var(--text-base));
+    font-weight: var(--weight-semibold);
+    letter-spacing: normal;
+    line-height: var(--leading-snug);
+  }
 }
 
 /* Event detail — session-first, full canvas width */
