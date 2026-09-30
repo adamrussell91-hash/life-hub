@@ -1,0 +1,48 @@
+/*
+ * Phone calendar header, every zoom (Day · Week · Term · Year · Almanac), every hub.
+ * Load after the four calendar-*.css files.
+ *
+ * Three rows, the same in every view, so the Zoom control never moves:
+ *   1. Zoom: full width, five equal 44px targets (js/calendar/zoom-pills.js).
+ *   2. Where you are: the period title, with ‹ › on the right.
+ *   3. What you can do here: Today, then the view's own actions.
+ * Desktop is untouched.
+ */
+@media (max-width:719px){
+  /* The hub card around a calendar view costs 24px of width and sits the Week header
+     lower than the others. The views bring their own cards. */
+  .hub-calendar--workspace:has(> :is(.cal,.dd,.tr,.alm)){
+    padding:0;border:0;border-radius:0;background:none;box-shadow:none;
+    -webkit-backdrop-filter:none;backdrop-filter:none
+  }
+
+  :is(.cal__nav,.dd__nav,.tr__nav,.alm__nav){
+    display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)
+  }
+
+  /* 1. Zoom */
+  .cal__nav > .cal__views{order:-3;flex:1 0 100%;display:block}
+  .cal__nav > .cal__views > .cal__focus{display:none}
+  :is(.dd__nav,.tr__nav,.alm__nav) > [data-part="zoom-pills"]{order:-3}
+  :is(.cal__views,.dd__nav,.tr__nav,.alm__nav) > .hub-pills[data-part="zoom-pills"]{
+    display:flex;flex:1 0 100%;width:100%;margin:0 0 var(--space-1)
+  }
+  :is(.cal__views,.dd__nav,.tr__nav,.alm__nav) > .hub-pills[data-part="zoom-pills"]:not(.hub-pills--loose) > .hub-pills__btn{
+    flex:1 1 0;min-width:0;min-height:2.75rem;padding:0 2px;
+    font-size:var(--text-sm);white-space:nowrap;-webkit-tap-highlight-color:transparent;touch-action:manipulation
+  }
+
+  /* 2. Period + arrows. The basis leaves room for exactly the two arrows and their gaps (2 × 2.5rem + 2 × space-2). */
+  :is(.cal__nav,.dd__nav,.tr__nav,.alm__nav) > [data-part="period"]{
+    order:-2;flex:1 1 calc(100% - 6.25rem);min-width:0;padding:0
+  }
+  :is(.cal__period,.dd__period,.tr__period,.alm__period) b{font-size:var(--text-base);white-space:normal}
+  :is(.cal__round,.dd__round,.tr__round,.alm__round){
+    order:-1;display:inline-grid;flex:none;width:2.5rem;height:2.5rem
+  }
+
+  /* 3. Actions: compact, one row where they fit. */
+  :is(.cal__nav,.dd__nav,.tr__nav,.alm__nav) > .btn{display:inline-flex;min-height:2.25rem;padding:0.3rem 0.85rem;font-size:var(--text-sm)}
+  :is(.cal__spacer,.dd__spacer,.alm__spacer,.alm__ask){display:none}
+  .dd__nav > [data-part="view-pills"]{margin-left:auto}
+}

@@ -167,6 +167,7 @@ export function renderCalendar(root, model, {
         : (weekDates.includes(model.date) ? model.date : weekDates[0]);
       renderTideline(root, calendar, {
         ...tidelineInput,
+        zoom: 'day',
         week: selected ? [selected] : weekDates.slice(0, 1)
       });
       return;
