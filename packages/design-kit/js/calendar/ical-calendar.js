@@ -89,12 +89,7 @@ export function calendarFeedRange(today) {
 }
 
 const FEED_IDS = Object.freeze(['work', 'social', 'family', 'health']);
-const SHORT_LABEL = Object.freeze({
-  work: 'work',
-  social: 'social',
-  family: 'family',
-  health: 'health'
-});
+const PROBLEM_STATUSES = new Set(['unconfigured', 'error', 'stale']);
 
 /**
  * Fail-visible summary of GET /api/calendar-feeds `data.feeds`.
@@ -106,27 +101,30 @@ const SHORT_LABEL = Object.freeze({
 export function summarizeIcalFeedStatuses(feeds) {
   const rows = Array.isArray(feeds) ? feeds : [];
   const byId = new Map(rows.map((row) => [String(row?.id ?? ''), String(row?.status ?? '')]));
-  const problems = [];
-  for (const id of FEED_IDS) {
-    const status = byId.get(id) || 'unconfigured';
-    if (status === 'unconfigured' || status === 'error' || status === 'stale') {
-      problems.push({ id, status });
-    }
-  }
+  const problems = FEED_IDS
+    .map((id) => ({ id, status: byId.get(id) || 'unconfigured' }))
+    .filter((row) => PROBLEM_STATUSES.has(row.status));
   if (!problems.length) return { severity: 'ok', line: null, problems };
-  const unconfigured = problems.filter((p) => p.status === 'unconfigured').map((p) => SHORT_LABEL[p.id]);
-  const errored = problems.filter((p) => p.status === 'error').map((p) => SHORT_LABEL[p.id]);
-  const stale = problems.filter((p) => p.status === 'stale').map((p) => SHORT_LABEL[p.id]);
+
+  const idsFor = (status) => problems.filter((p) => p.status === status).map((p) => p.id);
+  const unconfigured = idsFor('unconfigured');
+  const errored = idsFor('error');
+  const stale = idsFor('stale');
+
   const parts = [];
   if (unconfigured.length === FEED_IDS.length) {
-    parts.push('iCloud calendars not linked in Netlify (work, social, family, health)');
+    parts.push(`iCloud calendars not linked in Netlify (${FEED_IDS.join(', ')})`);
   } else if (unconfigured.length) {
     parts.push(`iCloud not linked: ${unconfigured.join(', ')}`);
   }
   if (errored.length) parts.push(`iCloud unreachable: ${errored.join(', ')}`);
   if (stale.length) parts.push(`iCloud stale copy: ${stale.join(', ')}`);
+
   // `error` = a configured feed failed to fetch. Missing Netlify secrets are `degraded`
   // (Retry cannot create ICAL_FEED_* vars).
-  const severity = errored.length ? 'error' : 'degraded';
-  return { severity, line: parts.join(' · '), problems };
+  return {
+    severity: errored.length ? 'error' : 'degraded',
+    line: parts.join(' · '),
+    problems
+  };
 }

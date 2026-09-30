@@ -226,20 +226,15 @@ export function paintSourceFilter(doc, host, opts) {
   attach(host, line);
 
   // Fail-visible: missing / broken iCloud feeds must not look like an empty week.
-  let feedLine = host.querySelector?.(':scope > [data-part="ical-feed-note"]') ?? null;
+  // Host was just cleared above, so always create fresh when a note is present.
   if (feedNote) {
-    if (!feedLine) {
-      feedLine = doc.createElement('p');
-      feedLine.className = 'cal-source-errors__line';
-      if (feedLine.dataset) feedLine.dataset.part = 'ical-feed-note';
-      else feedLine.setAttribute?.('data-part', 'ical-feed-note');
-      feedLine.setAttribute('role', 'status');
-      attach(host, feedLine);
-    }
-    feedLine.hidden = false;
+    const feedLine = doc.createElement('p');
+    feedLine.className = 'cal-source-errors__line';
+    if (feedLine.dataset) feedLine.dataset.part = 'ical-feed-note';
+    else feedLine.setAttribute?.('data-part', 'ical-feed-note');
+    feedLine.setAttribute('role', 'status');
     feedLine.textContent = feedNote;
-  } else if (feedLine) {
-    feedLine.remove?.();
+    attach(host, feedLine);
   }
 }
 

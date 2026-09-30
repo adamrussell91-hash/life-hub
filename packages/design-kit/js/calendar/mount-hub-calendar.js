@@ -195,7 +195,7 @@ export function mountHubCalendar(host, adapter) {
     const visual = loader.getVisual?.() ?? null;
     const feedStatus = loader.getStatuses?.()?.feeds;
     const icalFeedNote =
-      feedStatus && (feedStatus.status === 'error' || feedStatus.status === 'degraded')
+      feedStatus?.status === 'error' || feedStatus?.status === 'degraded'
         ? feedStatus.error
         : null;
     return {

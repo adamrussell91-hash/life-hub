@@ -256,17 +256,43 @@ test('summarizeIcalFeedStatuses: all unconfigured is fail-visible, not a healthy
   assert.equal(healthy.line, null);
 });
 
+function mockDomNode(tag = 'div') {
+  return {
+    tagName: String(tag).toUpperCase(),
+    className: '',
+    type: '',
+    textContent: '',
+    hidden: false,
+    dataset: {},
+    attrs: {},
+    listeners: {},
+    childNodes: [],
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+    addEventListener(type, fn) {
+      this.listeners[type] = fn;
+    },
+    append(...nodes) {
+      this.childNodes.push(...nodes);
+    },
+    replaceChildren(...nodes) {
+      this.childNodes = nodes;
+    },
+    remove() {},
+    querySelector() {
+      return null;
+    }
+  };
+}
+
 test('paintSourceFilter: ical feed note is fail-visible under the filter chips', () => {
   const kids = [];
   const host = {
     children: kids,
-    querySelector(sel) {
-      if (String(sel).includes('ical-feed-note')) {
-        return kids.find((n) => n.dataset?.part === 'ical-feed-note') ?? null;
-      }
-      return null;
+    append(...nodes) {
+      kids.push(...nodes);
     },
-    append(...nodes) { kids.push(...nodes); },
     replaceChildren(...nodes) {
       kids.length = 0;
       kids.push(...nodes);
@@ -274,30 +300,22 @@ test('paintSourceFilter: ical feed note is fail-visible under the filter chips',
   };
   const doc = {
     createElement(tag) {
-      return {
-        tagName: tag.toUpperCase(),
-        className: '',
-        type: '',
-        textContent: '',
-        hidden: false,
-        dataset: {},
-        attrs: {},
-        listeners: {},
-        childNodes: [],
-        setAttribute(name, value) { this.attrs[name] = value; },
-        addEventListener(type, fn) { this.listeners[type] = fn; },
-        append(...nodes) { this.childNodes.push(...nodes); },
-        remove() {
-          const i = kids.indexOf(this);
-          if (i >= 0) kids.splice(i, 1);
-        }
+      const node = mockDomNode(tag);
+      node.remove = () => {
+        const i = kids.indexOf(node);
+        if (i >= 0) kids.splice(i, 1);
       };
+      return node;
     }
   };
   const note = 'iCloud calendars not linked in Netlify (work, social, family, health)';
   paintSourceFilter(doc, host, {
     hub: 'life',
-    state: Object.fromEntries(['classes', 'comms', 'meetings', 'events', 'pd', 'promises', 'tasks', 'health', 'fitness', 'corey', 'social', 'family'].map((id) => [id, true])),
+    state: Object.fromEntries(
+      ['classes', 'comms', 'meetings', 'events', 'pd', 'promises', 'tasks', 'health', 'fitness', 'corey', 'social', 'family'].map(
+        (id) => [id, true]
+      )
+    ),
     counts: {},
     hidden: 0,
     feedNote: note,
@@ -314,8 +332,7 @@ test('paintSourceErrors: degraded iCloud config shows without a useless Retry', 
   const host = {
     childNodes: [],
     querySelector(sel) {
-      if (String(sel).includes('source-errors')) return strip;
-      return null;
+      return String(sel).includes('source-errors') ? strip : null;
     },
     prepend(node) {
       strip = node;
@@ -324,23 +341,16 @@ test('paintSourceErrors: degraded iCloud config shows without a useless Retry', 
   };
   const doc = {
     createElement(tag) {
-      return {
-        tagName: tag.toUpperCase(),
-        className: '',
-        type: '',
-        textContent: '',
-        dataset: {},
-        childNodes: [],
-        listeners: {},
-        setAttribute() {},
-        addEventListener(type, fn) { this.listeners[type] = fn; },
-        append(...nodes) { this.childNodes.push(...nodes); },
-        replaceChildren(...nodes) { this.childNodes = nodes; },
-        remove() { strip = null; host.childNodes = []; },
-        querySelector() { return null; }
+      const node = mockDomNode(tag);
+      node.remove = () => {
+        strip = null;
+        host.childNodes = [];
       };
+      return node;
     },
-    createTextNode(text) { return { textContent: text }; }
+    createTextNode(text) {
+      return { textContent: text };
+    }
   };
   paintSourceErrors(doc, host, {
     feeds: {

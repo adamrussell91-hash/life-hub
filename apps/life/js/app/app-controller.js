@@ -873,28 +873,31 @@ export function createAppController(dependencies) {
     const today = latestResult?.date ?? calendarSelectedDate;
     if (!today) return Promise.resolve();
     const range = calendarFeedRange(today);
+    const loadFailNote = "Couldn't load your iCloud calendars";
+
+    function applyFeedFailure(note) {
+      feedEvents = [];
+      icalFeedNote = note;
+    }
+
     feedsInFlight = apiFetch(`/api/calendar-feeds?from=${range.from}&to=${range.to}`)
       .then(async response => {
         if (!response.ok) {
-          feedEvents = [];
-          icalFeedNote = response.status === 401 || response.status === 403
-            ? null
-            : "Couldn't load your iCloud calendars";
+          // Signed-out: stay quiet. Any other failure must be fail-visible.
+          applyFeedFailure(
+            response.status === 401 || response.status === 403 ? null : loadFailNote
+          );
           return;
         }
         const payload = await response.json();
         if (!payload?.ok || !Array.isArray(payload.data?.events)) {
-          feedEvents = [];
-          icalFeedNote = "Couldn't load your iCloud calendars";
+          applyFeedFailure(loadFailNote);
           return;
         }
         feedEvents = eventsFromCalendarFeeds(payload.data.events, payload.data.freed ?? []);
         icalFeedNote = summarizeIcalFeedStatuses(payload.data.feeds ?? []).line;
       })
-      .catch(() => {
-        feedEvents = [];
-        icalFeedNote = "Couldn't load your iCloud calendars";
-      })
+      .catch(() => applyFeedFailure(loadFailNote))
       .finally(() => {
         feedsInFlight = null;
         if (currentSection === 'calendar') renderCalendarSection();

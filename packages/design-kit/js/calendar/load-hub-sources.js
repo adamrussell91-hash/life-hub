@@ -304,8 +304,10 @@ export function createHubSourceLoader(opts) {
         const feedMeta = payload.data?.feeds ?? [];
         const events = eventsFromCalendarFeeds(payload.data?.events ?? [], payload.data?.freed ?? []);
         const summary = summarizeIcalFeedStatuses(feedMeta);
+        // Map summary severity onto bucket status (`ok` → `live`).
+        const status = summary.severity === 'ok' ? 'live' : summary.severity;
         setBucket('feeds', {
-          status: summary.severity === 'ok' ? 'live' : summary.severity,
+          status,
           events,
           error: summary.line,
           meta: { feeds: feedMeta }
@@ -393,9 +395,10 @@ export function createHubSourceLoader(opts) {
  */
 export function paintSourceErrors(doc, host, statuses, onRetry) {
   let strip = host.querySelector(':scope > [data-part="source-errors"]');
-  const errors = Object.entries(statuses || {}).filter(
-    ([, row]) => row?.status === 'error' || row?.status === 'degraded'
-  );
+  const errors = Object.entries(statuses || {}).filter(([, row]) => {
+    const status = row?.status;
+    return status === 'error' || status === 'degraded';
+  });
   if (!errors.length) {
     strip?.remove();
     return;
@@ -413,9 +416,11 @@ export function paintSourceErrors(doc, host, statuses, onRetry) {
     line.className = 'cal-source-errors__line';
     line.dataset.source = id;
     if (row.status === 'degraded') line.dataset.severity = 'degraded';
+
     const msg = doc.createElement('span');
     msg.textContent = row.error || `Couldn't load ${row.label || id} events`;
     line.append(msg);
+
     // Retry helps a transport failure, not a missing Netlify secret.
     if (row.status === 'error') {
       const retry = doc.createElement('button');
