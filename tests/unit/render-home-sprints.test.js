@@ -28,12 +28,23 @@ class FakeElement {
     this.className = '';
     this.dataset = {};
     this.attributes = {};
-    this.style = {};
+    this.style = {
+      setProperty(name, value) {
+        this[name] = value;
+      }
+    };
     this.classList = new FakeClassList(this);
     this.textContent = '';
     this.children = [];
     this.listeners = [];
     this.hidden = false;
+    this.src = '';
+    this.alt = '';
+    this.width = 0;
+    this.height = 0;
+    this.decoding = '';
+    this.type = '';
+    this.href = '';
   }
   setAttribute(name, value) {
     this.attributes[name] = String(value);
@@ -78,15 +89,17 @@ function hostTree() {
   host.setAttribute('hidden', '');
   const status = new FakeElement('p');
   const rail = new FakeElement('div');
+  const count = new FakeElement('p');
   host.nodes = new Map([
     ['[data-home-sprints-status]', status],
-    ['[data-home-sprints-rail]', rail]
+    ['[data-home-sprints-rail]', rail],
+    ['[data-home-sprints-count]', count]
   ]);
   root.nodes = new Map([['#home-sprints', host]]);
   root._host = host;
   root._status = status;
   root._rail = rail;
-  // Fragment children land on rail via replaceChildren
+  root._count = count;
   const origReplace = rail.replaceChildren.bind(rail);
   rail.replaceChildren = (...nodes) => {
     const flat = [];
@@ -100,6 +113,27 @@ function hostTree() {
   return root;
 }
 
+function walkTexts(node, texts = []) {
+  if (node.textContent) texts.push(node.textContent);
+  for (const child of node.children || []) walkTexts(child, texts);
+  return texts;
+}
+
+function findByClass(node, className) {
+  if ((node.className || '').split(/\s+/).includes(className)) return node;
+  for (const child of node.children || []) {
+    const hit = findByClass(child, className);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function findAllByClass(node, className, out = []) {
+  if ((node.className || '').split(/\s+/).includes(className)) out.push(node);
+  for (const child of node.children || []) findAllByClass(child, className, out);
+  return out;
+}
+
 const sprintRow = {
   sprint: { id: 'blitz', kind: 'sprint' },
   state: {
@@ -108,13 +142,17 @@ const sprintRow = {
     open: true,
     ended_awaiting_review: false,
     day_label: 'day 4 of 12',
+    day_n: 4,
+    length_days: 12,
     end_date: '2026-10-12',
     checkin_done_today: false,
+    lead_agent: 'hammond',
     headline: {
       label: 'Midsection',
       metricLabel: 'Waist',
       unit: 'cm',
       baseline: 89,
+      direction: 'down',
       latest: { value: 88 },
       delta: -1,
       readings: [
@@ -157,23 +195,30 @@ test('home sprints card shows day, headline, lanes, check-in; unavailable ≠ mi
   });
   assert.equal(root._host.getAttribute('hidden'), null);
   assert.equal(root._rail.children.length, 1);
+  assert.equal(root._count.textContent, '1 open');
   const card = root._rail.children[0];
-  const texts = [];
-  const walk = node => {
-    if (node.textContent) texts.push(node.textContent);
-    for (const child of node.children || []) walk(child);
-  };
-  walk(card);
-  const blob = texts.join(' | ');
+  const blob = walkTexts(card).join(' | ');
   assert.match(blob, /Belly Flab Blitz/);
   assert.match(blob, /Day 4 of 12/i);
   assert.match(blob, /Waist/);
   assert.match(blob, /On track/);
   assert.match(blob, /Unavailable/);
   assert.doesNotMatch(blob, /\bMissed\b/i);
-  assert.match(blob, /protein 3\/3/i);
-  const checkBtn = card.children.find(c => c.className === 'home-sprint-card__actions')
-    ?.children.find(c => c.tagName === 'BUTTON');
+  assert.match(blob, /Protein ≥ target · 3 of 3 days/);
+  assert.match(blob, /Brisket/);
+  assert.match(blob, /Chadwick/);
+
+  const avatars = findAllByClass(card, 'home-sprint-card__avatar');
+  assert.equal(avatars.length, 2);
+  assert.match(avatars[0].src, /brisket/);
+  assert.match(avatars[1].src, /chadwick/);
+
+  const tracks = findAllByClass(card, 'home-sprint-card__track');
+  assert.ok(tracks.length >= 2);
+  assert.equal(tracks[0].attributes['aria-valuenow'], '33');
+  assert.equal(tracks[1].attributes['aria-valuenow'], '100');
+
+  const checkBtn = findByClass(card, 'home-sprint-card__cta');
   assert.equal(checkBtn?.textContent, 'Check in');
   checkBtn.listeners.find(l => l.type === 'click')?.fn();
   assert.match(opened, /#\/chat\/hammond\?protocol=sprint-checkin/);
@@ -195,7 +240,25 @@ test('home sprints card shows ended — final review state', async () => {
   });
   assert.equal(root._host.getAttribute('hidden'), null);
   const card = root._rail.children[0];
-  const btn = card.children.find(c => c.className === 'home-sprint-card__actions')
-    ?.children.find(c => c.tagName === 'BUTTON');
+  const btn = findByClass(card, 'home-sprint-card__cta');
   assert.equal(btn?.textContent, 'Ended — final review');
+});
+
+test('home sprints check-in done uses intentional done chip and secondary lead link', async () => {
+  const root = hostTree();
+  const doneRow = {
+    ...sprintRow,
+    state: { ...sprintRow.state, checkin_done_today: true }
+  };
+  let opened = null;
+  await renderHomeSprints(root, {
+    api: { list: async () => ({ sprints: [doneRow], flags: {} }) },
+    onOpenChat: href => { opened = href; }
+  });
+  const card = root._rail.children[0];
+  assert.ok(findByClass(card, 'home-sprint-card__done'));
+  const secondary = findByClass(card, 'home-sprint-card__secondary');
+  assert.match(secondary?.textContent || '', /Message Hammond/);
+  secondary.listeners.find(l => l.type === 'click')?.fn({ preventDefault() {} });
+  assert.match(opened, /#\/chat\/hammond/);
 });

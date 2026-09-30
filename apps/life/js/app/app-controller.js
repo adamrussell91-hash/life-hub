@@ -15,7 +15,7 @@ import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
 import { renderFitnessSurfaceWidgets, renderNutritionSurfaceWidgets } from './render-surface-widgets.js';
-import { renderHomeSprints } from './render-home-sprints.js';
+import { createHomeSprintsApi, renderHomeSprints } from './render-home-sprints.js';
 import { packCnBoard, readHiddenLoopIds } from './render-central-node.js';
 import { settleMetricRings } from './chart-kit/animate.js';
 
@@ -501,6 +501,7 @@ export function createAppController(dependencies) {
         const model = buildHomeModel({ ...result, date });
         renderHome(root, model, { quiet: syncQuiet, onOpenSection: showSection });
         void renderHomeSprints(root, {
+          api: createHomeSprintsApi(apiFetch),
           onOpenChat: (href) => {
             const url = new URL(href, window.location.href);
             const agent = url.hash.match(/#\/chat\/([^?]+)/)?.[1];
@@ -615,6 +616,7 @@ export function createAppController(dependencies) {
       const model = buildHomeModel({ ...result, date });
       renderHome(root, model, { onOpenSection: showSection });
       void renderHomeSprints(root, {
+        api: createHomeSprintsApi(apiFetch),
         onOpenChat: (href) => {
           const url = new URL(href, window.location.href);
           const agent = url.hash.match(/#\/chat\/([^?]+)/)?.[1];
