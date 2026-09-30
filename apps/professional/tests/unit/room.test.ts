@@ -39,4 +39,19 @@ describe('groupRoom', () => {
     expect(people.find((person) => person.name === 'Sam O.')!.isNew).toBe(true);
     expect(people.find((person) => person.name === 'Rachel Ford')!.role).toBe('chair');
   });
+
+  it('keeps the name on the link when the directory does not know the ref, and never calls them new', () => {
+    const room = groupRoom([{ ref: 'shared:person:blob-copy', role: null, name: 'Mia Chen' }], directory, new Date('2026-09-24T08:00:00.000Z'));
+    const person = room[0]!.people[0]!;
+    expect(person.name).toBe('Mia Chen');
+    expect(person.initials).toBe('MC');
+    expect(person.isNew).toBe(false);
+    expect(person.known).toBe(false);
+  });
+
+  it('matches a duplicate copy to its directory row by name when exactly one row has it', () => {
+    const students = [...directory, row('shared:person:student-rohan', 'Rohan Arianayagam', null, 'warm')];
+    const room = groupRoom([{ ref: 'shared:person:blob-twin', role: null, name: 'Rohan Arianayagam' }], students, new Date('2026-09-24T08:00:00.000Z'));
+    expect(room[0]!.people[0]).toMatchObject({ name: 'Rohan Arianayagam', warmthDots: 3, known: true });
+  });
 });

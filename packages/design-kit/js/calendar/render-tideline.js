@@ -893,11 +893,11 @@ function mountChip(body, chip) {
     : ghost ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${ghost.id}" data-label="Accept">Accept</button></div>` : '';
   const progress = chip.progress ? ` · ${chip.progress.done}/${chip.progress.total}` : '';
   const bookmark = chip.bookmark?.note ? `<div class="cal-chip__bm" title="Where you left it">↳ ${escapeHtml(chip.bookmark.note)}</div>` : '';
-  const node = el('div', classes.join(' '), `${agent}<div class="cal-chip__title">${title}</div><div class="cal-chip__meta">${chip.meta}${progress}</div>${bookmark}${acts}`, body, {
+  const node = el('div', classes.join(' '), `${agent}<div class="cal-chip__title">${title}</div><div class="cal-chip__meta">${escapeHtml(chip.meta ?? '')}${progress}</div>${bookmark}${acts}`, body, {
     'data-part': ghost ? 'ghost' : chip.isClass ? 'class' : 'chip',
     'data-id': chip.id,
     'data-kind': chip.kind,
-    title: chip.title,
+    title: chip.meta ? `${chip.title} · ${chip.meta}` : chip.title,
     tabindex: '0',
     role: 'button',
     'aria-label': `${chip.title}. ${chip.meta}`,

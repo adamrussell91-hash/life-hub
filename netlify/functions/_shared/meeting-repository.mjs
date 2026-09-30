@@ -119,9 +119,43 @@ export function createMeetingRepository(deps = {}) {
     );
   }
 
-  async function listScheduleProjections() {
+  // Attendee names for calendar chips. Only meetings inside the calendar
+  // window pay the link read; a link-store failure leaves chips without names.
+  async function attendeeNamesFor(meetings, { attendeesFrom, attendeesTo }) {
+    const names = new Map();
+    if (!attendeesFrom || !attendeesTo) return names;
+    const inWindow = meetings.filter((m) => {
+      const day = String(m.scheduled_start ?? '').slice(0, 10);
+      return day >= attendeesFrom && day <= attendeesTo;
+    });
+    if (!inWindow.length) return names;
+    let linkRepo;
+    try {
+      linkRepo = createUniversalLinkRepository({ store: await getUniversalLinkStore(), resolveEntity, now });
+    } catch {
+      return names;
+    }
+    const accessContext = createAccessContext({ workflow: 'life' });
+    await mapBounded(inWindow, LIST_BATCH_SIZE, async (m) => {
+      try {
+        const ref = formatEntityRef({ namespace: 'professional', kind: 'meeting', id: m.id });
+        const outgoing = await linkRepo.listOutgoing(ref, accessContext);
+        const labels = outgoing
+          .filter((entry) => entry.link?.relationship_type === 'attendee' && entry.link?.status === 'current')
+          .map((entry) => entry.endpoint?.display_label)
+          .filter((label) => typeof label === 'string' && label);
+        names.set(m.id, [...new Set(labels)]);
+      } catch {
+        // One unreadable meeting never blanks the calendar.
+      }
+    });
+    return names;
+  }
+
+  async function listScheduleProjections(options = {}) {
     const meetings = await listMeetings();
-    return meetings.map((m) => projectMeetingSchedule(m));
+    const names = await attendeeNamesFor(meetings, options);
+    return meetings.map((m) => projectMeetingSchedule(m, names.get(m.id) ?? []));
   }
 
   async function createMeeting(input) {

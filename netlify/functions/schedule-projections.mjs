@@ -10,7 +10,7 @@ import {
   projectCommunicationSchedule,
   projectNotionCommunicationSchedule
 } from './_shared/schedule-projection.mjs';
-import { listGithubCommunications } from './_shared/github-professional-data.mjs';
+import { getGithubActiveSelfPerson, listGithubCommunications } from './_shared/github-professional-data.mjs';
 import {
   resolveMeeting,
   resolveEvent,
@@ -37,6 +37,7 @@ export function createScheduleProjectionsHandler(deps = {}) {
   const createCommunications = deps.createCommunicationRepository ?? createCommunicationRepository;
   const createLedger = deps.createLedgerItemRepository ?? createLedgerItemRepository;
   const loadGithubCommunications = deps.listGithubCommunications ?? listGithubCommunications;
+  const loadSelfPerson = deps.getGithubActiveSelfPerson ?? getGithubActiveSelfPerson;
   const baseResolveEntity = deps.resolveEntity ?? defaultResolveEntity;
 
   return createOperatorHandler(
@@ -90,17 +91,21 @@ export function createScheduleProjectionsHandler(deps = {}) {
         const today = new Date(scheduleNow());
         const from = sydneyDateKey(new Date(today.getTime() - 30 * 86_400_000));
         const to = sydneyDateKey(new Date(today.getTime() + 120 * 86_400_000));
-        const [meetingProjections, eventProjections, communications, promises, notionComms] = await Promise.all([
-          meetingRepo.listScheduleProjections(),
+        const [meetingProjections, eventProjections, communications, promises, notionComms, self] = await Promise.all([
+          meetingRepo.listScheduleProjections({ attendeesFrom: from, attendeesTo: to }),
           eventRepo.listScheduleProjections(),
           commRepo.listCommunications(),
           ledgerRepo.listDueBetween(from, to),
           // Notion comms copied into life-hub-data. Unbound token or a
           // GitHub failure leaves the calendar on Blob records only.
-          loadGithubCommunications({ env }).catch(() => [])
+          loadGithubCommunications({ env }).catch(() => []),
+          loadSelfPerson({ env }).catch(() => null)
         ]);
         const commProjections = communications.map(projectCommunicationSchedule);
-        const notionCommProjections = notionComms.map(projectNotionCommunicationSchedule).filter(Boolean);
+        const selfName = typeof self?.display_name === 'string' ? self.display_name : null;
+        const notionCommProjections = notionComms
+          .map((row) => projectNotionCommunicationSchedule(row, { selfName }))
+          .filter(Boolean);
         const projections = mergeScheduleProjections([
           notionCommProjections,
           meetingProjections,
