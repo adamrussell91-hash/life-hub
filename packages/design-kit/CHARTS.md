@@ -2,16 +2,18 @@
 
 **Read this file. Do not hunt Life, Knowledge, Tasks, Teaching, or old specs for a chart or graph look.**
 
-This is the one source of truth for hub charts and graphs. Same job as `tokens.css` for colour and `RAIL.md` for the rail: a closed library. Pick a type from the catalog. Import from the implementation root listed. If the type is not here, do not invent one.
+**Selecting a type?** Start with [`CHART-CATALOG.md`](./CHART-CATALOG.md) — the flat super list (where used, purpose, data limits, code paths). This file (`CHARTS.md`) remains the **API / tokens / locked-look / log** source of truth for library types. Both must stay in sync when a type is added, changed, or retired.
 
-Implementation still lives in one root per family (Life chart-kit, Knowledge archive graph). Those roots are the library code. This file is the catalog, the rules, and the log. When a type is added, changed, or retired, update **this file in the same PR**.
+Same job as `tokens.css` for colour and `RAIL.md` for the rail: a closed library. Pick a type from the catalog. Import from the implementation root listed. If the type is not here (and not in `CHART-CATALOG.md`), do not invent one.
+
+Implementation still lives in one root per family (Life chart-kit, Knowledge archive graph). Those roots are the library code. This file is the APIs, the rules, and the log. When a type is added, changed, or retired, update **this file and `CHART-CATALOG.md` in the same PR**.
 
 ---
 
 ## Agent rule
 
-1. Open `packages/design-kit/CHARTS.md` (this file).
-2. Choose a catalog id.
+1. Open `packages/design-kit/CHART-CATALOG.md` to choose a type (purpose / limits / where used).
+2. Open `packages/design-kit/CHARTS.md` (this file) for the catalog id API and root.
 3. Import the listed export from the listed root.
 4. Use kit tokens (`tokens.css`). Clinical series: `CLINICAL_CHART_SLOTS`.
 5. Stop.
@@ -232,6 +234,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-30 | catalog | Added `CHART-CATALOG.md` — flat super-list (purpose, limits, where used, code paths) for choosing types. Agents consult it when adding graphs/charts; this file stays APIs / tokens / log. Includes bullseye + vis-timeline as documented-only rows. |
 | 2026-09-24 | `plan-timeline` | Tasks Timeline look is `docs/proposals/timeline-reference/`. Geometry `TL` in `apps/tasks/src/domain/timeline-geometry.ts`. Classes `tl-*`. Motion through `timeline-motion.ts`. |
 | 2026-09-22 | `transit-lines`, `flowchart-lanes`, `orbit-radar` | Visual contract ported from `docs/proposals/graph-reference/` (`lines.html`, `branch.html`, `orbit.html`). Geometry constants `TRANSIT_G` / `FLOW_G` / `ORBIT` live in the scene builders. |
 | 2026-09-22 | `transit-lines`, `flowchart-lanes`, `orbit-radar` | Tasks Graph rebuilt as Lines / Branch / Orbit. `weight-line` promoted to `transit-lines`. Branch uses `flowchart-lanes`. Orbit uses `orbit-radar` plus `polar-clock` helpers. |

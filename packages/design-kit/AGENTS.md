@@ -4,7 +4,7 @@ This folder is the design source of truth for Adam’s hub sites (Teaching, Life
 
 Tasks Hub agents: also read `TASKS.md` (Teaching chrome, board home).
 
-Charts / graphs: read `CHARTS.md` only. That file is the library — catalog, APIs, tokens, log. Do not hunt Life or Knowledge for a look.
+Charts / graphs: when **adding or choosing** a graph/chart, consult [`CHART-CATALOG.md`](./CHART-CATALOG.md) first (flat type list: where used, purpose, limits, code paths). Then read [`CHARTS.md`](./CHARTS.md) for APIs, tokens, locked look, and the change log. Do not hunt Life or Knowledge for a look.
 
 Calendars: read `CALENDAR.md` only. Tasks Hub is the reference paint. Do not invent a second calendar skin.
 
@@ -46,7 +46,7 @@ This freeze is **flat** (CSS at the kit root). There is no `css/` directory.
 21. `js/hub-inline-edit.js` / `js/hub-create-disclosure.js` / `js/hub-capture.js` — stay-in-place edit, chips/tags, create-pill grid, voice + paste.
 22. `js/hub-command-search.js` — shared command palette. Teaching keeps `.search-palette` markup; call `enhanceSearchPalette` on that panel. Other hubs use `openHubCommandSearch`.
 23. `js/hub-surfaces.js` — pin list, labeled progress, step indicator, run widget, schedule/slots/reminders, task/activities/collection disclosure, scroll island, progressive input stack, journal nav, save toggle, status picker.
-24. `CHARTS.md` — **locked** chart and graph library (catalog, APIs, tokens, log). Implementation roots listed there. Do not invent a type that is not in that file.
+24. `CHART-CATALOG.md` — **when adding graphs/charts**, consult this first (flat super list: purpose, limits, where used, code paths). `CHARTS.md` — **locked** library APIs, tokens, look, log. Implementation roots listed there. Do not invent a type that is not in those files.
 25. `CALENDAR.md` + `calendar.css` — **locked** calendar. Tasks Hub is the reference paint (Day / Week / Month, 7-day Monday week, `.event-chip`, workspace + rail). Do not invent a postcard, a five-day week, or a second phone skin.
 26. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-kinetic.html`, `hub-scroll-hide.html`, `morphing-popover.html`, `hub-compose.html`, `adaptive-slider.html`, `card-swipe.html`, `hub-toast.html`, `hub-ai-bar.html`)
 
@@ -114,7 +114,7 @@ In this monorepo Teaching / Knowledge / Tasks symlink `design-kit/` → `package
 
 Overlays change **canvas** glass and tile density only. They do not change `--rail-width` or rail item layout.
 
-Lesson blocks and domain screens stay in the hub. Chart and graph **look** is this kit’s library (`CHARTS.md`). Chrome does not live in a hub.
+Lesson blocks and domain screens stay in the hub. Chart and graph **look** is this kit’s library (`CHART-CATALOG.md` to choose; `CHARTS.md` for APIs). Chrome does not live in a hub.
 
 ## Hard rules
 
