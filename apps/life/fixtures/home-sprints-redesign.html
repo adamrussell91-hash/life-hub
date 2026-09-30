@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <base href="/">
+  <!-- Life app root so assets/, css/, js/ resolve like production Life Pages. -->
+  <base href="/apps/life/">
   <title>Life Hub · Home sprints redesign fixture</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +15,7 @@
   <link rel="stylesheet" href="/packages/design-kit/hub-interactions.css">
   <link rel="stylesheet" href="/packages/design-kit/rail.css">
   <link rel="stylesheet" href="/packages/design-kit/mobile.css">
-  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="css/app.css">
   <style>
     /* Fixture: keep Home chrome honest without full app boot */
     body { margin: 0; }
@@ -72,7 +73,7 @@
   </div>
 
   <script type="module">
-    import { renderHomeSprints } from '/js/app/render-home-sprints.js';
+    import { renderHomeSprints } from '/apps/life/js/app/render-home-sprints.js';
 
     const host = document.getElementById('fixture-sprints-host');
     host.innerHTML = `

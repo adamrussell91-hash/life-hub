@@ -86,6 +86,9 @@ test('buildSprintGlideChart adapts headline readings for chart-kit', () => {
   assert.equal(chart.points.length, 3);
   assert.equal(chart.points[0].weight_kg, 89);
   assert.ok(Number.isFinite(chart.points[0].trend_kg));
+  assert.equal(chart.trendReady, true);
+  assert.equal(chart.trendNeeds, null);
+  assert.ok(Number.isFinite(chart.points[0].split_kg));
   assert.equal(buildSprintAreaSeries({ readings: chart.points.map(p => ({ date: p.date, value: p.weight_kg })) }).length, 3);
 });
 

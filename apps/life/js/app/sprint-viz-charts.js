@@ -44,15 +44,25 @@ export function buildSprintGlideChart(headline) {
   const trend = linearTrend(readings);
   const from = readings[0].date;
   const date = readings[readings.length - 1].date;
+  const points = readings.map((r, i) => {
+    const trend_kg = trend[i];
+    return {
+      date: r.date,
+      weight_kg: r.value,
+      trend_kg,
+      split_kg: Number((r.value - trend_kg).toFixed(2))
+    };
+  });
+  const mad = points.reduce((sum, p) => sum + Math.abs(p.split_kg), 0) / points.length;
   return {
     from,
     date,
+    historyDays: Math.max(1, Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1),
     band: optionalBand(headline),
-    points: readings.map((r, i) => ({
-      date: r.date,
-      weight_kg: r.value,
-      trend_kg: trend[i]
-    })),
+    points,
+    trendReady: true,
+    trendNeeds: null,
+    residualMadKg: Number(mad.toFixed(2)),
     projection: null
   };
 }
