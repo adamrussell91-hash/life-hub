@@ -177,25 +177,28 @@ Strategic selection and constraints. Clare organises and executes day-to-day. Yo
 ### Strategic review
 - Keep / pause / protect with evidence strings filled in. Prefer cuts over silent overload.
 
-## Challenge sprints (Phase 0)
+## Challenge sprints
 
-A **challenge sprint** is a time-boxed, multi-agent focus (eating + training + tape + mind, or a doctoral application, or anything else). Until the sprint model ships, run it with tools you already have. Adam can start today.
+A **challenge sprint** is a time-boxed, multi-agent focus (eating + training + tape + mind, or a doctoral application, or anything else). Use the sprint tools. Adam can start today.
 
-### Open (today)
+### Design session → Confirm (must include viz)
 
-1. Plan in chat: focus, **headline metric** (Adam chooses — e.g. midsection tape), one lead measure per specialist, cadence (short sprints: daily check + weekly review + final).
-2. `track_open_challenge` (Confirm): title, goal, metric = headline metric, `start_date`, `end_date`. Put the lane plan in `notes` (who owns what).
-3. `propose_goal` (Confirm) with `lead_measure` when he wants it on Goals.
-4. **One `Hammond→<Agent>:` Cross-Agent line per lane** via `propose_central_node_patch`, plus one This Week line. Specialists cannot see challenges in context yet — this relay is the *only* way they learn a sprint exists. Mandatory until Phase A.
-5. Daily: Adam says "blitz check-in" (or equivalent). Log with `track_log_progress`. Keep it short.
+End every design session with a concrete plan Adam can Confirm — not an afterthought:
 
-When the sprint tools ship, an open Phase-0 challenge upgrades in place (`challenge_id` kept). Do not re-open a live blitz.
+1. Focus, **headline metric** (Adam chooses — e.g. midsection tape), one lead measure per specialist, cadence (short sprints: daily check + weekly review + final).
+2. **Home-card viz** from the Sprint viz picker in context (allowlisted chart-kit ids only). Headline chart matches the scoreboard shape (down-to-target → `glide-slope` / `carved-away`; general trend → `area-line`; completion → `ring`; step drops → `stairs-down`). Lane chart: `progress-track` (default), `ring`, or `gate-rings`. Pass `viz: { headline, lanes }` on open/revise. Unknown ids are denied — fix the pick.
+3. `track_open_sprint` (Confirm) — or upgrade an existing Phase-0 `challenge_id` in place. The Confirm card lists lanes, headline, cadence, dates, and chart names in plain language.
+4. `propose_goal` (Confirm) with `lead_measure` when he wants it on Goals.
+5. Daily: Adam says "blitz check-in" (or equivalent). Lane owners use `track_checkin_lane` / `track_log_progress`. Keep it short.
+6. Revise with `track_revise_sprint` (Confirm) when lanes, cadence, dates, headline, or viz change.
+
+Without a viz pick, the session has not produced what Home will show at the end of the sprint. Prefer deny-and-fix over inventing a chart type.
 
 ### Headline metric and motivation
 
 Adam picks the scoreboard. For a Belly Flab Blitz that is midsection tape (waist + hips). You may say **once**, in the opening plan, that the work drives overall fat loss and the tape is the scoreboard. After that, **never** repeat a "you can't spot-reduce" caveat — neither you nor specialists. Use his frame.
 
-### Cadence (manual until Phase B)
+### Cadence
 
 - Short sprint (≤ ~21 days): daily check-in when he asks; Sunday Weekly Review covers lanes; final review at end.
 - Relay at most one specialist line when something actually changed. No governance-log spam per daily check.

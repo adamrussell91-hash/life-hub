@@ -80,7 +80,7 @@
         <div class="section-heading home-sprints__heading">
           <div>
             <p class="section-kicker">Challenge sprints</p>
-            <h2 id="home-sprints-heading">Open sprints</h2>
+            <h2 id="home-sprints-heading">Challenge sprint</h2>
           </div>
           <p class="home-sprints__count" data-home-sprints-count></p>
         </div>
@@ -91,7 +91,11 @@
 
     const fixture = {
       sprints: [{
-        sprint: { id: 'blitz', kind: 'sprint' },
+        sprint: {
+          id: 'blitz',
+          kind: 'sprint',
+          viz: { headline: 'glide-slope', lanes: 'progress-track' }
+        },
         state: {
           id: 'blitz',
           title: 'Belly Flab Blitz',
@@ -103,6 +107,7 @@
           end_date: '2026-10-12',
           checkin_done_today: false,
           lead_agent: 'hammond',
+          viz: { headline: 'glide-slope', lanes: 'progress-track' },
           headline: {
             label: 'Midsection',
             metricLabel: 'Waist',
@@ -111,9 +116,11 @@
             direction: 'down',
             latest: { value: 88 },
             delta: -1,
+            target_band: { low: 84, high: 86 },
             readings: [
               { date: '2026-10-01', value: 89 },
               { date: '2026-10-02', value: 88.6 },
+              { date: '2026-10-03', value: 88.3 },
               { date: '2026-10-04', value: 88 }
             ]
           },
@@ -129,6 +136,12 @@
               role: 'Training',
               status: 'unavailable',
               measureSummaries: [{ label: 'Workout logged', met: 0, judged: 0 }]
+            },
+            {
+              agent: 'sara',
+              role: 'Tape',
+              status: 'on_track',
+              measureSummaries: [{ label: 'Waist logged', met: 2, judged: 3 }]
             }
           ]
         }
