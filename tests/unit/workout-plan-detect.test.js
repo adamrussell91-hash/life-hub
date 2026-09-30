@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   claimedPlanLocked,
   coerceChatWorkoutProposal,
+  isPureWorkoutLockIn,
   isWorkoutLockIn,
   looksLikeWorkoutActualsReport,
   looksLikeWorkoutPlan,
@@ -82,16 +83,38 @@ test('shouldForceChadwickPlanProposal fires when he claims saved without a numbe
   }), true);
 });
 
-test('shouldForceChadwickPlanProposal fires when he dumps a superset plan without claiming saved', () => {
+test('shouldForceChadwickPlanProposal does not fire on a draft plan Adam has not approved', () => {
   const pairing = [
     '1&2 superset: Bar Press / Cable Bar Wide Grip Curl',
     '3&4 superset: Reverse Grip Incline Bench Press / One Handle Arm Triceps'
   ].join('\n');
   assert.equal(shouldForceChadwickPlanProposal({
-    userMessage: 'sounds good',
+    userMessage: 'what about something for arms?',
     assistantText: pairing,
     sawLogEntry: false
-  }), true);
+  }), false);
+  assert.equal(shouldForceChadwickPlanProposal({
+    userMessage: 'build me a chest day',
+    assistantText: PLAN,
+    sawLogEntry: false
+  }), false);
+});
+
+test('approval-only replies count as lock-in; approvals asking for changes do not skip the model', () => {
+  assert.equal(isWorkoutLockIn('go ahead'), true);
+  assert.equal(isWorkoutLockIn('ok go'), true);
+  assert.equal(isWorkoutLockIn('yep looks good'), true);
+  assert.equal(isWorkoutLockIn('go ahead and research yoga for me'), false);
+  assert.equal(isWorkoutLockIn('make my workout harder'), false);
+  assert.equal(isPureWorkoutLockIn('lock it in'), true);
+  assert.equal(isPureWorkoutLockIn("let's do it but swap the curls for hammers"), false);
+});
+
+test('claimedPlanLocked ignores offers and conditionals', () => {
+  assert.equal(claimedPlanLocked("Say the word and it's locked in."), false);
+  assert.equal(claimedPlanLocked('Once you confirm it, the plan is on Fitness.'), false);
+  assert.equal(claimedPlanLocked("Here's today's plan for today, big guy."), false);
+  assert.equal(claimedPlanLocked('Plan is on Fitness now.'), true);
 });
 
 test('shouldForceChadwickPlanProposal also fires when he claims locked and dumps a plan', () => {
@@ -102,9 +125,16 @@ test('shouldForceChadwickPlanProposal also fires when he claims locked and dumps
   }), true);
 });
 
-test('shouldNudgeUnsavedWorkoutPlan is Chadwick-only and skips once a Confirm card arrived', () => {
+test('shouldNudgeUnsavedWorkoutPlan is Chadwick-only and only fires after approval or a false save claim', () => {
   assert.equal(shouldNudgeUnsavedWorkoutPlan({
     agentSlug: 'chadwick',
+    userMessage: 'build me a session',
+    assistantText: PLAN,
+    sawRecordProposal: false
+  }), false);
+  assert.equal(shouldNudgeUnsavedWorkoutPlan({
+    agentSlug: 'chadwick',
+    userMessage: 'lock it in',
     assistantText: PLAN,
     sawRecordProposal: false
   }), true);
@@ -115,21 +145,16 @@ test('shouldNudgeUnsavedWorkoutPlan is Chadwick-only and skips once a Confirm ca
   }), true);
   assert.equal(shouldNudgeUnsavedWorkoutPlan({
     agentSlug: 'chadwick',
+    userMessage: 'lock it in',
     assistantText: PLAN,
     sawRecordProposal: true
   }), false);
   assert.equal(shouldNudgeUnsavedWorkoutPlan({
     agentSlug: 'brisket',
+    userMessage: 'lock it in',
     assistantText: PLAN,
-    sawRecordProposal: false,
-    sawExerciseLibrarySaved: true
+    sawRecordProposal: false
   }), false);
-  assert.equal(shouldNudgeUnsavedWorkoutPlan({
-    agentSlug: 'chadwick',
-    assistantText: 'Checking the library.',
-    sawRecordProposal: false,
-    sawExerciseLibrarySaved: true
-  }), true);
 });
 
 function workoutValidation(status) {

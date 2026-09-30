@@ -138,7 +138,7 @@ import {
   searchExerciseLibrary,
   shelvedExerciseWarnings,
   upsertExerciseLibraryEntry,
-  validateExerciseLibraryEntry
+  validateExerciseLibraryBatch
 } from './_shared/exercise-library.mjs';
 import {
   FITNESS_RESEARCH_PATH,
@@ -354,7 +354,7 @@ import { buildBindingGoal } from '../../apps/life/js/app/binding-goal.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
-import { resolveForcedChadwickPlan } from './_shared/chadwick-plan-force.mjs';
+import { FORCED_PLAN_TEXT, resolveForcedChadwickPlan } from './_shared/chadwick-plan-force.mjs';
 import { coerceChatWorkoutProposal } from '../../apps/life/js/core/workout-plan-detect.js';
 import {
   forceStatusFor,
@@ -543,6 +543,7 @@ export function createChatHandler({
           slug,
           userMessage: parsed.message,
           today,
+          pureLockInOnly: true,
           messages: [
             ...materializeHistoryWithVisualEvidence(parsed.history),
             { role: 'user', content: parsed.userContent ?? parsed.message }
@@ -550,7 +551,7 @@ export function createChatHandler({
         });
         if (forcedPlan) {
           send({ type: 'status', text: 'Locking the plan onto Fitness…' });
-          send({ type: 'text', delta: 'On Fitness — confirm to save the plan.' });
+          send({ type: 'text', delta: FORCED_PLAN_TEXT });
           const validation = validateLogEntry(forcedPlan, {
             id: `${forcedPlan.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
             now: getSydneyTimestamp(nowInstant)
@@ -2207,6 +2208,7 @@ export function createChatHandler({
                 measurementRecords,
                 templates: templateContents,
                 targetRatio: physiqueTargetRatio,
+                library: exerciseLibraryEntries,
                 input: event.input ?? {}
               });
               if (fitnessRead != null) {
@@ -2222,32 +2224,47 @@ export function createChatHandler({
                 return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});
               }
               if (event.name === 'save_exercise_library_entry') {
-                const input = event.input?.shelved_until
-                  ? { ...event.input, shelved_on: event.input.shelved_on ?? today }
-                  : event.input;
-                const entry = validateExerciseLibraryEntry(input);
-                if (!entry) {
-                  return JSON.stringify({ ok: false, error: 'invalid_entry' });
+                const { entries: validEntries, rejected } = validateExerciseLibraryBatch(event.input ?? {}, {
+                  today,
+                  existing: exerciseLibraryEntries
+                });
+                if (validEntries.length === 0) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: 'invalid_entry',
+                    ...(Array.isArray(event.input?.entries) ? { rejected } : {})
+                  });
                 }
                 try {
-                  exerciseLibraryEntries = upsertExerciseLibraryEntry(
-                    exerciseLibraryEntries,
-                    entry,
-                    getSydneyTimestamp(nowInstant)
-                  );
+                  const updatedAt = getSydneyTimestamp(nowInstant);
+                  let next = exerciseLibraryEntries;
+                  for (const entry of validEntries) {
+                    next = upsertExerciseLibraryEntry(next, entry, updatedAt);
+                  }
+                  const names = validEntries.map(entry => entry.name);
                   const result = await client.writeFile({
                     path: EXERCISE_LIBRARY_PATH,
-                    content: JSON.stringify(exerciseLibraryEntries, null, 2),
+                    content: JSON.stringify(next, null, 2),
                     ...(exerciseLibrarySha ? { sha: exerciseLibrarySha } : {}),
-                    message: `chore(exercise-library): upsert ${entry.name}`
+                    message: names.length === 1
+                      ? `chore(exercise-library): upsert ${names[0]}`
+                      : `chore(exercise-library): upsert ${names.length} moves`
                   });
+                  exerciseLibraryEntries = next;
                   exerciseLibrarySha = result.sha;
-                  send({ type: 'exercise_library_saved', name: entry.name });
-                  return JSON.stringify({
-                    ok: true,
-                    name: entry.name,
-                    target_area: entry.target_area
+                  send({
+                    type: 'exercise_library_saved',
+                    name: names.length === 1 ? names[0] : `${names.length} moves`,
+                    ...(names.length > 1 ? { names } : {})
                   });
+                  if (validEntries.length === 1 && rejected.length === 0) {
+                    return JSON.stringify({
+                      ok: true,
+                      name: validEntries[0].name,
+                      target_area: validEntries[0].target_area
+                    });
+                  }
+                  return JSON.stringify({ ok: true, saved: names, ...(rejected.length ? { rejected } : {}) });
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }

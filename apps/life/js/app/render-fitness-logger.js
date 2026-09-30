@@ -5,6 +5,7 @@ import {
   createMorphingValuesPopover
 } from '../../../../packages/design-kit/js/morphing-popover.js';
 import { formatExerciseSetCount } from './format-exercise.js';
+import { describeSet, resolveTrackingType } from '../core/exercise-tracking.js';
 import {
   CABLE_TYPES,
   INTENSIFICATIONS,
@@ -33,9 +34,30 @@ function summarizeExercise(exercise) {
   const sets = exercise?.sets ?? [];
   if (!sets.length) return 'No sets yet · tap to log';
   const first = sets[0];
+  const described = describeSet(first, resolveTrackingType(exercise));
+  if (described) return `${formatExerciseSetCount(exercise)} · ${described}`;
   const reps = first.reps ?? '—';
   const kg = first.weight_kg ?? 0;
   return `${formatExerciseSetCount(exercise)} · ${reps} reps · ${kg} kg`;
+}
+
+function appendSetCue(root, table, exercise, setIndex, setCount) {
+  const isFinalSet = setIndex === setCount - 1;
+  if (isFinalSet) {
+    if (exercise.coach_cues?.final_set) {
+      const finalCue = root.createElement('p');
+      finalCue.className = 'fitness-logger__cue fitness-logger__cue--final-set';
+      finalCue.dataset.fitnessLogger = 'cue-final-set';
+      finalCue.textContent = exercise.coach_cues.final_set;
+      table.append(finalCue);
+    }
+  } else if (exercise.coach_cues?.rest) {
+    const restCue = root.createElement('p');
+    restCue.className = 'fitness-logger__cue fitness-logger__cue--rest';
+    restCue.dataset.fitnessLogger = 'cue-rest';
+    restCue.textContent = exercise.coach_cues.rest;
+    table.append(restCue);
+  }
 }
 
 function buildExercisePeek(root, exercise) {
@@ -184,7 +206,17 @@ function buildExerciseEditor(root, exercise, exerciseIndex, {
   table.className = 'fitness-logger__sets';
   const setHead = root.createElement('div');
   setHead.className = 'fitness-logger__set fitness-logger__set--head';
-  for (const label of ['#', 'kg', 'reps', 'cable']) {
+  // Columns follow how the move is measured. K1 weighted work is unchanged;
+  // bodyweight / timed / reps-in-time moves swap the cable column for what
+  // actually matters (added kg, seconds held, or the time window).
+  const tracking = resolveTrackingType(exercise);
+  const columns = {
+    weighted: ['#', 'kg', 'reps', 'cable'],
+    bodyweight_reps: ['#', '+kg', 'reps', ''],
+    timed: ['#', '+kg', 'secs', ''],
+    reps_in_time: ['#', 'secs', 'reps', '']
+  }[tracking];
+  for (const label of columns) {
     const cell = root.createElement('span');
     cell.textContent = label;
     setHead.append(cell);
@@ -198,23 +230,37 @@ function buildExerciseEditor(root, exercise, exerciseIndex, {
     const number = root.createElement('span');
     number.textContent = String(setIndex + 1);
 
-    const weight = root.createElement('input');
-    weight.type = 'number';
-    weight.inputMode = 'decimal';
-    weight.step = '0.5';
-    weight.value = set.weight_kg ?? 0;
-    weight.addEventListener('input', () => {
-      onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'weight_kg', value: Number(weight.value) });
-    });
+    const numberInput = (field, { step = '1', inputMode = 'numeric', label } = {}) => {
+      const input = root.createElement('input');
+      input.type = 'number';
+      input.inputMode = inputMode;
+      input.step = step;
+      input.value = set[field] ?? 0;
+      if (label) input.setAttribute?.('aria-label', label);
+      input.addEventListener('input', () => {
+        onChange?.({ type: 'set', exerciseIndex, setIndex, field, value: Number(input.value) });
+      });
+      return input;
+    };
 
-    const reps = root.createElement('input');
-    reps.type = 'number';
-    reps.inputMode = 'numeric';
-    reps.step = '1';
-    reps.value = set.reps ?? 0;
-    reps.addEventListener('input', () => {
-      onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'reps', value: Number(reps.value) });
-    });
+    if (tracking !== 'weighted') {
+      const cells = tracking === 'reps_in_time'
+        ? [numberInput('time_cap_sec', { label: 'Time window in seconds' }), numberInput('reps', { label: 'Reps' })]
+        : [
+          numberInput('weight_kg', { step: '0.5', inputMode: 'decimal', label: 'Added kg' }),
+          tracking === 'timed'
+            ? numberInput('duration_sec', { label: 'Seconds' })
+            : numberInput('reps', { label: 'Reps' })
+        ];
+      const spacer = root.createElement('span');
+      row.append(number, ...cells, spacer);
+      table.append(row);
+      appendSetCue(root, table, exercise, setIndex, exerciseSets.length);
+      return;
+    }
+
+    const weight = numberInput('weight_kg', { step: '0.5', inputMode: 'decimal' });
+    const reps = numberInput('reps');
 
     const cable = root.createElement('select');
     const selectedCable = normalizeLoggerCableType(set.cable_type);
@@ -231,23 +277,7 @@ function buildExerciseEditor(root, exercise, exerciseIndex, {
 
     row.append(number, weight, reps, cable);
     table.append(row);
-
-    const isFinalSet = setIndex === exerciseSets.length - 1;
-    if (isFinalSet) {
-      if (exercise.coach_cues?.final_set) {
-        const finalCue = root.createElement('p');
-        finalCue.className = 'fitness-logger__cue fitness-logger__cue--final-set';
-        finalCue.dataset.fitnessLogger = 'cue-final-set';
-        finalCue.textContent = exercise.coach_cues.final_set;
-        table.append(finalCue);
-      }
-    } else if (exercise.coach_cues?.rest) {
-      const restCue = root.createElement('p');
-      restCue.className = 'fitness-logger__cue fitness-logger__cue--rest';
-      restCue.dataset.fitnessLogger = 'cue-rest';
-      restCue.textContent = exercise.coach_cues.rest;
-      table.append(restCue);
-    }
+    appendSetCue(root, table, exercise, setIndex, exerciseSets.length);
   });
 
   card.append(table);

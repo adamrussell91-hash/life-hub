@@ -481,9 +481,36 @@ function appendNotesField(root, fields, inputs, notes) {
   inputs.notes = notesInput;
 }
 
+// The Confirm card carries the full exercise list, so a plan Chadwick also wrote
+// out in chat this turn collapses to its intro line — one plan on screen, not two.
+function findByClass(node, name, into = []) {
+  if (!node) return into;
+  if (String(node.className ?? '').split(/\s+/).includes(name)) into.push(node);
+  for (const child of Array.from(node.children ?? [])) findByClass(child, name, into);
+  return into;
+}
+
+function collapseTurnWorkoutText(root, list) {
+  const items = Array.from(list.children ?? []);
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (String(item.className ?? '').includes('chat-message--user')) break;
+    for (const workout of findByClass(item, 'chat-workout')) {
+      if (workout.dataset?.collapsed === 'true') continue;
+      for (const exercises of findByClass(workout, 'chat-workout__exercises')) exercises.remove?.();
+      const note = root.createElement('p');
+      note.className = 'chat-workout__collapsed';
+      note.textContent = 'Full plan is in the card below.';
+      workout.append(note);
+      if (workout.dataset) workout.dataset.collapsed = 'true';
+    }
+  }
+}
+
 export function appendRecordProposal(root, { path, record, notes, warnings, libraryByName }) {
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
+  if (record?.type === 'workout') collapseTurnWorkoutText(root, list);
   const card = root.createElement('li');
   card.className = 'record-proposal confirm-card';
   card.setAttribute('role', 'region');

@@ -239,6 +239,7 @@ function formatSession(record) {
     exercises: collapsed.map(exercise => ({
       name: exercise.name,
       sets: exercise.sets,
+      ...(exercise.tracking != null ? { tracking: exercise.tracking } : {}),
       ...(exercise.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
       ...(exercise.intensification != null ? { intensification: exercise.intensification } : {}),
       ...(exercise.equipment != null ? { equipment: exercise.equipment } : {}),

@@ -4775,11 +4775,16 @@ main { max-width: 76rem; margin: 0 auto; }
   gap: var(--space-3);
 }
 .chat-workout__intro,
-.chat-workout__outro {
+.chat-workout__outro,
+.chat-workout__collapsed {
   margin: 0;
   color: var(--depth);
   font-size: var(--text-base);
   line-height: var(--leading-snug);
+}
+.chat-workout__collapsed {
+  font-size: var(--text-sm);
+  font-style: italic;
 }
 .chat-workout__exercises {
   list-style: none;
