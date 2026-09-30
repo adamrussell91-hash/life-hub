@@ -153,10 +153,16 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
   if (Object.keys(log.sent).length >= PUSH_DAILY_CAP) return { sent: [], skipped: 'cap' };
 
   // Usual dose times: computed once a day (reads the dex files), then reused.
+  // Sprint challenge docs: same — one GitHub open shared across dose + sprints.
+  let repoHandle = null;
+  const ensureRepo = async () => {
+    if (!repoHandle && typeof openRepo === 'function') repoHandle = await openRepo();
+    return repoHandle;
+  };
   let med = null;
   if (!log.usual) {
     try {
-      const repo = await openRepo();
+      const repo = await ensureRepo();
       const logs = await loadDoseLogs(repo.client, repo.decodeBlob, today);
       log.usual = usualDoseTimes(logs, today);
       log.todayLogs = logs.filter((row) => row.date === today);
@@ -169,7 +175,7 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
   if (inDoseWindow) {
     // Only now is today's own log worth re-reading.
     try {
-      const repo = await openRepo();
+      const repo = await ensureRepo();
       const logs = await loadDoseLogs(repo.client, repo.decodeBlob, today);
       log.todayLogs = logs.filter((row) => row.date === today);
     } catch {
@@ -199,28 +205,33 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
   const review = await getJSON(store, `${DAY_REVIEW_PREFIX}${today}`).catch(() => null);
   let sprintNudges = [];
   try {
-    if (typeof openRepo === 'function') {
-      const { decideSprintNudges } = await import('./sprint-evidence.mjs');
-      const { listChallengePaths, parseJsonBlob } = await import('./capabilities/stores.mjs');
-      const repo = await openRepo();
-      const tree = (await repo.client.resolveTree())?.tree ?? [];
-      const paths = listChallengePaths(tree);
-      const sprints = [];
-      for (const path of paths) {
-        const entry = tree.find(item => item.path === path);
-        if (!entry?.sha) continue;
-        const raw = await repo.decodeBlob(await repo.client.readBlob(entry.sha));
-        const doc = parseJsonBlob(raw, null);
-        if (doc?.kind === 'sprint' && doc.status !== 'closed') sprints.push(doc);
+    if (!Array.isArray(log.sprintDocs)) {
+      const repo = await ensureRepo();
+      if (repo) {
+        const { listChallengePaths, parseJsonBlob } = await import('./capabilities/stores.mjs');
+        const tree = (await repo.client.resolveTree())?.tree ?? [];
+        const paths = listChallengePaths(tree);
+        const sprints = [];
+        for (const path of paths) {
+          const entry = tree.find(item => item.path === path);
+          if (!entry?.sha) continue;
+          const raw = await repo.decodeBlob(await repo.client.readBlob(entry.sha));
+          const doc = parseJsonBlob(raw, null);
+          if (doc?.kind === 'sprint' && doc.status !== 'closed') sprints.push(doc);
+        }
+        log.sprintDocs = sprints;
+      } else {
+        log.sprintDocs = [];
       }
-      sprintNudges = decideSprintNudges({
-        sprints,
-        records: [],
-        today,
-        nowHour,
-        log
-      });
     }
+    const { decideSprintNudges } = await import('./sprint-evidence.mjs');
+    sprintNudges = decideSprintNudges({
+      sprints: log.sprintDocs,
+      records: [],
+      today,
+      nowHour,
+      log
+    });
   } catch {
     sprintNudges = [];
   }
