@@ -54,6 +54,7 @@ export function buildSprintGlideChart(headline) {
     };
   });
   const mad = points.reduce((sum, p) => sum + Math.abs(p.split_kg), 0) / points.length;
+  const unit = String(headline?.unit || headline?.metric?.unit || 'kg').trim() || 'kg';
   return {
     from,
     date,
@@ -63,7 +64,10 @@ export function buildSprintGlideChart(headline) {
     trendReady: true,
     trendNeeds: null,
     residualMadKg: Number(mad.toFixed(2)),
-    projection: null
+    projection: null,
+    unit,
+    sampleWord: unit === 'kg' ? 'weigh-in' : 'reading',
+    label: `${headline?.metricLabel || headline?.label || 'Headline'} against the trend.`
   };
 }
 
