@@ -6,6 +6,11 @@ import {
   EVIDENCE_ADAPTERS,
   SPRINT_ROSTER
 } from './sprint-evidence.mjs';
+import {
+  formatSprintVizPickerBlock,
+  resolveSprintViz,
+  vizPlainName
+} from './sprint-viz.mjs';
 
 const MAX_SPRINT_CHARS = 700;
 
@@ -77,6 +82,8 @@ export function formatOpenSprintsForPrompt(sprints, { slug, today, records = [] 
       : `${state.day_label} (ends ${ends})`;
     const header = `OPEN SPRINT — ${state.title} · ${dayBit} · lead: ${lead}`;
     const headline = fmtHeadline(state);
+    const viz = resolveSprintViz({ ...state, viz: state.viz || sprint.viz });
+    const vizLine = `Home viz: headline=${vizPlainName(viz.headline, 'headline')} (${viz.headline}); lanes=${vizPlainName(viz.lanes, 'lanes')} (${viz.lanes})${viz.explicit ? '' : ' [default]'}`;
 
     const myLane = state.lanes.find(l => l.agent === slug);
     const isLead = slug === state.lead_agent || slug === 'hammond';
@@ -87,18 +94,19 @@ export function formatOpenSprintsForPrompt(sprints, { slug, today, records = [] 
           const name = SPRINT_ROSTER[l.agent] || l.agent;
           return `${name} · ${l.role || 'lane'}: ${measureLine(l)} [${l.status}]`;
         });
-        body = [headline, ...laneLines].join('\n');
+        body = [headline, vizLine, ...laneLines].join('\n');
       } else {
         const name = SPRINT_ROSTER[myLane.agent] || myLane.agent;
         const others = state.lanes.filter(l => l.agent !== slug).map(otherLaneChip);
         body = [
           headline,
+          vizLine,
           `YOUR LANE (${name} · ${myLane.role || 'lane'}): ${measureLine(myLane)}`,
           others.length ? `Other lanes: ${others.join(' · ')}` : ''
         ].filter(Boolean).join('\n');
       }
     } else {
-      body = `${headline}\n(You have no lane — summary only)`;
+      body = `${headline}\n${vizLine}\n(You have no lane — summary only)`;
     }
 
     const checkin = state.checkin_done_today
@@ -144,5 +152,7 @@ export function sprintRosterForPrompt() {
 
 export function formatSprintRosterBlock(active) {
   if (!active) return '';
-  return `SPRINT ROSTER (assign lanes only to these agents; use self_report when no adapter fits):\n${sprintRosterForPrompt()}`;
+  const roster = `SPRINT ROSTER (assign lanes only to these agents; use self_report when no adapter fits):\n${sprintRosterForPrompt()}`;
+  const picker = formatSprintVizPickerBlock(true);
+  return `${roster}\n\n${picker}`;
 }

@@ -247,7 +247,7 @@ describe("Thinking library settle (load flash)", () => {
       expect(cardsAfter.length).toBe(8);
       expect(cardsAfter.every((card, index) => card === cardsBefore[index])).toBe(true);
       expect(host.querySelector(".protocol-library")?.classList.contains("is-settled")).toBe(true);
-      stop();
+      stop.teardown();
     } finally {
       globalThis.fetch = previous;
     }
@@ -285,7 +285,7 @@ describe("Thinking library settle (load flash)", () => {
         expect(host.querySelector(".protocol-library")?.classList.contains("is-settled")).toBe(true);
       });
       expect(host.textContent).toContain("Enriched catalogue copy");
-      stop();
+      stop.teardown();
     } finally {
       globalThis.fetch = previous;
     }
@@ -639,10 +639,49 @@ describe("End session in the reply form", () => {
       });
       expect(host.textContent).not.toContain("Confirm this thesis");
       expect(host.textContent).toContain("Session ended");
-      stop();
+      stop.teardown();
     } finally {
       globalThis.fetch = previous;
     }
+  });
+});
+
+describe("protocols deep link", () => {
+  it("parses id, mode and intake fields from the hash", async () => {
+    const { parseProtocolsDeepLink, protocolsDeepLinkHash } = await import("./view");
+    expect(parseProtocolsDeepLink("#page/abc")).toBeNull();
+    expect(parseProtocolsDeepLink("#protocols")).toEqual({ id: "", fields: {} });
+    const link = parseProtocolsDeepLink(
+      "#protocols?id=mirror&mode=quick&conflict=Blitz%20lane%20Chadwick%20stalled"
+    );
+    expect(link).toEqual({
+      id: "mirror",
+      mode: "quick",
+      fields: { conflict: "Blitz lane Chadwick stalled" },
+      prompt: "Blitz lane Chadwick stalled",
+    });
+    expect(protocolsDeepLinkHash({
+      id: "mirror",
+      mode: "quick",
+      fields: { conflict: "Blitz lane Chadwick stalled" },
+    })).toBe("#protocols?id=mirror&mode=quick&conflict=Blitz+lane+Chadwick+stalled");
+  });
+
+  it("opens intake with mode and prompt pre-filled", async () => {
+    const { renderProtocols, parseProtocolsDeepLink } = await import("./view");
+    const host = document.createElement("div");
+    document.body.append(host);
+    const deepLink = parseProtocolsDeepLink(
+      "#protocols?id=mirror&mode=quick&conflict=Recovering%20from%20a%20cold"
+    );
+    const handle = renderProtocols({ host, deepLink });
+    expect(host.querySelector("h1")?.textContent).toBe("The Mirror Council");
+    const mode = host.querySelector<HTMLSelectElement>('select[name="mode"]');
+    const prompt = host.querySelector<HTMLTextAreaElement>('textarea[name="prompt"]');
+    expect(mode?.value).toBe("quick");
+    expect(prompt?.value).toBe("Recovering from a cold");
+    handle.teardown();
+    host.remove();
   });
 });
 

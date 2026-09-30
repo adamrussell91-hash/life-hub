@@ -39,6 +39,11 @@ import {
   computeSprintState
 } from '../sprint-evidence.mjs';
 import {
+  normalizeSprintViz,
+  formatVizForConfirm,
+  resolveSprintViz
+} from '../sprint-viz.mjs';
+import {
   isPathAllowedForAgent,
   capabilityIdsForAgent,
   loadCapability,
@@ -245,7 +250,7 @@ export function shortcutSchemas() {
     track_open_sprint: {
       name: 'track_open_sprint',
       description:
-        'Open a multi-agent challenge sprint, or upgrade an existing Phase-0 challenge_id to a sprint (Confirm). Lists lanes, headline, cadence and dates.',
+        'Open a multi-agent challenge sprint, or upgrade an existing Phase-0 challenge_id to a sprint (Confirm). Lists lanes, headline, cadence, dates and Home-card viz (chart-kit ids from the Sprint viz picker).',
       input_schema: {
         type: 'object',
         properties: {
@@ -258,7 +263,16 @@ export function shortcutSchemas() {
           notes: { type: 'string' },
           headline: { type: 'object' },
           cadence: { type: 'object' },
-          lanes: { type: 'array' }
+          lanes: { type: 'array' },
+          viz: {
+            type: 'object',
+            description: 'Home card charts: { headline, lanes } from Sprint viz picker allowlist (e.g. glide-slope + progress-track)',
+            properties: {
+              headline: { type: 'string' },
+              lanes: { type: 'string' }
+            },
+            additionalProperties: false
+          }
         },
         required: ['title', 'goal', 'lanes'],
         additionalProperties: false
@@ -302,7 +316,7 @@ export function shortcutSchemas() {
     },
     track_revise_sprint: {
       name: 'track_revise_sprint',
-      description: 'Revise sprint lanes, lead measures, cadence, dates or headline (Confirm).',
+      description: 'Revise sprint lanes, lead measures, cadence, dates, headline or Home-card viz (Confirm).',
       input_schema: {
         type: 'object',
         properties: {
@@ -315,7 +329,16 @@ export function shortcutSchemas() {
           notes: { type: 'string' },
           headline: { type: 'object' },
           cadence: { type: 'object' },
-          lanes: { type: 'array' }
+          lanes: { type: 'array' },
+          viz: {
+            type: 'object',
+            description: 'Home card charts: { headline, lanes } from Sprint viz picker allowlist',
+            properties: {
+              headline: { type: 'string' },
+              lanes: { type: 'string' }
+            },
+            additionalProperties: false
+          }
         },
         required: ['challenge_id'],
         additionalProperties: false
@@ -968,6 +991,8 @@ async function handleTrackOpenSprint(ctx, input) {
   }
   const headlineNorm = input.headline != null ? normalizeHeadline(input.headline) : { ok: true, headline: null };
   if (!headlineNorm.ok) return deny(headlineNorm.reason);
+  const vizNorm = normalizeSprintViz(input.viz);
+  if (!vizNorm.ok) return deny(vizNorm.reason);
 
   const existingId = String(input.challenge_id || '').trim();
   if (existingId) {
@@ -1000,6 +1025,8 @@ async function handleTrackOpenSprint(ctx, input) {
       updated_at: new Date().toISOString(),
       upgraded_at: new Date().toISOString()
     };
+    if (vizNorm.viz) upgraded.viz = vizNorm.viz;
+    const vizBit = formatVizForConfirm(vizNorm.viz || resolveSprintViz(upgraded));
     return propose(
       buildProposal({
         agentSlug: ctx.agentSlug,
@@ -1009,7 +1036,7 @@ async function handleTrackOpenSprint(ctx, input) {
           path,
           mode: 'overwrite',
           content: serializeJson(upgraded),
-          diff: `upgrade ${existingId} → sprint, ${lanesNorm.lanes.length} lanes (${start} → ${end})`
+          diff: `upgrade ${existingId} → sprint, ${lanesNorm.lanes.length} lanes (${start} → ${end})${vizBit ? `; ${vizBit}` : ''}`
         }]
       })
     );
@@ -1044,7 +1071,9 @@ async function handleTrackOpenSprint(ctx, input) {
     protocol_suggestions: [],
     created_at: new Date().toISOString()
   };
+  if (vizNorm.viz) body.viz = vizNorm.viz;
   const laneList = lanesNorm.lanes.map(l => `${SPRINT_ROSTER[l.agent]} (${l.role})`).join(', ');
+  const vizBit = formatVizForConfirm(vizNorm.viz || resolveSprintViz(body));
   return propose(
     buildProposal({
       agentSlug: ctx.agentSlug,
@@ -1054,7 +1083,7 @@ async function handleTrackOpenSprint(ctx, input) {
         path,
         mode: 'create',
         content: serializeJson(body),
-        diff: `sprint ${title}: ${laneList}; ${start} → ${end}; daily_check=${cadence.daily_check}`
+        diff: `sprint ${title}: ${laneList}; ${start} → ${end}; daily_check=${cadence.daily_check}${vizBit ? `; ${vizBit}` : ''}`
       }]
     })
   );
@@ -1188,10 +1217,18 @@ async function handleTrackReviseSprint(ctx, input) {
     if (!headlineNorm.ok) return deny(headlineNorm.reason);
     next.headline = headlineNorm.headline;
   }
+  if (input.viz != null) {
+    const vizNorm = normalizeSprintViz(input.viz);
+    if (!vizNorm.ok) return deny(vizNorm.reason);
+    next.viz = vizNorm.viz
+      ? { ...(typeof challenge.viz === 'object' && challenge.viz ? challenge.viz : {}), ...vizNorm.viz }
+      : challenge.viz;
+  }
   if (input.cadence) {
     next.cadence = resolveCadence({ ...next, cadence: { ...resolveCadence(next), ...input.cadence } });
   }
   next.updated_at = new Date().toISOString();
+  const vizBit = formatVizForConfirm(next.viz || resolveSprintViz(next));
   return propose(
     buildProposal({
       agentSlug: ctx.agentSlug,
@@ -1201,7 +1238,7 @@ async function handleTrackReviseSprint(ctx, input) {
         path,
         mode: 'overwrite',
         content: serializeJson(next),
-        diff: `revise sprint ${challengeId}`
+        diff: `revise sprint ${challengeId}${vizBit ? `; ${vizBit}` : ''}`
       }]
     })
   );
