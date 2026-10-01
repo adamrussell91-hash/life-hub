@@ -1,6 +1,7 @@
 /**
- * Home chart "i" copy. Windows and units match the renderers.
+ * Chart "i" copy. Windows and units match the renderers.
  * Stimulus gate copy is the model from the chart-info brief.
+ * Surfaces that already show a permanent caption or legend do not get an "i".
  */
 
 export function stimulusGateInfo(windowDays) {
@@ -56,4 +57,55 @@ export const fatInfo = {
   title: 'Fat',
   what: 'How much of this day’s fat ceiling you have logged.',
   how: 'The ring is logged fat for the date at the top of Home, divided by that day’s fat ceiling. It is a ceiling, not a goal to hit. The ring fills to the ceiling and stops; the percentage can pass 100 when you are over it.'
+};
+
+export const BODY_CHART_INFO = Object.freeze({
+  stack: {
+    id: 'life.body.shed-stack',
+    title: 'Shed stack',
+    what: 'How much weight you’ve shed since your heaviest, and what’s still above the band.',
+    how: 'One block is one kilogram. Today’s stack is your current weight. Every kilogram shed since your heaviest weigh-in piles beside it, coloured by the year it went. Dashed outlines keep the height the stack used to reach. Blocks still above the target band are tinted.'
+  },
+  stairs: {
+    id: 'life.body.stairs',
+    title: 'Stairs',
+    what: 'Whether weight is stepping toward the target band.',
+    how: 'One step per weigh-in, week, month or quarter depending on the selected range. Down steps and up steps use different colours. Dashed steps at the end are what is left to the band.'
+  },
+  carved: {
+    id: 'life.body.carved',
+    title: 'Carved away',
+    what: 'How much body fat you’ve taken off the high in this range.',
+    how: 'The hatched shape is everything shed from the running high you actually reached in the selected range. Earlier rises never count as progress. The pale sliver under the line is what is left to the target band.'
+  },
+  scissors: {
+    id: 'life.body.scissors',
+    title: 'Scissors',
+    what: 'Whether body fat and skeletal muscle are moving apart the right way.',
+    how: 'Both lines start at the first reading that has fat % and skeletal muscle. Each is percentage change on one shared axis. The shaded gap opens as fat falls and muscle rises.'
+  },
+  squares: {
+    id: 'life.body.squares',
+    title: '100 squares',
+    what: 'What a composition reading is made of.',
+    how: 'One hundred squares are 100% of body weight. Fat fills from the top, skeletal muscle from the bottom, and everything else sits between. Scrub Reading to move between dates; changed squares are marked.'
+  }
+});
+
+export function bodyChartInfo(viewId) {
+  return BODY_CHART_INFO[viewId] ?? null;
+}
+
+export const healthThreadsInfo = {
+  id: 'life.medical.threads',
+  title: 'Health Threads',
+  what: 'Your medical story as parallel threads over time — visits, episodes, and related blood markers.',
+  how: 'Each lane is a thread such as IBD, Liver, Mind or Acute. Markers are visits or linked blood results; bands are ongoing episodes. Weeks, Months and Years change density. − and + zoom the window around today.'
+};
+
+export const repMixInfo = {
+  id: 'life.fitness.rep-mix',
+  title: 'Rep mix',
+  what: 'How your recent valid sets split across rep ranges.',
+  how: 'The donut counts completed sets with weight and reps over the last 30 days. Buckets are 1–5 (strength), 6–8 and 9–12 (hypertrophy), and 13+ (endurance). The line above the chart names the dominant bucket.'
 };
