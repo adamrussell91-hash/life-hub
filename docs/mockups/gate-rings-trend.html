@@ -1,0 +1,420 @@
+<title>Gate Rings Trend Arcs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: the real Stimulus card at phone width on the left, how-to-read notes on the right; one column under 860px.
+   Colours are the Life design-kit tokens (packages/design-kit/tokens.css). The kit is light-only, so this page is too. */
+:root {
+  color-scheme: light;
+  --paper: #fbf8f2;
+  --page: #f3f1ec;
+  --shore: #eae7da;
+  --track: #eeebe1;
+  --ink: #13233a;
+  --muted: #6b7788;
+  --line: rgba(23, 55, 94, 0.10);
+  --navy: #17375e;
+  --wave: #376fb7;
+  --gold-ink: #6c581f;
+  --success: #2f7a4f;
+  --danger: #9b2c2c;
+  --success-surface: rgba(47, 122, 79, 0.1);
+  --danger-surface: rgba(155, 44, 44, 0.08);
+  --high-sea-ink: #a85a0c;
+  --focus: #376fb7;
+  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius-md: 20px;
+  --radius-xs: 6px;
+  --elev-2: 0 1px 2px rgba(19, 35, 58, 0.06), 0 8px 24px rgba(19, 35, 58, 0.08);
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 32px 16px 48px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 28px; }
+header h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: -0.02em; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); max-width: 62ch; }
+.layout { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 860px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+/* Scenario switcher */
+.scenarios { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.scenarios button {
+  font: inherit; font-size: 13px; font-weight: 500;
+  padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer;
+}
+.scenarios button[aria-pressed="true"] { background: var(--navy); color: var(--paper); border-color: var(--navy); }
+.scenarios button:focus-visible, .info:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.example-note { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+
+/* The card */
+.card {
+  background: var(--paper); border-radius: var(--radius-md); box-shadow: var(--elev-2);
+  padding: 20px 16px 16px; position: relative;
+}
+.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.label-row { display: flex; align-items: center; gap: 6px; }
+.metric-label { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.metric-context { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+.pills { display: flex; background: var(--shore); border-radius: 999px; padding: 3px; font-size: 12px; font-weight: 600; }
+.pills span { padding: 4px 10px; border-radius: 999px; color: var(--muted); }
+.pills span.on { background: var(--paper); color: var(--ink); }
+.rate { margin: 14px 0 2px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+.caption { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+
+/* The "i" button and its floating note */
+.info {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--muted) 45%, transparent);
+  background: transparent; color: var(--muted);
+  font: italic 600 11px/1 Georgia, "Times New Roman", serif;
+  display: inline-grid; place-items: center; cursor: pointer; padding: 0;
+  position: relative;
+}
+.info::after { content: ""; position: absolute; inset: -13px; } /* 44px touch target */
+.info:hover, .info[aria-expanded="true"] { color: var(--ink); border-color: var(--ink); }
+.note {
+  position: absolute; z-index: 10; left: 16px; right: 16px; top: 46px;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--elev-2); padding: 12px 14px; font-size: 13px; color: var(--muted);
+  opacity: 0; transform: translateY(4px); pointer-events: none;
+  transition: opacity 160ms ease, transform 220ms cubic-bezier(.2,.8,.2,1);
+}
+.note.is-on { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.note h3 { margin: 0 0 4px; font-size: 13px; color: var(--ink); }
+.note p { margin: 0 0 8px; }
+.note p:last-child { margin-bottom: 0; }
+.note b { color: var(--ink); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .note { transition: none; } }
+
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+.t { font-family: var(--font-ui); font-variant-numeric: tabular-nums; }
+.t-strong { fill: var(--ink); }
+.t-muted { fill: var(--muted); }
+.readout { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; margin: 6px 0 0; }
+
+/* Notes column */
+.notes { display: grid; gap: 22px; min-width: 0; }
+.notes section { display: grid; gap: 8px; }
+.notes h2 { margin: 0; font-size: 17px; letter-spacing: -0.01em; }
+.notes p { margin: 0; max-width: 62ch; }
+.notes .small { font-size: 13px; color: var(--muted); }
+.legend-grid { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 14px 16px; align-items: center; }
+.legend-grid svg { width: 112px; }
+.legend-grid p { font-size: 14px; }
+ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 6px; max-width: 62ch; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+code { font-size: 12.5px; background: var(--shore); padding: 1px 5px; border-radius: 4px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Gate rings: recent-pace arcs</h1>
+    <p>The thin line inside each ring shows what your last few days are doing to the long average. Switch scenarios to see it move. All numbers here are examples, not your data.</p>
+  </header>
+
+  <div class="layout">
+    <div>
+      <div class="scenarios" role="group" aria-label="Example scenario">
+        <button type="button" data-s="streak" aria-pressed="true">Protein streak</button>
+        <button type="button" data-s="missed">Missed week</button>
+        <button type="button" data-s="steady">Steady</button>
+        <button type="button" data-s="unlogged">Food not logged</button>
+      </div>
+      <p class="example-note" id="scenario-note"></p>
+
+      <article class="card" aria-labelledby="stim-label">
+        <div class="card-head">
+          <div>
+            <div class="label-row">
+              <p class="metric-label" id="stim-label">Stimulus</p>
+              <button type="button" class="info" id="info-btn" aria-label="About this chart" aria-expanded="false" aria-controls="info-note">i</button>
+            </div>
+            <p class="metric-context">Loaded work that counts</p>
+          </div>
+          <div class="pills" aria-hidden="true"><span class="on">Gate</span><span>Regions</span></div>
+        </div>
+        <div class="note" id="info-note" role="tooltip">
+          <h3>What this shows</h3>
+          <p>Whether your training and protein are enough for the forecast to assume you keep muscle while losing fat. Miss a key and the forecast assumes some loss is muscle, so your body-fat date moves later.</p>
+          <h3>How it's worked out</h3>
+          <p>Thick rings: your average over the forecast window (usually 28 days), scaled so every pass mark sits on the orange spoke.</p>
+          <p>Thin lines: your last <b>7 days</b> of training and last <b>4 fully logged days</b> of protein. Green clears the gate, red doesn't. The arrow shows where the average is heading.</p>
+        </div>
+
+        <p class="rate" id="rate">2.5/week loaded</p>
+        <p class="caption">26.3 upper-body loaded sets/week. Walks and mobility do not count.</p>
+        <svg id="chart" role="img" aria-labelledby="chart-label"></svg>
+        <p class="readout" id="readout"></p>
+        <span id="chart-label" hidden></span>
+      </article>
+    </div>
+
+    <div class="notes">
+      <section>
+        <h2>How to read the thin line</h2>
+        <div class="legend-grid" id="legend"></div>
+      </section>
+
+      <section>
+        <h2>Why these windows</h2>
+        <p><b>Protein: last 4 fully logged days.</b> Protein is a daily habit, so 4 days reacts quickly and five good days in a row shows up straight away. Only days marked complete count. An unlogged day is not counted as zero; it is skipped. Today is skipped until it's complete. With fewer than 3 complete days in the last 7, there's no line, and the row says so.</p>
+        <p><b>Sessions and upper sets: last 7 days.</b> Your gate is 2 sessions a week, so a 4-day window would go red after any normal rest stretch. Seven days is still four to eight times quicker than the average it sits beside, and a week's count is already a per-week number, so nothing gets scaled up.</p>
+      </section>
+
+      <section>
+        <h2>Two encodings, on purpose</h2>
+        <ul class="tight">
+          <li><b>Colour answers "is my recent behaviour good enough?"</b> Green if the recent pace is at or over the gate, red if it's under.</li>
+          <li><b>The arrow and length answer "which way is the average moving, and how hard?"</b> They don't depend on colour, so the line still reads for red-green colour blindness.</li>
+          <li>They can disagree, and that's useful. A green arrow pointing backwards means your average is dropping but you're still clear of the gate.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>One colour change it needs</h2>
+        <p>The protein ring is drawn in the kit's success green today. Once green and red mean good and bad, a green ring sitting next to a red line reads as a contradiction. This mockup moves protein to the kit's gold ink <span class="swatch" style="background:var(--gold-ink)"></span>, which is still clearly separate from navy and wave blue, including for colour-blind viewers. Met and Short keep their green and red pills.</p>
+      </section>
+
+      <section>
+        <p class="small">Display only. The forecast keeps using the long average; the thin line never changes the gate result or the dates.</p>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const START = -90, SWEEP = 270, GATE_ANGLE = START + SWEEP / 2;
+  const STEADY_DEG = 5;
+
+  const BASE = [
+    { key: 'sessions', label: 'Sessions / week', short: 'Sessions', avg: 2.5, gate: 2, digits: 1, gateDigits: 0, colour: 'var(--navy)', window: 'Last 7 days' },
+    { key: 'upper', label: 'Upper sets / week', short: 'Upper sets', avg: 26.3, gate: 10, digits: 1, gateDigits: 0, colour: 'var(--wave)', window: 'Last 7 days' },
+    { key: 'protein', label: 'Protein g/kg/day', short: 'Protein', avg: 1.28, gate: 1.62, digits: 2, gateDigits: 2, colour: 'var(--gold-ink)', window: 'Last 4 logged days' }
+  ];
+
+  const SCENARIOS = {
+    streak: {
+      note: 'Example: five days of hitting protein, a normal training week, a lighter upper-body week.',
+      recent: { sessions: 3, upper: 17, protein: 1.74 }
+    },
+    missed: {
+      note: 'Example: a week off training and a few low-protein days.',
+      recent: { sessions: 0, upper: 0, protein: 1.1 }
+    },
+    steady: {
+      note: 'Example: recent behaviour matches the averages, so the lines collapse to dots.',
+      recent: { sessions: 2.5, upper: 26, protein: 1.29 }
+    },
+    unlogged: {
+      note: 'Example: only 1 complete food day in the last 7, so protein has no recent line.',
+      recent: { sessions: 3, upper: 22, protein: null, proteinDays: 1 }
+    }
+  };
+
+  const fmt = (v, d) => Number(v).toFixed(d);
+  const polar = (cx, cy, r, deg) => {
+    const a = deg * Math.PI / 180;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  };
+  const angleOf = (v, g) => START + SWEEP * Math.max(0.004, Math.min(1, v / (2 * g)));
+  // A recent-pace tip near zero stops short of the ring labels at 12 o'clock.
+  const tipAngleOf = (v, g) => Math.max(START + 8, angleOf(v, g));
+  function arcPath(cx, cy, r, a0, a1) {
+    const lo = Math.min(a0, a1), hi = Math.max(a0, a1);
+    const [x0, y0] = polar(cx, cy, r, lo);
+    const [x1, y1] = polar(cx, cy, r, hi);
+    return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${hi - lo > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  }
+  function el(tag, attrs = {}, parent) {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (parent) parent.append(n);
+    return n;
+  }
+  function txt(parent, x, y, s, { size = 11, weight = 400, anchor = 'start', cls = 't t-muted' } = {}) {
+    const t = el('text', { x, y, 'font-size': size, 'font-weight': weight, 'text-anchor': anchor, class: cls }, parent);
+    t.textContent = s;
+    return t;
+  }
+
+  // The thin recent-pace line: tail at the average, tip (with chevron) at the recent pace.
+  function drawTrend(g, defs, id, cx, cy, r, avgA, recA, colour, w = 3) {
+    if (Math.abs(recA - avgA) < STEADY_DEG) {
+      const [x, y] = polar(cx, cy, r, avgA);
+      el('circle', { cx: x, cy: y, r: 2.6, fill: 'var(--muted)' }, g);
+      return;
+    }
+    const [x0, y0] = polar(cx, cy, r, avgA);
+    const [x1, y1] = polar(cx, cy, r, recA);
+    const grad = el('linearGradient', { id, gradientUnits: 'userSpaceOnUse', x1: x0, y1: y0, x2: x1, y2: y1 }, defs);
+    el('stop', { offset: '0', 'stop-color': colour, 'stop-opacity': '0.18' }, grad);
+    el('stop', { offset: '1', 'stop-color': colour, 'stop-opacity': '1' }, grad);
+    el('path', { d: arcPath(cx, cy, r, avgA, recA), fill: 'none', stroke: `url(#${id})`, 'stroke-width': w, 'stroke-linecap': 'round' }, g);
+    // Chevron pointing along the direction of travel.
+    const dir = recA > avgA ? 1 : -1;
+    const a = recA * Math.PI / 180;
+    const tx = -Math.sin(a) * dir, ty = Math.cos(a) * dir; // tangent
+    const nx = Math.cos(a), ny = Math.sin(a);              // normal
+    const s = w + 1.6;
+    const tip = [x1 + tx * s * 0.9, y1 + ty * s * 0.9];
+    const p1 = [x1 - tx * s * 0.6 + nx * s, y1 - ty * s * 0.6 + ny * s];
+    const p2 = [x1 - tx * s * 0.6 - nx * s, y1 - ty * s * 0.6 - ny * s];
+    el('path', { d: `M${p1[0].toFixed(2)} ${p1[1].toFixed(2)} L${tip[0].toFixed(2)} ${tip[1].toFixed(2)} L${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`, fill: 'none', stroke: colour, 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, g);
+  }
+
+  function render(name) {
+    const sc = SCENARIOS[name];
+    document.getElementById('scenario-note').textContent = sc.note;
+    const keys = BASE.map(k => {
+      const recent = sc.recent[k.key];
+      return { ...k, recent, met: k.avg >= k.gate, recentMet: recent == null ? null : recent >= k.gate };
+    });
+
+    const svg = document.getElementById('chart');
+    svg.replaceChildren();
+    const width = 358, size = 232, stroke = 15, gap = 9;
+    const cx = width / 2, cy = size / 2, outer = size / 2 - stroke / 2 - 4;
+    const rowTop = size + 14, rowH = 62;
+    const height = rowTop + keys.length * rowH;
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    const defs = el('defs', {}, svg);
+    const g = el('g', {}, svg);
+
+    keys.forEach((k, i) => {
+      const r = outer - i * (stroke + gap);
+      el('path', { d: arcPath(cx, cy, r, START, START + SWEEP), fill: 'none', stroke: 'var(--track)', 'stroke-width': stroke, 'stroke-linecap': 'round' }, g);
+      const aAvg = angleOf(k.avg, k.gate);
+      el('path', { d: arcPath(cx, cy, r, START, aAvg), fill: 'none', stroke: k.colour, 'stroke-width': stroke, 'stroke-linecap': 'round' }, g);
+      if (k.avg > 2 * k.gate) {
+        const [ex, ey] = polar(cx, cy, r, START + SWEEP);
+        el('circle', { cx: ex, cy: ey, r: 2.6, fill: 'var(--paper)' }, g);
+      }
+      txt(g, cx - 10, cy - r + 4, k.short, { size: 11, weight: 500, anchor: 'end' });
+    });
+
+    // Recent-pace lines sit in the gap just inside each ring.
+    keys.forEach((k, i) => {
+      if (k.recent == null) return;
+      const r = outer - i * (stroke + gap) - stroke / 2 - gap / 2;
+      drawTrend(g, defs, `tr-${k.key}`, cx, cy, r, angleOf(k.avg, k.gate), tipAngleOf(k.recent, k.gate), k.recentMet ? 'var(--success)' : 'var(--danger)');
+    });
+
+    const inner = outer - (keys.length - 1) * (stroke + gap) - stroke / 2;
+    const [gx0, gy0] = polar(cx, cy, Math.max(12, inner - 6), GATE_ANGLE);
+    const [gx1, gy1] = polar(cx, cy, outer + stroke / 2 + 3, GATE_ANGLE);
+    el('line', { x1: gx0, y1: gy0, x2: gx1, y2: gy1, stroke: 'var(--high-sea-ink)', 'stroke-width': 2, 'stroke-linecap': 'round' }, g);
+
+    const metCount = keys.filter(k => k.met).length;
+    txt(g, cx, cy + 3, `${metCount}/3`, { size: 24, weight: 700, anchor: 'middle', cls: 't t-strong' });
+    txt(g, cx, cy + 19, 'keys met', { size: 10.5, anchor: 'middle' });
+
+    // Rows: value, pill, then the recent line in words.
+    keys.forEach((k, i) => {
+      const y0 = rowTop + i * rowH;
+      el('circle', { cx: 6, cy: y0 + 17, r: 5, fill: k.colour }, g);
+      txt(g, 20, y0 + 21, k.label, { size: 13, weight: 600, cls: 't t-strong' });
+      txt(g, 20, y0 + 38, `Gate ${fmt(k.gate, k.gateDigits)}`, { size: 11.5 });
+
+      let recentText, arrow = '', arrowColour = 'var(--muted)';
+      if (k.recent == null) {
+        recentText = `${k.window}: ${sc.recent.proteinDays ?? 0} of 3 needed`;
+      } else {
+        const dAng = angleOf(k.recent, k.gate) - angleOf(k.avg, k.gate);
+        if (Math.abs(dAng) < STEADY_DEG) arrow = '•';
+        else arrow = dAng > 0 ? '↑' : '↓';
+        if (arrow !== '•') arrowColour = k.recentMet ? 'var(--success)' : 'var(--danger)';
+        recentText = `${k.window}: ${fmt(k.recent, k.digits)}`;
+      }
+      const t = txt(g, 20, y0 + 54, '', { size: 11.5 });
+      if (arrow) {
+        const ts = el('tspan', { fill: arrowColour, 'font-weight': 700 }, t);
+        ts.textContent = arrow + ' ';
+      }
+      const tr = el('tspan', {}, t);
+      tr.textContent = recentText;
+
+      const pillW = 42;
+      const ok = k.met;
+      el('rect', { x: width - pillW, y: y0 + 10, width: pillW, height: 20, rx: 6, fill: ok ? 'var(--success-surface)' : 'var(--danger-surface)' }, g);
+      txt(g, width - pillW / 2, y0 + 24, ok ? 'Met' : 'Short', { size: 11, weight: 600, anchor: 'middle', cls: 't' }).setAttribute('fill', ok ? 'var(--success)' : 'var(--danger)');
+      txt(g, width - pillW - 10, y0 + 25, fmt(k.avg, k.digits), { size: 17, weight: 700, anchor: 'end', cls: 't t-strong' });
+      if (i < keys.length - 1) el('line', { x1: 0, x2: width, y1: y0 + rowH - 3, y2: y0 + rowH - 3, stroke: 'var(--line)' }, g);
+    });
+
+    const label = keys.map(k => {
+      if (k.recent == null) return `${k.short}: average ${fmt(k.avg, k.digits)}, not enough recent logs.`;
+      return `${k.short}: average ${fmt(k.avg, k.digits)}, ${k.window.toLowerCase()} ${fmt(k.recent, k.digits)}, ${k.recentMet ? 'above' : 'below'} the gate.`;
+    }).join(' ');
+    svg.setAttribute('aria-label', `Lean-preservation gate: ${metCount} of 3 keys met. ${label}`);
+
+    // Readout: name the one thing that's changing.
+    const flip = keys.find(k => k.recent != null && k.recentMet !== k.met);
+    let readout = 'Recent behaviour matches the averages. Nothing is about to change.';
+    if (flip && flip.recentMet) readout = `${flip.short} is above the gate recently. Keep it up and the key will flip to Met.`;
+    else if (flip) readout = `${flip.short} has dropped below the gate recently. If it stays there, the key will flip to Short.`;
+    if (name === 'missed') readout = 'Sessions, upper sets and protein are all below the gate recently. Sessions and upper sets will flip to Short if this continues.';
+    if (name === 'unlogged') readout = 'Log food for a few complete days to see recent protein.';
+    document.getElementById('readout').textContent = readout;
+  }
+
+  // Legend: three tiny examples drawn with the same function.
+  function legend() {
+    const host = document.getElementById('legend');
+    const rows = [
+      { a0: 0.3, a1: 0.62, c: 'var(--success)', text: '<b>Green, pointing forward.</b> Your recent pace clears the gate and is pulling the average up. A line that crosses the spoke means the key is about to flip.' },
+      { a0: 0.9, a1: 0.65, c: 'var(--success)', text: '<b>Green, pointing back.</b> The average is drifting down, but recently you are still above the gate. Nothing to fix.' },
+      { a0: 0.62, a1: 0.2, c: 'var(--danger)', text: '<b>Red, pointing back.</b> Recently you are below the gate and the average is falling toward it.' },
+      { a0: 0.4, a1: 0.4, c: 'var(--muted)', text: '<b>Grey dot.</b> Recent pace matches the average. Steady.' }
+    ];
+    rows.forEach((row, i) => {
+      const svg = el('svg', { viewBox: '0 0 112 64', 'aria-hidden': 'true' });
+      const defs = el('defs', {}, svg);
+      const cx = 56, cy = 60, r = 46;
+      const a = f => -180 + 180 * f;
+      el('path', { d: arcPath(cx, cy, r, -180, 0), fill: 'none', stroke: 'var(--track)', 'stroke-width': 9, 'stroke-linecap': 'round' }, svg);
+      el('path', { d: arcPath(cx, cy, r, -180, a(row.a0)), fill: 'none', stroke: 'var(--navy)', 'stroke-width': 9, 'stroke-linecap': 'round' }, svg);
+      const [s0x, s0y] = polar(cx, cy, 28, -90), [s1x, s1y] = polar(cx, cy, 53, -90);
+      el('line', { x1: s0x, y1: s0y, x2: s1x, y2: s1y, stroke: 'var(--high-sea-ink)', 'stroke-width': 1.5, 'stroke-linecap': 'round' }, svg);
+      drawTrend(svg, defs, `lg-${i}`, cx, cy, 36, a(row.a0), a(row.a1), row.c, 2.5);
+      const p = document.createElement('p');
+      p.innerHTML = row.text;
+      host.append(svg, p);
+    });
+  }
+
+  // "i" button: hover shows on desktop, tap toggles on touch, Escape and outside tap close.
+  function wireInfo() {
+    const btn = document.getElementById('info-btn');
+    const note = document.getElementById('info-note');
+    const set = on => { note.classList.toggle('is-on', on); btn.setAttribute('aria-expanded', String(on)); };
+    let pinned = false;
+    const hoverable = window.matchMedia('(hover: hover) and (pointer: fine)');
+    btn.addEventListener('mouseenter', () => { if (hoverable.matches) set(true); });
+    btn.addEventListener('mouseleave', () => { if (hoverable.matches && !pinned) set(false); });
+    btn.addEventListener('focus', () => set(true));
+    btn.addEventListener('blur', () => { if (!pinned) set(false); });
+    btn.addEventListener('click', e => { e.stopPropagation(); pinned = !pinned; set(pinned); });
+    document.addEventListener('click', e => { if (!note.contains(e.target)) { pinned = false; set(false); } });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { pinned = false; set(false); btn.focus(); } });
+  }
+
+  for (const b of document.querySelectorAll('.scenarios button')) {
+    b.addEventListener('click', () => {
+      for (const o of document.querySelectorAll('.scenarios button')) o.setAttribute('aria-pressed', String(o === b));
+      render(b.dataset.s);
+    });
+  }
+  legend();
+  wireInfo();
+  render('streak');
+})();
+</script>
