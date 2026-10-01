@@ -143,3 +143,28 @@ export function isMeetingTaskLinkIncompleteError(err: unknown): err is ApiClient
 } {
   return err instanceof ApiClientError && err.code === 'professional_task_link_incomplete';
 }
+
+/** Task row was written even if the Universal Link bind later 503'd. */
+export function meetingTaskLinkWrote(err: unknown): boolean {
+  if (isMeetingTaskLinkIncompleteError(err)) return true;
+  if (!(err instanceof ApiClientError) || !err.data || typeof err.data !== 'object') return false;
+  const data = err.data as { task_id?: unknown; operation_id?: unknown };
+  return Boolean(data.task_id || data.operation_id);
+}
+
+export function meetingHasLinkedTask(
+  meeting: MeetingRecord,
+  relationship: 'preparation' | 'follow_up',
+  input: { title?: string; task_id?: string }
+): boolean {
+  const ops = [
+    ...(meeting[`${relationship}_operations`] ?? []),
+    meeting[`${relationship}_operation`]
+  ].filter((op): op is NonNullable<typeof op> => Boolean(op));
+  const title = input.title?.trim();
+  return ops.some(
+    (op) =>
+      (input.task_id && op.task_id === input.task_id) ||
+      (title && (op.title === title || op.task_id === title))
+  );
+}
