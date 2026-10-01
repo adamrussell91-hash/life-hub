@@ -994,14 +994,41 @@ export function createChatController({
     });
     proposalUi.discard.addEventListener('click', () => {
       dismissPendingCard(proposalUi.card, id);
-      if (id) {
-        void chatApi.confirm({
-          kind: 'action_dismiss',
-          id,
-          slug: actionProposalSlug(proposal)
-        }).catch(() => undefined);
-      }
+      if (!id) return;
+      void chatApi.confirm({
+        kind: 'action_dismiss',
+        id,
+        slug: actionProposalSlug(proposal)
+      }).catch((error) => {
+        const code = error?.code || '';
+        showChatError(
+          root,
+          code === 'pending_action_execution_in_progress'
+            ? 'That Confirm is still finishing — wait a moment, then Discard again.'
+            : 'Could not discard that Confirm. It may come back until the server clears it.'
+        );
+        void hydratePendingConfirms();
+      });
     });
+  }
+
+  function actionConfirmErrorMessage(error) {
+    const code = error?.code || '';
+    if (code === 'stale_write') {
+      return 'Something changed since this proposal. Discard this card and ask again.';
+    }
+    if (code === 'pending_action_execution_in_progress') {
+      return 'That Confirm is still finishing or stuck mid-save. Wait a moment, or Discard if it stays.';
+    }
+    if (code === 'pending_action_dismissed' || code === 'pending_action_consumed') {
+      return 'This Confirm is already closed. Refresh chat if it still shows.';
+    }
+    if (code === 'pending_action_not_found') {
+      return 'That Confirm is gone on the server. Refresh chat if it still shows.';
+    }
+    const message = typeof error?.message === 'string' ? error.message.trim() : '';
+    if (message && message !== 'Confirm request failed') return message;
+    return 'Saving that action failed. You can try again, or Discard the card.';
   }
 
   async function confirmAction(proposalUi, proposal, id = null) {
@@ -1037,12 +1064,15 @@ export function createChatController({
     } catch (error) {
       proposalUi.confirm.disabled = false;
       proposalUi.confirm.textContent = previousLabel;
-      showChatError(
-        root,
-        error?.code === 'stale_write'
-          ? 'A target file changed since this proposal. Discard and ask again.'
-          : 'Saving that action failed. You can try again.'
-      );
+      showChatError(root, actionConfirmErrorMessage(error));
+      if (
+        error?.code === 'pending_action_dismissed'
+        || error?.code === 'pending_action_consumed'
+        || error?.code === 'pending_action_not_found'
+      ) {
+        dismissPendingCard(proposalUi.card, id);
+        void hydratePendingConfirms();
+      }
     }
   }
 
