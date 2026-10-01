@@ -86,8 +86,8 @@ function linkedTaskChips(linked: LinkedTaskOperation[], relationshipType: string
     ref: op.task_id ? `tasks:task:${op.task_id}` : op.operation_id,
     label: op.title || op.task_id || 'Task',
     relationshipType,
-    state: (op.status === 'incomplete' ? 'pending' : 'saved') as 'pending' | 'saved',
-    readonly: true as const,
+    state: op.status === 'incomplete' ? 'pending' : 'saved',
+    readonly: true,
     href: op.task_id ? `/tasks/#/task/${encodeURIComponent(op.task_id)}` : null
   }));
 }
