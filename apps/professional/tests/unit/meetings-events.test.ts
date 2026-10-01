@@ -300,6 +300,75 @@ describe('renderMeetingDetailView task flows', () => {
       title: 'Prep notes'
     });
   });
+
+  it('renders multiple preparation task chips and keeps the add control', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const href = String(input);
+      if (href.includes('/api/universal-links')) {
+        return Response.json({ ok: true, data: { outgoing: [], incoming: [] } });
+      }
+      return Response.json({
+        ok: true,
+        data: {
+          meeting: {
+            schema_version: 1,
+            id: VALID_MEETING_ID,
+            title: 'Seth planning',
+            scheduled_start: '2026-09-15T01:00:00.000Z',
+            scheduled_end: '2026-09-15T02:00:00.000Z',
+            time_zone: 'Australia/Sydney',
+            location_text: null,
+            agenda: null,
+            notes: null,
+            state: 'scheduled',
+            occurrence_history: [],
+            created_at: '2026-09-01T10:00:00.000Z',
+            updated_at: '2026-09-01T10:00:00.000Z',
+            preparation_operations: [
+              {
+                operation_id: 'ptl_1',
+                status: 'committed',
+                task_id: 'task_a',
+                title: 'Agenda draft',
+                completed_intent_ids: [],
+                completed_link_ids: [],
+                failed_intent_ids: [],
+                pending_intent_ids: []
+              },
+              {
+                operation_id: 'ptl_2',
+                status: 'committed',
+                task_id: 'task_b',
+                title: 'Pack slides',
+                completed_intent_ids: [],
+                completed_link_ids: [],
+                failed_intent_ids: [],
+                pending_intent_ids: []
+              }
+            ],
+            preparation_operation: {
+              operation_id: 'ptl_2',
+              status: 'committed',
+              task_id: 'task_b',
+              title: 'Pack slides',
+              completed_intent_ids: [],
+              completed_link_ids: [],
+              failed_intent_ids: [],
+              pending_intent_ids: []
+            }
+          }
+        }
+      });
+    });
+    const { renderMeetingDetailView } = await import('@/views/meetings');
+    const canvas = document.createElement('div');
+    await renderMeetingDetailView(canvas, VALID_MEETING_ID);
+    const prep = canvas.querySelector('[data-part="task-link-preparation"]') as HTMLElement;
+    expect(prep.textContent).toMatch(/2 of 10 linked/);
+    expect(prep.textContent).toMatch(/Agenda draft/);
+    expect(prep.textContent).toMatch(/Pack slides/);
+    expect(prep.querySelector('[data-task-link-submit="preparation"]')).toBeTruthy();
+  });
 });
 
 describe('renderEventsView', () => {
