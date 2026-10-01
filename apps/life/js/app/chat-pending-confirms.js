@@ -1,6 +1,7 @@
 /**
- * Sticky Confirm tray — pending OS actions stay above the composer until
- * Confirm/Discard, across New chat and scroll. Hydrated from /api/chat/pending.
+ * Sticky Confirm tray — pending OS actions *and* session record/CN Confirms
+ * stay above the composer until Confirm/Discard, across New chat and scroll.
+ * Durable rows hydrate from /api/chat/pending; session-only cards mount via SSE.
  */
 
 export const CHAT_PENDING_CONFIRMS_ID = 'chat-pending-confirms';
@@ -91,16 +92,28 @@ function tagPendingId(card, id) {
   card.setAttribute?.('data-pending-id', id);
 }
 
+function isReceiptCard(node) {
+  const classes = (node?.className ?? '').split(/\s+/);
+  return classes.includes('confirm-card--receipt') || classes.includes('is-receipt');
+}
+
 function countConfirmCards(list) {
   let count = 0;
   for (const child of list.children ?? []) {
+    if (isReceiptCard(child)) continue;
     const classes = (child.className ?? '').split(/\s+/);
     if (classes.includes('confirm-card') || classes.includes('record-proposal')) count += 1;
   }
   if (count || typeof list.querySelectorAll !== 'function') return count;
-  return list.querySelectorAll('.confirm-card').length
-    || list.querySelectorAll('.record-proposal').length
-    || 0;
+  let fallback = 0;
+  for (const card of list.querySelectorAll('.confirm-card')) {
+    if (!isReceiptCard(card)) fallback += 1;
+  }
+  if (fallback) return fallback;
+  for (const card of list.querySelectorAll('.record-proposal')) {
+    if (!isReceiptCard(card)) fallback += 1;
+  }
+  return fallback;
 }
 
 function insertTrayBeforeForm(view, form, tray) {
@@ -271,6 +284,38 @@ export function appendActionProposalToPendingTray(root, { proposal, id }, { appe
   bindActionProposal(proposalUi, proposal, id ?? null);
   syncChatPendingConfirmsVisibility(root);
   return proposalUi;
+}
+
+/**
+ * Session-only Confirms (Brisket meals, Chadwick workouts, Hammond CN patches)
+ * that are not durable pending-actions still stick above the composer until
+ * Confirm/Discard — they must not float away inside #chat-messages.
+ */
+export function appendSessionConfirmToPendingTray(root, mountWithHost) {
+  if (typeof mountWithHost !== 'function') return null;
+  const tray = ensureChatPendingConfirmsTray(root);
+  if (!tray) return mountWithHost(null);
+  const list = trayList(tray);
+  const ui = mountWithHost(list);
+  if (ui?.card) {
+    ui.card.dataset.pendingSource = 'session';
+    syncChatPendingConfirmsVisibility(root);
+  }
+  return ui;
+}
+
+/** After Confirm, receipts belong in the transcript — not the waiting tray. */
+export function moveConfirmReceiptToTranscript(root, card) {
+  if (!card) return;
+  const messages = root?.querySelector?.('#chat-messages');
+  if (!messages || card.parent === messages) {
+    syncChatPendingConfirmsVisibility(root);
+    return;
+  }
+  // Detach first so FakeElement / odd hosts do not leave a dual-parent card.
+  card.remove?.();
+  if (typeof messages.append === 'function') messages.append(card);
+  syncChatPendingConfirmsVisibility(root);
 }
 
 export function removePendingConfirmCard(root, id) {

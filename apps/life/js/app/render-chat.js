@@ -507,10 +507,12 @@ function collapseTurnWorkoutText(root, list) {
   }
 }
 
-export function appendRecordProposal(root, { path, record, notes, warnings, libraryByName }) {
-  const list = root.querySelector('#chat-messages');
+export function appendRecordProposal(root, { path, record, notes, warnings, libraryByName, host = null }) {
+  const messages = root.querySelector('#chat-messages');
+  const list = host || messages;
   if (!list) return null;
-  if (record?.type === 'workout') collapseTurnWorkoutText(root, list);
+  // Collapse workout plan prose in the transcript even when the Confirm sits in the sticky tray.
+  if (record?.type === 'workout' && messages) collapseTurnWorkoutText(root, messages);
   const card = root.createElement('li');
   card.className = 'record-proposal confirm-card';
   card.setAttribute('role', 'region');
@@ -698,8 +700,8 @@ function cnPatchDiffRows(patch) {
   return rows;
 }
 
-export function appendCnPatchProposal(root, { patch }) {
-  const list = root.querySelector('#chat-messages');
+export function appendCnPatchProposal(root, { patch, host = null }) {
+  const list = host || root.querySelector('#chat-messages');
   if (!list) return null;
   const card = root.createElement('li');
   card.className = 'record-proposal cn-patch-proposal confirm-card';

@@ -33,6 +33,11 @@ export function appendActionProposalToPendingTray(
   event: { proposal: any, id?: string|null },
   opts: { appendActionProposal: MountPendingOpts['appendActionProposal'], bindActionProposal: MountPendingOpts['bindActionProposal'] }
 ): any;
+export function appendSessionConfirmToPendingTray(
+  root: any,
+  mountWithHost: (host: any) => any
+): any;
+export function moveConfirmReceiptToTranscript(root: any, card: any): void;
 export function removePendingConfirmCard(root: any, id: string): void;
 export const CHAT_PENDING_CONFIRMS_ID: string;
 export const CHAT_PENDING_CONFIRMS_LIST_ID: string;

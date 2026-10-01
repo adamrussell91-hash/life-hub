@@ -336,3 +336,91 @@ test('appendActionProposalToPendingTray rebuilds when a batch grows writes', asy
   assert.equal(tray.children[0].dataset.writeCount, '2');
   assert.equal(tray.children[0].dataset.pendingId, 'act_batch');
 });
+
+test('Brisket meal Confirm sticks in tray while more chat appends (Adam desktop symptom)', async () => {
+  const { appendRecordProposal } = await import('../../apps/life/js/app/render-chat.js');
+  const { appendSessionConfirmToPendingTray } = await import(
+    '../../apps/life/js/app/chat-pending-confirms.js'
+  );
+  const { root, messages, form, view } = buildChatRoot();
+
+  const proposal = appendSessionConfirmToPendingTray(root, (host) =>
+    appendRecordProposal(root, {
+      path: '2026/2026-10-01-brisket-breakfast.md',
+      record: {
+        schema_version: 1,
+        id: 'meal-breakfast-1',
+        type: 'meal',
+        meal: 'breakfast',
+        date: '2026-10-01',
+        created_at: '2026-10-01T07:30:00.000Z',
+        updated_at: '2026-10-01T07:30:00.000Z',
+        source: 'chat',
+        notes: 'Eggs and toast — on track'
+      },
+      host
+    })
+  );
+
+  assert.ok(proposal?.card, 'meal Confirm card mounts');
+  const tray = root.querySelector('#chat-pending-confirms');
+  const trayList = root.querySelector('#chat-pending-confirms-list');
+  assert.ok(tray, 'sticky tray exists above the composer');
+  assert.equal(tray.hidden, false, 'tray is visible while a Confirm waits');
+  assert.equal(
+    proposal.card.parent,
+    trayList,
+    'Brisket breakfast Confirm must sit in the sticky tray, not #chat-messages'
+  );
+  assert.equal(
+    messages.children.some((child) => (child.className || '').includes('confirm-card')),
+    false,
+    'scrollable thread must not hold the waiting Confirm'
+  );
+
+  // More chat after the Confirm — the card must stay pinned above the composer.
+  for (let i = 0; i < 5; i += 1) {
+    const bubble = root.createElement('li');
+    bubble.className = 'chat-message chat-message--assistant';
+    bubble.textContent = `Follow-up line ${i}`;
+    messages.append(bubble);
+  }
+  assert.equal(messages.children.length, 5);
+  assert.equal(proposal.card.parent, trayList, 'Confirm must not float up with new bubbles');
+  assert.equal(view.children.includes(tray), true);
+  assert.ok(
+    view.children.indexOf(tray) < view.children.indexOf(form),
+    'tray stays above the composer'
+  );
+});
+
+test('session Confirm receipt leaves the waiting tray for the transcript', async () => {
+  const { appendRecordProposal } = await import('../../apps/life/js/app/render-chat.js');
+  const {
+    appendSessionConfirmToPendingTray,
+    moveConfirmReceiptToTranscript,
+    syncChatPendingConfirmsVisibility
+  } = await import('../../apps/life/js/app/chat-pending-confirms.js');
+  const { root, messages } = buildChatRoot();
+  const proposal = appendSessionConfirmToPendingTray(root, (host) =>
+    appendRecordProposal(root, {
+      path: '2026/2026-10-01-brisket-breakfast.md',
+      record: {
+        schema_version: 1,
+        id: 'meal-breakfast-2',
+        type: 'meal',
+        meal: 'breakfast',
+        date: '2026-10-01',
+        created_at: '2026-10-01T07:30:00.000Z',
+        updated_at: '2026-10-01T07:30:00.000Z',
+        source: 'chat'
+      },
+      host
+    })
+  );
+  proposal.card.className += ' confirm-card--receipt is-receipt';
+  moveConfirmReceiptToTranscript(root, proposal.card);
+  syncChatPendingConfirmsVisibility(root);
+  assert.equal(proposal.card.parent, messages);
+  assert.equal(root.querySelector('#chat-pending-confirms').hidden, true);
+});
