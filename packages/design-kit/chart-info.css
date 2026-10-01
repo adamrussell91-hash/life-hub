@@ -1,0 +1,84 @@
+/* Chart "i" — opaque note, no fade. Tokens only. */
+
+.hub-chart-info-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.hub-chart-info {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--muted) 45%, transparent);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--muted);
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-2xs);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hub-chart-info::after {
+  content: "";
+  position: absolute;
+  /* Border-box 18px with a 1px border leaves a 16px padding box, so -14px reaches 44. */
+  inset: -14px;
+}
+
+.hub-chart-info:hover,
+.hub-chart-info[aria-expanded="true"] {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.hub-chart-info:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.hub-chart-info__note {
+  position: fixed;
+  z-index: 50;
+  width: min(18rem, calc(100vw - var(--space-6)));
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--warm-white);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  box-shadow: var(--elev-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-snug);
+  backdrop-filter: none;
+}
+
+.hub-chart-info__note[hidden] {
+  display: none;
+}
+
+.hub-chart-info__note h3 {
+  margin: 0 0 var(--space-1);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.hub-chart-info__note h3:not(:first-child) {
+  margin-top: var(--space-3);
+}
+
+.hub-chart-info__note p {
+  margin: 0;
+}

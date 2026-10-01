@@ -1,3 +1,5 @@
+import { mountChartInfo } from '../../../../packages/design-kit/js/hub-chart-info.js';
+import { energyInfo, fatInfo, proteinInfo } from './chart-info-copy.js';
 import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { renderHomeCharts } from './render-home-charts.js';
 import { formatGrams } from '../core/aggregate.js';
@@ -85,6 +87,10 @@ export function renderHome(root, model, options = {}) {
     protein: { value: model.nutrition.protein_g, target: model.targets.protein_g },
     fat: { value: model.nutrition.fat_g, target: model.targets.fat_ceiling_g }
   };
+  mountChartInfo(root.querySelector('#calories-label'), energyInfo);
+  mountChartInfo(root.querySelector('#protein-label'), proteinInfo);
+  mountChartInfo(root.querySelector('#fat-label'), fatInfo);
+
   for (const [name, config] of Object.entries(ringMap)) {
     applyRingTarget(root.querySelector(`[data-ring="${name}"]`), config, {
       size: 72,
