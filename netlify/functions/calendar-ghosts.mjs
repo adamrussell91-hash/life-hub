@@ -630,10 +630,11 @@ export async function queueCalendarGhostDualPath({
     const existing = typeof findLivePendingByCalendarGhostId === 'function'
       ? findLivePendingByCalendarGhostId(bound.id)
       : null;
-    if (existing && typeof existing.id === 'string' && existing.id.trim()) {
+    const reuseId = typeof existing?.id === 'string' ? existing.id.trim() : '';
+    if (reuseId) {
       // Re-surface the same Confirm card instead of twinning the queue / narrating
       // "re-queued" with no action_proposal SSE for Adam to tap.
-      pendingId = existing.id.trim();
+      pendingId = reuseId;
       if (typeof send === 'function') {
         send({
           type: 'action_proposal',
@@ -647,23 +648,22 @@ export async function queueCalendarGhostDualPath({
       pendingId = await proposeOsAction(validated.proposal, { calendarGhostId: bound.id });
     }
   }
-  const writes = validated.ok
-    ? validated.proposal.writes
-    : proposalInput.writes;
+
+  const writeSummaries = (validated.ok ? validated.proposal.writes : proposalInput.writes)
+    .map((write) => ({ path: write.path, mode: write.mode, diff: write.diff }));
+  const base = {
+    ok: true,
+    id: bound.id,
+    ghost_status: added ? 'queued' : 'already_queued',
+    intent: validated.ok ? validated.proposal.intent : proposalInput.intent,
+    writes: writeSummaries
+  };
   // Never tell the model "awaiting_confirm" without a chat Confirm id — that is
   // how Clare claims cards exist while the DOM has none.
   if (!pendingId) {
     return {
-      ok: true,
+      ...base,
       status: 'calendar_queued',
-      id: bound.id,
-      ghost_status: added ? 'queued' : 'already_queued',
-      intent: validated.ok ? validated.proposal.intent : proposalInput.intent,
-      writes: writes.map(write => ({
-        path: write.path,
-        mode: write.mode,
-        diff: write.diff
-      })),
       card: false,
       reply: added
         ? 'Queued on the calendar. Accept it there — no chat Confirm card opened.'
@@ -671,16 +671,8 @@ export async function queueCalendarGhostDualPath({
     };
   }
   return {
-    ok: true,
+    ...base,
     status: 'awaiting_confirm',
-    id: bound.id,
-    ghost_status: added ? 'queued' : 'already_queued',
-    intent: validated.ok ? validated.proposal.intent : proposalInput.intent,
-    writes: writes.map(write => ({
-      path: write.path,
-      mode: write.mode,
-      diff: write.diff
-    })),
     pendingId,
     card: true,
     reply

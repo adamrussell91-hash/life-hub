@@ -91,13 +91,12 @@ export function createChatPendingHandler({
       throw error;
     }
 
-    let live = selectLivePendingActions(queue).filter(isPendingActionLive);
-    if (slugFilter) {
-      live = live.filter((entry) => String(entry.slug || '').toLowerCase() === slugFilter);
-    }
     // Newest first so the tray shows the latest asks on top.
-    live = [...live].reverse();
-    const pending = live.map(pendingConfirmPublicFields).filter(Boolean);
+    const pending = [...selectLivePendingActions(queue).filter(isPendingActionLive)]
+      .filter((entry) => !slugFilter || String(entry.slug || '').toLowerCase() === slugFilter)
+      .reverse()
+      .map(pendingConfirmPublicFields)
+      .filter(Boolean);
 
     return withPrivate(okResponse(200, { pending, count: pending.length }));
   }

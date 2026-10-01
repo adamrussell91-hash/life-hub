@@ -55,20 +55,82 @@ export function pendingConfirmPublicFields(entry) {
   };
 }
 
+function cssEscape(value) {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(value);
+  return String(value).replace(/["\\]/g, '\\$&');
+}
+
+function resolveCreateElement(root, fallback = null) {
+  if (typeof root?.createElement === 'function') return root.createElement.bind(root);
+  if (typeof fallback?.createElement === 'function') return fallback.createElement.bind(fallback);
+  const doc =
+    root?.ownerDocument
+    || fallback?.ownerDocument
+    || (typeof document !== 'undefined' ? document : null);
+  return typeof doc?.createElement === 'function' ? doc.createElement.bind(doc) : null;
+}
+
+function trayList(tray) {
+  return tray?.querySelector?.(`#${CHAT_PENDING_CONFIRMS_LIST_ID}`) || tray;
+}
+
+function findCardByPendingId(host, id) {
+  if (!host || !id) return null;
+  return host.querySelector?.(`[data-pending-id="${cssEscape(id)}"]`) ?? null;
+}
+
+/** FakeElement tests need both dataset and the attribute for selector lookups. */
+function tagPendingId(card, id) {
+  if (!card || !id) return;
+  card.dataset.pendingId = id;
+  card.setAttribute?.('data-pending-id', id);
+}
+
+function countConfirmCards(list) {
+  let count = 0;
+  for (const child of list.children ?? []) {
+    const classes = (child.className ?? '').split(/\s+/);
+    if (classes.includes('confirm-card') || classes.includes('record-proposal')) count += 1;
+  }
+  if (count || typeof list.querySelectorAll !== 'function') return count;
+  return list.querySelectorAll('.confirm-card').length
+    || list.querySelectorAll('.record-proposal').length
+    || 0;
+}
+
+function insertTrayBeforeForm(view, form, tray) {
+  if (typeof form.parentElement?.insertBefore === 'function') {
+    form.parentElement.insertBefore(tray, form);
+    return;
+  }
+  if (typeof form.parent?.insertBefore === 'function') {
+    form.parent.insertBefore(tray, form);
+    return;
+  }
+  if (typeof view.insertBefore === 'function') {
+    view.insertBefore(tray, form);
+    return;
+  }
+  // FakeElement / odd hosts: rebuild children with tray before form.
+  const kids = [...(view.children || [])];
+  const idx = kids.indexOf(form);
+  if (idx >= 0) view.replaceChildren(...kids.slice(0, idx), tray, ...kids.slice(idx));
+  else view.append(tray);
+}
+
+function ensureListElement(tray, create) {
+  if (tray.querySelector(`#${CHAT_PENDING_CONFIRMS_LIST_ID}`) || !create) return;
+  const list = create('ul');
+  list.id = CHAT_PENDING_CONFIRMS_LIST_ID;
+  list.className = 'chat-pending-confirms__list';
+  tray.append(list);
+}
+
 export function ensureChatPendingConfirmsTray(root) {
   if (!root) return null;
   const existing = root.querySelector?.(`#${CHAT_PENDING_CONFIRMS_ID}`);
   if (existing) {
-    const doc = root.ownerDocument || (typeof document !== 'undefined' ? document : null);
-    const create = typeof root.createElement === 'function'
-      ? root.createElement.bind(root)
-      : doc?.createElement?.bind(doc);
-    if (!existing.querySelector(`#${CHAT_PENDING_CONFIRMS_LIST_ID}`) && create) {
-      const list = create('ul');
-      list.id = CHAT_PENDING_CONFIRMS_LIST_ID;
-      list.className = 'chat-pending-confirms__list';
-      existing.append(list);
-    }
+    ensureListElement(existing, resolveCreateElement(root));
     return existing;
   }
 
@@ -77,10 +139,7 @@ export function ensureChatPendingConfirmsTray(root) {
     || (root.id === 'chat-view' ? root : null)
     || (root.classList?.contains?.('chat-view') ? root : null);
   const form = root.querySelector?.('#chat-form') || view?.querySelector?.('#chat-form');
-  const doc = root.ownerDocument || view?.ownerDocument || (typeof document !== 'undefined' ? document : null);
-  const create = typeof root.createElement === 'function'
-    ? root.createElement.bind(root)
-    : doc?.createElement?.bind(doc);
+  const create = resolveCreateElement(root, view);
   if (!view || !form || typeof create !== 'function') return null;
 
   const tray = create('aside');
@@ -94,49 +153,31 @@ export function ensureChatPendingConfirmsTray(root) {
   label.textContent = 'Waiting on Confirm';
   tray.append(label);
 
-  const list = create('ul');
-  list.id = CHAT_PENDING_CONFIRMS_LIST_ID;
-  list.className = 'chat-pending-confirms__list';
-  tray.append(list);
-
-  if (typeof form.parentElement?.insertBefore === 'function') {
-    form.parentElement.insertBefore(tray, form);
-  } else if (typeof form.parent?.insertBefore === 'function') {
-    form.parent.insertBefore(tray, form);
-  } else if (typeof view.insertBefore === 'function') {
-    view.insertBefore(tray, form);
-  } else {
-    // FakeElement / odd hosts: rebuild children with tray before form.
-    const kids = [...(view.children || [])];
-    const idx = kids.indexOf(form);
-    if (idx >= 0) {
-      view.replaceChildren(...kids.slice(0, idx), tray, ...kids.slice(idx));
-    } else {
-      view.append(tray);
-    }
-  }
-
+  ensureListElement(tray, create);
+  insertTrayBeforeForm(view, form, tray);
   return tray;
 }
 
 export function syncChatPendingConfirmsVisibility(root) {
   const tray = root?.querySelector?.(`#${CHAT_PENDING_CONFIRMS_ID}`);
   if (!tray) return;
-  const list = tray.querySelector(`#${CHAT_PENDING_CONFIRMS_LIST_ID}`) || tray;
-  let count = 0;
-  for (const child of list.children ?? []) {
-    const classes = (child.className ?? '').split(/\s+/);
-    if (classes.includes('confirm-card') || classes.includes('record-proposal')) count += 1;
-  }
-  if (!count && typeof list.querySelectorAll === 'function') {
-    count = list.querySelectorAll('.confirm-card').length
-      || list.querySelectorAll('.record-proposal').length
-      || 0;
-  }
+  const count = countConfirmCards(trayList(tray));
   tray.hidden = count === 0;
   const label = tray.querySelector?.('.chat-pending-confirms__label');
   if (label) {
     label.textContent = count <= 1 ? 'Waiting on Confirm' : `Waiting on Confirm (${count})`;
+  }
+}
+
+function dropStaleDurableCards(list, keepIds) {
+  const cards = [...(list.querySelectorAll?.('[data-pending-id]') ?? list.children ?? [])];
+  for (const card of cards) {
+    const id = card.dataset?.pendingId || card.getAttribute?.('data-pending-id');
+    if (!id || keepIds.has(id) || card.dataset?.pendingSource === 'session') continue;
+    card.remove?.();
+    if (card.parent) {
+      card.parent.children = card.parent.children.filter((child) => child !== card);
+    }
   }
 }
 
@@ -155,40 +196,27 @@ export function mountPendingActionCards(root, pending, {
   }
   const tray = ensureChatPendingConfirmsTray(root);
   if (!tray) return [];
-  const list = tray.querySelector(`#${CHAT_PENDING_CONFIRMS_LIST_ID}`) || tray;
+  const list = trayList(tray);
   const rows = selectLivePendingActions(pending)
     .map(pendingConfirmPublicFields)
     .filter(Boolean);
 
-  if (reconcile) {
-    const keep = new Set(rows.map((row) => row.id));
-    for (const card of [...(list.querySelectorAll?.('[data-pending-id]') ?? list.children ?? [])]) {
-      const id = card.dataset?.pendingId || card.getAttribute?.('data-pending-id');
-      if (id && !keep.has(id) && card.dataset?.pendingSource !== 'session') {
-        card.remove?.();
-        if (card.parent) {
-          card.parent.children = card.parent.children.filter((c) => c !== card);
-        }
-      }
-    }
-  }
+  if (reconcile) dropStaleDurableCards(list, new Set(rows.map((row) => row.id)));
 
   const mounted = [];
   for (const row of rows) {
-    const existing = list.querySelector?.(`[data-pending-id="${cssEscape(row.id)}"]`);
+    const existing = findCardByPendingId(list, row.id);
     if (existing) {
       mounted.push({ card: existing, id: row.id, reused: true });
       continue;
     }
-    // Point append helper at the tray list for this card.
     const proposalUi = appendActionProposal(root, {
       proposal: row.proposal,
       host: list,
       pendingId: row.id
     });
     if (!proposalUi?.card) continue;
-    proposalUi.card.dataset.pendingId = row.id;
-    proposalUi.card.setAttribute('data-pending-id', row.id);
+    tagPendingId(proposalUi.card, row.id);
     if (row.slug) proposalUi.card.dataset.agentSlug = row.slug;
     bindActionProposal(proposalUi, row.proposal, row.id);
     mounted.push({ card: proposalUi.card, id: row.id, reused: false, proposalUi });
@@ -198,18 +226,13 @@ export function mountPendingActionCards(root, pending, {
   return mounted;
 }
 
-function cssEscape(value) {
-  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(value);
-  return String(value).replace(/["\\]/g, '\\$&');
-}
-
 /** Place a live SSE Confirm into the sticky tray (not the scrollable thread). */
 export function appendActionProposalToPendingTray(root, { proposal, id }, { appendActionProposal, bindActionProposal }) {
   const tray = ensureChatPendingConfirmsTray(root);
   if (!tray) return null;
-  const list = tray.querySelector(`#${CHAT_PENDING_CONFIRMS_LIST_ID}`) || tray;
+  const list = trayList(tray);
   if (id) {
-    const existing = list.querySelector?.(`[data-pending-id="${cssEscape(id)}"]`);
+    const existing = findCardByPendingId(list, id);
     if (existing) {
       syncChatPendingConfirmsVisibility(root);
       return { card: existing, reused: true };
@@ -217,12 +240,8 @@ export function appendActionProposalToPendingTray(root, { proposal, id }, { appe
   }
   const proposalUi = appendActionProposal(root, { proposal, host: list, pendingId: id });
   if (!proposalUi?.card) return null;
-  if (id) {
-    proposalUi.card.dataset.pendingId = id;
-    proposalUi.card.setAttribute('data-pending-id', id);
-  } else {
-    proposalUi.card.dataset.pendingSource = 'session';
-  }
+  if (id) tagPendingId(proposalUi.card, id);
+  else proposalUi.card.dataset.pendingSource = 'session';
   bindActionProposal(proposalUi, proposal, id ?? null);
   syncChatPendingConfirmsVisibility(root);
   return proposalUi;
@@ -231,7 +250,6 @@ export function appendActionProposalToPendingTray(root, { proposal, id }, { appe
 export function removePendingConfirmCard(root, id) {
   if (!id) return;
   const tray = root?.querySelector?.(`#${CHAT_PENDING_CONFIRMS_ID}`);
-  const card = tray?.querySelector?.(`[data-pending-id="${cssEscape(id)}"]`);
-  card?.remove?.();
+  findCardByPendingId(tray, id)?.remove?.();
   syncChatPendingConfirmsVisibility(root);
 }

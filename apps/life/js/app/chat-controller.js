@@ -973,20 +973,33 @@ export function createChatController({
     });
   }
 
+  function actionProposalSlug(proposal) {
+    return stickyAgentSlug()
+      || (typeof proposal?.agent === 'string' ? proposal.agent : null)
+      || 'hammond';
+  }
+
+  function dismissPendingCard(card, id = null) {
+    if (id) removePendingConfirmCard(root, id);
+    else {
+      card?.remove?.();
+      syncChatPendingConfirmsVisibility(root);
+    }
+  }
+
   function bindActionProposal(proposalUi, proposal, id = null) {
     if (!proposalUi) return;
     proposalUi.confirm.addEventListener('click', () => {
       void confirmAction(proposalUi, proposal, id);
     });
     proposalUi.discard.addEventListener('click', () => {
-      proposalUi.card.remove();
-      syncChatPendingConfirmsVisibility(root);
+      dismissPendingCard(proposalUi.card, id);
       if (id) {
-        removePendingConfirmCard(root, id);
-        const slug = stickyAgentSlug()
-          || (typeof proposal?.agent === 'string' ? proposal.agent : null)
-          || 'hammond';
-        void chatApi.confirm({ kind: 'action_dismiss', id, slug }).catch(() => undefined);
+        void chatApi.confirm({
+          kind: 'action_dismiss',
+          id,
+          slug: actionProposalSlug(proposal)
+        }).catch(() => undefined);
       }
     });
   }
@@ -996,9 +1009,7 @@ export function createChatController({
     proposalUi.confirm.disabled = true;
     proposalUi.confirm.textContent = 'Saving…';
     try {
-      const slug = stickyAgentSlug()
-        || (typeof proposal?.agent === 'string' ? proposal.agent : null)
-        || 'hammond';
+      const slug = actionProposalSlug(proposal);
       const result = await chatApi.confirm({
         kind: 'action',
         candidate: proposal,
@@ -1013,11 +1024,7 @@ export function createChatController({
           : 'Action applied.',
         label: 'Confirmed'
       });
-      if (id) removePendingConfirmCard(root, id);
-      else {
-        proposalUi.card.remove();
-        syncChatPendingConfirmsVisibility(root);
-      }
+      dismissPendingCard(proposalUi.card, id);
       const continuationText = typeof result?.continuation?.text === 'string'
         ? result.continuation.text.trim()
         : '';

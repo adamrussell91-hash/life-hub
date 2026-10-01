@@ -1042,16 +1042,24 @@ export function createClareChatController({
     void hydratePendingConfirms();
   }
 
+  type PendingProposal = {
+    intent?: string;
+    writes?: Array<{ path?: string; mode?: string; diff?: string }>;
+  };
+
+  const chatRoot = root as Document | HTMLElement;
+
   function paintPendingActionIntoHost(
     r: ParentNode | Document | HTMLElement,
-    proposal: { intent?: string; writes?: Array<{ path?: string; mode?: string; diff?: string }> },
+    proposal: PendingProposal,
     host: ParentNode | null | undefined,
     pendingId: string | null | undefined
   ) {
+    const id = typeof pendingId === 'string' ? pendingId : null;
     appendActionProposalCard(
       r,
       proposal ?? {},
-      typeof pendingId === 'string' ? pendingId : null,
+      id,
       () => {
         lastPendingActionId = null;
         void hydratePendingConfirms();
@@ -1059,11 +1067,10 @@ export function createClareChatController({
       host
     );
     const list = host ?? r.querySelector('#chat-pending-confirms-list');
-    const card = list?.querySelector?.(
-      typeof pendingId === 'string' && pendingId
-        ? `[data-pending-id="${pendingId}"]`
-        : '.action-proposal.confirm-card:last-child'
-    ) as HTMLElement | null;
+    const selector = id
+      ? `[data-pending-id="${id}"]`
+      : '.action-proposal.confirm-card:last-child';
+    const card = list?.querySelector?.(selector) as HTMLElement | null;
     return {
       card,
       confirm: card?.querySelector('.record-proposal__confirm') as HTMLButtonElement,
@@ -1071,35 +1078,31 @@ export function createClareChatController({
     };
   }
 
+  /** Adapter for shared sticky-tray helpers — card already binds Confirm/Discard. */
+  const pendingTrayMount = {
+    appendActionProposal(
+      r: ParentNode,
+      {
+        proposal,
+        host,
+        pendingId
+      }: { proposal: PendingProposal; host?: ParentNode | null; pendingId?: string | null }
+    ) {
+      return paintPendingActionIntoHost(r, proposal ?? {}, host, pendingId);
+    },
+    bindActionProposal() {}
+  };
+
   async function hydratePendingConfirms(): Promise<void> {
-    ensureChatPendingConfirmsTray(root as Document | HTMLElement);
+    ensureChatPendingConfirmsTray(chatRoot);
     try {
       const pending = await listPendingConfirms();
-      mountPendingActionCards(root as Document | HTMLElement, pending, {
-        appendActionProposal: (
-          r: any,
-          {
-            proposal,
-            host,
-            pendingId
-          }: { proposal: any; host?: any; pendingId?: string | null }
-        ) =>
-          paintPendingActionIntoHost(
-            r,
-            proposal as {
-              intent?: string;
-              writes?: Array<{ path?: string; mode?: string; diff?: string }>;
-            },
-            host as ParentNode | null | undefined,
-            pendingId
-          ),
-        bindActionProposal() {
-          // appendActionProposalCard already binds Confirm/Discard.
-        },
+      mountPendingActionCards(chatRoot, pending, {
+        ...pendingTrayMount,
         reconcile: true
       });
     } catch {
-      syncChatPendingConfirmsVisibility(root as Document | HTMLElement);
+      syncChatPendingConfirmsVisibility(chatRoot);
     }
   }
 
@@ -1405,34 +1408,12 @@ export function createClareChatController({
             typeof event.id === 'string' && event.id.trim() ? event.id.trim() : null;
           if (pendingId) lastPendingActionId = pendingId;
           appendActionProposalToPendingTray(
-            root as Document | HTMLElement,
+            chatRoot,
             {
-              proposal: (event.proposal as {
-                intent?: string;
-                writes?: Array<{ path?: string; mode?: string; diff?: string }>;
-              }) ?? {},
+              proposal: (event.proposal as PendingProposal) ?? {},
               id: pendingId
             },
-            {
-              appendActionProposal: (
-                r: any,
-                {
-                  proposal,
-                  host,
-                  pendingId: id
-                }: { proposal: any; host?: any; pendingId?: string | null }
-              ) =>
-                paintPendingActionIntoHost(
-                  r,
-                  proposal as {
-                    intent?: string;
-                    writes?: Array<{ path?: string; mode?: string; diff?: string }>;
-                  },
-                  host as ParentNode | null | undefined,
-                  id
-                ),
-              bindActionProposal() {}
-            }
+            pendingTrayMount
           );
           continue;
         }
@@ -1639,7 +1620,7 @@ export function createClareChatController({
     started = true;
     bindChrome();
     paintRoster();
-    ensureChatPendingConfirmsTray(root as Document | HTMLElement);
+    ensureChatPendingConfirmsTray(chatRoot);
     void hydratePendingConfirms();
     const templates = await tasksApi.listTemplates();
     frameworks = templates.frameworks as FrameworkEntry[];
