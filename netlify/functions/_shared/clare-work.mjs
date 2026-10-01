@@ -199,7 +199,7 @@ export function clareWorkSchemas() {
       question: { type: 'string' },
       urls: { type: 'array', items: { type: 'string' } }
     }, ['urls']),
-    tool('clare_mutate', 'Propose a Tasks write (Confirm before anything is stored). Ops: create_task, update_task, complete_task, reschedule_task, split_task, trash_task, move_task, create_project, estimate_task, tag_task, set_waiting_on, attach_research, batch_reschedule, pin_focus.', {
+    tool('clare_mutate', 'Propose a Tasks write (Confirm before anything is stored). Ops: create_task, update_task, complete_task, reschedule_task, split_task, trash_task, move_task, create_project, estimate_task, tag_task, set_waiting_on, attach_research, batch_reschedule, pin_focus. For moving several timed tasks in one go, use batch_reschedule with schedules[{task_id, due_date, due_time}] — one Confirm applies all.', {
       op: { type: 'string', enum: MUTATE_OPS },
       task_id: { type: 'string' },
       project_id: { type: 'string' },
@@ -233,6 +233,19 @@ export function clareWorkSchemas() {
       notes: { type: 'string' },
       subtasks: { type: 'array', items: { type: 'string' } },
       task_ids: { type: 'array', items: { type: 'string' } },
+      schedules: {
+        type: 'array',
+        description: 'batch_reschedule: per-task due_date / due_time / estimated_duration (preferred for timed multi-slot moves)',
+        items: {
+          type: 'object',
+          properties: {
+            task_id: { type: 'string' },
+            due_date: { type: 'string' },
+            due_time: { type: 'string' },
+            estimated_duration: { type: 'number' }
+          }
+        }
+      },
       summary: { type: 'string' }
     }, ['op']),
     tool('inspect_board', 'Read projects, stale tasks, blocked/waiting-on tasks, or likely duplicates.', {
@@ -1616,15 +1629,51 @@ export function buildClareMutation(input, { tasks = [], projects = [], nowIso = 
   }
 
   if (op === 'batch_reschedule') {
+    // Prefer schedules[] for timed multi-slot moves (one Confirm). Legacy: task_ids + due_date.
+    const schedules = Array.isArray(input.schedules)
+      ? input.schedules.slice(0, 16).filter((row) => row && typeof row.task_id === 'string' && row.task_id.trim())
+      : [];
+    if (schedules.length) {
+      const writes = [];
+      for (const row of schedules) {
+        const existing = findTask(tasks, row.task_id.trim());
+        if (!existing) continue;
+        const patch = {};
+        if (typeof row.due_date === 'string' && row.due_date.trim()) patch.due_date = row.due_date.trim();
+        if (typeof row.due_time === 'string' && row.due_time.trim()) patch.due_time = row.due_time.trim();
+        if (Number.isFinite(Number(row.estimated_duration))) {
+          patch.estimated_duration = Number(row.estimated_duration);
+        }
+        if (!Object.keys(patch).length) continue;
+        const record = buildTaskRecord(patch, existing, stamp);
+        const when = [record.due_date, record.due_time].filter(Boolean).join(' ');
+        writes.push(writeEntry(
+          `tasks:task:${record.id}`,
+          'overwrite',
+          record,
+          `reschedule ${existing.title} → ${when || 'new slot'}`
+        ));
+      }
+      if (!writes.length) return deny('no_matching_tasks');
+      return propose(`Batch reschedule ${writes.length} tasks`, writes);
+    }
     const ids = Array.isArray(input.task_ids) ? input.task_ids.slice(0, 8) : [];
     const due = typeof input.due_date === 'string' ? input.due_date : '';
     if (!ids.length || !due) return deny('missing_batch');
     const writes = [];
+    const dueTime = typeof input.due_time === 'string' && input.due_time.trim() ? input.due_time.trim() : null;
     for (const id of ids) {
       const existing = findTask(tasks, id);
       if (!existing) continue;
-      const record = buildTaskRecord({ due_date: due }, existing, stamp);
-      writes.push(writeEntry(`tasks:task:${record.id}`, 'overwrite', record, `reschedule ${existing.title} → ${due}`));
+      const patch = { due_date: due };
+      if (dueTime) patch.due_time = dueTime;
+      const record = buildTaskRecord(patch, existing, stamp);
+      writes.push(writeEntry(
+        `tasks:task:${record.id}`,
+        'overwrite',
+        record,
+        `reschedule ${existing.title} → ${due}${dueTime ? ` ${dueTime}` : ''}`
+      ));
     }
     if (!writes.length) return deny('no_matching_tasks');
     return propose(`Batch reschedule ${writes.length} tasks to ${due}`, writes);

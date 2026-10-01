@@ -221,12 +221,19 @@ import {
   parsePendingActions,
   serializePendingActions,
   addPendingAction,
+  patchPendingAction,
+  findPendingActionById,
   isPendingActionLive,
+  isPendingActionExecutable,
   validateProposeActionInput,
   classifyWriteTarget,
   snapshotGithubBases,
   snapshotBlobBases
 } from './_shared/capabilities/propose-action.mjs';
+import {
+  isBatchableScheduleProposal,
+  mergeIntoScheduleBatch
+} from './_shared/confirm-batch.mjs';
 import {
   TASK_PREFIX,
   defaultGetTasksStore,
@@ -1813,23 +1820,82 @@ export function createChatHandler({
           };
         };
 
+        // Same-turn schedule moves (update_task × N, ghosts × N) coalesce into one Confirm.
+        let turnScheduleBatchId = null;
+
+        const snapshotProposalBases = async (writes) => {
+          let bases = snapshotGithubBases(writes, repoTree);
+          try {
+            const needsTasks = writes.some(write => classifyWriteTarget(write.path).store === 'tasks');
+            const needsTeaching = writes.some(write => classifyWriteTarget(write.path).store === 'teaching');
+            if (needsTasks || needsTeaching) {
+              const blobStores = {};
+              if (needsTasks) blobStores.tasks = await getTasksStore(env);
+              if (needsTeaching) blobStores.teaching = await getTeachingStore(env);
+              bases = { ...bases, ...await snapshotBlobBases(writes, blobStores) };
+            }
+          } catch {
+            // Queue the GitHub write anyway; confirm skips the stale check without blob bases.
+          }
+          return bases;
+        };
+
         // os.propose-action: validate allowlist, persist pending queue, emit Confirm card with diffs.
         const proposeOsAction = async (proposal, extras = {}) => {
           let persistedId = null;
+          let emitProposal = proposal;
           try {
-            let bases = snapshotGithubBases(proposal.writes, repoTree);
-            try {
-              const needsTasks = proposal.writes.some(write => classifyWriteTarget(write.path).store === 'tasks');
-              const needsTeaching = proposal.writes.some(write => classifyWriteTarget(write.path).store === 'teaching');
-              if (needsTasks || needsTeaching) {
-                const blobStores = {};
-                if (needsTasks) blobStores.tasks = await getTasksStore(env);
-                if (needsTeaching) blobStores.teaching = await getTeachingStore(env);
-                bases = { ...bases, ...await snapshotBlobBases(proposal.writes, blobStores) };
+            const batchable = isBatchableScheduleProposal(proposal);
+            const openBatch = turnScheduleBatchId
+              ? findPendingActionById(pendingActions, turnScheduleBatchId)
+              : null;
+            const canMerge = batchable
+              && openBatch
+              && isPendingActionExecutable(openBatch)
+              && openBatch.slug === slug;
+
+            if (canMerge) {
+              const merged = mergeIntoScheduleBatch(openBatch, proposal, extras);
+              const bases = {
+                ...(openBatch.bases && typeof openBatch.bases === 'object' ? openBatch.bases : {}),
+                ...(await snapshotProposalBases(merged.proposal.writes))
+              };
+              const patched = {
+                proposal: merged.proposal,
+                bases,
+                ...(merged.calendarGhostId ? { calendarGhostId: merged.calendarGhostId } : {}),
+                ...(merged.calendarGhostIds.length
+                  ? { calendarGhostIds: merged.calendarGhostIds }
+                  : {}),
+                ...(extras && typeof extras === 'object' ? extras : {})
+              };
+              // Prefer the merged multi-ghost list over a singular extras.calendarGhostId.
+              if (merged.calendarGhostIds.length) {
+                patched.calendarGhostId = merged.calendarGhostId;
+                patched.calendarGhostIds = merged.calendarGhostIds;
               }
-            } catch {
-              // Queue the GitHub write anyway; confirm skips the stale check without blob bases.
+              const nextQueue = patchPendingAction(pendingActions, turnScheduleBatchId, patched);
+              const result = await client.writeFile({
+                path: PENDING_ACTIONS_PATH,
+                content: serializePendingActions(nextQueue),
+                ...(pendingActionsSha ? { sha: pendingActionsSha } : {}),
+                message: `chore(propose-action): batch ${merged.proposal.intent}`.slice(0, 200)
+              });
+              pendingActions = nextQueue;
+              pendingActionsSha = result.sha;
+              persistedId = turnScheduleBatchId;
+              emitProposal = merged.proposal;
+              send({
+                type: 'action_proposal',
+                proposal: emitProposal,
+                id: persistedId,
+                batched: true,
+                turnBound: Boolean(openBatch.turnId)
+              });
+              return persistedId;
             }
+
+            const bases = await snapshotProposalBases(proposal.writes);
             const pendingId = createPendingActionId();
             let turnId = null;
             let actionId = null;
@@ -1850,30 +1916,40 @@ export function createChatHandler({
                 checkpointError = checkpoint.error;
               }
             }
+            const seedMerged = batchable
+              ? mergeIntoScheduleBatch({ proposal, ...extras }, proposal, extras)
+              : null;
             const entry = {
               id: pendingId,
               createdAt: today,
               slug,
-              proposal,
+              proposal: seedMerged?.proposal || proposal,
               bases,
               turnId,
               actionId,
               ...(resumeUnavailable ? { resumeUnavailable, checkpointError } : {}),
-              ...(extras && typeof extras === 'object' ? extras : {})
+              ...(extras && typeof extras === 'object' ? extras : {}),
+              ...(seedMerged?.calendarGhostId ? { calendarGhostId: seedMerged.calendarGhostId } : {}),
+              ...(seedMerged?.calendarGhostIds?.length
+                ? { calendarGhostIds: seedMerged.calendarGhostIds }
+                : {})
             };
             const nextQueue = addPendingAction(pendingActions, entry);
             const result = await client.writeFile({
               path: PENDING_ACTIONS_PATH,
               content: serializePendingActions(nextQueue),
               ...(pendingActionsSha ? { sha: pendingActionsSha } : {}),
-              message: `chore(propose-action): queue ${proposal.intent}`.slice(0, 200)
+              message: `chore(propose-action): queue ${entry.proposal.intent}`.slice(0, 200)
             });
             pendingActions = nextQueue;
             pendingActionsSha = result.sha;
             persistedId = entry.id;
+            if (batchable) turnScheduleBatchId = persistedId;
+            else turnScheduleBatchId = null;
+            emitProposal = entry.proposal;
             send({
               type: 'action_proposal',
-              proposal,
+              proposal: emitProposal,
               id: persistedId,
               turnBound: Boolean(turnId),
               ...(resumeUnavailable ? { resumeUnavailable: true } : {})
@@ -1882,7 +1958,7 @@ export function createChatHandler({
           } catch {
             // Queue write failed — same-turn Confirm card still emits without a durable id.
           }
-          send({ type: 'action_proposal', proposal, id: persistedId });
+          send({ type: 'action_proposal', proposal: emitProposal, id: persistedId });
           return persistedId;
         };
 
@@ -1896,7 +1972,11 @@ export function createChatHandler({
             const fromExtras = entry.extras && typeof entry.extras.calendarGhostId === 'string'
               ? entry.extras.calendarGhostId.trim()
               : '';
-            if (fromTop === want || fromExtras === want) return entry;
+            const fromIds = [
+              ...(Array.isArray(entry.calendarGhostIds) ? entry.calendarGhostIds : []),
+              ...(Array.isArray(entry.extras?.calendarGhostIds) ? entry.extras.calendarGhostIds : [])
+            ].map((id) => (typeof id === 'string' ? id.trim() : '')).filter(Boolean);
+            if (fromTop === want || fromExtras === want || fromIds.includes(want)) return entry;
           }
           return null;
         };

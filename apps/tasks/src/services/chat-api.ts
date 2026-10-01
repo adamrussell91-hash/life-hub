@@ -30,7 +30,12 @@ function confirmErrorMessage(code: string, status: number): string {
   if (code === 'stale_schedule_collision') {
     return 'Schedule changed since this proposal. Ghosts kept — confirm a revised proposal.';
   }
-  if (status === 409) return 'Confirm conflict. The card stays actionable.';
+  if (code === 'stale_write') {
+    return 'Something changed since this proposal. Discard the stuck cards and ask Clare to propose the move once.';
+  }
+  if (status === 409) {
+    return 'Confirm conflict. Discard duplicate cards, then confirm the one batch — or ask Clare again.';
+  }
   return 'Confirm request failed';
 }
 
