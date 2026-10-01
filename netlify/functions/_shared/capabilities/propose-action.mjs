@@ -299,6 +299,17 @@ export function findPendingActionById(list, id) {
   return base.find(entry => entry.id === id) ?? null;
 }
 
+/** Replace fields on a live pending entry (same id). Used to grow a same-turn Confirm batch. */
+export function patchPendingAction(list, id, patch) {
+  const base = Array.isArray(list) ? list : [];
+  if (typeof id !== 'string' || !id.trim() || !patch || typeof patch !== 'object') return base;
+  return base.map((entry) => {
+    if (entry?.id !== id) return entry;
+    if (!isPendingActionExecutable(entry)) return entry;
+    return { ...entry, ...patch };
+  });
+}
+
 /**
  * Mark a pending action terminally consumed in place so replay cannot re-execute
  * even if a later physical cleanup write fails.

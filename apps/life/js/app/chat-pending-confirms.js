@@ -39,12 +39,17 @@ export function pendingConfirmPublicFields(entry) {
     (typeof entry.calendarGhostId === 'string' && entry.calendarGhostId.trim())
     || (entry.extras && typeof entry.extras.calendarGhostId === 'string' && entry.extras.calendarGhostId.trim())
     || null;
+  const calendarGhostIds = [
+    ...(Array.isArray(entry.calendarGhostIds) ? entry.calendarGhostIds : []),
+    ...(entry.extras && Array.isArray(entry.extras.calendarGhostIds) ? entry.extras.calendarGhostIds : [])
+  ].filter((id) => typeof id === 'string' && id.trim());
   return {
     id,
     slug: typeof entry.slug === 'string' ? entry.slug : '',
     createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : '',
     status: typeof entry.status === 'string' ? entry.status : 'pending',
     ...(calendarGhostId ? { calendarGhostId } : {}),
+    ...(calendarGhostIds.length ? { calendarGhostIds: [...new Set(calendarGhostIds)] } : {}),
     proposal: {
       intent: typeof proposal.intent === 'string' ? proposal.intent : 'Proposed durable write',
       agent: typeof proposal.agent === 'string' ? proposal.agent : undefined,
@@ -207,8 +212,17 @@ export function mountPendingActionCards(root, pending, {
   for (const row of rows) {
     const existing = findCardByPendingId(list, row.id);
     if (existing) {
-      mounted.push({ card: existing, id: row.id, reused: true });
-      continue;
+      // Refresh only when a same-turn batch grew the write list.
+      const priorWrites = Number(existing.dataset?.writeCount || 0)
+        || existing.querySelectorAll?.('.action-proposal__write')?.length
+        || existing.querySelectorAll?.('.hub-chips .chip')?.length
+        || 0;
+      const nextWrites = Array.isArray(row.proposal?.writes) ? row.proposal.writes.length : 0;
+      if (nextWrites <= priorWrites) {
+        mounted.push({ card: existing, id: row.id, reused: true });
+        continue;
+      }
+      existing.remove?.();
     }
     const proposalUi = appendActionProposal(root, {
       proposal: row.proposal,
@@ -217,6 +231,8 @@ export function mountPendingActionCards(root, pending, {
     });
     if (!proposalUi?.card) continue;
     tagPendingId(proposalUi.card, row.id);
+    const writeCount = Array.isArray(row.proposal?.writes) ? row.proposal.writes.length : 0;
+    proposalUi.card.dataset.writeCount = String(writeCount);
     if (row.slug) proposalUi.card.dataset.agentSlug = row.slug;
     bindActionProposal(proposalUi, row.proposal, row.id);
     mounted.push({ card: proposalUi.card, id: row.id, reused: false, proposalUi });
@@ -231,17 +247,27 @@ export function appendActionProposalToPendingTray(root, { proposal, id }, { appe
   const tray = ensureChatPendingConfirmsTray(root);
   if (!tray) return null;
   const list = trayList(tray);
+  const nextWrites = Array.isArray(proposal?.writes) ? proposal.writes.length : 0;
   if (id) {
     const existing = findCardByPendingId(list, id);
     if (existing) {
-      syncChatPendingConfirmsVisibility(root);
-      return { card: existing, reused: true };
+      const priorWrites = Number(existing.dataset?.writeCount || 0)
+        || existing.querySelectorAll?.('.action-proposal__write')?.length
+        || existing.querySelectorAll?.('.hub-chips .chip')?.length
+        || 0;
+      if (nextWrites <= priorWrites) {
+        syncChatPendingConfirmsVisibility(root);
+        return { card: existing, reused: true };
+      }
+      // Same pending id grew (batched schedule move) — rebuild so Confirm applies all.
+      existing.remove?.();
     }
   }
   const proposalUi = appendActionProposal(root, { proposal, host: list, pendingId: id });
   if (!proposalUi?.card) return null;
   if (id) tagPendingId(proposalUi.card, id);
   else proposalUi.card.dataset.pendingSource = 'session';
+  proposalUi.card.dataset.writeCount = String(nextWrites);
   bindActionProposal(proposalUi, proposal, id ?? null);
   syncChatPendingConfirmsVisibility(root);
   return proposalUi;

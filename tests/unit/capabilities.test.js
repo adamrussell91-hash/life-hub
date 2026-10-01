@@ -567,6 +567,27 @@ test('update_task returns Confirm append on the named task', async () => {
   assert.equal(validated.ok, true);
 });
 
+test('update_task items[] returns one Confirm with several schedule patches', async () => {
+  resetCapabilityCaches();
+  const { ctx } = mockCtx('clare');
+  const result = await executeShortcut(
+    'update_task',
+    {
+      items: [
+        { task_id: 'task_set_1', due_date: '2026-10-01', due_time: '16:00' },
+        { task_id: 'task_set_2', due_date: '2026-10-01', due_time: '16:20' },
+        { task_id: 'task_set_3', due_date: '2026-10-01', due_time: '16:40' }
+      ]
+    },
+    ctx
+  );
+  assert.equal(result.kind, 'propose');
+  assert.equal(result.proposal.writes.length, 3);
+  assert.match(result.proposal.intent, /Update 3 tasks/);
+  const validated = validateProposeActionInput(result.proposal, { agentSlug: 'clare' });
+  assert.equal(validated.ok, true);
+});
+
 test('clare keeps create_task attached on a focus-today turn', () => {
   resetCapabilityCaches();
   const names = buildAgentTools({

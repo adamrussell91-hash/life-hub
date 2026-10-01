@@ -534,7 +534,7 @@ export function shortcutSchemas() {
     create_task: {
       name: 'create_task',
       description:
-        `Create one or more Tasks Hub rows immediately. Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (at most ${CREATE_TASK_MAX_ITEMS}; call again for more). Omit due_date only when the work is not for today — otherwise it lands on Today. NEVER merge distinct actions into one title — one card per distinct piece of work. Never mention this limit or the tool name in chat.`,
+        `Create one or more Tasks Hub rows immediately. Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (at most ${CREATE_TASK_MAX_ITEMS}; call again for more). Omit due_date only when the work is not for today — otherwise it lands on Today. NEVER merge distinct actions into one title — use items[] for related rows on one Confirm. Never mention this limit or the tool name in chat.`,
       input_schema: {
         type: 'object',
         properties: {
@@ -603,7 +603,7 @@ export function shortcutSchemas() {
     update_task: {
       name: 'update_task',
       description:
-        'Patch an existing Tasks Hub row (Confirm). Call get_task first when appending so you know the current shape. Use append_description to add notes without replacing the rest of the task.',
+        'Patch an existing Tasks Hub row (Confirm). Call get_task first when appending so you know the current shape. Use append_description to add notes without replacing the rest of the task. To move several timed tasks in one Confirm, pass items[{task_id, due_date, due_time, ...}] — do not fire one update_task per row.',
       input_schema: {
         type: 'object',
         properties: {
@@ -627,12 +627,35 @@ export function shortcutSchemas() {
           waiting_on: { type: 'string' },
           waiting_since: { type: 'string' },
           follow_up_at: { type: 'string' },
+          items: {
+            type: 'array',
+            description: 'Batch patch several tasks in one Confirm (preferred for multi-slot reschedules).',
+            items: {
+              type: 'object',
+              properties: {
+                task_id: { type: 'string' },
+                title: { type: 'string' },
+                description: { type: 'string' },
+                append_description: { type: 'string' },
+                status: { type: 'string', enum: ['open', 'in_progress', 'done', 'deferred', 'dead'] },
+                priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
+                domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
+                due_date: { type: 'string' },
+                due_time: { type: 'string' },
+                target_date: { type: 'string' },
+                estimated_duration: { type: 'number' },
+                tags: { type: 'array', items: { type: 'string' } }
+              },
+              required: ['task_id'],
+              additionalProperties: false
+            }
+          },
           waiting_status: { type: 'string', enum: ['waiting', 'follow_up_due', 'resolved'] },
           contexts: { type: 'array', items: { type: 'object' } },
           cognitive_load: { type: 'string', enum: ['low', 'medium', 'high'] },
           depth: { type: 'string', enum: ['deep', 'shallow', 'admin'] }
         },
-        required: ['task_id'],
+        // task_id for a single patch; or items[] for a multi-task Confirm. Handler enforces one of them.
         additionalProperties: false
       }
     }
@@ -1970,9 +1993,7 @@ async function handleCreateTask(ctx, input) {
   return { ...propose(proposal), ...skippedMeta };
 }
 
-function handleUpdateTask(ctx, input) {
-  const taskId = asOptionalString(input?.task_id);
-  if (!taskId) return deny('task_id is required');
+function buildUpdateTaskPatch(input) {
   const patch = {};
   const title = asOptionalString(input.title);
   const description = typeof input.description === 'string' ? input.description : null;
@@ -2002,6 +2023,42 @@ function handleUpdateTask(ctx, input) {
   if (Array.isArray(input.contexts)) patch.contexts = input.contexts;
   if (asOptionalString(input.cognitive_load)) patch.cognitive_load = asOptionalString(input.cognitive_load);
   if (asOptionalString(input.depth)) patch.depth = asOptionalString(input.depth);
+  return patch;
+}
+
+function handleUpdateTask(ctx, input) {
+  const batchItems = Array.isArray(input?.items)
+    ? input.items.slice(0, CREATE_TASK_MAX_ITEMS)
+    : null;
+  if (batchItems?.length) {
+    const writes = [];
+    for (const item of batchItems) {
+      const taskId = asOptionalString(item?.task_id);
+      if (!taskId) continue;
+      const patch = buildUpdateTaskPatch(item);
+      if (!Object.keys(patch).length) continue;
+      writes.push({
+        path: `tasks:task:${taskId}`,
+        mode: 'append',
+        content: serializeJson(patch),
+        diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`
+      });
+    }
+    if (!writes.length) return deny('update_task items[] need task_id and at least one field');
+    return propose(
+      buildProposal({
+        agentSlug: ctx.agentSlug,
+        intent: writes.length === 1
+          ? `Update task ${writes[0].path.replace('tasks:task:', '')}`
+          : `Update ${writes.length} tasks`,
+        surfaces: ['confirm_card', 'governance_log'],
+        writes
+      })
+    );
+  }
+  const taskId = asOptionalString(input?.task_id);
+  if (!taskId) return deny('task_id is required');
+  const patch = buildUpdateTaskPatch(input);
   if (!Object.keys(patch).length) return deny('update_task needs at least one field to change');
   return propose(
     buildProposal({
