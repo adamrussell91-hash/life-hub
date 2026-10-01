@@ -1026,9 +1026,8 @@ export function createChatController({
     if (code === 'pending_action_not_found') {
       return 'That Confirm is gone on the server. Refresh chat if it still shows.';
     }
-    if (typeof error?.message === 'string' && error.message.trim() && error.message !== 'Confirm request failed') {
-      return error.message.trim();
-    }
+    const message = typeof error?.message === 'string' ? error.message.trim() : '';
+    if (message && message !== 'Confirm request failed') return message;
     return 'Saving that action failed. You can try again, or Discard the card.';
   }
 

@@ -828,7 +828,7 @@ export function createChatConfirmHandler({
           }
           // Abandoned fence (worker died after pending→executing). Restore so Confirm/Discard work.
           const recoveredQueue = markPendingActionPending(queue, parsed.id, {
-            extra: { executionRecovered: true, abandonedExecution: true }
+            extra: { executionRecovered: true }
           });
           try {
             const written = await client.writeFile({
@@ -839,7 +839,7 @@ export function createChatConfirmHandler({
             });
             queue = recoveredQueue;
             queueSha = written?.sha || queueSha;
-            stored = findPendingActionById(queue, parsed.id) || stored;
+            stored = findPendingActionById(queue, parsed.id);
           } catch (error) {
             if (error instanceof GitHubClientError && error.code === 'write_conflict') {
               return errorResponse(
@@ -1226,13 +1226,11 @@ export function createChatConfirmHandler({
                 status === PENDING_ACTION_STATUS_EXECUTING
                 && isAbandonedPendingExecution(stored, now())
               ) {
-                fenceQueue = markPendingActionExecuting(
-                  markPendingActionPending(queue, parsed.id, {
-                    extra: { executionRecovered: true, abandonedExecution: true }
-                  }),
-                  parsed.id,
-                  { executionStartedAt }
-                );
+                // Re-fence with a fresh startedAt; no need to round-trip through pending first.
+                fenceQueue = markPendingActionExecuting(queue, parsed.id, {
+                  executionStartedAt,
+                  extra: { executionRecovered: true }
+                });
               } else {
                 return errorResponse(
                   409,

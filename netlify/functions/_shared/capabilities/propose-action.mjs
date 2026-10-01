@@ -258,11 +258,10 @@ export function getPendingActionStatus(entry) {
  */
 export function isAbandonedPendingExecution(entry, nowMs = Date.now()) {
   if (getPendingActionStatus(entry) !== PENDING_ACTION_STATUS_EXECUTING) return false;
-  const started = typeof entry?.executionStartedAt === 'string' ? entry.executionStartedAt.trim() : '';
-  if (!started) return true;
-  const startedMs = Date.parse(started);
-  if (!Number.isFinite(startedMs)) return true;
-  return nowMs - startedMs >= PENDING_ACTION_EXECUTING_ABANDON_MS;
+  const startedMs = Date.parse(
+    typeof entry?.executionStartedAt === 'string' ? entry.executionStartedAt.trim() : ''
+  );
+  return !Number.isFinite(startedMs) || nowMs - startedMs >= PENDING_ACTION_EXECUTING_ABANDON_MS;
 }
 
 /** Live = pending/executing (or missing status). Consumed/dismissed tombstones are terminal history. */
