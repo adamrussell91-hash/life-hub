@@ -358,6 +358,9 @@ export interface MeetingRecord {
   created_at: string;
   updated_at: string;
   incomplete_links?: IncompleteLinksProjection | null;
+  /** Plural lists (up to 10 each). Singular fields stay for the incomplete/latest slot. */
+  preparation_operations?: FollowUpOperationProjection[];
+  follow_up_operations?: FollowUpOperationProjection[];
   preparation_operation?: FollowUpOperationProjection | null;
   follow_up_operation?: FollowUpOperationProjection | null;
   purpose?: string | null;

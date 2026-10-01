@@ -9,6 +9,9 @@ import { ApiClientError } from '@/api/client';
 import { createAutoRetry } from '@/lib/auto-retry';
 import { createPillGroup } from '@/lib/pills';
 
+/** Matches `MAX_TASK_LINKS_PER_TARGET` in professional-task-link-operation.mjs. */
+export const MAX_MEETING_TASK_LINKS = 10;
+
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className?: string,
@@ -42,8 +45,6 @@ export function renderRelationshipSection(
         ? (entry.link as { role?: string }).role
         : null;
     const text = role ? `${type} · ${label} (${role})` : `${type} · ${label}`;
-    // Render the resolved endpoint as a clickable link when the server
-    // supplied one — never invent a href client-side.
     const href = entry.endpoint?.href;
     if (href) {
       const link = document.createElement('a');
@@ -68,8 +69,32 @@ export async function loadEntityRelationships(
   ];
 }
 
+export type LinkedTaskOperation = {
+  operation_id: string;
+  status: string;
+  task_id: string | null;
+  title?: string | null;
+};
+
+function taskIdFromRef(ref: string): string {
+  return ref.replace(/^tasks:task:/, '');
+}
+
+function linkedTaskChips(linked: LinkedTaskOperation[], relationshipType: string) {
+  return linked.map((op) => ({
+    id: op.operation_id,
+    ref: op.task_id ? `tasks:task:${op.task_id}` : op.operation_id,
+    label: op.title || op.task_id || 'Task',
+    relationshipType,
+    state: op.status === 'incomplete' ? 'pending' : 'saved',
+    readonly: true,
+    href: op.task_id ? `/tasks/#/task/${encodeURIComponent(op.task_id)}` : null
+  }));
+}
+
 /**
  * Panel to select an existing Task or create a new one, then link it.
+ * Linked list can hold up to MAX_MEETING_TASK_LINKS tasks of this relationship.
  */
 export function mountTaskLinkPanel(options: {
   host: HTMLElement;
@@ -79,11 +104,33 @@ export function mountTaskLinkPanel(options: {
   onRetry?: (operationId: string) => Promise<void>;
   incompleteOperationId?: string | null;
   statusMessage?: string | null;
+  linkedOperations?: LinkedTaskOperation[];
+  maxLinks?: number;
   suggestTitle?: () => Promise<string>;
 }): { root: HTMLElement } {
+  const maxLinks = options.maxLinks ?? MAX_MEETING_TASK_LINKS;
+  const linked = Array.isArray(options.linkedOperations) ? options.linkedOperations : [];
+  const atCap = linked.length >= maxLinks;
+
   const root = el('section', 'task-link-panel');
   root.dataset.part = `task-link-${options.relationshipType}`;
   root.append(el('h3', undefined, options.heading));
+
+  const countLine = el(
+    'p',
+    'task-link-panel__count muted',
+    linked.length ? `${linked.length} of ${maxLinks} linked` : `Up to ${maxLinks} tasks`
+  );
+  root.append(countLine);
+
+  const linkedHost = el('div', 'task-link-panel__linked');
+  if (linked.length) {
+    createEntityChipList({
+      container: linkedHost,
+      chips: linkedTaskChips(linked, options.relationshipType)
+    });
+  }
+  root.append(linkedHost);
 
   const title = document.createElement('input');
   title.type = 'text';
@@ -119,16 +166,23 @@ export function mountTaskLinkPanel(options: {
     }
   });
 
+  const linkedTaskIds = new Set(
+    linked.map((op) => op.task_id).filter((id): id is string => Boolean(id))
+  );
+
   const picker = createEntityPicker({
     input: taskInput,
     allowedKinds: ['task'],
     emptyText: 'No matching tasks.',
     search: async (query, signal) => {
       const result = await searchEntities(query, 'task', { signal });
-      return { groups: { task: result.groups.task ?? [] } };
+      const tasks = (result.groups.task ?? []).filter(
+        (item) => !linkedTaskIds.has(taskIdFromRef(item.ref))
+      );
+      return { groups: { task: tasks } };
     },
     onSelect: (item) => {
-      selectedTaskId = item.ref.replace(/^tasks:task:/, '');
+      selectedTaskId = taskIdFromRef(item.ref);
       chipList.setChips([
         {
           id: `pending:${item.ref}`,
@@ -188,12 +242,19 @@ export function mountTaskLinkPanel(options: {
 
   const row = el('div', 'task-link-panel__row');
   row.append(title, taskInput, submit);
-  root.append(mode.root, row, picker.root, chipsHost, status);
+  const addBlock = el('div', 'task-link-panel__add');
+  addBlock.append(mode.root, row, picker.root, chipsHost, status);
+  if (atCap) {
+    addBlock.hidden = true;
+    root.append(
+      el('p', 'muted task-link-panel__full', `Full — max ${maxLinks} tasks on this list.`)
+    );
+  }
+  root.append(addBlock);
 
   if (options.incompleteOperationId && options.onRetry) {
     const operationId = options.incompleteOperationId;
     const onRetry = options.onRetry;
-    // One link at a time: no second task while this one is still landing.
     submit.disabled = true;
     for (const button of mode.root.querySelectorAll('button')) button.disabled = true;
     title.disabled = true;

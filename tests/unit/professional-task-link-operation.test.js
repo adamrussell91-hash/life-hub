@@ -3,7 +3,9 @@ import test from 'node:test';
 import {
   createProfessionalTaskLinkOperationRepository,
   deriveProfessionalTaskLinkOperationId,
-  deriveProfessionalTaskLinkTaskId
+  deriveProfessionalTaskLinkTaskId,
+  MAX_TASK_LINKS_PER_TARGET,
+  readPointerOperationIds
 } from '../../netlify/functions/_shared/professional-task-link-operation.mjs';
 import { createMeetingsHandler } from '../../netlify/functions/meetings.mjs';
 import { createEventsHandler } from '../../netlify/functions/events.mjs';
@@ -369,4 +371,176 @@ test('derive helpers stay stable for the same seed', () => {
     deriveProfessionalTaskLinkTaskId(operationId),
     deriveProfessionalTaskLinkTaskId(operationId)
   );
+});
+
+test('readPointerOperationIds migrates singular operation_id', () => {
+  assert.deepEqual(readPointerOperationIds(null), []);
+  assert.deepEqual(readPointerOperationIds({ operation_id: 'ptl_a' }), ['ptl_a']);
+  assert.deepEqual(readPointerOperationIds({ operation_ids: ['ptl_a', 'ptl_b', 'ptl_a'] }), [
+    'ptl_a',
+    'ptl_b'
+  ]);
+});
+
+test('preparation accepts multiple existing tasks up to the cap; duplicate is a no-op', async () => {
+  const professionalStore = memoryStore();
+  const tasksStore = memoryStore();
+  const links = [];
+  const targetRef = 'professional:meeting:meeting_00000000-0000-4000-8000-0000000000aa';
+  for (let i = 0; i < 3; i += 1) {
+    const id = `task_multi_${i}`;
+    await tasksStore.setJSON(taskKey(id), {
+      schema_version: 1,
+      id,
+      title: `Task ${i}`,
+      kind: 'task',
+      bucket: 'active',
+      status: 'open',
+      created_at: '2026-08-01T00:00:00.000Z',
+      updated_at: '2026-08-01T00:00:00.000Z'
+    });
+  }
+  const repo = makeRepo({
+    professionalStore,
+    tasksStore,
+    links,
+    getUniversalLinkStore: async () => memoryStore()
+  });
+
+  for (let i = 0; i < 3; i += 1) {
+    const result = await repo.linkTask({
+      targetRef,
+      relationshipType: 'preparation',
+      taskId: `task_multi_${i}`
+    });
+    assert.equal(result.operation.status, 'committed');
+  }
+  const listed = await repo.listForTarget(targetRef, 'preparation');
+  assert.equal(listed.length, 3);
+  assert.equal(links.length, 3);
+
+  const again = await repo.linkTask({
+    targetRef,
+    relationshipType: 'preparation',
+    taskId: 'task_multi_1'
+  });
+  assert.equal(again.created, false);
+  assert.equal((await repo.listForTarget(targetRef, 'preparation')).length, 3);
+  assert.equal(links.length, 3);
+});
+
+test('preparation rejects an 11th distinct task with task_link_limit', async () => {
+  const professionalStore = memoryStore();
+  const tasksStore = memoryStore();
+  const links = [];
+  const targetRef = 'professional:meeting:meeting_00000000-0000-4000-8000-0000000000aa';
+  const repo = makeRepo({
+    professionalStore,
+    tasksStore,
+    links,
+    getUniversalLinkStore: async () => memoryStore()
+  });
+  for (let i = 0; i < MAX_TASK_LINKS_PER_TARGET; i += 1) {
+    const id = `task_cap_${i}`;
+    await tasksStore.setJSON(taskKey(id), {
+      schema_version: 1,
+      id,
+      title: `Cap ${i}`,
+      kind: 'task',
+      bucket: 'active',
+      status: 'open',
+      created_at: '2026-08-01T00:00:00.000Z',
+      updated_at: '2026-08-01T00:00:00.000Z'
+    });
+    await repo.linkTask({ targetRef, relationshipType: 'preparation', taskId: id });
+  }
+  assert.equal((await repo.listForTarget(targetRef, 'preparation')).length, MAX_TASK_LINKS_PER_TARGET);
+
+  const overflowId = 'task_cap_overflow';
+  await tasksStore.setJSON(taskKey(overflowId), {
+    schema_version: 1,
+    id: overflowId,
+    title: 'Overflow',
+    kind: 'task',
+    bucket: 'active',
+    status: 'open',
+    created_at: '2026-08-01T00:00:00.000Z',
+    updated_at: '2026-08-01T00:00:00.000Z'
+  });
+  await assert.rejects(
+    () => repo.linkTask({ targetRef, relationshipType: 'preparation', taskId: overflowId }),
+    (error) => {
+      assert.equal(error.code, 'task_link_limit');
+      assert.equal(error.status, 400);
+      assert.equal(error.limit, MAX_TASK_LINKS_PER_TARGET);
+      return true;
+    }
+  );
+});
+
+test('Meetings GET returns preparation_operations list', async () => {
+  const professionalStore = memoryStore();
+  const tasksStore = memoryStore();
+  const meetingId = 'meeting_00000000-0000-4000-8000-0000000000aa';
+  const meetingRecord = {
+    schema_version: 1,
+    id: meetingId,
+    title: 'Alpha',
+    scheduled_start: '2026-08-02T10:00:00.000Z',
+    scheduled_end: '2026-08-02T11:00:00.000Z',
+    time_zone: 'UTC',
+    location_text: '',
+    agenda: '',
+    notes: '',
+    state: 'scheduled',
+    occurrence_history: [],
+    created_at: '2026-08-01T00:00:00.000Z',
+    updated_at: '2026-08-01T00:00:00.000Z'
+  };
+  await professionalStore.setJSON(meetingKey(meetingId), meetingRecord);
+  await professionalStore.setJSON(meetingIndexKey(meetingId), {
+    id: meetingId,
+    title: meetingRecord.title,
+    state: meetingRecord.state,
+    scheduled_start: meetingRecord.scheduled_start,
+    updated_at: meetingRecord.updated_at
+  });
+  for (const id of ['task_a', 'task_b']) {
+    await tasksStore.setJSON(taskKey(id), {
+      schema_version: 1,
+      id,
+      title: id,
+      kind: 'task',
+      bucket: 'active',
+      status: 'open',
+      created_at: '2026-08-01T00:00:00.000Z',
+      updated_at: '2026-08-01T00:00:00.000Z'
+    });
+  }
+  const handler = createMeetingsHandler({
+    env,
+    now: () => Date.parse('2026-08-01T12:00:00.000Z'),
+    getContentStore: async () => professionalStore,
+    getTasksStore: async () => tasksStore,
+    getUniversalLinkStore: async () => memoryStore(),
+    resolveEntity,
+    meetingNow: () => '2026-08-01T12:00:00.000Z'
+  });
+  for (const taskId of ['task_a', 'task_b']) {
+    const linkRes = await handler(
+      request({
+        url: `https://life-hub.adam-russell.com/api/meetings?id=${meetingId}&action=link-task`,
+        method: 'POST',
+        body: { relationship_type: 'preparation', task_id: taskId }
+      })
+    );
+    assert.equal(linkRes.status, 200);
+  }
+  const getRes = await handler(
+    request({ url: `https://life-hub.adam-russell.com/api/meetings?id=${meetingId}` })
+  );
+  assert.equal(getRes.status, 200);
+  const payload = await getRes.json();
+  assert.equal(payload.data.meeting.preparation_operations.length, 2);
+  assert.ok(payload.data.meeting.preparation_operation);
 });

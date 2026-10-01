@@ -44,77 +44,63 @@ function defaultZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Australia/Sydney';
 }
 
-/** Preparation and follow-up Task link panels, with Plan 1's auto-retry. */
+function meetingTaskOps(
+  record: MeetingRecord,
+  key: 'preparation' | 'follow_up'
+): NonNullable<MeetingRecord['preparation_operations']> {
+  const plural = record[`${key}_operations`];
+  if (Array.isArray(plural) && plural.length) return plural;
+  const singular = record[`${key}_operation`];
+  return singular ? [singular] : [];
+}
+
+const MEETING_TASK_LINK_PANELS = [
+  {
+    kind: 'preparation' as const,
+    heading: 'Preparation tasks',
+    incompleteMessage: 'Preparation link incomplete.'
+  },
+  {
+    kind: 'follow_up' as const,
+    heading: 'Follow-up tasks',
+    incompleteMessage: 'Follow-up link incomplete.'
+  }
+];
+
+/** Preparation and follow-up Task link panels (up to 10 each), with Plan 1's auto-retry. */
 export function buildMeetingTaskLinks(record: MeetingRecord, reload: () => Promise<void>): HTMLElement {
   const taskPanels = el('div', 'meeting-detail__task-panels');
-  mountTaskLinkPanel({
-    host: taskPanels,
-    heading: 'Preparation Task',
-    relationshipType: 'preparation',
-    incompleteOperationId:
-      record.preparation_operation?.status === 'incomplete'
-        ? record.preparation_operation.operation_id
-        : null,
-    statusMessage:
-      record.preparation_operation?.status === 'committed'
-        ? `✓ Linked · ${record.preparation_operation.title || 'task'}`
-        : record.preparation_operation?.status === 'incomplete'
-          ? 'Preparation link incomplete.'
-          : null,
-    onSubmit: async (input) => {
-      try {
-        await linkMeetingTask(record.id, {
-          relationship_type: 'preparation',
-          ...input
-        });
-        await reload();
-      } catch (err) {
-        if (isMeetingTaskLinkIncompleteError(err)) {
+  for (const panel of MEETING_TASK_LINK_PANELS) {
+    const ops = meetingTaskOps(record, panel.kind);
+    const incomplete = ops.find((op) => op.status === 'incomplete');
+    mountTaskLinkPanel({
+      host: taskPanels,
+      heading: panel.heading,
+      relationshipType: panel.kind,
+      linkedOperations: ops,
+      incompleteOperationId: incomplete?.operation_id ?? null,
+      statusMessage: incomplete ? panel.incompleteMessage : null,
+      onSubmit: async (input) => {
+        try {
+          await linkMeetingTask(record.id, {
+            relationship_type: panel.kind,
+            ...input
+          });
           await reload();
-          return;
+        } catch (err) {
+          if (isMeetingTaskLinkIncompleteError(err)) {
+            await reload();
+            return;
+          }
+          throw err;
         }
-        throw err;
-      }
-    },
-    onRetry: async (operationId) => {
-      await retryMeetingTaskLink(record.id, operationId);
-      await reload();
-    }
-  });
-  mountTaskLinkPanel({
-    host: taskPanels,
-    heading: 'Follow-up Task',
-    relationshipType: 'follow_up',
-    incompleteOperationId:
-      record.follow_up_operation?.status === 'incomplete'
-        ? record.follow_up_operation.operation_id
-        : null,
-    statusMessage:
-      record.follow_up_operation?.status === 'committed'
-        ? `✓ Linked · ${record.follow_up_operation.title || 'task'}`
-        : record.follow_up_operation?.status === 'incomplete'
-          ? 'Follow-up link incomplete.'
-          : null,
-    onSubmit: async (input) => {
-      try {
-        await linkMeetingTask(record.id, {
-          relationship_type: 'follow_up',
-          ...input
-        });
+      },
+      onRetry: async (operationId) => {
+        await retryMeetingTaskLink(record.id, operationId);
         await reload();
-      } catch (err) {
-        if (isMeetingTaskLinkIncompleteError(err)) {
-          await reload();
-          return;
-        }
-        throw err;
       }
-    },
-    onRetry: async (operationId) => {
-      await retryMeetingTaskLink(record.id, operationId);
-      await reload();
-    }
-  });
+    });
+  }
   return taskPanels;
 }
 
