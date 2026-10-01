@@ -1983,6 +1983,70 @@ export function createMockApi() {
         meeting.incomplete_links = null;
         return json(200, { ok: true, data: { meeting, links: [], retried: true } });
       }
+      if ((action === 'link-task' || action === 'retry-task-link') && id && meetings.has(id)) {
+        const meeting = meetings.get(id)! as Record<string, unknown>;
+        const input = body as {
+          relationship_type?: string;
+          title?: string;
+          task_id?: string;
+          operation_id?: string;
+        };
+        const relationshipType =
+          input.relationship_type === 'follow_up' ? 'follow_up' : 'preparation';
+        const listKey =
+          relationshipType === 'follow_up' ? 'follow_up_operations' : 'preparation_operations';
+        const singularKey =
+          relationshipType === 'follow_up' ? 'follow_up_operation' : 'preparation_operation';
+        const list = Array.isArray(meeting[listKey])
+          ? ([...(meeting[listKey] as Record<string, unknown>[])] as Record<string, unknown>[])
+          : [];
+        if (action === 'retry-task-link') {
+          const op = list.find((row) => row.operation_id === input.operation_id);
+          if (op) op.status = 'committed';
+          meeting[listKey] = list;
+          meeting[singularKey] = list.find((row) => row.status === 'incomplete') ?? list[list.length - 1] ?? null;
+          meeting.updated_at = new Date().toISOString();
+          return json(200, {
+            ok: true,
+            data: { meeting, operation: meeting[singularKey] }
+          });
+        }
+        const existingTaskId =
+          typeof input.task_id === 'string' && input.task_id.trim() ? input.task_id.trim() : null;
+        const same = existingTaskId
+          ? list.find((row) => row.task_id === existingTaskId && row.status === 'committed')
+          : null;
+        if (same) {
+          meeting[listKey] = list;
+          meeting[singularKey] = same;
+          return json(200, { ok: true, data: { meeting, operation: same } });
+        }
+        if (list.length >= 10) {
+          return json(400, {
+            ok: false,
+            error: {
+              code: 'task_link_limit',
+              message: `This ${relationshipType.replace(/_/g, ' ')} list is full (10 tasks).`
+            }
+          });
+        }
+        const operation = {
+          operation_id: `ptl_${randomUUID().slice(0, 8)}`,
+          status: 'committed',
+          task_id: existingTaskId ?? `task_${randomUUID().slice(0, 8)}`,
+          title: (input.title ?? existingTaskId ?? 'Task').toString(),
+          relationship_type: relationshipType,
+          completed_intent_ids: [] as string[],
+          completed_link_ids: [] as string[],
+          failed_intent_ids: [] as string[],
+          pending_intent_ids: [] as string[]
+        };
+        list.push(operation);
+        meeting[listKey] = list;
+        meeting[singularKey] = operation;
+        meeting.updated_at = new Date().toISOString();
+        return json(200, { ok: true, data: { meeting, operation } });
+      }
       if (action && id && meetings.has(id)) {
         const meeting = meetings.get(id)!;
         if (action === 'reschedule') {
