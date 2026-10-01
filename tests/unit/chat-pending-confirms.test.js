@@ -288,3 +288,51 @@ test('mountPendingActionCards dedupes by pending id so SSE + hydrate do not twin
   mountPendingActionCards(root, [{ id: 'act_1', slug: 'clare', proposal: { intent: 'One again' } }], opts);
   assert.equal(appendCount, 1);
 });
+
+test('appendActionProposalToPendingTray rebuilds when a batch grows writes', async () => {
+  const { appendActionProposalToPendingTray } = await import(
+    '../../apps/life/js/app/chat-pending-confirms.js'
+  );
+  const { root } = buildChatRoot();
+  ensureChatPendingConfirmsTray(root);
+  let appendCount = 0;
+  const opts = {
+    appendActionProposal(r, { proposal }) {
+      appendCount += 1;
+      const list = r.querySelector('#chat-pending-confirms-list');
+      const card = r.createElement('li');
+      card.className = 'record-proposal action-proposal confirm-card';
+      const summary = r.createElement('p');
+      summary.className = 'action-proposal__summary';
+      summary.textContent = proposal.intent;
+      card.append(summary);
+      list.append(card);
+      return { card, confirm: r.createElement('button'), discard: r.createElement('button') };
+    },
+    bindActionProposal() {}
+  };
+  appendActionProposalToPendingTray(
+    root,
+    { id: 'act_batch', proposal: { intent: 'Update task a', writes: [{ path: 'tasks:task:a', diff: 'a' }] } },
+    opts
+  );
+  appendActionProposalToPendingTray(
+    root,
+    {
+      id: 'act_batch',
+      proposal: {
+        intent: 'Move 2 tasks together — one Confirm applies all 2',
+        writes: [
+          { path: 'tasks:task:a', diff: 'a' },
+          { path: 'tasks:task:b', diff: 'b' }
+        ]
+      }
+    },
+    opts
+  );
+  assert.equal(appendCount, 2, 'grew write count must rebuild the tray card');
+  const tray = root.querySelector('#chat-pending-confirms-list');
+  assert.equal(tray.children.length, 1, 'still one card for the pending id');
+  assert.equal(tray.children[0].dataset.writeCount, '2');
+  assert.equal(tray.children[0].dataset.pendingId, 'act_batch');
+});

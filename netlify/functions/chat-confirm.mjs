@@ -44,6 +44,7 @@ import { createPeopleWriteExecutor } from './_shared/people-agent.mjs';
 import { createTravelWriteExecutor } from './_shared/travel-agent.mjs';
 import { createKnowledgeWriteExecutor } from './_shared/knowledge-page-agent.mjs';
 import { isCalendarGhostConfirmWrite } from './_shared/follow-up-agent.mjs';
+import { collectGhostIdsFromWrites } from './_shared/confirm-batch.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { defaultGetProfessionalStore, getJSON as getProfessionalJSON, setJSON as setProfessionalJSON } from './_shared/professional-blobs.mjs';
 import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolvers.mjs';
@@ -142,6 +143,60 @@ function calendarGhostIdFromStored(stored) {
     return extras.calendarGhostId.trim();
   }
   return null;
+}
+
+/** All ghost ids bound to a pending action (batch Confirm may hold several). */
+function calendarGhostIdsFromStored(stored, proposal) {
+  const ids = [];
+  const seen = new Set();
+  const push = (value) => {
+    if (typeof value !== 'string' || !value.trim()) return;
+    const id = value.trim();
+    if (seen.has(id)) return;
+    seen.add(id);
+    ids.push(id);
+  };
+  if (!stored || typeof stored !== 'object') {
+    for (const id of collectGhostIdsFromWrites(proposal?.writes)) push(id);
+    return ids;
+  }
+  push(calendarGhostIdFromStored(stored));
+  if (Array.isArray(stored.calendarGhostIds)) {
+    for (const id of stored.calendarGhostIds) push(id);
+  }
+  if (stored.extras && typeof stored.extras === 'object' && Array.isArray(stored.extras.calendarGhostIds)) {
+    for (const id of stored.extras.calendarGhostIds) push(id);
+  }
+  for (const id of collectGhostIdsFromWrites(proposal?.writes || stored.proposal?.writes)) push(id);
+  return ids;
+}
+
+async function acceptOrDismissGhosts({
+  ghostIds,
+  decision,
+  reason,
+  client,
+  env,
+  now,
+  ghostProfessionalDeps,
+  getTasksStore
+}) {
+  const results = [];
+  for (const ghostId of ghostIds) {
+    const instant = new Date(now());
+    const { open, commit } = githubOpenCommit(client);
+    const ghostResult = await runGhostDecision({
+      open,
+      commit,
+      tasksStore: () => getTasksStore(env),
+      professionalDeps: ghostProfessionalDeps,
+      decision: { id: ghostId, decision, reason: typeof reason === 'string' ? reason : null },
+      today: getSydneyDateKey(instant),
+      nowIso: getSydneyTimestamp(instant)
+    });
+    results.push({ ghostId, ghostResult });
+  }
+  return results;
 }
 
 function githubOpenCommit(client) {
@@ -822,54 +877,60 @@ export function createChatConfirmHandler({
       return errorResponse(400, 'write_path_denied', 'A write path is outside this agent\'s allowlist.', false, PRIVATE_CACHE);
     }
 
-    const boundGhostId = calendarGhostIdFromStored(stored);
-    if (boundGhostId) {
-      const instant = new Date(now());
-      const { open, commit } = githubOpenCommit(client);
-      let ghostResult;
+    const boundGhostIds = calendarGhostIdsFromStored(stored, proposal);
+    if (boundGhostIds.length) {
+      let ghostResults;
       try {
-        ghostResult = await runGhostDecision({
-          open,
-          commit,
-          tasksStore: () => getTasksStore(env),
-          professionalDeps: ghostProfessionalDeps,
-          decision: { id: boundGhostId, decision: 'accept', reason: typeof parsed.reason === 'string' ? parsed.reason : null },
-          today: getSydneyDateKey(instant),
-          nowIso: getSydneyTimestamp(instant)
+        ghostResults = await acceptOrDismissGhosts({
+          ghostIds: boundGhostIds,
+          decision: 'accept',
+          reason: parsed.reason,
+          client,
+          env,
+          now,
+          ghostProfessionalDeps,
+          getTasksStore
         });
       } catch (error) {
         return mapRepositoryError(error);
       }
-      const ghostCode = ghostResult?.payload?.error?.code;
-      if (ghostResult?.payload?.writes === 'partial') {
-        return errorResponse(
-          503,
-          'ghost_partial',
-          'Saved to the calendar but the Professional record failed. Tap Confirm again.',
-          true,
-          PRIVATE_CACHE
-        );
-      }
-      const ghostOk = ghostResult?.payload?.ok === true
-        || ghostCode === 'already_accepted';
-      if (!ghostOk) {
-        if (ghostCode === 'already_dismissed') {
-          return errorResponse(409, 'already_dismissed', 'This calendar proposal was already dismissed.', false, PRIVATE_CACHE);
+      for (const { ghostId, ghostResult } of ghostResults) {
+        const ghostCode = ghostResult?.payload?.error?.code;
+        if (ghostResult?.payload?.writes === 'partial') {
+          return errorResponse(
+            503,
+            'ghost_partial',
+            'Saved to the calendar but the Professional record failed. Tap Confirm again.',
+            true,
+            PRIVATE_CACHE
+          );
         }
-        if (ghostCode === 'ghost_not_found') {
-          return errorResponse(404, 'ghost_not_found', 'No pending calendar ghost matches this Confirm.', false, PRIVATE_CACHE);
+        const ghostOk = ghostResult?.payload?.ok === true
+          || ghostCode === 'already_accepted';
+        if (!ghostOk) {
+          if (ghostCode === 'already_dismissed') {
+            return errorResponse(409, 'already_dismissed', 'This calendar proposal was already dismissed.', false, PRIVATE_CACHE);
+          }
+          if (ghostCode === 'ghost_not_found') {
+            return errorResponse(404, 'ghost_not_found', 'No pending calendar ghost matches this Confirm.', false, PRIVATE_CACHE);
+          }
+          return jsonResponse(ghostResult?.status || 400, ghostResult?.payload || {
+            ok: false,
+            error: { code: 'ghost_accept_failed', message: 'The calendar proposal could not be accepted.', retryable: false }
+          }, PRIVATE_CACHE);
         }
-        return jsonResponse(ghostResult?.status || 400, ghostResult?.payload || {
-          ok: false,
-          error: { code: 'ghost_accept_failed', message: 'The calendar proposal could not be accepted.', retryable: false }
-        }, PRIVATE_CACHE);
+        void ghostId;
       }
+
+      const allAlreadyAccepted = ghostResults.every(
+        ({ ghostResult }) => ghostResult?.payload?.error?.code === 'already_accepted'
+      );
 
       // Follow-up tasks live on the ghost plan (acceptPlan), not companion writes.
       // Companion writes are only for rare non-ghost extras; skip when already accepted.
       const companionWrites = (proposal.writes ?? []).filter(write => !isCalendarGhostConfirmWrite(write.path));
       let companionResults = null;
-      if (companionWrites.length && ghostCode !== 'already_accepted') {
+      if (companionWrites.length && !allAlreadyAccepted) {
         const loaded = await loadBlobStoresForWrites(companionWrites, {
           env,
           fetchImpl,
@@ -902,13 +963,15 @@ export function createChatConfirmHandler({
         companionResults = applied.results;
       }
 
+      const primaryGhostId = boundGhostIds[0];
       if (parsed.id) {
         const consumedAt = new Date(now()).toISOString();
         const markedQueue = markPendingActionConsumed(queue, parsed.id, {
           consumedAt,
           extra: {
             writesApplied: true,
-            calendarGhostId: boundGhostId,
+            calendarGhostId: primaryGhostId,
+            calendarGhostIds: boundGhostIds,
             ...(companionResults ? { companionWrites: true } : {})
           }
         });
@@ -917,7 +980,7 @@ export function createChatConfirmHandler({
             path: PENDING_ACTIONS_PATH,
             content: serializePendingActions(markedQueue),
             ...(queueSha ? { sha: queueSha } : {}),
-            message: `chore(propose-action): consume calendar ghost ${boundGhostId}`.slice(0, 200)
+            message: `chore(propose-action): consume calendar ghost ${primaryGhostId}`.slice(0, 200)
           });
         } catch (error) {
           if (!(error instanceof GitHubClientError && error.code === 'write_conflict')) {
@@ -926,14 +989,16 @@ export function createChatConfirmHandler({
         }
       }
 
+      const first = ghostResults[0]?.ghostResult;
       return jsonResponse(200, {
         ok: true,
         data: {
           id: parsed.id || null,
-          calendarGhostId: boundGhostId,
-          receipt: ghostResult?.payload?.receipt || 'Accepted.',
-          writes: ghostCode === 'already_accepted' ? 'already_applied' : (ghostResult?.payload?.writes || 'applied'),
-          alreadyAccepted: ghostCode === 'already_accepted' || undefined,
+          calendarGhostId: primaryGhostId,
+          calendarGhostIds: boundGhostIds,
+          receipt: first?.payload?.receipt || 'Accepted.',
+          writes: allAlreadyAccepted ? 'already_applied' : (first?.payload?.writes || 'applied'),
+          alreadyAccepted: allAlreadyAccepted || undefined,
           ...(companionResults ? { companionResults } : {})
         }
       }, PRIVATE_CACHE);
@@ -1614,29 +1679,30 @@ export function createChatConfirmHandler({
         }, PRIVATE_CACHE);
       }
 
-      const boundGhostId = calendarGhostIdFromStored(dismissTarget);
-      if (boundGhostId) {
-        const instant = new Date(now());
-        const { open, commit } = githubOpenCommit(client);
+      const boundGhostIds = calendarGhostIdsFromStored(dismissTarget, dismissTarget?.proposal);
+      if (boundGhostIds.length) {
         try {
-          const ghostResult = await runGhostDecision({
-            open,
-            commit,
-            tasksStore: () => getTasksStore(env),
-            professionalDeps: ghostProfessionalDeps,
-            decision: { id: boundGhostId, decision: 'dismiss', reason: typeof parsed.reason === 'string' ? parsed.reason : null },
-            today: getSydneyDateKey(instant),
-            nowIso: getSydneyTimestamp(instant)
+          const ghostResults = await acceptOrDismissGhosts({
+            ghostIds: boundGhostIds,
+            decision: 'dismiss',
+            reason: parsed.reason,
+            client,
+            env,
+            now,
+            ghostProfessionalDeps,
+            getTasksStore
           });
-          const ghostCode = ghostResult?.payload?.error?.code;
-          if (ghostResult?.payload?.ok !== true && ghostCode !== 'already_dismissed' && ghostCode !== 'ghost_not_found') {
-            if (ghostCode === 'already_accepted') {
-              return errorResponse(409, 'already_accepted', 'This calendar proposal was already accepted.', false, PRIVATE_CACHE);
+          for (const { ghostResult } of ghostResults) {
+            const ghostCode = ghostResult?.payload?.error?.code;
+            if (ghostResult?.payload?.ok !== true && ghostCode !== 'already_dismissed' && ghostCode !== 'ghost_not_found') {
+              if (ghostCode === 'already_accepted') {
+                return errorResponse(409, 'already_accepted', 'This calendar proposal was already accepted.', false, PRIVATE_CACHE);
+              }
+              return jsonResponse(ghostResult?.status || 400, ghostResult?.payload || {
+                ok: false,
+                error: { code: 'ghost_dismiss_failed', message: 'The calendar proposal could not be dismissed.', retryable: false }
+              }, PRIVATE_CACHE);
             }
-            return jsonResponse(ghostResult?.status || 400, ghostResult?.payload || {
-              ok: false,
-              error: { code: 'ghost_dismiss_failed', message: 'The calendar proposal could not be dismissed.', retryable: false }
-            }, PRIVATE_CACHE);
           }
         } catch (error) {
           return mapRepositoryError(error);
