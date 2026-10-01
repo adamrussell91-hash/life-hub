@@ -22,6 +22,17 @@ class FakeRoot {
   createElement(tag) { return new FakeEl(tag); }
 }
 
+test('renderExercisePlanRow uses the pose image for a named pose', () => {
+  const root = new FakeRoot();
+  const row = renderExercisePlanRow(root, {
+    name: 'Side Plank',
+    sets: [{}, {}]
+  });
+  assert.equal(row.children[0].src, 'assets/fitness/exercises/side-plank.webp');
+  assert.match(row.children[0].className, /workout-plan-card__thumb--pose/);
+  assert.equal(row.children[1].children[0].textContent, 'Side Plank');
+});
+
 test('renderExercisePlanRow shows a thumb, title, set count, and chevron', () => {
   const root = new FakeRoot();
   const row = renderExercisePlanRow(root, {

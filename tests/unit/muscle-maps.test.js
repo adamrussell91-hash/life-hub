@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveMuscleMapKeys, muscleAssetPath, resolveExerciseThumbKey } from '../../apps/life/js/app/muscle-maps.js';
+import {
+  resolveMuscleMapKeys,
+  muscleAssetPath,
+  resolveExerciseThumbKey,
+  resolveExerciseThumbSrc
+} from '../../apps/life/js/app/muscle-maps.js';
 
 test('coarse focus falls back to whole-region keys', () => {
   assert.deepEqual(
@@ -51,4 +56,15 @@ test('resolveExerciseThumbKey prefers library then name hints', () => {
   assert.equal(resolveExerciseThumbKey({ name: 'Cable Fly' }, libraryByName), 'chest-upper');
   assert.equal(resolveExerciseThumbKey({ name: 'Barbell Squat' }), 'thighs-front');
   assert.equal(resolveExerciseThumbKey({ name: 'Unknown Move' }), 'chest-whole');
+});
+
+test('named poses use their own image and other moves stay on the muscle map', () => {
+  assert.equal(resolveExerciseThumbSrc({ name: 'Chair Pose' }), 'assets/fitness/exercises/chair-pose.webp');
+  assert.equal(resolveExerciseThumbSrc({ name: 'Warrior II' }), 'assets/fitness/exercises/warrior-ii.webp');
+  assert.equal(resolveExerciseThumbSrc({ name: 'Bridge Pose' }), 'assets/fitness/exercises/bridge-pose.webp');
+  assert.equal(resolveExerciseThumbSrc({ name: 'Downward Dog' }), 'assets/fitness/exercises/downward-dog.webp');
+  assert.equal(resolveExerciseThumbSrc({ name: 'Cow Face Pose' }), 'assets/fitness/exercises/cow-face-pose.webp');
+  assert.equal(resolveExerciseThumbSrc({ name: 'Side Plank' }), 'assets/fitness/exercises/side-plank.webp');
+  assert.match(resolveExerciseThumbSrc({ name: 'Side Plank Move' }), /muscles\/abs-full/);
+  assert.match(resolveExerciseThumbSrc({ name: 'Bench Press' }), /muscles\/chest-whole/);
 });

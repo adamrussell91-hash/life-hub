@@ -1,5 +1,5 @@
 import { formatExerciseSetCount, formatExerciseSets, formatExerciseTitle } from './format-exercise.js';
-import { muscleAssetPath, resolveExerciseThumbKey } from './muscle-maps.js';
+import { exercisePoseImagePath, resolveExerciseThumbSrc } from './muscle-maps.js';
 import { formatWeekday } from '../core/time.js';
 import {
   formatSupersetBlockLabel,
@@ -55,9 +55,12 @@ export function renderExercisePlanRow(root, exercise, libraryByName, {
   const row = create(root, tag);
   row.className = classNames('workout-plan-card__row', extraClass);
 
-  const src = muscleAssetPath(resolveExerciseThumbKey(exercise, libraryByName));
+  const src = resolveExerciseThumbSrc(exercise, libraryByName);
   const thumb = reuseThumb ?? create(root, 'img');
-  thumb.className = 'workout-plan-card__thumb';
+  thumb.className = classNames(
+    'workout-plan-card__thumb',
+    exercisePoseImagePath(exercise?.name) && 'workout-plan-card__thumb--pose'
+  );
   if (assignedSrc(thumb) !== src) thumb.src = src;
   thumb.alt = '';
   if (!reuseThumb) {
@@ -202,7 +205,7 @@ export function fillExercisePlanList(root, host, {
         tag,
         detail,
         extraClass,
-        reuseThumb: takeThumb(thumbPool, muscleAssetPath(resolveExerciseThumbKey(exercise, libraryByName)))
+        reuseThumb: takeThumb(thumbPool, resolveExerciseThumbSrc(exercise, libraryByName))
       }));
       continue;
     }
@@ -225,7 +228,7 @@ export function fillExercisePlanList(root, host, {
         detail,
         extraClass: 'workout-plan-card__row--paired',
         showBetweenSets: block.kind === 'between',
-        reuseThumb: takeThumb(thumbPool, muscleAssetPath(resolveExerciseThumbKey(exercise, libraryByName)))
+        reuseThumb: takeThumb(thumbPool, resolveExerciseThumbSrc(exercise, libraryByName))
       }));
     });
     wrap.append(inner);

@@ -1349,6 +1349,10 @@ main { max-width: 76rem; margin: 0 auto; }
   background: var(--cotton);
 }
 
+.workout-plan-card__thumb--pose {
+  object-fit: contain;
+}
+
 .workout-plan-card__thumb--empty {
   display: block;
 }
