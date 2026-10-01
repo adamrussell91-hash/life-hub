@@ -846,13 +846,17 @@ export function formatActionWriteDisplay(write) {
   };
 }
 
-export function appendActionProposal(root, { proposal }) {
-  const list = root.querySelector('#chat-messages');
+export function appendActionProposal(root, { proposal, host = null, pendingId = null } = {}) {
+  const list = host || root.querySelector('#chat-messages');
   if (!list) return null;
   const card = root.createElement('li');
   card.className = 'record-proposal action-proposal confirm-card';
   card.setAttribute('role', 'region');
   card.setAttribute('aria-label', 'Confirm change');
+  if (pendingId) {
+    card.dataset.pendingId = pendingId;
+    card.setAttribute('data-pending-id', pendingId);
+  }
 
   const eyebrow = root.createElement('p');
   eyebrow.className = 'record-proposal__eyebrow';

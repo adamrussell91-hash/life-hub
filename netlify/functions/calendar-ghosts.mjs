@@ -558,6 +558,7 @@ export async function queueCalendarGhostDualPath({
   proposeOsAction,
   send,
   validateProposeActionInput,
+  findLivePendingByCalendarGhostId = null,
   extraWrites = null,
   intent = null,
   surfaces = null
@@ -626,23 +627,54 @@ export async function queueCalendarGhostDualPath({
     : { ok: false };
   let pendingId = null;
   if (validated.ok && typeof proposeOsAction === 'function') {
-    pendingId = await proposeOsAction(validated.proposal, { calendarGhostId: bound.id });
+    const existing = typeof findLivePendingByCalendarGhostId === 'function'
+      ? findLivePendingByCalendarGhostId(bound.id)
+      : null;
+    const reuseId = typeof existing?.id === 'string' ? existing.id.trim() : '';
+    if (reuseId) {
+      // Re-surface the same Confirm card instead of twinning the queue / narrating
+      // "re-queued" with no action_proposal SSE for Adam to tap.
+      pendingId = reuseId;
+      if (typeof send === 'function') {
+        send({
+          type: 'action_proposal',
+          proposal: existing.proposal && typeof existing.proposal === 'object'
+            ? existing.proposal
+            : validated.proposal,
+          id: pendingId
+        });
+      }
+    } else {
+      pendingId = await proposeOsAction(validated.proposal, { calendarGhostId: bound.id });
+    }
   }
-  const writes = validated.ok
-    ? validated.proposal.writes
-    : proposalInput.writes;
-  return {
+
+  const writeSummaries = (validated.ok ? validated.proposal.writes : proposalInput.writes)
+    .map((write) => ({ path: write.path, mode: write.mode, diff: write.diff }));
+  const base = {
     ok: true,
-    status: 'awaiting_confirm',
     id: bound.id,
     ghost_status: added ? 'queued' : 'already_queued',
     intent: validated.ok ? validated.proposal.intent : proposalInput.intent,
-    writes: writes.map(write => ({
-      path: write.path,
-      mode: write.mode,
-      diff: write.diff
-    })),
-    ...(pendingId ? { pendingId } : {}),
+    writes: writeSummaries
+  };
+  // Never tell the model "awaiting_confirm" without a chat Confirm id — that is
+  // how Clare claims cards exist while the DOM has none.
+  if (!pendingId) {
+    return {
+      ...base,
+      status: 'calendar_queued',
+      card: false,
+      reply: added
+        ? 'Queued on the calendar. Accept it there — no chat Confirm card opened.'
+        : 'Already on the calendar. Accept it there — no chat Confirm card opened.'
+    };
+  }
+  return {
+    ...base,
+    status: 'awaiting_confirm',
+    pendingId,
+    card: true,
     reply
   };
 }
