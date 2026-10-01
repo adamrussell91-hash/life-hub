@@ -130,7 +130,7 @@ function stimulusCard(forecast, events, date, targetsConfig) {
       { asOf: date, days: STIMULUS_FALLBACK_DAYS },
       { targetsConfig }
     );
-  const chart = buildStimulusChartData(training, forecast);
+  const chart = buildStimulusChartData(training, forecast, { items: events, asOf: date, targetsConfig });
   const upper = chart.keys.find(item => item.key === 'upper_sets')?.value ?? null;
   const copy = stimulusCopy(training, upper);
   return {

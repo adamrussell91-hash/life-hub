@@ -21,6 +21,8 @@ const SHELL_FILES = [
   'packages/design-kit/sign-in.css',
   'packages/design-kit/motion.css',
   'packages/design-kit/morphing-popover.css',
+  'packages/design-kit/chart-info.css',
+  'packages/design-kit/js/hub-chart-info.js',
   'packages/design-kit/adaptive-slider.css',
   'packages/design-kit/view-on-map.css',
   'packages/design-kit/card-swipe.css',

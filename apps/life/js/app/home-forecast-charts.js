@@ -9,7 +9,7 @@ import {
   buildWeightTrend,
   upperBodySetsPerWeek
 } from '../core/forecast-body.js';
-import { weightTrackingPrompt } from '../core/forecast-inputs.js';
+import { recentCompleteProtein, summariseTrainingBehaviour, weightTrackingPrompt } from '../core/forecast-inputs.js';
 import { addCalendarDays, daysBetween } from '../core/time.js';
 import { REGION_KEYS, REGION_LABELS } from './fitness-model.js';
 
@@ -38,7 +38,31 @@ function proteinPerKg(training, forecast) {
   };
 }
 
-export function buildStimulusChartData(training, forecast) {
+function recentPace(items, asOf, forecast, targetsConfig) {
+  if (!items || !asOf) return null;
+  const summary = summariseTrainingBehaviour(items, { asOf, days: 7 }, { targetsConfig });
+  const protein = recentCompleteProtein(items, asOf);
+  const weight = Number(forecast?.current?.weight_kg);
+  let proteinValue = null;
+  let proteinReason = `${protein.completeDays} of ${protein.min} needed`;
+  if (protein.grams != null && weight > 0) {
+    proteinValue = round(protein.grams / weight, 2);
+    proteinReason = null;
+  } else if (protein.grams != null) {
+    proteinReason = 'needs a current weight';
+  }
+  return {
+    sessions: { value: round(summary.genuine_loaded_sessions, 1), window: 'Last 7 days', reason: null },
+    upper_sets: {
+      value: round(upperBodySetsPerWeek(summary.loaded_sets_by_muscle_group, 7), 1),
+      window: 'Last 7 days',
+      reason: null
+    },
+    protein: { value: proteinValue, window: 'Last 4 logged days', reason: proteinReason }
+  };
+}
+
+export function buildStimulusChartData(training, forecast, { items = null, asOf = null, targetsConfig = null } = {}) {
   const days = Number(training?.window?.days ?? 0);
   const weeks = days / 7;
   const byRegion = training?.loaded_sets_by_muscle_group ?? {};
@@ -46,6 +70,7 @@ export function buildStimulusChartData(training, forecast) {
     ?? round(upperBodySetsPerWeek(byRegion, days), 1);
   const protein = proteinPerKg(training, forecast);
   const gate = LEAN_PRESERVATION_GATE;
+  const recentByKey = recentPace(items, asOf, forecast, targetsConfig);
   const keys = [
     {
       key: 'sessions',
@@ -77,11 +102,21 @@ export function buildStimulusChartData(training, forecast) {
       reason: protein.reason,
       note: 'Plateau of the protein response to resistance training (Morton et al.).'
     }
-  ].map(item => ({
-    ...item,
-    status: item.value == null ? 'unscored' : item.value >= item.threshold ? 'met' : 'short',
-    ratio: item.value == null ? null : round(item.value / item.threshold, 2)
-  }));
+  ].map(item => {
+    const recent = recentByKey?.[item.key] ?? null;
+    const status = item.value == null ? 'unscored' : item.value >= item.threshold ? 'met' : 'short';
+    return {
+      ...item,
+      status,
+      ratio: item.value == null ? null : round(item.value / item.threshold, 2),
+      ...(recent ? {
+        recent: recent.value,
+        recentStatus: recent.value == null ? null : recent.value >= item.threshold ? 'met' : 'short',
+        recentWindow: recent.window,
+        recentReason: recent.value == null ? recent.reason : null
+      } : {})
+    };
+  });
 
   const regions = REGION_KEYS.map(key => ({
     key,
