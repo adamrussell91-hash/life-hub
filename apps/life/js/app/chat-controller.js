@@ -38,6 +38,13 @@ import {
 } from '../core/log-finalize-detect.js';
 import { appendChatThreadItem, beginChatTurnAnchor, clearChatTurnAnchors } from './chat-turn-anchor.js';
 import { lockConfirmCardReceipt } from './confirm-card-receipt.js';
+import {
+  appendActionProposalToPendingTray,
+  ensureChatPendingConfirmsTray,
+  mountPendingActionCards,
+  removePendingConfirmCard,
+  syncChatPendingConfirmsVisibility
+} from './chat-pending-confirms.js';
 
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
 const LIBRARY_SAVE_NUDGE_TEXT = 'No Confirm card came through for that plan — say "lock it in" again and I’ll send it.';
@@ -363,6 +370,26 @@ export function createChatController({
     paintRoster();
     syncChatChrome(root);
     clearUnread();
+    // Pending Confirm cards stay until Confirm/Discard — re-sync from the durable queue.
+    void hydratePendingConfirms();
+  }
+
+  async function hydratePendingConfirms() {
+    ensureChatPendingConfirmsTray(root);
+    if (typeof chatApi.listPending !== 'function') {
+      syncChatPendingConfirmsVisibility(root);
+      return;
+    }
+    try {
+      const pending = await chatApi.listPending();
+      mountPendingActionCards(root, pending, {
+        appendActionProposal,
+        bindActionProposal,
+        reconcile: true
+      });
+    } catch {
+      syncChatPendingConfirmsVisibility(root);
+    }
   }
 
   function bindComposer() {
@@ -726,8 +753,11 @@ export function createChatController({
           gotUsefulOutput = true;
           clearWorkingBubble();
           endTextTurn();
-          const proposal = appendActionProposal(root, { proposal: event.proposal });
-          bindActionProposal(proposal, event.proposal, event.id ?? null);
+          appendActionProposalToPendingTray(
+            root,
+            { proposal: event.proposal, id: event.id ?? null },
+            { appendActionProposal, bindActionProposal }
+          );
         } else if (event.type === 'plan_status') {
           turnSignaled = true;
           appendPlanStatusCard(root, {
@@ -943,18 +973,33 @@ export function createChatController({
     });
   }
 
+  function actionProposalSlug(proposal) {
+    return stickyAgentSlug()
+      || (typeof proposal?.agent === 'string' ? proposal.agent : null)
+      || 'hammond';
+  }
+
+  function dismissPendingCard(card, id = null) {
+    if (id) removePendingConfirmCard(root, id);
+    else {
+      card?.remove?.();
+      syncChatPendingConfirmsVisibility(root);
+    }
+  }
+
   function bindActionProposal(proposalUi, proposal, id = null) {
     if (!proposalUi) return;
     proposalUi.confirm.addEventListener('click', () => {
       void confirmAction(proposalUi, proposal, id);
     });
     proposalUi.discard.addEventListener('click', () => {
-      proposalUi.card.remove();
+      dismissPendingCard(proposalUi.card, id);
       if (id) {
-        const slug = stickyAgentSlug()
-          || (typeof proposal?.agent === 'string' ? proposal.agent : null)
-          || 'hammond';
-        void chatApi.confirm({ kind: 'action_dismiss', id, slug }).catch(() => undefined);
+        void chatApi.confirm({
+          kind: 'action_dismiss',
+          id,
+          slug: actionProposalSlug(proposal)
+        }).catch(() => undefined);
       }
     });
   }
@@ -964,9 +1009,7 @@ export function createChatController({
     proposalUi.confirm.disabled = true;
     proposalUi.confirm.textContent = 'Saving…';
     try {
-      const slug = stickyAgentSlug()
-        || (typeof proposal?.agent === 'string' ? proposal.agent : null)
-        || 'hammond';
+      const slug = actionProposalSlug(proposal);
       const result = await chatApi.confirm({
         kind: 'action',
         candidate: proposal,
@@ -981,6 +1024,7 @@ export function createChatController({
           : 'Action applied.',
         label: 'Confirmed'
       });
+      dismissPendingCard(proposalUi.card, id);
       const continuationText = typeof result?.continuation?.text === 'string'
         ? result.continuation.text.trim()
         : '';
@@ -989,6 +1033,7 @@ export function createChatController({
         remember('assistant', continuationText);
       }
       onRecordWritten?.(result);
+      void hydratePendingConfirms();
     } catch (error) {
       proposalUi.confirm.disabled = false;
       proposalUi.confirm.textContent = previousLabel;
@@ -1096,6 +1141,8 @@ export function createChatController({
   bindTools();
   bindScrollLock();
   bindMessageActions();
+  ensureChatPendingConfirmsTray(root);
+  void hydratePendingConfirms();
   {
     const slug = stickyAgentSlug() ?? null;
     if (slug) applyAgentAccent(slug);
@@ -1113,7 +1160,8 @@ export function createChatController({
     syncAccent,
     getSelectedAgentSlug: lockedAgentSlug,
     getSelectedProtocolId: () => selectedProtocolId,
-    clearUnread
+    clearUnread,
+    hydratePendingConfirms
   };
 }
 

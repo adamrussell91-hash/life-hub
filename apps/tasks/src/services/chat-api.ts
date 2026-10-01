@@ -228,6 +228,28 @@ export function createChatApi(
       return payload.data;
     },
 
+    async listPending({ slug, signal }: { slug?: string; signal?: AbortSignal } = {}) {
+      const base = baseUrl ?? getApiBaseUrl();
+      const qs = typeof slug === 'string' && slug.trim()
+        ? `?slug=${encodeURIComponent(slug.trim())}`
+        : '';
+      const response = await fetchImpl(`${base}/api/chat/pending${qs}`, {
+        method: 'GET',
+        credentials: 'include',
+        signal
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        throw httpError(
+          'Could not load pending Confirm cards',
+          response.status,
+          confirmErrorCode(payload),
+          payload?.data ?? payload
+        );
+      }
+      return Array.isArray(payload?.data?.pending) ? payload.data.pending : [];
+    },
+
     /**
      * Deterministic Clare work invoke (Weekly Review Confirm-stage selection).
      * Does not run a model turn — selected_changes are applied exactly.
@@ -274,6 +296,11 @@ export async function* streamChat(
 /** POST /api/chat/confirm bound to a pending action id. */
 export function confirmChat(opts: ConfirmChatOptions) {
   return defaultApi.confirm(opts);
+}
+
+/** GET /api/chat/pending — live Confirm cards for the sticky tray. */
+export function listPendingConfirms(opts: { slug?: string; signal?: AbortSignal } = {}) {
+  return defaultApi.listPending(opts);
 }
 
 /** POST /api/chat/clare-work — structured Weekly Review proposal generation. */

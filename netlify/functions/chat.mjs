@@ -221,6 +221,7 @@ import {
   parsePendingActions,
   serializePendingActions,
   addPendingAction,
+  isPendingActionLive,
   validateProposeActionInput,
   classifyWriteTarget,
   snapshotGithubBases,
@@ -1883,6 +1884,21 @@ export function createChatHandler({
           }
           send({ type: 'action_proposal', proposal, id: persistedId });
           return persistedId;
+        };
+
+        const findLivePendingByCalendarGhostId = (ghostId) => {
+          if (typeof ghostId !== 'string' || !ghostId.trim()) return null;
+          const want = ghostId.trim();
+          for (let i = pendingActions.length - 1; i >= 0; i -= 1) {
+            const entry = pendingActions[i];
+            if (!entry || !isPendingActionLive(entry)) continue;
+            const fromTop = typeof entry.calendarGhostId === 'string' ? entry.calendarGhostId.trim() : '';
+            const fromExtras = entry.extras && typeof entry.extras.calendarGhostId === 'string'
+              ? entry.extras.calendarGhostId.trim()
+              : '';
+            if (fromTop === want || fromExtras === want) return entry;
+          }
+          return null;
         };
 
         // Shared Confirm path for named propose_* builders (validate → queue → awaiting_confirm).

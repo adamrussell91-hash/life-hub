@@ -259,6 +259,110 @@ test('B4: identical re-propose binds; accepted then re-propose errors', async ()
   assert.equal(third.error, 'ghost_already_decided');
 });
 
+test('already_queued re-emits action_proposal for the live pending Confirm (no twin / no silent card)', async () => {
+  resetCapabilityCaches();
+  const entry = calendarGhostFromToolInput({
+    kind: 'outing', date: DATE, start: '09:00', end: '10:00', title: 'Breakfast'
+  }, { agent: 'clare', nowIso: '2026-10-03T12:00:00+10:00' });
+  const files = new Map([['pending-calendar-ghosts.json', '[]']]);
+  const client = {
+    async resolveTree() {
+      return {
+        tree: [{ type: 'blob', path: 'pending-calendar-ghosts.json', sha: 's1' }],
+        commitSha: 'c1',
+        treeSha: 't1'
+      };
+    },
+    async readBlob() {
+      return {
+        encoding: 'base64',
+        content: Buffer.from(files.get('pending-calendar-ghosts.json'), 'utf8').toString('base64')
+      };
+    },
+    async writeFile({ content: next }) {
+      files.set('pending-calendar-ghosts.json', next);
+      return { sha: 's2' };
+    }
+  };
+  const events = [];
+  const send = (event) => events.push(event);
+  const proposeOsAction = async (proposal, extras) => {
+    return `pending-${extras.calendarGhostId}`;
+  };
+  const first = await queueCalendarGhostDualPath({
+    client, entry, agentSlug: 'clare', proposeOsAction, send, validateProposeActionInput
+  });
+  assert.equal(first.status, 'awaiting_confirm');
+  assert.equal(first.pendingId, `pending-${entry.id}`);
+  assert.equal(first.card, true);
+  assert.ok(events.some((e) => e.type === 'action_proposal' || e.type === 'calendar_ghost_proposed'));
+
+  events.length = 0;
+  let proposedAgain = 0;
+  const second = await queueCalendarGhostDualPath({
+    client,
+    entry,
+    agentSlug: 'clare',
+    proposeOsAction: async () => {
+      proposedAgain += 1;
+      return 'should-not-run';
+    },
+    send,
+    validateProposeActionInput,
+    findLivePendingByCalendarGhostId: (ghostId) => ({
+      id: `pending-${ghostId}`,
+      proposal: { intent: 'Breakfast Confirm', writes: [] },
+      calendarGhostId: ghostId
+    })
+  });
+  assert.equal(second.ok, true);
+  assert.equal(second.ghost_status, 'already_queued');
+  assert.equal(second.status, 'awaiting_confirm');
+  assert.equal(second.pendingId, `pending-${entry.id}`);
+  assert.equal(proposedAgain, 0, 'must not twin the pending queue');
+  const resurfaced = events.filter((e) => e.type === 'action_proposal');
+  assert.equal(resurfaced.length, 1);
+  assert.equal(resurfaced[0].id, `pending-${entry.id}`);
+});
+
+test('dual-path without pendingId must not claim awaiting_confirm', async () => {
+  resetCapabilityCaches();
+  const entry = calendarGhostFromToolInput({
+    kind: 'outing', date: DATE, start: '11:00', end: '12:00', title: 'Brunch'
+  }, { agent: 'clare', nowIso: '2026-10-03T12:00:00+10:00' });
+  const files = new Map([['pending-calendar-ghosts.json', '[]']]);
+  const client = {
+    async resolveTree() {
+      return {
+        tree: [{ type: 'blob', path: 'pending-calendar-ghosts.json', sha: 's1' }],
+        commitSha: 'c1',
+        treeSha: 't1'
+      };
+    },
+    async readBlob() {
+      return {
+        encoding: 'base64',
+        content: Buffer.from(files.get('pending-calendar-ghosts.json'), 'utf8').toString('base64')
+      };
+    },
+    async writeFile({ content: next }) {
+      files.set('pending-calendar-ghosts.json', next);
+      return { sha: 's2' };
+    }
+  };
+  const result = await queueCalendarGhostDualPath({
+    client,
+    entry,
+    agentSlug: 'clare',
+    proposeOsAction: async () => null,
+    validateProposeActionInput
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 'calendar_queued');
+  assert.equal(result.card, false);
+  assert.equal(result.pendingId, undefined);
+});
+
 test('B5: follow_up_task is on the ghost plan as a tasks POST step', () => {
   const built = buildFollowUpProposal({
     summary: 'Follow up with Kate',

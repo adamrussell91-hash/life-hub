@@ -129,6 +129,7 @@ const SHELL_FILES = [
   'js/app/chat-composer.js',
   'js/app/chat-controller.js',
   'js/app/chat-panel.js',
+  'js/app/chat-pending-confirms.js',
   'js/app/chat-turn-anchor.js',
   'js/app/chadwick-voice.js',
   'js/app/confirm-card-receipt.js',

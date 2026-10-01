@@ -66,6 +66,27 @@ export function createChatApi(fetchImpl = fetch, { pollMs = CHAT_EVENTS_POLL_MS 
         );
       }
       return payload.data;
+    },
+
+    async listPending({ slug, signal } = {}) {
+      const qs = typeof slug === 'string' && slug.trim()
+        ? `?slug=${encodeURIComponent(slug.trim())}`
+        : '';
+      const response = await fetchImpl(`/api/chat/pending${qs}`, {
+        method: 'GET',
+        signal
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        throw httpError(
+          payload?.error?.message ?? 'Could not load pending Confirm cards',
+          response.status,
+          payload?.error?.code ?? 'request_failed',
+          payload?.data ?? null
+        );
+      }
+      const pending = Array.isArray(payload?.data?.pending) ? payload.data.pending : [];
+      return pending;
     }
   };
 }
