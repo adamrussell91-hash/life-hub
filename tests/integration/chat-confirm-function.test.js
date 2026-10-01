@@ -2161,3 +2161,104 @@ test('action confirm runs people writes through the identity and link repositori
   assert.ok([...map.keys()].some(key => /link/i.test(key)), 'a Universal Link was written');
   assert.equal(calls.filter(call => call.options?.method === 'PUT' && call.url.includes('people')).length, 0, 'no people data goes to GitHub');
 });
+
+test('abandoned executing fence can be dismissed (stuck Confirm card clears)', async () => {
+  // Adam symptom: Confirm failed after fence; status stayed executing; Discard 409'd; New chat rehydrated the card.
+  const { proposal } = clareTaskProposal('task_genevieve_2', 'Genevieve Quoyle accreditation set 2 of 5');
+  // Session fixture is valid on 2026-08-01; keep wall-clock inside that TTL.
+  const nowMs = Date.parse('2026-08-01T06:00:00.000Z');
+  let queue = [{
+    id: 'act_1b28edfa03c3',
+    createdAt: '2026-08-01',
+    slug: 'clare',
+    status: 'executing',
+    executionStartedAt: '2026-08-01T05:00:00.000Z',
+    proposal
+  }];
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = pendingActionsFetchImpl({
+    getQueue: () => queue,
+    setQueue: (next) => { queue = next; },
+    calls
+  });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => nowMs,
+    getTasksStore: async () => store
+  });
+
+  // Fresh fence must still reject Discard (worker may still be alive).
+  const freshDismiss = await createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl: pendingActionsFetchImpl({
+      getQueue: () => [{
+        id: 'act_fresh',
+        createdAt: '2026-08-01',
+        slug: 'clare',
+        status: 'executing',
+        executionStartedAt: new Date(nowMs - 5_000).toISOString(),
+        proposal
+      }],
+      setQueue: () => {},
+      calls: []
+    }),
+    now: () => nowMs,
+    getTasksStore: async () => store
+  })(request({
+    kind: 'action_dismiss',
+    slug: 'clare',
+    id: 'act_fresh'
+  }));
+  assert.equal(freshDismiss.status, 409);
+  assert.equal((await freshDismiss.json()).error.code, 'pending_action_execution_in_progress');
+
+  const response = await handler(request({
+    kind: 'action_dismiss',
+    slug: 'clare',
+    id: 'act_1b28edfa03c3'
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(payload));
+  assert.equal(payload.ok, true);
+  assert.equal(queue[0].status, 'dismissed');
+  assert.equal(queue[0].id, 'act_1b28edfa03c3');
+});
+
+test('abandoned executing fence recovers on Confirm then applies the write', async () => {
+  const { path, proposal } = clareTaskProposal('task_recover', 'Recover me');
+  const nowMs = Date.parse('2026-08-01T06:00:00.000Z');
+  let queue = [{
+    id: 'act_recover',
+    createdAt: '2026-08-01',
+    slug: 'clare',
+    status: 'executing',
+    executionStartedAt: '2026-08-01T05:00:00.000Z',
+    proposal
+  }];
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = pendingActionsFetchImpl({
+    getQueue: () => queue,
+    setQueue: (next) => { queue = next; },
+    calls
+  });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => nowMs,
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_recover',
+    accept: [path],
+    candidate: proposal
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(payload));
+  assert.equal(store.data['tasks/task_recover']?.title, 'Recover me');
+  assert.equal(queue[0].status, 'consumed');
+});

@@ -17,6 +17,8 @@ export const PENDING_ACTIONS_PATH = 'data/os/pending-actions.json';
 export const MAX_PENDING_ACTIONS = 30;
 export const MAX_WRITE_CONTENT_CHARS = 64 * 1024;
 export const WRITE_MODES = ['create', 'overwrite', 'append', 'delete'];
+/** Netlify confirms die well under this; past it, "executing" is an abandoned fence. */
+export const PENDING_ACTION_EXECUTING_ABANDON_MS = 120_000;
 
 export function proposeActionToolSchema() {
   return {
@@ -247,6 +249,20 @@ export function getPendingActionStatus(entry) {
   const status = typeof entry.status === 'string' ? entry.status.trim() : '';
   if (!status) return PENDING_ACTION_STATUS_PENDING;
   return status;
+}
+
+/**
+ * True when status is executing but the fence is old/corrupt enough that the
+ * confirm worker cannot still be running. Missing/invalid executionStartedAt
+ * counts as abandoned so stuck cards can be Discarded or retried.
+ */
+export function isAbandonedPendingExecution(entry, nowMs = Date.now()) {
+  if (getPendingActionStatus(entry) !== PENDING_ACTION_STATUS_EXECUTING) return false;
+  const started = typeof entry?.executionStartedAt === 'string' ? entry.executionStartedAt.trim() : '';
+  if (!started) return true;
+  const startedMs = Date.parse(started);
+  if (!Number.isFinite(startedMs)) return true;
+  return nowMs - startedMs >= PENDING_ACTION_EXECUTING_ABANDON_MS;
 }
 
 /** Live = pending/executing (or missing status). Consumed/dismissed tombstones are terminal history. */

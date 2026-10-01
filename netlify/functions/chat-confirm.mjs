@@ -59,6 +59,7 @@ import {
   markPendingActionDismissed,
   isPendingActionExecutable,
   getPendingActionStatus,
+  isAbandonedPendingExecution,
   PENDING_ACTION_STATUS_EXECUTING,
   PENDING_ACTION_STATUS_CONSUMED,
   PENDING_ACTION_STATUS_DISMISSED,
@@ -816,15 +817,51 @@ export function createChatConfirmHandler({
       if (!isPendingActionExecutable(stored)) {
         const status = getPendingActionStatus(stored);
         if (status === PENDING_ACTION_STATUS_EXECUTING) {
-          return errorResponse(
-            409,
-            'pending_action_execution_in_progress',
-            'This pending action is already executing. Do not retry blindly — wait for recovery.',
-            true,
-            PRIVATE_CACHE
-          );
-        }
-        if (status === PENDING_ACTION_STATUS_DISMISSED) {
+          if (!isAbandonedPendingExecution(stored, now())) {
+            return errorResponse(
+              409,
+              'pending_action_execution_in_progress',
+              'This pending action is already executing. Do not retry blindly — wait for recovery.',
+              true,
+              PRIVATE_CACHE
+            );
+          }
+          // Abandoned fence (worker died after pending→executing). Restore so Confirm/Discard work.
+          const recoveredQueue = markPendingActionPending(queue, parsed.id, {
+            extra: { executionRecovered: true, abandonedExecution: true }
+          });
+          try {
+            const written = await client.writeFile({
+              path: PENDING_ACTIONS_PATH,
+              content: serializePendingActions(recoveredQueue),
+              ...(queueSha ? { sha: queueSha } : {}),
+              message: `chore(propose-action): recover abandoned execute ${parsed.id}`.slice(0, 200)
+            });
+            queue = recoveredQueue;
+            queueSha = written?.sha || queueSha;
+            stored = findPendingActionById(queue, parsed.id) || stored;
+          } catch (error) {
+            if (error instanceof GitHubClientError && error.code === 'write_conflict') {
+              return errorResponse(
+                409,
+                'pending_action_execution_in_progress',
+                'This pending action is already executing. Do not retry blindly — wait for recovery.',
+                true,
+                PRIVATE_CACHE
+              );
+            }
+            return mapRepositoryError(error);
+          }
+          if (!isPendingActionExecutable(stored)) {
+            return errorResponse(
+              409,
+              'pending_action_execution_in_progress',
+              'This pending action is already executing. Do not retry blindly — wait for recovery.',
+              true,
+              PRIVATE_CACHE
+            );
+          }
+        } else if (status === PENDING_ACTION_STATUS_DISMISSED) {
           return errorResponse(
             409,
             'pending_action_dismissed',
@@ -832,14 +869,15 @@ export function createChatConfirmHandler({
             false,
             PRIVATE_CACHE
           );
+        } else {
+          return errorResponse(
+            409,
+            'pending_action_consumed',
+            'This pending action was already executed and cannot run again.',
+            false,
+            PRIVATE_CACHE
+          );
         }
-        return errorResponse(
-          409,
-          'pending_action_consumed',
-          'This pending action was already executed and cannot run again.',
-          false,
-          PRIVATE_CACHE
-        );
       }
       if (typeof stored.slug === 'string' && stored.slug.trim() && stored.slug !== parsed.slug) {
         return errorResponse(
@@ -1184,15 +1222,29 @@ export function createChatConfirmHandler({
               );
             }
             if (status === PENDING_ACTION_STATUS_EXECUTING || !isPendingActionExecutable(stored)) {
-              return errorResponse(
-                409,
-                'pending_action_execution_in_progress',
-                'This pending action is already executing. Do not retry blindly — wait for recovery.',
-                true,
-                PRIVATE_CACHE
-              );
+              if (
+                status === PENDING_ACTION_STATUS_EXECUTING
+                && isAbandonedPendingExecution(stored, now())
+              ) {
+                fenceQueue = markPendingActionExecuting(
+                  markPendingActionPending(queue, parsed.id, {
+                    extra: { executionRecovered: true, abandonedExecution: true }
+                  }),
+                  parsed.id,
+                  { executionStartedAt }
+                );
+              } else {
+                return errorResponse(
+                  409,
+                  'pending_action_execution_in_progress',
+                  'This pending action is already executing. Do not retry blindly — wait for recovery.',
+                  true,
+                  PRIVATE_CACHE
+                );
+              }
+            } else {
+              fenceQueue = markPendingActionExecuting(queue, parsed.id, { executionStartedAt });
             }
-            fenceQueue = markPendingActionExecuting(queue, parsed.id, { executionStartedAt });
           } catch (reloadError) {
             return mapRepositoryError(reloadError);
           }
@@ -1645,13 +1697,16 @@ export function createChatConfirmHandler({
       }
       const dismissStatus = getPendingActionStatus(dismissTarget);
       if (dismissStatus === PENDING_ACTION_STATUS_EXECUTING) {
-        return errorResponse(
-          409,
-          'pending_action_execution_in_progress',
-          'This pending action is executing and cannot be discarded.',
-          true,
-          PRIVATE_CACHE
-        );
+        if (!isAbandonedPendingExecution(dismissTarget, now())) {
+          return errorResponse(
+            409,
+            'pending_action_execution_in_progress',
+            'This pending action is executing and cannot be discarded.',
+            true,
+            PRIVATE_CACHE
+          );
+        }
+        // Fall through: abandoned executing fences may be discarded so sticky cards clear.
       }
       if (dismissStatus === PENDING_ACTION_STATUS_CONSUMED) {
         return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true, alreadyConsumed: true } }, PRIVATE_CACHE);
