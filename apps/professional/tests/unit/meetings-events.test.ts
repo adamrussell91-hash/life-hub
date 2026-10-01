@@ -278,14 +278,14 @@ describe('renderMeetingDetailView task flows', () => {
     const { renderMeetingDetailView } = await import('@/views/meetings');
     const canvas = document.createElement('div');
     await renderMeetingDetailView(canvas, VALID_MEETING_ID);
-    expect(canvas.textContent).toMatch(/Preparation Task/);
-    expect(canvas.textContent).toMatch(/Follow-up Task/);
+    expect(canvas.textContent).toMatch(/Preparation tasks/);
+    expect(canvas.textContent).toMatch(/Follow-up tasks/);
     const prepSubmit = canvas.querySelector(
       '[data-task-link-submit="preparation"]'
     ) as HTMLButtonElement;
     expect(prepSubmit).toBeTruthy();
     const title = [...canvas.querySelectorAll('input')].find(
-      (input) => input.getAttribute('aria-label') === 'Preparation Task title'
+      (input) => input.getAttribute('aria-label') === 'Preparation tasks title'
     ) as HTMLInputElement;
     title.value = 'Prep notes';
     prepSubmit.click();

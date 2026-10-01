@@ -86,6 +86,26 @@ function stateForAction(action) {
   return null;
 }
 
+/** Attach prep/follow-up task-link lists (plural) plus singular for older clients. */
+async function withMeetingTaskLinks(meeting, taskLinks) {
+  const meetingRef = `professional:meeting:${meeting.id}`;
+  const [preparation_operations, follow_up_operations] = await Promise.all([
+    taskLinks.listForTarget(meetingRef, 'preparation'),
+    taskLinks.listForTarget(meetingRef, 'follow_up')
+  ]);
+  const pickSingular = (list) =>
+    list.find((op) => op.status === 'incomplete') ?? list[list.length - 1] ?? null;
+  const preparation_operation = pickSingular(preparation_operations);
+  const follow_up_operation = pickSingular(follow_up_operations);
+  return {
+    ...meeting,
+    preparation_operations,
+    follow_up_operations,
+    ...(preparation_operation ? { preparation_operation } : {}),
+    ...(follow_up_operation ? { follow_up_operation } : {})
+  };
+}
+
 export function createMeetingsHandler(deps = {}) {
   const meetingNow = deps.meetingNow ?? (() => new Date().toISOString());
   const createRepository = deps.createMeetingRepository ?? createMeetingRepository;
@@ -136,21 +156,8 @@ export function createMeetingsHandler(deps = {}) {
         if (request.method === 'GET') {
           if (url.searchParams.has('id')) {
             const id = readId(url);
-            const meeting = await repo.getMeeting(id);
-            const meetingRef = `professional:meeting:${id}`;
-            const preparation_operation = await taskLinks.loadForTarget(meetingRef, 'preparation');
-            const follow_up_operation = await taskLinks.loadForTarget(meetingRef, 'follow_up');
-            return withCors(
-              okResponse(200, {
-                meeting: {
-                  ...meeting,
-                  ...(preparation_operation ? { preparation_operation } : {}),
-                  ...(follow_up_operation ? { follow_up_operation } : {})
-                }
-              }),
-              request,
-              env
-            );
+            const meeting = await withMeetingTaskLinks(await repo.getMeeting(id), taskLinks);
+            return withCors(okResponse(200, { meeting }), request, env);
           }
           // Blob hub meetings + Notion In-person/Video rows from communications.json.
           const [blobMeetings, notionRows] = await Promise.all([
@@ -195,7 +202,7 @@ export function createMeetingsHandler(deps = {}) {
               title: parsed.value?.title,
               taskId: parsed.value?.task_id
             });
-            const meeting = await repo.getMeeting(id);
+            const meeting = await withMeetingTaskLinks(await repo.getMeeting(id), taskLinks);
             return withCors(okResponse(200, { meeting, operation: result.operation }), request, env);
           }
           if (action === 'retry-task-link') {
@@ -212,7 +219,7 @@ export function createMeetingsHandler(deps = {}) {
               );
             }
             const result = await taskLinks.retry(operationId);
-            const meeting = await repo.getMeeting(id);
+            const meeting = await withMeetingTaskLinks(await repo.getMeeting(id), taskLinks);
             return withCors(okResponse(200, { meeting, operation: result.operation }), request, env);
           }
           if (action === 'reschedule') {

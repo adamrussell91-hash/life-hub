@@ -2,7 +2,8 @@
  * Cross-store Task → Meeting/Event/Application Universal Link journal.
  * Covers preparation, follow_up, learning_for, and application_action.
  * Deterministic Task ids when creating; existing Task ids when selecting.
- * Retry never duplicates.
+ * Retry never duplicates. A target may hold up to MAX_TASK_LINKS_PER_TARGET
+ * operations per relationship type (e.g. several prep tasks on one meeting).
  */
 import { createHash } from 'node:crypto';
 import { createAccessContext } from './entity-access.mjs';
@@ -21,6 +22,8 @@ import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { equivalenceInput, generateLinkId } from './universal-link-schema.mjs';
 
 const PREFIX = 'professional/task-link-operations/';
+/** Cap per (target, relationship_type). Prep and follow-up each get their own bucket. */
+export const MAX_TASK_LINKS_PER_TARGET = 10;
 
 const ALLOWED = Object.freeze({
   preparation: { targetKind: 'meeting', sourceKinds: ['tasks:task'] },
@@ -28,6 +31,18 @@ const ALLOWED = Object.freeze({
   learning_for: { targetKind: 'event', sourceKinds: ['tasks:task'] },
   application_action: { targetKind: 'application', sourceKinds: ['tasks:task'] }
 });
+
+/** Read pointer ids; older single `operation_id` shape still works. */
+export function readPointerOperationIds(pointer) {
+  if (!pointer || typeof pointer !== 'object') return [];
+  if (Array.isArray(pointer.operation_ids)) {
+    return [...new Set(pointer.operation_ids.filter((id) => typeof id === 'string' && id))];
+  }
+  if (typeof pointer.operation_id === 'string' && pointer.operation_id) {
+    return [pointer.operation_id];
+  }
+  return [];
+}
 
 export function deriveProfessionalTaskLinkOperationId(parts) {
   const digest = createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 32);
@@ -163,12 +178,31 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
       };
     }
     await setJSON(professionalStore, operationKey(merged.operation_id), merged);
+    const pointer = await getJSON(
+      professionalStore,
+      pointerKey(merged.target_ref, merged.relationship_type)
+    );
+    const operationIds = readPointerOperationIds(pointer);
+    if (!operationIds.includes(merged.operation_id)) operationIds.push(merged.operation_id);
     await setJSON(professionalStore, pointerKey(merged.target_ref, merged.relationship_type), {
-      operation_id: merged.operation_id,
+      operation_ids: operationIds,
+      // Keep singular for older readers until they move to listForTarget.
+      operation_id: operationIds[operationIds.length - 1],
       target_ref: merged.target_ref,
       relationship_type: merged.relationship_type
     });
     return merged;
+  }
+
+  async function listForTarget(targetRef, relationshipType) {
+    const pointer = await getJSON(professionalStore, pointerKey(targetRef, relationshipType));
+    const ids = readPointerOperationIds(pointer);
+    const out = [];
+    for (const id of ids) {
+      const projected = projectProfessionalTaskLinkOperation(await loadJournal(id));
+      if (projected) out.push(projected);
+    }
+    return out;
   }
 
   async function ensureTaskRecord(taskId, title) {
@@ -261,6 +295,14 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
       });
     }
 
+    const already = await listForTarget(targetRef, relationshipType);
+    if (existingTaskId) {
+      const same = already.find((op) => op.task_id === existingTaskId);
+      if (same?.status === 'committed') {
+        return { operation: same, created: false };
+      }
+    }
+
     const operationId = deriveProfessionalTaskLinkOperationId([
       'task_link',
       relationshipType,
@@ -270,6 +312,19 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
 
     let journal = await loadJournal(operationId);
     if (!journal) {
+      if (already.length >= MAX_TASK_LINKS_PER_TARGET) {
+        throw Object.assign(
+          new Error(
+            `This ${relationshipType.replace(/_/g, ' ')} list is full (${MAX_TASK_LINKS_PER_TARGET} tasks).`
+          ),
+          {
+            status: 400,
+            code: 'task_link_limit',
+            limit: MAX_TASK_LINKS_PER_TARGET,
+            count: already.length
+          }
+        );
+      }
       const taskId = existingTaskId || deriveProfessionalTaskLinkTaskId(operationId);
       journal = {
         schema_version: 1,
@@ -405,10 +460,11 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
   }
 
   async function loadForTarget(targetRef, relationshipType) {
-    const pointer = await getJSON(professionalStore, pointerKey(targetRef, relationshipType));
-    if (!pointer?.operation_id) return null;
-    return projectProfessionalTaskLinkOperation(await loadJournal(pointer.operation_id));
+    const list = await listForTarget(targetRef, relationshipType);
+    if (!list.length) return null;
+    // Prefer an incomplete op (retry UI); else the most recently listed.
+    return list.find((op) => op.status === 'incomplete') ?? list[list.length - 1];
   }
 
-  return { linkTask, retry, loadForTarget, loadJournal };
+  return { linkTask, retry, loadForTarget, listForTarget, loadJournal };
 }
