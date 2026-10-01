@@ -150,6 +150,7 @@ const SHELL_FILES = [
   'js/app/home-model.js',
   'js/app/home-forecast.js',
   'js/app/home-forecast-charts.js',
+  'js/app/chart-info-copy.js',
   'js/app/render-home-charts.js',
   'js/app/render-scene-chart.js',
   'js/app/load-live-events.js',
