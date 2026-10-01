@@ -44,6 +44,12 @@ export function readPointerOperationIds(pointer) {
   return [];
 }
 
+/** Incomplete first (retry UI); otherwise the last listed operation. */
+export function preferIncompleteOrLatest(operations) {
+  if (!operations?.length) return null;
+  return operations.find((op) => op.status === 'incomplete') ?? operations[operations.length - 1];
+}
+
 export function deriveProfessionalTaskLinkOperationId(parts) {
   const digest = createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 32);
   return `ptl_${digest}`;
@@ -196,13 +202,8 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
 
   async function listForTarget(targetRef, relationshipType) {
     const pointer = await getJSON(professionalStore, pointerKey(targetRef, relationshipType));
-    const ids = readPointerOperationIds(pointer);
-    const out = [];
-    for (const id of ids) {
-      const projected = projectProfessionalTaskLinkOperation(await loadJournal(id));
-      if (projected) out.push(projected);
-    }
-    return out;
+    const journals = await Promise.all(readPointerOperationIds(pointer).map(loadJournal));
+    return journals.map(projectProfessionalTaskLinkOperation).filter(Boolean);
   }
 
   async function ensureTaskRecord(taskId, title) {
@@ -460,10 +461,7 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
   }
 
   async function loadForTarget(targetRef, relationshipType) {
-    const list = await listForTarget(targetRef, relationshipType);
-    if (!list.length) return null;
-    // Prefer an incomplete op (retry UI); else the most recently listed.
-    return list.find((op) => op.status === 'incomplete') ?? list[list.length - 1];
+    return preferIncompleteOrLatest(await listForTarget(targetRef, relationshipType));
   }
 
   return { linkTask, retry, loadForTarget, listForTarget, loadJournal };

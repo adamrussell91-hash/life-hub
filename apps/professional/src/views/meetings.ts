@@ -48,29 +48,42 @@ function meetingTaskOps(
   record: MeetingRecord,
   key: 'preparation' | 'follow_up'
 ): NonNullable<MeetingRecord['preparation_operations']> {
-  const plural = key === 'preparation' ? record.preparation_operations : record.follow_up_operations;
+  const plural = record[`${key}_operations`];
   if (Array.isArray(plural) && plural.length) return plural;
-  const singular = key === 'preparation' ? record.preparation_operation : record.follow_up_operation;
+  const singular = record[`${key}_operation`];
   return singular ? [singular] : [];
 }
+
+const MEETING_TASK_LINK_PANELS = [
+  {
+    kind: 'preparation' as const,
+    heading: 'Preparation tasks',
+    incompleteMessage: 'Preparation link incomplete.'
+  },
+  {
+    kind: 'follow_up' as const,
+    heading: 'Follow-up tasks',
+    incompleteMessage: 'Follow-up link incomplete.'
+  }
+];
 
 /** Preparation and follow-up Task link panels (up to 10 each), with Plan 1's auto-retry. */
 export function buildMeetingTaskLinks(record: MeetingRecord, reload: () => Promise<void>): HTMLElement {
   const taskPanels = el('div', 'meeting-detail__task-panels');
-  for (const kind of ['preparation', 'follow_up'] as const) {
-    const ops = meetingTaskOps(record, kind);
+  for (const panel of MEETING_TASK_LINK_PANELS) {
+    const ops = meetingTaskOps(record, panel.kind);
     const incomplete = ops.find((op) => op.status === 'incomplete');
     mountTaskLinkPanel({
       host: taskPanels,
-      heading: kind === 'preparation' ? 'Preparation tasks' : 'Follow-up tasks',
-      relationshipType: kind,
+      heading: panel.heading,
+      relationshipType: panel.kind,
       linkedOperations: ops,
       incompleteOperationId: incomplete?.operation_id ?? null,
-      statusMessage: incomplete ? `${kind === 'preparation' ? 'Preparation' : 'Follow-up'} link incomplete.` : null,
+      statusMessage: incomplete ? panel.incompleteMessage : null,
       onSubmit: async (input) => {
         try {
           await linkMeetingTask(record.id, {
-            relationship_type: kind,
+            relationship_type: panel.kind,
             ...input
           });
           await reload();

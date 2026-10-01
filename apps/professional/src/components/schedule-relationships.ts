@@ -76,6 +76,22 @@ export type LinkedTaskOperation = {
   title?: string | null;
 };
 
+function taskIdFromRef(ref: string): string {
+  return ref.replace(/^tasks:task:/, '');
+}
+
+function linkedTaskChips(linked: LinkedTaskOperation[], relationshipType: string) {
+  return linked.map((op) => ({
+    id: op.operation_id,
+    ref: op.task_id ? `tasks:task:${op.task_id}` : op.operation_id,
+    label: op.title || op.task_id || 'Task',
+    relationshipType,
+    state: (op.status === 'incomplete' ? 'pending' : 'saved') as 'pending' | 'saved',
+    readonly: true as const,
+    href: op.task_id ? `/tasks/#/task/${encodeURIComponent(op.task_id)}` : null
+  }));
+}
+
 /**
  * Panel to select an existing Task or create a new one, then link it.
  * Linked list can hold up to MAX_MEETING_TASK_LINKS tasks of this relationship.
@@ -111,15 +127,7 @@ export function mountTaskLinkPanel(options: {
   if (linked.length) {
     createEntityChipList({
       container: linkedHost,
-      chips: linked.map((op) => ({
-        id: op.operation_id,
-        ref: op.task_id ? `tasks:task:${op.task_id}` : op.operation_id,
-        label: op.title || op.task_id || 'Task',
-        relationshipType: options.relationshipType,
-        state: op.status === 'incomplete' ? 'pending' : 'saved',
-        readonly: true,
-        href: op.task_id ? `/tasks/#/task/${encodeURIComponent(op.task_id)}` : null
-      }))
+      chips: linkedTaskChips(linked, options.relationshipType)
     });
   }
   root.append(linkedHost);
@@ -158,7 +166,9 @@ export function mountTaskLinkPanel(options: {
     }
   });
 
-  const linkedTaskIds = new Set(linked.map((op) => op.task_id).filter(Boolean) as string[]);
+  const linkedTaskIds = new Set(
+    linked.map((op) => op.task_id).filter((id): id is string => Boolean(id))
+  );
 
   const picker = createEntityPicker({
     input: taskInput,
@@ -166,14 +176,13 @@ export function mountTaskLinkPanel(options: {
     emptyText: 'No matching tasks.',
     search: async (query, signal) => {
       const result = await searchEntities(query, 'task', { signal });
-      const tasks = (result.groups.task ?? []).filter((item) => {
-        const id = item.ref.replace(/^tasks:task:/, '');
-        return !linkedTaskIds.has(id);
-      });
+      const tasks = (result.groups.task ?? []).filter(
+        (item) => !linkedTaskIds.has(taskIdFromRef(item.ref))
+      );
       return { groups: { task: tasks } };
     },
     onSelect: (item) => {
-      selectedTaskId = item.ref.replace(/^tasks:task:/, '');
+      selectedTaskId = taskIdFromRef(item.ref);
       chipList.setChips([
         {
           id: `pending:${item.ref}`,

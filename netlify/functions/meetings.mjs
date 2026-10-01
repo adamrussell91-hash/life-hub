@@ -10,7 +10,10 @@ import {
   resolveEntity as defaultResolveEntity
 } from './_shared/entity-resolvers.mjs';
 import { parseEntityRef } from './_shared/entity-ref.mjs';
-import { createProfessionalTaskLinkOperationRepository } from './_shared/professional-task-link-operation.mjs';
+import {
+  createProfessionalTaskLinkOperationRepository,
+  preferIncompleteOrLatest
+} from './_shared/professional-task-link-operation.mjs';
 import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
 import { listGithubCommunications } from './_shared/github-professional-data.mjs';
 import {
@@ -93,10 +96,8 @@ async function withMeetingTaskLinks(meeting, taskLinks) {
     taskLinks.listForTarget(meetingRef, 'preparation'),
     taskLinks.listForTarget(meetingRef, 'follow_up')
   ]);
-  const pickSingular = (list) =>
-    list.find((op) => op.status === 'incomplete') ?? list[list.length - 1] ?? null;
-  const preparation_operation = pickSingular(preparation_operations);
-  const follow_up_operation = pickSingular(follow_up_operations);
+  const preparation_operation = preferIncompleteOrLatest(preparation_operations);
+  const follow_up_operation = preferIncompleteOrLatest(follow_up_operations);
   return {
     ...meeting,
     preparation_operations,

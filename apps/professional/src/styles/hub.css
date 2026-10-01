@@ -638,8 +638,12 @@
   font-size: var(--text-sm);
 }
 
-.task-link-panel__count {
+.task-link-panel__count,
+.task-link-panel__full {
   margin: 0;
+}
+
+.task-link-panel__count {
   font-size: var(--text-xs);
 }
 
@@ -648,7 +652,6 @@
 }
 
 .task-link-panel__full {
-  margin: 0;
   font-size: var(--text-sm);
 }
 
