@@ -963,8 +963,7 @@ export function createChatController({
       void confirmProposal(proposal, event, overwrite);
     });
     proposal.discard.addEventListener('click', () => {
-      proposal.card.remove();
-      syncChatPendingConfirmsVisibility(root);
+      dismissPendingCard(proposal.card);
     });
   }
 
@@ -974,8 +973,7 @@ export function createChatController({
       void confirmCnPatch(proposal, patch, id);
     });
     proposal.discard.addEventListener('click', () => {
-      proposal.card.remove();
-      syncChatPendingConfirmsVisibility(root);
+      dismissPendingCard(proposal.card);
       // Best-effort: clear the server-side queue entry too, so Discard actually
       // means gone rather than just hidden in this one tab. Fire-and-forget --
       // the card is already removed either way, and a stale entry self-purges.

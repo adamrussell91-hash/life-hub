@@ -92,28 +92,33 @@ function tagPendingId(card, id) {
   card.setAttribute?.('data-pending-id', id);
 }
 
+function hasClass(node, name) {
+  return (node?.className ?? '').split(/\s+/).includes(name);
+}
+
 function isReceiptCard(node) {
-  const classes = (node?.className ?? '').split(/\s+/);
-  return classes.includes('confirm-card--receipt') || classes.includes('is-receipt');
+  return hasClass(node, 'confirm-card--receipt') || hasClass(node, 'is-receipt');
+}
+
+function isWaitingConfirmCard(node) {
+  return !isReceiptCard(node)
+    && (hasClass(node, 'confirm-card') || hasClass(node, 'record-proposal'));
 }
 
 function countConfirmCards(list) {
   let count = 0;
   for (const child of list.children ?? []) {
-    if (isReceiptCard(child)) continue;
-    const classes = (child.className ?? '').split(/\s+/);
-    if (classes.includes('confirm-card') || classes.includes('record-proposal')) count += 1;
+    if (isWaitingConfirmCard(child)) count += 1;
   }
   if (count || typeof list.querySelectorAll !== 'function') return count;
-  let fallback = 0;
-  for (const card of list.querySelectorAll('.confirm-card')) {
-    if (!isReceiptCard(card)) fallback += 1;
+  // FakeElement / odd hosts: walk by class, still excluding receipts.
+  for (const selector of ['.confirm-card', '.record-proposal']) {
+    for (const card of list.querySelectorAll(selector)) {
+      if (!isReceiptCard(card)) count += 1;
+    }
+    if (count) return count;
   }
-  if (fallback) return fallback;
-  for (const card of list.querySelectorAll('.record-proposal')) {
-    if (!isReceiptCard(card)) fallback += 1;
-  }
-  return fallback;
+  return 0;
 }
 
 function insertTrayBeforeForm(view, form, tray) {
@@ -295,8 +300,7 @@ export function appendSessionConfirmToPendingTray(root, mountWithHost) {
   if (typeof mountWithHost !== 'function') return null;
   const tray = ensureChatPendingConfirmsTray(root);
   if (!tray) return mountWithHost(null);
-  const list = trayList(tray);
-  const ui = mountWithHost(list);
+  const ui = mountWithHost(trayList(tray));
   if (ui?.card) {
     ui.card.dataset.pendingSource = 'session';
     syncChatPendingConfirmsVisibility(root);
@@ -308,13 +312,11 @@ export function appendSessionConfirmToPendingTray(root, mountWithHost) {
 export function moveConfirmReceiptToTranscript(root, card) {
   if (!card) return;
   const messages = root?.querySelector?.('#chat-messages');
-  if (!messages || card.parent === messages) {
-    syncChatPendingConfirmsVisibility(root);
-    return;
+  if (messages && card.parent !== messages) {
+    // Detach first so FakeElement / odd hosts do not leave a dual-parent card.
+    card.remove?.();
+    messages.append?.(card);
   }
-  // Detach first so FakeElement / odd hosts do not leave a dual-parent card.
-  card.remove?.();
-  if (typeof messages.append === 'function') messages.append(card);
   syncChatPendingConfirmsVisibility(root);
 }
 
