@@ -236,8 +236,6 @@ export async function renderMeetingPage(
   const roomHost = el('section', 'card');
   roomHost.dataset.part = 'room';
   let notesCardEl: HTMLElement | null = null;
-  let notesHeading: HTMLElement | null = null;
-  let notesHint: HTMLElement | null = null;
   let taskLinks = buildMeetingTaskLinks(record, refreshTaskLinks);
   let prepPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-preparation"]');
   let followPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-follow_up"]');
@@ -457,14 +455,12 @@ export async function renderMeetingPage(
     if (!notesCardEl) {
       notesCardEl = el('section', 'card meeting-page__notes-card');
       notesCardEl.dataset.part = 'notes';
-      notesHeading = el('h3', undefined, heading);
-      notesHint = el('p', 'muted meeting-page__hint', hint);
       const body = el('div', 'meeting-page__notes');
-      notesCardEl.append(notesHeading, notesHint, body);
+      notesCardEl.append(el('h3', undefined, heading), el('p', 'muted meeting-page__hint', hint), body);
       mountNotes(body);
     } else {
-      if (notesHeading) notesHeading.textContent = heading;
-      if (notesHint) notesHint.textContent = hint;
+      notesCardEl.querySelector('h3')!.textContent = heading;
+      notesCardEl.querySelector('.meeting-page__hint')!.textContent = hint;
     }
     return notesCardEl;
   }

@@ -90,17 +90,12 @@ export function buildMeetingTaskLinks(record: MeetingRecord, reload: () => Promi
           });
           wrote = true;
         } catch (err) {
-          if (meetingTaskLinkWrote(err)) {
-            wrote = true;
-          } else {
-            try {
-              const latest = (await getMeeting(record.id)).meeting;
-              wrote = meetingHasLinkedTask(latest, panel.kind, input);
-            } catch {
-              wrote = false;
-            }
-            if (!wrote) throw err;
-          }
+          wrote =
+            meetingTaskLinkWrote(err) ||
+            (await getMeeting(record.id)
+              .then(({ meeting }) => meetingHasLinkedTask(meeting, panel.kind, input))
+              .catch(() => false));
+          if (!wrote) throw err;
         }
         try {
           await reload();

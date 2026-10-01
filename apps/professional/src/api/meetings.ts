@@ -158,10 +158,8 @@ export function meetingHasLinkedTask(
   input: { title?: string; task_id?: string }
 ): boolean {
   const ops = [
-    ...(relationship === 'preparation'
-      ? meeting.preparation_operations ?? []
-      : meeting.follow_up_operations ?? []),
-    relationship === 'preparation' ? meeting.preparation_operation : meeting.follow_up_operation
+    ...(meeting[`${relationship}_operations`] ?? []),
+    meeting[`${relationship}_operation`]
   ].filter((op): op is NonNullable<typeof op> => Boolean(op));
   const title = input.title?.trim();
   return ops.some(
