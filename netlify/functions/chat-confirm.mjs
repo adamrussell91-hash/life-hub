@@ -894,7 +894,7 @@ export function createChatConfirmHandler({
       } catch (error) {
         return mapRepositoryError(error);
       }
-      for (const { ghostId, ghostResult } of ghostResults) {
+      for (const { ghostResult } of ghostResults) {
         const ghostCode = ghostResult?.payload?.error?.code;
         if (ghostResult?.payload?.writes === 'partial') {
           return errorResponse(
@@ -919,7 +919,6 @@ export function createChatConfirmHandler({
             error: { code: 'ghost_accept_failed', message: 'The calendar proposal could not be accepted.', retryable: false }
           }, PRIVATE_CACHE);
         }
-        void ghostId;
       }
 
       const allAlreadyAccepted = ghostResults.every(
