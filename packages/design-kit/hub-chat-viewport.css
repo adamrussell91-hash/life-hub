@@ -6,15 +6,25 @@
  * a second keyboard inset helper per hub.
  */
 
-.chat-view:not([hidden]) > .chat-form,
-.chat-view:not([hidden]) > .hub-ai-bar--thread {
+.chat-view:not([hidden]) > :is(.chat-form, .hub-ai-bar--thread),
+.chat-overlay > .chat-form,
+.coach.chat > .chat-floor,
+.ai-panel > .ai-panel__composer {
   flex: 0 0 auto;
   margin-top: auto;
 }
 
 /* Sticky Confirm tray sits above the composer; when visible it owns the
- * floor push so cards stay on screen across New chat / scroll. */
-.chat-view:not([hidden]) > .chat-pending-confirms {
+ * floor push so cards stay on screen across New chat / scroll.
+ * Hosts: Life/Tasks .chat-view, Knowledge .chat-overlay / .coach.chat,
+ * Teaching .ai-panel. */
+:is(
+  .chat-view:not([hidden]),
+  .chat-overlay,
+  .coach.chat,
+  .coach.chat > .chat-floor,
+  .ai-panel
+) > .chat-pending-confirms {
   flex: 0 0 auto;
   margin-top: auto;
   max-height: min(42vh, 22rem);
@@ -29,12 +39,25 @@
   background: color-mix(in srgb, var(--paper) 92%, var(--ink) 8%);
 }
 
-.chat-view:not([hidden]) > .chat-pending-confirms[hidden] {
+:is(
+  .chat-view:not([hidden]),
+  .chat-overlay,
+  .coach.chat,
+  .coach.chat > .chat-floor,
+  .ai-panel
+) > .chat-pending-confirms[hidden] {
   display: none;
 }
 
-.chat-view:has(> .chat-pending-confirms:not([hidden])) > .chat-form,
-.chat-view:has(> .chat-pending-confirms:not([hidden])) > .hub-ai-bar--thread {
+.chat-view:has(> .chat-pending-confirms:not([hidden])) > :is(.chat-form, .hub-ai-bar--thread),
+.chat-overlay:has(> .chat-pending-confirms:not([hidden])) > .chat-form,
+.coach.chat > .chat-floor:has(> .chat-pending-confirms) > :is(.chat__composer, .coach__form.chat__composer),
+.ai-panel:has(> .chat-pending-confirms:not([hidden])) > .ai-panel__composer {
+  margin-top: 0;
+}
+
+/* Floor already pins to the bottom — tray must not steal margin-top: auto. */
+.coach.chat > .chat-floor > .chat-pending-confirms {
   margin-top: 0;
 }
 
@@ -56,11 +79,14 @@
   gap: var(--space-2);
 }
 
-.chat-pending-confirms__list > .confirm-card,
-.chat-pending-confirms__list > .record-proposal,
-.chat-pending-confirms__list > .chat-message--structured,
-.chat-pending-confirms__list > .agent-choice-card,
-.chat-pending-confirms__list > .prod-card {
+.chat-pending-confirms__list > :is(
+  .confirm-card,
+  .record-proposal,
+  .chat-message--structured,
+  .agent-choice-card,
+  .prod-card,
+  .ai-panel__proposal
+) {
   margin: 0;
 }
 
@@ -70,7 +96,8 @@
   body:has(.chat-view:not([hidden]) .chat-form:focus-within) .hub-mobile-nav,
   body:has(.chat-view:not([hidden]) .hub-ai-bar--thread:focus-within) .hub-mobile-nav,
   body:has(.chat-overlay:not([hidden]) .chat-form:focus-within) .hub-mobile-nav,
-  body:has(.coach.chat .chat__composer:focus-within) .hub-mobile-nav {
+  body:has(.coach.chat .chat__composer:focus-within) .hub-mobile-nav,
+  body:has(.coach.chat .chat-floor:focus-within) .hub-mobile-nav {
     display: none;
   }
 
