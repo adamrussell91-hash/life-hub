@@ -1,13 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { buildHomeForecastCards } from '../../apps/life/js/app/home-forecast.js';
+import { buildStimulusChartData } from '../../apps/life/js/app/home-forecast-charts.js';
 import { traceBodyScenario, simulateBodyScenario, LEAN_PRESERVATION_GATE } from '../../apps/life/js/core/forecast-body.js';
-import { buildGateRings } from '../../apps/life/js/app/chart-kit/gate-rings.js';
+import { recentCompleteProtein } from '../../apps/life/js/core/forecast-inputs.js';
+import {
+  buildGateRings,
+  gateRingFrame,
+  gateTipAngle,
+  gateTrendRadius,
+  gateValueAngle
+} from '../../apps/life/js/app/chart-kit/gate-rings.js';
 import { buildRegionRose } from '../../apps/life/js/app/chart-kit/region-rose.js';
 import { buildGlideSlope } from '../../apps/life/js/app/chart-kit/glide-slope.js';
 import { buildTwinClocks } from '../../apps/life/js/app/chart-kit/twin-clocks.js';
 import { buildRecompPlane } from '../../apps/life/js/app/chart-kit/recomp-plane.js';
-import { arcPath, legend, monthStarts } from '../../apps/life/js/app/chart-kit/scene.js';
+import { arcPath, fx, legend, monthStarts, polar } from '../../apps/life/js/app/chart-kit/scene.js';
 
 const TARGETS_CONFIG = {
   target_sets: [{
@@ -221,6 +230,139 @@ test('gate rings put every threshold on the shared gate spoke', () => {
   const fills = [];
   walk(scene.nodes, n => { if (String(n.cls).includes('hc-gate-fill')) fills.push(n); });
   assert.equal(fills.length, 2, 'unscored key draws no fill');
+});
+
+function meal(date, protein, calories = 1200) {
+  return { type: 'meal', date, meal: 'dinner', calories, protein_g: protein };
+}
+
+test('recent protein uses complete days only and divides by weight', () => {
+  const dates = [0, 1, 2, 3, 4, 5, 6].map(offset => plus(AS_OF, offset - 6));
+  const four = dates.slice(2, 6).map(date => meal(date, 160));
+  const found = recentCompleteProtein(four, AS_OF);
+  assert.equal(found.completeDays, 4);
+  assert.equal(found.grams, 160);
+  const chart = buildStimulusChartData(
+    { window: { days: 28 }, sessions_per_week: 2.5, upper_body_loaded_sets_per_week: 26.3, protein_g_kg_day: 1.28 },
+    { current: { weight_kg: 80 } },
+    { items: four, asOf: AS_OF }
+  );
+  assert.equal(chart.keys.find(key => key.key === 'protein').recent, 2);
+
+  const sparse = [meal(dates[0], 90), meal(dates[1], 90)];
+  const missing = recentCompleteProtein(sparse, AS_OF);
+  assert.equal(missing.grams, null);
+  assert.equal(missing.completeDays, 2);
+  assert.match(buildStimulusChartData(
+    { window: { days: 28 }, protein_g_kg_day: 1.28 },
+    { current: { weight_kg: 80 } },
+    { items: sparse, asOf: AS_OF }
+  ).keys.find(key => key.key === 'protein').recentReason, /2 of 3 needed/);
+
+  const withToday = [
+    meal(dates[3], 100),
+    meal(dates[4], 100),
+    meal(dates[5], 100),
+    meal(dates[6], 200, 400)
+  ];
+  const skipped = recentCompleteProtein(withToday, AS_OF);
+  assert.equal(skipped.completeDays, 3);
+  assert.equal(skipped.grams, 100);
+});
+
+test('recent pace status follows the gate, and a steady pace is a dot', () => {
+  const dates = [0, 1, 2, 3, 4, 5, 6].map(offset => plus(AS_OF, offset - 6));
+  const workouts = [1, 3, 5].map(index => ({
+    type: 'workout', date: dates[index], status: 'completed', session_kind: 'strength',
+    exercises: [{ name: 'Bench Press', sets: Array.from({ length: 6 }, () => ({ weight_kg: 30, reps: 8 })) }]
+  }));
+  const highProtein = dates.slice(2, 6).map(date => meal(date, 160));
+  const streak = buildStimulusChartData(
+    { window: { days: 28 }, sessions_per_week: 2.5, upper_body_loaded_sets_per_week: 26.3, protein_g_kg_day: 1.28, lean_preservation_supported: false },
+    { current: { weight_kg: 80 } },
+    { items: [...workouts, ...highProtein], asOf: AS_OF }
+  );
+  assert.equal(streak.keys.find(key => key.key === 'sessions').recentStatus, 'met');
+  assert.equal(streak.keys.find(key => key.key === 'protein').recentStatus, 'met');
+  assert.match(buildGateRings(streak).readout, /above the gate recently/);
+
+  const missed = buildStimulusChartData(
+    { window: { days: 28 }, sessions_per_week: 2.5, upper_body_loaded_sets_per_week: 26.3, protein_g_kg_day: 1.8 },
+    { current: { weight_kg: 80 } },
+    { items: dates.slice(0, 4).map(date => meal(date, 80)), asOf: AS_OF }
+  );
+  assert.equal(missed.keys.find(key => key.key === 'sessions').recent, 0);
+  assert.equal(missed.keys.find(key => key.key === 'sessions').recentStatus, 'short');
+  assert.equal(missed.keys.find(key => key.key === 'protein').recentStatus, 'short');
+
+  const steady = buildGateRings({
+    keys: [{
+      key: 'sessions', label: 'Sessions / week', short: 'Sessions', value: 2.5, threshold: 2,
+      unit: '/wk', status: 'met', ratio: 1.25, note: 'Loaded sessions.',
+      recent: 2.5, recentStatus: 'met', recentWindow: 'Last 7 days', recentReason: null
+    }],
+    metCount: 1, scoredCount: 1
+  }, { width: 358 });
+  const trends = [];
+  const dots = [];
+  walk(steady.nodes, node => {
+    if (String(node.cls).startsWith('hc-gate-pace hc-gate-pace--')) trends.push(node);
+    if (String(node.cls).includes('hc-trend-dot--steady')) dots.push(node);
+  });
+  assert.equal(trends.length, 0);
+  assert.equal(dots.length, 1);
+  assert.match(steady.readout, /matches the averages/);
+});
+
+test('recent-pace arc starts at the average and ends at the recent tip', () => {
+  assert.equal(gateValueAngle(2.5, 2), 78.75);
+  assert.equal(gateTipAngle(3, 2), 112.5);
+  assert.equal(gateTipAngle(0, 2), -82);
+  const frame = gateRingFrame(358, 1);
+  const lane = gateTrendRadius(frame.radii[0]);
+  assert.equal(lane, frame.radii[0] - 15 / 2 - 9 / 2);
+  const scene = buildGateRings({
+    keys: [{
+      key: 'sessions', label: 'Sessions / week', short: 'Sessions', value: 2.5, threshold: 2,
+      unit: '/wk', status: 'met', ratio: 1.25, note: 'Loaded sessions.',
+      recent: 3, recentStatus: 'met', recentWindow: 'Last 7 days', recentReason: null
+    }],
+    metCount: 1, scoredCount: 1
+  }, { width: 358 });
+  const trend = [];
+  walk(scene.nodes, node => {
+    if (String(node.cls).includes('hc-gate-pace--met')) trend.push(node);
+  });
+  assert.equal(trend.length, 1);
+  assert.equal(trend[0].anim, 'draw');
+  assert.equal(trend[0].delay, 600);
+  assert.equal(trend[0].attrs.pathLength, 1);
+  assert.equal(trend[0].attrs.fill, 'none');
+  assert.equal(trend[0].attrs['stroke-width'], 3);
+  assert.equal(trend[0].attrs.stroke, 'url(#trend-sessions)');
+  const css = readFileSync(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
+  assert.match(css, /\.hc-gate-pace \{[^}]*stroke-linecap: round/);
+  assert.doesNotMatch(css, /\.hc-gate-pace \{[^}]*stroke:\s*var\(--navy\)/);
+  const [x0, y0] = polar(frame.cx, frame.cy, lane, 78.75);
+  const [x1, y1] = polar(frame.cx, frame.cy, lane, 112.5);
+  assert.ok(trend[0].attrs.d.startsWith(`M${fx(x0)} ${fx(y0)}`));
+  assert.ok(trend[0].attrs.d.endsWith(`${fx(x1)} ${fx(y1)}`));
+
+  const zero = buildGateRings({
+    keys: [{
+      key: 'sessions', label: 'Sessions / week', short: 'Sessions', value: 2.5, threshold: 2,
+      unit: '/wk', status: 'met', ratio: 1.25, note: 'Loaded sessions.',
+      recent: 0, recentStatus: 'short', recentWindow: 'Last 7 days', recentReason: null
+    }],
+    metCount: 1, scoredCount: 1
+  }, { width: 358 });
+  const back = [];
+  walk(zero.nodes, node => {
+    if (String(node.cls).includes('hc-gate-pace--short')) back.push(node);
+  });
+  const [zx, zy] = polar(frame.cx, frame.cy, lane, -82);
+  assert.ok(back[0].attrs.d.endsWith(`${fx(zx)} ${fx(zy)}`));
+  assert.equal(back[0].attrs.d.includes(' 0 '), true);
 });
 
 test('scene helpers', () => {
