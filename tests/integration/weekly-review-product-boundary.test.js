@@ -1436,7 +1436,13 @@ describe('LEVEL 4 Weekly Review execution fence (WR19–WR27)', () => {
       sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
       content: JSON.stringify(
         queue.map((item) =>
-          item.id === proposalEvent.id ? { ...item, status: 'executing' } : item
+          item.id === proposalEvent.id
+            ? {
+              ...item,
+              status: 'executing',
+              executionStartedAt: new Date(NOW_MS).toISOString()
+            }
+            : item
         )
       )
     });
