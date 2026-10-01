@@ -369,6 +369,144 @@ describe('renderMeetingDetailView task flows', () => {
     expect(prep.textContent).toMatch(/Pack slides/);
     expect(prep.querySelector('[data-task-link-submit="preparation"]')).toBeTruthy();
   });
+
+  it('does not show fail when follow-up Create wrote the task but UL bind 503s', async () => {
+    let wrote = false;
+    const meeting = {
+      schema_version: 1,
+      id: VALID_MEETING_ID,
+      title: 'Seth planning',
+      scheduled_start: '2026-09-15T01:00:00.000Z',
+      scheduled_end: '2026-09-15T02:00:00.000Z',
+      time_zone: 'Australia/Sydney',
+      location_text: null,
+      agenda: null,
+      notes: null,
+      state: 'scheduled',
+      occurrence_history: [],
+      created_at: '2026-09-01T10:00:00.000Z',
+      updated_at: '2026-09-01T10:00:00.000Z'
+    };
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const href = String(input);
+      if (href.includes('/api/universal-links')) {
+        return Response.json({ ok: true, data: { outgoing: [], incoming: [] } });
+      }
+      if (href.includes('action=link-task')) {
+        wrote = true;
+        return Response.json(
+          {
+            ok: false,
+            error: {
+              code: 'professional_task_link_incomplete',
+              message: 'Task relationship could not be completed.',
+              retryable: true
+            },
+            data: { operation_id: 'ptl_fu', task_id: 'task_fu', relationship_type: 'follow_up' }
+          },
+          { status: 503 }
+        );
+      }
+      return Response.json({
+        ok: true,
+        data: {
+          meeting: {
+            ...meeting,
+            follow_up_operations: wrote
+              ? [
+                  {
+                    operation_id: 'ptl_fu',
+                    status: 'incomplete',
+                    task_id: 'task_fu',
+                    title: 'Call Seth',
+                    completed_intent_ids: [],
+                    completed_link_ids: [],
+                    failed_intent_ids: [],
+                    pending_intent_ids: []
+                  }
+                ]
+              : []
+          }
+        }
+      });
+    });
+    const { renderMeetingDetailView } = await import('@/views/meetings');
+    const canvas = document.createElement('div');
+    await renderMeetingDetailView(canvas, VALID_MEETING_ID);
+    const title = [...canvas.querySelectorAll('input')].find(
+      (input) => input.getAttribute('aria-label') === 'Follow-up tasks title'
+    ) as HTMLInputElement;
+    title.value = 'Call Seth';
+    (canvas.querySelector('[data-task-link-submit="follow_up"]') as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      expect(wrote).toBe(true);
+      expect(canvas.textContent).toMatch(/Call Seth|Linking/);
+    });
+    expect(canvas.textContent).not.toMatch(/Link failed/);
+    expect(
+      canvas.querySelector('[data-part="task-link-follow_up"]')?.textContent
+    ).not.toMatch(/Task relationship could not be completed/);
+  });
+
+  it('recovers a timed-out follow-up Create when GET already has the task', async () => {
+    const meeting = {
+      schema_version: 1,
+      id: VALID_MEETING_ID,
+      title: 'Seth planning',
+      scheduled_start: '2026-09-15T01:00:00.000Z',
+      scheduled_end: '2026-09-15T02:00:00.000Z',
+      time_zone: 'Australia/Sydney',
+      location_text: null,
+      agenda: null,
+      notes: null,
+      state: 'scheduled',
+      occurrence_history: [],
+      created_at: '2026-09-01T10:00:00.000Z',
+      updated_at: '2026-09-01T10:00:00.000Z',
+      follow_up_operations: [
+        {
+          operation_id: 'ptl_fu',
+          status: 'committed',
+          task_id: 'task_fu',
+          title: 'Send minutes',
+          completed_intent_ids: [],
+          completed_link_ids: [],
+          failed_intent_ids: [],
+          pending_intent_ids: []
+        }
+      ]
+    };
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const href = String(input);
+      if (href.includes('/api/universal-links')) {
+        return Response.json({ ok: true, data: { outgoing: [], incoming: [] } });
+      }
+      if (href.includes('action=link-task')) {
+        return Response.json(
+          {
+            ok: false,
+            error: { code: 'timeout', message: 'Timed out calling /api/meetings' }
+          },
+          { status: 504 }
+        );
+      }
+      return Response.json({ ok: true, data: { meeting } });
+    });
+    const { renderMeetingDetailView } = await import('@/views/meetings');
+    const canvas = document.createElement('div');
+    await renderMeetingDetailView(canvas, VALID_MEETING_ID);
+    const title = [...canvas.querySelectorAll('input')].find(
+      (input) => input.getAttribute('aria-label') === 'Follow-up tasks title'
+    ) as HTMLInputElement;
+    title.value = 'Send minutes';
+    (canvas.querySelector('[data-task-link-submit="follow_up"]') as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-part="task-link-follow_up"]')?.textContent).toMatch(
+        /Send minutes/
+      );
+    });
+    expect(canvas.textContent).not.toMatch(/Timed out|Link failed/);
+  });
 });
 
 describe('renderEventsView', () => {

@@ -222,8 +222,11 @@ export function mountTaskLinkPanel(options: {
   const submit = el('button', 'btn btn--secondary', 'Create task') as HTMLButtonElement;
   submit.type = 'button';
   submit.dataset.taskLinkSubmit = options.relationshipType;
+  let submitting = false;
   submit.addEventListener('click', async () => {
+    if (submitting || submit.disabled) return;
     status.hidden = true;
+    submitting = true;
     submit.disabled = true;
     try {
       if (mode.get() === 'select') {
@@ -237,6 +240,8 @@ export function mountTaskLinkPanel(options: {
       status.hidden = false;
       status.textContent = err instanceof ApiClientError || err instanceof Error ? err.message : 'Link failed.';
       submit.disabled = false;
+    } finally {
+      submitting = false;
     }
   });
 

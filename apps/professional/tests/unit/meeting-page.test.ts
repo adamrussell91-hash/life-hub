@@ -64,11 +64,19 @@ vi.mock('@/api/clare-comms', () => ({
   clareHandwriting: vi.fn()
 }));
 let savedBlocks: unknown[] = [];
+let notesDisposeCount = 0;
 vi.mock('@/components/block-page', () => ({
   mountBlockPage: vi.fn((host: HTMLElement, options: { blocks: unknown[]; onSave: (blocks: unknown[]) => Promise<void> }) => {
     savedBlocks = options.blocks;
     host.append(Object.assign(document.createElement('div'), { className: 'block-page-stub' }));
-    return { flush: async () => {}, current: () => savedBlocks, dispose: () => {}, save: options.onSave };
+    return {
+      flush: async () => {},
+      current: () => savedBlocks,
+      dispose: () => {
+        notesDisposeCount += 1;
+      },
+      save: options.onSave
+    };
   })
 }));
 
@@ -78,7 +86,10 @@ import { meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meet
 import { createUniversalLink, endUniversalLink } from '@/api/universal-links';
 
 describe('meeting page', () => {
-  beforeEach(() => vi.useFakeTimers({ now: new Date('2026-09-24T08:30:00.000Z') }));
+  beforeEach(() => {
+    notesDisposeCount = 0;
+    vi.useFakeTimers({ now: new Date('2026-09-24T08:30:00.000Z') });
+  });
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
@@ -213,5 +224,22 @@ describe('meeting page', () => {
     const canvas = await render();
     expect(canvas.querySelector('[data-part="actions"]')!.textContent).toContain('»me');
     expect(canvas.querySelector('[data-part="mentions"]')!.textContent).toContain('@Name');
+  });
+
+  it('does not remount notes when the clock asks for the same phase', async () => {
+    const canvas = await render();
+    const mounted = (mountBlockPage as ReturnType<typeof vi.fn>).mock.calls.length;
+    canvas.querySelector<HTMLButtonElement>('[data-set-phase="during"]')!.click();
+    expect((mountBlockPage as ReturnType<typeof vi.fn>).mock.calls.length).toBe(mounted);
+    expect(notesDisposeCount).toBe(0);
+  });
+
+  it('keeps the same notes editor when the page recycles to After', async () => {
+    const canvas = await render();
+    const notes = canvas.querySelector('[data-part="notes"]');
+    canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
+    expect(canvas.querySelector('[data-part="notes"]')).toBe(notes);
+    expect(notesDisposeCount).toBe(0);
+    expect((mountBlockPage as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
   });
 });

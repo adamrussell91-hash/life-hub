@@ -235,9 +235,10 @@ export async function renderMeetingPage(
   const side = el('aside', 'meeting-page__side');
   const roomHost = el('section', 'card');
   roomHost.dataset.part = 'room';
-  const taskLinks = buildMeetingTaskLinks(record, reload);
-  const prepPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-preparation"]');
-  const followPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-follow_up"]');
+  let notesCardEl: HTMLElement | null = null;
+  let taskLinks = buildMeetingTaskLinks(record, refreshTaskLinks);
+  let prepPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-preparation"]');
+  let followPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-follow_up"]');
   const tagCard = el('section', 'card meeting-page__tags');
   mountTagAnythingSection(tagCard, meetingRef);
   side.append(roomHost, taskLinks, tagCard);
@@ -382,21 +383,43 @@ export async function renderMeetingPage(
     return wrap;
   }
 
+  async function refreshTaskLinks(): Promise<void> {
+    const { meeting } = await getMeeting(id);
+    record = {
+      ...record,
+      ...meeting,
+      blocks: blockPage?.current() ?? meeting.blocks ?? record.blocks,
+      decisions: record.decisions ?? meeting.decisions
+    };
+    const next = buildMeetingTaskLinks(record, refreshTaskLinks);
+    taskLinks.replaceWith(next);
+    taskLinks = next;
+    prepPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-preparation"]');
+    followPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-follow_up"]');
+    applyPhaseChrome();
+  }
+
+  function applyPhaseChrome(): void {
+    root.dataset.phase = phase;
+    for (const button of switcher.querySelectorAll<HTMLButtonElement>('[data-set-phase]')) {
+      button.setAttribute('aria-pressed', String(button.dataset.setPhase === phase));
+    }
+    phaseNote.textContent = manual ? 'Switched by hand' : autoNote(phase);
+    if (prepPanel) prepPanel.hidden = phase === 'after';
+    if (followPanel) followPanel.hidden = phase === 'before';
+  }
+
   // ── Phases ──
   function setPhase(next: CommPhase): void {
+    const alreadyPainted = next === phase && Boolean(blockPage);
     phase = next;
-    root.dataset.phase = next;
-    for (const button of switcher.querySelectorAll<HTMLButtonElement>('[data-set-phase]')) {
-      button.setAttribute('aria-pressed', String(button.dataset.setPhase === next));
-    }
-    phaseNote.textContent = manual ? 'Switched by hand' : autoNote(next);
-    if (prepPanel) prepPanel.hidden = next === 'after';
-    if (followPanel) followPanel.hidden = next === 'before';
+    applyPhaseChrome();
     if (tick !== null) clearInterval(tick);
     tick = null;
-    void blockPage?.flush();
-    blockPage?.dispose();
-    blockPage = null;
+    if (alreadyPainted) return;
+    // Keep the live notes editor. Disposing it on recycle/autosave left the
+    // remounted block as a preview with no contenteditable surface.
+    if (notesCardEl?.parentElement === main) notesCardEl.remove();
     main.replaceChildren();
     if (next === 'before') paintBefore();
     else if (next === 'during') paintDuring();
@@ -429,13 +452,17 @@ export async function renderMeetingPage(
   }
 
   function notesCard(heading: string, hint: string): HTMLElement {
-    const card = el('section', 'card meeting-page__notes-card');
-    card.dataset.part = 'notes';
-    card.append(el('h3', undefined, heading), el('p', 'muted meeting-page__hint', hint));
-    const body = el('div', 'meeting-page__notes');
-    card.append(body);
-    mountNotes(body);
-    return card;
+    if (!notesCardEl) {
+      notesCardEl = el('section', 'card meeting-page__notes-card');
+      notesCardEl.dataset.part = 'notes';
+      const body = el('div', 'meeting-page__notes');
+      notesCardEl.append(el('h3', undefined, heading), el('p', 'muted meeting-page__hint', hint), body);
+      mountNotes(body);
+    } else {
+      notesCardEl.querySelector('h3')!.textContent = heading;
+      notesCardEl.querySelector('.meeting-page__hint')!.textContent = hint;
+    }
+    return notesCardEl;
   }
 
   const actions = el('section', 'card');
