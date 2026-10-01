@@ -1,3 +1,4 @@
+import { mountChartInfo } from '../../../../packages/design-kit/js/hub-chart-info.js';
 import { animateAreaReveal, animateColumnGrow, prefersReducedMotion } from './chart-kit/animate.js';
 import { buildAreaLine, straightLinePath } from './chart-kit/area-line.js';
 import { buildBumpChart } from './chart-kit/bump.js';
@@ -6,6 +7,7 @@ import { buildColumns } from './chart-kit/columns.js';
 import { buildHorizonBands } from './chart-kit/horizon.js';
 import { buildMoodMixDonut } from './chart-kit/mood-mix.js';
 import { rangeBarLayout, rangeBarTick } from './chart-kit/range-bar.js';
+import { repMixInfo } from './chart-info-copy.js';
 import { REGION_COLOURS } from './fitness-charts-model.js';
 import { REGION_LABELS } from './fitness-model.js';
 import { buildStreamPaths } from './chart-kit/stream.js';
@@ -890,6 +892,7 @@ export function renderFitnessCharts(root, charts = {}) {
   renderPill(root, charts.sessionGauge, { cardSelector: '#fitness-session-shape-card', manageCard: false });
   renderYear(root, charts.yearMonths);
   renderRepMix(root, charts.repRanges, charts.repRead, { cardSelector: '#fitness-session-shape-card', manageCard: false });
+  mountChartInfo(root.querySelector('#fitness-rep-mix-label'), repMixInfo);
   renderSparks(root, charts.sessionReadings, {
     duration: charts.durationSeries,
     distance: charts.distanceSeries,

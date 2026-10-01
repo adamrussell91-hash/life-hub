@@ -1,5 +1,6 @@
 import { createMorphingValuesPopover } from '../../../../packages/design-kit/js/morphing-popover.js';
 import { applyHubPillsThumb } from '../../../../packages/design-kit/js/hub-motion.js';
+import { mountChartInfo } from '../../../../packages/design-kit/js/hub-chart-info.js';
 import { animateAreaReveal } from './chart-kit/animate.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { buildCarvedAway } from './chart-kit/carved-away.js';
@@ -7,6 +8,7 @@ import { buildHundredSquares, squareKinds, SQUARE_COLS } from './chart-kit/hundr
 import { buildRecompScissors } from './chart-kit/recomp-scissors.js';
 import { buildShedStack } from './chart-kit/shed-stack.js';
 import { buildStairsDown } from './chart-kit/stairs-down.js';
+import { bodyChartInfo } from './chart-info-copy.js';
 import { mountSceneChart } from './render-scene-chart.js';
 import { BODY_RANGES } from './body-model.js';
 import { formatDisplayDate } from '../core/time.js';
@@ -705,6 +707,11 @@ function resetChartHost(host) {
 
 const nextFrame = fn => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(fn) : fn());
 
+function attachBodyChartInfo(title, viewId) {
+  const spec = bodyChartInfo(viewId);
+  if (title && spec) mountChartInfo(title, spec);
+}
+
 function chartBlock(root, name, ariaLabel, views, quiet, { together = false } = {}) {
   const block = root.createElement('div');
   block.className = together ? 'body-chart-block body-chart-block--pair' : 'body-chart-block';
@@ -724,6 +731,7 @@ function chartBlock(root, name, ariaLabel, views, quiet, { together = false } = 
       host.id = `body-chart-${name}-${view.id}`;
       cell.append(title, host);
       row.append(cell);
+      attachBodyChartInfo(title, view.id);
       queueMicrotask(() => {
         mountSceneChart(host, view.build, view.data, { quiet, maxWidth: 520 });
       });
@@ -736,6 +744,13 @@ function chartBlock(root, name, ariaLabel, views, quiet, { together = false } = 
   const extra = root.createElement('div');
   extra.className = 'body-chart-extra';
   const current = () => views.find(v => v.id === bodyChartViews[name]) ?? views[0];
+
+  const title = root.createElement('p');
+  title.className = 'metric-label';
+  title.dataset.bodyChartInfo = name;
+  title.textContent = current().label;
+  block.append(title);
+  attachBodyChartInfo(title, current().id);
 
   let pills = null;
   if (views.length > 1) {
@@ -754,6 +769,8 @@ function chartBlock(root, name, ariaLabel, views, quiet, { together = false } = 
       button.addEventListener('click', () => {
         if (bodyChartViews[name] === view.id) return;
         bodyChartViews[name] = view.id;
+        title.textContent = view.label;
+        attachBodyChartInfo(title, view.id);
         syncPills();
         resetChartHost(host);
         paint(false);

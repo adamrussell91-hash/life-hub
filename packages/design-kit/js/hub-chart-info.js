@@ -87,6 +87,13 @@ export function mountChartInfo(anchorEl, spec) {
   if (!row) return null;
 
   const noteId = `hub-chart-info-${String(spec.id || 'chart').replace(/[^a-z0-9_-]+/gi, '-')}`;
+  // Body / Medical rebuild labels on each paint; drop the previous note for this id.
+  const stale = typeof doc.getElementById === 'function' ? doc.getElementById(noteId) : null;
+  if (stale) {
+    if (openApi?.note === stale) closeApi(openApi);
+    stale.remove();
+  }
+
   const button = doc.createElement('button');
   button.type = 'button';
   button.className = 'hub-chart-info';

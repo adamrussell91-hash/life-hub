@@ -1,4 +1,6 @@
+import { mountChartInfo } from '../../../../packages/design-kit/js/hub-chart-info.js';
 import { formatDisplayDate, daysBetween, isCalendarDate } from '../core/time.js';
+import { healthThreadsInfo } from './chart-info-copy.js';
 import { MEDICAL_THREAD_COLOURS } from './medical-model.js';
 
 const GUTTER = 140;
@@ -42,27 +44,36 @@ export function renderMedicalStrip(root, model, hooks = {}) {
   const header = root.createElement('div');
   header.className = 'medical-strip__header';
 
+  const lead = root.createElement('div');
+  lead.className = 'medical-strip__lead';
+
+  const title = root.createElement('strong');
+  title.className = 'medical-strip__title';
+  title.id = 'medical-threads-label';
+  title.textContent = 'Health Threads';
+  lead.append(title);
+  mountChartInfo(title, healthThreadsInfo);
+
   const toggle = root.createElement('button');
   toggle.type = 'button';
   toggle.className = 'medical-strip__toggle';
   toggle.setAttribute('aria-expanded', state.open ? 'true' : 'false');
   toggle.setAttribute('aria-controls', 'medical-strip-body');
+  toggle.setAttribute('aria-label', state.open ? 'Collapse Health Threads' : 'Expand Health Threads');
   const chevron = root.createElement('span');
   chevron.className = 'medical-strip__chevron';
   chevron.textContent = state.open ? '▾' : '▸';
-  const title = root.createElement('strong');
-  title.textContent = 'Health Threads';
   const summary = root.createElement('span');
   summary.className = 'medical-strip__summary';
   summary.textContent = collapseSummary(lanes, model);
-  toggle.append(chevron, title, summary);
+  toggle.append(chevron, summary);
   toggle.addEventListener('click', () => {
     state.open = !state.open;
     writeOpen(state.open);
     renderMedicalStrip(root, model, hooks);
   });
-
-  header.append(toggle);
+  lead.append(toggle);
+  header.append(lead);
   if (state.open) {
     const zoom = root.createElement('div');
     zoom.className = 'medical-strip__zoom hub-pills';
