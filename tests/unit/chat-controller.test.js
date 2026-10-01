@@ -1085,9 +1085,15 @@ test('applies the agent accent colour when the stream names the agent', async ()
 });
 
 function findChoiceCard(root) {
-  const list = root.querySelector('#chat-messages');
-  const item = list.children.find(child => String(child.className).includes('chat-message--structured'));
-  return item?.children?.[0] ?? null;
+  const hosts = [
+    root.querySelector('#chat-pending-confirms-list'),
+    root.querySelector('#chat-messages')
+  ].filter(Boolean);
+  for (const list of hosts) {
+    const item = list.children?.find?.(child => String(child.className).includes('chat-message--structured'));
+    if (item?.children?.[0]) return item.children[0];
+  }
+  return null;
 }
 
 function findChoiceOption(card, id) {

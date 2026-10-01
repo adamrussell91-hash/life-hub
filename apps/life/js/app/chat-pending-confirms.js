@@ -105,20 +105,45 @@ function isWaitingConfirmCard(node) {
     && (hasClass(node, 'confirm-card') || hasClass(node, 'record-proposal'));
 }
 
+function nestedWaitingConfirm(node) {
+  if (!node || typeof node.querySelector !== 'function') return null;
+  for (const selector of ['.confirm-card', '.record-proposal', '.agent-choice-card', '.prod-card']) {
+    const hit = node.querySelector(selector);
+    if (hit && isWaitingConfirmCard(hit)) return hit;
+  }
+  return null;
+}
+
 function countConfirmCards(list) {
   let count = 0;
   for (const child of list.children ?? []) {
-    if (isWaitingConfirmCard(child)) count += 1;
+    if (isWaitingConfirmCard(child) || nestedWaitingConfirm(child)) count += 1;
   }
   if (count || typeof list.querySelectorAll !== 'function') return count;
   // FakeElement / odd hosts: walk by class, still excluding receipts.
-  for (const selector of ['.confirm-card', '.record-proposal']) {
+  for (const selector of ['.confirm-card', '.record-proposal', '.agent-choice-card', '.prod-card']) {
     for (const card of list.querySelectorAll(selector)) {
       if (!isReceiptCard(card)) count += 1;
     }
     if (count) return count;
   }
   return 0;
+}
+
+/** Sticky tray list host, or null when the chat shell is not mounted. */
+export function getChatPendingConfirmsList(root) {
+  const tray = ensureChatPendingConfirmsTray(root);
+  return tray ? trayList(tray) : null;
+}
+
+/**
+ * Prefer the sticky Confirm tray for every Confirm card type.
+ * Falls back to #chat-messages only when the chat shell cannot host a tray
+ * (unit-test stubs without #chat-view / #chat-form).
+ */
+export function resolveStickyConfirmHost(root, host = null) {
+  if (host) return host;
+  return getChatPendingConfirmsList(root) || root?.querySelector?.('#chat-messages') || null;
 }
 
 function insertTrayBeforeForm(view, form, tray) {
@@ -292,19 +317,18 @@ export function appendActionProposalToPendingTray(root, { proposal, id }, { appe
 }
 
 /**
- * Session-only Confirms (Brisket meals, Chadwick workouts, Hammond CN patches)
- * that are not durable pending-actions still stick above the composer until
- * Confirm/Discard — they must not float away inside #chat-messages.
+ * Mount any session Confirm (record / CN / choice / productivity / Clare dump)
+ * into the sticky tray. Prefer this over appending into #chat-messages.
  */
 export function appendSessionConfirmToPendingTray(root, mountWithHost) {
   if (typeof mountWithHost !== 'function') return null;
-  const tray = ensureChatPendingConfirmsTray(root);
-  if (!tray) return mountWithHost(null);
-  const ui = mountWithHost(trayList(tray));
-  if (ui?.card) {
-    ui.card.dataset.pendingSource = 'session';
-    syncChatPendingConfirmsVisibility(root);
+  const list = resolveStickyConfirmHost(root, null);
+  const ui = mountWithHost(list);
+  const card = ui?.card || ui?.item || ui;
+  if (card?.dataset && !card.dataset.pendingId) {
+    card.dataset.pendingSource = 'session';
   }
+  syncChatPendingConfirmsVisibility(root);
   return ui;
 }
 

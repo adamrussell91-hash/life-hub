@@ -26,6 +26,8 @@
 export function selectLivePendingActions(list: any[]): any[];
 export function pendingConfirmPublicFields(entry: any): any;
 export function ensureChatPendingConfirmsTray(root: any): any;
+export function getChatPendingConfirmsList(root: any): any;
+export function resolveStickyConfirmHost(root: any, host?: any): any;
 export function syncChatPendingConfirmsVisibility(root: any): void;
 export function mountPendingActionCards(root: any, pending: any[], opts: MountPendingOpts): any[];
 export function appendActionProposalToPendingTray(

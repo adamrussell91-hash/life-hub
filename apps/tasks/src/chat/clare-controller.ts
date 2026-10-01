@@ -47,9 +47,16 @@ import {
 import {
   appendActionProposalToPendingTray,
   ensureChatPendingConfirmsTray,
+  getChatPendingConfirmsList,
   mountPendingActionCards,
+  moveConfirmReceiptToTranscript,
   syncChatPendingConfirmsVisibility
 } from '../../../life/js/app/chat-pending-confirms.js';
+
+function stickyConfirmList(root: ParentNode): ParentNode | null {
+  return getChatPendingConfirmsList(root as Document | HTMLElement)
+    || root.querySelector('#chat-messages');
+}
 const SKIP_REASONING_KEY = 'tasks-hub-clare-skip-reasoning';
 
 export function skipReasoning(): boolean {
@@ -150,9 +157,10 @@ function appendProposalCard(
   frameworks: FrameworkEntry[],
   onSaved: () => void
 ): void {
-  const list = root.querySelector('#chat-messages');
+  const list = stickyConfirmList(root);
   if (!list) return;
   const card = el('li', 'record-proposal confirm-card');
+  card.dataset.pendingSource = 'session';
   card.setAttribute('role', 'region');
   card.setAttribute('aria-label', 'Confirm change');
   card.append(el('p', 'page-header__eyebrow', 'Proposed write'));
@@ -203,7 +211,10 @@ function appendProposalCard(
   discard.type = 'button';
   const confirm = el('button', 'btn btn--primary record-proposal__confirm', 'Confirm');
   confirm.type = 'button';
-  discard.addEventListener('click', () => card.remove());
+  discard.addEventListener('click', () => {
+    card.remove();
+    syncChatPendingConfirmsVisibility(root as Document | HTMLElement);
+  });
   confirm.addEventListener('click', async () => {
     const previous = confirm.textContent || 'Confirm';
     setConfirmBusy(confirm, true);
@@ -220,6 +231,7 @@ function appendProposalCard(
         notifyTasksChanged(accepted.tasks);
       }
       appendSavedCard(card);
+      moveConfirmReceiptToTranscript(root as Document | HTMLElement, card);
       onSaved();
     } catch (err) {
       setConfirmBusy(confirm, false, previous);
@@ -230,7 +242,7 @@ function appendProposalCard(
   actions.append(discard, confirm);
   card.append(actions);
   list.append(card);
-  list.scrollTop = list.scrollHeight;
+  syncChatPendingConfirmsVisibility(root as Document | HTMLElement);
 }
 
 function paintScheduleGhostWeek(host: HTMLElement, diff: ScheduleDiffItem): void {
@@ -414,6 +426,7 @@ function appendActionProposalCard(
     if (!pendingId) {
       card.dataset.state = 'discarded';
       card.remove();
+      syncChatPendingConfirmsVisibility(root as Document | HTMLElement);
       return;
     }
     clearActionProposalFailure(card);
@@ -482,9 +495,10 @@ function appendMutationCard(
   agent: ChatAgentSlug,
   onSaved: () => void
 ): void {
-  const list = root.querySelector('#chat-messages');
+  const list = stickyConfirmList(root);
   if (!list) return;
   const card = el('li', 'record-proposal confirm-card');
+  card.dataset.pendingSource = 'session';
   card.setAttribute('role', 'region');
   card.setAttribute('aria-label', 'Confirm change');
   card.append(el('p', 'page-header__eyebrow', 'Proposed write'));
@@ -530,7 +544,10 @@ function appendMutationCard(
   discard.type = 'button';
   const confirm = el('button', 'btn btn--primary record-proposal__confirm', 'Confirm');
   confirm.type = 'button';
-  discard.addEventListener('click', () => card.remove());
+  discard.addEventListener('click', () => {
+    card.remove();
+    syncChatPendingConfirmsVisibility(root as Document | HTMLElement);
+  });
   confirm.addEventListener('click', async () => {
     const previous = confirm.textContent || 'Confirm';
     setConfirmBusy(confirm, true);
@@ -540,6 +557,7 @@ function appendMutationCard(
       const row = results[0];
       if (row && !row.ok) throw new Error(row.note);
       appendSavedCard(card);
+      moveConfirmReceiptToTranscript(root as Document | HTMLElement, card);
       onSaved();
     } catch (err) {
       setConfirmBusy(confirm, false, previous);
@@ -550,7 +568,7 @@ function appendMutationCard(
   actions.append(discard, confirm);
   card.append(actions);
   list.append(card);
-  list.scrollTop = list.scrollHeight;
+  syncChatPendingConfirmsVisibility(root as Document | HTMLElement);
   void agent;
 }
 
@@ -912,18 +930,46 @@ export function createClareChatController({
       if (type === 'schedule-diff') clearCalendarGhostBlocksForProposal(cardPendingId);
     };
 
-    appendProductivityCard(root, type, {
+    const settleProductivityCard = (item: HTMLElement | null, dismiss: boolean) => {
+      if (!item) return;
+      if (dismiss) {
+        item.remove();
+        syncChatPendingConfirmsVisibility(chatRoot);
+        return;
+      }
+      moveConfirmReceiptToTranscript(chatRoot, item);
+    };
+
+    const productivityItem = appendProductivityCard(root, type, {
       ...payload,
       pendingId: cardPendingId ?? undefined,
       title,
       hint,
-      onConfirmSelected: (picks: unknown, meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }) =>
-        runBoundConfirm(picks, false, meta),
-      onConfirmAll: (picks: unknown, meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }) =>
-        runBoundConfirm(picks, false, meta),
-      onConfirm: (picks: unknown, meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }) =>
-        runBoundConfirm(picks, false, meta),
-      onDiscard: () => runBoundConfirm(undefined, true),
+      onConfirmSelected: async (
+        picks: unknown,
+        meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }
+      ) => {
+        await runBoundConfirm(picks, false, meta);
+        settleProductivityCard(productivityItem, false);
+      },
+      onConfirmAll: async (
+        picks: unknown,
+        meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }
+      ) => {
+        await runBoundConfirm(picks, false, meta);
+        settleProductivityCard(productivityItem, false);
+      },
+      onConfirm: async (
+        picks: unknown,
+        meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }
+      ) => {
+        await runBoundConfirm(picks, false, meta);
+        settleProductivityCard(productivityItem, false);
+      },
+      onDiscard: async () => {
+        await runBoundConfirm(undefined, true);
+        settleProductivityCard(productivityItem, true);
+      },
       onPreview: (active: boolean, rows?: unknown) => {
         if (type !== 'schedule-diff' || !cardPendingId) return;
         if (active) setCalendarGhostBlocksForProposal(cardPendingId, ghostsFromBlocks(rows));
@@ -933,7 +979,10 @@ export function createClareChatController({
         if (type !== 'schedule-diff' || !cardPendingId) return;
         setCalendarGhostBlocksForProposal(cardPendingId, ghostsFromBlocks(rows));
       },
-      onClose: (payloadClose: unknown) => runBoundConfirm(payloadClose),
+      onClose: async (payloadClose: unknown) => {
+        await runBoundConfirm(payloadClose);
+        settleProductivityCard(productivityItem, false);
+      },
       onOrphanLink:
         type === 'review-progress'
           ? (taskId: string, goalId: string | null, links: Record<string, string | null>) => {
@@ -1236,7 +1285,8 @@ export function createClareChatController({
         }
         if (event.type === 'choice') {
           stopWait();
-          appendChoiceCard(root, {
+          let choiceItem: HTMLElement | null = null;
+          choiceItem = appendChoiceCard(root, {
             title: event.title,
             hint: event.hint,
             choices: Array.isArray(event.choices) ? event.choices : [],
@@ -1245,9 +1295,13 @@ export function createClareChatController({
             onConfirm: (picks) => {
               const labels = picks.map((pick) => pick.label).filter(Boolean);
               if (!labels.length) return;
+              if (choiceItem) moveConfirmReceiptToTranscript(chatRoot, choiceItem);
               void send(labels.join(', '));
             },
-            onDismiss: () => {}
+            onDismiss: () => {
+              choiceItem?.remove();
+              syncChatPendingConfirmsVisibility(chatRoot);
+            }
           });
           continue;
         }
@@ -1381,7 +1435,8 @@ export function createClareChatController({
         }
         if (event.type === 'choice') {
           stopWait();
-          appendChoiceCard(root, {
+          let choiceItem: HTMLElement | null = null;
+          choiceItem = appendChoiceCard(root, {
             title: typeof event.title === 'string' ? event.title : undefined,
             hint: typeof event.hint === 'string' ? event.hint : undefined,
             choices: Array.isArray(event.choices)
@@ -1392,9 +1447,13 @@ export function createClareChatController({
             onConfirm: (picks) => {
               const labels = picks.map((pick) => pick.label).filter(Boolean);
               if (!labels.length) return;
+              if (choiceItem) moveConfirmReceiptToTranscript(chatRoot, choiceItem);
               void send(labels.join(', '));
             },
-            onDismiss: () => {}
+            onDismiss: () => {
+              choiceItem?.remove();
+              syncChatPendingConfirmsVisibility(chatRoot);
+            }
           });
           continue;
         }

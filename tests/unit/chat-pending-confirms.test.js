@@ -394,6 +394,39 @@ test('Brisket meal Confirm sticks in tray while more chat appends (Adam desktop 
   );
 });
 
+test('resolveStickyConfirmHost prefers the tray for every Confirm card type', async () => {
+  const { resolveStickyConfirmHost } = await import(
+    '../../apps/life/js/app/chat-pending-confirms.js'
+  );
+  const { root, messages } = buildChatRoot();
+  const host = resolveStickyConfirmHost(root, null);
+  assert.equal(host.id, 'chat-pending-confirms-list');
+  assert.notEqual(host, messages);
+});
+
+test('choice Confirm cards stick in the tray while more chat appends', async () => {
+  const { appendSessionConfirmToPendingTray } = await import(
+    '../../apps/life/js/app/chat-pending-confirms.js'
+  );
+  const { root, messages } = buildChatRoot();
+  // Avoid design-kit choice DOM (needs EventTarget); mount a confirm-shaped choice shell.
+  const mounted = appendSessionConfirmToPendingTray(root, (host) => {
+    const item = root.createElement('li');
+    item.className = 'chat-message chat-message--structured confirm-card agent-choice-card';
+    host.append(item);
+    return { item, card: item };
+  });
+  assert.ok(mounted?.item);
+  assert.equal(mounted.item.parent?.id, 'chat-pending-confirms-list');
+  for (let i = 0; i < 4; i += 1) {
+    const bubble = root.createElement('li');
+    bubble.className = 'chat-message';
+    messages.append(bubble);
+  }
+  assert.equal(mounted.item.parent?.id, 'chat-pending-confirms-list');
+  assert.equal(root.querySelector('#chat-pending-confirms').hidden, false);
+});
+
 test('session Confirm receipt leaves the waiting tray for the transcript', async () => {
   const { appendRecordProposal } = await import('../../apps/life/js/app/render-chat.js');
   const {

@@ -57,7 +57,10 @@
 }
 
 .chat-pending-confirms__list > .confirm-card,
-.chat-pending-confirms__list > .record-proposal {
+.chat-pending-confirms__list > .record-proposal,
+.chat-pending-confirms__list > .chat-message--structured,
+.chat-pending-confirms__list > .agent-choice-card,
+.chat-pending-confirms__list > .prod-card {
   margin: 0;
 }
 

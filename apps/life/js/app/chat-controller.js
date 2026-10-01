@@ -777,7 +777,8 @@ export function createChatController({
           gotUsefulOutput = true;
           clearWorkingBubble();
           endTextTurn();
-          appendChoiceCard(root, {
+          let choiceUi = null;
+          choiceUi = appendChoiceCard(root, {
             title: event.title,
             hint: event.hint,
             choices: Array.isArray(event.choices) ? event.choices : [],
@@ -786,9 +787,10 @@ export function createChatController({
             onConfirm: picks => {
               const labels = picks.map(pick => pick.label).filter(Boolean);
               if (!labels.length || sending) return;
+              if (choiceUi?.item) moveConfirmReceiptToTranscript(root, choiceUi.item);
               void confirmSecondOpinion(picks[0]?.id, labels.join(', '));
             },
-            onDismiss: () => {}
+            onDismiss: () => dismissPendingCard(choiceUi?.item)
           });
         } else if (event.type === 'sources') {
           turnSignaled = true;
