@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v194';
+const CACHE_NAME = 'life-hub-shell-v195';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -277,6 +277,12 @@ const SHELL_FILES = [
   'assets/agents/full/penelope.png',
   'assets/agents/full/vera.png',
   'assets/agents/full/sara.png',
+  'assets/fitness/exercises/bridge-pose.webp',
+  'assets/fitness/exercises/chair-pose.webp',
+  'assets/fitness/exercises/cow-face-pose.webp',
+  'assets/fitness/exercises/downward-dog.webp',
+  'assets/fitness/exercises/side-plank.webp',
+  'assets/fitness/exercises/warrior-ii.webp',
   'assets/fitness/muscles/abs-full.png',
   'assets/fitness/muscles/abs-lower.png',
   'assets/fitness/muscles/abs-obliques.png',

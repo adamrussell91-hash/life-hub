@@ -121,6 +121,29 @@ export function resolveMuscleMapKeys({
   return keys;
 }
 
+/** Poses with their own picture. Everything else still uses the body-area muscle image. */
+const POSE_IMAGE_BY_NAME = {
+  'bridge pose': 'bridge-pose',
+  'chair pose': 'chair-pose',
+  'cow face pose': 'cow-face-pose',
+  'downward dog': 'downward-dog',
+  'side plank': 'side-plank',
+  'warrior ii': 'warrior-ii'
+};
+
+function poseNameKey(name) {
+  return String(name ?? '')
+    .replace(/\s+set\s+\d+\s*$/i, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+export function exercisePoseImagePath(name) {
+  const file = POSE_IMAGE_BY_NAME[poseNameKey(name)];
+  return file ? `assets/fitness/exercises/${file}.webp` : null;
+}
+
 const NAME_HINTS = [
   [/press|fly|pec|bench/i, 'chest-whole'],
   [/row|pulldown|pull-?up|deadlift|lat/i, 'back-full'],
@@ -148,6 +171,11 @@ export function resolveExerciseThumbKey(exercise, libraryByName) {
 
 export function muscleAssetPath(key) {
   return `assets/fitness/muscles/${key}.png`;
+}
+
+export function resolveExerciseThumbSrc(exercise, libraryByName) {
+  return exercisePoseImagePath(exercise?.name)
+    ?? muscleAssetPath(resolveExerciseThumbKey(exercise, libraryByName));
 }
 
 export function buildLibraryByName(entries) {
