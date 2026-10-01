@@ -48,6 +48,7 @@ Standalone Mac paths (same files): Life `js/app/chart-kit/`, Knowledge `src/arch
 | Dates | Axis / labels that are calendar days: `dd/mm/yy` via `js/format-display-date.js`. |
 | Rail | Graph is a **page** (icon + “Graph”), not a shortcut. Domain colour on the canvas, never the rail. Snippet: `snippets/rail.html`. |
 | Chrome | Charts and graphs sit on hub tiles / glass. They are not a third chrome system. |
+| Chart info | Every chart card carries a `hub-chart-info` "i" after its label. Hover on a fine pointer, tap on touch. The note is opaque and shows instantly. |
 
 ---
 
@@ -234,6 +235,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-10-01 | `gate-rings`, `hub-chart-info` | Stimulus gate rings gain a thin recent-pace arc (last 7 training days, last 4 complete protein days). Protein ring ink moves to `--pastel-gold-ink`. `hub-chart-info` is the shared "i"; Home macro rings and forecast cards mount it. |
 | 2026-09-30 | catalog | Added `CHART-CATALOG.md` — flat super-list (purpose, limits, where used, code paths) for choosing types. Agents consult it when adding graphs/charts; this file stays APIs / tokens / log. Includes bullseye + vis-timeline as documented-only rows. |
 | 2026-09-24 | `plan-timeline` | Tasks Timeline look is `docs/proposals/timeline-reference/`. Geometry `TL` in `apps/tasks/src/domain/timeline-geometry.ts`. Classes `tl-*`. Motion through `timeline-motion.ts`. |
 | 2026-09-22 | `transit-lines`, `flowchart-lanes`, `orbit-radar` | Visual contract ported from `docs/proposals/graph-reference/` (`lines.html`, `branch.html`, `orbit.html`). Geometry constants `TRANSIT_G` / `FLOW_G` / `ORBIT` live in the scene builders. |

@@ -8900,13 +8900,21 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 .hc-gate-fill { fill: none; stroke-linecap: round; }
 .hc-gate-fill--sessions { stroke: var(--navy); }
 .hc-gate-fill--upper { stroke: var(--wave); }
-.hc-gate-fill--protein { stroke: var(--success); }
+.hc-gate-fill--protein { stroke: var(--pastel-gold-ink); }
 .hc-gate-fill.is-hover, .hc-gate-fill.is-pinned { filter: brightness(1.12); }
 .hc-gate-overflow { fill: var(--warm-white); }
 .hc-gate-spoke { stroke: var(--high-sea-ink); stroke-width: 2; stroke-linecap: round; }
 .hc-key-dot--sessions { fill: var(--navy); }
 .hc-key-dot--upper { fill: var(--wave); }
-.hc-key-dot--protein { fill: var(--success); }
+.hc-key-dot--protein { fill: var(--pastel-gold-ink); }
+/* Not .hc-trend: that class is the scale chart's navy 2.5px stroke and would hide this gradient. */
+.hc-gate-pace { fill: none; stroke-linecap: round; }
+.hc-trend-dot--met { fill: var(--success); }
+.hc-trend-dot--short { fill: var(--danger); }
+.hc-trend-dot--steady { fill: var(--muted); }
+.hc-trend-arrow--met { fill: var(--success); }
+.hc-trend-arrow--short { fill: var(--danger); }
+.hc-trend-arrow--steady { fill: var(--muted); }
 .hc-pill--met { fill: var(--success-surface); }
 .hc-pill--short { fill: var(--danger-surface); }
 .hc-pill--unscored { fill: var(--warning-surface); }

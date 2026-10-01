@@ -71,6 +71,25 @@ function classifySpan(items, from, to) {
   }));
 }
 
+/**
+ * Mean logged protein over the most recent complete nutrition days.
+ * Unlogged and partial days are skipped. Today counts only once it is complete.
+ * Returns grams (not per kg); the caller divides by current weight.
+ */
+export function recentCompleteProtein(items, asOf, { lookback = 7, take = 4, min = 3 } = {}) {
+  if (!isCalendarDate(asOf)) throw new TypeError(`Invalid calendar date: ${asOf}`);
+  const from = addCalendarDays(asOf, -(lookback - 1));
+  const days = classifySpan(items, from, asOf);
+  const eligible = days.filter(day => day.date < asOf || day.nutrition_logging_status === 'complete');
+  const complete = eligible.filter(day => day.nutrition_logging_status === 'complete');
+  if (complete.length < min) {
+    return { grams: null, completeDays: complete.length, min };
+  }
+  const picked = complete.slice(-take);
+  const grams = picked.reduce((sum, day) => sum + (Number(day.logged_protein_g) || 0), 0) / picked.length;
+  return { grams, completeDays: complete.length, min };
+}
+
 function dayTotal(meals, mealType, field) {
   return round1(meals
     .filter(meal => meal.meal === mealType)

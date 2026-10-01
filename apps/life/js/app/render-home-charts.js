@@ -3,7 +3,9 @@
  * and Recomp (twin clocks + the road into the box). Data comes from
  * model.forecastCards (home-forecast.js); geometry from chart-kit.
  */
+import { mountChartInfo } from '../../../../packages/design-kit/js/hub-chart-info.js';
 import { applyHubPillsThumb } from '../../../../packages/design-kit/js/hub-motion.js';
+import { recompInfo, scaleInfo, stimulusGateInfo, stimulusRegionsInfo } from './chart-info-copy.js';
 import { buildGateRings } from './chart-kit/gate-rings.js';
 import { buildGlideSlope } from './chart-kit/glide-slope.js';
 import { buildRecompPlane } from './chart-kit/recomp-plane.js';
@@ -40,9 +42,18 @@ function resetHost(host) {
   host.replaceChildren();
 }
 
+function mountForecastInfo(root, cards) {
+  const days = cards?.stimulus?.chart?.windowDays;
+  const gate = stimulusView(root) === 'regions';
+  mountChartInfo(root.querySelector('#stimulus-label'), gate ? stimulusRegionsInfo(days) : stimulusGateInfo(days));
+  mountChartInfo(root.querySelector('#scale-label'), scaleInfo);
+  mountChartInfo(root.querySelector('#paths-label'), recompInfo);
+}
+
 function paintStimulus(root, cards, options) {
   const host = root.querySelector('[data-home-chart="stimulus"]');
   const chart = cards?.stimulus?.chart;
+  mountForecastInfo(root, cards);
   if (!host || !chart) return;
   const view = stimulusView(root);
   host.dataset.view = view;
