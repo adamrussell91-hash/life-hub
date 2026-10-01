@@ -43,4 +43,24 @@ describe('mountBlockPage', () => {
     await page.flush();
     expect((onSave.mock.calls[0][0] as Array<{ id: string }>).map((block) => block.id)).toEqual(['x_1']);
   });
+
+  it('clicking a saved rich-text preview opens an editable surface', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const page = mountBlockPage(host, {
+      blocks: [
+        {
+          id: 'r1',
+          block_type: 'rich_text',
+          variant: 'medium',
+          content: { html: '<p>Saved after autosave</p>' }
+        }
+      ],
+      onSave: vi.fn().mockResolvedValue(undefined)
+    });
+    expect(host.querySelector('[contenteditable="true"]')).toBeNull();
+    host.querySelector('.block-rich-text')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(host.querySelector('[contenteditable="true"], .block-editor__rich')).toBeTruthy();
+    page.dispose();
+  });
 });

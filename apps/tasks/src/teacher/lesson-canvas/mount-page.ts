@@ -562,6 +562,18 @@ export function mountBlockCanvas(
       bindRowDropTarget(row, index);
       if (canEdit) {
         row.append(createGrip(block, row), createBlockMenu(block));
+        row.addEventListener('click', (event) => {
+          if (selectedId === block.id) return;
+          const target = event.target as HTMLElement | null;
+          if (
+            target?.closest(
+              'button, a, input, textarea, select, .lesson-page__grip, .lesson-page__block-menu'
+            )
+          ) {
+            return;
+          }
+          select(block.id);
+        });
       }
 
       if (isLinkedSection(block)) {

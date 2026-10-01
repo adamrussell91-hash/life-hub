@@ -5,8 +5,9 @@ import {
   createMeeting,
   getMeeting,
   isMeetingIncompleteLinksError,
-  isMeetingTaskLinkIncompleteError,
   linkMeetingTask,
+  meetingHasLinkedTask,
+  meetingTaskLinkWrote,
   listMeetings,
   meetingStateAction,
   rescheduleMeeting,
@@ -81,18 +82,30 @@ export function buildMeetingTaskLinks(record: MeetingRecord, reload: () => Promi
       incompleteOperationId: incomplete?.operation_id ?? null,
       statusMessage: incomplete ? panel.incompleteMessage : null,
       onSubmit: async (input) => {
+        let wrote = false;
         try {
           await linkMeetingTask(record.id, {
             relationship_type: panel.kind,
             ...input
           });
-          await reload();
+          wrote = true;
         } catch (err) {
-          if (isMeetingTaskLinkIncompleteError(err)) {
-            await reload();
-            return;
+          if (meetingTaskLinkWrote(err)) {
+            wrote = true;
+          } else {
+            try {
+              const latest = (await getMeeting(record.id)).meeting;
+              wrote = meetingHasLinkedTask(latest, panel.kind, input);
+            } catch {
+              wrote = false;
+            }
+            if (!wrote) throw err;
           }
-          throw err;
+        }
+        try {
+          await reload();
+        } catch (reloadErr) {
+          if (!wrote) throw reloadErr;
         }
       },
       onRetry: async (operationId) => {
