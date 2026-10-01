@@ -9,9 +9,12 @@ const boundDocs = new WeakSet();
 
 const FLOAT = { placement: 'bottom-start', strategy: 'fixed', offset: 8 };
 
-function hoverable() {
-  return typeof window !== 'undefined'
-    && window.matchMedia?.('(hover: hover) and (pointer: fine)')?.matches === true;
+function viewOf(doc) {
+  return doc?.defaultView ?? (typeof globalThis !== 'undefined' ? globalThis : null);
+}
+
+function hoverable(doc) {
+  return viewOf(doc)?.matchMedia?.('(hover: hover) and (pointer: fine)')?.matches === true;
 }
 
 function place(api) {
@@ -44,9 +47,9 @@ function bindDocument(doc) {
   doc.addEventListener('scroll', event => {
     if (!openApi || openApi.button.ownerDocument !== doc) return;
     if (openApi.note.contains(event.target)) return;
-    if (openApi.pinned || !hoverable()) closeApi(openApi);
+    if (openApi.pinned || !hoverable(doc)) closeApi(openApi);
   }, true);
-  window.addEventListener?.('resize', () => {
+  viewOf(doc)?.addEventListener?.('resize', () => {
     if (openApi?.button?.ownerDocument === doc && !openApi.note.hidden) place(openApi);
   });
 }
@@ -138,7 +141,7 @@ export function mountChartInfo(anchorEl, spec) {
   const hideUnlessPinned = () => {
     if (!api.pinned) closeApi(api);
   };
-  button.addEventListener('mouseenter', () => { if (hoverable()) show(api, false); });
+  button.addEventListener('mouseenter', () => { if (hoverable(doc)) show(api, false); });
   button.addEventListener('mouseleave', hideUnlessPinned);
   button.addEventListener('focus', () => show(api, false));
   button.addEventListener('blur', hideUnlessPinned);
