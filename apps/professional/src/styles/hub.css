@@ -638,6 +638,23 @@
   font-size: var(--text-sm);
 }
 
+.task-link-panel__count,
+.task-link-panel__full {
+  margin: 0;
+}
+
+.task-link-panel__count {
+  font-size: var(--text-xs);
+}
+
+.task-link-panel__linked:not(:empty) {
+  margin-bottom: var(--space-2);
+}
+
+.task-link-panel__full {
+  font-size: var(--text-sm);
+}
+
 /* Comms / Meetings / Events database views — People Network chrome (eyebrow in shell), list rows. */
 .schedule-db__root {
   display: flex;
