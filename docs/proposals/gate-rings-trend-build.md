@@ -12,13 +12,13 @@
 
 For each key, a 3px arc sits in the gap **just inside** its ring, on the ring's own scale (0 → 2× gate).
 
-- **Tail** at the current average (where the thick ring ends). **Tip** at the recent pace. The tail fades in (gradient from 18% to 100% opacity along the chord), and the tip carries a small chevron pointing in the direction of travel.
+- **Tail** at the current average (where the thick ring ends). **Tip** at the recent pace. The line fades in from the tail (gradient from 18% to 100% opacity along the chord) and ends in a small solid dot (radius 0.8 × line width, same colour). **No arrowhead** (Adam, 01/10/26): the fade into the dot carries the direction.
 - **Colour = recent pace vs the gate:** `--success` if recent ≥ gate, `--danger` if below. One colour per arc, not a red-to-green blend.
 - **Direction and length = which way the average is heading, and how hard.** Forward (clockwise) = pulling the average up.
 - **Steady:** if |tip angle − tail angle| < 5°, draw a 2.6px `--muted` dot at the average instead of an arc.
 - **Both off the scale** (average and recent > 2× gate): steady dot at the end of the ring.
 - **No recent data** (see §2): no arc, no dot. The row says why.
-- **Tip floor:** a recent value of 0 draws its tip at `START + 8°`, so the chevron clears the ring label at 12 o'clock.
+- **Tip floor:** a recent value of 0 draws its tip at `START + 8°`, so the tip dot clears the ring label at 12 o'clock.
 
 Colour and direction are separate on purpose. A green arc pointing backwards ("average dropping, still clear of the gate") is a valid, useful state.
 
@@ -43,7 +43,7 @@ Add `recent` to each key in `buildStimulusChartData`:
 - Lane radius: `r - stroke / 2 - gap / 2` (gap is 9, so there's 3px clearance each side).
 - Draw the arcs **after all rings and before the spoke**, so the spoke stays on top.
 - Gradient: a `linearGradient` with `gradientUnits="userSpaceOnUse"` from the tail point to the tip point. Ids go through the scene's `url(#…)` prefixing (`scopedValue` in `render-scene-chart.js`) so two charts on one page don't collide.
-- Chevron: a 2px stroked open path, tangent to the arc at the tip. See `drawTrend` in the mockup; port it to scene nodes.
+- Tip: one `circle` at the tip point, `r = 2.4`, filled with the arc colour. See `drawTrend` in the mockup; port it to scene nodes.
 - Animation: `anim: 'draw'` with the delay after its ring (`120 * index + 600`). None under reduced motion (already handled by the shell).
 - Hit target: the existing ring `hit` id. Add one tooltip line: `Last 7 days: 3 sessions · above the gate` (or `below`).
 
@@ -73,7 +73,7 @@ Add `recent` to each key in `buildStimulusChartData`:
 1. Unit tests in `tests/unit/` for `recentCompleteProtein`: 4 complete days → mean ÷ weight; 2 complete days + 5 unlogged → `null` with reason; today partial → excluded.
 2. Unit tests for `buildStimulusChartData`: `recentStatus` for the four mockup scenarios; a steady case returns a dot, not an arc.
 3. Geometry test: lane radius and tip angle for sessions avg 2.5 / recent 3 (tail 78.75°, tip 112.5°); recent 0 → tip at −82°.
-4. Live umbrella at 390 and 1440 with real data: screenshot the card and compare it side by side with the mockup's "Protein streak" state. The arcs sit in the gaps, the spoke is on top, and no chevron touches a ring label.
+4. Live umbrella at 390 and 1440 with real data: screenshot the card and compare it side by side with the mockup's "Protein streak" state. The arcs sit in the gaps, the spoke is on top, and no tip dot touches a ring label.
 5. Two scene charts on one page: no gradient id collision (inspect `defs`).
 6. `npm run pre-pr-check` passes.
 
@@ -81,8 +81,8 @@ Add `recent` to each key in `buildStimulusChartData`:
 
 | ID | Check for this feature |
 |---|---|
-| **S4** (SVG fill) | The chevron path has `fill: none` and every dot has an explicit fill; nothing renders black. |
-| **C1** | At 390 no chevron overlaps "Sessions" / "Upper sets" / "Protein" labels, the centre "2/3 keys met" or the spoke end. Test recent = 0 for all three. |
+| **S4** (SVG fill) | Every arc has `fill: none` and every dot has an explicit fill; nothing renders black. |
+| **C1** | At 390 no tip dot overlaps "Sessions" / "Upper sets" / "Protein" labels, the centre "2/3 keys met" or the spoke end. Test recent = 0 for all three. |
 | **C2** | Every arc is drawn from real values; no decorative arc when `recent` is null. |
 | **D3** | Screenshots on real data, not fixtures. |
 | **D5** | Row text names its window ("Last 7 days", "Last 4 logged days"); no bare numbers. |

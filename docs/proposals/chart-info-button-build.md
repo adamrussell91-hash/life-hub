@@ -24,7 +24,7 @@ mountChartInfo(anchorEl, { id, title, what, how })
 - **Position:** `positionHubFloating` from `hub-floating.js` (flip + shift, the phone bottom pad already clears the tab bar). Prefer below the button, start-aligned.
 - **Desktop** (`(hover: hover) and (pointer: fine)`): show on `mouseenter` and keyboard focus. Hide on `mouseleave` and blur, unless it was clicked; a click pins it until an outside click or Esc.
 - **Phone / touch:** tap toggles it. An outside tap, Esc or scroll closes it. Only one note is open at a time across the page; reuse the module-level "open popover" pattern from `morphing-popover.js`.
-- **Motion:** 160ms fade + 4px rise, none under `prefers-reduced-motion`.
+- **Fully opaque, always** (Adam, 01/10/26). No opacity fade on open or close: it shows and hides instantly, so the chart never shows through, even for a frame. No `backdrop-filter`, no glass, no translucent surface token.
 - **It must not change chart interaction.** Tapping the "i" never selects a ring, row or bar. Stop propagation on the button only.
 
 ## 2. Copy: one registry per hub, keyed by placement
@@ -73,7 +73,7 @@ Add one line to `packages/design-kit/CHARTS.md` "Locked look": *Every chart card
 
 | ID | Check for this feature |
 |---|---|
-| **S3** | The note is fully opaque over a chart; nothing shows through. |
+| **S3** | The note is fully opaque over a chart; nothing shows through, including while it opens. Screenshot it open over the gate rings. |
 | **S4** (SVG fill) | n/a for the button (HTML); if any placement draws the "i" in SVG, give it an explicit fill. |
 | **C1** | The button never overlaps a card label, pills or a chart label at 390. Check every card head that has pills (Stimulus Gate/Regions). |
 | **R5** | Phone: the hover-only reveal has a tap replacement on every placement. |

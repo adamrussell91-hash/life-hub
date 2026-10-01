@@ -80,18 +80,16 @@ header p { margin: 0; color: var(--muted); max-width: 62ch; }
 .info::after { content: ""; position: absolute; inset: -13px; } /* 44px touch target */
 .info:hover, .info[aria-expanded="true"] { color: var(--ink); border-color: var(--ink); }
 .note {
-  position: absolute; z-index: 10; left: 16px; right: 16px; top: 46px;
-  background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+  position: absolute; z-index: 10; left: 16px; right: 16px; top: 66px;
+  background: var(--paper); border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent); border-radius: 10px;
   box-shadow: var(--elev-2); padding: 12px 14px; font-size: 13px; color: var(--muted);
-  opacity: 0; transform: translateY(4px); pointer-events: none;
-  transition: opacity 160ms ease, transform 220ms cubic-bezier(.2,.8,.2,1);
+  display: none;
 }
-.note.is-on { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.note.is-on { display: block; }
 .note h3 { margin: 0 0 4px; font-size: 13px; color: var(--ink); }
 .note p { margin: 0 0 8px; }
 .note p:last-child { margin-bottom: 0; }
 .note b { color: var(--ink); font-weight: 600; }
-@media (prefers-reduced-motion: reduce) { .note { transition: none; } }
 
 svg { display: block; width: 100%; height: auto; overflow: visible; }
 .t { font-family: var(--font-ui); font-variant-numeric: tabular-nums; }
@@ -145,7 +143,7 @@ code { font-size: 12.5px; background: var(--shore); padding: 1px 5px; border-rad
           <p>Whether your training and protein are enough for the forecast to assume you keep muscle while losing fat. Miss a key and the forecast assumes some loss is muscle, so your body-fat date moves later.</p>
           <h3>How it's worked out</h3>
           <p>Thick rings: your average over the forecast window (usually 28 days), scaled so every pass mark sits on the orange spoke.</p>
-          <p>Thin lines: your last <b>7 days</b> of training and last <b>4 fully logged days</b> of protein. Green clears the gate, red doesn't. The arrow shows where the average is heading.</p>
+          <p>Thin lines: your last <b>7 days</b> of training and last <b>4 fully logged days</b> of protein. Green clears the gate, red doesn't. Each line fades in from your average toward a dot at your recent pace.</p>
         </div>
 
         <p class="rate" id="rate">2.5/week loaded</p>
@@ -172,8 +170,8 @@ code { font-size: 12.5px; background: var(--shore); padding: 1px 5px; border-rad
         <h2>Two encodings, on purpose</h2>
         <ul class="tight">
           <li><b>Colour answers "is my recent behaviour good enough?"</b> Green if the recent pace is at or over the gate, red if it's under.</li>
-          <li><b>The arrow and length answer "which way is the average moving, and how hard?"</b> They don't depend on colour, so the line still reads for red-green colour blindness.</li>
-          <li>They can disagree, and that's useful. A green arrow pointing backwards means your average is dropping but you're still clear of the gate.</li>
+          <li><b>Direction and length answer "which way is the average moving, and how hard?"</b> The line fades in from your average and ends in a solid dot at your recent pace. That doesn't depend on colour, so it still reads with red-green colour blindness, and the row repeats it as ↑ or ↓.</li>
+          <li>They can disagree, and that's useful. A green line running backwards means your average is dropping but you're still clear of the gate.</li>
         </ul>
       </section>
 
@@ -246,7 +244,7 @@ code { font-size: 12.5px; background: var(--shore); padding: 1px 5px; border-rad
     return t;
   }
 
-  // The thin recent-pace line: tail at the average, tip (with chevron) at the recent pace.
+  // The thin recent-pace line: tail at the average, tip (a small dot) at the recent pace.
   function drawTrend(g, defs, id, cx, cy, r, avgA, recA, colour, w = 3) {
     if (Math.abs(recA - avgA) < STEADY_DEG) {
       const [x, y] = polar(cx, cy, r, avgA);
@@ -259,16 +257,8 @@ code { font-size: 12.5px; background: var(--shore); padding: 1px 5px; border-rad
     el('stop', { offset: '0', 'stop-color': colour, 'stop-opacity': '0.18' }, grad);
     el('stop', { offset: '1', 'stop-color': colour, 'stop-opacity': '1' }, grad);
     el('path', { d: arcPath(cx, cy, r, avgA, recA), fill: 'none', stroke: `url(#${id})`, 'stroke-width': w, 'stroke-linecap': 'round' }, g);
-    // Chevron pointing along the direction of travel.
-    const dir = recA > avgA ? 1 : -1;
-    const a = recA * Math.PI / 180;
-    const tx = -Math.sin(a) * dir, ty = Math.cos(a) * dir; // tangent
-    const nx = Math.cos(a), ny = Math.sin(a);              // normal
-    const s = w + 1.6;
-    const tip = [x1 + tx * s * 0.9, y1 + ty * s * 0.9];
-    const p1 = [x1 - tx * s * 0.6 + nx * s, y1 - ty * s * 0.6 + ny * s];
-    const p2 = [x1 - tx * s * 0.6 - nx * s, y1 - ty * s * 0.6 - ny * s];
-    el('path', { d: `M${p1[0].toFixed(2)} ${p1[1].toFixed(2)} L${tip[0].toFixed(2)} ${tip[1].toFixed(2)} L${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`, fill: 'none', stroke: colour, 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, g);
+    // Solid dot at the tip, slightly wider than the line, so the fade reads as travelling toward it.
+    el('circle', { cx: x1, cy: y1, r: w * 0.8, fill: colour }, g);
   }
 
   function render(name) {
@@ -370,9 +360,9 @@ code { font-size: 12.5px; background: var(--shore); padding: 1px 5px; border-rad
   function legend() {
     const host = document.getElementById('legend');
     const rows = [
-      { a0: 0.3, a1: 0.62, c: 'var(--success)', text: '<b>Green, pointing forward.</b> Your recent pace clears the gate and is pulling the average up. A line that crosses the spoke means the key is about to flip.' },
-      { a0: 0.9, a1: 0.65, c: 'var(--success)', text: '<b>Green, pointing back.</b> The average is drifting down, but recently you are still above the gate. Nothing to fix.' },
-      { a0: 0.62, a1: 0.2, c: 'var(--danger)', text: '<b>Red, pointing back.</b> Recently you are below the gate and the average is falling toward it.' },
+      { a0: 0.3, a1: 0.62, c: 'var(--success)', text: '<b>Green, running forward.</b> Your recent pace clears the gate and is pulling the average up. A line that crosses the spoke means the key is about to flip.' },
+      { a0: 0.9, a1: 0.65, c: 'var(--success)', text: '<b>Green, running back.</b> The average is drifting down, but recently you are still above the gate. Nothing to fix.' },
+      { a0: 0.62, a1: 0.2, c: 'var(--danger)', text: '<b>Red, running back.</b> Recently you are below the gate and the average is falling toward it.' },
       { a0: 0.4, a1: 0.4, c: 'var(--muted)', text: '<b>Grey dot.</b> Recent pace matches the average. Steady.' }
     ];
     rows.forEach((row, i) => {
