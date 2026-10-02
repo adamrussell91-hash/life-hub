@@ -538,12 +538,64 @@ function appendNotesField(root, fields, inputs, notes) {
   appendFieldRow(root, fields, inputs, 'notes', notes ?? '');
 }
 
-function proposalTitleDate(date) {
+function proposalShortDate(date) {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(date ?? ''));
   if (!match) return date ? formatDisplayDate(date) : '';
   const parsed = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
   if (Number.isNaN(parsed.getTime())) return formatDisplayDate(date);
-  return parsed.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+  const weekday = parsed.toLocaleDateString('en-AU', { weekday: 'short' });
+  const month = parsed.toLocaleDateString('en-AU', { month: 'short' });
+  return `${weekday} ${parsed.getDate()} ${month}`;
+}
+
+function capitalise(text) {
+  const value = String(text ?? '').trim();
+  return value ? value[0].toUpperCase() + value.slice(1) : '';
+}
+
+const SUMMARY_SKIP_FIELDS = new Set(['time', 'mood_score']);
+const SUMMARY_MAX_PILLS = 5;
+
+// Compact summary (confirm-card option B): short values as pills, the note as a
+// 2-line excerpt. Built from the live inputs so it matches any edits after collapse.
+function summaryPillText(key, value, inputs) {
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  if (key === 'mood') {
+    const score = String(inputs.mood_score?.value ?? '').trim();
+    return { label: 'Mood', value: score ? `${text} · ${score}` : text };
+  }
+  if (isLongTextField(key, text)) {
+    const handoff = key === 'cross_agent_note' ? /→\s*([A-Za-z]+)/.exec(text) : null;
+    return handoff
+      ? { label: `→ ${handoff[1]}`, value: 'note attached' }
+      : { label: humanizeFieldLabel(key), value: 'added' };
+  }
+  return { label: humanizeFieldLabel(key), value: text };
+}
+
+function renderProposalSummary(root, pills, excerpt, inputs) {
+  pills.replaceChildren?.();
+  let count = 0;
+  for (const [key, input] of Object.entries(inputs)) {
+    if (key === 'notes' || SUMMARY_SKIP_FIELDS.has(key) || count >= SUMMARY_MAX_PILLS) continue;
+    const pill = summaryPillText(key, input.value, inputs);
+    if (!pill) continue;
+    const item = root.createElement('span');
+    item.className = 'confirm-card__pill';
+    const label = root.createElement('span');
+    label.className = 'confirm-card__pill-label';
+    label.textContent = pill.label;
+    const value = root.createElement('span');
+    value.textContent = pill.value;
+    item.append(label, value);
+    pills.append(item);
+    count += 1;
+  }
+  pills.hidden = count === 0;
+  const note = String(inputs.notes?.value ?? '').trim();
+  excerpt.textContent = note;
+  excerpt.hidden = !note;
 }
 
 // The Confirm card carries the full exercise list, so a plan Chadwick also wrote
@@ -587,16 +639,22 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
   const isWorkout = record.type === 'workout';
   const plannedWorkout = isWorkout && record.status === 'planned';
 
-  const summary = root.createElement('p');
-  summary.className = 'record-proposal__eyebrow';
-  summary.textContent = plannedWorkout ? 'Proposed session' : `Proposed ${record.type}`;
-  card.append(summary);
-  if (!plannedWorkout) {
-    const title = root.createElement('h3');
-    title.className = 'record-proposal__title';
-    title.textContent = proposalTitleDate(record.date) || `New ${record.type} record`;
-    card.append(title);
+  const head = root.createElement('div');
+  head.className = 'confirm-card__head';
+  const title = root.createElement('h3');
+  title.className = 'confirm-card__title';
+  title.textContent = plannedWorkout ? 'Proposed session' : capitalise(record.type) || 'Record';
+  head.append(title);
+  const when = [proposalShortDate(record.date), typeof record.time === 'string' ? record.time.trim() : '']
+    .filter(Boolean)
+    .join(', ');
+  if (when) {
+    const meta = root.createElement('span');
+    meta.className = 'confirm-card__meta';
+    meta.textContent = `· ${when}`;
+    head.append(meta);
   }
+  card.append(head);
 
   if (isWorkout) {
     appendWorkoutPlanCard(root, card, { record, libraryByName });
@@ -647,6 +705,17 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
     fields.append(dt, dd);
   }
   appendNotesField(root, fields, inputs, notes);
+
+  const pills = root.createElement('div');
+  pills.className = 'confirm-card__pills';
+  const excerpt = root.createElement('p');
+  excerpt.className = 'confirm-card__excerpt';
+  if (!plannedWorkout) {
+    renderProposalSummary(root, pills, excerpt, inputs);
+    card.append(pills, excerpt);
+  }
+  // Editable fields stay folded behind "Show all & edit" so the card stays compact.
+  fields.hidden = true;
   card.append(fields);
 
   if (!isWorkout && Array.isArray(record.exercises) && record.exercises.length > 0) {
@@ -700,11 +769,25 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
   discard.className = 'btn btn--ghost record-proposal__discard';
   discard.textContent = 'Discard';
 
-  actions.append(discard, confirm);
+  const more = root.createElement('button');
+  more.type = 'button';
+  more.className = 'confirm-card__more';
+  more.textContent = 'Show all & edit';
+  more.setAttribute('aria-expanded', 'false');
+  more.addEventListener?.('click', () => {
+    const open = card.dataset.expanded !== 'true';
+    card.dataset.expanded = open ? 'true' : 'false';
+    fields.hidden = !open;
+    more.textContent = open ? 'Hide details' : 'Show all & edit';
+    more.setAttribute('aria-expanded', String(open));
+    if (open) fitCardTextareas(card);
+    else if (!plannedWorkout) renderProposalSummary(root, pills, excerpt, inputs);
+  });
+
+  actions.append(more, discard, confirm);
   card.append(actions);
 
   finishConfirmMount(root, list, card);
-  fitCardTextareas(card);
   return { card, confirm, discard, inputs };
 }
 

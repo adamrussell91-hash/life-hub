@@ -474,7 +474,7 @@ function saveCardHtml(canSave: boolean) {
     }
     return `<section class="confirm-card" role="region" aria-label="Add to archive">
       <p class="page-header__eyebrow">Add to archive</p>
-      <h2 class="page-header__title" style="font-size: var(--text-lg)">File this page</h2>
+      <h2 class="page-header__title">File this page</h2>
       <p class="page-header__supporting">Referenced, and stamped under ${book}.</p>
       <div class="confirm-card__actions">
         <button class="btn btn--primary" type="button" data-save-brief>Add to archive</button>
@@ -487,7 +487,7 @@ function saveCardHtml(canSave: boolean) {
     }
     return `<section class="confirm-card" role="region" aria-label="Add to archive">
       <p class="page-header__eyebrow">Add to archive</p>
-      <h2 class="page-header__title" style="font-size: var(--text-lg)">File this page</h2>
+      <h2 class="page-header__title">File this page</h2>
       <p class="page-header__supporting">Standalone page — tags from tidy, no notebook or uni stamp.</p>
       <div class="confirm-card__actions">
         <button class="btn btn--primary" type="button" data-save-brief>Add to archive</button>
