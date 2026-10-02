@@ -9,6 +9,9 @@
   --hub-motion-stagger: 45ms;
   --hub-motion-lift: 8px;
   --hub-motion-magnet: 5px;
+  /* Chat page title → thin rail. Ease-out so the collapse settles, not snaps. */
+  --hub-motion-rail: 560ms;
+  --hub-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .hub-reveal {
