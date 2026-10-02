@@ -229,14 +229,17 @@ function githubOpenCommit(client) {
 
 async function professionalDepsForGhosts(env, {
   getProfessionalStore = defaultGetProfessionalStore,
-  getPeopleStore = defaultGetUniversalLinkStore
+  getPeopleStore = defaultGetUniversalLinkStore,
+  resolveEntity = defaultResolveEntity
 } = {}) {
   const professionalStore = await getProfessionalStore(env);
   const repo = createCommunicationRepository({ store: professionalStore, env });
   const meetingRepo = createMeetingRepository({ store: professionalStore, env });
   const eventRepo = createEventRepository({ store: professionalStore, env });
   const universalLinkStore = await getPeopleStore(env);
-  const links = createUniversalLinkRepository({ store: universalLinkStore });
+  // resolveEntity is required: without it this threw before any Professional
+  // write, so every ghost Confirm ended as "the Professional record failed".
+  const links = createUniversalLinkRepository({ store: universalLinkStore, resolveEntity });
   const accessContext = createAccessContext({ workflow: 'life' });
   return {
     createCommunication: (input) => repo.createCommunication(input),
@@ -266,7 +269,8 @@ export function createChatConfirmHandler({
 } = {}) {
   const ghostProfessionalDeps = () => professionalDepsForGhosts(env, {
     getProfessionalStore,
-    getPeopleStore
+    getPeopleStore,
+    resolveEntity: resolvePeopleEntity
   });
 
   return async function chatConfirmHandler(request) {
