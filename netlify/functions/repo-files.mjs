@@ -16,6 +16,7 @@ import {
   GitHubClientError,
   GitHubConfigurationError
 } from './_shared/github-client.mjs';
+import { mapBounded } from './_shared/blobs-list.mjs';
 import { isAllowedRepositoryPath, isClientFileInRange, parseDateRange } from './_shared/repo-policy.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
@@ -23,6 +24,10 @@ const MAX_BODY_BYTES = 16 * 1024;
 const MAX_FILES = 50;
 const MAX_FILE_BYTES = 256 * 1024;
 const MAX_BATCH_BYTES = 1024 * 1024;
+// Live functions still die at the 10s default. A serial walk of a 50-file
+// batch spends that whole budget on GitHub round trips, the client aborts,
+// and hub calendars paint 80% "no logs" with the week's diaries never read.
+const BLOB_READ_CONCURRENCY = 8;
 const BLOB_SHA = /^[0-9a-f]{40}$/;
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 const REPOSITORY_MESSAGE = 'The repository is temporarily unavailable.';
@@ -82,34 +87,18 @@ export function createRepoFilesHandler({
       return repositoryError('github_unavailable', true);
     }
 
+    const reads = await mapBounded(
+      parsed.files,
+      BLOB_READ_CONCURRENCY,
+      (requestFile) => readRequestedFile(client, requestFile)
+    );
     const files = [];
     let actualBytes = 0;
-    for (const requestFile of parsed.files) {
-      let blob;
-      try {
-        blob = await client.readBlob(requestFile.sha);
-      } catch (error) {
-        if (error instanceof GitHubClientError && error.code === 'repository_not_found') {
-          return errorResponse(409, 'stale_manifest', 'Refresh the repository manifest and try again.', true, PRIVATE_CACHE);
-        }
-        return mapRepositoryError(error);
-      }
-
-      const decoded = decodeBlob(blob, requestFile.sha);
-      if (!decoded) return repositoryError('github_invalid_response', true);
-      if (decoded.byteLength > MAX_FILE_BYTES) {
-        return errorResponse(413, 'file_too_large', 'A requested file is too large.', false, PRIVATE_CACHE);
-      }
-      actualBytes += decoded.byteLength;
+    for (const read of reads) {
+      if (read.error) return read.error;
+      actualBytes += read.byteLength;
       if (actualBytes > MAX_BATCH_BYTES) return batchTooLarge();
-
-      let content;
-      try {
-        content = new TextDecoder('utf-8', { fatal: true }).decode(decoded);
-      } catch {
-        return repositoryError('github_invalid_response', true);
-      }
-      files.push({ path: requestFile.path, sha: requestFile.sha, content });
+      files.push({ path: read.path, sha: read.sha, content: read.content });
     }
 
     return jsonResponse(200, {
@@ -117,6 +106,32 @@ export function createRepoFilesHandler({
       data: { commitSha: parsed.commitSha, files }
     }, PRIVATE_CACHE);
   };
+}
+
+async function readRequestedFile(client, requestFile) {
+  let blob;
+  try {
+    blob = await client.readBlob(requestFile.sha);
+  } catch (error) {
+    if (error instanceof GitHubClientError && error.code === 'repository_not_found') {
+      return { error: errorResponse(409, 'stale_manifest', 'Refresh the repository manifest and try again.', true, PRIVATE_CACHE) };
+    }
+    return { error: mapRepositoryError(error) };
+  }
+
+  const decoded = decodeBlob(blob, requestFile.sha);
+  if (!decoded) return { error: repositoryError('github_invalid_response', true) };
+  if (decoded.byteLength > MAX_FILE_BYTES) {
+    return { error: errorResponse(413, 'file_too_large', 'A requested file is too large.', false, PRIVATE_CACHE) };
+  }
+
+  let content;
+  try {
+    content = new TextDecoder('utf-8', { fatal: true }).decode(decoded);
+  } catch {
+    return { error: repositoryError('github_invalid_response', true) };
+  }
+  return { path: requestFile.path, sha: requestFile.sha, content, byteLength: decoded.byteLength };
 }
 
 function isJsonRequest(request) {

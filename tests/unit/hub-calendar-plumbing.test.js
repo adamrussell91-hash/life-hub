@@ -47,9 +47,11 @@ test('Pages hub calendar adapters prefix getApiBaseUrl (not same-origin /api)', 
   }
 });
 
-test('Life events loader batches /api/repo/files like Life sync-repository', () => {
+test('Life events loader batches /api/repo/files under the 10s function cap', () => {
   const src = readFileSync(join(root, 'packages/design-kit/js/calendar/load-life-events.js'), 'utf8');
-  assert.match(src, /MAX_BATCH_FILES\s*=\s*50/);
+  // 50 serial GitHub blob reads blow the live 10s function limit, so the
+  // week paints 80% "no logs" even when the diary files are in the repo.
+  assert.match(src, /MAX_BATCH_FILES\s*=\s*16/);
   assert.match(src, /batchLifeFileRequests/);
   assert.match(src, /for \(const batch of batchLifeFileRequests/);
 });

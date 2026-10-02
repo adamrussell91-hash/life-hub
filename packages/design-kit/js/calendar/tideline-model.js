@@ -480,7 +480,8 @@ export function buildTidelineModel({
   today,
   nowHour,
   dayProfile = null,
-  terms = null
+  terms = null,
+  lifeLogStatus = 'live'
 } = {}) {
   const schoolTerms = terms ?? visual?.school_terms ?? [];
   const bands = bandsFromProfile(dayProfile ?? visual?.day_profile ?? {});
@@ -488,6 +489,16 @@ export function buildTidelineModel({
   const ghostList = Array.isArray(ghosts) ? ghosts : (useVisual ? (visual?.GHOSTS ?? []) : []);
   const holiday = date => isSchoolHoliday(date, schoolTerms);
   const capacity = capacityForDates(events, week, { isHoliday: holiday });
+  // A failed or in-flight Life fetch has no diaries yet. "no logs" would
+  // claim Adam didn't write them. Keep a real diary day's note when one arrived.
+  if (lifeLogStatus !== 'live') {
+    const waiting = lifeLogStatus === 'error' || lifeLogStatus === 'degraded' || lifeLogStatus === 'unavailable';
+    for (const [date, cap] of capacity) {
+      if (cap.note === 'no logs') {
+        capacity.set(date, { ...cap, note: waiting ? 'logs unavailable' : 'loading logs' });
+      }
+    }
+  }
   const medLogs = medicationLogs(events);
   const usualDoses = usualDoseTimes(medLogs, today);
   const days = week.map(date => {

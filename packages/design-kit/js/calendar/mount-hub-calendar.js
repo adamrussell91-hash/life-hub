@@ -209,6 +209,7 @@ export function mountHubCalendar(host, adapter) {
       onQuickAdd: adapter.onQuickAdd,
       quickAddLabel: adapter.quickAddLabel,
       events: scopedEvents(),
+      lifeLogStatus: loader.getStatuses()?.life?.status ?? 'pending',
       ghosts,
       week,
       today,
