@@ -112,4 +112,244 @@
   body:has(.teacher-chat) .hub-utilities {
     display: none;
   }
+
+  /* Date chip would crowd the phone rail; the who-header + Tools / New chat stay. */
+  .page-header.is-chat-rail .date-chip,
+  .page-header.is-chat-rail .system-chip,
+  .chat-view__toolbar .date-chip,
+  .chat-view__toolbar .system-chip {
+    display: none;
+  }
+}
+
+/*
+ * Chat pages collapse the canvas title into a thin rail so the thread
+ * keeps the window. startHubMotion() adds .is-chat-rail while a full-page
+ * chat is showing, and .is-chat-rail-merged once the thread is engaged
+ * (actions park in the Messenger toolbar — one row).
+ * Transition lives on the resting header so the first class change eases
+ * from the current title block. @starting-style covers a header that is
+ * born already on a chat page (Knowledge, Teaching).
+ */
+.page-header {
+  transition:
+    padding-top var(--hub-motion-rail) var(--hub-motion-ease),
+    padding-bottom var(--hub-motion-rail) var(--hub-motion-ease),
+    margin-top var(--hub-motion-rail) var(--hub-motion-ease),
+    margin-bottom var(--hub-motion-rail) var(--hub-motion-ease),
+    gap var(--hub-motion-rail) var(--hub-motion-ease),
+    box-shadow var(--hub-motion-rail) var(--hub-motion-ease);
+}
+
+.page-header > .page-header__copy .page-header__eyebrow,
+.page-header > .page-header__eyebrow,
+.page-header > .page-header__copy .page-header__supporting,
+.page-header > .page-header__supporting {
+  transition:
+    max-height var(--hub-motion-rail) var(--hub-motion-ease),
+    margin var(--hub-motion-rail) var(--hub-motion-ease),
+    opacity var(--hub-motion-duration) ease,
+    line-height var(--hub-motion-rail) var(--hub-motion-ease);
+}
+
+.page-header > .page-header__copy .page-header__eyebrow,
+.page-header > .page-header__eyebrow {
+  max-height: 3rem;
+}
+
+.page-header__title {
+  transition:
+    font-size var(--hub-motion-rail) var(--hub-motion-ease),
+    line-height var(--hub-motion-rail) var(--hub-motion-ease),
+    opacity var(--hub-motion-duration) ease;
+}
+
+.page-header__actions {
+  transition: transform var(--hub-motion-rail) var(--hub-motion-ease);
+}
+
+.chat-presence__portrait {
+  transition:
+    width var(--hub-motion-rail) var(--hub-motion-ease),
+    height var(--hub-motion-rail) var(--hub-motion-ease);
+}
+
+.page-header.is-chat-rail {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  padding-block: var(--space-2);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+.page-header.is-chat-rail .page-header__copy > .page-header__eyebrow,
+.page-header.is-chat-rail > .page-header__eyebrow,
+.page-header.is-chat-rail .page-header__supporting {
+  max-height: 0;
+  margin: 0;
+  opacity: 0;
+  overflow: hidden;
+  line-height: 0;
+  pointer-events: none;
+}
+
+.page-header.is-chat-rail .page-header__title-row .page-header__title,
+.page-header.is-chat-rail > .page-header__title {
+  font-size: var(--text-base);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.page-header.is-chat-rail .chat-presence__portrait {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.page-header.is-chat-rail .page-header__actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.page-header.is-chat-rail .date-chip,
+.page-header.is-chat-rail .system-chip {
+  min-height: 2rem;
+  padding-block: 0.2rem;
+}
+
+/* Engaged thread: the who-header is the rail. The title block eases shut. */
+.page-header.is-chat-rail.is-chat-rail-merged {
+  gap: 0;
+  margin-block: 0;
+  padding-block: 0;
+  min-height: 0;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.page-header.is-chat-rail.is-chat-rail-merged .page-header__title-row .page-header__title,
+.page-header.is-chat-rail.is-chat-rail-merged > .page-header__title {
+  font-size: 0;
+  line-height: 0;
+  opacity: 0;
+}
+
+.page-header.is-chat-rail.is-chat-rail-merged .chat-presence__portrait {
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+@starting-style {
+  .page-header.is-chat-rail {
+    margin-bottom: 1.8rem;
+    padding-block: 2.8rem 1.8rem;
+    gap: 1rem;
+  }
+
+  .page-header.is-chat-rail .page-header__title-row .page-header__title,
+  .page-header.is-chat-rail > .page-header__title {
+    font-size: var(--text-2xl);
+    line-height: var(--leading-tight);
+    opacity: 1;
+  }
+
+  .page-header.is-chat-rail .page-header__copy > .page-header__eyebrow,
+  .page-header.is-chat-rail > .page-header__eyebrow {
+    max-height: 3rem;
+    margin-bottom: var(--space-2);
+    opacity: 1;
+    line-height: var(--leading-snug);
+  }
+
+  .page-header.is-chat-rail .chat-presence__portrait {
+    width: 3.5rem;
+    height: 3.5rem;
+    opacity: 1;
+  }
+}
+
+/* Messenger toolbar becomes the single rail once utilities park in it.
+   An empty thread parks New chat on the title, so this row drops out
+   unless Tasks still has Skip reasoning in it. */
+.chat-view:not([data-panel-mode]) > .chat-view__toolbar {
+  align-items: center;
+  min-height: 0;
+}
+
+.chat-view:not([data-panel-mode]):not([data-chrome='engaged']) > .chat-view__toolbar:not(:has(.chat-new-button, .clare-prefs__skip)) {
+  display: none;
+}
+
+.chat-view[data-chrome='engaged']:not([data-panel-mode]) > .chat-view__toolbar,
+.chat-view__toolbar:has(.page-header__actions) {
+  min-height: 2.5rem;
+  padding-block: var(--space-1);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+.chat-view:not([data-panel-mode]) .chat-view__who-avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.chat-view__toolbar .page-header__actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.chat-view__toolbar .date-chip,
+.chat-view__toolbar .system-chip {
+  min-height: 2rem;
+  padding-block: 0.2rem;
+}
+
+.page-frame:has(> .page-header.is-chat-rail) .chat-view:not([data-panel-mode]),
+.hub-canvas:has(> .page-header.is-chat-rail) .chat-view:not([data-panel-mode]) {
+  gap: var(--space-1);
+}
+
+/* Phone: one row, 44px targets, and the same ease as desktop.
+   A column or wrapping page-header (Teaching, Knowledge) would stack the rail. */
+@media (max-width: 720px) {
+  .page-header.is-chat-rail {
+    gap: var(--space-2);
+    padding-block: var(--space-1);
+  }
+
+  .page-header.is-chat-rail .chat-new-button,
+  .chat-view:not([data-panel-mode]) > .chat-view__toolbar .btn {
+    min-height: 2.75rem;
+  }
+
+  /* Typing hides the header. When the keyboard closes, don't replay the ease. */
+  .page-header.is-chat-rail.is-chat-rail-merged,
+  .page-header.is-chat-rail.is-chat-rail-merged .page-header__title,
+  .page-header.is-chat-rail.is-chat-rail-merged .page-header__eyebrow,
+  .page-header.is-chat-rail.is-chat-rail-merged .page-header__supporting {
+    transition: none;
+  }
+
+  .canvas:has(> .page-header.is-chat-rail) .coach.chat {
+    min-height: calc(100dvh - 4.25rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-header,
+  .page-header__eyebrow,
+  .page-header__supporting,
+  .page-header__title,
+  .page-header__actions,
+  .chat-presence__portrait {
+    transition: none;
+  }
 }
