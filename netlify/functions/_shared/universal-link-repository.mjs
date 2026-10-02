@@ -991,7 +991,7 @@ export function createUniversalLinkRepository({
 
   return {
     createLink,
-    getLink: (id, accessContext) => readRepository.getLink(id, accessContext),
+    getLink: (id, accessContext, readOptions) => readRepository.getLink(id, accessContext, readOptions),
     listOutgoing: (sourceRef, accessContext, resolveOptions) => readRepository.listOutgoing(sourceRef, accessContext, resolveOptions),
     listIncoming: (targetRef, accessContext, resolveOptions) => readRepository.listIncoming(targetRef, accessContext, resolveOptions),
     listForEntity: (ref, accessContext, resolveOptions) => readRepository.listForEntity(ref, accessContext, resolveOptions),

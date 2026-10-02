@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { renderOrganisationsView } from '@/views/organisations';
+import { renderOrganisationsView, sparkLegend } from '@/views/organisations';
 import { renderOrganisationPage } from '@/views/organisation-page';
 import {
   layoutOrganisationTimeline,
@@ -96,6 +96,29 @@ describe('renderOrganisationsView (W2)', () => {
     expect(canvas.textContent).not.toMatch(/Phase [0-9]|arrives in|is built|coming soon/);
     canvas.remove();
   });
+
+  it('typing in search filters in place: no hashchange, no refetch, focus kept', async () => {
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderOrganisationsView(canvas);
+    const fetches = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
+    const hashchange = vi.fn();
+    window.addEventListener('hashchange', hashchange);
+    const search = canvas.querySelector('input.orgs-page__search') as HTMLInputElement;
+    search.focus();
+    for (const q of ['M', 'Me', 'Mer']) {
+      search.value = q;
+      search.dispatchEvent(new Event('input'));
+    }
+    await new Promise((r) => setTimeout(r, 200));
+    window.removeEventListener('hashchange', hashchange);
+    expect(hashchange).not.toHaveBeenCalled();
+    expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(fetches);
+    expect(location.hash).toContain('q=Mer');
+    expect(canvas.querySelector('input.orgs-page__search')).toBe(search);
+    expect(canvas.querySelector('.orgs-wall__empty')?.textContent).toBe('No organisations match these filters.');
+    canvas.remove();
+  });
 });
 
 describe('organisation page A5 / Part B wired controls', () => {
@@ -164,7 +187,8 @@ describe('organisation page A5 / Part B wired controls', () => {
     expect(canvas.querySelectorAll('button[disabled]').length).toBe(0);
     expect(canvas.textContent).toMatch(/Compare with/);
     expect(canvas.textContent).toMatch(/Draw the chart/);
-    expect(canvas.textContent).toMatch(/Edit chart/);
+    // One chart control: no second "Edit chart" in the header (F-08).
+    expect(canvas.textContent).not.toMatch(/Edit chart/);
     expect(canvas.textContent).toMatch(/Run now/);
     expect(canvas.textContent).toContain('Add opportunity');
     expect(canvas.textContent).not.toMatch(/Phase [0-9]|arrives in|is built|coming soon/);
@@ -175,6 +199,145 @@ describe('organisation page A5 / Part B wired controls', () => {
       '#/organisations/compare'
     );
     canvas.remove();
+  });
+});
+
+const POSITION_ID = 'position_00000000-0000-4000-8000-0000000000aa';
+
+function structureWithOneBox() {
+  return {
+    organisation_ref: `shared:organisation:${ORG_ID}`,
+    units: [],
+    positions: [
+      {
+        id: POSITION_ID,
+        kind: 'position',
+        title: 'Principal',
+        organisation_ref: `shared:organisation:${ORG_ID}`,
+        unit_ref: null,
+        is_head: false,
+        lifecycle_status: 'active'
+      }
+    ],
+    links: [],
+    layout: {},
+    people_here: [],
+    graph: {
+      organisation_ref: `shared:organisation:${ORG_ID}`,
+      nodes: [],
+      edges: [],
+      members_by_unit: {},
+      memberships_by_person: {},
+      member_person_ids: [],
+      member_count: 0,
+      cycles: []
+    }
+  };
+}
+
+describe('organisation page chart load + sheets (live test 2026-10-02)', () => {
+  const originalFetch = globalThis.fetch;
+  let structureStatus = 200;
+
+  beforeEach(() => {
+    structureStatus = 200;
+    globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/organisations/directory')) return jsonResponse(200, directoryPayload);
+      if (url.includes('/api/org-structure')) {
+        return structureStatus === 200
+          ? jsonResponse(200, { ok: true, data: structureWithOneBox() })
+          : jsonResponse(503, { ok: false, error: { code: 'unavailable', message: 'Timed out' } });
+      }
+      if (url.includes('/api/opportunities')) return jsonResponse(200, { ok: true, data: { opportunities: [] } });
+      if (url.includes('/api/organisation-read')) {
+        return jsonResponse(200, { ok: true, data: { read: { generated_at: null } } });
+      }
+      return jsonResponse(404, { ok: false, error: { code: 'not_found', message: 'missing' } });
+    });
+    location.hash = `#/organisations/${ORG_ID}`;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('a failed chart load says so with a retry, never "No chart yet" (F-04)', async () => {
+    structureStatus = 503;
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderOrganisationPage(canvas, ORG_ID);
+    const how = canvas.querySelector('.orgs-section--how') as HTMLElement;
+    expect(how.textContent).toMatch(/Could not load the chart/);
+    expect(how.textContent).not.toMatch(/No chart yet|Draw the chart/);
+    expect([...how.querySelectorAll('button')].some((b) => b.textContent === 'Try again')).toBe(true);
+    canvas.remove();
+  });
+
+  it('"Units & members…" opens the structure sheet and it stays open (F-02)', async () => {
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderOrganisationPage(canvas, ORG_ID);
+    const edit = [...canvas.querySelectorAll('button')].find((b) => b.textContent === 'Edit chart');
+    expect(edit).toBeTruthy();
+    edit!.click();
+    const advanced = [...canvas.querySelectorAll('button')].find((b) => b.textContent === 'Units & members…');
+    expect(advanced).toBeTruthy();
+    advanced!.click();
+    // Let the chart editor's async close (layout flush) finish.
+    for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(canvas.querySelector('[aria-label^="Edit structure"]')).not.toBeNull();
+    expect(canvas.querySelector('[aria-label^="Edit chart"]')).toBeNull();
+    canvas.remove();
+  });
+
+  it('Escape in the person search does not close the chart editor (F-05)', async () => {
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderOrganisationPage(canvas, ORG_ID);
+    [...canvas.querySelectorAll('button')].find((b) => b.textContent === 'Edit chart')!.click();
+    const search = canvas.querySelector('input[aria-label="Search people…"]') as HTMLInputElement;
+    search.value = 'Ma';
+    search.focus();
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(canvas.querySelector('[aria-label^="Edit chart"]')).not.toBeNull();
+    expect(search.value).toBe('');
+    canvas.remove();
+  });
+
+  it('the chart editor can add a faculty / team (E6)', async () => {
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderOrganisationPage(canvas, ORG_ID);
+    [...canvas.querySelectorAll('button')].find((b) => b.textContent === 'Edit chart')!.click();
+    const name = canvas.querySelector('input[aria-label="Faculty or team name"]') as HTMLInputElement;
+    expect(name).not.toBeNull();
+    name.value = 'Science Faculty';
+    [...canvas.querySelectorAll('button')].find((b) => b.textContent === 'Add faculty / team')!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0]));
+    expect(calls.some((u) => u.includes('action=create_unit'))).toBe(true);
+    canvas.remove();
+  });
+});
+
+describe('sparkLegend (tile chart key)', () => {
+  it('names the line, the bar and the dots in plain words', () => {
+    const legend = sparkLegend(
+      ['2025-02-01T00:00:00.000Z', '2025-03-01T00:00:00.000Z'],
+      [{ start: '2025-01-22T00:00:00.000Z', end: null }],
+      2
+    );
+    expect(legend.caption).toBe('met 2025 · you 2025–now · 2 events');
+    expect(legend.title).toMatch(/Line: people you know here/);
+    expect(legend.title).toMatch(/Bar: your time here \(2025–now\)/);
+  });
+
+  it('is empty when there is nothing dated', () => {
+    expect(sparkLegend([], [], 0)).toEqual({ caption: '', title: 'No dated links yet' });
   });
 });
 

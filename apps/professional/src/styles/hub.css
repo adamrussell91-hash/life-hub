@@ -4225,6 +4225,14 @@
   width: 100%;
 }
 
+.orgs-tile__spark-legend,
+.orgs-time__legend {
+  margin: 2px 0 0;
+  font-size: var(--text-2xs);
+  color: var(--muted);
+  line-height: 1.3;
+}
+
 .orgs-rchips {
   display: flex;
   flex-wrap: wrap;
@@ -4426,6 +4434,36 @@
 .orgs-flow__stage {
   min-width: 0;
   touch-action: pan-x pan-y;
+}
+
+/* A chart narrower than the card sits in the middle, not hard left. */
+.orgs-flow__stage > .orgs-flow__svg {
+  margin-inline: auto;
+}
+
+/* How card: view switch, highlight and Edit chart share one row. */
+.orgs-how__toolbar {
+  gap: var(--space-2);
+  margin-bottom: 12px;
+}
+
+.orgs-how__toolbar .orgs-how__seg,
+.orgs-how__toolbar .orgs-how__hl {
+  margin-bottom: 0;
+}
+
+/* Ann's read / Opportunities: the empty line and its button were touching. */
+.orgs-section--ann .people-pane__section-body,
+.orgs-section--opps .people-pane__section-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.orgs-section--ann .people-pane__section-body > .orgs-ann__threads,
+.orgs-section--opps .people-pane__section-body > .orgs-opps__list {
+  align-self: stretch;
 }
 
 .orgs-flow__svg {

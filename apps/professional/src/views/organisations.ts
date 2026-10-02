@@ -42,8 +42,13 @@ function hashQuery(): string {
   return i >= 0 ? location.hash.slice(i) : '';
 }
 
+// Keep the URL in step without firing hashchange. Assigning location.hash
+// made the router repaint the whole page — refetching the directory and
+// rebuilding the search box — after every letter typed in search, and on
+// every sort / group / filter change.
 function writeHash(query: OrgsQueryState): void {
-  location.hash = organisationsRoute(null, serializeOrgsQuery(query));
+  const next = organisationsRoute(null, serializeOrgsQuery(query));
+  if (location.hash !== next) history.replaceState(history.state, '', next);
 }
 
 function isPhone(): boolean {
@@ -166,10 +171,10 @@ function groupModels(
 
 function renderSpread(spread: OrganisationModel['warmthSpread']): HTMLElement {
   const bar = el('span', 'orgs-spread');
-  bar.setAttribute(
-    'aria-label',
-    `${spread.warm} warm, ${spread.cooling} cooling, ${spread.cold} cold`
-  );
+  const label = `How recently you’ve been in touch: ${spread.warm} warm, ${spread.cooling} cooling, ${spread.cold} cold`;
+  bar.setAttribute('aria-label', label);
+  bar.setAttribute('role', 'img');
+  bar.title = label;
   const total = Math.max(1, spread.total);
   for (const [cls, n] of [
     ['orgs-spread__w', spread.warm],
@@ -226,13 +231,19 @@ function renderTile(model: OrganisationModel, query: OrgsQueryState): HTMLAnchor
       `${undated} ${undated === 1 ? 'person' : 'people'} with no known start`
     );
   }
-  spark.setAttribute('aria-label', ariaParts.join('. '));
   const workMarks = model.timelineLanes
     .filter((l) => l.kind === 'work_study' || l.kind === 'roles')
     .map((l) => ({ start: l.start, end: l.end }));
   const eventMarks = model.timelineLanes
     .filter((l) => l.kind === 'events')
     .map((l) => ({ at: l.start }));
+  // The spark alone was unreadable (a dot and a grey bar, no hover). Say
+  // what it shows, on the tile and in the tooltip.
+  const legend = sparkLegend(model.arcPoints.map((p) => p.at), workMarks, eventMarks.length);
+  ariaParts.push(legend.title);
+  spark.setAttribute('aria-label', ariaParts.join('. '));
+  spark.setAttribute('role', 'img');
+  spark.title = `2019 → now. ${legend.title}`;
   spark.append(
     renderOrganisationSparkSvg({
       points: model.arcPoints,
@@ -242,8 +253,49 @@ function renderTile(model: OrganisationModel, query: OrgsQueryState): HTMLAnchor
     })
   );
 
+  if (legend.caption) spark.append(el('p', 'orgs-tile__spark-legend', legend.caption));
+
   a.append(head, count, spark);
   return a;
+}
+
+function yearOf(at: string | null | undefined): string | null {
+  const ms = Date.parse(at ?? '');
+  return Number.isFinite(ms) ? String(new Date(ms).getUTCFullYear()) : null;
+}
+
+/** Plain-words key for the tile spark: line = people met, bar = your time there, dots = events. */
+export function sparkLegend(
+  personStarts: string[],
+  work: Array<{ start: string; end: string | null }>,
+  eventCount: number
+): { caption: string; title: string } {
+  const caption: string[] = [];
+  const title: string[] = [];
+  const years = personStarts.map(yearOf).filter((y): y is string => Boolean(y)).sort();
+  if (years.length) {
+    const span = years[0] === years[years.length - 1] ? years[0] : `${years[0]}–${years[years.length - 1]}`;
+    caption.push(`met ${span}`);
+    title.push(`Line: people you know here, by when you first linked (${years.length} dated, ${span})`);
+  }
+  const firstWork = [...work].sort((a, b) => Date.parse(a.start) - Date.parse(b.start))[0];
+  if (firstWork) {
+    const from = yearOf(firstWork.start);
+    const open = work.some((w) => !w.end || Date.parse(w.end) > Date.now());
+    const lastEnd = work
+      .map((w) => w.end)
+      .filter((e): e is string => Boolean(e))
+      .sort()
+      .pop();
+    const span = open ? `${from}–now` : `${from}–${yearOf(lastEnd) ?? from}`;
+    caption.push(`you ${span}`);
+    title.push(`Bar: your time here (${span})`);
+  }
+  if (eventCount) {
+    caption.push(`${eventCount} event${eventCount === 1 ? '' : 's'}`);
+    title.push(`Dots: events (${eventCount})`);
+  }
+  return { caption: caption.join(' · '), title: title.join('. ') || 'No dated links yet' };
 }
 
 /**
