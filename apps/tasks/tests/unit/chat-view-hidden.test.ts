@@ -55,7 +55,8 @@ describe('parked Clare chat', () => {
   });
 
   it('engaged phone Clare drops the page header so the who-header can rise', () => {
-    expect(viewsCss).toMatch(
+    expect(viewsCss).toMatch(/Engaged phone Clare: \.is-chat-rail-merged/);
+    expect(viewsCss).not.toMatch(
       /\[data-hub-view='clare'\]:has\(\.chat-view\[data-chrome='engaged'\]:not\(\[hidden\]\)\)\s+\.page-header\s*\{\s*display:\s*none/
     );
   });

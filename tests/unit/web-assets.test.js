@@ -305,9 +305,11 @@ test('engaged phone Chat drops the page header stack and assistant left bar', as
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
   const phoneChat = css.slice(css.indexOf('Engaged phone Chat already has the Messenger who-header'));
   assert.ok(phoneChat.length > 80, 'engaged phone Chat chrome block exists');
-  assert.match(
+  assert.match(phoneChat, /is-chat-rail-merged/);
+  assert.doesNotMatch(
     phoneChat,
-    /#chat-view\[data-chrome='engaged'\][\s\S]*\.page-header\s*\{\s*display:\s*none/
+    /\.page-header\s*\{\s*display:\s*none/,
+    'display:none skips the rail ease; the merged header collapses instead'
   );
   assert.doesNotMatch(
     phoneChat,

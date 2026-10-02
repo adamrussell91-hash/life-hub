@@ -547,6 +547,153 @@ function enhanceScrollHide(el) {
   bindScrollHide(el);
 }
 
+const RAIL_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const RAIL_MS = 560;
+/** Actions parked in a chat toolbar, keyed back to their page header. */
+const railActionHome = new WeakMap();
+/** New chat button parked on the title rail while the thread is empty. */
+const railNewChatHome = new WeakMap();
+const railNewChatButton = new WeakMap();
+
+const CHAT_PAGE_SELECTOR = [
+  '.chat-view:not([hidden]):not([data-panel-mode])',
+  '.teacher-chat',
+  '.coach.chat'
+].join(', ');
+
+function chatPageIn(host) {
+  if (!host?.querySelector) return null;
+  return host.querySelector(CHAT_PAGE_SELECTOR);
+}
+
+/** Includes a hidden full-page chat so parked controls can be put back. */
+function chatHostPage(host) {
+  if (!host?.querySelector) return null;
+  return host.querySelector('.chat-view:not([data-panel-mode]), .teacher-chat, .coach.chat');
+}
+
+function actionsForHeader(header) {
+  const inside = [...(header.children ?? [])].find(child => child.classList?.contains('page-header__actions'));
+  if (inside) return inside;
+  const doc = header.ownerDocument;
+  if (!doc?.querySelectorAll) return null;
+  for (const el of doc.querySelectorAll('.page-header__actions')) {
+    if (railActionHome.get(el) === header) return el;
+  }
+  return null;
+}
+
+function toolbarSlot(chat) {
+  if (!chat?.matches?.('.chat-view')) return null;
+  return chat.querySelector('.chat-view__toolbar .chat-view__actions');
+}
+
+function moveRailActions(node, parent, before, reduced) {
+  const view = node.ownerDocument?.defaultView;
+  const canFlip = !reduced && !view?.happyDOM;
+  const first = canFlip ? node.getBoundingClientRect?.() : null;
+  if (before && before.parentElement === parent) parent.insertBefore(node, before);
+  else parent.append(node);
+  if (!first || reduced) return;
+  const last = node.getBoundingClientRect();
+  const dx = first.left - last.left;
+  const dy = first.top - last.top;
+  if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+  node.style.transition = 'none';
+  node.style.transform = `translate(${dx}px, ${dy}px)`;
+  const onEnd = (event) => {
+    if (event.target !== node || event.propertyName !== 'transform') return;
+    node.removeEventListener('transitionend', onEnd);
+    node.style.transition = '';
+    node.style.transform = '';
+  };
+  node.addEventListener('transitionend', onEnd);
+  const frame = view?.requestAnimationFrame?.bind(view);
+  if (!frame) {
+    node.style.transition = `transform ${RAIL_MS}ms ${RAIL_EASE}`;
+    node.style.transform = '';
+    return;
+  }
+  frame(() => {
+    frame(() => {
+      node.style.transition = `transform ${RAIL_MS}ms ${RAIL_EASE}`;
+      node.style.transform = '';
+    });
+  });
+}
+
+/**
+ * Collapse the canvas title on a full-page chat, and once the thread is
+ * engaged park header actions in the Messenger toolbar so one rail remains.
+ * Overlay chat (data-panel-mode) does not touch the page underneath.
+ * @param {Document | ParentNode} [root]
+ */
+export function syncChatPageRails(root = document) {
+  const scope = root?.nodeType === 1 || root?.nodeType === 9 || root?.nodeType === 11
+    ? root
+    : root?.parentElement;
+  if (!scope?.querySelectorAll) return;
+  const headers = [...scope.querySelectorAll('.page-header')];
+  if (scope.matches?.('.page-header')) headers.unshift(scope);
+  const reduced = prefersReducedMotion(scope);
+
+  for (const header of headers) {
+    if (header.closest?.('.confirm-card, [role="dialog"], .hub-morph-dialog, .create-modal')) continue;
+    const host = header.parentElement;
+    const chat = chatPageIn(host);
+    const pageChat = chat ?? chatHostPage(host);
+    const on = Boolean(chat);
+    header.classList.toggle('is-chat-rail', on);
+
+    const actions = actionsForHeader(header);
+    const slot = toolbarSlot(chat);
+    const merge = Boolean(on && chat?.dataset?.chrome === 'engaged' && actions && slot);
+    header.classList.toggle('is-chat-rail-merged', merge);
+
+    const willMerge = Boolean(actions && merge && actions.parentElement !== slot);
+    const willReturn = Boolean(
+      actions && !merge && railActionHome.get(actions) === header && actions.parentElement !== header
+    );
+    if (willMerge) {
+      railActionHome.set(actions, header);
+      moveRailActions(actions, slot, null, reduced);
+    } else if (willReturn) {
+      moveRailActions(actions, header, null, reduced);
+      parkNewChat(pageChat, actions, on, reduced);
+    } else {
+      parkNewChat(pageChat, actions, on && !merge, reduced);
+    }
+  }
+}
+
+/** Empty thread: New chat sits on the title rail. Engaged: it returns to its old slot. */
+function newChatButton(chat) {
+  const found = chat?.querySelector?.('#chat-new');
+  if (found) {
+    railNewChatButton.set(chat, found);
+    return found;
+  }
+  return railNewChatButton.get(chat) ?? null;
+}
+
+function parkNewChat(chat, actions, park, reduced) {
+  const neu = newChatButton(chat);
+  const slot = toolbarSlot(chat);
+  if (!neu || !slot) return;
+  if (neu.parentElement === slot && !railNewChatHome.has(neu)) {
+    railNewChatHome.set(neu, { slot, next: neu.nextElementSibling });
+  }
+  if (park && actions && neu.parentElement !== actions) {
+    moveRailActions(neu, actions, actions.firstElementChild, reduced);
+    return;
+  }
+  const home = railNewChatHome.get(neu);
+  if (!park && home?.slot === slot && neu.parentElement !== slot) {
+    const next = home.next?.parentElement === slot ? home.next : null;
+    moveRailActions(neu, slot, next, reduced);
+  }
+}
+
 function syncPillsFromTarget(target, reduced) {
   const btn = target.closest?.('.hub-pills__btn');
   const group = (btn?.parentElement?.classList.contains('hub-pills') ? btn.parentElement : null)
@@ -582,6 +729,7 @@ function scan(root, reduced) {
   if (scope.matches?.('.hub-pills')) enhancePills(scope, reduced);
   else syncPillsFromTarget(scope, reduced);
   if (scope.matches?.(SCROLL_HIDE_SELECTOR)) enhanceScrollHide(scope);
+  syncChatPageRails(scope);
 }
 
 function watchKinetic(mutations, reduced) {
@@ -642,10 +790,19 @@ export function startHubMotion(root = document) {
         ) {
           syncPillsFromTarget(mutation.target, nextReduced);
         }
+        if (
+          mutation.attributeName === 'hidden'
+          || mutation.attributeName === 'data-chrome'
+          || mutation.attributeName === 'data-panel-mode'
+          || mutation.attributeName === 'data-hub-view'
+        ) {
+          syncChatPageRails(doc);
+        }
       }
       for (const node of mutation.addedNodes) {
         if (node.nodeType === 1) scan(node, nextReduced);
       }
+      if (mutation.type === 'childList') syncChatPageRails(doc);
     }
   });
 
@@ -654,7 +811,16 @@ export function startHubMotion(root = document) {
     childList: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ['data-state', 'aria-selected', 'aria-pressed', 'aria-checked']
+    attributeFilter: [
+      'data-state',
+      'aria-selected',
+      'aria-pressed',
+      'aria-checked',
+      'hidden',
+      'data-chrome',
+      'data-panel-mode',
+      'data-hub-view'
+    ]
   });
 }
 
