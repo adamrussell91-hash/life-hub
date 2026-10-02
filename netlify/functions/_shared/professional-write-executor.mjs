@@ -1,6 +1,7 @@
-// Dispatches professional:* Confirm writes to meeting/event/career/tie executors.
+// Dispatches professional:* Confirm writes to meeting/event/communication/career/tie executors.
 
 import { createMeetingEventWriteExecutor } from './meeting-event-agent.mjs';
+import { createProfessionalEditWriteExecutor } from './professional-edit-agent.mjs';
 import { createCareerWriteExecutor } from './career-agent.mjs';
 import { createTieDecisionWriteExecutor } from './tie-decision-agent.mjs';
 import { writeError } from './agent-propose-helpers.mjs';
@@ -17,6 +18,7 @@ export function createProfessionalWriteExecutor({
 } = {}) {
   if (!store) throw new Error('createProfessionalWriteExecutor requires a professional store.');
   const meetingEvent = createMeetingEventWriteExecutor({ store, env, now });
+  const edits = createProfessionalEditWriteExecutor({ store, env, now, resolveEntity });
   const career = createCareerWriteExecutor({ store, env, now });
   const ties = createTieDecisionWriteExecutor({
     professionalStore: store,
@@ -27,6 +29,10 @@ export function createProfessionalWriteExecutor({
   });
 
   async function apply(write, target, created = new Map()) {
+    // Existing Meeting/Event edits and every Communication write.
+    if (target.kind === 'communication' || ((target.kind === 'meeting' || target.kind === 'event') && write.mode === 'overwrite')) {
+      return edits.apply(write, target, created);
+    }
     if (target.kind === 'meeting' || target.kind === 'event') {
       return meetingEvent.apply(write, target, created);
     }

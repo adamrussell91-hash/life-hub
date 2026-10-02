@@ -354,6 +354,13 @@ import {
   buildEventProposal
 } from './_shared/meeting-event-agent.mjs';
 import {
+  runSearchProfessional,
+  buildMeetingUpdateProposal,
+  buildEventUpdateProposal,
+  buildCommunicationProposal
+} from './_shared/professional-edit-agent.mjs';
+import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
+import {
   buildApplicationProposal,
   buildFutureProposal
 } from './_shared/career-agent.mjs';
@@ -369,6 +376,8 @@ import { buildHubPrefsProposal } from './_shared/hub-prefs-agent.mjs';
 import { buildFollowUpProposal } from './_shared/follow-up-agent.mjs';
 import { createTravelRepository } from './_shared/travel-repository.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
+import { findActiveSelfPerson } from './_shared/career-overview.mjs';
+import { formatEntityRef } from './_shared/entity-ref.mjs';
 import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolvers.mjs';
 import { buildBindingGoal } from '../../apps/life/js/app/binding-goal.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
@@ -463,6 +472,7 @@ export function createChatHandler({
   getTeachingStore = defaultGetTeachingStore,
   getLifeEvents = null,
   getPeopleStore = defaultGetUniversalLinkStore,
+  getProfessionalStore = defaultGetProfessionalStore,
   resolvePeopleEntity = defaultResolveEntity
 } = {}) {
   return async function chatHandler(request) {
@@ -2077,6 +2087,26 @@ export function createChatHandler({
                 });
                 return JSON.stringify(result);
               }
+              if (event.name === 'search_professional') {
+                send({ type: 'status', text: 'Searching Professional Hub…' });
+                try {
+                  return JSON.stringify(await runSearchProfessional(event.input ?? {}, {
+                    store: await getProfessionalStore(env),
+                    env
+                  }));
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'professional_unavailable' });
+                }
+              }
+              if (event.name === 'propose_meeting_update') {
+                return respondConfirmProposal(buildMeetingUpdateProposal(event.input ?? {}));
+              }
+              if (event.name === 'propose_event_update') {
+                return respondConfirmProposal(buildEventUpdateProposal(event.input ?? {}));
+              }
+              if (event.name === 'propose_communication') {
+                return respondConfirmProposal(buildCommunicationProposal(event.input ?? {}));
+              }
               if (event.name === 'search_people') {
                 send({ type: 'status', text: 'Searching People…' });
                 try {
@@ -2101,7 +2131,16 @@ export function createChatHandler({
                 const nameForRef = createPeopleNameLookup({ env, fetchImpl, resolveEntity: resolvePeopleEntity });
                 let built;
                 if (event.name === 'propose_people_changes') {
-                  built = await buildPeopleProposal(event.input ?? {}, { nameForRef });
+                  built = await buildPeopleProposal(event.input ?? {}, {
+                    nameForRef,
+                    selfRef: async () => {
+                      const self = await findActiveSelfPerson(await getPeopleStore(env), { env, fetchImpl });
+                      if (!self) return null;
+                      return typeof self.ref === 'string' && self.ref
+                        ? self.ref
+                        : formatEntityRef({ namespace: 'shared', kind: 'person', id: self.id });
+                    }
+                  });
                 } else if (event.name === 'propose_organisation_changes') {
                   built = await buildOrganisationProposal(event.input ?? {}, { nameForRef });
                 } else if (event.name === 'propose_observation') {

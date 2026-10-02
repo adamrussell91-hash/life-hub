@@ -842,6 +842,61 @@
       ],
       "tool_name": "propose_event"
     },
+    "professional.search": {
+      "file": "professional/search.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat"
+      ],
+      "tool_name": "search_professional"
+    },
+    "professional.propose-meeting-update": {
+      "file": "professional/propose-meeting-update.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_meeting_update"
+    },
+    "professional.propose-event-update": {
+      "file": "professional/propose-event-update.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_event_update"
+    },
+    "professional.propose-communication": {
+      "file": "professional/propose-communication.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_communication"
+    },
     "people.propose-tie-decision": {
       "file": "people/propose-tie-decision.json",
       "agents": [

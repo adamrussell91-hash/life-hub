@@ -461,8 +461,7 @@ export async function applyProfessionalStep(deps, step, { ghostId = null } = {})
       location_text: step.location_text ?? null,
       agenda: step.agenda ?? null,
       notes: step.notes ?? null,
-      links: attendeeRefs.map((ref) => ({ relationship_type: 'attendee', target_ref: ref })),
-      ...(boundGhostId ? { client_key: `ghost:${boundGhostId}` } : {})
+      links: attendeeRefs.map((ref) => ({ relationship_type: 'attendee', target_ref: ref }))
     });
     return remember(meeting);
   }
@@ -483,8 +482,7 @@ export async function applyProfessionalStep(deps, step, { ghostId = null } = {})
       all_day: step.all_day === true,
       location_text: step.location_text ?? null,
       hours: step.hours ?? null,
-      links: attendeeRefs.map((ref) => ({ relationship_type: 'attendee', target_ref: ref })),
-      ...(boundGhostId ? { client_key: `ghost:${boundGhostId}` } : {})
+      links: attendeeRefs.map((ref) => ({ relationship_type: 'attendee', target_ref: ref }))
     });
     return remember(event);
   }
@@ -1137,11 +1135,13 @@ async function finishTasks({ open, commit, tasksStore, professionalDeps, id, set
     }
     try {
       await clearTasksPending(open, commit, id);
-    } catch {
+    } catch (error) {
+      console.error('[calendar-ghosts] clear tasks_pending failed', id, error);
       return applied(settlement.plan, { drafts: settlement.drafts, writes: 'partial', retry: 'tasks' });
     }
     return applied(settlement.plan, { drafts: settlement.drafts ?? [] });
-  } catch {
+  } catch (error) {
+    console.error('[calendar-ghosts] follow-up write failed', id, error);
     return applied(settlement.plan, { drafts: settlement.drafts, writes: 'partial', retry: 'tasks' });
   }
 }

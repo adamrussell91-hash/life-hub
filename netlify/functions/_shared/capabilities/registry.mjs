@@ -30,6 +30,12 @@ import { proposeRememberFactSchema } from '../remember-fact-agent.mjs';
 import { proposeLogCommunicationSchema } from '../log-comm-agent.mjs';
 import { listCalendarBlocksSchema } from '../list-calendar-blocks.mjs';
 import { proposeMeetingSchema, proposeEventSchema } from '../meeting-event-agent.mjs';
+import {
+  searchProfessionalSchema,
+  proposeMeetingUpdateSchema,
+  proposeEventUpdateSchema,
+  proposeCommunicationSchema
+} from '../professional-edit-agent.mjs';
 import { checkCalendarsSchema } from '../agent-calendar-merge.mjs';
 import { proposeApplicationSchema, proposeFutureSchema } from '../career-agent.mjs';
 import { proposeTieDecisionSchema } from '../tie-decision-agent.mjs';
@@ -364,6 +370,10 @@ export function buildAgentTools({
   if (has('people.propose-tie-decision')) tools.push(proposeTieDecisionSchema());
   if (has('professional.propose-meeting')) tools.push(proposeMeetingSchema());
   if (has('professional.propose-event')) tools.push(proposeEventSchema());
+  if (has('professional.search')) tools.push(searchProfessionalSchema());
+  if (has('professional.propose-meeting-update')) tools.push(proposeMeetingUpdateSchema());
+  if (has('professional.propose-event-update')) tools.push(proposeEventUpdateSchema());
+  if (has('professional.propose-communication')) tools.push(proposeCommunicationSchema());
   // Full multi-hub calendar read for every agent that can propose calendar items.
   // Clare already gets check_calendars via her workbench — skip the duplicate.
   if (

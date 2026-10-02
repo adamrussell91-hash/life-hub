@@ -1,0 +1,17 @@
+{
+  "id": "professional.propose-meeting-update",
+  "tool_name": "propose_meeting_update",
+  "verb": "Meetings",
+  "agents": [
+    "clare",
+    "hammond",
+    "ann"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Fill in, reschedule, add attendees to, or close an existing Professional meeting. Confirm card; nothing saved until Confirm.",
+  "surfaces": [
+    "confirm_card",
+    "governance_log"
+  ]
+}
