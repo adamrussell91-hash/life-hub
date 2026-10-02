@@ -2887,17 +2887,21 @@ export function createMockApi() {
     }
 
     if (path === '/api/career-achievements' && method === 'POST') {
-      const input = body as { title?: string };
-      const id = `ach_${randomUUID().slice(0, 8)}`;
+      const input = body as { title?: string; occurred_on?: string; date_precision?: string;
+        skills?: string[]; star?: Record<string, string | null> };
+      const id = `achievement_${randomUUID()}`;
       const nowIso = new Date().toISOString();
       const achievement = {
+        schema_version: 1,
         id,
         title: typeof input.title === 'string' && input.title.trim() ? input.title.trim() : 'Untitled',
-        occurred_on: nowIso.slice(0, 10),
-        date_precision: 'day',
-        skills: [],
+        occurred_on: input.occurred_on ?? nowIso.slice(0, 10),
+        date_precision: input.date_precision ?? 'day',
+        skills: input.skills ?? [],
+        star: input.star ?? { situation: null, task: null, action: null, result: null },
+        origin: 'manual',
+        lifecycle_status: 'active',
         apst: [],
-        source_refs: [],
         created_at: nowIso,
         updated_at: nowIso
       };

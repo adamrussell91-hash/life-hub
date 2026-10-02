@@ -1,5 +1,6 @@
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { getCareer } from '@/api/career';
+import { openAddSkillSheet } from '@/views/career-skill-form';
 import { listApplications } from '@/api/applications';
 import { careerCardRoute, careerFutureRoute, parseRoute } from '@/app/router';
 import { buildCareerModel, type CareerModel } from '@/domain/career-model';
@@ -188,7 +189,7 @@ export async function renderCareerView(canvas: HTMLElement): Promise<void> {
   page.append(columns);
 
   await renderCareerApplications(page, model, { onChanged: reload });
-  renderSkillsLedger(page, model);
+  renderSkillsLedger(page, model, reload);
   renderWhatIfPanel(page, model);
 
   canvas.append(page);
@@ -204,16 +205,14 @@ export async function renderCareerView(canvas: HTMLElement): Promise<void> {
   }
 }
 
-function renderSkillsLedger(host: HTMLElement, model: CareerModel): void {
+function renderSkillsLedger(host: HTMLElement, model: CareerModel, onReload: () => void): void {
   const section = el('section', 'career-page__ledger');
   surface(section);
   const head = el('div', 'career-page__section-head');
   head.append(el('h2', 'career-page__heading', 'Skills ledger'));
   const add = el('button', 'btn btn--secondary', 'Add card') as HTMLButtonElement;
   add.type = 'button';
-  add.addEventListener('click', () => {
-    section.append(el('p', 'career-page__note', 'Add card with Ann draft lands with Skills scan.'));
-  });
+  add.addEventListener('click', () => openAddSkillSheet(document.body, onReload));
   head.append(add);
   section.append(head);
 

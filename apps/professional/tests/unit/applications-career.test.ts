@@ -376,6 +376,38 @@ describe('renderCareerView', () => {
     expect(canvas.textContent).not.toMatch(/Phase 3/);
   });
 
+  it('lets Add card save a manual skill card and reload the ledger', async () => {
+    const records: Record<string, unknown>[] = [];
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('/api/career-achievements') && init?.method === 'POST') {
+        const body = JSON.parse(String(init.body));
+        expect(body).toMatchObject({ title: 'Mentoring', occurred_on: '2026-10-02',
+          date_precision: 'day', origin: 'manual', skills: ['Coaching', 'Leadership'],
+          star: { situation: null, task: null, action: 'Supported new teachers', result: null } });
+        records.push({ ...body, schema_version: 1, lifecycle_status: 'active', apst: [], created_at: '2026-10-02T10:00:00Z', updated_at: '2026-10-02T10:00:00Z', id: 'achievement_00000000-0000-4000-8000-000000000001' });
+        return Response.json({ ok: true, data: { achievement: records[0] } });
+      }
+      if (String(input).includes('/api/applications')) return Response.json({ ok: true, data: { applications: [] } });
+      return Response.json({ ok: true, data: { achievements: records, futures: [], stones: [],
+        employment: { status: 'ok', items: [] }, scan: { pending_count: 0, last_run_at: null } } });
+    });
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    try {
+      await renderCareerView(canvas);
+      [...canvas.querySelectorAll('button')].find(b => b.textContent === 'Add card')!.click();
+      const form = document.querySelector<HTMLFormElement>('[aria-label="Add skill card"] form');
+      expect(form).toBeTruthy();
+      form!.querySelector<HTMLInputElement>('[name="title"]')!.value = ' Mentoring ';
+      form!.querySelector<HTMLInputElement>('[name="occurred_on"]')!.value = '2026-10-02';
+      form!.querySelector<HTMLInputElement>('[name="skills"]')!.value = 'Coaching, Leadership';
+      form!.querySelector<HTMLTextAreaElement>('[name="action"]')!.value = 'Supported new teachers';
+      form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await vi.waitFor(() => expect(canvas.querySelector('.career-page__ledger-link')?.textContent).toBe('Mentoring'));
+      expect(document.querySelector('[aria-label="Add skill card"]')).toBeNull();
+    } finally { canvas.remove(); document.querySelector('[aria-label="Add skill card"]')?.remove(); }
+  });
+
   it('renders work history from employment periods without collapsing stacked roles', async () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
