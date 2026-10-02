@@ -1,0 +1,361 @@
+/* Confirm card: the one look for every agent write-loop card in every hub.
+ *
+ * Grouped-inset style: elevated white card → eyebrow + title → a tinted list
+ * of label/value rows with hairline separators → Discard (quiet text) and
+ * Confirm (filled pill). Fields are borderless until hover/focus so the card
+ * reads as a summary, not a form; long values wrap in an auto-growing
+ * textarea stacked under their label.
+ *
+ * Hubs: do not restyle .confirm-card / .record-proposal surfaces locally.
+ * Loaded via actions.css and chrome.css.
+ */
+
+.confirm-card {
+  --cc-surface: color-mix(in srgb, #fff 94%, var(--paper, #fbf8f2));
+  --cc-group: color-mix(in srgb, var(--depth, #0a1536) 3.5%, transparent);
+  --cc-hairline: color-mix(in srgb, var(--depth, #0a1536) 8%, transparent);
+  --cc-ring: color-mix(in srgb, var(--wave, #376fb7) 28%, transparent);
+  --cc-radius: 1.125rem;
+  --cc-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  display: grid;
+  gap: 0.875rem;
+  min-width: 0;
+  padding: 1.125rem 1.25rem 1rem;
+  border-radius: var(--cc-radius);
+  border: 1px solid var(--cc-hairline);
+  background: var(--cc-surface);
+  box-shadow:
+    0 1px 1px rgba(10, 21, 54, 0.03),
+    0 2px 6px -1px rgba(10, 21, 54, 0.05),
+    0 18px 40px -18px rgba(10, 21, 54, 0.18);
+  color: var(--ink, #13233a);
+  font-family: var(--font-ui);
+  animation: cc-rise 320ms var(--cc-ease) both;
+}
+
+.confirm-card > * {
+  margin: 0;
+  min-width: 0;
+}
+
+@keyframes cc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+
+.confirm-card .page-header__eyebrow,
+.confirm-card .record-proposal__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  color: var(--muted, #6b7788);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.confirm-card .page-header__eyebrow::before,
+.confirm-card .record-proposal__eyebrow::before {
+  content: "";
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  background: var(--high-sea, #f68620);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--high-sea, #f68620) 18%, transparent);
+}
+
+.confirm-card .page-header__title,
+.confirm-card .record-proposal__title {
+  margin: -0.5rem 0 0;
+  color: var(--depth, #0a1536);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.3;
+}
+
+.confirm-card .page-header__supporting,
+.confirm-card .record-proposal__reasoning,
+.confirm-card .action-proposal__meta,
+.confirm-card .cn-patch-proposal__meta {
+  margin: -0.375rem 0 0;
+  color: var(--muted, #6b7788);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+/* ── Field list (grouped inset) ──────────────────────────────────────── */
+
+.confirm-card .record-proposal__fields:is(dl) {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, max-content) minmax(0, 1fr);
+  margin: 0;
+  padding: 0 0.875rem;
+  border-radius: 0.75rem;
+  background: var(--cc-group);
+}
+
+.confirm-card .record-proposal__fields:is(dl):empty {
+  display: none;
+}
+
+.confirm-card .record-proposal__fields > dt,
+.confirm-card .record-proposal__fields > dd {
+  margin: 0;
+  min-width: 0;
+  padding: 0.6875rem 0;
+  border-top: 1px solid var(--cc-hairline);
+}
+
+.confirm-card .record-proposal__fields > :is(dt, dd):nth-child(-n + 2) {
+  border-top: 0;
+}
+
+.confirm-card .record-proposal__fields > dt {
+  padding-right: 1rem;
+  color: var(--muted, #6b7788);
+  font-size: 0.9375rem;
+  font-weight: 450;
+  line-height: 1.5rem;
+}
+
+.confirm-card .record-proposal__fields > dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  align-items: center;
+  line-height: 1.5rem;
+}
+
+/* Long values: label on its own line, value full-width beneath it. */
+.confirm-card .record-proposal__fields > dt.record-proposal__field--long {
+  grid-column: 1 / -1;
+  padding-bottom: 0.125rem;
+}
+
+.confirm-card .record-proposal__fields > dd.record-proposal__field--long {
+  grid-column: 1 / -1;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.confirm-card .record-proposal__fields :is(input, textarea) {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 1.5rem;
+  margin: 0 -0.5rem;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  box-shadow: none;
+  color: var(--depth, #0a1536);
+  font: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.5rem;
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.confirm-card .record-proposal__fields textarea {
+  display: block;
+  height: auto;
+  min-height: 1.5rem;
+  resize: none;
+  overflow: hidden;
+  field-sizing: content;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.confirm-card .record-proposal__fields :is(input, textarea):hover {
+  background: color-mix(in srgb, var(--depth, #0a1536) 4%, transparent);
+}
+
+.confirm-card .record-proposal__fields :is(input, textarea):focus,
+.confirm-card .record-proposal__fields :is(input, textarea):focus-visible {
+  outline: none;
+  background: #fff;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--wave, #376fb7) 55%, transparent), 0 0 0 4px var(--cc-ring);
+}
+
+/* Tasks / Knowledge flex field rows (hub-field, hub-filter) */
+.confirm-card div.record-proposal__fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0;
+}
+
+/* ── Chips, diffs, warnings ──────────────────────────────────────────── */
+
+.confirm-card .hub-chips {
+  margin: 0;
+  padding: 0;
+}
+
+.confirm-card .record-proposal__warnings {
+  margin: 0;
+  padding: 0.625rem 0.875rem;
+  list-style: none;
+  display: grid;
+  gap: 0.25rem;
+  border-radius: 0.75rem;
+  border: 0;
+  background: color-mix(in srgb, var(--high-sea, #f68620) 10%, transparent);
+  color: var(--high-sea-ink, #a85a0c);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.confirm-card .action-proposal__diffs {
+  margin: 0;
+  padding: 0.25rem 0.875rem;
+  border-radius: 0.75rem;
+  background: var(--cc-group);
+}
+
+.confirm-card .action-proposal__diffs > li + li {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--cc-hairline);
+}
+
+/* ── Actions ─────────────────────────────────────────────────────────── */
+
+.confirm-card .confirm-card__actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 0.125rem;
+}
+
+.confirm-card .confirm-card__actions .btn {
+  min-height: 2.375rem;
+  padding: 0 1.125rem;
+  border-radius: 999px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  transition: background-color 140ms ease, box-shadow 140ms ease, transform 120ms ease, opacity 120ms ease;
+}
+
+.confirm-card .confirm-card__actions .btn--ghost,
+.confirm-card .confirm-card__actions .btn--secondary {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted, #6b7788);
+}
+
+.confirm-card .confirm-card__actions .btn--ghost:hover:not(:disabled),
+.confirm-card .confirm-card__actions .btn--secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--depth, #0a1536) 6%, transparent);
+  color: var(--depth, #0a1536);
+}
+
+.confirm-card .confirm-card__actions .btn--primary {
+  border-color: transparent;
+  background: var(--depth, #0a1536);
+  color: #fff;
+  box-shadow:
+    0 1px 2px rgba(10, 21, 54, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.confirm-card .confirm-card__actions .btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--depth, #0a1536) 86%, var(--wave, #376fb7));
+}
+
+.confirm-card .confirm-card__actions .btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.confirm-card .confirm-card__actions .btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--cc-ring);
+}
+
+/* ── Receipt (after Confirm) ─────────────────────────────────────────── */
+
+.confirm-card--receipt,
+.record-proposal.confirm-card--receipt {
+  opacity: 0.96;
+}
+
+.confirm-card__receipt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--muted, #6b7788);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+/* ── Phone ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .confirm-card {
+    padding: 1rem 1rem 0.875rem;
+  }
+
+  .confirm-card .record-proposal__fields:is(dl) {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0 0.75rem;
+  }
+
+  .confirm-card .record-proposal__fields > dt {
+    padding: 0.5rem 0 0;
+    font-size: 0.75rem;
+    line-height: 1.2rem;
+  }
+
+  .confirm-card .record-proposal__fields > dd {
+    padding: 0 0 0.5rem;
+    border-top: 0;
+  }
+
+  .confirm-card .record-proposal__fields > :is(dt, dd):nth-child(-n + 2) {
+    border-top: 0;
+  }
+
+  .confirm-card .record-proposal__fields > dt:not(:first-child) {
+    border-top: 1px solid var(--cc-hairline);
+  }
+
+  /* iOS zooms on focus below 16px (register R4). */
+  .confirm-card .record-proposal__fields :is(input, textarea) {
+    font-size: 16px;
+  }
+
+  .confirm-card .confirm-card__actions {
+    flex-wrap: nowrap;
+  }
+
+  .confirm-card .confirm-card__actions .btn {
+    flex: 1 1 0;
+    min-height: 2.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confirm-card {
+    animation: none;
+  }
+
+  .confirm-card .confirm-card__actions .btn:active:not(:disabled) {
+    transform: none;
+  }
+}

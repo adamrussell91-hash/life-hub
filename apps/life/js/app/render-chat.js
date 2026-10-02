@@ -483,16 +483,67 @@ function appendTableRow(root, container, line) {
   table.append(row);
 }
 
+// Free-text fields get a wrapping textarea under their label so a long note reads in
+// full instead of being clipped to one line of an input.
+const LONG_TEXT_FIELDS = new Set(['notes', 'cross_agent_note', 'summary', 'reflection', 'description', 'gratitude', 'body', 'text']);
+const LONG_TEXT_MIN_CHARS = 48;
+
+function isLongTextField(key, value) {
+  if (LONG_TEXT_FIELDS.has(key)) return true;
+  const text = String(value ?? '');
+  return text.length > LONG_TEXT_MIN_CHARS || text.includes('\n');
+}
+
+function fitTextarea(textarea) {
+  if (!textarea?.style || typeof textarea.scrollHeight !== 'number') return;
+  textarea.style.height = 'auto';
+  textarea.style.height = `${textarea.scrollHeight}px`;
+}
+
+function supportsFieldSizing() {
+  try {
+    return Boolean(globalThis.CSS?.supports?.('field-sizing', 'content'));
+  } catch {
+    return false;
+  }
+}
+
+function appendFieldRow(root, fields, inputs, key, value) {
+  const long = isLongTextField(key, value);
+  const dt = root.createElement('dt');
+  dt.textContent = humanizeFieldLabel(key);
+  const dd = root.createElement('dd');
+  const input = root.createElement(long ? 'textarea' : 'input');
+  input.value = String(value ?? '');
+  input.dataset.field = key;
+  if (long) {
+    dt.className = 'record-proposal__field--long';
+    dd.className = 'record-proposal__field--long';
+    input.rows = 1;
+    if (!supportsFieldSizing()) input.addEventListener?.('input', () => fitTextarea(input));
+  }
+  dd.append(input);
+  fields.append(dt, dd);
+  inputs[key] = input;
+}
+
+function fitCardTextareas(card) {
+  if (supportsFieldSizing() || typeof card?.querySelectorAll !== 'function') return;
+  const fit = () => card.querySelectorAll('textarea').forEach(fitTextarea);
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fit);
+  else fit();
+}
+
 function appendNotesField(root, fields, inputs, notes) {
-  const notesDt = root.createElement('dt');
-  notesDt.textContent = humanizeFieldLabel('notes');
-  const notesDd = root.createElement('dd');
-  const notesInput = root.createElement('input');
-  notesInput.value = notes ?? '';
-  notesInput.dataset.field = 'notes';
-  notesDd.append(notesInput);
-  fields.append(notesDt, notesDd);
-  inputs.notes = notesInput;
+  appendFieldRow(root, fields, inputs, 'notes', notes ?? '');
+}
+
+function proposalTitleDate(date) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(date ?? ''));
+  if (!match) return date ? formatDisplayDate(date) : '';
+  const parsed = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (Number.isNaN(parsed.getTime())) return formatDisplayDate(date);
+  return parsed.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 // The Confirm card carries the full exercise list, so a plan Chadwick also wrote
@@ -537,11 +588,15 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
   const plannedWorkout = isWorkout && record.status === 'planned';
 
   const summary = root.createElement('p');
-  summary.className = plannedWorkout ? 'record-proposal__eyebrow' : '';
-  summary.textContent = plannedWorkout
-    ? 'Proposed session'
-    : `Proposed ${record.type} record for ${formatDisplayDate(record.date)}`;
+  summary.className = 'record-proposal__eyebrow';
+  summary.textContent = plannedWorkout ? 'Proposed session' : `Proposed ${record.type}`;
   card.append(summary);
+  if (!plannedWorkout) {
+    const title = root.createElement('h3');
+    title.className = 'record-proposal__title';
+    title.textContent = proposalTitleDate(record.date) || `New ${record.type} record`;
+    card.append(title);
+  }
 
   if (isWorkout) {
     appendWorkoutPlanCard(root, card, { record, libraryByName });
@@ -557,15 +612,7 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
     for (const [key, value] of Object.entries(displayRecord)) {
       if (HIDDEN_FIELDS.has(key) || (typeof value === 'object' && value !== null)) continue;
       if (isWorkout && WORKOUT_HEADER_FIELDS.has(key)) continue;
-      const dt = root.createElement('dt');
-      dt.textContent = humanizeFieldLabel(key);
-      const dd = root.createElement('dd');
-      const input = root.createElement('input');
-      input.value = String(value ?? '');
-      input.dataset.field = key;
-      dd.append(input);
-      fields.append(dt, dd);
-      inputs[key] = input;
+      appendFieldRow(root, fields, inputs, key, value);
     }
   } else if (isWorkout) {
     // Planned cards used to hide day_type/duration/status — Adam could not fix a wrong window.
@@ -657,6 +704,7 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
   card.append(actions);
 
   finishConfirmMount(root, list, card);
+  fitCardTextareas(card);
   return { card, confirm, discard, inputs };
 }
 
