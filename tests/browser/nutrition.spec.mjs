@@ -45,7 +45,7 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
     await page.locator('.desktop-rail [data-section="nutrition"]').click();
     await page.locator('#nutrition-dashboard').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#home-dashboard').isHidden(), true);
-    assert.equal(await page.locator('#page-eyebrow').textContent(), "Today's macros");
+    assert.equal(await page.locator('#page-eyebrow').textContent(), 'Life Hub');
     await page.locator('#page-title', { hasText: 'Nutrition' }).waitFor();
     assert.equal(await page.locator('.page-header__title-row .hub-mark').count(), 0);
 

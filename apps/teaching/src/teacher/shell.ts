@@ -26,14 +26,6 @@ const REFRESH_ICON = `
   </svg>
 `.trim();
 
-const SIGN_OUT_ICON = `
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M10 7V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-1" />
-    <path d="M15 12H3" />
-    <path d="m7 8-4 4 4 4" />
-  </svg>
-`.trim();
-
 /**
  * Builds the teacher chrome (rail / main / context bar / canvas) and returns
  * references to the mount points callers render into. Replaces any existing
@@ -79,46 +71,24 @@ export function renderTeacherShell(
   const canvas = document.createElement('div');
   canvas.className = 'teacher-layout__canvas';
 
-  let logoutButton: HTMLButtonElement | null = null;
-  if (options.onLogout || options.onRefresh) {
+  const logoutButton: HTMLButtonElement | null = null;
+  if (options.onRefresh) {
     const utilities = document.createElement('div');
     utilities.className = 'hub-utilities';
-
-    if (options.onRefresh) {
-      const refreshButton = document.createElement('button');
-      refreshButton.type = 'button';
-      refreshButton.className = 'hub-icon-btn';
-      refreshButton.setAttribute('aria-label', 'Refresh');
-      refreshButton.title = 'Refresh';
-      refreshButton.dataset.hubRefresh = '';
-      refreshButton.innerHTML = REFRESH_ICON;
-      refreshButton.addEventListener('click', () => {
-        refreshButton.disabled = true;
-        void Promise.resolve(options.onRefresh?.()).finally(() => {
-          refreshButton.disabled = false;
-        });
+    const refreshButton = document.createElement('button');
+    refreshButton.type = 'button';
+    refreshButton.className = 'hub-icon-btn';
+    refreshButton.setAttribute('aria-label', 'Refresh');
+    refreshButton.title = 'Refresh';
+    refreshButton.dataset.hubRefresh = '';
+    refreshButton.innerHTML = REFRESH_ICON;
+    refreshButton.addEventListener('click', () => {
+      refreshButton.disabled = true;
+      void Promise.resolve(options.onRefresh?.()).finally(() => {
+        refreshButton.disabled = false;
       });
-      utilities.append(refreshButton);
-    }
-
-    if (options.onLogout) {
-      logoutButton = document.createElement('button');
-      logoutButton.type = 'button';
-      logoutButton.className = 'hub-icon-btn';
-      logoutButton.setAttribute('aria-label', 'Sign out');
-      logoutButton.title = 'Sign out';
-      logoutButton.dataset.hubSignOut = '';
-      logoutButton.innerHTML = SIGN_OUT_ICON;
-      logoutButton.addEventListener('click', () => {
-        if (!logoutButton) return;
-        logoutButton.disabled = true;
-        void Promise.resolve(options.onLogout?.()).finally(() => {
-          if (logoutButton) logoutButton.disabled = false;
-        });
-      });
-      utilities.append(logoutButton);
-    }
-
+    });
+    utilities.append(refreshButton);
     registerHubUtilities(utilities);
   } else {
     registerHubUtilities(null);

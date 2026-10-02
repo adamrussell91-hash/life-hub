@@ -147,9 +147,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'people') {
-      // One h1 lives in the People page canvas (P3 — no shell "People / People").
-      shell.pageHeader.classList.add('page-header--people-redesign');
-      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: '' });
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: 'People' });
       await renderPeoplePage(shell.canvas, {
         selectedId: route.id,
         isCurrent: () => generation === routeGeneration
@@ -157,8 +155,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'people-ties') {
-      shell.pageHeader.classList.add('page-header--people-redesign');
-      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: '' });
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: 'Ties to confirm' });
       await renderTiesToConfirmView(shell.canvas, {
         isCurrent: () => generation === routeGeneration
       });
@@ -166,15 +163,14 @@ async function bootApp(root: HTMLElement): Promise<void> {
     }
     shell.pageHeader.classList.remove('page-header--people-redesign');
     if (route.name === 'organisations') {
-      // Page owns its single Organisations h1 (People pattern).
-      renderPageHeader(shell, { eyebrow: '', title: '' });
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: 'Organisations' });
       await renderOrganisationsView(shell.canvas, {
         isCurrent: () => generation === routeGeneration
       });
       return;
     }
     if (route.name === 'organisations-compare') {
-      renderPageHeader(shell, { eyebrow: '', title: '' });
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: 'Compare' });
       await renderOrganisationsCompare(shell.canvas, {
         isCurrent: () => generation === routeGeneration
       });
@@ -186,25 +182,21 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'communications') {
-      // Network list chrome matches People: Professional Hub eyebrow; page owns h1.
-      shell.pageHeader.classList.add('page-header--people-redesign');
-      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: '' });
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: 'Comms' });
       await renderCommunicationsView(shell.canvas, {
         isCurrent: () => generation === routeGeneration
       });
       return;
     }
     if (route.name === 'meetings') {
-      shell.pageHeader.classList.add('page-header--people-redesign');
-      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: '' });
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: 'Meetings' });
       await renderMeetingsView(shell.canvas, {
         isCurrent: () => generation === routeGeneration
       });
       return;
     }
     if (route.name === 'events') {
-      shell.pageHeader.classList.add('page-header--people-redesign');
-      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: '' });
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: 'Events' });
       await renderEventsView(shell.canvas, {
         isCurrent: () => generation === routeGeneration
       });
@@ -328,11 +320,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'organisation') {
-      // Detail page owns its org title h1.
-      renderPageHeader(shell, { eyebrow: '', title: '' });
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: 'Organisation' });
       await renderOrganisationPage(shell.canvas, route.id, {
-        onTitleReady: () => {
-          /* title rendered in-page */
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'Professional Hub', title });
         },
         isCurrent: () => generation === routeGeneration
       });

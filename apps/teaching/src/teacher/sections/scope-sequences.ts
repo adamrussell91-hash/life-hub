@@ -39,7 +39,7 @@ export function renderScopeSequencesIndex(
     curriculum.classes[0]?.academic_year;
 
   renderPageHeader(canvas, {
-    eyebrow: 'Workspace',
+    eyebrow: 'Teaching Hub',
     title: 'Overall Scope & Sequence',
     supporting: academicYear != null ? `Academic year ${academicYear}` : 'Academic year',
     actions: [createHost]

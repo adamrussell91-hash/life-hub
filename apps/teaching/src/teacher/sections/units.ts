@@ -81,7 +81,7 @@ export function renderUnitsIndex(
   groupByHost.setAttribute('aria-label', 'Group units by');
 
   renderPageHeader(canvas, {
-    eyebrow: 'Workspace',
+    eyebrow: 'Teaching Hub',
     title: 'Units',
     actions: [groupByHost, createHost]
   });

@@ -37,7 +37,7 @@ export function renderTeacherHome(
 ): { dispose: () => void } {
   canvas.replaceChildren();
 
-  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Dashboard' });
+  renderPageHeader(canvas, { eyebrow: 'Teaching Hub', title: 'Dashboard' });
 
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));

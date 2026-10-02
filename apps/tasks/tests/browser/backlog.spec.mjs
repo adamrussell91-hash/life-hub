@@ -79,7 +79,7 @@ test.describe('Backlog', () => {
     await signIn(page);
     await openBacklog(page, '#/list');
     await expect(page.getByRole('heading', { name: 'Backlog', level: 1 })).toBeVisible();
-    await expect(page.locator('.page-header__copy > .page-header__eyebrow')).toHaveText('Views');
+    await expect(page.locator('.page-header__copy > .page-header__eyebrow')).toHaveText('Tasks Hub');
     await expect(page.locator('.page-header__title-row .backlog-count')).toHaveCount(0);
     await expect(page.locator('.page-header__title-row > *')).toHaveCount(1);
     await expect(page.locator('.backlog-zone')).toHaveCount(4);
