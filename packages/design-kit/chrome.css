@@ -3,6 +3,7 @@
 @import url("./morphing-popover.css");
 @import url("./hub-compose.css");
 @import url("./adaptive-slider.css");
+@import url("./confirm-card.css");
 @import url("./card-swipe.css");
 @import url("./hub-interactions.css");
 @import url("./hub-chat-viewport.css");
@@ -266,23 +267,7 @@ html[data-hub="life"] .glass-panel {
   border-color: var(--high-sea);
 }
 
-/* ── Agent confirm (chat write-loop) ──────────────────────────────────── */
-
-.confirm-card {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border-radius: var(--hub-tile-radius);
-  border: 1px solid var(--line);
-  background: var(--hub-glass-fill);
-  box-shadow: var(--hub-elev-card);
-}
-
-.confirm-card__actions {
-  display: flex;
-  gap: var(--space-2);
-  justify-content: flex-end;
-}
+/* Agent confirm (chat write-loop) cards: confirm-card.css (imported above). */
 
 /* ── Focus: Wave for keyboard. High Sea is not a focus colour. ───────── */
 

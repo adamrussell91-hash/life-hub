@@ -739,7 +739,6 @@
 /* Productivity OS cards (Clare / Hammond) — progressive disclosure, tokens only */
 .prod-card {
   display: grid;
-  gap: var(--space-3);
   max-width: 100%;
   min-width: 0;
   overflow-x: hidden;
@@ -747,7 +746,6 @@
 
 .prod-card__title {
   margin: 0;
-  font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   color: var(--ink);
 }
