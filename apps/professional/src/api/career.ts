@@ -86,3 +86,7 @@ export function binScanProposal(id: string, options: { signal?: AbortSignal } = 
 export function listCareerMoves(options: { signal?: AbortSignal } = {}) {
   return apiGet('/api/career-moves', { signal: options.signal });
 }
+
+export function getAchievement(id: string) {
+  return apiGet<{ achievement: import('@/views/career-skill-form').SkillCard }>(`/api/career-achievements?id=${encodeURIComponent(id)}`);
+}

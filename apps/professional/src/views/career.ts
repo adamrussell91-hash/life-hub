@@ -1,4 +1,5 @@
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { renderSkillCardDetail } from '@/views/career-card-detail';
 import { getCareer } from '@/api/career';
 import { openAddSkillSheet } from '@/views/career-skill-form';
 import { listApplications } from '@/api/applications';
@@ -121,6 +122,8 @@ function renderSkillsScan(
 }
 
 export async function renderCareerView(canvas: HTMLElement): Promise<void> {
+  const initialRoute = parseRoute(location.hash);
+  if (initialRoute.name === 'career-card') { await renderSkillCardDetail(canvas, initialRoute.id); return; }
   showViewLoading(canvas, 'Loading career…');
   let overview: CareerOverview;
   try {
