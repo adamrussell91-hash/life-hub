@@ -35,8 +35,9 @@ export function createCareerAchievementsHandler(deps = {}) {
           return withCors(okResponse(200, { achievements: await repo.listAchievements() }), request, env);
         }
         if (request.method === 'POST') {
-          const body = await readJsonObject(request);
-          const achievement = await repo.createAchievement(body);
+          const parsed = await readJsonObject(request);
+          if (parsed.error) return withCors(parsed.error, request, env);
+          const achievement = await repo.createAchievement(parsed.value);
           return withCors(okResponse(201, { achievement }), request, env);
         }
         if (request.method === 'PATCH') {
@@ -44,8 +45,9 @@ export function createCareerAchievementsHandler(deps = {}) {
           if (!id || !isValidAchievementId(id)) {
             return withCors(errorResponse(400, 'invalid_achievement_id', 'id required.'), request, env);
           }
-          const body = await readJsonObject(request);
-          const achievement = await repo.updateAchievement(id, body);
+          const parsed = await readJsonObject(request);
+          if (parsed.error) return withCors(parsed.error, request, env);
+          const achievement = await repo.updateAchievement(id, parsed.value);
           return withCors(okResponse(200, { achievement }), request, env);
         }
         return withCors(methodNotAllowed('GET, POST, PATCH, OPTIONS'), request, env);
