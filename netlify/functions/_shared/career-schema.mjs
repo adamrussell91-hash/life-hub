@@ -7,7 +7,7 @@ import { sanitizeApstFocus } from './apst-focus.mjs';
 export const CAREER_SCHEMA_VERSION = 1;
 
 export const ACHIEVEMENT_ORIGINS = new Set(['scan', 'manual', 'import']);
-export const ACHIEVEMENT_LIFECYCLES = new Set(['active', 'archived']);
+export const ACHIEVEMENT_LIFECYCLES = new Set(['active', 'archived', 'deleted']);
 export const DATE_PRECISIONS = new Set(['day', 'month', 'year']);
 
 export const FUTURE_STATUSES = new Set(['active', 'parked', 'suggested', 'dismissed']);

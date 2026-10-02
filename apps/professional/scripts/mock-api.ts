@@ -1,3 +1,4 @@
+import { isDeletedRecord, withoutDeleted } from '../../../netlify/functions/_shared/record-liveness.mjs';
 /**
  * In-memory mock of umbrella endpoints Professional needs for local Vite
  * development: session, entities search/overview, and Communications.
@@ -2805,7 +2806,7 @@ export function createMockApi() {
           people: { status: 'ok', items: [] },
           organisations: { status: 'ok', items: [] },
           deferred: ['publication', 'presentation'],
-          achievements: [...achievements.values()],
+          achievements: withoutDeleted([...achievements.values()]),
           futures: [...futures.values()],
           stones: [...stones.values()],
           supports_future: [],
@@ -2882,8 +2883,16 @@ export function createMockApi() {
       return json(400, { ok: false, error: { code: 'unknown_action', message: 'Unknown scan action.' } });
     }
 
-    if (path === '/api/career-achievements' && method === 'GET') {
-      return json(200, { ok: true, data: { achievements: [...achievements.values()] } });
+    if (path === '/api/career-achievements' && (method === 'GET' || method === 'PATCH')) {
+      const id = url.searchParams.get('id');
+      if (id) {
+        const existing = achievements.get(id);
+        if (!existing || isDeletedRecord(existing)) return json(404, { ok: false, error: { code: 'not_found', message: 'Skill card not found.' } });
+        const achievement = method === 'PATCH' ? { ...existing, ...body as Record<string, unknown>, id, updated_at: new Date().toISOString() } : existing;
+        if (method === 'PATCH') achievements.set(id, achievement);
+        return json(200, { ok: true, data: { achievement } });
+      }
+      return json(200, { ok: true, data: { achievements: withoutDeleted([...achievements.values()]) } });
     }
 
     if (path === '/api/career-achievements' && method === 'POST') {

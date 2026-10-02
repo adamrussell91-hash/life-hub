@@ -1,3 +1,4 @@
+import { isDeletedRecord, withoutDeleted } from './record-liveness.mjs';
 import {
   CAREER_SCHEMA_VERSION,
   compareAchievementsNewestFirst,
@@ -61,13 +62,13 @@ export function createCareerRepository(deps = {}) {
       if (record) records.push(record);
     }
     records.sort(compareAchievementsNewestFirst);
-    return records;
+    return withoutDeleted(records);
   }
 
   async function getAchievement(id) {
     if (!isValidAchievementId(id)) throw notFound('Achievement');
     const record = parseAchievementRecord(await getJSON(store, careerAchievementKey(id)));
-    if (!record) throw notFound('Achievement');
+    if (!record || isDeletedRecord(record)) throw notFound('Achievement');
     return record;
   }
 

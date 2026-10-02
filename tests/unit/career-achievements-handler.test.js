@@ -6,7 +6,8 @@ function setup() {
   const records = new Map();
   const store = {
     get: async key => records.get(key) ?? null,
-    setJSON: async (key, value) => records.set(key, structuredClone(value))
+    setJSON: async (key, value) => records.set(key, structuredClone(value)),
+    list: async ({ prefix }) => ({ blobs: [...records.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key })) })
   };
   const handler = createCareerAchievementsHandler({
     env: { LIFE_HUB_PASSPHRASE_HASH: 'test-only', SESSION_SECRET: 'x'.repeat(32) },
@@ -50,3 +51,15 @@ for (const [body, code] of [['{', 'invalid_json'], ['[]', 'validation_error']]) 
     assert.equal(records.size, 0);
   });
 }
+
+test('deleted skill cards disappear from list and direct reads', async () => {
+  const { handler, request } = setup();
+  const created = await handler(request('POST', { title: 'Remove this', occurred_on: '2026-10-02', date_precision: 'day' }));
+  const { data: { achievement } } = await created.json();
+  const deleted = await handler(request('PATCH', { lifecycle_status: 'deleted' }, achievement.id));
+  assert.equal(deleted.status, 200, await deleted.clone().text());
+  const listed = await handler(request('GET'));
+  assert.deepEqual((await listed.json()).data.achievements, []);
+  assert.equal((await handler(request('GET', undefined, achievement.id))).status, 404);
+  assert.equal((await handler(request('PATCH', { title: 'Restore accidentally' }, achievement.id))).status, 404);
+});

@@ -1,3 +1,4 @@
+import { isDeletedRecord } from './record-liveness.mjs';
 import { parseEntityRef, formatEntityRef } from './entity-ref.mjs';
 import { assertEntityKindAllowed, endpointNotFoundError, isVisibilityAllowed } from './entity-access.mjs';
 import { communicationDisplayLabel, isValidCommunicationId, parseCommunicationRecord } from './communication-schema.mjs';
@@ -399,7 +400,7 @@ export async function resolveAchievement(
   if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
   const store = await getStore();
   const record = parseAchievementRecord(await getProfessionalJSON(store, careerAchievementKey(id)));
-  if (!record) throw endpointNotFoundError();
+  if (!record || isDeletedRecord(record)) throw endpointNotFoundError();
   return {
     ref,
     kind: 'achievement',

@@ -1,18 +1,25 @@
-import { createAchievement } from '@/api/career';
+import { createAchievement, updateAchievement } from '@/api/career';
 
-export function openAddSkillSheet(root: HTMLElement, onSaved: () => void): void {
-  if (root.querySelector('[aria-label="Add skill card"]')) return;
+export interface SkillCard {
+  id: string; title: string; occurred_on: string; date_precision: 'day' | 'month' | 'year';
+  skills: string[]; star: { situation: string | null; task: string | null; action: string | null; result: string | null };
+  apst?: string[];
+}
+
+export function openAddSkillSheet(root: HTMLElement, onSaved: () => void, card?: SkillCard): void {
+  const dialogLabel = card ? 'Edit skill card' : 'Add skill card';
+  if (root.querySelector('.career-sheet')) return;
   const previousFocus = document.activeElement as HTMLElement | null;
   const sheet = document.createElement('div');
   sheet.className = 'career-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
-  sheet.setAttribute('aria-label', 'Add skill card');
+  sheet.setAttribute('aria-label', dialogLabel);
   const form = document.createElement('form');
   form.className = 'career-sheet__inner';
   const heading = document.createElement('h2');
   heading.className = 'career-page__heading';
-  heading.textContent = 'Add skill card';
+  heading.textContent = dialogLabel;
   form.append(heading);
   function field(name: string, label: string, multiline = false) {
     const wrapper = document.createElement('label');
@@ -34,12 +41,14 @@ export function openAddSkillSheet(root: HTMLElement, onSaved: () => void): void 
   const today = new Date();
   date.value = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'), String(today.getDate()).padStart(2, '0')].join('-');
   const skills = field('skills', 'Skills (comma-separated)');
+  if (card) { title.value = card.title; date.value = card.occurred_on; skills.value = card.skills.join(', '); }
   const star = {
     situation: field('situation', 'Situation (optional)', true),
     task: field('task', 'Task (optional)', true),
     action: field('action', 'Action (optional)', true),
     result: field('result', 'Result (optional)', true)
   };
+  if (card) for (const key of ['situation', 'task', 'action', 'result'] as const) star[key].value = card.star[key] ?? '';
   const status = document.createElement('p');
   status.className = 'career-page__meta';
   status.setAttribute('role', 'status');
@@ -88,9 +97,11 @@ export function openAddSkillSheet(root: HTMLElement, onSaved: () => void): void 
     status.textContent = 'Saving…';
     void (async () => {
       try {
-        await createAchievement({ title: title.value.trim(), occurred_on: date.value,
-          date_precision: 'day', origin: 'manual', skills: skillNames,
-          star: Object.fromEntries(Object.entries(star).map(([key, input]) => [key, input.value.trim() || null])) });
+        const body = { title: title.value.trim(), occurred_on: date.value,
+          date_precision: card?.date_precision ?? 'day', skills: skillNames,
+          star: Object.fromEntries(Object.entries(star).map(([key, input]) => [key, input.value.trim() || null])) };
+        if (card) await updateAchievement(card.id, body);
+        else await createAchievement({ ...body, origin: 'manual' });
         saving = false;
         close();
         onSaved();
