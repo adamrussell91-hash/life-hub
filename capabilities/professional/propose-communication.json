@@ -1,0 +1,17 @@
+{
+  "id": "professional.propose-communication",
+  "tool_name": "propose_communication",
+  "verb": "Communications",
+  "agents": [
+    "clare",
+    "hammond",
+    "ann"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Create or edit a Professional Communication record (email, call, message, in person, video). Confirm card; nothing saved until Confirm.",
+  "surfaces": [
+    "confirm_card",
+    "governance_log"
+  ]
+}

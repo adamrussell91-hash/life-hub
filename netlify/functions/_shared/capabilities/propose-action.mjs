@@ -470,7 +470,7 @@ export function classifyWriteTarget(path) {
   }
   if (
     store === 'professional'
-    && (kind === 'meeting' || kind === 'event' || kind === 'application' || kind === 'future' || kind === 'tie')
+    && (kind === 'meeting' || kind === 'event' || kind === 'communication' || kind === 'application' || kind === 'future' || kind === 'tie')
     && BLOB_ID.test(id)
   ) {
     return { store: 'professional', kind, id, path: raw };
