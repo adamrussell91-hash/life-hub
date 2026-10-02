@@ -174,6 +174,8 @@
 }
 
 .page-header.is-chat-rail {
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-3);
   margin-bottom: var(--space-2);
@@ -314,8 +316,27 @@
   gap: var(--space-1);
 }
 
-/* Phone chat already subtracts a tall header. A thin rail needs less clearance. */
+/* Phone: one row, 44px targets, and the same ease as desktop.
+   A column or wrapping page-header (Teaching, Knowledge) would stack the rail. */
 @media (max-width: 720px) {
+  .page-header.is-chat-rail {
+    gap: var(--space-2);
+    padding-block: var(--space-1);
+  }
+
+  .page-header.is-chat-rail .chat-new-button,
+  .chat-view:not([data-panel-mode]) > .chat-view__toolbar .btn {
+    min-height: 2.75rem;
+  }
+
+  /* Typing hides the header. When the keyboard closes, don't replay the ease. */
+  .page-header.is-chat-rail.is-chat-rail-merged,
+  .page-header.is-chat-rail.is-chat-rail-merged .page-header__title,
+  .page-header.is-chat-rail.is-chat-rail-merged .page-header__eyebrow,
+  .page-header.is-chat-rail.is-chat-rail-merged .page-header__supporting {
+    transition: none;
+  }
+
   .canvas:has(> .page-header.is-chat-rail) .coach.chat {
     min-height: calc(100dvh - 4.25rem);
   }

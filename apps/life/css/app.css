@@ -7437,12 +7437,9 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 
   /*
    * Engaged phone Chat already has the Messenger who-header + Tools / New chat.
-   * Drop the whole page-header (title, date chip, refresh / sign-out) so the
-   * who-header can sit at the top of the canvas.
+   * The shared .is-chat-rail-merged header eases shut so that who-header is the
+   * only rail. display:none here would skip the ease.
    */
-  .app-shell:has(#chat-view[data-chrome='engaged']:not([hidden]):not([data-panel-mode])) .page-header {
-    display: none;
-  }
 
   .chat-view {
     min-width: 0;
