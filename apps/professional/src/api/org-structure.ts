@@ -147,6 +147,14 @@ export async function createOrgStructureLink(input: {
   return apiPost('/api/org-structure?action=create_link', input);
 }
 
+/** Remove a faculty / team. Its boxes stay on the chart, outside any container. */
+export async function archiveOrgUnit(input: {
+  organisation_ref: string;
+  unit_id: string;
+}): Promise<{ unit: OrgStructureUnit }> {
+  return apiPost('/api/org-structure?action=archive_unit', input);
+}
+
 /** Persist dragged box positions for the chart editor (merged server-side). */
 export async function saveOrgLayout(
   organisationId: string,

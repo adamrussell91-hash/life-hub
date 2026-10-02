@@ -27,11 +27,8 @@ import { organisationsRoute } from '@/app/router';
 import { openStructureEditor } from '@/components/org-structure-editor';
 import { openOrgChartEditor } from '@/components/org-chart-editor';
 import { crestNode, el, sectionHost, setSectionState } from '@/components/org-ui';
-import {
-  layoutOrgFlowchart,
-  renderFlowchartSvg,
-  renderStructureOutline
-} from '@/domain/org-flowchart';
+import { chartOutline, lineLegend, staticChart } from '@/components/org-chart-board';
+import { buildChartModel } from '@/domain/org-chart-model';
 import {
   buildOrganisationModel,
   type OrganisationModel
@@ -269,12 +266,11 @@ export async function renderOrganisationPage(
   let firstStructure: Promise<OrgStructurePayload> | null = fetchOrgStructure(organisationId);
   firstStructure.catch(() => undefined);
 
-  // View state lives outside the section so a repaint (after Done, after a
-  // collapse) keeps the view, zoom and collapsed containers.
+  // View state lives outside the section so a repaint (after Done) keeps
+  // the view and zoom you chose.
   const phoneMq = window.matchMedia('(max-width: 719px)');
   let view: 'outline' | 'flow' | 'people' = phoneMq.matches ? 'outline' : 'flow';
-  let flowScale = 1;
-  const collapsedUnits = new Set<string>();
+  let flowScale: number | null = null;
   let repaintView: (() => Promise<void>) | null = null;
   phoneMq.addEventListener('change', () => {
     if (view === 'people') return;
@@ -342,7 +338,7 @@ export async function renderOrganisationPage(
     // Highlight control (V2) — URL ?line=
     const hl = el('div', 'orgs-how__hl');
     hl.append(el('span', 'orgs-how__hl-lbl', 'Highlight'));
-    const yourLines = lineParam || 'your_lines';
+    const activeLine = lineParam || 'your_lines';
     const pills: Array<{ id: string; label: string }> = [
       { id: 'your_lines', label: 'Your lines' }
     ];
@@ -360,7 +356,7 @@ export async function renderOrganisationPage(
       if (seen.has(p.id)) continue;
       seen.add(p.id);
       const active =
-        yourLines === p.id || (p.id === 'your_lines' && (!lineParam || lineParam === 'your_lines'));
+        activeLine === p.id || (p.id === 'your_lines' && (!lineParam || lineParam === 'your_lines'));
       const btn = el('button', `orgs-how__pill${active ? ' is-active' : ''}`, p.label) as HTMLButtonElement;
       btn.type = 'button';
       btn.addEventListener('click', () => {
@@ -375,7 +371,7 @@ export async function renderOrganisationPage(
 
     const viewToggle = el('div', 'orgs-how__seg');
     const outlineBtn = el('button', 'orgs-how__seg-btn', 'Outline') as HTMLButtonElement;
-    const flowBtn = el('button', 'orgs-how__seg-btn', 'Flow') as HTMLButtonElement;
+    const flowBtn = el('button', 'orgs-how__seg-btn', 'Chart') as HTMLButtonElement;
     const peopleBtn = el('button', 'orgs-how__seg-btn', 'People list') as HTMLButtonElement;
     outlineBtn.type = flowBtn.type = peopleBtn.type = 'button';
     viewToggle.append(outlineBtn, flowBtn, peopleBtn);
@@ -396,10 +392,9 @@ export async function renderOrganisationPage(
       host.replaceChildren();
       if (view === 'outline') {
         host.append(
-          renderStructureOutline(
-            structure,
-            selfPersonRef,
-            Object.fromEntries(directoryPeople.map((p) => [p.id, p.display_name]))
+          chartOutline(
+            buildChartModel(structure, Object.fromEntries(directoryPeople.map((p) => [p.id, p.display_name]))),
+            selfPersonRef
           )
         );
         return;
@@ -426,7 +421,8 @@ export async function renderOrganisationPage(
         host.append(list);
         return;
       }
-      // Flow + pan/zoom chrome (C4)
+      // Chart: the same drawing as Edit chart (org-chart-board), read-only —
+      // your saved box positions, the same faculty containers and line styles.
       const wrap = el('div', 'orgs-flow__box');
       const zoomRow = el('div', 'orgs-flow__zoom');
       const zoomIn = el('button', 'btn btn--ghost', '+') as HTMLButtonElement;
@@ -435,83 +431,36 @@ export async function renderOrganisationPage(
       zoomIn.type = zoomOut.type = zoomFit.type = 'button';
       zoomIn.setAttribute('aria-label', 'Zoom in');
       zoomOut.setAttribute('aria-label', 'Zoom out');
-      zoomFit.setAttribute('aria-label', 'Fit flowchart');
+      zoomFit.setAttribute('aria-label', 'Fit the whole chart');
       zoomRow.append(zoomOut, zoomIn, zoomFit);
-      const stage = el('div', 'orgs-flow__stage');
-      wrap.append(zoomRow, stage);
+      const peopleNames = Object.fromEntries(directoryPeople.map((p) => [p.id, p.display_name]));
+      const chart = staticChart(structure, peopleNames, {
+        personRef: selfPersonRef,
+        highlight: lineParam,
+        onActivateBox: () => openChartEditor()
+      });
+      const viewport = chart.viewport;
+      wrap.append(zoomRow, viewport, lineLegend());
       host.append(wrap);
-      try {
-        const peopleNames = Object.fromEntries(
-          directoryPeople.map((p) => [p.id, p.display_name])
-        );
-        const layout = await layoutOrgFlowchart(structure, {
-          selfPersonRef,
-          highlightLine: lineParam || 'your_lines',
-          compact: phoneMq.matches,
-          peopleNames,
-          collapsedUnits
-        });
-        const svg = renderFlowchartSvg(layout, {
-          collapsedUnits,
-          onToggleUnit: (uref) => {
-            if (collapsedUnits.has(uref)) collapsedUnits.delete(uref);
-            else collapsedUnits.add(uref);
-            void paintView();
-          },
-          onVacantPosition: () => openChartEditor()
-        });
-        stage.append(svg);
-        const applyZoom = () => {
-          svg.style.transform = `scale(${flowScale})`;
-          svg.style.transformOrigin = '0 0';
-        };
+
+      const applyZoom = () => chart.zoom(flowScale ?? 1);
+      // First paint fits the chart to the card; after that, the zoom you chose sticks.
+      if (flowScale === null) flowScale = chart.fit();
+      applyZoom();
+      zoomIn.addEventListener('click', () => {
+        flowScale = Math.min(2, (flowScale ?? 1) + 0.15);
         applyZoom();
-        zoomIn.addEventListener('click', () => {
-          flowScale = Math.min(2.5, flowScale + 0.15);
-          applyZoom();
-        });
-        zoomOut.addEventListener('click', () => {
-          flowScale = Math.max(0.4, flowScale - 0.15);
-          applyZoom();
-        });
-        zoomFit.addEventListener('click', () => {
-          flowScale = 1;
-          applyZoom();
-          wrap.scrollLeft = 0;
-          wrap.scrollTop = 0;
-        });
-        // Touch pan via native overflow; Pointer Events keep buttons usable without gestures (C4).
-        stage.style.touchAction = 'pan-x pan-y';
-        let pointers = 0;
-        stage.addEventListener('pointerdown', (ev) => {
-          pointers += 1;
-          if (pointers === 1 && ev.target === stage) {
-            stage.setPointerCapture(ev.pointerId);
-          }
-        });
-        stage.addEventListener('pointerup', () => {
-          pointers = Math.max(0, pointers - 1);
-        });
-        // Safari gesture path (non-blocking; buttons remain the primary control).
-        wrap.addEventListener('gesturestart', ((ev: Event) => {
-          ev.preventDefault();
-        }) as EventListener);
-        wrap.addEventListener('gesturechange', ((ev: Event) => {
-          const ge = ev as Event & { scale?: number };
-          if (typeof ge.scale === 'number') {
-            flowScale = Math.min(2.5, Math.max(0.4, ge.scale));
-            applyZoom();
-          }
-        }) as EventListener);
-      } catch (err) {
-        wrap.append(
-          el(
-            'p',
-            'people-pane__empty',
-            err instanceof Error ? err.message : 'Could not layout flowchart.'
-          )
-        );
-      }
+      });
+      zoomOut.addEventListener('click', () => {
+        flowScale = Math.max(0.4, (flowScale ?? 1) - 0.15);
+        applyZoom();
+      });
+      zoomFit.addEventListener('click', () => {
+        flowScale = chart.fit();
+        applyZoom();
+        viewport.scrollLeft = 0;
+        viewport.scrollTop = 0;
+      });
     }
 
     outlineBtn.addEventListener('click', () => {
