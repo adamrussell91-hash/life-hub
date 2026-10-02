@@ -1746,10 +1746,15 @@ export function createChatConfirmHandler({
           });
           for (const { ghostResult } of ghostResults) {
             const ghostCode = ghostResult?.payload?.error?.code;
-            if (ghostResult?.payload?.ok !== true && ghostCode !== 'already_dismissed' && ghostCode !== 'ghost_not_found') {
-              if (ghostCode === 'already_accepted') {
-                return errorResponse(409, 'already_accepted', 'This calendar proposal was already accepted.', false, PRIVATE_CACHE);
-              }
+            // Already accepted (e.g. the calendar block saved but a follow-up write
+            // failed): there is nothing left to dismiss on the calendar, so Discard
+            // just retires the card. Refusing here left Confirm cards stuck forever.
+            if (
+              ghostResult?.payload?.ok !== true
+              && ghostCode !== 'already_dismissed'
+              && ghostCode !== 'ghost_not_found'
+              && ghostCode !== 'already_accepted'
+            ) {
               return jsonResponse(ghostResult?.status || 400, ghostResult?.payload || {
                 ok: false,
                 error: { code: 'ghost_dismiss_failed', message: 'The calendar proposal could not be dismissed.', retryable: false }
