@@ -499,7 +499,7 @@ function saveCardHtml() {
     const book = bookContext?.label ? escapeHtml(bookContext.label) : "this book";
     return `<section class="confirm-card" role="region" aria-label="Add to archive">
       <p class="page-header__eyebrow">Add to archive</p>
-      <h2 class="page-header__title" style="font-size: var(--text-lg)">File this page</h2>
+      <h2 class="page-header__title">File this page</h2>
       <p class="page-header__supporting">Referenced, and stamped under ${book}.</p>
       <div class="confirm-card__actions">
         <button class="btn btn--primary" type="button" data-save-brief ${saveBusy || busy ? "disabled" : ""}>${saveBusy ? "Saving…" : "Add to archive"}</button>
@@ -509,7 +509,7 @@ function saveCardHtml() {
   if (makeNoteSelected()) {
     return `<section class="confirm-card" role="region" aria-label="Add to archive">
       <p class="page-header__eyebrow">Add to archive</p>
-      <h2 class="page-header__title" style="font-size: var(--text-lg)">File this page</h2>
+      <h2 class="page-header__title">File this page</h2>
       <p class="page-header__supporting">Standalone page — tags from tidy, no notebook or uni stamp.</p>
       <div class="confirm-card__actions">
         <button class="btn btn--primary" type="button" data-save-brief ${saveBusy || busy ? "disabled" : ""}>${saveBusy ? "Saving…" : "Add to archive"}</button>
@@ -526,7 +526,7 @@ function saveCardHtml() {
 function editConfirmHtml(edit: RetagProposal) {
   return `<section class="confirm-card" role="region" aria-label="Confirm change">
     <p class="page-header__eyebrow">Proposed write</p>
-    <h2 class="page-header__title" style="font-size: var(--text-lg)">Retag this note</h2>
+    <h2 class="page-header__title">Retag this note</h2>
     <p class="page-header__supporting">Replace tags on ${escapeHtml(edit.title)}.</p>
     ${deltaHtml(edit)}
     <div class="confirm-card__actions">

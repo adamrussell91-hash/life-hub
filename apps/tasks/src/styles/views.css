@@ -38,14 +38,6 @@
   width: min(28rem, 100%);
 }
 
-.confirm-card .page-header__title {
-  font-size: var(--text-lg);
-}
-
-.confirm-card .page-header__supporting {
-  font-size: var(--text-sm);
-}
-
 .board-confirm:empty,
 .task-confirm:empty,
 .excursion-confirm:empty {
@@ -3818,30 +3810,6 @@
 .record-proposal {
   align-self: flex-start;
   width: min(36rem, 100%);
-  gap: var(--space-2);
-  padding: var(--space-3);
-}
-
-.record-proposal.confirm-card .page-header__title {
-  font-size: var(--text-md);
-}
-
-.record-proposal .page-header__eyebrow {
-  margin-bottom: 0;
-}
-
-.record-proposal__reasoning {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-.record-proposal__fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
 }
 
 .record-proposal__confirm:disabled,
@@ -4117,11 +4085,6 @@
   .floating-chat-button {
     right: var(--space-4);
     bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
-  }
-
-  .record-proposal {
-    gap: var(--space-3);
-    padding: var(--space-4);
   }
 
   .record-proposal .hub-chips {
