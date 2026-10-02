@@ -229,14 +229,17 @@ function githubOpenCommit(client) {
 
 async function professionalDepsForGhosts(env, {
   getProfessionalStore = defaultGetProfessionalStore,
-  getPeopleStore = defaultGetUniversalLinkStore
+  getPeopleStore = defaultGetUniversalLinkStore,
+  resolveEntity = defaultResolveEntity
 } = {}) {
   const professionalStore = await getProfessionalStore(env);
   const repo = createCommunicationRepository({ store: professionalStore, env });
   const meetingRepo = createMeetingRepository({ store: professionalStore, env });
   const eventRepo = createEventRepository({ store: professionalStore, env });
   const universalLinkStore = await getPeopleStore(env);
-  const links = createUniversalLinkRepository({ store: universalLinkStore });
+  // resolveEntity is required: without it this threw before any Professional
+  // write, so every ghost Confirm ended as "the Professional record failed".
+  const links = createUniversalLinkRepository({ store: universalLinkStore, resolveEntity });
   const accessContext = createAccessContext({ workflow: 'life' });
   return {
     createCommunication: (input) => repo.createCommunication(input),
@@ -266,7 +269,8 @@ export function createChatConfirmHandler({
 } = {}) {
   const ghostProfessionalDeps = () => professionalDepsForGhosts(env, {
     getProfessionalStore,
-    getPeopleStore
+    getPeopleStore,
+    resolveEntity: resolvePeopleEntity
   });
 
   return async function chatConfirmHandler(request) {
@@ -1746,10 +1750,15 @@ export function createChatConfirmHandler({
           });
           for (const { ghostResult } of ghostResults) {
             const ghostCode = ghostResult?.payload?.error?.code;
-            if (ghostResult?.payload?.ok !== true && ghostCode !== 'already_dismissed' && ghostCode !== 'ghost_not_found') {
-              if (ghostCode === 'already_accepted') {
-                return errorResponse(409, 'already_accepted', 'This calendar proposal was already accepted.', false, PRIVATE_CACHE);
-              }
+            // Already accepted (e.g. the calendar block saved but a follow-up write
+            // failed): there is nothing left to dismiss on the calendar, so Discard
+            // just retires the card. Refusing here left Confirm cards stuck forever.
+            if (
+              ghostResult?.payload?.ok !== true
+              && ghostCode !== 'already_dismissed'
+              && ghostCode !== 'ghost_not_found'
+              && ghostCode !== 'already_accepted'
+            ) {
               return jsonResponse(ghostResult?.status || 400, ghostResult?.payload || {
                 ok: false,
                 error: { code: 'ghost_dismiss_failed', message: 'The calendar proposal could not be dismissed.', retryable: false }
