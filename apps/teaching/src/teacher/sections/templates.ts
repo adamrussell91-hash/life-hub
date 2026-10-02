@@ -70,7 +70,7 @@ export function renderTemplatesPage(
   const root = document.createElement('div');
   root.className = 'templates-page';
 
-  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Templates' });
+  renderPageHeader(canvas, { eyebrow: 'Teaching Hub', title: 'Templates' });
 
   const tabs = document.createElement('div');
   tabs.className = 'hub-pills templates-page__tabs';

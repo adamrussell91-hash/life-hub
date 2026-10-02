@@ -29,28 +29,21 @@ describe('teacher shell', () => {
     expect(refs.main.id).toBe('teacher-main');
   });
 
-  it('renders refresh and sign-out in page-header actions and invokes onLogout when clicked', async () => {
-    const onLogout = vi.fn().mockResolvedValue(undefined);
+  it('renders refresh in page-header actions and does not render sign-out', () => {
     const onRefresh = vi.fn();
-    const refs = renderTeacherShell(root, { onLogout, onRefresh });
+    const refs = renderTeacherShell(root, { onLogout: vi.fn(), onRefresh });
     const host = document.createElement('div');
-    renderPageHeader(host, { title: 'Classes' });
+    renderPageHeader(host, { eyebrow: 'Teaching Hub', title: 'Classes' });
 
-    expect(refs.logoutButton).toBeInstanceOf(HTMLButtonElement);
-    expect(refs.logoutButton?.classList.contains('hub-icon-btn')).toBe(true);
-    expect(refs.logoutButton?.getAttribute('aria-label')).toBe('Sign out');
-    expect(refs.logoutButton?.textContent).not.toBe('Sign out');
+    expect(refs.logoutButton).toBeNull();
+    expect(host.querySelector('[data-hub-sign-out]')).toBeNull();
+    expect(host.textContent).not.toContain('Sign out');
     expect(host.querySelector('[data-hub-refresh]')?.getAttribute('aria-label')).toBe('Refresh');
-    expect(host.querySelectorAll('.page-header__actions .hub-utilities .hub-icon-btn')).toHaveLength(2);
-    expect(host.querySelector('.page-header__actions .hub-utilities [data-hub-sign-out]')).toBe(
-      refs.logoutButton
-    );
-    expect(refs.rail.contains(refs.logoutButton!)).toBe(false);
+    expect(host.querySelectorAll('.page-header__actions .hub-utilities .hub-icon-btn')).toHaveLength(1);
 
-    refs.logoutButton?.click();
-    await vi.waitFor(() => {
-      expect(onLogout).toHaveBeenCalledTimes(1);
-    });
+    const refresh = host.querySelector<HTMLButtonElement>('[data-hub-refresh]');
+    refresh?.click();
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
   it('hides the context bar when it has no children', () => {

@@ -2,8 +2,8 @@
  * Left rail is rail.css (RAIL.md) — load it alongside this sheet when adopting.
  */
 
-/* Discrete chrome utilities (refresh / sign out). Top-right of the page header —
-   faded icon only, never a labelled .btn. Snippet: snippets/hub-utilities.html */
+/* Refresh. Top-right of the page header, same row as the title.
+   Faded icon only, never a labelled .btn. Snippet: snippets/hub-utilities.html */
 .hub-utilities {
   display: inline-flex;
   align-items: center;
@@ -42,6 +42,13 @@
   width: 1.125rem;
   height: 1.125rem;
   display: block;
+}
+
+@media (max-width: 720px) {
+  .hub-icon-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
 }
 
 .btn {

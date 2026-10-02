@@ -100,12 +100,21 @@ html[data-hub="life"] .glass-panel {
 
 /* ── Page header ──────────────────────────────────────────────────────── */
 
+/* One row on every hub: eyebrow + title on the left, refresh in the top-right
+   corner. Do not wrap the utilities onto their own row. */
 .page-header {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-6);
-  margin-bottom: var(--space-6);
+  flex-wrap: nowrap;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-6);
+  min-width: 0;
+}
+
+.page-header__copy {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* View return above the eyebrow — same job as .page-card__back / Someday back links. */
@@ -125,12 +134,12 @@ html[data-hub="life"] .glass-panel {
 }
 
 .page-header__eyebrow {
+  margin: 0 0 var(--space-2);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: var(--space-2);
 }
 
 .page-header__title-row {
@@ -140,6 +149,7 @@ html[data-hub="life"] .glass-panel {
 }
 
 .page-header__title {
+  margin: 0;
   font-size: var(--text-2xl);
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-tight);
@@ -148,8 +158,18 @@ html[data-hub="life"] .glass-panel {
 }
 
 @media (max-width: 720px) {
+  .page-header {
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+
   .page-header__title {
     font-size: var(--text-xl);
+  }
+
+  .page-header__eyebrow {
+    font-size: var(--text-2xs);
+    margin-bottom: var(--space-1);
   }
 }
 
@@ -161,13 +181,18 @@ html[data-hub="life"] .glass-panel {
 
 .page-header__actions {
   display: flex;
+  flex-wrap: nowrap;
   gap: var(--space-2);
   align-items: center;
-  flex-shrink: 0;
+  align-self: flex-start;
+  flex: 0 0 auto;
+  width: auto;
+  margin-left: auto;
+  justify-content: flex-end;
 }
 
-/* Discrete chrome utilities (refresh / sign out). Always top-right of the
-   canvas header — never pill .btn labels on the rail. See snippets/hub-utilities.html */
+/* Refresh sits in this cluster, top-right of the header row. Sign out is not
+   canvas chrome. See snippets/hub-utilities.html */
 .hub-utilities {
   display: inline-flex;
   align-items: center;
@@ -189,6 +214,13 @@ html[data-hub="life"] .glass-panel {
   color: var(--shallow);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 720px) {
+  .hub-icon-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
 }
 
 .hub-icon-btn:hover:not(:disabled),

@@ -701,19 +701,19 @@ export function createAppController(dependencies) {
   }
 
   const SECTION_TITLES = {
-    home: { eyebrow: 'Your day at a glance', title: 'Home' },
-    chat: { eyebrow: 'Talk to your agents', title: 'Chat' },
-    nutrition: { eyebrow: "Today's macros", title: 'Nutrition' },
-    fitness: { eyebrow: 'Training', title: 'Fitness' },
-    skincare: { eyebrow: 'Consistency first', title: 'Skincare' },
-    calendar: { eyebrow: 'Everything, every hub', title: 'Calendar' },
-    body: { eyebrow: 'Scale, composition, tape', title: 'Body' },
-    'body-bloods': { eyebrow: 'Labs', title: 'Bloods' },
-    'body-medical': { eyebrow: 'History', title: 'Medical Overview' },
-    mind: { eyebrow: 'Mood and themes', title: 'Mind' },
-    'central-node': { eyebrow: 'Coordination hub', title: 'Central Node' },
-    'future-map': { eyebrow: 'Bucket list and dreams jar', title: 'Future map' },
-    'hub-map': { eyebrow: 'Every hub and page', title: 'Hub map' }
+    home: { eyebrow: 'Life Hub', title: 'Home' },
+    chat: { eyebrow: 'Life Hub', title: 'Chat' },
+    nutrition: { eyebrow: 'Life Hub', title: 'Nutrition' },
+    fitness: { eyebrow: 'Life Hub', title: 'Fitness' },
+    skincare: { eyebrow: 'Life Hub', title: 'Skincare' },
+    calendar: { eyebrow: 'Life Hub', title: 'Calendar' },
+    body: { eyebrow: 'Life Hub', title: 'Body' },
+    'body-bloods': { eyebrow: 'Life Hub', title: 'Bloods' },
+    'body-medical': { eyebrow: 'Life Hub', title: 'Medical Overview' },
+    mind: { eyebrow: 'Life Hub', title: 'Mind' },
+    'central-node': { eyebrow: 'Life Hub', title: 'Central Node' },
+    'future-map': { eyebrow: 'Life Hub', title: 'Future map' },
+    'hub-map': { eyebrow: 'Life Hub', title: 'Hub map' }
   };
 
   function closeMoreSheet() {
