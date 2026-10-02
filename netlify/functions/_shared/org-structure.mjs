@@ -805,9 +805,48 @@ export function createOrgStructureRepository(deps = {}) {
       return { position: updated, ended_link_ids: ended };
     }
 
+    // Remove a faculty / team: archive the unit, take every box out of it
+    // (the boxes and their people stay on the chart) and end the membership
+    // and part-of lines that pointed at it.
+    async function archiveUnit(organisationId, unitId) {
+      if (!isValidUnitId(unitId)) {
+        throw Object.assign(new Error('Invalid unit id.'), { status: 400, code: 'invalid_unit_id' });
+      }
+      const existing = parseUnitRecord(await getJSON(resolved, unitKey(unitId), STRONG));
+      if (!existing) {
+        throw Object.assign(new Error('Unit not found.'), { status: 404, code: 'unit_not_found' });
+      }
+      const orgRef = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: organisationId });
+      if (existing.organisation_ref !== orgRef) {
+        throw Object.assign(new Error('Unit belongs to another organisation.'), {
+          status: 400,
+          code: 'unit_organisation_mismatch'
+        });
+      }
+      const unitRef = formatEntityRef({ namespace: 'shared', kind: 'unit', id: unitId });
+      const { positions, links } = await loadStructure(organisationId);
+      const released = [];
+      for (const position of positions) {
+        if (position.unit_ref !== unitRef) continue;
+        await updatePosition(position.id, { unit_ref: null, is_head: false });
+        released.push(position.id);
+      }
+      const ended = [];
+      for (const link of links) {
+        if (!linkIsCurrent(link)) continue;
+        if (link.source_ref !== unitRef && link.target_ref !== unitRef) continue;
+        await endStructureLink(organisationId, link.id, { dismiss: false });
+        ended.push(link.id);
+      }
+      const updated = { ...existing, lifecycle_status: 'archived', updated_at: now() };
+      await setJSON(resolved, unitKey(unitId), updated);
+      return { unit: updated, released_position_ids: released, ended_link_ids: ended };
+    }
+
     return {
       loadStructure,
       createUnit,
+      archiveUnit,
       updateUnit,
       createPosition,
       updatePosition,
@@ -833,6 +872,9 @@ export function createOrgStructureRepository(deps = {}) {
     },
     async updateUnit(unitId, patch) {
       return (await withStore()).updateUnit(unitId, patch);
+    },
+    async archiveUnit(organisationId, unitId) {
+      return (await withStore()).archiveUnit(organisationId, unitId);
     },
     async createPosition(input) {
       return (await withStore()).createPosition(input);

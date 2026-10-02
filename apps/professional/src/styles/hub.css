@@ -5781,10 +5781,172 @@
   transform-origin: 0 0;
 }
 
+.org-chart__inner {
+  /* Layout origin. Offset inside the board so containers can reach above
+     and left of their boxes (BOARD_OFFSET). */
+  position: absolute;
+  right: 0;
+  bottom: 0;
+}
+
 .org-chart__lines {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
   overflow: visible;
+  pointer-events: none;
+}
+
+.org-chart__lines .org-chart__line-hit {
+  pointer-events: stroke;
+}
+
+/* Faculty / team containers: drawn under the lines and boxes. */
+.org-chart__units {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.org-chart__unit {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--wave) 35%, var(--line));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--wave) 7%, var(--paper));
+}
+
+.org-chart__unit.is-empty {
+  border-style: dashed;
+}
+
+.org-chart__unit.is-selected {
+  outline: 2px solid var(--high-sea);
+  outline-offset: 2px;
+}
+
+.org-chart__unit-label {
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  right: 12px;
+  overflow: hidden;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--depth);
+}
+
+button.org-chart__unit-label {
+  cursor: grab;
+  touch-action: none;
+}
+
+button.org-chart__unit-label:hover {
+  color: var(--high-sea-ink);
+}
+
+button.org-chart__unit-label:focus-visible {
+  outline: 2px solid var(--high-sea);
+  border-radius: 4px;
+}
+
+.org-chart__unit-empty {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 44px;
+  font-size: var(--text-2xs);
+  color: var(--muted);
+}
+
+.org-chart__unit-members {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-2xs);
+  color: var(--muted);
+}
+
+.org-chart__unit.is-target {
+  border: 2px dashed var(--wave);
+  background: color-mix(in srgb, var(--wave) 16%, var(--paper));
+}
+
+/* "Your lines" on the organisation page: your boxes and the chain above. */
+.org-chart__box.is-mine {
+  border-color: var(--wave);
+  background: color-mix(in srgb, var(--wave) 10%, var(--paper));
+}
+
+.org-chart__box.is-self {
+  border: 2px solid var(--wave);
+  background: var(--pastel-blue, color-mix(in srgb, var(--wave) 18%, var(--paper)));
+}
+
+.org-chart__line.is-mine .org-chart__line-stroke {
+  stroke-width: 3;
+}
+
+/* Read-only boxes (organisation page): links / buttons, not draggable. */
+.org-chart__box.is-static {
+  cursor: pointer;
+  touch-action: auto;
+  text-decoration: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.org-chart__box.is-static:hover {
+  border-color: var(--high-sea);
+}
+
+/* Key under the read-only chart. */
+.org-chart__key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 8px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.org-chart__key-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.org-chart__key-unit {
+  width: 18px;
+  height: 12px;
+  border: 1px solid color-mix(in srgb, var(--wave) 35%, var(--line));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--wave) 7%, var(--paper));
+}
+
+/* The page's read-only chart viewport. */
+.orgs-board {
+  position: relative;
+  overflow: auto;
+  max-height: 70vh;
+  border-radius: var(--radius-sm);
+}
+
+.orgs-board .org-chart__sizer {
+  margin-inline: auto;
 }
 
 .org-chart__line-stroke {

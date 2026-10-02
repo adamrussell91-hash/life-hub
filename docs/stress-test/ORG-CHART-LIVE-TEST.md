@@ -8,10 +8,11 @@ Code under test (read only, so you know what each control is meant to do):
 
 | File | What it is |
 |------|------------|
-| `apps/professional/src/views/organisation-page.ts` | Organisation page: header, "How X is run", Outline / Flow / People list, Ann's read, Opportunities |
+| `apps/professional/src/views/organisation-page.ts` | Organisation page: header, "How X is run", Outline / Chart / People list, Ann's read, Opportunities |
 | `apps/professional/src/components/org-chart-editor.ts` | Drag-and-connect **Edit chart** editor (boxes, lines, inspector) |
-| `apps/professional/src/components/org-structure-editor.ts` | Older **Units & members…** sheet. This is the only place a unit (faculty) can be created |
-| `apps/professional/src/domain/org-flowchart.ts` | ELK auto-layout used by the **Flow** view |
+| `apps/professional/src/components/org-structure-editor.ts` | Older **Units & members…** sheet (units, head positions, member links, exception lines) |
+| `apps/professional/src/components/org-chart-board.ts` | The one chart drawing, shared by Edit chart, the page's **Chart** view, Compare and Outline |
+| `apps/professional/src/domain/org-chart-model.ts` | Boxes, lines, faculty containers, drop-into-a-faculty rules |
 | `apps/professional/src/api/org-structure.ts` | Every write goes to `/api/org-structure?action=…` |
 
 ---
@@ -44,7 +45,7 @@ Hard rules:
 
 ### 0.1 Viewports
 
-Run the whole suite at **1280×800**. Then run the sections marked **📱** again at **390×844** (phone). The page switches Flow → Outline under 720px, so the phone run checks different code.
+Run the whole suite at **1280×800**. Then run the sections marked **📱** again at **390×844** (phone). The page switches Chart → Outline under 720px, so the phone run checks different code.
 
 ### 0.2 Network + console recorder
 
@@ -112,12 +113,12 @@ Open St. Aloysius College from Organisations. **Do not click Edit chart, Run now
 
 | ID | Step | Expect / what to log |
 |----|------|----------------------|
-| R-1 **Cold load timing** 📱 | Hard reload (cache disabled) 3×. For each, time from navigation to: (a) `h1` stops saying "Loading…", (b) "How … is run" body is not empty, (c) Flow SVG has at least one box, (d) Ann's read body is ready, (e) Opportunities body is ready, (f) "Your time with …" timeline drawn. | All within budget. **Look for:** the sections load **one after another**, not in parallel. The code awaits chart → Ann → Opportunities → timeline in sequence, so a slow `/api/org-structure` or ELK layout delays everything below it. Log the gaps between a/b/c/d/e/f and the `/api/` waterfall. |
+| R-1 **Cold load timing** 📱 | Hard reload (cache disabled) 3×. For each, time from navigation to: (a) `h1` stops saying "Loading…", (b) "How … is run" body is not empty, (c) the Chart view has at least one box, (d) Ann's read body is ready, (e) Opportunities body is ready, (f) "Your time with …" timeline drawn. | All within budget. **Look for:** the sections load **one after another**, not in parallel. The code awaits chart → Ann → Opportunities → timeline in sequence, so a slow `/api/org-structure` delays everything below it. Log the gaps between a/b/c/d/e/f and the `/api/` waterfall. |
 | R-2 **Blank-while-loading** | During R-1, take a screenshot every 150 ms of the "How … is run" card until the chart appears. | A loading indicator is shown the whole time. **Look for:** the card going completely blank (the code sets the section to "ready" and empties it *before* fetching the structure). A blank card with no spinner is FAIL. |
-| R-3 **Refresh stability** | Reload 5× in a row. On each load record: box count, line count, container count, and box positions (Flow). | Same counts and same layout every time. Any box, line or container that appears on one load and not another is FAIL. Log which one. |
-| R-4 **Flow chart quality** | At 1280, Flow view, click **Fit**. Inspect it. | No overlapping boxes. No line drawn through a box. Arrows point the right way (from report to manager). Text not clipped mid-word: the screenshot shows "Director - Professional L…", so log every truncated title and whether the full text shows on hover. Containers are fully visible. Nothing is drawn outside the card. |
-| R-5 **View switch + controls** 📱 | Click Outline → People list → Flow → Outline. In Flow: −, +, Fit, each 3×. Collapse and expand a container with its − / + toggle. Click a **Vacant** box if one exists. | Each view paints in ≤ 1 s with the right button highlighted. Zoom changes size and Fit resets. Collapse hides members and shows a summary, and expand restores it. **Look for:** after collapse/expand, zoom resets or the view jumps. Clicking a vacant box opens the editor, so log that it opened and then close it with **Done** without changing anything. |
-| R-6 **Duplicate / dead controls** | Note every control on the page. | There are two **Edit chart** buttons (top right and in the card). Log it as a UX issue. Check both open the same editor and close with Done without changes. **Highlight → Your lines**: click it. Does it change anything? If Adam is not flagged as "self" on this org, it is a control that does nothing, so log FAIL with what the URL `?line=` became. Phone: Flow is replaced by Outline under 720 px. Check Outline is readable and the People list links work. |
+| R-3 **Refresh stability** | Reload 5× in a row. On each load record: box count, line count, container count, and box positions (Chart view). | Same counts and same layout every time. Any box, line or container that appears on one load and not another is FAIL. Log which one. |
+| R-4 **Chart quality** | At 1280, Chart view, click **Fit**. Inspect it. | No overlapping boxes. No line drawn through a box. Arrows point the right way (from report to manager). Text not clipped mid-word: the screenshot shows "Director - Professional L…", so log every truncated title and whether the full text shows on hover. Containers are fully visible. Nothing is drawn outside the card. |
+| R-5 **View switch + controls** 📱 | Click Outline → People list → Chart → Outline. In Chart: −, +, Fit, each 3×. Click a **Vacant** box if one exists, and a held box. | Each view paints in ≤ 1 s with the right button highlighted. Zoom changes size; Fit fits the whole chart to the card. A held box opens that person's profile. A vacant box opens the editor; close it with **Done** without changing anything. Outline lists the same people in the same faculties as the Chart. |
+| R-6 **Duplicate / dead controls** | Note every control on the page. | There are two **Edit chart** buttons (top right and in the card). Log it as a UX issue. Check both open the same editor and close with Done without changes. **Highlight → Your lines**: click it. Does it change anything? If Adam is not flagged as "self" on this org, it is a control that does nothing, so log FAIL with what the URL `?line=` became. Phone: Chart is replaced by Outline under 720 px. Check Outline is readable and the People list links work. |
 
 ---
 
@@ -165,7 +166,7 @@ Open the sandbox org and click **Draw the chart**. In every test below, after th
 | E4-3 | Drag from a handle onto the **same** box. | No line, no crash. |
 | E4-4 | Without dragging: select P4 → Connect → "manages" → P3 → **Add line**. | Read-back: `reports_to` with source P3 and target P4 (manages is stored reversed). Check the inspector wording is the right way round. |
 | E4-5 | Create the **same** P3 → P2 reports-to line again. | No duplicate line (server returns `created:false`). Log if it duplicates or errors. |
-| E4-6 | Create a cycle: P2 reports to P3 while P3 reports to P2. | Allowed or refused, but the editor and Flow view must not hang or crash. Log behaviour and any `cycles` in read-back. |
+| E4-6 | Create a cycle: P2 reports to P3 while P3 reports to P2. | Allowed or refused, but the editor and the Chart view must not hang or crash. Log behaviour and any `cycles` in read-back. |
 | E4-7 | Click a line (thin target). | Line inspector opens. If clicking the line is hard (missed 2+ of 5 attempts), log FAIL with the zoom level. Then **Flip direction**, then "Change to works with", then **Remove line**, timing each. The arrow flips, the style changes, and the line is gone. |
 | E4-8 | Select a box → in its "Lines" list click **Remove** on one line. | That line is removed and the others are untouched. |
 | E4-9 | Keyboard: Tab to a line and press Enter. Tab to a box and press Enter. | The inspector opens for each. Focus is visible. |
@@ -179,12 +180,12 @@ Open the sandbox org and click **Draw the chart**. In every test below, after th
 | E5-3 | Drag a box off the top-left (negative x/y) and far bottom-right. | Board grows. Box never becomes unreachable. Log where it ends up. |
 | E5-4 | **Tidy up**. | Boxes re-arranged by reporting. Status "Tidied.". Reopen: tidy layout kept. |
 | E5-5 | Zoom + ×5, − ×5, Fit. Then drag a box at 0.4× and 1.8×. | The box follows the pointer exactly at every zoom. Log the offset if it drifts. |
-| E5-6 | **Editor layout vs page Flow**: arrange boxes by hand, Done, compare the page's Flow chart. | **Look for:** the page Flow uses ELK auto-layout and ignores your saved positions, so the page will not look like what you drew. Log screenshots of both. This is a design FAIL unless the page says it auto-arranges. |
+| E5-6 | **Editor vs page**: arrange boxes by hand, Done, compare the page's Chart view. | The page shows exactly what you arranged: same positions, same faculty containers, same line styles. Any difference is FAIL. Log screenshots of both. |
 | E5-7 📱 | 390 px: is the editor usable? Is the inspector reachable? Can you add a person and a line without dragging? | All writes possible. Log every control that is off-screen or under 44 px. |
 
-### E6. Containers (units / faculties): the known-broken area
+### E6. Containers (units / faculties)
 
-There is **no "add unit" control in the Edit chart editor**. The only route is **Units & members…** in the editor header, which opens the older Edit structure sheet. Test exactly that.
+Faculties are added in Edit chart (**+ Faculty / team**) and drawn as containers in the editor and on the page alike. **Units & members…** opens the older sheet; test both routes.
 
 | ID | Step | Expect / what to log |
 |----|------|----------------------|
@@ -192,18 +193,18 @@ There is **no "add unit" control in the Edit chart editor**. The only route is *
 | E6-2 | If the sheet survived: Add unit `ZZT Science Faculty`, kind Faculty (timed). | Status "Unit added.". **Look for:** the sheet closes itself after one save (`onSaved` removes it), so a second unit means reopening it. Log it. Read-back: one unit. |
 | E6-3 | Add unit with an **empty** name. | Validation message, no unit created. Read-back confirms. |
 | E6-4 | Add a 2nd unit `ZZT Humanities Faculty`. Reopen the sheet. | Both units in the "Unit" dropdowns. **Look for** stale dropdowns that list only the first unit. |
-| E6-5 | Back in Edit chart, select P2's box. Does a **Unit / team** dropdown now appear? Pick `ZZT Science Faculty`. | The dropdown only shows once a unit exists. After picking: the box shows the unit name and read-back shows `position.unit_ref`. Close with Done. In Flow, P2 is drawn **inside** the Science Faculty container. |
-| E6-6 | Make P2 head of Science. In the old sheet, Add position `ZZT Head of Science`, unit Science, ✓ Head of unit. | The container shows a head position. Log how the head appears in Flow vs the editor (the editor has no "is head" control at all). |
-| E6-7 **Add a person to a container (two routes)** | Route A: editor → select P3's box → Unit = Science. Route B: old sheet → Add member → person P4, unit Science, role `ZZT Member`. | Both people appear inside the container in Flow and Outline. **Look for:** Route B's person list only has people already linked to the org (the directory), not all of Life Hub, so P4 may not be in it. Route B makes a `member_of_unit` link, not a box, so P4 may show in Flow but **not** in the editor, or the reverse. Log where each person shows in Editor / Flow / Outline / People list. |
+| E6-5 | Back in Edit chart, select P2's box. Does a **Unit / team** dropdown now appear? Pick `ZZT Science Faculty`. | The dropdown only shows once a unit exists. After picking: the box shows the unit name and read-back shows `position.unit_ref`. Close with Done. On the page Chart, P2 is drawn **inside** the Science Faculty container, the same as in the editor. |
+| E6-6 | Make P2 head of Science. In the old sheet, Add position `ZZT Head of Science`, unit Science, ✓ Head of unit. | The container shows a head position. Log how the head appears on the page Chart vs the editor (the editor has no "is head" control at all). |
+| E6-7 **Add a person to a container (two routes)** | Route A: editor → select P3's box → Unit = Science. Route B: old sheet → Add member → person P4, unit Science, role `ZZT Member`. | Both people appear inside the container on the Chart and in Outline. **Look for:** Route B's person list only has people already linked to the org (the directory), not all of Life Hub, so P4 may not be in it. Route B makes a `member_of_unit` link, not a box, so P4 shows as an "Also:" name in the container rather than a box. Log where each person shows in Editor / Chart / Outline / People list. |
 | E6-8 | Move P3 from Science to Humanities, then to "No unit". | The container membership updates each time. The empty container still renders, labelled. |
-| E6-9 | Collapse / expand Science in Flow (page). | Works. Member count / warmth dots shown when collapsed. |
-| E6-10 | Try to **rename** or **delete** a unit anywhere in the UI. | Log that no control exists (there is no archive-unit action), so test units are permanent. Note it for cleanup. |
+| E6-9 | In the editor: drag a box into Science, then out again; drag Science by its name; click its name, rename it, then remove it. | The target container highlights while dragging. In: the box joins (status says so). A small nudge inside does not take them out. Out past the outline: they leave. Dragging the name moves every box in it. Rename shows on the page; Remove keeps the boxes on the chart, outside any group. |
+| E6-10 | Click a faculty's name in Edit chart: rename it, change its kind, take one box out, add another, then **Remove** it (dismiss the confirm once, then accept). | Each change shows on the page Chart after Done. Remove archives the faculty; its boxes stay on the chart outside any group. Use this to clean up every `ZZT` faculty. |
 
 ### E7. Done → page refresh consistency 📱
 
 | ID | Step | Expect |
 |----|------|--------|
-| E7-1 | Make one change (add a line), click **Done** (timed until the page Flow shows the line). | Within budget. **Look for:** the "How … is run" card going blank, the view resetting to Flow (if you were on Outline), and collapsed containers re-expanding. Log each. |
+| E7-1 | Make one change (add a line), click **Done** (timed until the page Chart shows the line). | Within budget. **Look for:** the "How … is run" card going blank, and the view resetting to Chart (if you were on Outline). Log each. |
 | E7-2 | Hard reload. | Everything from E2–E6 is still there, matching read-back. |
 | E7-3 | Open the same sandbox org in a **second tab**. Add a box in tab A. In tab B, open the editor (no reload) and drag a box. | **Look for:** tab B overwriting tab A's work or showing stale data. Log it. |
 | E7-4 | Throttle network to "Slow 3G" in DevTools/CDP. Add a person, add a line, rename. | A busy state is visible the whole time (`is-busy`, status text). Clicks during busy don't duplicate. Nothing is lost. Log the time each took. |
@@ -266,10 +267,10 @@ Top 5 problems (one line each, worst first):
 | R-2 How card blank (no spinner) while loading | | |
 | R-1 Sections load one after another | | |
 | E1-2 Escape in search closes whole editor | | |
-| E5-6 Page Flow ignores editor layout | | |
+| E5-6 Page Chart differs from the editor | | |
 | E6-7 Old-sheet member ≠ editor box (two models for "in a container") | | |
 | R-6 "Your lines" highlight does nothing | | |
-| E7-1 View/collapse state resets after Done | | |
+| E7-1 View/zoom resets after Done | | |
 
 ## Leftovers for Adam to clean up
 - 

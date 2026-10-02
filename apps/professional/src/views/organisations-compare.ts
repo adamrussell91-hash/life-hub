@@ -8,7 +8,7 @@ import { fetchOrgStructure } from '@/api/org-structure';
 import { listUniversalLinksForEntity } from '@/api/universal-links';
 import { organisationsRoute } from '@/app/router';
 import { el } from '@/components/org-ui';
-import { layoutOrgFlowchart, renderFlowchartSvg } from '@/domain/org-flowchart';
+import { staticChart } from '@/components/org-chart-board';
 
 export interface ComparePageOptions {
   isCurrent?: () => boolean;
@@ -129,28 +129,19 @@ export async function renderOrganisationsCompare(
         col.append(box);
         host.append(col);
         const structure = structures[i];
-        if (!structure || !structure.units.length) {
-          box.append(el('p', 'people-pane__empty', 'No structure yet.'));
+        const hasChart =
+          structure &&
+          (structure.units.some((u) => u.lifecycle_status === 'active') ||
+            structure.positions.some((p) => p.lifecycle_status === 'active'));
+        if (!structure || !hasChart) {
+          box.append(el('p', 'people-pane__empty', 'No chart yet.'));
           continue;
         }
-        try {
-          const peopleNames = Object.fromEntries(
-            (row.people || []).map((p) => [p.id, p.display_name])
-          );
-          const layout = await layoutOrgFlowchart(structure, {
-            compact: phoneMq.matches,
-            peopleNames
-          });
-          box.append(renderFlowchartSvg(layout));
-        } catch (err) {
-          box.append(
-            el(
-              'p',
-              'people-pane__empty',
-              err instanceof Error ? err.message : 'Layout failed.'
-            )
-          );
-        }
+        // Same drawing as the organisation page and Edit chart.
+        const peopleNames = Object.fromEntries((row.people || []).map((p) => [p.id, p.display_name]));
+        const chart = staticChart(structure, peopleNames, { highlight: 'none' });
+        box.append(chart.viewport);
+        chart.zoom(chart.fit());
       }
     }
 

@@ -498,3 +498,34 @@ test('repairDroppedPositions puts back a box the index lost, and only that box',
   assert.deepEqual(titles, ['Deputy', 'Lost role', 'Principal']);
   assert.equal(await f.repo.repairDroppedPositions(f.orgId), 0);
 });
+
+test('archiveUnit removes the faculty, keeps its boxes on the chart and ends links to it', async () => {
+  const f = await chartFixture();
+  const science = await f.repo.createUnit({ organisation_ref: f.orgRef, name: 'Science', unit_kind: 'faculty' });
+  const scienceRef = formatEntityRef({ namespace: 'shared', kind: 'unit', id: science.id });
+  await f.repo.updatePosition(f.deputy.id, { unit_ref: scienceRef, is_head: true });
+  await f.repo.createStructureLink({
+    organisationRef: f.orgRef,
+    relationshipType: 'member_of_unit',
+    sourceRef: f.personRef,
+    targetRef: scienceRef,
+    validFrom: new Date(Date.now() - 1000).toISOString()
+  });
+
+  const result = await f.repo.archiveUnit(f.orgId, science.id);
+  assert.deepEqual(result.released_position_ids, [f.deputy.id]);
+  assert.equal(result.ended_link_ids.length, 1);
+
+  const payload = await f.repo.getDerivedGraph(f.orgId);
+  assert.equal(payload.units.find((u) => u.id === science.id).lifecycle_status, 'archived');
+  const deputy = payload.positions.find((p) => p.id === f.deputy.id);
+  assert.equal(deputy.lifecycle_status, 'active');
+  assert.equal(deputy.unit_ref, null);
+  assert.equal(deputy.is_head, false);
+  assert.equal(payload.graph.nodes.filter((n) => n.kind === 'unit').length, 0);
+  assert.deepEqual(payload.graph.members_by_unit[scienceRef] ?? [], []);
+
+  const elsewhere = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: generateOrganisationId() });
+  const other = await f.repo.createUnit({ organisation_ref: elsewhere, name: 'Other', unit_kind: 'team' });
+  await assert.rejects(() => f.repo.archiveUnit(f.orgId, other.id), /another organisation/);
+});
