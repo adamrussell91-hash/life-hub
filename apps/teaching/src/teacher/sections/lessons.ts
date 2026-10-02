@@ -41,7 +41,7 @@ export function renderLessonsIndex(
   disposers.push(templateMenu.dispose);
 
   renderPageHeader(canvas, {
-    eyebrow: 'Workspace',
+    eyebrow: 'Teaching Hub',
     title: 'Lessons',
     actions: [templateMenu.el, createHost]
   });

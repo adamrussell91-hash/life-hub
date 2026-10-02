@@ -79,6 +79,12 @@ describe("Knowledge Hub rail", () => {
     expect(mobile).toContain("goNotebooks");
   });
 
+  it("reloads the archive when the header refresh is used", () => {
+    const refreshHandler = main.slice(main.indexOf("[data-hub-refresh]"), main.indexOf("[data-logout]"));
+    expect(refreshHandler).toContain("entries = await listPages()");
+    expect(refreshHandler).not.toContain("data-hub-sign-out");
+  });
+
   it("opens on Notebooks after boot, not the archive list", () => {
     expect(main).toMatch(/let view: View = "notebooks"/);
     expect(main).toMatch(/await refreshVisible\(\);\s*view = "notebooks"/);

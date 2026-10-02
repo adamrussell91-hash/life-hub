@@ -1,6 +1,6 @@
 import { appendHubSwitcher, hubSwitcherHost } from '../../../../packages/hub-switcher.js';
 import { mountMobileChrome } from '../../../../packages/design-kit/js/mount-mobile-chrome.js';
-import { railIconFor, refreshIcon, signOutIcon, RAIL_ICON_PATHS } from '@/shell/icons';
+import { railIconFor, refreshIcon, RAIL_ICON_PATHS } from '@/shell/icons';
 
 export type RailHighlight = 'trip' | 'today' | 'trips' | null;
 
@@ -85,9 +85,7 @@ export function renderHubShell(root: HTMLElement, options: HubShellOptions = {})
   brand.className = 'hub-rail__brand';
   brand.textContent = 'Life Hub · Travel';
 
-  const logoutButton = options.onLogout
-    ? iconButton('Sign out', signOutIcon(), () => options.onLogout?.())
-    : null;
+  const logoutButton = null;
   const refreshButton = options.onRefresh
     ? iconButton('Refresh', refreshIcon(), () => options.onRefresh?.())
     : null;

@@ -125,7 +125,7 @@ Run this on **every** page before the page-specific list. Fail any item that is 
 - [ ] Rail brand is an `<a>` reading `Life Hub` / `Teaching Hub` / `Knowledge Hub` / `Tasks Hub`. Click it. It returns to that hub’s home (Home / Dashboard / Archive / Board).
 - [ ] Primary rail items are icon + title-case label. No coloured dots. No icon-only column. No uppercase item labels.
 - [ ] Current page is marked (`aria-current="page"` or `.is-current` / `.is-active`).
-- [ ] Refresh and Sign out sit in the canvas header as icon buttons, not labelled pills on the rail.
+- [ ] Refresh sits in the canvas header top-right, on the title row, as an icon button. Sign out is not in the header. No labelled pills on the rail.
 - [ ] Title is `h1` only. **No** hub tile anywhere: no favicon, no `.sign-in__mark`, no title-row `.hub-mark`.
 - [ ] Page header is eyebrow → title → optional supporting. Title is not blank, not `undefined`, not the previous page’s title.
 - [ ] Hub switcher / Hubs accordion lists the other three hubs. Expand each preview. Click through to the other hub and back.
@@ -186,7 +186,7 @@ Start at `https://life-hub.adam-russell.com/`.
 - [ ] Gate uses kit sign-in: title `Sign in`, label `Passphrase`, hub tile, no supporting/purpose copy.
 - [ ] Enter submits. Wrong passphrase shows an error, does not reload a silent blank.
 - [ ] After a valid existing session: shell paints, rail appears, Home is not an infinite spinner.
-- [ ] Sign out returns to the gate. Refresh on the gate stays signed out.
+- [ ] Refresh on the gate stays signed out. There is no header sign-out control.
 - [ ] Repeat the gate check on `/teaching/`, `/knowledge/`, `/tasks/` — same kit, same session, no second passphrase.
 
 Then walk hubs in this order: Life → Teaching → Knowledge → Tasks → cross-hub jumps.

@@ -66,7 +66,7 @@ export function renderTrashSection(canvas: HTMLElement): { dispose: () => void }
     { label: 'Trash options' }
   );
 
-  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Trash', actions: [optionsMenu.el] });
+  renderPageHeader(canvas, { eyebrow: 'Teaching Hub', title: 'Trash', actions: [optionsMenu.el] });
 
   const root = document.createElement('div');
   root.className = 'trash-page';

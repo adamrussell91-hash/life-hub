@@ -30,7 +30,7 @@ This freeze is **flat** (CSS at the kit root). There is no `css/` directory.
 10. `js/mount-mobile-chrome.js` — mount the phone bar + More sheet
 11. `motion.css` + `js/hub-motion.js` — shared fade, count-up, list stagger, magnet, opt-in kinetic text, opt-in scroll-hide chrome. Call `startHubMotion()` once from each hub.
 12. `js/hub-kinetic.js` — reusable word/line/character reveal (play / reset, stagger origins). Opt in with `.hub-kinetic` on canvas titles. **Not on the rail.**
-    Scroll-hide: mark chrome with `[data-hub-scroll-hide]` (see `snippets/hub-scroll-hide.html`). Typical: chat agent pickers, protocol pills, and sitting toolbars above a transcript. Do not scroll-hide refresh / sign-out utilities on non-chat pages. On phone chat canvases, `hub-chat-viewport.css` hides `.hub-utilities` so the Messenger who-header can sit at the top.
+    Scroll-hide: mark chrome with `[data-hub-scroll-hide]` (see `snippets/hub-scroll-hide.html`). Typical: chat agent pickers, protocol pills, and sitting toolbars above a transcript. Do not scroll-hide the refresh control on non-chat pages. On phone chat canvases, `hub-chat-viewport.css` hides `.hub-utilities` so the Messenger who-header can sit at the top.
 13. `js/morphing-dialog.js` — **locked** micro → expanded card morph (spring FLIP). Overlay: `openMorphingDialog`. In-place: `runMorphTransform`. Route change: `morphFromRect`. Mark shared title / subtitle / image with `data-hub-morph`.
 14. `morphing-popover.css` + `js/morphing-popover.js` — trigger expands into a compact editor (blur fade, 250ms ease-out). Notes / text: `createMorphingNotePopover`. Labelled values: `createMorphingValuesPopover`. Closed chip (status, priority, domain): `createMorphingClosedFieldPopover` — chip is the trigger, `.hub-pills` over a closed list, Save commits, Discard / click-outside / Escape keep the last saved value. No free text, no colour picker, no custom icons. Or copy `snippets/morphing-popover.html` and call `mountMorphingPopovers()`.
 15. `card-swipe.css` + `js/card-swipe.js` — horizontal deck (drag, dots, arrows, tap-to-select). Workout session swipes compact exercise cards, then `onSelect` expands one into the set editor via `openMorphingDialog`. Copy `snippets/card-swipe.html` or call `createCardSwipe`. Tokens only — no React / shadcn / Hugeicons.
@@ -93,12 +93,12 @@ In this monorepo Teaching / Knowledge / Tasks symlink `design-kit/` → `package
 ## Locked (do not reinvent)
 
 - Colours, type scale, spacing, radius, shadows
-- Page header: uppercase eyebrow → `.page-header__title-row` (`h1` only) → optional supporting → actions on the right. **Never put `.hub-mark` in the title row.**
+- Page header: uppercase eyebrow (the hub name on each hub’s home) → `.page-header__title-row` (`h1` only) → optional supporting. Refresh is the last item in `.page-header__actions`, top-right of that same row — never its own row, never a labelled pill. **Never put `.hub-mark` in the title row.** Sign out is not page chrome.
 - Left rail: `--rail-width` 15rem, depth→marine gradient, `--on-dark*` text. Same labeled rail on every hub — see `RAIL.md`
 - Rail brand: `.hub-rail__brand` — **`<a>` to hub home**, single line, CSS `text-transform: uppercase`, `--text-2xs`. Copy is `"Teaching Hub"` / `"Life Hub"` / `"Knowledge Hub"` / `"Tasks Hub"`. No stacked `<br>`, no logo, no large title-case hero. Optional `.hub-rail__tagline` only.
 - Rail items: `.hub-rail__link` = outline icon + title-case label. No coloured dots. No icon-over-label stacks. No `text-transform: uppercase` on item labels.
 - Hub mark: **deleted.** No favicon, no `.sign-in__mark`, no `.hub-mark`, no rail tile — on Life, Teaching, Knowledge, Tasks, or any new hub. See `ICONS.md`. Do not “fix” a missing favicon by restoring the tile.
-- Chrome utilities: refresh and sign out are `.hub-icon-btn` icons in `.hub-utilities` at the **canvas top-right**. Faded `--shallow` icons — never labelled pill `.btn`s on the rail or header. Snippet: `snippets/hub-utilities.html`.
+- Chrome utilities: refresh is one `.hub-icon-btn` in `.hub-utilities` at the **canvas top-right**, on the title row. Faded `--shallow` icon — never a labelled pill `.btn` on the rail or header. Snippet: `snippets/hub-utilities.html`. Do not put sign out in the header.
 - Buttons: `.btn` + `--primary` / `--secondary` / `--ghost` / `--decisive`
 - Agent UX: propose → **confirm card** (`.confirm-card`) → apply. Never silent writes that look like a new UI kit. Do not invent parallel proposal button skins.
 - Inter 400/500/600/700 only
@@ -132,7 +132,7 @@ When editing a hub, replace local logout/refresh chrome **and** the left rail wi
 
 1. Rail brand → `<a class="hub-rail__brand" href="…home…">`. Single line of copy `"… Hub"`; CSS uppercases it. Drop stacked `<br>` titles, logos, and large title-case rail heroes. Clicking the brand always returns to that hub’s home.
 2. Rail destinations → `.hub-rail__link` (outline icon + title-case label). Replace coloured dots. Knowledge drops the narrow icon column and uses the 15rem labeled rail.
-3. Sign out / refresh → copy `snippets/hub-utilities.html` into `.page-header__actions` (canvas top-right). Keep existing ids/data attributes if tests rely on them; change the markup to `.hub-icon-btn`. Leave the title row as `h1` only — **never add `.hub-mark`.** Do not add `<link rel="icon">` or `.sign-in__mark`. Drop `.sign-in__supporting` and any login purpose copy.
+3. Refresh → copy `snippets/hub-utilities.html` into `.page-header__actions` (canvas top-right, same row as the title). Keep existing ids/data attributes if tests rely on them; change the markup to `.hub-icon-btn`. Leave the title row as `h1` only — **never add `.hub-mark`.** Do not add `<link rel="icon">` or `.sign-in__mark`. Drop `.sign-in__supporting` and any login purpose copy. Do not add a sign-out button to the header.
 4. Delete labelled pill logout styles on the rail (`.teacher-layout__logout`, `.rail__logout`, `.hub-rail__logout`, `.quiet-button` used as Sign out/Refresh).
 5. Load `rail.css` (or `chrome.css`) and `actions.css` so `.hub-rail__*` and `.hub-icon-btn` are defined.
 6. Delete hub CSS that overrides `--rail-width` or restyles rail markers. Do not add `.hub-mark`, `.sign-in__mark`, or a hub favicon.

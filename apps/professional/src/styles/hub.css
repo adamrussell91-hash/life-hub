@@ -3008,10 +3008,9 @@
 
 @media (max-width: 720px) {
   .page-header {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: flex-start;
     gap: var(--space-2);
-    margin-bottom: var(--space-3);
     min-width: 0;
     max-width: 100%;
   }
@@ -3035,9 +3034,10 @@
   }
 
   .page-header__actions {
-    flex-wrap: wrap;
-    width: 100%;
-    justify-content: flex-start;
+    flex-wrap: nowrap;
+    width: auto;
+    margin-left: auto;
+    justify-content: flex-end;
   }
 
   /* Option B: utilities stay on the eyebrow row, name steps down so the
@@ -3113,6 +3113,15 @@
 }
 
 /* People redesign Phase 1 — directory + person pane */
+
+/* Shell header is the only page title. These in-canvas h1s used to sit under
+   an empty shell row, so refresh looked like its own heading. */
+.people-page__title,
+.ties-confirm__title,
+.orgs-page__title,
+.schedule-db__title {
+  display: none;
+}
 
 .page-header--people-redesign .page-header__title:empty,
 .page-header--people-redesign .page-header__title-row:has(.page-header__title:empty) {

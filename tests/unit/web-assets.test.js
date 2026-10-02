@@ -62,12 +62,13 @@ test('authenticated shell provides a semantic sign-in gate and reachable control
     'id="app-shell"',
     'id="refresh-button"',
     'id="last-synced"',
-    'id="provider-status"',
-    'id="sign-out-button"'
+    'id="provider-status"'
   ]) {
     assert.ok(html.includes(fragment), fragment);
   }
   assert.match(html, /id="app-shell"[^>]*hidden/);
+  assert.doesNotMatch(html, /id="sign-out-button"/);
+  assert.doesNotMatch(html, /aria-label="Sign out"/);
 });
 
 const TITLE_ROW_TILE = /class(?:Name)?=["']hub-mark["']|className\s*=\s*['"]hub-mark['"]/;

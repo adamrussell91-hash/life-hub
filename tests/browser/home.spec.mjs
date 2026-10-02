@@ -279,23 +279,19 @@ test('manual refresh uses the unchanged manifest without downloading files again
   await context.close();
 });
 
-test('sign-out clears the session marker, cookie, and private repository cache', async () => {
-  const context = await browser.newContext();
+test('home header is the hub name, the page title, and refresh in the top-right', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
-  const assertNoSecretResponses = await monitorApiResponses(page);
   await signIn(page);
-  assert.equal(await page.evaluate(() => caches.has('life-hub-private-v2')), true);
-
-  const logout = page.waitForResponse(response => new URL(response.url()).pathname === '/api/logout');
-  await page.locator('#sign-out-button').click();
-  await logout;
-  await page.locator('#sign-in-view').waitFor();
-
-  assert.equal(await page.locator('#sign-in-view').isVisible(), true);
-  assert.equal(await page.evaluate(() => sessionStorage.getItem('life-hub:session-expiry')), null);
-  assert.equal(await page.evaluate(() => caches.has('life-hub-private-v2')), false);
-  assert.equal((await context.cookies()).some(cookie => cookie.name === 'life_hub_mock'), false);
-  await assertNoSecretResponses();
+  assert.equal((await page.locator('#page-eyebrow').textContent())?.trim(), 'Life Hub');
+  assert.equal((await page.locator('#page-title').textContent())?.trim(), 'Home');
+  assert.equal(await page.locator('#sign-out-button').count(), 0);
+  const header = await page.locator('.page-header').boundingBox();
+  const refresh = await page.locator('#refresh-button').boundingBox();
+  const title = await page.locator('#page-title').boundingBox();
+  assert.ok(header && refresh && title);
+  assert.ok(refresh.y < title.y + title.height, 'refresh stays on the title row');
+  assert.ok(refresh.x > title.x + title.width, 'refresh sits to the right of the title');
   await context.close();
 });
 
@@ -379,61 +375,6 @@ test('known server deadline hides private data when crossed online or offline', 
     assert.match(await page.locator('#sign-in-error').textContent(), /session expired/i);
     await context.close();
   }
-});
-
-test('offline logout survives reload and clears the server cookie on reconnect', async () => {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await signIn(page);
-  await waitForServiceWorkerControl(page);
-
-  await context.setOffline(true);
-  await page.locator('#sign-out-button').click();
-  await page.locator('#sign-in-view').waitFor();
-  await page.waitForFunction(() => localStorage.getItem('life-hub:logout-pending') === '1');
-  await page.reload();
-  await page.locator('#sign-in-view').waitFor();
-  assert.equal(await page.locator('#app-shell').isHidden(), true);
-
-  const completedLogout = page.waitForResponse(response => (
-    new URL(response.url()).pathname === '/api/logout' && response.status() === 204
-  ));
-  await context.setOffline(false);
-  await completedLogout;
-  await page.waitForFunction(() => localStorage.getItem('life-hub:logout-pending') === null);
-
-  assert.equal((await context.cookies()).some(cookie => cookie.name === 'life_hub_mock'), false);
-  assert.equal(await page.evaluate(() => caches.has('life-hub-private-v2')), false);
-  await context.close();
-});
-
-test('rapid sign-in waits behind a delayed logout request', async () => {
-  const context = await browser.newContext({ serviceWorkers: 'block' });
-  const page = await context.newPage();
-  let authRequests = 0;
-  page.on('request', request => {
-    if (new URL(request.url()).pathname === '/api/auth') authRequests += 1;
-  });
-  await signIn(page);
-
-  let releaseLogout;
-  const logoutGate = new Promise(resolve => { releaseLogout = resolve; });
-  await page.route('**/api/logout', async route => {
-    await logoutGate;
-    await route.continue();
-  });
-  await page.locator('#sign-out-button').click();
-  await page.locator('#sign-in-view').waitFor();
-  await page.locator('#sign-in-passphrase').fill(LOCAL_PASSPHRASE);
-  await page.locator('#sign-in-button').click();
-  await page.waitForTimeout(100);
-  assert.equal(authRequests, 1);
-
-  releaseLogout();
-  await page.locator('#app[data-state="ready"]').waitFor();
-  assert.equal(authRequests, 2);
-  assert.equal(await page.evaluate(() => localStorage.getItem('life-hub:logout-pending')), null);
-  await context.close();
 });
 
 test('home metric rings recover from a mid-flight data-sync-quiet freeze', async () => {

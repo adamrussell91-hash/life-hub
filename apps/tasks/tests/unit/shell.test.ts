@@ -28,14 +28,13 @@ describe('hub shell chrome', () => {
     expect(refs.rail.textContent).not.toContain('Sign out');
   });
 
-  it('places refresh and sign-out icons in page-header utilities', () => {
+  it('places the refresh icon in page-header utilities and omits sign-out', () => {
     const root = document.createElement('div');
-    const onLogout = vi.fn();
     const onRefresh = vi.fn();
-    const refs = renderHubShell(root, { onLogout, onRefresh });
+    const refs = renderHubShell(root, { onLogout: vi.fn(), onRefresh });
 
     renderPageHeader(refs, {
-      eyebrow: 'Home',
+      eyebrow: 'Tasks Hub',
       title: 'Dashboard',
       supporting: 'Today, projects, excursions — then your board grouped by status.'
     });
@@ -43,18 +42,16 @@ describe('hub shell chrome', () => {
     const labels = [...refs.pageHeader.querySelectorAll('.hub-utilities .hub-icon-btn')].map(
       (btn) => btn.getAttribute('aria-label')
     );
-    expect(labels).toEqual(['Refresh', 'Sign out']);
+    expect(labels).toEqual(['Refresh']);
     expect(refs.refreshButton?.querySelector('svg')).not.toBeNull();
-    expect(refs.logoutButton?.querySelector('svg')).not.toBeNull();
-    expect(refs.logoutButton?.textContent?.trim()).toBe('');
+    expect(refs.logoutButton).toBeNull();
+    expect(refs.pageHeader.textContent).not.toContain('Sign out');
     expect(refs.pageHeader.querySelector('.page-header__actions .hub-utilities')).not.toBeNull();
     expect(refs.pageHeader.querySelector('.page-header__status')).not.toBeNull();
     expect(refs.pageHeader.querySelector('.page-header__copy')?.nextElementSibling?.className).toBe(
       'page-header__status'
     );
 
-    refs.logoutButton?.click();
-    expect(onLogout).toHaveBeenCalledTimes(1);
     refs.refreshButton?.click();
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
@@ -77,7 +74,7 @@ describe('hub shell chrome', () => {
     expect(actions[0]).toContain('btn');
     expect(actions.at(-1)).toBe('hub-utilities');
     expect(refs.pageHeader.querySelector('.hub-mark')).toBeNull();
-    expect(refs.logoutButton?.getAttribute('aria-label')).toBe('Sign out');
+    expect(refs.pageHeader.querySelector('[aria-label="Sign out"]')).toBeNull();
   });
 
   it('strips leftover title-row chrome on re-render', () => {
@@ -173,17 +170,17 @@ describe('hub shell chrome', () => {
 
 describe('viewChrome', () => {
   it('uses the rail group then the tab name', () => {
-    expect(viewChrome('day')).toEqual({ eyebrow: 'Views', title: 'Today' });
-    expect(viewChrome('week')).toEqual({ eyebrow: 'Views', title: 'Week' });
-    expect(viewChrome('term')).toEqual({ eyebrow: 'Views', title: 'Term' });
-    expect(viewChrome('year')).toEqual({ eyebrow: 'Views', title: 'Year' });
-    expect(viewChrome('almanac')).toEqual({ eyebrow: 'Views', title: 'Almanac' });
-    expect(viewChrome('list')).toEqual({ eyebrow: 'Views', title: 'Backlog' });
-    expect(viewChrome('excursions')).toEqual({ eyebrow: 'Work', title: 'Excursions' });
-    expect(viewChrome('maps')).toEqual({ eyebrow: 'Tools', title: 'Maps' });
-    expect(viewChrome('orbit')).toEqual({ eyebrow: 'Views', title: 'Orbit' });
-    expect(viewChrome('board')).toEqual({ eyebrow: 'Home', title: 'Dashboard' });
-    expect(viewChrome('clare')).toEqual({ eyebrow: 'Home', title: 'Chat' });
+    expect(viewChrome('day')).toEqual({ eyebrow: 'Tasks Hub', title: 'Today' });
+    expect(viewChrome('week')).toEqual({ eyebrow: 'Tasks Hub', title: 'Week' });
+    expect(viewChrome('term')).toEqual({ eyebrow: 'Tasks Hub', title: 'Term' });
+    expect(viewChrome('year')).toEqual({ eyebrow: 'Tasks Hub', title: 'Year' });
+    expect(viewChrome('almanac')).toEqual({ eyebrow: 'Tasks Hub', title: 'Almanac' });
+    expect(viewChrome('list')).toEqual({ eyebrow: 'Tasks Hub', title: 'Backlog' });
+    expect(viewChrome('excursions')).toEqual({ eyebrow: 'Tasks Hub', title: 'Excursions' });
+    expect(viewChrome('maps')).toEqual({ eyebrow: 'Tasks Hub', title: 'Maps' });
+    expect(viewChrome('orbit')).toEqual({ eyebrow: 'Tasks Hub', title: 'Orbit' });
+    expect(viewChrome('board')).toEqual({ eyebrow: 'Tasks Hub', title: 'Dashboard' });
+    expect(viewChrome('clare')).toEqual({ eyebrow: 'Tasks Hub', title: 'Chat' });
   });
 });
 

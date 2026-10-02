@@ -52,7 +52,7 @@ export function renderClassesIndex(
   createHost.className = 'classes-index__create create-control';
   createHost.dataset.createHost = '';
 
-  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Classes', actions: [createHost] });
+  renderPageHeader(canvas, { eyebrow: 'Teaching Hub', title: 'Classes', actions: [createHost] });
 
   const createControl = mountCreateControl(createHost, {
     context: 'classes',

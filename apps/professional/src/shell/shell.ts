@@ -1,6 +1,6 @@
 import { appendHubSwitcher, hubSwitcherHost } from '../../../../packages/hub-switcher.js';
 import { mountMobileChrome } from '../../../../packages/design-kit/js/mount-mobile-chrome.js';
-import { railIconFor, refreshIcon, signOutIcon, RAIL_ICON_PATHS } from '@/shell/icons';
+import { railIconFor, refreshIcon, RAIL_ICON_PATHS } from '@/shell/icons';
 import type { RailViewId } from '@/app/router';
 
 export interface HubShellRefs {
@@ -45,7 +45,7 @@ const NAV: NavItem[] = [...MAJOR_ITEMS, ...REST];
 
 export function viewChrome(view: RailViewId): { eyebrow: string; title: string } {
   const item = NAV.find((entry) => entry.id === view);
-  return { eyebrow: 'Professional', title: item?.label ?? 'People' };
+  return { eyebrow: 'Professional Hub', title: item?.label ?? 'People' };
 }
 
 function iconButton(label: string, icon: SVGSVGElement, onClick: () => void | Promise<void>): HTMLButtonElement {
@@ -83,7 +83,6 @@ function mountUtilities(refs: HubShellRefs): HTMLElement {
   const utilities = document.createElement('div');
   utilities.className = 'hub-utilities';
   if (refs.refreshButton) utilities.append(refs.refreshButton);
-  if (refs.logoutButton) utilities.append(refs.logoutButton);
   return utilities;
 }
 
@@ -107,9 +106,7 @@ export function renderHubShell(root: HTMLElement, options: HubShellOptions = {})
   brand.textContent = 'Professional Hub';
   top.append(brand);
 
-  const logoutButton = options.onLogout
-    ? iconButton('Sign out', signOutIcon(), () => options.onLogout?.())
-    : null;
+  const logoutButton = null;
   const refreshButton = options.onRefresh
     ? iconButton('Refresh', refreshIcon(), () => options.onRefresh?.())
     : null;

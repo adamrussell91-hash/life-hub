@@ -692,7 +692,20 @@ function shell(main: string) {
   });
 
   app.querySelector<HTMLButtonElement>("[data-hub-refresh]")?.addEventListener("click", () => {
-    void refreshVisible().then(render);
+    const button = app.querySelector<HTMLButtonElement>("[data-hub-refresh]");
+    if (!button || button.disabled) return;
+    button.disabled = true;
+    void (async () => {
+      try {
+        entries = await listPages();
+        await ensurePageReviews();
+        await refreshVisible();
+        render();
+      } catch {
+        showToast("Could not refresh.");
+        button.disabled = false;
+      }
+    })();
   });
 
   app.querySelector<HTMLButtonElement>("[data-logout]")?.addEventListener("click", async () => {
@@ -1068,7 +1081,7 @@ function renderNotebooks() {
   const cards = notebookCards(entries);
   shell(`
     ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · notebooks stay on this canvas</p>` : ""}
-    ${pageHeader("Knowledge", "Notebooks")}
+    ${pageHeader("Knowledge Hub", "Notebooks")}
     ${notebooksGridHtml(cards)}
   `);
   bindNotebooksGrid(

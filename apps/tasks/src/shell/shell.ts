@@ -1,6 +1,6 @@
 import { appendHubSwitcher, hubSwitcherHost } from '../../../../packages/hub-switcher.js';
 import { mountMobileChrome } from '../../../../packages/design-kit/js/mount-mobile-chrome.js';
-import { railIconFor, refreshIcon, signOutIcon } from '@/shell/icons';
+import { railIconFor, refreshIcon } from '@/shell/icons';
 import { createRailDisclosureState, type RailSectionId } from '@/shell/rail-disclosure';
 
 export interface HubShellRefs {
@@ -184,17 +184,17 @@ export function railHighlightId(view: HubViewId): HubViewId {
   return STRETCH_VIEWS.includes(view) ? 'graph' : view;
 }
 
-/** Page header is the rail group, then the tab (or stretch) name. Nothing else. */
+/** Page header is the hub name, then the page. Same eyebrow on every Tasks view. */
 export function viewChrome(view: HubViewId): { eyebrow: string; title: string } {
   const major = MAJOR_ITEMS.find((entry) => entry.id === view);
-  if (major) return { eyebrow: 'Home', title: major.label };
+  if (major) return { eyebrow: 'Tasks Hub', title: major.label };
   for (const section of NAV_SECTIONS) {
     const item = section.items.find((entry) => entry.id === view);
-    if (item) return { eyebrow: section.title, title: item.label };
+    if (item) return { eyebrow: 'Tasks Hub', title: item.label };
   }
   const stretch = NAV.find((item) => item.id === view);
-  if (stretch) return { eyebrow: 'Views', title: stretch.label };
-  return { eyebrow: 'Home', title: 'Dashboard' };
+  if (stretch) return { eyebrow: 'Tasks Hub', title: stretch.label };
+  return { eyebrow: 'Tasks Hub', title: 'Dashboard' };
 }
 
 function fitTitleField(field: HTMLTextAreaElement): void {
@@ -307,7 +307,6 @@ function mountUtilities(refs: HubShellRefs): HTMLElement {
   const utilities = document.createElement('div');
   utilities.className = 'hub-utilities';
   if (refs.refreshButton) utilities.append(refs.refreshButton);
-  if (refs.logoutButton) utilities.append(refs.logoutButton);
   return utilities;
 }
 
@@ -331,9 +330,7 @@ export function renderHubShell(root: HTMLElement, options: HubShellOptions = {})
   brand.textContent = 'Tasks Hub';
   top.append(brand);
 
-  const logoutButton = options.onLogout
-    ? iconButton('Sign out', signOutIcon(), () => options.onLogout?.())
-    : null;
+  const logoutButton = null;
   const refreshButton = options.onRefresh
     ? iconButton('Refresh', refreshIcon(), () => options.onRefresh?.())
     : null;
