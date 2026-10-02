@@ -371,41 +371,81 @@ describe('renderHomeView', () => {
     expect(calendarHost?.querySelector('[data-part="hub-calendar-mount"]')).toBeTruthy();
   });
 
-  it('plots a clickable year-strip mark for each meeting and event', async () => {
+  it('plots a clickable year-strip mark for each PD event only', async () => {
+    const general = {
+      ...events[0],
+      id: 'event_00000000-0000-4000-8000-000000000099',
+      title: 'Staff morning tea',
+      event_type: 'general',
+      occurrence_state: 'scheduled',
+      hours: 2,
+      accreditation_category: null
+    };
+    const comm = {
+      schema_version: 2,
+      id: 'communication_00000000-0000-4000-8000-000000000098',
+      direction: 'outbound',
+      channel: 'in_person',
+      occurred_at: '2026-06-01T01:00:00.000Z',
+      subject: 'Parent phone call',
+      summary: '',
+      status: 'completed',
+      created_at: '2026-06-01T00:00:00.000Z',
+      updated_at: '2026-06-01T00:00:00.000Z',
+      scheduled_start: '2026-06-01T01:00:00.000Z',
+      scheduled_end: '2026-06-01T01:30:00.000Z',
+      time_zone: 'Australia/Sydney',
+      purpose_tag: null,
+      agenda: [],
+      blocks: []
+    };
+    globalThis.fetch = defaultFetchMock([
+      {
+        test: (url) => url.includes('/api/events'),
+        respond: () => Response.json({ ok: true, data: { events: [...events, general] } })
+      },
+      {
+        test: (url) => url.includes('/api/communications'),
+        respond: () => Response.json({ ok: true, data: { communications: [comm] } })
+      }
+    ]);
+
     const canvas = document.createElement('div');
     await renderHomeView(canvas);
     const marks = [...canvas.querySelectorAll<HTMLAnchorElement>('.pro-home__yearstrip-mark')];
-    expect(marks).toHaveLength(3);
-
-    const meeting = marks.find((node) => node.dataset.kind === 'meeting');
-    expect(meeting?.getAttribute('href')).toBe('#/meeting/meeting_00000000-0000-4000-8000-000000000010');
-    expect(meeting?.getAttribute('aria-label')).toMatch(/Seth planning/);
+    expect(marks).toHaveLength(2);
+    expect(marks.every((node) => node.dataset.kind === 'pd')).toBe(true);
 
     const pd = marks.find((node) => node.dataset.id === 'event_00000000-0000-4000-8000-000000000001');
     expect(pd?.getAttribute('href')).toBe('#/event/event_00000000-0000-4000-8000-000000000001');
-    expect(pd?.getAttribute('aria-label')).toMatch(/Critical Study PD Day/);
+    expect(pd?.getAttribute('aria-label')).toMatch(/PD: Critical Study PD Day/);
 
     const conference = marks.find((node) => node.dataset.id === 'event_00000000-0000-4000-8000-000000000002');
     expect(conference?.getAttribute('href')).toBe('#/event/event_00000000-0000-4000-8000-000000000002');
 
+    const hrefs = marks.map((node) => node.getAttribute('href'));
+    expect(hrefs.some((href) => href?.includes('/meeting/'))).toBe(false);
+    expect(hrefs.some((href) => href?.includes('/communication/'))).toBe(false);
+    expect(marks.some((node) => node.dataset.id === 'event_00000000-0000-4000-8000-000000000099')).toBe(false);
     expect(marks.some((node) => node.dataset.id === 'event_00000000-0000-4000-8000-000000000003')).toBe(false);
   });
 
-  it('shows the meeting or event on year-strip hover', async () => {
+  it('shows the PD event on year-strip hover', async () => {
     const canvas = document.createElement('div');
     await renderHomeView(canvas);
-    const meeting = canvas.querySelector<HTMLAnchorElement>('.pro-home__yearstrip-mark--meeting');
+    const pd = canvas.querySelector<HTMLAnchorElement>('.pro-home__yearstrip-mark--event');
     const tip = canvas.querySelector<HTMLElement>('.pro-home__yearstrip-tip');
-    expect(meeting).toBeTruthy();
+    expect(pd).toBeTruthy();
     expect(tip?.hidden).toBe(true);
 
-    meeting?.dispatchEvent(new Event('pointerenter'));
+    pd?.dispatchEvent(new Event('pointerenter'));
     expect(tip?.hidden).toBe(false);
-    expect(tip?.textContent).toMatch(/Seth planning/);
-    expect(tip?.textContent).toMatch(/Meeting/);
-    expect(tip?.textContent).toMatch(/15\/09\/26/);
+    expect(tip?.textContent).toMatch(/Critical Study PD Day/);
+    expect(tip?.textContent).toMatch(/PD/);
+    expect(tip?.textContent).toMatch(/18\/09\/26/);
+    expect(tip?.textContent).not.toMatch(/Meeting/);
 
-    meeting?.dispatchEvent(new Event('pointerleave'));
+    pd?.dispatchEvent(new Event('pointerleave'));
     expect(tip?.hidden).toBe(true);
   });
 

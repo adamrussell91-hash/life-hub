@@ -6,7 +6,7 @@ import {
   mountProfessionalCalendar,
   unmountProfessionalCalendar
 } from '@/calendar/hub-calendar';
-import type { CommunicationRecord, EventOccurrenceState, EventRecord, LedgerItem, MeetingRecord, MeetingState } from '@/domain/types';
+import type { CommunicationRecord, EventOccurrenceState, EventRecord, LedgerItem, MeetingRecord } from '@/domain/types';
 import { splitEventLabels } from '@/domain/priority-area';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { nextWalkIn, homeNudges } from '@/lib/walk-in';
@@ -84,22 +84,12 @@ const STATE_LABEL: Record<EventOccurrenceState, string> = {
   cancelled: 'Cancelled'
 };
 
-const MEETING_STATE_LABEL: Record<MeetingState, string> = {
-  completed: 'Completed',
-  scheduled: 'Scheduled',
-  rescheduled: 'Rescheduled',
-  cancelled: 'Cancelled',
-  no_show: 'No show'
-};
-
 interface YearMark {
   id: string;
-  kind: 'meeting' | 'event';
   title: string;
   start: string;
   href: string;
   stateLabel: string;
-  tint: 'meeting' | 'event' | 'muted';
 }
 
 function dayOfYear(year: number, parts: YmdParts): number {
@@ -197,39 +187,25 @@ function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElemen
   return card;
 }
 
-function collectYearMarks(today: YmdParts, events: EventRecord[], meetings: MeetingRecord[]): YearMark[] {
+function collectYearMarks(today: YmdParts, events: EventRecord[]): YearMark[] {
   const marks: YearMark[] = [];
   for (const event of events) {
+    if (event.event_type !== 'professional_development') continue;
     if (event.occurrence_state === 'cancelled') continue;
     if (sydneyParts(new Date(event.start)).year !== today.year) continue;
     marks.push({
       id: event.id,
-      kind: 'event',
       title: event.title,
       start: event.start,
       href: eventRoute(event.id),
-      stateLabel: STATE_LABEL[event.occurrence_state],
-      tint: 'event'
-    });
-  }
-  for (const meeting of meetings) {
-    if (meeting.state === 'cancelled') continue;
-    if (sydneyParts(new Date(meeting.scheduled_start)).year !== today.year) continue;
-    marks.push({
-      id: meeting.id,
-      kind: 'meeting',
-      title: meeting.title,
-      start: meeting.scheduled_start,
-      href: meetingRoute(meeting.id),
-      stateLabel: MEETING_STATE_LABEL[meeting.state],
-      tint: 'meeting'
+      stateLabel: STATE_LABEL[event.occurrence_state]
     });
   }
   marks.sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   return marks;
 }
 
-function renderYearStrip(today: YmdParts, events: EventRecord[], meetings: MeetingRecord[]): HTMLElement {
+function renderYearStrip(today: YmdParts, events: EventRecord[]): HTMLElement {
   const card = el('section', 'pro-home__yearstrip');
   const head = el('div', 'pro-home__yearstrip-head');
   head.append(
@@ -275,11 +251,10 @@ function renderYearStrip(today: YmdParts, events: EventRecord[], meetings: Meeti
   };
 
   const showTip = (anchor: HTMLAnchorElement, mark: YearMark): void => {
-    const kindLabel = mark.kind === 'meeting' ? 'Meeting' : 'Event';
     const date = formatDisplayDate(mark.start);
     tip.replaceChildren(
       el('strong', 'pro-home__yearstrip-tip-title', mark.title),
-      el('span', 'pro-home__yearstrip-tip-meta', `${kindLabel} · ${date} · ${mark.stateLabel}`)
+      el('span', 'pro-home__yearstrip-tip-meta', `PD · ${date} · ${mark.stateLabel}`)
     );
     tip.hidden = false;
     tip.dataset.for = mark.id;
@@ -293,7 +268,7 @@ function renderYearStrip(today: YmdParts, events: EventRecord[], meetings: Meeti
   };
 
   const stackByDay = new Map<string, number>();
-  for (const mark of collectYearMarks(today, events, meetings)) {
+  for (const mark of collectYearMarks(today, events)) {
     const parts = sydneyParts(new Date(mark.start));
     const key = ymdKey(parts);
     const stack = stackByDay.get(key) ?? 0;
@@ -302,14 +277,14 @@ function renderYearStrip(today: YmdParts, events: EventRecord[], meetings: Meeti
     const isPast = Date.parse(mark.start) < Date.now();
     const dot = el(
       'a',
-      `pro-home__yearstrip-mark pro-home__yearstrip-mark--${mark.tint}${isPast ? ' pro-home__yearstrip-mark--past' : ''}`
+      `pro-home__yearstrip-mark pro-home__yearstrip-mark--event${isPast ? ' pro-home__yearstrip-mark--past' : ''}`
     );
     dot.href = mark.href;
-    dot.dataset.kind = mark.kind;
+    dot.dataset.kind = 'pd';
     dot.dataset.id = mark.id;
     dot.setAttribute(
       'aria-label',
-      `${mark.kind === 'meeting' ? 'Meeting' : 'Event'}: ${mark.title}, ${formatDisplayDate(mark.start)}, ${mark.stateLabel}`
+      `PD: ${mark.title}, ${formatDisplayDate(mark.start)}, ${mark.stateLabel}`
     );
     dot.style.left = `calc(${yearProgressPct(today.year, parts, totalDays)}% + ${stack * 10}px)`;
     dot.addEventListener('pointerenter', () => showTip(dot, mark));
@@ -504,7 +479,7 @@ export async function renderHomeView(
     const today = sydneyParts(new Date());
 
     const lede = el('div', 'pro-home__lede');
-    lede.append(renderYearStrip(today, events, meetings));
+    lede.append(renderYearStrip(today, events));
     const side = el('div', 'pro-home__side');
     side.append(renderAccreditation(today, events));
     lede.append(side);
