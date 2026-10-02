@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { load as loadYaml } from 'js-yaml';
+import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolvers.mjs';
 import { verifySessionToken, serializeExpiredSessionCookie } from './_shared/auth-security.mjs';
 import {
   errorResponse,
@@ -402,6 +403,24 @@ function uuidFromGhostSeed(seed) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
+/**
+ * The Meeting/Event record is written before its attendee links. A link
+ * failure must not fail the accept: the record exists (the hub shows its
+ * incomplete links and can retry them), and failing here made every retry
+ * create a duplicate meeting.
+ */
+async function savedDespiteLinks(create, code, idField, kind, title) {
+  try {
+    return await create();
+  } catch (error) {
+    if (error?.code === code && typeof error[idField] === 'string') {
+      console.error(`[calendar-ghosts] ${kind} saved, attendee links incomplete`, error[idField]);
+      return { [kind]: { id: error[idField], title, links_incomplete: true } };
+    }
+    throw error;
+  }
+}
+
 /** Accept of a book_comm / log_comm / pro_meeting / pro_event ghost. */
 export async function applyProfessionalStep(deps, step, { ghostId = null } = {}) {
   const boundGhostId = ghostId || step.ghostId || null;
@@ -453,7 +472,7 @@ export async function applyProfessionalStep(deps, step, { ghostId = null } = {})
     const scheduled_end = step.scheduled_end
       || wallLocalToUtcIso(`${step.date}T${step.end}`, timeZone);
     const attendeeRefs = Array.isArray(step.attendee_refs) ? step.attendee_refs : [];
-    const { meeting } = await deps.createMeeting({
+    const { meeting } = await savedDespiteLinks(() => deps.createMeeting({
       title: step.title,
       scheduled_start,
       scheduled_end,
@@ -462,7 +481,7 @@ export async function applyProfessionalStep(deps, step, { ghostId = null } = {})
       agenda: step.agenda ?? null,
       notes: step.notes ?? null,
       links: attendeeRefs.map((ref) => ({ relationship_type: 'attendee', target_ref: ref }))
-    });
+    }), 'meeting_links_incomplete', 'meeting_id', 'meeting', step.title);
     return remember(meeting);
   }
   if (step.action === 'create_event') {
@@ -473,7 +492,7 @@ export async function applyProfessionalStep(deps, step, { ghostId = null } = {})
     const start = step.start_iso || wallLocalToUtcIso(`${step.date}T${step.start}`, timeZone);
     const end = step.end_iso || wallLocalToUtcIso(`${step.date}T${step.end}`, timeZone);
     const attendeeRefs = Array.isArray(step.attendee_refs) ? step.attendee_refs : [];
-    const { event } = await deps.createEvent({
+    const { event } = await savedDespiteLinks(() => deps.createEvent({
       title: step.title,
       start,
       end,
@@ -483,7 +502,7 @@ export async function applyProfessionalStep(deps, step, { ghostId = null } = {})
       location_text: step.location_text ?? null,
       hours: step.hours ?? null,
       links: attendeeRefs.map((ref) => ({ relationship_type: 'attendee', target_ref: ref }))
-    });
+    }), 'event_links_incomplete', 'event_id', 'event', step.title);
     return remember(event);
   }
   if (step.action !== 'create_communication') throw new TypeError(`Unknown professional step: ${step.action}`);
@@ -1318,7 +1337,7 @@ export function createCalendarGhostsHandler({
           const meetingRepo = createMeetingRepository({ store: professionalStore, env });
           const eventRepo = createEventRepository({ store: professionalStore, env });
           const universalLinkStore = await defaultGetUniversalLinkStore(env);
-          const links = createUniversalLinkRepository({ store: universalLinkStore });
+          const links = createUniversalLinkRepository({ store: universalLinkStore, resolveEntity: defaultResolveEntity });
           const accessContext = createAccessContext({ workflow: 'life' });
           return {
             createCommunication: (input) => repo.createCommunication(input),

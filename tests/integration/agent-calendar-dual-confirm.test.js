@@ -432,3 +432,98 @@ test('B6: chat Confirm returns ghost_partial and does not consume the card', asy
   const entryStatus = queue.find(item => item.id === pendingId)?.status;
   assert.ok(entryStatus !== 'consumed', `card was consumed: ${entryStatus}`);
 });
+
+test('Discard on a card whose ghost already accepted (Professional write failed) retires the card', async () => {
+  resetCapabilityCaches();
+  const github = memoryGitHub({
+    [PENDING_CALENDAR_GHOSTS_PATH]: '[]',
+    'central-node.md': CN
+  });
+  const entry = calendarGhostFromToolInput({
+    kind: 'log_comm',
+    date: DATE,
+    time: '12:00',
+    direction: 'outbound',
+    channel: 'email',
+    title: 'Gifted week',
+    summary: 'Emailed Kate',
+    person_refs: [],
+    time_zone: 'Australia/Sydney'
+  }, { agent: 'clare', nowIso: '2026-10-03T12:00:00+10:00' });
+  // Calendar half landed; the Professional half is still pending.
+  github.files.set(PENDING_CALENDAR_GHOSTS_PATH, serializePendingCalendarGhosts([{
+    ...entry,
+    status: 'accepted',
+    tasks_pending: true,
+    decided_at: '2026-10-03T12:00:00+10:00'
+  }]));
+  const pendingId = 'act_stuck_1';
+  github.files.set(PENDING_ACTIONS_PATH, JSON.stringify([{
+    id: pendingId,
+    createdAt: '2026-10-03',
+    slug: 'clare',
+    proposal: validateProposeActionInput(calendarGhostConfirmProposal(entry), { agentSlug: 'clare' }).proposal,
+    extras: { calendarGhostId: entry.id },
+    calendarGhostId: entry.id,
+    status: 'pending'
+  }], null, 2));
+
+  const confirm = createChatConfirmHandler({
+    env: ENV,
+    now: () => NOW,
+    createGitHubClient: () => github,
+    getTasksStore: async () => memoryBlobStore({ [TASKS_INDEX_KEY]: [] })
+  });
+  const response = await confirm(confirmRequest({ kind: 'action_dismiss', slug: 'clare', id: pendingId }));
+  const payload = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(payload));
+  assert.equal(payload.ok, true);
+  const queue = JSON.parse(github.files.get(PENDING_ACTIONS_PATH));
+  assert.equal(queue.find(item => item.id === pendingId)?.status, 'dismissed');
+});
+
+test('pro_meeting chat Confirm creates the Meeting end to end (no stubbed Professional deps)', async () => {
+  resetCapabilityCaches();
+  const github = memoryGitHub({ [PENDING_CALENDAR_GHOSTS_PATH]: '[]', 'central-node.md': CN });
+  const entry = calendarGhostFromToolInput({
+    kind: 'pro_meeting',
+    date: DATE,
+    start: '13:15',
+    end: '13:40',
+    title: 'Mod C Prep — Cooper Katrib',
+    time_zone: 'Australia/Sydney',
+    location_text: 'Library',
+    agenda: 'Prepping for Module C',
+    notes: 'Completed.'
+  }, { agent: 'clare', nowIso: '2026-10-03T12:00:00+10:00' });
+  github.files.set(PENDING_CALENDAR_GHOSTS_PATH, serializePendingCalendarGhosts([entry]));
+  const pendingId = 'act_meeting_1';
+  github.files.set(PENDING_ACTIONS_PATH, JSON.stringify([{
+    id: pendingId,
+    createdAt: '2026-10-03',
+    slug: 'clare',
+    proposal: validateProposeActionInput(calendarGhostConfirmProposal(entry), { agentSlug: 'clare' }).proposal,
+    extras: { calendarGhostId: entry.id },
+    calendarGhostId: entry.id,
+    status: 'pending'
+  }], null, 2));
+
+  const professional = memoryBlobStore();
+  const confirm = createChatConfirmHandler({
+    env: ENV,
+    now: () => NOW,
+    createGitHubClient: () => github,
+    getTasksStore: async () => memoryBlobStore({ [TASKS_INDEX_KEY]: [] }),
+    getProfessionalStore: async () => professional,
+    getPeopleStore: async () => memoryBlobStore()
+  });
+  const response = await confirm(confirmRequest({ kind: 'action', slug: 'clare', id: pendingId }));
+  const payload = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(payload));
+  const meetings = [...professional.data.keys()].filter(key => key.startsWith('meetings/records/'));
+  assert.equal(meetings.length, 1);
+  assert.equal(professional.data.get(meetings[0]).title, 'Mod C Prep — Cooper Katrib');
+  const ghosts = JSON.parse(github.files.get(PENDING_CALENDAR_GHOSTS_PATH));
+  const stored = (Array.isArray(ghosts) ? ghosts : ghosts.ghosts).find(item => item.id === entry.id);
+  assert.notEqual(stored.tasks_pending, true);
+});
