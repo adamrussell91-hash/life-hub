@@ -1,0 +1,17 @@
+{
+  "id": "professional.propose-event-update",
+  "tool_name": "propose_event_update",
+  "verb": "Events",
+  "agents": [
+    "clare",
+    "hammond",
+    "ann"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Fill in hours, attendance, certificate, accreditation; reschedule or close an existing Professional event. Confirm card; nothing saved until Confirm.",
+  "surfaces": [
+    "confirm_card",
+    "governance_log"
+  ]
+}

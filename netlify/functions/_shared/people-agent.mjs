@@ -68,7 +68,14 @@ export function searchPeopleSchema() {
   };
 }
 
+const ROLE_TO_ADAM = getRelationshipDeclaration('professional_relationship')?.allowed_roles ?? [];
+
 const PERSON_PROFILE_PROPS = {
+  role_to_adam: {
+    type: 'string',
+    enum: [...ROLE_TO_ADAM],
+    description: 'Who this person is to Adam. "student" files them under Students in Professional Hub; "colleague", "mentor" etc. under People.'
+  },
   summary: { type: 'string', description: 'Profile notes (professional_profile.summary).' },
   linkedin_url: { type: 'string', description: 'https LinkedIn URL, or empty to clear.' },
   current_workplace: {
@@ -82,7 +89,7 @@ export function proposePeopleChangesSchema() {
   return {
     name: 'propose_people_changes',
     description:
-      'Propose adding People, editing People (name, aliases, profile notes, LinkedIn, workplace), and linking People to each other or to Organisations. Nothing is saved until Adam taps Confirm on the card, and he can untick single items. Search first. To link a person you are adding in the same call, use "new:<key>" as the ref.',
+      'Propose adding People (colleagues OR students — set role_to_adam), editing People (name, aliases, profile notes, LinkedIn, workplace, role to Adam), and linking People to each other or to Organisations. Nothing is saved until Adam taps Confirm on the card, and he can untick single items. Search first. To link a person you are adding in the same call, use "new:<key>" as the ref.',
     input_schema: {
       type: 'object',
       properties: {
@@ -270,7 +277,7 @@ function endpointRef(value) {
  * Turn propose_people_changes input into os_propose_action writes. `nameForRef`
  * resolves a display name for card copy (and proves the ref exists).
  */
-export async function buildPeopleProposal(input, { nameForRef } = {}) {
+export async function buildPeopleProposal(input, { nameForRef, selfRef } = {}) {
   if (!input || typeof input !== 'object') return { ok: false, error: 'invalid_input' };
   const summary = clean(input.summary, 160);
   if (!summary) return { ok: false, error: 'summary_required' };
@@ -292,6 +299,14 @@ export async function buildPeopleProposal(input, { nameForRef } = {}) {
   const writes = [];
   const newPaths = new Map();
   const newNames = new Map();
+  const roleLinks = [];
+  const readRole = (item, target, name, detail) => {
+    if (item?.role_to_adam === undefined || item?.role_to_adam === null || item?.role_to_adam === '') return null;
+    const role = clean(item.role_to_adam, 40);
+    if (!ROLE_TO_ADAM.includes(role)) return { ok: false, error: 'invalid_role', detail };
+    roleLinks.push({ target, name, role });
+    return null;
+  };
 
   for (const [index, add] of adds.entries()) {
     const key = clean(add?.key, 31);
@@ -317,6 +332,8 @@ export async function buildPeopleProposal(input, { nameForRef } = {}) {
       ].filter(Boolean).join(', ')})`
       : '';
     writes.push({ path, mode: 'create', content: JSON.stringify(body), diff: `Add person: ${displayName}${profileBit}` });
+    const roleError = readRole(add, path, displayName, `add_people[${index}].role_to_adam`);
+    if (roleError) return roleError;
   }
 
   for (const [index, update] of updates.entries()) {
@@ -354,7 +371,12 @@ export async function buildPeopleProposal(input, { nameForRef } = {}) {
         );
       }
     }
-    if (!bits.length) return { ok: false, error: 'no_fields_to_update', detail: canonical };
+    const roleError = readRole(update, canonical, current, `update_people[${index}].role_to_adam`);
+    if (roleError) return roleError;
+    if (!bits.length) {
+      if (update?.role_to_adam) continue;
+      return { ok: false, error: 'no_fields_to_update', detail: canonical };
+    }
     writes.push({
       path: `people:person:${ref.id}`,
       mode: 'overwrite',
@@ -416,6 +438,24 @@ export async function buildPeopleProposal(input, { nameForRef } = {}) {
       content: JSON.stringify(body),
       diff: `Link ${from.name} → ${to.name}: ${label}`
     });
+  }
+
+  if (roleLinks.length) {
+    let self = null;
+    try {
+      self = typeof selfRef === 'function' ? await selfRef() : null;
+    } catch {
+      self = null;
+    }
+    if (!self) return { ok: false, error: 'no_self_person', detail: 'Adam\'s own Person record is not set up, so role_to_adam cannot be saved.' };
+    for (const [index, { target, name, role }] of roleLinks.entries()) {
+      writes.push({
+        path: `people:link:new-role-${index + 1}`,
+        mode: 'create',
+        content: JSON.stringify({ source_ref: self, target_ref: target, relationship_type: 'professional_relationship', role }),
+        diff: `${name} is Adam's ${role.replace(/_/g, ' ')}`
+      });
+    }
   }
 
   return {

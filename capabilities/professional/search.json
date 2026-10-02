@@ -1,0 +1,16 @@
+{
+  "id": "professional.search",
+  "tool_name": "search_professional",
+  "verb": "Lookup",
+  "agents": [
+    "clare",
+    "hammond",
+    "ann"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Find existing Professional Meetings, Events and Communications (ids) before editing them.",
+  "surfaces": [
+    "chat"
+  ]
+}

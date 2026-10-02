@@ -16,6 +16,7 @@
     "tasks:task:*",
     "professional:meeting:*",
     "professional:event:*",
+    "professional:communication:*",
     "professional:tie:*",
     "professional:application:*",
     "professional:future:*"
@@ -36,6 +37,7 @@
     "tasks:task:*",
     "professional:meeting:*",
     "professional:event:*",
+    "professional:communication:*",
     "professional:tie:*",
     "professional:application:*",
     "professional:future:*"
