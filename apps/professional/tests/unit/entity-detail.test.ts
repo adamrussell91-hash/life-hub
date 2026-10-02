@@ -749,59 +749,81 @@ describe('renderOrganisationPage', () => {
   });
 
   it('renders crest-wall organisation page (not generic entity detail)', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      jsonResponse(200, {
-        ok: true,
-        data: {
-          organisations: [
-            {
-              id: ORG_ID,
-              ref: `shared:organisation:${ORG_ID}`,
-              display_name: 'Example University',
-              legal_name: 'Example University Ltd',
-              logo_key: null,
-              monogram: 'EU',
-              chips: [
-                {
-                  kind: 'workplace',
-                  label: 'Workplace',
-                  detail: '2023–now',
-                  filterBucket: 'work'
-                }
-              ],
-              people_count: 1,
-              people: [
-                {
-                  id: 'person_1',
-                  display_name: 'Seth',
-                  warmth_band: 'warm',
-                  warmth: 70,
-                  first_link_at: '2023-01-15T00:00:00.000Z'
-                }
-              ],
-              warmth_spread: { warm: 1, cooling: 0, cold: 0, total: 1 },
-              arc_points: [
-                { id: 'person_1', at: '2023-01-15T00:00:00.000Z', label: '1' }
-              ],
-              is_current_workplace: true,
-              first_touch_at: '2023-01-15T00:00:00.000Z',
-              last_activity_at: '2026-01-01T00:00:00.000Z',
-              timeline_lanes: [
-                {
-                  id: 'lane_1',
-                  kind: 'work_study',
-                  label: 'Workplace',
-                  start: '2023-01-15T00:00:00.000Z',
-                  end: null
-                }
-              ],
-              created_at: '2020-01-01T00:00:00.000Z',
-              updated_at: '2026-01-01T00:00:00.000Z'
-            }
-          ],
-          counts: { organisations: 1, people: 1 }
+    const directory = {
+      ok: true,
+      data: {
+        organisations: [
+          {
+            id: ORG_ID,
+            ref: `shared:organisation:${ORG_ID}`,
+            display_name: 'Example University',
+            legal_name: 'Example University Ltd',
+            logo_key: null,
+            monogram: 'EU',
+            chips: [
+              {
+                kind: 'workplace',
+                label: 'Workplace',
+                detail: '2023–now',
+                filterBucket: 'work'
+              }
+            ],
+            people_count: 1,
+            people: [
+              {
+                id: 'person_1',
+                display_name: 'Seth',
+                warmth_band: 'warm',
+                warmth: 70,
+                first_link_at: '2023-01-15T00:00:00.000Z'
+              }
+            ],
+            warmth_spread: { warm: 1, cooling: 0, cold: 0, total: 1 },
+            arc_points: [
+              { id: 'person_1', at: '2023-01-15T00:00:00.000Z', label: '1' }
+            ],
+            is_current_workplace: true,
+            first_touch_at: '2023-01-15T00:00:00.000Z',
+            last_activity_at: '2026-01-01T00:00:00.000Z',
+            timeline_lanes: [
+              {
+                id: 'lane_1',
+                kind: 'work_study',
+                label: 'Workplace',
+                start: '2023-01-15T00:00:00.000Z',
+                end: null
+              }
+            ],
+            created_at: '2020-01-01T00:00:00.000Z',
+            updated_at: '2026-01-01T00:00:00.000Z'
+          }
+        ],
+        counts: { organisations: 1, people: 1 }
+      }
+    };
+    const emptyStructure = {
+      ok: true,
+      data: {
+        organisation_ref: `shared:organisation:${ORG_ID}`,
+        units: [],
+        positions: [],
+        links: [],
+        graph: {
+          organisation_ref: `shared:organisation:${ORG_ID}`,
+          nodes: [],
+          edges: [],
+          members_by_unit: {},
+          memberships_by_person: {},
+          member_person_ids: [],
+          member_count: 0,
+          cycles: []
         }
-      })
+      }
+    };
+    // A fresh Response per call, routed by URL: the page fetches the chart
+    // alongside the directory now.
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) =>
+      jsonResponse(200, String(input).includes('/api/org-structure') ? emptyStructure : directory)
     );
     const canvas = document.createElement('div');
     let title = '';

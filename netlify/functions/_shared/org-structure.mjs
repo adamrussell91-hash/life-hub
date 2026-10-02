@@ -12,6 +12,7 @@ import {
   validateUnitCreateInput,
   validateUnitFieldUpdate
 } from './identity-schema.mjs';
+import { mapBounded } from './blobs-list.mjs';
 import { createAccessContext } from './entity-access.mjs';
 import { formatEntityRef, parseEntityRef } from './entity-ref.mjs';
 import { resolveEntity as defaultResolveEntity } from './entity-resolvers.mjs';
@@ -339,8 +340,16 @@ export function sanitizeDiagramLayout(raw) {
   return out;
 }
 
+// Netlify Blobs reads are eventually consistent by default. The org index
+// is one blob that every write loads, mutates and saves, so a stale read
+// there silently drops whatever the previous write added (a new box
+// vanished after "Saved." because the following link / layout write saved
+// an index that predated it). Every index and record read is strong.
+const STRONG = { consistency: 'strong' };
+const READ_BATCH = 10;
+
 async function loadOrgIndex(store, organisationId) {
-  const raw = await getJSON(store, orgStructureIndexKey(organisationId));
+  const raw = await getJSON(store, orgStructureIndexKey(organisationId), STRONG);
   if (!raw || typeof raw !== 'object') {
     return { unit_ids: [], position_ids: [], link_ids: [], diagram_layout: {}, sync_dismissed: [] };
   }
@@ -387,29 +396,26 @@ export function createOrgStructureRepository(deps = {}) {
         throw Object.assign(new Error('Invalid organisation id.'), { status: 400, code: 'invalid_organisation_id' });
       }
       const index = await loadOrgIndex(resolved, organisationId);
-      const units = [];
-      for (const id of index.unit_ids) {
-        const raw = await getJSON(resolved, unitKey(id));
-        const parsed = parseUnitRecord(raw);
-        if (parsed) units.push(parsed);
-      }
-      const positions = [];
-      for (const id of index.position_ids) {
-        const raw = await getJSON(resolved, positionKey(id));
-        const parsed = parsePositionRecord(raw);
-        if (parsed) positions.push(parsed);
-      }
-      const links = [];
-      for (const id of index.link_ids) {
-        try {
-          // Must pass the access context: without it every link fails the
-          // visibility check and the chart silently loses all its lines.
-          const link = await linksRepo.getLink(id, accessContext);
-          if (link) links.push(link);
-        } catch {
-          /* missing link — skip */
-        }
-      }
+      const [unitRecords, positionRecords, linkRecords] = await Promise.all([
+        mapBounded(index.unit_ids, READ_BATCH, async (id) =>
+          parseUnitRecord(await getJSON(resolved, unitKey(id), STRONG))
+        ),
+        mapBounded(index.position_ids, READ_BATCH, async (id) =>
+          parsePositionRecord(await getJSON(resolved, positionKey(id), STRONG))
+        ),
+        mapBounded(index.link_ids, READ_BATCH, async (id) => {
+          try {
+            // Must pass the access context: without it every link fails the
+            // visibility check and the chart silently loses all its lines.
+            return await linksRepo.getLink(id, accessContext, STRONG);
+          } catch {
+            return null; /* missing link — skip */
+          }
+        })
+      ]);
+      const units = unitRecords.filter(Boolean);
+      const positions = positionRecords.filter(Boolean);
+      const links = linkRecords.filter(Boolean);
       // Also pull active structure links by listing for each unit/position
       // when index is incomplete (repair path).
       return { units, positions, links, index };
@@ -443,7 +449,7 @@ export function createOrgStructureRepository(deps = {}) {
       if (!isValidUnitId(unitId)) {
         throw Object.assign(new Error('Invalid unit id.'), { status: 400, code: 'invalid_unit_id' });
       }
-      const existing = parseUnitRecord(await getJSON(resolved, unitKey(unitId)));
+      const existing = parseUnitRecord(await getJSON(resolved, unitKey(unitId), STRONG));
       if (!existing) {
         throw Object.assign(new Error('Unit not found.'), { status: 404, code: 'unit_not_found' });
       }
@@ -481,7 +487,7 @@ export function createOrgStructureRepository(deps = {}) {
       if (!isValidPositionId(positionId)) {
         throw Object.assign(new Error('Invalid position id.'), { status: 400, code: 'invalid_position_id' });
       }
-      const existing = parsePositionRecord(await getJSON(resolved, positionKey(positionId)));
+      const existing = parsePositionRecord(await getJSON(resolved, positionKey(positionId), STRONG));
       if (!existing) {
         throw Object.assign(new Error('Position not found.'), { status: 404, code: 'position_not_found' });
       }
@@ -603,17 +609,57 @@ export function createOrgStructureRepository(deps = {}) {
       }
     }
 
-    /** Chart load: everyone at this organisation with a job title gets a box. */
+    /**
+     * Chart load: everyone at this organisation with a job title gets a box.
+     * Loads the structure once and only takes the per-person write path for
+     * people whose box is missing or out of date (it used to reload the whole
+     * structure once per person, which made every chart load take 10s+).
+     */
     async function syncFromProfiles(organisationId, workplaces) {
+      const candidates = (workplaces ?? []).filter((w) => w?.job_title && w.person_ref);
+      if (!candidates.length) return 0;
+      const { positions, links, index } = await loadStructure(organisationId);
       let changed = 0;
-      for (const w of workplaces ?? []) {
-        if (!w?.job_title || !w.person_ref) continue;
+      for (const w of candidates) {
+        const clean = String(w.job_title).trim();
+        if (!clean || index.sync_dismissed.includes(dismissKey(w.person_ref, clean))) continue;
+        const holds = currentHoldsFor(links, positions, w.person_ref);
+        if (holds.some((h) => sameTitle(h.position.title, clean))) continue;
+        if (holds.length > 1) continue;
         const result = await syncHolderFromProfile(organisationId, w.person_ref, w.job_title, {
           respectDismissed: true
         });
         if (result.changed) changed += 1;
       }
       return changed;
+    }
+
+    /**
+     * Put back boxes an earlier stale index write dropped. A dropped position
+     * still has its record and usually a saved layout entry, so any layout key
+     * for an active position of this organisation that the index no longer
+     * lists is re-added. Returns the number of boxes recovered.
+     */
+    async function repairDroppedPositions(organisationId) {
+      const index = await loadOrgIndex(resolved, organisationId);
+      const listed = new Set(index.position_ids);
+      const orgRef = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: organisationId });
+      const candidates = Object.keys(index.diagram_layout ?? {})
+        .map((ref) => parseEntityRef(ref))
+        .filter((ref) => ref?.kind === 'position' && isValidPositionId(ref.id) && !listed.has(ref.id))
+        .map((ref) => ref.id);
+      if (!candidates.length) return 0;
+      const records = await mapBounded(candidates, READ_BATCH, async (id) =>
+        parsePositionRecord(await getJSON(resolved, positionKey(id), STRONG))
+      );
+      const recovered = records
+        .filter((p) => p && p.organisation_ref === orgRef && p.lifecycle_status === 'active')
+        .map((p) => p.id);
+      if (!recovered.length) return 0;
+      const fresh = await loadOrgIndex(resolved, organisationId);
+      for (const id of recovered) if (!fresh.position_ids.includes(id)) fresh.position_ids.push(id);
+      await saveOrgIndex(resolved, organisationId, fresh);
+      return recovered.length;
     }
 
     /** Current holders of a position (for chart → profile). */
@@ -636,7 +682,7 @@ export function createOrgStructureRepository(deps = {}) {
       }
       const byId = {};
       const personAccess = createAccessContext({ workflow: 'life' });
-      for (const ref of refs) {
+      await mapBounded([...refs], READ_BATCH, async (ref) => {
         try {
           const endpoint = await resolveEntity(ref, personAccess);
           const id = parseEntityRef(ref)?.id;
@@ -644,7 +690,7 @@ export function createOrgStructureRepository(deps = {}) {
         } catch {
           /* hidden or missing person — leave unnamed */
         }
-      }
+      });
       return byId;
     }
 
@@ -711,11 +757,11 @@ export function createOrgStructureRepository(deps = {}) {
           code: 'structure_link_not_found'
         });
       }
-      const link = await linksRepo.getLink(linkId, accessContext);
+      const link = await linksRepo.getLink(linkId, accessContext, STRONG);
       if (!linkIsCurrent(link)) return link;
       if (link.relationship_type === 'holds_position' && options.dismiss !== false) {
         const position = parsePositionRecord(
-          await getJSON(resolved, positionKey(parseEntityRef(link.target_ref)?.id ?? ''))
+          await getJSON(resolved, positionKey(parseEntityRef(link.target_ref)?.id ?? ''), STRONG)
         );
         if (position) await addDismissed(organisationId, [dismissKey(link.source_ref, position.title)]);
       }
@@ -732,7 +778,7 @@ export function createOrgStructureRepository(deps = {}) {
       if (!isValidPositionId(positionId)) {
         throw Object.assign(new Error('Invalid position id.'), { status: 400, code: 'invalid_position_id' });
       }
-      const existing = parsePositionRecord(await getJSON(resolved, positionKey(positionId)));
+      const existing = parsePositionRecord(await getJSON(resolved, positionKey(positionId), STRONG));
       if (!existing) {
         throw Object.assign(new Error('Position not found.'), { status: 404, code: 'position_not_found' });
       }
@@ -773,6 +819,7 @@ export function createOrgStructureRepository(deps = {}) {
       syncHolderFromProfile,
       releaseHolder,
       syncFromProfiles,
+      repairDroppedPositions,
       holdersOf
     };
   }
@@ -816,6 +863,9 @@ export function createOrgStructureRepository(deps = {}) {
     },
     async syncFromProfiles(organisationId, workplaces) {
       return (await withStore()).syncFromProfiles(organisationId, workplaces);
+    },
+    async repairDroppedPositions(organisationId) {
+      return (await withStore()).repairDroppedPositions(organisationId);
     },
     async holdersOf(organisationId, positionId) {
       return (await withStore()).holdersOf(organisationId, positionId);

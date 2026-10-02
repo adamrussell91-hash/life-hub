@@ -169,10 +169,12 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
   const headActions = el('div', 'org-chart__head-actions');
   const addPersonBtn = button('+ Person', 'btn btn--primary');
   const addRoleBtn = button('+ Empty role');
+  const addUnitBtn = button('+ Faculty / team');
+  addUnitBtn.title = 'Add a container (faculty, team, department) that boxes can sit inside';
   const tidyBtn = button('Tidy up');
   tidyBtn.title = 'Re-arrange every box by who reports to whom';
   const doneBtn = button('Done', 'btn btn--primary');
-  headActions.append(addPersonBtn, addRoleBtn, tidyBtn);
+  headActions.append(addPersonBtn, addRoleBtn, addUnitBtn, tidyBtn);
   if (options.onOpenAdvanced) {
     const advanced = button('Units & members…');
     advanced.addEventListener('click', () => {
@@ -559,7 +561,7 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
     paintAdd();
   }
 
-  function paintAdd(focus: 'person' | 'role' | null = null): void {
+  function paintAdd(focus: 'person' | 'role' | 'unit' | null = null): void {
     inspector.replaceChildren();
     inspector.append(el('h3', undefined, 'Add someone'));
     const title = textInput('Their role, e.g. Head of English');
@@ -599,6 +601,56 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
       });
     });
     inspector.append(field('Role name', roleTitle), addRole);
+
+    // Containers (faculties, teams…). Boxes join one from their own panel.
+    inspector.append(el('h3', undefined, 'Add a faculty or team'));
+    const unitName = textInput('e.g. Learning Enrichment Faculty');
+    unitName.setAttribute('aria-label', 'Faculty or team name');
+    const unitKind = document.createElement('select');
+    unitKind.className = 'org-chart__select';
+    unitKind.setAttribute('aria-label', 'Kind');
+    for (const [value, label] of [
+      ['faculty', 'Faculty'],
+      ['team', 'Team'],
+      ['department', 'Department'],
+      ['program', 'Program'],
+      ['leadership', 'Leadership'],
+      ['board', 'Board'],
+      ['other', 'Other']
+    ]) {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = label;
+      unitKind.append(opt);
+    }
+    const addUnit = button('Add faculty / team');
+    addUnit.addEventListener('click', () => {
+      const name = unitName.value.trim();
+      if (!name) {
+        setStatus('Give the faculty or team a name first.');
+        unitName.focus();
+        return;
+      }
+      void mutate('Adding', async () => {
+        await createOrgUnit({
+          organisation_ref: options.organisationRef,
+          name,
+          unit_kind: unitKind.value,
+          order: structure?.units.length ?? 0
+        });
+      }).then(() => {
+        if (status.textContent === 'Saved.') {
+          setStatus(`${name} added. Click a box and choose it under “Unit / team” to put that person in it.`);
+        }
+      });
+    });
+    inspector.append(field('Name', unitName), field('Kind', unitKind), addUnit);
+    const activeUnits = (structure?.units ?? []).filter((u) => u.lifecycle_status === 'active');
+    if (activeUnits.length) {
+      inspector.append(
+        el('p', 'org-chart__muted', `Already here: ${activeUnits.map((u) => u.name).join(', ')}.`)
+      );
+    }
 
     // People whose profile says they work here but who aren't on the chart
     // (no job title yet, or you took their box off). One click adds them.
@@ -647,6 +699,7 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
 
     if (focus === 'person') (picker.querySelector('input') as HTMLInputElement | null)?.focus();
     if (focus === 'role') roleTitle.focus();
+    if (focus === 'unit') unitName.focus();
   }
 
   function paintBox(box: ChartBox): void {
@@ -871,6 +924,11 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
     paint();
     paintAdd('role');
   });
+  addUnitBtn.addEventListener('click', () => {
+    selection = { kind: 'none' };
+    paint();
+    paintAdd('unit');
+  });
   tidyBtn.addEventListener('click', () => {
     const fresh = resolveLayout(model.boxes, model.lines, {});
     positions = fresh;
@@ -904,6 +962,18 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
 
   function onKey(ev: KeyboardEvent): void {
     if (ev.key !== 'Escape') return;
+    // Escape in a text box clears it (then leaves it); it never throws away
+    // the whole editor mid-typing.
+    const target = ev.target as HTMLElement | null;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+      if ((target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) && target.value) {
+        target.value = '';
+        target.dispatchEvent(new Event('input'));
+      } else {
+        target.blur();
+      }
+      return;
+    }
     if (selection.kind !== 'none') {
       selection = { kind: 'none' };
       paint();

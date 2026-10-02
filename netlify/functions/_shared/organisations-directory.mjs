@@ -346,6 +346,8 @@ export function assembleOrganisationsDirectory(orgsWithRelationships, options = 
         peopleMap.set(personId, {
           id: personId,
           display_name: endpoint.display_label ?? 'Person',
+          // The org page needs to know which person is Adam ("Your lines").
+          is_self: Boolean(selfId && personId === selfId),
           warmth_band: warmthBand,
           warmth: warmthScore,
           first_link_at: firstLinkAt

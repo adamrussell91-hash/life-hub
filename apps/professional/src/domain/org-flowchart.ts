@@ -588,6 +588,16 @@ export function renderFlowchartSvg(
     g.classList.add(vacant ? 'orgs-flow__vacant-card' : 'orgs-flow__card');
     if (box.unitRef) g.dataset.unitRef = box.unitRef;
 
+    // Card text is cut to fit; the full name and role show on hover and to
+    // screen readers.
+    const fullLabel = [box.you ? `${box.label} · You` : box.label, box.sublabel, box.alsoIn.length ? `also in ${box.alsoIn.join(', ')}` : '']
+      .filter(Boolean)
+      .join(' — ');
+    const tip = document.createElementNS(ns, 'title');
+    tip.textContent = fullLabel;
+    g.append(tip);
+    g.setAttribute('aria-label', fullLabel);
+
     const rect = document.createElementNS(ns, 'rect');
     rect.setAttribute('x', String(box.x));
     rect.setAttribute('y', String(box.y));

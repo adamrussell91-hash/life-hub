@@ -19,6 +19,8 @@ export interface DirectoryOrganisationRow {
     warmth_band: WarmthBand;
     warmth: number;
     first_link_at: string | null;
+    /** True for the operator's own Person record. */
+    is_self?: boolean;
   }>;
   undated_people_count?: number;
   warmth_spread: { warm: number; cooling: number; cold: number; total: number };

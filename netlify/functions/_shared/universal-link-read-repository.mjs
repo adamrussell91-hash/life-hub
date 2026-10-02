@@ -56,9 +56,9 @@ export function createUniversalLinkReadRepository({ store, resolveEntity }) {
   // Returns null for anything malformed or invalid rather than throwing —
   // a corrupted record must not break reads of everything else. Does NOT
   // filter by status — callers decide what statuses are disclosable.
-  async function loadValidLink(linkId) {
+  async function loadValidLink(linkId, readOptions = {}) {
     assertValidGetLinkId(linkId);
-    const raw = await getJSON(store, linkKey(linkId));
+    const raw = await getJSON(store, linkKey(linkId), readOptions);
     try {
       return validateUniversalLinkRecord(raw);
     } catch {
@@ -130,8 +130,10 @@ export function createUniversalLinkReadRepository({ store, resolveEntity }) {
   }
 
   return {
-    async getLink(id, accessContext) {
-      const record = await loadValidLink(id);
+    // `readOptions` forwards to the Blobs read (e.g. `{ consistency: 'strong' }`
+    // for a caller that must see a link it has just written).
+    async getLink(id, accessContext, readOptions = {}) {
+      const record = await loadValidLink(id, readOptions);
       if (!record) throw endpointNotFoundError();
       // A suppressed or deleted link is not disclosed through this
       // ordinary read method — the same non-disclosure rule as list reads
