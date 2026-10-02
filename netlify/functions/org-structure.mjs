@@ -161,7 +161,7 @@ export function createOrgStructureHandler(deps = {}) {
           }
           return withCors(okResponse(result.created ? 201 : 200, { link: result.link, created: result.created }), request, env);
         }
-        if (action === 'end_link' || action === 'archive_position') {
+        if (action === 'end_link' || action === 'archive_position' || action === 'archive_unit') {
           const organisationId = organisationRef?.startsWith('shared:organisation:')
             ? organisationRef.slice('shared:organisation:'.length)
             : '';
@@ -179,6 +179,10 @@ export function createOrgStructureHandler(deps = {}) {
             }
             const link = await repo.endStructureLink(organisationId, linkId);
             return withCors(okResponse(200, { link }), request, env);
+          }
+          if (action === 'archive_unit') {
+            const result = await repo.archiveUnit(organisationId, parsed.value.unit_id);
+            return withCors(okResponse(200, result), request, env);
           }
           const result = await repo.archivePosition(organisationId, parsed.value.position_id);
           return withCors(okResponse(200, result), request, env);

@@ -15,33 +15,49 @@
 
 import {
   archiveOrgPosition,
+  archiveOrgUnit,
   createOrgPosition,
   createOrgStructureLink,
   createOrgUnit,
   endOrgStructureLink,
   fetchOrgStructure,
   patchOrgPosition,
+  patchOrgUnit,
   saveOrgLayout,
   type OrgStructurePayload
 } from '@/api/org-structure';
 import { searchEntities } from '@/api/entities';
 import { el } from '@/components/org-ui';
 import {
+  boardPoint,
+  createBoardDom,
+  fitScale,
+  paintBoxes,
+  paintFrames,
+  paintLines,
+  sizeBoard
+} from '@/components/org-chart-board';
+import {
   BOX_H,
   BOX_W,
   LINE_KIND_LABELS,
-  boardSize,
   boxLabel,
   buildChartModel,
   describeLine,
-  linePath,
+  dragFrames,
+  emptyUnitSpot,
   nextFreeSpot,
   resolveLayout,
   snap,
+  unitForDrop,
+  unitFrames,
   type ChartBox,
   type ChartLine,
   type ChartLineKind,
-  type ChartPoint
+  type ChartModel,
+  type ChartPoint,
+  type ChartUnit,
+  type UnitFrame
 } from '@/domain/org-chart-model';
 
 export interface OrgChartEditorOptions {
@@ -62,6 +78,7 @@ type Selection =
   | { kind: 'none' }
   | { kind: 'box'; ref: string }
   | { kind: 'line'; id: string }
+  | { kind: 'unit'; ref: string }
   | { kind: 'connect'; from: string; to: string };
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -152,7 +169,8 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
   let selection: Selection = { kind: 'none' };
   let scale = 1;
   let positions: Record<string, ChartPoint> = {};
-  let model: { boxes: ChartBox[]; lines: ChartLine[] } = { boxes: [], lines: [] };
+  let model: ChartModel = { boxes: [], lines: [], units: [] };
+  let frames: UnitFrame[] = [];
   let busy = false;
   let layoutTimer: ReturnType<typeof setTimeout> | null = null;
   const pendingLayout: Record<string, ChartPoint> = {};
@@ -192,7 +210,7 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
   const hint = el(
     'p',
     'org-chart__hint',
-    'Drag a box to move it. Drag from a box’s ● onto another box to connect them. Click a line to change it.'
+    'Drag a box to move it, or into a faculty to add them. Drag from a box’s ● onto another box to connect them. Click a line or a faculty name to change it.'
   );
   const zoomRow = el('div', 'org-chart__zoom');
   const zoomOut = button('−');
@@ -200,17 +218,11 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
   const zoomFit = button('Fit');
   zoomOut.setAttribute('aria-label', 'Zoom out');
   zoomIn.setAttribute('aria-label', 'Zoom in');
-  zoomFit.setAttribute('aria-label', 'Reset zoom');
+  zoomFit.setAttribute('aria-label', 'Fit the whole chart');
   zoomRow.append(zoomOut, zoomIn, zoomFit);
   const viewport = el('div', 'org-chart__viewport');
-  const sizer = el('div', 'org-chart__sizer');
-  const board = el('div', 'org-chart__board');
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('class', 'org-chart__lines');
-  const boxLayer = el('div', 'org-chart__boxes');
-  board.append(svg, boxLayer);
-  sizer.append(board);
-  viewport.append(sizer);
+  const dom = createBoardDom();
+  viewport.append(dom.sizer);
   const status = el('p', 'org-chart__status');
   status.setAttribute('role', 'status');
   canvasCol.append(hint, zoomRow, viewport, status);
@@ -229,21 +241,41 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
     return model.boxes.find((b) => b.ref === ref);
   }
 
+  function unitByRef(ref: string): ChartUnit | undefined {
+    return model.units.find((u) => u.ref === ref);
+  }
+
+  function savedLayout(): Record<string, ChartPoint> {
+    return { ...(structure?.layout ?? {}), ...pendingLayout };
+  }
+
+  function computeFrames(): UnitFrame[] {
+    return unitFrames(model.units, model.boxes, positions, savedLayout());
+  }
+
   function rebuildModel(): void {
     if (!structure) {
-      model = { boxes: [], lines: [] };
+      model = { boxes: [], lines: [], units: [] };
       positions = {};
+      frames = [];
       return;
     }
     model = buildChartModel(structure, options.peopleNames ?? {});
-    const saved = { ...(structure.layout ?? {}), ...pendingLayout };
-    positions = resolveLayout(model.boxes, model.lines, saved);
+    positions = resolveLayout(model.boxes, model.lines, savedLayout());
+    frames = computeFrames();
+    // Pin an empty container the first time it is drawn, so it doesn't drift
+    // down the board as boxes move.
+    const saved = savedLayout();
+    for (const f of frames) {
+      if (f.empty && !saved[f.ref]) pendingLayout[f.ref] = emptyUnitSpot(f);
+    }
   }
 
   async function reload(): Promise<void> {
     structure = await fetchOrgStructure(options.organisationId);
     rebuildModel();
     if (selection.kind === 'box' && !boxByRef(selection.ref)) selection = { kind: 'none' };
+    if (selection.kind === 'unit' && !unitByRef(selection.ref)) selection = { kind: 'none' };
     if (selection.kind === 'line' && !model.lines.some((l) => l.id === (selection as { id: string }).id)) {
       selection = { kind: 'none' };
     }
@@ -295,156 +327,124 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
   }
 
   function applyScale(): void {
-    const { width, height } = boardSize(positions);
-    board.style.width = `${width}px`;
-    board.style.height = `${height}px`;
-    board.style.transform = `scale(${scale})`;
-    sizer.style.width = `${Math.ceil(width * scale)}px`;
-    sizer.style.height = `${Math.ceil(height * scale)}px`;
-    svg.setAttribute('width', String(width));
-    svg.setAttribute('height', String(height));
-    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    sizeBoard(dom, positions, frames, scale);
   }
 
-  function boardPoint(ev: PointerEvent): ChartPoint {
-    const rect = board.getBoundingClientRect();
-    return { x: (ev.clientX - rect.left) / scale, y: (ev.clientY - rect.top) / scale };
+  function pointer(ev: PointerEvent): ChartPoint {
+    return boardPoint(dom, scale, ev);
   }
 
-  // --- painting ---
-  function paintLines(): void {
-    svg.replaceChildren();
-    const defs = document.createElementNS(SVG_NS, 'defs');
-    const marker = document.createElementNS(SVG_NS, 'marker');
-    marker.setAttribute('id', 'org-chart-arrow');
-    marker.setAttribute('viewBox', '0 0 10 10');
-    marker.setAttribute('refX', '9');
-    marker.setAttribute('refY', '5');
-    marker.setAttribute('markerWidth', '7');
-    marker.setAttribute('markerHeight', '7');
-    marker.setAttribute('orient', 'auto-start-reverse');
-    const tip = document.createElementNS(SVG_NS, 'path');
-    tip.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
-    tip.setAttribute('class', 'org-chart__arrow');
-    marker.append(tip);
-    defs.append(marker);
-    svg.append(defs);
+  // --- painting (shared with the organisation page: org-chart-board) ---
+  let dropUnit: string | null = null;
 
-    for (const line of model.lines) {
-      const from = positions[line.source];
-      const to = positions[line.target];
-      if (!from || !to) continue;
-      const d = linePath(line.kind, from, to);
-      const selected = selection.kind === 'line' && selection.id === line.id;
-      const group = document.createElementNS(SVG_NS, 'g');
-      group.setAttribute('class', `org-chart__line org-chart__line--${line.kind}${selected ? ' is-selected' : ''}`);
-      const visible = document.createElementNS(SVG_NS, 'path');
-      visible.setAttribute('d', d);
-      visible.setAttribute('class', 'org-chart__line-stroke');
-      if (line.kind === 'reports_to') visible.setAttribute('marker-start', 'url(#org-chart-arrow)');
-      const hit = document.createElementNS(SVG_NS, 'path');
-      hit.setAttribute('d', d);
-      hit.setAttribute('class', 'org-chart__line-hit');
-      hit.setAttribute('tabindex', '0');
-      hit.setAttribute('role', 'button');
-      hit.setAttribute('aria-label', describeLine(line, model.boxes));
+  function paintState() {
+    const selectedBoxes = new Set<string>();
+    if (selection.kind === 'box') selectedBoxes.add(selection.ref);
+    if (selection.kind === 'connect') {
+      selectedBoxes.add(selection.from);
+      selectedBoxes.add(selection.to);
+    }
+    return {
+      model,
+      positions,
+      frames,
+      readOnly: false,
+      selectedBoxes,
+      selectedLine: selection.kind === 'line' ? selection.id : null,
+      selectedUnit: selection.kind === 'unit' ? selection.ref : null,
+      dropUnit
+    };
+  }
+
+  function paintLinesOnly(): void {
+    const hits = paintLines(dom, paintState());
+    for (const [id, hit] of hits) {
       const pick = () => {
-        selection = { kind: 'line', id: line.id };
+        selection = { kind: 'line', id };
         paint();
       };
       hit.addEventListener('click', pick);
       hit.addEventListener('keydown', (ev) => {
-        if ((ev as KeyboardEvent).key === 'Enter' || (ev as KeyboardEvent).key === ' ') {
+        const key = (ev as KeyboardEvent).key;
+        if (key === 'Enter' || key === ' ') {
           ev.preventDefault();
           pick();
         }
       });
-      group.append(visible, hit);
-      svg.append(group);
     }
   }
 
-  function paintBoxes(): void {
-    boxLayer.replaceChildren();
+  function paintFramesOnly(): void {
+    const labels = paintFrames(dom, paintState());
+    for (const [ref, label] of labels) wireUnitPointer(label, ref);
+  }
+
+  function paintCanvas(): void {
+    applyScale();
+    paintFramesOnly();
+    paintLinesOnly();
+    const nodes = paintBoxes(dom, paintState());
     for (const box of model.boxes) {
-      const p = positions[box.ref];
-      if (!p) continue;
-      const node = el('div', 'org-chart__box');
-      node.dataset.box = box.ref;
-      node.style.left = `${p.x}px`;
-      node.style.top = `${p.y}px`;
-      node.style.width = `${BOX_W}px`;
-      node.style.height = `${BOX_H}px`;
-      node.tabIndex = 0;
-      node.setAttribute('role', 'button');
-      node.setAttribute('aria-label', `${boxLabel(box)}. Press Enter to edit.`);
-      node.title = [box.holderName, box.title, box.unitName].filter(Boolean).join(' · ');
-      if (!box.holderRef) node.classList.add('is-vacant');
-      if (
-        (selection.kind === 'box' && selection.ref === box.ref) ||
-        (selection.kind === 'connect' && (selection.from === box.ref || selection.to === box.ref))
-      ) {
-        node.classList.add('is-selected');
-      }
-      node.append(
-        el('span', 'org-chart__box-name', box.holderName ?? 'Vacant'),
-        el('span', 'org-chart__box-title', box.title)
-      );
-      if (box.unitName) node.append(el('span', 'org-chart__box-unit', box.unitName));
-      const handle = el('span', 'org-chart__handle');
-      handle.title = 'Drag onto another box to connect';
-      handle.setAttribute('aria-hidden', 'true');
-      node.append(handle);
-      node.addEventListener('keydown', (ev) => {
+      const entry = nodes.get(box.ref);
+      if (!entry) continue;
+      entry.node.addEventListener('keydown', (ev) => {
         if (ev.key === 'Enter' || ev.key === ' ') {
           ev.preventDefault();
           selection = { kind: 'box', ref: box.ref };
           paint();
         }
       });
-      wireBoxPointer(node, handle, box);
-      boxLayer.append(node);
+      wireBoxPointer(entry.node, entry.handle!, box);
     }
-    if (!model.boxes.length) {
+    if (!model.boxes.length && !model.units.length) {
       const empty = el('div', 'org-chart__empty');
       empty.append(
         el('p', undefined, 'No one on the chart yet.'),
         el('p', 'org-chart__muted', 'Start with “+ Person”, e.g. the principal, then add the people who report to them.')
       );
-      boxLayer.append(empty);
+      dom.boxLayer.append(empty);
     }
   }
 
   function paint(): void {
-    applyScale();
-    paintLines();
-    paintBoxes();
+    frames = computeFrames();
+    paintCanvas();
     paintInspector();
   }
 
-  // --- pointer: move boxes and draw connections ---
+  /** While dragging: move containers and lines with the box, without a full repaint. */
+  function repaintWhileDragging(box: ChartBox, origin: ChartPoint): void {
+    frames = dragFrames(model.units, model.boxes, positions, savedLayout(), box, origin);
+    const target = unitForDrop(box, positions[box.ref]!, model.units, model.boxes, positions, savedLayout(), origin);
+    dropUnit = typeof target === 'string' ? target : null;
+    applyScale();
+    paintFramesOnly();
+    paintLinesOnly();
+  }
+
+  // --- pointer: move boxes, draw connections, drop into containers ---
   function wireBoxPointer(node: HTMLElement, handle: HTMLElement, box: ChartBox): void {
     node.addEventListener('pointerdown', (ev) => {
       if (ev.button !== 0 || busy) return;
       const onHandle = ev.target === handle;
       ev.preventDefault();
-      node.setPointerCapture(ev.pointerId);
-      const start = boardPoint(ev);
+      node.setPointerCapture?.(ev.pointerId);
+      const start = pointer(ev);
       const origin = { ...positions[box.ref]! };
       let moved = false;
       let ghost: SVGPathElement | null = null;
 
       const onMove = (mv: PointerEvent) => {
-        const pt = boardPoint(mv);
+        const pt = pointer(mv);
         const dx = pt.x - start.x;
         const dy = pt.y - start.y;
         if (!moved && Math.hypot(dx, dy) < 4) return;
         moved = true;
         if (onHandle) {
           if (!ghost) {
-            ghost = document.createElementNS(SVG_NS, 'path');
+            ghost = document.createElementNS(SVG_NS, 'path') as SVGPathElement;
             ghost.setAttribute('class', 'org-chart__ghost');
-            svg.append(ghost);
+            dom.svg.append(ghost);
           }
           const sx = origin.x + BOX_W;
           const sy = origin.y + BOX_H / 2;
@@ -455,7 +455,7 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
         positions[box.ref] = next;
         node.style.left = `${next.x}px`;
         node.style.top = `${next.y}px`;
-        paintLines();
+        repaintWhileDragging(box, origin);
       };
 
       const onUp = (up: PointerEvent) => {
@@ -463,6 +463,7 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
         node.removeEventListener('pointerup', onUp);
         node.removeEventListener('pointercancel', onUp);
         ghost?.remove();
+        dropUnit = null;
         if (onHandle && moved) {
           const hitEl = document.elementFromPoint(up.clientX, up.clientY);
           const targetRef = (hitEl?.closest('[data-box]') as HTMLElement | null)?.dataset.box;
@@ -475,8 +476,28 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
           return;
         }
         if (moved) {
-          queueLayoutSave(box.ref, positions[box.ref]!);
-          applyScale();
+          const at = positions[box.ref]!;
+          queueLayoutSave(box.ref, at);
+          const unitRef = unitForDrop(box, at, model.units, model.boxes, positions, savedLayout(), origin);
+          if (unitRef !== undefined) {
+            // The last person out leaves an empty container where the group was.
+            const left = box.unitRef ? frames.find((f) => f.ref === box.unitRef) : null;
+            if (left && left.memberRefs.length === 1 && left.memberRefs[0] === box.ref) {
+              queueLayoutSave(left.ref, emptyUnitSpot(left));
+            }
+            const name = unitRef ? unitByRef(unitRef)?.name ?? 'the group' : null;
+            const who = box.holderName ?? box.title;
+            void mutate(name ? `Moving ${who} into ${name}` : `Taking ${who} out of ${box.unitName ?? 'the group'}`, async () => {
+              await flushLayout();
+              await patchOrgPosition(box.id, { unit_ref: unitRef });
+            }).then(() => {
+              if (status.textContent === 'Saved.') {
+                setStatus(name ? `${who} is now in ${name}.` : `${who} is no longer in ${box.unitName ?? 'that group'}.`);
+              }
+            });
+            return;
+          }
+          paint();
           return;
         }
         selection = { kind: 'box', ref: box.ref };
@@ -489,18 +510,73 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
     });
   }
 
-  viewport.addEventListener('pointerdown', (ev) => {
-    if (
-      ev.target === viewport ||
-      ev.target === sizer ||
-      ev.target === board ||
-      ev.target === boxLayer ||
-      ev.target === svg
-    ) {
-      if (selection.kind !== 'none') {
-        selection = { kind: 'none' };
-        paint();
+  /** Drag a container's name to move the whole group; click it to edit the group. */
+  function wireUnitPointer(label: HTMLElement, ref: string): void {
+    const select = () => {
+      selection = { kind: 'unit', ref };
+      paint();
+    };
+    label.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        select();
       }
+    });
+    label.addEventListener('pointerdown', (ev) => {
+      if (ev.button !== 0 || busy) return;
+      ev.preventDefault();
+      label.setPointerCapture?.(ev.pointerId);
+      const start = pointer(ev);
+      const frame = frames.find((f) => f.ref === ref);
+      if (!frame) return;
+      const members = frame.memberRefs.map((r) => ({ ref: r, origin: { ...positions[r]! } }));
+      const emptyOrigin = frame.empty ? emptyUnitSpot(frame) : null;
+      let moved = false;
+
+      const onMove = (mv: PointerEvent) => {
+        const pt = pointer(mv);
+        const dx = pt.x - start.x;
+        const dy = pt.y - start.y;
+        if (!moved && Math.hypot(dx, dy) < 4) return;
+        moved = true;
+        for (const m of members) positions[m.ref] = { x: snap(m.origin.x + dx), y: snap(m.origin.y + dy) };
+        if (emptyOrigin) pendingLayout[ref] = { x: snap(emptyOrigin.x + dx), y: snap(emptyOrigin.y + dy) };
+        paintCanvas();
+      };
+
+      const onUp = () => {
+        label.removeEventListener('pointermove', onMove);
+        label.removeEventListener('pointerup', onUp);
+        label.removeEventListener('pointercancel', onUp);
+        if (!moved) {
+          select();
+          return;
+        }
+        for (const m of members) queueLayoutSave(m.ref, positions[m.ref]!);
+        if (emptyOrigin && pendingLayout[ref]) queueLayoutSave(ref, pendingLayout[ref]!);
+        paint();
+      };
+
+      label.addEventListener('pointermove', onMove);
+      label.addEventListener('pointerup', onUp);
+      label.addEventListener('pointercancel', onUp);
+    });
+  }
+
+  viewport.addEventListener('pointerdown', (ev) => {
+    const target = ev.target as Element | null;
+    const onBackground =
+      target === viewport ||
+      target === dom.sizer ||
+      target === dom.board ||
+      target === dom.inner ||
+      target === dom.boxLayer ||
+      target === dom.unitLayer ||
+      target === dom.svg ||
+      Boolean(target?.classList?.contains('org-chart__unit'));
+    if (onBackground && selection.kind !== 'none') {
+      selection = { kind: 'none' };
+      paint();
     }
   });
 
@@ -531,7 +607,9 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
   async function addBox(title: string, personRef: string | null): Promise<string> {
     const position = await createOrgPosition({ organisation_ref: options.organisationRef, title });
     const ref = `shared:position:${position.id}`;
-    const spot = nextFreeSpot(positions);
+    // Keep clear of empty containers as well as boxes.
+    const emptySpots = Object.fromEntries(frames.filter((f) => f.empty).map((f) => [f.ref, emptyUnitSpot(f)]));
+    const spot = nextFreeSpot({ ...positions, ...emptySpots });
     pendingLayout[ref] = spot;
     positions[ref] = spot;
     if (personRef) {
@@ -558,7 +636,138 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
       const box = boxByRef(selection.ref);
       if (box) return paintBox(box);
     }
+    if (selection.kind === 'unit') {
+      const unit = unitByRef(selection.ref);
+      if (unit) return paintUnit(unit);
+    }
     paintAdd();
+  }
+
+  const UNIT_KIND_OPTIONS: Array<[string, string]> = [
+    ['faculty', 'Faculty'],
+    ['team', 'Team'],
+    ['department', 'Department'],
+    ['program', 'Program'],
+    ['leadership', 'Leadership'],
+    ['board', 'Board'],
+    ['other', 'Other']
+  ];
+
+  function kindSelect(value: string): HTMLSelectElement {
+    const sel = document.createElement('select');
+    sel.className = 'org-chart__select';
+    for (const [v, label] of UNIT_KIND_OPTIONS) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = label;
+      opt.selected = v === value;
+      sel.append(opt);
+    }
+    return sel;
+  }
+
+  function paintUnit(unit: ChartUnit): void {
+    const members = model.boxes.filter((b) => b.unitRef === unit.ref);
+    inspector.append(
+      el('h3', undefined, unit.name),
+      el(
+        'p',
+        'org-chart__muted',
+        members.length
+          ? `${members.length} ${members.length === 1 ? 'box' : 'boxes'} in this group. Drag its name on the chart to move them all.`
+          : 'No one in this group yet. Drag a box into it, or add one below.'
+      )
+    );
+
+    const name = textInput('Name', unit.name);
+    name.setAttribute('aria-label', 'Group name');
+    const rename = button('Rename');
+    rename.addEventListener('click', () => {
+      const t = name.value.trim();
+      if (!t || t === unit.name) return;
+      void mutate('Renaming', async () => {
+        await patchOrgUnit(unit.id, { name: t });
+      });
+    });
+    const nameRow = el('div', 'org-chart__row');
+    nameRow.append(name, rename);
+    inspector.append(field('Name', nameRow));
+
+    const kind = kindSelect(unit.kind);
+    kind.setAttribute('aria-label', 'Kind');
+    kind.addEventListener('change', () => {
+      void mutate('Saving', async () => {
+        await patchOrgUnit(unit.id, { unit_kind: kind.value });
+      });
+    });
+    inspector.append(field('Kind', kind));
+
+    if (members.length) {
+      const list = el('ul', 'org-chart__line-list');
+      for (const box of members) {
+        const li = el('li');
+        const open = button(boxLabel(box), 'org-chart__line-link');
+        open.addEventListener('click', () => {
+          selection = { kind: 'box', ref: box.ref };
+          paint();
+        });
+        const out = button('Take out');
+        out.setAttribute('aria-label', `Take ${boxLabel(box)} out of ${unit.name}`);
+        out.addEventListener('click', () =>
+          void mutate('Saving', async () => {
+            await patchOrgPosition(box.id, { unit_ref: null });
+          })
+        );
+        li.append(open, out);
+        list.append(li);
+      }
+      inspector.append(el('span', 'org-chart__field-label', 'In this group'), list);
+    }
+
+    const others = model.boxes.filter((b) => b.unitRef !== unit.ref);
+    if (others.length) {
+      const pick = document.createElement('select');
+      pick.className = 'org-chart__select';
+      pick.setAttribute('aria-label', `Add someone to ${unit.name}`);
+      for (const b of others) {
+        const opt = document.createElement('option');
+        opt.value = b.ref;
+        opt.textContent = b.unitName ? `${boxLabel(b)} — now in ${b.unitName}` : boxLabel(b);
+        pick.append(opt);
+      }
+      const add = button('Add to group');
+      add.addEventListener('click', () => {
+        const box = boxByRef(pick.value);
+        if (!box) return;
+        void mutate('Saving', async () => {
+          await patchOrgPosition(box.id, { unit_ref: unit.ref });
+        });
+      });
+      const block = el('div', 'org-chart__block');
+      block.append(el('span', 'org-chart__field-label', 'Add a box to this group'), pick, add);
+      inspector.append(block);
+    }
+
+    const del = button(`Remove ${unit.name}`, 'btn btn--ghost org-chart__danger');
+    del.addEventListener('click', () => {
+      if (
+        !window.confirm(
+          `Remove “${unit.name}”? Everyone in it stays on the chart, just outside a group.`
+        )
+      ) {
+        return;
+      }
+      void mutate('Removing', async () => {
+        await archiveOrgUnit({ organisation_ref: options.organisationRef, unit_id: unit.id });
+        selection = { kind: 'none' };
+      });
+    });
+    const back = button('Close');
+    back.addEventListener('click', () => {
+      selection = { kind: 'none' };
+      paint();
+    });
+    inspector.append(del, back);
   }
 
   function paintAdd(focus: 'person' | 'role' | 'unit' | null = null): void {
@@ -606,23 +815,8 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
     inspector.append(el('h3', undefined, 'Add a faculty or team'));
     const unitName = textInput('e.g. Learning Enrichment Faculty');
     unitName.setAttribute('aria-label', 'Faculty or team name');
-    const unitKind = document.createElement('select');
-    unitKind.className = 'org-chart__select';
+    const unitKind = kindSelect('faculty');
     unitKind.setAttribute('aria-label', 'Kind');
-    for (const [value, label] of [
-      ['faculty', 'Faculty'],
-      ['team', 'Team'],
-      ['department', 'Department'],
-      ['program', 'Program'],
-      ['leadership', 'Leadership'],
-      ['board', 'Board'],
-      ['other', 'Other']
-    ]) {
-      const opt = document.createElement('option');
-      opt.value = value;
-      opt.textContent = label;
-      unitKind.append(opt);
-    }
     const addUnit = button('Add faculty / team');
     addUnit.addEventListener('click', () => {
       const name = unitName.value.trim();
@@ -945,7 +1139,7 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
     applyScale();
   });
   zoomFit.addEventListener('click', () => {
-    scale = 1;
+    scale = fitScale(positions, frames, viewport.clientWidth - 16);
     applyScale();
     viewport.scrollLeft = 0;
     viewport.scrollTop = 0;
