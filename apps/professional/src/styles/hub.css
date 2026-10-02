@@ -2336,10 +2336,6 @@
   background: var(--wave);
 }
 
-.pro-home__yearstrip-mark--meeting::after {
-  background: var(--marine);
-}
-
 .pro-home__yearstrip-mark--event::after {
   background: var(--wave);
 }
