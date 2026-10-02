@@ -11,6 +11,20 @@ import { createAgentChoiceCard } from '../../../../packages/design-kit/js/agent-
 import { createAgentSourcesCard } from '../../../../packages/design-kit/js/agent-sources-card.js';
 import { createAgentPlanCard } from '../../../../packages/design-kit/js/agent-plan-card.js';
 import { createProductivityCard } from '../../../../packages/design-kit/js/agent-productivity-cards.js';
+import {
+  CHAT_PENDING_CONFIRMS_LIST_ID,
+  resolveStickyConfirmHost,
+  syncChatPendingConfirmsVisibility
+} from './chat-pending-confirms.js';
+
+function finishConfirmMount(root, list, card) {
+  appendChatThreadItem(list, card);
+  scrollChatIfPinned(list);
+  if (list?.id === CHAT_PENDING_CONFIRMS_LIST_ID && card?.dataset && !card.dataset.pendingId) {
+    card.dataset.pendingSource = 'session';
+  }
+  syncChatPendingConfirmsVisibility(root);
+}
 
 const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'tags', 'highlights', 'challenges', 'products', 'system_note']);
 const WORKOUT_HEADER_FIELDS = new Set(['title', 'session_kind', 'day_type', 'status', 'duration_min']);
@@ -507,10 +521,12 @@ function collapseTurnWorkoutText(root, list) {
   }
 }
 
-export function appendRecordProposal(root, { path, record, notes, warnings, libraryByName }) {
-  const list = root.querySelector('#chat-messages');
+export function appendRecordProposal(root, { path, record, notes, warnings, libraryByName, host = null }) {
+  const messages = root.querySelector('#chat-messages');
+  const list = resolveStickyConfirmHost(root, host);
   if (!list) return null;
-  if (record?.type === 'workout') collapseTurnWorkoutText(root, list);
+  // Collapse workout plan prose in the transcript even when the Confirm sits in the sticky tray.
+  if (record?.type === 'workout' && messages) collapseTurnWorkoutText(root, messages);
   const card = root.createElement('li');
   card.className = 'record-proposal confirm-card';
   card.setAttribute('role', 'region');
@@ -640,8 +656,7 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
   actions.append(discard, confirm);
   card.append(actions);
 
-  appendChatThreadItem(list, card);
-  scrollChatIfPinned(list);
+  finishConfirmMount(root, list, card);
   return { card, confirm, discard, inputs };
 }
 
@@ -698,8 +713,8 @@ function cnPatchDiffRows(patch) {
   return rows;
 }
 
-export function appendCnPatchProposal(root, { patch }) {
-  const list = root.querySelector('#chat-messages');
+export function appendCnPatchProposal(root, { patch, host = null }) {
+  const list = resolveStickyConfirmHost(root, host);
   if (!list) return null;
   const card = root.createElement('li');
   card.className = 'record-proposal cn-patch-proposal confirm-card';
@@ -762,8 +777,7 @@ export function appendCnPatchProposal(root, { patch }) {
   actions.append(discard, confirm);
   card.append(actions);
 
-  appendChatThreadItem(list, card);
-  scrollChatIfPinned(list);
+  finishConfirmMount(root, list, card);
   return { card, confirm, discard };
 }
 
@@ -847,7 +861,7 @@ export function formatActionWriteDisplay(write) {
 }
 
 export function appendActionProposal(root, { proposal, host = null, pendingId = null } = {}) {
-  const list = host || root.querySelector('#chat-messages');
+  const list = resolveStickyConfirmHost(root, host);
   if (!list) return null;
   const card = root.createElement('li');
   card.className = 'record-proposal action-proposal confirm-card';
@@ -926,8 +940,7 @@ export function appendActionProposal(root, { proposal, host = null, pendingId = 
   actions.append(discard, confirm);
   card.append(actions);
 
-  appendChatThreadItem(list, card);
-  scrollChatIfPinned(list);
+  finishConfirmMount(root, list, card);
   return {
     card,
     confirm,
@@ -967,30 +980,29 @@ export function appendPlanStatusCard(root, opts = {}) {
 }
 
 export function appendChoiceCard(root, opts = {}) {
-  const list = root.querySelector('#chat-messages');
+  const list = resolveStickyConfirmHost(root, opts.host ?? null);
   if (!list) return null;
   const item = root.createElement('li');
   item.className = 'chat-message chat-message--structured';
   const card = createAgentChoiceCard(root, opts);
   item.append(card);
-  appendChatThreadItem(list, item);
-  markLatestMessage(list);
-  scrollChatIfPinned(list);
+  finishConfirmMount(root, list, item);
+  // Choice cards live outside the transcript scroll — don't retarget #chat-messages latest.
+  if (list.id !== CHAT_PENDING_CONFIRMS_LIST_ID) markLatestMessage(list);
   syncChatChrome(root);
   return { item, card };
 }
 
 export function appendProductivityCard(root, type, opts = {}) {
-  const list = root.querySelector('#chat-messages');
+  const list = resolveStickyConfirmHost(root, opts.host ?? null);
   if (!list) return null;
   const card = createProductivityCard(root, type, opts);
   if (!card) return null;
   const item = root.createElement('li');
   item.className = 'chat-message chat-message--structured';
   item.append(card);
-  appendChatThreadItem(list, item);
-  markLatestMessage(list);
-  scrollChatIfPinned(list);
+  finishConfirmMount(root, list, item);
+  if (list.id !== CHAT_PENDING_CONFIRMS_LIST_ID) markLatestMessage(list);
   syncChatChrome(root);
   return { item, card };
 }

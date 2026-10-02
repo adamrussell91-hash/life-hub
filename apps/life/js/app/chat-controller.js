@@ -40,8 +40,10 @@ import { appendChatThreadItem, beginChatTurnAnchor, clearChatTurnAnchors } from 
 import { lockConfirmCardReceipt } from './confirm-card-receipt.js';
 import {
   appendActionProposalToPendingTray,
+  appendSessionConfirmToPendingTray,
   ensureChatPendingConfirmsTray,
   mountPendingActionCards,
+  moveConfirmReceiptToTranscript,
   removePendingConfirmCard,
   syncChatPendingConfirmsVisibility
 } from './chat-pending-confirms.js';
@@ -726,7 +728,9 @@ export function createChatController({
           sawRecordProposal = true;
           clearWorkingBubble();
           endTextTurn();
-          const proposal = appendRecordProposal(root, event);
+          const proposal = appendSessionConfirmToPendingTray(root, (host) =>
+            appendRecordProposal(root, { ...event, host })
+          );
           bindProposal(proposal, event);
         } else if (event.type === 'record_saved') {
           turnSignaled = true;
@@ -746,7 +750,9 @@ export function createChatController({
           gotUsefulOutput = true;
           clearWorkingBubble();
           endTextTurn();
-          const proposal = appendCnPatchProposal(root, { patch: event.patch });
+          const proposal = appendSessionConfirmToPendingTray(root, (host) =>
+            appendCnPatchProposal(root, { patch: event.patch, host })
+          );
           bindCnPatchProposal(proposal, event.patch, event.id ?? null);
         } else if (event.type === 'action_proposal') {
           turnSignaled = true;
@@ -771,7 +777,8 @@ export function createChatController({
           gotUsefulOutput = true;
           clearWorkingBubble();
           endTextTurn();
-          appendChoiceCard(root, {
+          let choiceUi = null;
+          choiceUi = appendChoiceCard(root, {
             title: event.title,
             hint: event.hint,
             choices: Array.isArray(event.choices) ? event.choices : [],
@@ -780,9 +787,10 @@ export function createChatController({
             onConfirm: picks => {
               const labels = picks.map(pick => pick.label).filter(Boolean);
               if (!labels.length || sending) return;
+              if (choiceUi?.item) moveConfirmReceiptToTranscript(root, choiceUi.item);
               void confirmSecondOpinion(picks[0]?.id, labels.join(', '));
             },
-            onDismiss: () => {}
+            onDismiss: () => dismissPendingCard(choiceUi?.item)
           });
         } else if (event.type === 'sources') {
           turnSignaled = true;
@@ -956,7 +964,9 @@ export function createChatController({
       const overwrite = proposal.confirm.dataset.overwrite === '1';
       void confirmProposal(proposal, event, overwrite);
     });
-    proposal.discard.addEventListener('click', () => proposal.card.remove());
+    proposal.discard.addEventListener('click', () => {
+      dismissPendingCard(proposal.card);
+    });
   }
 
   function bindCnPatchProposal(proposal, patch, id = null) {
@@ -965,7 +975,7 @@ export function createChatController({
       void confirmCnPatch(proposal, patch, id);
     });
     proposal.discard.addEventListener('click', () => {
-      proposal.card.remove();
+      dismissPendingCard(proposal.card);
       // Best-effort: clear the server-side queue entry too, so Discard actually
       // means gone rather than just hidden in this one tab. Fire-and-forget --
       // the card is already removed either way, and a stale entry self-purges.
@@ -1094,6 +1104,7 @@ export function createChatController({
           : 'Central Node updated.',
         label: 'Confirmed'
       });
+      moveConfirmReceiptToTranscript(root, proposal.card);
       onRecordWritten?.(result);
     } catch {
       proposal.confirm.disabled = false;
@@ -1115,6 +1126,7 @@ export function createChatController({
         summary: 'Saved.',
         label: 'Confirmed'
       });
+      moveConfirmReceiptToTranscript(root, proposal.card);
       if (result?.centralNodeUpdated === false) {
         showChatError(root, 'Logged, but Central Node didn\u2019t update — try Refresh.');
       }

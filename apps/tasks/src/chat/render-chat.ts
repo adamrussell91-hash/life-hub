@@ -21,6 +21,10 @@ import {
   createAttentionAuditCard,
   createPlanningStackCard
 } from '../../design-kit/js/agent-productivity-cards.js';
+import {
+  getChatPendingConfirmsList,
+  syncChatPendingConfirmsVisibility
+} from '../../../life/js/app/chat-pending-confirms.js';
 
 export type ChatRole = 'user' | 'assistant' | 'status';
 
@@ -184,16 +188,20 @@ export function appendChoiceCard(
     confirmLabel?: string;
     onConfirm?: (selected: Array<{ id: string; label: string; detail?: string }>) => void;
     onDismiss?: () => void;
+    host?: ParentNode | null;
   }
 ): HTMLElement | null {
-  const list = root.querySelector('#chat-messages');
+  const list = (opts.host
+    || getChatPendingConfirmsList(root as Document | HTMLElement)
+    || root.querySelector('#chat-messages')) as HTMLElement | null;
   if (!list) return null;
   const item = document.createElement('li');
   item.className = 'chat-message chat-message--structured';
+  item.dataset.pendingSource = 'session';
   const card = createAgentChoiceCard(document, opts);
   item.append(card);
   list.append(item);
-  list.scrollTop = list.scrollHeight;
+  syncChatPendingConfirmsVisibility(root as Document | HTMLElement);
   return item;
 }
 
@@ -224,14 +232,21 @@ export function appendPlanStatusCard(
   return item;
 }
 
-function appendStructuredCard(root: ParentNode, card: HTMLElement | null): HTMLElement | null {
-  const list = root.querySelector('#chat-messages');
+function appendStructuredCard(
+  root: ParentNode,
+  card: HTMLElement | null,
+  host?: ParentNode | null
+): HTMLElement | null {
+  const list = (host
+    || getChatPendingConfirmsList(root as Document | HTMLElement)
+    || root.querySelector('#chat-messages')) as HTMLElement | null;
   if (!list || !card) return null;
   const item = document.createElement('li');
   item.className = 'chat-message chat-message--structured';
+  item.dataset.pendingSource = 'session';
   item.append(card);
   list.append(item);
-  list.scrollTop = list.scrollHeight;
+  syncChatPendingConfirmsVisibility(root as Document | HTMLElement);
   return item;
 }
 
@@ -239,10 +254,11 @@ function appendStructuredCard(root: ParentNode, card: HTMLElement | null): HTMLE
 export function appendProductivityCard(
   root: ParentNode,
   type: string,
-  opts: Record<string, unknown> = {}
+  opts: Record<string, unknown> & { host?: ParentNode | null } = {}
 ): HTMLElement | null {
-  const card = createProductivityCard(document, type, opts);
-  return appendStructuredCard(root, card);
+  const { host, ...cardOpts } = opts;
+  const card = createProductivityCard(document, type, cardOpts);
+  return appendStructuredCard(root, card, host);
 }
 
 export function appendDecisionStackCard(

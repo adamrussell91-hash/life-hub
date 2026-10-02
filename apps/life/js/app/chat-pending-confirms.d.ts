@@ -26,6 +26,8 @@
 export function selectLivePendingActions(list: any[]): any[];
 export function pendingConfirmPublicFields(entry: any): any;
 export function ensureChatPendingConfirmsTray(root: any): any;
+export function getChatPendingConfirmsList(root: any): any;
+export function resolveStickyConfirmHost(root: any, host?: any): any;
 export function syncChatPendingConfirmsVisibility(root: any): void;
 export function mountPendingActionCards(root: any, pending: any[], opts: MountPendingOpts): any[];
 export function appendActionProposalToPendingTray(
@@ -33,6 +35,11 @@ export function appendActionProposalToPendingTray(
   event: { proposal: any, id?: string|null },
   opts: { appendActionProposal: MountPendingOpts['appendActionProposal'], bindActionProposal: MountPendingOpts['bindActionProposal'] }
 ): any;
+export function appendSessionConfirmToPendingTray(
+  root: any,
+  mountWithHost: (host: any) => any
+): any;
+export function moveConfirmReceiptToTranscript(root: any, card: any): void;
 export function removePendingConfirmCard(root: any, id: string): void;
 export const CHAT_PENDING_CONFIRMS_ID: string;
 export const CHAT_PENDING_CONFIRMS_LIST_ID: string;

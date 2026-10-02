@@ -113,6 +113,18 @@ class FakeElement extends EventTarget {
   }
 
   querySelector(selector) {
+    if (selector?.startsWith?.('#')) {
+      const id = selector.slice(1);
+      const walk = (node) => {
+        if (node.id === id) return node;
+        for (const child of node.children ?? []) {
+          const hit = walk(child);
+          if (hit) return hit;
+        }
+        return null;
+      };
+      return walk(this);
+    }
     if (selector === '.chat-message__body') {
       return this.children.find(child => child.className === 'chat-message__body') ?? null;
     }
@@ -158,14 +170,22 @@ class FakeElement extends EventTarget {
 
 class FakeDocument {
   constructor() {
+    const view = new FakeElement('section');
+    view.id = 'chat-view';
+    view.className = 'chat-view';
+    const messages = new FakeElement('ul');
+    messages.id = 'chat-messages';
+    const form = new FakeElement('form');
+    form.id = 'chat-form';
+    view.append(messages, form);
     this.elements = new Map([
-      ['#chat-form', new FakeElement('form')],
+      ['#chat-form', form],
       ['#chat-input', new FakeElement('input')],
-      ['#chat-messages', new FakeElement('ul')],
+      ['#chat-messages', messages],
       ['#chat-error', new FakeElement('p')],
       ['#chat-send', new FakeElement('button')],
       ['#chat-new', new FakeElement('button')],
-      ['#chat-view', new FakeElement('section')],
+      ['#chat-view', view],
       ['#agent-picker', new FakeElement('div')],
       ['#agent-protocol-pills', new FakeElement('div')],
       ['#chat-agent-hero', new FakeElement('div')]
@@ -173,7 +193,23 @@ class FakeDocument {
   }
 
   querySelector(selector) {
-    return this.elements.get(selector) ?? null;
+    if (this.elements.has(selector)) return this.elements.get(selector);
+    if (selector?.startsWith?.('#')) {
+      const id = selector.slice(1);
+      const walk = (node) => {
+        if (node?.id === id) return node;
+        for (const child of node?.children ?? []) {
+          const hit = walk(child);
+          if (hit) return hit;
+        }
+        return null;
+      };
+      for (const node of this.elements.values()) {
+        const hit = walk(node);
+        if (hit) return hit;
+      }
+    }
+    return null;
   }
 
   querySelectorAll(selector) {
@@ -194,7 +230,14 @@ class FakeDocument {
 }
 
 function findProposalCard(list, token = 'record-proposal') {
-  return list.children.find(child => child.className.includes(token));
+  return list?.children?.find(child => child.className.includes(token)) ?? null;
+}
+
+function findProposalCardInRoot(root, token = 'record-proposal') {
+  const trayList = root.querySelector('#chat-pending-confirms-list');
+  const fromTray = findProposalCard(trayList, token);
+  if (fromTray) return fromTray;
+  return findProposalCard(root.querySelector('#chat-messages'), token);
 }
 
 function findProposalButton(proposal, token) {
@@ -275,7 +318,7 @@ test('confirm shows Saving… while the request is in flight then restores on fa
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = findProposalCard(list);
+  const proposal = findProposalCardInRoot(root);
   const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
@@ -303,7 +346,7 @@ test('editing a numeric and a boolean field before confirming sends the coerced 
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = findProposalCard(list);
+  const proposal = findProposalCardInRoot(root);
   assert.ok(proposal, 'a record proposal card should have been appended');
 
   const fields = proposal.children.find(child => child.tagName === 'dl');
@@ -341,7 +384,7 @@ test('a confirm that reports centralNodeUpdated:false shows an ephemeral warning
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = findProposalCard(list);
+  const proposal = findProposalCardInRoot(root);
   const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
@@ -369,7 +412,7 @@ test('a confirm that reports centralNodeUpdated:true does not show the Central N
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = findProposalCard(list);
+  const proposal = findProposalCardInRoot(root);
   const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
@@ -397,7 +440,7 @@ test('a diary confirm that reports dayoneSent:false shows a Day One warning with
   await controller.send('Penelope, diary time');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = findProposalCard(list);
+  const proposal = findProposalCardInRoot(root);
   const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
@@ -426,7 +469,7 @@ test('confirming a completed workout with a reported PB appends an in-voice Chad
   await controller.send('Chadwick, log today\'s session');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = findProposalCard(list);
+  const proposal = findProposalCardInRoot(root);
   const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
@@ -454,13 +497,16 @@ test('confirming a completed workout with no PB does not append a hype line', as
   await controller.send('Chadwick, log today\'s session');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = findProposalCard(list);
+  const proposal = findProposalCardInRoot(root);
   const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
-  const bubbleCountBefore = list.children.length;
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
-  assert.equal(list.children.length, bubbleCountBefore, 'no extra bubble should be appended when there is no PB');
+  const hype = list.children.find(child =>
+    child.className.includes('chat-message--assistant')
+    && (child.querySelector?.('.chat-message__body')?.textContent ?? '').includes('Chest Press')
+  );
+  assert.equal(hype, undefined, 'no PB hype line should be appended when personalBests is empty');
 });
 
 test('a non-workout confirm never appends a PB hype line even if personalBests is somehow present', async () => {
@@ -475,7 +521,7 @@ test('a non-workout confirm never appends a PB hype line even if personalBests i
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = findProposalCard(list);
+  const proposal = findProposalCardInRoot(root);
   const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
@@ -502,7 +548,7 @@ test('a write_conflict on first confirm prompts a retry, and confirming again se
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = findProposalCard(list);
+  const proposal = findProposalCardInRoot(root);
   const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
 
   confirmButton.dispatchEvent(new Event('click'));
@@ -1039,9 +1085,15 @@ test('applies the agent accent colour when the stream names the agent', async ()
 });
 
 function findChoiceCard(root) {
-  const list = root.querySelector('#chat-messages');
-  const item = list.children.find(child => String(child.className).includes('chat-message--structured'));
-  return item?.children?.[0] ?? null;
+  const hosts = [
+    root.querySelector('#chat-pending-confirms-list'),
+    root.querySelector('#chat-messages')
+  ].filter(Boolean);
+  for (const list of hosts) {
+    const item = list.children?.find?.(child => String(child.className).includes('chat-message--structured'));
+    if (item?.children?.[0]) return item.children[0];
+  }
+  return null;
 }
 
 function findChoiceOption(card, id) {
@@ -2050,8 +2102,7 @@ test('cn_patch_proposal Confirm posts kind cn_patch with the patch candidate', a
   const controller = createChatController({ root, chatApi });
   await controller.send('Hammond, clear the taper flag');
 
-  const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
+  const proposal = findProposalCardInRoot(root, 'cn-patch-proposal');
   assert.ok(proposal, 'expected a CN patch proposal card');
   const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
@@ -2091,7 +2142,7 @@ test('cn_patch_proposal Confirm includes the pending id when the propose SSE car
   await controller.send('Hammond, run the weekly review');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = findProposalCard(list);
+  const proposal = findProposalCardInRoot(root);
   const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
@@ -2123,13 +2174,12 @@ test('cn_patch_proposal Discard also dismisses the server-side queue entry when 
   const controller = createChatController({ root, chatApi });
   await controller.send('Hammond, run the weekly review');
 
-  const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
+  const proposal = findProposalCardInRoot(root, 'cn-patch-proposal');
   const discardButton = findProposalButton(proposal, 'record-proposal__discard');
   discardButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
-  assert.equal(list.children.includes(proposal), false);
+  assert.equal(findProposalCardInRoot(root, 'cn-patch-proposal'), null);
   assert.equal(confirmCalls.length, 1);
   assert.equal(confirmCalls[0].kind, 'cn_patch_dismiss');
   assert.equal(confirmCalls[0].id, 'cnp_abc123');
@@ -2157,13 +2207,12 @@ test('cn_patch_proposal Discard removes the card without confirming', async () =
   const controller = createChatController({ root, chatApi });
   await controller.send('Hammond, clear the taper flag');
 
-  const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
+  const proposal = findProposalCardInRoot(root, 'cn-patch-proposal');
   const discardButton = findProposalButton(proposal, 'record-proposal__discard');
   discardButton.dispatchEvent(new Event('click'));
 
   assert.equal(confirmCalls.length, 0);
-  assert.equal(list.children.includes(proposal), false);
+  assert.equal(findProposalCardInRoot(root, 'cn-patch-proposal'), null);
 });
 
 test('record_saved appends the summary without a Confirm card and notifies onRecordWritten', async () => {
