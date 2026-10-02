@@ -229,9 +229,8 @@ export async function renderOrganisationPage(
   compareBtn.className = 'btn btn--ghost';
   compareBtn.textContent = 'Compare with…';
   compareBtn.href = `#/organisations/compare?ids=${encodeURIComponent(organisationId)}`;
-  const editBtn = el('button', 'btn btn--ghost', 'Edit chart') as HTMLButtonElement;
-  editBtn.type = 'button';
-  switchBar.append(back, switchSpacer, compareBtn, editBtn);
+  // One "Edit chart" control: the one in the "How … is run" card.
+  switchBar.append(back, switchSpacer, compareBtn);
 
   const hdr = el('header', 'orgs-page__hdr');
   const hdrStack = el('div', 'orgs-page__hdr-stack');
@@ -265,16 +264,51 @@ export async function renderOrganisationPage(
   let selfPersonRef: string | null = null;
   let editorSheet: HTMLElement | null = null;
 
+  // The chart is the slowest call on the page; start it alongside the
+  // directory instead of after it.
+  let firstStructure: Promise<OrgStructurePayload> | null = fetchOrgStructure(organisationId);
+  firstStructure.catch(() => undefined);
+
+  // View state lives outside the section so a repaint (after Done, after a
+  // collapse) keeps the view, zoom and collapsed containers.
+  const phoneMq = window.matchMedia('(max-width: 719px)');
+  let view: 'outline' | 'flow' | 'people' = phoneMq.matches ? 'outline' : 'flow';
+  let flowScale = 1;
+  const collapsedUnits = new Set<string>();
+  let repaintView: (() => Promise<void>) | null = null;
+  phoneMq.addEventListener('change', () => {
+    if (view === 'people') return;
+    view = phoneMq.matches ? 'outline' : 'flow';
+    void repaintView?.();
+  });
+
   async function patchHowSection(): Promise<void> {
     if (!model || !isCurrent()) return;
-    setSectionState(how.body, 'ready');
-    how.body.replaceChildren();
+    repaintView = null;
+    setSectionState(how.body, 'loading', 'Loading the chart…');
 
+    const pending = firstStructure ?? fetchOrgStructure(model.id);
+    firstStructure = null;
     try {
-      structure = await fetchOrgStructure(model.id);
-    } catch {
+      structure = await pending;
+    } catch (err) {
+      if (!isCurrent()) return;
+      // A failed load is not an empty chart: say so and offer a retry
+      // instead of "No chart yet / Draw the chart".
       structure = null;
+      setSectionState(
+        how.body,
+        'error',
+        `Could not load the chart${err instanceof Error && err.message ? ` (${err.message})` : ''}.`
+      );
+      const retry = el('button', 'btn btn--ghost', 'Try again') as HTMLButtonElement;
+      retry.type = 'button';
+      retry.addEventListener('click', () => void patchHowSection());
+      how.body.append(retry);
+      return;
     }
+    if (!isCurrent()) return;
+    how.body.replaceChildren();
 
     // A chart made only of roles (no units) is still a structure — the
     // drag-and-connect editor starts from people and roles, not units.
@@ -283,10 +317,13 @@ export async function renderOrganisationPage(
         (structure.units.length > 0 || structure.positions.some((p) => p.lifecycle_status === 'active'))
     );
     const toolbar = el('div', 'orgs-how__toolbar');
-    const addStructure = el('button', 'btn btn--primary', hasStructure ? 'Edit chart' : 'Draw the chart') as HTMLButtonElement;
+    const addStructure = el(
+      'button',
+      hasStructure ? 'btn btn--ghost orgs-how__edit' : 'btn btn--primary',
+      hasStructure ? 'Edit chart' : 'Draw the chart'
+    ) as HTMLButtonElement;
     addStructure.type = 'button';
     addStructure.addEventListener('click', () => openChartEditor());
-    toolbar.append(addStructure);
 
     if (!hasStructure || !structure) {
       const howEmpty = el('div', 'orgs-how__empty');
@@ -337,8 +374,6 @@ export async function renderOrganisationPage(
     }
 
     const viewToggle = el('div', 'orgs-how__seg');
-    const phoneMq = window.matchMedia('(max-width: 719px)');
-    let view: 'outline' | 'flow' | 'people' = phoneMq.matches ? 'outline' : 'flow';
     const outlineBtn = el('button', 'orgs-how__seg-btn', 'Outline') as HTMLButtonElement;
     const flowBtn = el('button', 'orgs-how__seg-btn', 'Flow') as HTMLButtonElement;
     const peopleBtn = el('button', 'orgs-how__seg-btn', 'People list') as HTMLButtonElement;
@@ -346,9 +381,12 @@ export async function renderOrganisationPage(
     viewToggle.append(outlineBtn, flowBtn, peopleBtn);
 
     const host = el('div', 'orgs-how__host');
-    how.body.append(toolbar, hl, viewToggle, host);
-
-    const collapsedUnits = new Set<string>();
+    // One row: view switch, highlight (only when it can do something), then
+    // Edit chart on the right — instead of three stacked rows of controls.
+    toolbar.append(viewToggle);
+    if (pills.length > 1 || selfPersonRef) toolbar.append(hl);
+    toolbar.append(el('span', 'orgs-page__spacer'), addStructure);
+    how.body.append(toolbar, host);
 
     async function paintView(): Promise<void> {
       if (!structure) return;
@@ -402,7 +440,6 @@ export async function renderOrganisationPage(
       const stage = el('div', 'orgs-flow__stage');
       wrap.append(zoomRow, stage);
       host.append(wrap);
-      let scale = 1;
       try {
         const peopleNames = Object.fromEntries(
           directoryPeople.map((p) => [p.id, p.display_name])
@@ -425,19 +462,20 @@ export async function renderOrganisationPage(
         });
         stage.append(svg);
         const applyZoom = () => {
-          svg.style.transform = `scale(${scale})`;
+          svg.style.transform = `scale(${flowScale})`;
           svg.style.transformOrigin = '0 0';
         };
+        applyZoom();
         zoomIn.addEventListener('click', () => {
-          scale = Math.min(2.5, scale + 0.15);
+          flowScale = Math.min(2.5, flowScale + 0.15);
           applyZoom();
         });
         zoomOut.addEventListener('click', () => {
-          scale = Math.max(0.4, scale - 0.15);
+          flowScale = Math.max(0.4, flowScale - 0.15);
           applyZoom();
         });
         zoomFit.addEventListener('click', () => {
-          scale = 1;
+          flowScale = 1;
           applyZoom();
           wrap.scrollLeft = 0;
           wrap.scrollTop = 0;
@@ -461,7 +499,7 @@ export async function renderOrganisationPage(
         wrap.addEventListener('gesturechange', ((ev: Event) => {
           const ge = ev as Event & { scale?: number };
           if (typeof ge.scale === 'number') {
-            scale = Math.min(2.5, Math.max(0.4, ge.scale));
+            flowScale = Math.min(2.5, Math.max(0.4, ge.scale));
             applyZoom();
           }
         }) as EventListener);
@@ -489,44 +527,43 @@ export async function renderOrganisationPage(
       void paintView();
     });
 
-    const onPhoneChange = () => {
-      const next = phoneMq.matches ? 'outline' : 'flow';
-      if (view === 'outline' || view === 'flow') {
-        view = next;
-        void paintView();
-      }
-    };
-    phoneMq.addEventListener('change', onPhoneChange);
-
+    repaintView = paintView;
     await paintView();
     return;
   }
 
-  function openEditor(): void {
+  // Each sheet's callbacks act on that sheet only. The chart editor closes
+  // asynchronously (it flushes layout first), so "Units & members…" used to
+  // open the structure sheet and then the editor's late onClose removed it.
+  function closeSheet(sheet: HTMLElement | null): void {
+    sheet?.remove();
+    if (editorSheet === sheet) editorSheet = null;
+  }
+
+  function openEditor(notice?: string): void {
     if (!model) return;
     editorSheet?.remove();
-    editorSheet = openStructureEditor({
+    const sheet: HTMLElement = openStructureEditor({
       organisationRef: model.ref,
       organisationName: model.displayName,
       structure,
       people: directoryPeople,
-      onSaved: async () => {
-        editorSheet?.remove();
-        editorSheet = null;
+      notice,
+      onSaved: async (message?: string) => {
         await patchHowSection();
+        // Re-open with the fresh structure so new units show in the pickers.
+        if (editorSheet === sheet) openEditor(message);
       },
-      onClose: () => {
-        editorSheet?.remove();
-        editorSheet = null;
-      }
+      onClose: () => closeSheet(sheet)
     });
-    root.append(editorSheet);
+    editorSheet = sheet;
+    root.append(sheet);
   }
 
   function openChartEditor(): void {
     if (!model) return;
     editorSheet?.remove();
-    editorSheet = openOrgChartEditor({
+    const sheet: HTMLElement = openOrgChartEditor({
       organisationId: model.id,
       organisationRef: model.ref,
       organisationName: model.displayName,
@@ -536,15 +573,11 @@ export async function renderOrganisationPage(
       onChanged: async () => {
         await patchHowSection();
       },
-      onClose: () => {
-        editorSheet?.remove();
-        editorSheet = null;
-      }
+      onClose: () => closeSheet(sheet)
     });
-    root.append(editorSheet);
+    editorSheet = sheet;
+    root.append(sheet);
   }
-
-  editBtn.addEventListener('click', () => openChartEditor());
 
   async function patchAnn(): Promise<void> {
     if (!model) return;
@@ -700,6 +733,50 @@ export async function renderOrganisationPage(
     opps.body.append(list, addBtn);
   }
 
+  function patchTime(): Promise<void> {
+    if (!model) return Promise.resolve();
+    setSectionState(time.body, 'ready');
+    // Start the axis at the year of the first mark, not a fixed 2019, so a
+    // workplace you joined last year isn't a sliver at the right edge.
+    const marks = [
+      ...model.peopleSteps.map((p) => p.at),
+      ...model.timelineLanes.map((l) => l.start)
+    ]
+      .map((at) => Date.parse(at ?? ''))
+      .filter((ms) => Number.isFinite(ms));
+    const earliest = marks.length ? Math.min(...marks) : Date.parse(ORG_SPARK_DOMAIN_START);
+    const domainStart = new Date(Date.UTC(new Date(earliest).getUTCFullYear(), 0, 1)).toISOString();
+    const domainEnd = new Date().toISOString();
+    const wrap = el('div', 'orgs-time__svg');
+    time.body.append(wrap);
+    const measured = Math.max(wrap.clientWidth || 0, 448);
+    const svg = renderOrganisationTimelineSvg({
+      lanes: model.timelineLanes,
+      peopleSteps: model.peopleSteps,
+      domainStart,
+      domainEnd,
+      width: measured
+    });
+    wrap.append(svg);
+    if (model.timelineLanes.length === 0 && model.peopleSteps.length === 0) {
+      time.body.prepend(
+        el('p', 'people-pane__empty', 'No timeline marks yet — links and events will appear here.')
+      );
+    } else {
+      const dated = model.peopleSteps.length;
+      const undated = Math.max(0, model.peopleCount - dated);
+      time.body.append(
+        el(
+          'p',
+          'orgs-time__legend',
+          `Bars: your roles here. Shaded step: people you know here, by when you first linked` +
+            (undated ? ` (${dated} dated; ${undated} with no known start aren’t shown).` : '.')
+        )
+      );
+    }
+    return Promise.resolve();
+  }
+
   try {
     const directory = await fetchOrganisationsDirectory();
     if (!isCurrent()) return;
@@ -763,37 +840,9 @@ export async function renderOrganisationPage(
       chipsHost.append(chip);
     }
 
-    await patchHowSection();
-    await patchAnn();
-    await patchOpps();
-
-    // Your time with …
-    setSectionState(time.body, 'ready');
-    const domainStart =
-      model.peopleSteps[0]?.at &&
-      Date.parse(model.peopleSteps[0].at) < Date.parse(ORG_SPARK_DOMAIN_START)
-        ? model.peopleSteps[0].at
-        : model.timelineLanes[0]?.start &&
-            Date.parse(model.timelineLanes[0].start) < Date.parse(ORG_SPARK_DOMAIN_START)
-          ? model.timelineLanes[0].start
-          : ORG_SPARK_DOMAIN_START;
-    const domainEnd = new Date().toISOString();
-    const wrap = el('div', 'orgs-time__svg');
-    time.body.append(wrap);
-    const measured = Math.max(wrap.clientWidth || 0, 448);
-    const svg = renderOrganisationTimelineSvg({
-      lanes: model.timelineLanes,
-      peopleSteps: model.peopleSteps,
-      domainStart,
-      domainEnd,
-      width: measured
-    });
-    wrap.append(svg);
-    if (model.timelineLanes.length === 0 && model.peopleSteps.length === 0) {
-      time.body.prepend(
-        el('p', 'people-pane__empty', 'No timeline marks yet — links and events will appear here.')
-      );
-    }
+    // Independent sections load together; one slow call no longer holds
+    // up everything below it.
+    await Promise.all([patchHowSection(), patchAnn(), patchOpps(), patchTime()]);
   } catch (err) {
     if (!isCurrent()) return;
     title.textContent = 'Organisations';

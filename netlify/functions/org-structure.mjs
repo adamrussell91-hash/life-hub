@@ -81,6 +81,13 @@ export function createOrgStructureHandler(deps = {}) {
         const organisationRef = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: organisationId });
         // Profile → chart: everyone here with a job title gets a box. If the
         // people list is unavailable the chart still loads.
+        // Recover boxes an older stale-index write dropped, before the
+        // profile sync decides someone is missing and adds a duplicate.
+        try {
+          await repo.repairDroppedPositions(organisationId);
+        } catch (error) {
+          console.warn('[org-structure] position repair skipped', error?.code ?? error?.message);
+        }
         let peopleHere = [];
         try {
           peopleHere = await workplaces.listOrganisationWorkplaces(organisationRef);

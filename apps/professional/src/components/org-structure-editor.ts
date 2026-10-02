@@ -17,7 +17,10 @@ export interface StructureEditorOptions {
   structure: OrgStructurePayload | null;
   /** Person search results: id + display_name (from directory people on this org). */
   people: Array<{ id: string; display_name: string }>;
-  onSaved: () => void | Promise<void>;
+  /** Status line to show on open (e.g. "Unit added." after a save reopened the sheet). */
+  notice?: string;
+  /** The caller refreshes and reopens the sheet; `message` is the status to carry over. */
+  onSaved: (message?: string) => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -57,7 +60,8 @@ export function openStructureEditor(options: StructureEditorOptions): HTMLElemen
   const inner = el('div', 'orgs-page__sheet-inner');
   inner.append(el('h2', undefined, 'Edit structure'));
 
-  const status = el('p', 'orgs-page__meta', '');
+  const status = el('p', 'orgs-page__meta', options.notice ?? '');
+  status.setAttribute('role', 'status');
   inner.append(status);
 
   // --- Add unit ---
@@ -75,6 +79,11 @@ export function openStructureEditor(options: StructureEditorOptions): HTMLElemen
   addUnitBtn.type = 'button';
   addUnitBtn.addEventListener('click', () => {
     void (async () => {
+      if (!unitName.value.trim()) {
+        status.textContent = 'Give the unit a name first.';
+        unitName.focus();
+        return;
+      }
       addUnitBtn.disabled = true;
       status.textContent = 'Saving…';
       try {
@@ -85,9 +94,10 @@ export function openStructureEditor(options: StructureEditorOptions): HTMLElemen
           unit_kind: unitKind.value,
           order
         });
+        const added = `${unitName.value.trim()} added.`;
         unitName.value = '';
-        status.textContent = 'Unit added.';
-        await options.onSaved();
+        status.textContent = added;
+        await options.onSaved(added);
       } catch (err) {
         status.textContent = err instanceof Error ? err.message : 'Could not add unit.';
       } finally {
@@ -116,6 +126,11 @@ export function openStructureEditor(options: StructureEditorOptions): HTMLElemen
   addPosBtn.type = 'button';
   addPosBtn.addEventListener('click', () => {
     void (async () => {
+      if (!posTitle.value.trim()) {
+        status.textContent = 'Give the position a title first.';
+        posTitle.focus();
+        return;
+      }
       addPosBtn.disabled = true;
       status.textContent = 'Saving…';
       try {
@@ -127,7 +142,7 @@ export function openStructureEditor(options: StructureEditorOptions): HTMLElemen
         });
         posTitle.value = '';
         status.textContent = 'Position added.';
-        await options.onSaved();
+        await options.onSaved('Position added.');
       } catch (err) {
         status.textContent = err instanceof Error ? err.message : 'Could not add position.';
       } finally {
@@ -179,7 +194,7 @@ export function openStructureEditor(options: StructureEditorOptions): HTMLElemen
           valid_from: new Date().toISOString()
         });
         status.textContent = 'Member added.';
-        await options.onSaved();
+        await options.onSaved('Member added.');
       } catch (err) {
         status.textContent = err instanceof Error ? err.message : 'Could not add member.';
       } finally {
@@ -232,7 +247,7 @@ export function openStructureEditor(options: StructureEditorOptions): HTMLElemen
           valid_from: new Date().toISOString()
         });
         status.textContent = 'Reporting line added.';
-        await options.onSaved();
+        await options.onSaved('Reporting line added.');
       } catch (err) {
         status.textContent = err instanceof Error ? err.message : 'Could not add link.';
       } finally {

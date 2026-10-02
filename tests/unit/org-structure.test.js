@@ -412,3 +412,89 @@ test('removing a line ends it; archiving a box ends every line touching it', asy
 
   await assert.rejects(() => f.repo.endStructureLink(generateOrganisationId(), holds.id), /not part of this organisation/);
 });
+
+// Netlify Blobs: a default read can return the value from before the last
+// write; only `{ consistency: 'strong' }` is guaranteed fresh. This store
+// serves the previous value of a key to any non-strong read.
+function laggingStore() {
+  const map = new Map();
+  const previous = new Map();
+  return {
+    async get(key, { type, consistency } = {}) {
+      const source = consistency === 'strong' ? map : previous.has(key) ? previous : map;
+      if (!source.has(key)) return null;
+      const raw = source.get(key);
+      if (raw === undefined) return null;
+      return type === 'json' ? JSON.parse(raw) : raw;
+    },
+    async setJSON(key, value) {
+      previous.set(key, map.has(key) ? map.get(key) : undefined);
+      map.set(key, JSON.stringify(value));
+    },
+    async list({ prefix = '' } = {}) {
+      return { blobs: [...map.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })) };
+    }
+  };
+}
+
+test('a new box survives the link and layout writes that follow it (stale index read)', async () => {
+  const store = laggingStore();
+  const orgId = generateOrganisationId();
+  const orgRef = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: orgId });
+  const personId = generatePersonId();
+  const personRef = formatEntityRef({ namespace: 'shared', kind: 'person', id: personId });
+  const repo = createOrgStructureRepository({
+    store,
+    resolveEntity: chartResolver(orgRef, { [personId]: 'Martin Corcoran' }),
+    getContentStore: async () => store,
+    now: () => new Date().toISOString()
+  });
+  await repo.createPosition({ organisation_ref: orgRef, title: 'Principal' });
+  // Same sequence as "+ Person → Add to chart": position, holder line, layout.
+  const position = await repo.createPosition({ organisation_ref: orgRef, title: 'Director - Student Wellbeing' });
+  const positionRef = formatEntityRef({ namespace: 'shared', kind: 'position', id: position.id });
+  await repo.createStructureLink({
+    organisationRef: orgRef,
+    relationshipType: 'holds_position',
+    sourceRef: personRef,
+    targetRef: positionRef,
+    validFrom: new Date(Date.now() - 1000).toISOString()
+  });
+  await repo.saveLayout(orgId, { [positionRef]: { x: 240, y: 0 } });
+
+  const payload = await repo.getDerivedGraph(orgId);
+  assert.deepEqual(
+    payload.positions.map((p) => p.title).sort(),
+    ['Director - Student Wellbeing', 'Principal']
+  );
+  assert.equal(payload.links.length, 1);
+  assert.deepEqual(payload.layout[positionRef], { x: 240, y: 0 });
+});
+
+test('repairDroppedPositions puts back a box the index lost, and only that box', async () => {
+  const f = await chartFixture();
+  const otherOrgRef = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: generateOrganisationId() });
+  const lost = await f.repo.createPosition({ organisation_ref: f.orgRef, title: 'Lost role' });
+  const archived = await f.repo.createPosition({ organisation_ref: f.orgRef, title: 'Archived role' });
+  const foreign = await f.repo.createPosition({ organisation_ref: otherOrgRef, title: 'Elsewhere' });
+  const ref = (id) => formatEntityRef({ namespace: 'shared', kind: 'position', id });
+  await f.repo.archivePosition(f.orgId, archived.id);
+  await f.repo.saveLayout(f.orgId, {
+    [ref(lost.id)]: { x: 0, y: 0 },
+    [ref(archived.id)]: { x: 240, y: 0 },
+    [ref(foreign.id)]: { x: 480, y: 0 }
+  });
+  // Simulate the old bug: the index forgot the lost and archived boxes.
+  const indexKey = [...(await f.store.list()).blobs.map((b) => b.key)].find((k) => k.includes(f.orgId));
+  const index = await f.store.get(indexKey, { type: 'json' });
+  index.position_ids = index.position_ids.filter((id) => id !== lost.id && id !== archived.id);
+  await f.store.setJSON(indexKey, index);
+
+  assert.equal(await f.repo.repairDroppedPositions(f.orgId), 1);
+  const titles = (await f.repo.getDerivedGraph(f.orgId)).positions
+    .filter((p) => p.lifecycle_status === 'active')
+    .map((p) => p.title)
+    .sort();
+  assert.deepEqual(titles, ['Deputy', 'Lost role', 'Principal']);
+  assert.equal(await f.repo.repairDroppedPositions(f.orgId), 0);
+});
