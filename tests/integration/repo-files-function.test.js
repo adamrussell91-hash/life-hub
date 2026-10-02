@@ -219,6 +219,38 @@ test('files endpoint bounds JSON, validates authentication first, and accepts PO
   assert.equal(github.calls.resolve, 0);
 });
 
+test('files endpoint reads a batch of blobs concurrently and returns them in request order', async () => {
+  const paths = Array.from({ length: 12 }, (_, i) => ({
+    path: `data/mind/2026/07/2026-07-${String(i + 2).padStart(2, '0')}-diary.md`,
+    sha: String(i + 1).padStart(40, '0')
+  }));
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const client = {
+    async readBlob(sha) {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      inFlight -= 1;
+      const text = `---\ntype: diary\nid: ${sha.slice(0, 6)}\ndate: "2026-07-02"\n---\n`;
+      return { sha, encoding: 'base64', content: Buffer.from(text).toString('base64') };
+    }
+  };
+  const handler = createRepoFilesHandler({
+    env: validEnv,
+    now: () => NOW,
+    createGitHubClient: () => client
+  });
+  const response = await handler(jsonRequest(requestBody(paths)));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.ok(maxInFlight > 1, `expected overlapping blob reads, saw ${maxInFlight}`);
+  assert.ok(maxInFlight <= 8);
+  assert.deepEqual(payload.data.files.map((file) => file.path), paths.map((file) => file.path));
+  assert.equal(payload.data.files[0].content.includes('type: diary'), true);
+});
+
 test('files endpoint sanitizes provider failures and never leaks the upstream body', async () => {
   const fetchImpl = async () => Response.json({ message: `private upstream ${TOKEN}` }, { status: 500 });
   const handler = createRepoFilesHandler({ env: validEnv, now: () => NOW, fetchImpl });

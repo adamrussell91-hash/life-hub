@@ -141,6 +141,7 @@ function paintKey(inp) {
     events,
     terms,
     inp?.dayProfile ? JSON.stringify(inp.dayProfile) : '',
+    inp?.lifeLogStatus ?? 'live',
     state.phone ? state.phoneDay : 'desk'
   ].join('|');
 }
@@ -491,7 +492,8 @@ function mount({ entrance = false } = {}) {
     today: input.today,
     nowHour,
     dayProfile: input.dayProfile ?? null,
-    terms: input.terms ?? null
+    terms: input.terms ?? null,
+    lifeLogStatus: input.lifeLogStatus ?? 'live'
   });
   bands = model.bands;
   if (!input.week.includes(state.phoneDay)) state.phoneDay = input.week.includes(input.today) ? input.today : input.week[0];

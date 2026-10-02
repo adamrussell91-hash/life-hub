@@ -21,6 +21,19 @@ function model() {
   });
 }
 
+test('a failed life-log fetch does not claim the week has no logs', () => {
+  const built = buildTidelineModel({
+    events: [],
+    week: WEEK,
+    today: '2026-09-24',
+    nowHour: 18,
+    terms: TERMS,
+    lifeLogStatus: 'error'
+  });
+  assert.equal(built.days[0].cap.pct, 80);
+  assert.equal(built.days[0].cap.note, 'logs unavailable');
+});
+
 test('tideline capacity, period and grid come from the fixture logs', () => {
   const built = model();
   assert.equal(built.period.title, 'T3 W10 · last week of term');

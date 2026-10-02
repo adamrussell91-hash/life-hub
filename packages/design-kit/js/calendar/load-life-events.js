@@ -2,9 +2,11 @@
  * Load Life calendar events the same way Life does: repo manifest + files,
  * plus calendar-visual.json LOGS when present (visual seed / mock parity).
  *
- * `/api/repo/files` caps batches at 50 files / 1 MiB — same limits as
- * apps/life/js/app/sync-repository.js. One unbatched POST fails when the
- * date window has more than 50 Life logs (common on Professional Home).
+ * `/api/repo/files` caps batches at 50 files / 1 MiB. The live function
+ * still dies at 10s, and a serial GitHub walk of 50 blobs spends that
+ * budget before any diary is parsed — the week then paints 80% "no logs".
+ * Stay well under 50 so a serial read still returns, and so one slow
+ * batch cannot drop the whole window.
  */
 
 import { addDaysKey, mondayOf } from '../school-time.js';
@@ -13,7 +15,7 @@ import { getSydneyDateKey } from '../sydney-clock.js';
 const CALENDAR_VISUAL_PATH = 'calendar-visual.json';
 const EVENT_MD = /^data\/(?:nutrition|fitness|mind|sleep|heart|skincare|fragrance|body|calendar)\/\d{4}\/\d{2}\/\d{4}-\d{2}-\d{2}-.+\.md$/;
 const LINKED_MD = /^records\/\d{4}\/\d{2}\/\d{2}\/.+\.md$/;
-const MAX_BATCH_FILES = 50;
+const MAX_BATCH_FILES = 16;
 const MAX_BATCH_BYTES = 1024 * 1024;
 
 async function resolveYamlLoad() {
