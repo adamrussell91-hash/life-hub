@@ -10,7 +10,6 @@ import {
   askPeople,
   declineLinkProposal,
   fetchLinkProposals,
-  fetchOrgCrestUrl,
   fetchPeopleDirectory,
   fetchPersonLedger,
   fetchRememberFacts,
@@ -30,6 +29,7 @@ import {
   type TodayStripResponse
 } from '@/api/people-directory';
 import { mountAddPersonForm } from '@/components/add-person-form';
+import { invalidateCrestUrl, resolveCrestUrl } from '@/components/org-ui';
 import { mountIdentityEditor } from '@/components/person-identity-editor';
 import { renderLinkedEverywhere } from '@/components/linked-everywhere';
 import { relationshipKicker as relationshipWord } from '@/components/entity-detail';
@@ -76,21 +76,6 @@ const ROLE_FILTER_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'student', label: 'Student' },
   { value: 'other', label: 'Other' }
 ];
-
-const crestUrlCache = new Map<string, string | null>();
-
-async function resolveCrestUrl(orgRef: string | null | undefined, logoKey: string | null | undefined): Promise<string | null> {
-  if (!orgRef || !logoKey) return null;
-  if (crestUrlCache.has(orgRef)) return crestUrlCache.get(orgRef) ?? null;
-  try {
-    const res = await fetchOrgCrestUrl(orgRef);
-    crestUrlCache.set(orgRef, res.url);
-    return res.url;
-  } catch {
-    crestUrlCache.set(orgRef, null);
-    return null;
-  }
-}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -216,13 +201,17 @@ function crestNode(
   crest.setAttribute('aria-hidden', 'true');
   const label = el('span', 'people-crest__mono', monogram ?? '');
   crest.append(label);
-  if (opts.orgRef && opts.logoKey) {
+  if (opts.orgRef) {
     void resolveCrestUrl(opts.orgRef, opts.logoKey).then((url) => {
       if (!url) return;
       label.hidden = true;
       const img = document.createElement('img');
       img.className = 'people-crest__img';
       img.alt = '';
+      img.addEventListener('error', () => {
+        img.remove();
+        label.hidden = false;
+      }, { once: true });
       img.src = url;
       crest.prepend(img);
     });
@@ -615,7 +604,7 @@ export async function renderPeoplePage(
       });
       await uploadSignedCrest(signed.put_url, file, signed.attachment.content_type);
       await updateOrganisation(orgRef, { logo_key: signed.attachment.r2_key });
-      crestUrlCache.delete(orgRef);
+      invalidateCrestUrl(orgRef);
       if (directory) {
         for (const p of directory.people) {
           if (p.organisation?.ref === orgRef) p.organisation.logo_key = signed.attachment.r2_key;

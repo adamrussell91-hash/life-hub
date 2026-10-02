@@ -3,8 +3,15 @@
  */
 
 import { fetchOrgCrestUrl } from '@/api/organisations-directory';
+import bundledCrests from '@/data/organisation-crests.json';
 
 const crestUrlCache = new Map<string, string | null>();
+
+export function invalidateCrestUrl(orgRef: string): void {
+  for (const key of crestUrlCache.keys()) {
+    if (key.startsWith(`${orgRef}|`)) crestUrlCache.delete(key);
+  }
+}
 
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -21,15 +28,18 @@ export async function resolveCrestUrl(
   orgRef: string | null | undefined,
   logoKey: string | null | undefined
 ): Promise<string | null> {
-  if (!orgRef || !logoKey) return null;
-  if (crestUrlCache.has(orgRef)) return crestUrlCache.get(orgRef) ?? null;
+  if (!orgRef) return null;
+  const filename = (bundledCrests as Record<string, string>)[orgRef];
+  const fallback = filename ? `${import.meta.env.BASE_URL}organisation-crests/${filename}` : null;
+  if (!logoKey) return fallback;
+  const cacheKey = `${orgRef}|${logoKey}`;
+  if (crestUrlCache.has(cacheKey)) return crestUrlCache.get(cacheKey) ?? fallback;
   try {
     const res = await fetchOrgCrestUrl(orgRef);
-    crestUrlCache.set(orgRef, res.url);
-    return res.url;
+    crestUrlCache.set(cacheKey, res.url);
+    return res.url ?? fallback;
   } catch {
-    crestUrlCache.set(orgRef, null);
-    return null;
+    return fallback;
   }
 }
 
@@ -45,13 +55,17 @@ export function crestNode(
   crest.setAttribute('aria-hidden', 'true');
   const label = el('span', 'people-crest__mono', monogram ?? '');
   crest.append(label);
-  if (opts.orgRef && opts.logoKey) {
+  if (opts.orgRef) {
     void resolveCrestUrl(opts.orgRef, opts.logoKey).then((url) => {
       if (!url) return;
       label.hidden = true;
       const img = document.createElement('img');
       img.className = 'people-crest__img';
       img.alt = '';
+      img.addEventListener('error', () => {
+        img.remove();
+        label.hidden = false;
+      }, { once: true });
       img.src = url;
       crest.prepend(img);
     });
