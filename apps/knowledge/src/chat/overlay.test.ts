@@ -169,6 +169,43 @@ Effortful retrieval is the load-bearing claim. The archive supports Bjork here a
     expect(document.querySelector("[data-save-brief]")?.textContent).toBe("Save as new page");
   });
 
+  it("keeps Confirm cards in the sticky tray above the composer, not in the thread", () => {
+    sessionStorage.setItem(
+      "knowledge-hub-overlay-chat-v1",
+      JSON.stringify({
+        personality: "clementine",
+        open: true,
+        input: "",
+        turns: [
+          {
+            role: "assistant",
+            content: `## Desirable difficulties
+
+Effortful retrieval is the load-bearing claim. The archive supports Bjork here and turns that back onto the book. The notes that earn a citation are the ones that change what a careful reader would believe.`,
+            edit: {
+              action: "retag",
+              pageId: "page_1",
+              title: "Retrieval practice",
+              tags: ["Memory"],
+            },
+          },
+        ],
+      }),
+    );
+    ensureChatOverlay({ visible: true });
+    const tray = document.querySelector(".chat-pending-confirms");
+    const form = document.querySelector(".chat-form");
+    const messages = document.querySelector(".chat-messages");
+    expect(tray).toBeTruthy();
+    expect(tray?.querySelector("[data-confirm-edit]")).toBeTruthy();
+    expect(tray?.querySelector("[data-save-brief]")).toBeTruthy();
+    expect(messages?.querySelector(".confirm-card")).toBeNull();
+    const overlay = document.querySelector(".chat-overlay")!;
+    const kids = [...overlay.children];
+    expect(kids.indexOf(tray as Element)).toBeLessThan(kids.indexOf(form as Element));
+    expect(kids.indexOf(messages as Element)).toBeLessThan(kids.indexOf(tray as Element));
+  });
+
   it("asks for the book before researching a From a book sitting", () => {
     ensureChatOverlay({
       visible: true,

@@ -405,9 +405,42 @@ Effortful retrieval is the load-bearing claim. The archive supports Bjork here a
     expect(host.app.textContent).toContain("Reading: Make It Stick (p. 142)");
     expect(host.app.textContent).toContain("Add to archive");
     expect(host.app.textContent).toContain("stamped under Make It Stick");
+    const tray = host.app.querySelector(".chat-pending-confirms");
+    expect(tray?.querySelector("[data-save-brief]")).toBeTruthy();
+    expect(host.app.querySelector(".coach__thread .confirm-card")).toBeNull();
     host.app.querySelector<HTMLButtonElement>("[data-save-brief]")!.click();
     await vi.waitFor(() => expect(savePageMock).toHaveBeenCalled());
     expect(savePageMock.mock.calls[0]?.[0]?.origins).toEqual([{ kind: "book", label: "Make It Stick" }]);
+  });
+
+  it("keeps archive Confirms in the sticky tray above the composer", () => {
+    sessionStorage.setItem(
+      "knowledge-hub-chat-v1",
+      JSON.stringify({
+        hat: "scoping",
+        input: "",
+        turns: [
+          { role: "user", content: "desirable difficulties" },
+          {
+            role: "assistant",
+            content: `## Desirable difficulties
+
+Effortful retrieval is the load-bearing claim. The archive supports Bjork here and turns that back onto the notes. The notes that earn a citation are the ones that change what a careful reader would believe.`,
+          },
+        ],
+      }),
+    );
+    const host = makeHost();
+    host.render();
+    const floor = host.app.querySelector(".chat-floor");
+    const tray = floor?.querySelector(".chat-pending-confirms");
+    const form = floor?.querySelector("form.chat__composer, form.coach__form");
+    expect(tray?.querySelector("[data-save-brief]")).toBeTruthy();
+    expect(host.app.querySelector(".coach__thread .confirm-card")).toBeNull();
+    expect(floor).toBeTruthy();
+    expect(form).toBeTruthy();
+    const kids = [...(floor?.children ?? [])];
+    expect(kids.indexOf(tray as Element)).toBeLessThan(kids.indexOf(form as Element));
   });
 
   it("does not remount .chat__sitting across book-note research phase and researching result", async () => {

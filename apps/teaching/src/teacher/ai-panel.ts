@@ -218,6 +218,17 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   const thread = document.createElement('div');
   thread.className = 'ai-panel__thread';
 
+  const pendingTray = document.createElement('aside');
+  pendingTray.className = 'chat-pending-confirms';
+  pendingTray.hidden = true;
+  pendingTray.setAttribute('aria-label', 'Waiting on Confirm');
+  const pendingLabel = document.createElement('p');
+  pendingLabel.className = 'chat-pending-confirms__label';
+  pendingLabel.textContent = 'Waiting on Confirm';
+  const pendingList = document.createElement('div');
+  pendingList.className = 'chat-pending-confirms__list';
+  pendingTray.append(pendingLabel, pendingList);
+
   const composer = document.createElement('form');
   composer.className = 'ai-panel__composer';
 
@@ -241,6 +252,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     actionsBar,
     empty,
     thread,
+    pendingTray,
     composer
   );
 
@@ -427,8 +439,101 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     acceptProposal(msg, filtered.proposal);
   }
 
+  function proposalTitle(msg: ChatMessage): string {
+    if (msg.proposalStatus === 'accepted') return 'Proposal accepted';
+    if (msg.proposalStatus === 'rejected') return 'Proposal rejected';
+    return `Proposal: ${msg.proposal!.kind.replaceAll('_', ' ')}`;
+  }
+
+  function buildProposalCard(msg: ChatMessage): HTMLElement {
+    const card = document.createElement('div');
+    card.className = 'confirm-card ai-panel__proposal';
+    card.dataset.msgId = msg.id;
+    const title = document.createElement('p');
+    title.className = 'page-header__eyebrow ai-panel__proposal-title';
+    title.textContent = proposalTitle(msg);
+    card.append(title);
+
+    if (msg.proposalStatus !== 'pending' || !msg.proposal) return card;
+
+    const units = listPartialAcceptUnits(msg.proposal);
+    const partial = units.length >= 2;
+    const actions = document.createElement('div');
+    actions.className = 'confirm-card__actions ai-panel__proposal-actions';
+    const accept = document.createElement('button');
+    accept.type = 'button';
+    accept.className = 'btn btn--primary';
+    accept.textContent = partial ? 'Accept selected' : 'Accept';
+    accept.addEventListener('click', () => {
+      if (partial) acceptSelected(msg);
+      else acceptProposal(msg);
+    });
+    if (partial) {
+      if (!msg.selectedKeys) msg.selectedKeys = units.map((unit) => unit.key);
+      const selected = new Set(msg.selectedKeys);
+      accept.disabled = !units.some((unit) => selected.has(unit.key));
+      const list = document.createElement('ul');
+      list.className = 'ai-panel__proposal-list';
+      for (const unit of units) {
+        const item = document.createElement('li');
+        const label = document.createElement('label');
+        label.className = unit.group
+          ? 'ai-panel__proposal-check ai-panel__proposal-check--nested'
+          : 'ai-panel__proposal-check';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = selected.has(unit.key);
+        box.addEventListener('change', () => {
+          const next = new Set(msg.selectedKeys ?? units.map((u) => u.key));
+          if (box.checked) next.add(unit.key);
+          else next.delete(unit.key);
+          msg.selectedKeys = [...next];
+          accept.disabled = !units.some((u) => next.has(u.key));
+        });
+        label.append(box, document.createTextNode(unit.label));
+        item.append(label);
+        list.append(item);
+      }
+      card.append(list);
+    }
+    if (msg.proposalError) {
+      const error = document.createElement('p');
+      error.className = 'ai-panel__proposal-error';
+      error.textContent = msg.proposalError;
+      card.append(error);
+    }
+    const reject = document.createElement('button');
+    reject.type = 'button';
+    reject.className = 'btn btn--secondary';
+    reject.textContent = 'Reject';
+    reject.addEventListener('click', () => {
+      msg.proposalStatus = 'rejected';
+      saveTranscript(options.lessonId, messages);
+      renderThread();
+      if (msg.jobId) void resolveAiJob(msg.jobId, 'rejected');
+    });
+    const regen = document.createElement('button');
+    regen.type = 'button';
+    regen.className = 'btn btn--ghost';
+    regen.textContent = 'Regenerate';
+    regen.addEventListener('click', () => {
+      const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+      if (lastUser) void sendMessage(lastUser.text);
+    });
+    actions.append(accept, reject, regen);
+    card.append(actions);
+    return card;
+  }
+
+  function syncPendingTray(): void {
+    const count = pendingList.childElementCount;
+    pendingTray.hidden = count === 0;
+    pendingLabel.textContent = count <= 1 ? 'Waiting on Confirm' : `Waiting on Confirm (${count})`;
+  }
+
   function renderThread(): void {
     thread.replaceChildren();
+    pendingList.replaceChildren();
     for (const msg of messages) {
       const row = document.createElement('div');
       row.className = `ai-panel__msg ai-panel__msg--${msg.role}`;
@@ -478,87 +583,9 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       }
 
       if (msg.proposal && msg.proposal.kind !== 'review_only') {
-        const card = document.createElement('div');
-        card.className = 'confirm-card ai-panel__proposal';
-        const title = document.createElement('p');
-        title.className = 'page-header__eyebrow ai-panel__proposal-title';
-        title.textContent =
-          msg.proposalStatus === 'accepted'
-            ? 'Proposal accepted'
-            : msg.proposalStatus === 'rejected'
-              ? 'Proposal rejected'
-              : `Proposal: ${msg.proposal.kind.replaceAll('_', ' ')}`;
-        card.append(title);
-
-        if (msg.proposalStatus === 'pending') {
-          const units = listPartialAcceptUnits(msg.proposal);
-          const partial = units.length >= 2;
-          const actions = document.createElement('div');
-          actions.className = 'confirm-card__actions ai-panel__proposal-actions';
-          const accept = document.createElement('button');
-          accept.type = 'button';
-          accept.className = 'btn btn--primary';
-          accept.textContent = partial ? 'Accept selected' : 'Accept';
-          accept.addEventListener('click', () => {
-            if (partial) acceptSelected(msg);
-            else acceptProposal(msg);
-          });
-          if (partial) {
-            if (!msg.selectedKeys) msg.selectedKeys = units.map((unit) => unit.key);
-            const selected = new Set(msg.selectedKeys);
-            accept.disabled = !units.some((unit) => selected.has(unit.key));
-            const list = document.createElement('ul');
-            list.className = 'ai-panel__proposal-list';
-            for (const unit of units) {
-              const item = document.createElement('li');
-              const label = document.createElement('label');
-              label.className = unit.group
-                ? 'ai-panel__proposal-check ai-panel__proposal-check--nested'
-                : 'ai-panel__proposal-check';
-              const box = document.createElement('input');
-              box.type = 'checkbox';
-              box.checked = selected.has(unit.key);
-              box.addEventListener('change', () => {
-                const next = new Set(msg.selectedKeys ?? units.map((u) => u.key));
-                if (box.checked) next.add(unit.key);
-                else next.delete(unit.key);
-                msg.selectedKeys = [...next];
-                accept.disabled = !units.some((u) => next.has(u.key));
-              });
-              label.append(box, document.createTextNode(unit.label));
-              item.append(label);
-              list.append(item);
-            }
-            card.append(list);
-          }
-          if (msg.proposalError) {
-            const error = document.createElement('p');
-            error.className = 'ai-panel__proposal-error';
-            error.textContent = msg.proposalError;
-            card.append(error);
-          }
-          const reject = document.createElement('button');
-          reject.type = 'button';
-          reject.className = 'btn btn--secondary';
-          reject.textContent = 'Reject';
-          reject.addEventListener('click', () => {
-            msg.proposalStatus = 'rejected';
-            saveTranscript(options.lessonId, messages);
-            renderThread();
-            if (msg.jobId) void resolveAiJob(msg.jobId, 'rejected');
-          });
-          const regen = document.createElement('button');
-          regen.type = 'button';
-          regen.className = 'btn btn--ghost';
-          regen.textContent = 'Regenerate';
-          regen.addEventListener('click', () => {
-            const lastUser = [...messages].reverse().find((m) => m.role === 'user');
-            if (lastUser) void sendMessage(lastUser.text);
-          });
-          actions.append(accept, reject, regen);
-          card.append(actions);
-        }
-        row.append(card);
+        const card = buildProposalCard(msg);
+        if (msg.proposalStatus === 'pending') pendingList.append(card);
+        else row.append(card);
       } else if (msg.proposal?.kind === 'review_only') {
         const note = document.createElement('p');
         note.className = 'ai-panel__review';
@@ -568,6 +595,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
 
       thread.append(row);
     }
+    syncPendingTray();
     thread.scrollTop = thread.scrollHeight;
   }
 

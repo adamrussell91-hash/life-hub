@@ -516,9 +516,40 @@ function saveCardHtml() {
       </div>
     </section>`;
   }
-  return `<div class="chat-overlay__save">
-    <button class="btn btn--secondary" type="button" data-save-brief ${saveBusy || busy ? "disabled" : ""}>${saveBusy ? "Saving…" : "Save as new page"}</button>
-  </div>`;
+  return `<section class="confirm-card chat-overlay__save" role="region" aria-label="Save as new page">
+    <div class="confirm-card__actions">
+      <button class="btn btn--secondary" type="button" data-save-brief ${saveBusy || busy ? "disabled" : ""}>${saveBusy ? "Saving…" : "Save as new page"}</button>
+    </div>
+  </section>`;
+}
+
+function editConfirmHtml(edit: RetagProposal) {
+  return `<section class="confirm-card" role="region" aria-label="Confirm change">
+    <p class="page-header__eyebrow">Proposed write</p>
+    <h2 class="page-header__title" style="font-size: var(--text-lg)">Retag this note</h2>
+    <p class="page-header__supporting">Replace tags on ${escapeHtml(edit.title)}.</p>
+    ${deltaHtml(edit)}
+    <div class="confirm-card__actions">
+      <button class="btn btn--ghost" type="button" data-discard-edit ${confirmBusy ? "disabled" : ""}>Discard</button>
+      <button class="btn btn--primary" type="button" data-confirm-edit ${confirmBusy ? "disabled" : ""}>${confirmBusy ? "Saving…" : "Confirm"}</button>
+    </div>
+  </section>`;
+}
+
+/** Pending Confirms stay above the composer — not in the scrollable thread. */
+function pendingConfirmsTrayHtml() {
+  const cards: string[] = [];
+  for (const turn of turns) {
+    if (turn.edit) cards.push(editConfirmHtml(turn.edit));
+  }
+  const save = saveCardHtml();
+  if (save) cards.push(save);
+  if (!cards.length) return "";
+  const label = cards.length <= 1 ? "Waiting on Confirm" : `Waiting on Confirm (${cards.length})`;
+  return `<aside class="chat-pending-confirms" aria-label="Waiting on Confirm">
+    <p class="chat-pending-confirms__label">${label}</p>
+    <div class="chat-pending-confirms__list">${cards.join("")}</div>
+  </aside>`;
 }
 
 function pickerHtml() {
@@ -597,20 +628,6 @@ function overlayHtml() {
                   return `<li class="chat-message chat-message--assistant${tail}" data-agent="${personality}">
                     <img class="chat-message__avatar" src="${who.avatarSrc}" alt="${escapeHtml(who.name)}" width="52" height="52" />
                     <div class="chat-message__body">${renderChatMarkdown(turn.content, turn.findings, notes, currentHost?.archiveNotes)}</div>
-                    ${
-                      turn.edit
-                        ? `<section class="confirm-card" role="region" aria-label="Confirm change">
-                            <p class="page-header__eyebrow">Proposed write</p>
-                            <h2 class="page-header__title" style="font-size: var(--text-lg)">Retag this note</h2>
-                            <p class="page-header__supporting">Replace tags on ${escapeHtml(turn.edit.title)}.</p>
-                            ${deltaHtml(turn.edit)}
-                            <div class="confirm-card__actions">
-                              <button class="btn btn--ghost" type="button" data-discard-edit ${confirmBusy ? "disabled" : ""}>Discard</button>
-                              <button class="btn btn--primary" type="button" data-confirm-edit ${confirmBusy ? "disabled" : ""}>${confirmBusy ? "Saving…" : "Confirm"}</button>
-                            </div>
-                          </section>`
-                        : ""
-                    }
                   </li>`;
                 })
                 .join("")
@@ -631,7 +648,7 @@ function overlayHtml() {
         }
       </ul>
       ${error ? `<p class="alchemist__error">${escapeHtml(error)}</p>` : ""}
-      ${saveCardHtml()}
+      ${pendingConfirmsTrayHtml()}
       ${bookFieldHtml()}
       <form class="chat-form hub-ai-bar hub-ai-bar--thread">
         <label class="sr-only" for="overlay-chat-input">${inputLabel}</label>

@@ -1,6 +1,7 @@
 /**
- * Sticky Confirm tray — pending OS actions stay above the composer until
- * Confirm/Discard, across New chat and scroll. Hydrated from /api/chat/pending.
+ * Sticky Confirm tray — pending OS actions *and* session record/CN Confirms
+ * stay above the composer until Confirm/Discard, across New chat and scroll.
+ * Durable rows hydrate from /api/chat/pending; session-only cards mount via SSE.
  */
 
 export const CHAT_PENDING_CONFIRMS_ID = 'chat-pending-confirms';
@@ -91,16 +92,58 @@ function tagPendingId(card, id) {
   card.setAttribute?.('data-pending-id', id);
 }
 
+function hasClass(node, name) {
+  return (node?.className ?? '').split(/\s+/).includes(name);
+}
+
+function isReceiptCard(node) {
+  return hasClass(node, 'confirm-card--receipt') || hasClass(node, 'is-receipt');
+}
+
+function isWaitingConfirmCard(node) {
+  return !isReceiptCard(node)
+    && (hasClass(node, 'confirm-card') || hasClass(node, 'record-proposal'));
+}
+
+function nestedWaitingConfirm(node) {
+  if (!node || typeof node.querySelector !== 'function') return null;
+  for (const selector of ['.confirm-card', '.record-proposal', '.agent-choice-card', '.prod-card']) {
+    const hit = node.querySelector(selector);
+    if (hit && isWaitingConfirmCard(hit)) return hit;
+  }
+  return null;
+}
+
 function countConfirmCards(list) {
   let count = 0;
   for (const child of list.children ?? []) {
-    const classes = (child.className ?? '').split(/\s+/);
-    if (classes.includes('confirm-card') || classes.includes('record-proposal')) count += 1;
+    if (isWaitingConfirmCard(child) || nestedWaitingConfirm(child)) count += 1;
   }
   if (count || typeof list.querySelectorAll !== 'function') return count;
-  return list.querySelectorAll('.confirm-card').length
-    || list.querySelectorAll('.record-proposal').length
-    || 0;
+  // FakeElement / odd hosts: walk by class, still excluding receipts.
+  for (const selector of ['.confirm-card', '.record-proposal', '.agent-choice-card', '.prod-card']) {
+    for (const card of list.querySelectorAll(selector)) {
+      if (!isReceiptCard(card)) count += 1;
+    }
+    if (count) return count;
+  }
+  return 0;
+}
+
+/** Sticky tray list host, or null when the chat shell is not mounted. */
+export function getChatPendingConfirmsList(root) {
+  const tray = ensureChatPendingConfirmsTray(root);
+  return tray ? trayList(tray) : null;
+}
+
+/**
+ * Prefer the sticky Confirm tray for every Confirm card type.
+ * Falls back to #chat-messages only when the chat shell cannot host a tray
+ * (unit-test stubs without #chat-view / #chat-form).
+ */
+export function resolveStickyConfirmHost(root, host = null) {
+  if (host) return host;
+  return getChatPendingConfirmsList(root) || root?.querySelector?.('#chat-messages') || null;
 }
 
 function insertTrayBeforeForm(view, form, tray) {
@@ -271,6 +314,34 @@ export function appendActionProposalToPendingTray(root, { proposal, id }, { appe
   bindActionProposal(proposalUi, proposal, id ?? null);
   syncChatPendingConfirmsVisibility(root);
   return proposalUi;
+}
+
+/**
+ * Mount any session Confirm (record / CN / choice / productivity / Clare dump)
+ * into the sticky tray. Prefer this over appending into #chat-messages.
+ */
+export function appendSessionConfirmToPendingTray(root, mountWithHost) {
+  if (typeof mountWithHost !== 'function') return null;
+  const list = resolveStickyConfirmHost(root, null);
+  const ui = mountWithHost(list);
+  const card = ui?.card || ui?.item || ui;
+  if (card?.dataset && !card.dataset.pendingId) {
+    card.dataset.pendingSource = 'session';
+  }
+  syncChatPendingConfirmsVisibility(root);
+  return ui;
+}
+
+/** After Confirm, receipts belong in the transcript — not the waiting tray. */
+export function moveConfirmReceiptToTranscript(root, card) {
+  if (!card) return;
+  const messages = root?.querySelector?.('#chat-messages');
+  if (messages && card.parent !== messages) {
+    // Detach first so FakeElement / odd hosts do not leave a dual-parent card.
+    card.remove?.();
+    messages.append?.(card);
+  }
+  syncChatPendingConfirmsVisibility(root);
 }
 
 export function removePendingConfirmCard(root, id) {

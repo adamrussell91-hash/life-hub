@@ -494,9 +494,21 @@ function saveCardHtml(canSave: boolean) {
       </div>
     </section>`;
   }
-  return `<div class="alchemist__actions chat__save-row">
-    <button class="btn btn--secondary" type="button" data-save-brief ${saveBusy ? "disabled" : ""}>${saveBusy ? "Saving…" : "Save as new page"}</button>
-  </div>`;
+  return `<section class="confirm-card" role="region" aria-label="Save as new page">
+    <div class="confirm-card__actions alchemist__actions chat__save-row">
+      <button class="btn btn--secondary" type="button" data-save-brief ${saveBusy ? "disabled" : ""}>${saveBusy ? "Saving…" : "Save as new page"}</button>
+    </div>
+  </section>`;
+}
+
+/** Pending Confirms stay above the composer — not inside the scrollable thread. */
+function pendingConfirmsTrayHtml(canSave: boolean) {
+  const card = saveCardHtml(canSave);
+  if (!card) return "";
+  return `<aside class="chat-pending-confirms" aria-label="Waiting on Confirm">
+    <p class="chat-pending-confirms__label">Waiting on Confirm</p>
+    <div class="chat-pending-confirms__list">${card}</div>
+  </aside>`;
 }
 
 function noteComposerHtml(fileNote: boolean, placeholder: string, label: string, submitLabel = "Send") {
@@ -585,7 +597,7 @@ function assistantPortrait() {
 function turnHtml(
   turn: ChatTurn,
   index: number,
-  opts: { lastTurn: boolean; canSave: boolean; archiveNotes?: NoteTitle[] },
+  opts: { lastTurn: boolean; archiveNotes?: NoteTitle[] },
 ) {
   const body =
     turn.role === "assistant"
@@ -606,7 +618,6 @@ function turnHtml(
         }
         ${turn.ticks?.length ? thinkingHistoryHtml(turn.ticks, thinkingOpen && opts.lastTurn) : ""}
         ${turn.findings?.length ? searchedNotesHtml(turn.findings, sourcesOpen.has(index), index) : ""}
-        ${opts.lastTurn ? saveCardHtml(opts.canSave) : ""}
       </div>
     </article>`;
   }
@@ -640,7 +651,6 @@ export function renderChatRail(host: ChatRailHost) {
         .map((turn, index) =>
           turnHtml(turn, index, {
             lastTurn: index === turns.length - 1,
-            canSave,
             archiveNotes: host.archiveNotes,
           }),
         )
@@ -681,6 +691,7 @@ export function renderChatRail(host: ChatRailHost) {
         }
         ${bookFieldHtml(bookLabels)}
         ${fileNote ? noteComposerHtml(true, placeholder, inputLabel, submitLabel) : ""}
+        ${fileNote ? pendingConfirmsTrayHtml(canSave) : ""}
         <button type="button" class="chat__dials-toggle" data-toggle-dials>${showDials ? "Hide scope and depth" : "Adjust scope and depth"}</button>
         ${
           showDials
@@ -708,7 +719,14 @@ export function renderChatRail(host: ChatRailHost) {
       <div class="coach__thread" aria-live="polite">
         ${threadHtml}
       </div>
-      ${fileNote ? "" : noteComposerHtml(false, placeholder, inputLabel, submitLabel)}
+      ${
+        fileNote
+          ? ""
+          : `<div class="chat-floor">
+              ${pendingConfirmsTrayHtml(canSave)}
+              ${noteComposerHtml(false, placeholder, inputLabel, submitLabel)}
+            </div>`
+      }
     </section>
   `);
 

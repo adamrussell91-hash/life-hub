@@ -46,10 +46,15 @@ test('sending a message routes to the mocked agent and renders a confirmable rec
   await assistantBubble.waitFor();
   assert.equal(await assistantBubble.getAttribute('data-agent'), 'chadwick');
 
-  const proposal = page.locator('.record-proposal');
+  const proposal = page.locator('#chat-pending-confirms .record-proposal');
   await proposal.waitFor();
+  assert.equal(
+    await page.locator('#chat-messages .record-proposal').count(),
+    0,
+    'waiting Confirm must not live in the scrollable thread'
+  );
   await proposal.locator('.record-proposal__confirm').click();
-  await page.locator('.record-proposal >> text=Saved.').waitFor();
+  await page.locator('#chat-messages .record-proposal >> text=Saved.').waitFor();
   await context.close();
 });
 
@@ -61,7 +66,7 @@ test('discarding a proposal removes it without confirming', async () => {
   await page.locator('#chat-input').fill('Chadwick, log a session');
   await page.locator('#chat-send').click();
 
-  const proposal = page.locator('.record-proposal');
+  const proposal = page.locator('#chat-pending-confirms .record-proposal');
   await proposal.waitFor();
   await proposal.locator('.record-proposal__discard').click();
   await assert.rejects(proposal.waitFor({ timeout: 500 }));

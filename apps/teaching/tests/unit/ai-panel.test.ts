@@ -287,9 +287,17 @@ describe('mountAiPanel', () => {
     });
     expect(handle.isWorking()).toBe(false);
     expect(onWorkingChange).toHaveBeenCalledWith(false);
-    expect(mounted.host.querySelector('.ai-panel__proposal')).not.toBeNull();
-    expect(mounted.host.querySelector('.confirm-card')).not.toBeNull();
-    expect(mounted.host.querySelector('.confirm-card__actions')).not.toBeNull();
+    const tray = mounted.host.querySelector('.chat-pending-confirms');
+    expect(tray).not.toBeNull();
+    expect(tray?.hidden).toBe(false);
+    expect(tray?.querySelector('.ai-panel__proposal')).not.toBeNull();
+    expect(tray?.querySelector('.confirm-card')).not.toBeNull();
+    expect(tray?.querySelector('.confirm-card__actions')).not.toBeNull();
+    expect(mounted.host.querySelector('.ai-panel__thread .confirm-card')).toBeNull();
+    const floor = [...mounted.host.children];
+    expect(floor.indexOf(tray as Element)).toBeLessThan(
+      floor.indexOf(mounted.host.querySelector('.ai-panel__composer') as Element),
+    );
   });
 
   it('does not claim Job finished when Clementine is still working after the poll cap', async () => {
