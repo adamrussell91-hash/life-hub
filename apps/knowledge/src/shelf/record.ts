@@ -1,7 +1,7 @@
 import type { Page } from "../domain/page";
 import type { BookContext } from "../chat/bookNote";
-import { getShelf, savePlacements } from "./client";
-import { bookKey, chapterStartPage, gapsFromBody, parseLocusChapter, parseLocusPage, stanceFromBody } from "./model";
+import { getShelf, gradeKind, savePlacements } from "./client";
+import { bookKey, chapterStartPage, gapsFromBody, kindFromBody, parseLocusChapter, parseLocusPage, stanceFromBody } from "./model";
 import type { Chapter, PlacementInput } from "./schema";
 
 /** What the Bookshelf learns from a freshly saved From-a-book note. */
@@ -17,12 +17,14 @@ export function placementForBookNote(
   const chapterPage = chapter ? chapterStartPage(chapters, chapter) : undefined;
   const pageNumber = exact ?? chapterPage;
   const stance = stanceFromBody(page.body);
+  const kind = kindFromBody(page.body);
   const gaps = gapsFromBody(page.body);
-  if (!pageNumber && !stance && !gaps.length) return null;
+  if (!pageNumber && !stance && !kind && !gaps.length) return null;
   return {
     pageId: page.id,
     ...(pageNumber ? { page: pageNumber, guessed: !exact } : {}),
     ...(stance ? { stance } : {}),
+    ...(kind ? { kind, kindBy: "clementine" as const, kindGuessed: false } : {}),
     ...(gaps.length ? { gaps } : {}),
   };
 }
@@ -39,8 +41,15 @@ export async function recordBookNote(page: Pick<Page, "id" | "body">, book?: Boo
       chapters = shelf.books.find(item => bookKey(item.label) === bookKey(book.label))?.chapters ?? [];
     }
     const placement = placementForBookNote(page, book, chapters);
-    if (!placement) return;
-    await savePlacements([placement]);
+    if (placement) await savePlacements([placement]);
+    // No Kind: line (write-it-yourself, or Clementine missed it) → grade once. Never fails the save.
+    if (!placement?.kind) {
+      try {
+        await gradeKind(page.id);
+      } catch (error) {
+        console.warn("Bookshelf: could not grade the note's kind.", error);
+      }
+    }
   } catch (error) {
     console.warn("Bookshelf: could not place the new note; it will show as a loose page.", error);
   }

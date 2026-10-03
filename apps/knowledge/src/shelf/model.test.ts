@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PageManifestEntry } from "../domain/page";
-import { buildShelf, gapsFromBody, matchShelf, parseLocusPage, stanceFromBody } from "./model";
+import { buildShelf, gapsFromBody, kindFromBody, matchShelf, parseLocusPage, stanceFromBody } from "./model";
 import { parseShelfData } from "./schema";
 
 function entry(id: string, title: string, book: string | string[], extra: Partial<PageManifestEntry> = {}): PageManifestEntry {
@@ -76,6 +76,15 @@ describe("book note parsing", () => {
   it("reads stance from the How this bears section only", () => {
     expect(stanceFromBody(body)).toBe("complicates");
     expect(stanceFromBody("## In the book\nIt supports things")).toBeUndefined();
+  });
+  it("reads Kind lines and carries kind on buildShelf notes", () => {
+    expect(kindFromBody("Kind: bridge\n\n# Title")).toBe("bridge");
+    expect(kindFromBody(body)).toBeUndefined();
+    const shelf = buildShelf(
+      [{ id: "n1", title: "N", excerpt: "", tags: [], connected: [], origins: [{ kind: "book", label: "Make It Stick" }] }],
+      { books: [], placements: [{ pageId: "n1", page: 10, kind: "idea", kindGuessed: true }] },
+    );
+    expect(shelf[0]?.placed[0]).toMatchObject({ kind: "idea", kindGuessed: true });
   });
   it("reads gaps as bullet lines", () => {
     expect(gapsFromBody(body)).toEqual(["Does it hold for novices?", "Long-term retention"]);

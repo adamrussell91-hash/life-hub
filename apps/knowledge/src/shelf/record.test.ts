@@ -8,6 +8,12 @@ describe("placementForBookNote", () => {
       pageId: "p1", page: 28, guessed: false, stance: "supports", gaps: ["Replication?"],
     });
   });
+  it("reads an explicit Kind line as clementine", () => {
+    const withKind = "Kind: debate\n\n## How this bears on the book\nAdds a rival account.\n";
+    expect(placementForBookNote({ id: "p1", body: withKind }, { label: "X", locus: "p. 1" })).toMatchObject({
+      kind: "debate", kindBy: "clementine", kindGuessed: false,
+    });
+  });
   it("skips notes that are not from a book", () => {
     expect(placementForBookNote({ id: "p1", body }, undefined)).toBeNull();
   });
