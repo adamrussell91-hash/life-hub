@@ -2,7 +2,7 @@ import type { AtlasModel, AtlasTown } from "./atlasLayout";
 import { renderTerrain, type TerrainCanvas } from "./atlasTerrain";
 import { mostConnected } from "./archipelagoLayout";
 import { mountSeaLife, pickBottle } from "./seaLife";
-import { MAP_SEA_HTML, MAP_SKY_HTML, mapControlsHtml, positionTerrain, positionWorld, terrainLayers, wireFullScreen } from "./mapChrome";
+import { MAP_SEA_HTML, MAP_SKY_HTML, mapControlsHtml, positionTerrain, positionWorld, revealAt, terrainLayers, wireFullScreen } from "./mapChrome";
 import type { BookModel } from "./model";
 import type { BookSwatch } from "./palette";
 
@@ -33,6 +33,7 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
       ${MAP_SEA_HTML}
       <div class="atlas__land" data-land></div>
       <div class="atlas__world" data-world aria-hidden="true"></div>
+      <div class="atlas__world atlas__ink" data-ink aria-hidden="true"></div>
       ${MAP_SKY_HTML}
       <svg class="atlas__lines" data-lines aria-hidden="true"></svg>
       <div class="atlas__marks" data-marks></div>
@@ -53,7 +54,8 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
         <li><i class="atlas-key isles-key--treasure"></i>Golden X: this book's most-connected note</li>
         <li><i class="atlas-key isles-key--bloom"></i>Ink bloom: a note added since you last looked</li>
       </ul>
-      <p class="isles-key__hint">The compass turns the hours and the word beneath it turns the seasons. Everything else at sea is just for fun: try tapping it.</p>
+      <p class="isles-key__hint">The compass turns the hours and the word beneath it turns the seasons. Everything else at sea is just for fun: zoom in to find it, then try tapping it.</p>
+      <p class="isles-key__hint">Ships and monsters from Olaus Magnus, <i>Carta Marina</i> (1539).</p>
     </details>
     <aside class="atlas__card" data-card hidden></aside>
   </div>`;
@@ -64,6 +66,9 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
   const marks = root.querySelector<HTMLElement>("[data-marks]")!;
   const card = root.querySelector<HTMLElement>("[data-card]")!;
   const world = root.querySelector<HTMLElement>("[data-world]")!;
+  const inkLayer = root.querySelector<HTMLElement>("[data-ink]")!;
+  /** The scale that fits the whole map: the god's-eye view. */
+  let home = 1;
   const byId = new Map(atlas.towns.map(t => [t.note.id, t]));
   const provinceName = new Map(atlas.provinces.map(p => [p.id, p.label]));
   provinceName.set("loose", "Loose pages");
@@ -95,6 +100,7 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
     const b = atlas.bounds;
     const fitted = Math.min(w / b.w, h / b.h) * 0.94;
     scale = Math.min(1.15, Math.max(fitted, Math.min(0.56, (h / b.h) * 0.9)));
+    home = scale;
     ox = (w - b.w * scale) / 2 - b.x * scale;
     oy = (h - b.h * scale) / 2 - b.y * scale;
     if (b.w * scale > w) {
@@ -126,6 +132,8 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
   function apply() {
     if (terrain) positionTerrain(terrain, atlas.width, scale, ox, oy);
     positionWorld(world, scale, ox, oy);
+    positionWorld(inkLayer, scale, ox, oy);
+    revealAt(root, scale / home);
     drawMarks();
   }
 
@@ -387,6 +395,7 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
   const treasure = mostConnected(atlas.towns);
   const life = mountSeaLife(world, {
     root,
+    inkLayer,
     bottle,
     landmarks: treasure ? [{ kind: "treasure", x: treasure.x + 16, y: treasure.y - 10, noteId: treasure.note.id, links: treasure.note.connected.length }] : [],
     onTreasure: mark => {

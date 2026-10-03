@@ -273,7 +273,8 @@ export function shorePoint(from: Island, to: Island) {
  * Your notes, drawn as landmarks: a lighthouse on every book you wrote in this
  * week, a campfire on the one you're reading, smoke over the book your notes
  * argue with most (two or more that complicate it), mist over books with no
- * notes, and a golden X on your most-connected note.
+ * notes, a golden X on your most-connected note, and the great tree on the
+ * book you've written most in.
  */
 export function chartLandmarks(model: Pick<ArchipelagoModel, "islands">): Landmark[] {
   const marks: Landmark[] = [];
@@ -290,6 +291,9 @@ export function chartLandmarks(model: Pick<ArchipelagoModel, "islands">): Landma
     const count = notes.filter(n => n.stance === "complicates").length;
     if (count >= 2 && count > (contested?.count ?? 0)) contested = { island, count };
   }
+  // The great tree grows on the book you've written most in.
+  const deepest = [...model.islands].sort((a, b) => b.book.noteCount - a.book.noteCount || a.key.localeCompare(b.key))[0];
+  if (deepest && deepest.book.noteCount >= 5) marks.push({ kind: "tree", x: deepest.x - deepest.r * 0.22, y: deepest.y - deepest.r * 0.3 });
   if (contested) marks.push({ kind: "volcano", x: contested.island.x + contested.island.r * 0.12, y: contested.island.y - contested.island.r * 0.12 });
   const treasure = mostConnected(model.islands.flatMap(island => [...island.book.placed, ...island.book.loose].map(note => ({ note, island }))));
   if (treasure) {
