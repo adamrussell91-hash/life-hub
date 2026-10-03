@@ -14,7 +14,9 @@ describe("Chat rail layout", () => {
     expect(css).toContain(".coach.chat .coach__thread");
     expect(css).toContain("order: -1");
     expect(css).toContain("bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px))");
-    expect(css).toMatch(/\.coach\.chat \.chat__composer\s*\{[^}]*position:\s*fixed/);
+    // Since #636 the Confirm tray and composer share one fixed .chat-floor.
+    expect(css).toMatch(/\.coach\.chat > \.chat-floor\s*\{[^}]*position:\s*fixed/);
+    expect(rail).toMatch(/<div class="chat-floor">[\s\S]*?noteComposerHtml\(/);
     expect(css).toContain(".coach.chat::after");
     expect(rail).toContain("renderChatMarkdown(turn.content, turn.findings, opts.archiveNotes)");
     expect(rail).toContain("thinkingHistoryHtml");
