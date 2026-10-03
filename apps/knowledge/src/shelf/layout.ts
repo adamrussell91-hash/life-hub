@@ -115,3 +115,53 @@ export function orderedLinks(book: BookModel) {
     .filter(link => rank.has(link.fromId))
     .sort((a, b) => rank.get(a.fromId)! - rank.get(b.fromId)!);
 }
+
+// ── Covers: books standing face out ──────────────────────────────────
+
+export type CoverBox = { book: BookModel; width: number; height: number };
+export type CoverSet = { notebook?: string; books: CoverBox[]; width: number };
+export type CoverRow = { sets: CoverSet[] };
+
+export const COVER_GAP = 12;
+export const COVER_SET_GAP = 32;
+
+/** Cover width that fits `columns` books on a narrow shelf, capped for desktop. */
+export function coverWidth(shelfWidth: number, phone: boolean) {
+  if (!phone) return 124;
+  return Math.max(72, Math.min(124, Math.floor((shelfWidth - 2 * COVER_GAP) / 3)));
+}
+
+/** Books stand at slightly different heights (stable per title), like a real shelf. */
+export function coverBox(book: BookModel, width: number): CoverBox {
+  return { book, width, height: Math.round(width * 1.5 * (0.9 + (hash(book.key) % 11) / 100)) };
+}
+
+/** Books face out in notebook sets; a set that doesn't fit carries on along the next shelf. */
+export function packCovers(books: BookModel[], shelfWidth: number, width: number): CoverRow[] {
+  const rows: CoverRow[] = [];
+  let row: CoverRow = { sets: [] };
+  let used = 0;
+  let set: CoverSet | null = null;
+  const newRow = () => {
+    if (row.sets.length) rows.push(row);
+    row = { sets: [] };
+    used = 0;
+    set = null;
+  };
+  for (const book of books) {
+    const box = coverBox(book, width);
+    const sameSet = set !== null && (set as CoverSet).notebook === book.notebook;
+    const need = sameSet ? COVER_GAP + width : (row.sets.length ? COVER_SET_GAP : 0) + width;
+    if (used + need > shelfWidth && used > 0) newRow();
+    if (!set || (set as CoverSet).notebook !== book.notebook) {
+      if (row.sets.length) used += COVER_SET_GAP;
+      set = { notebook: book.notebook, books: [], width: 0 };
+      row.sets.push(set);
+    } else used += COVER_GAP;
+    (set as CoverSet).books.push(box);
+    (set as CoverSet).width += ((set as CoverSet).books.length > 1 ? COVER_GAP : 0) + width;
+    used += width;
+  }
+  if (row.sets.length) rows.push(row);
+  return rows;
+}

@@ -36,6 +36,26 @@ Notes stay in the data repo. The Bookshelf keeps its own Netlify Blobs store, `k
 - New From-a-book notes save their page, stance and gaps automatically. The prompt asks for a `Verdict: supports|complicates|extends` line, which the stance reader prefers; a chapter-only locus ("ch 3") lands at the chapter's first page as a guess.
 - Write-it-yourself notes with a book origin get a **Page in <book>** field in compose; it places the note on save.
 
+## Covers (built)
+
+The Shelf room has two faces, **Covers** (default) and **Page edges**, remembered per viewer (`knowledge-hub:shelf-face`). Searching always shows page edges, because the search threads live there; choosing Covers clears the search.
+
+- Covers stand face out in notebook sets (`packCovers` in `layout.ts`), at slightly different heights per title. Books without a cover image get a plain one in the book's colour with its title and author. Each cover carries its note count and, for books you're reading, a navy band along the foot showing how far in you are.
+- **Turning** (`turn.ts`): switching faces flies each book from where it stood to where it lands while it rotates through edge-on, staggered along the shelf (`turnBooks`). Reduced motion skips it.
+- **Opening a cover** flies it to the middle of the screen, swings the front board open and fades through to the book's map (`openCover`).
+- The header says what the current face shows, and "N still need a page" opens the Place loose pages sheet book by book, most loose first.
+- Phone: three covers a row; the toolbar is the view pills, then search and a ⋯ menu for Read my notes, Fill book facts and Add a book (failure register L5).
+
+## Islands (built)
+
+A third room, **Islands** (`archipelagoLayout.ts`, `archipelagoView.ts`): the whole shelf as an archipelago.
+
+- Each book is an island, radius by note count; notebooks are seas, their islands packed together (wide on desktop, upright on a phone). Up to five notes per island are its hills, with notes that complicate the book first, as peaks. Books with no notes are sand-grey.
+- The terrain is the Atlas renderer (`renderTerrain`) fed islands as provinces and notes as towns, in each book's colour.
+- **Sea routes** join books whose notes link, one per pair of books, counting each linked note pair once. Counts show for strong routes (3+), the selected island's routes, or close in.
+- Click an island: it flies into view and a card shows its cover, notebook, notes, stance counts, top themes and sea routes (sail to another island from the list). **Go ashore** opens the book's map; **By page** opens the page view. Coming back lands on the same island.
+- Flags mark books you're reading; an orange dot marks a note added this week. Labels are placed only where they fit whole, clear of the Key and zoom buttons.
+
 ## Phase 2: Atlas (built)
 
 Inside a book, **Map** (default, remembered per viewer) or **By page** (the Fore-edge descent).
