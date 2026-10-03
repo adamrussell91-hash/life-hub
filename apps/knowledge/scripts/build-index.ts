@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Page } from "../src/domain/page";
 import { embedTexts } from "../src/lib/embed";
+import { embeddingText, indexExcerpt } from "../src/research/catalogue";
 import { listDataRepoPages } from "./dataRepoPages";
 import { loadDotEnv, loadLocalStagedPages } from "./loadLocalPages";
 
@@ -24,15 +25,14 @@ export interface LexicalCorpusEntry {
 
 const BATCH = 4;
 
-export function excerptFromBody(body: string) {
-  return body.replace(/^#.*$/gm, "").replace(/\s+/g, " ").trim().slice(0, 300);
-}
+/** Shared with the hourly catalogue sync so both embed notes the same way. */
+export const excerptFromBody = indexExcerpt;
 
 export async function buildIndex(pages: Page[], embed: EmbedFn): Promise<IndexEntry[]> {
   const vectors: number[][] = [];
   for (let offset = 0; offset < pages.length; offset += BATCH) {
     const chunk = pages.slice(offset, offset + BATCH);
-    const embedded = await embed(chunk.map(page => `${page.title}\n\n${excerptFromBody(page.body)}`));
+    const embedded = await embed(chunk.map(embeddingText));
     vectors.push(...embedded);
   }
   return pages.map((page, index) => ({
