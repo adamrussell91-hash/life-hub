@@ -2704,6 +2704,36 @@ body.is-map-expanded {
 }
 
 .sl-beast--spikefish { width: calc(90px * var(--s)); }
+.sl-tree { width: calc(40px * var(--s)); }
+.sl-tree .sl-engraving { transform-origin: 50% 70%; animation: sl-sway 7s ease-in-out infinite alternate; }
+
+@keyframes sl-sway {
+  from { transform: skewX(-1.2deg); }
+  to { transform: skewX(1.4deg); }
+}
+
+/* Rare risings share the horned beast's window; each is sized to its figure. */
+.sl-rise--serpent .sl-kraken-window { width: calc(150px * var(--s)); aspect-ratio: 509 / 498; }
+.sl-rise--wyvern .sl-kraken-window { width: calc(130px * var(--s)); aspect-ratio: 420 / 380; }
+
+/* The lobster climbs out, takes a few steps up the beach, and backs into the sea. */
+.sl-lobster {
+  position: absolute;
+  width: calc(34px * var(--s));
+  transform: translate(-50%, -50%) rotate(var(--turn));
+  opacity: 0;
+  pointer-events: none;
+  animation: sl-crawl 14s ease-in-out forwards;
+}
+
+@keyframes sl-crawl {
+  0% { opacity: 0; translate: 0 0; }
+  12% { opacity: 1; }
+  45% { translate: calc(8px * var(--s)) calc(-10px * var(--s)); }
+  60% { translate: calc(8px * var(--s)) calc(-10px * var(--s)); }
+  88% { opacity: 1; }
+  100% { opacity: 0; translate: 0 calc(6px * var(--s)); }
+}
 
 .sl-flame path { fill: #f68620; stroke: #c0392b; stroke-width: 0.8; }
 .sl-lava { fill: #b5532e; stroke: none; }
@@ -3207,6 +3237,7 @@ body.is-map-expanded {
 .isles-key--bottle { width: 14px; height: 6px; border-radius: 3px; background: rgba(140, 196, 170, 0.9); box-shadow: inset 0 0 0 1px var(--navy); }
 
 .isles-key--treasure { border-radius: 0; background: #d4a017; clip-path: polygon(0 12%, 12% 0, 50% 38%, 88% 0, 100% 12%, 62% 50%, 100% 88%, 88% 100%, 50% 62%, 12% 100%, 0 88%, 38% 50%); }
+.isles-key--tree { border-radius: 50% 50% 20% 20%; background: radial-gradient(circle at 50% 35%, var(--navy) 0 45%, transparent 46%), linear-gradient(var(--navy), var(--navy)) 50% 100% / 2px 45% no-repeat; }
 .isles-key--bloom { background: radial-gradient(closest-side, rgba(23, 55, 94, 0.6), rgba(23, 55, 94, 0.1)); }
 .isles-key--charter { border-radius: 0; background: #d4a017; clip-path: polygon(0 0, 100% 30%, 0 60%); }
 
