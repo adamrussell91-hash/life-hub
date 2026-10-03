@@ -37,6 +37,14 @@ async function parseKernelPayload(response) {
   }
 }
 
+/** Kernel error plus its detail, so the page can say why (V5), capped so a stack never reaches the UI. */
+export function podcastFailureMessage(raw) {
+  const error = typeof raw?.error === 'string' && raw.error ? raw.error : 'Podcast failed';
+  const detail = typeof raw?.detail === 'string' ? raw.detail.replace(/\s+/g, ' ').trim() : '';
+  if (!detail) return error;
+  return `${error}: ${detail.length > 240 ? `${detail.slice(0, 237)}…` : detail}`;
+}
+
 export async function runPodcastRequest({
   pathname,
   method,
@@ -84,7 +92,7 @@ export async function runPodcastRequest({
   });
   const payload = await parseKernelPayload(response);
   if (!response.ok) {
-    throw Object.assign(new Error(typeof payload.raw?.error === 'string' ? payload.raw.error : 'Podcast failed'), {
+    throw Object.assign(new Error(podcastFailureMessage(payload.raw)), {
       status: response.status || 502,
       code: response.status === 503 ? 'knowledge_kernel_unbound' : 'podcast_failed'
     });

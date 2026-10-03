@@ -1,5 +1,5 @@
 import "./wireless.css";
-import { getPodcast, getPodcastAudioUrl, startPodcast } from "../api/client";
+import { getPodcast, getPodcastAudioUrl, listPodcasts, startPodcast } from "../api/client";
 import { PodcastDialsSchema, PodcastEpisodeSchema, type PodcastEpisode, type PodcastTurn } from "../podcast/schema";
 import type { BookModel } from "./model";
 import {
@@ -12,9 +12,12 @@ import {
   clock,
   disagreementFor,
   estimatedStarts,
+  holdThoughtDraft,
+  latestBroadcast,
   mixCounts,
   nearestStation,
   orderDial,
+  orderFromDial,
   runningOrder,
   signalFor,
   turnSegments,
@@ -36,7 +39,7 @@ export type WirelessHost = {
   header: (supporting: string, opts?: { eyebrow?: string; title?: string; actions?: string }) => string;
   openPage: (id: string) => void;
   /** Starts a From-a-book note at this page, in Chat. */
-  holdThought: (bookLabel: string, locus?: string) => void;
+  holdThought: (bookLabel: string, locus?: string, draft?: string) => void;
   toast: (message: string, ms?: number) => void;
   /** Asks the shelf to repaint (on-air swaps the page header). */
   repaint: () => void;
@@ -62,6 +65,9 @@ const STATION_KEY = "knowledge-hub:wireless-station";
 const MIX_KEY = "knowledge-hub:wireless-mix";
 const EPISODES_KEY = "knowledge-hub:wireless-episodes";
 const POS_KEY = "knowledge-hub:wireless-pos:";
+/** On air has its own address, so Back returns to the dial. */
+export const AIR_ROUTE = "~air";
+const PEAK_BARS = 48;
 const IN_RANGE = 0.6;
 const PHONE = "(max-width: 720px)";
 
@@ -127,7 +133,7 @@ function guessSeconds(turn: PodcastTurn) {
 }
 
 function brokenWorker(message: string) {
-  return /invalid (enum|option)|broadcast|expected .*recap/i.test(message);
+  return /invalid (enum|option)|received '?broadcast|expected .*recap/i.test(message);
 }
 
 export function createWireless(host: WirelessHost) {
@@ -147,6 +153,14 @@ export function createWireless(host: WirelessHost) {
   let frame = 0;
   let dragging = false;
   const durations = new Map<string, number>();
+  /** Loudness per line, from the decoded clip, once it has played (when storage allows the read). */
+  const peaks = new Map<string, number[]>();
+  let clipUrl = "";
+  /** Broadcasts from the Podcast library, so a broadcast made on one device replays on another. */
+  let library: PodcastEpisode[] | null = null;
+  let libraryLoading = false;
+  /** Where the needle goes when on air ends (the mini dial picks a station). */
+  let retuneTo: number | undefined;
   let audio: HTMLAudioElement | null = null;
   let noise: HTMLCanvasElement | null = null;
   const phone = window.matchMedia(PHONE);
@@ -180,6 +194,38 @@ export function createWireless(host: WirelessHost) {
   const bandName = (s?: Station) => (s ? dial.bands[s.band]?.name ?? "" : "");
   const book = (key: string) => books.find(b => b.key === key);
 
+  function loadLibrary() {
+    if (library || libraryLoading) return;
+    libraryLoading = true;
+    void listPodcasts()
+      .then(raw => {
+        const list = raw && typeof raw === "object" && Array.isArray((raw as { episodes?: unknown }).episodes) ? (raw as { episodes: unknown[] }).episodes : [];
+        library = list.flatMap(item => {
+          const parsed = PodcastEpisodeSchema.safeParse(item);
+          return parsed.success ? [parsed.data] : [];
+        });
+        if (root && !onAir) updateDial(true);
+      })
+      .catch(() => {
+        // Local preview, or the library is down: fall back to this browser's memory.
+        library = [];
+      })
+      .finally(() => {
+        libraryLoading = false;
+      });
+  }
+
+  /** The last broadcast of a book: the Podcast library first, then this browser's memory. */
+  function lastFor(b: BookModel): { id: string; order: OrderEntry[] } | undefined {
+    const remote = library ? latestBroadcast(library, b.key) : undefined;
+    const local = saved[b.key];
+    if (remote && (!local || remote.id !== local.id)) {
+      const order = orderFromDial(remote.modeDial.order ?? "", b);
+      if (order.length) return { id: remote.id, order };
+    }
+    return local ? { id: local.id, order: local.order } : undefined;
+  }
+
   // ── Header (the shelf calls this so the page title can go on air) ──
 
   function headerHtml(): string | null {
@@ -212,6 +258,7 @@ export function createWireless(host: WirelessHost) {
 
   function mount(el: HTMLElement) {
     root = el;
+    loadLibrary();
     if (onAir) paintOnAir();
     else paintDial();
     bindHeader();
@@ -437,7 +484,7 @@ export function createWireless(host: WirelessHost) {
     const order = runningOrder(b, mix);
     const counts = mixCounts(b);
     const crossBooks = [...new Set(b.links.map(l => l.toLabel))];
-    const last = saved[b.key];
+    const last = lastFor(b);
     const blurb = !b.noteCount
       ? "No notes on this book yet, so there's nothing to broadcast. Write one from Chat with From a book."
       : `A programme cut from ${b.noteCount === 1 ? "your one note" : `your ${b.noteCount} notes`}: ${[
@@ -563,7 +610,7 @@ export function createWireless(host: WirelessHost) {
         End: () => glide(dial.stations.at(-1)!.khz),
         Enter: () => {
           const near = station();
-          if (near && strength(near) >= IN_RANGE) void tuneIn(near, !saved[near.key]);
+          if (near && strength(near) >= IN_RANGE) void tuneIn(near, !lastFor(near.book));
         },
       };
       const preset = /^[1-4]$/.test(event.key) ? presets()[Number(event.key) - 1] : undefined;
@@ -637,7 +684,7 @@ export function createWireless(host: WirelessHost) {
     panel.querySelectorAll<HTMLButtonElement>(".wl-spine").forEach(spine => {
       spine.addEventListener("dblclick", () => {
         const s = dial.stations.find(item => item.key === spine.dataset.station);
-        if (s) void tuneIn(s, !saved[s.key]);
+        if (s) void tuneIn(s, !lastFor(s.book));
       });
     });
   }
@@ -649,7 +696,8 @@ export function createWireless(host: WirelessHost) {
     if (!b.noteCount) return;
     khz = s.khz;
     remember();
-    const last = saved[b.key];
+    goOnAirRoute(b.key);
+    const last = lastFor(b);
     if (!fresh && last) {
       onAir = { book: b.key, khz: s.khz, order: last.order, starting: true, index: readJson<number>(POS_KEY + last.id, 0), playing: false, loadingLine: false, skip: new Set() };
       host.repaint();
@@ -724,17 +772,57 @@ export function createWireless(host: WirelessHost) {
     }, 6000);
   }
 
-  function retune() {
+  function airHash(key: string) {
+    return `#bookshelf/${AIR_ROUTE}/${encodeURIComponent(key)}`;
+  }
+
+  function goOnAirRoute(key: string) {
+    const next = airHash(key);
+    if (location.hash === next) return;
+    if (history.state?.wlAir) history.replaceState({ wlAir: true }, "", next);
+    else history.pushState({ wlAir: true }, "", next);
+  }
+
+  /** Leaves the broadcast without touching history (Back already moved it). */
+  function leaveAir() {
     playGen += 1;
     audio?.pause();
     window.clearTimeout(pollTimer);
     if (onAir) {
       const episodeId = onAir.episode?.id;
       if (episodeId) writeJson(POS_KEY + episodeId, onAir.index);
-      khz = onAir.khz;
+      khz = retuneTo ?? onAir.khz;
+      remember();
     }
+    retuneTo = undefined;
     onAir = null;
     host.repaint();
+  }
+
+  /** Retune, Esc and the mini dial: step back through history when we pushed the on-air address. */
+  function retune() {
+    if (history.state?.wlAir) {
+      history.back();
+      return;
+    }
+    if (location.hash.startsWith(`#bookshelf/${AIR_ROUTE}`)) history.replaceState(null, "", "#bookshelf");
+    leaveAir();
+  }
+
+  /** Arriving at #bookshelf/~air/<book> (reload, Back from a note): replay the saved broadcast, never cut a new one. */
+  async function restore(key: string) {
+    if (onAir?.book === key) return;
+    const s = dial.stations.find(item => item.key === key);
+    if (!s) return;
+    khz = s.khz;
+    remember();
+    if (!library && !libraryLoading) loadLibrary();
+    for (let i = 0; i < 20 && libraryLoading; i += 1) await new Promise(resolve => setTimeout(resolve, 150));
+    if (lastFor(s.book)) await tuneIn(s, false);
+    else {
+      history.replaceState(null, "", "#bookshelf");
+      host.repaint();
+    }
   }
 
   function holdThought() {
@@ -745,8 +833,17 @@ export function createWireless(host: WirelessHost) {
     audio?.pause();
     onAir.playing = false;
     const entry = onAir.order[segmentIndexes()[onAir.index] ?? 0];
+    const turn = turns()[onAir.index];
     if (onAir.episode) writeJson(POS_KEY + onAir.episode.id, onAir.index);
-    host.holdThought(b.label, entry?.page ? `p. ${entry.page}` : undefined);
+    const draft = holdThoughtDraft({
+      book: b.label,
+      page: entry?.page,
+      at: elapsedSeconds(),
+      segment: entry?.segment ?? "feature",
+      speaker: turn ? speaker(turn) : undefined,
+      line: turn?.text,
+    });
+    host.holdThought(b.label, entry?.page ? `p. ${entry.page}` : undefined, draft);
   }
 
   /** Player changes redraw the on-air panels only; a full repaint would replay the kinetic title. */
@@ -904,8 +1001,8 @@ export function createWireless(host: WirelessHost) {
       button.onclick = () => {
         const s = dial.stations.find(item => item.key === button.dataset.mini);
         if (!s) return;
+        retuneTo = s.khz;
         retune();
-        glide(s.khz);
       };
     });
     el.querySelectorAll<HTMLButtonElement>("[data-open-note]").forEach(button => {
@@ -1029,7 +1126,8 @@ export function createWireless(host: WirelessHost) {
       if (gen !== playGen || !onAir) return;
       audio ??= new Audio();
       const player = audio;
-      player.src = url;
+      player.src = await clipSource(url, turn.id, gen);
+      if (gen !== playGen || !onAir) return;
       player.onloadedmetadata = () => {
         if (Number.isFinite(player.duration)) durations.set(turn.id, player.duration);
       };
@@ -1047,6 +1145,49 @@ export function createWireless(host: WirelessHost) {
       onAir.loadingLine = false;
       refreshAir();
       host.toast(error instanceof Error ? `Couldn't play that line: ${error.message}` : "Couldn't play that line.");
+    }
+  }
+
+  /**
+   * Downloads the clip once, so the waveform can draw its real loudness and the
+   * player plays the same bytes. If storage refuses a cross-origin read, the
+   * player streams the URL and that line keeps its drawn bars.
+   */
+  async function clipSource(url: string, turnId: string, gen: number): Promise<string> {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return url;
+      const blob = await response.blob();
+      if (gen !== playGen) return url;
+      if (clipUrl) URL.revokeObjectURL(clipUrl);
+      clipUrl = URL.createObjectURL(blob);
+      if (!peaks.has(turnId)) void readPeaks(blob, turnId);
+      return clipUrl;
+    } catch {
+      return url;
+    }
+  }
+
+  async function readPeaks(blob: Blob, turnId: string) {
+    try {
+      const Ctx = window.OfflineAudioContext ?? (window as unknown as { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+      if (!Ctx) return;
+      const decoder = new Ctx(1, 1, 22050);
+      const buffer = await decoder.decodeAudioData(await blob.arrayBuffer());
+      const data = buffer.getChannelData(0);
+      const size = Math.max(1, Math.floor(data.length / PEAK_BARS));
+      const bars: number[] = [];
+      for (let i = 0; i < PEAK_BARS; i += 1) {
+        let sum = 0;
+        for (let j = i * size; j < Math.min(data.length, (i + 1) * size); j += 1) sum += data[j]! * data[j]!;
+        bars.push(Math.sqrt(sum / size));
+      }
+      const loudest = Math.max(...bars, 1e-6);
+      peaks.set(turnId, bars.map(v => v / loudest));
+      durations.set(turnId, buffer.duration);
+      if (root && onAir) drawWave();
+    } catch {
+      // Undecodable clip: keep the drawn bars for this line.
     }
   }
 
@@ -1096,7 +1237,14 @@ export function createWireless(host: WirelessHost) {
       const turn = list[i];
       if (!turn) continue;
       const seg = onAir.order[segs[i] ?? 0]?.segment ?? "feature";
-      const h = turn.kind === "cue" || turn.kind === "empty" ? 0.06 : 0.18 + ((hash(`${turn.id}:${x}`) % 1000) / 1000) * 0.7 * (turn.speaker === "ann" ? 0.8 : 1);
+      const real = peaks.get(turn.id);
+      const span = spans[i]!;
+      const within = span.to > span.from ? (f - span.from) / (span.to - span.from) : 0;
+      const h = turn.kind === "cue" || turn.kind === "empty"
+        ? 0.06
+        : real
+          ? 0.08 + real[Math.min(real.length - 1, Math.floor(within * real.length))]! * 0.88
+          : 0.18 + ((hash(`${turn.id}:${x}`) % 1000) / 1000) * 0.7 * (turn.speaker === "ann" ? 0.8 : 1);
       ctx.globalAlpha = onAir.skip.has(seg) ? 0.15 : f < playedTo ? 0.95 : 0.42;
       ctx.fillStyle = colour(seg);
       const bh = Math.max(2, h * height * 0.9);
@@ -1145,6 +1293,7 @@ export function createWireless(host: WirelessHost) {
     unmount,
     destroy: () => {
       destroy();
+      if (clipUrl) URL.revokeObjectURL(clipUrl);
       phone.removeEventListener("change", onMedia);
     },
     headerHtml,
@@ -1152,6 +1301,9 @@ export function createWireless(host: WirelessHost) {
     get onAir() {
       return onAir !== null;
     },
+    onAirBook: () => onAir?.book,
+    restore: (key: string) => void restore(key),
+    leaveAir,
     /** Escape on air goes back to the dial. */
     escape() {
       if (!onAir) return false;

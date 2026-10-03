@@ -1,4 +1,4 @@
-import { verifySession } from "../../netlify/functions/_lib/session";
+import { verifySessionToken } from "./session";
 import type { Page } from "../domain/page";
 
 export const KNOWLEDGE_HUB_ORIGIN = "https://knowledge-hub.adam-russell.com";
@@ -43,17 +43,18 @@ async function readId(request: Request) {
   }
 }
 
-function authorize(request: Request, bindings: TidyHttpBindings) {
+/** The umbrella's session cookie; kh_session is the pre-consolidation name. */
+const SESSION_COOKIES = ["life_hub_session", "kh_session"];
+
+async function authorize(request: Request, bindings: TidyHttpBindings) {
   const kernel = request.headers.get("x-research-kernel-secret") ?? "";
   if (bindings.kernelSecret && kernel && kernel === bindings.kernelSecret) return true;
-  const token = cookieValue(request.headers.get("Cookie"), "kh_session");
-  if (!bindings.sessionSecret || !token) return false;
-  try {
-    verifySession(token, bindings.sessionSecret);
-    return true;
-  } catch {
-    return false;
+  if (!bindings.sessionSecret) return false;
+  for (const name of SESSION_COOKIES) {
+    const token = cookieValue(request.headers.get("Cookie"), name);
+    if (token && (await verifySessionToken(token, bindings.sessionSecret))) return true;
   }
+  return false;
 }
 
 export async function handleTidyRequest(request: Request, bindings: TidyHttpBindings): Promise<Response> {
@@ -68,7 +69,7 @@ export async function handleTidyRequest(request: Request, bindings: TidyHttpBind
   if (request.method !== "POST") {
     return json(405, { error: "Method not allowed" }, headers);
   }
-  if (!authorize(request, bindings)) {
+  if (!(await authorize(request, bindings))) {
     return json(401, { error: "Unauthenticated" }, headers);
   }
   const id = await readId(request);

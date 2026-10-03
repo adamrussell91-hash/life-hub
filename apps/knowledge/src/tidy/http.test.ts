@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { signSession } from "../../netlify/functions/_lib/session";
+// The umbrella signer, so the Worker check is tested against the real token format.
+import { createSessionToken } from "../../../../netlify/functions/_shared/auth-security.mjs";
 import { handleTidyRequest, KNOWLEDGE_HUB_ORIGIN } from "./http";
 import type { Page } from "../domain/page";
 
-const secret = "session-secret";
+const secret = "session-secret-at-least-thirty-two-bytes-long";
 const hub = KNOWLEDGE_HUB_ORIGIN;
 const page = { id: "page_hub_p", title: "Tidied" } as Page;
 
@@ -49,12 +50,12 @@ describe("handleTidyRequest", () => {
   });
 
   it("tidies the posted id after a valid session and returns the page", async () => {
-    const token = signSession({ sub: "single-user" }, secret);
+    const token = createSessionToken({}, secret).token;
     const tidyPage = vi.fn(async (id: string) => {
       expect(id).toBe("page_hub_p");
       return page;
     });
-    const response = await handleTidyRequest(request({ cookie: `kh_session=${token}` }), bindings(tidyPage));
+    const response = await handleTidyRequest(request({ cookie: `life_hub_session=${token}` }), bindings(tidyPage));
     expect(response.status).toBe(200);
     expect(response.headers.get("Access-Control-Allow-Credentials")).toBe("true");
     await expect(response.json()).resolves.toMatchObject({ id: "page_hub_p" });
@@ -72,5 +73,16 @@ describe("handleTidyRequest", () => {
     expect(waitUntil).toHaveBeenCalledOnce();
     await waitUntil.mock.calls[0]?.[0];
     expect(tidyPage).toHaveBeenCalledWith("page_hub_p");
+  });
+});
+
+describe("Worker session check", () => {
+  it("rejects a token signed with another secret, and an expired one", async () => {
+    const { verifySessionToken } = await import("./session");
+    const other = createSessionToken({}, "a-different-secret-that-is-32-bytes-long!").token;
+    expect(await verifySessionToken(other, secret)).toBe(false);
+    const old = createSessionToken({ now: Date.now() - 31 * 24 * 60 * 60 * 1000 }, secret).token;
+    expect(await verifySessionToken(old, secret)).toBe(false);
+    expect(await verifySessionToken(createSessionToken({}, secret).token, secret)).toBe(true);
   });
 });

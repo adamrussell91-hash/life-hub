@@ -12,7 +12,7 @@ import { formatDisplayDate } from "../../design-kit/js/format-display-date.js";
 import { escapeHtml } from "../lib/dom";
 import { hubUtilitiesActionsHtml, titleRowHtml } from "../lib/hubChrome";
 import type { ResearchScope } from "../research/scope";
-import { playerHtml, bindPlayer, resetPlayer } from "./playerView";
+import { bindPlayer, episodeName, playerHtml, resetPlayer } from "./playerView";
 import {
   PodcastDialsSchema,
   type PodcastDials,
@@ -322,7 +322,7 @@ function currentHtml() {
   if ((current.status === "ready" || current.status === "cancelled") && current.turns.length) {
     return playerHtml(current);
   }
-  const title = current.showTitle ?? labelize(current.mode);
+  const title = current.showTitle ?? (current.mode === "broadcast" ? episodeName(current) : labelize(current.mode));
   const failure = current.status === "error" ? episodeFailure(current) : "";
   return `<article class="coach-msg glass-panel">
     <p class="coach-msg__who">${escapeHtml(title)}</p>
@@ -355,7 +355,7 @@ function libraryHtml() {
     .filter(episode => !episode.seriesId)
     .map(
       episode => `<article class="podcast-card glass-panel">
-        <button type="button" data-open-episode="${escapeHtml(episode.id)}">${escapeHtml(episode.mode)} · ${escapeHtml(formatDate(episode.created_at))}</button>
+        <button type="button" data-open-episode="${escapeHtml(episode.id)}">${escapeHtml(episode.mode === "broadcast" ? episodeName(episode) : episode.mode)} · ${escapeHtml(formatDate(episode.created_at))}</button>
       </article>`,
     )
     .join("");

@@ -7,7 +7,7 @@ import { bookFactsPrompt, parseBookFacts } from "./facts";
 import { notesToRead, readNotesForShelf } from "./backfill";
 import { buildAtlas } from "./atlasLayout";
 import { mountAtlas } from "./atlasView";
-import { createWireless } from "./wireless";
+import { AIR_ROUTE, createWireless } from "./wireless";
 import type { FactsJob, ShelfData, ShelfStance } from "./schema";
 
 export type BookshelfContext = {
@@ -16,7 +16,7 @@ export type BookshelfContext = {
   /** Page header HTML (kit chrome) for the shelf view. Title is HTML. */
   header: (supporting: string, opts?: { eyebrow?: string; title?: string; actions?: string }) => string;
   /** Starts a From-a-book note in Chat at this book and page (the Wireless's Hold this thought). */
-  holdThought: (bookLabel: string, locus?: string) => void;
+  holdThought: (bookLabel: string, locus?: string, draft?: string) => void;
   openPage: (id: string) => void;
   /** Fetches a note's body, for reading pages, stances and gaps out of old notes. */
   getPage: (id: string) => Promise<{ id: string; body: string }>;
@@ -86,9 +86,11 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   let factsTimer = 0;
   /** True once this visit started or watched a running batch, so finishing gets a toast. */
   let watchingFacts = false;
-  let active: string | undefined = ctx.initialBook;
-  let focusNote: string | undefined = ctx.initialNote;
-  let openNote: string | undefined = ctx.initialNote;
+  /** #bookshelf/~air/<book>: the Wireless, on air with that book. */
+  let pendingAir: string | undefined = ctx.initialBook === AIR_ROUTE ? ctx.initialNote : undefined;
+  let active: string | undefined = pendingAir ? undefined : ctx.initialBook;
+  let focusNote: string | undefined = pendingAir ? undefined : ctx.initialNote;
+  let openNote: string | undefined = pendingAir ? undefined : ctx.initialNote;
   let alive = true;
   /** True when the next paint should bring the focused note into view (navigation), false for in-place edits. */
   let jumpToFocus = true;
@@ -97,7 +99,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   let mode = readMode();
   let atlasTeardown: (() => void) | null = null;
   /** The shelf as a bookcase, or as the Wireless dial. Remembered per viewer. */
-  let room: Room = readRoom();
+  let room: Room = pendingAir ? "wireless" : readRoom();
   const wireless = createWireless({
     header: ctx.header,
     openPage: ctx.openPage,
@@ -124,6 +126,10 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     if (!alive) return;
     rebuild();
     paint();
+    if (pendingAir) {
+      wireless.restore(pendingAir);
+      pendingAir = undefined;
+    }
     if (data.factsJob?.status === "running") watchFacts();
   }
 
@@ -300,6 +306,19 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   const onPop = () => {
     const route = parseBookshelfHash(location.hash);
     if (!route) return;
+    if (route.book === AIR_ROUTE) {
+      // Forward onto a broadcast, or Back from a note opened on air.
+      room = "wireless";
+      active = undefined;
+      if (route.note && wireless.onAirBook() !== route.note) wireless.restore(route.note);
+      else paint();
+      return;
+    }
+    if (wireless.onAir) {
+      // Back from on air lands on the dial.
+      wireless.leaveAir();
+      return;
+    }
     active = route.book;
     focusNote = route.note;
     openNote = route.note;
