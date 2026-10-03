@@ -123,7 +123,6 @@ export async function retrievePodcastNotes(
     const allowed = new Set(pageIds);
     manifest = filterCorpus(manifest, allowed, item => item.id);
     index = filterCorpus(index, allowed, item => item.pageId);
-    if (!manifest.length) return [];
   }
 
   if (scope?.area || scope?.tags?.length) {
@@ -132,16 +131,18 @@ export async function retrievePodcastNotes(
     index = index.filter(entry => allowed.has(entry.pageId));
   }
 
-  const queryVector = env.EMBEDDINGS_API_KEY ? await embedQuery(query, env.EMBEDDINGS_API_KEY) : null;
-  const hits = hybridRetrieve({
-    query,
-    manifest,
-    index,
-    queryVector,
-    k: Math.max(1, limit),
-  });
+  const queryVector = manifest.length && env.EMBEDDINGS_API_KEY ? await embedQuery(query, env.EMBEDDINGS_API_KEY) : null;
+  const hits = manifest.length
+    ? hybridRetrieve({
+        query,
+        manifest,
+        index,
+        queryVector,
+        k: Math.max(1, limit),
+      })
+    : [];
 
-  return Promise.all(
+  const ranked = await Promise.all(
     hits.map(async hit => {
       const page = await loadPage(env, hit.pageId);
       return {
@@ -152,6 +153,25 @@ export async function retrievePodcastNotes(
       };
     }),
   );
+  if (!pageIds?.length) return ranked;
+
+  // Asked-for notes are the sources, not a filter: any the catalogue hasn't
+  // caught yet (or the search ranked out) are read straight from the archive.
+  const found = new Set(ranked.map(note => note.pageId));
+  const rest = pageIds.filter(id => !found.has(id)).slice(0, Math.max(0, limit - ranked.length));
+  const direct = await Promise.all(
+    rest.map(async (pageId): Promise<PodcastNote | null> => {
+      const page = await loadPage(env, pageId);
+      if (!page) return null;
+      return {
+        pageId,
+        title: page.title,
+        excerpt: excerptFromBody(page.body),
+        ...(typeof page.updated_at === "string" ? { updated_at: page.updated_at } : {}),
+      };
+    }),
+  );
+  return [...ranked, ...direct.filter((note): note is PodcastNote => note !== null)];
 }
 
 export async function completePrompt(env: PodcastKernelEnv, prompt: string): Promise<string> {

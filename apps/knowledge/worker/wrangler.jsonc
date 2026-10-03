@@ -45,6 +45,10 @@
       {
         "name": "CHAT_WRITE",
         "class_name": "ChatWrite"
+      },
+      {
+        "name": "CATALOGUE_SYNC",
+        "class_name": "CatalogueSync"
       }
     ]
   },
@@ -60,6 +64,14 @@
     {
       "tag": "v3",
       "new_sqlite_classes": ["ChatWrite"]
+    },
+    {
+      "tag": "v4",
+      "new_sqlite_classes": ["CatalogueSync"]
     }
-  ]
+  ],
+  // Hourly catalogue sync; the cron only pokes the CatalogueSync object.
+  "triggers": {
+    "crons": ["23 * * * *"]
+  }
 }
