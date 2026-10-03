@@ -37,6 +37,8 @@ export type BookModel = {
   cover?: string;
   pages: number;
   pagesKnown: boolean;
+  /** Claude's estimate rather than facts Adam checked. */
+  estimated?: { confidence: "high" | "medium" | "low" };
   chapters: ChapterModel[];
   /** Notes with a page, in page order. */
   placed: BookNote[];
@@ -220,6 +222,7 @@ function modelBook(
     cover: cover ? coverSrc(cover.file) : undefined,
     pages,
     pagesKnown,
+    estimated: facts?.estimated ? { confidence: facts.estimated.confidence } : undefined,
     chapters,
     placed,
     loose,

@@ -5,7 +5,7 @@ Three views of the same books, built in this order. Mockups: Fore-edge (shelf + 
 ## Decisions (Adam, 03/10/26)
 
 - Old notes have no page. Adam places them by rough guess (the **Place loose pages** sheet). **Read my notes** fills any page the note text already names, marked as a guess.
-- Book facts (pages, chapters, edition) come from ChatGPT. **Book facts → Copy ChatGPT prompt**, paste the JSON answer back. Edition matters: page numbers follow Adam's copy. The prompt text lives in `src/shelf/facts.ts` `bookFactsPrompt()`.
+- Book facts (pages, chapters, edition): ~200 books is too many to paste one by one. **Fill book facts** sends every book without a page count to Claude (Opus 5.5, one Message Batch, background, half price) and fills only blank fields, marked "estimated". Books Claude doesn't recognise are listed; those go through **Book facts → Copy ChatGPT prompt** by hand (prompt in `src/shelf/facts.ts`). Pasting real facts replaces an estimate.
 - Book covers: Adam supplies a folder; Cursor adds them (job 0 below).
 - Reading now: The Knowledge Gene, The Origins of Political Order, The Enigma of Reason (just started). Set in Book facts.
 - Radio bands = existing Notebooks (set per book in Book facts).

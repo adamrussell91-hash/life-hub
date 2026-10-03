@@ -1,11 +1,11 @@
 import "./bookshelf.css";
 import type { PageManifestEntry } from "../domain/page";
-import { getShelf, saveBookFacts, savePlacements } from "./client";
+import { checkBookFacts, getShelf, saveBookFacts, savePlacements, startBookFacts } from "./client";
 import { CARD_HEIGHT, layoutDescent, orderedLinks, packShelf } from "./layout";
 import { buildShelf, findBook, matchShelf, type BookModel, type BookNote } from "./model";
 import { bookFactsPrompt, parseBookFacts } from "./facts";
 import { notesToRead, readNotesForShelf } from "./backfill";
-import type { ShelfData, ShelfStance } from "./schema";
+import type { FactsJob, ShelfData, ShelfStance } from "./schema";
 
 export type BookshelfContext = {
   entries: PageManifestEntry[];
@@ -56,6 +56,9 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   let loadError = "";
   let query = "";
   let reading: { done: number; total: number } | null = null;
+  let factsTimer = 0;
+  /** True once this visit started or watched a running batch, so finishing gets a toast. */
+  let watchingFacts = false;
   let active: string | undefined = ctx.initialBook;
   let focusNote: string | undefined = ctx.initialNote;
   let openNote: string | undefined = ctx.initialNote;
@@ -81,6 +84,112 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     if (!alive) return;
     rebuild();
     paint();
+    if (data.factsJob?.status === "running") watchFacts();
+  }
+
+  // ── Book facts batch ────────────────────────────────────────────────
+
+  function booksWithoutFacts() {
+    return books.filter(book => !book.pagesKnown);
+  }
+
+  function watchFacts() {
+    watchingFacts = true;
+    window.clearTimeout(factsTimer);
+    const tick = async () => {
+      if (!alive) return;
+      try {
+        const job = await checkBookFacts();
+        data = { ...data, factsJob: job };
+        if (job.status === "done") {
+          data = await getShelf();
+          rebuild();
+          paint();
+          if (watchingFacts) toast(factsSummary(job), 12000);
+          watchingFacts = false;
+          return;
+        }
+        paint();
+      } catch (error) {
+        console.warn("Bookshelf: could not check book facts yet.", error);
+      }
+      factsTimer = window.setTimeout(() => void tick(), 60_000);
+    };
+    void tick();
+  }
+
+  function factsSummary(job: FactsJob) {
+    const misses = (job.unknown?.length ?? 0) + (job.failed?.length ?? 0);
+    return `Book facts filled for ${job.filled ?? 0} ${job.filled === 1 ? "book" : "books"}.${misses ? ` ${misses} still need yours: open them and paste facts from ChatGPT.` : ""}`;
+  }
+
+  function factsDismissKey(job: FactsJob) {
+    return `knowledge-hub:shelf-facts-dismissed:${job.finished_at ?? ""}`;
+  }
+
+  function factsCardHtml() {
+    const job = data.factsJob;
+    if (job?.status === "running") {
+      const done = job.finished ?? 0;
+      return `<div class="shelf-card" role="status">
+        <p class="shelf-eyebrow">Book facts</p>
+        <h3>Claude is working out ${job.total ?? "your"} ${job.total === 1 ? "book" : "books"}</h3>
+        <p>${done ? `${done} done so far. ` : ""}It runs in the background and usually finishes within the hour. You can leave this page; the facts appear when it's done.</p>
+      </div>`;
+    }
+    if (job?.status !== "done") return "";
+    try {
+      if (localStorage.getItem(factsDismissKey(job))) return "";
+    } catch {
+      // Storage blocked: show the card; dismiss just won't stick.
+    }
+    const misses = [...(job.unknown ?? []), ...(job.failed ?? [])];
+    const low = job.lowConfidence ?? [];
+    const open = (label: string) => {
+      const book = books.find(b => b.label.toLowerCase() === label.toLowerCase());
+      return book ? `<li><button type="button" data-open-book="${esc(book.key)}">${esc(label)}</button></li>` : `<li>${esc(label)}</li>`;
+    };
+    return `<div class="shelf-card">
+      <p class="shelf-eyebrow">Book facts</p>
+      <h3>Filled for ${job.filled ?? 0} ${job.filled === 1 ? "book" : "books"}</h3>
+      <p>These are Claude's estimates for a common edition. Check any you read closely against your copy; pasting real facts replaces the estimate.</p>
+      ${misses.length ? `<p><b>${misses.length} Claude didn't recognise.</b> Open each and paste facts from ChatGPT:</p><ul>${misses.slice(0, 12).map(open).join("")}</ul>` : ""}
+      ${low.length ? `<p><b>${low.length} low-confidence:</b> page count only, no chapters.</p>` : ""}
+      <button class="btn btn--ghost" type="button" data-facts-dismiss>Dismiss</button>
+    </div>`;
+  }
+
+  function openFactsBatchSheet() {
+    const targets = booksWithoutFacts();
+    const { sheet, close } = openSheet(`
+      <p class="shelf-eyebrow">Book facts</p>
+      <h2>Fill facts for ${targets.length} ${targets.length === 1 ? "book" : "books"}</h2>
+      <p class="place-readout" style="display:block;line-height:1.5">Claude works out the page count and the chapter start pages for every book that doesn't have them yet, for the edition most readers in Australia own. It runs in the background, usually within the hour, and costs roughly $${Math.max(1, Math.ceil(targets.length * 0.04))}.</p>
+      <p class="place-readout" style="display:block;line-height:1.5;margin-top:var(--space-3)">It only fills blanks. Anything you've set stays. Books Claude doesn't recognise are listed afterwards so you can paste those from ChatGPT.</p>
+      <p class="shelf-sheet__error" data-error role="alert" hidden></p>
+      <div class="shelf-sheet__row shelf-sheet__row--end">
+        <button class="btn btn--ghost" type="button" data-cancel>Cancel</button>
+        <button class="btn btn--primary" type="button" data-start>Start</button>
+      </div>`, "Fill book facts");
+    sheet.querySelector<HTMLButtonElement>("[data-cancel]")!.onclick = close;
+    sheet.querySelector<HTMLButtonElement>("[data-start]")!.onclick = async event => {
+      const button = event.currentTarget as HTMLButtonElement;
+      button.disabled = true;
+      try {
+        const job = await startBookFacts(targets.map(book => book.label));
+        data = { ...data, factsJob: job };
+        close();
+        paint();
+        toast("Started. Claude is working out your book facts in the background.");
+        factsTimer = window.setTimeout(() => watchFacts(), 60_000);
+        watchingFacts = true;
+      } catch (error) {
+        const el = sheet.querySelector<HTMLElement>("[data-error]")!;
+        el.textContent = error instanceof Error ? error.message : "Could not start book facts.";
+        el.hidden = false;
+        button.disabled = false;
+      }
+    };
   }
 
   function setRoute(key?: string, noteId?: string, push = false) {
@@ -152,10 +261,11 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
           <input class="hub-search__input" id="shelf-search" type="search" placeholder="Find an idea across books" value="${esc(query)}" aria-label="Find an idea across books" />
         </label>
         ${readButtonHtml()}
+        ${factsButtonHtml()}
       </div>
       ${loadError ? `<p class="shelf-sheet__error" role="alert">${esc(loadError)} Notes still show; pages and book facts are missing until it loads.</p>` : ""}
       ${books.length ? "" : loaded ? emptyHtml() : ""}
-      <div class="shelf-room${searching ? " is-searching" : ""}${searching || readingBooks().length ? "" : " is-quiet"}">
+      <div class="shelf-room${searching ? " is-searching" : ""}${searching || readingBooks().length || factsCardHtml() ? "" : " is-quiet"}">
         <div class="shelf-stage" data-stage></div>
         ${sideHtml(hits)}
       </div>
@@ -172,11 +282,26 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       };
     }
     host.querySelector<HTMLButtonElement>("[data-read-notes]")?.addEventListener("click", () => void readNotes());
+    host.querySelector<HTMLButtonElement>("[data-fill-facts]")?.addEventListener("click", openFactsBatchSheet);
+    host.querySelector<HTMLButtonElement>("[data-facts-dismiss]")?.addEventListener("click", () => {
+      try {
+        if (data.factsJob) localStorage.setItem(factsDismissKey(data.factsJob), "1");
+      } catch {
+        // Not stored; the card returns next visit.
+      }
+      paintShelf();
+    });
     host.querySelectorAll<HTMLButtonElement>("[data-open-book]").forEach(button => {
       button.onclick = () => go(button.dataset.openBook, button.dataset.note || undefined);
     });
     const stage = host.querySelector<HTMLElement>("[data-stage]");
     if (stage && books.length) drawShelf(stage, hits);
+  }
+
+  function factsButtonHtml() {
+    if (!loaded || loadError || data.factsJob?.status === "running") return "";
+    const count = booksWithoutFacts().length;
+    return count ? `<button class="btn btn--secondary" type="button" data-fill-facts>Fill book facts (${count})</button>` : "";
   }
 
   function readButtonHtml() {
@@ -236,6 +361,12 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   }
 
   function sideHtml(hits: Set<string>) {
+    const facts = factsCardHtml();
+    const main = mainSideCard(hits);
+    return facts || main ? `<aside class="shelf-side">${facts}${main}</aside>` : "";
+  }
+
+  function mainSideCard(hits: Set<string>) {
     if (query.trim()) {
       const counts = books
         .map(book => ({ book, count: [...book.placed, ...book.loose].filter(note => hits.has(note.id)).length }))
@@ -243,24 +374,24 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         .sort((a, b) => b.count - a.count);
       const total = counts.reduce((sum, item) => sum + item.count, 0);
       if (!counts.length) {
-        return `<aside class="shelf-side"><div class="shelf-card"><p class="shelf-eyebrow">Thread</p><h3>Nothing on the shelf mentions “${esc(query.trim())}”</h3><p>Search reads note titles, tags and excerpts.</p></div></aside>`;
+        return `<div class="shelf-card"><p class="shelf-eyebrow">Thread</p><h3>Nothing on the shelf mentions “${esc(query.trim())}”</h3><p>Search reads note titles, tags and excerpts.</p></div>`;
       }
       const top = counts[0]!.book;
       const firstHit = [...top.placed, ...top.loose].find(note => hits.has(note.id));
-      return `<aside class="shelf-side"><div class="shelf-card">
+      return `<div class="shelf-card">
         <p class="shelf-eyebrow">Thread</p>
         <h3>“${esc(query.trim())}” runs through ${counts.length} ${counts.length === 1 ? "book" : "books"}</h3>
         <p>${total} ${total === 1 ? "note" : "notes"}. Strongest in ${esc(top.label)}.</p>
         <ul>${counts.slice(0, 8).map(item => `<li><button type="button" data-open-book="${esc(item.book.key)}" data-note="${esc([...item.book.placed, ...item.book.loose].find(note => hits.has(note.id))?.id ?? "")}">${esc(item.book.label)}</button><span>${item.count}</span></li>`).join("")}</ul>
         <button class="btn btn--primary" type="button" data-open-book="${esc(top.key)}" data-note="${esc(firstHit?.id ?? "")}" style="width:100%">Open ${esc(top.label)}</button>
-      </div></aside>`;
+      </div>`;
     }
     const reading = readingBooks();
     if (!reading.length) return "";
-    return `<aside class="shelf-side"><div class="shelf-card">
+    return `<div class="shelf-card">
       <p class="shelf-eyebrow">Reading now</p>
       <ul>${reading.map(book => `<li><button type="button" class="shelf-reading" data-open-book="${esc(book.key)}">${coverImg(book, "shelf-reading__cover")}${esc(book.label)}</button><span>${book.reading?.page ? `p.${book.reading.page}` : "just started"}</span></li>`).join("")}</ul>
-    </div></aside>`;
+    </div>`;
   }
 
   function drawShelf(stage: HTMLElement, hits: Set<string>) {
@@ -393,7 +524,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
 
   function descentMeta(book: BookModel) {
     const parts = [`${book.noteCount} ${book.noteCount === 1 ? "note" : "notes"}`];
-    parts.push(book.pagesKnown ? `${book.pages} pages` : "page count not set");
+    parts.push(book.pagesKnown ? `${book.pages} pages${book.estimated ? " (estimated)" : ""}` : "page count not set");
     if (book.densestChapter?.noteCount) parts.push(`densest in ${book.densestChapter.label ? `chapter ${book.densestChapter.label}` : book.densestChapter.title}`);
     if (book.lastNotePage && book.pagesKnown && book.lastNotePage < book.pages * 0.85) parts.push(`nothing written after p.${book.lastNotePage}`);
     return parts.join(" · ");
@@ -701,6 +832,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         <dt>Author</dt><dd>${esc(book.author ?? "Not set")}</dd>
         <dt>Edition</dt><dd>${esc(book.edition ?? "Not set")}</dd>
         <dt>Pages</dt><dd>${book.pagesKnown ? book.pages : "Not set (the column assumes 300)"}</dd>
+        ${book.estimated ? `<dt>Source</dt><dd>Estimated by Claude (${book.estimated.confidence} confidence). Check against your copy; pasting facts replaces the estimate.</dd>` : ""}
         <dt>Chapters</dt><dd>${chapters}</dd>
       </dl>
       <div class="shelf-sheet__grid">
@@ -882,6 +1014,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
 
   return () => {
     alive = false;
+    window.clearTimeout(factsTimer);
     document.body.classList.remove("is-bookshelf-immersive");
     for (const cleanup of cleanups.splice(0)) cleanup();
   };
