@@ -5,6 +5,7 @@ export type HubView =
   | "graph"
   | "timeline"
   | "notebooks"
+  | "bookshelf"
   | "page"
   | "compose"
   | "chat"
