@@ -184,12 +184,13 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     if (reading) return `<button class="btn btn--secondary" type="button" disabled>Reading notes ${reading.done} of ${reading.total}…</button>`;
     const count = notesToRead(books).length;
     return count
-      ? `<button class="btn btn--secondary" type="button" data-read-notes title="Fill in pages, stances and gaps from what your notes already say">Read my notes (${count})</button>`
+      ? `<button class="btn btn--secondary" type="button" data-read-notes title="Fills in any page, stance and open questions your notes already state. It never changes what you've set.">Read my notes</button>`
       : "";
   }
 
   async function readNotes() {
-    reading = { done: 0, total: notesToRead(books).length };
+    const total = notesToRead(books).length;
+    reading = { done: 0, total };
     paintShelf();
     const button = () => host.querySelector<HTMLButtonElement>(".shelf-tools .btn");
     const { patches, failed } = await readNotesForShelf(books, ctx.getPage, (done, total) => {
@@ -206,9 +207,11 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       const pages = patches.filter(p => p.page).length;
       const stances = patches.filter(p => p.stance).length;
       const gaps = patches.filter(p => p.gaps).length;
-      toast(patches.length
-        ? `Filled ${pages} ${pages === 1 ? "page" : "pages"}, ${stances} ${stances === 1 ? "stance" : "stances"} and ${gaps} gap ${gaps === 1 ? "list" : "lists"}.${failed ? ` ${failed} notes couldn't be read.` : ""}`
-        : `Nothing new in your notes to fill in.${failed ? ` ${failed} couldn't be read.` : ""}`);
+      rebuild();
+      const stillLoose = books.reduce((sum, book) => sum + book.loose.length, 0);
+      const found = `Read ${total} ${total === 1 ? "note" : "notes"}: found ${pages} ${pages === 1 ? "page" : "pages"}, ${stances} ${stances === 1 ? "stance" : "stances"}, ${gaps} sets of open questions.`;
+      const left = stillLoose ? ` ${stillLoose} ${stillLoose === 1 ? "note doesn't" : "notes don't"} name a page, so place ${stillLoose === 1 ? "it" : "them"} by hand.` : "";
+      toast(`${found}${left}${failed ? ` ${failed} couldn't be opened.` : ""}`, 9000);
     } catch (error) {
       toast(error instanceof Error ? error.message : "Could not save what was read.");
     }
@@ -619,16 +622,16 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
 
   // ── Saving ──────────────────────────────────────────────────────────
 
-  function toast(message: string) {
+  function toast(message: string, ms = 2600) {
     const existing = document.querySelector(".shelf-toast");
     existing?.remove();
     const el = document.createElement("div");
     el.className = "toast shelf-toast";
     el.setAttribute("role", "status");
     el.textContent = message;
-    el.style.cssText = "position:fixed;left:50%;bottom:2rem;transform:translateX(-50%);z-index:60;padding:.6rem 1rem;border-radius:999px;background:var(--navy);color:#fff;font-size:var(--text-sm);box-shadow:var(--elev-4)";
+    el.style.cssText = "position:fixed;left:50%;bottom:2rem;transform:translateX(-50%);z-index:60;max-width:min(36rem,calc(100vw - 2rem));padding:.6rem 1rem;border-radius:var(--radius-sm);background:var(--navy);color:#fff;font-size:var(--text-sm);box-shadow:var(--elev-4)";
     document.body.appendChild(el);
-    window.setTimeout(() => el.remove(), 2600);
+    window.setTimeout(() => el.remove(), ms);
   }
 
   async function place(list: Parameters<typeof savePlacements>[0], done: string) {

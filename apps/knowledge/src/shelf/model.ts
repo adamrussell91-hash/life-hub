@@ -64,13 +64,40 @@ export function parseLocusPage(locus?: string): number | undefined {
   return Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
-function section(body: string, heading: RegExp): string {
+const SECTION_NAMES = /^(in the book|what it means|how this bears|sources|gaps|archive citations|title)\b/i;
+
+/** A heading in any form the notes use: "## In the book", "**In the book**", "2. In the book:", "IN THE BOOK". */
+function headingName(line: string): string | null {
+  const text = line
+    .trim()
+    .replace(/^#{1,6}\s*/, "")
+    .replace(/^\*\*|\*\*:?$|^__|__:?$/g, "")
+    .replace(/^\d+[.)]\s*/, "")
+    .replace(/\*\*/g, "")
+    .trim();
+  const isMarked = /^\s*(#{1,6}\s|\*\*|__|\d+[.)]\s)/.test(line);
+  const match = text.match(SECTION_NAMES);
+  if (match && (isMarked || text.length <= match[0].length + 30)) return match[1]!.toLowerCase();
+  return /^\s*#{1,6}\s/.test(line) ? text.toLowerCase() : null;
+}
+
+/** The text under a named section, up to the next heading of any kind. "" when the note has no such section. */
+export function sectionText(body: string, name: RegExp): string {
   const lines = body.split(/\r?\n/);
-  const start = lines.findIndex(line => /^#{1,4}\s/.test(line) && heading.test(line));
+  const start = lines.findIndex(line => {
+    const heading = headingName(line);
+    return heading !== null && name.test(heading);
+  });
   if (start < 0) return "";
+  // An inline heading ("**In the book** — Kelly's move…") keeps the rest of its line.
+  const first = lines[start]!.replace(/^.*?(in the book|how this bears on the book|how this bears|gaps)\**:?\**\s*[—–:-]?\s*/i, "");
   const rest = lines.slice(start + 1);
-  const end = rest.findIndex(line => /^#{1,4}\s/.test(line));
-  return (end < 0 ? rest : rest.slice(0, end)).join("\n").trim();
+  const end = rest.findIndex(line => headingName(line) !== null);
+  return [first, ...(end < 0 ? rest : rest.slice(0, end))].join("\n").trim();
+}
+
+function section(body: string, heading: RegExp): string {
+  return sectionText(body, heading);
 }
 
 /** Reads the stance from a book note's "How this bears on the book" section. */
@@ -85,7 +112,7 @@ export function stanceFromBody(body: string): ShelfStance | undefined {
 
 /** Reads the open questions from a book note's "Gaps" section, one per bullet or line. */
 export function gapsFromBody(body: string): string[] {
-  return section(body, /^#{1,4}\s*gaps\b/i)
+  return section(body, /^gaps\b/)
     .split(/\r?\n/)
     .map(line => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim())
     .filter(Boolean)

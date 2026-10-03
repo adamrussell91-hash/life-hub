@@ -32,3 +32,25 @@ describe("backfill from note bodies", () => {
     expect(progress.at(-1)).toBe(2);
   });
 });
+
+describe("page formats Clementine and Clean up produce", () => {
+  const cases: Array<[string, number | undefined]> = [
+    ["**In the book**\nOn p42 Kelly argues…\n\n**What it means**\nSee p. 9 of Smith.", 42],
+    ["## 2. In the book\nAround pg 118, the move is…", 118],
+    ["In the book: pp 140–142 set up the claim.\n\nWhat it means\n…", 140],
+    ["**In the book** — page 7 opens with pilots.", 7],
+    ["# Songlines\n\nKelly (p. 64) treats songlines as maps.\n\n## Sources\n- [Atlas, p. 3](https://x.org/p/3)", 64],
+    ["# Title\n\n## What it means\nSmith 2020, p. 9.\n\n## Sources\n- p. 12", undefined],
+    ["## In the book\nChapter 3, no page given.", undefined],
+  ];
+  it.each(cases)("%#", (body, page) => {
+    expect(pageFromBody(body)).toBe(page);
+  });
+
+  it("reads stance and gaps under bold headings too", async () => {
+    const { stanceFromBody, gapsFromBody } = await import("./model");
+    const bold = "**How this bears on the book**\nThe research complicates Brown here.\n\n**Gaps**\n- Novices?\n- Long term?\n";
+    expect(stanceFromBody(bold)).toBe("complicates");
+    expect(gapsFromBody(bold)).toEqual(["Novices?", "Long term?"]);
+  });
+});
