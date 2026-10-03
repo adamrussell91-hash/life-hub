@@ -5,6 +5,8 @@ import { CARD_HEIGHT, layoutDescent, orderedLinks, packShelf } from "./layout";
 import { buildShelf, findBook, matchShelf, type BookModel, type BookNote } from "./model";
 import { bookFactsPrompt, parseBookFacts } from "./facts";
 import { notesToRead, readNotesForShelf } from "./backfill";
+import { buildAtlas } from "./atlasLayout";
+import { mountAtlas } from "./atlasView";
 import type { FactsJob, ShelfData, ShelfStance } from "./schema";
 
 export type BookshelfContext = {
@@ -24,6 +26,15 @@ export type BookshelfContext = {
 
 const STANCE_WORD: Record<ShelfStance, string> = { supports: "supports", complicates: "complicates", extends: "extends" };
 const PHONE = "(max-width: 720px)";
+const MODE_KEY = "knowledge-hub:shelf-mode";
+
+function readMode(): "map" | "page" {
+  try {
+    return localStorage.getItem(MODE_KEY) === "page" ? "page" : "map";
+  } catch {
+    return "map";
+  }
+}
 
 function esc(value: unknown) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
@@ -68,6 +79,9 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   /** True when the next paint should bring the focused note into view (navigation), false for in-place edits. */
   let jumpToFocus = true;
   let paintedBook: string | undefined;
+  /** Inside a book: the Atlas map or the page-by-page descent. Remembered per viewer. */
+  let mode = readMode();
+  let atlasTeardown: (() => void) | null = null;
   const cleanups: Array<() => void> = [];
   const phone = window.matchMedia(PHONE);
 
@@ -280,6 +294,8 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     if (!alive) return;
     const book = active ? findBook(books, active) : undefined;
     const previousScroll = host.querySelector<HTMLElement>(".descent")?.scrollTop;
+    atlasTeardown?.();
+    atlasTeardown = null;
     paintShelf();
     document.body.classList.toggle("is-bookshelf-immersive", Boolean(book));
     if (book) {
@@ -560,12 +576,31 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     shell.setAttribute("aria-modal", "true");
     shell.setAttribute("aria-label", book.label);
     shell.style.setProperty("--c", book.swatch.fill);
-    shell.innerHTML = `${descentBarHtml(book)}<div class="descent__body" data-body></div>`;
+    const onMap = mode === "map" && book.noteCount > 0;
+    shell.classList.toggle("is-map", onMap);
+    shell.innerHTML = `${descentBarHtml(book, onMap)}${onMap ? `<div class="descent__map" data-map></div>` : `<div class="descent__body" data-body></div>`}`;
     host.appendChild(shell);
+    bindDescentBar(shell, book);
+    if (onMap) {
+      const bar = shell.querySelector<HTMLElement>(".descent__bar")!;
+      shell.style.setProperty("--descent-bar", `${bar.offsetHeight}px`);
+      atlasTeardown = mountAtlas(shell.querySelector<HTMLElement>("[data-map]")!, book, buildAtlas(book), {
+        openNote: id => {
+          void savePlacements([{ pageId: id, lastOpened: new Date().toISOString() }]).catch(() => undefined);
+          document.body.classList.remove("is-bookshelf-immersive");
+          ctx.openPage(id);
+        },
+        showByPage: id => setMode("page", id),
+        goBook: (key, noteId) => go(key, noteId),
+        swatchFor: key => findBook(books, key)?.swatch,
+        focusNote,
+      });
+      if (focusBack) shell.querySelector<HTMLElement>("[data-back]")?.focus({ preventScroll: true });
+      return;
+    }
     const body = shell.querySelector<HTMLElement>("[data-body]")!;
     if (phone.matches) paintDescentList(body, book);
     else paintDescentColumns(shell, body, book);
-    bindDescentBar(shell, book);
     if (focusBack) shell.querySelector<HTMLElement>("[data-back]")?.focus({ preventScroll: true });
     if (restoreScroll !== undefined) {
       shell.scrollTop = restoreScroll;
@@ -583,7 +618,22 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     return parts.join(" · ");
   }
 
-  function descentBarHtml(book: BookModel) {
+  function setMode(next: "map" | "page", noteId?: string) {
+    mode = next;
+    try {
+      localStorage.setItem(MODE_KEY, next);
+    } catch {
+      // Not remembered; this visit still switches.
+    }
+    if (noteId) {
+      focusNote = noteId;
+      openNote = noteId;
+    }
+    jumpToFocus = true;
+    paint();
+  }
+
+  function descentBarHtml(book: BookModel, onMap = false) {
     const reading = book.reading
       ? `<label class="descent__reading">Reading · p.<input id="descent-reading" type="number" inputmode="numeric" min="1" max="${book.pages}" value="${book.reading.page ?? ""}" aria-label="Page you're on" /></label>`
       : "";
@@ -592,6 +642,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       ${coverImg(book, "descent__cover")}
       <div class="descent__id"><h1>${esc(book.label)}</h1><p>${esc([book.author, descentMeta(book)].filter(Boolean).join(" · "))}</p></div>
       <div class="descent__actions">
+        ${book.noteCount ? `<div class="hub-pills descent__modes" role="group" aria-label="View"><button class="hub-pills__btn${onMap ? " is-active" : ""}" type="button" data-mode="map" aria-pressed="${onMap}">Map</button><button class="hub-pills__btn${onMap ? "" : " is-active"}" type="button" data-mode="page" aria-pressed="${!onMap}">By page</button></div>` : ""}
         ${reading}
         ${book.loose.length ? `<button class="btn btn--secondary" type="button" data-place>Place ${book.loose.length} loose ${book.loose.length === 1 ? "page" : "pages"}</button>` : ""}
         <button class="btn btn--primary" type="button" data-facts>Book facts</button>
@@ -601,6 +652,11 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
 
   function bindDescentBar(shell: HTMLElement, book: BookModel) {
     shell.querySelector<HTMLButtonElement>("[data-back]")!.onclick = () => go(undefined);
+    shell.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(button => {
+      button.onclick = () => {
+        if (button.dataset.mode !== mode) setMode(button.dataset.mode === "page" ? "page" : "map");
+      };
+    });
     shell.querySelector<HTMLButtonElement>("[data-facts]")!.onclick = () => openFactsSheet(book);
     const place = shell.querySelector<HTMLButtonElement>("[data-place]");
     if (place) place.onclick = () => openPlaceSheet(book);
@@ -1098,6 +1154,8 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   const onResize = () => {
     cancelAnimationFrame(resizeFrame);
     resizeFrame = requestAnimationFrame(() => {
+      // The map handles its own resizing; repainting would throw away the pan and zoom.
+      if (active && mode === "map") return;
       if (!phone.matches || !active) paint();
     });
   };
@@ -1111,6 +1169,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   return () => {
     alive = false;
     window.clearTimeout(factsTimer);
+    atlasTeardown?.();
     document.body.classList.remove("is-bookshelf-immersive");
     for (const cleanup of cleanups.splice(0)) cleanup();
   };
