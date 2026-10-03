@@ -156,6 +156,54 @@
   justify-content: flex-end;
 }
 
+/* Note titles use the whole canvas. Labelled actions sit under the title
+   in .reader__actions; only refresh stays on the eyebrow row. */
+.canvas:has(> .reader) > .page-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.canvas:has(> .reader) > .page-header .page-header__copy {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.canvas:has(> .reader) > .page-header .page-header__actions {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  align-self: start;
+  width: auto;
+  max-width: 100%;
+  margin-left: 0;
+  z-index: 1;
+}
+
+.canvas:has(> .reader) > .page-header .page-header__eyebrow {
+  min-height: var(--space-8);
+  padding-right: calc(var(--space-8) + var(--space-3));
+}
+
+.canvas:has(> .reader) > .page-header .page-header__title-row,
+.canvas:has(> .reader) > .page-header .page-header__title {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  .canvas:has(> .reader) > .page-header .page-header__eyebrow {
+    /* Matches .hub-icon-btn at this breakpoint so the title starts below it. */
+    min-height: 2.75rem;
+    padding-right: calc(2.75rem + var(--space-2));
+  }
+}
+
 .new-note {
   position: relative;
   display: inline-flex;
@@ -2306,6 +2354,7 @@ body.is-universe-fullscreen .local-banner {
   .coach.chat.chat--from-book .chat__note-form .btn,
   .compose__capture .btn,
   .compose__save,
+  .reader__actions .btn,
   .origin-add .btn,
   .origin-add select,
   .origin-add input {
@@ -3053,13 +3102,12 @@ body.is-universe-fullscreen .local-banner {
 
 .reader__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-5);
-}
-
-.reader__actions .hub-utilities {
-  margin-left: auto;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 var(--space-5);
 }
 
 .reader__tidy {
