@@ -1,6 +1,6 @@
 import { renderTerrain, type TerrainCanvas } from "./atlasTerrain";
 import { mountSeaLife, pickBottle, type Bottle, type Charter, type Land, type Landmark } from "./seaLife";
-import { MAP_SEA_HTML, MAP_SKY_HTML, mapControlsHtml, positionTerrain, positionWorld, terrainLayers, wireFullScreen } from "./mapChrome";
+import { MAP_SEA_HTML, MAP_SKY_HTML, mapControlsHtml, positionTerrain, positionWorld, revealAt, terrainLayers, wireFullScreen } from "./mapChrome";
 import { chartLandmarks, shorePoint, type ArchipelagoModel, type Island } from "./archipelagoLayout";
 import { noteThemes } from "./atlasLayout";
 
@@ -44,6 +44,7 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
       ${MAP_SEA_HTML}
       <div class="atlas__land" data-land></div>
       <div class="atlas__world" data-world aria-hidden="true"></div>
+      <div class="atlas__world atlas__ink" data-ink aria-hidden="true"></div>
       ${MAP_SKY_HTML}
       <svg class="atlas__lines" data-lines aria-hidden="true"></svg>
       <div class="atlas__marks" data-marks></div>
@@ -66,7 +67,8 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
         <li><i class="atlas-key isles-key--bloom"></i>Ink bloom: notes added since you last looked</li>
         <li><i class="atlas-key isles-key--charter"></i>Gold-flagged ship: sails a route your links made; tap to follow</li>
       </ul>
-      <p class="isles-key__hint">The compass turns the hours and the word beneath it turns the seasons. Everything else at sea is just for fun: try tapping it.</p>
+      <p class="isles-key__hint">The compass turns the hours and the word beneath it turns the seasons. Everything else at sea is just for fun: zoom in to find it, then try tapping it.</p>
+      <p class="isles-key__hint">Ships and monsters from Olaus Magnus, <i>Carta Marina</i> (1539).</p>
     </details>
     <aside class="atlas__card" data-card hidden></aside>
   </div>`;
@@ -77,6 +79,9 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
   const marks = root.querySelector<HTMLElement>("[data-marks]")!;
   const card = root.querySelector<HTMLElement>("[data-card]")!;
   const world = root.querySelector<HTMLElement>("[data-world]")!;
+  const inkLayer = root.querySelector<HTMLElement>("[data-ink]")!;
+  /** The scale that fits the whole map: the god's-eye view. */
+  let home = 1;
   const byKey = new Map(model.islands.map(i => [i.key, i]));
   const names = mapNames(model.islands);
   // The biggest islands are named even at a distance; the rest wait for zoom or hover.
@@ -107,6 +112,7 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
     scale = Math.min(1.1, Math.min(w / b.w, h / b.h) * 0.96);
     ox = (w - b.w * scale) / 2 - b.x * scale;
     oy = (h - b.h * scale) / 2 - b.y * scale;
+    home = scale;
   };
   const centreOn = (island: Island, animate = false) => {
     const { w, h } = size();
@@ -156,6 +162,8 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
   function apply() {
     if (terrain) positionTerrain(terrain, model.width, scale, ox, oy);
     positionWorld(world, scale, ox, oy);
+    positionWorld(inkLayer, scale, ox, oy);
+    revealAt(root, scale / home);
     draw();
   }
 
@@ -516,6 +524,7 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
   const bottle = pickBottle(model.islands.map(i => ({ key: i.key, label: i.label, notes: [...i.book.placed, ...i.book.loose] })));
   const life = mountSeaLife(world, {
     root,
+    inkLayer,
     bounds: model.bounds,
     lands: [...shores.values()],
     harbours: [...shores.values()],
