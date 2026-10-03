@@ -47,6 +47,18 @@ export function positionWorld(layer: HTMLElement, scale: number, ox: number, oy:
 }
 
 /**
+ * The god's-eye view: from the whole world you see only land, sea and weather.
+ * Zoom past it and the sea's life (and the notes' landmarks) fade into view.
+ * `closer` is the current scale over the scale that fits the whole map.
+ */
+export function revealAt(root: HTMLElement, closer: number) {
+  const reveal = Math.max(0, Math.min(1, (closer - 1.2) / 0.9));
+  root.style.setProperty("--reveal", reveal.toFixed(3));
+  if (reveal > 0.02) root.dataset.revealed = "";
+  else delete root.dataset.revealed;
+}
+
+/**
  * Full screen: the browser's own where it has one (desktop), otherwise the map
  * fills the window above the page and its chat button. Esc leaves either way.
  */
