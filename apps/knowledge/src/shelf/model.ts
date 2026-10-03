@@ -1,5 +1,6 @@
 import type { PageManifestEntry } from "../domain/page";
-import { bookSwatch, type BookSwatch } from "./palette";
+import { coverEntry, coverSrc } from "./covers";
+import { BOOK_PALETTE, bookSwatch, type BookSwatch } from "./palette";
 import type { Chapter, Placement, ShelfBook, ShelfData, ShelfStance } from "./schema";
 
 /** Page count assumed for a book whose facts have not been filled in yet. */
@@ -32,6 +33,8 @@ export type BookModel = {
   edition?: string;
   notebook?: string;
   swatch: BookSwatch;
+  /** Cover image URL, when one has been added to public/books. */
+  cover?: string;
   pages: number;
   pagesKnown: boolean;
   chapters: ChapterModel[];
@@ -178,13 +181,16 @@ function modelBook(
     }
   }
   const activity = [...notes.map(note => note.createdAt), facts?.reading?.updated_at].filter((d): d is string => Boolean(d)).sort();
+  const cover = coverEntry(key);
+  const coverSwatch = cover?.swatch !== undefined ? BOOK_PALETTE[cover.swatch] : undefined;
   return {
     key,
     label,
     author: facts?.author,
     edition: facts?.edition,
     notebook: facts?.notebook,
-    swatch: bookSwatch(label),
+    swatch: coverSwatch ?? bookSwatch(label),
+    cover: cover ? coverSrc(cover.file) : undefined,
     pages,
     pagesKnown,
     chapters,

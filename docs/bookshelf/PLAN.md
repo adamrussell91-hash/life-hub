@@ -5,7 +5,8 @@ Three views of the same books, built in this order. Mockups: Fore-edge (shelf + 
 ## Decisions (Adam, 03/10/26)
 
 - Old notes have no page. Adam places them by rough guess (the **Place loose pages** sheet). **Read my notes** fills any page the note text already names, marked as a guess.
-- Book facts (pages, chapters, edition) come from ChatGPT. **Book facts → Copy ChatGPT prompt**, paste the JSON answer back. Edition matters: page numbers follow Adam's copy.
+- Book facts (pages, chapters, edition) come from ChatGPT. **Book facts → Copy ChatGPT prompt**, paste the JSON answer back. Edition matters: page numbers follow Adam's copy. The prompt text lives in `src/shelf/facts.ts` `bookFactsPrompt()`.
+- Book covers: Adam supplies a folder; Cursor adds them (job 0 below).
 - Reading now: The Knowledge Gene, The Origins of Political Order, The Enigma of Reason (just started). Set in Book facts.
 - Radio bands = existing Notebooks (set per book in Book facts).
 - A one-off pass over book notes to read stance and gaps is approved (it's the **Read my notes** button; it reads note text, no model call).
@@ -44,6 +45,14 @@ Dial built from notebooks as bands. New Podcast scope by book origin (today `pod
 ## Cursor: back-end grunt only
 
 Not UI. Each item ships with tests and passes `npm run pre-pr-check`.
+
+0. **Book covers (do first).** Adam has a folder of cover images. The UI is already wired: a cover shows in the book's header, in Book facts and in the Reading now card, and its colour sets the book's spine colour.
+   - For each image, find the book's exact title as it appears on the Bookshelf (the note's book origin). Skip any image with no matching book and list it in the PR.
+   - Save it as `apps/knowledge/public/books/<file>`, where `<file>` is `coverFileName(title)` from `src/shelf/covers.ts` (e.g. `why-dont-students-like-school.jpg`). JPEG, 600px tall, quality about 80, under 120 KB. Strip metadata.
+   - Add one entry per cover to `apps/knowledge/src/shelf/covers.json`, keyed by the lower-case title (`bookKey(title)`): `"make it stick": { "file": "make-it-stick.jpg", "swatch": 7 }`.
+   - `swatch`: average the cover's pixels (ignore near-white and near-black), then `nearestSwatchIndex(r, g, b)` from `src/shelf/palette.ts`. Do not invent colours.
+   - `src/shelf/covers.test.ts` must pass: every entry points at a real file and a valid swatch.
+   - Do not touch `view.ts`, `bookshelf.css` or any layout. If a cover looks wrong in the UI, report it; Claude fixes the UI.
 
 1. **Themes for Atlas regions (Phase 2).** For each book note, pick up to 3 themes from the closed topic vocabulary (`canonicalTopicTag`) using its tags, and write them as `themes` via `POST /api/knowledge/shelf {op:"place"}`. Never overwrite a field that already has a value. Report counts per book.
 2. **Book-note count report.** Count notes per book origin in production and post the table in the PR. This is the check that the Atlas has enough towns per book.

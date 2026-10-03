@@ -217,6 +217,12 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     paint();
   }
 
+  function coverImg(book: BookModel, className: string) {
+    return book.cover
+      ? `<img class="${className}" src="${esc(book.cover)}" alt="" loading="lazy" decoding="async" style="--c:${book.swatch.fill}" />`
+      : "";
+  }
+
   function readingBooks() {
     return books.filter(book => book.reading);
   }
@@ -250,7 +256,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     if (!reading.length) return "";
     return `<aside class="shelf-side"><div class="shelf-card">
       <p class="shelf-eyebrow">Reading now</p>
-      <ul>${reading.map(book => `<li><button type="button" data-open-book="${esc(book.key)}">${esc(book.label)}</button><span>${book.reading?.page ? `p.${book.reading.page}` : "just started"}</span></li>`).join("")}</ul>
+      <ul>${reading.map(book => `<li><button type="button" class="shelf-reading" data-open-book="${esc(book.key)}">${coverImg(book, "shelf-reading__cover")}${esc(book.label)}</button><span>${book.reading?.page ? `p.${book.reading.page}` : "just started"}</span></li>`).join("")}</ul>
     </div></aside>`;
   }
 
@@ -396,6 +402,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       : "";
     return `<header class="descent__bar">
       <button class="btn btn--ghost" type="button" data-back>← Bookshelf</button>
+      ${coverImg(book, "descent__cover")}
       <div class="descent__id"><h1>${esc(book.label)}</h1><p>${esc([book.author, descentMeta(book)].filter(Boolean).join(" · "))}</p></div>
       <div class="descent__actions">
         ${reading}
@@ -683,8 +690,10 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       : "None yet";
     const notebooks = ctx.notebookLabels;
     const { sheet, close } = openSheet(`
-      <p class="shelf-eyebrow">Book facts</p>
-      <h2>${esc(book.label)}</h2>
+      <div class="shelf-sheet__head">
+        <div><p class="shelf-eyebrow">Book facts</p><h2>${esc(book.label)}</h2></div>
+        ${coverImg(book, "shelf-sheet__cover")}
+      </div>
       <dl class="shelf-sheet__facts">
         <dt>Author</dt><dd>${esc(book.author ?? "Not set")}</dd>
         <dt>Edition</dt><dd>${esc(book.edition ?? "Not set")}</dd>
