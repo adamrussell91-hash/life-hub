@@ -27,16 +27,19 @@ import { runQuickKernel } from "../../src/research/kernel";
 import { tidy as tidyPrompt } from "../../src/clementine/pack";
 import { handleTidyRequest, KNOWLEDGE_HUB_ORIGIN } from "../../src/tidy/http";
 import { tidyPageOnGitHub } from "../../src/tidy/githubIo";
+import { CATALOGUE_STATE_KEY, catalogueHealth, parseState } from "../../src/research/catalogue";
+import { CatalogueSync } from "./catalogueSync";
 import { ChatWrite } from "./chatWrite";
 import { PodcastSession } from "./podcastSession";
 import { ResearchSession, type ResearchEnv } from "./researchSession";
 
-export { ChatWrite, PodcastSession, ResearchSession };
+export { CatalogueSync, ChatWrite, PodcastSession, ResearchSession };
 
 type WorkerEnv = ResearchEnv &
   PodcastKernelEnv & {
     PODCAST_SESSION: DurableObjectNamespace;
     CHAT_WRITE: DurableObjectNamespace;
+    CATALOGUE_SYNC: DurableObjectNamespace;
     SESSION_SECRET?: string;
     KNOWLEDGE_HUB_ORIGIN?: string;
   };
@@ -121,6 +124,13 @@ async function nextInSeries(env: WorkerEnv, seriesId: string) {
   });
 }
 
+/** The podcast library carries the catalogue's health so the page can warn when it falls behind. */
+async function listIndexWithCatalogue(env: WorkerEnv) {
+  const [index, stateObject] = await Promise.all([readPodcastIndex(env), env.ARCHIVE.get(CATALOGUE_STATE_KEY)]);
+  const state = stateObject ? parseState(await stateObject.text()) : null;
+  return { ...index, catalogue: catalogueHealth(state, Date.now()) };
+}
+
 function followupInput(body: unknown, key: "question" | "text") {
   const value = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
   return {
@@ -155,6 +165,12 @@ async function answerEpisode(env: WorkerEnv, id: string, body: unknown) {
 }
 
 export default {
+  /** Hourly: poke the catalogue sync, which does the work in its own alarm. */
+  async scheduled(_controller: unknown, env: WorkerEnv, ctx: ExecutionContext) {
+    const stub = env.CATALOGUE_SYNC.get(env.CATALOGUE_SYNC.idFromName("catalogue"));
+    ctx.waitUntil(stub.fetch(new Request("https://catalogue/run", { method: "POST" })));
+  },
+
   async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
     const pathname = new URL(request.url).pathname;
     const path = pathname.replace(/\/+$/, "") || "/";
@@ -174,7 +190,7 @@ export default {
         nextInSeries: seriesId => nextInSeries(env, seriesId),
         getEpisode: id => getEpisode(env, id),
         getSeries: id => getSeries(env, id),
-        listIndex: () => readPodcastIndex(env),
+        listIndex: () => listIndexWithCatalogue(env),
         interrupt: (id, body) => interruptEpisode(env, id, body),
         answer: (id, body) => answerEpisode(env, id, body),
       });
