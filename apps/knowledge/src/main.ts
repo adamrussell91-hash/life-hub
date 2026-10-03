@@ -1503,20 +1503,19 @@ function renderPage(page: LivePage) {
   };
 
   shell(`
-    ${pageHeader(
-      topics[0] ? escapeHtml(topics[0]) : "Note",
-      escapeHtml(page.title),
-      `        <button class="btn btn--ghost reader__back" data-back type="button">← ${pageReturnView === "notebooks" ? "Notebooks" : pageReturnView === "bookshelf" ? "Bookshelf" : "Archive"}</button>
-        <button class="btn btn--ghost" data-pin-note type="button">${isPinned(page.id) ? "Unpin" : "Pin"}</button>
-        <button class="btn btn--ghost" data-edit type="button">Edit</button>
-        <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyReviewJob ? "disabled" : ""}>${tidyBusy ? intakeBusyLabel(tidyReviewJob?.phase) : "Clean up"}</button>
-        <button class="btn btn--ghost" data-open-chat type="button">Chat</button>
-        ${
-          resolvedOrigins(page).find(origin => origin.kind === "book")
-            ? `<button class="btn btn--ghost" data-from-book type="button">Note from this book</button>`
-            : ""
-        }`,
-    )}
+    ${pageHeader(topics[0] ? escapeHtml(topics[0]) : "Note", escapeHtml(page.title))}
+    <div class="reader__actions">
+      <button class="btn btn--ghost reader__back" data-back type="button">← ${pageReturnView === "notebooks" ? "Notebooks" : pageReturnView === "bookshelf" ? "Bookshelf" : "Archive"}</button>
+      <button class="btn btn--ghost" data-pin-note type="button">${isPinned(page.id) ? "Unpin" : "Pin"}</button>
+      <button class="btn btn--ghost" data-edit type="button">Edit</button>
+      <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyReviewJob ? "disabled" : ""}>${tidyBusy ? intakeBusyLabel(tidyReviewJob?.phase) : "Clean up"}</button>
+      <button class="btn btn--ghost" data-open-chat type="button">Chat</button>
+      ${
+        resolvedOrigins(page).find(origin => origin.kind === "book")
+          ? `<button class="btn btn--ghost" data-from-book type="button">Note from this book</button>`
+          : ""
+      }
+    </div>
     <article class="reader" data-hub-morph-page>
       ${
         tidyReviewJob
