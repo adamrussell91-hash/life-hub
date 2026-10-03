@@ -23,5 +23,7 @@ describe("buildProposePrompt", () => {
     expect(prompt).toContain("Return JSON only");
     expect(prompt).toContain("builds-on");
     expect(prompt).toContain("id:b");
+    expect(prompt).toContain("confidence");
+    expect(prompt).toContain("Adam reviews every score under 0.80");
   });
 });

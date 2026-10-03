@@ -155,7 +155,14 @@ test('Curator lists pending and can queue a run without Teaching Blobs', async (
     '_curator/pending-proposals.json': { sha: 'p', text: JSON.stringify([proposal]) },
     '_curator/dismissed.json': { sha: 'd', text: '[]' },
     'pages/a.json': { sha: 'a1', text: JSON.stringify(pageA) },
-    'pages/b.json': { sha: 'b1', text: JSON.stringify({ ...pageA, id: 'b', title: 'B' }) }
+    'pages/b.json': { sha: 'b1', text: JSON.stringify({ ...pageA, id: 'b', title: 'B' }) },
+    'manifest.json': {
+      sha: 'm1',
+      text: JSON.stringify([
+        { id: 'a', title: 'A', area: 'notes', tags: [], excerpt: 'ea' },
+        { id: 'b', title: 'B', area: 'notes', tags: [], excerpt: 'eb' }
+      ])
+    }
   };
   const listed = await createKnowledgeCuratorHandler({
     env,

@@ -1900,6 +1900,58 @@ body.is-universe-fullscreen .local-banner {
   font-size: var(--text-sm);
 }
 
+.wiki-card,
+.wiki-card__pair button {
+  min-width: 0;
+}
+
+.wiki-card__pair button {
+  min-height: 2.75rem;
+  padding: var(--space-2) 0;
+}
+
+.wiki-card__relation,
+.wiki-card__pair strong,
+.wiki-card__book,
+.wiki-card__why {
+  overflow-wrap: anywhere;
+}
+
+.wiki-card__book {
+  font-style: normal;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.wiki-card__tag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0.125rem var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--glass);
+  vertical-align: middle;
+}
+
+.wiki .btn {
+  min-height: 2.75rem;
+}
+
+.wiki-auto {
+  margin-top: var(--space-6);
+}
+
+.wiki-auto summary {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  cursor: pointer;
+  font-weight: var(--weight-semibold);
+}
+
 .wiki-links {
   margin-top: var(--space-6);
 }
