@@ -69,17 +69,71 @@
   width: min(22rem, 100%);
 }
 
+/* The shelf always takes the full width; notices sit above it, Reading now lives in the toolbar. */
 .shelf-room {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 19rem;
-  gap: var(--space-8);
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
   margin-top: var(--space-4);
 }
 
-.shelf-room.is-quiet {
-  grid-template-columns: minmax(0, 1fr);
+.shelf-reading-pop {
+  position: relative;
+}
+
+.shelf-reading-pop__toggle {
+  gap: var(--space-2);
+}
+
+.shelf-reading-pop__stack {
+  display: inline-flex;
+}
+
+.shelf-reading-pop__stack .shelf-reading__cover {
+  width: 1.25rem;
+  height: 1.85rem;
+  box-shadow: inset 2px 0 0 rgba(0, 0, 0, 0.12), 0 0 0 1.5px var(--paper);
+}
+
+.shelf-reading-pop__stack .shelf-reading__cover + .shelf-reading__cover {
+  margin-left: -0.55rem;
+}
+
+.shelf-reading-pop__panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-2));
+  z-index: 20;
+  display: none;
+  width: 19rem;
+  box-shadow: var(--elev-2, 0 12px 28px rgba(20, 35, 70, 0.18));
+}
+
+/* Bridge the gap so the pointer can travel from the button into the panel. */
+.shelf-reading-pop__panel::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--space-2) - 1px) 0 auto;
+  height: var(--space-2);
+}
+
+.shelf-reading-pop__panel ul {
+  margin: var(--space-3) 0 0;
+}
+
+.shelf-reading-pop__panel li {
+  align-items: center;
+}
+
+.shelf-reading-pop.is-open .shelf-reading-pop__panel {
+  display: block;
+}
+
+@media (hover: hover) {
+  .shelf-reading-pop:hover .shelf-reading-pop__panel {
+    display: block;
+  }
 }
 
 .shelf-stage {
@@ -306,10 +360,10 @@
 }
 
 .shelf-side {
-  position: sticky;
-  top: var(--space-6);
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
   gap: var(--space-4);
+  align-items: start;
   min-width: 0;
 }
 
@@ -1018,6 +1072,7 @@ body.is-bookshelf-immersive .local-banner {
 
 @media (max-width: 720px) {
   .shelf-tools {
+    position: relative;
     width: 100%;
     flex-wrap: wrap;
     gap: var(--space-2);
@@ -1054,13 +1109,20 @@ body.is-bookshelf-immersive .local-banner {
     margin-right: auto;
   }
 
-  .shelf-room {
-    grid-template-columns: minmax(0, 1fr);
+  /* Row 2: search, Reading now (covers only), ⋯. The panel spans the toolbar. */
+  .shelf-reading-pop {
+    position: static;
+    flex: 0 0 auto;
   }
 
-  .shelf-side {
-    position: static;
-    order: -1;
+  .shelf-reading-pop__label {
+    display: none;
+  }
+
+  .shelf-reading-pop__panel {
+    left: 0;
+    right: 0;
+    width: auto;
   }
 
   .shelf-row {
