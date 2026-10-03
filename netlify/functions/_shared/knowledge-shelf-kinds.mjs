@@ -38,7 +38,8 @@ debate needs a quoted sentence from the note showing the disagreement, the corre
 bridge needs a quoted sentence pointing outside the book (to practice, teaching or another field) that the page is organised around.
 fallback is always the best crystallised fit (person, idea or case), used if a fluid grade cannot be backed up.
 
-Return JSON only.`;
+Return JSON only, exactly this shape:
+{"kind":"person|idea|case|debate|bridge","fallback":"person|idea|case","evidence":"a sentence quoted from the note","reason":"one line","confidence":0.0}`;
 
 function failure(message, status = 400, code = 'validation_error') {
   return Object.assign(new Error(message), { status, code });
@@ -116,7 +117,8 @@ export function parseKindGrade(text, body) {
   const fallback = CRYSTALLISED_KINDS.includes(raw.fallback) ? raw.fallback : 'idea';
   const evidence = typeof raw.evidence === 'string' ? raw.evidence.trim() : '';
   let reason = typeof raw.reason === 'string' ? raw.reason.trim().slice(0, 300) : '';
-  const confidence = typeof raw.confidence === 'number' && Number.isFinite(raw.confidence) ? raw.confidence : null;
+  const confidenceRaw = typeof raw.confidence === 'number' ? raw.confidence : typeof raw.confidence === 'string' ? Number(raw.confidence) : NaN;
+  const confidence = Number.isFinite(confidenceRaw) ? confidenceRaw : null;
   if (!kind) return { unreadable: true };
 
   let kindGuessed = confidence === null || confidence < 0.7;
