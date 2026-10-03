@@ -716,6 +716,7 @@ body.is-bookshelf-immersive .local-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-3);
   width: 100%;
   min-height: 2rem;
@@ -806,15 +807,25 @@ body.is-bookshelf-immersive .local-banner {
   font-variant-numeric: tabular-nums;
 }
 
-.descent-exit {
+.descent__col .descent-exit {
   position: absolute;
   left: 0;
   right: 0;
   box-sizing: border-box;
-  padding: var(--space-2) var(--space-3);
+  overflow: hidden;
   border: 0;
-  border-top: 8px solid var(--c);
   border-radius: 2px;
+  padding: 0;
+  background: var(--c, var(--shallow));
+}
+
+.descent-exit.is-bar {
+  pointer-events: none;
+}
+
+.descent-exit.is-open {
+  padding: var(--space-2) var(--space-3);
+  border-top: 6px solid var(--c, var(--shallow));
   background: var(--paper);
   box-shadow: inset 0 0 0 1px var(--line);
   font: inherit;
@@ -822,11 +833,11 @@ body.is-bookshelf-immersive .local-banner {
   cursor: pointer;
 }
 
-.descent-exit:hover {
+.descent-exit.is-open:hover {
   box-shadow: inset 0 0 0 1px var(--line), var(--elev-2);
 }
 
-.descent-exit b {
+.descent-exit__label b {
   display: block;
   font-size: var(--text-xs);
   color: var(--ink);
@@ -835,13 +846,28 @@ body.is-bookshelf-immersive .local-banner {
   text-overflow: ellipsis;
 }
 
-.descent-exit span {
+.descent-exit__label span {
   display: block;
   font-size: var(--text-2xs);
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.descent-note__bars {
+  display: flex;
+  flex: 1 0 100%;
+  gap: 3px;
+  height: 8px;
+}
+
+.descent-note__bars i {
+  flex: 1 1 0;
+  max-width: 2rem;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--c, var(--shallow));
 }
 
 .descent__loose {
@@ -1198,31 +1224,24 @@ body.is-bookshelf-immersive .local-banner {
 }
 
 .descent-list__exits {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: var(--space-2);
   padding: 0 var(--space-3) var(--space-3);
 }
 
-.descent-list__exits button {
-  max-width: 100%;
-  padding: 0.2rem 0.5rem;
-  border: 0;
-  border-left: 4px solid var(--c);
-  border-radius: var(--radius-xs);
-  background: var(--cotton);
-  font: inherit;
-  font-size: var(--text-xs);
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
+.descent-list .descent-exit.is-open {
+  position: relative;
+  top: auto;
+  height: auto;
+  width: 100%;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shelf-book {
+  .shelf-book,
+  .descent-exit,
+  .descent-note {
     transition: none;
+    animation: none;
   }
 }
 
