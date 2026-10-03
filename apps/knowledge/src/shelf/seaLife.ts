@@ -67,103 +67,129 @@ export type SeaLife = {
 };
 
 // ── Drawings ────────────────────────────────────────────────────────
+// Engravings, after old charts: ink line on parchment, hatched for shade.
+// i-fill = parchment with an ink edge, i-line = ink only, i-hatch = fine shading,
+// i-solid = filled ink. A tube is a body drawn as three strokes: edge, flesh, scales.
 
-const SHIP = `<svg viewBox="0 0 60 50" aria-hidden="true">
-  <path class="sl-wake" d="M2 46q4-3 8 0t8 0 8 0 8 0 8 0 8 0 8 0"/>
-  <path class="sl-hull" d="M5 33h50l-8 11H14z"/>
-  <path class="sl-line" d="M30 33V5"/>
-  <path class="sl-sail" d="M17 9q13 4 26 0v18q-13 4-26 0z"/>
-  <path class="sl-sail" d="M31 30V20q9 2 13 9z"/>
-  <path class="sl-flag" d="M30 5l9-3-9-2z"/>
-  <circle class="sl-port" cx="22" cy="37" r="1.6"/><circle class="sl-port" cx="32" cy="37" r="1.6"/><circle class="sl-port" cx="42" cy="37" r="1.6"/>
+const tube = (d: string, w: number) =>
+  `<path class="i-tube-o" d="${d}" stroke-width="${w}"/><path class="i-tube-f" d="${d}" stroke-width="${w - 2.6}"/><path class="i-tube-s" d="${d}" stroke-width="${w - 3.2}"/>`;
+
+const SHIP = `<svg viewBox="0 0 80 60" aria-hidden="true">
+  <path class="i-hatch sl-wake" d="M0 54q5-2.5 10 0t10 0 10 0 10 0 10 0 10 0 10 0 10 0M10 57.5q4-2 8 0t8 0M50 57.5q4-2 8 0t8 0"/>
+  <path class="i-line" d="M22 43l-5 9M30 45l-5 9M38 46l-5 9M46 46l-5 9M54 45l-5 9"/>
+  <path class="i-fill" d="M8 34c8 12 50 13 62 0-12 4-48 4-62 0z"/>
+  <path class="i-hatch" d="M16 40c10 3 34 4 46 0M23 43c8 1.5 21 1.8 29 0"/>
+  <path class="i-line" d="M8 34c-4-6-4-14 1-17 4-2 6 2 3 4"/>
+  <path class="i-line" d="M70 34c5-6 6-14 3-19"/>
+  <path class="i-fill" d="M73 15c-1-4 3-6 7-4l-2 2 2 2h-4c-1 2-3 2-3 0z"/>
+  <g class="i-fill"><circle cx="18" cy="36.4" r="2.5"/><circle cx="26" cy="37.2" r="2.5"/><circle cx="34" cy="37.6" r="2.5"/><circle cx="42" cy="37.6" r="2.5"/><circle cx="50" cy="37.2" r="2.5"/><circle cx="58" cy="36.4" r="2.5"/></g>
+  <path class="i-line" d="M39 36V5M24 9h30"/>
+  <path class="i-fill" d="M25 9c-1 8 0 16 2 22h24c2-6 3-14 2-22z"/>
+  <path class="i-hatch" d="M31 9c-.5 8 0 15 1.5 22M47 9c.5 8 0 15-1.5 22M25.5 13h27"/>
+  <path class="i-line" d="M39 15.5a3.5 3.5 0 1 0 .01 0M35.5 19h7M39 15.5v7"/>
+  <path class="sl-flag" d="M39 5l9 2-9 2z"/>
+  <circle class="sl-port" cx="11" cy="23" r="1.3"/>
 </svg>`;
 
-const SERPENT = `<svg viewBox="0 0 180 70" aria-hidden="true">
-  <path class="sl-scale" d="M2 57c3-8 9-11 13-18 1 8-1 14 3 18z"/>
-  <path class="sl-scale" d="M26 57c5-26 29-26 34 0z"/>
-  <path class="sl-belly" d="M32 57c4-14 18-14 22 0"/>
-  <path class="sl-scale" d="M72 57c5-30 33-30 38 0z"/>
-  <path class="sl-belly" d="M79 57c4-17 20-17 24 0"/>
-  <path class="sl-fin" d="M80 34l4-9 4 6 4-8 3 9"/>
-  <path class="sl-scale" d="M122 57c-2-24 8-41 26-41 14 0 24 7 22 15-4 4-16 2-24 4-6 6-8 14-6 22z"/>
-  <path class="sl-fin" d="M136 20l2-9 5 6 3-8 3 8"/>
-  <circle class="sl-eye" cx="157" cy="22" r="2.4"/>
-  <path class="sl-tongue" d="M169 29l8-3m-8 3l8 3"/>
+const SERPENT = `<svg viewBox="0 0 180 72" aria-hidden="true">
+  ${tube("M34 63C28 44 30 24 46 17s28-2 26 13", 10)}
+  ${tube("M98 63c2-17 24-17 26 0", 9)}
+  ${tube("M142 63c2-11 10-17 11-27s-2-12 0-16", 7)}
+  <path class="i-fill" d="M48 13l3-10 2 7 3-9 2 8 3-7 2 8 3-5 1 7"/>
+  <path class="i-fill" d="M104 50l2-8 3 5 2-7 3 6 2-5 2 6"/>
+  <path class="i-fill" d="M66 27c5-5 15-6 24-2l9-1-6 4 7 2-9 2c-6 4-17 5-24 2-3-2-3-5-1-7z"/>
+  <path class="i-hatch" d="M70 33c6 1.5 13 1.6 19 0M70 25c3-1 6-1.5 9-1.5"/>
+  <path class="i-line" d="M86 31l1 2 1-2 1 2 1-2M64 25c-3-3-4-6-2-9M66 32c-4 1-7 0-9-3"/>
+  <circle class="i-solid" cx="80" cy="27" r="1.6"/>
+  <path class="i-fill" d="M153 20c4-8 14-12 22-10-6 3-10 7-12 13-3-2-6-3-10-3z"/>
+  <path class="i-hatch" d="M156 18l13-6M158 21l12-4M160 23l9-2"/>
+  <path class="i-line" d="M0 62q6-3.5 12 0t12 0 12 0 12 0 12 0 12 0 12 0 12 0 12 0 12 0 12 0 12 0 12 0 12 0 12 0"/>
+  <path class="i-hatch" d="M8 66q5-2.5 10 0t10 0M70 66q5-2.5 10 0t10 0 10 0M140 66q5-2.5 10 0t10 0"/>
 </svg>`;
 
 const WHALE = `<svg viewBox="0 0 120 60" aria-hidden="true">
-  <g class="sl-spout"><path d="M42 26C38 16 32 11 26 9M42 26c0-10 0-15 0-22M42 26c4-10 10-15 16-17"/></g>
-  <path class="sl-whale" d="M8 50c10-28 62-32 90-14 6 4 9 9 10 14z"/>
-  <path class="sl-whale" d="M6 50c-4-6-4-12-1-16 2 6 6 9 11 10z"/>
-  <circle class="sl-eye" cx="88" cy="40" r="2"/>
-  <path class="sl-line" d="M96 46q-6 2-12 0"/>
+  <g class="sl-spout"><path d="M42 26C38 16 32 11 26 9M42 26c0-10 0-15 0-22M42 26c4-10 10-15 16-17"/><circle cx="25" cy="10" r="1"/><circle cx="42" cy="3" r="1"/><circle cx="59" cy="8" r="1"/></g>
+  <path class="i-fill" d="M10 50C18 26 64 20 94 33c7 3 11 9 13 17z"/>
+  <path class="i-hatch" d="M24 46c12-8 34-12 52-8M30 49c14-5 30-7 44-5M60 30c10 0 20 2 28 6M70 27c8 1 15 3 20 6"/>
+  <path class="i-fill" d="M8 50C4 44 2 38 4 33c3 5 7 8 12 9"/>
+  <circle class="i-solid" cx="88" cy="40" r="1.6"/>
+  <path class="i-line" d="M100 46q-8 2-16 0"/>
+  <path class="i-line" d="M0 50q6-3.5 12 0t12 0 12 0 12 0 12 0 12 0 12 0 12 0 12 0 12 0"/>
 </svg>`;
 
 const MERMAID = `<svg viewBox="0 0 64 70" aria-hidden="true">
   <g class="sl-maid">
-    <path class="sl-tail" d="M30 52c12 2 20-4 22-14l7-6-8 3-1-7-2 9c-2 7-8 10-18 10z"/>
-    <path class="sl-hair" d="M24 22c-3 9-5 18-2 26 3-6 4-15 7-26z"/>
-    <path class="sl-skin" d="M24 52c-2-8 0-16 4-21 4 4 6 12 4 21z"/>
-    <circle class="sl-skin" cx="28.5" cy="24" r="4.6"/>
-    <path class="sl-line sl-arm" d="M31 36q5-3 6-11"/>
+    <path class="i-fill sl-tail" d="M30 52c12 2 20-4 22-14l7-6-8 3-1-7-2 9c-2 7-8 10-18 10z"/>
+    <path class="i-hatch" d="M35 50q3-2 5 0M39 48q3-2 5 0M43 45q2.5-2 4.5 0M46 41q2-2 4 0"/>
+    <path class="i-fill" d="M24 52c-2-8 0-16 4-21 4 4 6 12 4 21z"/>
+    <circle class="i-fill" cx="28.5" cy="24" r="4.4"/>
+    <path class="i-line" d="M25 21c-4 6-6 14-4 25M27 20c-3 7-4 15-2 24M30 20c2 3 4 6 7 8"/>
+    <path class="i-line sl-arm" d="M31 36q5-3 6-11"/>
   </g>
-  <path class="sl-rock" d="M3 67c4-14 18-18 30-16s22 8 26 16z"/>
+  <path class="i-fill" d="M3 67c4-14 18-18 30-16s22 8 26 16z"/>
+  <path class="i-hatch" d="M10 65l6-7M17 66l7-8M44 65l6-6M50 66l5-5"/>
+  <path class="i-line" d="M0 68q4-2.5 8 0t8 0M48 68q4-2.5 8 0t8 0"/>
 </svg>`;
 
 const COMPASS = `<svg viewBox="0 0 100 100" aria-hidden="true">
-  <circle class="sl-ring" cx="50" cy="50" r="36"/>
-  <circle class="sl-ring" cx="50" cy="50" r="31"/>
+  <circle class="i-fill" cx="50" cy="50" r="36"/>
+  <circle class="i-line" cx="50" cy="50" r="31"/>
+  <path class="i-hatch" d="M50 14v4M50 82v4M14 50h4M82 50h4M24.5 24.5l2.8 2.8M72.7 72.7l2.8 2.8M75.5 24.5l-2.8 2.8M27.3 72.7l-2.8 2.8"/>
   <g class="sl-needle">
-    <path class="sl-point" d="M50 50l-6-6 6-36 6 36zM50 50l6 6-6 36-6-36z"/>
-    <path class="sl-point sl-point--side" d="M50 50l6-6 36 6-36 6zM50 50l-6 6-36-6 36-6z"/>
-    <path class="sl-point sl-point--north" d="M50 8l6 36-6 6z"/>
-    <path class="sl-point sl-point--minor" d="M50 50l20-20-4 12zM50 50l-20 20 4-12zM50 50l20 20-12-4zM50 50l-20-20 12 4z"/>
+    <path class="i-solid" d="M50 50l-6-6 6-36 6 36zM50 50l6 6-6 36-6-36z"/>
+    <path class="i-fill" d="M50 50l6-6 36 6-36 6zM50 50l-6 6-36-6 36-6z"/>
+    <path class="i-fill" d="M50 8l6 36-6 6z"/>
+    <path class="i-hatch" d="M50 50l20-20M50 50l-20 20M50 50l20 20M50 50l-20-20"/>
   </g>
   <text class="sl-n" x="50" y="6" text-anchor="middle">N</text>
 </svg>`;
 
 const LIGHTHOUSE = `<svg viewBox="0 0 24 50" aria-hidden="true">
-  <path class="sl-rock" d="M1 49c2-6 8-8 11-8s9 2 11 8z"/>
-  <path class="sl-tower" d="M8 43l2-28h4l2 28z"/>
-  <path class="sl-stripe" d="M9.2 34h5.6l.4 5H8.8zM9.8 24h4.4l.4 5H9.4z"/>
-  <path class="sl-lantern" d="M9 15h6v-4H9z"/>
-  <path class="sl-roof" d="M8 11l4-4 4 4z"/>
+  <path class="i-fill" d="M1 49c2-6 8-8 11-8s9 2 11 8z"/>
+  <path class="i-fill" d="M8 43l2-28h4l2 28z"/>
+  <path class="i-hatch" d="M9 36h6M9.2 33h5.6M9.6 26h4.8M9.7 23h4.6M3 47l3-3M18 47l3-3"/>
+  <path class="i-fill sl-lantern" d="M9 15h6v-4H9z"/>
+  <path class="i-solid" d="M8 11l4-4 4 4z"/>
 </svg>`;
 
 const CAMP = `<svg viewBox="0 0 30 24" aria-hidden="true">
-  <path class="sl-tent" d="M2 22L11 6l9 16z"/>
-  <path class="sl-line" d="M11 6v16"/>
+  <path class="i-fill" d="M2 22L11 6l9 16z"/>
+  <path class="i-hatch" d="M11 6v16M13 10l4 10M14 14l2 6"/>
   <g class="sl-flame"><path d="M23 21c-3-2-3-6 0-10 1 3 4 4 3 7 0 2-1 3-3 3z"/></g>
-  <path class="sl-line" d="M19 22l8-2M19 20l8 2"/>
+  <path class="i-line" d="M19 22l8-2M19 20l8 2"/>
 </svg>`;
 
 const VOLCANO = `<svg viewBox="0 0 40 26" aria-hidden="true">
-  <path class="sl-cone" d="M2 25l13-18h10l13 18z"/>
+  <path class="i-fill" d="M2 25l13-18h10l13 18z"/>
+  <path class="i-hatch" d="M24 9l4 14M26 11l6 12M28 14l6 9M16 9l-4 14"/>
   <path class="sl-lava" d="M16 7h8l-2 5-2-2-2 4z"/>
 </svg>`;
 
 const BOTTLE = `<svg viewBox="0 0 34 16" aria-hidden="true">
-  <path class="sl-glass" d="M3 5h18c3 0 5 1 6 2h4v2h-4c-1 1-3 2-6 2H3c-2 0-2-6 0-6z"/>
-  <path class="sl-scroll" d="M6 7h11v2H6z"/>
-  <path class="sl-cork" d="M30 6.5h3v3h-3z"/>
+  <path class="i-fill sl-glass" d="M3 5h18c3 0 5 1 6 2h4v2h-4c-1 1-3 2-6 2H3c-2 0-2-6 0-6z"/>
+  <path class="i-hatch" d="M6 7h11M6 9h11"/>
+  <path class="i-solid" d="M30 6.5h3v3h-3z"/>
 </svg>`;
 
 const DOLPHIN = `<svg viewBox="0 0 40 20" aria-hidden="true">
-  <path class="sl-dolphin-body" d="M2 12C10 4 26 2 36 8l3-1-2 3c-7 4-21 6-35 2z"/>
-  <path class="sl-dolphin-body" d="M18 5l4-5 2 5z"/>
-  <path class="sl-dolphin-body" d="M3 12L0 8l1 6z"/>
-  <circle class="sl-eye" cx="31" cy="8" r="0.9"/>
+  <path class="i-fill" d="M2 12C10 4 26 2 36 8l3-1-2 3c-7 4-21 6-35 2z"/>
+  <path class="i-fill" d="M18 5l4-5 2 5z"/>
+  <path class="i-fill" d="M3 12L0 8l1 6z"/>
+  <path class="i-hatch" d="M10 12c8 1 16 0 22-3"/>
+  <circle class="i-solid" cx="31" cy="8" r="0.9"/>
 </svg>`;
 
 const TENTACLE = `<svg viewBox="0 0 30 90" aria-hidden="true">
-  <path class="sl-kraken" d="M8 90C4 62 20 52 14 32 10 20 18 6 27 10c-7 2-9 10-5 20 6 20-4 34 0 60z"/>
-  <circle class="sl-sucker" cx="15" cy="70" r="1.6"/><circle class="sl-sucker" cx="17" cy="55" r="1.4"/><circle class="sl-sucker" cx="16" cy="40" r="1.2"/>
+  ${tube("M15 92C11 66 22 54 16 36S18 10 26 11", 8)}
+  <path class="i-line" d="M26 11c2 2 1 5-2 5"/>
+  <g class="i-fill"><circle cx="12.5" cy="72" r="1.3"/><circle cx="16" cy="58" r="1.2"/><circle cx="13.5" cy="44" r="1.1"/><circle cx="16" cy="30" r="1"/></g>
 </svg>`;
 
 const KRAKEN_EYE = `<svg viewBox="0 0 60 34" aria-hidden="true">
-  <path class="sl-kraken" d="M2 34C6 10 54 10 58 34z"/>
+  <path class="i-fill" d="M2 34C6 10 54 10 58 34z"/>
+  <path class="i-hatch" d="M8 30c4-8 10-12 16-14M52 30c-4-8-10-12-16-14M14 33c2-4 4-6 7-8M46 33c-2-4-4-6-7-8"/>
   <ellipse class="sl-iris" cx="30" cy="25" rx="9" ry="6"/>
-  <path class="sl-pupil" d="M30 20c-2 3-2 7 0 10 2-3 2-7 0-10z"/>
+  <path class="i-solid sl-pupil" d="M30 20c-2 3-2 7 0 10 2-3 2-7 0-10z"/>
 </svg>`;
 
 const TREASURE = `<svg viewBox="0 0 40 40" aria-hidden="true">
@@ -171,7 +197,7 @@ const TREASURE = `<svg viewBox="0 0 40 40" aria-hidden="true">
   <path class="sl-x" d="M22 8l12 12M34 8L22 20"/>
 </svg>`;
 
-const FISH = `<svg viewBox="0 0 16 8" aria-hidden="true"><path class="sl-fish" d="M1 4c3-4 8-4 11 0l3-3v6l-3-3c-3 4-8 4-11 0z"/></svg>`;
+const FISH = `<svg viewBox="0 0 16 8" aria-hidden="true"><path class="i-fill" d="M1 4c3-4 8-4 11 0l3-3v6l-3-3c-3 4-8 4-11 0z"/></svg>`;
 
 const GULL = `<svg viewBox="0 0 16 6" aria-hidden="true"><path d="M0 5Q4 0 8 5Q12 0 16 5"/></svg>`;
 

@@ -187,11 +187,14 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
       const nx = -(q.y - p.y) / (Math.hypot(q.x - p.x, q.y - p.y) || 1);
       const ny = (q.x - p.x) / (Math.hypot(q.x - p.x, q.y - p.y) || 1);
       const c = { x: (p.x + q.x) / 2 + nx * bend, y: (p.y + q.y) / 2 + ny * bend };
-      const on = selected === passage.from || selected === passage.to;
-      svg += `<path class="isles-route${on ? " is-on" : ""}" d="M${p.x},${p.y} Q${c.x},${c.y} ${q.x},${q.y}" style="stroke-width:${(1.2 + Math.log2(passage.count + 1) * 0.9).toFixed(2)}px" />`;
+      // Routes are a faint web until you pick (or point at) an island; then its own routes come up.
+      const focus = selected ?? hovered;
+      const on = focus === passage.from || focus === passage.to;
+      const dim = Boolean(focus) && !on;
+      svg += `<path class="isles-route${on ? " is-on" : ""}${dim ? " is-dim" : ""}" d="M${p.x},${p.y} Q${c.x},${c.y} ${q.x},${q.y}" style="stroke-width:${(0.6 + Math.log2(passage.count + 1) * (on ? 0.5 : 0.28)).toFixed(2)}px" />`;
       const mid = { x: (p.x + 2 * c.x + q.x) / 4, y: (p.y + 2 * c.y + q.y) / 4 };
-      // Counts only where they help: strong routes, the selected island's, or close in.
-      if (on || passage.count >= 3 || scale > 0.85) {
+      // Counts only for the island in focus: on the whole shelf they'd bury the map.
+      if (on) {
         const text = `${passage.count} ${passage.count === 1 ? "link" : "links"}`;
         const bw = text.length * 6.6 + 14;
         placed.push({ x: mid.x - bw / 2, y: mid.y - 10, w: bw, h: 20 });
