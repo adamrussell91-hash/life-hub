@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PodcastModeSchema = z.enum(["recap", "connector", "quiz", "debate"]);
+export const PodcastModeSchema = z.enum(["recap", "connector", "quiz", "debate", "broadcast"]);
 export type PodcastMode = z.infer<typeof PodcastModeSchema>;
 
 export const PodcastDialsSchema = z.object({

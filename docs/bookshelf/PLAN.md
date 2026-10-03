@@ -47,9 +47,17 @@ Inside a book, **Map** (default, remembered per viewer) or **By page** (the Fore
 - **Terrain** (`atlasTerrain.ts`) is note gravity: a hill per town, wider humps per province, contour bands, a navy coast and sea ripples, in kit pastels then the graph palette. It's rendered once per book shape and cached for the last three books.
 - **Interaction** (`atlasView.ts`): drag, wheel or pinch zoom, double-click, arrow keys, and +/−/fit. Towns are buttons and open a card with Open note and See it by page. Labels are placed greedily so none overlap. Phones get a bottom-sheet card. An unfold animation plays on entry unless reduced motion is set.
 
-## Phase 3: Wireless
+## Phase 3: Wireless (built)
 
-Dial built from notebooks as bands. New Podcast scope by book origin (today `podcast/select.ts` scopes by tag/area only) and a `broadcast` mode: cold open, features, counterpoints, crosstalk, phone-in (gaps). Counter fader maps to the existing `disagreement` dial. "Hold this thought" saves a note with book, page and episode time.
+A **Shelf / Wireless** toggle on the Bookshelf (remembered per viewer, `knowledge-hub:shelf-room`). Code: `apps/knowledge/src/shelf/wirelessModel.ts` (pure: dial, signal, running order), `wireless.ts` (view + player), `wireless.css`.
+
+- **Dial.** Notebooks are bands, busiest first, Unfiled last; books are stations on the AM 9 kHz grid (531–1602). Spines blur and pick up static with distance from the needle. Drag the glass (desktop: the needle follows; phone: the band slides under a fixed needle), turn the knob (drag or scroll), ‹ › for the next station, arrow keys on the glass (Shift or PageUp/Down jumps stations), 1–4 for presets. Presets are reading-now books, then the busiest. The needle remembers its station (`knowledge-hub:wireless-station`).
+- **Tune in** starts a Podcast episode with `mode: "broadcast"`, `sourcePageIds` = the book's notes in the running order, and `modeDial: { book, author, order }`, where `order` is one `pageId | segment | page` line per note. Episodes generate only on press; the last broadcast per book is remembered in the browser (`knowledge-hub:wireless-episodes`) and Tune in replays it from where you stopped. **Cut a new broadcast** makes a fresh one.
+- **Running order** (`runningOrder`): cold open (most-connected supporting note), then kept notes in page order: feature (supports or no stance), counterpoint (complicates), extends, crosstalk (links to another book's note), then a phone-in of up to 4 notes' open questions. Lengths cap the notes at 10 / 20 / 34.
+- **Mixer.** Supports, Counter, Extends and Crosstalk faders set the share of each kept for the *next* broadcast. Counter also sets the Podcast `disagreement` dial (mild / medium / sharp). Length pills map to the Podcast `length` dial.
+- **On air.** Running order (estimated times marked ≈ until recorded), waveform coloured by segment (bars are drawn per spoken line; widths use clip durations once loaded), transport with previous/next segment, Now card with Open note and Skip <segment>s, and Retune. **Hold this thought** pauses and opens Chat → From a book at that book and page.
+- **Backend.** `parseEpisodeCommission` accepts `sourcePageIds` (deduped, max 120); `runGenerate` retrieves only inside them and errors honestly when none are indexed. `select.ts` queries a broadcast by book title and author. `prompts/clementine-podcast.md` has a Broadcast mode section.
+- **Deploy.** The podcast kernel runs in the research Worker, which is deployed by hand: run `npm run research:deploy` from `apps/knowledge` after merge. Until then Tune in shows "The radio needs the research Worker redeployed".
 
 ## Cursor: back-end grunt only
 

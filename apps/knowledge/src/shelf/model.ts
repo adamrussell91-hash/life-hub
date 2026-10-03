@@ -56,6 +56,19 @@ export function bookKey(label: string) {
   return label.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+/** "ch 3", "chapter 3", "Ch. 12: Title" → 3 / 12. Only when the locus names no page. */
+export function parseLocusChapter(locus?: string): string | undefined {
+  if (!locus || parseLocusPage(locus)) return undefined;
+  return locus.match(/\b(?:ch(?:apter)?|chap)\.?\s*(\d{1,3}|[ivxlc]+)\b/i)?.[1]?.toLowerCase();
+}
+
+/** The start page of the chapter a locus names, from the book's facts. */
+export function chapterStartPage(chapters: Chapter[], chapter: string): number | undefined {
+  const byLabel = chapters.find(ch => ch.label?.trim().toLowerCase() === chapter);
+  const byIndex = /^\d+$/.test(chapter) ? chapters[Number(chapter) - 1] : undefined;
+  return (byLabel ?? byIndex)?.start;
+}
+
 /** "p. 42", "pp 42–45", "page 42", "42" → 42. Chapter-only loci return undefined. */
 export function parseLocusPage(locus?: string): number | undefined {
   if (!locus) return undefined;
@@ -104,7 +117,9 @@ function section(body: string, heading: RegExp): string {
 
 /** Reads the stance from a book note's "How this bears on the book" section. */
 export function stanceFromBody(body: string): ShelfStance | undefined {
-  const text = section(body, /how this bears/i).toLowerCase();
+  // The prompt asks for an explicit "Verdict: supports" line; trust it over prose.
+  const verdict = body.match(/^[\s>*_-]*verdict\s*[:：]?\s*\**\s*(supports?|complicates?|extends?)\b/im);
+  const text = verdict ? verdict[1]!.toLowerCase() : section(body, /how this bears/i).toLowerCase();
   const hit = text.match(/\b(supports?|complicates?|extends?)\b/);
   if (!hit) return undefined;
   if (hit[1]!.startsWith("support")) return "supports";

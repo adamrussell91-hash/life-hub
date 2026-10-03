@@ -476,14 +476,14 @@ function openCompose(origins: Origin[] = []) {
   render();
 }
 
-function openBookNote(book?: string) {
+function openBookNote(book?: string, locus?: string) {
   leaveSpecialRails();
   compose = null;
   activePage = null;
   enterChatRail({
     fresh: true,
     hat: "fromBook",
-    bookContext: book ? { label: book } : undefined,
+    bookContext: book ? { label: book, ...(locus ? { locus } : {}) } : undefined,
   });
   view = "chat";
   if (isPageHash(location.hash)) {
@@ -1120,8 +1120,10 @@ function renderBookshelf() {
   const unmount = mountBookshelf(host, {
     entries,
     notebookLabels: notebookCatalog().map(cover => cover.label),
-    header: supporting => pageHeader("Library", "Bookshelf", "", { supportingHtml: supporting }),
+    header: (supporting, opts) =>
+      pageHeader(opts?.eyebrow ?? "Library", opts?.title ?? "Bookshelf", opts?.actions ?? "", { supportingHtml: supporting }),
     openPage: id => void openPage(id),
+    holdThought: (bookLabel, locus) => openBookNote(bookLabel, locus),
     getPage,
     moveNotesToNotebook: async (bookLabel, noteIds, notebook) => {
       const key = bookLabel.replace(/\s+/g, " ").trim().toLowerCase();

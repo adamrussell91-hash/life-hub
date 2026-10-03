@@ -7,13 +7,16 @@ import { bookFactsPrompt, parseBookFacts } from "./facts";
 import { notesToRead, readNotesForShelf } from "./backfill";
 import { buildAtlas } from "./atlasLayout";
 import { mountAtlas } from "./atlasView";
+import { createWireless } from "./wireless";
 import type { FactsJob, ShelfData, ShelfStance } from "./schema";
 
 export type BookshelfContext = {
   entries: PageManifestEntry[];
   notebookLabels: string[];
-  /** Page header HTML (kit chrome) for the shelf view. */
-  header: (supporting: string) => string;
+  /** Page header HTML (kit chrome) for the shelf view. Title is HTML. */
+  header: (supporting: string, opts?: { eyebrow?: string; title?: string; actions?: string }) => string;
+  /** Starts a From-a-book note in Chat at this book and page (the Wireless's Hold this thought). */
+  holdThought: (bookLabel: string, locus?: string) => void;
   openPage: (id: string) => void;
   /** Fetches a note's body, for reading pages, stances and gaps out of old notes. */
   getPage: (id: string) => Promise<{ id: string; body: string }>;
@@ -27,6 +30,17 @@ export type BookshelfContext = {
 const STANCE_WORD: Record<ShelfStance, string> = { supports: "supports", complicates: "complicates", extends: "extends" };
 const PHONE = "(max-width: 720px)";
 const MODE_KEY = "knowledge-hub:shelf-mode";
+const ROOM_KEY = "knowledge-hub:shelf-room";
+
+type Room = "shelf" | "wireless";
+
+function readRoom(): Room {
+  try {
+    return localStorage.getItem(ROOM_KEY) === "wireless" ? "wireless" : "shelf";
+  } catch {
+    return "shelf";
+  }
+}
 
 function readMode(): "map" | "page" {
   try {
@@ -82,6 +96,15 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   /** Inside a book: the Atlas map or the page-by-page descent. Remembered per viewer. */
   let mode = readMode();
   let atlasTeardown: (() => void) | null = null;
+  /** The shelf as a bookcase, or as the Wireless dial. Remembered per viewer. */
+  let room: Room = readRoom();
+  const wireless = createWireless({
+    header: ctx.header,
+    openPage: ctx.openPage,
+    holdThought: ctx.holdThought,
+    toast: (message, ms) => toast(message, ms),
+    repaint: () => paint(),
+  });
   const cleanups: Array<() => void> = [];
   const phone = window.matchMedia(PHONE);
 
@@ -296,6 +319,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     const previousScroll = host.querySelector<HTMLElement>(".descent")?.scrollTop;
     atlasTeardown?.();
     atlasTeardown = null;
+    wireless.unmount();
     paintShelf();
     document.body.classList.toggle("is-bookshelf-immersive", Boolean(book));
     if (book) {
@@ -317,12 +341,50 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     return `${parts.join(" · ")}. Books sit page-edge out; every line is a note at the page you wrote it.`;
   }
 
+  function roomPillsHtml() {
+    if (!books.length) return "";
+    const pill = (value: Room, label: string) =>
+      `<button class="hub-pills__btn${room === value ? " is-active" : ""}" type="button" data-room="${value}" aria-pressed="${room === value}">${label}</button>`;
+    return `<div class="hub-pills shelf-rooms" role="group" aria-label="View">${pill("shelf", "Shelf")}${pill("wireless", "Wireless")}</div>`;
+  }
+
+  function bindRooms() {
+    host.querySelectorAll<HTMLButtonElement>("[data-room]").forEach(button => {
+      button.onclick = () => {
+        const next = button.dataset.room as Room;
+        if (next === room) return;
+        room = next;
+        try {
+          localStorage.setItem(ROOM_KEY, room);
+        } catch {
+          // Not remembered; the toggle still works this visit.
+        }
+        paint();
+      };
+    });
+  }
+
+  function paintWireless() {
+    const onAir = wireless.headerHtml();
+    host.innerHTML = `<div class="shelf-root shelf-root--wireless">
+      ${onAir ?? ctx.header(esc(loaded ? wireless.supporting() : "Warming up the valves…"))}
+      ${onAir ? "" : `<div class="shelf-tools">${roomPillsHtml()}</div>`}
+      ${loadError ? `<p class="shelf-sheet__error" role="alert">${esc(loadError)}</p>` : ""}
+      <div class="wl-room" data-wireless></div>
+    </div>`;
+    bindRooms();
+    wireless.setBooks(books);
+    wireless.mount(host.querySelector<HTMLElement>("[data-wireless]")!);
+  }
+
   function paintShelf() {
+    if (room === "wireless" && books.length) return paintWireless();
     const searching = query.trim().length > 0;
     const hits = matchShelf(books, query);
     host.innerHTML = `<div class="shelf-root">
       ${ctx.header(esc(shelfSupporting()))}
       <div class="shelf-tools">
+        ${roomPillsHtml()}
         <label class="hub-search">
           <svg class="hub-search__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input class="hub-search__input" id="shelf-search" type="search" placeholder="Find an idea across books" value="${esc(query)}" aria-label="Find an idea across books" />
@@ -338,6 +400,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         ${sideHtml(hits)}
       </div>
     </div>`;
+    bindRooms();
     const input = host.querySelector<HTMLInputElement>("#shelf-search");
     if (input) {
       input.oninput = () => {
@@ -1144,7 +1207,13 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   }
 
   const onKey = (event: KeyboardEvent) => {
-    if (event.key !== "Escape" || !active || document.querySelector(".shelf-sheet-backdrop")) return;
+    if (event.key !== "Escape" || document.querySelector(".shelf-sheet-backdrop")) return;
+    if (!active) {
+      // Escape on air goes back to the dial, unless you're typing (I8).
+      const target = event.target as HTMLElement | null;
+      if (room === "wireless" && !target?.closest("input, textarea, [contenteditable]")) wireless.escape();
+      return;
+    }
     go(undefined);
   };
   document.addEventListener("keydown", onKey);
@@ -1170,6 +1239,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     alive = false;
     window.clearTimeout(factsTimer);
     atlasTeardown?.();
+    wireless.destroy();
     document.body.classList.remove("is-bookshelf-immersive");
     for (const cleanup of cleanups.splice(0)) cleanup();
   };

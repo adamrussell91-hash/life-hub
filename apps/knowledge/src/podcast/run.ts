@@ -30,6 +30,7 @@ export type RunGenerateInput = {
   scope?: ResearchScope;
   modeDial: Record<string, string>;
   dials: PodcastDials;
+  sourcePageIds?: string[];
   topic?: string;
   series?: {
     id: string;
@@ -129,7 +130,17 @@ export async function runGenerate(input: RunGenerateInput, deps: RunGenerateDeps
   });
   const episodes = await deps.listEpisodes();
   const noteLimit = noteCap(input.dials.length, input.dials.pacing);
-  let notes = await deps.retrieve(query, input.scope, undefined, noteLimit);
+  let notes = await deps.retrieve(query, input.scope, input.sourcePageIds, noteLimit);
+
+  if (input.mode === "broadcast" && !notes.length) {
+    return PodcastEpisodeSchema.parse({
+      ...episodeBase(input, deps),
+      status: "error",
+      sourcePageIds: [],
+      turns: [],
+      error: "None of this book's notes are in the archive index yet.",
+    });
+  }
 
   if (input.mode === "recap") {
     const cutoff = recapCutoff({
