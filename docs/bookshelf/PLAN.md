@@ -7,7 +7,8 @@ Three views of the same books, built in this order. Mockups: Fore-edge (shelf + 
 - Old notes have no page. Adam places them by rough guess (the **Place loose pages** sheet). **Read my notes** fills any page the note text already names, marked as a guess.
 - Book facts (pages, chapters, edition): ~200 books is too many to paste one by one. **Fill book facts** sends every book without a page count to Claude (Opus 5.5, one Message Batch, background, half price) and fills only blank fields, marked "estimated". Books Claude doesn't recognise are listed; those go through **Book facts → Copy ChatGPT prompt** by hand (prompt in `src/shelf/facts.ts`). Pasting real facts replaces an estimate.
 - Book covers: Adam supplies a folder; Cursor adds them (job 0 below).
-- Reading now: The Knowledge Gene, The Origins of Political Order, The Enigma of Reason (just started). Set in Book facts.
+- Reading now: The Knowledge Gene, The Origins of Political Order, The Enigma of Reason (just started). Set in Book facts. The Enigma of Reason has no notes yet, so it goes on with **Add a book**.
+- Cursor's production count (manifest `3e2db217`): 298 book notes across 23 books. The book origin "~10%" is a mistake: its one note ("Design Flaws in Traditional Education…") moves to a notebook via the note's origin pill, and the book then leaves the shelf on its own.
 - Radio bands = existing Notebooks (set per book in Book facts).
 - A one-off pass over book notes to read stance and gaps is approved (it's the **Read my notes** button; it reads note text, no model call).
 - Wireless episodes generate only when Adam presses Tune in.

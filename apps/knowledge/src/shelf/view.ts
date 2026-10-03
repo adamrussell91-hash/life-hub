@@ -159,6 +159,54 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     </div>`;
   }
 
+  /** A book you're reading before any note points at it (notes add books on their own). */
+  function openAddBookSheet() {
+    const { sheet, close } = openSheet(`
+      <p class="shelf-eyebrow">Bookshelf</p>
+      <h2>Add a book</h2>
+      <div class="shelf-sheet__grid">
+        <label>Title<input type="text" id="add-title" autocomplete="off" required style="width:100%;box-sizing:border-box;padding:var(--space-2) var(--space-3);border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--warm-white);font:inherit;font-weight:400" /></label>
+        <label>Author (optional)<input type="text" id="add-author" autocomplete="off" style="width:100%;box-sizing:border-box;padding:var(--space-2) var(--space-3);border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--warm-white);font:inherit;font-weight:400" /></label>
+      </div>
+      <div class="shelf-sheet__grid">
+        <label class="shelf-sheet__check"><input type="checkbox" id="add-reading" checked /> I'm reading this now</label>
+        <label>Page I'm on<input type="number" id="add-page" min="1" inputmode="numeric" /></label>
+      </div>
+      <p class="place-readout" style="display:block">Use the exact title your notes will use, so they land on this book.</p>
+      <p class="shelf-sheet__error" data-error role="alert" hidden></p>
+      <div class="shelf-sheet__row shelf-sheet__row--end">
+        <button class="btn btn--ghost" type="button" data-cancel>Cancel</button>
+        <button class="btn btn--primary" type="button" data-save>Add to shelf</button>
+      </div>`, "Add a book");
+    const fail = (message: string) => {
+      const el = sheet.querySelector<HTMLElement>("[data-error]")!;
+      el.textContent = message;
+      el.hidden = false;
+    };
+    sheet.querySelector<HTMLButtonElement>("[data-cancel]")!.onclick = close;
+    const save = async () => {
+      const label = sheet.querySelector<HTMLInputElement>("#add-title")!.value.replace(/\s+/g, " ").trim();
+      if (!label) return fail("Give the book a title.");
+      const existing = books.find(book => book.key === label.toLowerCase());
+      if (existing) return fail(`“${existing.label}” is already on the shelf.`);
+      const author = sheet.querySelector<HTMLInputElement>("#add-author")!.value.trim();
+      const readingOn = sheet.querySelector<HTMLInputElement>("#add-reading")!.checked;
+      const page = Number(sheet.querySelector<HTMLInputElement>("#add-page")!.value);
+      try {
+        await saveFacts({
+          label,
+          ...(author ? { author } : {}),
+          ...(readingOn ? { reading: { page: Number.isInteger(page) && page > 0 ? page : null } } : {}),
+        }, `${label} is on the shelf.`);
+        close();
+      } catch (error) {
+        fail(error instanceof Error ? error.message : "Could not add the book.");
+      }
+    };
+    sheet.querySelector<HTMLButtonElement>("[data-save]")!.onclick = () => void save();
+    sheet.querySelector<HTMLInputElement>("#add-title")!.focus();
+  }
+
   function openFactsBatchSheet() {
     const targets = booksWithoutFacts();
     const { sheet, close } = openSheet(`
@@ -262,6 +310,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         </label>
         ${readButtonHtml()}
         ${factsButtonHtml()}
+        ${loaded && !loadError ? `<button class="btn btn--ghost" type="button" data-add-book>Add a book</button>` : ""}
       </div>
       ${loadError ? `<p class="shelf-sheet__error" role="alert">${esc(loadError)} Notes still show; pages and book facts are missing until it loads.</p>` : ""}
       ${books.length ? "" : loaded ? emptyHtml() : ""}
@@ -283,6 +332,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     }
     host.querySelector<HTMLButtonElement>("[data-read-notes]")?.addEventListener("click", () => void readNotes());
     host.querySelector<HTMLButtonElement>("[data-fill-facts]")?.addEventListener("click", openFactsBatchSheet);
+    host.querySelector<HTMLButtonElement>("[data-add-book]")?.addEventListener("click", openAddBookSheet);
     host.querySelector<HTMLButtonElement>("[data-facts-dismiss]")?.addEventListener("click", () => {
       try {
         if (data.factsJob) localStorage.setItem(factsDismissKey(data.factsJob), "1");
