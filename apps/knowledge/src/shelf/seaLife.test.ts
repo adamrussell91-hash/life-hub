@@ -58,6 +58,8 @@ describe("chartLandmarks", () => {
     expect(near("camp", "peak")).toBe(true);
     expect(near("mist", "range")).toBe(true);
     expect(marks.some(m => m.kind === "volcano")).toBe(false);
+    // Neither book has five notes, so no great tree yet.
+    expect(marks.some(m => m.kind === "tree")).toBe(false);
   });
 });
 

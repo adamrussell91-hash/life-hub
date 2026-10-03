@@ -62,6 +62,7 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
         <li><i class="atlas-key isles-key--lighthouse"></i>Lighthouse: written in this week</li>
         <li><i class="atlas-key isles-key--camp"></i>Campfire: the book you're reading</li>
         <li><i class="atlas-key isles-key--smoke"></i>Smoke: the book your notes argue with most</li>
+        <li><i class="atlas-key isles-key--tree"></i>Great tree: the book you've written most in</li>
         <li><i class="atlas-key isles-key--bottle"></i>Bottle: a note you haven't touched in months; a new one each day</li>
         <li><i class="atlas-key isles-key--treasure"></i>Golden X: your most-connected note</li>
         <li><i class="atlas-key isles-key--bloom"></i>Ink bloom: notes added since you last looked</li>

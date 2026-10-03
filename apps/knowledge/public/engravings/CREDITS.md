@@ -9,5 +9,5 @@ NW Portion".
 Each figure has two masks: `<name>.png` (the ink) and `<name>-fill.png` (its
 parchment silhouette). The map colours both, so they work by day and by night.
 
-`spikefish` is cut from the same plate. `lighthouse`, `campfire` and `volcano`
-are engraving-style drawings supplied by the hub's owner for this map.
+`spikefish` is cut from the same plate. `lighthouse`, `campfire`, `volcano`,
+`tree`, `lobster`, `wyvern` and `sea-serpent` are engraving-style drawings supplied by the hub's owner for this map.

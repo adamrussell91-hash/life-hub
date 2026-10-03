@@ -26,6 +26,7 @@ export type Landmark =
   | { kind: "lighthouse"; x: number; y: number }
   | { kind: "camp"; x: number; y: number }
   | { kind: "volcano"; x: number; y: number }
+  | { kind: "tree"; x: number; y: number }
   | { kind: "mist"; x: number; y: number; r: number }
   | { kind: "treasure"; x: number; y: number; noteId: string; links: number };
 
@@ -89,6 +90,10 @@ const ENGRAVINGS = {
   lighthouse: [360, 482],
   campfire: [360, 504],
   volcano: [360, 380],
+  tree: [420, 419],
+  lobster: [360, 320],
+  wyvern: [420, 380],
+  "sea-serpent": [420, 340],
 } as const;
 
 type Engraving = keyof typeof ENGRAVINGS;
@@ -365,6 +370,7 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
   for (const mark of opts.landmarks ?? []) {
     if (mark.kind === "lighthouse") parts.push(`<div class="sl-mark sl-lighthouse" style="${at(mark)};--s:${s}"><i class="sl-beam"></i>${engraving("lighthouse")}<i class="sl-lamp"></i></div>`);
     if (mark.kind === "camp") parts.push(`<div class="sl-mark sl-camp" style="${at(mark)};--s:${s}"><i class="sl-glow"></i><i class="sl-smoke"></i><i class="sl-smoke"></i>${engraving("campfire")}</div>`);
+    if (mark.kind === "tree") parts.push(`<div class="sl-mark sl-tree" style="${at(mark)};--s:${s}">${engraving("tree")}</div>`);
     if (mark.kind === "volcano") parts.push(`<div class="sl-mark sl-volcano" style="${at(mark)};--s:${s}"><i class="sl-glow"></i>${engraving("volcano")}</div>`);
     if (mark.kind === "treasure") parts.push(`<button type="button" class="sl-treasure" data-sl="treasure" style="${at(mark)};--s:${s}" aria-label="${esc(`Treasure: your most-connected note, linked ${mark.links} times`)}"><i class="sl-glint"></i>${TREASURE}</button>`);
     if (mark.kind === "mist") parts.push(`<div class="sl-mist" style="${at(mark)};--m:${(mark.r * 2.4).toFixed(0)}px;--delay:${(-roll() * 30).toFixed(1)}s"><i></i><i></i></div>`);
@@ -390,7 +396,7 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
 
   const serpent = claim(free(110 * s), 110 * s);
   if (serpent) {
-    parts.push(`<div class="sl-beast sl-beast--serpent" data-sl="serpent" style="${at(serpent)};--s:${s};--dur:41s;--delay:${(-roll() * 20).toFixed(1)}s"><div class="sl-beast__water">${engraving("serpent")}</div><i class="sl-ripple"></i></div>`);
+    parts.push(`<div class="sl-beast sl-beast--serpent" data-sl="serpent" style="${at(serpent)};--s:${s};--dur:41s;--delay:${(-roll() * 20).toFixed(1)}s"><div class="sl-beast__water">${engraving("sea-serpent")}</div><i class="sl-ripple"></i></div>`);
     const words = claim(free(80 * s, serpent), 90 * s);
     if (words) parts.push(`<span class="sl-legend" style="${at(words)};--s:${s}">Here be dragons</span>`);
   }
@@ -481,14 +487,34 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
       if (!p) return;
       spawn(layer, `<div class="sl-squall" style="${at(p)};--s:${s}"><i class="sl-rain"></i><i class="sl-cloud"></i><i class="sl-bolt"></i></div>`, 30000);
     },
+    shipTaker() {
+      // The great serpent of the Carta Marina rises with a ship in its coils.
+      const p = free(130 * s, undefined, chance) ?? free(70 * s, undefined, chance);
+      if (!p) return;
+      spawn(layer, `<div class="sl-kraken-rise sl-rise--serpent" style="${at(p)};--s:${s}"><div class="sl-kraken-window"><div>${engraving("serpent")}</div></div></div>`, 12500);
+    },
+    wyvern() {
+      // The winged sea dragon rears out of the sea, spreads its wings, and is gone.
+      const p = free(120 * s, undefined, chance) ?? free(70 * s, undefined, chance);
+      if (!p) return;
+      spawn(layer, `<div class="sl-kraken-rise sl-rise--wyvern" style="${at(p)};--s:${s}"><div class="sl-kraken-window"><div>${engraving("wyvern")}</div></div></div>`, 12500);
+    },
+    lobster() {
+      // A great lobster climbs out on some island's shore, takes a few steps, and backs into the sea.
+      const isle = opts.harbours[Math.floor(chance() * opts.harbours.length)];
+      if (!isle) return;
+      const a = chance() * Math.PI * 2;
+      const p = { x: isle.x + Math.cos(a) * (isle.r - 30 * s), y: isle.y + Math.sin(a) * (isle.r - 30 * s) };
+      spawn(layer, `<div class="sl-lobster" style="${at(p)};--s:${s};--turn:${((a * 180) / Math.PI + 90).toFixed(0)}deg">${engraving("lobster")}</div>`, 14500);
+    },
     kraken() {
       // The horned beast of the north rises from a maelstrom, looks about, and is gone.
-      const p = free(130 * s, undefined, chance);
+      const p = free(130 * s, undefined, chance) ?? free(70 * s, undefined, chance);
       if (!p) return;
       spawn(layer, `<div class="sl-kraken-rise" style="${at(p)};--s:${s}"><div class="sl-kraken-pool">${engraving("maelstrom")}</div><div class="sl-kraken-window"><div>${engraving("horned")}</div></div></div>`, 12500);
     },
   };
-  const roster: Array<[keyof typeof wonders, number]> = [["gulls", 4], ["squall", 1.4], ["kraken", 0.8]];
+  const roster: Array<[keyof typeof wonders, number]> = [["gulls", 4], ["squall", 1.4], ["lobster", 1.4], ["kraken", 0.7], ["shipTaker", 0.6], ["wyvern", 0.6]];
   const wonder = () => {
     if (!document.hidden) {
       let pickAt = chance() * roster.reduce((sum, [, weight]) => sum + weight, 0);
