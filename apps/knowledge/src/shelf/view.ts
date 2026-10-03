@@ -1,6 +1,6 @@
 import "./bookshelf.css";
 import type { PageManifestEntry } from "../domain/page";
-import { checkBookFacts, getShelf, saveBookFacts, savePlacements, startBookFacts } from "./client";
+import { checkBookFacts, deleteBookRecord, getShelf, saveBookFacts, savePlacements, startBookFacts } from "./client";
 import { CARD_HEIGHT, layoutDescent, orderedLinks, packShelf } from "./layout";
 import { buildShelf, findBook, matchShelf, type BookModel, type BookNote } from "./model";
 import { bookFactsPrompt, parseBookFacts } from "./facts";
@@ -15,6 +15,8 @@ export type BookshelfContext = {
   openPage: (id: string) => void;
   /** Fetches a note's body, for reading pages, stances and gaps out of old notes. */
   getPage: (id: string) => Promise<{ id: string; body: string }>;
+  /** Re-points these notes from the book to a notebook, saves them, and returns the refreshed archive list. */
+  moveNotesToNotebook: (bookLabel: string, noteIds: string[], notebook: string) => Promise<PageManifestEntry[]>;
   /** Book key from the URL, if the route named one. */
   initialBook?: string;
   initialNote?: string;
@@ -69,8 +71,9 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   const cleanups: Array<() => void> = [];
   const phone = window.matchMedia(PHONE);
 
+  let entries = ctx.entries;
   const rebuild = () => {
-    books = buildShelf(ctx.entries, data);
+    books = buildShelf(entries, data);
   };
 
   async function load() {
@@ -898,8 +901,20 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         <textarea id="facts-paste" spellcheck="false" placeholder='{"label": "${esc(book.label)}", "author": "…", "pages": 396, "chapters": [{"label": "1", "title": "…", "start": 11}]}'></textarea>
       </label>
       <p class="shelf-sheet__error" data-error role="alert" hidden></p>
+      <div class="shelf-remove" data-remove-panel hidden>
+        <p class="shelf-eyebrow">Remove from shelf</p>
+        ${book.noteCount
+          ? `<p>${book.noteCount} ${book.noteCount === 1 ? "note points" : "notes point"} to this book. They move to a notebook, then the book comes off the shelf. The ${book.noteCount === 1 ? "note itself is" : "notes themselves are"} kept.</p>
+             <label>Move ${book.noteCount === 1 ? "it" : "them"} to<select id="remove-notebook">${notebooks.map(label => `<option${label === book.notebook ? " selected" : ""}>${esc(label)}</option>`).join("")}</select></label>`
+          : `<p>No notes point to this book. Removing it clears its facts and reading page.</p>`}
+        <div class="shelf-sheet__row shelf-sheet__row--end">
+          <button class="btn btn--ghost" type="button" data-remove-cancel>Keep the book</button>
+          <button class="btn btn--high-sea" type="button" data-remove-confirm>${book.noteCount ? "Move and remove" : "Remove the book"}</button>
+        </div>
+      </div>
       <div class="shelf-sheet__row">
         <button class="btn btn--ghost" type="button" data-copy>Copy ChatGPT prompt</button>
+        <button class="btn btn--ghost" type="button" data-remove-open>Remove from shelf</button>
         <span style="flex:1"></span>
         <button class="btn btn--ghost" type="button" data-cancel>Cancel</button>
         <button class="btn btn--primary" type="button" data-save>Save</button>
@@ -910,6 +925,37 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       error.hidden = false;
     };
     sheet.querySelector<HTMLButtonElement>("[data-cancel]")!.onclick = close;
+    const panel = sheet.querySelector<HTMLElement>("[data-remove-panel]")!;
+    sheet.querySelector<HTMLButtonElement>("[data-remove-open]")!.onclick = () => {
+      panel.hidden = false;
+      panel.scrollIntoView({ block: "nearest" });
+    };
+    sheet.querySelector<HTMLButtonElement>("[data-remove-cancel]")!.onclick = () => {
+      panel.hidden = true;
+    };
+    sheet.querySelector<HTMLButtonElement>("[data-remove-confirm]")!.onclick = async event => {
+      const button = event.currentTarget as HTMLButtonElement;
+      button.disabled = true;
+      error.hidden = true;
+      try {
+        const ids = [...book.placed, ...book.loose].map(note => note.id);
+        if (ids.length) {
+          const notebook = sheet.querySelector<HTMLSelectElement>("#remove-notebook")!.value;
+          button.textContent = `Moving ${ids.length} ${ids.length === 1 ? "note" : "notes"}…`;
+          entries = await ctx.moveNotesToNotebook(book.label, ids, notebook);
+        }
+        await deleteBookRecord(book.label);
+        data = { ...data, books: data.books.filter(item => item.label.toLowerCase() !== book.key) };
+        close();
+        rebuild();
+        go(undefined);
+        toast(ids.length ? `${book.label} is off the shelf. Its ${ids.length === 1 ? "note is" : "notes are"} in the notebook now.` : `${book.label} is off the shelf.`);
+      } catch (err) {
+        fail(err instanceof Error ? err.message : "Could not remove the book.");
+        button.disabled = false;
+        button.textContent = book.noteCount ? "Move and remove" : "Remove the book";
+      }
+    };
     sheet.querySelector<HTMLButtonElement>("[data-copy]")!.onclick = async () => {
       const prompt = bookFactsPrompt(book.label, book.author);
       try {

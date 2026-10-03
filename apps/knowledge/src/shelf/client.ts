@@ -95,3 +95,14 @@ export async function checkBookFacts(): Promise<FactsJob> {
   if (USE_LOCAL_DATA) return { status: "none" };
   return FactsJobSchema.parse((await post<{ job: unknown }>({ op: "facts-check" })).job);
 }
+
+/** Takes a book's own record (facts, notebook, reading) off the shelf. */
+export async function deleteBookRecord(label: string): Promise<void> {
+  if (!USE_LOCAL_DATA) {
+    await post<unknown>({ op: "book-delete", label });
+    return;
+  }
+  const data = readLocal();
+  data.books = data.books.filter(book => bookKey(book.label) !== bookKey(label));
+  writeLocal(data);
+}
