@@ -61,26 +61,44 @@ export function packShelf(books: BookModel[], width: number): ShelfRowBox[] {
 }
 
 export type DescentCard = { note: BookNote; top: number; anchor: number; height: number };
-export type DescentExit = { fromId: string; top: number; anchor: number };
+export type DescentExit = { fromId: string; toId: string; top: number; anchor: number; height: number; open: boolean };
 export type DescentLayout = { pxPerPage: number; height: number; cards: DescentCard[]; exits: DescentExit[] };
 
 export const CARD_HEIGHT = 34;
 const CARD_GAP = 4;
-const EXIT_HEIGHT = 44;
+/** Closed lead: a colour bar beside the note. Open lead: the named card. */
+export const EXIT_BAR = 8;
+export const EXIT_OPEN = 52;
+const EXIT_BAR_GAP = 3;
+const EXIT_OPEN_GAP = 6;
 
 /**
  * Places each note at its page depth, then pushes cards down so none overlap.
  * The column is tall enough for every card, never shorter than the viewport.
  */
+function exitBlockHeight(count: number, open: boolean) {
+  if (!count) return 0;
+  const item = open ? EXIT_OPEN : EXIT_BAR;
+  const gap = open ? EXIT_OPEN_GAP : EXIT_BAR_GAP;
+  return count * item + (count - 1) * gap;
+}
+
 export function layoutDescent(book: BookModel, viewport: number, openId?: string, openHeight = 180): DescentLayout {
   const notes = book.placed;
+  const linksByNote = new Map<string, ReturnType<typeof orderedLinks>>();
+  for (const link of orderedLinks(book)) {
+    const list = linksByNote.get(link.fromId) ?? [];
+    list.push(link);
+    linksByNote.set(link.fromId, list);
+  }
   const place = (pxPerPage: number) => {
     let floor = -Infinity;
     return notes.map(note => {
       const anchor = (note.page! - 1) * pxPerPage;
       const height = note.id === openId ? openHeight : CARD_HEIGHT;
+      const slot = Math.max(height, exitBlockHeight(linksByNote.get(note.id)?.length ?? 0, note.id === openId));
       const top = Math.max(anchor - CARD_HEIGHT / 2, floor + CARD_GAP);
-      floor = top + height;
+      floor = top + slot;
       return { note, top, anchor, height };
     });
   };
@@ -93,17 +111,21 @@ export function layoutDescent(book: BookModel, viewport: number, openId?: string
     cards = place(pxPerPage);
   }
   const floor = cards.length ? cards[cards.length - 1]!.top + cards[cards.length - 1]!.height : 0;
-  const byId = new Map(cards.map(card => [card.note.id, card]));
-  let exitFloor = -Infinity;
   const exits: DescentExit[] = [];
-  for (const link of orderedLinks(book)) {
-    const card = byId.get(link.fromId);
-    if (!card) continue;
+  for (const card of cards) {
+    const links = linksByNote.get(card.note.id) ?? [];
+    const open = card.note.id === openId;
+    const height = open ? EXIT_OPEN : EXIT_BAR;
+    const gap = open ? EXIT_OPEN_GAP : EXIT_BAR_GAP;
+    const block = exitBlockHeight(links.length, open);
     const anchor = card.top + Math.min(card.height, CARD_HEIGHT) / 2;
-    const top = Math.max(anchor - EXIT_HEIGHT / 2, exitFloor + 8);
-    exitFloor = top + EXIT_HEIGHT;
-    exits.push({ fromId: link.fromId, top, anchor });
+    let top = block > Math.min(card.height, CARD_HEIGHT) ? card.top : anchor - block / 2;
+    for (const link of links) {
+      exits.push({ fromId: link.fromId, toId: link.toId, top, anchor, height, open });
+      top += height + gap;
+    }
   }
+  const exitFloor = exits.length ? exits[exits.length - 1]!.top + exits[exits.length - 1]!.height : 0;
   const height = Math.max(book.pages * pxPerPage, floor, exitFloor) + 24;
   return { pxPerPage, height, cards, exits };
 }
