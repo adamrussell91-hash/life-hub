@@ -2687,9 +2687,23 @@ body.is-map-expanded {
   transform: translate(-50%, -88%);
 }
 
-.sl-lighthouse { width: calc(16px * var(--s)); }
-.sl-camp { width: calc(22px * var(--s)); }
-.sl-volcano { width: calc(30px * var(--s)); }
+.sl-lighthouse { width: calc(22px * var(--s)); }
+.sl-camp { width: calc(20px * var(--s)); }
+.sl-volcano { width: calc(38px * var(--s)); }
+
+/* The campfire breathes; the volcano's plume leans in the wind. */
+.sl-camp .sl-engraving { transform-origin: 50% 100%; animation: sl-burn 1.6s ease-in-out infinite alternate; }
+.sl-volcano .sl-engraving { transform-origin: 50% 100%; animation: sl-lean 9s ease-in-out infinite alternate; }
+
+@keyframes sl-burn {
+  to { transform: scale(1.02, 1.05); }
+}
+
+@keyframes sl-lean {
+  to { transform: skewX(-2.5deg); }
+}
+
+.sl-beast--spikefish { width: calc(90px * var(--s)); }
 
 .sl-flame path { fill: #f68620; stroke: #c0392b; stroke-width: 0.8; }
 .sl-lava { fill: #b5532e; stroke: none; }
@@ -2717,8 +2731,8 @@ body.is-map-expanded {
 }
 
 .sl-lamp {
-  left: 50%;
-  top: 26%;
+  left: 47%;
+  top: 14%;
   width: 34%;
   aspect-ratio: 1;
   border-radius: 50%;
@@ -2729,8 +2743,8 @@ body.is-map-expanded {
 }
 
 .sl-beam {
-  left: 50%;
-  top: 26%;
+  left: 47%;
+  top: 14%;
   width: calc(260px * var(--s));
   aspect-ratio: 1;
   border-radius: 50%;
@@ -2772,7 +2786,8 @@ body.is-map-expanded {
   animation: sl-flicker-glow 1.8s ease-in-out infinite alternate;
 }
 
-.sl-volcano .sl-glow { top: 20%; background: radial-gradient(closest-side, rgba(255, 96, 40, 0.6), rgba(255, 60, 20, 0)); }
+.sl-camp .sl-glow { top: 58%; }
+.sl-volcano .sl-glow { top: 46%; width: 120%; background: radial-gradient(closest-side, rgba(255, 96, 40, 0.6), rgba(255, 60, 20, 0)); }
 .atlas[data-sky="dusk"] .sl-glow { opacity: 0.5; }
 .atlas[data-sky="night"] .sl-glow { opacity: 1; }
 
@@ -2784,8 +2799,8 @@ body.is-map-expanded {
 /* Smoke: soft puffs that rise, drift with the wind and fade. */
 .sl-smoke {
   position: absolute;
-  left: 72%;
-  top: 30%;
+  left: 30%;
+  top: 0;
   width: 40%;
   aspect-ratio: 1;
   border-radius: 50%;

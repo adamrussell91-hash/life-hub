@@ -85,6 +85,10 @@ const ENGRAVINGS = {
   physeter: [254, 280],
   horned: [315, 304],
   maelstrom: [194, 184],
+  spikefish: [364, 187],
+  lighthouse: [360, 482],
+  campfire: [360, 504],
+  volcano: [360, 380],
 } as const;
 
 type Engraving = keyof typeof ENGRAVINGS;
@@ -113,26 +117,8 @@ const COMPASS = `<svg viewBox="0 0 100 100" aria-hidden="true">
   <text class="sl-n" x="50" y="6" text-anchor="middle">N</text>
 </svg>`;
 
-const LIGHTHOUSE = `<svg viewBox="0 0 24 50" aria-hidden="true">
-  <path class="i-fill" d="M1 49c2-6 8-8 11-8s9 2 11 8z"/>
-  <path class="i-fill" d="M8 43l2-28h4l2 28z"/>
-  <path class="i-hatch" d="M9 36h6M9.2 33h5.6M9.6 26h4.8M9.7 23h4.6M3 47l3-3M18 47l3-3"/>
-  <path class="i-fill sl-lantern" d="M9 15h6v-4H9z"/>
-  <path class="i-solid" d="M8 11l4-4 4 4z"/>
-</svg>`;
 
-const CAMP = `<svg viewBox="0 0 30 24" aria-hidden="true">
-  <path class="i-fill" d="M2 22L11 6l9 16z"/>
-  <path class="i-hatch" d="M11 6v16M13 10l4 10M14 14l2 6"/>
-  <g class="sl-flame"><path d="M23 21c-3-2-3-6 0-10 1 3 4 4 3 7 0 2-1 3-3 3z"/></g>
-  <path class="i-line" d="M19 22l8-2M19 20l8 2"/>
-</svg>`;
 
-const VOLCANO = `<svg viewBox="0 0 40 26" aria-hidden="true">
-  <path class="i-fill" d="M2 25l13-18h10l13 18z"/>
-  <path class="i-hatch" d="M24 9l4 14M26 11l6 12M28 14l6 9M16 9l-4 14"/>
-  <path class="sl-lava" d="M16 7h8l-2 5-2-2-2 4z"/>
-</svg>`;
 
 const BOTTLE = `<svg viewBox="0 0 34 16" aria-hidden="true">
   <path class="i-fill sl-glass" d="M3 5h18c3 0 5 1 6 2h4v2h-4c-1 1-3 2-6 2H3c-2 0-2-6 0-6z"/>
@@ -377,9 +363,9 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
 
   // Landmarks first: they belong to islands, so they never move.
   for (const mark of opts.landmarks ?? []) {
-    if (mark.kind === "lighthouse") parts.push(`<div class="sl-mark sl-lighthouse" style="${at(mark)};--s:${s}"><i class="sl-beam"></i><i class="sl-lamp"></i>${LIGHTHOUSE}</div>`);
-    if (mark.kind === "camp") parts.push(`<div class="sl-mark sl-camp" style="${at(mark)};--s:${s}"><i class="sl-glow"></i><i class="sl-smoke"></i><i class="sl-smoke"></i>${CAMP}</div>`);
-    if (mark.kind === "volcano") parts.push(`<div class="sl-mark sl-volcano" style="${at(mark)};--s:${s}"><i class="sl-glow"></i><i class="sl-smoke"></i><i class="sl-smoke"></i><i class="sl-smoke"></i>${VOLCANO}</div>`);
+    if (mark.kind === "lighthouse") parts.push(`<div class="sl-mark sl-lighthouse" style="${at(mark)};--s:${s}"><i class="sl-beam"></i>${engraving("lighthouse")}<i class="sl-lamp"></i></div>`);
+    if (mark.kind === "camp") parts.push(`<div class="sl-mark sl-camp" style="${at(mark)};--s:${s}"><i class="sl-glow"></i><i class="sl-smoke"></i><i class="sl-smoke"></i>${engraving("campfire")}</div>`);
+    if (mark.kind === "volcano") parts.push(`<div class="sl-mark sl-volcano" style="${at(mark)};--s:${s}"><i class="sl-glow"></i>${engraving("volcano")}</div>`);
     if (mark.kind === "treasure") parts.push(`<button type="button" class="sl-treasure" data-sl="treasure" style="${at(mark)};--s:${s}" aria-label="${esc(`Treasure: your most-connected note, linked ${mark.links} times`)}"><i class="sl-glint"></i>${TREASURE}</button>`);
     if (mark.kind === "mist") parts.push(`<div class="sl-mist" style="${at(mark)};--m:${(mark.r * 2.4).toFixed(0)}px;--delay:${(-roll() * 30).toFixed(1)}s"><i></i><i></i></div>`);
   }
@@ -412,6 +398,9 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
   if (whale) parts.push(`<div class="sl-beast sl-beast--whale" data-sl="whale" style="${at(whale)};--s:${s};--dur:29s;--delay:${(-roll() * 27).toFixed(1)}s"><div class="sl-beast__water">${engraving("ziphius")}</div><i class="sl-ripple"></i></div>`);
   const physeter = claim(free(90 * s), 70 * s);
   if (physeter) parts.push(`<div class="sl-beast sl-beast--physeter" data-sl="physeter" style="${at(physeter)};--s:${s};--dur:37s;--delay:${(-roll() * 37).toFixed(1)}s"><div class="sl-beast__water">${engraving("physeter")}</div><i class="sl-ripple"></i></div>`);
+
+  const spikefish = claim(free(80 * s), 60 * s);
+  if (spikefish) parts.push(`<div class="sl-beast sl-beast--spikefish" data-sl="physeter" style="${at(spikefish)};--s:${s};--dur:33s;--delay:${(-roll() * 33).toFixed(1)}s"><div class="sl-beast__water">${engraving("spikefish")}</div><i class="sl-ripple"></i></div>`);
 
   // The maelstrom turns forever in the deepest water.
   const pool = claim(free(120 * s), 80 * s);
