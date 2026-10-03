@@ -1,13 +1,16 @@
 import "./bookshelf.css";
 import type { PageManifestEntry } from "../domain/page";
 import { checkBookFacts, deleteBookRecord, getShelf, saveBookFacts, savePlacements, startBookFacts } from "./client";
-import { CARD_HEIGHT, layoutDescent, orderedLinks, packShelf } from "./layout";
+import { CARD_HEIGHT, COVER_SET_GAP, coverWidth, layoutDescent, orderedLinks, packCovers, packShelf, type CoverBox } from "./layout";
+import { openCover, snapshotBooks, turnBooks } from "./turn";
 import { buildShelf, findBook, matchShelf, type BookModel, type BookNote } from "./model";
 import { bookFactsPrompt, parseBookFacts } from "./facts";
 import { notesToRead, readNotesForShelf } from "./backfill";
 import { buildAtlas } from "./atlasLayout";
 import { mountAtlas } from "./atlasView";
 import { AIR_ROUTE, createWireless } from "./wireless";
+import { buildArchipelago } from "./archipelagoLayout";
+import { mountArchipelago } from "./archipelagoView";
 import type { FactsJob, ShelfData, ShelfStance } from "./schema";
 
 export type BookshelfContext = {
@@ -31,12 +34,25 @@ const STANCE_WORD: Record<ShelfStance, string> = { supports: "supports", complic
 const PHONE = "(max-width: 720px)";
 const MODE_KEY = "knowledge-hub:shelf-mode";
 const ROOM_KEY = "knowledge-hub:shelf-room";
+const FACE_KEY = "knowledge-hub:shelf-face";
 
-type Room = "shelf" | "wireless";
+/** Which way the books face on the shelf. Covers by default; searching turns them to page edges. */
+type Face = "covers" | "edges";
+
+function readFace(): Face {
+  try {
+    return localStorage.getItem(FACE_KEY) === "edges" ? "edges" : "covers";
+  } catch {
+    return "covers";
+  }
+}
+
+type Room = "shelf" | "islands" | "wireless";
 
 function readRoom(): Room {
   try {
-    return localStorage.getItem(ROOM_KEY) === "wireless" ? "wireless" : "shelf";
+    const stored = localStorage.getItem(ROOM_KEY);
+    return stored === "wireless" || stored === "islands" ? stored : "shelf";
   } catch {
     return "shelf";
   }
@@ -98,8 +114,12 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   /** Inside a book: the Atlas map or the page-by-page descent. Remembered per viewer. */
   let mode = readMode();
   let atlasTeardown: (() => void) | null = null;
+  let archTeardown: (() => void) | null = null;
   /** The shelf as a bookcase, or as the Wireless dial. Remembered per viewer. */
   let room: Room = pendingAir ? "wireless" : readRoom();
+  let face: Face = readFace();
+  /** Search threads live on the page edges, so a query always shows them. */
+  const shownFace = (): Face => (query.trim() ? "edges" : face);
   const wireless = createWireless({
     header: ctx.header,
     openPage: ctx.openPage,
@@ -189,8 +209,16 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     } catch {
       // Storage blocked: show the card; dismiss just won't stick.
     }
-    const misses = [...(job.unknown ?? []), ...(job.failed ?? [])];
-    const low = job.lowConfidence ?? [];
+    // The job's lists are a snapshot from when it finished: drop books since removed or filled in.
+    const shelfBook = (label: string) => books.find(b => b.label.toLowerCase() === label.toLowerCase());
+    const misses = [...(job.unknown ?? []), ...(job.failed ?? [])].filter(label => {
+      const book = shelfBook(label);
+      return book && !book.pagesKnown;
+    });
+    const low = (job.lowConfidence ?? []).filter(label => {
+      const book = shelfBook(label);
+      return book && !book.chapters.length;
+    });
     const open = (label: string) => {
       const book = books.find(b => b.label.toLowerCase() === label.toLowerCase());
       return book ? `<li><button type="button" data-open-book="${esc(book.key)}">${esc(label)}</button></li>` : `<li>${esc(label)}</li>`;
@@ -351,20 +379,59 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
 
   // ── Shelf ────────────────────────────────────────────────────────────
 
+  /** Header line (HTML): counts, a way into the loose pile, and what this face shows. */
   function shelfSupporting() {
     if (!loaded) return "Taking the books down…";
     const notes = books.reduce((sum, book) => sum + book.noteCount, 0);
     const loose = books.reduce((sum, book) => sum + book.loose.length, 0);
     const parts = [`${books.length} ${books.length === 1 ? "book" : "books"}`, `${notes} ${notes === 1 ? "note" : "notes"}`];
-    if (loose) parts.push(`${loose} still need a page`);
-    return `${parts.join(" · ")}. Books sit page-edge out; every line is a note at the page you wrote it.`;
+    if (loose) parts.push(`<button class="shelf-inline-link" type="button" data-place-all title="Place them at a rough page, book by book">${loose} still ${loose === 1 ? "needs" : "need"} a page</button>`);
+    const what = shownFace() === "covers"
+      ? "Covers face out; turn them to page edges to see where in each book you wrote."
+      : "Books sit page-edge out; every line is a note at the page you wrote it.";
+    return `${parts.join(" · ")}. ${what}`;
+  }
+
+  function facePillsHtml() {
+    if (!books.length) return "";
+    const shown = shownFace();
+    const pill = (value: Face, label: string) =>
+      `<button class="hub-pills__btn${shown === value ? " is-active" : ""}" type="button" data-face="${value}" aria-pressed="${shown === value}">${label}</button>`;
+    return `<div class="hub-pills shelf-faces" role="group" aria-label="Books face">${pill("covers", "Covers")}${pill("edges", "Page edges")}</div>`;
+  }
+
+  /** Repaints the shelf, turning the books when the face changes. */
+  function turnShelf(change: () => void) {
+    const stage = host.querySelector<HTMLElement>("[data-stage]");
+    const was = shownFace();
+    const before = stage ? snapshotBooks(stage) : null;
+    const scrollY = window.scrollY;
+    change();
+    paintShelf();
+    // Repainting can clamp the scroll while the stage is empty; keep the shelf where it was.
+    if (window.scrollY !== scrollY) window.scrollTo(0, scrollY);
+    const next = host.querySelector<HTMLElement>("[data-stage]");
+    if (before && next && was !== shownFace()) void turnBooks(host.querySelector<HTMLElement>(".shelf-root") ?? host, before, next);
+  }
+
+  function setFace(next: Face) {
+    turnShelf(() => {
+      face = next;
+      // Choosing covers clears a search, since the search threads need page edges.
+      if (next === "covers") query = "";
+      try {
+        localStorage.setItem(FACE_KEY, face);
+      } catch {
+        // Not remembered; the turn still happens.
+      }
+    });
   }
 
   function roomPillsHtml() {
     if (!books.length) return "";
     const pill = (value: Room, label: string) =>
       `<button class="hub-pills__btn${room === value ? " is-active" : ""}" type="button" data-room="${value}" aria-pressed="${room === value}">${label}</button>`;
-    return `<div class="hub-pills shelf-rooms" role="group" aria-label="View">${pill("shelf", "Shelf")}${pill("wireless", "Wireless")}</div>`;
+    return `<div class="hub-pills shelf-rooms" role="group" aria-label="View">${pill("shelf", "Shelf")}${pill("islands", "Islands")}${pill("wireless", "Wireless")}</div>`;
   }
 
   function bindRooms() {
@@ -396,21 +463,58 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     wireless.mount(host.querySelector<HTMLElement>("[data-wireless]")!);
   }
 
+  /** The book you last opened from the islands, so coming back lands on it. */
+  let lastIsland: string | undefined;
+
+  function paintIslands() {
+    const notes = books.reduce((sum, book) => sum + book.noteCount, 0);
+    const links = new Set(books.flatMap(book => book.links.map(l => [l.fromId, l.toId].sort().join("|")))).size;
+    host.innerHTML = `<div class="shelf-root">
+      ${ctx.header(esc(`${books.length} books · ${notes} notes · ${links} ${links === 1 ? "link" : "links"} between books. Each book is an island, as big as what you've written in it; notebooks are its sea.`))}
+      <div class="shelf-tools">${roomPillsHtml()}</div>
+      <div class="isles-room" data-isles></div>
+    </div>`;
+    bindRooms();
+    // A book is open over the shelf: don't chart islands nobody can see.
+    if (active) return;
+    const model = buildArchipelago(books, Date.now(), phone.matches ? "tall" : "wide");
+    archTeardown = mountArchipelago(host.querySelector<HTMLElement>("[data-isles]")!, model, {
+      focusBook: lastIsland,
+      openBook: (key, noteId) => {
+        lastIsland = key;
+        go(key, noteId);
+      },
+      openByPage: key => {
+        lastIsland = key;
+        mode = "page";
+        try {
+          localStorage.setItem(MODE_KEY, mode);
+        } catch {
+          // The view still switches for this visit.
+        }
+        go(key);
+      },
+    });
+  }
+
   function paintShelf() {
+    archTeardown?.();
+    archTeardown = null;
     if (room === "wireless" && books.length) return paintWireless();
+    if (room === "islands" && books.length) return paintIslands();
     const searching = query.trim().length > 0;
     const hits = matchShelf(books, query);
     host.innerHTML = `<div class="shelf-root">
-      ${ctx.header(esc(shelfSupporting()))}
+      ${ctx.header(shelfSupporting())}
       <div class="shelf-tools">
         ${roomPillsHtml()}
+        ${facePillsHtml()}
+        <span class="shelf-tools__break" aria-hidden="true"></span>
         <label class="hub-search">
           <svg class="hub-search__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input class="hub-search__input" id="shelf-search" type="search" placeholder="Find an idea across books" value="${esc(query)}" aria-label="Find an idea across books" />
         </label>
-        ${readButtonHtml()}
-        ${factsButtonHtml()}
-        ${loaded && !loadError ? `<button class="btn btn--ghost" type="button" data-add-book>Add a book</button>` : ""}
+        ${toolActionsHtml()}
       </div>
       ${loadError ? `<p class="shelf-sheet__error" role="alert">${esc(loadError)} Notes still show; pages and book facts are missing until it loads.</p>` : ""}
       ${books.length ? "" : loaded ? emptyHtml() : ""}
@@ -420,20 +524,29 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       </div>
     </div>`;
     bindRooms();
+    host.querySelectorAll<HTMLButtonElement>("[data-face]").forEach(button => {
+      button.onclick = () => {
+        const next = button.dataset.face as Face;
+        if (next !== shownFace() || next !== face) setFace(next);
+      };
+    });
+    host.querySelector<HTMLButtonElement>("[data-place-all]")?.addEventListener("click", openPlaceAll);
     const input = host.querySelector<HTMLInputElement>("#shelf-search");
     if (input) {
       input.oninput = () => {
-        query = input.value;
         const caret = input.selectionStart;
-        paintShelf();
+        turnShelf(() => {
+          query = input.value;
+        });
         const next = host.querySelector<HTMLInputElement>("#shelf-search");
         next?.focus();
         if (caret !== null) next?.setSelectionRange(caret, caret);
       };
     }
-    host.querySelector<HTMLButtonElement>("[data-read-notes]")?.addEventListener("click", () => void readNotes());
-    host.querySelector<HTMLButtonElement>("[data-fill-facts]")?.addEventListener("click", openFactsBatchSheet);
-    host.querySelector<HTMLButtonElement>("[data-add-book]")?.addEventListener("click", openAddBookSheet);
+    const closeMore = () => host.querySelector<HTMLDetailsElement>(".shelf-tools__more")?.removeAttribute("open");
+    host.querySelectorAll<HTMLButtonElement>("[data-read-notes]").forEach(b => b.addEventListener("click", () => { closeMore(); void readNotes(); }));
+    host.querySelectorAll<HTMLButtonElement>("[data-fill-facts]").forEach(b => b.addEventListener("click", () => { closeMore(); openFactsBatchSheet(); }));
+    host.querySelectorAll<HTMLButtonElement>("[data-add-book]").forEach(b => b.addEventListener("click", () => { closeMore(); openAddBookSheet(); }));
     host.querySelector<HTMLButtonElement>("[data-facts-dismiss]")?.addEventListener("click", () => {
       try {
         if (data.factsJob) localStorage.setItem(factsDismissKey(data.factsJob), "1");
@@ -446,7 +559,21 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       button.onclick = () => go(button.dataset.openBook, button.dataset.note || undefined);
     });
     const stage = host.querySelector<HTMLElement>("[data-stage]");
-    if (stage && books.length) drawShelf(stage, hits);
+    if (stage && books.length) {
+      if (shownFace() === "covers") drawCovers(stage);
+      else drawShelf(stage, hits);
+    }
+  }
+
+  /** Occasional shelf actions: inline on desktop, one "⋯" menu on a phone so the toolbar stays two rows (L5). */
+  function toolActionsHtml() {
+    const actions = [readButtonHtml(), factsButtonHtml(), loaded && !loadError ? `<button class="btn btn--ghost" type="button" data-add-book>Add a book</button>` : ""].filter(Boolean);
+    if (!actions.length) return "";
+    return `<div class="shelf-tools__wide">${actions.join("")}</div>
+      <details class="shelf-tools__more">
+        <summary class="btn btn--ghost" aria-label="More shelf actions">⋯</summary>
+        <div class="shelf-tools__menu">${actions.join("")}</div>
+      </details>`;
   }
 
   function factsButtonHtml() {
@@ -543,6 +670,43 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       <p class="shelf-eyebrow">Reading now</p>
       <ul>${reading.map(book => `<li><button type="button" class="shelf-reading" data-open-book="${esc(book.key)}">${coverImg(book, "shelf-reading__cover")}${esc(book.label)}</button><span>${book.reading?.page ? `p.${book.reading.page}` : "just started"}</span></li>`).join("")}</ul>
     </div>`;
+  }
+
+  function drawCovers(stage: HTMLElement) {
+    const width = (stage.clientWidth || 900) - 24;
+    const rows = packCovers(books, width, coverWidth(width, phone.matches));
+    stage.innerHTML = rows.map(row => {
+      let x = 12;
+      const plaques: string[] = [];
+      const sets = row.sets.map(set => {
+        plaques.push(`<span class="shelf-plaque" style="left:${x}px;max-width:${Math.max(set.width, 120)}px;overflow:hidden;text-overflow:ellipsis">${esc(set.notebook ?? "No notebook yet")}</span>`);
+        x += set.width + COVER_SET_GAP;
+        return `<div class="shelf-coverset">${set.books.map(coverHtml).join("")}</div>`;
+      }).join("");
+      return `<div class="shelf-row shelf-row--covers">${sets}${plaques.join("")}</div>`;
+    }).join("");
+    stage.querySelectorAll<HTMLButtonElement>(".shelf-cover").forEach(button => {
+      button.onclick = () => openCover(button, () => go(button.dataset.book));
+    });
+  }
+
+  function coverHtml(box: CoverBox) {
+    const book = box.book;
+    const progress = book.reading ? Math.max(3, Math.min(100, ((book.reading.page ?? 0) / book.pages) * 100)) : null;
+    const reading = book.reading ? `, reading${book.reading.page ? ` p.${book.reading.page}` : ", just started"}` : "";
+    const label = `${book.label}${book.author ? ` by ${book.author}` : ""}, ${book.noteCount} ${book.noteCount === 1 ? "note" : "notes"}${reading}`;
+    return `<button type="button" class="shelf-cover" data-book="${esc(book.key)}" title="${esc(label)}" aria-label="${esc(label)}"
+      style="width:${box.width}px;height:${box.height}px;--c:${book.swatch.fill};--c-ink:${book.swatch.ink}">
+      ${book.cover ? `<img src="${esc(book.cover)}" alt="" loading="lazy" decoding="async" />` : `<span class="shelf-cover__made"><b>${esc(book.label)}</b><i>${esc(book.author ?? "")}</i></span>`}
+      <span class="shelf-cover__count${book.noteCount ? "" : " is-empty"}">${book.noteCount}</span>
+      ${progress !== null ? `<span class="shelf-cover__progress"><i style="width:${progress}%"></i></span>` : ""}
+    </button>`;
+  }
+
+  /** Every book's loose pages, one book after another, most loose first. */
+  function openPlaceAll() {
+    const queue = books.filter(book => book.loose.length).sort((a, b) => b.loose.length - a.loose.length);
+    if (queue.length) openPlaceSheet(queue[0]!, queue.slice(1).map(book => book.key));
   }
 
   function drawShelf(stage: HTMLElement, hits: Set<string>) {
@@ -826,7 +990,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       </div></div>
       <div class="descent__col" style="height:${layout.height}px">
         ${book.chapters.length
-          ? chapterTops(book, y).map(({ ch, top }) => `<div class="descent__chapter" style="top:${top}px"><b>${esc(ch.label ? `${ch.label} · ${ch.title}` : ch.title)}</b><span>${ch.noteCount ? `${ch.noteCount} ${ch.noteCount === 1 ? "note" : "notes"}` : "no notes"}</span></div>`).join("")
+          ? chapterTops(book, y).map(({ ch, top }) => `<div class="descent__chapter${ch.noteCount ? "" : " is-empty"}" style="top:${top}px" data-top="${top}" title="${esc(ch.label ? `${ch.label} · ${ch.title}` : ch.title)}"><span>${esc([ch.label ? `Ch ${ch.label}` : "", ch.noteCount ? `${ch.noteCount} ${ch.noteCount === 1 ? "note" : "notes"}` : "no notes"].filter(Boolean).join(" · "))}</span><b>${esc(ch.title)}</b></div>`).join("")
           : `<p class="descent__hint">No chapters yet.<br />Add them in Book facts.</p>`}
       </div>
       <div class="descent__col descent__core" style="height:${layout.height}px">
@@ -852,6 +1016,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
 
     bindNotes(body, book);
     body.querySelector<HTMLButtonElement>("[data-place-bottom]")?.addEventListener("click", () => openPlaceSheet(book));
+    settleChapterLabels(body);
 
     // Leader lines: tick → card, card → exit. Measured after layout so columns can flex.
     const svg = body.querySelector<SVGSVGElement>("[data-links]")!;
@@ -910,6 +1075,19 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   }
 
   /** Chapter labels sit at their start page but never on top of each other. */
+  /** Chapter labels sit at their first page, pushed down by their real height so wrapped titles never overlap (C1). */
+  function settleChapterLabels(body: HTMLElement) {
+    const labels = [...body.querySelectorAll<HTMLElement>(".descent__chapter")];
+    let floor = -Infinity;
+    for (const label of labels) {
+      const top = Math.max(Number(label.dataset.top) || 0, floor + 10);
+      label.style.top = `${top}px`;
+      floor = top + label.offsetHeight;
+    }
+    const column = labels[0]?.parentElement;
+    if (column && floor > column.offsetHeight) column.style.height = `${Math.ceil(floor + 12)}px`;
+  }
+
   function chapterTops(book: BookModel, y: (page: number) => number) {
     let floor = -Infinity;
     return book.chapters.map(ch => {
@@ -1128,7 +1306,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     };
   }
 
-  function openPlaceSheet(book: BookModel) {
+  function openPlaceSheet(book: BookModel, nextBooks: string[] = []) {
     const queue = [...book.loose];
     if (!queue.length) return;
     let index = 0;
@@ -1149,10 +1327,21 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       const note = queue[index];
       const host = sheet.querySelector<HTMLElement>("[data-place-body]")!;
       if (!note) {
+        const nextKey = nextBooks.find(key => findBook(books, key)?.loose.length);
+        const nextBook = nextKey ? findBook(books, nextKey) : undefined;
         host.innerHTML = `<p class="shelf-eyebrow">Done</p><h2>${placedCount} ${placedCount === 1 ? "page" : "pages"} placed</h2>
           <p class="place-readout">${queue.length - placedCount ? `${queue.length - placedCount} skipped. They stay on the loose pile.` : "Every note in this book now has a page."}</p>
-          <div class="shelf-sheet__row shelf-sheet__row--end"><button class="btn btn--primary" type="button" data-close>Back to the book</button></div>`;
+          <div class="shelf-sheet__row shelf-sheet__row--end">
+            <button class="btn ${nextBook ? "btn--ghost" : "btn--primary"}" type="button" data-close>${nextBook ? "Stop here" : "Done"}</button>
+            ${nextBook ? `<button class="btn btn--primary" type="button" data-next>Next: ${esc(nextBook.label)} (${nextBook.loose.length})</button>` : ""}
+          </div>`;
         host.querySelector<HTMLButtonElement>("[data-close]")!.onclick = close;
+        host.querySelector<HTMLButtonElement>("[data-next]")?.addEventListener("click", () => {
+          close();
+          // close() rebuilt the shelf; carry on with the fresh copy of the next book.
+          const fresh = findBook(books, nextKey!);
+          if (fresh) openPlaceSheet(fresh, nextBooks.slice(nextBooks.indexOf(nextKey!) + 1));
+        });
         return;
       }
       const ch = chapterAt(current);
@@ -1242,8 +1431,9 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   const onResize = () => {
     cancelAnimationFrame(resizeFrame);
     resizeFrame = requestAnimationFrame(() => {
-      // The map handles its own resizing; repainting would throw away the pan and zoom.
+      // The maps handle their own resizing; repainting would throw away the pan and zoom (V7).
       if (active && mode === "map") return;
+      if (!active && room === "islands") return;
       if (!phone.matches || !active) paint();
     });
   };
@@ -1258,6 +1448,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     alive = false;
     window.clearTimeout(factsTimer);
     atlasTeardown?.();
+    archTeardown?.();
     wireless.destroy();
     document.body.classList.remove("is-bookshelf-immersive");
     for (const cleanup of cleanups.splice(0)) cleanup();
