@@ -1,9 +1,9 @@
-import { writeSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeSync } from "node:fs";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { PageSchema, type Page, type PageManifestEntry } from "../src/domain/page";
 import { bookLabelFromOrigins, mergeManifestConnected, runCrossBook, type CrossBookNote } from "../src/curator/crossBook";
-import { DEFAULT_JUDGE_MODEL, judgeLinksDetailed } from "../src/curator/propose";
+import { DEFAULT_JUDGE_MODEL, judgeLinksDetailed, type JudgedLink } from "../src/curator/propose";
 import { appendProposals } from "../src/curator/proposals";
 import { excerptLine } from "../src/curator/run";
 import type { AutoApproved, DismissedPair, PendingProposal } from "../src/curator/schema";
@@ -12,7 +12,27 @@ import { loadDotEnv } from "./loadLocalPages";
 /** Published Claude Sonnet 4.6 rates. Update these if DEFAULT_JUDGE_MODEL changes. */
 const SONNET_INPUT_PER_MTOK = 3;
 const SONNET_OUTPUT_PER_MTOK = 15;
-const JUDGE_CONCURRENCY = 6;
+const JUDGE_CONCURRENCY = 12;
+const CACHE_PATH = "/tmp/cross-book-judgements.jsonl";
+
+type CachedJudgement = {
+  noteId: string;
+  links: JudgedLink[];
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+};
+
+function loadCache() {
+  const cache = new Map<string, CachedJudgement>();
+  if (!existsSync(CACHE_PATH)) return cache;
+  for (const line of readFileSync(CACHE_PATH, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    const row = JSON.parse(line) as CachedJudgement;
+    if (row.noteId) cache.set(row.noteId, row);
+  }
+  return cache;
+}
 
 function say(line: string) {
   writeSync(1, `${line}\n`);
@@ -77,7 +97,8 @@ async function main() {
   let outputTokens = 0;
   let model = DEFAULT_JUDGE_MODEL;
   let judgeCalls = 0;
-  say(`loaded ${notes.length} book notes (${unreadable} unreadable)`);
+  const cache = loadCache();
+  say(`loaded ${notes.length} book notes (${unreadable} unreadable), cache ${cache.size}`);
   const result = await runCrossBook({
     notes,
     pending,
@@ -91,19 +112,40 @@ async function main() {
       say(`judged ${info.done}/${info.total} ${info.noteId}`);
     },
     judge: async (note, candidates) => {
+      const cached = cache.get(note.id);
+      if (cached) {
+        inputTokens += cached.inputTokens;
+        outputTokens += cached.outputTokens;
+        model = cached.model;
+        return cached.links;
+      }
       const page = pages.get(note.id);
       if (!page) return [];
       const ask = () => judgeLinksDetailed({ note: page, candidates, apiKey: anthropic });
-      let judged;
-      try {
-        judged = await ask();
-      } catch (error) {
-        say(`retry ${note.id}: ${error instanceof Error ? error.message : "judge failed"}`);
-        judged = await ask();
+      let judged: Awaited<ReturnType<typeof judgeLinksDetailed>> | undefined;
+      for (let attempt = 1; attempt <= 4; attempt += 1) {
+        try {
+          judged = await ask();
+          break;
+        } catch (error) {
+          say(`retry ${attempt} ${note.id}: ${error instanceof Error ? error.message : "judge failed"}`);
+          if (attempt === 4) return [];
+          await new Promise(resolve => setTimeout(resolve, 1000 * 2 ** attempt));
+        }
       }
+      if (!judged) return [];
       inputTokens += judged.usage.input_tokens;
       outputTokens += judged.usage.output_tokens;
       model = judged.model;
+      const row: CachedJudgement = {
+        noteId: note.id,
+        links: judged.links,
+        model: judged.model,
+        inputTokens: judged.usage.input_tokens,
+        outputTokens: judged.usage.output_tokens,
+      };
+      appendFileSync(CACHE_PATH, `${JSON.stringify(row)}\n`);
+      cache.set(note.id, row);
       return judged.links;
     },
   });
@@ -118,7 +160,7 @@ async function main() {
     }
     if (result.connected.length) {
       const rows = await readJson<PageManifestEntry[]>(manifestPath, []);
-      await writeFile(manifestPath, JSON.stringify(mergeManifestConnected(rows, result.connected), null, 2) + "\n");
+      await writeFile(manifestPath, JSON.stringify(mergeManifestConnected(rows, result.connected)) + "\n");
     }
     const nextPending = appendProposals(await readJson<PendingProposal[]>(pendingPath, []), result.queued);
     await writeFile(pendingPath, JSON.stringify(nextPending, null, 2) + "\n");

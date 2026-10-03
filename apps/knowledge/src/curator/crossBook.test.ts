@@ -183,6 +183,22 @@ describe("cross-book pairs", () => {
     expect(new Set(sent).size).toBe(sent.length);
     expect(sent).toHaveLength(3);
   });
+
+  it("keeps one link when a reply names the same note twice", async () => {
+    const result = await runCrossBook({
+      notes: [note("a", "Alpha"), note("b", "Beta")],
+      pending: [],
+      dismissed: [],
+      now: () => now,
+      judge: async () => [
+        { pageId: "b", related: true, relation: "related", rationale: "again", confidence: 0.97, confidenceExplicit: true },
+        { pageId: "b", related: true, relation: "builds-on", rationale: "first", confidence: 0.8, confidenceExplicit: true },
+      ],
+    });
+    expect(result.autoApproved).toHaveLength(1);
+    expect(result.autoApproved[0]?.rationale).toBe("again");
+    expect(result.pairsJudged).toBe(1);
+  });
 });
 
 describe("mergeManifestConnected", () => {

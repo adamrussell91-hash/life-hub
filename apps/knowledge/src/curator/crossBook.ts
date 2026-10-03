@@ -194,8 +194,15 @@ export async function runCrossBook(input: {
 
   jobs.forEach((job, index) => {
     const sent = new Set(job.hits.map(hit => hit.pageId));
+    const best = new Map<string, JudgedLink>();
     for (const judgement of judged[index] ?? []) {
       if (!sent.has(judgement.pageId)) continue;
+      const previous = best.get(judgement.pageId);
+      const score = judgement.confidenceExplicit ? judgement.confidence ?? -1 : -1;
+      const previousScore = previous?.confidenceExplicit ? previous.confidence ?? -1 : -1;
+      if (!previous || score > previousScore) best.set(judgement.pageId, judgement);
+    }
+    for (const judgement of best.values()) {
       const other = byId.get(judgement.pageId);
       if (!other || !isCrossBookPair(job.note.book, other.book)) continue;
       const proposal = makeProposal({
