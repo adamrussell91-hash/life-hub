@@ -11,7 +11,16 @@ describe("placementForBookNote", () => {
   it("skips notes that are not from a book", () => {
     expect(placementForBookNote({ id: "p1", body }, undefined)).toBeNull();
   });
-  it("leaves the page off when the locus names only a chapter", () => {
+  it("leaves the page off when the locus names a chapter the shelf doesn't know", () => {
     expect(placementForBookNote({ id: "p1", body }, { label: "X", locus: "chapter 3" })).not.toHaveProperty("page");
+  });
+  it("puts a chapter-only locus at the chapter's first page, as a guess", () => {
+    const chapters = [{ title: "One", start: 1 }, { title: "Two", start: 23 }, { label: "3", title: "Three", start: 46 }];
+    expect(placementForBookNote({ id: "p1", body }, { label: "X", locus: "Ch. 2" }, chapters)).toMatchObject({ page: 23, guessed: true });
+    expect(placementForBookNote({ id: "p1", body }, { label: "X", locus: "chapter 3: Mix it up" }, chapters)).toMatchObject({ page: 46, guessed: true });
+  });
+  it("trusts an explicit Verdict line over the prose", () => {
+    const verdict = "## How this bears on the book\nVerdict: complicates\nIt mostly supports the claim, but...\n";
+    expect(placementForBookNote({ id: "p1", body: verdict }, { label: "X" })).toMatchObject({ stance: "complicates" });
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ANTHROPIC_TIMEOUT_MS, completePrompt } from "./kernel";
+import { ANTHROPIC_TIMEOUT_MS, completePrompt, parseEpisodeCommission } from "./kernel";
 
 const env = {
   ARCHIVE: { get: async () => null, put: async () => undefined },
@@ -32,5 +32,21 @@ describe("completePrompt", () => {
       }),
     );
     await expect(completePrompt(env, "hello")).resolves.toBe("done");
+  });
+});
+
+describe("parseEpisodeCommission", () => {
+  it("keeps a broadcast's source pages, deduped and trimmed of junk", () => {
+    const commission = parseEpisodeCommission({
+      mode: "broadcast",
+      modeDial: { book: "The Enigma of Reason" },
+      sourcePageIds: ["a", "b", "a", "", 4],
+    });
+    expect(commission.mode).toBe("broadcast");
+    expect(commission.sourcePageIds).toEqual(["a", "b"]);
+  });
+
+  it("leaves sourcePageIds off ordinary commissions", () => {
+    expect(parseEpisodeCommission({ mode: "recap" })).not.toHaveProperty("sourcePageIds");
   });
 });

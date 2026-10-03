@@ -47,6 +47,43 @@ const framedTurns = [
 ];
 
 describe("runGenerate", () => {
+  it("scopes a broadcast to the book's own pages and queries by title", async () => {
+    const calls: Array<{ query: string; pageIds?: string[] }> = [];
+    const { complete } = completionSequence(scriptJson(framedTurns), scriptJson(framedTurns));
+    const episode = await runGenerate(
+      { mode: "broadcast", modeDial: { book: "The Knowledge Gene", author: "Lynne Kelly" }, dials, sourcePageIds: ["p1"], now },
+      {
+        retrieve: async (query, _scope, pageIds) => {
+          calls.push({ query, pageIds });
+          return [notes[0]!];
+        },
+        complete,
+        listEpisodes: async () => [],
+      },
+    );
+    expect(calls).toEqual([{ query: "The Knowledge Gene Lynne Kelly", pageIds: ["p1"] }]);
+    expect(episode.mode).toBe("broadcast");
+    expect(episode.sourcePageIds).toEqual(["p1"]);
+  });
+
+  it("errors a broadcast honestly when none of the book's pages are indexed", async () => {
+    let completed = 0;
+    const episode = await runGenerate(
+      { mode: "broadcast", modeDial: { book: "New book" }, dials, sourcePageIds: ["missing"], now },
+      {
+        retrieve: async () => [],
+        complete: async () => {
+          completed += 1;
+          return scriptJson([]);
+        },
+        listEpisodes: async () => [],
+      },
+    );
+    expect(completed).toBe(0);
+    expect(episode.status).toBe("error");
+    expect(episode.error).toMatch(/archive index/);
+  });
+
   it("returns a ready empty recap when retrieve only has pages before the cutoff", async () => {
     let completed = 0;
     const episode = await runGenerate(

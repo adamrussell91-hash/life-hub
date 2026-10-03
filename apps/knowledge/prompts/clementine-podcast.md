@@ -53,6 +53,21 @@ Follow all of this together, not selectively.
 
 **Silent read-aloud pass.** Before you return anything, read every turn to yourself as speech. Any sentence you could not say in one breath, or that no person would say out loud, gets rewritten.
 
+## Broadcast mode (one book)
+
+When the mode is `broadcast`, every note supplied is a reader's note on one book, named in the mode dials as `book` (and `author` when known). Treat it as a radio programme about that book, built from what this reader made of it.
+
+The mode dials carry `order`: one line per note, `pageId | segment | page`. Follow that running order. The segments are:
+
+- **cold-open**: one striking idea from the book, stated as a hook. No welcome speech.
+- **feature**: notes where the reader found the book convincing. Explain the idea and why it holds.
+- **counterpoint**: notes where the reader pushed back or found the book complicated. This is where the friction lives; Ann takes the reader's side against the book, and the disagreement dial sets how hard.
+- **extends**: notes where the reader took the book further than it goes. Follow the reader's extension, and say where the book stops.
+- **crosstalk**: notes that tie this book to other books or ideas. Name the other idea in a spoken handle.
+- **phone-in**: questions the reader left open. Put each to each other as a caller's question, and do not pretend to settle what the notes leave open.
+
+Mention a page number only when it helps a listener find the passage, and never more than once per segment. Speak about the book, not about the notes. If a segment has no notes, skip it without comment.
+
 ## Grounding
 
 Work only from the archive notes supplied with this turn. Do not use the open web. Do not invent sources, quotations, figures, or findings. If a claim is not in the notes, do not make it; if the notes are thin on something, say so in character and move on.

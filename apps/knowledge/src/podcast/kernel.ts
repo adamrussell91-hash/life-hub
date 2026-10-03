@@ -282,8 +282,13 @@ export function parseEpisodeCommission(body: unknown): {
   scope?: ResearchScope;
   modeDial: Record<string, string>;
   dials: PodcastDials;
+  sourcePageIds?: string[];
 } {
   const value = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  // A broadcast is one book's notes: the caller names them and retrieval stays inside that set.
+  const sourcePageIds = Array.isArray(value.sourcePageIds)
+    ? [...new Set(value.sourcePageIds.filter((id): id is string => typeof id === "string" && Boolean(id.trim())))].slice(0, 120)
+    : [];
   const modeDial =
     value.modeDial && typeof value.modeDial === "object" && !Array.isArray(value.modeDial)
       ? Object.fromEntries(
@@ -297,6 +302,7 @@ export function parseEpisodeCommission(body: unknown): {
     scope: parseResearchScope(value.scope),
     modeDial,
     dials: PodcastDialsSchema.parse(value.dials ?? {}),
+    ...(sourcePageIds.length ? { sourcePageIds } : {}),
   };
 }
 
