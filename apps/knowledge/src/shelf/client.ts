@@ -1,0 +1,83 @@
+import { API_BASE } from "../api/config";
+import { USE_LOCAL_DATA } from "../api/client";
+import { readApiError, unwrapApiPayload } from "../api/envelope";
+import { bookKey } from "./model";
+import {
+  parseShelfData,
+  type BookFactsInput,
+  type Placement,
+  type PlacementInput,
+  type ShelfBook,
+  type ShelfData,
+} from "./schema";
+
+const LOCAL_KEY = "knowledge-hub:shelf-preview-v1";
+
+async function apiFetch<T>(init?: RequestInit): Promise<T> {
+  // API_BASE already ends in /api/knowledge (same as Stars: "/stars").
+  const path = "/shelf";
+  const response = await fetch(`${API_BASE}${path}`, { credentials: "include", ...init });
+  let payload: unknown = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+  if (!response.ok) throw new Error(readApiError(payload, response.status, path));
+  return unwrapApiPayload<T>(payload);
+}
+
+function post<T>(body: unknown) {
+  return apiFetch<T>({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+}
+
+function readLocal(): ShelfData {
+  try {
+    return parseShelfData(JSON.parse(localStorage.getItem(LOCAL_KEY) ?? "{}"));
+  } catch {
+    return { books: [], placements: [] };
+  }
+}
+
+function writeLocal(data: ShelfData) {
+  try {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+  } catch {
+    // Preview only; nothing to recover.
+  }
+}
+
+function strip<T extends object>(value: T) {
+  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== undefined)) as T;
+}
+
+export async function getShelf(): Promise<ShelfData> {
+  if (USE_LOCAL_DATA) return readLocal();
+  return parseShelfData(await apiFetch<unknown>());
+}
+
+export async function saveBookFacts(input: BookFactsInput): Promise<ShelfBook> {
+  if (!USE_LOCAL_DATA) return (await post<{ book: ShelfBook }>({ op: "book", book: input })).book;
+  const data = readLocal();
+  const key = bookKey(input.label);
+  const current = data.books.find(book => bookKey(book.label) === key) ?? { label: input.label };
+  const reading = input.reading === true ? { page: current.reading?.page ?? null } : input.reading;
+  const next = strip({ ...current, ...input, reading: reading ? { page: reading.page ?? null, updated_at: new Date().toISOString() } : reading }) as ShelfBook;
+  data.books = [...data.books.filter(book => bookKey(book.label) !== key), next];
+  writeLocal(data);
+  return next;
+}
+
+export async function savePlacements(list: PlacementInput[]): Promise<Placement[]> {
+  if (!list.length) return [];
+  if (!USE_LOCAL_DATA) return (await post<{ placements: Placement[] }>({ op: "place", placements: list })).placements;
+  const data = readLocal();
+  const saved = list.map(patch => {
+    const current = data.placements.find(item => item.pageId === patch.pageId) ?? { pageId: patch.pageId };
+    return strip({ ...current, ...patch }) as Placement;
+  });
+  const ids = new Set(saved.map(item => item.pageId));
+  data.placements = [...data.placements.filter(item => !ids.has(item.pageId)), ...saved];
+  writeLocal(data);
+  return saved;
+}

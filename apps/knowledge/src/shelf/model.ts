@@ -1,0 +1,223 @@
+import type { PageManifestEntry } from "../domain/page";
+import { bookSwatch, type BookSwatch } from "./palette";
+import type { Chapter, Placement, ShelfBook, ShelfData, ShelfStance } from "./schema";
+
+/** Page count assumed for a book whose facts have not been filled in yet. */
+export const FALLBACK_PAGES = 300;
+
+export type BookNote = {
+  id: string;
+  title: string;
+  excerpt: string;
+  tags: string[];
+  connected: string[];
+  createdAt?: string;
+  page?: number;
+  guessed: boolean;
+  stance?: ShelfStance;
+  gaps: string[];
+  themes: string[];
+  lastOpened?: string;
+  chapterIndex?: number;
+};
+
+export type ChapterModel = Chapter & { index: number; end: number; noteCount: number };
+
+export type BookLink = { fromId: string; toId: string; toBook: string; toLabel: string; toPage?: number; toTitle: string };
+
+export type BookModel = {
+  key: string;
+  label: string;
+  author?: string;
+  edition?: string;
+  notebook?: string;
+  swatch: BookSwatch;
+  pages: number;
+  pagesKnown: boolean;
+  chapters: ChapterModel[];
+  /** Notes with a page, in page order. */
+  placed: BookNote[];
+  /** Notes still waiting for a page. */
+  loose: BookNote[];
+  noteCount: number;
+  lastNotePage?: number;
+  densestChapter?: ChapterModel;
+  reading?: { page?: number };
+  links: BookLink[];
+  latestActivity?: string;
+};
+
+export function bookKey(label: string) {
+  return label.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+/** "p. 42", "pp 42–45", "page 42", "42" → 42. Chapter-only loci return undefined. */
+export function parseLocusPage(locus?: string): number | undefined {
+  if (!locus) return undefined;
+  const text = locus.trim();
+  const tagged = text.match(/\b(?:pp?\.?|pages?)\s*(\d{1,4})/i);
+  const bare = text.match(/^(\d{1,4})(?:\s*[-–]\s*\d{1,4})?$/);
+  const value = Number((tagged ?? bare)?.[1]);
+  return Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function section(body: string, heading: RegExp): string {
+  const lines = body.split(/\r?\n/);
+  const start = lines.findIndex(line => /^#{1,4}\s/.test(line) && heading.test(line));
+  if (start < 0) return "";
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex(line => /^#{1,4}\s/.test(line));
+  return (end < 0 ? rest : rest.slice(0, end)).join("\n").trim();
+}
+
+/** Reads the stance from a book note's "How this bears on the book" section. */
+export function stanceFromBody(body: string): ShelfStance | undefined {
+  const text = section(body, /how this bears/i).toLowerCase();
+  const hit = text.match(/\b(supports?|complicates?|extends?)\b/);
+  if (!hit) return undefined;
+  if (hit[1]!.startsWith("support")) return "supports";
+  if (hit[1]!.startsWith("complicat")) return "complicates";
+  return "extends";
+}
+
+/** Reads the open questions from a book note's "Gaps" section, one per bullet or line. */
+export function gapsFromBody(body: string): string[] {
+  return section(body, /^#{1,4}\s*gaps\b/i)
+    .split(/\r?\n/)
+    .map(line => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim())
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+export function chapterIndexForPage(chapters: Chapter[], page: number): number | undefined {
+  let found: number | undefined;
+  chapters.forEach((chapter, index) => {
+    if (chapter.start <= page) found = index;
+  });
+  return found;
+}
+
+function toNote(entry: PageManifestEntry, placement?: Placement): BookNote {
+  return {
+    id: entry.id,
+    title: entry.title,
+    excerpt: entry.excerpt,
+    tags: entry.tags ?? [],
+    connected: entry.connected ?? [],
+    createdAt: entry.created_at,
+    page: placement?.page,
+    guessed: Boolean(placement?.guessed),
+    stance: placement?.stance,
+    gaps: placement?.gaps ?? [],
+    themes: placement?.themes ?? [],
+    lastOpened: placement?.lastOpened,
+  };
+}
+
+/**
+ * The one model for every Bookshelf view: books from the archive's book origins,
+ * merged with shelf facts and note placements. Views must read counts from here.
+ */
+export function buildShelf(entries: PageManifestEntry[], data: ShelfData): BookModel[] {
+  const facts = new Map(data.books.map(book => [bookKey(book.label), book]));
+  const placements = new Map(data.placements.map(item => [item.pageId, item]));
+  const grouped = new Map<string, { label: string; notes: BookNote[] }>();
+  for (const entry of entries) {
+    for (const origin of entry.origins ?? []) {
+      if (origin.kind !== "book" || !origin.label.trim()) continue;
+      const key = bookKey(origin.label);
+      const group = grouped.get(key) ?? { label: facts.get(key)?.label ?? origin.label.trim(), notes: [] };
+      if (!group.notes.some(note => note.id === entry.id)) group.notes.push(toNote(entry, placements.get(entry.id)));
+      grouped.set(key, group);
+    }
+  }
+  for (const [key, book] of facts) {
+    if (!grouped.has(key)) grouped.set(key, { label: book.label, notes: [] });
+  }
+
+  const noteBook = new Map<string, { key: string; label: string; note: BookNote }>();
+  for (const [key, group] of grouped) for (const note of group.notes) noteBook.set(note.id, { key, label: group.label, note });
+
+  const books = [...grouped].map(([key, group]) => modelBook(key, group.label, group.notes, facts.get(key), noteBook));
+  return books.sort(shelfOrder);
+}
+
+function modelBook(
+  key: string,
+  label: string,
+  notes: BookNote[],
+  facts: ShelfBook | undefined,
+  noteBook: Map<string, { key: string; label: string; note: BookNote }>,
+): BookModel {
+  const placedPages = notes.flatMap(note => (note.page ? [note.page] : []));
+  const lastNotePage = placedPages.length ? Math.max(...placedPages) : undefined;
+  const pagesKnown = Boolean(facts?.pages);
+  const pages = facts?.pages ?? Math.max(FALLBACK_PAGES, Math.ceil(((lastNotePage ?? 0) * 1.1) / 10) * 10);
+  const rawChapters = facts?.chapters ?? [];
+  for (const note of notes) {
+    if (note.page && rawChapters.length) note.chapterIndex = chapterIndexForPage(rawChapters, note.page);
+  }
+  const chapters: ChapterModel[] = rawChapters.map((chapter, index) => ({
+    ...chapter,
+    index,
+    end: (rawChapters[index + 1]?.start ?? pages + 1) - 1,
+    noteCount: notes.filter(note => note.chapterIndex === index).length,
+  }));
+  const densestChapter = chapters.reduce<ChapterModel | undefined>(
+    (best, chapter) => (chapter.noteCount > (best?.noteCount ?? 0) ? chapter : best),
+    undefined,
+  );
+  const placed = notes.filter(note => note.page).sort((a, b) => a.page! - b.page! || a.title.localeCompare(b.title));
+  const loose = notes.filter(note => !note.page).sort((a, b) => a.title.localeCompare(b.title));
+  const links: BookLink[] = [];
+  for (const note of notes) {
+    for (const id of note.connected) {
+      const other = noteBook.get(id);
+      if (!other || other.key === key) continue;
+      links.push({ fromId: note.id, toId: id, toBook: other.key, toLabel: other.label, toPage: other.note.page, toTitle: other.note.title });
+    }
+  }
+  const activity = [...notes.map(note => note.createdAt), facts?.reading?.updated_at].filter((d): d is string => Boolean(d)).sort();
+  return {
+    key,
+    label,
+    author: facts?.author,
+    edition: facts?.edition,
+    notebook: facts?.notebook,
+    swatch: bookSwatch(label),
+    pages,
+    pagesKnown,
+    chapters,
+    placed,
+    loose,
+    noteCount: notes.length,
+    lastNotePage,
+    densestChapter,
+    reading: facts?.reading ? { page: facts.reading.page ?? undefined } : undefined,
+    links,
+    latestActivity: activity[activity.length - 1],
+  };
+}
+
+function shelfOrder(a: BookModel, b: BookModel) {
+  if (Boolean(a.notebook) !== Boolean(b.notebook)) return a.notebook ? -1 : 1;
+  return (a.notebook ?? "").localeCompare(b.notebook ?? "") || a.label.localeCompare(b.label);
+}
+
+/** Note ids whose title, tags or excerpt contain every word of the query. */
+export function matchShelf(books: BookModel[], query: string): Set<string> {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const hits = new Set<string>();
+  if (!words.length) return hits;
+  for (const book of books) {
+    for (const note of [...book.placed, ...book.loose]) {
+      const hay = `${note.title} ${note.tags.join(" ")} ${note.excerpt} ${note.themes.join(" ")}`.toLowerCase();
+      if (words.every(word => hay.includes(word))) hits.add(note.id);
+    }
+  }
+  return hits;
+}
+
+export function findBook(books: BookModel[], key: string) {
+  return books.find(book => book.key === key);
+}

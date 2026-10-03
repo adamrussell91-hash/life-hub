@@ -126,7 +126,8 @@ import { remainingTopicTags, topicTagPickerHtml } from "./tidy/tagPicker";
 import { filterPickerOptions, optionPickerListHtml } from "./ui/optionPicker";
 import { syncKnowledgeMobileChrome } from "./mobile-chrome";
 import { parseProtocolsDeepLink, renderProtocols } from "./protocols/view";
-import { notebookCards, notesForNotebook } from "./notebooks/catalog";
+import { notebookCards, notebookCatalog, notesForNotebook } from "./notebooks/catalog";
+import { mountBookshelf, parseBookshelfHash } from "./shelf/view";
 import { bindNotebooksGrid, notebooksGridHtml } from "./notebooks/view";
 import { getQuizSchedule, saveQuiz } from "./api/quizClient";
 import { applyRating } from "./quiz/review";
@@ -140,6 +141,7 @@ type View =
   | "graph"
   | "timeline"
   | "notebooks"
+  | "bookshelf"
   | "page"
   | "compose"
   | "chat"
@@ -237,6 +239,7 @@ let view: View = "notebooks";
 let protocolTeardown: (() => void) | null = null;
 let protocolApplyDeepLink: ((link: ReturnType<typeof parseProtocolsDeepLink>) => boolean) | null = null;
 let pageReturnView: View = "notebooks";
+let bookshelfReturnHash = "#bookshelf";
 let query = "";
 let keywordFilter = "";
 let originFilter = emptyOriginFilter();
@@ -360,6 +363,7 @@ const icons = {
   quiz: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v16H8z"/><path d="M11 8h2M11 12h2M11 16h1"/></svg>`,
   timeline: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><circle cx="6" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="12" r="2"/></svg>`,
   notebooks: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h11a2 2 0 0 1 2 2v14H8a2 2 0 0 0-2 2V4z"/><path d="M8 20a2 2 0 0 1 2-2h9"/><path d="M10 8h6M10 12h6"/></svg>`,
+  bookshelf: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M5 20V6h3v14M9 20V4h3v16"/><path d="m14 7 3-1 3 13-3 1z"/></svg>`,
   protocols: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`,
 };
 
@@ -382,7 +386,7 @@ function pageHeader(
   eyebrow: string,
   title: string,
   actionsInner = "",
-  opts?: { portraitSrc?: string; portraitAlt?: string },
+  opts?: { portraitSrc?: string; portraitAlt?: string; supportingHtml?: string },
 ) {
   const utilities = hubUtilitiesHtml();
   const actions =
@@ -397,6 +401,7 @@ function pageHeader(
       <div class="page-header__copy">
         <p class="eyebrow page-header__eyebrow">${eyebrow}</p>
         ${titleRowHtml(title)}
+        ${opts?.supportingHtml ? `<p class="page-header__supporting">${opts.supportingHtml}</p>` : ""}
       </div>
       ${actions}
     </header>`;
@@ -639,6 +644,7 @@ function shell(main: string) {
         <button class="rail__btn hub-rail__link ${view === "chat" ? "is-current" : ""}" data-nav="chat" type="button">${icons.chat}<span>Chat</span></button>
         </div>
         <p class="hub-rail__section">Library</p>
+        <button class="rail__btn hub-rail__link ${view === "bookshelf" ? "is-current" : ""}" data-nav="bookshelf" type="button">${icons.bookshelf}<span>Bookshelf</span></button>
         <button class="rail__btn hub-rail__link ${view === "notebooks" ? "is-current" : ""}" data-nav="notebooks" type="button">${icons.notebooks}<span>Notebooks</span></button>
         <button class="rail__btn hub-rail__link ${view === "graph" ? "is-current" : ""}" data-nav="graph" type="button">${icons.graph}<span>Graph</span></button>
         <button class="rail__btn hub-rail__link ${view === "timeline" ? "is-current" : ""}" data-nav="timeline" type="button">${icons.timeline}<span>Timeline</span></button>
@@ -659,6 +665,7 @@ function shell(main: string) {
       const next = button.dataset.nav!;
       const special: Record<string, View> = {
         notebooks: "notebooks",
+        bookshelf: "bookshelf",
         graph: "graph",
         timeline: "timeline",
         chat: "chat",
@@ -732,6 +739,13 @@ function shell(main: string) {
     goNotebooks: () => {
       leaveSpecialRails();
       view = "notebooks";
+      activePage = null;
+      clearPageHash();
+      render();
+    },
+    goBookshelf: () => {
+      leaveSpecialRails();
+      view = "bookshelf";
       activePage = null;
       clearPageHash();
       render();
@@ -1097,6 +1111,41 @@ function renderNotebooks() {
   );
 }
 
+function renderBookshelf() {
+  shell(`${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · pages and book facts stay in this browser</p>` : ""}<div data-bookshelf></div>`);
+  const host = app.querySelector<HTMLElement>("[data-bookshelf]");
+  if (!host) return;
+  const route = parseBookshelfHash(location.hash);
+  if (!route) history.replaceState(null, "", "#bookshelf");
+  const unmount = mountBookshelf(host, {
+    entries,
+    notebookLabels: notebookCatalog().map(cover => cover.label),
+    header: supporting => pageHeader("Library", "Bookshelf", "", { supportingHtml: supporting }),
+    openPage: id => void openPage(id),
+    getPage,
+    initialBook: route?.book,
+    initialNote: route?.note,
+  });
+  graphTeardown = () => {
+    unmount();
+    // Leaving for another view: drop the #bookshelf route so a refresh lands where Adam is.
+    if (view !== "bookshelf" && parseBookshelfHash(location.hash)) {
+      history.replaceState(null, "", `${location.pathname}${location.search}`);
+    }
+  };
+}
+
+/** #bookshelf, #bookshelf/<book>, #bookshelf/<book>/<note> */
+function applyBookshelfHash(): boolean {
+  if (!parseBookshelfHash(location.hash)) return false;
+  if (view === "bookshelf") return true;
+  leaveSpecialRails();
+  view = "bookshelf";
+  activePage = null;
+  render();
+  return true;
+}
+
 function renderTimeline() {
   shell(`
     ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · university timeline stays on this canvas</p>` : ""}
@@ -1332,7 +1381,10 @@ function archiveNotes() {
 }
 
 async function openPage(id: string, title?: string) {
-  if (view !== "page") pageReturnView = view === "notebooks" ? "notebooks" : "list";
+  if (view !== "page") {
+    pageReturnView = view === "notebooks" || view === "bookshelf" ? view : "list";
+    if (view === "bookshelf" && parseBookshelfHash(location.hash)) bookshelfReturnHash = location.hash;
+  }
   const resolved = resolveArchivePageId(id, title, archiveNotes());
   try {
     activePage = await getPage(resolved);
@@ -1427,7 +1479,7 @@ function renderPage(page: LivePage) {
     ${pageHeader(
       topics[0] ? escapeHtml(topics[0]) : "Note",
       escapeHtml(page.title),
-      `        <button class="btn btn--ghost reader__back" data-back type="button">← ${pageReturnView === "notebooks" ? "Notebooks" : "Archive"}</button>
+      `        <button class="btn btn--ghost reader__back" data-back type="button">← ${pageReturnView === "notebooks" ? "Notebooks" : pageReturnView === "bookshelf" ? "Bookshelf" : "Archive"}</button>
         <button class="btn btn--ghost" data-pin-note type="button">${isPinned(page.id) ? "Unpin" : "Pin"}</button>
         <button class="btn btn--ghost" data-edit type="button">Edit</button>
         <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyReviewJob ? "disabled" : ""}>${tidyBusy ? intakeBusyLabel(tidyReviewJob?.phase) : "Clean up"}</button>
@@ -1472,7 +1524,8 @@ function renderPage(page: LivePage) {
   });
   app.querySelector<HTMLButtonElement>("[data-back]")!.onclick = () => {
     activePage = null;
-    view = pageReturnView === "notebooks" ? "notebooks" : "list";
+    view = pageReturnView === "notebooks" || pageReturnView === "bookshelf" ? pageReturnView : "list";
+    if (view === "bookshelf") history.replaceState(null, "", bookshelfReturnHash);
     render();
   };
   app.querySelector<HTMLButtonElement>("[data-edit]")!.onclick = () => openCompose();
@@ -2097,6 +2150,7 @@ function render() {
   else if (view === "page" && activePage) renderPage(activePage);
   else if (view === "graph") renderGraph();
   else if (view === "notebooks") renderNotebooks();
+  else if (view === "bookshelf") renderBookshelf();
   else if (view === "timeline") renderTimeline();
   else if (view === "chat") {
     renderChatRail({
@@ -2208,9 +2262,11 @@ function renderLoadError() {
     goGraph: () => void boot({ signedIn: true }),
     goChat: () => void boot({ signedIn: true }),
     goNotebooks: () => void boot({ signedIn: true }),
+    goBookshelf: () => void boot({ signedIn: true }),
     goTimeline: () => void boot({ signedIn: true }),
     goPodcast: () => void boot({ signedIn: true }),
-    goQuiz: () => void boot({ signedIn: true })
+    goQuiz: () => void boot({ signedIn: true }),
+    goProtocols: () => void boot({ signedIn: true })
   });
 }
 
@@ -2264,15 +2320,16 @@ async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean 
     await ensurePageReviews();
     await refreshVisible();
     view = "notebooks";
-    if (!(await applyPageHash()) && !applyProtocolsHash()) render();
+    if (!(await applyPageHash()) && !applyProtocolsHash() && !applyBookshelfHash()) render();
     if (!(window as Window & { __khPageHashBound?: boolean }).__khPageHashBound) {
       (window as Window & { __khPageHashBound?: boolean }).__khPageHashBound = true;
       window.addEventListener("hashchange", () => {
         void (async () => {
           if (await applyPageHash()) return;
           if (applyProtocolsHash()) return;
+          if (applyBookshelfHash()) return;
           if (view === "page") {
-            view = pageReturnView === "notebooks" ? "notebooks" : "list";
+            view = pageReturnView === "notebooks" || pageReturnView === "bookshelf" ? pageReturnView : "list";
             activePage = null;
             render();
           }
@@ -2310,6 +2367,7 @@ document.addEventListener("keydown", event => {
       heading: "Go to",
       items: [
         { id: "all", label: "Archive", hint: "Notes", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=all]")?.click() },
+        { id: "bookshelf", label: "Bookshelf", hint: "Books", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=bookshelf]")?.click() },
         { id: "notebooks", label: "Notebooks", hint: "Covers", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=notebooks]")?.click() },
         { id: "graph", label: "Graph", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=graph]")?.click() },
         { id: "timeline", label: "Timeline", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=timeline]")?.click() },
