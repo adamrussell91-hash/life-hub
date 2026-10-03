@@ -1,1 +1,90 @@
-{}
+{
+  "a textbook of neuroanatomy": {
+    "file": "a-textbook-of-neuroanatomy.jpg",
+    "swatch": 13
+  },
+  "ancient greek philosophers": {
+    "file": "ancient-greek-philosophers.jpg",
+    "swatch": 13
+  },
+  "ancient philosophy: a very short introduction": {
+    "file": "ancient-philosophy-a-very-short-introduction.jpg",
+    "swatch": 10
+  },
+  "atomic habits": {
+    "file": "atomic-habits.jpg",
+    "swatch": 15
+  },
+  "ausubel’s meaningful learning in action": {
+    "file": "ausubels-meaningful-learning-in-action.jpg",
+    "swatch": 7
+  },
+  "brief answers to the big questions": {
+    "file": "brief-answers-to-the-big-questions.jpg",
+    "swatch": 10
+  },
+  "clinical neuroanatomy": {
+    "file": "clinical-neuroanatomy.jpg",
+    "swatch": 12
+  },
+  "color atlas of neuroscience (greenstein)": {
+    "file": "color-atlas-of-neuroscience-greenstein.jpg",
+    "swatch": 4
+  },
+  "critical thinking: the basics": {
+    "file": "critical-thinking-the-basics.jpg",
+    "swatch": 13
+  },
+  "critique of judgement": {
+    "file": "critique-of-judgement.jpg",
+    "swatch": 1
+  },
+  "degree in a book: philosophy": {
+    "file": "degree-in-a-book-philosophy.jpg",
+    "swatch": 13
+  },
+  "developing curriculum for deep thinking: the knowledge revival": {
+    "file": "developing-curriculum-for-deep-thinking-the-knowledge-revival.jpg",
+    "swatch": 13
+  },
+  "handbook of motivation at school": {
+    "file": "handbook-of-motivation-at-school.jpg",
+    "swatch": 10
+  },
+  "handbook of research on student engagement": {
+    "file": "handbook-of-research-on-student-engagement.jpg",
+    "swatch": 10
+  },
+  "neuroscience (purves et al., 3rd ed)": {
+    "file": "neuroscience-purves-et-al-3rd-ed.jpg",
+    "swatch": 11
+  },
+  "neuroscience: exploring the brain": {
+    "file": "neuroscience-exploring-the-brain.jpg",
+    "swatch": 13
+  },
+  "nexus": {
+    "file": "nexus.jpg",
+    "swatch": 15
+  },
+  "problem solver": {
+    "file": "problem-solver.jpg",
+    "swatch": 15
+  },
+  "the knowledge gene": {
+    "file": "the-knowledge-gene.jpg",
+    "swatch": 15
+  },
+  "the neural mind": {
+    "file": "the-neural-mind.jpg",
+    "swatch": 10
+  },
+  "the origins of political order: from prehuman times to the french revolution": {
+    "file": "the-origins-of-political-order-from-prehuman-times-to-the-french-revolution.jpg",
+    "swatch": 13
+  },
+  "the year i met my brain": {
+    "file": "the-year-i-met-my-brain.jpg",
+    "swatch": 9
+  }
+}
