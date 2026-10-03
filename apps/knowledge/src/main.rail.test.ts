@@ -116,6 +116,9 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain("intakeReviewHtml");
     expect(css).toContain("align-items: flex-end");
     expect(css).toContain(".page-header__actions");
+    expect(main).toContain('class="reader__actions"');
+    expect(css).toMatch(/\.canvas:has\(> \.reader\) > \.page-header \.page-header__title\s*\{[^}]*width:\s*100%/);
+    expect(css).toMatch(/\.reader__actions\s*\{[^}]*flex-wrap:\s*wrap/);
     expect(css).not.toMatch(/\.reader__tidy\s*\{[^}]*font-size:/);
   });
 
