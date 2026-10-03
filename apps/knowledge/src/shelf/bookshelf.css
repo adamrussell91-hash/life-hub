@@ -1115,3 +1115,21 @@ body.is-bookshelf-immersive .local-banner {
     height: 3.4rem;
   }
 }
+
+.shelf-remove {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--cotton);
+}
+
+.shelf-remove[hidden] {
+  display: none;
+}
+
+.shelf-remove p {
+  margin: var(--space-1) 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--ink);
+}

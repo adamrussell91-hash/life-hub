@@ -166,3 +166,13 @@ export async function savePlacements(store, rawList, { now = new Date().toISOStr
   await setJSON(store, PLACEMENTS_KEY, placements);
   return saved;
 }
+
+/** Takes a book's own record off the shelf (facts, notebook, reading). Notes keep their placements. */
+export async function deleteBook(store, label) {
+  const key = shelfBookKey(text(label, 200) ?? '');
+  const books = await getJSON(store, BOOKS_KEY);
+  const existed = Boolean(books[key]);
+  delete books[key];
+  await setJSON(store, BOOKS_KEY, books);
+  return { label, removed: existed };
+}
