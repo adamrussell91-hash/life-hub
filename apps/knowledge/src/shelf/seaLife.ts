@@ -1,10 +1,11 @@
 import type { BookNote } from "./model";
 
 /**
- * The old chart's sea, alive. Ships working between the islands, a serpent and
- * a whale that surface now and then, a mermaid on her rock, a compass rose that
- * turns the hours, and the chart's weather and wonders: dolphins, gulls, squalls,
- * shooting stars, a ghost ship by night and, once in a long while, the kraken.
+ * The old chart's sea, alive. Its ships and monsters are cut from Olaus Magnus's
+ * Carta Marina (1539; see public/engravings/CREDITS.md): carracks working
+ * between the islands, the great serpent, Ziphius and Physeter surfacing now
+ * and then, the maelstrom turning, and once in a long while the horned beast
+ * rising. Weather too: gulls, squalls, shooting stars, a ghost ship by night.
  *
  * Some of it is your notes in disguise: lighthouses burn on books you wrote in
  * this week, smoke rises from the book your notes argue with most, mist hangs
@@ -25,6 +26,7 @@ export type Landmark =
   | { kind: "lighthouse"; x: number; y: number }
   | { kind: "camp"; x: number; y: number }
   | { kind: "volcano"; x: number; y: number }
+  | { kind: "tree"; x: number; y: number }
   | { kind: "mist"; x: number; y: number; r: number }
   | { kind: "treasure"; x: number; y: number; noteId: string; links: number };
 
@@ -53,6 +55,8 @@ export type SeaLifeOptions = {
   onTreasure?: (mark: Extract<Landmark, { kind: "treasure" }>) => void;
   /** A named ship was tapped: the view can show its voyage and follow the ship. */
   onCharter?: (charter: Charter, ship: HTMLElement) => void;
+  /** Where new ink blooms: a layer that stays visible from the whole-world view. */
+  inkLayer?: HTMLElement;
   /** Every note's place on the map, so notes added since the last visit can bloom. */
   notesAt?: Array<{ id: string; x: number; y: number }>;
   /** Creature size in world units per CSS pixel of the drawings. */
@@ -67,111 +71,75 @@ export type SeaLife = {
 };
 
 // ── Drawings ────────────────────────────────────────────────────────
+// Engravings, after old charts: ink line on parchment, hatched for shade.
+// i-fill = parchment with an ink edge, i-line = ink only, i-hatch = fine shading,
+// i-solid = filled ink. Ships and monsters are real engravings (ENGRAVINGS, below).
 
-const SHIP = `<svg viewBox="0 0 60 50" aria-hidden="true">
-  <path class="sl-wake" d="M2 46q4-3 8 0t8 0 8 0 8 0 8 0 8 0 8 0"/>
-  <path class="sl-hull" d="M5 33h50l-8 11H14z"/>
-  <path class="sl-line" d="M30 33V5"/>
-  <path class="sl-sail" d="M17 9q13 4 26 0v18q-13 4-26 0z"/>
-  <path class="sl-sail" d="M31 30V20q9 2 13 9z"/>
-  <path class="sl-flag" d="M30 5l9-3-9-2z"/>
-  <circle class="sl-port" cx="22" cy="37" r="1.6"/><circle class="sl-port" cx="32" cy="37" r="1.6"/><circle class="sl-port" cx="42" cy="37" r="1.6"/>
-</svg>`;
 
-const SERPENT = `<svg viewBox="0 0 180 70" aria-hidden="true">
-  <path class="sl-scale" d="M2 57c3-8 9-11 13-18 1 8-1 14 3 18z"/>
-  <path class="sl-scale" d="M26 57c5-26 29-26 34 0z"/>
-  <path class="sl-belly" d="M32 57c4-14 18-14 22 0"/>
-  <path class="sl-scale" d="M72 57c5-30 33-30 38 0z"/>
-  <path class="sl-belly" d="M79 57c4-17 20-17 24 0"/>
-  <path class="sl-fin" d="M80 34l4-9 4 6 4-8 3 9"/>
-  <path class="sl-scale" d="M122 57c-2-24 8-41 26-41 14 0 24 7 22 15-4 4-16 2-24 4-6 6-8 14-6 22z"/>
-  <path class="sl-fin" d="M136 20l2-9 5 6 3-8 3 8"/>
-  <circle class="sl-eye" cx="157" cy="22" r="2.4"/>
-  <path class="sl-tongue" d="M169 29l8-3m-8 3l8 3"/>
-</svg>`;
+/** Figures cut from the Carta Marina: an ink mask and a parchment mask, each sized w × h. */
+const ENGRAVINGS = {
+  "ship-carrack": [238, 259],
+  "ship-cog": [224, 244],
+  "ship-small": [154, 161],
+  serpent: [509, 498],
+  ziphius: [496, 248],
+  physeter: [254, 280],
+  horned: [315, 304],
+  maelstrom: [194, 184],
+  spikefish: [364, 187],
+  lighthouse: [360, 482],
+  campfire: [360, 504],
+  volcano: [360, 380],
+  tree: [420, 419],
+  lobster: [360, 320],
+  wyvern: [420, 380],
+  "sea-serpent": [420, 340],
+} as const;
 
-const WHALE = `<svg viewBox="0 0 120 60" aria-hidden="true">
-  <g class="sl-spout"><path d="M42 26C38 16 32 11 26 9M42 26c0-10 0-15 0-22M42 26c4-10 10-15 16-17"/></g>
-  <path class="sl-whale" d="M8 50c10-28 62-32 90-14 6 4 9 9 10 14z"/>
-  <path class="sl-whale" d="M6 50c-4-6-4-12-1-16 2 6 6 9 11 10z"/>
-  <circle class="sl-eye" cx="88" cy="40" r="2"/>
-  <path class="sl-line" d="M96 46q-6 2-12 0"/>
-</svg>`;
+type Engraving = keyof typeof ENGRAVINGS;
+const SHIPS: Engraving[] = ["ship-carrack", "ship-cog", "ship-small"];
 
-const MERMAID = `<svg viewBox="0 0 64 70" aria-hidden="true">
-  <g class="sl-maid">
-    <path class="sl-tail" d="M30 52c12 2 20-4 22-14l7-6-8 3-1-7-2 9c-2 7-8 10-18 10z"/>
-    <path class="sl-hair" d="M24 22c-3 9-5 18-2 26 3-6 4-15 7-26z"/>
-    <path class="sl-skin" d="M24 52c-2-8 0-16 4-21 4 4 6 12 4 21z"/>
-    <circle class="sl-skin" cx="28.5" cy="24" r="4.6"/>
-    <path class="sl-line sl-arm" d="M31 36q5-3 6-11"/>
-  </g>
-  <path class="sl-rock" d="M3 67c4-14 18-18 30-16s22 8 26 16z"/>
-</svg>`;
+function engraving(name: Engraving) {
+  const base = (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
+  const [w, h] = ENGRAVINGS[name];
+  return `<i class="sl-engraving" style="--ar:${w} / ${h};--ink:url('${base}engravings/${name}.png');--fill:url('${base}engravings/${name}-fill.png')"></i>`;
+}
+
+
+
+
 
 const COMPASS = `<svg viewBox="0 0 100 100" aria-hidden="true">
-  <circle class="sl-ring" cx="50" cy="50" r="36"/>
-  <circle class="sl-ring" cx="50" cy="50" r="31"/>
+  <circle class="i-fill" cx="50" cy="50" r="36"/>
+  <circle class="i-line" cx="50" cy="50" r="31"/>
+  <path class="i-hatch" d="M50 14v4M50 82v4M14 50h4M82 50h4M24.5 24.5l2.8 2.8M72.7 72.7l2.8 2.8M75.5 24.5l-2.8 2.8M27.3 72.7l-2.8 2.8"/>
   <g class="sl-needle">
-    <path class="sl-point" d="M50 50l-6-6 6-36 6 36zM50 50l6 6-6 36-6-36z"/>
-    <path class="sl-point sl-point--side" d="M50 50l6-6 36 6-36 6zM50 50l-6 6-36-6 36-6z"/>
-    <path class="sl-point sl-point--north" d="M50 8l6 36-6 6z"/>
-    <path class="sl-point sl-point--minor" d="M50 50l20-20-4 12zM50 50l-20 20 4-12zM50 50l20 20-12-4zM50 50l-20-20 12 4z"/>
+    <path class="i-solid" d="M50 50l-6-6 6-36 6 36zM50 50l6 6-6 36-6-36z"/>
+    <path class="i-fill" d="M50 50l6-6 36 6-36 6zM50 50l-6 6-36-6 36-6z"/>
+    <path class="i-fill" d="M50 8l6 36-6 6z"/>
+    <path class="i-hatch" d="M50 50l20-20M50 50l-20 20M50 50l20 20M50 50l-20-20"/>
   </g>
   <text class="sl-n" x="50" y="6" text-anchor="middle">N</text>
 </svg>`;
 
-const LIGHTHOUSE = `<svg viewBox="0 0 24 50" aria-hidden="true">
-  <path class="sl-rock" d="M1 49c2-6 8-8 11-8s9 2 11 8z"/>
-  <path class="sl-tower" d="M8 43l2-28h4l2 28z"/>
-  <path class="sl-stripe" d="M9.2 34h5.6l.4 5H8.8zM9.8 24h4.4l.4 5H9.4z"/>
-  <path class="sl-lantern" d="M9 15h6v-4H9z"/>
-  <path class="sl-roof" d="M8 11l4-4 4 4z"/>
-</svg>`;
 
-const CAMP = `<svg viewBox="0 0 30 24" aria-hidden="true">
-  <path class="sl-tent" d="M2 22L11 6l9 16z"/>
-  <path class="sl-line" d="M11 6v16"/>
-  <g class="sl-flame"><path d="M23 21c-3-2-3-6 0-10 1 3 4 4 3 7 0 2-1 3-3 3z"/></g>
-  <path class="sl-line" d="M19 22l8-2M19 20l8 2"/>
-</svg>`;
 
-const VOLCANO = `<svg viewBox="0 0 40 26" aria-hidden="true">
-  <path class="sl-cone" d="M2 25l13-18h10l13 18z"/>
-  <path class="sl-lava" d="M16 7h8l-2 5-2-2-2 4z"/>
-</svg>`;
 
 const BOTTLE = `<svg viewBox="0 0 34 16" aria-hidden="true">
-  <path class="sl-glass" d="M3 5h18c3 0 5 1 6 2h4v2h-4c-1 1-3 2-6 2H3c-2 0-2-6 0-6z"/>
-  <path class="sl-scroll" d="M6 7h11v2H6z"/>
-  <path class="sl-cork" d="M30 6.5h3v3h-3z"/>
+  <path class="i-fill sl-glass" d="M3 5h18c3 0 5 1 6 2h4v2h-4c-1 1-3 2-6 2H3c-2 0-2-6 0-6z"/>
+  <path class="i-hatch" d="M6 7h11M6 9h11"/>
+  <path class="i-solid" d="M30 6.5h3v3h-3z"/>
 </svg>`;
 
-const DOLPHIN = `<svg viewBox="0 0 40 20" aria-hidden="true">
-  <path class="sl-dolphin-body" d="M2 12C10 4 26 2 36 8l3-1-2 3c-7 4-21 6-35 2z"/>
-  <path class="sl-dolphin-body" d="M18 5l4-5 2 5z"/>
-  <path class="sl-dolphin-body" d="M3 12L0 8l1 6z"/>
-  <circle class="sl-eye" cx="31" cy="8" r="0.9"/>
-</svg>`;
 
-const TENTACLE = `<svg viewBox="0 0 30 90" aria-hidden="true">
-  <path class="sl-kraken" d="M8 90C4 62 20 52 14 32 10 20 18 6 27 10c-7 2-9 10-5 20 6 20-4 34 0 60z"/>
-  <circle class="sl-sucker" cx="15" cy="70" r="1.6"/><circle class="sl-sucker" cx="17" cy="55" r="1.4"/><circle class="sl-sucker" cx="16" cy="40" r="1.2"/>
-</svg>`;
 
-const KRAKEN_EYE = `<svg viewBox="0 0 60 34" aria-hidden="true">
-  <path class="sl-kraken" d="M2 34C6 10 54 10 58 34z"/>
-  <ellipse class="sl-iris" cx="30" cy="25" rx="9" ry="6"/>
-  <path class="sl-pupil" d="M30 20c-2 3-2 7 0 10 2-3 2-7 0-10z"/>
-</svg>`;
 
 const TREASURE = `<svg viewBox="0 0 40 40" aria-hidden="true">
   <path class="sl-trail" d="M2 38c6-4 4-10 10-12s8 2 12-4"/>
   <path class="sl-x" d="M22 8l12 12M34 8L22 20"/>
 </svg>`;
 
-const FISH = `<svg viewBox="0 0 16 8" aria-hidden="true"><path class="sl-fish" d="M1 4c3-4 8-4 11 0l3-3v6l-3-3c-3 4-8 4-11 0z"/></svg>`;
+const FISH = `<svg viewBox="0 0 16 8" aria-hidden="true"><path class="i-fill" d="M1 4c3-4 8-4 11 0l3-3v6l-3-3c-3 4-8 4-11 0z"/></svg>`;
 
 const GULL = `<svg viewBox="0 0 16 6" aria-hidden="true"><path d="M0 5Q4 0 8 5Q12 0 16 5"/></svg>`;
 
@@ -400,9 +368,10 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
 
   // Landmarks first: they belong to islands, so they never move.
   for (const mark of opts.landmarks ?? []) {
-    if (mark.kind === "lighthouse") parts.push(`<div class="sl-mark sl-lighthouse" style="${at(mark)};--s:${s}"><i class="sl-beam"></i><i class="sl-lamp"></i>${LIGHTHOUSE}</div>`);
-    if (mark.kind === "camp") parts.push(`<div class="sl-mark sl-camp" style="${at(mark)};--s:${s}"><i class="sl-glow"></i><i class="sl-smoke"></i><i class="sl-smoke"></i>${CAMP}</div>`);
-    if (mark.kind === "volcano") parts.push(`<div class="sl-mark sl-volcano" style="${at(mark)};--s:${s}"><i class="sl-glow"></i><i class="sl-smoke"></i><i class="sl-smoke"></i><i class="sl-smoke"></i>${VOLCANO}</div>`);
+    if (mark.kind === "lighthouse") parts.push(`<div class="sl-mark sl-lighthouse" style="${at(mark)};--s:${s}"><i class="sl-beam"></i>${engraving("lighthouse")}<i class="sl-lamp"></i></div>`);
+    if (mark.kind === "camp") parts.push(`<div class="sl-mark sl-camp" style="${at(mark)};--s:${s}"><i class="sl-glow"></i><i class="sl-smoke"></i><i class="sl-smoke"></i>${engraving("campfire")}</div>`);
+    if (mark.kind === "tree") parts.push(`<div class="sl-mark sl-tree" style="${at(mark)};--s:${s}">${engraving("tree")}</div>`);
+    if (mark.kind === "volcano") parts.push(`<div class="sl-mark sl-volcano" style="${at(mark)};--s:${s}"><i class="sl-glow"></i>${engraving("volcano")}</div>`);
     if (mark.kind === "treasure") parts.push(`<button type="button" class="sl-treasure" data-sl="treasure" style="${at(mark)};--s:${s}" aria-label="${esc(`Treasure: your most-connected note, linked ${mark.links} times`)}"><i class="sl-glint"></i>${TREASURE}</button>`);
     if (mark.kind === "mist") parts.push(`<div class="sl-mist" style="${at(mark)};--m:${(mark.r * 2.4).toFixed(0)}px;--delay:${(-roll() * 30).toFixed(1)}s"><i></i><i></i></div>`);
   }
@@ -427,28 +396,21 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
 
   const serpent = claim(free(110 * s), 110 * s);
   if (serpent) {
-    parts.push(`<div class="sl-beast sl-beast--serpent" data-sl="serpent" style="${at(serpent)};--s:${s};--dur:34s;--delay:${(-roll() * 20).toFixed(1)}s"><div class="sl-beast__water">${SERPENT}</div><i class="sl-ripple"></i></div>`);
+    parts.push(`<div class="sl-beast sl-beast--serpent" data-sl="serpent" style="${at(serpent)};--s:${s};--dur:41s;--delay:${(-roll() * 20).toFixed(1)}s"><div class="sl-beast__water">${engraving("sea-serpent")}</div><i class="sl-ripple"></i></div>`);
     const words = claim(free(80 * s, serpent), 90 * s);
     if (words) parts.push(`<span class="sl-legend" style="${at(words)};--s:${s}">Here be dragons</span>`);
   }
   const whale = claim(free(80 * s), 80 * s);
-  if (whale) parts.push(`<div class="sl-beast sl-beast--whale" data-sl="whale" style="${at(whale)};--s:${s};--dur:27s;--delay:${(-roll() * 27).toFixed(1)}s"><div class="sl-beast__water">${WHALE}</div><i class="sl-ripple"></i></div>`);
+  if (whale) parts.push(`<div class="sl-beast sl-beast--whale" data-sl="whale" style="${at(whale)};--s:${s};--dur:29s;--delay:${(-roll() * 27).toFixed(1)}s"><div class="sl-beast__water">${engraving("ziphius")}</div><i class="sl-ripple"></i></div>`);
+  const physeter = claim(free(90 * s), 70 * s);
+  if (physeter) parts.push(`<div class="sl-beast sl-beast--physeter" data-sl="physeter" style="${at(physeter)};--s:${s};--dur:37s;--delay:${(-roll() * 37).toFixed(1)}s"><div class="sl-beast__water">${engraving("physeter")}</div><i class="sl-ripple"></i></div>`);
 
-  // A slow whirlpool in the deepest water.
+  const spikefish = claim(free(80 * s), 60 * s);
+  if (spikefish) parts.push(`<div class="sl-beast sl-beast--spikefish" data-sl="physeter" style="${at(spikefish)};--s:${s};--dur:33s;--delay:${(-roll() * 33).toFixed(1)}s"><div class="sl-beast__water">${engraving("spikefish")}</div><i class="sl-ripple"></i></div>`);
+
+  // The maelstrom turns forever in the deepest water.
   const pool = claim(free(120 * s), 80 * s);
-  if (pool) parts.push(`<div class="sl-whirl" style="${at(pool)};--s:${s}"><i></i><i></i><i></i></div>`);
-
-  // The mermaid keeps to a rock just off some island's shore.
-  const shores = [...opts.harbours].sort(() => roll() - 0.5);
-  for (const isle of shores) {
-    const a = roll() * Math.PI * 2;
-    const p = { x: isle.x + Math.cos(a) * (isle.r + 34 * s), y: isle.y + Math.sin(a) * (isle.r + 34 * s) };
-    if ([...opts.lands, ...taken].every(l => l === isle || Math.hypot(l.x - p.x, l.y - p.y) > l.r + 50 * s)) {
-      claim(p, 50 * s);
-      parts.push(`<div class="sl-mermaid" data-sl="mermaid" style="${at(p)};--s:${s};--delay:${(-roll() * 40).toFixed(1)}s">${MERMAID}</div>`);
-      break;
-    }
-  }
+  if (pool) parts.push(`<div class="sl-whirl" style="${at(pool)};--s:${s}">${engraving("maelstrom")}</div>`);
 
   // Winter's ice: a scatter of floes, only seen in that season.
   const ice = dice(`${opts.seed}:ice`);
@@ -516,13 +478,6 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
   };
 
   const wonders = {
-    dolphins() {
-      const p = free(90 * s, undefined, chance);
-      if (!p) return;
-      const flip = chance() < 0.5 ? -1 : 1;
-      const arc = `path('M0 0Q${(30 * s).toFixed(0)} ${(-38 * s).toFixed(0)} ${(60 * s).toFixed(0)} 0')`;
-      spawn(layer, `<div class="sl-pod" style="${at(p)};--s:${s};--flip:${flip}">${[0, 1, 2].map(i => `<div class="sl-dolphin" style="offset-path:${arc};animation-delay:${i * 0.28}s;top:${i * 9 * s}px">${DOLPHIN}</div>`).join("")}</div>`, 7600);
-    },
     gulls() {
       const top = 8 + chance() * 50;
       spawn(air, `<div class="sl-gulls${chance() < 0.5 ? " is-west" : ""}" style="top:${top.toFixed(1)}%">${[0, 1, 2, 3, 4].map(i => `<i style="--i:${i}">${GULL}</i>`).join("")}</div>`, 19000);
@@ -532,15 +487,34 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
       if (!p) return;
       spawn(layer, `<div class="sl-squall" style="${at(p)};--s:${s}"><i class="sl-rain"></i><i class="sl-cloud"></i><i class="sl-bolt"></i></div>`, 30000);
     },
-    kraken() {
-      const p = free(130 * s, undefined, chance);
+    shipTaker() {
+      // The great serpent of the Carta Marina rises with a ship in its coils.
+      const p = free(130 * s, undefined, chance) ?? free(70 * s, undefined, chance);
       if (!p) return;
-      const arms = [-2.4, -1.5, -0.6, 0.6, 1.5, 2.4].map((k, i) =>
-        `<div class="sl-arm-window" style="left:${(k * 34 * s).toFixed(0)}px;top:${(Math.abs(k) * 6 * s).toFixed(0)}px;--lean:${(k * 9).toFixed(0)}deg;animation-delay:${((i % 3) * 0.35 + Math.abs(k) * 0.2).toFixed(2)}s"><div>${TENTACLE}</div></div>`).join("");
-      spawn(layer, `<div class="sl-kraken-rise" style="${at(p)};--s:${s}"><i class="sl-maelstrom"></i>${arms}<div class="sl-eye-window"><div>${KRAKEN_EYE}</div></div></div>`, 12500);
+      spawn(layer, `<div class="sl-kraken-rise sl-rise--serpent" style="${at(p)};--s:${s}"><div class="sl-kraken-window"><div>${engraving("serpent")}</div></div></div>`, 12500);
+    },
+    wyvern() {
+      // The winged sea dragon rears out of the sea, spreads its wings, and is gone.
+      const p = free(120 * s, undefined, chance) ?? free(70 * s, undefined, chance);
+      if (!p) return;
+      spawn(layer, `<div class="sl-kraken-rise sl-rise--wyvern" style="${at(p)};--s:${s}"><div class="sl-kraken-window"><div>${engraving("wyvern")}</div></div></div>`, 12500);
+    },
+    lobster() {
+      // A great lobster climbs out on some island's shore, takes a few steps, and backs into the sea.
+      const isle = opts.harbours[Math.floor(chance() * opts.harbours.length)];
+      if (!isle) return;
+      const a = chance() * Math.PI * 2;
+      const p = { x: isle.x + Math.cos(a) * (isle.r - 30 * s), y: isle.y + Math.sin(a) * (isle.r - 30 * s) };
+      spawn(layer, `<div class="sl-lobster" style="${at(p)};--s:${s};--turn:${((a * 180) / Math.PI + 90).toFixed(0)}deg">${engraving("lobster")}</div>`, 14500);
+    },
+    kraken() {
+      // The horned beast of the north rises from a maelstrom, looks about, and is gone.
+      const p = free(130 * s, undefined, chance) ?? free(70 * s, undefined, chance);
+      if (!p) return;
+      spawn(layer, `<div class="sl-kraken-rise" style="${at(p)};--s:${s}"><div class="sl-kraken-pool">${engraving("maelstrom")}</div><div class="sl-kraken-window"><div>${engraving("horned")}</div></div></div>`, 12500);
     },
   };
-  const roster: Array<[keyof typeof wonders, number]> = [["dolphins", 4], ["gulls", 4], ["squall", 1.4], ["kraken", 0.8]];
+  const roster: Array<[keyof typeof wonders, number]> = [["gulls", 4], ["squall", 1.4], ["lobster", 1.4], ["kraken", 0.7], ["shipTaker", 0.6], ["wyvern", 0.6]];
   const wonder = () => {
     if (!document.hidden) {
       let pickAt = chance() * roster.reduce((sum, [, weight]) => sum + weight, 0);
@@ -561,9 +535,7 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
     later(shootingStar, 7000 + chance() * 14000);
   };
   if (!still) {
-    // Dolphins first, so there's something to see before long.
-    later(() => wonders.dolphins(), 5000);
-    later(wonder, 26000);
+    later(wonder, 20000);
     later(shootingStar, 3000);
   }
 
@@ -572,7 +544,7 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
     const seen = readSeen();
     const blooms = freshInk(opts.notesAt, seen);
     writeSeen(opts.notesAt.map(n => n.id), seen);
-    blooms.slice(0, 8).forEach((b, i) => later(() => spawn(layer,
+    blooms.slice(0, 8).forEach((b, i) => later(() => spawn(opts.inkLayer ?? layer,
       `<div class="sl-bloom" style="${at(b)};--s:${s}"><i class="sl-ink"></i><i class="sl-ink"></i><i class="sl-hill"></i><span>+${b.count} new</span></div>`, 5200), still ? 0 : 1400 + i * 650));
   }
 
@@ -622,10 +594,9 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
         splash(p, false);
         return true;
       case "whale":
-        once(thing, "is-blowing", 1600);
-        return true;
-      case "mermaid":
-        once(thing, "is-waving", 2400);
+      case "physeter":
+        once(thing, "is-startled", 1200);
+        splash(p, false);
         return true;
       case "ship": {
         const charter = charters.get(thing.dataset.charter ?? "");
@@ -655,10 +626,11 @@ export function mountSeaLife(layer: HTMLElement, opts: SeaLifeOptions): SeaLife 
 }
 
 function shipHtml(v: Voyage, s: number, roll: () => number, extra = "") {
+  const figure = SHIPS[Math.floor(roll() * SHIPS.length)]!;
   const d = `M${v.from.x.toFixed(1)} ${v.from.y.toFixed(1)}Q${v.via.x.toFixed(1)} ${v.via.y.toFixed(1)} ${v.to.x.toFixed(1)} ${v.to.y.toFixed(1)}`;
   const dir = v.to.x >= v.from.x ? 1 : -1;
   const named = v.charter ? ` sl-ship--charter" data-charter="${esc(v.charter.key)}" title="${esc(v.charter.name)}` : "";
-  return `<div class="sl-ship${extra}${named}" data-sl="ship" style="offset-path:path('${d}');--dur:${v.seconds.toFixed(1)}s;--delay:${(-roll() * v.seconds * 2).toFixed(1)}s;--dir:${dir};--s:${s}"><span><i class="sl-lantern-glow"></i>${SHIP}</span></div>`;
+  return `<div class="sl-ship${extra}${named}" data-sl="ship" style="offset-path:path('${d}');--dur:${v.seconds.toFixed(1)}s;--delay:${(-roll() * v.seconds * 2).toFixed(1)}s;--dir:${dir};--s:${s}"><span><i class="sl-lantern-glow"></i>${v.charter ? `<i class="sl-pennant"></i>` : ""}${engraving(figure)}</span></div>`;
 }
 
 function esc(value: string) {

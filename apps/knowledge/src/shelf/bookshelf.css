@@ -2122,27 +2122,35 @@ body.is-bookshelf-immersive .local-banner {
 .isles-route {
   fill: none;
   stroke: var(--navy);
-  stroke-opacity: 0.32;
-  stroke-dasharray: 5 6;
+  stroke-opacity: 0.16;
+  stroke-dasharray: 1.5 5;
   stroke-linecap: round;
+  transition: stroke-opacity 200ms ease;
+}
+
+.isles-route.is-dim {
+  stroke-opacity: 0.05;
 }
 
 .isles-route.is-on {
   stroke: var(--high-sea-ink);
-  stroke-opacity: 0.85;
+  stroke-opacity: 0.75;
+  stroke-dasharray: 4 5;
 }
 
 .isles-route-count {
   position: absolute;
   transform: translate(-50%, -50%);
-  padding: 0.1rem 0.45rem;
-  border: 1px solid var(--line);
+  padding: 0 0.35rem;
+  border: 0;
   border-radius: 999px;
-  background: var(--paper);
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
   color: var(--navy);
   font: inherit;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: var(--text-2xs);
-  font-weight: var(--weight-bold);
+  font-style: italic;
+  font-weight: var(--weight-medium);
   white-space: nowrap;
   pointer-events: auto;
   cursor: pointer;
@@ -2371,7 +2379,7 @@ body.is-map-expanded {
   to { translate: calc(100vw + 30rem) 0; }
 }
 
-.isles-route {
+.isles-route.is-on {
   animation: atlas-flow 2.6s linear infinite;
 }
 
@@ -2446,16 +2454,16 @@ body.is-map-expanded {
   height: 1px;
   transform-origin: 0 0;
   pointer-events: none;
-  --sl-ink: #17375e;
-  --sl-wood: #8a6142;
-  --sl-sail: #fbf8f2;
-  --sl-scale: #6f9a83;
-  --sl-belly: #d9c98f;
-  --sl-whale: #7d8daa;
-  --sl-skin: #f0cdb0;
-  --sl-hair: #c8692c;
-  --sl-tail: #4e9a8e;
-  --sl-rock: #d6cdb6;
+  /* Ink on parchment by day; pale ink on the dark sea by night (a moonlit engraving). */
+  --sl-ink: #22324a;
+  --sl-paper: #f5eedb;
+  --sl-shade: rgba(34, 50, 74, 0.55);
+}
+
+.atlas[data-sky="night"] .atlas__world {
+  --sl-ink: #ece2c6;
+  --sl-paper: #1b2a4a;
+  --sl-shade: rgba(236, 226, 198, 0.5);
 }
 
 .atlas__world svg {
@@ -2464,40 +2472,28 @@ body.is-map-expanded {
   height: auto;
   overflow: visible;
   stroke: var(--sl-ink);
-  stroke-width: 1.3;
+  stroke-width: 1.1;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
 
-.sl-line, .sl-wake, .sl-tongue, .sl-belly, .sl-spout path { fill: none; }
-.sl-wake { stroke: #376fb7; stroke-opacity: 0.5; }
-.sl-hull { fill: var(--sl-wood); }
-.sl-sail { fill: var(--sl-sail); }
-.sl-flag { fill: #f68620; }
-.sl-scale { fill: var(--sl-scale); }
-.sl-belly { stroke: var(--sl-belly); stroke-width: 3; }
-.sl-fin { fill: #c8692c; }
-.sl-eye { fill: var(--sl-ink); stroke: none; }
-.sl-tongue { stroke: #c0392b; }
-.sl-whale { fill: var(--sl-whale); }
-.sl-spout path { stroke: #376fb7; stroke-width: 1.6; }
-.sl-skin { fill: var(--sl-skin); }
-.sl-hair { fill: var(--sl-hair); }
-.sl-tail { fill: var(--sl-tail); }
-.sl-rock { fill: var(--sl-rock); }
-.sl-ring { fill: rgba(251, 248, 242, 0.7); stroke-width: 1; }
-.sl-point { fill: var(--sl-ink); stroke-width: 0.6; }
-.sl-point--side { fill: #376fb7; }
-.sl-point--north { fill: #f68620; }
-.sl-point--minor { fill: rgba(23, 55, 94, 0.35); stroke: none; }
-.sl-n { font: 700 9px/1 var(--font-sans, sans-serif); fill: var(--sl-ink); stroke: none; }
+.i-fill { fill: var(--sl-paper); stroke: var(--sl-ink); }
+.i-line { fill: none; stroke: var(--sl-ink); }
+.i-hatch { fill: none; stroke: var(--sl-shade); stroke-width: 0.6; }
+.i-solid { fill: var(--sl-ink); stroke: none; }
+.i-tube-o { fill: none; stroke: var(--sl-ink); stroke-linecap: round; }
+.i-tube-f { fill: none; stroke: var(--sl-paper); stroke-linecap: round; }
+.i-tube-s { fill: none; stroke: var(--sl-shade); stroke-dasharray: 0.45 1.5; stroke-linecap: butt; opacity: 0.8; }
+.sl-flag { fill: var(--sl-ink); stroke: none; }
+.sl-glass { fill: color-mix(in srgb, var(--sl-paper) 80%, #6f9a83); }
+.sl-n { font: italic 700 10px/1 Georgia, "Times New Roman", serif; fill: var(--sl-ink); stroke: none; }
 
 /* Ships follow their course there and back, turning about at each end, rocking as they go. */
 .sl-ship {
   position: absolute;
   left: 0;
   top: 0;
-  width: calc(60px * var(--s));
+  width: calc(46px * var(--s));
   offset-rotate: 0deg;
   offset-anchor: 50% 80%;
   offset-distance: 50%;
@@ -2510,7 +2506,7 @@ body.is-map-expanded {
   animation: sl-rock 3.4s ease-in-out infinite alternate;
 }
 
-.sl-ship svg {
+.sl-ship .sl-engraving {
   transform: scaleX(var(--dir));
   animation: sl-turn calc(var(--dur) * 2) step-end var(--delay) infinite;
 }
@@ -2536,20 +2532,16 @@ body.is-map-expanded {
   transform: translate(-50%, -80%);
 }
 
-.sl-beast--serpent { width: calc(180px * var(--s)); }
-.sl-beast--whale { width: calc(120px * var(--s)); }
+.sl-beast--serpent { width: calc(150px * var(--s)); }
+.sl-beast--whale { width: calc(130px * var(--s)); }
+.sl-beast--physeter { width: calc(80px * var(--s)); }
 
+/* The beast rises out of the bottom edge of its window, as if from below the surface. */
 .sl-beast__water {
   overflow: hidden;
-  /* Down to the waterline drawn in each picture (y 57 of 70; 50 of 60). */
-  aspect-ratio: 180 / 57;
 }
 
-.sl-beast--whale .sl-beast__water {
-  aspect-ratio: 120 / 50;
-}
-
-.sl-beast__water svg {
+.sl-beast__water .sl-engraving {
   animation: sl-surface var(--dur) ease-in-out var(--delay) infinite;
 }
 
@@ -2566,7 +2558,7 @@ body.is-map-expanded {
   right: 10%;
   bottom: -6%;
   height: 20%;
-  border: 1.5px solid rgba(55, 111, 183, 0.5);
+  border: 1px solid var(--sl-shade);
   border-radius: 50%;
   opacity: 0;
   animation: sl-ripple var(--dur) ease-out var(--delay) infinite;
@@ -2577,47 +2569,6 @@ body.is-map-expanded {
   62% { opacity: 0.9; }
   80% { opacity: 0.5; transform: scale(1.1); }
   96%, 100% { opacity: 0; transform: scale(1.4); }
-}
-
-.sl-spout {
-  transform-origin: 42px 26px;
-  transform-box: view-box;
-  animation: sl-spout var(--dur) ease-out var(--delay) infinite;
-}
-
-@keyframes sl-spout {
-  0%, 68% { transform: scaleY(0); opacity: 0; }
-  72% { transform: scaleY(1.1); opacity: 1; }
-  80%, 100% { transform: scaleY(1.2) translateY(-3px); opacity: 0; }
-}
-
-/* The mermaid sits on her rock, flicks her tail, and slips under once in a while. */
-.sl-mermaid {
-  position: absolute;
-  width: calc(64px * var(--s));
-  transform: translate(-50%, -80%);
-}
-
-.sl-maid {
-  animation: sl-dive 41s ease-in-out var(--delay) infinite;
-}
-
-.sl-tail {
-  transform-origin: 30px 52px;
-  transform-box: view-box;
-  animation: sl-flick 3.6s ease-in-out infinite alternate;
-}
-
-@keyframes sl-dive {
-  0%, 80% { transform: none; opacity: 1; }
-  84% { transform: translate(14px, 22px) rotate(30deg); opacity: 0; }
-  95% { transform: translate(14px, 22px) rotate(30deg); opacity: 0; }
-  100% { transform: none; opacity: 1; }
-}
-
-@keyframes sl-flick {
-  from { transform: rotate(-6deg); }
-  to { transform: rotate(9deg); }
 }
 
 .sl-compass {
@@ -2678,7 +2629,7 @@ body.is-map-expanded {
 .atlas[data-sky="night"] .atlas__terrain { filter: brightness(0.74) saturate(0.9) hue-rotate(6deg); }
 
 /* By night the surf glows like plankton. */
-.atlas[data-sky="night"] .atlas__surf { filter: sepia(1) hue-rotate(130deg) saturate(5) brightness(1.15); }
+.atlas[data-sky="night"] .atlas__surf { filter: sepia(1) hue-rotate(140deg) saturate(2.2) brightness(0.8); }
 
 .atlas__stars {
   opacity: 0;
@@ -2727,8 +2678,7 @@ body.is-map-expanded {
 .atlas[data-sky="night"] .atlas-fog--question span { color: #c9d2e8; }
 
 /* Creatures sit in the moonlight; lights do not. */
-.atlas[data-sky="night"] .atlas__world svg { filter: brightness(0.62) saturate(0.7); }
-.atlas[data-sky="dusk"] .atlas__world svg { filter: sepia(0.25) brightness(0.92); }
+.atlas[data-sky="dusk"] .atlas__world { --sl-paper: #f1e1cc; }
 
 /* ── Landmarks: your notes on the land ──────────────────────────── */
 
@@ -2737,18 +2687,59 @@ body.is-map-expanded {
   transform: translate(-50%, -88%);
 }
 
-.sl-lighthouse { width: calc(16px * var(--s)); }
-.sl-camp { width: calc(22px * var(--s)); }
-.sl-volcano { width: calc(30px * var(--s)); }
+.sl-lighthouse { width: calc(22px * var(--s)); }
+.sl-camp { width: calc(20px * var(--s)); }
+.sl-volcano { width: calc(38px * var(--s)); }
 
-.sl-tower { fill: #fbf8f2; }
-.sl-stripe { fill: #c0392b; stroke: none; }
-.sl-lantern { fill: #f6c453; }
-.sl-roof { fill: var(--sl-ink); }
-.sl-tent { fill: #e8d9b5; }
+/* The campfire breathes; the volcano's plume leans in the wind. */
+.sl-camp .sl-engraving { transform-origin: 50% 100%; animation: sl-burn 1.6s ease-in-out infinite alternate; }
+.sl-volcano .sl-engraving { transform-origin: 50% 100%; animation: sl-lean 9s ease-in-out infinite alternate; }
+
+@keyframes sl-burn {
+  to { transform: scale(1.02, 1.05); }
+}
+
+@keyframes sl-lean {
+  to { transform: skewX(-2.5deg); }
+}
+
+.sl-beast--spikefish { width: calc(90px * var(--s)); }
+.sl-tree { width: calc(40px * var(--s)); }
+.sl-tree .sl-engraving { transform-origin: 50% 70%; animation: sl-sway 7s ease-in-out infinite alternate; }
+
+@keyframes sl-sway {
+  from { transform: skewX(-1.2deg); }
+  to { transform: skewX(1.4deg); }
+}
+
+/* Rare risings share the horned beast's window; each is sized to its figure. */
+.sl-rise--serpent .sl-kraken-window { width: calc(150px * var(--s)); aspect-ratio: 509 / 498; }
+.sl-rise--wyvern .sl-kraken-window { width: calc(130px * var(--s)); aspect-ratio: 420 / 380; }
+
+/* The lobster climbs out, takes a few steps up the beach, and backs into the sea. */
+.sl-lobster {
+  position: absolute;
+  width: calc(34px * var(--s));
+  transform: translate(-50%, -50%) rotate(var(--turn));
+  opacity: 0;
+  pointer-events: none;
+  animation: sl-crawl 14s ease-in-out forwards;
+}
+
+@keyframes sl-crawl {
+  0% { opacity: 0; translate: 0 0; }
+  12% { opacity: 1; }
+  45% { translate: calc(8px * var(--s)) calc(-10px * var(--s)); }
+  60% { translate: calc(8px * var(--s)) calc(-10px * var(--s)); }
+  88% { opacity: 1; }
+  100% { opacity: 0; translate: 0 calc(6px * var(--s)); }
+}
+
 .sl-flame path { fill: #f68620; stroke: #c0392b; stroke-width: 0.8; }
-.sl-cone { fill: #8f7a68; }
-.sl-lava { fill: #e2562b; stroke: none; }
+.sl-lava { fill: #b5532e; stroke: none; }
+.sl-port { fill: none; stroke: none; }
+.atlas[data-sky="dusk"] .sl-lantern,
+.atlas[data-sky="night"] .sl-lantern { fill: #ffe7a3; }
 
 .sl-flame {
   transform-origin: 23px 21px;
@@ -2770,8 +2761,8 @@ body.is-map-expanded {
 }
 
 .sl-lamp {
-  left: 50%;
-  top: 26%;
+  left: 47%;
+  top: 14%;
   width: 34%;
   aspect-ratio: 1;
   border-radius: 50%;
@@ -2782,8 +2773,8 @@ body.is-map-expanded {
 }
 
 .sl-beam {
-  left: 50%;
-  top: 26%;
+  left: 47%;
+  top: 14%;
   width: calc(260px * var(--s));
   aspect-ratio: 1;
   border-radius: 50%;
@@ -2825,7 +2816,8 @@ body.is-map-expanded {
   animation: sl-flicker-glow 1.8s ease-in-out infinite alternate;
 }
 
-.sl-volcano .sl-glow { top: 20%; background: radial-gradient(closest-side, rgba(255, 96, 40, 0.6), rgba(255, 60, 20, 0)); }
+.sl-camp .sl-glow { top: 58%; }
+.sl-volcano .sl-glow { top: 46%; width: 120%; background: radial-gradient(closest-side, rgba(255, 96, 40, 0.6), rgba(255, 60, 20, 0)); }
 .atlas[data-sky="dusk"] .sl-glow { opacity: 0.5; }
 .atlas[data-sky="night"] .sl-glow { opacity: 1; }
 
@@ -2837,8 +2829,8 @@ body.is-map-expanded {
 /* Smoke: soft puffs that rise, drift with the wind and fade. */
 .sl-smoke {
   position: absolute;
-  left: 72%;
-  top: 30%;
+  left: 30%;
+  top: 0;
   width: 40%;
   aspect-ratio: 1;
   border-radius: 50%;
@@ -2893,13 +2885,11 @@ body.is-map-expanded {
 .sl-ship,
 .sl-compass,
 .sl-bottle,
-.sl-mermaid,
-.sl-beast__water svg {
+.sl-beast__water .sl-engraving {
   pointer-events: auto;
   cursor: pointer;
 }
 
-.sl-port { fill: var(--sl-ink); stroke: none; }
 
 /* Lanterns and lit portholes after dark; the wake glows. */
 .sl-lantern-glow {
@@ -2920,20 +2910,20 @@ body.is-map-expanded {
 .atlas[data-sky="night"] .sl-lantern-glow,
 .atlas[data-sky="dusk"] .sl-lantern-glow { opacity: 1; }
 .atlas[data-sky="night"] .sl-port { fill: #ffd27a; }
-.atlas[data-sky="night"] .sl-wake { stroke: #7ef3e1; stroke-opacity: 0.9; }
+.atlas[data-sky="night"] .sl-wake { stroke: rgba(160, 236, 222, 0.75); }
 
 /* The ghost ship: only by night, pale and slow. */
 .sl-ship--ghost {
   opacity: 0;
   pointer-events: none;
   transition: opacity 3s ease;
-  --sl-wood: rgba(170, 236, 225, 0.35);
-  --sl-sail: rgba(200, 248, 240, 0.28);
+  --sl-ink: rgba(170, 236, 225, 0.85);
+  --sl-paper: rgba(120, 200, 190, 0.12);
+  --sl-shade: rgba(170, 236, 225, 0.45);
 }
 
 .atlas[data-sky="night"] .sl-ship--ghost { opacity: 0.75; pointer-events: auto; }
-.atlas[data-sky="night"] .atlas__world .sl-ship--ghost svg { filter: drop-shadow(0 0 4px rgba(126, 243, 225, 0.8)); stroke: rgba(170, 240, 230, 0.8); }
-.sl-ship--ghost .sl-flag { fill: rgba(200, 248, 240, 0.5); }
+.atlas[data-sky="night"] .atlas__world .sl-ship--ghost svg { filter: drop-shadow(0 0 3px rgba(126, 243, 225, 0.6)); }
 
 .sl-ship.is-firing > span { animation: sl-recoil 0.5s ease-out; }
 
@@ -2993,40 +2983,18 @@ body.is-map-expanded {
   animation: sl-arc 0.9s ease-in-out forwards;
 }
 
-.sl-fish { fill: #9fb5c9; }
 
 @keyframes sl-arc {
   from { offset-distance: 0%; }
   to { offset-distance: 100%; }
 }
 
-.sl-beast.is-startled .sl-beast__water svg { animation: sl-startle 0.7s ease-in forwards; }
+.sl-beast.is-startled .sl-beast__water .sl-engraving { animation: sl-startle 0.7s ease-in forwards; }
 
 @keyframes sl-startle {
   0% { transform: translate(0, 0); }
   25% { transform: translate(-2%, -6%) rotate(-2deg); }
   100% { transform: translate(-6%, 110%); }
-}
-
-.sl-beast--whale.is-blowing .sl-spout { animation: sl-blow 1.5s ease-out; }
-
-@keyframes sl-blow {
-  0% { transform: scaleY(0); opacity: 0; }
-  20% { transform: scaleY(1.5); opacity: 1; }
-  100% { transform: scaleY(1.8) translateY(-6px); opacity: 0; }
-}
-
-.sl-arm {
-  transform-origin: 31px 36px;
-  transform-box: view-box;
-}
-
-.sl-mermaid.is-waving .sl-arm { animation: sl-wave 0.45s ease-in-out 5 alternate; }
-.sl-mermaid.is-waving .sl-maid { animation: none; }
-
-@keyframes sl-wave {
-  from { transform: rotate(-12deg); }
-  to { transform: rotate(22deg); }
 }
 
 .sl-compass.is-turning svg { animation: sl-spin 0.85s cubic-bezier(0.3, 1.4, 0.5, 1); }
@@ -3035,28 +3003,17 @@ body.is-map-expanded {
   from { transform: rotate(-90deg); }
 }
 
-/* The whirlpool turns forever in the deep. */
+/* The maelstrom turns forever in the deep. */
 .sl-whirl {
   position: absolute;
-  width: calc(90px * var(--s));
-  aspect-ratio: 1.6;
-  transform: translate(-50%, -50%);
+  width: calc(80px * var(--s));
+  transform: translate(-50%, -50%) scaleY(0.62);
   pointer-events: none;
 }
 
-.sl-whirl i {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1.5px dashed rgba(55, 111, 183, 0.35);
-  border-left-color: transparent;
-  border-bottom-color: transparent;
-  animation: sl-whirl 7s linear infinite;
+.sl-whirl .sl-engraving {
+  animation: sl-whirl 60s linear infinite reverse;
 }
-
-.sl-whirl i:nth-child(2) { inset: 18%; animation-duration: 4.5s; }
-.sl-whirl i:nth-child(3) { inset: 36%; animation-duration: 2.6s; border-color: rgba(23, 55, 94, 0.45); border-left-color: transparent; }
-.atlas[data-sky="night"] .sl-whirl i { border-top-color: rgba(126, 243, 225, 0.55); border-right-color: rgba(126, 243, 225, 0.55); }
 
 @keyframes sl-whirl {
   to { transform: rotate(360deg); }
@@ -3073,9 +3030,6 @@ body.is-map-expanded {
   animation: sl-bob 3.2s ease-in-out infinite alternate;
 }
 
-.sl-glass { fill: rgba(140, 196, 170, 0.7); }
-.sl-scroll { fill: #f1e2bd; stroke-width: 0.6; }
-.sl-cork { fill: #a07850; }
 
 .sl-glint {
   position: absolute;
@@ -3102,36 +3056,6 @@ body.is-map-expanded {
 }
 
 /* ── Wonders ────────────────────────────────────────────────────── */
-
-.sl-pod {
-  position: absolute;
-  transform: scaleX(var(--flip));
-  pointer-events: none;
-  animation: sl-pod 7.5s linear forwards;
-}
-
-@keyframes sl-pod {
-  to { translate: calc(var(--flip) * 240px * var(--s)) 0; }
-}
-
-.sl-dolphin {
-  position: absolute;
-  left: 0;
-  width: calc(24px * var(--s));
-  offset-rotate: auto;
-  offset-distance: 0%;
-  opacity: 0;
-  animation: sl-leap 2.2s ease-in-out 3 both;
-}
-
-.sl-dolphin-body { fill: #6f86a6; }
-
-@keyframes sl-leap {
-  0% { offset-distance: 0%; opacity: 0; }
-  12% { opacity: 1; }
-  88% { opacity: 1; }
-  100% { offset-distance: 100%; opacity: 0; }
-}
 
 .atlas__air {
   position: absolute;
@@ -3261,291 +3185,48 @@ body.is-map-expanded {
   45%, 45.4% { opacity: 1; }
 }
 
-/* The kraken: arms rise in a ring, an eye opens, and it is gone. */
+/* The horned beast: a maelstrom opens, the beast rises through it, looks about, and sinks. */
 .sl-kraken-rise {
   position: absolute;
   pointer-events: none;
 }
 
-.sl-kraken { fill: #8a4f6b; }
-.sl-sucker { fill: #e4b9c9; stroke: none; }
-.sl-iris { fill: #f1c84b; }
-.sl-pupil { fill: #1b1b1b; stroke: none; }
-
-.sl-maelstrom {
+.sl-kraken-pool {
   position: absolute;
-  width: calc(240px * var(--s));
-  aspect-ratio: 1.8;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: repeating-radial-gradient(closest-side, rgba(23, 55, 94, 0.18) 0 2px, transparent 2px 12px);
+  width: calc(130px * var(--s));
+  transform: translate(-50%, -40%) scaleY(0.55);
   opacity: 0;
   animation: sl-maelstrom 12s ease-in-out forwards;
 }
 
+.sl-kraken-pool .sl-engraving { animation: sl-whirl 8s linear infinite reverse; }
+
 @keyframes sl-maelstrom {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(0deg); }
-  15%, 80% { opacity: 1; }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1) rotate(540deg); }
+  0% { opacity: 0; }
+  12%, 82% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
-.sl-arm-window {
-  position: absolute;
-  width: calc(34px * var(--s));
-  aspect-ratio: 30 / 90;
-  overflow: hidden;
-  transform: translate(-50%, -100%) rotate(var(--lean));
-  transform-origin: 50% 100%;
-}
-
-.sl-arm-window > div,
-.sl-eye-window > div {
-  transform: translateY(105%);
-  animation: sl-arm 11s ease-in-out forwards;
-  animation-delay: inherit;
-}
-
-@keyframes sl-arm {
-  0% { transform: translateY(105%); }
-  14% { transform: translateY(0) rotate(0deg); }
-  30% { transform: translateY(2%) skewX(8deg); }
-  48% { transform: translateY(0) skewX(-8deg); }
-  66% { transform: translateY(3%) skewX(6deg); }
-  80% { transform: translateY(0); }
-  100% { transform: translateY(105%); }
-}
-
-.sl-eye-window {
-  position: absolute;
-  width: calc(70px * var(--s));
-  aspect-ratio: 60 / 34;
-  overflow: hidden;
-  transform: translate(-50%, -100%);
-  animation-delay: 1.4s;
-}
-
-.sl-iris,
-.sl-pupil {
-  transform-origin: 30px 25px;
-  transform-box: view-box;
-  animation: sl-blink 11s ease-in-out forwards;
-}
-
-@keyframes sl-blink {
-  0%, 30% { transform: scaleY(0.1); }
-  36%, 58% { transform: scaleY(1); }
-  60% { transform: scaleY(0.1); }
-  62%, 100% { transform: scaleY(1); }
-}
-
-.atlas[data-sky="night"] .sl-iris { fill: #ffe066; filter: drop-shadow(0 0 4px #ffe066); }
-
-/* ── The seasons ────────────────────────────────────────────────── */
-
-.sl-season-name {
-  position: absolute;
-  transform: translate(-50%, 0);
-  padding: 0 4px;
-  border: 0;
-  background: none;
-  color: rgba(23, 55, 94, 0.62);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: calc(17px * var(--s));
-  font-style: italic;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  pointer-events: auto;
-  cursor: pointer;
-}
-
-.atlas[data-sky="night"] .sl-season-name { color: rgba(214, 226, 255, 0.7); }
-
-/* One set of motes: blossom in spring, leaves in autumn, snow in winter, none in summer. */
-.sl-motes {
-  position: absolute;
-  inset: 0;
-  display: none;
-}
-
-.atlas[data-season="spring"] .sl-motes,
-.atlas[data-season="autumn"] .sl-motes,
-.atlas[data-season="winter"] .sl-motes { display: block; }
-
-.sl-motes i {
-  position: absolute;
-  top: -4%;
-  width: calc(9px * var(--k));
-  height: calc(6px * var(--k));
-  border-radius: 60% 0 60% 0;
-  background: #f4b6c8;
-  opacity: 0.75;
-  animation: sl-fall var(--d) linear var(--delay) infinite;
-}
-
-.atlas[data-season="autumn"] .sl-motes i { background: #d9822b; border-radius: 70% 0 70% 0; width: calc(11px * var(--k)); height: calc(7px * var(--k)); }
-.atlas[data-season="autumn"] .sl-motes i:nth-child(3n) { background: #b8452c; }
-.atlas[data-season="autumn"] .sl-motes i:nth-child(3n + 1) { background: #c9a227; }
-.atlas[data-season="winter"] .sl-motes i { width: calc(4px * var(--k)); height: calc(4px * var(--k)); border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.18), 0 1px 3px rgba(23, 55, 94, 0.3); opacity: 0.95; }
-
-@keyframes sl-fall {
-  0% { transform: translate(0, 0) rotate(0deg); }
-  25% { transform: translate(var(--sway), 25cqh) rotate(calc(var(--spin) * 0.25)); }
-  50% { transform: translate(calc(var(--sway) * -0.4), 50cqh) rotate(calc(var(--spin) * 0.5)); }
-  75% { transform: translate(var(--sway), 75cqh) rotate(calc(var(--spin) * 0.75)); }
-  100% { transform: translate(calc(var(--sway) * 0.3), 108cqh) rotate(var(--spin)); }
-}
-
-.atlas__air { container-type: size; }
-
-/* Summer: the reflected stars become the sun's glints on the water. */
-.atlas[data-season="summer"]:not([data-sky="night"]) .atlas__stars { opacity: 1; }
-.atlas[data-season="summer"]:not([data-sky="night"]) .atlas__stars i {
-  width: calc(var(--z) * 3.5);
-  height: calc(var(--z) * 3.5);
-  border-radius: 0;
-  background: #fff;
-  box-shadow: none;
-  clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
-  animation-name: sl-sun-glint;
-  animation-duration: 3.2s;
-}
-
-@keyframes sl-sun-glint {
-  0%, 60% { opacity: 0; transform: scale(0.3); }
-  80% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(0.4); }
-}
-
-/* Winter: ice floes drift in the open water. */
-.sl-floe {
-  position: absolute;
-  display: none;
-  width: calc(80px * var(--s) * var(--z));
-  aspect-ratio: 1.3;
-  transform: translate(-50%, -50%);
-  background: linear-gradient(160deg, #ffffff 40%, #cfe0ee);
-  filter: drop-shadow(0 2px 0 rgba(23, 55, 94, 0.35));
-  pointer-events: none;
-  animation: sl-floe 24s ease-in-out var(--delay) infinite alternate;
-}
-
-.atlas[data-season="winter"] .sl-floe { display: block; }
-/* A cold, grey-blue sea, so the ice and the snow show. */
-.atlas[data-season="winter"]:not([data-sky="night"]) .atlas__tide { background: rgb(208, 222, 236); }
-.atlas[data-sky="night"] .sl-floe { background: linear-gradient(160deg, #c9d6ee, #8ea3c8); }
-
-@keyframes sl-floe {
-  from { translate: -14px -4px; rotate: -6deg; }
-  to { translate: 14px 5px; rotate: 7deg; }
-}
-
-.atlas[data-season="winter"] .atlas__terrain { filter: saturate(0.7) brightness(1.04); }
-.atlas[data-season="winter"][data-sky="night"] .atlas__terrain { filter: brightness(0.78) saturate(0.6) hue-rotate(10deg); }
-.atlas[data-season="autumn"]:not([data-sky="night"]) .atlas__terrain { filter: sepia(0.22) saturate(1.2); }
-.atlas[data-season="spring"][data-sky="day"] .atlas__terrain { filter: saturate(1.15) brightness(1.02); }
-
-/* ── The treasure ───────────────────────────────────────────────── */
-
-.sl-treasure {
-  position: absolute;
-  width: calc(26px * var(--s));
-  padding: 0;
-  border: 0;
-  background: none;
-  transform: translate(-50%, -50%);
-  pointer-events: auto;
-  cursor: pointer;
-}
-
-.sl-trail { fill: none; stroke: #8a5a2b; stroke-dasharray: 2 3; stroke-width: 1.6; }
-.sl-x { fill: none; stroke: #d4a017; stroke-width: 4; filter: drop-shadow(0 0 2px rgba(120, 70, 0, 0.6)); }
-.sl-treasure .sl-glint { left: 50%; top: 0; width: 60%; animation-duration: 2.6s; }
-.atlas[data-sky="night"] .atlas__world .sl-treasure svg { filter: drop-shadow(0 0 6px rgba(255, 210, 90, 0.9)); }
-.sl-treasure:focus-visible { outline: 2px solid var(--wave); outline-offset: 3px; border-radius: 4px; }
-
-/* ── New ink: a note added since your last look blooms up ───────── */
-
-.sl-bloom {
-  position: absolute;
-  pointer-events: none;
-}
-
-.sl-ink {
+.sl-kraken-window {
   position: absolute;
   width: calc(120px * var(--s));
-  aspect-ratio: 1;
-  margin: calc(-60px * var(--s));
-  border-radius: 46% 54% 52% 48%;
-  background: radial-gradient(closest-side, rgba(23, 55, 94, 0.45), rgba(23, 55, 94, 0.18) 60%, transparent);
-  animation: sl-ink 4.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  aspect-ratio: 315 / 304;
+  overflow: hidden;
+  transform: translate(-50%, -96%);
 }
 
-.sl-ink + .sl-ink { animation-delay: 0.35s; border-radius: 55% 45% 40% 60%; }
-
-@keyframes sl-ink {
-  0% { transform: scale(0.05) rotate(0deg); opacity: 0; }
-  12% { opacity: 1; }
-  100% { transform: scale(1.5) rotate(30deg); opacity: 0; }
+.sl-kraken-window > div {
+  transform: translateY(105%);
+  animation: sl-rise 11s ease-in-out 0.8s forwards;
 }
 
-.sl-hill {
-  position: absolute;
-  width: calc(40px * var(--s));
-  aspect-ratio: 1;
-  margin: calc(-20px * var(--s));
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(23, 55, 94, 0.55), 0 0 0 calc(7px * var(--s)) rgba(23, 55, 94, 0), 0 0 0 calc(9px * var(--s)) rgba(23, 55, 94, 0.35), 0 0 0 calc(16px * var(--s)) rgba(23, 55, 94, 0), 0 0 0 calc(18px * var(--s)) rgba(23, 55, 94, 0.2);
-  animation: sl-hill 4.6s ease-out 0.2s both;
-}
-
-@keyframes sl-hill {
-  0% { transform: scale(0); opacity: 0; }
-  30% { transform: scale(1); opacity: 1; }
-  80% { opacity: 1; }
-  100% { transform: scale(1.1); opacity: 0; }
-}
-
-.sl-bloom span {
-  position: absolute;
-  transform: translate(-50%, 0);
-  color: var(--navy);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: calc(15px * var(--s));
-  font-style: italic;
-  font-weight: 700;
-  white-space: nowrap;
-  text-shadow: 0 0 4px var(--paper), 0 0 4px var(--paper);
-  animation: sl-new 4.6s ease-out forwards;
-}
-
-.atlas[data-sky="night"] .sl-ink { background: radial-gradient(closest-side, rgba(126, 243, 225, 0.5), rgba(126, 243, 225, 0.15) 60%, transparent); }
-.atlas[data-sky="night"] .sl-bloom span { color: #e9fffb; text-shadow: 0 0 6px #0c1834; }
-
-@keyframes sl-new {
-  0% { opacity: 0; translate: 0 0; }
-  20% { opacity: 1; }
-  80% { opacity: 1; }
-  100% { opacity: 0; translate: 0 calc(-40px * var(--s)); }
-}
-
-/* ── Named ships ────────────────────────────────────────────────── */
-
-.sl-ship--charter .sl-flag { fill: #d4a017; }
-.sl-ship--charter .sl-sail:first-of-type { fill: #fff3cf; }
-
-.sl-ship.is-followed > span::after {
-  content: "";
-  position: absolute;
-  inset: -30%;
-  border-radius: 50%;
-  border: 2px solid rgba(212, 160, 23, 0.8);
-  animation: sl-follow 1.6s ease-out infinite;
-}
-
-@keyframes sl-follow {
-  from { transform: scale(0.6); opacity: 1; }
-  to { transform: scale(1.4); opacity: 0; }
+@keyframes sl-rise {
+  0% { transform: translateY(105%); }
+  18% { transform: translateY(4%) rotate(-2deg); }
+  35% { transform: translateY(0) rotate(2deg); }
+  55% { transform: translateY(2%) rotate(-3deg); }
+  75% { transform: translateY(0) rotate(1deg); }
+  100% { transform: translateY(105%); }
 }
 
 /* ── Key additions ──────────────────────────────────────────────── */
@@ -3556,6 +3237,7 @@ body.is-map-expanded {
 .isles-key--bottle { width: 14px; height: 6px; border-radius: 3px; background: rgba(140, 196, 170, 0.9); box-shadow: inset 0 0 0 1px var(--navy); }
 
 .isles-key--treasure { border-radius: 0; background: #d4a017; clip-path: polygon(0 12%, 12% 0, 50% 38%, 88% 0, 100% 12%, 62% 50%, 100% 88%, 88% 100%, 50% 62%, 12% 100%, 0 88%, 38% 50%); }
+.isles-key--tree { border-radius: 50% 50% 20% 20%; background: radial-gradient(circle at 50% 35%, var(--navy) 0 45%, transparent 46%), linear-gradient(var(--navy), var(--navy)) 50% 100% / 2px 45% no-repeat; }
 .isles-key--bloom { background: radial-gradient(closest-side, rgba(23, 55, 94, 0.6), rgba(23, 55, 94, 0.1)); }
 .isles-key--charter { border-radius: 0; background: #d4a017; clip-path: polygon(0 0, 100% 30%, 0 60%); }
 
@@ -3598,6 +3280,80 @@ body.is-map-expanded {
 }
 
 /* Sea routes and their counts stay visible on a dark sea. */
-.atlas[data-sky="night"] .isles-route { stroke: #9cc0ff; stroke-opacity: 0.55; }
-.atlas[data-sky="night"] .isles-route.is-on { stroke: #ffc46b; stroke-opacity: 0.95; }
+.atlas[data-sky="night"] .isles-route { stroke: #c9d6f2; stroke-opacity: 0.14; }
+.atlas[data-sky="night"] .isles-route.is-dim { stroke-opacity: 0.04; }
+.atlas[data-sky="night"] .isles-route-count { background: rgba(12, 24, 52, 0.75); color: #f0e6cc; }
+.atlas[data-sky="night"] .isles-route.is-on { stroke: #e9cf8f; stroke-opacity: 0.8; }
 .atlas[data-sky="night"] .atlas-road { stroke: rgba(214, 226, 255, 0.6); }
+
+/* ── Engravings (Carta Marina, 1539) ────────────────────────────── */
+
+/* Two masks per figure: its parchment silhouette, then its ink, coloured by the hour. */
+.sl-engraving {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: var(--ar);
+}
+
+.sl-engraving::before,
+.sl-engraving::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.sl-engraving::before {
+  background: var(--sl-paper);
+  opacity: 0.9;
+  -webkit-mask-image: var(--fill);
+  mask-image: var(--fill);
+}
+
+.sl-engraving::after {
+  background: var(--sl-ink);
+  -webkit-mask-image: var(--ink);
+  mask-image: var(--ink);
+}
+
+.sl-ship--ghost .sl-engraving { filter: none; }
+.atlas[data-sky="night"] .sl-ship--ghost .sl-engraving { filter: drop-shadow(0 0 3px rgba(126, 243, 225, 0.6)); }
+
+/* A gold pennant at the masthead marks a ship on a route your links made. */
+.sl-pennant {
+  position: absolute;
+  z-index: 1;
+  left: 48%;
+  top: -6%;
+  width: 26%;
+  height: 9%;
+  background: #c9a227;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+  animation: isles-flutter 2.4s ease-in-out infinite;
+  transform-origin: 0 50%;
+}
+
+/* ── The god's-eye view ─────────────────────────────────────────── */
+
+/* From the whole world: land, sea and weather only. Closer in, the life of the sea appears. */
+.atlas__world:not(.atlas__ink) {
+  opacity: var(--reveal, 1);
+}
+
+.atlas:not([data-revealed]) .atlas__world:not(.atlas__ink) {
+  visibility: hidden;
+}
+
+.sl-motes,
+.sl-gulls {
+  opacity: var(--reveal, 1);
+}
+
+/* The clouds are what a god sees first; zooming in drops below them. */
+.atlas__sky {
+  opacity: calc(1 - var(--reveal, 0) * 0.75);
+}
