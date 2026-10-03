@@ -14,7 +14,8 @@ import {
 const LOCAL_KEY = "knowledge-hub:shelf-preview-v1";
 
 async function apiFetch<T>(init?: RequestInit): Promise<T> {
-  const path = "/api/knowledge/shelf";
+  // API_BASE already ends in /api/knowledge (same as Stars: "/stars").
+  const path = "/shelf";
   const response = await fetch(`${API_BASE}${path}`, { credentials: "include", ...init });
   let payload: unknown = null;
   try {
