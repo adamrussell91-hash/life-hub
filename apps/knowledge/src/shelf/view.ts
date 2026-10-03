@@ -189,8 +189,16 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     } catch {
       // Storage blocked: show the card; dismiss just won't stick.
     }
-    const misses = [...(job.unknown ?? []), ...(job.failed ?? [])];
-    const low = job.lowConfidence ?? [];
+    // The job's lists are a snapshot from when it finished: drop books since removed or filled in.
+    const shelfBook = (label: string) => books.find(b => b.label.toLowerCase() === label.toLowerCase());
+    const misses = [...(job.unknown ?? []), ...(job.failed ?? [])].filter(label => {
+      const book = shelfBook(label);
+      return book && !book.pagesKnown;
+    });
+    const low = (job.lowConfidence ?? []).filter(label => {
+      const book = shelfBook(label);
+      return book && !book.chapters.length;
+    });
     const open = (label: string) => {
       const book = books.find(b => b.label.toLowerCase() === label.toLowerCase());
       return book ? `<li><button type="button" data-open-book="${esc(book.key)}">${esc(label)}</button></li>` : `<li>${esc(label)}</li>`;
@@ -826,7 +834,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       </div></div>
       <div class="descent__col" style="height:${layout.height}px">
         ${book.chapters.length
-          ? chapterTops(book, y).map(({ ch, top }) => `<div class="descent__chapter" style="top:${top}px"><b>${esc(ch.label ? `${ch.label} · ${ch.title}` : ch.title)}</b><span>${ch.noteCount ? `${ch.noteCount} ${ch.noteCount === 1 ? "note" : "notes"}` : "no notes"}</span></div>`).join("")
+          ? chapterTops(book, y).map(({ ch, top }) => `<div class="descent__chapter${ch.noteCount ? "" : " is-empty"}" style="top:${top}px" data-top="${top}" title="${esc(ch.label ? `${ch.label} · ${ch.title}` : ch.title)}"><span>${esc([ch.label ? `Ch ${ch.label}` : "", ch.noteCount ? `${ch.noteCount} ${ch.noteCount === 1 ? "note" : "notes"}` : "no notes"].filter(Boolean).join(" · "))}</span><b>${esc(ch.title)}</b></div>`).join("")
           : `<p class="descent__hint">No chapters yet.<br />Add them in Book facts.</p>`}
       </div>
       <div class="descent__col descent__core" style="height:${layout.height}px">
@@ -852,6 +860,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
 
     bindNotes(body, book);
     body.querySelector<HTMLButtonElement>("[data-place-bottom]")?.addEventListener("click", () => openPlaceSheet(book));
+    settleChapterLabels(body);
 
     // Leader lines: tick → card, card → exit. Measured after layout so columns can flex.
     const svg = body.querySelector<SVGSVGElement>("[data-links]")!;
@@ -910,6 +919,19 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   }
 
   /** Chapter labels sit at their start page but never on top of each other. */
+  /** Chapter labels sit at their first page, pushed down by their real height so wrapped titles never overlap (C1). */
+  function settleChapterLabels(body: HTMLElement) {
+    const labels = [...body.querySelectorAll<HTMLElement>(".descent__chapter")];
+    let floor = -Infinity;
+    for (const label of labels) {
+      const top = Math.max(Number(label.dataset.top) || 0, floor + 10);
+      label.style.top = `${top}px`;
+      floor = top + label.offsetHeight;
+    }
+    const column = labels[0]?.parentElement;
+    if (column && floor > column.offsetHeight) column.style.height = `${Math.ceil(floor + 12)}px`;
+  }
+
   function chapterTops(book: BookModel, y: (page: number) => number) {
     let floor = -Infinity;
     return book.chapters.map(ch => {
