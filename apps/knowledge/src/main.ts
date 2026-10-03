@@ -1123,6 +1123,17 @@ function renderBookshelf() {
     header: supporting => pageHeader("Library", "Bookshelf", "", { supportingHtml: supporting }),
     openPage: id => void openPage(id),
     getPage,
+    moveNotesToNotebook: async (bookLabel, noteIds, notebook) => {
+      const key = bookLabel.replace(/\s+/g, " ").trim().toLowerCase();
+      for (const id of noteIds) {
+        const page = await getPage(id);
+        const kept = (page.origins ?? []).filter(origin => !(origin.kind === "book" && origin.label.replace(/\s+/g, " ").trim().toLowerCase() === key));
+        const hasNotebook = kept.some(origin => origin.kind === "notebook" && origin.label === notebook);
+        await savePage({ ...page, origins: hasNotebook ? kept : [...kept, { kind: "notebook", label: notebook }] });
+      }
+      entries = await listPages();
+      return entries;
+    },
     initialBook: route?.book,
     initialNote: route?.note,
   });

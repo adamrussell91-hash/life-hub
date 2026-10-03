@@ -85,3 +85,13 @@ test('Shelf API gates the archive, reads, and writes both ops', async () => {
   assert.equal(read.data.books[0].label, 'The Enigma of Reason');
   assert.equal(read.data.placements[0].page, 30);
 });
+
+test('Shelf can take a book record off the shelf', async () => {
+  const { deleteBook } = await import('../../netlify/functions/_shared/knowledge-shelf.mjs');
+  const store = memoryStore();
+  await saveBook(store, { label: '~10%', notebook: 'Pedagogy and Planning' }, { now: NOW });
+  assert.deepEqual(await deleteBook(store, '~10%'), { label: '~10%', removed: true });
+  assert.equal((await readShelf(store)).books.length, 0);
+  assert.deepEqual(await deleteBook(store, '~10%'), { label: '~10%', removed: false });
+  await assert.rejects(() => deleteBook(store, ''), /title is required/);
+});
