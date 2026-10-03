@@ -8,8 +8,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { writeSync } from "node:fs";
 import { KIND_SYSTEM, kindPrompt, parseKindGrade } from "../src/shelf/kindGrade";
-import { FACTS_MODEL } from "../../../../netlify/functions/_shared/knowledge-shelf-facts.mjs";
-import { SHELF_KINDS } from "../../../../netlify/functions/_shared/knowledge-shelf.mjs";
+import { FACTS_MODEL } from "../../../netlify/functions/_shared/knowledge-shelf-facts.mjs";
+import { SHELF_KINDS } from "../../../netlify/functions/_shared/knowledge-shelf.mjs";
 import { loadDotEnv } from "./loadLocalPages";
 
 const ANTHROPIC_ORIGIN = "https://api.anthropic.com";
@@ -143,6 +143,11 @@ async function main() {
     rows = rows.filter(entry =>
       (entry.origins ?? []).some(o => o.kind === "book" && (o.label ?? "").replace(/\s+/g, " ").trim().toLowerCase() === want),
     );
+  }
+  if (goldPath && process.argv.includes("--gold-only")) {
+    const gold = JSON.parse(await readFile(path.resolve(goldPath), "utf8")) as GoldFile;
+    const want = new Set(gold.notes.map(note => note.id));
+    rows = rows.filter(entry => want.has(entry.id));
   }
   if (limit) rows = rows.slice(0, limit);
 

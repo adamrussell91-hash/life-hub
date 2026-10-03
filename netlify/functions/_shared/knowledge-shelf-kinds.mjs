@@ -17,18 +17,25 @@ const BODY_CHARS = 6000;
 
 export const KIND_SYSTEM = `You grade one book note with exactly one kind. A book note is information on something in a book.
 
-Kinds (pick one):
-- person: who someone is and what they contributed
-- idea: a concept, term, mechanism or the book's argument, explained
-- case: a specific event, study, example or story
-- debate: where knowledge isn't settled — rival accounts, critics, a popular version that's wrong, an open question
-- bridge: where the idea leads out of the book — implications for teaching or learning, or a link to another field or book
+Pick the kind that names the note's MAIN job — what most of the page is doing. A side mention does not change the kind.
 
-Precedence when two fit: debate > bridge > case > person > idea.
-idea is only when nothing else fits. It is the easy default a lazy grader will reach for — do not reach for it when debate, bridge, case or person fit.
+Kinds:
+- person: the page is mainly a profile — who someone is and what they contributed
+- idea: the page is mainly explaining a concept, term, mechanism or the book's argument
+- case: the page is mainly a specific event, study, example or story
+- debate: the page's main job is unsettled knowledge — rival accounts, a correction of a popular version, or an open question it is organised around
+- bridge: the page's main job is carrying the idea out of the book — implications for teaching, classroom practice, or learning design, or a link to another field or book
 
-debate needs a quoted sentence from the note showing the disagreement, the correction or the open question.
-bridge needs a quoted sentence pointing outside the book (to practice, teaching or another field).
+Do NOT choose debate just because the note mentions a caveat, a critic, "contested", or two views in passing while it is still mostly a profile, an explanation, or a case. Those stay person / idea / case.
+A short closing tip for teachers is not enough for bridge. But if the note's stated aim or a major section is implications for teaching, classroom practice, or learning design, prefer bridge over idea — that is the page carrying the idea out of the book.
+Clinical or in-domain professional implications that stay inside the book's own subject (for example lesion localisation tips in a neuroanatomy note) are not bridge. Bridge leaves the book toward teaching/learning design or another field.
+When the page is organised around interpretive caution, rival accounts, or an open question, choose debate — even if it also has an "implications" section.
+
+When two kinds truly both describe the main job: debate > bridge > case > person > idea.
+idea is only when nothing else fits. It is the easy default a lazy grader will reach for — do not reach for it when debate, bridge, case or person is the main job.
+
+debate needs a quoted sentence from the note showing the disagreement, the correction or the open question that the page is organised around.
+bridge needs a quoted sentence pointing outside the book (to practice, teaching or another field) that the page is organised around.
 fallback is always the best crystallised fit (person, idea or case), used if a fluid grade cannot be backed up.
 
 Return JSON only.`;
@@ -51,7 +58,27 @@ function headers(apiKey) {
 }
 
 function normalise(text) {
-  return String(text ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return String(text ?? '')
+    .toLowerCase()
+    .replace(/[*_`#>"'“”‘’]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** True when the evidence quote (or a long contiguous chunk of it) appears in the body. */
+function evidenceInBody(evidence, body) {
+  const hay = normalise(body);
+  const needle = normalise(evidence);
+  if (!needle || needle.length < 12) return false;
+  if (hay.includes(needle)) return true;
+  // Model quotes often trim or slightly rephrase; accept a 48-char window from the quote.
+  if (needle.length >= 48) {
+    for (let i = 0; i + 48 <= needle.length; i += 12) {
+      if (hay.includes(needle.slice(i, i + 48))) return true;
+    }
+  }
+  return false;
 }
 
 function bookLabelFromOrigins(origins) {
@@ -94,15 +121,11 @@ export function parseKindGrade(text, body) {
 
   let kindGuessed = confidence === null || confidence < 0.7;
   let downgraded = false;
-  if (FLUID_KINDS.includes(kind)) {
-    const hay = normalise(body);
-    const needle = normalise(evidence);
-    if (!needle || !hay.includes(needle)) {
-      kind = fallback;
-      kindGuessed = true;
-      downgraded = true;
-      reason = `Downgraded: quote not found.${reason ? ` ${reason}` : ''}`.slice(0, 300);
-    }
+  if (FLUID_KINDS.includes(kind) && !evidenceInBody(evidence, body)) {
+    kind = fallback;
+    kindGuessed = true;
+    downgraded = true;
+    reason = `Downgraded: quote not found.${reason ? ` ${reason}` : ''}`.slice(0, 300);
   }
   return { kind, kindGuessed, kindReason: reason || undefined, downgraded, confidence };
 }
