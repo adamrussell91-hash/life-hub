@@ -514,13 +514,14 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
           <svg class="hub-search__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input class="hub-search__input" id="shelf-search" type="search" placeholder="Find an idea across books" value="${esc(query)}" aria-label="Find an idea across books" />
         </label>
+        ${readingPopHtml()}
         ${toolActionsHtml()}
       </div>
       ${loadError ? `<p class="shelf-sheet__error" role="alert">${esc(loadError)} Notes still show; pages and book facts are missing until it loads.</p>` : ""}
       ${books.length ? "" : loaded ? emptyHtml() : ""}
-      <div class="shelf-room${searching ? " is-searching" : ""}${searching || readingBooks().length || factsCardHtml() ? "" : " is-quiet"}">
-        <div class="shelf-stage" data-stage></div>
+      <div class="shelf-room${searching ? " is-searching" : ""}">
         ${sideHtml(hits)}
+        <div class="shelf-stage" data-stage></div>
       </div>
     </div>`;
     bindRooms();
@@ -531,6 +532,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       };
     });
     host.querySelector<HTMLButtonElement>("[data-place-all]")?.addEventListener("click", openPlaceAll);
+    bindReadingPop();
     const input = host.querySelector<HTMLInputElement>("#shelf-search");
     if (input) {
       input.oninput = () => {
@@ -664,12 +666,45 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         <button class="btn btn--primary" type="button" data-open-book="${esc(top.key)}" data-note="${esc(firstHit?.id ?? "")}" style="width:100%">Open ${esc(top.label)}</button>
       </div>`;
     }
+    return "";
+  }
+
+  /** Reading now: a toolbar button that opens on hover (or tap) so the shelf keeps the full width. */
+  function readingPopHtml() {
     const reading = readingBooks();
     if (!reading.length) return "";
-    return `<div class="shelf-card">
-      <p class="shelf-eyebrow">Reading now</p>
-      <ul>${reading.map(book => `<li><button type="button" class="shelf-reading" data-open-book="${esc(book.key)}">${coverImg(book, "shelf-reading__cover")}${esc(book.label)}</button><span>${book.reading?.page ? `p.${book.reading.page}` : "just started"}</span></li>`).join("")}</ul>
+    const stack = reading.slice(0, 3).map(book => coverImg(book, "shelf-reading__cover") || `<span class="shelf-reading__cover" style="--c:${book.swatch.fill}"></span>`).join("");
+    return `<div class="shelf-reading-pop">
+      <button type="button" class="btn btn--ghost shelf-reading-pop__toggle" aria-expanded="false" aria-controls="shelf-reading-panel" aria-label="Reading now, ${reading.length} ${reading.length === 1 ? "book" : "books"}">
+        <span class="shelf-reading-pop__stack" aria-hidden="true">${stack}</span>
+        <span class="shelf-reading-pop__label">Reading now</span>
+      </button>
+      <div class="shelf-card shelf-reading-pop__panel" id="shelf-reading-panel">
+        <p class="shelf-eyebrow">Reading now</p>
+        <ul>${reading.map(book => `<li><button type="button" class="shelf-reading" data-open-book="${esc(book.key)}">${coverImg(book, "shelf-reading__cover")}${esc(book.label)}</button><span>${book.reading?.page ? `p.${book.reading.page}` : "just started"}</span></li>`).join("")}</ul>
+      </div>
     </div>`;
+  }
+
+  function bindReadingPop() {
+    const pop = host.querySelector<HTMLElement>(".shelf-reading-pop");
+    const toggle = pop?.querySelector<HTMLButtonElement>(".shelf-reading-pop__toggle");
+    if (!pop || !toggle) return;
+    const outside = (event: PointerEvent) => {
+      if (!pop.contains(event.target as Node)) set(false);
+    };
+    const set = (open: boolean) => {
+      pop.classList.toggle("is-open", open);
+      toggle.setAttribute("aria-expanded", String(open));
+      if (open) document.addEventListener("pointerdown", outside, true);
+      else document.removeEventListener("pointerdown", outside, true);
+    };
+    toggle.onclick = () => set(!pop.classList.contains("is-open"));
+    pop.onkeydown = event => {
+      if (event.key !== "Escape" || !pop.classList.contains("is-open")) return;
+      set(false);
+      toggle.focus();
+    };
   }
 
   function drawCovers(stage: HTMLElement) {
