@@ -25,7 +25,13 @@ export type AtlasProvince = {
   radius: number;
   explored: boolean;
   colour: number;
+  /** Elongation of the province's land (1 = round) and the angle it runs at. */
+  stretch?: number;
+  angle?: number;
 };
+
+/** Extra land shaping a province: peninsulas, islets, and (with a negative amp) bays. */
+export type AtlasLand = { province: string; x: number; y: number; amp: number; sigma: number; stretch?: number; angle?: number };
 
 export type AtlasTown = {
   note: BookNote;
@@ -54,6 +60,7 @@ export type AtlasModel = {
   roads: AtlasRoad[];
   routes: AtlasRoute[];
   fogs: AtlasFog[];
+  land?: AtlasLand[];
 };
 
 function hash(text: string) {

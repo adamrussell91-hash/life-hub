@@ -1,5 +1,8 @@
 import type { AtlasModel, AtlasTown } from "./atlasLayout";
-import { renderTerrain } from "./atlasTerrain";
+import { renderTerrain, type TerrainCanvas } from "./atlasTerrain";
+import { mostConnected } from "./archipelagoLayout";
+import { mountSeaLife, pickBottle } from "./seaLife";
+import { MAP_SEA_HTML, MAP_SKY_HTML, mapControlsHtml, positionTerrain, positionWorld, terrainLayers, wireFullScreen } from "./mapChrome";
 import type { BookModel } from "./model";
 import type { BookSwatch } from "./palette";
 
@@ -12,7 +15,7 @@ export type AtlasHandlers = {
 };
 
 const STANCE_WORD = { supports: "supports the book", complicates: "complicates it", extends: "extends it" } as const;
-const terrainCache = new Map<string, HTMLCanvasElement>();
+const terrainCache = new Map<string, TerrainCanvas>();
 
 function esc(value: unknown) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
@@ -27,15 +30,14 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   host.innerHTML = `<div class="atlas${reduceMotion ? "" : " is-unfolding"}">
     <div class="atlas__viewport" tabindex="0" role="application" aria-label="Map of ${esc(book.label)}. Drag or use the arrow keys to move, plus and minus to zoom.">
+      ${MAP_SEA_HTML}
       <div class="atlas__land" data-land></div>
+      <div class="atlas__world" data-world aria-hidden="true"></div>
+      ${MAP_SKY_HTML}
       <svg class="atlas__lines" data-lines aria-hidden="true"></svg>
       <div class="atlas__marks" data-marks></div>
     </div>
-    <div class="atlas__controls" role="group" aria-label="Zoom">
-      <button class="hub-icon-btn atlas__zoom" type="button" data-zoom="in" aria-label="Zoom in">+</button>
-      <button class="hub-icon-btn atlas__zoom" type="button" data-zoom="out" aria-label="Zoom out">−</button>
-      <button class="hub-icon-btn atlas__zoom" type="button" data-zoom="fit" aria-label="Fit the whole map">⤢</button>
-    </div>
+    ${mapControlsHtml("Fit the whole map")}
     <details class="atlas__legend">
       <summary>Key</summary>
       <ul>
@@ -47,7 +49,11 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
         <li><i class="atlas-key atlas-key--fog"></i>Fog: a chapter you haven't written about, or an open question</li>
         <li><i class="atlas-key atlas-key--new"></i>Settled this week</li>
         <li><i class="atlas-key atlas-key--faded"></i>Faded: untouched for six months</li>
+        <li><i class="atlas-key isles-key--bottle"></i>Bottle: one of this book's old notes, washed up today</li>
+        <li><i class="atlas-key isles-key--treasure"></i>Golden X: this book's most-connected note</li>
+        <li><i class="atlas-key isles-key--bloom"></i>Ink bloom: a note added since you last looked</li>
       </ul>
+      <p class="isles-key__hint">The compass turns the hours and the word beneath it turns the seasons. Everything else at sea is just for fun: try tapping it.</p>
     </details>
     <aside class="atlas__card" data-card hidden></aside>
   </div>`;
@@ -57,12 +63,13 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
   const lines = root.querySelector<SVGSVGElement>("[data-lines]")!;
   const marks = root.querySelector<HTMLElement>("[data-marks]")!;
   const card = root.querySelector<HTMLElement>("[data-card]")!;
+  const world = root.querySelector<HTMLElement>("[data-world]")!;
   const byId = new Map(atlas.towns.map(t => [t.note.id, t]));
   const provinceName = new Map(atlas.provinces.map(p => [p.id, p.label]));
   provinceName.set("loose", "Loose pages");
 
   // Terrain: rendered once per shape of the book, after the shell paints.
-  let terrain: HTMLCanvasElement | null = null;
+  let terrain: TerrainCanvas | null = null;
   const key = terrainKey(book, atlas);
   const placeTerrain = () => {
     // Small maps get more pixels per unit so the coast stays crisp when zoomed.
@@ -71,8 +78,7 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
     terrainCache.delete(key);
     terrainCache.set(key, terrain);
     while (terrainCache.size > 3) terrainCache.delete(terrainCache.keys().next().value!);
-    terrain.className = "atlas__terrain";
-    land.replaceChildren(terrain);
+    land.replaceChildren(...terrainLayers(terrain));
     apply();
   };
   land.innerHTML = `<p class="atlas__drawing">Drawing the land…</p>`;
@@ -118,10 +124,8 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
   };
 
   function apply() {
-    if (terrain) {
-      const res = terrain.width / atlas.width;
-      terrain.style.transform = `translate(${ox}px, ${oy}px) scale(${scale / res})`;
-    }
+    if (terrain) positionTerrain(terrain, atlas.width, scale, ox, oy);
+    positionWorld(world, scale, ox, oy);
     drawMarks();
   }
 
@@ -307,6 +311,10 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
     if (moved < 6 && event.type === "pointerup") {
       // Pointer capture retargets to the viewport, so find what was actually under the finger.
       const hit = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
+      const rect = viewport.getBoundingClientRect();
+      // Treasure and sea life sit under the islands' hit areas; they answer first.
+      const found = document.elementsFromPoint(event.clientX, event.clientY).find(el => el.closest("[data-sl]")) ?? hit;
+      if (life.tap(found, { x: (event.clientX - rect.left - ox) / scale, y: (event.clientY - rect.top - oy) / scale })) return;
       const target = hit?.closest<HTMLElement>("[data-town], [data-route]");
       if (target?.dataset.town) showCard(target.dataset.town);
       else if (target?.dataset.route) {
@@ -359,8 +367,46 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
       }
     };
   });
-  const resize = new ResizeObserver(() => schedule());
+  // Going full screen resizes over a few frames; keep refitting until it settles.
+  let refitUntil = 0;
+  const resize = new ResizeObserver(() => {
+    if (performance.now() < refitUntil) fit();
+    schedule();
+  });
   resize.observe(viewport);
+  const leaveFullScreen = wireFullScreen(root, () => {
+    refitUntil = performance.now() + 900;
+    fit();
+    schedule();
+  });
+
+  const b = atlas.bounds;
+  const x0 = Math.max(0, b.x - 220);
+  const y0 = Math.max(0, b.y - 160);
+  const bottle = pickBottle([{ key: book.key, label: book.label, notes: [...book.placed, ...book.loose] }]);
+  const treasure = mostConnected(atlas.towns);
+  const life = mountSeaLife(world, {
+    root,
+    bottle,
+    landmarks: treasure ? [{ kind: "treasure", x: treasure.x + 16, y: treasure.y - 10, noteId: treasure.note.id, links: treasure.note.connected.length }] : [],
+    onTreasure: mark => {
+      const town = byId.get(mark.noteId);
+      if (town) centreOn(town);
+      showCard(mark.noteId);
+    },
+    notesAt: atlas.towns.map(t => ({ id: t.note.id, x: t.x, y: t.y })),
+    onBottle: found => {
+      const town = byId.get(found.noteId);
+      if (town) centreOn(town);
+      showCard(found.noteId);
+    },
+    bounds: { x: x0, y: y0, w: Math.min(atlas.width, b.x + b.w + 220) - x0, h: Math.min(atlas.height, b.y + b.h + 160) - y0 },
+    // Land reaches well past its towns once the hills spread; keep beasts a long way off.
+    lands: [...atlas.provinces.map(p => ({ x: p.x, y: p.y, r: p.radius * 1.6 + 70 })), ...atlas.towns.map(t => ({ x: t.x, y: t.y, r: 150 }))],
+    harbours: [],
+    size: 0.9,
+    seed: book.key,
+  });
 
   fit();
   if (selected) {
@@ -375,5 +421,7 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
     window.clearTimeout(idle);
     cancelAnimationFrame(frame);
     resize.disconnect();
+    leaveFullScreen();
+    life.stop();
   };
 }
