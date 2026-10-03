@@ -102,13 +102,19 @@ function waitingNote() {
   return `<p class="alchemist__mode" data-player-note hidden></p>`;
 }
 
+/** Episode name for lists and the player: Wireless broadcasts are named for their book. */
+export function episodeName(episode: Pick<PodcastEpisode, "mode" | "modeDial" | "episodeIndex">) {
+  if (episode.mode === "broadcast") return `Wireless · ${episode.modeDial.book || "a book"}`;
+  return episode.episodeIndex ? `Episode ${episode.episodeIndex}` : episode.mode.replace(/-/g, " ");
+}
+
 export function playerHtml(episode: PodcastEpisode) {
   ensureEpisode(episode.id);
   if (!playError && episode.status !== "running" && !hasPlayableTurn(episode.turns)) {
     playInfo = nothingToPlayMessage(episode);
   }
   const turn = episode.turns[state.index];
-  const title = episode.episodeIndex ? `Episode ${episode.episodeIndex}` : episode.mode.replace(/-/g, " ");
+  const title = episodeName(episode);
   const eyebrow = episode.showTitle ?? "Podcast";
   return `<article class="podcast-player glass-panel">
     <p class="eyebrow">${escapeHtml(eyebrow)}</p>

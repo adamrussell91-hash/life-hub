@@ -1,14 +1,8 @@
 import { PageSchema, type Page, type PageManifestEntry } from "../domain/page";
-import { savePageRecord } from "../../netlify/functions/_lib/savePageRecord";
-import { getContent, putContent } from "../../netlify/functions/_lib/githubWrite";
+import { getContent, putContent, savePageRecord, type ContentFns } from "./githubContent";
 import { applyTidyProposal, proposeTidy } from "./propose";
 import type { TidyProposal } from "./types";
 import { tidyOnePage, type TidyIO, type TidyState } from "./run";
-
-type ContentFns = {
-  getContent: (file: string) => Promise<{ sha: string; text: string } | null>;
-  putContent: (file: string, text: string, sha?: string, message?: string) => Promise<void>;
-};
 
 async function readJson<T>(fns: ContentFns, file: string, fallback: T): Promise<T> {
   const current = await fns.getContent(file);

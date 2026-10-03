@@ -167,7 +167,14 @@ function resetSitting() {
 }
 
 export function enterChatRail(
-  opts?: { noteContext?: { pageId: string; title: string }; fresh?: boolean; hat?: ChatHatId; bookContext?: BookContext },
+  opts?: {
+    noteContext?: { pageId: string; title: string };
+    fresh?: boolean;
+    hat?: ChatHatId;
+    bookContext?: BookContext;
+    /** Text to start the composer with (e.g. the Wireless's Hold this thought). */
+    draft?: string;
+  },
 ) {
   restore();
   if (opts?.fresh) resetSitting();
@@ -182,6 +189,7 @@ export function enterChatRail(
     bookQuery = "";
     bookOpen = false;
   }
+  if (opts?.draft) input = opts.draft;
   persist();
 }
 

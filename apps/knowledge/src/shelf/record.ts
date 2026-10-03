@@ -45,3 +45,21 @@ export async function recordBookNote(page: Pick<Page, "id" | "body">, book?: Boo
     console.warn("Bookshelf: could not place the new note; it will show as a loose page.", error);
   }
 }
+
+/** A "Write it yourself" note with a book origin and a page typed in compose. */
+export function placementForComposedPage(pageId: string, origins: Array<{ kind: string }>, page?: string): PlacementInput | null {
+  if (!origins.some(origin => origin.kind === "book")) return null;
+  const value = Number(page);
+  if (!Number.isInteger(value) || value < 1 || value > 5000) return null;
+  return { pageId, page: value, guessed: false };
+}
+
+export async function recordComposedPage(pageId: string, origins: Array<{ kind: string }>, page?: string) {
+  const placement = placementForComposedPage(pageId, origins, page);
+  if (!placement) return;
+  try {
+    await savePlacements([placement]);
+  } catch (error) {
+    console.warn("Bookshelf: could not place the note; it will show as a loose page.", error);
+  }
+}

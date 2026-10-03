@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Page } from "../domain/page";
 import { tidyPageDirect } from "./githubIo";
-import { getContent, putContent } from "../../netlify/functions/_lib/githubWrite";
+import { getContent, putContent } from "./githubContent";
 
-vi.mock("../../netlify/functions/_lib/githubWrite", () => ({
+vi.mock("./githubContent", async importOriginal => ({
+  ...(await importOriginal<typeof import("./githubContent")>()),
   getContent: vi.fn(),
   putContent: vi.fn(),
-  GitHubWriteError: class GitHubWriteError extends Error {},
 }));
 
 const page: Page = {
@@ -72,5 +72,19 @@ describe("tidyPageDirect", () => {
         fetchImpl: async () => new Response(JSON.stringify({ content: [{ type: "text", text: "nope" }] })),
       }),
     ).rejects.toThrow("Claude didn’t return a usable tidy");
+  });
+});
+
+describe("savePageRecord", () => {
+  it("refuses to overwrite a manifest it cannot read", async () => {
+    const { savePageRecord } = await vi.importActual<typeof import("./githubContent")>("./githubContent");
+    const put = vi.fn(async () => undefined);
+    await expect(
+      savePageRecord(page, {
+        getContent: async file => (file === "manifest.json" ? { sha: "m", text: "{not json" } : null),
+        putContent: put,
+      }),
+    ).rejects.toThrow(/unreadable/);
+    expect(put.mock.calls.map(call => (call as unknown[])[0])).toEqual([`pages/${page.id}.json`]);
   });
 });

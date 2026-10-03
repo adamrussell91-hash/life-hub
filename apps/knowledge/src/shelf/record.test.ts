@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { placementForBookNote } from "./record";
+import { placementForBookNote, placementForComposedPage } from "./record";
 
 describe("placementForBookNote", () => {
   const body = "## In the book\nx\n\n## How this bears on the book\nThe web supports the claim.\n\n## Gaps\n- Replication?\n";
@@ -22,5 +22,14 @@ describe("placementForBookNote", () => {
   it("trusts an explicit Verdict line over the prose", () => {
     const verdict = "## How this bears on the book\nVerdict: complicates\nIt mostly supports the claim, but...\n";
     expect(placementForBookNote({ id: "p1", body: verdict }, { label: "X" })).toMatchObject({ stance: "complicates" });
+  });
+});
+
+describe("placementForComposedPage", () => {
+  it("places a written note at its typed page only when it has a book origin", () => {
+    expect(placementForComposedPage("p1", [{ kind: "book" }], "42")).toEqual({ pageId: "p1", page: 42, guessed: false });
+    expect(placementForComposedPage("p1", [{ kind: "notebook" }], "42")).toBeNull();
+    expect(placementForComposedPage("p1", [{ kind: "book" }], "")).toBeNull();
+    expect(placementForComposedPage("p1", [{ kind: "book" }], "-3")).toBeNull();
   });
 });

@@ -128,6 +128,7 @@ import { syncKnowledgeMobileChrome } from "./mobile-chrome";
 import { parseProtocolsDeepLink, renderProtocols } from "./protocols/view";
 import { notebookCards, notebookCatalog, notesForNotebook } from "./notebooks/catalog";
 import { mountBookshelf, parseBookshelfHash } from "./shelf/view";
+import { recordComposedPage } from "./shelf/record";
 import { bindNotebooksGrid, notebooksGridHtml } from "./notebooks/view";
 import { getQuizSchedule, saveQuiz } from "./api/quizClient";
 import { applyRating } from "./quiz/review";
@@ -278,6 +279,8 @@ function getSolarModel() {
 
 type ComposeState = {
   id: string;
+  /** Page in the book, for a note with a book origin; places it on the Bookshelf on save. */
+  bookPage?: string;
   title: string;
   area: "notes" | "university";
   tags: string[];
@@ -305,6 +308,16 @@ const composeVoice = createVoiceCapture({
   waveformHost: composeVoiceWave,
 });
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
+
+function composeBookPageHtml(state: ComposeState) {
+  const book = state.origins.find(origin => origin.kind === "book");
+  if (!book) return "";
+  return `<div class="compose__field">
+        <label for="compose-book-page">Page in ${escapeHtml(book.label)}</label>
+        <p class="compose__hint">Optional. Puts the note at that page on the Bookshelf; leave it blank to keep what's there.</p>
+        <input id="compose-book-page" type="number" min="1" inputmode="numeric" value="${escapeHtml(state.bookPage ?? "")}" style="max-width:8rem" />
+      </div>`;
+}
 
 function blankCompose(origins: Origin[] = []): ComposeState {
   return {
@@ -476,7 +489,7 @@ function openCompose(origins: Origin[] = []) {
   render();
 }
 
-function openBookNote(book?: string, locus?: string) {
+function openBookNote(book?: string, locus?: string, draft?: string) {
   leaveSpecialRails();
   compose = null;
   activePage = null;
@@ -484,6 +497,7 @@ function openBookNote(book?: string, locus?: string) {
     fresh: true,
     hat: "fromBook",
     bookContext: book ? { label: book, ...(locus ? { locus } : {}) } : undefined,
+    ...(draft ? { draft } : {}),
   });
   view = "chat";
   if (isPageHash(location.hash)) {
@@ -1123,7 +1137,7 @@ function renderBookshelf() {
     header: (supporting, opts) =>
       pageHeader(opts?.eyebrow ?? "Library", opts?.title ?? "Bookshelf", opts?.actions ?? "", { supportingHtml: supporting }),
     openPage: id => void openPage(id),
-    holdThought: (bookLabel, locus) => openBookNote(bookLabel, locus),
+    holdThought: (bookLabel, locus, draft) => openBookNote(bookLabel, locus, draft),
     getPage,
     moveNotesToNotebook: async (bookLabel, noteIds, notebook) => {
       const key = bookLabel.replace(/\s+/g, " ").trim().toLowerCase();
@@ -1727,6 +1741,7 @@ function renderCompose(state: ComposeState) {
         originLabelsForKind(entries, composeOriginDraft?.kind ?? composeOriginKind).map(item => item.label),
         composeOriginKind,
       )}
+      ${composeBookPageHtml(state)}
       <div class="compose__field compose__field--body">
         <label id="compose-body-label">Body (markdown)</label>
         <div id="compose-body-host" class="compose__body-host" aria-labelledby="compose-body-label"></div>
@@ -1905,6 +1920,9 @@ function renderCompose(state: ComposeState) {
     composeOriginDraft = null;
     render();
   };
+  app.querySelector<HTMLInputElement>("#compose-book-page")?.addEventListener("input", event => {
+    if (compose) compose.bookPage = (event.target as HTMLInputElement).value;
+  });
   app.querySelector<HTMLSelectElement>("#compose-origin-kind")?.addEventListener("change", event => {
     if (!compose) return;
     syncFields();
@@ -2096,6 +2114,8 @@ async function saveCompose() {
       schema_version: 1,
     };
     const saved = await savePage(page);
+    // Never blocks the save: a failure just leaves the note loose on the shelf.
+    await recordComposedPage(saved.id, snapshot.origins, snapshot.bookPage);
     entries = await listPages();
     activePage = saved;
     composeBodyEditor?.destroy();
