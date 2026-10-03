@@ -88,7 +88,7 @@ describe('event page', () => {
       hours: null,
       talks: [{ id: 't_page', time: null, title: 'NESA update', presenter: null, hours: null }],
       knowledge_notes: [{ talk_id: 't_page', page_id: 'page_notion_abc', title: 'NESA update', href: '/knowledge/#page/page_notion_abc' }]
-    };
+    } as unknown as typeof base;
     const canvas = await render();
     expect(canvas.querySelector('a.kn')?.getAttribute('href')).toBe('/knowledge/#page/page_notion_abc');
     expect(canvas.querySelector('[data-talk-note]')).toBeNull();
