@@ -107,6 +107,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   let active: string | undefined = pendingAir ? undefined : ctx.initialBook;
   let focusNote: string | undefined = pendingAir ? undefined : ctx.initialNote;
   let openNote: string | undefined = pendingAir ? undefined : ctx.initialNote;
+  let descentMotion: { kind: "none" | "open" | "close"; noteId?: string } = { kind: "none" };
   let alive = true;
   /** True when the next paint should bring the focused note into view (navigation), false for in-place edits. */
   let jumpToFocus = true;
@@ -364,6 +365,9 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     if (!alive) return;
     const book = active ? findBook(books, active) : undefined;
     const previousScroll = host.querySelector<HTMLElement>(".descent")?.scrollTop;
+    const before = boxMap(host);
+    const motion = descentMotion;
+    descentMotion = { kind: "none" };
     atlasTeardown?.();
     atlasTeardown = null;
     wireless.unmount();
@@ -371,7 +375,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     document.body.classList.toggle("is-bookshelf-immersive", Boolean(book));
     if (book) {
       const sameBook = paintedBook === book.key;
-      paintDescent(book, sameBook && !jumpToFocus ? previousScroll : undefined, !sameBook);
+      paintDescent(book, sameBook && !jumpToFocus ? previousScroll : undefined, !sameBook, before, motion);
     }
     paintedBook = book?.key;
     jumpToFocus = false;
@@ -850,7 +854,13 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
 
   // ── Inside a book ───────────────────────────────────────────────────
 
-  function paintDescent(book: BookModel, restoreScroll?: number, focusBack = false) {
+  function paintDescent(
+    book: BookModel,
+    restoreScroll?: number,
+    focusBack = false,
+    before: Map<string, { top: number; height: number }> = new Map(),
+    motion: { kind: "none" | "open" | "close"; noteId?: string } = { kind: "none" },
+  ) {
     const shell = document.createElement("div");
     shell.className = "descent";
     shell.setAttribute("role", "dialog");
@@ -880,8 +890,8 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       return;
     }
     const body = shell.querySelector<HTMLElement>("[data-body]")!;
-    if (phone.matches) paintDescentList(body, book);
-    else paintDescentColumns(shell, body, book);
+    if (phone.matches) paintDescentList(body, book, before, motion);
+    else paintDescentColumns(shell, body, book, before, motion);
     if (focusBack) shell.querySelector<HTMLElement>("[data-back]")?.focus({ preventScroll: true });
     if (restoreScroll !== undefined) {
       shell.scrollTop = restoreScroll;
@@ -973,7 +983,9 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     scope.querySelectorAll<HTMLButtonElement>("[data-toggle]").forEach(button => {
       button.onclick = () => {
         const id = button.dataset.toggle!;
-        openNote = openNote === id ? undefined : id;
+        const closing = openNote === id;
+        descentMotion = { kind: closing ? "close" : "open", noteId: id };
+        openNote = closing ? undefined : id;
         focusNote = openNote;
         setRoute(book.key, openNote);
         paint();
@@ -1003,7 +1015,90 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     });
   }
 
-  function paintDescentColumns(shell: HTMLElement, body: HTMLElement, book: BookModel) {
+  const MOTION_MS = 420;
+  const MOTION_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+
+  function exitKey(fromId: string, toId: string) {
+    return `${fromId}||${toId}`;
+  }
+
+  function boxMap(root: ParentNode) {
+    const map = new Map<string, { top: number; height: number }>();
+    root.querySelectorAll<HTMLElement>("[data-exit-key], [data-note-card]").forEach(el => {
+      const id = el.dataset.exitKey ?? (el.dataset.noteCard ? `note:${el.dataset.noteCard}` : "");
+      if (!id) return;
+      const rect = el.getBoundingClientRect();
+      map.set(id, { top: rect.top, height: rect.height });
+    });
+    return map;
+  }
+
+  function glideIntoPlace(root: ParentNode, before: Map<string, { top: number; height: number }>, motion: { kind: "none" | "open" | "close"; noteId?: string }) {
+    if (motion.kind === "none" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const moving: Array<{ el: HTMLElement; prev: { top: number; height: number }; next: DOMRect }> = [];
+    root.querySelectorAll<HTMLElement>("[data-exit-key], [data-note-card]").forEach(el => {
+      const id = el.dataset.exitKey ?? (el.dataset.noteCard ? `note:${el.dataset.noteCard}` : "");
+      const prev = before.get(id);
+      if (!prev) return;
+      moving.push({ el, prev, next: el.getBoundingClientRect() });
+    });
+    for (const { el, prev, next } of moving) {
+      const dy = prev.top - next.top;
+      if (Math.abs(dy) < 1 && Math.abs(prev.height - next.height) < 1) continue;
+      if (el.dataset.noteCard) el.style.overflow = "hidden";
+      const anim = el.animate(
+        [
+          { transform: `translateY(${dy}px)`, height: `${prev.height}px` },
+          { transform: "translateY(0px)", height: `${next.height}px` },
+        ],
+        { duration: MOTION_MS, easing: MOTION_EASE },
+      );
+      anim.onfinish = () => {
+        if (el.dataset.noteCard) el.style.overflow = "";
+      };
+    }
+    if (motion.kind === "open") {
+      root.querySelectorAll<HTMLElement>(".descent-exit.is-open .descent-exit__label").forEach(label => {
+        label.animate(
+          [{ opacity: 0, transform: "translateY(-8px)" }, { opacity: 1, transform: "translateY(0px)" }],
+          { duration: MOTION_MS, easing: MOTION_EASE },
+        );
+      });
+    }
+  }
+
+  function leadLine(svg: SVGSVGElement, x0: number, y0: number, x1: number, y1: number, color: string, strong: boolean, reveal: "in" | "out" | "stay") {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    const mx = (x0 + x1) / 2;
+    path.setAttribute("d", `M${x0} ${y0} C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1}`);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", color);
+    path.setAttribute("stroke-opacity", strong ? "1" : "0.28");
+    path.setAttribute("stroke-width", strong ? "2" : "1");
+    svg.appendChild(path);
+    if (reveal === "stay" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (reveal === "in") {
+      path.setAttribute("stroke-opacity", "0.28");
+      path.setAttribute("stroke-width", "1");
+    } else {
+      path.setAttribute("stroke-opacity", "1");
+      path.setAttribute("stroke-width", "2");
+    }
+    path.animate(
+      reveal === "in"
+        ? [{ strokeOpacity: 0.28, strokeWidth: "1px" }, { strokeOpacity: 1, strokeWidth: "2px" }]
+        : [{ strokeOpacity: 1, strokeWidth: "2px" }, { strokeOpacity: 0.28, strokeWidth: "1px" }],
+      { duration: MOTION_MS, easing: MOTION_EASE, fill: "forwards" },
+    );
+  }
+
+  function paintDescentColumns(
+    shell: HTMLElement,
+    body: HTMLElement,
+    book: BookModel,
+    before: Map<string, { top: number; height: number }>,
+    motion: { kind: "none" | "open" | "close"; noteId?: string },
+  ) {
     const viewport = Math.max(420, window.innerHeight - 220);
     const openCardHeight = 210;
     const layout = layoutDescent(book, viewport, openNote, openCardHeight);
@@ -1042,8 +1137,13 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         ${layout.exits.map((exit, i) => {
           const link = links[i]!;
           const swatch = findBook(books, link.toBook)?.swatch;
-          return `<button class="descent-exit" type="button" style="top:${exit.top}px;--c:${swatch?.fill ?? "var(--shallow)"}" data-exit="${esc(link.toBook)}" data-exit-note="${esc(link.toId)}">
-            <b>${esc(link.toLabel)}</b><span>${esc([link.toPage ? `p.${link.toPage}` : "", link.toTitle].filter(Boolean).join(" · "))}</span></button>`;
+          const color = swatch?.fill ?? "var(--shallow)";
+          const key = esc(exitKey(link.fromId, link.toId));
+          if (!exit.open) {
+            return `<div class="descent-exit is-bar" style="top:${exit.top}px;height:${exit.height}px;--c:${color}" data-exit-key="${key}" aria-hidden="true"></div>`;
+          }
+          return `<button class="descent-exit is-open" type="button" style="top:${exit.top}px;height:${exit.height}px;--c:${color}" data-exit="${esc(link.toBook)}" data-exit-note="${esc(link.toId)}" data-exit-key="${key}">
+            <span class="descent-exit__label"><b>${esc(link.toLabel)}</b><span>${esc([link.toPage ? `p.${link.toPage}` : "", link.toTitle].filter(Boolean).join(" · "))}</span></span></button>`;
         }).join("")}
       </div>
       ${book.loose.length ? `<div class="descent__loose"><span>${book.loose.length} ${book.loose.length === 1 ? "note has" : "notes have"} no page yet, so ${book.loose.length === 1 ? "it isn't" : "they aren't"} in the column.</span><button class="btn btn--secondary" type="button" data-place-bottom>Place them</button></div>` : ""}
@@ -1068,24 +1168,27 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         const mx = (x0 + x1) / 2;
         paths += `<path d="M${x0} ${y0} C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1}" fill="none" stroke="${stanceVar(card.note.stance)}" stroke-width="1.2" opacity=".7"/>`;
       }
-      const exitButtons = body.querySelectorAll<HTMLElement>(".descent-exit");
-      layout.exits.forEach((exit, i) => {
-        const button = exitButtons[i];
-        if (!button) return;
-        const r = button.getBoundingClientRect();
-        const x0 = lane.right - base.left;
-        const y0 = lane.top - base.top + exit.anchor;
-        const x1 = r.left - base.left;
-        const y1 = r.top - base.top + r.height / 2;
-        const mx = (x0 + x1) / 2;
-        const hot = exit.fromId === openNote;
-        paths += `<path d="M${x0} ${y0} C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1}" fill="none" stroke="${hot ? "var(--high-sea)" : "var(--shallow)"}" stroke-width="1.4" stroke-dasharray="3 4"/>`;
-      });
+      const exitCol = body.querySelector<HTMLElement>(".descent-exit")?.parentElement?.getBoundingClientRect();
       svg.setAttribute("width", String(base.width));
       svg.setAttribute("height", String(base.height));
       svg.innerHTML = paths;
+      layout.exits.forEach((exit, i) => {
+        const link = links[i];
+        if (!exitCol || !link) return;
+        const x0 = lane.right - base.left;
+        const y0 = lane.top - base.top + exit.anchor;
+        const x1 = exitCol.left - base.left;
+        const y1 = exitCol.top - base.top + exit.top + exit.height / 2;
+        const hot = exit.fromId === openNote;
+        const reveal = motion.kind === "open" && hot ? "in" : motion.kind === "close" && exit.fromId === motion.noteId ? "out" : "stay";
+        const swatch = findBook(books, link.toBook)?.swatch;
+        leadLine(svg, x0, y0, x1, y1, swatch?.fill ?? "var(--shallow)", hot, reveal);
+      });
     };
-    requestAnimationFrame(draw);
+    requestAnimationFrame(() => {
+      glideIntoPlace(body, before, motion);
+      draw();
+    });
 
     // Bracket on the whole-book strip follows the scroll position.
     const strip = body.querySelector<HTMLElement>("[data-strip]")!;
@@ -1132,7 +1235,12 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     });
   }
 
-  function paintDescentList(body: HTMLElement, book: BookModel) {
+  function paintDescentList(
+    body: HTMLElement,
+    book: BookModel,
+    before: Map<string, { top: number; height: number }>,
+    motion: { kind: "none" | "open" | "close"; noteId?: string },
+  ) {
     const groups: string[] = [];
     let chapterIndex: number | undefined = -1;
     for (const note of book.placed) {
@@ -1142,10 +1250,16 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         groups.push(`<p class="descent-list__chapter">${esc(ch ? (ch.label ? `${ch.label} · ${ch.title}` : ch.title) : "Before chapter 1")} <span>· from p.${ch?.start ?? 1}</span></p>`);
       }
       const exits = book.links.filter(link => link.fromId === note.id);
-      const card = noteCardHtml(note, book);
-      groups.push(exits.length
-        ? card.replace(/<\/article>$/, `<div class="descent-list__exits">${exits.map(link => `<button type="button" style="--c:${findBook(books, link.toBook)?.swatch.fill ?? "var(--shallow)"}" data-exit="${esc(link.toBook)}" data-exit-note="${esc(link.toId)}">→ ${esc(link.toLabel)}${link.toPage ? ` p.${link.toPage}` : ""}</button>`).join("")}</div></article>`)
-        : card);
+      let card = noteCardHtml(note, book);
+      if (exits.length && note.id !== openNote) {
+        const bars = `<span class="descent-note__bars">${exits.map(link => `<i data-exit-key="${esc(exitKey(link.fromId, link.toId))}" style="--c:${findBook(books, link.toBook)?.swatch.fill ?? "var(--shallow)"}"></i>`).join("")}</span>`;
+        card = card.replace("</button>", `${bars}</button>`);
+      }
+      if (exits.length && note.id === openNote) {
+        const openExits = `<div class="descent-list__exits is-open">${exits.map(link => `<button class="descent-exit is-open" type="button" style="--c:${findBook(books, link.toBook)?.swatch.fill ?? "var(--shallow)"}" data-exit="${esc(link.toBook)}" data-exit-note="${esc(link.toId)}" data-exit-key="${esc(exitKey(link.fromId, link.toId))}"><span class="descent-exit__label"><b>${esc(link.toLabel)}</b><span>${esc([link.toPage ? `p.${link.toPage}` : "", link.toTitle].filter(Boolean).join(" · "))}</span></span></button>`).join("")}</div>`;
+        card = card.replace("</article>", `${openExits}</article>`);
+      }
+      groups.push(card);
     }
     body.innerHTML = `<div class="descent-list">
       ${groups.join("") || `<p class="descent__hint" style="text-align:left">No notes have a page yet.</p>`}
@@ -1153,6 +1267,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     </div>`;
     bindNotes(body, book);
     body.querySelector<HTMLButtonElement>("[data-place-bottom]")?.addEventListener("click", () => openPlaceSheet(book));
+    requestAnimationFrame(() => glideIntoPlace(body, before, motion));
   }
 
   // ── Saving ──────────────────────────────────────────────────────────
