@@ -31,7 +31,7 @@ Use this order. Keep headings.
 1. **Title** — the topic, not "Notes on…" and not the book title alone.
 2. **In the book** — what this moment is doing in the named book. Name the author's move. If he gave a page or passage, use it. Do not pretend you have the book in front of you beyond what he typed.
 3. **What it means** — three to five short sections that explain the idea from the web. Cite load-bearing claims as markdown links `[Title](url)`. Label a claim as a direct finding, a complication, or an implication when that is not obvious.
-4. **How this bears on the book** — the tilt. Does the web support the book's claim, complicate it, or extend it? Say which, and why. This section is mandatory. A page that never turns back to the book has failed the protocol.
+4. **How this bears on the book** — the tilt. Does the web support the book's claim, complicate it, or extend it? Say which, and why. Open the section with one plain line, exactly `Verdict: supports`, `Verdict: complicates` or `Verdict: extends`, then give the reasoning. The Bookshelf reads that line to colour the note. This section is mandatory. A page that never turns back to the book has failed the protocol.
 5. **Sources** — the cited web links only, as markdown links. No extras.
 6. **Gaps** — what a stronger page would still need. One to three lines.
 

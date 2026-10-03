@@ -11,6 +11,7 @@ export function selectQuery(input: {
 }) {
   if (input.topic?.trim()) return input.topic.trim();
   if (input.mode === "connector") return `${input.modeDial.clusterA ?? ""} ${input.modeDial.clusterB ?? ""}`.trim();
+  if (input.mode === "broadcast") return [input.modeDial.book, input.modeDial.author].filter(Boolean).join(" ") || "book notes";
   if (input.mode === "debate") return `${input.modeDial.positionA ?? ""} ${input.modeDial.positionB ?? ""}`.trim();
   const tags = input.scope?.tags?.join(" ") ?? "";
   if (input.mode === "recap") return `what is new in ${tags || "the archive"}`;
