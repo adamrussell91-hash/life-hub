@@ -35,9 +35,17 @@ Notes stay in the data repo. The Bookshelf keeps its own Netlify Blobs store, `k
 - Book facts sheet, Place loose pages sheet, Read my notes, reading page.
 - New From-a-book notes save their page, stance and gaps automatically.
 
-## Phase 2: Atlas
+## Phase 2: Atlas (built)
 
-Regions from note tags (closed topic vocabulary, `archive/keywordGraph.ts`), fallback `archive/showAllCommunities.ts`. Deterministic, cached canvas terrain. Towns, roads (links), peaks (complicates), fog (gaps), sea routes (links to other books), fading by lastOpened. "By page" pill switches to the Fore-edge descent.
+Inside a book, **Map** (default, remembered per viewer) or **By page** (the Fore-edge descent).
+
+- **Provinces are chapters**, west → east in reading order (`src/shelf/atlasLayout.ts`). Long books merge adjacent chapters into at most 8 provinces, balanced by page span. Books without chapters fall back to themes: each note settles under its least common theme (placement `themes`, else its closed-vocabulary tags).
+- **Towns** are notes: navy supports, sage extends, High Sea ink peaks for complicates, grey for stance not read yet. Size follows excerpt length and links. A ring marks notes settled this week; towns untouched for six months fade.
+- **Fog** covers chapters with no notes yet ("Not written about yet · pp. x–y"), and each note's first open question drifts offshore as a fog patch.
+- **Roads** are links between notes in the book. **Sea routes** run to other books, one per book with a count; clicking one walks into that book at the linked note.
+- **Loose pages** (no page yet) sit on an island offshore.
+- **Terrain** (`atlasTerrain.ts`) is note gravity: a hill per town, wider humps per province, contour bands, a navy coast and sea ripples, in kit pastels then the graph palette. It's rendered once per book shape and cached for the last three books.
+- **Interaction** (`atlasView.ts`): drag, wheel or pinch zoom, double-click, arrow keys, and +/−/fit. Towns are buttons and open a card with Open note and See it by page. Labels are placed greedily so none overlap. Phones get a bottom-sheet card. An unfold animation plays on entry unless reduced motion is set.
 
 ## Phase 3: Wireless
 
