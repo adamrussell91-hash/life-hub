@@ -20,3 +20,22 @@ export function bookSwatch(label: string): BookSwatch {
   }
   return BOOK_PALETTE[(hash >>> 0) % BOOK_PALETTE.length]!;
 }
+
+/** Index of the palette fill nearest an RGB colour (for matching a cover's dominant colour). */
+export function nearestSwatchIndex(r: number, g: number, b: number) {
+  let best = 0;
+  let bestDistance = Infinity;
+  BOOK_PALETTE.forEach((swatch, index) => {
+    const n = Number.parseInt(swatch.fill.slice(1), 16);
+    const dr = ((n >> 16) & 255) - r;
+    const dg = ((n >> 8) & 255) - g;
+    const db = (n & 255) - b;
+    // Weighted for how eyes see colour, so a red cover doesn't land on brown.
+    const distance = 2 * dr * dr + 4 * dg * dg + 3 * db * db;
+    if (distance < bestDistance) {
+      best = index;
+      bestDistance = distance;
+    }
+  });
+  return best;
+}

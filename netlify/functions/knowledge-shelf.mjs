@@ -2,20 +2,25 @@ import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { defaultGetShelfStore, readShelf, saveBook, savePlacements } from './_shared/knowledge-shelf.mjs';
+import { checkFactsJob, readFactsJob, startFactsJob } from './_shared/knowledge-shelf-facts.mjs';
 
 export const config = { path: '/api/knowledge/shelf' };
 
 // GET  → { books, placements }
 // POST { op: "book", book }            upsert one book's facts
 // POST { op: "place", placements: [] } merge note placements (page, stance, gaps, themes, lastOpened)
+// POST { op: "facts-start", books: [] } Claude estimates facts for these titles (one Message Batch)
+// POST { op: "facts-check" }           check the batch; applies results once it has ended
 export function createKnowledgeShelfHandler(deps = {}) {
   return createSessionOriginHandler(async (request, context) => {
     const { env } = context;
     try {
       const store = await (deps.getStore ?? defaultGetShelfStore)(env);
       const now = deps.now?.();
+      const claude = { apiKey: deps.apiKey ?? env?.ANTHROPIC_API_KEY, fetchImpl: deps.fetchImpl, now };
       if (request.method === 'GET') {
-        return withCors(okResponse(200, await readShelf(store)), request, env);
+        const [shelf, factsJob] = await Promise.all([readShelf(store), readFactsJob(store)]);
+        return withCors(okResponse(200, { ...shelf, factsJob }), request, env);
       }
       if (request.method !== 'POST') return withCors(methodNotAllowed('GET, POST, OPTIONS'), request, env);
       const parsed = await readJsonObject(request);
@@ -27,7 +32,13 @@ export function createKnowledgeShelfHandler(deps = {}) {
       if (body.op === 'place') {
         return withCors(okResponse(200, { placements: await savePlacements(store, body.placements, { now }) }), request, env);
       }
-      return withCors(errorResponse(400, 'validation_error', 'op must be "book" or "place".', false), request, env);
+      if (body.op === 'facts-start') {
+        return withCors(okResponse(200, { job: await startFactsJob(store, body.books, claude) }), request, env);
+      }
+      if (body.op === 'facts-check') {
+        return withCors(okResponse(200, { job: await checkFactsJob(store, claude) }), request, env);
+      }
+      return withCors(errorResponse(400, 'validation_error', 'op must be "book", "place", "facts-start" or "facts-check".', false), request, env);
     } catch (error) {
       const status = Number.isInteger(error?.status) ? error.status : 502;
       const code = typeof error?.code === 'string' ? error.code : 'shelf_unavailable';

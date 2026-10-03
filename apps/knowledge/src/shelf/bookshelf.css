@@ -1068,3 +1068,50 @@ body.is-bookshelf-immersive .local-banner {
   grid-column: auto;
   margin-top: var(--space-4);
 }
+
+/* ── Covers (public/books, listed in covers.json) ─────────────────────── */
+
+.descent__cover,
+.shelf-sheet__cover,
+.shelf-reading__cover {
+  flex: none;
+  object-fit: cover;
+  border-radius: 2px 4px 4px 2px;
+  background: var(--c, var(--shore));
+  box-shadow: inset 3px 0 0 rgba(0, 0, 0, 0.12), var(--elev-2);
+}
+
+.descent__cover {
+  width: 2.75rem;
+  height: 4.1rem;
+}
+
+.shelf-sheet__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.shelf-sheet__cover {
+  width: 4.5rem;
+  height: 6.75rem;
+}
+
+.shelf-reading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.shelf-reading__cover {
+  width: 1.75rem;
+  height: 2.6rem;
+}
+
+@media (max-width: 720px) {
+  .descent__cover {
+    width: 2.25rem;
+    height: 3.4rem;
+  }
+}

@@ -1,18 +1,33 @@
 import type { Page } from "../domain/page";
 import type { BookModel } from "./model";
-import { gapsFromBody, stanceFromBody } from "./model";
+import { gapsFromBody, sectionText, stanceFromBody } from "./model";
 import type { PlacementInput } from "./schema";
 
-/** A page number written in the "In the book" section, e.g. "(p. 42)" or "page 118". */
-export function pageFromBody(body: string): number | undefined {
-  const lines = body.split(/\r?\n/);
-  const start = lines.findIndex(line => /^#{1,4}\s*in the book\b/i.test(line));
-  const rest = start < 0 ? lines.slice(0, 12) : lines.slice(start + 1);
-  const end = rest.findIndex(line => /^#{1,4}\s/.test(line));
-  const text = (end < 0 ? rest : rest.slice(0, end)).slice(0, 12).join(" ");
-  const match = text.match(/\b(?:pp?\.|pages?)\s*(\d{1,4})\b/i);
-  const value = Number(match?.[1]);
+const PAGE_RE = /\b(?:pp?|pg|pages?)\.?\s*(\d{1,4})(?:\s*[-–]\s*\d{1,4})?\b/i;
+const NOT_THE_BOOK = /^(what it means|how this bears|sources|gaps|archive citations)/;
+
+function firstPage(text: string) {
+  const clean = text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/https?:\/\/\S+/g, "");
+  const value = Number(clean.match(PAGE_RE)?.[1]);
   return Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+/**
+ * The book page a note names: "p. 42", "p42", "pg 42", "page 42", "pp 140–142".
+ * Reads "In the book" when the note has it; otherwise the note minus its web
+ * sections, so a source's page number is never taken for the book's.
+ */
+export function pageFromBody(body: string): number | undefined {
+  const inBook = sectionText(body, /^in the book/);
+  if (inBook) return firstPage(inBook);
+  const kept: string[] = [];
+  let skipping = false;
+  for (const line of body.split(/\r?\n/)) {
+    const lower = line.replace(/^[#*_\d.)\s]+/, "").toLowerCase();
+    if (/^\s*(#{1,6}\s|\*\*|__)/.test(line)) skipping = NOT_THE_BOOK.test(lower);
+    if (!skipping) kept.push(line);
+  }
+  return firstPage(kept.join("\n"));
 }
 
 /** Notes missing a page, stance or gaps: the ones worth reading. */
