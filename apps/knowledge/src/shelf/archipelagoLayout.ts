@@ -1,6 +1,7 @@
-import type { AtlasModel, AtlasProvince, AtlasTown } from "./atlasLayout";
+import type { AtlasLand, AtlasModel, AtlasProvince, AtlasTown } from "./atlasLayout";
 import type { BookModel } from "./model";
 import { BOOK_PALETTE } from "./palette";
+import type { Landmark } from "./seaLife";
 
 /**
  * The Archipelago: the whole shelf as islands. Each book is an island sized by
@@ -182,6 +183,7 @@ export function buildArchipelago(books: BookModel[], now = Date.now(), shape: "w
 function terrainModel(islands: Island[], width: number, height: number, bounds: ArchipelagoModel["bounds"]): AtlasModel {
   const provinces: AtlasProvince[] = islands.map(island => {
     const swatch = BOOK_PALETTE.findIndex(s => s.fill === island.book.swatch.fill);
+    const roll = rolls(island.key);
     return {
       id: island.key,
       label: island.label,
@@ -191,6 +193,9 @@ function terrainModel(islands: Island[], width: number, height: number, bounds: 
       explored: island.book.noteCount > 0,
       // renderTerrain's PASTELS: five kit pastels, then the book palette softened.
       colour: 5 + Math.max(0, swatch),
+      // No two islands the same shape: some long, some round, each at its own heading.
+      stretch: 1 + roll() * 1.3,
+      angle: roll() * Math.PI,
     };
   });
   const towns: AtlasTown[] = islands.flatMap(island => {
@@ -216,7 +221,44 @@ function terrainModel(islands: Island[], width: number, height: number, bounds: 
       };
     });
   });
-  return { width, height, bounds, source: "themes", provinces, towns, roads: [], routes: [], fogs: [] };
+  return { width, height, bounds, source: "themes", provinces, towns, roads: [], routes: [], fogs: [], land: islands.flatMap(coastline) };
+}
+
+/** Deterministic dice for one island: the same book always rolls the same shape. */
+function rolls(key: string) {
+  let n = 0;
+  return () => hash(`${key}#${(n += 1)}`);
+}
+
+/**
+ * Peninsulas, a bay and a few islets, so islands read as coastlines rather than
+ * blobs. Everything stays within ISLAND_GAP / 2 of the shore, so neighbours never merge.
+ */
+function coastline(island: Island): AtlasLand[] {
+  const roll = rolls(`${island.key}:coast`);
+  const r = island.r;
+  const land: AtlasLand[] = [];
+  const lobes = 2 + Math.floor(roll() * (r > 110 ? 3 : 2));
+  for (let k = 0; k < lobes; k += 1) {
+    const a = roll() * Math.PI * 2;
+    const sigma = r * (0.13 + roll() * 0.1);
+    const stretch = 1.8 + roll() * 1.6;
+    // Peninsulas: long, thin and reaching outward, but their tips stay within ~1.05r.
+    const dist = Math.min(r * (0.5 + roll() * 0.35), r * 1.05 - 1.1 * sigma * Math.sqrt(stretch));
+    land.push({ province: island.key, x: island.x + Math.cos(a) * dist, y: island.y + Math.sin(a) * dist, amp: 0.55 + roll() * 0.2, sigma, stretch, angle: a });
+  }
+  if (r > 80 && roll() < 0.7) {
+    // A bay: a dip pressed into one shore.
+    const a = roll() * Math.PI * 2;
+    land.push({ province: island.key, x: island.x + Math.cos(a) * r * 0.62, y: island.y + Math.sin(a) * r * 0.62, amp: -0.45, sigma: r * 0.18, stretch: 1.6, angle: a + Math.PI / 2 });
+  }
+  const islets = Math.floor(roll() * 4);
+  for (let k = 0; k < islets; k += 1) {
+    const a = roll() * Math.PI * 2;
+    const dist = r * 0.82 + 14 + roll() * 30;
+    land.push({ province: island.key, x: island.x + Math.cos(a) * dist, y: island.y + Math.sin(a) * dist, amp: 0.6 + roll() * 0.2, sigma: 7 + roll() * 9, stretch: 1 + roll() * 0.8, angle: roll() * Math.PI });
+  }
+  return land;
 }
 
 /** Where a sea route meets an island's shore, facing the other island. */
@@ -225,4 +267,45 @@ export function shorePoint(from: Island, to: Island) {
   const dy = to.y - from.y;
   const d = Math.hypot(dx, dy) || 1;
   return { x: from.x + (dx / d) * from.r * 0.9, y: from.y + (dy / d) * from.r * 0.9 };
+}
+
+/**
+ * Your notes, drawn as landmarks: a lighthouse on every book you wrote in this
+ * week, a campfire on the one you're reading, smoke over the book your notes
+ * argue with most (two or more that complicate it), mist over books with no
+ * notes, and a golden X on your most-connected note.
+ */
+export function chartLandmarks(model: Pick<ArchipelagoModel, "islands">): Landmark[] {
+  const marks: Landmark[] = [];
+  let contested: { island: Island; count: number } | undefined;
+  for (const island of model.islands) {
+    const roll = rolls(`${island.key}:marks`);
+    const notes = [...island.book.placed, ...island.book.loose];
+    if (!notes.length) marks.push({ kind: "mist", x: island.x, y: island.y, r: island.r * 0.6 });
+    if (island.fresh) {
+      const a = roll() * Math.PI * 2;
+      marks.push({ kind: "lighthouse", x: island.x + Math.cos(a) * island.r * 0.5, y: island.y + Math.sin(a) * island.r * 0.5 });
+    }
+    if (island.reading) marks.push({ kind: "camp", x: island.x - island.r * 0.18, y: island.y + island.r * 0.12 });
+    const count = notes.filter(n => n.stance === "complicates").length;
+    if (count >= 2 && count > (contested?.count ?? 0)) contested = { island, count };
+  }
+  if (contested) marks.push({ kind: "volcano", x: contested.island.x + contested.island.r * 0.12, y: contested.island.y - contested.island.r * 0.12 });
+  const treasure = mostConnected(model.islands.flatMap(island => [...island.book.placed, ...island.book.loose].map(note => ({ note, island }))));
+  if (treasure) {
+    const a = rolls(`${treasure.note.id}:x`)() * Math.PI * 2;
+    marks.push({ kind: "treasure", x: treasure.island.x + Math.cos(a) * treasure.island.r * 0.32, y: treasure.island.y + Math.sin(a) * treasure.island.r * 0.32, noteId: treasure.note.id, links: treasure.note.connected.length });
+  }
+  return marks;
+}
+
+/** The note with the most links (three or more), for the treasure X. Ties go to the earlier id. */
+export function mostConnected<T extends { note: { id: string; connected: string[] } }>(items: T[]): T | undefined {
+  let best: T | undefined;
+  for (const item of items) {
+    const n = item.note.connected.length;
+    if (n < 3) continue;
+    if (!best || n > best.note.connected.length || (n === best.note.connected.length && item.note.id < best.note.id)) best = item;
+  }
+  return best;
 }
