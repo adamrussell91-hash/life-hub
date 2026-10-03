@@ -51,9 +51,14 @@ export function makeProposal(input: {
   relation: Relation;
   rationale: string;
   proposedAt: string;
+  confidence?: number;
+  bookA?: string;
+  bookB?: string;
 }): PendingProposal {
   const [noteA, noteB] = input.noteA < input.noteB ? [input.noteA, input.noteB] : [input.noteB, input.noteA];
   const swapped = noteA !== input.noteA;
+  const bookA = swapped ? input.bookB : input.bookA;
+  const bookB = swapped ? input.bookA : input.bookB;
   return {
     id: pairKey(input.noteA, input.noteB),
     noteA,
@@ -65,5 +70,8 @@ export function makeProposal(input: {
     relation: input.relation,
     rationale: input.rationale,
     proposedAt: input.proposedAt,
+    ...(typeof input.confidence === "number" ? { confidence: input.confidence } : {}),
+    ...(bookA ? { bookA } : {}),
+    ...(bookB ? { bookB } : {}),
   };
 }

@@ -6,6 +6,7 @@ import { parseJudgements } from "./propose";
 import { appendProposals, makeProposal } from "./proposals";
 import { DUPLICATE_HOLD, pairKey } from "./schema";
 import { excerptLine, runCurator, type CuratorIO } from "./run";
+import type { AutoApproved } from "./schema";
 import type { Page } from "../domain/page";
 
 const now = "2026-08-15T00:00:00.000Z";
@@ -136,7 +137,9 @@ describe("parseJudgements", () => {
       `{"proposals":[{"pageId":"keep","related":true,"relation":"contrasts-with","rationale":"foil"},{"pageId":"skip","related":false,"relation":"related","rationale":"no"},{"pageId":"ghost","related":true,"relation":"related","rationale":"x"}]}`,
       new Set(["keep", "skip"]),
     );
-    expect(judged).toEqual([{ pageId: "keep", related: true, relation: "contrasts-with", rationale: "foil" }]);
+    expect(judged).toEqual([
+      { pageId: "keep", related: true, relation: "contrasts-with", rationale: "foil", confidenceExplicit: false },
+    ]);
   });
 
   it("returns nothing for invalid JSON", () => {
@@ -328,5 +331,65 @@ describe("runCurator", () => {
     expect(pages.get("keep")?.connected).toEqual([]);
     expect(pending).toEqual([]);
     expect(state.lastProcessedSha).toBe("sha1");
+  });
+
+  it("writes an explicit 0.80 link and queues every lower score", async () => {
+    const pages = new Map([
+      ["page_a", page("page_a", { title: "Duty", origins: [{ kind: "book", label: "The Neural Mind" }] })],
+      ["page_b", page("page_b", { title: "Heaney", origins: [{ kind: "book", label: "Atomic Habits" }] })],
+      ["page_c", page("page_c", { title: "Loose", origins: [{ kind: "book", label: "Other" }] })],
+    ]);
+    let pending: ReturnType<typeof makeProposal>[] = [];
+    let auto: AutoApproved[] = [];
+    const manifest: { id: string; connected: string[] }[] = [];
+    const io: CuratorIO = {
+      gitNameStatus: async () => "A\tpages/page_a.json\n",
+      headSha: async () => "sha1",
+      readState: async () => ({ lastProcessedSha: "sha0" }),
+      writeState: async () => undefined,
+      readPending: async () => pending,
+      writePending: async next => {
+        pending = next;
+      },
+      readDismissed: async () => [],
+      writeDismissed: async () => undefined,
+      readPage: async id => pages.get(id) ?? null,
+      writePage: async next => {
+        pages.set(next.id, next);
+      },
+      listPageIds: async () => [...pages.keys()],
+      corpus: [
+        { pageId: "page_b", title: "Heaney", excerpt: "Inherited duty in the poem", vector: [0.8, 0.6] },
+        { pageId: "page_c", title: "Loose", excerpt: "Inherited duty loosely", vector: [0.7, 0.5] },
+      ],
+      embed: async () => [1, 0],
+      judge: async (_note, candidates) =>
+        candidates.map(hit => ({
+          pageId: hit.pageId,
+          related: true as const,
+          relation: "related" as const,
+          rationale: hit.pageId,
+          confidence: hit.pageId === "page_b" ? 0.8 : 0.41,
+          confidenceExplicit: true,
+        })),
+      now: () => now,
+      excerpt: excerptLine,
+      bookOf: id => pages.get(id)?.origins?.find(origin => origin.kind === "book")?.label,
+      readAutoApproved: async () => auto,
+      writeAutoApproved: async rows => {
+        auto = rows;
+      },
+      patchManifest: async updates => {
+        manifest.push(...updates);
+      },
+    };
+    await runCurator(io);
+    expect(pages.get("page_a")?.connected).toEqual(["page_b"]);
+    expect(pages.get("page_b")?.connected).toEqual(["page_a"]);
+    expect(auto).toHaveLength(1);
+    expect(auto[0]?.confidence).toBe(0.8);
+    expect(pending.map(item => item.noteB)).toEqual(["page_c"]);
+    expect(pending[0]?.confidence).toBe(0.41);
+    expect(manifest.some(row => row.id === "page_a" && row.connected.includes("page_b"))).toBe(true);
   });
 });

@@ -1,6 +1,7 @@
 import type { Page } from "../domain/page";
 import type { LexicalDoc } from "../lib/lexicalRetrieve";
 import { blockedIdsFor } from "./apply";
+import { addCrossBookCandidates, bookLabelFromOrigins } from "./crossBook";
 import { rankCandidates, type VectorHit } from "./candidates";
 import { capChanged, parseNameStatus } from "./changedPages";
 import { parseJudgements, type JudgedLink } from "./propose";
@@ -8,10 +9,17 @@ import {
   appendProposals,
   dropDismissedMentioning,
   dropPairsMentioning,
+  linkBoth,
   makeProposal,
   stripConnected,
 } from "./proposals";
-import { CuratorStateSchema, type DismissedPair, type PendingProposal } from "./schema";
+import {
+  CuratorStateSchema,
+  routeConfidence,
+  type AutoApproved,
+  type DismissedPair,
+  type PendingProposal,
+} from "./schema";
 
 export type CorpusEntry = {
   pageId: string;
@@ -38,6 +46,10 @@ export type CuratorIO = {
   judge: (note: Page, candidates: VectorHit[]) => Promise<JudgedLink[]>;
   now: () => string;
   excerpt: (body: string) => string;
+  bookOf?: (pageId: string) => string | undefined;
+  readAutoApproved?: () => Promise<AutoApproved[]>;
+  writeAutoApproved?: (rows: AutoApproved[]) => Promise<void>;
+  patchManifest?: (updates: { id: string; connected: string[] }[]) => Promise<void>;
 };
 
 export function excerptLine(body: string) {
@@ -74,9 +86,14 @@ export async function runCurator(io: CuratorIO) {
   }
 
   const incoming: PendingProposal[] = [];
+  const autoApproved: AutoApproved[] = [];
+  const manifestUpdates = new Map<string, string[]>();
+  const written = new Map<string, Page>();
+  const readCurrent = async (id: string) => written.get(id) ?? io.readPage(id);
   for (const change of process) {
-    const page = await io.readPage(change.id);
+    const page = await readCurrent(change.id);
     if (!page) continue;
+    let connected = [...(page.connected ?? [])];
     const query = `${page.title}\n\n${io.excerpt(page.body)}`;
     const useLexical = !io.corpus.some(entry => entry.vector.length);
     const vector = useLexical ? [] : await io.embed(query);
@@ -85,35 +102,93 @@ export async function runCurator(io: CuratorIO) {
       if (item.noteA === page.id) skip.add(item.noteB);
       if (item.noteB === page.id) skip.add(item.noteA);
     }
-    const { linking, heldBack: held } = rankCandidates({
+    const ranked = rankCandidates({
       sourceId: page.id,
       sourceVector: vector,
       corpus: io.corpus,
-      connected: page.connected ?? [],
+      connected,
       skip,
       query,
       lexicalDocs: io.lexicalDocs,
     });
-    heldBack += held.length;
+    heldBack += ranked.heldBack.length;
+    const sourceBook = bookLabelFromOrigins(page.origins) ?? io.bookOf?.(page.id);
+    const linking = io.bookOf
+      ? addCrossBookCandidates({
+          sourceBook,
+          linking: ranked.linking,
+          sourceId: page.id,
+          sourceVector: vector,
+          corpus: io.corpus,
+          connected,
+          skip,
+          query,
+          lexicalDocs: io.lexicalDocs,
+          bookOf: io.bookOf,
+        })
+      : ranked.linking;
     const judgements = await io.judge(page, linking);
     const byId = new Map(linking.map(hit => [hit.pageId, hit]));
     for (const judgement of judgements) {
       const hit = byId.get(judgement.pageId);
       if (!hit) continue;
-      incoming.push(
-        makeProposal({
-          noteA: page.id,
-          noteB: hit.pageId,
-          titleA: page.title,
-          titleB: hit.title,
-          excerptA: io.excerpt(page.body),
-          excerptB: hit.excerpt || io.excerpt(""),
-          relation: judgement.relation,
-          rationale: judgement.rationale,
-          proposedAt: io.now(),
-        }),
-      );
+      const proposal = makeProposal({
+        noteA: page.id,
+        noteB: hit.pageId,
+        titleA: page.title,
+        titleB: hit.title,
+        excerptA: io.excerpt(page.body),
+        excerptB: hit.excerpt || io.excerpt(""),
+        relation: judgement.relation,
+        rationale: judgement.rationale,
+        proposedAt: io.now(),
+        confidence: judgement.confidenceExplicit ? judgement.confidence : undefined,
+        bookA: sourceBook,
+        bookB: hit.book ?? io.bookOf?.(hit.pageId),
+      });
+      const canRecord = Boolean(io.writeAutoApproved && io.readAutoApproved && io.patchManifest);
+      if (routeConfidence(judgement) !== "auto" || judgement.confidence === undefined || !canRecord) {
+        incoming.push(proposal);
+        continue;
+      }
+      const other = await readCurrent(hit.pageId);
+      if (!other) {
+        incoming.push(proposal);
+        continue;
+      }
+      const linked = linkBoth(connected, other.connected, page.id, other.id);
+      connected = linked.a;
+      const nextPage = { ...page, connected: linked.a };
+      const nextOther = { ...other, connected: linked.b };
+      await io.writePage(nextPage);
+      await io.writePage(nextOther);
+      written.set(nextPage.id, nextPage);
+      written.set(nextOther.id, nextOther);
+      manifestUpdates.set(nextPage.id, nextPage.connected ?? []);
+      manifestUpdates.set(nextOther.id, nextOther.connected ?? []);
+      autoApproved.push({
+        noteA: proposal.noteA,
+        noteB: proposal.noteB,
+        titleA: proposal.titleA,
+        titleB: proposal.titleB,
+        bookA: proposal.bookA ?? sourceBook ?? "",
+        bookB: proposal.bookB ?? hit.book ?? io.bookOf?.(hit.pageId) ?? "",
+        relation: proposal.relation,
+        rationale: proposal.rationale,
+        confidence: judgement.confidence,
+        approvedAt: io.now(),
+      });
     }
+  }
+
+  if (autoApproved.length) {
+    if (!io.writeAutoApproved || !io.readAutoApproved) {
+      throw new Error("curator cannot record auto-approved links");
+    }
+    const existing = await io.readAutoApproved();
+    await io.writeAutoApproved([...existing, ...autoApproved]);
+    if (!io.patchManifest) throw new Error("curator cannot update the manifest for auto-approved links");
+    await io.patchManifest([...manifestUpdates].map(([id, ids]) => ({ id, connected: ids })));
   }
 
   const nextPending = appendProposals(pending, incoming);

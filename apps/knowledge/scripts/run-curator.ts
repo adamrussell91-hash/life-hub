@@ -4,10 +4,12 @@ import { promisify } from "node:util";
 import path from "node:path";
 import { PageSchema } from "../src/domain/page";
 import { embedQuery } from "../src/lib/embed";
+import { bookLabelFromOrigins, mergeManifestConnected } from "../src/curator/crossBook";
 import { judgeLinks } from "../src/curator/propose";
 import { excerptLine, GIT_EMPTY_TREE_SHA, runCurator } from "../src/curator/run";
 import type { CorpusEntry } from "../src/curator/run";
-import type { DismissedPair, PendingProposal } from "../src/curator/schema";
+import type { AutoApproved, DismissedPair, PendingProposal } from "../src/curator/schema";
+import type { PageManifestEntry } from "../src/domain/page";
 import type { LexicalDoc } from "../src/lib/lexicalRetrieve";
 import { loadDotEnv } from "./loadLocalPages";
 
@@ -71,7 +73,14 @@ async function main() {
   const statePath = path.join(curatorDir, "state.json");
   const pendingPath = path.join(curatorDir, "pending-proposals.json");
   const dismissedPath = path.join(curatorDir, "dismissed.json");
+  const autoPath = path.join(curatorDir, "auto-approved.json");
+  const manifestPath = path.join(dataDir, "manifest.json");
   await mkdir(curatorDir, { recursive: true });
+  const manifest = await readJson<PageManifestEntry[]>(manifestPath, []);
+  const books = new Map(manifest.flatMap(row => {
+    const book = typeof row.id === "string" ? bookLabelFromOrigins(row.origins) : undefined;
+    return row.id && book ? [[row.id, book] as const] : [];
+  }));
 
   const head = await git(dataDir, ["rev-parse", "HEAD"]);
   const existingState = await readJson<{ lastProcessedSha?: string }>(statePath, {});
@@ -118,6 +127,15 @@ async function main() {
     judge: async (note, candidates) => judgeLinks({ note, candidates, apiKey: anthropic }),
     now: () => new Date().toISOString(),
     excerpt: excerptLine,
+    bookOf: id => books.get(id),
+    readAutoApproved: async () => readJson<AutoApproved[]>(autoPath, []),
+    writeAutoApproved: async rows => {
+      await writeFile(autoPath, JSON.stringify(rows, null, 2) + "\n");
+    },
+    patchManifest: async updates => {
+      const rows = await readJson<PageManifestEntry[]>(manifestPath, []);
+      await writeFile(manifestPath, JSON.stringify(mergeManifestConnected(rows, updates), null, 2) + "\n");
+    },
   });
   console.log(JSON.stringify(result));
 }

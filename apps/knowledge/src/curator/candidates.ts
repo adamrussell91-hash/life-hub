@@ -6,6 +6,7 @@ export type VectorHit = {
   title: string;
   excerpt: string;
   score: number;
+  book?: string;
 };
 
 function cosine(left: ArrayLike<number>, right: ArrayLike<number>) {
@@ -27,28 +28,27 @@ function cosine(left: ArrayLike<number>, right: ArrayLike<number>) {
 export function rankCandidates(input: {
   sourceId: string;
   sourceVector: ArrayLike<number>;
-  corpus: { pageId: string; title: string; excerpt?: string; vector: ArrayLike<number> }[];
+  corpus: { pageId: string; title: string; excerpt?: string; vector: ArrayLike<number>; book?: string }[];
   connected: string[];
   skip: Set<string>;
   k?: number;
   floor?: number;
   query?: string;
-  lexicalDocs?: LexicalDoc[];
+  lexicalDocs?: (LexicalDoc & { book?: string })[];
 }): { linking: VectorHit[]; heldBack: VectorHit[] } {
   const k = input.k ?? CANDIDATE_CAP;
   const floor = input.floor ?? LINK_FLOOR;
   const blocked = new Set([input.sourceId, ...input.connected, ...input.skip]);
   const hasVectors = input.corpus.some(entry => entry.vector.length);
   if (!hasVectors && input.query && input.lexicalDocs?.length) {
-    const linking = lexicalRetrieve(
-      input.lexicalDocs.filter(doc => !blocked.has(doc.id)),
-      input.query,
-      k,
-    ).map(hit => ({
+    const docs = input.lexicalDocs.filter(doc => !blocked.has(doc.id));
+    const books = new Map(docs.flatMap(doc => (doc.book ? [[doc.id, doc.book] as const] : [])));
+    const linking = lexicalRetrieve(docs, input.query, k).map(hit => ({
       pageId: hit.id,
       title: hit.title,
       excerpt: hit.excerpt,
       score: hit.score,
+      ...(books.get(hit.id) ? { book: books.get(hit.id) } : {}),
     }));
     return { linking, heldBack: [] };
   }
@@ -59,6 +59,7 @@ export function rankCandidates(input: {
       title: entry.title,
       excerpt: entry.excerpt ?? "",
       score: cosine(input.sourceVector, entry.vector),
+      ...(entry.book ? { book: entry.book } : {}),
     }))
     .filter(hit => hit.score >= floor)
     .sort((left, right) => right.score - left.score)

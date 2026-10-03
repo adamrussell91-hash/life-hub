@@ -3,7 +3,7 @@ import {
   applyCuratorAction,
   curatorBound,
   dispatchCurator,
-  loadCuratorQueue
+  presentCuratorQueue
 } from './_shared/knowledge-curator.mjs';
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
@@ -31,8 +31,8 @@ export function createKnowledgeCuratorHandler(deps = {}) {
     }
     if (request.method === 'GET') {
       try {
-        const { pending } = await loadCuratorQueue({ env, fetchImpl: deps.fetchImpl });
-        return withCors(okResponse(200, { pending }), request, env);
+        const review = await presentCuratorQueue({ env, fetchImpl: deps.fetchImpl });
+        return withCors(okResponse(200, review), request, env);
       } catch (error) {
         return withCors(knowledgeError(error), request, env);
       }
