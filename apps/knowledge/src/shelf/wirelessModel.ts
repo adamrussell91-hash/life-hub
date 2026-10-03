@@ -215,3 +215,45 @@ export function turnSegments(turns: Array<{ citations: Array<{ pageId: string }>
     return at;
   });
 }
+
+// ── Broadcasts kept on the server ────────────────────────────────────
+
+type DialEpisode = { id: string; mode: string; status: string; created_at: string; modeDial: Record<string, string> };
+
+/** The newest usable broadcast of this book, from the Podcast library (any device). */
+export function latestBroadcast<T extends DialEpisode>(episodes: T[], key: string): T | undefined {
+  return episodes
+    .filter(ep => ep.mode === "broadcast" && ep.status !== "error" && (ep.modeDial.book ?? "").replace(/\s+/g, " ").trim().toLowerCase() === key)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+}
+
+const SEGMENTS = new Set<Segment>(["cold-open", "feature", "counterpoint", "extends", "crosstalk", "phone-in"]);
+
+/** Rebuilds a broadcast's running order from its `order` dial, reading titles and questions from the book as it is now. */
+export function orderFromDial(text: string, book: BookModel): OrderEntry[] {
+  const notes = new Map([...book.placed, ...book.loose].map(note => [note.id, note]));
+  const linked = new Map(book.links.map(link => [link.fromId, link.toLabel]));
+  return text.split("\n").flatMap(line => {
+    const [pageId = "", rawSegment = "", rawPage = ""] = line.split("|").map(part => part.trim());
+    const segment = rawSegment as Segment;
+    if (!pageId || !SEGMENTS.has(segment)) return [];
+    const note = notes.get(pageId);
+    const page = Number(rawPage.replace(/^p\./, "")) || note?.page;
+    return [{
+      pageId,
+      segment,
+      title: note?.title ?? "A note no longer on this book",
+      ...(page ? { page } : {}),
+      ...(segment === "crosstalk" && linked.get(pageId) ? { via: linked.get(pageId) } : {}),
+      ...(segment === "phone-in" && note?.gaps.length ? { questions: note.gaps.slice(0, 2) } : {}),
+      weight: segment === "phone-in" ? 70 : Math.max(40, Math.min(220, (note?.excerpt.split(/\s+/).length ?? 20) * 2)),
+    }];
+  });
+}
+
+/** What Hold this thought puts in the Chat box: where you were, and the line you were hearing. */
+export function holdThoughtDraft(input: { book: string; page?: number; at: number; segment: Segment; speaker?: string; line?: string }) {
+  const where = [input.page ? `p. ${input.page}` : "", `${clock(input.at)} in`, SEGMENT_LABEL[input.segment].toLowerCase()].filter(Boolean).join(", ");
+  const quote = input.line ? ` ${input.speaker ?? "The host"} said: “${input.line.length > 280 ? `${input.line.slice(0, 277)}…` : input.line}”` : "";
+  return `From the Wireless broadcast of ${input.book} (${where}).${quote}\n\nMy thought: `;
+}
