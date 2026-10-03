@@ -10,7 +10,7 @@ export const PLACEMENTS_KEY = 'placements';
 export const SHELF_STANCES = ['supports', 'complicates', 'extends'];
 const MAX_PAGE = 5000;
 const MAX_CHAPTERS = 120;
-const MAX_PLACEMENTS_PER_WRITE = 500;
+export const MAX_PLACEMENTS_PER_WRITE = 500;
 
 export async function defaultGetShelfStore() {
   const { getStore } = await import('@netlify/blobs');
