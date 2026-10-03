@@ -12,6 +12,8 @@ import {
 import { parseEntityRef } from './_shared/entity-ref.mjs';
 import { createProfessionalTaskLinkOperationRepository } from './_shared/professional-task-link-operation.mjs';
 import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
+import { listGithubPdEvents } from './_shared/github-professional-data.mjs';
+import { importedPdEventById, mergeNotionPdEvents } from './_shared/notion-pd-events.mjs';
 
 export const config = { path: '/api/events' };
 
@@ -80,6 +82,7 @@ export function createEventsHandler(deps = {}) {
   const getTasksStore = deps.getTasksStore ?? defaultGetTasksStore;
   const createTaskLinkRepository =
     deps.createProfessionalTaskLinkOperationRepository ?? createProfessionalTaskLinkOperationRepository;
+  const loadGithubPdEvents = deps.listGithubPdEvents ?? listGithubPdEvents;
 
   return createOperatorHandler(
     async (request, context) => {
@@ -120,7 +123,15 @@ export function createEventsHandler(deps = {}) {
         if (request.method === 'GET') {
           if (url.searchParams.has('id')) {
             const id = readId(url);
-            const event = await repo.getEvent(id);
+            let event;
+            try {
+              event = await repo.getEvent(id);
+            } catch (error) {
+              if (error?.status !== 404) throw error;
+              const imported = importedPdEventById(await loadGithubPdEvents({ env }).catch(() => []), id);
+              if (!imported) throw error;
+              event = imported;
+            }
             const learning_operation = await taskLinks.loadForTarget(
               `professional:event:${id}`,
               'learning_for'
@@ -136,7 +147,11 @@ export function createEventsHandler(deps = {}) {
               env
             );
           }
-          const events = await repo.listEvents();
+          const [stored, imported] = await Promise.all([
+            repo.listEvents(),
+            loadGithubPdEvents({ env }).catch(() => [])
+          ]);
+          const events = mergeNotionPdEvents(stored, imported);
           return withCors(okResponse(200, { events }), request, env);
         }
 

@@ -81,6 +81,23 @@ describe('event page', () => {
     await vi.waitFor(() => expect(canvas.querySelector('.pd-fields-stub')).toBeNull());
   });
 
+  it('a Notion PD event shows the knowledge note and does not offer edits', async () => {
+    current = {
+      ...base,
+      source: 'notion',
+      hours: null,
+      talks: [{ id: 't_page', time: null, title: 'NESA update', presenter: null, hours: null }],
+      knowledge_notes: [{ talk_id: 't_page', page_id: 'page_notion_abc', title: 'NESA update', href: '/knowledge/#page/page_notion_abc' }]
+    } as unknown as typeof base;
+    const canvas = await render();
+    expect(canvas.querySelector('a.kn')?.getAttribute('href')).toBe('/knowledge/#page/page_notion_abc');
+    expect(canvas.querySelector('[data-talk-note]')).toBeNull();
+    expect(canvas.querySelector('.talk-add')).toBeNull();
+    expect(canvas.querySelector('.pd-fields-stub')).toBeNull();
+    expect(canvas.querySelector('[data-part="shape"]')).toBeNull();
+    expect((canvas.querySelector('[data-part="pd-switch"]') as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('Make note creates a Knowledge page and links it to the talk', async () => {
     const canvas = await render();
     canvas.querySelector<HTMLButtonElement>('[data-talk-note="t1"]')!.click();
