@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Page } from "../src/domain/page";
 import { packVectorIndex } from "../src/research/vectorPack";
-import { createDataRepo } from "../netlify/functions/_lib/dataRepo";
+import { listDataRepoPages } from "./dataRepoPages";
 import type { IndexEntry } from "./build-index";
 import { loadDotEnv, loadLocalStagedPages } from "./loadLocalPages";
 
@@ -60,7 +60,7 @@ async function main() {
     pages =
       (await loadLocalStagedPages((done, total) => {
         console.log(`Loaded ${done}/${total} local pages`);
-      })) ?? (await createDataRepo().listPages());
+      })) ?? (await listDataRepoPages());
     objects.push({
       key: researchObjectKeys.manifest,
       body: JSON.stringify(researchManifestFromPages(pages)),

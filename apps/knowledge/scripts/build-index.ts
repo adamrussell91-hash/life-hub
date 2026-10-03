@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Page } from "../src/domain/page";
 import { embedTexts } from "../src/lib/embed";
-import { createDataRepo } from "../netlify/functions/_lib/dataRepo";
+import { listDataRepoPages } from "./dataRepoPages";
 import { loadDotEnv, loadLocalStagedPages } from "./loadLocalPages";
 
 export type EmbedFn = (texts: string[]) => Promise<number[][]>;
@@ -67,7 +67,7 @@ async function main() {
   const local = await loadLocalStagedPages((done, total) => {
     console.log(`Loaded ${done}/${total} local pages`);
   });
-  const pages = local ?? (await createDataRepo().listPages());
+  const pages = local ?? (await listDataRepoPages());
   const source = local ? "migrated/data-repo" : "data repo / fixtures";
   console.log(`Using ${pages.length} pages from ${source}`);
   const lexicalPath = path.join(outputDir, "lexical-corpus.json");
