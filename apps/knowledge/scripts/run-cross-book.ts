@@ -1,3 +1,4 @@
+import { writeSync } from "node:fs";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { PageSchema, type Page, type PageManifestEntry } from "../src/domain/page";
@@ -11,6 +12,11 @@ import { loadDotEnv } from "./loadLocalPages";
 /** Published Claude Sonnet 4.6 rates. Update these if DEFAULT_JUDGE_MODEL changes. */
 const SONNET_INPUT_PER_MTOK = 3;
 const SONNET_OUTPUT_PER_MTOK = 15;
+const JUDGE_CONCURRENCY = 6;
+
+function say(line: string) {
+  writeSync(1, `${line}\n`);
+}
 
 function arg(name: string) {
   const index = process.argv.indexOf(name);
@@ -70,17 +76,31 @@ async function main() {
   let inputTokens = 0;
   let outputTokens = 0;
   let model = DEFAULT_JUDGE_MODEL;
+  let judgeCalls = 0;
+  say(`loaded ${notes.length} book notes (${unreadable} unreadable)`);
   const result = await runCrossBook({
     notes,
     pending,
     dismissed,
     book,
     limit,
+    concurrency: JUDGE_CONCURRENCY,
     now: () => new Date().toISOString(),
+    onJudged: info => {
+      judgeCalls = info.total;
+      say(`judged ${info.done}/${info.total} ${info.noteId}`);
+    },
     judge: async (note, candidates) => {
       const page = pages.get(note.id);
       if (!page) return [];
-      const judged = await judgeLinksDetailed({ note: page, candidates, apiKey: anthropic });
+      const ask = () => judgeLinksDetailed({ note: page, candidates, apiKey: anthropic });
+      let judged;
+      try {
+        judged = await ask();
+      } catch (error) {
+        say(`retry ${note.id}: ${error instanceof Error ? error.message : "judge failed"}`);
+        judged = await ask();
+      }
       inputTokens += judged.usage.input_tokens;
       outputTokens += judged.usage.output_tokens;
       model = judged.model;
@@ -113,6 +133,7 @@ async function main() {
     notes: notes.length,
     unreadable,
     notesProcessed: result.notesProcessed,
+    judgeCalls,
     pairsJudged: result.pairsJudged,
     autoApproved: result.autoApproved.length,
     queued: result.queued.length,

@@ -3,6 +3,7 @@ import type { VectorHit } from "./candidates";
 import { parseConfidence, RELATIONS, type Relation } from "./schema";
 
 export const DEFAULT_JUDGE_MODEL = "claude-sonnet-4-6";
+const JUDGE_TIMEOUT_MS = 120_000;
 
 export type JudgedLink = {
   pageId: string;
@@ -106,6 +107,7 @@ export async function judgeLinksDetailed(input: {
   const fetchImpl = input.fetchImpl ?? fetch;
   const response = await fetchImpl("https://api.anthropic.com/v1/messages", {
     method: "POST",
+    signal: AbortSignal.timeout(JUDGE_TIMEOUT_MS),
     headers: {
       "content-type": "application/json",
       "x-api-key": input.apiKey,

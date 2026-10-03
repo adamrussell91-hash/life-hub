@@ -144,6 +144,45 @@ describe("cross-book pairs", () => {
     expect(result.connected.find(row => row.id === "a")?.connected).toContain("b");
     expect(result.connected.find(row => row.id === "b")?.connected).toContain("a");
   });
+
+  it("sends each pair once, even when the first judge returns nothing", async () => {
+    const sent: string[] = [];
+    await runCrossBook({
+      notes: [note("a", "Alpha"), note("b", "Beta")],
+      pending: [],
+      dismissed: [],
+      now: () => now,
+      judge: async (source, candidates) => {
+        for (const hit of candidates) sent.push([source.id, hit.pageId].sort().join("||"));
+        return [];
+      },
+    });
+    expect(sent).toEqual(["a||b"]);
+  });
+
+  it("judges claimed pairs concurrently without sending one twice", async () => {
+    let inflight = 0;
+    let maxInflight = 0;
+    const sent: string[] = [];
+    await runCrossBook({
+      notes: [note("a", "Alpha"), note("b", "Beta"), note("c", "Gamma")],
+      pending: [],
+      dismissed: [],
+      concurrency: 3,
+      now: () => now,
+      judge: async (source, candidates) => {
+        inflight += 1;
+        maxInflight = Math.max(maxInflight, inflight);
+        await new Promise(resolve => setTimeout(resolve, 30));
+        inflight -= 1;
+        for (const hit of candidates) sent.push([source.id, hit.pageId].sort().join("||"));
+        return [];
+      },
+    });
+    expect(maxInflight).toBeGreaterThan(1);
+    expect(new Set(sent).size).toBe(sent.length);
+    expect(sent).toHaveLength(3);
+  });
 });
 
 describe("mergeManifestConnected", () => {

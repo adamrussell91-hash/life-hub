@@ -97,12 +97,42 @@ export type CrossBookResult = {
   connected: { id: string; connected: string[] }[];
 };
 
+type CrossBookJob = { note: CrossBookNote; hits: VectorHit[] };
+
+async function judgePool(
+  jobs: CrossBookJob[],
+  limit: number,
+  judge: (note: CrossBookNote, candidates: VectorHit[]) => Promise<JudgedLink[]>,
+  onJudged?: (info: { done: number; total: number; noteId: string }) => void,
+) {
+  const judged: JudgedLink[][] = jobs.map(() => []);
+  let cursor = 0;
+  let done = 0;
+  const width = Math.min(Math.max(1, limit), jobs.length);
+  if (!width) return judged;
+  await Promise.all(Array.from({ length: width }, async () => {
+    while (cursor < jobs.length) {
+      const index = cursor;
+      cursor += 1;
+      const job = jobs[index];
+      if (!job) continue;
+      judged[index] = await judge(job.note, job.hits);
+      done += 1;
+      onJudged?.({ done, total: jobs.length, noteId: job.note.id });
+    }
+  }));
+  return judged;
+}
+
 export async function runCrossBook(input: {
   notes: CrossBookNote[];
   pending: PendingProposal[];
   dismissed: DismissedPair[];
   book?: string;
   limit?: number;
+  /** Judge calls in flight. Defaults to 1 so a sequential caller stays ordered. */
+  concurrency?: number;
+  onJudged?: (info: { done: number; total: number; noteId: string }) => void;
   judge: (note: CrossBookNote, candidates: VectorHit[]) => Promise<JudgedLink[]>;
   now: () => string;
   vectors?: { pageId: string; title: string; excerpt?: string; vector: number[] }[];
@@ -112,20 +142,20 @@ export async function runCrossBook(input: {
     .filter(note => !wanted || bookKey(note.book) === wanted)
     .sort((a, b) => bookKey(a.book).localeCompare(bookKey(b.book)) || a.id.localeCompare(b.id));
   const slice = input.limit && input.limit > 0 ? selected.slice(0, input.limit) : selected;
+  const byId = new Map(input.notes.map(note => [note.id, note]));
   const connected = new Map(input.notes.map(note => [note.id, [...note.connected]]));
-  const seen = new Set<string>();
-  const autoApproved: AutoApproved[] = [];
-  const queued: PendingProposal[] = [];
-  let pairsJudged = 0;
+  const claimed = new Map<string, Set<string>>();
+  const claim = (left: string, right: string) => {
+    const partners = claimed.get(left) ?? new Set<string>();
+    partners.add(right);
+    claimed.set(left, partners);
+  };
+  const jobs: CrossBookJob[] = [];
 
   for (const note of slice) {
-    const skip = blockedIdsFor(note.id, [...input.pending, ...queued], input.dismissed);
+    const skip = blockedIdsFor(note.id, input.pending, input.dismissed);
     for (const id of connected.get(note.id) ?? []) skip.add(id);
-    for (const key of seen) {
-      const [left, right] = key.split("||");
-      if (left === note.id && right) skip.add(right);
-      if (right === note.id && left) skip.add(left);
-    }
+    for (const id of claimed.get(note.id) ?? []) skip.add(id);
     const pool = input.notes.filter(other => other.id !== note.id && isCrossBookPair(note.book, other.book));
     const poolIds = new Set(pool.map(other => other.id));
     const vectorRows = (input.vectors ?? []).filter(row => poolIds.has(row.pageId) && row.vector.length);
@@ -150,26 +180,38 @@ export async function runCrossBook(input: {
       })),
     }).linking;
     if (!hits.length) continue;
-    const judgements = await input.judge(note, hits);
-    for (const judgement of judgements) {
-      const other = pool.find(item => item.id === judgement.pageId);
-      if (!other) continue;
+    for (const hit of hits) {
+      claim(note.id, hit.pageId);
+      claim(hit.pageId, note.id);
+    }
+    jobs.push({ note, hits });
+  }
+
+  const judged = await judgePool(jobs, input.concurrency ?? 1, input.judge, input.onJudged);
+  const autoApproved: AutoApproved[] = [];
+  const queued: PendingProposal[] = [];
+  let pairsJudged = 0;
+
+  jobs.forEach((job, index) => {
+    const sent = new Set(job.hits.map(hit => hit.pageId));
+    for (const judgement of judged[index] ?? []) {
+      if (!sent.has(judgement.pageId)) continue;
+      const other = byId.get(judgement.pageId);
+      if (!other || !isCrossBookPair(job.note.book, other.book)) continue;
       const proposal = makeProposal({
-        noteA: note.id,
+        noteA: job.note.id,
         noteB: other.id,
-        titleA: note.title,
+        titleA: job.note.title,
         titleB: other.title,
-        excerptA: note.excerpt,
+        excerptA: job.note.excerpt,
         excerptB: other.excerpt,
         relation: judgement.relation,
         rationale: judgement.rationale,
         proposedAt: input.now(),
         confidence: judgement.confidenceExplicit ? judgement.confidence : undefined,
-        bookA: note.book,
+        bookA: job.note.book,
         bookB: other.book,
       });
-      if (seen.has(proposal.id) || skip.has(other.id)) continue;
-      seen.add(proposal.id);
       pairsJudged += 1;
       if (routeConfidence(judgement) === "auto" && judgement.confidence !== undefined && proposal.bookA && proposal.bookB) {
         const linked = linkBoth(connected.get(proposal.noteA), connected.get(proposal.noteB), proposal.noteA, proposal.noteB);
@@ -191,7 +233,7 @@ export async function runCrossBook(input: {
         queued.push(proposal);
       }
     }
-  }
+  });
 
   const changed = [...connected.entries()]
     .filter(([id, next]) => {
