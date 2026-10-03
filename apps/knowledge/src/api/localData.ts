@@ -28,6 +28,9 @@ export function normalizeManifestRow(entry: Record<string, unknown>) {
     tags: entry.tags ?? [],
     excerpt: entry.excerpt ?? "",
     ...(origins.length ? { origins } : {}),
+    ...(Array.isArray(entry.connected) && entry.connected.length
+      ? { connected: entry.connected.filter((id): id is string => typeof id === "string" && id.length > 0) }
+      : {}),
     ...(typeof entry.created_at === "string" ? { created_at: entry.created_at } : {}),
   };
 }

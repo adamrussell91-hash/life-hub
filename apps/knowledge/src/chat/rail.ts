@@ -1,4 +1,5 @@
 import { ChatWriteDroppedError, runChat, savePage, tidyPage, USE_LOCAL_DATA } from "../api/client";
+import { recordBookNote } from "../shelf/record";
 import { newHubPageId } from "../domain/page";
 import type { Page } from "../domain/page";
 import { escapeHtml, showToast } from "../lib/dom";
@@ -404,6 +405,7 @@ async function saveBrief(host: ChatRailHost) {
       origins: origin ? [origin] : undefined,
     });
     const saved = await savePage(page);
+    if (origin) await recordBookNote(saved, bookContext);
     try {
       await tidyPage(saved.id, saved.updated_at);
     } catch {

@@ -5,6 +5,7 @@ export type KnowledgeMobileView =
   | "graph"
   | "timeline"
   | "notebooks"
+  | "bookshelf"
   | "chat"
   | "podcast"
   | "quiz"
@@ -40,6 +41,7 @@ const NOTEBOOKS = [
   "M10 8h6",
   "M10 12h6"
 ];
+const BOOKSHELF = ["M3 20h18", "M5 20V6h3v14", "M9 20V4h3v16", "m14 7 3-1 3 13-3 1z"];
 const PROTOCOLS = ["M5 4h14v16H5z", "M8 8h8", "M8 12h8", "M8 16h5"];
 
 export type KnowledgeMobileNav = {
@@ -47,6 +49,7 @@ export type KnowledgeMobileNav = {
   goGraph: () => void;
   goChat: () => void;
   goNotebooks: () => void;
+  goBookshelf: () => void;
   goTimeline: () => void;
   goPodcast: () => void;
   goQuiz: () => void;
@@ -85,6 +88,12 @@ export function syncKnowledgeMobileChrome(
       }
     ],
     more: [
+      {
+        id: "bookshelf",
+        label: "Bookshelf",
+        paths: BOOKSHELF,
+        onSelect: nav.goBookshelf
+      },
       {
         id: "notebooks",
         label: "Notebooks",
