@@ -437,6 +437,29 @@ export async function listGithubCommunications({ env = process.env, fetchImpl = 
   return rows;
 }
 
+// `pd-events.json`: 2026 Notion Professional Development rows, with Knowledge
+// Hub page ids for the notes that matched. Read-only. Missing token or file → [].
+let pdEventsCache = null; // { repo, expiresAt, rows }
+
+export function resetGithubPdEventsCache() {
+  pdEventsCache = null;
+}
+
+export async function listGithubPdEvents({ env = process.env, fetchImpl = fetch, now = () => Date.now() } = {}) {
+  const token = professionalDataToken(env);
+  if (!token) return [];
+  const repo = professionalDataRepo(env);
+  if (pdEventsCache && pdEventsCache.repo === repo && pdEventsCache.expiresAt > now()) {
+    return pdEventsCache.rows;
+  }
+  const raw = await fetchDataFile(repo, token, fetchImpl, 'pd-events.json');
+  const rows = Array.isArray(raw?.events)
+    ? raw.events.filter((row) => row && typeof row === 'object' && isNonEmptyString(row.notion_id))
+    : [];
+  pdEventsCache = { repo, expiresAt: now() + CACHE_TTL_MS, rows };
+  return rows;
+}
+
 export async function getGithubPerson(id, options = {}) {
   const data = await loadProfessionalData(options);
   return data?.peopleById.get(id) ?? null;

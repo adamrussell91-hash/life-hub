@@ -8,9 +8,11 @@ import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
 import {
   mergeScheduleProjections,
   projectCommunicationSchedule,
+  projectEventSchedule,
   projectNotionCommunicationSchedule
 } from './_shared/schedule-projection.mjs';
-import { getGithubActiveSelfPerson, listGithubCommunications } from './_shared/github-professional-data.mjs';
+import { getGithubActiveSelfPerson, listGithubCommunications, listGithubPdEvents } from './_shared/github-professional-data.mjs';
+import { mergeNotionPdEvents } from './_shared/notion-pd-events.mjs';
 import {
   resolveMeeting,
   resolveEvent,
@@ -37,6 +39,7 @@ export function createScheduleProjectionsHandler(deps = {}) {
   const createCommunications = deps.createCommunicationRepository ?? createCommunicationRepository;
   const createLedger = deps.createLedgerItemRepository ?? createLedgerItemRepository;
   const loadGithubCommunications = deps.listGithubCommunications ?? listGithubCommunications;
+  const loadGithubPdEvents = deps.listGithubPdEvents ?? listGithubPdEvents;
   const loadSelfPerson = deps.getGithubActiveSelfPerson ?? getGithubActiveSelfPerson;
   const baseResolveEntity = deps.resolveEntity ?? defaultResolveEntity;
 
@@ -91,7 +94,7 @@ export function createScheduleProjectionsHandler(deps = {}) {
         const today = new Date(scheduleNow());
         const from = sydneyDateKey(new Date(today.getTime() - 30 * 86_400_000));
         const to = sydneyDateKey(new Date(today.getTime() + 120 * 86_400_000));
-        const [meetingProjections, eventProjections, communications, promises, notionComms, self] = await Promise.all([
+        const [meetingProjections, eventProjections, communications, promises, notionComms, notionPdRows, self] = await Promise.all([
           meetingRepo.listScheduleProjections({ attendeesFrom: from, attendeesTo: to }),
           eventRepo.listScheduleProjections(),
           commRepo.listCommunications(),
@@ -99,6 +102,7 @@ export function createScheduleProjectionsHandler(deps = {}) {
           // Notion comms copied into life-hub-data. Unbound token or a
           // GitHub failure leaves the calendar on Blob records only.
           loadGithubCommunications({ env }).catch(() => []),
+          loadGithubPdEvents({ env }).catch(() => []),
           loadSelfPerson({ env }).catch(() => null)
         ]);
         const commProjections = communications.map(projectCommunicationSchedule);
@@ -106,8 +110,12 @@ export function createScheduleProjectionsHandler(deps = {}) {
         const notionCommProjections = notionComms
           .map((row) => projectNotionCommunicationSchedule(row, { selfName }))
           .filter(Boolean);
+        const notionPdProjections = mergeNotionPdEvents(eventProjections, notionPdRows)
+          .filter((event) => event.source === 'notion')
+          .map(projectEventSchedule);
         const projections = mergeScheduleProjections([
           notionCommProjections,
+          notionPdProjections,
           meetingProjections,
           eventProjections,
           commProjections

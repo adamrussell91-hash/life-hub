@@ -35,6 +35,9 @@ async function load(id: string): Promise<Loaded> {
     const talkId = (entry.link as { metadata?: { talk_id?: string } }).metadata?.talk_id;
     if (talkId) notedTalks.set(talkId, entry.endpoint!.href ?? '');
   }
+  for (const note of record.knowledge_notes ?? []) {
+    if (note.talk_id && !notedTalks.has(note.talk_id)) notedTalks.set(note.talk_id, note.href);
+  }
   let group: PdGroupRecord | null = null;
   let members: EventRecord[] = [record];
   if (groupEntry) {
@@ -68,6 +71,7 @@ export async function renderEventPage(
 
   const root = el('div', 'event-page');
   const isPd = data.record.event_type === PD;
+  const imported = data.record.source === 'notion';
   root.dataset.pd = String(isPd);
 
   const toggleRow = el('div', 'pd-toggle');
@@ -77,17 +81,27 @@ export async function renderEventPage(
   toggle.setAttribute('aria-checked', String(isPd));
   toggle.setAttribute('aria-label', 'Counts as PD');
   toggle.dataset.part = 'pd-switch';
-  toggle.addEventListener('click', async () => {
+  if (!imported) {
+    toggle.addEventListener('click', async () => {
+      toggle.disabled = true;
+      await updateEvent(id, { event_type: isPd ? 'general' : PD });
+      await rerender();
+    });
+  } else {
     toggle.disabled = true;
-    await updateEvent(id, { event_type: isPd ? 'general' : PD });
-    await rerender();
-  });
+  }
   toggleRow.append(toggle, el('b', undefined, 'Counts as PD'),
-    el('span', 'muted', isPd ? 'Feeds the PD dashboard' : 'Off. No hours or evidence.'));
+    el('span', 'muted', imported
+      ? 'Brought across from your Notion PD list. Hours stay blank until you log them.'
+      : isPd ? 'Feeds the PD dashboard' : 'Off. No hours or evidence.'));
   root.append(toggleRow);
 
   if (isPd) {
-    root.append(shapePicker(), talksCard(), buildPdFields(data.record, (next) => { data.record = next; }), buildLearningTaskPanel(data.record, rerender));
+    if (!imported) root.append(shapePicker());
+    root.append(talksCard());
+    if (!imported) {
+      root.append(buildPdFields(data.record, (next) => { data.record = next; }), buildLearningTaskPanel(data.record, rerender));
+    }
     if (data.group) root.append(seriesStrip(data.group));
   }
 
@@ -98,7 +112,7 @@ export async function renderEventPage(
   root.append(notes);
   mountBlockPage(body, {
     blocks: (data.record.blocks ?? []) as never[],
-    editable: true,
+    editable: !imported,
     onSave: async (blocks) => {
       data.record = (await updateEvent(id, { blocks })).event;
     }
@@ -190,7 +204,7 @@ export async function renderEventPage(
       data.record = (await updateEvent(id, { talks })).event;
       await rerender();
     });
-    card.append(form);
+    if (!imported) card.append(form);
     return card;
   }
 
@@ -203,7 +217,7 @@ export async function renderEventPage(
       const link = el('a', 'kn', '✓ Knowledge note') as HTMLAnchorElement;
       if (href) link.href = href;
       row.append(link);
-    } else {
+    } else if (!imported) {
       const make = el('button', 'kn is-draft', '＋ Make note') as HTMLButtonElement;
       make.type = 'button';
       make.dataset.talkNote = talk.id;
