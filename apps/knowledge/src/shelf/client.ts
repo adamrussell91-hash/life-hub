@@ -4,7 +4,9 @@ import { readApiError, unwrapApiPayload } from "../api/envelope";
 import { bookKey } from "./model";
 import {
   parseShelfData,
+  FactsJobSchema,
   type BookFactsInput,
+  type FactsJob,
   type Placement,
   type PlacementInput,
   type ShelfBook,
@@ -80,4 +82,16 @@ export async function savePlacements(list: PlacementInput[]): Promise<Placement[
   data.placements = [...data.placements.filter(item => !ids.has(item.pageId)), ...saved];
   writeLocal(data);
   return saved;
+}
+
+/** Asks Claude to estimate facts for every listed title in one background batch. */
+export async function startBookFacts(labels: string[]): Promise<FactsJob> {
+  if (USE_LOCAL_DATA) throw new Error("Filling book facts needs the live hub; local preview can't call Claude.");
+  return FactsJobSchema.parse((await post<{ job: unknown }>({ op: "facts-start", books: labels })).job);
+}
+
+/** Checks the batch; once it has ended the server applies the results and returns the outcome. */
+export async function checkBookFacts(): Promise<FactsJob> {
+  if (USE_LOCAL_DATA) return { status: "none" };
+  return FactsJobSchema.parse((await post<{ job: unknown }>({ op: "facts-check" })).job);
 }

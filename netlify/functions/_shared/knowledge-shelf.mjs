@@ -138,6 +138,8 @@ export async function saveBook(store, raw, { now = new Date().toISOString() } = 
   const current = books[key] ?? { label: patch.label };
   if (patch.reading && patch.reading.page === null && current.reading?.page) patch.reading = current.reading;
   const next = merge({ ...current }, patch);
+  // Facts Adam pastes or types replace Claude's estimate, so it stops being marked as one.
+  if (patch.pages !== undefined || patch.chapters !== undefined) delete next.estimated;
   if (next.reading) next.reading = { ...next.reading, updated_at: now };
   if (next.pages && Array.isArray(next.chapters) && next.chapters.some(ch => ch.start > next.pages)) {
     throw invalid('A chapter starts after the last page.');
