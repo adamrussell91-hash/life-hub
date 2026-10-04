@@ -156,10 +156,13 @@ html[data-hub="life"] .glass-panel {
   letter-spacing: var(--tracking-tight);
   line-height: var(--leading-tight);
   color: var(--navy);
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 @media (max-width: 720px) {
   .page-header {
+    flex-wrap: wrap;
     gap: var(--space-2);
     margin-bottom: var(--space-4);
   }
@@ -171,6 +174,17 @@ html[data-hub="life"] .glass-panel {
   .page-header__eyebrow {
     font-size: var(--text-2xs);
     margin-bottom: var(--space-1);
+  }
+
+  /* Extra header controls (view switch, New note) sit under the title so a
+     short heading cannot wrap as “Archiv / e”. Refresh-only actions stay on
+     the title row. */
+  .page-header__actions:has(> :not(.hub-utilities)) {
+    flex: 1 0 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    margin-left: 0;
+    max-width: 100%;
   }
 }
 
