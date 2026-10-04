@@ -718,6 +718,18 @@ export function createChatHandler({
         let hubLessons = [];
         let hubUnits = [];
         let hubLoadErrors = {};
+        // Agents that skip the hub preload still get search_tasks / get_task: load tasks on first use.
+        let hubTasksLoaded = needsHubRetrieval;
+        const ensureHubTasks = async () => {
+          if (hubTasksLoaded) return;
+          hubTasksLoaded = true;
+          try {
+            const tasksStore = await getTasksStore(env);
+            hubTasks = withoutDeleted(await listTasksJSON(tasksStore, TASK_PREFIX));
+          } catch (err) {
+            hubLoadErrors.tasks = err?.code || 'load_failed';
+          }
+        };
         let knowledgePages = [];
         let knowledgeLoadError = null;
         let sourceMeta = {};
@@ -2338,6 +2350,7 @@ export function createChatHandler({
               }
               if (event.name === 'search_tasks') {
                 send({ type: 'status', text: 'Searching tasks…' });
+                await ensureHubTasks();
                 if (hubLoadErrors.tasks) {
                   return JSON.stringify({ ok: false, error: 'tasks_unavailable', store: 'tasks_hub' });
                 }
@@ -2345,6 +2358,10 @@ export function createChatHandler({
               }
               if (event.name === 'get_task') {
                 send({ type: 'status', text: 'Reading task…' });
+                await ensureHubTasks();
+                if (hubLoadErrors.tasks) {
+                  return JSON.stringify({ ok: false, error: 'tasks_unavailable', store: 'tasks_hub' });
+                }
                 return JSON.stringify(getTask(hubTasks, event.input ?? {}));
               }
               if (event.name === 'search_teaching') {

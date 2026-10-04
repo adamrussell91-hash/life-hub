@@ -19,8 +19,8 @@ import { formatHubAgentContext } from './hub-agent-context.mjs';
 import { getWeekReviewSchema } from './hammond-week.mjs';
 import { rankKnowledgePages } from './knowledge-data.mjs';
 import { NUTRITION_LOG_PATH, SKINCARE_LOG_PATH } from './treatment-state.mjs';
-import { isOpenTask } from './task-liveness.mjs';
-import { withoutDeleted } from './record-liveness.mjs';
+import { isClosedTask, isOpenTask } from './task-liveness.mjs';
+import { isDeletedRecord, withoutDeleted } from './record-liveness.mjs';
 
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 20;
@@ -457,42 +457,54 @@ export function getTasksFocus(tasks = [], projects = [], { now = new Date() } = 
   };
 }
 
+/** Agents see every field on a task, plus a plain done flag. */
 function summariseTask(task) {
-  return {
-    id: task.id,
-    title: task.title,
-    status: task.status,
-    domain: task.domain,
-    priority: task.priority,
-    due_date: task.due_date ?? null,
-    parent_project_id: task.parent_project_id ?? null
-  };
+  return { ...task, is_done: isClosedTask(task) };
 }
 
-export function searchTasks(tasks = [], { query, limit = DEFAULT_LIMIT } = {}) {
-  const toks = tokens(query);
-  if (!toks.length) return { ok: false, error: 'empty_query', store: 'tasks_hub' };
-  const cap = capLimit(limit);
-  const hits = (tasks ?? [])
-    .filter(isOpenTask)
-    .map(task => {
-      const hay = [task.title, task.domain, task.status, task.notes, task.id]
+/** Done tasks are searchable on request; trashed (deleted) tasks never are. */
+function isDoneTask(task) {
+  if (!task || typeof task !== 'object' || Array.isArray(task)) return false;
+  if (isDeletedRecord(task) || isOpenTask(task)) return false;
+  return typeof task.title === 'string' && task.title.trim().length > 0;
+}
+
+function matchTasks(tasks, toks, keep) {
+  return (tasks ?? [])
+    .filter(keep)
+    .filter(task => {
+      const hay = [task.title, task.domain, task.status, task.notes, task.description, task.id]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
-      const matched = toks.filter(t => hay.includes(t));
-      return { task, score: matched.length };
-    })
-    .filter(row => row.score === toks.length);
+      return toks.every(t => hay.includes(t));
+    });
+}
+
+export function searchTasks(tasks = [], { query, limit = DEFAULT_LIMIT, include_done = false } = {}) {
+  const toks = tokens(query);
+  if (!toks.length) return { ok: false, error: 'empty_query', store: 'tasks_hub' };
+  const cap = capLimit(limit);
+  const includeDone = include_done === true;
+  const hits = matchTasks(tasks, toks, task => isOpenTask(task) || (includeDone && isDoneTask(task)));
   const slice = hits.slice(0, cap);
-  return {
+  const result = {
     ok: true,
     store: 'tasks_hub',
     query,
+    include_done: includeDone,
     count: slice.length,
     ...truncatedMeta(hits.length, slice.length),
-    results: slice.map(({ task }) => summariseTask(task))
+    results: slice.map(summariseTask)
   };
+  if (!includeDone && !slice.length) {
+    const hiddenDone = matchTasks(tasks, toks, isDoneTask).length;
+    if (hiddenDone) {
+      result.done_matches_hidden = hiddenDone;
+      result.next_step = 'No open task matches. Ask Adam whether it is already marked done; if yes, search again with include_done: true.';
+    }
+  }
+  return result;
 }
 
 export function getTask(tasks = [], { task_id } = {}) {
@@ -500,7 +512,7 @@ export function getTask(tasks = [], { task_id } = {}) {
   if (!id) return { ok: false, error: 'missing_task_id', store: 'tasks_hub' };
   const task = (tasks ?? []).find(t => t?.id === id);
   if (!task) return { ok: true, found: false, store: 'tasks_hub', task_id: id };
-  return { ok: true, found: true, store: 'tasks_hub', task };
+  return { ok: true, found: true, store: 'tasks_hub', task: summariseTask(task) };
 }
 
 /** Split mixed Teaching hub loads (draft lessons + scheduled_lesson rows). */
@@ -967,6 +979,35 @@ export function domainRetrievalSchemasFor(slug) {
     }
   ];
 
+  const sharedTasks = [
+    {
+      name: 'search_tasks',
+      description:
+        'Search Tasks Hub by text (title, notes, description, domain, status, id). Every result is the full task record — every field, including status, completed_at and is_done. Open tasks only by default. If nothing open matches, ask Adam whether it is already marked done; when he says yes (or names it as finished), search again with include_done: true. Trashed (dead) tasks are never returned. A task is only the same task if the id matches — never treat a differently titled task as already handled, and never treat a done result as open work. Only Clare can change a task (Clare reopens with update_task status "open").',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+          limit: { type: 'number' },
+          include_done: {
+            type: 'boolean',
+            description: 'Also return done/completed tasks. Use after Adam confirms the task is marked done.'
+          }
+        },
+        required: ['query']
+      }
+    },
+    {
+      name: 'get_task',
+      description: 'Fetch one task by id (open or done) — the full record with every field.',
+      input_schema: {
+        type: 'object',
+        properties: { task_id: { type: 'string' } },
+        required: ['task_id']
+      }
+    }
+  ];
+
   const bySlug = {
     brisket: [
       {
@@ -1065,28 +1106,6 @@ export function domainRetrievalSchemasFor(slug) {
         description:
           'Open tasks, overdue, due soon, capacity, and stress flags from Tasks Hub. Required before answering what Adam should focus on today.',
         input_schema: { type: 'object', properties: {} }
-      },
-      {
-        name: 'search_tasks',
-        description:
-          'Search open tasks by text. Done and trashed (dead) tasks are never returned. A task is only the same task if the id matches — never treat a differently titled task as already handled.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            query: { type: 'string' },
-            limit: { type: 'number' }
-          },
-          required: ['query']
-        }
-      },
-      {
-        name: 'get_task',
-        description: 'Fetch one task by id.',
-        input_schema: {
-          type: 'object',
-          properties: { task_id: { type: 'string' } },
-          required: ['task_id']
-        }
       }
     ],
     ann: [
@@ -1140,7 +1159,7 @@ export function domainRetrievalSchemasFor(slug) {
     ]
   };
 
-  return bySlug[slug] ?? [];
+  return [...(bySlug[slug] ?? []), ...sharedTasks];
 }
 
 export { getBodyState };
