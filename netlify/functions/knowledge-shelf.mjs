@@ -15,7 +15,7 @@ export const config = { path: '/api/knowledge/shelf' };
 // POST { op: "facts-check" }           check the batch; applies results once it has ended
 // POST { op: "kinds-start", ids?, regrade? } Claude grades book-note kinds (one Message Batch)
 // POST { op: "kinds-check" }           check the batch; applies kinds once it has ended
-// POST { op: "kind", pageId }          grade one note synchronously
+// POST { op: "kind", pageId, regrade? } grade one note synchronously; keeps an existing kind unless regrade
 export function createKnowledgeShelfHandler(deps = {}) {
   return createSessionOriginHandler(async (request, context) => {
     const { env } = context;
@@ -60,7 +60,7 @@ export function createKnowledgeShelfHandler(deps = {}) {
         return withCors(okResponse(200, { job: await checkKindsJob(store, claude) }), request, env);
       }
       if (body.op === 'kind') {
-        return withCors(okResponse(200, { placement: await gradeOneKind(store, body.pageId, claude) }), request, env);
+        return withCors(okResponse(200, { placement: await gradeOneKind(store, body.pageId, claude, { regrade: body.regrade === true }) }), request, env);
       }
       return withCors(errorResponse(400, 'validation_error', 'op must be "book", "book-delete", "place", "facts-start", "facts-check", "kinds-start", "kinds-check" or "kind".', false), request, env);
     } catch (error) {
