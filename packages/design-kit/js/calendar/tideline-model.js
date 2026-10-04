@@ -347,8 +347,31 @@ function dueFor(visual, events, date, useVisual) {
   return [...allDay, ...dueForHubs(visual, events, date, useVisual)];
 }
 
+function taskDueRow(event, date) {
+  return {
+    id: event.record.id || event.path,
+    date,
+    title: event.record.title || 'Task',
+    kind: 'task',
+    filterKey: 'tasks',
+    source: 'task',
+    time: event.record.time || undefined,
+    meta: event.record.time ? `due ${clockMeta(toHour(event.record.time))}` : '',
+    record: event.record
+  };
+}
+
+function liveTaskDues(events, date) {
+  // Untimed tasks, and timed tasks with no end (a due time is a deadline, not a block).
+  return (events ?? [])
+    .filter(event => event.record?.type === 'task' && event.record.date === date && !(event.record.time && event.record.end_time))
+    .map(event => taskDueRow(event, date))
+    .sort((a, b) => String(a.time ?? '').localeCompare(String(b.time ?? '')));
+}
+
 function dueForHubs(visual, events, date, useVisual) {
   const promises = promiseDuesFromEvents(events, date);
+  const live = liveTaskDues(events, date);
   if (useVisual) {
     const visualDue = (visual.DUE ?? []).filter(item => item.date === date).map(item => {
       const task = (events ?? []).find(event => event.record?.type === 'task' && event.record.id === item.id);
@@ -357,24 +380,11 @@ function dueForHubs(visual, events, date, useVisual) {
       if (typeof actual === 'string' && actual !== item.date) return { ...withRecord, moved: true, movedTo: actual };
       return withRecord;
     });
-    return [...visualDue, ...promises.filter(item => !visualDue.some(due => due.id === item.id))];
+    // Same contract as chipsFromVisual overlays: a covering visual must not hide live Tasks Due.
+    const extras = live.filter(row => !visualDue.some(due => due.id === row.id));
+    return [...visualDue, ...extras, ...promises.filter(item => !visualDue.some(due => due.id === item.id))];
   }
-  // Untimed tasks, and timed tasks with no end (a due time is a deadline, not a block).
-  const tasks = (events ?? [])
-    .filter(event => event.record?.type === 'task' && event.record.date === date && !(event.record.time && event.record.end_time))
-    .map(event => ({
-      id: event.record.id || event.path,
-      date,
-      title: event.record.title || 'Task',
-      kind: 'task',
-      filterKey: 'tasks',
-      source: 'task',
-      time: event.record.time || undefined,
-      meta: event.record.time ? `due ${clockMeta(toHour(event.record.time))}` : '',
-      record: event.record
-    }))
-    .sort((a, b) => String(a.time ?? '').localeCompare(String(b.time ?? '')));
-  return [...tasks, ...promises];
+  return [...live, ...promises];
 }
 
 function wallsFor(visual, events, date, useVisual) {

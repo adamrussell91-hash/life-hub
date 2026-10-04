@@ -332,6 +332,9 @@ export function createAppController(dependencies) {
       ...tasksEvents.filter(item => (item.record?.type !== 'task' && item.record?.type !== 'task_context') || !ids.has(item.record.id)),
       ...incoming
     ];
+    // Memory alone leaves Day Dial / Tideline on the last paint — Week remount looked
+    // fresh after a Clare dump while Dial stayed empty until something else re-rendered.
+    if (currentSection === 'calendar') renderCalendarSection();
   });
   bind(windowTarget, 'hashchange', () => {
     if (!authenticated) return;

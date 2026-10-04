@@ -41,6 +41,30 @@ test('comms are comm chips; pins stay short; non-PD events are event chips; prom
   assert.deepEqual(wed.due.map((due) => [due.kind, due.filterKey, due.late]), [['promise', 'promises', true]]);
 });
 
+test('covering Life visual still merges live Clare dump Due tasks', () => {
+  const model = build(
+    [
+      {
+        path: 'tasks:dump-live',
+        record: { type: 'task', id: 'dump-live', date: '2026-09-24', title: 'Clare dump live', status: 'open' }
+      },
+      {
+        path: 'tasks:fixture-only',
+        record: { type: 'task', id: 'fixture-only', date: '2026-09-24', title: 'Fixture due', status: 'open' }
+      }
+    ],
+    {
+      ITEMS: [{ id: 'life-meds', date: '2026-09-24', start: '07:00', end: '07:15', kind: 'health', title: 'Meds' }],
+      DUE: [{ id: 'fixture-only', date: '2026-09-24', title: 'Fixture due', kind: 'task' }],
+      WALLS: [],
+      FREE: []
+    }
+  );
+  assert.ok(model.visual, 'visual covers the week');
+  const thu = model.days.find((day) => day.date === '2026-09-24');
+  assert.deepEqual(thu.due.map((due) => due.id).sort(), ['dump-live', 'fixture-only']);
+});
+
 test('covering Life visual still keeps Professional overlays and ledger promises', () => {
   const model = build(
     [

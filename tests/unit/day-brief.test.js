@@ -64,6 +64,25 @@ test('a logged dinner removes the Dinner row; after lights out the evening is do
   assert.deepEqual(late.rows, []);
 });
 
+test('tonight: Due tasks from the Week Due row appear with time Due', () => {
+  const t = tonight({
+    date: '2026-09-24',
+    now: NOW,
+    chips: CHIPS,
+    due: [
+      { id: 'task-emails', title: 'Reply to parent emails' },
+      { id: 'task-pack', title: 'Pack swim bag', meta: 'due 5:00 pm' }
+    ],
+    ghosts: GHOSTS,
+    logs: LOGS
+  });
+  const dues = t.rows.filter(r => r.time === 'Due');
+  assert.deepEqual(dues.map(r => r.title), ['Reply to parent emails', 'Pack swim bag']);
+  assert.equal(dues[0].itemId, 'task-emails');
+  assert.equal(dues[1].note, 'due 5:00 pm');
+  assert.ok(t.rows.some(r => r.title === 'Workout · upper body'), 'timed commitments stay');
+});
+
 test('tomorrow: the PD, the task with Hammond’s move, and the holidays after', () => {
   const t = tomorrow({
     date: '2026-09-25',

@@ -46,10 +46,11 @@ export function lightsOutFor(date, ghosts, profileSleep = BRIEF.lightsOut) {
  * Tonight, as seen at `now` (hour) on `date`.
  * Returns { timeLeft: { minutes, label, until, by }, rows[] }.
  * Rows are chronological: commitments still ahead, proposals (with ghostId so the view
- * can offer Accept), a Dinner row when nothing's been logged since the afternoon, and
+ * can offer Accept), a Dinner row when nothing's been logged since the afternoon,
+ * today's Due tasks (Week Due row — untimed / deadline-only, not dial arcs), and
  * lights out.
  */
-export function tonight({ date, now, chips = [], ghosts = [], logs = [], profileSleep = BRIEF.lightsOut, plannedDinnerAt = null }) {
+export function tonight({ date, now, chips = [], due = [], ghosts = [], logs = [], profileSleep = BRIEF.lightsOut, plannedDinnerAt = null }) {
   const lightsOut = lightsOutFor(date, ghosts, profileSleep);
   const bedGhost = ghosts.find(g => g.kind === 'bedtime' && g.date === date && g.status !== 'dismissed');
   const minutes = Math.max(0, (lightsOut - now) * 60);
@@ -94,6 +95,22 @@ export function tonight({ date, now, chips = [], ghosts = [], logs = [], profile
     // A missed / late afternoon dose plans dinner early (medication-model); otherwise the usual slot.
     const dinnerAt = Math.max(now, plannedDinnerAt ?? BRIEF.dinnerAt);
     rows.push({ at: dinnerAt, time: clock12(dinnerAt), title: plannedDinnerAt != null ? 'Dinner, planned' : 'Dinner', kind: 'log', note: hadLunch ? since : `${since} (no lunch)`, struck: false, ghostId: null, suggestion: null });
+  }
+  // Same Due contract as Tomorrow / Week: untimed and deadline-only tasks (not arcs).
+  for (const d of due) {
+    if (d.kind === 'allday' || d.kind === 'promise') continue;
+    const move = ghosts.find(g => g.kind === 'move_task' && g.taskId === d.id && g.status !== 'dismissed' && g.status !== 'accepted');
+    rows.push({
+      at: 99,
+      time: 'Due',
+      title: d.title,
+      kind: 'task',
+      itemId: d.id,
+      note: d.meta || 'Tasks · open',
+      struck: false,
+      ghostId: move?.id ?? null,
+      suggestion: move ? `${agentName(move.agent)}: move to ${move.label.replace(/^→\s*/, '')}` : null
+    });
   }
   rows.sort((a, b) => a.at - b.at);
   return {
