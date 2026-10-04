@@ -69,7 +69,7 @@ import {
 } from '../cn-patch-queue.mjs';
 import { applyIntuitionEdit } from './intuition.mjs';
 import { executeProposeActionWrites, validateProposeActionInput } from './propose-action.mjs';
-import { listJSON as listTasksJSON, newTaskId, TASK_PREFIX } from '../tasks-blobs.mjs';
+import { listJSON as listTasksJSON, getJSON as getTasksJSON, newTaskId, TASK_PREFIX, taskKey } from '../tasks-blobs.mjs';
 import { isOpenTask } from '../task-liveness.mjs';
 import { findTaskTwin } from '../task-duplicates.mjs';
 import {
@@ -143,7 +143,10 @@ function buildProposal({ agentSlug, intent, writes, surfaces = ['governance_log'
       path: write.path,
       mode: write.mode || 'create',
       content: write.content,
-      diff: write.diff || `${write.mode || 'create'} ${write.path}`
+      diff: write.diff || `${write.mode || 'create'} ${write.path}`,
+      ...(typeof write.title === 'string' && write.title.trim()
+        ? { title: write.title.trim() }
+        : {})
     })),
     surfaces
   };
@@ -2045,8 +2048,19 @@ function buildUpdateTaskPatch(input) {
 }
 
 /** A linked work block for update_task's start_time + end_time (the deadline is untouched). */
-function updateBlockWrite(ctx, taskId, item, patch) {
-  const known = Array.isArray(ctx.openTasks) ? ctx.openTasks.find(task => task?.id === taskId) : null;
+async function resolveKnownTask(ctx, taskId) {
+  const listed = Array.isArray(ctx.openTasks) ? ctx.openTasks.find(task => task?.id === taskId) : null;
+  if (listed) return listed;
+  if (!ctx.tasksStore || !taskId) return null;
+  try {
+    const record = await getTasksJSON(ctx.tasksStore, taskKey(taskId));
+    return record && typeof record === 'object' ? record : null;
+  } catch {
+    return null;
+  }
+}
+
+function updateBlockWrite(ctx, taskId, item, patch, known) {
   const task = {
     id: taskId,
     title: patch.title || known?.title || 'Planned work',
@@ -2058,7 +2072,19 @@ function updateBlockWrite(ctx, taskId, item, patch) {
   return taskBlockWrite(task, item, new Date().toISOString(), { today });
 }
 
-function handleUpdateTask(ctx, input) {
+function updateTaskIntent(writes) {
+  const taskWrites = writes.filter((write) => /^tasks:task:/.test(String(write?.path || '')));
+  if (!taskWrites.length) {
+    return writes.length === 1 ? 'Block time on the calendar' : `Block ${writes.length} calendar slots`;
+  }
+  if (taskWrites.length === 1) {
+    const title = typeof taskWrites[0].title === 'string' ? taskWrites[0].title.trim() : '';
+    return title ? `Update ${title}` : `Update task ${taskWrites[0].path.replace('tasks:task:', '')}`;
+  }
+  return `Update ${taskWrites.length} tasks`;
+}
+
+async function handleUpdateTask(ctx, input) {
   const batchItems = Array.isArray(input?.items)
     ? input.items.slice(0, CREATE_TASK_MAX_ITEMS)
     : null;
@@ -2068,14 +2094,16 @@ function handleUpdateTask(ctx, input) {
       const taskId = asOptionalString(item?.task_id);
       if (!taskId) continue;
       const patch = buildUpdateTaskPatch(item);
-      const block = updateBlockWrite(ctx, taskId, item, patch);
+      const known = await resolveKnownTask(ctx, taskId);
+      const block = updateBlockWrite(ctx, taskId, item, patch, known);
       if (!Object.keys(patch).length && !block) continue;
       if (Object.keys(patch).length) {
         writes.push({
           path: `tasks:task:${taskId}`,
           mode: 'append',
           content: serializeJson(patch),
-          diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`
+          diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`,
+          ...(known?.title ? { title: known.title } : {})
         });
       }
       if (block) writes.push(block);
@@ -2084,9 +2112,7 @@ function handleUpdateTask(ctx, input) {
     return propose(
       buildProposal({
         agentSlug: ctx.agentSlug,
-        intent: writes.length === 1
-          ? `Update task ${writes[0].path.replace('tasks:task:', '')}`
-          : `Update ${writes.length} tasks`,
+        intent: updateTaskIntent(writes),
         surfaces: ['confirm_card', 'governance_log'],
         writes
       })
@@ -2095,22 +2121,25 @@ function handleUpdateTask(ctx, input) {
   const taskId = asOptionalString(input?.task_id);
   if (!taskId) return deny('task_id is required');
   const patch = buildUpdateTaskPatch(input);
-  const block = updateBlockWrite(ctx, taskId, input, patch);
+  const known = await resolveKnownTask(ctx, taskId);
+  const block = updateBlockWrite(ctx, taskId, input, patch, known);
   if (!Object.keys(patch).length && !block) return deny('update_task needs at least one field to change');
+  const writes = [
+    ...(Object.keys(patch).length ? [{
+      path: `tasks:task:${taskId}`,
+      mode: 'append',
+      content: serializeJson(patch),
+      diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`,
+      ...(known?.title ? { title: known.title } : {})
+    }] : []),
+    ...(block ? [block] : [])
+  ];
   return propose(
     buildProposal({
       agentSlug: ctx.agentSlug,
-      intent: block && !Object.keys(patch).length ? `Block time for task ${taskId}` : `Update task ${taskId}`,
+      intent: updateTaskIntent(writes),
       surfaces: ['confirm_card', 'governance_log'],
-      writes: [
-        ...(Object.keys(patch).length ? [{
-          path: `tasks:task:${taskId}`,
-          mode: 'append',
-          content: serializeJson(patch),
-          diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`
-        }] : []),
-        ...(block ? [block] : [])
-      ]
+      writes
     })
   );
 }

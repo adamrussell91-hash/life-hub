@@ -8,6 +8,7 @@ import {
   loadHumanizerGuidance
 } from '../../netlify/functions/_shared/load-humanizer.mjs';
 import { buildSystemPrompt } from '../../netlify/functions/_shared/persona.mjs';
+import { hammondThinkingProtocolLastReadRule } from '../../netlify/functions/_shared/thinking-protocol-recommend.mjs';
 
 const slugs = [...AGENTS.map(agent => agent.slug), ROUTER_SLUG];
 
@@ -117,9 +118,13 @@ test('the Humanizer tail is the same shared guidance, not a per-personality rewr
   const clare = buildSystemPrompt({ slug: 'clare' });
   const hammond = buildSystemPrompt({ slug: 'hammond' });
   assert.ok(clare.endsWith(guidance));
-  assert.ok(hammond.endsWith(guidance));
   assert.equal(clare.split(guidance).length - 1, 1);
   assert.equal(hammond.split(guidance).length - 1, 1);
+  assert.ok(hammond.includes(guidance));
+  assert.ok(
+    hammond.endsWith(hammondThinkingProtocolLastReadRule()),
+    'Hammond last-read thinking-protocol rule sits after the shared Humanizer tail'
+  );
 });
 
 test('structured-output and fact-preservation contracts are in the shared layer', () => {

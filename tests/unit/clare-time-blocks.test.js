@@ -51,6 +51,28 @@ test('clare_mutate update_task and batch_reschedule add blocks', () => {
   assert.equal(content(batch.proposal.writes[2]).date, '2026-10-06', 'block follows the new due day');
 });
 
+test('update_task items[] with blocks counts tasks not writes, and titles the block from the store', async () => {
+  const store = {
+    async get(key) {
+      if (key === 'tasks/task_korea') return { id: 'task_korea', title: 'Korea itinerary', due_date: '2026-10-04' };
+      if (key === 'tasks/task_lead') return { id: 'task_lead', title: 'Lead accreditation', due_date: '2026-10-04' };
+      return null;
+    }
+  };
+  const result = await executeShortcut('update_task', {
+    items: [
+      { task_id: 'task_korea', due_date: '2026-10-05', start_time: '08:30', end_time: '09:00' },
+      { task_id: 'task_lead', due_date: '2026-10-06', start_time: '10:30', end_time: '11:30' }
+    ]
+  }, { agentSlug: 'clare', tasksStore: store, today: '2026-10-04' });
+  assert.equal(result.kind, 'propose');
+  assert.equal(result.proposal.intent, 'Update 2 tasks');
+  assert.equal(result.proposal.writes.length, 4);
+  assert.equal(result.proposal.writes[0].title, 'Korea itinerary');
+  assert.equal(JSON.parse(result.proposal.writes[1].content).title, 'Korea itinerary');
+  assert.equal(JSON.parse(result.proposal.writes[3].content).title, 'Lead accreditation');
+});
+
 test('create_task / update_task (umbrella chat) write linked blocks on the same Confirm', async () => {
   const created = await executeShortcut('create_task', { items: [
     { title: 'Email Keith', due_date: '2026-10-05', start_time: '15:00', end_time: '15:15' },

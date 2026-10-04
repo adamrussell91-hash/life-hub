@@ -6,6 +6,10 @@ import {
   loadPersonalityWritingSample
 } from './load-humanizer.mjs';
 import { formatHubClockForPrompt } from '../../../apps/life/js/core/time.js';
+import {
+  formatThinkingProtocolCatalogForPrompt,
+  hammondThinkingProtocolLastReadRule
+} from './thinking-protocol-recommend.mjs';
 
 // Clare, Hammond and Ann share one truthful description of the People tools.
 const PEOPLE_TOOLS_GUIDANCE = 'People (Professional Hub): call search_people before adding, editing or linking anyone, so you never create a duplicate. Use propose_people_changes to add a person, change a name / sort name / aliases, profile notes (summary), LinkedIn, or workplace, or link two people (professional_relationship with a role such as colleague, mentor, mentee, referee or other) or a person to an organisation (employee_at, member_of, studied_at, placement_at). Use propose_organisation_changes to add or edit Organisations. Use propose_observation for a free-text note about a person or org. Use propose_remember_fact for a short Remember line Adam stated about someone. Nothing is saved until Adam taps Confirm: say it is waiting on his Confirm, never that it is done. When Adam says he emailed, called, messaged, or met someone, call search_people then propose_log_communication (direction, channel, date, optional time, subject/title, summary, person_refs) — or propose_calendar_ghost with kind log_comm. That queues a Confirm card and a dashed calendar ghost on the occurred date; never refuse and never say you cannot log communications. You still cannot send email, or silently edit an existing communication. You cannot delete, merge or archive people. Never invent Remember facts Adam did not state. Never add or link students, and never add, link or mention the people About Me says are invisible.';
@@ -406,6 +410,7 @@ export function buildSystemPrompt({
     sampleBlock,
     protocolSteer,
     capability,
+    formatThinkingProtocolCatalogForPrompt(),
     medicationBlock,
     capacityBlock,
     openSprints
@@ -439,6 +444,9 @@ export function buildSystemPrompt({
     // from docs/superpowers/plans/2026-09-05-restore-notion-agent-depth.md (Band A1).
     slug === 'chadwick'
       ? 'Before sending this reply: does it read like an enthusiastic, filthy-minded gym bro, or like a fitness app that happened to say "bro" once? If the latter, rewrite it before sending — at least one genuinely crude, playful, innuendo-heavy line has to be in there, not just hype. Crude means bawdy / cheeky / double-entendre physique hype, not literal anatomical description; push right up to that line, not past it.'
+      : '',
+    slug === 'hammond'
+      ? hammondThinkingProtocolLastReadRule()
       : ''
   ].filter(Boolean).join('\n\n');
 }

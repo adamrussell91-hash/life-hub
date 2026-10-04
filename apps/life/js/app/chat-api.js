@@ -2,6 +2,19 @@ function httpError(message, status, code, data = null) {
   return Object.assign(new Error(message), { status, code, data });
 }
 
+/** Confirm errors are `{ code, message }` or a bare string (`stale_schedule_collision`). */
+function unpackConfirmError(payload) {
+  const err = payload?.error;
+  if (typeof err === 'string' && err.trim()) {
+    return { code: err.trim(), message: payload?.message || err.trim() };
+  }
+  const code = typeof err?.code === 'string' && err.code.trim() ? err.code.trim() : 'request_failed';
+  const message = typeof err?.message === 'string' && err.message.trim()
+    ? err.message.trim()
+    : 'Confirm request failed';
+  return { code, message };
+}
+
 export const CHAT_EVENTS_POLL_MS = 400;
 
 export function createChatApi(fetchImpl = fetch, { pollMs = CHAT_EVENTS_POLL_MS } = {}) {
@@ -58,10 +71,11 @@ export function createChatApi(fetchImpl = fetch, { pollMs = CHAT_EVENTS_POLL_MS 
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || payload?.ok !== true) {
+        const unpacked = unpackConfirmError(payload);
         throw httpError(
-          payload?.error?.message ?? 'Confirm request failed',
+          unpacked.message,
           response.status,
-          payload?.error?.code ?? 'request_failed',
+          unpacked.code,
           payload?.data ?? null
         );
       }

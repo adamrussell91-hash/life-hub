@@ -977,6 +977,20 @@ export function detectStaleScheduleCollisions({
   };
 }
 
+/** Human Confirm-card copy for a stale_schedule_collision check. */
+export function formatStaleScheduleCollisionMessage(check) {
+  const reasons = [...new Set((check?.conflicts ?? [])
+    .map((row) => (typeof row?.reason === 'string' ? row.reason.trim() : ''))
+    .filter(Boolean))];
+  if (reasons.length === 1) {
+    return `That time is blocked: ${reasons[0]}. Discard this card and pick another slot.`;
+  }
+  if (reasons.length) {
+    return `That time is blocked: ${reasons.join('; ')}. Discard this card and pick another slot.`;
+  }
+  return 'That time collides with the current calendar. Discard this card and pick another slot.';
+}
+
 export function validateProposedBlocks(proposed, hardBusy, workday = FALLBACK_WORKDAY) {
   const bounds = {
     start: minutesOf(workday.start) ?? 8 * 60,

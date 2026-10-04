@@ -10,6 +10,7 @@ import {
   topicQuery
 } from './knowledge-research.mjs';
 import { runSurfaceAgentTurn } from './agent-surface.mjs';
+import { formatThinkingProtocolCatalogForPrompt } from './thinking-protocol-recommend.mjs';
 
 const ARCHIVE_FAILED_NOTE =
   'The archive pull failed. Say so in character and continue with what you have. Do not empty the conversation.';
@@ -250,7 +251,8 @@ function assembledSystem(input, archive) {
           : '',
         sprintBlock
           ? `Open challenge sprints:\n${sprintBlock}\n${sprintToolsNote}`
-          : ''
+          : '',
+        formatThinkingProtocolCatalogForPrompt()
       ].filter(Boolean).join('\n\n'),
       quality: formatKnowledgeQualityBlock()
     })
