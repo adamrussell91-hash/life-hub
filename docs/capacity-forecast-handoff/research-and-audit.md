@@ -11,12 +11,13 @@ The research below guided the design. None validates the prototype's point weigh
 | [Consensus Sleep Diary, Carney et al., 2012](https://pmc.ncbi.nlm.nih.gov/articles/PMC3250369/) | Capture perceived restorative quality separately from duration; morning entry is appropriate. | A shortened bubble flow is not automatically a validated sleep diary. |
 | [Sonnentag, 2003](https://pubmed.ncbi.nlm.nih.gov/12814299/): recovery and next-day work engagement | Include prior workload and experienced recovery. | Engagement and overall capacity are different outcomes. |
 | [Syrek et al., 2017](https://pubmed.ncbi.nlm.nih.gov/27101340/): unfinished tasks, rumination and sleep | Task context/carry-over can inform hypotheses; actual workload is more than scheduled hours. | Observational associations do not establish personal causality. |
-| [ECCO extraintestinal manifestation guideline, 2024](https://academic.oup.com/ecco-jcc/article/18/1/1/7205776) | Fatigue can be multifactorial; a stable health marker does not prove full readiness. | Do not turn lab results into automatic score penalties or clinical decisions. |
 | [PROMIS Fatigue scoring manual](https://www.healthmeasures.net/images/PROMIS/manuals/Scoring_Manual_Only/PROMIS_Fatigue_User_Manual_and_Scoring_Instructions_02202023.pdf) | Distinguish fatigue experience from impact on physical, mental and social function. | Custom bubble answers are not validated PROMIS scoring. |
 | [Saw et al., 2016](https://pubmed.ncbi.nlm.nih.gov/26423706/): athlete monitoring review | Subjective recovery/wellbeing can be useful alongside training evidence. | Athlete findings do not directly calibrate this user's exercise effects. |
 | [TRIPOD+AI, 2024](https://www.bmj.com/content/385/bmj-2023-078378) | Define the prediction target, report evaluation/calibration and uncertainty honestly. | Reporting guidance is not evidence that a model is accurate. |
 
-## Existing calculation (verified again on main during handoff)
+## Existing calculation (before readiness v1)
+
+Superseded by `readiness-model.js`; see [algorithm.md](algorithm.md). Kept for provenance.
 
 Canonical implementation: `packages/design-kit/js/calendar/capacity-model.js`; Life app capacity file reexports it. Baseline 80, floor 10, ceiling 95. Current adjustments:
 

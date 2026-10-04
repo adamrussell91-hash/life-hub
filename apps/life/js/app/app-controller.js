@@ -20,6 +20,7 @@ import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
 import { renderFitnessSurfaceWidgets, renderNutritionSurfaceWidgets } from './render-surface-widgets.js';
 import { createHomeSprintsApi, renderHomeSprints } from './render-home-sprints.js';
+import { loadRecentCheckins, renderMorningCheckin } from './morning-checkin.js';
 import { packCnBoard, readHiddenLoopIds } from './render-central-node.js';
 import { settleMetricRings } from './chart-kit/animate.js';
 
@@ -174,6 +175,9 @@ export function createAppController(dependencies) {
   let lastPaintedKey = null;
   let lastPaintedEventCount = null;
   let currentSection = 'home';
+  // Morning check-ins live in Blobs; they join Life events so the dial's capacity uses them.
+  let checkinEvents = [];
+  let checkinsRequested = false;
   let calendarSelectedDate = null;
   let calendarViewMonth = null;
   let calendarView = 'week';
@@ -510,6 +514,14 @@ export function createAppController(dependencies) {
         if (syncQuiet) settleMetricRings(root);
         const model = buildHomeModel({ ...result, date });
         renderHome(root, model, { quiet: syncQuiet, onOpenSection: showSection });
+        void renderMorningCheckin(root, {
+          apiFetch,
+          events: result.events,
+          date: getSydneyDateKey(currentDate()),
+          now: currentDate,
+          onSaved: () => void refreshCheckins()
+        });
+        if (!checkinsRequested) void refreshCheckins();
         void renderHomeSprints(root, {
           api: createHomeSprintsApi(apiFetch),
           onOpenChat: (href) => {
@@ -1573,6 +1585,12 @@ export function createAppController(dependencies) {
     host.append(note);
   }
 
+  async function refreshCheckins() {
+    checkinsRequested = true;
+    checkinEvents = await loadRecentCheckins(apiFetch, getSydneyDateKey(currentDate()));
+    if (currentSection === 'calendar') renderCalendarSection();
+  }
+
   function renderCalendarSection({ scrollToDetail = false, monthDelta = 0 } = {}) {
     if (holdCalendarPaint) return;
     if (!latestResult || !buildCalendarModel || !renderCalendar) return;
@@ -1583,7 +1601,7 @@ export function createAppController(dependencies) {
     // Same list for month model and Day/Week Tideline — dropping a hub here
     // zeroes its filter chips even when the API loaded (Meetings 0 with filters off).
     const calendarEvents = mergeLifeCalendarEvents({
-      lifeEvents: latestResult.events,
+      lifeEvents: checkinEvents.length ? [...latestResult.events, ...checkinEvents] : latestResult.events,
       teachingEvents,
       knowledgeEvents,
       tasksEvents,

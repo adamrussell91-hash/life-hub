@@ -97,7 +97,7 @@ test('bedtimeFromSleep subtracts 30 minutes and caps at 22:00', () => {
   assert.equal(bedtimeFromSleep('22:00'), '21:30');
 });
 
-test('Thursday 34% yields Sara skip_workout and bedtime; Monday yields nothing', () => {
+test('Thursday 36% yields Sara skip_workout and bedtime; Monday yields nothing', () => {
   const ghosts = proposeGhosts(baseInput());
   for (const ghost of ghosts) validateGhost(ghost);
 
@@ -107,7 +107,7 @@ test('Thursday 34% yields Sara skip_workout and bedtime; Monday yields nothing',
   assert.equal(skip.id, ghostId('sara', 'skip_workout', '2026-09-24'));
   assert.equal(skip.agent, 'sara');
   assert.equal(skip.date, '2026-09-24');
-  assert.equal(skip.reason, 'capacity 34%, sore throat');
+  assert.equal(skip.reason, 'capacity 36%, sore throat');
   assert.equal(skip.workoutPath, 'records/2026/09/24/workout-1815.md');
   assert.equal(skip.overItem, 'thu-workout');
 
@@ -153,6 +153,8 @@ test('rerunning is idempotent — known ids are skipped', () => {
 });
 
 test('fixture ghosts g-skip and g-good block duplicates by meaning, not id', () => {
+  // g-good sits on whichever evening the good-night opening holds.
+  const goodNightDate = baseInput().openings.find(o => o.wantId === 'good-night').dates[0];
   const ghosts = proposeGhosts(baseInput({
     pending: [
       {
@@ -167,7 +169,7 @@ test('fixture ghosts g-skip and g-good block duplicates by meaning, not id', () 
         id: 'g-good',
         agent: 'hammond',
         kind: 'protect_block',
-        date: '2026-09-26',
+        date: goodNightDate,
         start: '18:00',
         end: '22:00',
         title: 'Dinner out + a show',

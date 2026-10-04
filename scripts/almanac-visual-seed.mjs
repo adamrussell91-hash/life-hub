@@ -36,7 +36,7 @@ function stamp(record, index) {
 
 /**
  * Load the Almanac fixture into the mock repo and freeze today at 2026-09-24.
- * Sleep and diary rows are the Tideline logs whose capacity is LAST_LOG (34%).
+ * Sleep and diary rows are the Tideline logs whose capacity is LAST_LOG (36%).
  * The 26/09 evening block is the taken evening the reference assumes.
  */
 export async function loadAlmanacVisualSeed() {

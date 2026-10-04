@@ -38,7 +38,7 @@ test('tideline capacity, period and grid come from the fixture logs', () => {
   const built = model();
   assert.equal(built.period.title, 'T3 W10 · last week of term');
   assert.equal(built.period.range, '21/09/26 – 27/09/26');
-  assert.deepEqual(built.days.map(day => day.cap.pct), [79, 51, 42, 34, 52, 68, 75]);
+  assert.deepEqual(built.days.map(day => day.cap.pct), [84, 50, 42, 36, 49, 63, 71]);
   assert.deepEqual(built.days.map(day => day.over), [false, false, false, true, false, false, false]);
   assert.equal(built.days[3].cap.note, 'sore throat, poor sleep');
   assert.equal(built.days[4].cap.forecast, true);

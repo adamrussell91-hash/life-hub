@@ -993,7 +993,9 @@ function mountDial(size) {
   s('text', { class: 'dd-t-caps', x: cx, y: (cy + big * 0.35 - big - 6).toFixed(1) }, gauge, cap.forecast ? 'FORECAST' : 'CAPACITY');
   nodes.set('pct', s('text', { class: 'dd-t-pct', x: cx, y: (cy + big * 0.35).toFixed(1), 'font-size': big, fill: capColour(cap.pct) }, gauge, `${cap.pct}%`));
   const noteRoom = rings.gauge * 1.6; // inside the gauge ring, with air
-  s('text', { class: 'dd-t-note', x: cx, y: cy + big * 0.38 + 22 }, gauge, fitText(cap.note, noteRoom, NOTE_FONT));
+  // The caps line already says FORECAST; never repeat it as the note.
+  const note = cap.forecast && /^forecast$/i.test(String(cap.note ?? '')) ? '' : cap.note;
+  s('text', { class: 'dd-t-note', x: cx, y: cy + big * 0.38 + 22 }, gauge, fitText(note, noteRoom, NOTE_FONT));
   const streak = cap.factors?.find(factor => factor.id === 'streak');
   if (streak && !rings.compact) {
     s('text', { class: 'dd-t-note', x: cx, y: cy + big * 0.38 + 38 }, gauge, fitText(streak.label, noteRoom, NOTE_FONT));
@@ -1004,7 +1006,7 @@ function mountDial(size) {
     nodes.set('hand', s('line', { class: 'dd-hand', 'data-part': 'now-hand' }, svg));
     nodes.set('hand-dot', s('circle', { class: 'dd-hand-dot', r: 5 }, svg));
     // On a compact dial the time is in the Tonight heading; no label outside the ring.
-    if (!rings.compact) nodes.set('hand-label', s('text', { class: 'dd-t-now' }, svg, `now ${clock12(nowHour).replace(' pm', '').replace(' am', '')}`));
+    if (!rings.compact) nodes.set('hand-label', s('text', { class: 'dd-t-now', 'text-anchor': 'middle' }, svg, clock12(nowHour).replace(' pm', '').replace(' am', '')));
   }
 }
 
@@ -1392,9 +1394,13 @@ function apply(id, props) {
     }
     const label = nodes.get('hand-label');
     if (label) {
-      const l = point(cx, cy, rings.event[1] + 14, props.h);
-      label.setAttribute('x', (l.x + 8).toFixed(1));
-      label.setAttribute('y', (l.y + 22).toFixed(1));
+      // Inside the dial, in the quiet band between the gauge and the day's bands, just ahead
+      // of the hand: never in the callout column or on the hour labels outside the ring.
+      const rGap = (rings.gauge + rings.gaugeWidth / 2 + rings.context[0]) / 2;
+      const ahead = (26 / rGap) * (24 / (2 * Math.PI));
+      const l = point(cx, cy, rGap, props.h + ahead);
+      label.setAttribute('x', l.x.toFixed(1));
+      label.setAttribute('y', (l.y + 4).toFixed(1));
       label.style.opacity = String(props.o);
     }
     return;

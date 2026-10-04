@@ -1,6 +1,8 @@
 # Capacity forecast redesign — Claude Code handoff
 
-This folder captures Adam's agreed direction, research, code audit and interactive prototypes from the 4 October 2026 design conversation. **This is a design/documentation PR. It does not replace the production algorithm or wire the prototypes into Life Hub.**
+This folder captures Adam's agreed direction, research, code audit and interactive prototypes from the 4 October 2026 design conversation.
+
+**Status (4 Oct, later):** readiness model v1 is implemented and replaces the production daily formula — see [algorithm.md](algorithm.md). The morning check-in is live on the Life dashboard, and the hourly battery and weather rules exist as tested modules (not yet drawn on the dial). Complication and watch-face mockups: `mockups/dial-complications.html`.
 
 Start with [implementation-brief.md](implementation-brief.md), then [algorithm.md](algorithm.md), [check-ins-and-logging.md](check-ins-and-logging.md), [weather-states.md](weather-states.md), and [research-and-audit.md](research-and-audit.md).
 
