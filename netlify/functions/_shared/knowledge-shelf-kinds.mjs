@@ -13,7 +13,9 @@ export const KIND_PRECEDENCE = ['debate', 'bridge', 'case', 'person', 'idea'];
 const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
 const MAX_NOTES = 1000;
-const BODY_CHARS = 6000;
+// Implications / practice sections often sit after the construct explanation; 6k
+// cut those off and the grader never saw the bridge evidence (Motivation gold misses).
+const BODY_CHARS = 14000;
 const UNREADABLE_GRADE = { kind: 'idea', kindGuessed: true, kindReason: 'Grader reply unreadable.' };
 // Unreadable batch rows get one synchronous retry each; capped so kinds-check stays inside the function timeout.
 const BATCH_RETRY_CAP = 20;
@@ -31,7 +33,8 @@ Kinds:
 
 Do NOT choose debate just because the note mentions a caveat, a critic, "contested", or two views in passing while it is still mostly a profile, an explanation, or a case. Those stay person / idea / case.
 A note is bridge when carrying the idea out is its main job, OR when it has a substantial section that does it: a heading of its own with at least a full paragraph or three points about teaching, learning, schools, curriculum or another field. A one-line tip is not enough.
-Not bridge: practical steps that restate the book's own advice (a habits book's habit tips, a reasoning book's checklist), clinical or medical practice, and sections that only point ahead to later chapters. Those stay idea, case or person.
+A section headed for teaching, practice, schools or curriculum that meets that size counts as bridge even when the rest of the page is explanation, and even when the book itself is about education — moving from a construct or finding to what schools or teachers should do is carrying the idea out.
+Not bridge: a how-to guide restating its own steps in the same domain (a habits book's habit tips, a reasoning book's fallacy checklist), clinical or medical practice tips, and sections that only point ahead to later chapters. Those stay idea, case or person.
 For bridge, quote the evidence from that section.
 When the page is organised around rival accounts, a correction or an open question, choose debate, even if it also has an implications section.
 
@@ -39,7 +42,7 @@ When two kinds truly both describe the main job: debate > bridge > case > person
 idea is only when nothing else fits. It is the easy default a lazy grader will reach for — do not reach for it when debate, bridge, case or person is the main job.
 
 debate needs a quoted sentence from the note showing the disagreement, the correction or the open question that the page is organised around.
-bridge needs a quoted sentence pointing outside the book (to practice, teaching or another field) that the page is organised around.
+bridge needs a quoted sentence from that carrying-out section (teaching, learning, schools, curriculum or another field).
 fallback is always the best crystallised fit (person, idea or case), used if a fluid grade cannot be backed up.
 
 Return JSON only, exactly this shape:
