@@ -173,6 +173,7 @@ function mountHistory(host, today) {
   view.paint = () => {
     const history = view.model.mealHistory;
     const days = new Map(history.days.map(day => [day.date, day]));
+    const outsideRange = date => history.from ? date < history.from : view.model.freshness === 'fallback';
     const start = monday(view.selected);
     const end = addCalendarDays(start, 6);
     input.min = addCalendarDays(view.today, -(MAX_LOOKBACK_DAYS - 1));
@@ -187,7 +188,8 @@ function mountHistory(host, today) {
       const day = days.get(date);
       const count = day?.meals.length ?? 0;
       const future = date > view.today;
-      const loading = !day && history.loading && date < history.from;
+      const loading = !day && history.loading && outsideRange(date);
+      const unavailable = !day && !loading && outsideRange(date);
       const button = node(future ? 'span' : 'button', 'meal-history__day');
       button.dataset.date = date;
       button.dataset.logged = String(count > 0);
@@ -195,8 +197,8 @@ function mountHistory(host, today) {
       button.dataset.selected = String(date === view.selected);
       button.append(node('span', 'meal-history__weekday', weekday(date)),
         node('span', 'meal-history__day-number', String(Number(date.slice(-2)))),
-        node('span', 'meal-history__day-count', future ? '—' : loading ? '…' : String(count)));
-      button.setAttribute('aria-label', `${weekday(date)} ${formatDisplayDate(date)}${date === view.today ? ', today' : ''}, ${future ? 'future date' : loading ? 'loading meals' : `${count} meal${count === 1 ? '' : 's'}`}`);
+        node('span', 'meal-history__day-count', future || unavailable ? '—' : loading ? '…' : String(count)));
+      button.setAttribute('aria-label', `${weekday(date)} ${formatDisplayDate(date)}${date === view.today ? ', today' : ''}, ${future ? 'future date' : loading ? 'loading meals' : unavailable ? 'history unavailable' : `${count} meal${count === 1 ? '' : 's'}`}`);
       button.title = button.getAttribute('aria-label');
       if (!future) {
         button.type = 'button';
@@ -210,7 +212,7 @@ function mountHistory(host, today) {
     }
     const day = days.get(view.selected);
     const meals = day?.meals ?? [];
-    const outside = history.from && view.selected < history.from;
+    const outside = !day && outsideRange(view.selected);
     const loading = outside && history.loading;
     status.textContent = history.error ? 'Earlier history could not be loaded. Use Refresh to try again.'
       : view.model.freshness === 'fallback' ? 'Showing saved meal records. Refresh to check for updates.'

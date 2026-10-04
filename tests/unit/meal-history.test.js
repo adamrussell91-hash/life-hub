@@ -83,6 +83,11 @@ test('date jumping, future dates, empty days and history failures have distinct 
   renderNutrition(doc, model({ history: { from: '2026-07-24', loading: false, error: true } }));
   assert.match(doc.querySelector('.meal-log__empty').textContent, /unavailable/);
   assert.match(doc.querySelector('[role="status"]').textContent, /could not be loaded/);
+  assert.equal(doc.querySelector('[data-date="2026-07-22"] .meal-history__day-count').textContent, '—');
+  assert.match(doc.querySelector('[data-date="2026-07-22"]').getAttribute('aria-label'), /history unavailable/);
+  renderNutrition(doc, model({ freshness: 'fallback' }));
+  assert.match(doc.querySelector('.meal-log__empty').textContent, /unavailable/);
+  assert.match(doc.querySelector('[data-date="2026-07-22"]').getAttribute('aria-label'), /history unavailable/);
   renderNutrition(doc, model({ history: { from: '2020-01-01', loading: false } }));
   assert.match(doc.querySelector('.meal-log__empty').textContent, /No meals logged/);
   input.value = '2026-07-31';
