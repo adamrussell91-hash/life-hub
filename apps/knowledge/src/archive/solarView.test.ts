@@ -169,7 +169,7 @@ function worldPos(body: Body, model: ReturnType<typeof buildSolarModel>) {
 
 describe("presence and bands", () => {
   it("exposes a build number so a stale Universe bundle is obvious", () => {
-    expect(UNIVERSE_BUILD).toBe(20);
+    expect(UNIVERSE_BUILD).toBe(21);
   });
 
   it("maps band thresholds onto KIND_DEPTH cutoffs", () => {
@@ -644,3 +644,126 @@ describe("mountSolarView", () => {
     stop();
   });
 });
+
+describe("universe effects in the mounted view", () => {
+  beforeEach(() => {
+    installCanvas();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.body.className = "";
+  });
+
+  function memory() {
+    const data = new Map<string, string>();
+    return { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => void data.set(key, value) };
+  }
+
+  function stage(width = 800) {
+    const host = document.createElement("div");
+    Object.defineProperty(host, "clientWidth", { value: width, configurable: true });
+    return host;
+  }
+
+  function clickAt(host: HTMLElement, x: number, y: number) {
+    const canvas = host.querySelector("canvas")!;
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 720, right: 800, bottom: 720, x: 0, y: 0, toJSON() {} });
+    canvas.dispatchEvent(new MouseEvent("pointerdown", { clientX: x, clientY: y, bubbles: true }));
+    window.dispatchEvent(new MouseEvent("pointerup", { clientX: x, clientY: y, bubbles: true }));
+  }
+
+  it("mounts a Big Bang replay bar that starts on today", () => {
+    stubFrame();
+    const host = stage();
+    const stop = mountSolarView(host, buildSolarModel(tagged("g", V0, 6)), { search: "", onNoteSelect() {}, storage: memory() });
+    const bar = host.querySelector(".universe-replay")!;
+    expect(bar.getAttribute("aria-label")).toBe("Big Bang replay");
+    expect(bar.querySelector("[data-replay-label]")!.textContent).toBe("Today");
+    expect(bar.querySelector<HTMLButtonElement>("[data-replay-exit]")!.hidden).toBe(true);
+    stop();
+  });
+
+  it("dials a selected note's connected notes and still reports the selection", () => {
+    const frames = stubFrame();
+    const host = stage();
+    const entries = tagged("g", V0, 8, i => (i === 0 ? "Zebra Unique Page" : `Note ${i}`));
+    entries[0]!.connected = ["g3", "g5", "missing"];
+    const model = buildSolarModel(entries);
+    const onNoteSelect = vi.fn();
+    const stop = mountSolarView(host, model, { search: "Zebra Unique", onNoteSelect, entries, storage: memory() });
+    frames.pump(16);
+    const target = model.bodies.find(body => body.pageId === "g0")!;
+    const world = worldPos(target, model);
+    const height = Math.max(720, Math.floor(window.innerHeight * 0.8));
+    const { fitK } = solarScales(model.reach, model.tightest, 800, height);
+    clickAt(host, 400 + world.x * fitK, height / 2 + world.y * fitK);
+    expect(onNoteSelect).toHaveBeenCalledWith(expect.objectContaining({ pageId: "g0" }));
+    frames.pump(32);
+    stop();
+  });
+
+  it("remembers the visit so the next mount only showers newer notes", () => {
+    stubFrame();
+    const storage = memory();
+    const stop = mountSolarView(stage(), buildSolarModel(tagged("g", V0, 4)), {
+      search: "",
+      onNoteSelect() {},
+      storage,
+      now: () => 1_000_000,
+    });
+    expect(JSON.parse(storage.getItem("kh-universe-visit")!).lastVisit).toBe(1_000_000);
+    stop();
+  });
+
+  it("follows a comet and runs the screensaver until teardown", () => {
+    const frames = stubFrame();
+    const V = TOPIC_VOCABULARY;
+    const entries = [
+      ...Array.from({ length: 6 }, (_, i) => page(`a${i}`, `A ${i}`, [V[0]!, V[1]!, V[2]!])),
+      page("rare", "Rare bridge", [V[0]!, V[3]!, V[4]!]),
+      ...tagged("c", V[3]!, 5),
+      ...tagged("d", V[4]!, 5),
+    ];
+    const onNoteSelect = vi.fn();
+    const stop = mountSolarView(stage(), buildSolarModel(entries), { search: "", onNoteSelect, entries, storage: memory() });
+    frames.pump(16);
+    stop.followNextComet();
+    expect(onNoteSelect).toHaveBeenCalledWith(expect.objectContaining({ pageId: "rare" }));
+    stop.startScreensaver();
+    expect(document.body.classList.contains("is-universe-saver")).toBe(true);
+    frames.pump(48);
+    stop();
+    expect(document.body.classList.contains("is-universe-saver")).toBe(false);
+  });
+
+  it("flies to the nearest search hit and selects it", () => {
+    const frames = stubFrame();
+    const entries = tagged("g", V0, 6, i => (i === 2 ? "Needle" : `Hay ${i}`));
+    const onNoteSelect = vi.fn();
+    const stop = mountSolarView(stage(), buildSolarModel(entries), { search: "", onNoteSelect, storage: memory() });
+    frames.pump(16);
+    expect(stop.flyToNearestHit()).toBe(false);
+    stop.setSearch("Needle");
+    expect(stop.flyToNearestHit()).toBe(true);
+    expect(onNoteSelect).toHaveBeenCalledWith(expect.objectContaining({ pageId: "g2" }));
+    stop();
+  });
+
+  it("draws the sky, corona and bridges with filled dots only, never stroked circles", () => {
+    const recorded = installCanvas();
+    const frames = stubFrame();
+    const entries = tagged("g", V0, 10);
+    entries[0]!.connected = ["g1", "g2"];
+    entries[0]!.created_at = new Date().toISOString();
+    const stop = mountSolarView(stage(), buildSolarModel(entries), { search: "", onNoteSelect() {}, entries, storage: memory() });
+    frames.pump(16);
+    stop.setLens(true);
+    stop.setConstellations([]);
+    frames.pump(32);
+    expect(recorded.fullCircleStrokes).toHaveLength(0);
+    expect(recorded.arcs.length).toBeGreaterThan(300);
+    stop();
+  });
+});
+
