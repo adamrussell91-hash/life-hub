@@ -275,3 +275,60 @@ test('kinds-check retries an unreadable batch row once before defaulting', async
   assert.equal(c.kindGuessed, true);
   assert.equal(c.kindReason, 'Grader reply unreadable.');
 });
+
+test('onlyKind idea batches only Claude idea notes and refuses invalid onlyKind', async () => {
+  const store = memoryStore();
+  await savePlacements(store, [
+    { pageId: 'page_a', kind: 'idea', kindBy: 'claude', kindGuessed: false },
+    { pageId: 'page_b', kind: 'bridge', kindBy: 'claude', kindGuessed: false },
+    { pageId: 'page_c', kind: 'idea', kindBy: 'clementine', kindGuessed: false }
+  ], { now: NOW });
+  const { calls, fetchImpl } = fakeClaude([]);
+  const job = await startKindsJob(store, { onlyKind: 'idea' }, { apiKey: 'k', fetchImpl, now: NOW, ...pageDeps() });
+  assert.equal(job.total, 1);
+  assert.equal(job.onlyKind, 'idea');
+  assert.match(JSON.parse(calls[0].init.body).requests[0].params.messages[0].content, /Knowledge Gene/);
+  await assert.rejects(
+    () => startKindsJob(memoryStore(), { onlyKind: 'theme' }, { apiKey: 'k', fetchImpl, now: NOW, ...pageDeps() }),
+    /person, idea, case, debate, bridge/
+  );
+});
+
+test('onlyKind idea apply writes only bridge; suggestedOther and W6 skips are not applied', async () => {
+  const store = memoryStore();
+  await savePlacements(store, [
+    { pageId: 'page_a', kind: 'idea', kindBy: 'claude', kindGuessed: true, kindReason: 'old-a' },
+    { pageId: 'page_b', kind: 'idea', kindBy: 'claude', kindGuessed: false, kindReason: 'old-b' },
+    { pageId: 'page_c', kind: 'idea', kindBy: 'claude', kindGuessed: false, kindReason: 'old-c' }
+  ], { now: NOW });
+  await startKindsJob(store, { onlyKind: 'idea' }, { apiKey: 'k', fetchImpl: fakeClaude([]).fetchImpl, now: NOW, ...pageDeps() });
+
+  // W6: Adam changes page_c during the batch.
+  await savePlacements(store, [{ pageId: 'page_c', kind: 'person', kindBy: 'adam', kindGuessed: false }], { now: NOW });
+
+  const ended = fakeClaude([
+    succeeded('note_0000', { kind: 'bridge', fallback: 'idea', evidence: 'Paul Gerard Bahn is a British archaeologist', reason: 'teaching', confidence: 0.4 }),
+    succeeded('note_0001', { kind: 'debate', fallback: 'idea', evidence: 'sits against any pedagogy that begins with parts', reason: 'contested', confidence: 0.9 }),
+    succeeded('note_0002', { kind: 'bridge', fallback: 'idea', evidence: 'has not been established', reason: 'school', confidence: 0.9 })
+  ]);
+  // start ordered page_a, page_b only (page_c was idea/claude at start — all three were idea/claude; wait)
+  // page_a, page_b, page_c were all idea/claude at start so total=3. page_c changed mid-batch.
+  const done = await checkKindsJob(store, { apiKey: 'k', fetchImpl: ended.fetchImpl, now: NOW, ...pageDeps() });
+  assert.equal(done.examined, 3);
+  assert.equal(done.toBridge, 1);
+  assert.equal(done.stayedIdea, 0);
+  assert.equal(done.suggestedOther.count, 1);
+  assert.equal(done.applied, 1);
+  assert.equal(done.toBridgeByBook['The Knowledge Gene'], 1);
+
+  const { placements } = await readShelf(store);
+  const a = placements.find(p => p.pageId === 'page_a');
+  assert.equal(a.kind, 'bridge');
+  assert.equal(a.kindGuessed, true, 'D1: low-confidence bridge stays guessed');
+  const b = placements.find(p => p.pageId === 'page_b');
+  assert.equal(b.kind, 'idea', 'suggestedOther debate is not applied');
+  assert.equal(b.kindReason, 'old-b');
+  const c = placements.find(p => p.pageId === 'page_c');
+  assert.equal(c.kind, 'person', 'W6: Adam mid-batch kind kept');
+  assert.equal(c.kindBy, 'adam');
+});

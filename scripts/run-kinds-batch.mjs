@@ -29,7 +29,8 @@ async function main() {
   if (!siteID || !token) throw new Error('NETLIFY_SITE_ID and NETLIFY_BLOBS_TOKEN are required');
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is required');
 
-  const regrade = process.argv.includes('--regrade');
+  const onlyKind = arg('--only-kind');
+  const regrade = process.argv.includes('--regrade') || Boolean(onlyKind);
   const store = getStore({ name: KNOWLEDGE_SHELF_STORE, siteID, token, consistency: 'strong' });
   const manifest = JSON.parse(await readFile(path.join(dataDir, 'manifest.json'), 'utf8'));
   const bookEntries = manifest.filter(entry =>
@@ -50,7 +51,7 @@ async function main() {
   if (current.status === 'running') {
     console.log('A job is already running; checking it instead of starting another.');
   } else {
-    console.log('started:', JSON.stringify(await startKindsJob(store, { regrade }, { apiKey, listPages, getPage })));
+    console.log('started:', JSON.stringify(await startKindsJob(store, { regrade, onlyKind }, { apiKey, listPages, getPage })));
   }
 
   for (;;) {

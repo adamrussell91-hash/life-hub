@@ -27,12 +27,13 @@ Kinds:
 - idea: the page is mainly explaining a concept, term, mechanism or the book's argument
 - case: the page is mainly a specific event, study, example or story
 - debate: the page's main job is unsettled knowledge — rival accounts, a correction of a popular version, or an open question it is organised around
-- bridge: the page's main job is carrying the idea out of the book — implications for teaching, classroom practice, or learning design, or a link to another field or book
+- bridge: the page carries the idea out of the book's own subject: into teaching, learning, schools or curriculum, or into another field or book
 
 Do NOT choose debate just because the note mentions a caveat, a critic, "contested", or two views in passing while it is still mostly a profile, an explanation, or a case. Those stay person / idea / case.
-A short closing tip for teachers is not enough for bridge. But if the note's stated aim or a major section is implications for teaching, classroom practice, or learning design, prefer bridge over idea — that is the page carrying the idea out of the book.
-Clinical or in-domain professional implications that stay inside the book's own subject (for example lesion localisation tips in a neuroanatomy note) are not bridge. Bridge leaves the book toward teaching/learning design or another field.
-When the page is organised around interpretive caution, rival accounts, or an open question, choose debate — even if it also has an "implications" section.
+A note is bridge when carrying the idea out is its main job, OR when it has a substantial section that does it: a heading of its own with at least a full paragraph or three points about teaching, learning, schools, curriculum or another field. A one-line tip is not enough.
+Not bridge: practical steps that restate the book's own advice (a habits book's habit tips, a reasoning book's checklist), clinical or medical practice, and sections that only point ahead to later chapters. Those stay idea, case or person.
+For bridge, quote the evidence from that section.
+When the page is organised around rival accounts, a correction or an open question, choose debate, even if it also has an implications section.
 
 When two kinds truly both describe the main job: debate > bridge > case > person > idea.
 idea is only when nothing else fits. It is the easy default a lazy grader will reach for — do not reach for it when debate, bridge, case or person is the main job.
@@ -180,7 +181,8 @@ function publicJob(job) {
   return rest;
 }
 
-function shouldGrade(placement, { regrade }) {
+function shouldGrade(placement, { regrade, onlyKind }) {
+  if (onlyKind) return placement?.kind === onlyKind && placement?.kindBy === 'claude';
   if (placement?.kindBy === 'adam') return false;
   if (regrade) return placement?.kindBy !== 'clementine';
   return !placement?.kind;
@@ -216,7 +218,7 @@ function pageLoaders({ listPages, getPage, env, fetchImpl }) {
 }
 
 /** Starts one batch for book notes that still need a kind. Refuses while a batch is running. */
-export async function startKindsJob(store, { ids, regrade = false } = {}, {
+export async function startKindsJob(store, { ids, regrade = false, onlyKind } = {}, {
   apiKey,
   fetchImpl = fetch,
   now = new Date().toISOString(),
@@ -228,6 +230,17 @@ export async function startKindsJob(store, { ids, regrade = false } = {}, {
   const current = await getJSON(store, KINDS_JOB_KEY);
   if (current?.status === 'running') throw failure('Book-note kinds are already being graded. Check back shortly.', 409, 'job_running');
 
+  let filterKind = onlyKind;
+  if (filterKind !== undefined && filterKind !== null && filterKind !== '') {
+    if (!SHELF_KINDS.includes(filterKind)) {
+      throw failure(`onlyKind must be one of ${SHELF_KINDS.join(', ')}.`);
+    }
+  } else {
+    filterKind = undefined;
+  }
+  // onlyKind implies a targeted regrade of that kind from Claude.
+  const effectiveRegrade = Boolean(regrade) || Boolean(filterKind);
+
   const loaders = pageLoaders({ listPages, getPage, env, fetchImpl });
   const placements = (await getJSON(store, PLACEMENTS_KEY)) ?? {};
   const candidates = await loadBookNotes({
@@ -235,8 +248,12 @@ export async function startKindsJob(store, { ids, regrade = false } = {}, {
     getPage: loaders.getPage,
     idsFilter: Array.isArray(ids) ? ids.filter(id => typeof id === 'string') : null
   });
-  const notes = candidates.filter(note => shouldGrade(placements[note.id], { regrade }));
-  if (!notes.length) throw failure('Every book note already has a kind.');
+  const notes = candidates.filter(note => shouldGrade(placements[note.id], { regrade: effectiveRegrade, onlyKind: filterKind }));
+  if (!notes.length) {
+    throw failure(filterKind
+      ? `No book notes with kind ${filterKind} from Claude are left to regrade.`
+      : 'Every book note already has a kind.');
+  }
 
   const idMap = Object.fromEntries(notes.map((note, index) => [`note_${String(index).padStart(4, '0')}`, note.id]));
   const byId = new Map(notes.map(note => [note.id, note]));
@@ -254,7 +271,15 @@ export async function startKindsJob(store, { ids, regrade = false } = {}, {
   }
   if (!response.ok) throw failure(`Claude refused the kinds batch (HTTP ${response.status}).`, 502, 'anthropic_request_failed');
   const batch = await response.json();
-  const job = { status: 'running', batchId: batch.id, ids: idMap, total: notes.length, regrade: Boolean(regrade), started_at: now };
+  const job = {
+    status: 'running',
+    batchId: batch.id,
+    ids: idMap,
+    total: notes.length,
+    regrade: effectiveRegrade,
+    ...(filterKind ? { onlyKind: filterKind } : {}),
+    started_at: now
+  };
   await setJSON(store, KINDS_JOB_KEY, job);
   return publicJob(job);
 }
@@ -347,12 +372,21 @@ export async function checkKindsJob(store, {
 
   const { getPage: pageLoader } = pageLoaders({ getPage, env, fetchImpl });
   let retries = 0;
+  const onlyKind = SHELF_KINDS.includes(job.onlyKind) ? job.onlyKind : undefined;
+  const ideaOnly = onlyKind === 'idea';
   const outcome = {
     applied: 0,
     byKind: Object.fromEntries(SHELF_KINDS.map(kind => [kind, 0])),
     guessed: 0,
     downgraded: 0,
-    unreadable: 0
+    unreadable: 0,
+    ...(ideaOnly ? {
+      examined: 0,
+      toBridge: 0,
+      stayedIdea: 0,
+      suggestedOther: { count: 0, titles: [] },
+      toBridgeByBook: {}
+    } : {})
   };
 
   for (const raw of text.split('\n')) {
@@ -384,6 +418,33 @@ export async function checkKindsJob(store, {
     else {
       if (grade.downgraded) outcome.downgraded += 1;
       if (grade.kindGuessed) outcome.guessed += 1;
+    }
+
+    if (ideaOnly) {
+      outcome.examined += 1;
+      const placements = (await getJSON(store, PLACEMENTS_KEY)) ?? {};
+      const current = placements[pageId];
+      // W6: skip if Adam/Clementine changed it, or it's no longer a Claude idea.
+      if (!current || current.kind !== 'idea' || current.kindBy !== 'claude') continue;
+      if (grade.kind === 'bridge') {
+        const saved = await applyKindPatch(store, pageId, grade, now, { regrade: true });
+        if (saved) {
+          outcome.applied += 1;
+          outcome.toBridge += 1;
+          outcome.byKind.bridge = (outcome.byKind.bridge ?? 0) + 1;
+          const book = note?.bookLabel || 'Unknown';
+          outcome.toBridgeByBook[book] = (outcome.toBridgeByBook[book] ?? 0) + 1;
+        }
+        continue;
+      }
+      if (grade.kind === 'idea' || grade.unreadable) {
+        outcome.stayedIdea += 1;
+        continue;
+      }
+      outcome.suggestedOther.count += 1;
+      const title = note?.title || page?.title || pageId;
+      if (outcome.suggestedOther.titles.length < 50) outcome.suggestedOther.titles.push(title);
+      continue;
     }
 
     const saved = await applyKindPatch(store, pageId, grade, now, { regrade: Boolean(job.regrade) });
