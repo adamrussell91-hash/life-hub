@@ -94,12 +94,12 @@ const CASES = [
   {
     slug: 'chadwick',
     broad: 'How has my training been going lately?',
-    expectTools: ['get_fitness_snapshot', 'compare_workout_windows']
+    expectTools: ['get_fitness_snapshot', 'compare_workout_windows', 'analyse_training_evidence']
   },
   {
     slug: 'brisket',
     broad: "How's my nutrition looking this week?",
-    expectTools: ['get_nutrition_snapshot', 'get_nutrition_adherence']
+    expectTools: ['get_nutrition_snapshot', 'get_nutrition_adherence', 'get_nutrition_day_remaining', 'analyse_nutrition_evidence']
   },
   {
     slug: 'sara',
@@ -109,37 +109,37 @@ const CASES = [
   {
     slug: 'penelope',
     broad: 'Have I been feeling anxious often?',
-    expectTools: ['search_diary_records']
+    expectTools: ['search_diary_records', 'analyse_diary_evidence']
   },
   {
     slug: 'vera',
     broad: 'What patterns do you notice across our recent sessions?',
-    expectTools: ['search_mind_records', 'compare_mind_sessions']
+    expectTools: ['search_mind_records', 'compare_mind_sessions', 'analyse_mind_evidence']
   },
   {
     slug: 'hyaluronica',
     broad: 'Is my routine actually helping?',
-    expectTools: ['get_skincare_adherence', 'get_skincare_response_evidence']
+    expectTools: ['get_skincare_adherence', 'get_skincare_response_evidence', 'analyse_skincare_evidence']
   },
   {
     slug: 'clare',
     broad: 'What should I focus on today?',
-    expectTools: ['get_tasks_focus']
+    expectTools: ['get_tasks_focus', 'get_tasks_open_loops']
   },
   {
     slug: 'ann',
     broad: "Help me improve tomorrow's Year 10 lesson",
-    expectTools: ['search_teaching', 'get_teaching_context']
+    expectTools: ['search_teaching', 'get_teaching_context', 'get_teaching_diagnosis']
   },
   {
     slug: 'clementine',
     broad: 'What do I already know about cognitive load?',
-    expectTools: ['search_knowledge']
+    expectTools: ['search_knowledge', 'get_knowledge_synthesis']
   },
   {
     slug: 'hammond',
     broad: 'What is slipping across my life?',
-    expectTools: ['inspect_hub_signals', 'get_week_review']
+    expectTools: ['inspect_hub_signals', 'get_hammond_attention_pack']
   }
 ];
 

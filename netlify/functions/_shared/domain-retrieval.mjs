@@ -1073,7 +1073,19 @@ export function domainRetrievalSchemasFor(slug) {
       }
     ],
     vera: [
-      // mind tools already attached; keep empty here
+      {
+        name: 'search_diary_records',
+        description:
+          'Read-only diary search for mood/day context. Logging diary stays Penelope. Use when a session question needs Adam\'s own journal as background, not as a diagnosis.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' },
+            limit: { type: 'number' }
+          },
+          required: ['query']
+        }
+      }
     ],
     hyaluronica: [
       {
@@ -1138,6 +1150,19 @@ export function domainRetrievalSchemasFor(slug) {
         name: 'search_knowledge',
         description:
           'Search the Knowledge Hub archive (titles, tags, excerpts, connected). These are Knowledge Hub pages — not Notion. Call before answering what Adam already has on a topic. Distinguish retrieved notes from new synthesis.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' },
+            limit: { type: 'number' }
+          },
+          required: ['query']
+        }
+      },
+      {
+        name: 'search_teaching',
+        description:
+          'Search Teaching classes, lessons, and units when a Knowledge question has a classroom bridge. Archive notes still come from search_knowledge.',
         input_schema: {
           type: 'object',
           properties: {

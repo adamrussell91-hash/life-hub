@@ -24,6 +24,7 @@ import {
   statedTeachingConstraints,
   getTeachingContext
 } from './domain-retrieval.mjs';
+import { analyseMedicalEvidence } from './medical-overview-read.mjs';
 import { searchMindRecords } from './mind-session-read.mjs';
 import { topicQuery, researchFromDocs, coverageFromResearch } from './knowledge-research.mjs';
 import { rankKnowledgePages } from './knowledge-data.mjs';
@@ -1369,4 +1370,193 @@ export function getHammondAttentionPack({
     how_to_read:
       'Cross-hub attention pack. Name unavailable hubs. Delegate to specialists with observable handoffs; do not invent their domain rows.'
   };
+}
+
+function readTool(name, description, properties = {}, required = []) {
+  return {
+    name,
+    description,
+    input_schema: {
+      type: 'object',
+      properties,
+      ...(required.length ? { required } : {})
+    }
+  };
+}
+
+/**
+ * Analysis / remaining-day tools the kernel already runs server-side.
+ * Attaching them here is what lets the model call the same skills on a
+ * live chat turn when the evidence pack did not already fire.
+ */
+export function specialistReadSchemasFor(slug) {
+  const bySlug = {
+    brisket: [
+      readTool(
+        'get_nutrition_day_remaining',
+        'Deterministic remaining macros for today (targets minus logged intake). Not a forecast. Use when Adam asks what is left in the day.'
+      ),
+      readTool(
+        'compare_nutrition_periods',
+        'Compare this week vs previous week vs month from logged meals only. Unlogged days are missing evidence, not zero intake.'
+      ),
+      readTool(
+        'analyse_nutrition_evidence',
+        'Interpret snapshot, adherence, remaining day, and logging coverage. Names missing days and does not invent intake.',
+        { query: { type: 'string' } }
+      )
+    ],
+    sara: [
+      readTool(
+        'analyse_medical_evidence',
+        'Interpret Medical Overview + body records with temporal discipline: recent dated visits stay historical unless Adam stated a current symptom. Never promote recency into a current diagnosis.',
+        { query: { type: 'string' } }
+      )
+    ],
+    penelope: [
+      readTool(
+        'compare_diary_periods',
+        'Compare recent diary window vs prior window (counts, moods). Sparse windows stay named — do not invent a pattern.'
+      ),
+      readTool(
+        'extract_diary_themes',
+        'Extract recurring diary themes for a query. Unresolved referents return unresolved, not a guessed mood.',
+        { query: { type: 'string' }, limit: { type: 'number' } }
+      ),
+      readTool(
+        'analyse_diary_evidence',
+        'Interpret diary search + period compare + themes. Do not treat derived themes as current state.',
+        { query: { type: 'string' } }
+      )
+    ],
+    vera: [
+      readTool(
+        'compare_mind_sessions',
+        'Compare recent vs prior mind_session records (themes, dates). Sparse coverage stays named. Do not diagnose.'
+      ),
+      readTool(
+        'analyse_mind_evidence',
+        'Interpret session search + multi-session compare. Ground every claimed pattern in retrieved sessions.',
+        { query: { type: 'string' } }
+      )
+    ],
+    hyaluronica: [
+      readTool(
+        'get_skincare_response_evidence',
+        'Recent treatment/routine logs plus response notes for "is this helping?". Not a clinical diagnosis.'
+      ),
+      readTool(
+        'analyse_skincare_evidence',
+        'Interpret adherence vs response evidence. Missing logs stay missing, not proof the routine failed.',
+        { query: { type: 'string' } }
+      )
+    ],
+    clare: [
+      readTool(
+        'get_tasks_open_loops',
+        'Open tasks plus stall candidates, stress patterns, and capacity headlines. Use with get_tasks_focus before naming today\'s move.'
+      )
+    ],
+    ann: [
+      readTool(
+        'get_teaching_diagnosis',
+        'Diagnose the matched class/unit/upcoming lesson: gaps, next-in-unit, stated time constraints. Call after get_teaching_context. Do not invent lesson IDs.'
+      )
+    ],
+    clementine: [
+      readTool(
+        'get_knowledge_synthesis',
+        'Synthesise only from ranked Knowledge Hub notes for a query (claims, conflicts, coverage, gaps). Distinguish retrieved notes from new synthesis.',
+        { query: { type: 'string' }, limit: { type: 'number' } },
+        ['query']
+      )
+    ],
+    hammond: [
+      readTool(
+        'get_hammond_attention_pack',
+        'Cross-hub attention: open loops, upcoming teaching, loaded Life signals, named unavailable hubs. Required before claiming what is slipping.'
+      )
+    ]
+  };
+  return bySlug[slug] ?? [];
+}
+
+export function executeSpecialistRead(name, ctx = {}) {
+  const today = ctx.today;
+  const message = ctx.message ?? ctx.input?.query ?? '';
+  const query = ctx.input?.query ?? message;
+  const limit = ctx.input?.limit;
+  const now = ctx.now instanceof Date ? ctx.now : new Date(ctx.now || Date.now());
+  const meals = ctx.nutritionRecords ?? [];
+  const nutritionChallenges = ctx.nutritionChallenges ?? null;
+
+  if (name === 'get_nutrition_day_remaining') {
+    return getNutritionDayRemaining(meals, today, { nutritionChallenges });
+  }
+  if (name === 'compare_nutrition_periods') return compareNutritionPeriods(meals, today);
+  if (name === 'analyse_nutrition_evidence') {
+    return analyseNutritionEvidence(meals, today, { nutritionChallenges, message: query });
+  }
+  if (name === 'analyse_medical_evidence') {
+    return analyseMedicalEvidence(ctx.medicalEvents ?? [], {
+      today,
+      message: query,
+      compositionRecords: ctx.compositionRecords ?? [],
+      measurementRecords: ctx.measurementRecords ?? []
+    });
+  }
+  if (name === 'compare_diary_periods') return compareDiaryPeriods(ctx.mindEvents ?? [], today);
+  if (name === 'extract_diary_themes') {
+    return extractDiaryThemes(ctx.mindEvents ?? [], { query, limit });
+  }
+  if (name === 'analyse_diary_evidence') {
+    return analyseDiaryEvidence(ctx.mindEvents ?? [], today, { query, message: query });
+  }
+  if (name === 'compare_mind_sessions') return compareMindSessions(ctx.mindEvents ?? [], today);
+  if (name === 'analyse_mind_evidence') {
+    return analyseMindEvidence(ctx.mindEvents ?? [], today, { query, message: query });
+  }
+  if (name === 'get_skincare_response_evidence') {
+    return getSkincareResponseEvidence(ctx.skincareHistoryRecords ?? [], today);
+  }
+  if (name === 'analyse_skincare_evidence') {
+    return analyseSkincareEvidence(ctx.skincareHistoryRecords ?? [], today, { message: query });
+  }
+  if (name === 'get_tasks_open_loops') {
+    return getTasksOpenLoops(ctx.hubTasks ?? [], ctx.hubProjects ?? [], {
+      now,
+      stressFlags: ctx.stressFlags ?? [],
+      inbox: ctx.inbox ?? []
+    });
+  }
+  if (name === 'get_teaching_diagnosis') {
+    return getTeachingDiagnosis({
+      classes: ctx.hubClasses ?? [],
+      lessons: ctx.hubLessons ?? [],
+      units: ctx.hubUnits ?? [],
+      query,
+      now,
+      message: query
+    });
+  }
+  if (name === 'get_knowledge_synthesis') {
+    return getKnowledgeSynthesis(ctx.knowledgePages ?? [], { query, limit: limit ?? 10 });
+  }
+  if (name === 'get_hammond_attention_pack') {
+    return getHammondAttentionPack({
+      tasks: ctx.hubTasks ?? [],
+      projects: ctx.hubProjects ?? [],
+      classes: ctx.hubClasses ?? [],
+      lessons: ctx.hubLessons ?? [],
+      mindEvents: ctx.mindEvents ?? [],
+      workouts: ctx.workoutRecords ?? [],
+      meals,
+      loadErrors: ctx.hubLoadErrors ?? {},
+      stressFlags: ctx.stressFlags ?? [],
+      inbox: ctx.inbox ?? [],
+      today,
+      now
+    });
+  }
+  return null;
 }

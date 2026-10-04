@@ -71,6 +71,7 @@ import {
   selectNutritionEntries,
   selectSkincareHistoryEntries
 } from './_shared/domain-retrieval.mjs';
+import { executeSpecialistRead } from './_shared/domain-analysis.mjs';
 import { listKnowledgePages } from './_shared/knowledge-data.mjs';
 import {
   buildUserContent,
@@ -111,9 +112,6 @@ import {
   emptyNutritionChallenges,
   parseNutritionChallenges,
   serializeNutritionChallenges,
-  upsertNutritionChallengeSchema,
-  markNutritionChallengeDaySchema,
-  listNutritionChallengesSchema,
   validateUpsertNutritionChallengeInput,
   validateMarkNutritionChallengeDayInput,
   upsertNutritionChallenge,
@@ -1533,13 +1531,6 @@ export function createChatHandler({
             attachments: parsed.attachments,
             keepFullDomainTools: visualCtx.keepFullDomainTools
           }),
-          ...(needsNutritionChallenges
-            ? [
-                listNutritionChallengesSchema(),
-                upsertNutritionChallengeSchema(),
-                markNutritionChallengeDaySchema()
-              ]
-            : []),
           ...buildPromotedShortcutToolSchemas(promotedShortcutDrafts),
           ...(needsVisualEvidenceTool ? [recordVisualEvidenceToolSchema()] : [])
         ];
@@ -2406,6 +2397,33 @@ export function createChatHandler({
                   hammondDigest,
                   now: nowInstant
                 }));
+              }
+              {
+                const specialist = executeSpecialistRead(event.name, {
+                  today,
+                  now: nowInstant,
+                  message: parsed.message,
+                  input: event.input ?? {},
+                  nutritionRecords,
+                  nutritionChallenges,
+                  medicalEvents,
+                  compositionRecords,
+                  measurementRecords,
+                  mindEvents,
+                  skincareHistoryRecords,
+                  hubTasks,
+                  hubProjects,
+                  hubClasses,
+                  hubLessons,
+                  hubUnits,
+                  knowledgePages,
+                  workoutRecords,
+                  hubLoadErrors
+                });
+                if (specialist != null) {
+                  send({ type: 'status', text: 'Reading domain evidence…' });
+                  return JSON.stringify(specialist);
+                }
               }
               if (event.name === 'get_week_review') {
                 send({ type: 'status', text: 'Reading the week…' });

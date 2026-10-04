@@ -139,8 +139,7 @@
     "remember.write-memory": {
       "file": "remember/write-memory.json",
       "agents": [
-        "chadwick",
-        "clare"
+        "*"
       ],
       "risk": "auto",
       "surfaces": [

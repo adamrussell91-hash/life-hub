@@ -10,11 +10,10 @@ import assert from 'node:assert/strict';
 import { activationForTurn } from '../../netlify/functions/_shared/capabilities/activation-policy.mjs';
 import { buildAgentTools, resetCapabilityCaches } from '../../netlify/functions/_shared/capabilities/registry.mjs';
 import {
-  getFitnessSnapshot,
-  getLoadStatus,
-  getPainTrainingSummary,
-  getBodyState
+  getBodyState,
+  executeFitnessReadTool
 } from '../../netlify/functions/_shared/fitness-tools.mjs';
+import { executeSpecialistRead } from '../../netlify/functions/_shared/domain-analysis.mjs';
 import { compareWorkoutWindows } from '../../netlify/functions/_shared/workout-history.mjs';
 import {
   getNutritionSnapshot,
@@ -54,6 +53,11 @@ function assertComposedAnswer(evidence, { must = [], limitations = [], complete 
 }
 
 const TODAY = '2026-08-20';
+const NOW = new Date('2026-08-20T01:00:00Z');
+
+function specialist(tool, extra = {}) {
+  return executeSpecialistRead(tool, { today: TODAY, now: NOW, ...extra });
+}
 
 const WORKOUTS = [
   {
@@ -145,9 +149,9 @@ test('scenario 1: Chadwick training overview retrieves snapshot + compare', () =
       message: 'How has my training been going lately?'
     }),
     executeRequired: (tool) => {
-      if (tool === 'get_fitness_snapshot') return getFitnessSnapshot(WORKOUTS, TODAY);
       if (tool === 'compare_workout_windows') return compareWorkoutWindows(WORKOUTS, TODAY);
-      return null;
+      return executeFitnessReadTool(tool, { workouts: WORKOUTS, today: TODAY })
+        ?? specialist(tool, { workoutRecords: WORKOUTS });
     }
   });
   assert.equal(evidence.get_fitness_snapshot.ok, true);
@@ -176,9 +180,6 @@ test('scenario 2: Chadwick decline checks load, pain, snapshot, body', () => {
       message: 'Why is my performance declining?'
     }),
     executeRequired: (tool) => {
-      if (tool === 'get_load_status') return getLoadStatus(WORKOUTS, TODAY);
-      if (tool === 'get_pain_training_summary') return getPainTrainingSummary(WORKOUTS, TODAY);
-      if (tool === 'get_fitness_snapshot') return getFitnessSnapshot(WORKOUTS, TODAY);
       if (tool === 'get_body_state') {
         return getBodyState({
           compositionRecords: [{ date: TODAY, weight_kg: 84, body_fat_pct: 18 }],
@@ -186,7 +187,8 @@ test('scenario 2: Chadwick decline checks load, pain, snapshot, body', () => {
           targetRatio: 1.6
         });
       }
-      return null;
+      return executeFitnessReadTool(tool, { workouts: WORKOUTS, today: TODAY })
+        ?? specialist(tool, { workoutRecords: WORKOUTS });
     }
   });
   assert.equal(evidence.get_load_status.ok, true);
@@ -216,9 +218,9 @@ test('scenario 3: Clare focus today retrieves tasks focus', () => {
     buildTools: () => buildAgentTools({ slug: 'clare', message: 'What should I focus on today?' }),
     executeRequired: (tool) => {
       if (tool === 'get_tasks_focus') {
-        return getTasksFocus(tasks, [], { now: new Date('2026-08-20T01:00:00Z') });
+        return getTasksFocus(tasks, [], { now: NOW });
       }
-      return null;
+      return specialist(tool, { hubTasks: tasks });
     }
   });
   assert.equal(evidence.get_tasks_focus.open_count, 2);
@@ -241,19 +243,28 @@ test('scenario 4: Ann improve lesson retrieves teaching context', () => {
       message: "Help me improve tomorrow's Year 10 lesson."
     }),
     executeRequired: (tool) => {
+      const classes = [{ id: 'c1', code: '10ENG', display_name: 'Year 10 English', status: 'active' }];
+      const lessons = [{ id: 'l1', date: '2026-08-21', title: 'Essay structure', class_id: 'c1', unit_id: 'u1' }];
+      const units = [{ id: 'u1', title: 'Module A' }];
       if (tool === 'search_teaching') {
         return { ok: true, count: 1, results: [{ type: 'class', id: 'c1', title: '10ENG' }] };
       }
       if (tool === 'get_teaching_context') {
         return getTeachingContext({
-          classes: [{ id: 'c1', code: '10ENG', display_name: 'Year 10 English', status: 'active' }],
-          lessons: [{ id: 'l1', date: '2026-08-21', title: 'Essay structure', class_id: 'c1', unit_id: 'u1' }],
-          units: [{ id: 'u1', title: 'Module A' }],
+          classes,
+          lessons,
+          units,
           query: 'year 10',
-          now: new Date('2026-08-20T01:00:00Z')
+          now: NOW
         });
       }
-      return null;
+      return specialist(tool, {
+        hubClasses: classes,
+        hubLessons: lessons,
+        hubUnits: units,
+        message: "Help me improve tomorrow's Year 10 lesson.",
+        input: { query: 'year 10' }
+      });
     }
   });
   assert.equal(evidence.get_teaching_context.lesson.id, 'l1');
@@ -280,7 +291,11 @@ test('scenario 5: Clementine knowledge lookup searches corpus', () => {
     }),
     executeRequired: (tool) => {
       if (tool === 'search_knowledge') return searchKnowledge(pages, { query: 'cognitive load' });
-      return null;
+      return specialist(tool, {
+        knowledgePages: pages,
+        input: { query: 'cognitive load' },
+        message: 'What do I already have about cognitive load?'
+      });
     }
   });
   assert.equal(evidence.search_knowledge.count, 1);
@@ -324,7 +339,14 @@ test('scenario 6: Sara weight question retrieves body trend', () => {
           ]
         });
       }
-      return null;
+      return specialist(tool, {
+        compositionRecords: [
+          { date: '2026-08-20', weight_kg: 84.2, body_fat_pct: 18 },
+          { date: '2026-08-01', weight_kg: 83.8, body_fat_pct: 18.2 }
+        ],
+        medicalEvents: [],
+        message: 'Is my weight change unusual?'
+      });
     }
   });
   assert.equal(evidence.get_weight_trend.found, true);
@@ -356,7 +378,11 @@ test('scenario 7: Penelope pattern question searches diary', () => {
       if (tool === 'search_diary_records') {
         return searchDiaryRecords(events, { query: 'flat tired' });
       }
-      return null;
+      return specialist(tool, {
+        mindEvents: events,
+        message: 'Have I been feeling like this often?',
+        input: { query: 'flat tired' }
+      });
     }
   });
   assert.ok(evidence.search_diary_records.count >= 1);
@@ -383,7 +409,11 @@ test('scenario 8: Vera pattern question searches mind records', () => {
       if (tool === 'search_mind_records') {
         return searchMindRecords(events, { query: 'avoidance' });
       }
-      return null;
+      return specialist(tool, {
+        mindEvents: events,
+        message: 'What pattern have you noticed across our recent sessions?',
+        input: { query: 'avoidance' }
+      });
     }
   });
   assert.ok(evidence.search_mind_records.count >= 2);
@@ -413,7 +443,10 @@ test('scenario 9: Hyaluronica routine question retrieves adherence', () => {
       if (tool === 'search_skincare_records') {
         return { ok: true, count: 1, results: [{ date: TODAY, notes: 'barrier calm' }] };
       }
-      return null;
+      return specialist(tool, {
+        skincareHistoryRecords: records,
+        message: 'Is this routine helping?'
+      });
     }
   });
   assert.equal(evidence.get_skincare_adherence.ok, true);
@@ -433,17 +466,23 @@ test('scenario 10: Hammond life slipping inspects hubs', () => {
       message: 'What is slipping across my life right now?'
     }),
     executeRequired: (tool) => {
+      const tasks = [{ id: '1', title: 'Overdue report', status: 'open', due_date: '2026-08-01' }];
+      const loadErrors = { classes: 'load_failed' };
       if (tool === 'inspect_hub_signals') {
         return inspectHubSignals({
-          tasks: [{ id: '1', title: 'Overdue report', status: 'open', due_date: '2026-08-01' }],
+          tasks,
           classes: [],
           scheduledLessons: [],
-          loadErrors: { classes: 'load_failed' },
+          loadErrors,
           hammondDigest: 'fitness streak 2',
-          now: new Date('2026-08-20T01:00:00Z')
+          now: NOW
         });
       }
-      return null;
+      return specialist(tool, {
+        hubTasks: tasks,
+        hubLoadErrors: loadErrors,
+        message: 'What is slipping across my life right now?'
+      });
     }
   });
   assert.ok(evidence.inspect_hub_signals.unavailable.some(u => u.hub === 'classes'));
@@ -535,7 +574,10 @@ test('scenario nutrition overview for Brisket', () => {
     executeRequired: (tool) => {
       if (tool === 'get_nutrition_snapshot') return getNutritionSnapshot(meals, TODAY);
       if (tool === 'get_nutrition_adherence') return getNutritionAdherence(meals, TODAY);
-      return null;
+      return specialist(tool, {
+        nutritionRecords: meals,
+        message: 'How is my nutrition going this week?'
+      });
     }
   });
   assert.equal(evidence.get_nutrition_snapshot.ok, true);

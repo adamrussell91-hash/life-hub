@@ -34,6 +34,7 @@ test('activation: Chadwick training overview requires fitness retrieval tools', 
   assert.equal(act.intentClass, 'training_overview');
   assert.ok(act.requiredTools.includes('get_fitness_snapshot'));
   assert.ok(act.requiredTools.includes('compare_workout_windows'));
+  assert.ok(act.requiredTools.includes('analyse_training_evidence'));
   assert.equal(act.forceToolChoice, true);
   assert.match(act.activationBlock, /MUST call these retrieval tools/i);
   assert.match(act.catalogueBlock, /get_fitness_snapshot/);
@@ -56,7 +57,7 @@ test('activation: Clare focus today requires tasks focus', () => {
     message: 'What should I focus on today?'
   });
   assert.equal(act.intentClass, 'focus_today');
-  assert.deepEqual(act.requiredTools, ['get_tasks_focus']);
+  assert.deepEqual(act.requiredTools, ['get_tasks_focus', 'get_tasks_open_loops']);
 });
 
 test('activation: irrelevant small talk does not force tools', () => {
@@ -280,10 +281,12 @@ test('buildAgentTools attaches domain retrieval for parity agents', () => {
 
   const ann = buildAgentTools({ slug: 'ann' }).map(t => t.name);
   assert.ok(ann.includes('search_teaching'));
-  assert.ok(ann.includes('get_teaching_context'));
+  assert.ok(ann.includes('get_teaching_diagnosis'));
 
   const clementine = buildAgentTools({ slug: 'clementine' }).map(t => t.name);
   assert.ok(clementine.includes('search_knowledge'));
+  assert.ok(clementine.includes('get_knowledge_synthesis'));
+  assert.ok(clementine.includes('search_teaching'));
 
   const brisket = buildAgentTools({
     slug: 'brisket',
@@ -355,10 +358,10 @@ test('classifyIntent weekly_planning requires get_week_review', () => {
 test('classifyIntent history_search maps per agent', () => {
   assert.deepEqual(
     classifyIntent('clementine', 'Have I mentioned cognitive load before?').requiredTools,
-    ['search_knowledge']
+    ['search_knowledge', 'get_knowledge_synthesis']
   );
   assert.deepEqual(
     classifyIntent('penelope', 'Have I mentioned this feeling before?').requiredTools,
-    ['search_diary_records']
+    ['search_diary_records', 'analyse_diary_evidence']
   );
 });
