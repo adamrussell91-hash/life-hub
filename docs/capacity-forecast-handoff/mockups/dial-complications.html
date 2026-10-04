@@ -103,6 +103,10 @@ svg { display: block; width: 100%; height: 100%; }
 .wcard i { font-style: normal; color: var(--muted); line-height: 1.15; }
 .back { font-size: 0.75rem; border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 0.3rem 0.8rem; cursor: pointer; }
 .note { font-size: 0.8125rem; color: var(--muted); margin: 0; }
+.plaque { margin: 0 auto; padding: 0.35rem 0.9rem; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; }
+[hidden] { display: none !important; }
+.demo { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; }
+.pill { min-height: 2.5rem; padding: 0.45rem 1rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--navy); font-weight: 600; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .flip { transition: none; } .spin { animation: none !important; } }
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { transform-box: fill-box; transform-origin: center; animation: spin 6s linear infinite; }
@@ -112,7 +116,7 @@ svg { display: block; width: 100%; height: 100%; }
   <header>
     <p class="kicker">Life Hub · Day Dial · mockup</p>
     <h1>The dial grows complications</h1>
-    <p class="lede">Your green dial stays exactly as it is. These faces add what a watch would: a dive bezel for medication, a GMT hand for Seoul and Corey, a moon for the term, and the day's weather in the quiet band. Swipe or use the arrows to change face; tap the centre to flip to the caseback.</p>
+    <p class="lede">Your green dial stays exactly as it is. These faces add what a watch would: a dive bezel for medication, a GMT hand for Seoul and Corey, a moon for the term, a retrograde tally, and the day's weather on the Tool watch. Swipe or use the arrows to change face; tap the centre to flip to the caseback.</p>
   </header>
 
   <section class="stage" aria-label="Watch faces">
@@ -132,6 +136,11 @@ svg { display: block; width: 100%; height: 100%; }
           </div>
           <div class="side side--back" id="caseback" aria-hidden="true"></div>
         </div>
+      </div>
+      <p class="plaque" id="plaque" hidden></p>
+      <div class="demo" id="demo" hidden>
+        <button class="pill" id="close-task" type="button">Close a task</button>
+        <button class="pill" id="midnight" type="button">Jump to midnight</button>
       </div>
       <div class="dots" id="dots" role="tablist" aria-label="Faces"></div>
       <p class="hint" id="hint">Example data · Monday 5 October · T4 W1</p>
@@ -153,10 +162,12 @@ svg { display: block; width: 100%; height: 100%; }
 <script>
 (() => {
   const NS = 'http://www.w3.org/2000/svg';
-  const C = 200, R = 150;
-  const ring = { log: 0.95, eventOuter: 0.88, eventInner: 0.7, ctxOuter: 0.66, ctxInner: 0.575, gauge: 0.43 };
+  const C = 200, R = 146;
+  const ring = { eventOuter: 0.88, eventInner: 0.7, ctxOuter: 0.66, ctxInner: 0.575, gauge: 0.43 };
+  const BEZEL = [R + 4, R + 19];
   const ang = h => ((((h % 24) + 24) % 24 - 12) / 24) * 2 * Math.PI;
   const pt = (r, h) => [C + r * Math.sin(ang(h)), C - r * Math.cos(ang(h))];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function arc(r1, r2, h1, h2) {
     const span = ((h2 - h1) % 24 + 24) % 24 || 24;
     const large = span > 12 ? 1 : 0;
@@ -180,7 +191,7 @@ svg { display: block; width: 100%; height: 100%; }
       const now = items.filter(i => demandOf(i) && i.start < h + 0.5 && i.end > h);
       const starts = items.filter(i => demandOf(i) && i.start >= h - 1 && i.start < h + 1).length;
       const tr = Math.max(0, starts - 1);
-      let rate = 0.008 + now.reduce((s, i) => s + DEMAND[demandOf(i)], 0) + (now.length > 1 ? 0.015 : 0) + Math.max(0, tr - 1) * 0.01;
+      const rate = 0.008 + now.reduce((s, i) => s + DEMAND[demandOf(i)], 0) + (now.length > 1 ? 0.015 : 0) + Math.max(0, tr - 1) * 0.01;
       free = now.length ? 0 : free + 0.5;
       const to = ceil * 0.9, rec = !now.length && free >= 0.5 && level < to ? (to - level) * 0.15 : 0;
       if (h > wake) level = level * (1 - rate * 0.5) + rec * 0.5;
@@ -189,7 +200,7 @@ svg { display: block; width: 100%; height: 100%; }
     }
     return pts;
   }
-  const NAMES = { 1: 'Clear skies', 3: 'Morning sunshine', 4: 'Afternoon sunshine', 5: 'Sunny intervals', 8: 'Gentle breeze', 9: 'Building breeze', 10: 'Gusty', 11: 'Strong headwind', 13: 'High cloud', 14: 'Increasing cloud', 15: 'Overcast', 16: 'Heavy cloud', 29: 'Cloud breaking', 30: 'Calm evening' };
+  const NAMES = { 1: 'Clear skies', 3: 'Morning sunshine', 4: 'Afternoon sunshine', 8: 'Gentle breeze', 9: 'Building breeze', 10: 'Gusty', 11: 'Strong headwind', 13: 'High cloud', 14: 'Increasing cloud', 15: 'Overcast', 16: 'Heavy cloud', 29: 'Cloud breaking', 30: 'Calm evening' };
   const FAMILY = id => [1,2,3,4,5,6].includes(id) ? 'sun' : [7,8,9].includes(id) ? 'breeze' : [10,11,12].includes(id) ? 'gust' : [13,14,15,16,17].includes(id) ? 'cloud' : [29,30].includes(id) ? 'clearing' : 'breeze';
   function weather(pts, i) {
     const p = pts[i], ahead = pts[Math.min(pts.length - 1, i + 4)], trend = ahead.pct - p.pct;
@@ -212,73 +223,161 @@ svg { display: block; width: 100%; height: 100%; }
     { start: 16.5, end: 18, kind: 'task', depth: 'deep', title: 'HSC feedback' },
     { start: 19.5, end: 21.5, kind: 'corey' }
   ];
-  const DAY = { readiness: 74, low: 64, high: 84, note: 'short sleep', why: 'Your check-in said better but still tired. Three classes before lunch and back-to-back meetings at 3 pm will cost the most.' };
+  const DAY = { readiness: 74, note: 'short sleep', why: 'Your check-in said better but still tired. Three classes before lunch and back-to-back meetings at 3 pm will cost the most.' };
   const PTS = project(DAY.readiness, ITEMS);
+  const TASKS_TOTAL = 6;
+  let tasksClosed = 3;
 
   const FACES = [
-    { id: 'tool', title: 'Tool watch', sub: 'School day', when: 'Auto on school days, 6 am to 4 pm', now: 13.25,
-      comps: ['weather', 'bezel', 'eot', 'moon', 'tourbillon'] },
-    { id: 'focus', title: 'Focus', sub: 'Deep work · HSC feedback', when: 'Auto during a deep-work block you started', now: 17.1, dim: true,
-      comps: ['weather', 'retro', 'eot'] },
-    { id: 'pilot', title: 'Pilot GMT', sub: 'Travelling · Seoul', when: 'Auto when a trip is on (KL, Seoul)', now: 15.5, gmt: true,
-      comps: ['weather', 'gmt', 'corey', 'bezel'] },
-    { id: 'dress', title: 'Dress watch', sub: 'Weekend', when: 'Auto on weekends and holidays', now: 11, quiet: true,
-      comps: ['weather'] },
-    { id: 'grand', title: 'Grand complication', sub: 'Wedding day', when: 'Auto on the wedding day only', now: 14.5, gold: true,
-      comps: ['weather', 'bezel', 'eot', 'moon', 'tourbillon', 'gmt', 'countdown'] }
+    { id: 'tool', title: 'Tool watch', sub: 'School day', when: 'Auto on school days, 6 am to 4 pm', now: 13.25, comps: ['weather', 'bezel', 'moon'] },
+    { id: 'focus', title: 'Focus', sub: 'Deep work · HSC feedback', when: 'Auto during a deep-work block you started', now: 17.1, dim: true, comps: ['retro', 'bezel'] },
+    { id: 'pilot', title: 'Pilot GMT', sub: 'Travelling · Seoul', when: 'Auto when a trip is on (KL, Seoul)', now: 15.5, gmt: true, comps: ['gmt', 'corey', 'bezel'] },
+    { id: 'dress', title: 'Dress watch', sub: 'Weekend', when: 'Auto on weekends and holidays', now: 11, dress: true, comps: [] },
+    { id: 'grand', title: 'Grand complication', sub: 'Wedding day', when: 'Auto on the wedding day only', now: 14.5, gold: true, comps: ['bezel', 'moon', 'tourbillon', 'gmt', 'countdown'] }
   ];
 
   const COMPS = {
-    weather: { name: 'Weather ring', watch: 'the quiet band', text: 'Hour-by-hour readiness, coloured by condition. Solid behind the hand, softer ahead.', status: ['ready', 'Model built'] },
-    bezel: { name: 'Dive bezel', watch: 'dive watch', text: 'Starts at the logged dose and fills across its usual window, warming as it wears off. Visual only: it never changes the forecast unless your check-ins show a pattern.', status: ['ready', 'Data ready'] },
-    eot: { name: 'Equation of time', watch: 'astronomical', text: 'How far the day has drifted from its plan. "+25 min behind the HSC block."', status: ['model', 'Needs plan-vs-actual feed'] },
-    moon: { name: 'Moon phase', watch: 'moonphase', text: 'Where the term is. New moon in quiet weeks, full moon when it is all happening at once.', status: ['ready', 'Data ready'] },
-    tourbillon: { name: 'Tourbillon', watch: 'haute horlogerie', text: 'Spins only while Clare or Hammond is reworking your day.', status: ['data', 'Needs agent status'] },
-    retro: { name: 'Retrograde tally', watch: 'retrograde', text: 'Sweeps as you close tasks, snaps back at midnight.', status: ['ready', 'Data ready'] },
+    weather: { name: 'Weather ring', watch: 'the quiet band', text: 'Hour-by-hour readiness, coloured by condition. Solid behind the hand, softer ahead. Tool watch only.', status: ['ready', 'Model built'] },
+    bezel: { name: 'Dive bezel', watch: 'dive watch', text: 'The outer ring. The blue pip is when you logged the dose; the band is its usual window, solid for time gone, and it turns orange for the last 45 minutes. Visual only: it never changes the forecast unless your check-ins show a pattern.', status: ['ready', 'Data ready'] },
+    moon: { name: 'Moon phase', watch: 'moonphase', text: 'Under the number. Where the term is: new moon in quiet weeks, full moon when it is all happening at once.', status: ['ready', 'Data ready'] },
+    tourbillon: { name: 'Tourbillon', watch: 'haute horlogerie', text: 'Its own window at the bottom left. Spins only while Clare or Hammond is reworking your day.', status: ['data', 'Needs agent status'] },
+    retro: { name: 'Retrograde tally', watch: 'retrograde', text: 'Sweeps one step for each task you close today, then snaps back at midnight. Try the buttons under the dial.', status: ['ready', 'Data ready'] },
     gmt: { name: 'GMT hand', watch: 'pilot / GMT', text: 'A second 24-hour hand for the other place. Home Sydney while you are away.', status: ['data', 'Needs trip dates'] },
-    corey: { name: 'Corey hand', watch: 'second time zone', text: 'Corey’s time at home while you are in KL or Seoul, with Corey’s evening shaded.', status: ['data', 'Needs trip dates'] },
-    countdown: { name: 'Countdown', watch: 'regatta', text: 'Ceremony countdown on the wedding face only.', status: ['ready', 'Data ready'] }
+    corey: { name: 'Corey hand', watch: 'second time zone', text: 'Corey’s time at home while you are in KL or Seoul, with Corey’s evening shaded on the rim.', status: ['data', 'Needs trip dates'] },
+    countdown: { name: 'Countdown plaque', watch: 'regatta', text: 'Ceremony countdown, engraved under the dial so the face stays clear.', status: ['ready', 'Data ready'] }
   };
 
-  const cs = getComputedStyle(document.documentElement);
-  const tok = n => cs.getPropertyValue(n).trim();
   const gaugeColour = pct => pct >= 60 ? 'var(--good)' : pct >= 40 ? 'var(--mid)' : 'var(--low)';
   const clock = h => { const hh = Math.floor(h) % 24, mm = Math.round((h - Math.floor(h)) * 60); const s = hh >= 12 ? 'pm' : 'am'; return `${hh % 12 || 12}:${String(mm).padStart(2, '0')} ${s}`; };
+  const dur = h => { const m = Math.round(h * 60); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} m` : `${m} m`; };
+
+  function hatch(defs, id, colour) {
+    const pat = el('pattern', { id, width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+    el('rect', { width: 6, height: 6, fill: 'var(--track)' }, pat);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: colour, 'stroke-opacity': 0.35, 'stroke-width': 2 }, pat);
+  }
+
+  function drawBezel(svg, face) {
+    const [b1, b2] = BEZEL;
+    el('path', { d: `M${C - b2} ${C}A${b2} ${b2} 0 1 1 ${C + b2} ${C}A${b2} ${b2} 0 1 1 ${C - b2} ${C}ZM${C - b1} ${C}A${b1} ${b1} 0 1 0 ${C + b1} ${C}A${b1} ${b1} 0 1 0 ${C - b1} ${C}Z`, fill: 'var(--track)', 'fill-rule': 'evenodd' }, svg);
+    for (let h = 0; h < 24; h += 0.5) {
+      const major = h % 1 === 0;
+      const [x1, y1] = pt(b2 - 1, h), [x2, y2] = pt(b2 - (major ? 5 : 3), h);
+      el('line', { x1, y1, x2, y2, stroke: 'var(--muted)', 'stroke-opacity': major ? 0.55 : 0.3, 'stroke-width': 1 }, svg);
+    }
+    const doses = face.gmt ? [[8.5, 12.5]] : [[7.67, 11.67], [12.5, 16.5]];
+    for (const [a, b] of doses) {
+      el('path', { d: arc(b1 + 2, b2 - 2, a, b), fill: 'var(--wave)', 'fill-opacity': 0.22 }, svg);
+      const gone = Math.min(b, face.now);
+      if (gone > a) el('path', { d: arc(b1 + 2, b2 - 2, a, Math.min(gone, b - 0.75)), fill: 'var(--wave)' }, svg);
+      if (gone > b - 0.75) el('path', { d: arc(b1 + 2, b2 - 2, b - 0.75, gone), fill: 'var(--low)' }, svg);
+      else el('path', { d: arc(b1 + 2, b2 - 2, b - 0.75, b), fill: 'var(--low)', 'fill-opacity': 0.3 }, svg);
+      // Lume pip: a triangle at the dose time pointing inwards.
+      const [px, py] = pt(b2 + 1, a), [lx, ly] = pt(b1 + 1, a - 0.25), [rx, ry] = pt(b1 + 1, a + 0.25);
+      el('path', { d: `M${px} ${py}L${lx} ${ly}L${rx} ${ry}Z`, fill: 'var(--wave)', stroke: 'var(--paper)', 'stroke-width': 1.2 }, svg);
+      if (face.now > a && face.now < b) {
+        const [tx, ty] = pt(b2 + 13, (face.now + b) / 2);
+        el('text', { x: tx, y: ty + 3, 'text-anchor': 'middle', 'font-size': 9.5, 'font-weight': 700, fill: 'var(--wave)', 'paint-order': 'stroke', stroke: 'var(--paper)', 'stroke-width': 3 }, svg, `${dur(b - face.now)} left`);
+      }
+    }
+  }
+
+  function drawMoon(svg, cx, cy, r) {
+    // T4 W1: a thin waxing crescent. Full moon would be the busiest week.
+    el('circle', { cx, cy, r, fill: 'var(--navy)', 'fill-opacity': 0.9 }, svg);
+    el('path', { d: `M${cx} ${cy - r}A${r} ${r} 0 0 1 ${cx} ${cy + r}A${r * 0.55} ${r} 0 0 0 ${cx} ${cy - r}Z`, fill: 'var(--gold)' }, svg);
+    el('text', { x: cx, y: cy + r + 11, 'text-anchor': 'middle', 'font-size': 8.5, 'font-weight': 600, fill: 'var(--muted)', 'letter-spacing': '0.05em' }, svg, 'T4 W1');
+  }
+
+  let retroHand = null;
+  function retroAngle(n) { return Math.PI * (1 - n / TASKS_TOTAL); }
+  function drawRetro(svg) {
+    const cy = C + 34, rr = 24;
+    const g = el('g', {}, svg);
+    const p = t => [C + rr * Math.cos(t), cy - rr * Math.sin(t)];
+    const [ax, ay] = p(Math.PI), [bx, by] = p(0);
+    el('path', { d: `M${ax} ${ay}A${rr} ${rr} 0 0 1 ${bx} ${by}`, fill: 'none', stroke: 'var(--track)', 'stroke-width': 5, 'stroke-linecap': 'round' }, g);
+    for (let k = 0; k <= TASKS_TOTAL; k++) {
+      const [x1, y1] = [C + (rr + 4) * Math.cos(retroAngle(k)), cy - (rr + 4) * Math.sin(retroAngle(k))];
+      const [x2, y2] = [C + (rr + 8) * Math.cos(retroAngle(k)), cy - (rr + 8) * Math.sin(retroAngle(k))];
+      el('line', { x1, y1, x2, y2, stroke: 'var(--muted)', 'stroke-width': 1 }, g);
+    }
+    retroHand = el('line', { x1: C, y1: cy, x2: C, y2: cy, stroke: 'var(--good)', 'stroke-width': 2.4, 'stroke-linecap': 'round' }, g);
+    el('circle', { cx: C, cy, r: 2.6, fill: 'var(--ink)' }, g);
+    el('text', { x: C, y: cy + 14, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 600, fill: 'var(--muted)', id: 'retro-label' }, g, `${tasksClosed} of ${TASKS_TOTAL} closed`);
+    setRetro(tasksClosed, true);
+  }
+  let retroValue = 3, raf = 0;
+  function setRetro(target, instant) {
+    const cy = C + 34, rr = 21;
+    const place = v => { const a = retroAngle(v); retroHand?.setAttribute('x2', C + rr * Math.cos(a)); retroHand?.setAttribute('y2', cy - rr * Math.sin(a)); };
+    cancelAnimationFrame(raf);
+    if (instant || reduce) { retroValue = target; place(target); return; }
+    const from = retroValue, t0 = performance.now(), snap = target < from;
+    const len = snap ? 650 : 420;
+    const step = now => {
+      const t = Math.min(1, (now - t0) / len);
+      // Snap-back overshoots like a spring; a step forward eases in.
+      const e = snap ? 1 - Math.cos(t * Math.PI * 2.5) * Math.exp(-5 * t) : 1 - Math.pow(1 - t, 3);
+      retroValue = from + (target - from) * e;
+      place(retroValue);
+      if (t < 1) raf = requestAnimationFrame(step); else retroValue = target;
+    };
+    raf = requestAnimationFrame(step);
+  }
+
+  function drawDress(svg, face) {
+    // A deliberate single look: black lacquer, sunburst, gold. No words.
+    const defs = el('defs', {}, svg);
+    const grad = el('radialGradient', { id: 'lacquer', cx: '50%', cy: '42%', r: '60%' }, defs);
+    el('stop', { offset: '0%', 'stop-color': '#24365a' }, grad);
+    el('stop', { offset: '100%', 'stop-color': '#070d1b' }, grad);
+    el('circle', { cx: C, cy: C, r: R + 22, fill: '#c9a55a' }, svg);
+    el('circle', { cx: C, cy: C, r: R + 19, fill: 'url(#lacquer)' }, svg);
+    for (let k = 0; k < 180; k++) {
+      const h = k * 24 / 180, [x, y] = pt(R + 18, h);
+      el('line', { x1: C, y1: C, x2: x, y2: y, stroke: '#ffffff', 'stroke-opacity': k % 2 ? 0.025 : 0.05, 'stroke-width': 1 }, svg);
+    }
+    // Yours: a whisper of champagne at the rim. Sleep: a darker crescent.
+    el('path', { d: arc(R * 0.9, R * 0.96, 17.5, 22.5), fill: '#e8cf9a', 'fill-opacity': 0.22 }, svg);
+    el('path', { d: arc(R * 0.9, R * 0.96, 22.5, 6.5), fill: '#000000', 'fill-opacity': 0.35 }, svg);
+    for (let h = 0; h < 24; h++) {
+      const major = h % 6 === 0;
+      const [x1, y1] = pt(R * 0.98, h), [x2, y2] = pt(R * (major ? 0.82 : 0.9), h);
+      el('line', { x1, y1, x2, y2, stroke: '#e3c47d', 'stroke-width': major ? 3.2 : 1.4, 'stroke-linecap': 'round' }, svg);
+      if (major) { const [a1, b1] = pt(R * 0.98, h + 0.12), [a2, b2] = pt(R * 0.86, h + 0.12); el('line', { x1: a1, y1: b1, x2: a2, y2: b2, stroke: '#e3c47d', 'stroke-width': 1, 'stroke-opacity': 0.6 }, svg); }
+    }
+    // Readiness as a fine gold arc and nothing else.
+    const gr = R * 0.36, circ = 2 * Math.PI * gr;
+    el('circle', { cx: C, cy: C, r: gr, fill: 'none', stroke: '#ffffff', 'stroke-opacity': 0.08, 'stroke-width': 2 }, svg);
+    el('circle', { cx: C, cy: C, r: gr, fill: 'none', stroke: '#e3c47d', 'stroke-width': 2, 'stroke-dasharray': `${circ * DAY.readiness / 100} ${circ}`, transform: `rotate(-90 ${C} ${C})` }, svg);
+    // Leaf hand pointing to now.
+    const [tx, ty] = pt(R * 0.8, face.now), [lx, ly] = pt(14, face.now - 1.2), [rx, ry] = pt(14, face.now + 1.2), [bx, by] = pt(18, face.now + 12);
+    el('path', { d: `M${bx} ${by}Q${lx} ${ly} ${tx} ${ty}Q${rx} ${ry} ${bx} ${by}Z`, fill: '#e3c47d' }, svg);
+    el('circle', { cx: C, cy: C, r: 4.5, fill: '#e3c47d' }, svg);
+    el('circle', { cx: C, cy: C, r: 1.6, fill: '#070d1b' }, svg);
+  }
 
   function drawDial(face) {
     const svg = document.getElementById('dial');
-    svg.replaceChildren(el('desc', { id: 'dial-desc' }, null, `${face.title}: readiness ${DAY.readiness}, ${DAY.note}`));
+    svg.replaceChildren(el('desc', { id: 'dial-desc' }, null, `${face.title}: readiness ${DAY.readiness}, ${DAY.note}, now ${clock(face.now)}`));
+    retroHand = null;
+    if (face.dress) return drawDress(svg, face);
     const defs = el('defs', {}, svg);
-    const pat = el('pattern', { id: 'hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
-    el('rect', { width: 6, height: 6, fill: 'var(--track)' }, pat);
-    el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: 'var(--muted)', 'stroke-opacity': 0.35, 'stroke-width': 2 }, pat);
+    hatch(defs, 'hatch', 'var(--muted)');
     const dim = face.dim ? 0.35 : 1;
 
-    // Rim (and gold for the grand complication).
-    el('circle', { cx: C, cy: C, r: R + 18, fill: 'var(--paper)', stroke: face.gold ? 'var(--gold)' : 'var(--line)', 'stroke-width': face.gold ? 3 : 1 }, svg);
+    el('circle', { cx: C, cy: C, r: R + 22, fill: 'var(--paper)', stroke: face.gold ? 'var(--gold)' : 'var(--line)', 'stroke-width': face.gold ? 3 : 1 }, svg);
+    if (face.comps.includes('bezel')) drawBezel(svg, face);
     for (let h = 0; h < 24; h += 1) {
       const [x1, y1] = pt(R * 0.985, h), [x2, y2] = pt(R * (h % 6 === 0 ? 0.93 : 0.96), h);
       el('line', { x1, y1, x2, y2, stroke: 'var(--muted)', 'stroke-opacity': h % 6 === 0 ? 0.6 : 0.3, 'stroke-width': h % 6 === 0 ? 1.6 : 1 }, svg);
     }
     for (const [h, t] of [[12, 'noon'], [18, '6 pm'], [0, 'midnight'], [6, '6 am']]) {
-      const [x, y] = pt(R + 30, h);
-      el('text', { x, y: y + 4, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 600, fill: 'var(--navy)', 'paint-order': 'stroke', stroke: 'var(--paper)', 'stroke-width': 3 }, svg, t);
+      const [x, y] = pt(R + 36, h);
+      el('text', { x, y: y + 4, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 600, fill: 'var(--navy)' }, svg, t);
     }
 
-    // Dive bezel: logged doses, with the elapsed part darker. Pip at the dose like a lume pip.
-    if (face.comps.includes('bezel')) {
-      const doses = face.gmt ? [[8.5, 12.5]] : [[7.67, 11.67], [12.5, 16.5]];
-      const g = el('g', { opacity: dim }, svg);
-      for (const [a, b] of doses) {
-        el('path', { d: arc(R * 0.905, R * 0.93, a, b), fill: 'var(--wave)', 'fill-opacity': 0.18 }, g);
-        const end = Math.min(b, face.now);
-        if (end > a) el('path', { d: arc(R * 0.905, R * 0.93, a, end), fill: end >= b - 0.75 ? 'var(--low)' : 'var(--wave)', 'fill-opacity': 0.7 }, g);
-        const [x, y] = pt(R * 0.945, a);
-        el('circle', { cx: x, cy: y, r: 3.2, fill: 'var(--wave)' }, g);
-      }
-    }
-
-    // Event ring.
     el('circle', { cx: C, cy: C, r: R * (ring.eventInner + ring.eventOuter) / 2, fill: 'none', stroke: 'var(--track)', 'stroke-width': R * (ring.eventOuter - ring.eventInner) }, svg);
     for (const i of ITEMS) {
       const focus = face.dim && i.title === 'HSC feedback';
@@ -286,105 +385,61 @@ svg { display: block; width: 100%; height: 100%; }
         fill: i.kind === 'corey' ? 'var(--yours)' : i.isClass ? 'var(--school)' : 'var(--chip)',
         stroke: focus ? 'var(--navy)' : 'var(--line)', 'stroke-width': focus ? 2 : 1, opacity: face.dim && !focus ? 0.35 : 1 }, svg);
     }
-
-    // Context ring: sleep wall, school, yours.
     el('path', { d: arc(R * ring.ctxInner, R * ring.ctxOuter, 22.5, 6.5), fill: 'url(#hatch)', opacity: dim }, svg);
-    if (!face.quiet && !face.gmt) el('path', { d: arc(R * ring.ctxInner, R * ring.ctxOuter, 8.5, 15.25), fill: 'var(--school)', opacity: dim }, svg);
+    if (!face.gmt) el('path', { d: arc(R * ring.ctxInner, R * ring.ctxOuter, 8.5, 15.25), fill: 'var(--school)', opacity: dim }, svg);
     el('path', { d: arc(R * ring.ctxInner, R * ring.ctxOuter, 17.5, 22.5), fill: 'var(--yours)', opacity: dim }, svg);
 
-    // Moon phase on the sleep wall: the term's phase. T4 W1 is a thin new crescent.
-    if (face.comps.includes('moon')) {
-      const [x, y] = pt(R * (ring.ctxInner + ring.ctxOuter) / 2, 3);
-      const g = el('g', { opacity: dim }, svg);
-      el('circle', { cx: x, cy: y, r: 9, fill: 'var(--paper)', stroke: 'var(--muted)', 'stroke-opacity': 0.5 }, g);
-      el('path', { d: `M${x} ${y - 9}A9 9 0 0 1 ${x} ${y + 9}A6 9 0 0 0 ${x} ${y - 9}Z`, fill: 'var(--gold)' }, g);
-      el('title', {}, g, 'Moon phase: T4 W1, quiet start of term');
-    }
-
-    // Weather ring in the quiet band between the gauge and the bands.
     if (face.comps.includes('weather')) {
       const r1 = R * 0.475, r2 = R * 0.545;
-      const g = el('g', { 'data-part': 'weather' }, svg);
       PTS.forEach((p, i) => {
         if (i === PTS.length - 1) return;
         const fam = FAMILY(weather(PTS, i));
-        const past = p.h < face.now;
         const thick = (r2 - r1) * Math.max(0.35, p.pct / 100);
-        el('path', { d: arc(r1, r1 + thick, p.h, p.h + 0.5), fill: `var(--${fam})`, 'fill-opacity': past ? 0.95 : face.quiet ? 0.35 : 0.55 }, g);
-      });
-      // Icons only where conditions change (debounced like weatherCards).
-      let last = null;
-      PTS.forEach((p, i) => {
-        const id = weather(PTS, i);
-        if (FAMILY(id) === last || PTS[i + 1] && weather(PTS, i + 1) !== id) return;
-        last = FAMILY(id);
-        const [x, y] = pt(R * 0.51, p.h + 0.25);
-        const dot = el('circle', { cx: x, cy: y, r: 2.6, fill: 'var(--paper)', stroke: `var(--${last})`, 'stroke-width': 1.5 }, g);
-        el('title', {}, dot, `${clock(p.h)} · ${NAMES[id] || 'Weather'} · ${p.pct}`);
+        el('path', { d: arc(r1, r1 + thick, p.h, p.h + 0.5), fill: `var(--${fam})`, 'fill-opacity': p.h < face.now ? 0.95 : 0.5 }, svg);
       });
     }
 
-    // Equation of time: plan drift as a small fan inside the gauge (−60 to +60 min).
-    // Retrograde tally sits in the same place on the Focus face.
-    const gr = R * ring.gauge;
-    el('circle', { cx: C, cy: C, r: gr, fill: 'none', stroke: 'var(--track)', 'stroke-width': 10 }, svg);
-    const circ = 2 * Math.PI * gr;
-    el('circle', { cx: C, cy: C, r: gr, fill: 'none', stroke: gaugeColour(DAY.readiness), 'stroke-width': 10, 'stroke-linecap': 'round',
-      'stroke-dasharray': `${circ * DAY.readiness / 100} ${circ}`, transform: `rotate(-90 ${C} ${C})` }, svg);
-    el('text', { x: C, y: C - 22, 'text-anchor': 'middle', 'font-size': 9.5, 'font-weight': 600, 'letter-spacing': '0.08em', fill: 'var(--muted)' }, svg, 'READINESS');
-    el('text', { x: C, y: C + 12, 'text-anchor': 'middle', 'font-size': 34, 'font-weight': 700, fill: gaugeColour(DAY.readiness) }, svg, `${DAY.readiness}`);
-    if (face.comps.includes('eot') || face.comps.includes('retro')) {
-      const retro = face.comps.includes('retro') && !face.comps.includes('moon');
-      const cy = C + 40, rr = 15;
-      const from = -60, to = 60, val = retro ? 3 / 6 : 25 / 60;
-      const toXY = t => { const a = Math.PI * (1 - t); return [C + rr * Math.cos(a), cy - rr * Math.sin(a)]; };
-      const [ax, ay] = toXY(0), [bx, by] = toXY(1);
-      el('path', { d: `M${ax} ${ay}A${rr} ${rr} 0 0 1 ${bx} ${by}`, fill: 'none', stroke: 'var(--track)', 'stroke-width': 4, 'stroke-linecap': 'round' }, svg);
-      const t = retro ? val : 0.5 + val / 2;
-      const [nx, ny] = toXY(t);
-      el('line', { x1: C, y1: cy, x2: nx, y2: ny, stroke: retro ? 'var(--good)' : 'var(--mid)', 'stroke-width': 2, 'stroke-linecap': 'round' }, svg);
-      el('circle', { cx: C, cy, r: 2, fill: 'var(--ink)' }, svg);
-      el('text', { x: C, y: cy + 12, 'text-anchor': 'middle', 'font-size': 8.5, fill: 'var(--muted)' }, svg, retro ? '3 of 6 closed' : '+25 min behind');
-    } else {
-      el('text', { x: C, y: C + 32, 'text-anchor': 'middle', 'font-size': 10.5, fill: 'var(--muted)' }, svg, DAY.note);
-    }
-
-    // Tourbillon: a small spinning cage near noon, inside the gauge.
+    // Tourbillon in its own window in the quiet band, bottom left (the night side).
     if (face.comps.includes('tourbillon')) {
+      const [x, y] = pt(R * 0.51, 3.2);
+      el('circle', { cx: x, cy: y, r: 13, fill: 'var(--paper)', stroke: 'var(--gold)', 'stroke-width': 1.5 }, svg);
       const g = el('g', { class: 'spin' }, svg);
-      const ty = C - 44;
-      el('circle', { cx: C, cy: ty, r: 7, fill: 'none', stroke: 'var(--gold)', 'stroke-width': 1.3 }, g);
-      for (let k = 0; k < 3; k++) { const a = k * 2 * Math.PI / 3; el('line', { x1: C, y1: ty, x2: C + 7 * Math.cos(a), y2: ty + 7 * Math.sin(a), stroke: 'var(--gold)', 'stroke-width': 1.1 }, g); }
+      el('circle', { cx: x, cy: y, r: 8, fill: 'none', stroke: 'var(--gold)', 'stroke-width': 1.3 }, g);
+      for (let k = 0; k < 3; k++) { const a = k * 2 * Math.PI / 3; el('line', { x1: x, y1: y, x2: x + 8 * Math.cos(a), y2: y + 8 * Math.sin(a), stroke: 'var(--gold)', 'stroke-width': 1.1 }, g); }
       el('title', {}, g, 'Tourbillon: Clare is rebalancing this afternoon');
     }
 
-    // GMT hand (home Sydney) and Corey hand.
+    // The green gauge, exactly as it is.
+    const gr = R * ring.gauge, circ = 2 * Math.PI * gr;
+    el('circle', { cx: C, cy: C, r: gr, fill: 'none', stroke: 'var(--track)', 'stroke-width': 10 }, svg);
+    el('circle', { cx: C, cy: C, r: gr, fill: 'none', stroke: gaugeColour(DAY.readiness), 'stroke-width': 10, 'stroke-linecap': 'round', 'stroke-dasharray': `${circ * DAY.readiness / 100} ${circ}`, transform: `rotate(-90 ${C} ${C})` }, svg);
+    const hasCentre = face.comps.includes('moon') || face.comps.includes('retro');
+    el('text', { x: C, y: C - (hasCentre ? 26 : 20), 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 600, 'letter-spacing': '0.08em', fill: 'var(--muted)' }, svg, 'READINESS');
+    el('text', { x: C, y: C + (hasCentre ? 4 : 12), 'text-anchor': 'middle', 'font-size': hasCentre ? 28 : 34, 'font-weight': 700, fill: gaugeColour(DAY.readiness) }, svg, `${DAY.readiness}`);
+    if (face.comps.includes('moon')) drawMoon(svg, C, C + 24, 9.5);
+    else if (face.comps.includes('retro')) drawRetro(svg);
+    else el('text', { x: C, y: C + 32, 'text-anchor': 'middle', 'font-size': 10.5, fill: 'var(--muted)' }, svg, DAY.note);
+
     if (face.comps.includes('gmt')) {
-      const other = face.gmt ? face.now + 2 : face.now - 2; // Sydney is +2 h from Seoul in October
-      const [x, y] = pt(R * 0.9, other), [bx, by] = pt(R * ring.gauge + 10, other);
-      el('line', { x1: bx, y1: by, x2: x, y2: y, stroke: 'var(--gmt)', 'stroke-width': 1.6 }, svg);
-      const [tx, ty] = pt(R * 0.84, other);
-      el('path', { d: `M${x} ${y}L${tx - 4} ${ty}L${tx + 4} ${ty}Z`, fill: 'var(--gmt)', transform: `rotate(0)` }, svg);
-      const [lx, ly] = pt(R * 0.64, other + 0.6);
-      el('text', { x: lx, y: ly, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 600, fill: 'var(--gmt)', 'paint-order': 'stroke', stroke: 'var(--paper)', 'stroke-width': 3 }, svg, face.gmt ? 'Sydney' : 'Seoul');
+      const other = face.gmt ? face.now + 2 : face.now - 2; // Sydney is 2 h ahead of Seoul in October
+      const [x, y] = pt(R * 0.9, other), [bx, by] = pt(gr + 10, other);
+      el('line', { x1: bx, y1: by, x2: x, y2: y, stroke: 'var(--gmt)', 'stroke-width': 1.8 }, svg);
+      const [lx2, ly2] = pt(R * 0.82, other - 0.3), [rx2, ry2] = pt(R * 0.82, other + 0.3);
+      el('path', { d: `M${x} ${y}L${lx2} ${ly2}L${rx2} ${ry2}Z`, fill: 'var(--gmt)' }, svg);
+      const [tx, ty] = pt(R * 0.62, other - 0.9);
+      el('text', { x: tx, y: ty + 3, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: 'var(--gmt)', 'paint-order': 'stroke', stroke: 'var(--paper)', 'stroke-width': 3 }, svg, face.gmt ? 'Sydney' : 'Seoul');
     }
     if (face.comps.includes('corey')) {
       const home = face.now + 2;
-      el('path', { d: arc(R * 0.885, R * 0.9, 18, 22.5), fill: 'var(--corey)', 'fill-opacity': 0.5 }, svg);
-      const [x, y] = pt(R * 0.82, home);
-      el('circle', { cx: x, cy: y, r: 6.5, fill: 'var(--corey)' }, svg);
+      el('path', { d: arc(R * 0.885, R * 0.905, 18, 22.5), fill: 'var(--corey)', 'fill-opacity': 0.6 }, svg);
+      const [x, y] = pt(R * 0.8, home + 0.9);
+      el('circle', { cx: x, cy: y, r: 7, fill: 'var(--corey)' }, svg);
       el('text', { x, y: y + 3, 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 700, fill: 'var(--paper)' }, svg, 'C');
     }
-    if (face.comps.includes('countdown')) {
-      el('text', { x: C, y: C + 56, 'text-anchor': 'middle', 'font-size': 9.5, 'font-weight': 700, fill: 'var(--gold)' }, svg, 'Ceremony in 1 h 30 m');
-    }
 
-    // The now hand and its time, inside the quiet band so it never meets a callout.
     const [hx, hy] = pt(R * ring.eventOuter + 6, face.now), [sx, sy] = pt(gr + 8, face.now);
     el('line', { x1: sx, y1: sy, x2: hx, y2: hy, stroke: 'var(--hand)', 'stroke-width': 2.2 }, svg);
     el('circle', { cx: hx, cy: hy, r: 4.5, fill: 'var(--hand)' }, svg);
-    const [tx, ty] = pt(R * 0.51, face.now + 0.55);
-    if (!face.comps.includes('weather')) el('text', { x: tx, y: ty + 4, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, fill: 'var(--hand)' }, svg, clock(face.now).replace(/ [ap]m/, ''));
   }
 
   function drawCaseback() {
@@ -412,13 +467,11 @@ svg { display: block; width: 100%; height: 100%; }
   function compIcon(id) {
     const s = document.createElementNS(NS, 'svg');
     s.setAttribute('viewBox', '0 0 36 36'); s.setAttribute('aria-hidden', 'true');
-    const c = (a) => el('circle', { cx: 18, cy: 18, r: 15, fill: 'var(--chip)', ...a }, s);
-    c({});
+    el('circle', { cx: 18, cy: 18, r: 15, fill: 'var(--chip)' }, s);
     const map = {
       weather: () => { el('path', { d: 'M6 18A12 12 0 0 1 30 18', fill: 'none', stroke: 'var(--sun)', 'stroke-width': 4 }, s); el('path', { d: 'M30 18A12 12 0 0 1 18 30', fill: 'none', stroke: 'var(--cloud)', 'stroke-width': 4 }, s); },
-      bezel: () => { el('circle', { cx: 18, cy: 18, r: 12, fill: 'none', stroke: 'var(--wave)', 'stroke-width': 3, 'stroke-dasharray': '24 80' }, s); el('circle', { cx: 18, cy: 6, r: 2.5, fill: 'var(--wave)' }, s); },
-      eot: () => { el('path', { d: 'M8 22A10 10 0 0 1 28 22', fill: 'none', stroke: 'var(--muted)', 'stroke-width': 2 }, s); el('line', { x1: 18, y1: 22, x2: 24, y2: 14, stroke: 'var(--mid)', 'stroke-width': 2 }, s); },
-      moon: () => { el('circle', { cx: 18, cy: 18, r: 8, fill: 'var(--paper)' }, s); el('path', { d: 'M18 10A8 8 0 0 1 18 26A5 8 0 0 0 18 10Z', fill: 'var(--gold)' }, s); },
+      bezel: () => { el('circle', { cx: 18, cy: 18, r: 11, fill: 'none', stroke: 'var(--wave)', 'stroke-width': 4, 'stroke-dasharray': '22 80' }, s); el('path', { d: 'M18 4L15 9L21 9Z', fill: 'var(--wave)' }, s); },
+      moon: () => { el('circle', { cx: 18, cy: 18, r: 8, fill: 'var(--navy)' }, s); el('path', { d: 'M18 10A8 8 0 0 1 18 26A4.4 8 0 0 0 18 10Z', fill: 'var(--gold)' }, s); },
       tourbillon: () => { el('circle', { cx: 18, cy: 18, r: 7, fill: 'none', stroke: 'var(--gold)', 'stroke-width': 1.5 }, s); el('line', { x1: 18, y1: 11, x2: 18, y2: 25, stroke: 'var(--gold)' }, s); el('line', { x1: 12, y1: 22, x2: 24, y2: 14, stroke: 'var(--gold)' }, s); },
       retro: () => { el('path', { d: 'M8 22A10 10 0 0 1 28 22', fill: 'none', stroke: 'var(--muted)', 'stroke-width': 2 }, s); el('line', { x1: 18, y1: 22, x2: 18, y2: 12, stroke: 'var(--good)', 'stroke-width': 2 }, s); },
       gmt: () => { el('line', { x1: 18, y1: 18, x2: 26, y2: 9, stroke: 'var(--gmt)', 'stroke-width': 2 }, s); el('path', { d: 'M26 9L21 10L25 14Z', fill: 'var(--gmt)' }, s); },
@@ -435,15 +488,25 @@ svg { display: block; width: 100%; height: 100%; }
     document.getElementById('face-title').textContent = face.title;
     document.getElementById('face-sub').textContent = `${face.sub} · ${clock(face.now)}`;
     drawDial(face);
+    document.getElementById('demo').hidden = !face.comps.includes('retro');
+    const plaque = document.getElementById('plaque');
+    plaque.hidden = !face.comps.includes('countdown');
+    plaque.textContent = 'Ceremony in 1 h 30 m';
     const list = document.getElementById('complist');
-    list.replaceChildren(...face.comps.map(id => {
+    const rows = face.comps.map(id => {
       const c = COMPS[id];
       const row = document.createElement('div'); row.className = 'comp';
       const body = document.createElement('div');
       body.innerHTML = `<b>${c.name} <span class="watchword">· ${c.watch}</span></b><p>${c.text}</p><span class="status status--${c.status[0]}">${c.status[1]}</span>`;
       row.append(compIcon(id), body);
       return row;
-    }));
+    });
+    if (face.dress) {
+      const row = document.createElement('div'); row.className = 'comp';
+      row.innerHTML = '<span></span><div><b>No complications <span class="watchword">· dress watch</span></b><p>Black lacquer, a gold sunburst, a leaf hand pointing to now and readiness as one fine gold arc. No words. Your evening shows as a whisper of champagne at the rim; the night is the darker crescent.</p></div>';
+      rows.push(row);
+    }
+    list.replaceChildren(...rows);
     document.querySelectorAll('#dots button').forEach((b, i) => b.setAttribute('aria-current', String(i === index)));
     document.querySelectorAll('.facecard').forEach((b, i) => b.setAttribute('aria-pressed', String(i === index)));
     const autoBtn = document.getElementById('auto');
@@ -464,7 +527,17 @@ svg { display: block; width: 100%; height: 100%; }
   document.getElementById('prev').addEventListener('click', () => go(index - 1));
   document.getElementById('next').addEventListener('click', () => go(index + 1));
   document.getElementById('auto').addEventListener('click', () => { auto = true; go(0, false); });
-  document.addEventListener('keydown', e => { if (e.key === 'ArrowRight') go(index + 1); if (e.key === 'ArrowLeft') go(index - 1); });
+  document.getElementById('close-task').addEventListener('click', () => {
+    tasksClosed = Math.min(TASKS_TOTAL, tasksClosed + 1);
+    document.getElementById('retro-label').textContent = `${tasksClosed} of ${TASKS_TOTAL} closed`;
+    setRetro(tasksClosed);
+  });
+  document.getElementById('midnight').addEventListener('click', () => {
+    tasksClosed = 0;
+    document.getElementById('retro-label').textContent = 'Midnight · back to 0';
+    setRetro(0);
+  });
+  document.addEventListener('keydown', e => { if (e.target.closest('button')) return; if (e.key === 'ArrowRight') go(index + 1); if (e.key === 'ArrowLeft') go(index - 1); });
   const host = document.getElementById('dialhost');
   let sx = null;
   host.addEventListener('pointerdown', e => { sx = e.clientX; });
