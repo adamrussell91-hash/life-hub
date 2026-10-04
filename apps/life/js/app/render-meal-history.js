@@ -1,5 +1,6 @@
 import { createDisclosureCard } from '../../../../packages/design-kit/js/hub-surfaces.js';
 import { runMorphTransform } from '../../../../packages/design-kit/js/morphing-dialog.js';
+import { buildWeekGrid, WEEK_GRID_ROWS } from './chart-kit/week-grid.js';
 import { addCalendarDays, enumerateDateKeys, formatDisplayDate, isCalendarDate } from '../core/time.js';
 import { formatGrams } from '../core/aggregate.js';
 import { MAX_LOOKBACK_DAYS } from './load-live-events.js';
@@ -11,13 +12,15 @@ const weekday = date => new Intl.DateTimeFormat('en-AU', {
 const monday = date => addCalendarDays(date, -((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7));
 const category = meal => meal ? meal[0].toUpperCase() + meal.slice(1) : 'Meal';
 const number = value => Number.isFinite(value) ? formatGrams(value) : '—';
+const cellValue = (value, unit) => (unit === 'kcal' ? String(Math.round(value)) : formatGrams(value));
+const TREND_ARROW = { up: '↑', down: '↓', flat: '→' };
 
 export function renderMealHistory(root, model) {
   const host = root.querySelector('#nutrition-meal-history');
   if (!host) return;
   let view = views.get(host);
   if (!view) {
-    view = mountHistory(host, model.date);
+    view = mountHistory(host, root.querySelector('#nutrition-meal-day') ?? host, model.date);
     views.set(host, view);
   }
   view.model = model;
@@ -27,7 +30,7 @@ export function renderMealHistory(root, model) {
   view.paint();
 }
 
-function mountHistory(host, today) {
+function mountHistory(host, dayHost, today) {
   const doc = host.ownerDocument;
   const node = (tag, className, text) => {
     const el = doc.createElement(tag);
@@ -35,9 +38,9 @@ function mountHistory(host, today) {
     if (text != null) el.textContent = text;
     return el;
   };
-  const view = { today, selected: today, expanded: false, openMeals: new Set(), model: null };
+  const view = { today, selected: today, openMeals: new Set(), model: null };
   const header = node('div', 'meal-history__header');
-  const title = node('h2', 'meal-history__title', 'Meal history');
+  const title = node('h2', 'meal-history__title', 'Macros by day');
   title.id = 'meal-log-label';
   const titleGroup = node('div', 'meal-history__title-group');
   titleGroup.append(title);
@@ -62,22 +65,88 @@ function mountHistory(host, today) {
   picker.prepend(range);
   navigation.append(previous, picker, next);
   header.append(titleGroup, navigation, todayButton);
-  const strip = node('div', 'meal-history__strip');
-  strip.setAttribute('role', 'group');
-  strip.setAttribute('aria-label', 'Meal history days');
-  strip.title = 'Meal counts are shown beside each date.';
+
+  // Week grid: a label column plus seven day columns. Each column is one button
+  // (the whole column is the hit area) and its nodes persist across paints so bar
+  // heights morph between weeks instead of being rebuilt.
+  const grid = node('div', 'week-grid');
+  grid.setAttribute('role', 'group');
+  grid.setAttribute('aria-label', 'Meal history days');
+  const labels = node('div', 'week-grid__labels');
+  labels.setAttribute('aria-hidden', 'true');
+  labels.append(node('span', 'week-grid__corner'));
+  const rowLabels = WEEK_GRID_ROWS.map(row => {
+    const cell = node('div', 'week-grid__row-label');
+    cell.dataset.row = row.key;
+    const summary = node('span', 'week-grid__summary');
+    cell.append(node('strong', '', row.label), summary);
+    let trend = null;
+    if (row.key === 'protein') {
+      trend = node('span', 'week-grid__trend');
+      cell.append(trend);
+    }
+    labels.append(cell);
+    return { summary, trend };
+  });
+  grid.append(labels);
+  const columns = Array.from({ length: 7 }, (_, col) => {
+    const button = node('button', 'week-grid__day');
+    button.type = 'button';
+    const head = node('span', 'week-grid__head');
+    const name = node('span', 'week-grid__weekday');
+    const date = node('span', 'week-grid__date');
+    const num = node('span', 'week-grid__num');
+    const count = node('span', 'week-grid__count');
+    date.append(num, count);
+    head.append(name, date);
+    button.append(head);
+    const cells = WEEK_GRID_ROWS.map((row, rowIndex) => {
+      const cell = node('span', 'week-grid__cell');
+      cell.dataset.row = row.key;
+      const plot = node('span', 'week-grid__plot');
+      const target = node('span', 'week-grid__target');
+      const bar = node('span', 'week-grid__bar');
+      const value = node('span', 'week-grid__value');
+      const delay = `${col * 45 + rowIndex * 70}ms`;
+      for (const el of [target, bar, value]) el.style.setProperty('--d', delay);
+      plot.append(target, bar, value);
+      cell.append(plot);
+      button.append(cell);
+      return { target, bar, value };
+    });
+    button.addEventListener('click', () => {
+      if (!button.disabled) select(button.dataset.date);
+    });
+    grid.append(button);
+    return { button, name, num, count, cells };
+  });
+  const key = node('p', 'week-grid__key');
+  key.setAttribute('aria-hidden', 'true');
+  for (const [colour, text] of [
+    ['var(--success)', 'hit goal / under ceiling / within 10% of energy'],
+    ['var(--wave)', 'under goal'],
+    ['var(--danger)', 'over fat ceiling'],
+    [null, 'dashed line = target · choose a day to see its meals']
+  ]) {
+    const item = node('span', '');
+    if (colour) {
+      const swatch = node('i', '');
+      swatch.style.background = colour;
+      item.append(swatch);
+    }
+    item.append(text);
+    key.append(item);
+  }
   const status = node('p', 'meal-history__status');
   status.setAttribute('role', 'status');
+
   const panel = node('section', 'meal-history__panel');
   panel.id = 'meal-history-day';
   const heading = node('div', 'meal-history__day-heading');
   const dayTitle = node('h3', 'meal-history__day-title');
   dayTitle.id = 'meal-history-date';
   const mealCount = node('span', 'meal-history__count');
-  const expand = node('button', 'btn btn--ghost meal-history__expand', 'View meals');
-  expand.type = 'button';
-  expand.setAttribute('aria-controls', panel.id);
-  heading.append(dayTitle, mealCount, expand);
+  heading.append(dayTitle, mealCount);
   panel.setAttribute('aria-labelledby', dayTitle.id);
   const totals = node('dl', 'meal-history__totals');
   totals.setAttribute('aria-label', 'Logged daily totals');
@@ -86,19 +155,19 @@ function mountHistory(host, today) {
   const list = node('ul', 'meal-log');
   list.id = 'nutrition-meal-log';
   panel.append(totals, empty, list);
-  host.append(header, strip, status, heading, panel);
+  host.append(header, grid, key, status);
+  if (dayHost === host) host.append(heading, panel);
+  else dayHost.append(heading, panel);
 
-  const select = (date, toggle = false) => {
+  const select = date => {
     if (!isCalendarDate(date) || date > view.today || date < input.min) return;
-    const expanded = toggle && date === view.selected ? !view.expanded : true;
-    runMorphTransform({ from: host, update: () => {
+    if (date === view.selected) return;
+    runMorphTransform({ from: dayHost, update: () => {
       view.selected = date;
-      view.expanded = expanded;
       view.paint();
     } });
   };
   todayButton.addEventListener('click', () => select(view.today));
-  expand.addEventListener('click', () => select(view.selected, true));
   input.addEventListener('change', () => {
     if (input.validity.valid) select(input.value);
     input.value = view.selected;
@@ -182,34 +251,72 @@ function mountHistory(host, today) {
     previous.hidden = addCalendarDays(view.selected, -7) < input.min;
     next.hidden = end >= view.today;
     range.textContent = `${formatDisplayDate(start)} – ${formatDisplayDate(end)}`;
-    const active = doc.activeElement?.dataset?.date;
-    strip.replaceChildren();
-    for (const date of enumerateDateKeys(start, end)) {
+
+    const dates = enumerateDateKeys(start, end);
+    const entries = dates.map(date => {
+      const day = days.get(date);
+      return {
+        date,
+        logged: Boolean(day?.meals.length),
+        // Unknown carbs stay unknown in the grid rather than drawing a partial sum.
+        totals: day ? { ...day.totals, carbs_g: day.carbsKnown ? day.totals.carbs_g : NaN } : {},
+        targets: day?.targets ?? {}
+      };
+    });
+    const rows = buildWeekGrid(entries);
+    rows.forEach((row, rowIndex) => {
+      const label = rowLabels[rowIndex];
+      label.summary.textContent = row.summary.text;
+      label.summary.dataset.tone = row.summary.tone;
+    });
+    const trend = view.model.proteinTrend;
+    const trendLabel = rowLabels[0].trend;
+    if (trendLabel) {
+      const showTrend = trend && trend.delta != null && start <= view.today && view.today <= end;
+      trendLabel.hidden = !showTrend;
+      trendLabel.textContent = showTrend ? `${TREND_ARROW[trend.direction] ?? ''} ${trend.label} vs last wk`.trim() : '';
+      trendLabel.dataset.colour = trend?.colour ?? 'neutral';
+    }
+
+    dates.forEach((date, col) => {
       const day = days.get(date);
       const count = day?.meals.length ?? 0;
       const future = date > view.today;
       const loading = !day && history.loading && outsideRange(date);
       const unavailable = !day && !loading && outsideRange(date);
-      const button = node(future ? 'span' : 'button', 'meal-history__day');
+      const column = columns[col];
+      const { button } = column;
       button.dataset.date = date;
       button.dataset.logged = String(count > 0);
       button.dataset.today = String(date === view.today);
       button.dataset.selected = String(date === view.selected);
-      button.append(node('span', 'meal-history__weekday', weekday(date)),
-        node('span', 'meal-history__day-number', String(Number(date.slice(-2)))),
-        node('span', 'meal-history__day-count', future || unavailable ? '—' : loading ? '…' : String(count)));
-      button.setAttribute('aria-label', `${weekday(date)} ${formatDisplayDate(date)}${date === view.today ? ', today' : ''}, ${future ? 'future date' : loading ? 'loading meals' : unavailable ? 'history unavailable' : `${count} meal${count === 1 ? '' : 's'}`}`);
+      button.dataset.future = String(future);
+      button.disabled = future;
+      column.name.textContent = weekday(date);
+      column.num.textContent = String(Number(date.slice(-2)));
+      column.count.textContent = future || unavailable ? '' : loading ? ' · …' : ` · ${count}`;
+      const label = `${weekday(date)} ${formatDisplayDate(date)}${date === view.today ? ', today' : ''}, ${future ? 'future date' : loading ? 'loading meals' : unavailable ? 'history unavailable' : `${count} meal${count === 1 ? '' : 's'}`}`;
+      const facts = rows
+        .filter(row => row.cells[col].logged)
+        .map(row => `${row.label} ${cellValue(row.cells[col].value, row.unit)}${row.unit === 'kcal' ? ' kcal' : ` ${row.unit}`}`);
+      button.setAttribute('aria-label', facts.length ? `${label}: ${facts.join(', ')}` : label);
       button.title = button.getAttribute('aria-label');
-      if (!future) {
-        button.type = 'button';
-        button.setAttribute('aria-pressed', String(date === view.selected));
-        button.setAttribute('aria-expanded', String(date === view.selected && view.expanded));
-        button.setAttribute('aria-controls', panel.id);
-        button.addEventListener('click', () => select(date, true));
-      }
-      strip.append(button);
-      if (active === date && !future) button.focus({ preventScroll: true });
-    }
+      button.setAttribute('aria-pressed', String(date === view.selected));
+      button.setAttribute('aria-controls', panel.id);
+      rows.forEach((row, rowIndex) => {
+        const cell = row.cells[col];
+        const { target, bar, value } = column.cells[rowIndex];
+        bar.dataset.state = cell.state;
+        bar.style.setProperty('--pct', `${cell.pct}%`);
+        value.style.setProperty('--pct', `${cell.pct}%`);
+        value.textContent = cell.logged ? cellValue(cell.value, row.unit)
+          : loading ? '…' : future ? '' : '—';
+        const targetPct = cell.target > 0 ? (cell.target / row.max) * 100 : null;
+        target.hidden = targetPct == null;
+        if (targetPct != null) target.style.setProperty('--target', `${targetPct}%`);
+      });
+    });
+
     const day = days.get(view.selected);
     const meals = day?.meals ?? [];
     const outside = !day && outsideRange(view.selected);
@@ -218,10 +325,6 @@ function mountHistory(host, today) {
       : view.model.freshness === 'fallback' ? 'Showing saved meal records. Refresh to check for updates.'
       : history.loading ? 'Loading earlier meal history…' : '';
     status.hidden = !status.textContent;
-    panel.hidden = !view.expanded;
-    heading.hidden = !view.expanded;
-    expand.textContent = view.expanded ? 'Hide meals' : 'View meals';
-    expand.setAttribute('aria-expanded', String(view.expanded));
     dayTitle.textContent = `${view.selected === view.today ? 'Today · ' : ''}${weekday(view.selected)} ${formatDisplayDate(view.selected)}`;
     mealCount.textContent = `${meals.length} meal${meals.length === 1 ? '' : 's'} logged`;
     mealCount.hidden = !meals.length;
