@@ -402,3 +402,24 @@ test('isQueuedPatchStale compares a queued rewrite with the live section, ignori
   assert.equal(isQueuedPatchStale(FIXTURE, { ...entry, patch: { ...entry.patch, op: 'append_line' }, base_section_text: 'x' }), false);
   assert.equal(isQueuedPatchStale(FIXTURE, { patch: entry.patch }), false);
 });
+
+// Contract: every section x op Hammond's tool schema offers must actually apply to the
+// live Central Node. A combo the schema allows but the applier rejects becomes a
+// Confirm card that can never save (5 Oct weight reading, constraints upsert_field).
+test('every schema-allowed section x op applies to the live Central Node', () => {
+  const live = readFileSync(new URL('../../central-node.md', import.meta.url), 'utf8');
+  const payloads = {
+    upsert_field: { field: 'Probe', text: '**Probe**: x', summary: 's' },
+    append_line: { text: '- probe line', summary: 's' },
+    replace_section: { text: 'probe body', summary: 's' },
+    condense: { text: 'probe body', summary: 's' },
+    delete_lines: { match: 'zzz-no-match', summary: 's' }
+  };
+  const broken = [];
+  for (const section of CENTRAL_NODE_SECTIONS) {
+    for (const [op, payload] of Object.entries(payloads)) {
+      if (applyCentralNodePatch(live, { section, op, payload }) === null) broken.push(`${section}.${op}`);
+    }
+  }
+  assert.deepEqual(broken, []);
+});
