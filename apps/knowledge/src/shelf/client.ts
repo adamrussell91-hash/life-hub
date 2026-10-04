@@ -5,8 +5,10 @@ import { bookKey } from "./model";
 import {
   parseShelfData,
   FactsJobSchema,
+  KindsJobSchema,
   type BookFactsInput,
   type FactsJob,
+  type KindsJob,
   type Placement,
   type PlacementInput,
   type ShelfBook,
@@ -105,4 +107,22 @@ export async function deleteBookRecord(label: string): Promise<void> {
   const data = readLocal();
   data.books = data.books.filter(book => bookKey(book.label) !== bookKey(label));
   writeLocal(data);
+}
+
+/** Asks Claude to grade kinds for every book note that still needs one. */
+export async function startBookKinds(ids?: string[], regrade = false): Promise<KindsJob> {
+  if (USE_LOCAL_DATA) throw new Error("Grading kinds needs the live hub; local preview can't call Claude.");
+  return KindsJobSchema.parse((await post<{ job: unknown }>({ op: "kinds-start", ids, regrade })).job);
+}
+
+/** Checks the kinds batch; once ended the server applies results and returns the outcome. */
+export async function checkBookKinds(): Promise<KindsJob> {
+  if (USE_LOCAL_DATA) return { status: "none" };
+  return KindsJobSchema.parse((await post<{ job: unknown }>({ op: "kinds-check" })).job);
+}
+
+/** Grades one note's kind synchronously. */
+export async function gradeKind(pageId: string): Promise<Placement> {
+  if (USE_LOCAL_DATA) throw new Error("Grading kinds needs the live hub; local preview can't call Claude.");
+  return (await post<{ placement: Placement }>({ op: "kind", pageId })).placement;
 }

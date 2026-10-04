@@ -31,7 +31,17 @@ Use this order. Keep headings.
 1. **Title** — the topic, not "Notes on…" and not the book title alone.
 2. **In the book** — what this moment is doing in the named book. Name the author's move. If he gave a page or passage, use it. Do not pretend you have the book in front of you beyond what he typed.
 3. **What it means** — three to five short sections that explain the idea from the web. Cite load-bearing claims as markdown links `[Title](url)`. Label a claim as a direct finding, a complication, or an implication when that is not obvious.
-4. **How this bears on the book** — the tilt. Does the web support the book's claim, complicate it, or extend it? Say which, and why. Open the section with one plain line, exactly `Verdict: supports`, `Verdict: complicates` or `Verdict: extends`, then give the reasoning. The Bookshelf reads that line to colour the note. This section is mandatory. A page that never turns back to the book has failed the protocol.
+4. **How this bears on the book** — what this adds to your reading of the book. Open the note (before any heading) with one plain line, exactly `Kind: <one of the five>` — the Bookshelf reads that line. Then in this section say what the page adds to the reading. This section is mandatory. A page that never turns back to the book has failed the protocol.
+
+   | Kind | When to use it |
+   |---|---|
+   | `person` | Who someone is and what they contributed |
+   | `idea` | A concept, term, mechanism or the book's argument, explained |
+   | `case` | A specific event, study, example or story |
+   | `debate` | Rival accounts, critics, a popular version that's wrong, an open question |
+   | `bridge` | Implications for teaching or learning, or a link to another field or book |
+
+   Precedence when two fit: `debate` > `bridge` > `case` > `person` > `idea`. `idea` is only when nothing else fits — it is the easy default a lazy writer will reach for.
 5. **Sources** — the cited web links only, as markdown links. No extras.
 6. **Gaps** — what a stronger page would still need. One to three lines.
 

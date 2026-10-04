@@ -23,7 +23,7 @@ Notes stay in the data repo. The Bookshelf keeps its own Netlify Blobs store, `k
 | Key | Holds |
 |-----|-------|
 | `books` | per title: author, edition, pages, chapters `[{label, title, start}]`, notebook, reading `{page}` |
-| `placements` | per note id: page, guessed, stance (supports / complicates / extends), gaps, themes, lastOpened |
+| `placements` | per note id: page, guessed, stance (supports / complicates / extends; being replaced by kind, see `BOOK-NOTE-KINDS-BRIEF.md`), gaps, themes, lastOpened |
 
 `src/shelf/model.ts` `buildShelf()` is the one model every view reads (failure register V4).
 

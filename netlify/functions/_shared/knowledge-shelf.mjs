@@ -8,6 +8,9 @@ export const BOOKS_KEY = 'books';
 export const PLACEMENTS_KEY = 'placements';
 
 export const SHELF_STANCES = ['supports', 'complicates', 'extends'];
+/** Mirror of ShelfKindSchema in apps/knowledge/src/shelf/schema.ts — keep in sync (V4). */
+export const SHELF_KINDS = ['person', 'idea', 'case', 'debate', 'bridge'];
+export const SHELF_KIND_BY = ['adam', 'clementine', 'claude'];
 const MAX_PAGE = 5000;
 const MAX_CHAPTERS = 120;
 export const MAX_PLACEMENTS_PER_WRITE = 500;
@@ -112,6 +115,22 @@ export function cleanPlacement(raw) {
   if (raw.stance !== undefined) {
     if (raw.stance !== null && !SHELF_STANCES.includes(raw.stance)) throw invalid('Stance must be supports, complicates or extends.');
     patch.stance = raw.stance;
+  }
+  if (raw.kind !== undefined) {
+    if (raw.kind !== null && !SHELF_KINDS.includes(raw.kind)) {
+      throw invalid(`Kind must be one of ${SHELF_KINDS.join(', ')}.`);
+    }
+    patch.kind = raw.kind;
+  }
+  if (raw.kindGuessed !== undefined) patch.kindGuessed = raw.kindGuessed === null ? null : Boolean(raw.kindGuessed);
+  if (raw.kindBy !== undefined) {
+    if (raw.kindBy !== null && !SHELF_KIND_BY.includes(raw.kindBy)) throw invalid('kindBy must be adam, clementine or claude.');
+    patch.kindBy = raw.kindBy;
+  }
+  if (raw.kindReason !== undefined) patch.kindReason = raw.kindReason === null ? null : text(raw.kindReason, 300);
+  if (raw.kindAt !== undefined) {
+    if (raw.kindAt !== null && Number.isNaN(Date.parse(raw.kindAt))) throw invalid('kindAt must be a date.');
+    patch.kindAt = raw.kindAt;
   }
   for (const field of ['gaps', 'themes']) {
     if (raw[field] === undefined) continue;

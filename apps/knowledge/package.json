@@ -16,6 +16,7 @@
     "sync-research-r2": "tsx scripts/sync-research-r2.ts",
     "curator": "tsx scripts/run-curator.ts",
     "cross-book": "tsx scripts/run-cross-book.ts",
+    "grade-kinds": "tsx scripts/grade-kinds.ts",
     "tidy": "tsx scripts/run-tidy.ts",
     "tidy:backfill": "tsx scripts/run-tidy-backfill.ts",
     "tidy:split": "tsx scripts/run-tidy-split.ts",
