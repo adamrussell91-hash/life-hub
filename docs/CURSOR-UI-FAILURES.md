@@ -125,6 +125,8 @@
 
 **T1 · Uncontrolled font sizes.** **Seen:** Medical detail sheet notes at about 22px; calendar filter chips (29/09/26) — `.cal-src` set `font-size:var(--text-2xs)` then `font:inherit` later in the same rule, so the shorthand reset every chip to the page size in all hubs. **Rule:** Every text node uses a kit size token. A `font` shorthand goes first in a rule, never after `font-size`/`font-weight`. **Check:** no computed `font-size` above the brief's stated maximums; `grep -n "font-size[^}]*font:inherit"` over changed CSS returns nothing.
 
+**T2 · Page title wraps mid-word beside header actions.** **Seen:** Knowledge Archive at 390 (2026-10-04) — “Archive” painted as “Archiv” / “e” because New note + List + Graph sat on the title row and `overflow-wrap: anywhere` allowed a last-letter break. **Rule:** Phone headers with controls besides refresh put those controls on the row under the title (`flex: 1 0 100%` on `.page-header__actions:has(> :not(.hub-utilities))`). Page titles use `overflow-wrap: break-word` / `word-break: normal`, never `anywhere`. **Check:** at 390, `#archive-title` / `.page-header__title` with the word “Archive” has `getClientRects().length === 1` and the title box’s right edge stays left of any leftover last-letter fragment (there is none).
+
 ## I: Interaction
 
 **I1 · Kinetic/motion text on interactive or editable text.** **Seen:** Goals title (G-06) and runway (G-22). **Rule:** No `hub-kinetic` on anything clickable or editable. **Check:** select, copy and edit the text.
