@@ -42,9 +42,9 @@ test('nutrition page does not include this-week vs prior protein compare', async
 
 test('nutrition-grid stays dense: smaller rings and 2×2 on narrow, not full-bleed stack', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
-  assert.match(css, /\.nutrition-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*1fr\)/);
+  assert.match(css, /\.nutrition-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(css, /\.nutrition-grid\s+\.metric-ring\s*\{[^}]*3\.5rem/);
-  assert.match(css, /\.nutrition-grid\s*\{\s*grid-template-columns:\s*1fr 1fr\s*;\s*\}/);
+  assert.match(css, /\.nutrition-grid\s*\{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)\s*;\s*\}/);
   assert.equal((css.match(/\.nutrition-grid\s*\{\s*grid-template-columns:\s*1fr\s*;\s*\}/g) || []).length, 0);
 });
 

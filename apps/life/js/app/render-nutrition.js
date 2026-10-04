@@ -3,6 +3,7 @@ import { buildAreaLine } from './chart-kit/area-line.js';
 import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { buildMealProteinPie } from './chart-kit/pie.js';
 import { buildRingTarget } from './chart-kit/ring.js';
+import { renderMealHistory } from './render-meal-history.js';
 import { formatGrams } from '../core/aggregate.js';
 import { formatDisplayDate } from '../core/time.js';
 
@@ -31,7 +32,7 @@ export function renderNutrition(root, model, options = {}) {
   renderMealProteinPie(root, model.nutrition.meals);
 
   renderMacroSplit(root, model);
-  renderMealsToday(root, model.mealsToday);
+  renderMealHistory(root, model);
   renderChallengeTrackers(root, model.challenges);
   renderMacroRings(root, model, { quiet });
   const proteinGuide = model.week.find(day => day.proteinTarget > 0)?.proteinTarget ?? model.targets.protein_g;
@@ -261,32 +262,6 @@ export function renderMealProteinPie(root, meals) {
     return item;
   });
   legend?.replaceChildren(...legendItems);
-}
-
-function renderMealsToday(root, mealsToday) {
-  const list = root.querySelector('#nutrition-meal-log');
-  const empty = root.querySelector('[data-nutrition="meal-log-empty"]');
-  if (!list) return;
-  list.replaceChildren();
-  if (!mealsToday?.length) {
-    empty?.removeAttribute('hidden');
-    return;
-  }
-  empty?.setAttribute('hidden', '');
-  for (const meal of mealsToday) {
-    const item = root.createElement('li');
-    item.className = 'meal-log__item';
-    const title = root.createElement('strong');
-    const mealLabel = meal.meal ? meal.meal[0].toUpperCase() + meal.meal.slice(1) : 'Meal';
-    title.textContent = meal.time ? `${mealLabel} · ${meal.time}` : mealLabel;
-    const detail = root.createElement('p');
-    detail.textContent = meal.summary;
-    const macros = root.createElement('p');
-    macros.className = 'meal-log__macros';
-    macros.textContent = `${meal.calories} kcal · ${formatGrams(meal.protein_g)} g protein · ${formatGrams(meal.fat_g)} g fat`;
-    item.append(title, detail, macros);
-    list.append(item);
-  }
 }
 
 function renderChallengeTrackers(root, challenges) {

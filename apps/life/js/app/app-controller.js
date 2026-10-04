@@ -602,6 +602,8 @@ export function createAppController(dependencies) {
         return;
       }
       if (painted) {
+        latestResult.history = { ...latestResult.history, loading: false, error: true };
+        if (currentSection === 'nutrition') renderNutritionSection();
         setStatus('Earlier history unavailable');
         return;
       }
@@ -2183,6 +2185,8 @@ function paintedViewKey(result) {
     result.events?.length ?? 0,
     result.commitSha ?? '',
     result.freshness ?? '',
-    result.warnings?.length ?? 0
+    result.warnings?.length ?? 0,
+    result.history?.from ?? '',
+    result.history?.loading ?? false
   ].join('\0');
 }
