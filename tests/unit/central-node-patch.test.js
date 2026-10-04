@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -127,6 +128,44 @@ test('apply upsert_field updates Flags', () => {
   });
   assert.match(next, /\*\*Flags:\*\* Flare watch\./);
   assert.match(next, /\*\*Energy:\*\* Ok\./);
+});
+
+test('apply upsert_field on constraints replaces the matching bullet (5 Oct weight Confirm)', () => {
+  const live = readFileSync(new URL('../../central-node.md', import.meta.url), 'utf8');
+  const text = '**Weight**: 88.6 kg, 20.4% body fat (5 Oct 2026, smart scale). Body composition goal: 78-82kg at 8-10% body fat.';
+  const next = applyCentralNodePatch(live, {
+    section: 'constraints',
+    op: 'upsert_field',
+    payload: { field: 'Weight', text, summary: 'Update Weight' }
+  });
+  assert.ok(next, 'constraints upsert_field must apply');
+  assert.ok(next.includes(`- ${text}`));
+  assert.ok(!next.includes('88kg (weighed by Mary-anne Chamoun'));
+  // Lookalike bullets stay untouched.
+  assert.match(next, /Weight-bearing\/spine-loading/);
+  assert.equal(next.split('\n').length, live.split('\n').length);
+});
+
+test('apply upsert_field on constraints appends when the field is new', () => {
+  const live = readFileSync(new URL('../../central-node.md', import.meta.url), 'utf8');
+  const next = applyCentralNodePatch(live, {
+    section: 'constraints',
+    op: 'upsert_field',
+    payload: { field: 'Grip strength', text: '- **Grip strength**: 52kg', summary: 's' }
+  });
+  assert.ok(next);
+  const body = readCentralNodeSectionBody(next, 'constraints');
+  assert.ok(body.endsWith('- **Grip strength**: 52kg'));
+});
+
+test('apply upsert_field accepts the **Field:** bold-colon variant', () => {
+  const content = '## 🔴 Current Constraints & Priorities\n- **RMR:** 1946 kcal\n- **Other**: x\n';
+  const next = applyCentralNodePatch(content, {
+    section: 'constraints',
+    op: 'upsert_field',
+    payload: { field: 'RMR', text: '**RMR:** 1990 kcal', summary: 's' }
+  });
+  assert.equal(next, '## 🔴 Current Constraints & Priorities\n- **RMR:** 1990 kcal\n- **Other**: x\n');
 });
 
 test('apply append_line to cross_agent', () => {
@@ -362,4 +401,25 @@ test('isQueuedPatchStale compares a queued rewrite with the live section, ignori
   // Append-style patches and entries without a base are never stale.
   assert.equal(isQueuedPatchStale(FIXTURE, { ...entry, patch: { ...entry.patch, op: 'append_line' }, base_section_text: 'x' }), false);
   assert.equal(isQueuedPatchStale(FIXTURE, { patch: entry.patch }), false);
+});
+
+// Contract: every section x op Hammond's tool schema offers must actually apply to the
+// live Central Node. A combo the schema allows but the applier rejects becomes a
+// Confirm card that can never save (5 Oct weight reading, constraints upsert_field).
+test('every schema-allowed section x op applies to the live Central Node', () => {
+  const live = readFileSync(new URL('../../central-node.md', import.meta.url), 'utf8');
+  const payloads = {
+    upsert_field: { field: 'Probe', text: '**Probe**: x', summary: 's' },
+    append_line: { text: '- probe line', summary: 's' },
+    replace_section: { text: 'probe body', summary: 's' },
+    condense: { text: 'probe body', summary: 's' },
+    delete_lines: { match: 'zzz-no-match', summary: 's' }
+  };
+  const broken = [];
+  for (const section of CENTRAL_NODE_SECTIONS) {
+    for (const [op, payload] of Object.entries(payloads)) {
+      if (applyCentralNodePatch(live, { section, op, payload }) === null) broken.push(`${section}.${op}`);
+    }
+  }
+  assert.deepEqual(broken, []);
 });
