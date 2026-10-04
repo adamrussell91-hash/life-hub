@@ -299,12 +299,19 @@ function mountSide(side: HTMLElement) {
   const date = state.day;
   const ghosts = ghostsNow();
   const isToday = date === F.NOW.date;
+  const dayDue = F.DUE.filter(d => d.date === date).map(d => ({ id: d.id, title: d.title }));
   if (isToday) {
-    const t = tonightBrief({ date, now: NOW_H, chips: chipsFor(date), ghosts, logs: logsFor(date) });
+    const t = tonightBrief({ date, now: NOW_H, chips: chipsFor(date), due: dayDue, ghosts, logs: logsFor(date) });
     const sec = el('section', '', undefined, side, { 'data-part': 'tonight' });
     el('h4', 'dd-h', 'Tonight', sec);
     el('div', 'dd-big', `${t.timeLeft.label}<small>Now ${clock12(NOW_H)} · lights out ${t.timeLeft.until}${t.timeLeft.by ? ` (${t.timeLeft.by})` : ''}</small>`, sec, { 'data-part': 'time-left-label' });
     renderRows(el('div', 'dd-rows', undefined, sec), t.rows, ghosts);
+  } else if (dayDue.length) {
+    const sec = el('section', '', undefined, side, { 'data-part': 'due' });
+    el('h4', 'dd-h', 'Due', sec);
+    renderRows(el('div', 'dd-rows', undefined, sec), dayDue.map(d => ({
+      at: 99, time: 'Due', title: d.title, kind: 'task', itemId: d.id, note: 'Tasks · open', struck: false, ghostId: null, suggestion: null
+    })), ghosts);
   }
   const next = F.WEEK[F.WEEK.indexOf(date) + 1];
   if (next) {
