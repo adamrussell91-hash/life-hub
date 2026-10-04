@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PageManifestEntry } from "../domain/page";
 import { buildShelf } from "./model";
 import {
+  mixCounts,
   DEFAULT_MIX,
   DIAL_MAX,
   DIAL_MIN,
@@ -38,10 +39,10 @@ const data = {
     { label: "Range" },
   ],
   placements: [
-    { pageId: "a", page: 10, stance: "supports" as const },
-    { pageId: "b", page: 40, stance: "complicates" as const, gaps: ["Does it hold for novices?"] },
-    { pageId: "c", page: 90, stance: "extends" as const },
-    { pageId: "d", page: 120, stance: "supports" as const },
+    { pageId: "a", page: 10, kind: "idea" as const },
+    { pageId: "b", page: 40, kind: "debate" as const, gaps: ["Does it hold for novices?"] },
+    { pageId: "c", page: 90, kind: "bridge" as const },
+    { pageId: "d", page: 120, kind: "idea" as const },
   ],
 };
 const books = buildShelf(entries, data);
@@ -70,7 +71,7 @@ describe("buildDial", () => {
 });
 
 describe("runningOrder", () => {
-  it("opens on the most-connected supporting note, follows the book's pages, and closes with the phone-in", () => {
+  it("opens on the most-connected idea note, follows the book's pages, and closes with the phone-in", () => {
     const order = runningOrder(stick, { ...DEFAULT_MIX, supports: 100, counter: 100, extends: 100, crosstalk: 100 });
     expect(order[0]).toMatchObject({ pageId: "a", segment: "cold-open" });
     expect(order.map(item => item.segment)).toEqual(["cold-open", "counterpoint", "extends", "crosstalk", "feature", "phone-in"]);
@@ -113,6 +114,39 @@ describe("broadcasts kept on the server", () => {
 
   it("writes a Hold this thought draft with the page, the time and the line", () => {
     expect(holdThoughtDraft({ book: "Make It Stick", page: 38, at: 232, segment: "counterpoint", speaker: "Ann O’Tation", line: "Read it again." }))
-      .toBe("From the Wireless broadcast of Make It Stick (p. 38, 03:52 in, counterpoint). Ann O’Tation said: “Read it again.”\n\nMy thought: ");
+      .toBe("From the Wireless broadcast of Make It Stick (p. 38, 03:52 in, debate). Ann O’Tation said: “Read it again.”\n\nMy thought: ");
+  });
+});
+
+describe("kinds on the air", () => {
+  const kinded = buildShelf(
+    [entry("p", "Range"), entry("q", "Range"), entry("r", "Range"), entry("s", "Range"), entry("t", "Range"), entry("u", "Range")],
+    {
+      books: [{ label: "Range", pages: 300 }],
+      placements: [
+        { pageId: "p", page: 10, kind: "idea" as const },
+        { pageId: "q", page: 20, kind: "person" as const },
+        { pageId: "r", page: 30, kind: "case" as const },
+        { pageId: "s", page: 40, kind: "debate" as const },
+        { pageId: "t", page: 50, kind: "bridge" as const },
+        { pageId: "u", page: 60 },
+      ],
+    },
+  ).find(book => book.label === "Range")!;
+
+  it("puts person and case notes in Backstory, debates in Counterpoint and bridges in So what", () => {
+    const order = runningOrder(kinded, { ...DEFAULT_MIX, supports: 100, counter: 100, extends: 100, crosstalk: 100 });
+    const segmentOf = (id: string) => order.find(item => item.pageId === id)?.segment;
+    expect(order[0]).toMatchObject({ pageId: "p", segment: "cold-open" });
+    expect([segmentOf("q"), segmentOf("r"), segmentOf("s"), segmentOf("t"), segmentOf("u")]).toEqual(["backstory", "backstory", "counterpoint", "extends", "feature"]);
+  });
+
+  it("counts every unsorted, idea, person and case note on the Explains fader", () => {
+    expect(mixCounts(kinded)).toMatchObject({ supports: 4, counter: 1, extends: 1 });
+  });
+
+  it("keeps old broadcasts' segment ids readable", () => {
+    const rebuilt = orderFromDial("p | feature | p.10\nq | backstory | p.20\ns | counterpoint | p.40", kinded);
+    expect(rebuilt.map(item => item.segment)).toEqual(["feature", "backstory", "counterpoint"]);
   });
 });

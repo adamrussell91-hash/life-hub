@@ -11,8 +11,8 @@ describe("backfill from note bodies", () => {
   });
 
   it("fills only missing fields and marks inferred pages as guesses", () => {
-    expect(fillFromBody({ id: "a", body }, { gaps: [] }, 336)).toEqual({ pageId: "a", page: 64, guessed: true, stance: "complicates", gaps: ["Dating?"] });
-    expect(fillFromBody({ id: "a", body }, { page: 70, stance: "supports", gaps: ["x"] }, 336)).toBeNull();
+    expect(fillFromBody({ id: "a", body }, { gaps: [] }, 336)).toEqual({ pageId: "a", page: 64, guessed: true, gaps: ["Dating?"] });
+    expect(fillFromBody({ id: "a", body }, { page: 70, kind: "idea", gaps: ["x"] }, 336)).toBeNull();
     expect(fillFromBody({ id: "a", body }, { gaps: [] }, 50)).not.toHaveProperty("page");
   });
 
@@ -47,10 +47,9 @@ describe("page formats Clementine and Clean up produce", () => {
     expect(pageFromBody(body)).toBe(page);
   });
 
-  it("reads stance and gaps under bold headings too", async () => {
-    const { stanceFromBody, gapsFromBody } = await import("./model");
+  it("reads gaps under bold headings too", async () => {
+    const { gapsFromBody } = await import("./model");
     const bold = "**How this bears on the book**\nThe research complicates Brown here.\n\n**Gaps**\n- Novices?\n- Long term?\n";
-    expect(stanceFromBody(bold)).toBe("complicates");
     expect(gapsFromBody(bold)).toEqual(["Novices?", "Long term?"]);
   });
 });

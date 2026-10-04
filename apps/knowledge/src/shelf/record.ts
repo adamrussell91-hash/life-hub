@@ -1,7 +1,7 @@
 import type { Page } from "../domain/page";
 import type { BookContext } from "../chat/bookNote";
 import { getShelf, gradeKind, savePlacements } from "./client";
-import { bookKey, chapterStartPage, gapsFromBody, kindFromBody, parseLocusChapter, parseLocusPage, stanceFromBody } from "./model";
+import { bookKey, chapterStartPage, gapsFromBody, kindFromBody, parseLocusChapter, parseLocusPage } from "./model";
 import type { Chapter, PlacementInput } from "./schema";
 
 /** What the Bookshelf learns from a freshly saved From-a-book note. */
@@ -16,14 +16,12 @@ export function placementForBookNote(
   const chapter = exact ? undefined : parseLocusChapter(book.locus);
   const chapterPage = chapter ? chapterStartPage(chapters, chapter) : undefined;
   const pageNumber = exact ?? chapterPage;
-  const stance = stanceFromBody(page.body);
   const kind = kindFromBody(page.body);
   const gaps = gapsFromBody(page.body);
-  if (!pageNumber && !stance && !kind && !gaps.length) return null;
+  if (!pageNumber && !kind && !gaps.length) return null;
   return {
     pageId: page.id,
     ...(pageNumber ? { page: pageNumber, guessed: !exact } : {}),
-    ...(stance ? { stance } : {}),
     ...(kind ? { kind, kindBy: "clementine" as const, kindGuessed: false } : {}),
     ...(gaps.length ? { gaps } : {}),
   };

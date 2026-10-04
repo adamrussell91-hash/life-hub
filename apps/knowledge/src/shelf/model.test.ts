@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PageManifestEntry } from "../domain/page";
-import { buildShelf, gapsFromBody, kindFromBody, matchShelf, parseLocusPage, stanceFromBody } from "./model";
+import { buildShelf, gapsFromBody, kindFromBody, matchShelf, parseLocusPage } from "./model";
 import { parseShelfData } from "./schema";
 
 function entry(id: string, title: string, book: string | string[], extra: Partial<PageManifestEntry> = {}): PageManifestEntry {
@@ -20,7 +20,7 @@ describe("buildShelf", () => {
       { label: "Make It Stick", pages: 313, notebook: "Cognitive Psychology", chapters: [{ title: "One", start: 1 }, { title: "Two", start: 23 }] },
       { label: "The Enigma of Reason", reading: { page: null } },
     ],
-    placements: [{ pageId: "a", page: 28 }, { pageId: "c", page: 91, stance: "supports" }, { pageId: "bad", page: -1 }],
+    placements: [{ pageId: "a", page: 28 }, { pageId: "c", page: 91, kind: "idea" }, { pageId: "bad", page: -1 }],
   });
   const books = buildShelf(entries, data);
   const stick = books.find(book => book.key === "make it stick")!;
@@ -73,10 +73,6 @@ describe("book note parsing", () => {
   });
 
   const body = `# Retrieval\n\n## In the book\nPilots.\n\n## How this bears on the book\nThis complicates the claim for novices.\n\n## Sources\n- x\n\n## Gaps\n- Does it hold for novices?\n- Long-term retention\n`;
-  it("reads stance from the How this bears section only", () => {
-    expect(stanceFromBody(body)).toBe("complicates");
-    expect(stanceFromBody("## In the book\nIt supports things")).toBeUndefined();
-  });
   it("reads Kind lines and carries kind on buildShelf notes", () => {
     expect(kindFromBody("Kind: bridge\n\n# Title")).toBe("bridge");
     expect(kindFromBody(body)).toBeUndefined();

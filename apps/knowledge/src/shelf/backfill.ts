@@ -1,6 +1,6 @@
 import type { Page } from "../domain/page";
 import type { BookModel } from "./model";
-import { gapsFromBody, kindFromBody, sectionText, stanceFromBody } from "./model";
+import { gapsFromBody, kindFromBody, sectionText } from "./model";
 import type { PlacementInput } from "./schema";
 
 const PAGE_RE = /\b(?:pp?|pg|pages?)\.?\s*(\d{1,4})(?:\s*[-–]\s*\d{1,4})?\b/i;
@@ -30,13 +30,13 @@ export function pageFromBody(body: string): number | undefined {
   return firstPage(kept.join("\n"));
 }
 
-/** Notes missing a page, stance or gaps: the ones worth reading. */
+/** Notes missing a page, kind or gaps: the ones worth reading. */
 export function notesToRead(books: BookModel[]) {
   const seen = new Set<string>();
   const list: Array<{ id: string; maxPage: number }> = [];
   for (const book of books) {
     for (const note of [...book.placed, ...book.loose]) {
-      if (seen.has(note.id) || (note.page && note.stance && note.gaps.length)) continue;
+      if (seen.has(note.id) || (note.page && note.kind && note.gaps.length)) continue;
       seen.add(note.id);
       list.push({ id: note.id, maxPage: book.pagesKnown ? book.pages : 5000 });
     }
@@ -47,17 +47,13 @@ export function notesToRead(books: BookModel[]) {
 /** Only fills fields the note doesn't have yet; never overwrites a page Adam placed. */
 export function fillFromBody(
   page: Pick<Page, "id" | "body">,
-  current: { page?: number; stance?: string; kind?: string; gaps: string[] },
+  current: { page?: number; kind?: string; gaps: string[] },
   maxPage: number,
 ): PlacementInput | null {
   const patch: PlacementInput = { pageId: page.id };
   if (!current.page) {
     const found = pageFromBody(page.body);
     if (found && found <= maxPage) Object.assign(patch, { page: found, guessed: true });
-  }
-  if (!current.stance) {
-    const stance = stanceFromBody(page.body);
-    if (stance) patch.stance = stance;
   }
   if (!current.kind) {
     const kind = kindFromBody(page.body);

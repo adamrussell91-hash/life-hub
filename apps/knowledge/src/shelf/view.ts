@@ -11,7 +11,8 @@ import { mountAtlas } from "./atlasView";
 import { AIR_ROUTE, createWireless } from "./wireless";
 import { buildArchipelago } from "./archipelagoLayout";
 import { mountArchipelago } from "./archipelagoView";
-import type { FactsJob, ShelfData, ShelfStance } from "./schema";
+import type { FactsJob, ShelfData } from "./schema";
+import { KIND_COLOUR, KIND_MEANING, KIND_ORDER, KIND_UNKNOWN, KIND_WORD, kindColour, kindLabel } from "./kinds";
 
 export type BookshelfContext = {
   entries: PageManifestEntry[];
@@ -21,7 +22,7 @@ export type BookshelfContext = {
   /** Starts a From-a-book note in Chat at this book and page (the Wireless's Hold this thought). */
   holdThought: (bookLabel: string, locus?: string, draft?: string) => void;
   openPage: (id: string) => void;
-  /** Fetches a note's body, for reading pages, stances and gaps out of old notes. */
+  /** Fetches a note's body, for reading pages, kinds and gaps out of old notes. */
   getPage: (id: string) => Promise<{ id: string; body: string }>;
   /** Re-points these notes from the book to a notebook, saves them, and returns the refreshed archive list. */
   moveNotesToNotebook: (bookLabel: string, noteIds: string[], notebook: string) => Promise<PageManifestEntry[]>;
@@ -30,7 +31,6 @@ export type BookshelfContext = {
   initialNote?: string;
 };
 
-const STANCE_WORD: Record<ShelfStance, string> = { supports: "supports", complicates: "complicates", extends: "extends" };
 const PHONE = "(max-width: 720px)";
 const MODE_KEY = "knowledge-hub:shelf-mode";
 const ROOM_KEY = "knowledge-hub:shelf-room";
@@ -70,9 +70,6 @@ function esc(value: unknown) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
 }
 
-function stanceVar(stance?: ShelfStance) {
-  return `var(--stance-${stance ?? "unknown"})`;
-}
 
 function pageLabel(note: BookNote) {
   return note.page ? `${note.guessed ? "≈ " : ""}p.${note.page}` : "no page";
@@ -593,7 +590,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     if (reading) return `<button class="btn btn--secondary" type="button" disabled>Reading notes ${reading.done} of ${reading.total}…</button>`;
     const count = notesToRead(books).length;
     return count
-      ? `<button class="btn btn--secondary" type="button" data-read-notes title="Fills in any page, stance and open questions your notes already state. It never changes what you've set.">Read my notes</button>`
+      ? `<button class="btn btn--secondary" type="button" data-read-notes title="Fills in any page, kind and open questions your notes already state. It never changes what you've set.">Read my notes</button>`
       : "";
   }
 
@@ -614,11 +611,11 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         data = { ...data, placements: [...data.placements.filter(item => !byId.has(item.pageId)), ...saved] };
       }
       const pages = patches.filter(p => p.page).length;
-      const stances = patches.filter(p => p.stance).length;
+      const kinds = patches.filter(p => p.kind).length;
       const gaps = patches.filter(p => p.gaps).length;
       rebuild();
       const stillLoose = books.reduce((sum, book) => sum + book.loose.length, 0);
-      const found = `Read ${total} ${total === 1 ? "note" : "notes"}: found ${pages} ${pages === 1 ? "page" : "pages"}, ${stances} ${stances === 1 ? "stance" : "stances"}, ${gaps} sets of open questions.`;
+      const found = `Read ${total} ${total === 1 ? "note" : "notes"}: found ${pages} ${pages === 1 ? "page" : "pages"}, ${kinds} ${kinds === 1 ? "kind" : "kinds"}, ${gaps} sets of open questions.`;
       const left = stillLoose ? ` ${stillLoose} ${stillLoose === 1 ? "note doesn't" : "notes don't"} name a page, so place ${stillLoose === 1 ? "it" : "them"} by hand.` : "";
       toast(`${found}${left}${failed ? ` ${failed} couldn't be opened.` : ""}`, 9000);
     } catch (error) {
@@ -765,10 +762,8 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       }).join("");
       return `<div class="shelf-row">${stacks}${plaques.join("")}</div>`;
     }).join("") + `<div class="shelf-legend">
-        <span class="shelf-key" style="--k:var(--stance-supports)">Supports the book</span>
-        <span class="shelf-key" style="--k:var(--stance-complicates)">Complicates it</span>
-        <span class="shelf-key" style="--k:var(--stance-extends)">Extends it</span>
-        <span class="shelf-key" style="--k:var(--stance-unknown)">Stance not read yet</span>
+        ${KIND_ORDER.map(kind => `<span class="shelf-key" style="--k:${KIND_COLOUR[kind]}" title="${esc(KIND_MEANING[kind])}">${KIND_WORD[kind][0]!.toUpperCase()}${KIND_WORD[kind].slice(1)}</span>`).join("")}
+        <span class="shelf-key" style="--k:${KIND_UNKNOWN}">Not sorted yet</span>
         <span class="shelf-key" style="--k:var(--navy)">Where you're reading</span>
         ${query.trim() ? `<span class="shelf-key" style="--k:var(--high-sea)">Matches “${esc(query.trim())}”</span>` : ""}
       </div><svg class="shelf-threads" data-threads aria-hidden="true"></svg>`;
@@ -788,7 +783,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   function bookHtml(book: BookModel, width: number, thickness: number, hits: Set<string>) {
     const inner = thickness - 18;
     const top = (page: number) => 2 + ((page - 1) / book.pages) * (inner - 4);
-    const marks = book.placed.map(note => `<i class="shelf-mark${note.guessed ? " shelf-mark--guess" : ""}${hits.has(note.id) ? " is-hit" : ""}" style="top:${top(note.page!)}px;--m:${stanceVar(note.stance)}"></i>`).join("");
+    const marks = book.placed.map(note => `<i class="shelf-mark${note.guessed ? " shelf-mark--guess" : ""}${hits.has(note.id) ? " is-hit" : ""}" style="top:${top(note.page!)}px;--m:${kindColour(note.kind)}"></i>`).join("");
     const ribbon = book.reading?.page ? `<i class="shelf-ribbon" style="top:${top(book.reading.page)}px"></i>` : "";
     const slips = book.loose.length ? `<span class="shelf-slips">${"<i></i>".repeat(Math.min(book.loose.length, 5))}</span>` : "";
     const empty = book.noteCount ? "" : `<span class="shelf-book__empty">No notes yet</span>`;
@@ -822,7 +817,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     const tip = document.createElement("div");
     tip.className = "shelf-tip";
     tip.innerHTML = note
-      ? `<b>${esc(book.label)} · ${esc(pageLabel(note))}</b>${esc(note.title)}${note.stance ? ` · ${STANCE_WORD[note.stance]}` : ""}`
+      ? `<b>${esc(book.label)} · ${esc(pageLabel(note))}</b>${esc(note.title)}${note.kind ? ` · ${kindLabel(note)}` : ""}`
       : `<b>${esc(book.label)}</b>${book.noteCount} ${book.noteCount === 1 ? "note" : "notes"}${book.author ? ` · ${esc(book.author)}` : ""}`;
     tip.style.left = `${event.clientX - stageRect.left + 16}px`;
     tip.style.top = `${event.clientY - stageRect.top - 46}px`;
@@ -967,19 +962,43 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       ? `<div class="descent-note__body">
           ${note.excerpt ? `<p>${esc(note.excerpt)}</p>` : ""}
           ${note.gaps.length ? `<ul class="descent-note__gaps">${note.gaps.map(gap => `<li>${esc(gap)}</li>`).join("")}</ul>` : ""}
+          ${kindPickerHtml(note)}
           <div class="descent-note__actions">
             <button class="btn btn--primary" type="button" data-open-note="${esc(note.id)}">Open note</button>
             <label class="descent-note__page">p.<input type="number" inputmode="numeric" min="1" max="${book.pages}" value="${note.page ?? ""}" data-move="${esc(note.id)}" aria-label="Move to page" /></label>
           </div>
         </div>`
       : "";
-    return `<article class="descent-note${open ? " is-open" : ""}" data-note-card="${esc(note.id)}" style="--m:${stanceVar(note.stance)};${style}">
+    return `<article class="descent-note${open ? " is-open" : ""}" data-note-card="${esc(note.id)}" style="--m:${kindColour(note.kind)};${style}">
       <button class="descent-note__row" type="button" data-toggle="${esc(note.id)}" aria-expanded="${open}">
-        <b>${esc(note.title)}</b><span class="descent-note__meta">${esc(pageLabel(note))}${note.stance ? ` · ${STANCE_WORD[note.stance]}` : ""}</span>
+        <b>${esc(note.title)}</b><span class="descent-note__meta">${esc(pageLabel(note))}${note.kind ? ` · ${kindLabel(note)}` : ""}</span>
       </button>${body}</article>`;
   }
 
+  function kindPickerHtml(note: BookNote) {
+    const hint = !note.kind
+      ? "Not sorted yet. Pick what this note does."
+      : note.kindGuessed
+        ? `Claude's guess${note.kindReason ? `: ${note.kindReason}` : "."} Tap the right one to keep it.`
+        : note.kindBy === "adam" ? "You set this." : "";
+    return `<div class="descent-note__kind">
+        <div class="hub-pills hub-pills--loose descent-kinds" role="group" aria-label="What this note does">${KIND_ORDER.map(kind => {
+          const on = note.kind === kind;
+          return `<button class="hub-pills__btn${on ? " is-active" : ""}${on && note.kindGuessed ? " is-guess" : ""}" type="button" data-kind-pick="${kind}" data-kind-note="${esc(note.id)}" aria-pressed="${on}" title="${esc(KIND_MEANING[kind])}" style="--k:${KIND_COLOUR[kind]}">${KIND_WORD[kind]}</button>`;
+        }).join("")}</div>
+        ${hint ? `<p class="descent-note__kind-hint">${esc(hint)}</p>` : ""}
+      </div>`;
+  }
+
   function bindNotes(scope: HTMLElement, book: BookModel) {
+    scope.querySelectorAll<HTMLButtonElement>("[data-kind-pick]").forEach(button => {
+      button.onclick = () => {
+        const kind = button.dataset.kindPick as BookNote["kind"];
+        const pageId = button.dataset.kindNote!;
+        if (!kind) return;
+        void place([{ pageId, kind, kindBy: "adam", kindGuessed: false, kindReason: null, kindAt: new Date().toISOString() }], `Marked as ${KIND_WORD[kind]}.`);
+      };
+    });
     scope.querySelectorAll<HTMLButtonElement>("[data-toggle]").forEach(button => {
       button.onclick = () => {
         const id = button.dataset.toggle!;
@@ -1113,7 +1132,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     body.innerHTML = `
       <p class="descent__head">Whole book</p><p class="descent__head" style="text-align:right">Chapters</p><p class="descent__head">${book.pagesKnown ? `pp. 1–${book.pages}` : "Pages"}</p><p class="descent__head">Your notes, at their page</p><p class="descent__head">Where they lead out</p>
       <div class="descent__col"><div class="descent__strip" style="height:${stripH}px" data-strip>
-        ${book.placed.map(note => `<i style="top:${stripY(note.page!)}px;--m:${stanceVar(note.stance)}"></i>`).join("")}
+        ${book.placed.map(note => `<i style="top:${stripY(note.page!)}px;--m:${kindColour(note.kind)}"></i>`).join("")}
         ${book.reading?.page ? `<i style="top:${stripY(book.reading.page)}px;--m:var(--navy);left:-6px;right:-6px;height:3px"></i>` : ""}
         ${unread ? `<div class="descent__unread" style="height:${stripH - 12 - stripY(book.lastNotePage!)}px" title="No notes after p.${book.lastNotePage}"></div>` : ""}
         <div class="descent__bracket" data-bracket></div>
@@ -1126,7 +1145,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       <div class="descent__col descent__core" style="height:${layout.height}px">
         ${book.chapters.map((ch, i) => (i % 2 ? "" : `<div class="descent__band" style="top:${y(ch.start)}px;height:${(ch.end - ch.start + 1) * layout.pxPerPage}px"></div>`)).join("")}
         ${rulers.map(page => `<span class="descent__ruler" style="top:${y(page)}px">p.${page}</span>`).join("")}
-        ${book.placed.map(note => `<i class="descent__tick${note.guessed ? " descent__tick--guess" : ""}" style="top:${y(note.page!)}px;--m:${stanceVar(note.stance)}"></i>`).join("")}
+        ${book.placed.map(note => `<i class="descent__tick${note.guessed ? " descent__tick--guess" : ""}" style="top:${y(note.page!)}px;--m:${kindColour(note.kind)}"></i>`).join("")}
         ${book.reading?.page ? `<i class="descent__tick" style="top:${y(book.reading.page)}px;--m:var(--navy);left:-12px;right:-12px"></i>` : ""}
       </div>
       <div class="descent__col" style="height:${layout.height}px" data-lane>
@@ -1166,7 +1185,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         const x1 = lane.left - base.left;
         const y1 = lane.top - base.top + card.top + CARD_HEIGHT / 2;
         const mx = (x0 + x1) / 2;
-        paths += `<path d="M${x0} ${y0} C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1}" fill="none" stroke="${stanceVar(card.note.stance)}" stroke-width="1.2" opacity=".7"/>`;
+        paths += `<path d="M${x0} ${y0} C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1}" fill="none" stroke="${kindColour(card.note.kind)}" stroke-width="1.2" opacity=".7"/>`;
       }
       const exitCol = body.querySelector<HTMLElement>(".descent-exit")?.parentElement?.getBoundingClientRect();
       svg.setAttribute("width", String(base.width));
@@ -1500,7 +1519,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         <div class="place-note"><h3>${esc(note.title)}</h3>${note.excerpt ? `<p>${esc(note.excerpt)}</p>` : ""}</div>
         <div class="place-edge" style="--c:${book.swatch.fill}">
           ${book.chapters.map(c => `<span class="place-edge__chapter" style="left:${pct(c.start)};width:calc(${pct(c.end + 1)} - ${pct(c.start)})" title="${esc(c.title)}"></span>`).join("")}
-          ${book.placed.map(n => `<i class="place-edge__mark" style="left:${pct(n.page!)};--m:${stanceVar(n.stance)}"></i>`).join("")}
+          ${book.placed.map(n => `<i class="place-edge__mark" style="left:${pct(n.page!)};--m:${kindColour(n.kind)}"></i>`).join("")}
           <i class="place-edge__pin" style="left:${pct(current)}"></i>
           <input type="range" id="place-range" min="1" max="${book.pages}" value="${current}" aria-label="Rough page in the book" />
         </div>

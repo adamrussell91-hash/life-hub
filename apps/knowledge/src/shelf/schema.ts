@@ -1,8 +1,5 @@
 import { z } from "zod";
 
-export const ShelfStanceSchema = z.enum(["supports", "complicates", "extends"]);
-export type ShelfStance = z.infer<typeof ShelfStanceSchema>;
-
 export const ShelfKindSchema = z.enum(["person", "idea", "case", "debate", "bridge"]);
 export type ShelfKind = z.infer<typeof ShelfKindSchema>;
 /** Fluid kinds need a quoted sentence; crystallised kinds do not. */
@@ -37,7 +34,6 @@ export const PlacementSchema = z.object({
   pageId: z.string(),
   page: z.number().int().positive().optional(),
   guessed: z.boolean().optional(),
-  stance: ShelfStanceSchema.optional(),
   kind: ShelfKindSchema.optional(),
   kindGuessed: z.boolean().optional(),
   kindBy: KindBySchema.optional(),
@@ -111,7 +107,6 @@ export type PlacementInput = {
   pageId: string;
   page?: number | null;
   guessed?: boolean | null;
-  stance?: ShelfStance | null;
   kind?: ShelfKind | null;
   kindGuessed?: boolean | null;
   kindBy?: KindBy | null;
