@@ -90,6 +90,17 @@ export const WRITE_GATEWAY_TOOLS = Object.freeze([
   'propose_central_node_patch',
   'remember_write_memory',
   'save_workout_template',
+  'upsert_nutrition_challenge',
+  'mark_nutrition_challenge_day',
+  'list_nutrition_challenges',
+  'save_food_library_entry',
+  'save_exercise_library_entry',
+  'save_fitness_research',
+  'save_fitness_coaching_profile',
+  'save_skincare_library_entry',
+  'set_skincare_routine_membership',
+  'propose_calendar_ghost',
+  'list_calendar_blocks',
   'propose_travel_item',
   'propose_travel_checkin',
   'propose_knowledge_page',
@@ -324,7 +335,8 @@ export function planTurn({ slug, message } = {}) {
       tools: [
         'get_nutrition_snapshot', 'get_nutrition_adherence', 'get_nutrition_day_remaining',
         'analyse_nutrition_evidence', 'get_nutrition_targets', 'compare_nutrition_periods',
-        'search_nutrition_records'
+        'search_nutrition_records',
+        'list_nutrition_challenges', 'upsert_nutrition_challenge', 'mark_nutrition_challenge_day'
       ],
       risk: 'low',
       writeIntent: false,

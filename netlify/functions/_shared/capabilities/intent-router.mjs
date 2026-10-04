@@ -122,8 +122,8 @@ const PINNED_CAPABILITY_IDS = [
   'tasks.create',
   'tasks.update',
   'log.delete-meal',
-  // Cross-agent notes ("yes, send that to Brisket") must not wait on magic wording.
-  'coordinate.request-cn-write'
+  'coordinate.request-cn-write',
+  'remember.write-memory'
 ];
 
 /** Soft image presence — never inspect base64 contents. */
@@ -181,7 +181,7 @@ export function selectCapabilityIdsForTurn({
   const restKeep = ordered.filter(id => keep.has(id) && id !== 'os.propose-action');
   const restOther = ordered
     .filter(id => id !== 'os.propose-action' && !keep.has(id))
-    .slice(0, Math.max(0, maxShortcuts - restKeep.length));
+    .slice(0, maxShortcuts);
   return [...propose, ...restKeep, ...restOther];
 }
 

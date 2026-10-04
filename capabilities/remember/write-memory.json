@@ -3,8 +3,7 @@
   "tool_name": "remember_write_memory",
   "verb": "Remember",
   "agents": [
-    "chadwick",
-    "clare"
+    "*"
   ],
   "risk": "auto",
   "kind": "capacity",
