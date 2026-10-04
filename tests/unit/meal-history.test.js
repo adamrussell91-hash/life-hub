@@ -42,7 +42,7 @@ test('unrecorded carbs remain unknown rather than being displayed as zero', () =
   window.happyDOM.abort();
 });
 
-test('nutrition entry point opens earlier logs, keeps selection and disclosures through repaint, and collapses the day', () => {
+test('nutrition entry point opens earlier logs, keeps selection and disclosures through repaint, and keeps the chosen day open', () => {
   const window = new Window();
   const doc = window.document;
   doc.body.innerHTML = '<div id="nutrition-meal-history"></div>';
@@ -59,9 +59,8 @@ test('nutrition entry point opens earlier logs, keeps selection and disclosures 
   assert.equal(doc.querySelector('[data-meal-id="later"] button'), detail, 'unchanged meals stay mounted');
   assert.equal(detail.getAttribute('aria-expanded'), 'true');
   doc.querySelector('[data-date="2026-07-23"]').click();
-  assert.equal(doc.querySelector('#meal-history-day').hidden, true);
-  doc.querySelector('[data-date="2026-07-23"]').click();
-  assert.equal(doc.querySelector('#meal-history-day').hidden, false);
+  assert.equal(doc.querySelector('#meal-history-day').hidden, false, 'choosing the open day again never collapses it');
+  assert.equal(doc.querySelector('[data-date="2026-07-23"]').getAttribute('aria-pressed'), 'true');
   assert.equal(detail.getAttribute('aria-expanded'), 'true');
   doc.querySelector('[aria-label="Next week of meals"]').click();
   assert.match(doc.querySelector('#meal-history-date').textContent, /Today/);
@@ -83,7 +82,8 @@ test('date jumping, future dates, empty days and history failures have distinct 
   renderNutrition(doc, model({ history: { from: '2026-07-24', loading: false, error: true } }));
   assert.match(doc.querySelector('.meal-log__empty').textContent, /unavailable/);
   assert.match(doc.querySelector('[role="status"]').textContent, /could not be loaded/);
-  assert.equal(doc.querySelector('[data-date="2026-07-22"] .meal-history__day-count').textContent, '—');
+  assert.equal(doc.querySelector('[data-date="2026-07-22"] .week-grid__count').textContent, '');
+  assert.ok([...doc.querySelectorAll('[data-date="2026-07-22"] .week-grid__value')].every(value => value.textContent === '—'));
   assert.match(doc.querySelector('[data-date="2026-07-22"]').getAttribute('aria-label'), /history unavailable/);
   renderNutrition(doc, model({ freshness: 'fallback' }));
   assert.match(doc.querySelector('.meal-log__empty').textContent, /unavailable/);
@@ -94,8 +94,8 @@ test('date jumping, future dates, empty days and history failures have distinct 
   input.dispatchEvent(new window.Event('change'));
   assert.equal(input.value, '2026-07-22');
   doc.querySelector('.meal-history__header > button').click();
-  assert.equal(doc.querySelectorAll('.meal-history__day:is(button)').length, 4);
-  assert.equal(doc.querySelectorAll('.meal-history__day:is(span)').length, 3);
+  assert.equal(doc.querySelectorAll('.week-grid__day:not([disabled])').length, 4);
+  assert.equal(doc.querySelectorAll('.week-grid__day[data-future="true"][disabled]').length, 3);
   window.happyDOM.abort();
 });
 
@@ -107,4 +107,36 @@ test('live loading reports the fetched range, settling even when older windows c
   });
   assert.deepEqual(partials, [{ from: '2026-07-24', loading: true }]);
   assert.deepEqual(result.history, { from: '2026-06-21', loading: false });
+});
+
+test('the week grid draws each logged day against its own targets and stubs empty days', () => {
+  const window = new Window();
+  const doc = window.document;
+  doc.body.innerHTML = '<div id="nutrition-meal-history"></div><div id="nutrition-meal-day"></div>';
+  const targetsConfig = {
+    target_sets: [{
+      valid_from: '2020-01-01',
+      calories: { movement: 1660, workout_30: 1900, workout_45_60: 2200, recovery_bonus: 200 },
+      protein: { daily: 20, recovery_daily: 20, breakfast: 30, lunch: 30, dinner: 40, snack: 20, min_per_meal: 25 },
+      fat_ceiling_g: 5,
+      sodium_ceiling_mg: 2000,
+      calcium_target_mg: 1000,
+      polyphenol_daily_aim: 10
+    }]
+  };
+  renderNutrition(doc, model({ targetsConfig, history: { from: '2020-01-01', loading: false } }));
+  const today = doc.querySelector('[data-date="2026-07-30"]');
+  const bar = row => today.querySelector(`.week-grid__cell[data-row="${row}"] .week-grid__bar`);
+  assert.equal(bar('protein').dataset.state, 'hit');
+  assert.equal(bar('fat').dataset.state, 'over');
+  assert.equal(bar('carbs').dataset.state, 'neutral');
+  assert.match(today.getAttribute('aria-label'), /Protein 24\.2 g, Fat 7 g, Energy 320 kcal, Carbs 40 g/);
+  const empty = doc.querySelector('[data-date="2026-07-28"]');
+  assert.equal(empty.querySelector('.week-grid__bar').dataset.state, 'none');
+  assert.equal(empty.querySelector('.week-grid__value').textContent, '—');
+  assert.equal(doc.querySelector('.week-grid__row-label[data-row="protein"] .week-grid__summary').textContent, 'hit 1/7');
+  assert.equal(doc.querySelector('.week-grid__row-label[data-row="fat"] .week-grid__summary').textContent, 'over 1/7');
+  assert.ok(doc.querySelector('#nutrition-meal-day #meal-history-day'), 'the day panel lives in its own card');
+  assert.ok(!doc.querySelector('#nutrition-meal-history #meal-history-day'));
+  window.happyDOM.abort();
 });

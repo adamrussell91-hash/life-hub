@@ -660,6 +660,19 @@ test('formatActionWriteDisplay falls back to cleaned diff when content has no ti
   assert.equal(display.path, 'tasks:task:task_abc');
 });
 
+test('formatActionWriteDisplay prefers a sibling title over a due_date patch dump', () => {
+  const display = formatActionWriteDisplay({
+    path: 'tasks:task:task_mut921wb_spoclx',
+    mode: 'append',
+    title: 'Korea holiday itinerary — add to with Corey',
+    content: JSON.stringify({ due_date: '2026-10-05' }),
+    diff: 'update task_mut921wb_spoclx: due_date'
+  });
+  assert.equal(display.label, 'Korea holiday itinerary — add to with Corey');
+  assert.equal(display.detail, 'update task_mut921wb_spoclx: due_date');
+  assert.equal(display.useCode, false);
+});
+
 test('formatActionWriteDisplay keeps useful update detail without dumping the blob id', () => {
   const display = formatActionWriteDisplay({
     path: 'tasks:task:task_appraisal',

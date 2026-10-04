@@ -3,6 +3,7 @@ import { buildAreaLine, straightLinePath } from './chart-kit/area-line.js';
 import {
   allowanceUsed,
   bandDomain,
+  buildBloodsBullseyes,
   buildFbcRadial,
   buildGlucoseMap,
   buildLipidRings,
@@ -22,6 +23,7 @@ import { formatShortMonth } from '../core/time.js';
 export {
   allowanceUsed,
   bandDomain,
+  buildBloodsBullseyes,
   buildFbcRadial,
   buildGlucoseMap,
   buildLipidRings,

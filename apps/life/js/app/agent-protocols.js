@@ -71,6 +71,12 @@ export const AGENT_PROTOCOLS = {
     pills: [
       { id: 'whats-running', label: "What's running", steer: 'Session Triage (gateway)', explain: 'Triage what’s live across the hubs.' },
       { id: 'decision', label: 'Decision help', steer: 'Decision Priority Hierarchy (provisional)', explain: 'Work a choice through the priority hierarchy.' },
+      {
+        id: 'thinking-protocol',
+        label: 'Thinking protocol',
+        steer: 'Knowledge Hub Thinking protocols — name exactly one catalog protocol (The Three Fates, Horizon Council, Refinery, Cartographers, Mirror Council, Consilium, Witness, Tribunal of Frames) with mode, why, and a #protocols deep link. Direction Session is not a Thinking protocol.',
+        explain: 'Pick one Knowledge Hub thinking protocol and why it fits.'
+      },
       { id: 'weekly-review', label: 'Week recap + plan', steer: 'Follow-on protocols — Weekly Review', explain: 'Recap the week that happened, then plan the next one.' },
       {
         id: 'sprint-checkin',

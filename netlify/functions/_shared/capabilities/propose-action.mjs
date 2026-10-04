@@ -172,7 +172,10 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
       path,
       mode,
       content,
-      diff: diff || defaultDiffSummary(mode, path, content)
+      diff: diff || defaultDiffSummary(mode, path, content),
+      ...(typeof entry.title === 'string' && entry.title.trim()
+        ? { title: entry.title.trim() }
+        : {})
     });
   }
 

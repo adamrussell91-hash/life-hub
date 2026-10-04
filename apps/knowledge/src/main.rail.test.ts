@@ -122,6 +122,16 @@ describe("Knowledge Hub rail", () => {
     expect(css).not.toMatch(/\.reader__tidy\s*\{[^}]*font-size:/);
   });
 
+  it("keeps Archive as one word on the phone header (T2)", () => {
+    expect(css).not.toMatch(/\.page-header__title,\s*\.reader__title\s*\{[^}]*overflow-wrap:\s*anywhere/);
+    expect(css).toMatch(/\.page-header__title\s*\{[^}]*overflow-wrap:\s*break-word/);
+    expect(css).toMatch(/\.page-header__title\s*\{[^}]*word-break:\s*normal/);
+    expect(css).toMatch(
+      /\.page-header__actions:has\(>\s*:not\(\.hub-utilities\)\)\s*\{[^}]*flex:\s*1 0 100%/,
+    );
+    expect(css).toMatch(/\.topbar,\s*\.page-header\s*\{[^}]*flex-wrap:\s*wrap/);
+  });
+
   it("puts Ask Clementine, From a book, and Write it yourself under one New note menu", () => {
     expect(main).toContain("function newNoteMenuHtml");
     expect(main).toContain("function bindNewNoteMenu");
