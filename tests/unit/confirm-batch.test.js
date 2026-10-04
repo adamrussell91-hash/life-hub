@@ -71,6 +71,26 @@ test('create-task and note patches are not batchable schedule moves', () => {
     }),
     false
   );
+  assert.equal(
+    isBatchableScheduleProposal({
+      writes: [
+        {
+          path: 'tasks:task:task_a',
+          mode: 'append',
+          content: JSON.stringify({ due_date: '2026-10-05' }),
+          diff: 'update due_date'
+        },
+        {
+          path: 'tasks:work_block:wblock_korea',
+          mode: 'create',
+          content: JSON.stringify({ id: 'wblock_korea', start_time: '08:30' }),
+          diff: 'block 08:30'
+        }
+      ]
+    }),
+    false,
+    'explicit Clare time-blocks must not merge into a Schedule Diff Confirm'
+  );
 });
 
 test('merge grows one proposal with shared intent', () => {

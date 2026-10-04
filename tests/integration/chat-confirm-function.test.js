@@ -1513,6 +1513,245 @@ test('explicit Clare time-block Confirm is not vetoed by Schedule Diff workday b
   assert.equal(tasks.data['work_blocks/wblock_korea'].start_time, '07:00');
 });
 
+function koreaLeadWrites({ koreaStart = '08:30', surfaces = ['confirm_card', 'governance_log'] } = {}) {
+  const koreaBlock = {
+    schema_version: 1,
+    id: 'wblock_korea',
+    task_id: 'task_mut921wb_spoclx',
+    title: 'Korea itinerary',
+    date: '2026-10-05',
+    start_time: koreaStart,
+    duration_minutes: 30,
+    status: 'confirmed',
+    source: 'clare'
+  };
+  const leadBlock = {
+    schema_version: 1,
+    id: 'wblock_lead',
+    task_id: 'task_mut921wb_bya2jc',
+    title: 'Lead accreditation',
+    date: '2026-10-06',
+    start_time: '10:30',
+    duration_minutes: 60,
+    status: 'confirmed',
+    source: 'clare'
+  };
+  return {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Update 2 tasks',
+    reads: [],
+    writes: [
+      {
+        path: 'tasks:task:task_mut921wb_spoclx',
+        mode: 'append',
+        content: JSON.stringify({ due_date: '2026-10-05' }),
+        diff: 'update task_mut921wb_spoclx: due_date'
+      },
+      {
+        path: 'tasks:work_block:wblock_korea',
+        mode: 'create',
+        content: JSON.stringify(koreaBlock),
+        diff: 'block 2026-10-05 08:30–09:00 · Korea itinerary'
+      },
+      {
+        path: 'tasks:task:task_mut921wb_bya2jc',
+        mode: 'append',
+        content: JSON.stringify({ due_date: '2026-10-06' }),
+        diff: 'update task_mut921wb_bya2jc: due_date'
+      },
+      {
+        path: 'tasks:work_block:wblock_lead',
+        mode: 'create',
+        content: JSON.stringify(leadBlock),
+        diff: 'block 2026-10-06 10:30–11:30 · Lead accreditation'
+      }
+    ],
+    surfaces
+  };
+}
+
+function actionConfirmHandler({ tasks, teaching }) {
+  const fetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  let getTeachingStore;
+  if (teaching === 'throw') {
+    getTeachingStore = async () => {
+      throw new Error('teaching store down');
+    };
+  } else if (teaching === undefined) {
+    getTeachingStore = async () => null;
+  } else {
+    getTeachingStore = async () => teaching;
+  }
+  return createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => tasks,
+    getTeachingStore
+  });
+}
+
+test('screenshot card: explicit Clare 8:30 Korea block writes even when a Monday lesson occupies 8:30', async () => {
+  const tasks = memoryBlobStore({
+    'tasks/task_mut921wb_spoclx': {
+      id: 'task_mut921wb_spoclx',
+      title: 'Korea holiday itinerary — add to with Corey',
+      due_date: '2026-10-04',
+      status: 'open',
+      created_at: '2026-10-04T03:16:51.611Z'
+    },
+    'tasks/task_mut921wb_bya2jc': {
+      id: 'task_mut921wb_bya2jc',
+      title: 'Lead accreditation — organise with Corey',
+      due_date: '2026-10-04',
+      status: 'open',
+      created_at: '2026-10-04T03:16:51.611Z'
+    }
+  });
+  const teaching = memoryBlobStore({
+    'scheduled_lessons/y12-mon': {
+      id: 'y12-mon',
+      title: 'Year 12 Advanced',
+      date: '2026-10-05',
+      start_time: '08:30',
+      duration_minutes: 50
+    }
+  });
+  const handler = actionConfirmHandler({ tasks, teaching });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: koreaLeadWrites()
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(payload));
+  assert.equal(tasks.data['tasks/task_mut921wb_spoclx'].due_date, '2026-10-05');
+  assert.equal(tasks.data['tasks/task_mut921wb_bya2jc'].due_date, '2026-10-06');
+  assert.equal(tasks.data['work_blocks/wblock_korea'].start_time, '08:30');
+  assert.equal(tasks.data['work_blocks/wblock_lead'].start_time, '10:30');
+});
+
+test('screenshot card as Schedule Diff still 409s against the Monday lesson, with a human message', async () => {
+  const tasks = memoryBlobStore({
+    'tasks/task_mut921wb_spoclx': {
+      id: 'task_mut921wb_spoclx',
+      title: 'Korea itinerary',
+      due_date: '2026-10-04',
+      status: 'open'
+    },
+    'tasks/task_mut921wb_bya2jc': {
+      id: 'task_mut921wb_bya2jc',
+      title: 'Lead accreditation',
+      due_date: '2026-10-04',
+      status: 'open'
+    }
+  });
+  const teaching = memoryBlobStore({
+    'scheduled_lessons/y12-mon': {
+      id: 'y12-mon',
+      title: 'Year 12 Advanced',
+      date: '2026-10-05',
+      start_time: '08:30',
+      duration_minutes: 50
+    }
+  });
+  const handler = actionConfirmHandler({ tasks, teaching });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: koreaLeadWrites({ surfaces: ['confirm_card', 'schedule_diff'] })
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 409, JSON.stringify(payload));
+  assert.equal(payload.error.code, 'stale_schedule_collision');
+  assert.match(payload.error.message, /Year 12 Advanced/);
+  assert.equal(tasks.data['work_blocks/wblock_korea'], undefined);
+});
+
+test('explicit Clare time-block Confirm does not require a Teaching blob store', async () => {
+  const tasks = memoryBlobStore({
+    'tasks/task_mut921wb_spoclx': {
+      id: 'task_mut921wb_spoclx',
+      title: 'Korea itinerary',
+      due_date: '2026-10-04',
+      status: 'open'
+    },
+    'tasks/task_mut921wb_bya2jc': {
+      id: 'task_mut921wb_bya2jc',
+      title: 'Lead accreditation',
+      due_date: '2026-10-04',
+      status: 'open'
+    }
+  });
+  const handler = actionConfirmHandler({ tasks, teaching: undefined });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: koreaLeadWrites()
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(payload));
+  assert.equal(tasks.data['work_blocks/wblock_korea'].start_time, '08:30');
+});
+
+test('explicit Clare time-block Confirm still writes when Teaching blobs throw', async () => {
+  const tasks = memoryBlobStore({
+    'tasks/task_mut921wb_spoclx': {
+      id: 'task_mut921wb_spoclx',
+      title: 'Korea itinerary',
+      due_date: '2026-10-04',
+      status: 'open'
+    },
+    'tasks/task_mut921wb_bya2jc': {
+      id: 'task_mut921wb_bya2jc',
+      title: 'Lead accreditation',
+      due_date: '2026-10-04',
+      status: 'open'
+    }
+  });
+  const handler = actionConfirmHandler({ tasks, teaching: 'throw' });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: koreaLeadWrites()
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(payload));
+  assert.equal(tasks.data['work_blocks/wblock_korea'].start_time, '08:30');
+});
+
+test('Schedule Diff Confirm fail-closes when Teaching blobs throw', async () => {
+  const tasks = memoryBlobStore({
+    'tasks/task_mut921wb_spoclx': {
+      id: 'task_mut921wb_spoclx',
+      title: 'Korea itinerary',
+      due_date: '2026-10-04',
+      status: 'open'
+    }
+  });
+  const handler = actionConfirmHandler({ tasks, teaching: 'throw' });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: koreaLeadWrites({ surfaces: ['confirm_card', 'schedule_diff'] })
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 503, JSON.stringify(payload));
+  assert.equal(payload.error.code, 'schedule_validation_unavailable');
+  assert.equal(tasks.data['work_blocks/wblock_korea'], undefined);
+});
+
+
 
 
 test('N: confirming pending A with B\'s write path is rejected; neither proposal is consumed or written', async () => {

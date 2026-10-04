@@ -1094,6 +1094,22 @@ export function createChatConfirmHandler({
     // Confirm) must not reuse that veto — it turned "Korea 8:30am" into a
     // generic "Saving that action failed" with no reason.
     if (isScheduleDiffProposal(stored, proposal)) {
+      if (!blobStores.teaching) {
+        try {
+          blobStores.teaching = await getTeachingStore(env);
+        } catch {
+          blobStores.teaching = null;
+        }
+      }
+      if (!blobStores.teaching) {
+        return errorResponse(
+          503,
+          'schedule_validation_unavailable',
+          'Authoritative schedule data could not be loaded. Confirm was not run.',
+          true,
+          PRIVATE_CACHE
+        );
+      }
       const scheduleCollision = await checkStaleWorkBlockCollisions(accepted, blobStores, {
         stored,
         client,
@@ -2106,8 +2122,7 @@ async function loadBlobStoresForWrites(writes, {
     const kind = classifyWriteTarget(write.path).kind;
     return kind === 'goal' || kind === 'goal_checkin';
   });
-  const needsTeaching = writes.some(write => classifyWriteTarget(write.path).store === 'teaching')
-    || writes.some(write => classifyWriteTarget(write.path).kind === 'work_block');
+  const needsTeachingWrites = writes.some(write => classifyWriteTarget(write.path).store === 'teaching');
   const needsPeople = writes.some(write => classifyWriteTarget(write.path).store === 'people');
   const needsTravel = writes.some(write => classifyWriteTarget(write.path).store === 'travel');
   const needsKnowledge = writes.some(write => classifyWriteTarget(write.path).store === 'knowledge');
@@ -2120,7 +2135,10 @@ async function loadBlobStoresForWrites(writes, {
   let professionalStore = null;
   try {
     if (needsTasks) stores.tasks = await getTasksStore(env);
-    if (needsTeaching) stores.teaching = await getTeachingStore(env);
+    // Teaching is only required for teaching writes. Explicit Clare time-block
+    // Confirm stores work_blocks in Tasks; do not 503 the whole Confirm because
+    // Teaching blobs throw or are unbound. Schedule Diff loads teaching itself.
+    if (needsTeachingWrites) stores.teaching = await getTeachingStore(env);
     if (needsPeople) peopleStore = await getPeopleStore(env);
     if (needsProfessional || needsProfessionalWrites) professionalStore = await getProfessionalStore(env);
   } catch {
@@ -2134,7 +2152,7 @@ async function loadBlobStoresForWrites(writes, {
       nowIso: () => new Date(now()).toISOString()
     });
   }
-  if (needsTeaching && !stores.teaching) return { ok: false, error: 'teaching_blobs_unbound' };
+  if (needsTeachingWrites && !stores.teaching) return { ok: false, error: 'teaching_blobs_unbound' };
   if (needsPeople) {
     if (!peopleStore) return { ok: false, error: 'people_blobs_unbound' };
     if (needsProfessional && !professionalStore) return { ok: false, error: 'professional_blobs_unbound' };
