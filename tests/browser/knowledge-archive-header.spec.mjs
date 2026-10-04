@@ -26,6 +26,7 @@ const pageHtml = `<!doctype html>
 </head>
 <body style="margin:0">
   <div class="app-shell">
+    <aside class="rail hub-rail" aria-hidden="true"></aside>
     <main class="canvas">
       <header class="topbar page-header">
         <div class="page-header__copy">
@@ -130,11 +131,15 @@ test('Archive title and header actions share one row at 1280', async () => {
       const actionsBox = actions.getBoundingClientRect();
       return {
         lines: title.getClientRects().length,
+        titleWidth: titleBox.width,
+        titleHeight: titleBox.height,
         titleRight: titleBox.right,
         actionsLeft: actionsBox.left
       };
     });
     assert.equal(metrics.lines, 1);
+    assert.ok(metrics.titleWidth > 80, `title collapsed (${metrics.titleWidth}px)`);
+    assert.ok(metrics.titleHeight < 64, `title stacked by letter (${metrics.titleHeight}px)`);
     assert.ok(
       metrics.actionsLeft >= metrics.titleRight - 1,
       `desktop actions overlapped the title (titleRight=${metrics.titleRight}, actionsLeft=${metrics.actionsLeft})`
