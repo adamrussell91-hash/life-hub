@@ -1,0 +1,109 @@
+<div id="capacity-compare">
+  <div class="cc-top"><div><span class="cc-eyebrow">LIFE HUB · FORECAST LAB</span><h2>The same day. Two ways to read it.</h2></div><span class="cc-tag">Assumed history</span></div>
+  <div class="cc-scenarios" aria-label="Forecast scenarios">
+    <button type="button" class="cursor-interaction" data-preset="missing" aria-pressed="true">Two days without sleep answers</button>
+    <button type="button" class="cursor-interaction" data-preset="checkin" aria-pressed="false">Morning check-in</button>
+    <button type="button" class="cursor-interaction" data-preset="poorHeavy" aria-pressed="false">Poor sleep + heavy yesterday</button>
+    <button type="button" class="cursor-interaction" data-preset="recovering" aria-pressed="false">Full capacity · peaches</button>
+  </div>
+  <div class="cc-columns">
+    <section class="cc-model" aria-labelledby="cc-current-title">
+      <header><span class="cc-eyebrow">CURRENT · EXISTING FORMULA</span><h3 id="cc-current-title">A diary-led snapshot</h3></header>
+      <div class="cc-inputs">
+        <div class="cc-input"><div class="cc-label">Mood <span>Diary · usually evening</span></div><div class="cc-options" data-field="mood"><button data-value="unknown">Not entered</button><button data-value="low">Low · 3/10</button><button data-value="okay">Okay · 6/10</button><button data-value="good">Good · 8/10</button></div></div>
+        <div class="cc-input"><div class="cc-label">Energy <span>Diary</span></div><div class="cc-options" data-field="energy"><button data-value="unknown">Not entered</button><button data-value="low">Low</button><button data-value="medium">Medium</button><button data-value="high">High</button></div></div>
+        <div class="cc-input"><div class="cc-label">Sleep hours <span>Dedicated log</span></div><div class="cc-options" data-field="hours"><button data-value="unknown">Not entered</button><button data-value="5">5 h</button><button data-value="6">6 h</button><button data-value="7">7+ h</button></div></div>
+        <div class="cc-input"><div class="cc-label">Symptoms <span>Diary only</span></div><div class="cc-options" data-field="diarySymptoms"><button data-value="unknown">Not entered</button><button data-value="none">None</button><button data-value="one">One</button><button data-value="two">Two or more</button></div></div>
+        <div class="cc-input cc-static"><div class="cc-label">Earlier low days <span>Within calculation range</span></div><div class="cc-history">Last diary: <strong>40%</strong> · two days ago<br>Previous low logged days: <strong>2</strong></div></div>
+        <div class="cc-unused"><span>Outside the percentage calculation</span><div>Medical records · Central Node · Tasks · Work sessions · Workouts · Sleep quality</div></div>
+      </div>
+      <div class="cc-result" aria-live="polite"><div class="cc-result-label" data-old-label>Forecast · no entry today</div><div class="cc-score"><span data-old-score>66</span><span>%</span></div><div class="cc-meter" role="meter" aria-label="Current capacity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="66"><div data-old-fill></div></div><div class="cc-result-detail" data-old-detail>Automatic recovery towards 80%</div><div class="cc-status" data-old-status>No uncertainty estimate</div></div>
+    </section>
+    <section class="cc-model cc-proposed" aria-labelledby="cc-new-title">
+      <header><span class="cc-eyebrow">PROPOSED · ILLUSTRATIVE MODEL</span><h3 id="cc-new-title">History, health and a quick check-in</h3><div class="cc-small">Energy 25% · focus 25% · health 20% · sleep 20% · mood 10%</div></header>
+      <div class="cc-inputs">
+        <div class="cc-input"><div class="cc-label">Morning mood <span>Same answer as left</span></div><div class="cc-options" data-field="mood"><button data-value="unknown">Not entered</button><button data-value="low">Low · 3/10</button><button data-value="okay">Okay · 6/10</button><button data-value="good">Good · 8/10</button></div></div>
+        <div class="cc-input"><div class="cc-label">Energy & focus <span>Quick check-in</span></div><div class="cc-options" data-field="energy"><button data-value="unknown">Energy unknown</button><button data-value="low">Low</button><button data-value="medium">Medium</button><button data-value="high">High</button></div><div class="cc-options" data-field="focus"><button data-value="unknown">Focus unknown</button><button data-value="foggy">Foggy</button><button data-value="okay">Okay</button><button data-value="clear">Clear</button></div></div>
+        <div class="cc-input"><div class="cc-label">Sleep quality <span>Optional · never a gate</span></div><div class="cc-options" data-field="sleep"><button data-value="missing">No answer</button><button data-value="poor">Poor</button><button data-value="fair">Fair</button><button data-value="good">Good</button></div><div class="cc-options" data-field="missingDays"><button data-value="1">1 day missing</button><button data-value="2">2 days</button><button data-value="4">4 days</button><button data-value="7">7 days</button></div><div class="cc-small" data-sleep-note>Last sleep report: poor · two days ago</div></div>
+        <div class="cc-input"><div class="cc-label">Health & recovery <span>Medical + diary + Central Node</span></div><div class="cc-options" data-field="health"><button data-value="ill">Still unwell</button><button data-value="improving">Improving</button><button data-value="resolved">Resolved</button></div><div class="cc-small">Same illness across sources counts once</div></div>
+        <div class="cc-input"><div class="cc-label">Yesterday’s actual work <span>Tasks work sessions</span></div><div class="cc-options" data-field="work"><button data-value="light">Light · 1 h</button><button data-value="moderate">Moderate · 3 h</button><button data-value="heavy">Heavy · 6 h</button></div></div>
+        <div class="cc-input"><div class="cc-label">Yesterday’s exercise <span>Fitness logs</span></div><div class="cc-options" data-field="exercise"><button data-value="gentle">Gentle / rest</button><button data-value="hard">Hard session</button></div></div>
+        <div class="cc-input cc-static"><div class="cc-label">History & today’s plan <span>Available before any answer</span></div><div class="cc-history">Yesterday’s state estimate <strong>43</strong> · 7-day mean <strong>49</strong> · usual baseline <strong>75</strong></div><div class="cc-small">Today: 4½ h planned · 2 h demanding work<br>Teaching, travel and protected time included in the plan</div></div>
+        <div class="cc-input cc-static"><div class="cc-label">Other context <span>Life Hub + Central Node</span></div><div class="cc-small">Medication taken: unknown · nutrition: partial logs<br>Unknowns contribute no invented deduction</div></div>
+      </div>
+      <div class="cc-result" aria-live="polite"><div class="cc-result-label">Estimated capacity · available now</div><div class="cc-score"><span data-new-score>41</span><span>/100</span></div><div class="cc-meter cc-range" role="meter" aria-label="Proposed capacity index" aria-valuemin="0" aria-valuemax="100" aria-valuenow="41"><div data-new-fill></div><span data-new-range></span></div><div class="cc-result-detail" data-new-detail>Illustrative range 28–54 · limited confidence</div><div class="cc-small" data-new-drains></div><div class="cc-status" data-new-status>Still working · sleep unanswered for 2 days</div></div>
+    </section>
+  </div>
+  <div class="cc-foot"><span>Current: exact formula for the assumed inputs</span><span>100 = full capacity to smash your day · weights and ranges are illustrative</span></div>
+</div>
+<style>
+#capacity-compare{--cc-bg:light-dark(#f7f8fa,#171c23);--cc-panel:light-dark(#ffffff,#222a34);--cc-text:light-dark(#1d3349,#e6edf5);--cc-sub:light-dark(#53677a,#b5c3d1);--cc-line:light-dark(#dce4eb,#3b4857);--cc-wash:light-dark(#edf2f6,#2b3642);--cc-old:light-dark(#7c92a9,#91a9c2);--cc-new:light-dark(#277c76,#65bfb4);--cc-selected:light-dark(#263e53,#d3e4f4);--cc-selected-text:light-dark(#ffffff,#203142);background:var(--cc-bg);color:var(--cc-text);font:400 14px/1.5 system-ui,sans-serif;border-radius:20px;padding:26px;box-sizing:border-box;color-scheme:light dark}
+#capacity-compare *{box-sizing:border-box}#capacity-compare h2{font-size:24px;line-height:1.2;font-weight:500;margin:7px 0 0;letter-spacing:-.6px}#capacity-compare h3{font-size:19px;font-weight:500;margin:5px 0 0;letter-spacing:-.3px}#capacity-compare strong{font-weight:500}#capacity-compare .cc-top{display:flex;align-items:center;justify-content:space-between;gap:18px;padding-right:75px;margin-bottom:22px}#capacity-compare .cc-eyebrow{font-size:11px;letter-spacing:1.3px;color:var(--cc-sub);font-weight:500}#capacity-compare .cc-tag{background:var(--cc-wash);padding:5px 10px;border-radius:20px;color:var(--cc-sub);font-size:12px;white-space:nowrap}#capacity-compare .cc-scenarios{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}#capacity-compare button{font:inherit;color:var(--cc-text);background:var(--cc-panel);border:1px solid var(--cc-line);border-radius:18px;padding:6px 11px;min-height:34px;text-align:center}#capacity-compare button[aria-pressed=true]{background:var(--cc-selected);color:var(--cc-selected-text);border-color:var(--cc-selected)}#capacity-compare button:focus-visible{outline:3px solid var(--cc-new);outline-offset:3px}#capacity-compare .cc-columns{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}#capacity-compare .cc-model{background:var(--cc-panel);border:1px solid var(--cc-line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;min-width:0}#capacity-compare .cc-model header{padding:20px 20px 16px;border-bottom:1px solid var(--cc-line)}#capacity-compare .cc-inputs{padding:4px 20px 16px;flex:1}#capacity-compare .cc-input{padding:13px 0;border-bottom:1px solid var(--cc-line)}#capacity-compare .cc-input:last-child{border-bottom:0}#capacity-compare .cc-label{font-weight:500;display:flex;justify-content:space-between;flex-wrap:wrap;gap:3px 8px;margin-bottom:8px}#capacity-compare .cc-label span{font-weight:400;font-size:11px;color:var(--cc-sub)}#capacity-compare .cc-options{display:flex;flex-wrap:wrap;gap:5px;margin:5px 0}#capacity-compare .cc-options button{font-size:12px;padding:5px 9px;min-height:30px}#capacity-compare .cc-small{font-size:12px;color:var(--cc-sub);margin-top:7px}#capacity-compare .cc-history{font-size:12px;color:var(--cc-sub)}#capacity-compare .cc-history strong{color:var(--cc-text)}#capacity-compare .cc-unused{margin-top:20px;color:var(--cc-sub);font-size:12px;line-height:1.8}#capacity-compare .cc-unused>span{display:block;font-weight:500;margin-bottom:5px}#capacity-compare .cc-result{border-top:1px solid var(--cc-line);padding:23px 20px 21px;background:var(--cc-wash);min-height:213px}#capacity-compare .cc-result-label{font-size:12px;color:var(--cc-sub)}#capacity-compare .cc-score{display:flex;align-items:baseline;gap:5px;margin:7px 0 14px;font-variant-numeric:tabular-nums}#capacity-compare .cc-score>span:first-child{font-size:49px;line-height:1;font-weight:500;letter-spacing:-2px}#capacity-compare .cc-score>span:last-child{font-size:18px;color:var(--cc-sub)}#capacity-compare .cc-meter{height:9px;background:color-mix(in srgb,var(--cc-sub) 12%,transparent);border-radius:7px;position:relative;margin-bottom:15px}#capacity-compare .cc-meter>div{height:100%;width:66%;background:var(--cc-old);border-radius:7px;transition:width .25s}#capacity-compare .cc-proposed .cc-meter>div{background:var(--cc-new)}#capacity-compare .cc-range>span{position:absolute;top:-4px;height:17px;background:color-mix(in srgb,var(--cc-new) 20%,transparent);border-radius:5px;transition:left .25s,width .25s}#capacity-compare .cc-result-detail{font-size:12px;color:var(--cc-sub)}#capacity-compare .cc-status{font-size:12px;font-weight:500;margin-top:8px}#capacity-compare .cc-foot{display:flex;justify-content:space-between;gap:14px;font-size:11px;color:var(--cc-sub);margin-top:13px}#capacity-compare .cc-foot>span{width:50%}
+@media(max-width:650px){#capacity-compare{padding:16px}#capacity-compare .cc-columns{grid-template-columns:1fr}#capacity-compare .cc-top{padding-right:0;align-items:flex-start}#capacity-compare h2{font-size:21px}#capacity-compare .cc-tag{display:none}#capacity-compare .cc-foot{flex-direction:column}#capacity-compare .cc-foot>span{width:auto}}
+@media(pointer:coarse){#capacity-compare button,#capacity-compare .cc-options button{min-height:44px}}
+@media(prefers-reduced-motion:reduce){#capacity-compare .cc-meter>div,#capacity-compare .cc-range>span{transition:none}}
+</style>
+<script>
+(()=>{
+const root=document.getElementById('capacity-compare');
+const defaults={mood:'unknown',energy:'unknown',hours:'unknown',diarySymptoms:'unknown',focus:'unknown',sleep:'missing',missingDays:'2',health:'improving',work:'heavy',exercise:'gentle'};
+let state={...defaults};
+const allowed={mood:['unknown','low','okay','good'],energy:['unknown','low','medium','high'],hours:['unknown','5','6','7'],diarySymptoms:['unknown','none','one','two'],focus:['unknown','foggy','okay','clear'],sleep:['missing','poor','fair','good'],missingDays:['1','2','4','7'],health:['ill','improving','resolved'],work:['light','moderate','heavy'],exercise:['gentle','hard']};
+function restore(s){const saved=s?.privateContent?.inputs;if(!saved)return;for(const key of Object.keys(defaults))if(allowed[key].includes(saved[key]))state[key]=saved[key];}
+restore(window.openai?.widgetState);
+const clamp=n=>Math.round(Math.max(10,Math.min(95,n)));
+const readiness=n=>Math.round(Math.max(0,Math.min(100,n)));
+function scores(){
+ const logged=state.mood!=='unknown'||state.energy!=='unknown'||state.hours!=='unknown'||state.diarySymptoms!=='unknown';
+ const old=logged?clamp(80+(state.mood==='low'?-8:0)+({unknown:0,low:-15,medium:0,high:8}[state.energy])+(state.hours==='unknown'?0:-Math.min(30,(7-Number(state.hours))*8))+({unknown:0,none:0,one:-15,two:-25}[state.diarySymptoms])-8):clamp(80+(40-80)*Math.pow(.6,2));
+ const days=Number(state.missingDays);
+ // These are demonstration mappings, not fitted clinical coefficients.
+ // History supplies unanswered dimensions; it never caps a fresh observation.
+ const baseline=Math.round(.55*43+.30*49+.15*75);
+ const energy=state.energy==='unknown'?baseline:{low:30,medium:70,high:100}[state.energy];
+ const focus=state.focus==='unknown'?baseline:{foggy:30,okay:70,clear:100}[state.focus];
+ const mood=state.mood==='unknown'?baseline:{low:30,okay:70,good:100}[state.mood];
+ let sleep=state.sleep==='missing'?35:{poor:25,fair:70,good:100}[state.sleep];
+ if(state.hours!=='unknown'){
+   const duration={5:45,6:70,7:100}[state.hours];
+   // One sleep dimension, not two separate penalties. Adequate duration
+   // does not erase an explicit report of poor sleep quality.
+   sleep=Math.min(sleep,duration);
+ }
+ let health={ill:30,improving:65,resolved:100}[state.health];
+ if(state.diarySymptoms==='one')health=Math.min(health,65);
+ if(state.diarySymptoms==='two')health=Math.min(health,35);
+ // Recovery costs survive a fresh check-in. Good recovery attenuates them;
+ // a cheerful mood or a clear-focus answer does not erase them.
+ const base=.25*energy+.25*focus+.10*mood+.20*health+.20*sleep;
+ const recoveryFactor=state.sleep==='missing'?.7:sleep>=85?.4:sleep>=60?.7:1;
+ const workCost={light:0,moderate:3,heavy:8}[state.work]*recoveryFactor;
+ const exerciseCost=(state.exercise==='hard'?5:0)*recoveryFactor;
+ const interactionCost=state.sleep!=='missing'&&sleep<60&&state.work==='heavy'?5:0;
+ const next=readiness(base-workCost-exerciseCost-interactionCost);
+ const unanswered=[state.mood,state.energy,state.focus].filter(v=>v==='unknown').length;
+ const spread=6+unanswered+(state.sleep==='missing'?Math.min(12,days*2):0);
+ return {old,next,logged,low:Math.max(0,next-spread),high:Math.min(100,next+spread),spread,days,base,workCost,exerciseCost,interactionCost};
+}
+function render(){
+ const s=scores();
+ for(const group of root.querySelectorAll('[data-field]'))for(const button of group.querySelectorAll('button')){button.type='button';button.classList.add('cursor-interaction');button.setAttribute('aria-pressed',String(state[group.dataset.field]===button.dataset.value));if(group.dataset.field==='missingDays')button.disabled=state.sleep!=='missing';}
+ root.querySelector('[data-old-score]').textContent=s.old;root.querySelector('[data-new-score]').textContent=s.next;
+ root.querySelector('[data-old-fill]').style.width=s.old+'%';root.querySelector('[data-new-fill]').style.width=s.next+'%';
+ root.querySelector('[data-new-range]').style.left=s.low+'%';root.querySelector('[data-new-range]').style.width=(s.high-s.low)+'%';
+ root.querySelector('[data-old-label]').textContent=s.logged?'Capacity · solid / diary or sleep logged':'Forecast · no diary or sleep entry today';
+ root.querySelector('[data-old-detail]').textContent=s.logged?'80% baseline + today’s fixed adjustments':'40% two days ago → assumed recovery to '+s.old+'%';
+ root.querySelector('[data-old-status]').textContent='No uncertainty estimate';
+ root.querySelector('[data-new-detail]').textContent='Illustrative range '+s.low+'–'+s.high+' · '+(s.spread>10?'limited':'moderate')+' confidence';
+ const points=n=>Number(n.toFixed(1));
+ root.querySelector('[data-new-drains]').textContent='Readiness '+points(s.base)+' · work −'+points(s.workCost)+' · exercise −'+points(s.exerciseCost)+' · recovery interaction −'+points(s.interactionCost);
+ root.querySelector('[data-new-status]').textContent=s.next>=90?'Ready to smash your day'+(state.sleep==='missing'?' · sleep uncertain':''):state.sleep==='missing'?'Still working · sleep unanswered for '+s.days+' day'+(s.days===1?'':'s'):'Sleep and yesterday’s effort still count';
+ root.querySelector('[data-sleep-note]').textContent=state.sleep==='missing'?'Last sleep report: poor · '+s.days+' day'+(s.days===1?'':'s')+' ago':'Today’s sleep quality: '+state.sleep;
+ const meters=root.querySelectorAll('[role=meter]');meters[0].setAttribute('aria-valuenow',String(s.old));meters[1].setAttribute('aria-valuenow',String(s.next));
+}
+function save(){const s=scores();window.openai?.setWidgetState?.({modelContent:{scenario:'hypothetical school day; latest diary 40 two days ago; personal baseline 75; prior-day state 43; seven-day mean 49',inputs:state,currentScore:s.old,illustrativeProposedIndex:s.next,illustrativeRange:[s.low,s.high]},privateContent:{inputs:state}})?.catch(()=>{});}
+root.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;const group=b.closest('[data-field]');if(group){state[group.dataset.field]=b.dataset.value;for(const p of root.querySelectorAll('[data-preset]'))p.setAttribute('aria-pressed','false');}else if(b.dataset.preset){state={...defaults};if(b.dataset.preset==='checkin')Object.assign(state,{mood:'okay',energy:'low',focus:'foggy',sleep:'fair'});if(b.dataset.preset==='poorHeavy')Object.assign(state,{mood:'good',energy:'high',hours:'7',diarySymptoms:'none',focus:'clear',sleep:'poor',health:'resolved',work:'heavy'});if(b.dataset.preset==='recovering')Object.assign(state,{mood:'good',energy:'high',hours:'7',diarySymptoms:'none',focus:'clear',sleep:'good',health:'resolved',work:'light'});for(const p of root.querySelectorAll('[data-preset]'))p.setAttribute('aria-pressed',String(p===b));}render();save();});
+window.addEventListener('openai:set_globals',e=>{restore(e.detail?.globals?.widgetState);render();});
+render();
+})();
+</script>
