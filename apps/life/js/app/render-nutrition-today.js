@@ -215,6 +215,7 @@ function paintClimb(root, svg, model, options) {
   svg.setAttribute('width', String(width));
   svg.setAttribute('height', String(height));
   const { left, right, top, base } = chart.plot;
+  const MARKER_Y = base + 30;
   const nodes = [];
 
   if (chart.goalBand) {
@@ -226,7 +227,7 @@ function paintClimb(root, svg, model, options) {
     nodes.push(svgNode(doc, 'text', { x: left - 5, y: tick.y + 3, 'text-anchor': 'end', class: 'climb-axis' }, String(tick.grams)));
   }
   for (const tick of chart.ticks) {
-    nodes.push(svgNode(doc, 'text', { x: tick.x, y: height - 4, 'text-anchor': 'middle', class: 'climb-axis' }, tick.label));
+    nodes.push(svgNode(doc, 'text', { x: tick.x, y: base + 13, 'text-anchor': 'middle', class: 'climb-axis' }, tick.label));
   }
   if (chart.usualPath) {
     nodes.push(titled(doc, svgNode(doc, 'path', { d: chart.usualPath, class: 'climb-usual climb-fade', style: '--d:200ms' }),
@@ -242,14 +243,14 @@ function paintClimb(root, svg, model, options) {
     nodes.push(svgNode(doc, 'path', { d: chart.stepPath, class: 'climb-line', 'data-role': 'climb-line', style: `--len:${Math.ceil(chart.length)};--d:250ms;--dur:1300ms` }));
     for (const marker of chart.markers) {
       const delay = Math.round(250 + 1300 * marker.progress);
-      nodes.push(svgNode(doc, 'line', { x1: marker.x, x2: marker.x, y1: base, y2: base + 8, class: 'climb-tick climb-fade', style: `--d:${delay}ms` }));
+      nodes.push(svgNode(doc, 'line', { x1: marker.x, x2: marker.x, y1: base, y2: base + 18, class: 'climb-tick climb-fade', style: `--d:${delay}ms` }));
       const group = svgNode(doc, 'g', {
         class: 'climb-marker climb-pop',
         'data-time-known': String(marker.timeKnown),
-        style: `--d:${delay}ms;transform-origin:${marker.x}px ${base + 18}px`
+        style: `--d:${delay}ms;transform-origin:${marker.x}px ${MARKER_Y}px`
       });
-      group.append(svgNode(doc, 'circle', { cx: marker.x, cy: base + 18, r: marker.r, class: 'climb-marker__dot' }));
-      group.append(svgNode(doc, 'text', { x: marker.x, y: base + 18 + marker.r + 11, 'text-anchor': 'middle', class: 'climb-marker__label' }, marker.label));
+      group.append(svgNode(doc, 'circle', { cx: marker.x, cy: MARKER_Y, r: marker.r, class: 'climb-marker__dot' }));
+      group.append(svgNode(doc, 'text', { x: marker.x, y: MARKER_Y + marker.r + 11, 'text-anchor': 'middle', class: 'climb-marker__label' }, marker.label));
       titled(doc, group, marker.meals.map(meal => (
         `${meal.label} · ${formatClock(meal.minutes)} · ${formatGrams(meal.protein_g)} g protein${meal.timeKnown === false ? ' · time not logged' : ''}`
       )).join('\n'));
@@ -274,7 +275,8 @@ function paintClimb(root, svg, model, options) {
     const p = chart.projection;
     nodes.push(svgNode(doc, 'line', { x1: p.x1, y1: p.y1, x2: p.x2, y2: p.y2, class: 'climb-projection climb-fade', style: '--d:1750ms' }));
     nodes.push(svgNode(doc, 'text', {
-      x: right - 2, y: Math.min(base - 6, (p.y1 + p.y2) / 2 + 14), 'text-anchor': 'end', class: 'climb-projection-label climb-fade', style: '--d:1850ms'
+      // Below the current total, right of now: the dashed line only rises from there.
+      x: right - 2, y: Math.min(base - 6, p.y1 + 16), 'text-anchor': 'end', class: 'climb-projection-label climb-fade', style: '--d:1850ms'
     }, `${formatGrams(p.remaining)} g to go before bed`));
   } else if (chart.goalHitMinutes != null && chart.goalBand) {
     nodes.push(svgNode(doc, 'text', {

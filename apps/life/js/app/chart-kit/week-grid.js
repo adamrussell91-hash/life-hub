@@ -39,15 +39,15 @@ export function buildWeekGrid(days) {
     const cells = days.map((day, index) => {
       const value = values[index];
       if (!day.logged || !Number.isFinite(value)) {
-        return { date: day.date, logged: false, value: null, pct: 0, state: 'none', target: targets[index] };
+        return { date: day.date, logged: false, value: null, pct: 0, state: 'none', target: targets[index] || target };
       }
       return {
         date: day.date,
         logged: true,
         value,
         pct: (value / max) * 100,
-        state: cellState(row.kind, value, targets[index]),
-        target: targets[index]
+        state: cellState(row.kind, value, targets[index] || target),
+        target: targets[index] || target
       };
     });
     return {

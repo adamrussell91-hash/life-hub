@@ -36,6 +36,8 @@ test('summaries count logged days only and say what they mean', () => {
 test('an unlogged day is a stub, never a zero bar', () => {
   const [protein] = buildWeekGrid(week);
   assert.deepEqual(protein.cells[5], { date: '2026-10-03', logged: false, value: null, pct: 0, state: 'none', target: 120 });
+  const unlogged = buildWeekGrid(week.map((entry, index) => (index === 5 ? { ...entry, targets: {} } : entry)));
+  assert.equal(unlogged[0].cells[5].target, 120, 'an unlogged day borrows the week target so the line runs across the row');
 });
 
 test('row max includes the target so the target line stays inside the cell', () => {

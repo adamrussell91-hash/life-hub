@@ -30,7 +30,7 @@ export function buildProteinClimb({
   height = 200,
   padding = {}
 } = {}) {
-  const pad = { left: 30, right: 14, top: 22, bottom: 52, ...padding };
+  const pad = { left: 30, right: 14, top: 22, bottom: 64, ...padding };
   const sorted = meals
     .filter(meal => Number.isFinite(meal.minutes))
     .map(meal => ({ ...meal, protein_g: Math.max(0, Number(meal.protein_g) || 0) }))

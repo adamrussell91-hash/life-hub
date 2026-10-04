@@ -56,75 +56,70 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
     assert.equal(await page.locator('.page-header__title-row .hub-mark').count(), 0);
 
     assert.equal(await page.locator('#nutrition-energy-slider').count(), 0);
-    assert.equal(await page.locator('[data-split="energy"]').textContent(), '1,130 / 1,900 kcal');
-    assert.equal(await page.locator('[data-split="protein"]').textContent(), '80 g / 120 g');
-    assert.equal(await page.locator('[data-split="fat"]').textContent(), '27 g / 50 g');
-    assert.equal(await page.locator('#nutrition-meal-protein-pie').count(), 1);
-    assert.equal(await page.getByText('Protein by meal', { exact: true }).count(), 1);
-    assert.equal(await page.locator('.meal-breakdown-card').count(), 0);
-    assert.equal(await page.locator('[data-meal-breakdown-empty]').count(), 0);
-    assert.equal(await page.locator('[data-nutrition-ring="protein"]').count(), 0);
-    assert.equal(await page.locator('[data-nutrition-ring="calories"]').count(), 0);
-    assert.equal(await page.locator('[data-nutrition-ring="fat"]').count(), 0);
-    assert.equal(await page.locator('[data-nutrition-ring="sodium"]').count(), 1);
-    assert.equal(await page.locator('[data-nutrition-ring="calcium"]').count(), 1);
-    assert.equal(await page.locator('#nutrition-protein-chart [data-role="last-point"]').count(), 0);
-    assert.equal(await page.locator('#nutrition-calories-chart').count(), 1);
-    assert.equal(await page.locator('#nutrition-meal-timing').count(), 0);
-    assert.equal(await page.locator('[data-nutrition="polyphenol-pill"]').count(), 1);
-    assert.equal(
-      await page.locator('#nutrition-protein-chart').getAttribute('preserveAspectRatio'),
-      'xMidYMid meet'
-    );
-    assert.equal(await page.locator('[data-nutrition="rolling-caption"]').count(), 0);
-    assert.equal(await page.locator('#nutrition-protein-chart [data-role="guide-labels"] .chart-guide-label').count(), 2);
-    assert.equal(await page.locator('#nutrition-fat-chart [data-role="guide-labels"] .chart-guide-label').count(), 1);
-    assert.deepEqual(await page.locator('#nutrition-protein-chart .chart-guide-label').allTextContents(), ['goal', 'avg']);
-    assert.deepEqual(await page.locator('#nutrition-fat-chart .chart-guide-label').allTextContents(), ['ceiling']);
-    const avgLabelY = Number(await page.locator('#nutrition-protein-chart .chart-guide-label--avg').getAttribute('y'));
-    const finalValueLabelY = Number(await page.locator('#nutrition-protein-chart [data-role="value-labels"] text').last().getAttribute('y'));
-    assert.ok(avgLabelY < finalValueLabelY, 'average label sits above the final value label');
-    assert.equal(await page.locator('#nutrition-week-compare').count(), 0);
-    assert.equal(await page.locator('#nutrition-macro-split').count(), 1);
-
-    const heatmapTiles = page.locator('#nutrition-heatmap .heatmap-tile');
-    assert.equal(await heatmapTiles.count(), 30);
+    const legend = page.locator('#nutrition-ring-legend li');
+    assert.deepEqual(await legend.evaluateAll(items => items.map(item => item.dataset.ring)), ['protein', 'energy', 'fat', 'sodium']);
+    assert.equal(await page.locator('[data-ring="protein"] .nutrition-rings__amount').textContent(), '80 / 120 g');
+    assert.equal(await page.locator('[data-ring="energy"] .nutrition-rings__amount').textContent(), '1,130 / 1,900 kcal');
+    assert.equal(await page.locator('[data-ring="fat"] .nutrition-rings__amount').textContent(), '27 / 50 g ceiling');
+    assert.equal(await page.locator('#nutrition-climb .climb-marker').count(), 2);
+    assert.equal(await page.locator('#nutrition-climb .climb-now-label').textContent(), 'now · 12 pm');
+    assert.equal(await page.locator('#nutrition-climb .climb-projection-label').textContent(), '40 g to go before bed');
+    for (const retired of ['#nutrition-macro-split', '[data-nutrition-ring]', '#nutrition-meal-protein-pie',
+      '#nutrition-protein-chart', '#nutrition-calories-chart', '#nutrition-heatmap', '#nutrition-week-compare', '.meal-history__strip']) {
+      assert.equal(await page.locator(retired).count(), 0, `${retired} is retired`);
+    }
+    assert.equal(await page.locator('.week-grid__day').count(), 7);
+    assert.equal(await page.locator('.week-grid__day').first().locator('.week-grid__cell').count(), 4);
+    assert.equal(await page.locator('#nutrition-consistency-strip .consistency-strip__bar').count(), 30);
 
     await page.locator('#nutrition-challenges').waitFor({ state: 'visible' });
     assert.match(await page.locator('.nutrition-challenge__heading strong').textContent(), /No refined sugar/);
     assert.equal(await page.locator('.nutrition-challenge__day').count(), 7);
 
-    // Post-log refresh sets data-sync-quiet. Charts must stay settled/visible —
-    // a leftover chart-animating class used to pin areas at opacity 0.
-    await page.waitForTimeout(850);
+    // The entrance plays once and always rests on the finished chart.
+    await page.waitForFunction(() => document.querySelectorAll('#nutrition-dashboard .is-playing').length === 0, null, { timeout: 4000 });
     const settled = await page.evaluate(() => {
-      const svg = document.querySelector('#nutrition-protein-chart');
-      const area = svg?.querySelector('[data-role="area"]');
-      return {
-        static: svg?.classList?.contains('chart-static') === true,
-        animating: svg?.classList?.contains('chart-animating') === true,
-        areaOpacity: area ? getComputedStyle(area).opacity : null,
-        dLen: svg?.querySelector('[data-role="line"]')?.getAttribute('d')?.length ?? 0
-      };
+      const line = document.querySelector('#nutrition-climb .climb-line');
+      return { animations: line.getAnimations().length, d: line.getAttribute('d').length };
     });
-    assert.equal(settled.static, true);
-    assert.equal(settled.animating, false);
-    assert.equal(settled.areaOpacity, '1');
-    assert.ok(settled.dLen > 0);
+    assert.equal(settled.animations, 0);
+    assert.ok(settled.d > 0);
 
+    // A quiet sync mid-entrance stops every animation on the final geometry.
     await page.locator('.desktop-rail [data-section="chat"]').click();
+    await page.locator('.desktop-rail [data-section="nutrition"]').click();
     await page.evaluate(() => { document.querySelector('#app').dataset.syncQuiet = 'true'; });
-    const duringQuiet = await page.evaluate(() => {
-      const area = document.querySelector('#nutrition-protein-chart [data-role="area"]');
-      return area ? getComputedStyle(area).opacity : null;
-    });
-    assert.equal(duringQuiet, '1');
+    const duringQuiet = await page.evaluate(() => ['#nutrition-today', '.week-grid', '#nutrition-consistency']
+      .reduce((count, selector) => count + document.querySelector(selector).getAnimations({ subtree: true }).length, 0));
+    assert.equal(duringQuiet, 0);
     await page.evaluate(() => { delete document.querySelector('#app').dataset.syncQuiet; });
-    const afterQuiet = await page.evaluate(() => {
-      const area = document.querySelector('#nutrition-protein-chart [data-role="area"]');
-      return area ? getComputedStyle(area).opacity : null;
-    });
-    assert.equal(afterQuiet, '1');
+
+    // C1: climb labels never overlap each other or leave the SVG, at desktop and phone width.
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.waitForTimeout(150);
+      const collisions = await page.evaluate(() => {
+        const svg = document.querySelector('#nutrition-climb');
+        const view = svg.viewBox.baseVal;
+        const boxes = [...svg.querySelectorAll('.climb-now-label, .climb-projection-label, .climb-goal-label, .climb-marker__label, .climb-hit-label')]
+          .map(text => ({ text: text.textContent, box: text.getBBox() }));
+        const problems = [];
+        for (const { text, box } of boxes) {
+          if (box.x < 0 || box.y < -2 || box.x + box.width > view.width + 1 || box.y + box.height > view.height + 1) problems.push(`${text} leaves the chart`);
+        }
+        for (let i = 0; i < boxes.length; i++) {
+          for (let j = i + 1; j < boxes.length; j++) {
+            const a = boxes[i].box; const b = boxes[j].box;
+            if (a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height) problems.push(`${boxes[i].text} overlaps ${boxes[j].text}`);
+          }
+        }
+        return problems;
+      });
+      assert.deepEqual(collisions, [], `climb labels at ${width}px`);
+      const fits = await page.evaluate(() => document.documentElement.scrollWidth === innerWidth);
+      assert.ok(fits, `no horizontal scroll at ${width}px`);
+    }
+
   } finally {
     await context.close();
   }
@@ -161,11 +156,9 @@ test('meal history browses previous weeks and dates with working detail, empty a
   try {
     await signIn(page);
     await page.locator('.desktop-rail [data-section="nutrition"]').click();
-    assert.equal(await page.locator('#meal-history-day').isHidden(), true);
-    assert.equal(await page.locator('#meal-history-day').evaluate(el => el.offsetHeight), 0);
-    await page.getByRole('button', { name: 'Today', exact: true }).click();
     await page.locator('.meal-log__item').first().waitFor();
-    assert.equal(await page.locator('.meal-history__day').count(), 7);
+    assert.equal(await page.locator('#meal-history-day').isVisible(), true, 'the chosen day is open in its own card');
+    assert.equal(await page.locator('.week-grid__day').count(), 7);
     await page.getByRole('button', { name: 'Previous week of meals' }).click();
     await page.locator('#meal-history-date', { hasText: 'Thu 23/07/26' }).waitFor();
     await page.locator('.meal-log__item').waitFor();
@@ -179,10 +172,9 @@ test('meal history browses previous weeks and dates with working detail, empty a
     await page.locator('#app[data-state="ready"]').waitFor();
     assert.equal(await page.locator('#meal-history-date').textContent(), 'Thu 23/07/26');
     assert.equal(await detail.getAttribute('aria-expanded'), 'true');
-    await page.locator('[data-date="2026-07-23"]').press('Enter');
-    assert.equal(await page.locator('#meal-history-day').isHidden(), true);
-    assert.equal(await page.locator('#meal-history-day').evaluate(el => el.offsetHeight), 0);
-    await page.locator('[data-date="2026-07-23"]').press('Enter');
+    await page.locator('.week-grid__day[data-date="2026-07-23"]').press('Enter');
+    assert.equal(await page.locator('#meal-history-day').isVisible(), true, 'choosing the open day never collapses it');
+    assert.equal(await page.locator('.week-grid__day[data-date="2026-07-23"]').getAttribute('aria-pressed'), 'true');
     assert.equal(await detail.getAttribute('aria-expanded'), 'true');
     await page.getByLabel('Jump to meal date').fill('2026-07-29');
     await page.getByLabel('Jump to meal date').press('Tab');
@@ -203,14 +195,14 @@ test('meal history browses previous weeks and dates with working detail, empty a
       assert.equal(await page.locator('#meal-history-date').textContent(), 'Thu 23/07/26');
       const dimensions = await page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth }));
       assert.equal(dimensions.scroll, dimensions.width, `Nutrition must fit the ${width}px viewport`);
-      const sizes = await page.locator('.meal-history__day:is(button)').evaluateAll(elements => elements.map(el => el.getBoundingClientRect().height));
+      const sizes = await page.locator('.week-grid__day:not([disabled])').evaluateAll(elements => elements.map(el => el.getBoundingClientRect().height));
       assert.ok(sizes.every(height => height >= 44));
       assert.ok(await page.locator('input[type="date"]').evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 16));
     }
     await page.getByRole('button', { name: 'Today', exact: true }).click();
     await page.locator('#meal-history-date', { hasText: 'Today' }).waitFor();
     assert.equal(await page.locator('.meal-log__item').count(), 2);
-    assert.equal(await page.locator('.meal-history__day[data-selected="true"]').getAttribute('data-date'), '2026-07-30');
+    assert.equal(await page.locator('.week-grid__day[data-selected="true"]').getAttribute('data-date'), '2026-07-30');
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

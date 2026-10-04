@@ -43,7 +43,7 @@ At 390px, every card stacks in that order. In the Today card, the rings and lege
 ## Cuts (must unmount; delete markup, CSS and renderer code)
 
 1. The macro split card (`.macro-split-card`, `#nutrition-macro-split`, `renderMacroSplit` ring drawing). Its numbers move into the ring legend, and its Brisket note moves into the Today card.
-2. The `.nutrition-grid` tiles: Sodium, Calcium, Polyphenols and Protein by meal (`renderMacroRings`, `renderMealProteinPie`). `chart-kit/pie.js` stays only if something else imports it. Nothing else does today, so delete it and its test.
+2. The `.nutrition-grid` tiles: Sodium, Calcium, Polyphenols and Protein by meal (`renderMacroRings`, `renderMealProteinPie`). `chart-kit/pie.js` stays: it is a catalogued kit primitive (CHART-CATALOG), so only Nutrition's use of it is removed.
 3. Both `.nutrition-week-charts` rows (the protein, fat, energy and carbs area charts, and `renderNamedAreaChart`).
 4. The `#nutrition-heatmap` square grid and `renderHeatmap`.
 5. Meal history's **day strip** (`.meal-history__strip`) and its "View meals" expand toggle. The week grid's columns take over the strip's job (see below).
@@ -149,7 +149,7 @@ Use the existing `chart-kit/animate.js` gate (`motionIsQuiet`: `quiet`, `data-sy
 | `apps/life/js/app/render-nutrition.js` | Render the Today card and the strip. Drop the cut renderers. |
 | `apps/life/js/app/render-meal-history.js` | Swap the strip for the grid. Two-card split. Drop the expand toggle. |
 | `apps/life/js/app/nutrition-model.js` | Add `mealHistory.days[].targets`, `usualClimb` (the per-time-of-day average) and `mealsToday[].timeKnown`. |
-| `apps/life/js/app/chart-kit/pie.js` + its test | Delete if unused after the cuts. |
+| `apps/life/js/app/chart-kit/pie.js` | Kept (catalogued primitive). Only the Nutrition pie test is removed. |
 | `tests/unit/*` | New geometry tests per kit file. Rewrite `nutrition-layout.test.js` for the new structure. Update `render-nutrition-meals.test.js`. |
 | `tests/browser/nutrition.spec.mjs` | Update the meal history spec: grid columns replace the strip, the day card is always open. Add checks at 390 and 1440. |
 | `docs/superpowers/specs/2026-07-31-life-hub-design.md` | Charts table: Nutrition now uses nested rings, climb, week grid and strip. Remove the "Nutrition 7-day protein" row. |
