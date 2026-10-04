@@ -130,3 +130,40 @@ describe("universe view chrome", () => {
     expect(document.querySelector<HTMLButtonElement>("[data-universe-exit]")!.hidden).toBe(false);
   });
 });
+
+describe("universe effects toolbar", () => {
+  it("renders lens, chimes, ambient, comet and screensaver controls from prefs", async () => {
+    const { universeEffectToolsHtml } = await import("./universeChrome");
+    document.body.innerHTML = universeEffectToolsHtml({ lens: true, sound: false, ambient: 2 });
+    expect(document.querySelector("[data-universe-lens]")!.getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelector("[data-universe-sound]")!.getAttribute("aria-pressed")).toBe("false");
+    expect(document.querySelector<HTMLLabelElement>(".universe-ambient")!.hidden).toBe(true);
+    expect(document.querySelector<HTMLSelectElement>("[data-universe-ambient]")!.value).toBe("2");
+    expect(document.querySelector("[data-universe-comet]")!.textContent).toBe("Follow a comet");
+    expect(document.querySelector("[data-universe-saver]")!.textContent).toBe("Screensaver");
+  });
+
+  it("toggles chimes, reveals ambient, and forwards comet actions", async () => {
+    const { bindUniverseEffects, universeEffectToolsHtml } = await import("./universeChrome");
+    document.body.innerHTML = universeEffectToolsHtml({ lens: false, sound: false, ambient: 1 });
+    const prefs = { lens: false, sound: false, ambient: 1 };
+    const calls: string[] = [];
+    bindUniverseEffects(document, {
+      getPrefs: () => prefs,
+      setLens: on => ((prefs.lens = on), calls.push(`lens:${on}`)),
+      setSound: on => ((prefs.sound = on), calls.push(`sound:${on}`)),
+      setAmbient: level => calls.push(`ambient:${level}`),
+      followComet: () => calls.push("comet"),
+      screensaver: () => calls.push("saver"),
+    });
+    document.querySelector<HTMLButtonElement>("[data-universe-sound]")!.click();
+    expect(document.querySelector<HTMLLabelElement>(".universe-ambient")!.hidden).toBe(false);
+    const select = document.querySelector<HTMLSelectElement>("[data-universe-ambient]")!;
+    select.value = "3";
+    select.dispatchEvent(new Event("change"));
+    document.querySelector<HTMLButtonElement>("[data-universe-lens]")!.click();
+    document.querySelector<HTMLButtonElement>("[data-universe-comet]")!.click();
+    document.querySelector<HTMLButtonElement>("[data-universe-saver]")!.click();
+    expect(calls).toEqual(["sound:true", "ambient:3", "lens:true", "comet", "saver"]);
+  });
+});
