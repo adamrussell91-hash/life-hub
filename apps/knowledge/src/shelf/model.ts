@@ -1,7 +1,8 @@
 import type { PageManifestEntry } from "../domain/page";
 import { coverEntry, coverSrc } from "./covers";
 import { BOOK_PALETTE, bookSwatch, type BookSwatch } from "./palette";
-import type { Chapter, Placement, ShelfBook, ShelfData, ShelfStance } from "./schema";
+import type { Chapter, Placement, ShelfBook, ShelfData, ShelfKind, ShelfStance } from "./schema";
+import { ShelfKindSchema } from "./schema";
 
 /** Page count assumed for a book whose facts have not been filled in yet. */
 export const FALLBACK_PAGES = 300;
@@ -16,6 +17,8 @@ export type BookNote = {
   page?: number;
   guessed: boolean;
   stance?: ShelfStance;
+  kind?: ShelfKind;
+  kindGuessed?: boolean;
   gaps: string[];
   themes: string[];
   lastOpened?: string;
@@ -127,6 +130,14 @@ export function stanceFromBody(body: string): ShelfStance | undefined {
   return "extends";
 }
 
+/** Reads an explicit `Kind:` line. No prose fallback — missing line means undefined. */
+export function kindFromBody(body: string): ShelfKind | undefined {
+  const hit = body.match(/^[\s>*_-]*\**\s*kind\s*[:：]\s*\**\s*(person|idea|case|debate|bridge)\b/im);
+  if (!hit?.[1]) return undefined;
+  const parsed = ShelfKindSchema.safeParse(hit[1].toLowerCase());
+  return parsed.success ? parsed.data : undefined;
+}
+
 /** Reads the open questions from a book note's "Gaps" section, one per bullet or line. */
 export function gapsFromBody(body: string): string[] {
   return section(body, /^gaps\b/)
@@ -155,6 +166,8 @@ function toNote(entry: PageManifestEntry, placement?: Placement): BookNote {
     page: placement?.page,
     guessed: Boolean(placement?.guessed),
     stance: placement?.stance,
+    kind: placement?.kind,
+    kindGuessed: placement?.kindGuessed,
     gaps: placement?.gaps ?? [],
     themes: placement?.themes ?? [],
     lastOpened: placement?.lastOpened,

@@ -1,6 +1,6 @@
 import type { Page } from "../domain/page";
 import type { BookModel } from "./model";
-import { gapsFromBody, sectionText, stanceFromBody } from "./model";
+import { gapsFromBody, kindFromBody, sectionText, stanceFromBody } from "./model";
 import type { PlacementInput } from "./schema";
 
 const PAGE_RE = /\b(?:pp?|pg|pages?)\.?\s*(\d{1,4})(?:\s*[-–]\s*\d{1,4})?\b/i;
@@ -47,7 +47,7 @@ export function notesToRead(books: BookModel[]) {
 /** Only fills fields the note doesn't have yet; never overwrites a page Adam placed. */
 export function fillFromBody(
   page: Pick<Page, "id" | "body">,
-  current: { page?: number; stance?: string; gaps: string[] },
+  current: { page?: number; stance?: string; kind?: string; gaps: string[] },
   maxPage: number,
 ): PlacementInput | null {
   const patch: PlacementInput = { pageId: page.id };
@@ -58,6 +58,10 @@ export function fillFromBody(
   if (!current.stance) {
     const stance = stanceFromBody(page.body);
     if (stance) patch.stance = stance;
+  }
+  if (!current.kind) {
+    const kind = kindFromBody(page.body);
+    if (kind) Object.assign(patch, { kind, kindBy: "clementine" as const, kindGuessed: false });
   }
   if (!current.gaps.length) {
     const gaps = gapsFromBody(page.body);
