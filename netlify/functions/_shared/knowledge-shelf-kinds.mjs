@@ -32,6 +32,7 @@ Kinds:
 - bridge: the page carries the idea out of the book's own subject: into teaching, learning, schools or curriculum, or into another field or book
 
 Do NOT choose debate just because the note mentions a caveat, a critic, "contested", or two views in passing while it is still mostly a profile, an explanation, or a case. Those stay person / idea / case.
+When the page's organising job is unsettled knowledge — a lead section of corrections to a neat framing, claims marked unknown or unproven, or open questions — choose debate. A list of such points is still debate when that is the frame; a later clinical tips or implications section does not demote it to idea.
 A note is bridge when carrying the idea out is its main job, OR when it has a substantial section that does it: a heading of its own with at least a full paragraph or three points about teaching, learning, schools, curriculum or another field. A one-line tip is not enough.
 A section headed for teaching, practice, schools or curriculum that meets that size counts as bridge even when the rest of the page is explanation, and even when the book itself is about education — moving from a construct or finding to what schools or teachers should do is carrying the idea out.
 Not bridge: a how-to guide restating its own steps in the same domain (a habits book's habit tips, a reasoning book's fallacy checklist), clinical or medical practice tips, and sections that only point ahead to later chapters. Those stay idea, case or person.
