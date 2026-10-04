@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v196';
+const CACHE_NAME = 'life-hub-shell-v197';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -92,6 +92,7 @@ const SHELL_FILES = [
   'js/app/chart-kit/animate.js',
   'js/app/chart-kit/scene.js',
   'js/app/chart-kit/gate-rings.js',
+  'js/app/chart-kit/bullseye-rings.js',
   'js/app/chart-kit/region-rose.js',
   'js/app/chart-kit/glide-slope.js',
   'js/app/chart-kit/twin-clocks.js',

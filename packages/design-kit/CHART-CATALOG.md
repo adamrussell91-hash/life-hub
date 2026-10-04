@@ -6,7 +6,7 @@ This is the flat **selection** catalog (purpose, limits, where used, code paths)
 
 **Research notes (general practice):** Sankey ≈ ≤8–10 nodes/stage before spaghetti; chord ≈ ≤12 categories; streamgraph ≈ 5–15 layers; radar ≈ 5–8 axes / ≤4–5 overlays; waffle ≈ ≤3–4 categories on a 100-grid; pie/donut ≈ ≤5–6 slices; force/node-link degrade past a few dozen interactive nodes without clustering; Gantt stays readable when filtered to the audience’s critical path—not every micro-task. Cite those families in the rows below; hub-specific ceilings are local.
 
-**Inventory base:** hub chart-types inventory (2026-09-30) + call-site verification on this branch. Documented-only rows (bullseye, vis-timeline) are included on purpose.
+**Inventory base:** hub chart-types inventory (2026-09-30) + call-site verification on this branch. Documented-only rows (vis-timeline) are included on purpose.
 
 ---
 
@@ -36,6 +36,7 @@ This is the flat **selection** catalog (purpose, limits, where used, code paths)
 | Swimlane flowchart (`flowchart-lanes`) | Tasks → Graph → Branch | Labelled boxes, orthogonal connectors, project lanes. | Wide graphs need pan; deep trees overflow vertical phone space. | `apps/life/js/app/chart-kit/flowchart-lanes.js`; consumer `apps/tasks/src/views/graph-branch.ts` |
 | Orbit radar (`orbit-radar`) | Tasks → Graph → Orbit | Polar due-date radar (radius = days to go). | Many bodies overlap near “today”; far-future ring is sparse. | `apps/life/js/app/chart-kit/orbit-radar.js`; consumer `apps/tasks/src/views/graph-orbit.ts` |
 | Gate rings (`gate-rings`) | Life → Home Stimulus (lean-preservation keys) | Concentric 270° rings vs a shared threshold spoke — multi-lead vs thresholds. | A few keys only; more rings → unreadable stroke gaps. | `apps/life/js/app/chart-kit/gate-rings.js` |
+| Bullseye rings (`bullseye-rings`) | Life → Bloods Glucose/Diabetes (HbA1c, fasting glucose) and Lipid Studies (LDL) | One ring per test closing in on a reference band (the bullseye). Convergence story: is each test getting nearer the range? | Needs ≥2 tests and at least one reference limit; rings on opposite sides of a two-sided band at equal distance overlap (tooltip tells them apart); not for series that must read as going *down*. | `apps/life/js/app/chart-kit/bullseye-rings.js`; adapter `buildBloodsBullseyes` in `apps/life/js/app/bloods-charts-layout.js` |
 | Nightingale / region rose (`region-rose`) | Life → Home Stimulus → Regions | Area-true rose + ranked bars vs reference for regional stimulus. | Area comparison is imprecise; many petals blur — keep region count small. | `apps/life/js/app/chart-kit/region-rose.js` |
 | Glide slope (`glide-slope`) | Life → Home Scale / body forecast | Weigh-ins vs Theil-Sen trend, residual stalks, projected target band + slope wedge. | Needs enough weigh-ins for a stable slope; projection is not a promise. Crowded if dual series + guides fight for ink. | `apps/life/js/app/chart-kit/glide-slope.js` |
 | Twin year clocks (`twin-clocks`) | Life → Home Recomp scenarios | Independent one-year dials; overlap of in-band windows = target date. | Two conditions only; dials need space (~desktop); phone stacks cramped. | `apps/life/js/app/chart-kit/twin-clocks.js` |
@@ -82,7 +83,6 @@ This is the flat **selection** catalog (purpose, limits, where used, code paths)
 | Pro Home compact event timeline | Professional → Home | Dotted chronological row list (upcoming/past). | List, not chart — cap visible rows; “View all” for overflow. | `apps/professional/src/views/home.ts` (`.pro-home__timeline*`); styles `apps/professional/src/styles/hub.css` |
 | Galton board (quincunx) | widgets → Classroom-Tools / Statistics (`galton-studio`) — not in life-hub UI | Interactive peg-board → bin distribution sim for teaching probability. | Simulation UI, not a hub dashboard chart; bin count vs board size trade-off. | External `widgets` repo path (not in life-hub): `Classroom-Tools/Statistics-tools/galton-studio/BoardCanvas.tsx` |
 | Literary HTML timeline | widgets → English Tools — not in life-hub UI | Static/interactive period timeline page for a literary work. | Content-specific HTML page, not a reusable hub chart type. | External `widgets` repo: `English/Tools/Widgets/An-Artist-of-the-floating-world-timeline.html` |
-| Bullseye rings (`bullseye-rings`) | not shipped — parked / documented only | Concentric period rings closing on a target (convergence story). | Not a library type until promoted; rejected for Body weight (must read as going *down*). | Prototype only: `packages/design-kit/future-charts/weight-line-and-bullseye.html`; see Future charts in `packages/design-kit/CHARTS.md` |
 | vis-timeline (general chronology) | not shipped — proposal / documented only | Proposed multi-rep continuous chronology camera (years→days unfold). | Heavy dep (~78 MB unpacked if ever used); product chronology gap, not a live renderer. | Proposal: `REPO_MINING_ROUND_C_VISUAL_INTELLIGENCE.md` (vis-timeline B-PROTOTYPE). No implementation path in tree. Knowledge archive Timeline rail was **removed** by product decision. |
 
 ---
@@ -112,4 +112,4 @@ Helpers that are **not** chart types: `animate`, `scene`, `polar-clock`, `clinic
 
 - [`CHARTS.md`](./CHARTS.md) — APIs, locked look, implementation roots, log
 - [`CALENDAR.md`](./CALENDAR.md) — Day Dial / Tideline / Term River / Almanac paint
-- [`future-charts/`](./future-charts/) — parked prototypes (bullseye)
+- [`future-charts/`](./future-charts/) — parked prototypes (originals kept for promoted types)

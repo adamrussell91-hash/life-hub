@@ -4882,6 +4882,17 @@ main { max-width: 76rem; margin: 0 auto; }
 #body-bloods-dashboard .bloods-lipid-rings__chart [data-role="lipid-ring"] {
   cursor: pointer;
 }
+/* Closing-in bullseye rings (chart-kit bullseye-rings) under glucose and lipids. */
+.bloods-bullseyes { margin: 0 0 var(--space-4); }
+.bloods-bullseyes__head { margin: 0 0 var(--space-2); }
+.bloods-bullseyes__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--space-4);
+}
+.bloods-bullseye { margin: 0; min-width: 0; }
+.bloods-bullseye__title { color: var(--ink); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.bloods-bullseye__chart.hc-host { margin-top: var(--space-2); }
 #body-bloods-dashboard .bloods-lipid-rings__chart text:not([data-role="lipid-centre"]) {
   fill: var(--muted);
   font-size: var(--text-xs);
@@ -8981,6 +8992,18 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 .hc-bar--gate { fill: var(--navy); }
 .hc-bar--quiet { fill: var(--shallow); }
 .hc-bar-reference { stroke: var(--high-sea-ink); stroke-width: 2; }
+
+/* Bloods: bullseye rings */
+.hc-bull-field { fill: color-mix(in srgb, var(--shore) 30%, transparent); }
+.hc-bull-edge { fill: none; stroke: var(--pastel-sage-ink); stroke-opacity: 0.55; stroke-width: 1; }
+.hc-bull-ring { fill: none; stroke: var(--navy); stroke-width: 1.4; }
+.hc-bull-ring--latest { stroke-width: 3.2; }
+.hc-bull-ring--worst { stroke: var(--high-sea-ink); stroke-width: 1.8; stroke-dasharray: 3 3; }
+.hc-bull-ring.is-hover, .hc-bull-ring.is-pinned, .hc-bull-ring.is-focus { stroke: var(--wave); stroke-opacity: 1; stroke-width: 3.2; }
+.hc-bull-key { stroke: var(--navy); stroke-linecap: round; }
+.hc-bull-key--latest { stroke-width: 3.2; }
+.hc-bull-key--worst { stroke: var(--high-sea-ink); stroke-width: 1.8; stroke-dasharray: 3 3; }
+.hc-bull-key--band { stroke: var(--pastel-sage-ink); stroke-opacity: 0.55; }
 
 /* Scale: glide slope */
 .hc-band { fill: var(--pastel-sage); fill-opacity: 0.75; }
