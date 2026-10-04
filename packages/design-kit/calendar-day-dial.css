@@ -42,6 +42,8 @@
 .dd-arc.is-proposal{stroke:var(--dd-ghost-line);stroke-width:1.5;stroke-dasharray:4 3}
 .dd-arc.is-ghost{fill:var(--dd-ghost-fill);stroke:var(--dd-ghost-line);stroke-width:1.4;stroke-dasharray:3 3}
 .dd-arc.is-skipped{opacity:.35}
+/* A ticked-off task keeps its slot: pale, so the day still shows when it happened. */
+.dd-arc.k-task.is-done{fill:color-mix(in srgb,var(--pastel-sage) 30%,#fff);stroke:color-mix(in srgb,var(--pastel-sage-ink) 35%,#fff);stroke-dasharray:2 2}
 .dd-arc:focus-visible{outline:none;stroke:var(--wave);stroke-width:2.5;stroke-dasharray:none}
 .dd-left{fill:var(--high-sea);opacity:.85}
 .dd-log{stroke-width:1.6}

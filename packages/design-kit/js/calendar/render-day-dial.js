@@ -26,7 +26,8 @@ import {
   readFilterState
 } from './calendar-filter.js';
 import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
-import { saveCalendarItem } from './calendar-item-actions.js';
+import { canTickItem, isItemDone, saveCalendarItem, toggleItemDone } from './calendar-item-actions.js';
+import { offerTimedUndo } from '../hub-feedback.js';
 import { presetBand } from './render-tideline.js';
 import { clock as medClock, doseCandidate, MEDICATION, toHHMM } from './medication-model.js';
 import { bookmarkMoment, tonightFit, trackedHours } from './day-sense.js';
@@ -791,7 +792,7 @@ function mountDial(size) {
     const proposal = ghosts.find(ghost => ghost.overItem === chip.id && ghost.status === 'pending');
     const inset = chip.isClass ? 4 : 2;
     const texture = chip.texture && !['fixed', 'focus', 'protected'].includes(chip.texture) ? `tx-${chip.texture}` : '';
-    const cls = ['dd-arc', `k-${chip.kind}`, chip.isClass ? 'is-class' : '', proposal ? 'is-proposal' : '', chip.skipped ? 'is-skipped' : '', texture, chip.regained ? 'is-regained' : ''].filter(Boolean).join(' ');
+    const cls = ['dd-arc', `k-${chip.kind}`, chip.isClass ? 'is-class' : '', proposal ? 'is-proposal' : '', chip.skipped ? 'is-skipped' : '', chip.done ? 'is-done' : '', texture, chip.regained ? 'is-regained' : ''].filter(Boolean).join(' ');
     nodes.set(`arc:${chip.id}`, s('path', {
       class: cls,
       tabindex: 0,
@@ -1232,8 +1233,8 @@ function mountSide(side) {
   // Agenda before Dexy / offers: on phone the side stacks under the dial, and Due
   // tasks from a Clare dump must not sit below the medication panel.
   const dayDue = (dayAt(date)?.due ?? [])
-    .filter(item => item.kind !== 'allday' && item.kind !== 'promise')
-    .map(item => ({ id: item.id, title: item.title, time: item.time, meta: item.meta, kind: item.kind }));
+    .filter(item => item.kind !== 'allday' && item.kind !== 'promise' && !item.onGrid)
+    .map(item => ({ id: item.id, title: item.title, time: item.time, meta: item.meta, kind: item.kind, done: item.done === true }));
   if (date === input.today) {
     const plannedDinnerAt = dayAt(date)?.med?.evening?.rows?.find(row => row.at === MEDICATION.dinnerAt)?.at ?? null;
     const brief = tonightBrief({
@@ -1271,7 +1272,7 @@ function mountSide(side) {
       kind: 'task',
       itemId: d.id,
       note: d.meta || 'Tasks · open',
-      struck: false,
+      struck: d.done,
       ghostId: null,
       suggestion: null
     })), ghosts);
@@ -1308,7 +1309,10 @@ function renderRows(wrap, rows, ghosts) {
     });
     el('div', 'dd-row__t', row.time, node);
     const mark = row.kind === 'corey' ? '<span class="dd-mark"></span>' : '';
-    const words = el('div', 'dd-row__w', `<b>${mark}${escapeHtml(row.title)}</b><span>${escapeHtml(row.note)}</span>`, node);
+    // Tasks and work blocks tick off right here, the same gesture as the Tasks board.
+    const item = row.itemId ? findDialItem(row.itemId) : null;
+    const tick = item && canTickItem(item) ? tickHtml(item) : '';
+    const words = el('div', 'dd-row__w', `<b>${tick}${mark}${escapeHtml(row.title)}</b><span>${escapeHtml(row.note)}</span>`, node);
     if (!row.ghostId) continue;
     const ghost = ghosts.find(item => item.id === row.ghostId);
     if (!ghost) continue;
@@ -1470,6 +1474,45 @@ function writePreview(ghost) {
 }
 
 /** A chip or Due row on any day of the week, or a log dot on the dial. */
+function tickHtml(item) {
+  const done = isItemDone(item);
+  const label = done ? `Mark ${item.title} not done` : `Mark ${item.title} done`;
+  return `<button type="button" class="cal-tick${done ? ' is-done' : ''}" data-tick="${escapeHtml(item.id)}" aria-pressed="${done}" aria-label="${escapeHtml(label)}" title="${done ? 'Done · tap to reopen' : 'Mark done'}"></button>`;
+}
+
+/** Optimistic tick from a Tonight / Due / Tomorrow row: flips, saves, offers Undo. */
+async function tickItem(id, button) {
+  const item = chipsFor(state.day).find(chip => chip.id === id) ?? findDialItem(id);
+  if (!item || !canTickItem(item) || button.disabled) return;
+  const done = !isItemDone(item);
+  const row = button.closest?.('.dd-row');
+  const flip = on => {
+    row?.classList?.toggle?.('is-struck', on);
+    button.classList?.toggle?.('is-done', on);
+    button.setAttribute('aria-pressed', String(on));
+    nodes.get(`arc:${id}`)?.classList?.toggle?.('is-done', on);
+  };
+  flip(done);
+  button.disabled = true;
+  try {
+    const undo = await toggleItemDone(input?.apiFetch, item);
+    void input?.onSourcesChanged?.();
+    offerTimedUndo({
+      root: doc,
+      message: done ? `Done: ${item.title}` : `Reopened: ${item.title}`,
+      onUndo: () => {
+        void undo().then(() => input?.onSourcesChanged?.())
+          .catch(() => showToast('<b>Not undone.</b> Try again.'));
+      }
+    });
+  } catch (error) {
+    flip(!done);
+    showToast(`<b>Not saved.</b> ${escapeHtml(error?.message || 'Could not reach the server.')}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function findDialItem(id) {
   for (const day of model?.days ?? []) {
     const chip = day.chips.find(entry => entry.id === id);
@@ -1701,6 +1744,12 @@ function wire(section) {
         input?.onSwitchView?.(name);
       }
       return;
+    }
+    const tickButton = target.closest?.('[data-tick]');
+    if (tickButton) {
+      event.stopPropagation?.();
+      closePop();
+      return void tickItem(tickButton.getAttribute('data-tick'), tickButton);
     }
     const arc = target.closest?.('.dd-arc[data-id]');
     if (arc) {

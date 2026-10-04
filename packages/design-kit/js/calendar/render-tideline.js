@@ -30,7 +30,8 @@ import {
   writeFilterState
 } from './calendar-filter.js';
 import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
-import { canMoveItem, canResizeItem, dragPatch, saveCalendarItem } from './calendar-item-actions.js';
+import { canMoveItem, canResizeItem, canTickItem, dragPatch, isItemDone, saveCalendarItem, toggleItemDone } from './calendar-item-actions.js';
+import { offerTimedUndo } from '../hub-feedback.js';
 import { formatDisplayDate } from '../format-display-date.js';
 import { openRescueSheet } from './rescue-sheet.js';
 import { captureChips, morphPairs, playChips } from './rescue-morph.js';
@@ -757,6 +758,8 @@ function mountAllDay(grid, date) {
   cell.style.gridColumn = String(dayGridColumn(date));
   cell.style.gridRow = '2';
   for (const due of day.due) {
+    // Already a block on the grid this day, with no deadline time: not listed twice.
+    if (due.onGrid) continue;
     const ghost = model.ghosts.find(item => item.id === due.ghostId);
     const moved = state.settled.get(due.ghostId);
     const allDayClass = due.kind === 'allday' ? ` is-allday k-${due.filterKey === 'events' ? 'event' : due.filterKey}${due.ambient ? ' is-ambient' : ''}` : '';
@@ -773,7 +776,9 @@ function mountAllDay(grid, date) {
     const frag = due.fragility && due.fragility.status !== 'fits'
       ? `<span class="cal-due__flag is-${due.fragility.status}" title="${escapeHtml(due.fragility.text)}">${due.fragility.status === 'short' ? 'won’t fit' : 'fragile'}</span>`
       : '';
-    const chip = el('div', `cal-due${promiseClass}`, `<b>${escapeHtml(due.title)}</b>${frag}${dueMeta ? `<span class="cal-due__meta">${escapeHtml(dueMeta)}</span>` : ''}${after}${bookmarkHtml}`, cell, {
+    const tick = canTickItem(due) ? tickHtml(due) : '';
+    const doneClass = due.done ? ' is-done' : '';
+    const chip = el('div', `cal-due${promiseClass}${doneClass}`, `<b>${tick}${escapeHtml(due.title)}</b>${frag}${dueMeta ? `<span class="cal-due__meta">${escapeHtml(dueMeta)}</span>` : ''}${after}${bookmarkHtml}`, cell, {
       'data-part': 'due',
       'data-id': due.id,
       tabindex: '0',
@@ -831,6 +836,16 @@ function mountBody(grid, date) {
     if (band.id === 'yours') nodes.set(`bg:${date}:${index}`, el('div', 'cal-bg cal-bg--yours', undefined, body, { 'data-band': String(index) }));
     nodes.set(`line:${date}:${index}`, el('div', 'cal-line', undefined, body));
   });
+  // Hour lines: hairlines under everything, so a chip's place reads at a glance.
+  // Only the first column carries the hour labels; the rest just keep the rhythm.
+  const labelled = dayGridColumn(date) === 2;
+  for (const hour of hourMarks()) {
+    const label = labelled ? `<span>${hourLabel(hour)}</span>` : '';
+    nodes.set(`hr:${date}:${hour}`, el('div', `cal-hour${hour % 3 === 0 ? ' is-major' : ''}`, label, body, {
+      'data-part': 'hour-line',
+      'aria-hidden': 'true'
+    }));
+  }
   const sleep = el('div', 'cal-sleep', `${ICON.moon}${day.sleepText}`, body, { 'data-part': 'sleep-strip' });
   sleep.style.top = `${model.total}px`;
   sleep.style.height = `${SLEEP_STRIP_PX}px`;
@@ -870,6 +885,70 @@ function mountBody(grid, date) {
   }
 }
 
+/** Whole hours inside the band stack, minus any within 15 min of a band edge (that line already reads as the hour). */
+function hourMarks() {
+  if (!bands.length) return [];
+  const out = [];
+  for (let hour = Math.ceil(bands[0].from); hour < bands[bands.length - 1].to; hour++) {
+    if (bands.some(band => Math.abs(band.from - hour) <= 0.25 || Math.abs(band.to - hour) <= 0.25)) continue;
+    out.push(hour);
+  }
+  return out;
+}
+
+function hourLabel(hour) {
+  if (hour === 12) return 'noon';
+  return `${hour % 12 || 12}${hour < 12 ? 'am' : 'pm'}`;
+}
+
+/**
+ * How visible an hour line is at this band height. Squeezed bands keep only the
+ * 3-hourly lines; a folded band shows none. Labels need more room than lines.
+ */
+export function hourVisibility(pxPerHour, major) {
+  const line = major ? clamp01((pxPerHour - 4) / 6) : clamp01((pxPerHour - 14) / 8);
+  const label = major ? clamp01((pxPerHour - 10) / 8) : clamp01((pxPerHour - 30) / 10);
+  return { line, label };
+}
+
+/** The tick circle on a task or work block: one tap marks it done, again reopens it. */
+function tickHtml(item) {
+  const done = isItemDone(item);
+  const label = done ? `Mark ${item.title} not done` : `Mark ${item.title} done`;
+  return `<button type="button" class="cal-tick${done ? ' is-done' : ''}" data-tick="${escapeHtml(item.id)}" aria-pressed="${done}" aria-label="${escapeHtml(label)}" title="${done ? 'Done · tap to reopen' : 'Mark done'}"></button>`;
+}
+
+/** Optimistic tick: the item flips straight away, saves, and offers Undo. */
+async function tickItem(id, button) {
+  const item = chipById(id) ?? dueById(id);
+  if (!item || !canTickItem(item) || button.disabled) return;
+  const done = !isItemDone(item);
+  const owner = button.closest?.('.cal-chip, .cal-due');
+  const flip = (on) => {
+    owner?.classList?.toggle?.('is-done', on);
+    button.classList?.toggle?.('is-done', on);
+    button.setAttribute('aria-pressed', String(on));
+  };
+  flip(done);
+  button.disabled = true;
+  try {
+    const undo = await toggleItemDone(input?.apiFetch, item);
+    void input?.onSourcesChanged?.();
+    offerTimedUndo({
+      root,
+      message: done ? `Done: ${item.title}` : `Reopened: ${item.title}`,
+      onUndo: () => {
+        void undo().then(() => input?.onSourcesChanged?.()).catch(() => showToast('Could not undo. Try again.'));
+      }
+    });
+  } catch (cause) {
+    flip(!done);
+    showToast(escapeHtml(cause?.message || 'Could not save.'));
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function chipIsMovable(chip) {
   if (!chip || chip.ghost) return false;
   if (typeof input?.onReschedule !== 'function' && typeof input?.apiFetch !== 'function') return false;
@@ -883,12 +962,13 @@ function mountChip(body, chip) {
   if (chip.skipped) classes.push('is-skipped');
   if (chip.kind === 'corey') classes.push('is-corey');
   if (chip.pin) classes.push('is-pin');
-  if (chip.ambient) classes.push('is-ambient');
+  if (chip.done) classes.push('is-done');
+  else if (chip.ambient) classes.push('is-ambient');
   if (chip.texture && !['fixed', 'focus', 'protected'].includes(chip.texture)) classes.push(`tx-${chip.texture}`);
   if (chip.regained) classes.push('is-regained');
   if (ghost) classes.push('is-ghost');
   if (chip.ghost?.settled === 'accepted') classes.push('is-accepted');
-  const title = `${chip.kind === 'corey' ? '<span class="cal-mark"></span>' : ''}${chip.title}`;
+  const title = `${chip.kind === 'corey' ? '<span class="cal-mark"></span>' : ''}${!ghost && canTickItem(chip) ? tickHtml(chip) : ''}${chip.title}`;
   const agent = ghost ? `<span class="cal-chip__agent"><span class="cal-av cal-av--sm ${ghost.agent === 'sara' ? 'cal-av--sara' : ''}">${AGENT_INITIAL[ghost.agent]}</span></span>` : '';
   const acts = ghost && ghost.kind !== 'bedtime'
     ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${ghost.id}" data-label="Accept">Accept</button><button type="button" data-dismiss="${ghost.id}">Dismiss</button></div>`
@@ -940,6 +1020,13 @@ export function layout(nextHeights) {
       const band = bands[Number(bandIndex)];
       const top = yForHour(bands, nextHeights, band.from);
       out.set(id, type === 'bg' ? { top, height: yForHour(bands, nextHeights, band.to) - top } : { top });
+    } else if (type === 'hr') {
+      const hour = Number(bandIndex);
+      const index = bands.findIndex(band => hour > band.from && hour < band.to);
+      // Labels sit under chips (z-index), fully hidden by one; the chip has its own time.
+      const band = bands[index];
+      const pxPerHour = band ? nextHeights[index] / (band.to - band.from) : 0;
+      out.set(id, { top: yForHour(bands, nextHeights, hour), ...hourVisibility(pxPerHour, hour % 3 === 0) });
     } else if (type === 'chip') {
       out.set(id, blockGeometry(bands, nextHeights, Number(node.dataset.start), Number(node.dataset.end)));
     } else if (type === 'tex') {
@@ -995,6 +1082,11 @@ function apply(id, props) {
   }
   if (id.startsWith('free:')) {
     node.style.opacity = String(props.fade);
+    return;
+  }
+  if (id.startsWith('hr:')) {
+    css(node, '--hl', String(props.line ?? 0));
+    css(node, '--hlab', String(props.label ?? 0));
     return;
   }
   if (id.startsWith('chip:')) {
@@ -1337,6 +1429,13 @@ function wire(section) {
       return;
     }
 
+    const tickButton = target.closest('[data-tick]');
+    if (tickButton) {
+      event.stopPropagation?.();
+      closePop();
+      void tickItem(tickButton.dataset.tick, tickButton);
+      return;
+    }
     const acceptButton = target.closest('[data-accept]');
     if (acceptButton) {
       closePop();

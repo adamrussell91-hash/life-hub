@@ -46,6 +46,7 @@ import {
   lessonToBusySpan
 } from './productivity-os.mjs';
 import { isOpenTask as isOpen } from './task-liveness.mjs';
+import { DUE_TIME_FIELD, taskBlockWrite, TIME_BLOCK_FIELDS } from './task-block-write.mjs';
 const MAX_PROTOCOL_CHARS = 24_000;
 
 function applyProtocolUpdate(current, input) {
@@ -199,7 +200,7 @@ export function clareWorkSchemas() {
       question: { type: 'string' },
       urls: { type: 'array', items: { type: 'string' } }
     }, ['urls']),
-    tool('clare_mutate', 'Propose a Tasks write (Confirm before anything is stored). Ops: create_task, update_task, complete_task, reschedule_task, split_task, trash_task, move_task, create_project, estimate_task, tag_task, set_waiting_on, attach_research, batch_reschedule, pin_focus. For moving several timed tasks in one go, use batch_reschedule with schedules[{task_id, due_date, due_time}] — one Confirm applies all.', {
+    tool('clare_mutate', 'Propose a Tasks write (Confirm before anything is stored). Ops: create_task, update_task, complete_task, reschedule_task, split_task, trash_task, move_task, create_project, estimate_task, tag_task, set_waiting_on, attach_research, batch_reschedule, pin_focus. due_time is a hard deadline only ("due by 5pm"). To time-block ("do it 3–4pm", "3:00 for 15 min"), pass start_time + end_time (and block_date when the day differs from due_date): the same Confirm adds a work block linked to the task. Never put a start time in due_time. For several tasks in one go, use batch_reschedule with schedules[{task_id, due_date, due_time, start_time, end_time, block_date}] — one Confirm applies all.', {
       op: { type: 'string', enum: MUTATE_OPS },
       task_id: { type: 'string' },
       project_id: { type: 'string' },
@@ -208,7 +209,8 @@ export function clareWorkSchemas() {
       domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
       priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
       due_date: { type: 'string' },
-      due_time: { type: 'string' },
+      due_time: DUE_TIME_FIELD,
+      ...TIME_BLOCK_FIELDS,
       target_date: { type: 'string' },
       review_at: { type: 'string' },
       status: { type: 'string' },
@@ -241,8 +243,9 @@ export function clareWorkSchemas() {
           properties: {
             task_id: { type: 'string' },
             due_date: { type: 'string' },
-            due_time: { type: 'string' },
-            estimated_duration: { type: 'number' }
+            due_time: DUE_TIME_FIELD,
+            estimated_duration: { type: 'number' },
+            ...TIME_BLOCK_FIELDS
           }
         }
       },
@@ -1604,8 +1607,10 @@ export function buildClareMutation(input, { tasks = [], projects = [], nowIso = 
     if (!title) return deny('missing_title');
     const record = buildTaskRecord(input, null, stamp);
     record.title = title;
+    const block = taskBlockWrite(record, input, stamp);
     return propose(`Create task: ${title}`, [
-      writeEntry(`tasks:task:${record.id}`, 'create', record, `new task “${title}”`)
+      writeEntry(`tasks:task:${record.id}`, 'create', record, `new task “${title}”`),
+      ...(block ? [block] : [])
     ]);
   }
 
@@ -1644,15 +1649,19 @@ export function buildClareMutation(input, { tasks = [], projects = [], nowIso = 
         if (Number.isFinite(Number(row.estimated_duration))) {
           patch.estimated_duration = Number(row.estimated_duration);
         }
-        if (!Object.keys(patch).length) continue;
-        const record = buildTaskRecord(patch, existing, stamp);
-        const when = [record.due_date, record.due_time].filter(Boolean).join(' ');
-        writes.push(writeEntry(
-          `tasks:task:${record.id}`,
-          'overwrite',
-          record,
-          `reschedule ${existing.title} → ${when || 'new slot'}`
-        ));
+        const block = taskBlockWrite({ ...existing, ...patch }, row, stamp);
+        if (!Object.keys(patch).length && !block) continue;
+        if (Object.keys(patch).length) {
+          const record = buildTaskRecord(patch, existing, stamp);
+          const when = [record.due_date, record.due_time].filter(Boolean).join(' ');
+          writes.push(writeEntry(
+            `tasks:task:${record.id}`,
+            'overwrite',
+            record,
+            `reschedule ${existing.title} → ${when || 'new slot'}`
+          ));
+        }
+        if (block) writes.push(block);
       }
       if (!writes.length) return deny('no_matching_tasks');
       return propose(`Batch reschedule ${writes.length} tasks`, writes);
@@ -1748,8 +1757,10 @@ export function buildClareMutation(input, { tasks = [], projects = [], nowIso = 
   const record = buildTaskRecord(patch, existing, stamp);
   if (op === 'complete_task') record.completed_at = stamp;
   const label = String(input.summary ?? op).replace(/_/g, ' ');
+  const block = op === 'update_task' || op === 'reschedule_task' ? taskBlockWrite(record, input, stamp) : null;
   return propose(`${label}: ${existing.title}`, [
-    writeEntry(`tasks:task:${record.id}`, 'overwrite', record, `${label} — ${existing.title}`)
+    writeEntry(`tasks:task:${record.id}`, 'overwrite', record, `${label} — ${existing.title}`),
+    ...(block ? [block] : [])
   ]);
 }
 
