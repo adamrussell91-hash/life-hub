@@ -5159,3 +5159,156 @@ body.is-stars-fullscreen .stars-sky-wrap {
 .reader__tags {
   margin-top: var(--space-4, 1.5rem);
 }
+
+/* ---------- Universe effects (lens, chimes, comets, Big Bang) ---------- */
+
+.universe-key__swatch--comet {
+  --swatch: #f4f1ff;
+}
+
+.universe-key__swatch--comet .universe-key__dot {
+  position: relative;
+  width: 0.38rem;
+  height: 0.38rem;
+  background: var(--navy);
+  transform: translate(0.32rem, -0.2rem);
+}
+
+.universe-key__swatch--comet .universe-key__dot::after {
+  content: "";
+  position: absolute;
+  right: 0.24rem;
+  top: 0.08rem;
+  width: 0.95rem;
+  height: 0.2rem;
+  border-radius: 999px;
+  transform: rotate(-28deg);
+  transform-origin: right center;
+  background: linear-gradient(90deg, transparent, #d9a3c4 45%, #7eb0d5);
+}
+
+.universe-key__swatch--bridge .universe-key__dot {
+  width: 1.3rem;
+  height: 0.3rem;
+  border-radius: 0;
+  background: radial-gradient(circle, var(--navy) 0 0.07rem, transparent 0.08rem) 0 50% / 0.26rem 0.3rem repeat-x;
+}
+
+.universe-effect-tools label.universe-ambient {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.25rem 0.4rem 0.25rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--navy);
+  font-size: var(--text-xs);
+}
+
+.universe-effect-tools label.universe-ambient[hidden] {
+  display: none;
+}
+
+.universe-ambient select {
+  border: 0;
+  background: transparent;
+  color: var(--navy);
+  font: inherit;
+  font-weight: var(--weight-semibold);
+}
+
+@media (hover: none) {
+  [data-universe-lens] {
+    display: none;
+  }
+}
+
+.universe-replay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--space-4);
+  margin-inline: auto;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  width: min(32rem, calc(100% - 9rem));
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-radius: 999px;
+}
+
+.universe-replay__title {
+  color: var(--navy);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.universe-replay__scrub {
+  flex: 1 1 6rem;
+  min-width: 4rem;
+  accent-color: var(--navy);
+}
+
+.universe-replay__label {
+  min-width: 9rem;
+  color: var(--navy);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.universe-replay .btn {
+  min-height: 2rem;
+  padding: 0.25rem 0.75rem;
+  font-size: var(--text-xs);
+}
+
+.universe-replay .btn[hidden] {
+  display: none;
+}
+
+/* The note preview owns the bottom edge while it is open. */
+.graph-wrap:has(.graph-preview:not([hidden])) .universe-replay {
+  visibility: hidden;
+}
+
+body.is-universe-saver .graph-chrome,
+body.is-universe-saver .graph-preview,
+body.is-universe-saver .universe-replay,
+body.is-universe-saver .universe-exit,
+body.is-universe-saver .universe-zoom,
+body.is-universe-saver .graph-tip {
+  display: none !important;
+}
+
+body.is-universe-saver .graph-canvas {
+  cursor: none;
+}
+
+@media (max-width: 720px) {
+  .universe-replay {
+    left: var(--space-2);
+    right: var(--space-2);
+    bottom: calc(5.2rem + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    border-radius: var(--radius-md);
+    padding: var(--space-2);
+  }
+
+  .universe-replay__title {
+    display: none;
+  }
+
+  .universe-replay__scrub {
+    flex-basis: 100%;
+  }
+
+  .universe-replay__label {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+}

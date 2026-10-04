@@ -46,6 +46,16 @@ export const UNIVERSE_KEY_ITEMS: readonly UniverseKeyItem[] = [
     title: "Rock",
     meaning: "A note with no topic tags yet. Belt debris until it is tagged.",
   },
+  {
+    id: "comet",
+    title: "Comet",
+    meaning: "One of up to 20 notes joining three topics that rarely meet. Its tail carries their colours.",
+  },
+  {
+    id: "bridge",
+    title: "Light bridge",
+    meaning: "Select a note to dial its connected notes. Light travels along each link.",
+  },
 ];
 
 export const UNIVERSE_KEY_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

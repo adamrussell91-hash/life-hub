@@ -5,7 +5,7 @@ import { bindUniverseKey, setUniverseKeyOpen, UNIVERSE_KEY_ITEMS, universeKeyHtm
 describe("universe key language", () => {
   it("explains every hover kind plus the giant and ring decorations", () => {
     const ids = UNIVERSE_KEY_ITEMS.map(item => item.id);
-    expect(ids).toEqual(["sun", "planet", "giant", "ringed", "minor", "moon", "page", "rock"]);
+    expect(ids).toEqual(["sun", "planet", "giant", "ringed", "minor", "moon", "page", "rock", "comet", "bridge"]);
   });
 
   it("says a rock is an untagged note and a planet is a major topic", () => {

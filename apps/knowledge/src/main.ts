@@ -85,17 +85,22 @@ import {
   type ShowAllGrouping,
 } from "./archive/showAllScope";
 import { buildSolarModel, type SolarModel } from "./archive/solarModel";
-import { UNIVERSE_BUILD, mountSolarView, resolveSearchHits } from "./archive/solarView";
+import { UNIVERSE_BUILD, mountSolarView, resolveSearchHits, type SolarMount } from "./archive/solarView";
+import { readSoundPrefs, universeChimes, writeSoundPrefs, type AmbientLevel } from "./archive/universeChimes";
 import {
   applyUniverseViewState,
+  bindUniverseEffects,
   bindUniverseView,
   graphFullscreenToolsHtml,
   readUniverseDark,
+  readUniverseLens,
   shouldExitUniverseFullscreen,
+  universeEffectToolsHtml,
   universeExitHtml,
   universeViewToolsHtml,
   universeWrapClass,
   writeUniverseDark,
+  writeUniverseLens,
 } from "./archive/universeChrome";
 import { bindUniverseKey, universeKeyHtml } from "./archive/universeKey";
 import { enterPodcastRail, leavePodcastRail, renderPodcastRail } from "./podcast/rail";
@@ -136,6 +141,7 @@ import { duePageReviews, seedPageReview, upsertPageReview } from "./quiz/pageRev
 import { duePagesHtml, pageReviewActionsHtml } from "./quiz/pageReviewView";
 import { type PageReview, type QuizRating, type QuizStore } from "./quiz/schema";
 import { mountStarsView } from "./stars/view";
+import { listSavedConstellations } from "./stars/client";
 
 type View =
   | "list"
@@ -266,6 +272,8 @@ let graphSearch = "";
 let orbitSpeed = 0.5;
 let universeKeyOpen = false;
 let universeDark = readUniverseDark(typeof localStorage === "undefined" ? null : localStorage);
+let universeLens = readUniverseLens(typeof localStorage === "undefined" ? null : localStorage);
+let universeSound = readSoundPrefs(typeof localStorage === "undefined" ? null : localStorage);
 let graphFullscreen = false;
 let solarModelCache: { source: PageManifestEntry[]; model: SolarModel } | null = null;
 let showAllModelCache: { source: PageManifestEntry[]; grouping: ShowAllGrouping; model: ReturnType<typeof buildShowAllGraph> } | null = null;
@@ -1267,7 +1275,8 @@ function renderGraph() {
                   <input type="range" min="0" max="1" step="0.05" value="${orbitSpeed}" data-orbit-speed />
                   <output class="graph-speed__value" data-orbit-speed-value>${orbitSpeedLabel(orbitSpeed)}</output>
                 </label>
-                ${universeViewToolsHtml(universeDark, graphFullscreen)}`
+                ${universeViewToolsHtml(universeDark, graphFullscreen)}
+                ${universeEffectToolsHtml({ lens: universeLens, sound: universeSound.on, ambient: universeSound.ambient })}`
               : graphFullscreenToolsHtml(graphFullscreen)
           }
           <p class="graph-toolbar__meta">${escapeHtml(graphMetaText())}</p>
@@ -1310,6 +1319,12 @@ function renderGraph() {
     graphSearch = search.value;
     graphMount?.setSearch(graphSearch);
     writeGraphChrome();
+  };
+  search.onkeydown = event => {
+    if (event.key !== "Enter" || graphMode !== "universe" || !solarMount) return;
+    event.preventDefault();
+    event.stopPropagation();
+    solarMount.flyToNearestHit();
   };
 
   app.querySelectorAll<HTMLInputElement>("[data-show-all-tune]").forEach(input => {
@@ -1370,6 +1385,7 @@ function renderGraph() {
   };
 
   let mounted: GraphMount;
+  let solarMount: SolarMount | null = null;
   if (graphMode === "universe") {
     const clock = { speed: orbitSpeed };
     const slider = app.querySelector<HTMLInputElement>("[data-orbit-speed]");
@@ -1381,11 +1397,53 @@ function renderGraph() {
         if (readout) readout.textContent = orbitSpeedLabel(orbitSpeed);
       };
     }
-    mounted = mountSolarView(stage, getSolarModel(), {
+    const storage = typeof localStorage === "undefined" ? null : localStorage;
+    const solar = mountSolarView(stage, getSolarModel(), {
       search: graphSearch,
       onNoteSelect,
       clock,
+      entries,
+      lens: universeLens,
+      ambient: universeSound.ambient as AmbientLevel,
     });
+    solarMount = solar;
+    mounted = solar;
+    // Audio can only start from a gesture: a saved "Chimes on" wakes on the first touch of the sky.
+    const wakeChimes = () => {
+      if (universeSound.on && universeChimes.start()) universeChimes.enabled = true;
+    };
+    wrap.addEventListener("pointerdown", wakeChimes, { once: true });
+    bindUniverseEffects(app, {
+      getPrefs: () => ({ lens: universeLens, sound: universeSound.on, ambient: universeSound.ambient }),
+      setLens: on => {
+        universeLens = on;
+        writeUniverseLens(on, storage);
+        solar.setLens(on);
+      },
+      setSound: on => {
+        universeSound = { ...universeSound, on };
+        writeSoundPrefs(universeSound, storage);
+        universeChimes.enabled = on && universeChimes.start();
+      },
+      setAmbient: level => {
+        universeSound = { ...universeSound, ambient: level as AmbientLevel };
+        writeSoundPrefs(universeSound, storage);
+        solar.setAmbient(level as AmbientLevel);
+      },
+      followComet: () => solar.followNextComet(),
+      screensaver: () => {
+        graphFullscreen = true;
+        applyUniverseViewState(wrap, document.body, universeDark, true);
+        solar.startScreensaver();
+      },
+    });
+    listSavedConstellations()
+      .then(saved => {
+        if (graphMount === solar) solar.setConstellations(saved);
+      })
+      .catch(() => {
+        /* the sky simply has no constellations */
+      });
   } else {
     mounted = mountForceGraph(
       stage,
