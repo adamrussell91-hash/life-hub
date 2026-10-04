@@ -3,13 +3,15 @@ import test from 'node:test';
 import { tasksEventsFromTasks } from '../../apps/life/js/shell/tasks-calendar.js';
 import { knowledgeEventsFromPages } from '../../apps/life/js/shell/knowledge-calendar.js';
 
-test('tasksEventsFromTasks maps open due dates and skips done work', () => {
+test('tasksEventsFromTasks maps due dates; done work stays, marked done', () => {
   const events = tasksEventsFromTasks([
     { id: 't1', title: 'Mark 12 English', due_date: '2026-08-12', status: 'open' },
     { id: 't2', title: 'Done', due_date: '2026-08-12', status: 'done' },
+    { id: 't4', title: 'Done bucket', due_date: '2026-08-12', status: 'open', bucket: 'done' },
+    { id: 't5', title: 'Dead', due_date: '2026-08-12', status: 'dead' },
     { id: 't3', title: 'No date', status: 'open' }
   ]);
-  assert.equal(events.length, 1);
+  assert.deepEqual(events.map(e => [e.record.id, e.record.status]), [['t1', 'open'], ['t2', 'done'], ['t4', 'done']]);
   assert.equal(events[0].record.type, 'task');
   assert.equal(events[0].record.date, '2026-08-12');
 });

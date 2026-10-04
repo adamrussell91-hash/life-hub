@@ -30,7 +30,8 @@ import {
   writeFilterState
 } from './calendar-filter.js';
 import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
-import { canMoveItem, canResizeItem, dragPatch, saveCalendarItem } from './calendar-item-actions.js';
+import { canMoveItem, canResizeItem, canTickItem, dragPatch, isItemDone, saveCalendarItem, toggleItemDone } from './calendar-item-actions.js';
+import { offerTimedUndo } from '../hub-feedback.js';
 import { formatDisplayDate } from '../format-display-date.js';
 import { openRescueSheet } from './rescue-sheet.js';
 import { captureChips, morphPairs, playChips } from './rescue-morph.js';
@@ -757,6 +758,8 @@ function mountAllDay(grid, date) {
   cell.style.gridColumn = String(dayGridColumn(date));
   cell.style.gridRow = '2';
   for (const due of day.due) {
+    // Already a block on the grid this day, with no deadline time: not listed twice.
+    if (due.onGrid) continue;
     const ghost = model.ghosts.find(item => item.id === due.ghostId);
     const moved = state.settled.get(due.ghostId);
     const allDayClass = due.kind === 'allday' ? ` is-allday k-${due.filterKey === 'events' ? 'event' : due.filterKey}${due.ambient ? ' is-ambient' : ''}` : '';
@@ -773,7 +776,9 @@ function mountAllDay(grid, date) {
     const frag = due.fragility && due.fragility.status !== 'fits'
       ? `<span class="cal-due__flag is-${due.fragility.status}" title="${escapeHtml(due.fragility.text)}">${due.fragility.status === 'short' ? 'won’t fit' : 'fragile'}</span>`
       : '';
-    const chip = el('div', `cal-due${promiseClass}`, `<b>${escapeHtml(due.title)}</b>${frag}${dueMeta ? `<span class="cal-due__meta">${escapeHtml(dueMeta)}</span>` : ''}${after}${bookmarkHtml}`, cell, {
+    const tick = canTickItem(due) ? tickHtml(due) : '';
+    const doneClass = due.done ? ' is-done' : '';
+    const chip = el('div', `cal-due${promiseClass}${doneClass}`, `<b>${tick}${escapeHtml(due.title)}</b>${frag}${dueMeta ? `<span class="cal-due__meta">${escapeHtml(dueMeta)}</span>` : ''}${after}${bookmarkHtml}`, cell, {
       'data-part': 'due',
       'data-id': due.id,
       tabindex: '0',
@@ -906,6 +911,44 @@ export function hourVisibility(pxPerHour, major) {
   return { line, label };
 }
 
+/** The tick circle on a task or work block: one tap marks it done, again reopens it. */
+function tickHtml(item) {
+  const done = isItemDone(item);
+  const label = done ? `Mark ${item.title} not done` : `Mark ${item.title} done`;
+  return `<button type="button" class="cal-tick${done ? ' is-done' : ''}" data-tick="${escapeHtml(item.id)}" aria-pressed="${done}" aria-label="${escapeHtml(label)}" title="${done ? 'Done · tap to reopen' : 'Mark done'}"></button>`;
+}
+
+/** Optimistic tick: the item flips straight away, saves, and offers Undo. */
+async function tickItem(id, button) {
+  const item = chipById(id) ?? dueById(id);
+  if (!item || !canTickItem(item) || button.disabled) return;
+  const done = !isItemDone(item);
+  const owner = button.closest?.('.cal-chip, .cal-due');
+  const flip = (on) => {
+    owner?.classList?.toggle?.('is-done', on);
+    button.classList?.toggle?.('is-done', on);
+    button.setAttribute('aria-pressed', String(on));
+  };
+  flip(done);
+  button.disabled = true;
+  try {
+    const undo = await toggleItemDone(input?.apiFetch, item);
+    void input?.onSourcesChanged?.();
+    offerTimedUndo({
+      root,
+      message: done ? `Done: ${item.title}` : `Reopened: ${item.title}`,
+      onUndo: () => {
+        void undo().then(() => input?.onSourcesChanged?.()).catch(() => showToast('Could not undo. Try again.'));
+      }
+    });
+  } catch (cause) {
+    flip(!done);
+    showToast(escapeHtml(cause?.message || 'Could not save.'));
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function chipIsMovable(chip) {
   if (!chip || chip.ghost) return false;
   if (typeof input?.onReschedule !== 'function' && typeof input?.apiFetch !== 'function') return false;
@@ -925,7 +968,7 @@ function mountChip(body, chip) {
   if (chip.regained) classes.push('is-regained');
   if (ghost) classes.push('is-ghost');
   if (chip.ghost?.settled === 'accepted') classes.push('is-accepted');
-  const title = `${chip.kind === 'corey' ? '<span class="cal-mark"></span>' : ''}${chip.done ? '<span class="cal-chip__tick" aria-hidden="true">✓</span>' : ''}${chip.title}`;
+  const title = `${chip.kind === 'corey' ? '<span class="cal-mark"></span>' : ''}${!ghost && canTickItem(chip) ? tickHtml(chip) : ''}${chip.title}`;
   const agent = ghost ? `<span class="cal-chip__agent"><span class="cal-av cal-av--sm ${ghost.agent === 'sara' ? 'cal-av--sara' : ''}">${AGENT_INITIAL[ghost.agent]}</span></span>` : '';
   const acts = ghost && ghost.kind !== 'bedtime'
     ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${ghost.id}" data-label="Accept">Accept</button><button type="button" data-dismiss="${ghost.id}">Dismiss</button></div>`
@@ -1386,6 +1429,13 @@ function wire(section) {
       return;
     }
 
+    const tickButton = target.closest('[data-tick]');
+    if (tickButton) {
+      event.stopPropagation?.();
+      closePop();
+      void tickItem(tickButton.dataset.tick, tickButton);
+      return;
+    }
     const acceptButton = target.closest('[data-accept]');
     if (acceptButton) {
       closePop();

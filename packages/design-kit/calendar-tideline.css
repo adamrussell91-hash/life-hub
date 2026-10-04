@@ -193,11 +193,19 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-chip.is-ghost:not(.is-accepted)::before{opacity:var(--solid,0)}
 .cal-chip.is-over-item{background:color-mix(in srgb,var(--warm-white) 88%,transparent)}
 .cal-chip.is-skipped .cal-chip__title{text-decoration:line-through;color:var(--muted)}
-/* A ticked-off task keeps its slot: pale, ticked, struck through. */
+/* A ticked-off task or block keeps its slot: pale, ticked, struck through. */
 .cal-chip.is-done{--chip-bg:color-mix(in srgb,var(--k-bg) 28%,#fff);background:var(--chip-bg);box-shadow:none}
 .cal-chip.is-done::before{opacity:.45}
-.cal-chip.is-done .cal-chip__title{text-decoration:line-through;color:var(--muted);font-weight:var(--weight-medium)}
-.cal-chip__tick{margin-right:4px;color:var(--pastel-sage-ink);font-weight:var(--weight-semibold);text-decoration:none;display:inline-block}
+.cal-chip.is-done .cal-chip__title,.cal-due.is-done b{text-decoration:line-through;color:var(--muted);font-weight:var(--weight-medium)}
+.cal-due.is-done{background:color-mix(in srgb,var(--pastel-sage) 30%,#fff)}
+/* Tick circle: same gesture as the Tasks board. The hit area is larger than the ring. */
+.cal-tick{position:relative;display:inline-block;vertical-align:-2px;width:14px;height:14px;margin:0 6px 0 0;padding:0;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--pastel-sage-ink) 70%,transparent);background:#fff;cursor:pointer;flex:none}
+.cal-tick::after{content:"";position:absolute;inset:-8px}
+.cal-tick:hover{background:color-mix(in srgb,var(--pastel-sage) 60%,#fff)}
+.cal-tick:focus-visible{outline:2px solid var(--wave);outline-offset:2px}
+.cal-tick.is-done{background:var(--pastel-sage-ink);border-color:var(--pastel-sage-ink)}
+.cal-tick.is-done::before{content:"";position:absolute;left:3.5px;top:1px;width:3px;height:6px;border:solid #fff;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+.cal-tick:disabled{cursor:progress}
 .cal-chip.is-class{box-shadow:none;--chip-bg:color-mix(in srgb,#fff 80%,transparent);border-color:color-mix(in srgb,var(--wave) calc(var(--t,1) * 18%),transparent)}
 .cal-chip.is-corey{--chip-bg:color-mix(in srgb,var(--pastel-peach) 80%,#fff);background:linear-gradient(135deg,color-mix(in srgb,var(--pastel-peach) 62%,#fff),var(--pastel-peach));border-color:color-mix(in srgb,var(--pastel-peach-ink) 22%,transparent)}
 .cal-chip.is-corey.is-ghost{background:color-mix(in srgb,var(--pastel-peach) calc(35% + var(--solid,0) * 45%),transparent)}
@@ -349,6 +357,18 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-card__field input,.cal-card__field textarea,.cal-card__field select{font:inherit;font-size:var(--text-sm);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:5px 8px;min-width:0;width:100%;box-sizing:border-box}
 .cal-card__field textarea{resize:vertical;min-height:3.5rem}
 .cal-card__field input:focus-visible,.cal-card__field textarea:focus-visible,.cal-card__field select:focus-visible{outline:2px solid var(--wave);outline-offset:0}
+/* Status pills (To do / Doing / Done) and Plan time — one tap saves. */
+.cal-card__status{display:flex;flex-wrap:wrap;gap:4px;margin-top:var(--space-2)}
+.cal-card__pill{font:inherit;font-size:var(--text-xs);font-weight:var(--weight-semibold);min-height:2rem;padding:2px var(--space-3);border-radius:var(--radius-full);border:1px solid var(--line);background:var(--paper);color:var(--navy);cursor:pointer}
+.cal-card__pill:hover{background:color-mix(in srgb,var(--wave) 6%,var(--paper))}
+.cal-card__pill.is-active{background:var(--navy);border-color:var(--navy);color:#fff;cursor:default}
+.cal-card__pill[data-status="done"].is-active{background:var(--pastel-sage-ink);border-color:var(--pastel-sage-ink)}
+.cal-card__pill:focus-visible{outline:2px solid var(--wave);outline-offset:1px}
+.cal-card__pill:disabled{opacity:.6;cursor:progress}
+.cal-card__plan{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-2);margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--line);align-items:end}
+.cal-card__plan-label{grid-column:1/-1;font-size:var(--text-xs);font-weight:var(--weight-semibold);color:var(--navy)}
+.cal-card__plan .btn{grid-column:1/-1;justify-self:start;min-height:2rem;padding:2px var(--space-3);font-size:var(--text-xs)}
+.cal-card__plan .cal-card__hint{grid-column:1/-1;margin:0}
 .cal-card__error{grid-column:1/-1;margin:0;font-size:var(--text-xs);color:var(--high-sea-ink)}
 .cal-card__form .cal-pop__acts{grid-column:1/-1;margin-top:var(--space-1)}
 @media (max-width:719px){

@@ -3,6 +3,7 @@ import {
   looksLikeTaskDirection,
   parseBrainDump,
   parseClockTime,
+  parseTimeBlock,
   parseWordingCorrection,
   resolveDuplicateFollowUp,
   resolveTaskDirection,
@@ -376,3 +377,24 @@ describe('brain dump parsing', () => {
     ]);
   });
 });
+
+describe('parseTimeBlock', () => {
+  it('reads ranges and "for" spans; leaves deadlines and number ranges alone', () => {
+    expect(parseTimeBlock('Email Keith 3-3:15pm')).toMatchObject({ start_time: '15:00', end_time: '15:15' });
+    expect(parseTimeBlock('Lead accreditation 5:30 to 6:30pm')).toMatchObject({ start_time: '17:30', end_time: '18:30' });
+    expect(parseTimeBlock('plan 11-1pm')).toMatchObject({ start_time: '11:00', end_time: '13:00' });
+    expect(parseTimeBlock('call mum at 3pm for 15 min')).toMatchObject({ start_time: '15:00', end_time: '15:15' });
+    expect(parseTimeBlock('3:00-3:15 email Fergus')).toMatchObject({ start_time: '15:00', end_time: '15:15' });
+    expect(parseTimeBlock('Mark Year 11-12 essays')).toBeNull();
+    expect(parseTimeBlock('report due by 5pm')).toBeNull();
+  });
+
+  it('parseBrainDump strips the slot from the title and carries it as start/end', () => {
+    const [item] = parseBrainDump('Email Keith Pavlis 3-3:15pm', { now: new Date('2026-10-04T03:00:00Z') });
+    expect(item.title).toBe('Email Keith Pavlis');
+    expect(item).toMatchObject({ start_time: '15:00', end_time: '15:15' });
+    const result = assembleDumpResult([item], frameworks, () => null);
+    expect(result.proposals[0]).toMatchObject({ start_time: '15:00', end_time: '15:15', proposed_minutes: 15 });
+  });
+});
+

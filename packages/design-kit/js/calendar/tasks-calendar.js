@@ -41,12 +41,9 @@ function bookmarkOf(task) {
     : null;
 }
 
-/**
- * A task with a due time and an estimate happens at that time: the calendar draws it
- * as a block, and keeps it there (struck through) once it is ticked off.
- */
-export function isScheduledTask(task) {
-  return TIME_KEY.test(task?.due_time ?? '') && Number(task?.estimated_duration) > 0;
+/** Closed the same way task-liveness reads it: status, the Done bucket, or a completion stamp. */
+function isDoneTask(task) {
+  return task?.status === 'done' || task?.bucket === 'done' || Boolean(task?.completed_at);
 }
 
 export function tasksEventsFromTasks(tasks) {
@@ -81,8 +78,7 @@ export function tasksEventsFromTasks(tasks) {
       task &&
       typeof task.id === 'string' &&
       DATE_KEY.test(task.due_date) &&
-      task.status !== 'dead' &&
-      (task.status !== 'done' || isScheduledTask(task))
+      task.status !== 'dead'
     )
     .map(task => ({
       path: `tasks:${task.id}`,
@@ -92,7 +88,8 @@ export function tasksEventsFromTasks(tasks) {
         date: task.due_date,
         time: typeof task.due_time === 'string' && TIME_KEY.test(task.due_time) ? task.due_time : undefined,
         title: typeof task.title === 'string' && task.title ? task.title : task.id,
-        status: typeof task.status === 'string' ? task.status : undefined,
+        // Ticked-off tasks stay on their day (struck through), so status is normalised.
+        status: isDoneTask(task) ? 'done' : typeof task.status === 'string' ? task.status : undefined,
         // Context for the calendar item card (click a Due row or chip).
         priority: typeof task.priority === 'string' ? task.priority : undefined,
         description: typeof task.description === 'string' ? task.description : '',

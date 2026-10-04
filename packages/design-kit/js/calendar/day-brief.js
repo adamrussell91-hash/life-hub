@@ -106,9 +106,9 @@ export function tonight({ date, now, chips = [], due = [], ghosts = [], logs = [
       title: d.title,
       kind: 'task',
       itemId: d.id,
-      note: d.meta || 'Tasks · open',
-      struck: false,
-      ghostId: move?.id ?? null,
+      note: d.meta || (d.done ? 'Done' : 'Tasks · open'),
+      struck: !!d.done,
+      ghostId: d.done ? null : move?.id ?? null,
       suggestion: move ? `${agentName(move.agent)}: move to ${move.label.replace(/^→\s*/, '')}` : null
     });
   }

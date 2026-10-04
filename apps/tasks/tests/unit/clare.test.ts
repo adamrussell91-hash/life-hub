@@ -255,3 +255,22 @@ describe('clare store negotiation', () => {
     expect(afterActual?.actual_sample_count).toBe(1);
   });
 });
+
+describe('clare dump time-blocks', () => {
+  it('a dumped slot becomes a block linked to the task; the deadline stays empty', async () => {
+    const kv = memoryKv();
+    await seedIfEmpty(kv, keys, seed);
+    const store = createTasksStore(kv, keys);
+    const proposal = {
+      ...(await store.proposeWithClare({ title: 'Email Keith Pavlis', domain: 'teaching', priority: 'medium', due_date: '2026-10-05' })),
+      start_time: '15:00',
+      end_time: '15:15'
+    };
+    const { task } = await store.acceptClareProposal({ proposal, accepted_minutes: 15 });
+    expect(task.due_time ?? null).toBeNull();
+    const blocks = (await store.listWorkBlocks()).filter((block) => block.task_id === task.id);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ date: '2026-10-05', start_time: '15:00', duration_minutes: 15, status: 'confirmed', source: 'clare' });
+  });
+});
+
