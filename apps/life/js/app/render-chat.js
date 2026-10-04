@@ -921,6 +921,7 @@ function parseTypedWritePath(path) {
 }
 
 function titleFromWriteContent(write) {
+  if (typeof write?.title === 'string' && write.title.trim()) return write.title.trim();
   const content = write?.content;
   if (content && typeof content === 'object' && !Array.isArray(content)) {
     const title = typeof content.title === 'string' ? content.title.trim() : '';

@@ -1178,6 +1178,13 @@ function memoryBlobStore(initial = {}) {
     async setJSON(key, value) {
       data[key] = value;
     },
+    async list({ prefix = '' } = {}) {
+      return {
+        blobs: Object.keys(data)
+          .filter(key => key.startsWith(prefix))
+          .map(key => ({ key }))
+      };
+    },
     data
   };
 }
@@ -1431,6 +1438,81 @@ test('action confirm writes a Tasks task blob onto tasks/_index', async () => {
     'Existing goals draft\n\nAdd evidence notes'
   );
 });
+
+test('explicit Clare time-block Confirm is not vetoed by Schedule Diff workday bounds', async () => {
+  const tasks = memoryBlobStore({
+    'tasks/task_korea': {
+      id: 'task_korea',
+      title: 'Korea itinerary',
+      due_date: '2026-10-04',
+      status: 'open',
+      created_at: '2026-10-04T03:16:51.611Z'
+    }
+  });
+  const teaching = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [] });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => tasks,
+    getTeachingStore: async () => teaching
+  });
+  const block = {
+    schema_version: 1,
+    id: 'wblock_korea',
+    task_id: 'task_korea',
+    title: 'Korea itinerary',
+    date: '2026-10-05',
+    start_time: '07:00',
+    duration_minutes: 30,
+    status: 'confirmed',
+    source: 'clare'
+  };
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: {
+      capability: 'os.propose-action',
+      agent: 'clare',
+      intent: 'Update Korea itinerary',
+      reads: [],
+      writes: [
+        {
+          path: 'tasks:task:task_korea',
+          mode: 'append',
+          content: JSON.stringify({ due_date: '2026-10-05' }),
+          diff: 'update task_korea: due_date'
+        },
+        {
+          path: 'tasks:work_block:wblock_korea',
+          mode: 'create',
+          content: JSON.stringify(block),
+          diff: 'block 2026-10-05 07:00–07:30 · Korea itinerary'
+        }
+      ],
+      surfaces: ['confirm_card', 'governance_log']
+    }
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(payload));
+  assert.equal(tasks.data['tasks/task_korea'].due_date, '2026-10-05');
+  assert.equal(tasks.data['work_blocks/wblock_korea'].start_time, '07:00');
+});
+
 
 
 test('N: confirming pending A with B\'s write path is rejected; neither proposal is consumed or written', async () => {

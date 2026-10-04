@@ -94,6 +94,7 @@ import {
 import {
   buildAuthoritativeHardBusy,
   detectStaleScheduleCollisions,
+  formatStaleScheduleCollisionMessage,
   workdayForDate
 } from './_shared/productivity-os.mjs';
 import {
@@ -1088,27 +1089,36 @@ export function createChatConfirmHandler({
     }
     const blobStores = blobStoresResult.stores;
 
-    const scheduleCollision = await checkStaleWorkBlockCollisions(accepted, blobStores, {
-      stored,
-      client,
-      tree,
-      getLifeEvents
-    });
-    if (scheduleCollision?.unavailable) {
-      return errorResponse(
-        503,
-        'schedule_validation_unavailable',
-        'Authoritative schedule data could not be loaded. Confirm was not run.',
-        true,
-        PRIVATE_CACHE
-      );
-    }
-    if (scheduleCollision && !scheduleCollision.ok) {
-      return jsonResponse(409, {
-        ok: false,
-        error: 'stale_schedule_collision',
-        data: scheduleCollision.revised
-      }, PRIVATE_CACHE);
+    // Schedule Diff auto-compose must re-check workday/lessons before write.
+    // Explicit Clare update_task time-blocks (Adam named the slot, then tapped
+    // Confirm) must not reuse that veto — it turned "Korea 8:30am" into a
+    // generic "Saving that action failed" with no reason.
+    if (isScheduleDiffProposal(stored, proposal)) {
+      const scheduleCollision = await checkStaleWorkBlockCollisions(accepted, blobStores, {
+        stored,
+        client,
+        tree,
+        getLifeEvents
+      });
+      if (scheduleCollision?.unavailable) {
+        return errorResponse(
+          503,
+          'schedule_validation_unavailable',
+          'Authoritative schedule data could not be loaded. Confirm was not run.',
+          true,
+          PRIVATE_CACHE
+        );
+      }
+      if (scheduleCollision && !scheduleCollision.ok) {
+        return errorResponse(
+          409,
+          'stale_schedule_collision',
+          formatStaleScheduleCollisionMessage(scheduleCollision),
+          true,
+          PRIVATE_CACHE,
+          { revised: scheduleCollision.revised, conflicts: scheduleCollision.conflicts }
+        );
+      }
     }
 
     // Schedule Diff Confirm promotes durable work blocks to confirmed (server-side).

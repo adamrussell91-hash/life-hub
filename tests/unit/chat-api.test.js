@@ -158,11 +158,32 @@ test('confirm omits kind from the body when not provided', async () => {
   assert.equal('kind' in sentBody, false);
 });
 
-test('confirm throws a structured error when the write fails', async () => {
-  const chatApi = createChatApi(async () => Response.json({ ok: false, error: { code: 'write_conflict' } }, { status: 409 }));
+test('confirm maps a string stale_schedule_collision error onto code and message', async () => {
+  const chatApi = createChatApi(async () => Response.json({
+    ok: false,
+    error: 'stale_schedule_collision',
+    data: { status: 'needs_recompose' }
+  }, { status: 409 }));
   await assert.rejects(
-    chatApi.confirm({ candidate: {}, slug: 'x' }),
-    error => error.status === 409 && error.code === 'write_conflict'
+    chatApi.confirm({ kind: 'action', slug: 'clare', id: 'act_x' }),
+    error => error.status === 409
+      && error.code === 'stale_schedule_collision'
+      && error.message === 'stale_schedule_collision'
+  );
+});
+
+test('confirm keeps structured stale_schedule_collision messages', async () => {
+  const chatApi = createChatApi(async () => Response.json({
+    ok: false,
+    error: {
+      code: 'stale_schedule_collision',
+      message: 'That time is blocked: Outside work boundaries. Discard this card and pick another slot.'
+    }
+  }, { status: 409 }));
+  await assert.rejects(
+    chatApi.confirm({ kind: 'action', slug: 'clare', id: 'act_x' }),
+    error => error.code === 'stale_schedule_collision'
+      && /Outside work boundaries/.test(error.message)
   );
 });
 

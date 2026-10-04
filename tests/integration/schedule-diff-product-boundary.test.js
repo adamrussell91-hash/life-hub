@@ -590,7 +590,8 @@ describe('LEVEL 4 Schedule Diff confirm (SD3–SD11)', () => {
     );
     const payload = await response.json();
     assert.equal(response.status, 409);
-    assert.equal(payload.error, 'stale_schedule_collision');
+    assert.equal(payload.error.code, 'stale_schedule_collision');
+    assert.match(payload.error.message, /blocked|collides/i);
     assert.equal(tasks.data['work_blocks/a'], undefined);
     const entry = findPendingActionById(
       parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
@@ -937,7 +938,7 @@ describe('SD16–SD18 planning profile workday (LEVEL 3/4)', () => {
     );
     const earlyBody = await early.json();
     assert.equal(early.status, 409);
-    assert.equal(earlyBody.error, 'stale_schedule_collision');
+    assert.equal(earlyBody.error.code, 'stale_schedule_collision');
     assert.equal(tasks.data['work_blocks/a'], undefined);
     const pending = findPendingActionById(
       parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
@@ -986,7 +987,7 @@ describe('SD16–SD18 planning profile workday (LEVEL 3/4)', () => {
     );
     const body = await response.json();
     assert.equal(response.status, 409);
-    assert.equal(body.error, 'stale_schedule_collision');
+    assert.equal(body.error.code, 'stale_schedule_collision');
     assert.equal(tasks.data['work_blocks/a'], undefined);
     assert.equal(
       isPendingActionExecutable(
@@ -1182,7 +1183,7 @@ describe('SD21/SD22 durable confirmed status (LEVEL 4)', () => {
     );
     const body = await blocked.json();
     assert.equal(blocked.status, 409);
-    assert.equal(body.error, 'stale_schedule_collision');
+    assert.equal(body.error.code, 'stale_schedule_collision');
     assert.equal(tasks.data['work_blocks/b22'], undefined);
     assert.equal(
       isPendingActionExecutable(
@@ -1654,7 +1655,7 @@ describe('SD31/SD32 Life calendar events (LEVEL 3/4)', () => {
     );
     const body = await blocked.json();
     assert.equal(blocked.status, 409);
-    assert.equal(body.error, 'stale_schedule_collision');
+    assert.equal(body.error.code, 'stale_schedule_collision');
     assert.equal(tasks.data['work_blocks/life32'], undefined);
     assert.equal(
       isPendingActionExecutable(
