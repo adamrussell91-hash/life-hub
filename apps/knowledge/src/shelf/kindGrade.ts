@@ -3,10 +3,10 @@
  * CLI, unit tests and Netlify handler share one parse/prompt (V4).
  */
 export {
-  kindPrompt,
-  parseKindGrade,
+  CRYSTALLISED_KINDS,
   FLUID_KINDS,
   KIND_PRECEDENCE,
-  CRYSTALLISED_KINDS,
   KIND_SYSTEM,
+  kindPrompt,
+  parseKindGrade,
 } from "../../../../netlify/functions/_shared/knowledge-shelf-kinds.mjs";

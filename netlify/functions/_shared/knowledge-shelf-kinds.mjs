@@ -14,6 +14,7 @@ const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
 const MAX_NOTES = 1000;
 const BODY_CHARS = 6000;
+const UNREADABLE_GRADE = { kind: 'idea', kindGuessed: true, kindReason: 'Grader reply unreadable.' };
 
 export const KIND_SYSTEM = `You grade one book note with exactly one kind. A book note is information on something in a book.
 
@@ -45,6 +46,10 @@ function failure(message, status = 400, code = 'validation_error') {
   return Object.assign(new Error(message), { status, code });
 }
 
+function requireApiKey(apiKey) {
+  if (!apiKey) throw failure('Book-note kinds need the Anthropic key on the server.', 503, 'anthropic_unconfigured');
+}
+
 async function getJSON(store, key) {
   return (await store.get(key, { type: 'json', consistency: 'strong' })) ?? null;
 }
@@ -56,6 +61,10 @@ async function setJSON(store, key, value) {
 
 function headers(apiKey) {
   return { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': API_VERSION };
+}
+
+function textFromMessage(message) {
+  return (message?.content ?? []).filter(part => part?.type === 'text').map(part => part.text).join('');
 }
 
 function normalise(text) {
@@ -87,6 +96,26 @@ function bookLabelFromOrigins(origins) {
   return book ? { label: book.label.trim(), locus: typeof book.locus === 'string' ? book.locus : '' } : null;
 }
 
+function readJsonObject(text) {
+  try {
+    const fenced = String(text ?? '').match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const slice = (fenced ? fenced[1] : String(text ?? '')).trim();
+    const start = slice.indexOf('{');
+    const end = slice.lastIndexOf('}');
+    if (start < 0 || end <= start) return null;
+    const raw = JSON.parse(slice.slice(start, end + 1));
+    return raw && typeof raw === 'object' ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function readConfidence(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number(value);
+  return NaN;
+}
+
 export function kindPrompt(note) {
   const body = String(note?.body ?? '').slice(0, BODY_CHARS);
   return `Title: ${note?.title ?? ''}
@@ -101,25 +130,17 @@ ${body}`;
  * Fluid grades whose evidence quote is missing are downgraded to fallback.
  */
 export function parseKindGrade(text, body) {
-  let raw;
-  try {
-    const fenced = String(text ?? '').match(/```(?:json)?\s*([\s\S]*?)```/i);
-    const slice = (fenced ? fenced[1] : String(text ?? '')).trim();
-    const start = slice.indexOf('{');
-    const end = slice.lastIndexOf('}');
-    if (start < 0 || end <= start) return { unreadable: true };
-    raw = JSON.parse(slice.slice(start, end + 1));
-  } catch {
-    return { unreadable: true };
-  }
-  if (!raw || typeof raw !== 'object') return { unreadable: true };
+  const raw = readJsonObject(text);
+  if (!raw) return { unreadable: true };
+
   let kind = SHELF_KINDS.includes(raw.kind) ? raw.kind : null;
+  if (!kind) return { unreadable: true };
+
   const fallback = CRYSTALLISED_KINDS.includes(raw.fallback) ? raw.fallback : 'idea';
   const evidence = typeof raw.evidence === 'string' ? raw.evidence.trim() : '';
   let reason = typeof raw.reason === 'string' ? raw.reason.trim().slice(0, 300) : '';
-  const confidenceRaw = typeof raw.confidence === 'number' ? raw.confidence : typeof raw.confidence === 'string' ? Number(raw.confidence) : NaN;
+  const confidenceRaw = readConfidence(raw.confidence);
   const confidence = Number.isFinite(confidenceRaw) ? confidenceRaw : null;
-  if (!kind) return { unreadable: true };
 
   let kindGuessed = confidence === null || confidence < 0.7;
   let downgraded = false;
@@ -129,7 +150,14 @@ export function parseKindGrade(text, body) {
     downgraded = true;
     reason = `Downgraded: quote not found.${reason ? ` ${reason}` : ''}`.slice(0, 300);
   }
-  return { kind, kindGuessed, kindReason: reason || undefined, downgraded, confidence };
+  return {
+    kind,
+    kindGuessed,
+    kindReason: reason || undefined,
+    downgraded,
+    confidence,
+    evidence: evidence || undefined
+  };
 }
 
 export function kindsRequest(customId, note) {
@@ -178,6 +206,13 @@ async function loadBookNotes({ listPages, getPage, idsFilter }) {
   return notes;
 }
 
+function pageLoaders({ listPages, getPage, env, fetchImpl }) {
+  return {
+    listPages: listPages ?? (() => listKnowledgePages({ env, fetchImpl })),
+    getPage: getPage ?? (id => getKnowledgePage(id, { env, fetchImpl }))
+  };
+}
+
 /** Starts one batch for book notes that still need a kind. Refuses while a batch is running. */
 export async function startKindsJob(store, { ids, regrade = false } = {}, {
   apiKey,
@@ -187,18 +222,15 @@ export async function startKindsJob(store, { ids, regrade = false } = {}, {
   getPage,
   env
 } = {}) {
-  if (!apiKey) throw failure('Book-note kinds need the Anthropic key on the server.', 503, 'anthropic_unconfigured');
+  requireApiKey(apiKey);
   const current = await getJSON(store, KINDS_JOB_KEY);
   if (current?.status === 'running') throw failure('Book-note kinds are already being graded. Check back shortly.', 409, 'job_running');
 
-  const pageLoader = {
-    listPages: listPages ?? (() => listKnowledgePages({ env, fetchImpl })),
-    getPage: getPage ?? (id => getKnowledgePage(id, { env, fetchImpl }))
-  };
+  const loaders = pageLoaders({ listPages, getPage, env, fetchImpl });
   const placements = (await getJSON(store, PLACEMENTS_KEY)) ?? {};
   const candidates = await loadBookNotes({
-    listPages: pageLoader.listPages,
-    getPage: pageLoader.getPage,
+    listPages: loaders.listPages,
+    getPage: loaders.getPage,
     idsFilter: Array.isArray(ids) ? ids.filter(id => typeof id === 'string') : null
   });
   const notes = candidates.filter(note => shouldGrade(placements[note.id], { regrade }));
@@ -233,8 +265,12 @@ function gradeFromLine(line) {
   if (line?.result?.type !== 'succeeded') return { unreadable: true };
   const message = line.result.message;
   if (message?.stop_reason === 'refusal' || message?.stop_reason === 'max_tokens') return { unreadable: true };
-  const text = (message?.content ?? []).filter(part => part?.type === 'text').map(part => part.text).join('');
-  return { text };
+  return { text: textFromMessage(message) };
+}
+
+function gradeFromText(text, body) {
+  const grade = parseKindGrade(text, body);
+  return grade.unreadable ? { ...UNREADABLE_GRADE, unreadable: true } : grade;
 }
 
 async function applyKindPatch(store, pageId, grade, now) {
@@ -271,7 +307,7 @@ export async function checkKindsJob(store, {
 } = {}) {
   const job = await getJSON(store, KINDS_JOB_KEY);
   if (!job || job.status !== 'running') return publicJob(job);
-  if (!apiKey) throw failure('Book-note kinds need the Anthropic key on the server.', 503, 'anthropic_unconfigured');
+  requireApiKey(apiKey);
 
   let batch;
   try {
@@ -296,7 +332,7 @@ export async function checkKindsJob(store, {
     throw failure('Claude finished, but the kinds results could not be downloaded. Try again.', 502, 'anthropic_unavailable');
   }
 
-  const pageLoader = getPage ?? (id => getKnowledgePage(id, { env, fetchImpl }));
+  const { getPage: pageLoader } = pageLoaders({ getPage, env, fetchImpl });
   const outcome = {
     applied: 0,
     byKind: Object.fromEntries(SHELF_KINDS.map(kind => [kind, 0])),
@@ -315,22 +351,22 @@ export async function checkKindsJob(store, {
     }
     const pageId = job.ids[line.custom_id];
     if (!pageId) continue;
+
     const extracted = gradeFromLine(line);
     let grade;
     if (extracted.unreadable) {
-      grade = { kind: 'idea', kindGuessed: true, kindReason: 'Grader reply unreadable.', unreadable: true };
-      outcome.unreadable += 1;
+      grade = { ...UNREADABLE_GRADE, unreadable: true };
     } else {
       const page = await pageLoader(pageId);
-      grade = parseKindGrade(extracted.text, page?.body ?? '');
-      if (grade.unreadable) {
-        grade = { kind: 'idea', kindGuessed: true, kindReason: 'Grader reply unreadable.', unreadable: true };
-        outcome.unreadable += 1;
-      } else {
-        if (grade.downgraded) outcome.downgraded += 1;
-        if (grade.kindGuessed) outcome.guessed += 1;
-      }
+      grade = gradeFromText(extracted.text, page?.body ?? '');
     }
+
+    if (grade.unreadable) outcome.unreadable += 1;
+    else {
+      if (grade.downgraded) outcome.downgraded += 1;
+      if (grade.kindGuessed) outcome.guessed += 1;
+    }
+
     const saved = await applyKindPatch(store, pageId, grade, now);
     if (saved) {
       outcome.applied += 1;
@@ -351,16 +387,15 @@ export async function gradeOneKind(store, pageId, {
   getPage,
   env
 } = {}) {
-  if (!apiKey) throw failure('Book-note kinds need the Anthropic key on the server.', 503, 'anthropic_unconfigured');
+  requireApiKey(apiKey);
   if (typeof pageId !== 'string' || !pageId.trim()) throw failure('A pageId is required.');
+
   const placements = (await getJSON(store, PLACEMENTS_KEY)) ?? {};
   const current = placements[pageId] ?? null;
   if (current?.kindBy === 'adam') throw failure('This note already has a kind set by Adam.', 409, 'kind_locked');
-  if (current?.kindBy === 'clementine' && current?.kind) {
-    return current;
-  }
+  if (current?.kindBy === 'clementine' && current?.kind) return current;
 
-  const pageLoader = getPage ?? (id => getKnowledgePage(id, { env, fetchImpl }));
+  const { getPage: pageLoader } = pageLoaders({ getPage, env, fetchImpl });
   const page = await pageLoader(pageId);
   if (!page) throw failure('Unknown pageId.', 404, 'page_not_found');
   const book = bookLabelFromOrigins(page.origins);
@@ -371,17 +406,11 @@ export async function gradeOneKind(store, pageId, {
     const response = await fetchImpl(`${ANTHROPIC_ORIGIN}/v1/messages`, {
       method: 'POST',
       headers: headers(apiKey),
-      body: JSON.stringify({
-        model: FACTS_MODEL,
-        max_tokens: 1024,
-        system: KIND_SYSTEM,
-        messages: [{ role: 'user', content: kindPrompt(note) }]
-      })
+      body: JSON.stringify(kindsRequest('sync', note).params)
     });
     if (!response.ok) throw failure(`Claude refused to grade the kind (HTTP ${response.status}).`, 502, 'anthropic_request_failed');
     const message = await response.json();
-    const text = (message?.content ?? []).filter(part => part?.type === 'text').map(part => part.text).join('');
-    return parseKindGrade(text, note.body);
+    return parseKindGrade(textFromMessage(message), note.body);
   };
 
   let grade;
@@ -392,9 +421,6 @@ export async function gradeOneKind(store, pageId, {
     if (error?.status) throw error;
     throw failure('Could not reach Claude to grade the kind.', 502, 'anthropic_unavailable');
   }
-  if (grade.unreadable) {
-    grade = { kind: 'idea', kindGuessed: true, kindReason: 'Grader reply unreadable.' };
-  }
-  const saved = await applyKindPatch(store, pageId, grade, now);
-  return saved;
+  if (grade.unreadable) grade = { ...UNREADABLE_GRADE };
+  return applyKindPatch(store, pageId, grade, now);
 }

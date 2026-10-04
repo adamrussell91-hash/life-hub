@@ -16,6 +16,10 @@ function arg(name) {
   return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function main() {
   const dataDir = arg('--data-dir');
   if (!dataDir) throw new Error('--data-dir needs a path');
@@ -46,26 +50,23 @@ async function main() {
   if (current.status === 'running') {
     console.log('A job is already running; checking it instead of starting another.');
   } else {
-    const job = await startKindsJob(store, { regrade }, { apiKey, listPages, getPage });
-    console.log('started:', JSON.stringify(job));
+    console.log('started:', JSON.stringify(await startKindsJob(store, { regrade }, { apiKey, listPages, getPage })));
   }
 
   for (;;) {
     const job = await checkKindsJob(store, { apiKey, getPage });
     console.log('check:', JSON.stringify(job));
-    if (job.status !== 'running') {
-      const placements = (await store.get(PLACEMENTS_KEY, { type: 'json', consistency: 'strong' })) ?? {};
-      let withKind = 0;
-      let missing = 0;
-      for (const entry of bookEntries) {
-        if (placements[entry.id]?.kind) withKind += 1;
-        else missing += 1;
-      }
-      console.log(JSON.stringify({ bookNotes: bookEntries.length, withKind, missing, job }, null, 2));
-      if (missing) process.exitCode = 2;
-      return;
+    if (job.status === 'running') {
+      await sleep(15000);
+      continue;
     }
-    await new Promise(resolve => setTimeout(resolve, 15000));
+
+    const placements = (await store.get(PLACEMENTS_KEY, { type: 'json', consistency: 'strong' })) ?? {};
+    const withKind = bookEntries.filter(entry => placements[entry.id]?.kind).length;
+    const missing = bookEntries.length - withKind;
+    console.log(JSON.stringify({ bookNotes: bookEntries.length, withKind, missing, job }, null, 2));
+    if (missing) process.exitCode = 2;
+    return;
   }
 }
 

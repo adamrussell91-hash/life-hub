@@ -31,6 +31,8 @@ type Graded = {
   evidence?: string;
 };
 
+type Origin = { kind?: string; label?: string; locus?: string };
+
 function say(line: string) {
   writeSync(1, `${line}\n`);
 }
@@ -38,6 +40,27 @@ function say(line: string) {
 function arg(name: string) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+function emptyCounts(): Record<string, number> {
+  return Object.fromEntries(SHELF_KINDS.map((kind: string) => [kind, 0]));
+}
+
+function bookOrigin(origins: Origin[] | undefined): Origin | undefined {
+  return (origins ?? []).find(origin => origin.kind === "book" && origin.label?.trim());
+}
+
+function normaliseLabel(label: string) {
+  return label.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function pick<T>(list: T[], n: number): T[] {
+  const copy = [...list];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
+  }
+  return copy.slice(0, n);
 }
 
 async function mapPool<T, R>(items: T[], size: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
@@ -59,6 +82,8 @@ async function gradeNote(
   note: { id: string; title: string; bookLabel: string; locus: string; body: string },
   apiKey: string,
 ): Promise<Graded> {
+  const base = { id: note.id, title: note.title, book: note.bookLabel };
+
   const call = async () => {
     const response = await fetch(`${ANTHROPIC_ORIGIN}/v1/messages`, {
       method: "POST",
@@ -70,9 +95,7 @@ async function gradeNote(
       body: JSON.stringify({
         model: FACTS_MODEL,
         max_tokens: 1024,
-        system: `${KIND_SYSTEM}
-
-Return JSON only: {"kind":"...","fallback":"person|idea|case","evidence":"a sentence quoted from the note","reason":"one line","confidence":0.0}`,
+        system: KIND_SYSTEM,
         messages: [{ role: "user", content: kindPrompt(note) }],
       }),
     });
@@ -81,41 +104,19 @@ Return JSON only: {"kind":"...","fallback":"person|idea|case","evidence":"a sent
     return (message.content ?? []).filter(part => part?.type === "text").map(part => part.text ?? "").join("");
   };
 
-  let text = await call();
-  let parsed = parseKindGrade(text, note.body);
+  let parsed = parseKindGrade(await call(), note.body);
+  if (parsed.unreadable) parsed = parseKindGrade(await call(), note.body);
   if (parsed.unreadable) {
-    text = await call();
-    parsed = parseKindGrade(text, note.body);
+    return { ...base, kind: "idea", kindGuessed: true, downgraded: false, reason: "Grader reply unreadable." };
   }
-  if (parsed.unreadable) {
-    return {
-      id: note.id,
-      title: note.title,
-      book: note.bookLabel,
-      kind: "idea",
-      kindGuessed: true,
-      downgraded: false,
-      reason: "Grader reply unreadable.",
-    };
-  }
-  let evidence: string | undefined;
-  try {
-    const raw = JSON.parse(text.includes("{") ? text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1) : text) as {
-      evidence?: string;
-    };
-    evidence = typeof raw.evidence === "string" ? raw.evidence : undefined;
-  } catch {
-    evidence = undefined;
-  }
+
   return {
-    id: note.id,
-    title: note.title,
-    book: note.bookLabel,
+    ...base,
     kind: parsed.kind,
     kindGuessed: Boolean(parsed.kindGuessed),
     downgraded: Boolean(parsed.downgraded),
     reason: parsed.kindReason,
-    evidence,
+    evidence: parsed.evidence,
   };
 }
 
@@ -134,14 +135,14 @@ async function main() {
   const manifest = JSON.parse(await readFile(path.join(dataDir, "manifest.json"), "utf8")) as Array<{
     id: string;
     title?: string;
-    origins?: Array<{ kind?: string; label?: string; locus?: string }>;
+    origins?: Origin[];
   }>;
 
-  let rows = manifest.filter(entry => (entry.origins ?? []).some(o => o.kind === "book" && o.label?.trim()));
+  let rows = manifest.filter(entry => bookOrigin(entry.origins));
   if (bookFilter) {
-    const want = bookFilter.replace(/\s+/g, " ").trim().toLowerCase();
+    const want = normaliseLabel(bookFilter);
     rows = rows.filter(entry =>
-      (entry.origins ?? []).some(o => o.kind === "book" && (o.label ?? "").replace(/\s+/g, " ").trim().toLowerCase() === want),
+      (entry.origins ?? []).some(origin => origin.kind === "book" && normaliseLabel(origin.label ?? "") === want),
     );
   }
   if (goldPath && process.argv.includes("--gold-only")) {
@@ -156,9 +157,9 @@ async function main() {
     const page = JSON.parse(await readFile(path.join(dataDir, "pages", `${entry.id}.json`), "utf8")) as {
       title?: string;
       body?: string;
-      origins?: Array<{ kind?: string; label?: string; locus?: string }>;
+      origins?: Origin[];
     };
-    const book = (page.origins ?? entry.origins ?? []).find(o => o.kind === "book" && o.label?.trim());
+    const book = bookOrigin(page.origins ?? entry.origins);
     return gradeNote(
       {
         id: entry.id,
@@ -171,7 +172,7 @@ async function main() {
     );
   });
 
-  const totals = Object.fromEntries(SHELF_KINDS.map((k: string) => [k, 0])) as Record<string, number>;
+  const totals = emptyCounts();
   let guessed = 0;
   let downgraded = 0;
   let unreadable = 0;
@@ -193,12 +194,12 @@ async function main() {
   say("## Per book");
   const byBook = new Map<string, Record<string, number>>();
   for (const row of graded) {
-    const bucket = byBook.get(row.book) ?? Object.fromEntries(SHELF_KINDS.map((k: string) => [k, 0]));
+    const bucket = byBook.get(row.book) ?? emptyCounts();
     bucket[row.kind] = (bucket[row.kind] ?? 0) + 1;
     byBook.set(row.book, bucket);
   }
   for (const [book, counts] of [...byBook.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    say(`${book}: ${SHELF_KINDS.map((k: string) => `${k}=${counts[k] ?? 0}`).join(" ")}`);
+    say(`${book}: ${SHELF_KINDS.map((kind: string) => `${kind}=${counts[kind] ?? 0}`).join(" ")}`);
   }
 
   if (goldPath) {
@@ -213,11 +214,12 @@ async function main() {
       const got = byId.get(note.id);
       const key = `${note.kind}→${got?.kind ?? "missing"}`;
       confusion.set(key, (confusion.get(key) ?? 0) + 1);
-      if (got?.kind === note.kind) hits += 1;
-      else {
-        misses.push(`${note.title} | gold=${note.kind} graded=${got?.kind ?? "missing"} | ${got?.reason ?? ""}`);
-        if ((note.kind === "debate" || note.kind === "bridge") && got?.kind === "idea") fluidAsIdea += 1;
+      if (got?.kind === note.kind) {
+        hits += 1;
+        continue;
       }
+      misses.push(`${note.title} | gold=${note.kind} graded=${got?.kind ?? "missing"} | ${got?.reason ?? ""}`);
+      if ((note.kind === "debate" || note.kind === "bridge") && got?.kind === "idea") fluidAsIdea += 1;
     }
     say("");
     say(`## Gold agreement: ${hits}/${gold.notes.length}`);
@@ -232,21 +234,15 @@ async function main() {
     if (hits >= 24 && !fluidAsIdea) say("GATE PASS");
   }
 
-  const debates = graded.filter(row => row.kind === "debate");
-  const bridges = graded.filter(row => row.kind === "bridge");
-  const pick = <T>(list: T[], n: number) => {
-    const copy = [...list];
-    for (let i = copy.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [copy[i], copy[j]] = [copy[j]!, copy[i]!];
-    }
-    return copy.slice(0, n);
-  };
   say("");
   say("## Sample debate evidence");
-  for (const row of pick(debates, 10)) say(`- ${row.title}: ${row.evidence ?? "(no evidence)"}`);
+  for (const row of pick(graded.filter(row => row.kind === "debate"), 10)) {
+    say(`- ${row.title}: ${row.evidence ?? "(no evidence)"}`);
+  }
   say("## Sample bridge evidence");
-  for (const row of pick(bridges, 10)) say(`- ${row.title}: ${row.evidence ?? "(no evidence)"}`);
+  for (const row of pick(graded.filter(row => row.kind === "bridge"), 10)) {
+    say(`- ${row.title}: ${row.evidence ?? "(no evidence)"}`);
+  }
 }
 
 main().catch(error => {

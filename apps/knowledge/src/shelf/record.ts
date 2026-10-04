@@ -42,13 +42,12 @@ export async function recordBookNote(page: Pick<Page, "id" | "body">, book?: Boo
     }
     const placement = placementForBookNote(page, book, chapters);
     if (placement) await savePlacements([placement]);
-    // No Kind: line (write-it-yourself, or Clementine missed it) → grade once. Never fails the save.
-    if (!placement?.kind) {
-      try {
-        await gradeKind(page.id);
-      } catch (error) {
-        console.warn("Bookshelf: could not grade the note's kind.", error);
-      }
+    // Kind: line already set by Clementine → keep it. Otherwise grade once; never fail the save.
+    if (placement?.kind) return;
+    try {
+      await gradeKind(page.id);
+    } catch (error) {
+      console.warn("Bookshelf: could not grade the note's kind.", error);
     }
   } catch (error) {
     console.warn("Bookshelf: could not place the new note; it will show as a loose page.", error);
