@@ -147,6 +147,29 @@ function deleteLinesInSection(content, headingPrefix, matchText) {
   return `${content.slice(0, span.headingEnd)}${filtered.join('\n')}${separator}${content.slice(span.bodyEnd)}`;
 }
 
+const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Bullet-field upsert for every section except Today's Status, whose lines are
+ * `- **Weight**: 88kg ...` (or `- **Weight:** ...`). Replaces the first bullet
+ * carrying that bold label anywhere in the section (sub-headings included);
+ * appends a new bullet at the section's end when none exists yet.
+ */
+function upsertBulletFieldInSection(content, headingPrefix, field, text) {
+  const span = findSectionSpan(content, headingPrefix);
+  if (!span) return null;
+  const body = text.trim().replace(/^[-*]\s+/, '');
+  if (!body) return null;
+  const line = `- ${body}`;
+  const label = escapeRegExp(field.trim().replace(/^\*\*|\*\*$/g, '').replace(/:$/, ''));
+  const pattern = new RegExp(`^[ \\t]*[-*][ \\t]+\\*\\*${label}(?::\\*\\*|\\*\\*[ \\t]*:).*$`, 'im');
+  const sectionBody = content.slice(span.headingEnd, span.contentEnd);
+  const match = pattern.exec(sectionBody);
+  if (!match) return appendLineToSection(content, headingPrefix, line);
+  const start = span.headingEnd + match.index;
+  return `${content.slice(0, start)}${line}${content.slice(start + match[0].length)}`;
+}
+
 export function applyCentralNodePatch(content, patch) {
   if (typeof content !== 'string' || !patch || !CENTRAL_NODE_SECTIONS.includes(patch.section)) return null;
   const op = patch.op;
@@ -156,10 +179,10 @@ export function applyCentralNodePatch(content, patch) {
   if (patch.section === 'about_me') content = ensureAboutMeSection(content);
 
   if (op === 'upsert_field') {
-    if (patch.section !== 'todays_status') return null;
     const field = payload.field;
     const text = payload.text;
     if (typeof field !== 'string' || field.trim() === '' || typeof text !== 'string') return null;
+    if (patch.section !== 'todays_status') return upsertBulletFieldInSection(content, heading, field, text);
     const block = extractTodaysStatusBlock(content);
     if (!block.heading) return null;
     const nextBody = upsertStatusField(block.body, field, text);
