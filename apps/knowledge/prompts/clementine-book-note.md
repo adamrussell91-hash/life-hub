@@ -39,7 +39,7 @@ Use this order. Keep headings.
    | `idea` | A concept, term, mechanism or the book's argument, explained |
    | `case` | A specific event, study, example or story |
    | `debate` | Rival accounts, critics, a popular version that's wrong, an open question |
-   | `bridge` | Implications for teaching or learning, or a link to another field or book |
+   | `bridge` | Carries the idea out of the book's own subject: into teaching, learning, schools or curriculum, or into another field or book |
 
    Precedence when two fit: `debate` > `bridge` > `case` > `person` > `idea`. `idea` is only when nothing else fits — it is the easy default a lazy writer will reach for.
 5. **Sources** — the cited web links only, as markdown links. No extras.

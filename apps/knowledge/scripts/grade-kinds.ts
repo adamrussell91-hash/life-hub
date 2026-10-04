@@ -1,8 +1,10 @@
 /**
- * Dry-run grader for book-note kinds. Calls Claude through kindGrade / the shared
- * parse path and writes nothing. Real apply is kinds-start against production.
+ * Dry-run grader for book-note kinds. Writes nothing.
  *
- *   npm run grade-kinds -- --data-dir <knowledge-hub-data> --gold ../../docs/bookshelf/kind-gold.json
+ *   npm run grade-kinds -- --data-dir <knowledge-hub-data> \
+ *     --gold ../../docs/bookshelf/kind-gold.json \
+ *     --held-out ../../docs/bookshelf/kind-heldout-bridge.json \
+ *     --only-kind idea --placements /tmp/placements.json
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -14,12 +16,18 @@ import { loadDotEnv } from "./loadLocalPages";
 
 const ANTHROPIC_ORIGIN = "https://api.anthropic.com";
 const CONCURRENCY = 6;
+const PRACTICE_HEADING = /\b(implications?\s+for\s+(practice|teaching|learning|education|schools?|curriculum)|for\s+teachers?|classroom\s+practice|instructional\s+practice)\b/i;
 
 type GoldFile = {
   confirmed?: boolean;
   notes: Array<{ id: string; book: string; title: string; kind: string }>;
 };
 
+type HeldOutFile = {
+  notes: Array<{ id: string; book: string; title: string; bridge: boolean; why?: string }>;
+};
+
+type PlacementRow = { pageId?: string; kind?: string; kindBy?: string };
 type Graded = {
   id: string;
   title: string;
@@ -29,8 +37,8 @@ type Graded = {
   downgraded: boolean;
   reason?: string;
   evidence?: string;
+  body?: string;
 };
-
 type Origin = { kind?: string; label?: string; locus?: string };
 
 function say(line: string) {
@@ -63,6 +71,13 @@ function pick<T>(list: T[], n: number): T[] {
   return copy.slice(0, n);
 }
 
+function hasPracticeHeading(body: string) {
+  return body.split(/\r?\n/).some(line => {
+    const heading = line.replace(/^[#*\d.)\s_-]+/, "").trim();
+    return PRACTICE_HEADING.test(heading) || /^#{1,3}\s+/.test(line) && PRACTICE_HEADING.test(line);
+  }) || PRACTICE_HEADING.test(body.slice(0, 2000));
+}
+
 async function mapPool<T, R>(items: T[], size: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
   let next = 0;
@@ -82,7 +97,7 @@ async function gradeNote(
   note: { id: string; title: string; bookLabel: string; locus: string; body: string },
   apiKey: string,
 ): Promise<Graded> {
-  const base = { id: note.id, title: note.title, book: note.bookLabel };
+  const base = { id: note.id, title: note.title, book: note.bookLabel, body: note.body };
 
   const call = async () => {
     const response = await fetch(`${ANTHROPIC_ORIGIN}/v1/messages`, {
@@ -120,6 +135,15 @@ async function gradeNote(
   };
 }
 
+function readPlacements(raw: unknown): PlacementRow[] {
+  if (Array.isArray(raw)) return raw as PlacementRow[];
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, PlacementRow>;
+    return Object.entries(obj).map(([pageId, row]) => ({ pageId, ...row }));
+  }
+  return [];
+}
+
 async function main() {
   await loadDotEnv();
   const dataDir = arg("--data-dir");
@@ -127,16 +151,46 @@ async function main() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is required");
   const goldPath = arg("--gold");
+  const heldOutPath = arg("--held-out");
+  const onlyKind = arg("--only-kind");
+  const placementsPath = arg("--placements");
   const bookFilter = arg("--book");
   const limitArg = arg("--limit");
   const limit = limitArg ? Number(limitArg) : undefined;
   if (limitArg && (!Number.isInteger(limit) || limit! <= 0)) throw new Error("--limit needs a positive integer");
+  if (onlyKind && onlyKind !== "idea") throw new Error("--only-kind currently supports idea");
+  if (onlyKind && !placementsPath) throw new Error("--only-kind idea needs --placements <file>");
 
   const manifest = JSON.parse(await readFile(path.join(dataDir, "manifest.json"), "utf8")) as Array<{
     id: string;
     title?: string;
     origins?: Origin[];
   }>;
+  const byManifest = new Map(manifest.map(entry => [entry.id, entry]));
+
+  const wantIds = new Set<string>();
+  let ideaIds = new Set<string>();
+  let gold: GoldFile | undefined;
+  let heldOut: HeldOutFile | undefined;
+
+  if (goldPath) {
+    gold = JSON.parse(await readFile(path.resolve(goldPath), "utf8")) as GoldFile;
+    if (!gold.confirmed) throw new Error("kind-gold.json is not confirmed yet (set confirmed: true).");
+    for (const note of gold.notes) wantIds.add(note.id);
+  }
+  if (heldOutPath) {
+    heldOut = JSON.parse(await readFile(path.resolve(heldOutPath), "utf8")) as HeldOutFile;
+    for (const note of heldOut.notes) wantIds.add(note.id);
+  }
+  if (onlyKind === "idea" && placementsPath) {
+    const placements = readPlacements(JSON.parse(await readFile(path.resolve(placementsPath), "utf8")));
+    ideaIds = new Set(
+      placements
+        .filter(row => row.kind === "idea" && row.kindBy === "claude" && row.pageId)
+        .map(row => row.pageId!),
+    );
+    for (const id of ideaIds) wantIds.add(id);
+  }
 
   let rows = manifest.filter(entry => bookOrigin(entry.origins));
   if (bookFilter) {
@@ -145,10 +199,10 @@ async function main() {
       (entry.origins ?? []).some(origin => origin.kind === "book" && normaliseLabel(origin.label ?? "") === want),
     );
   }
-  if (goldPath && process.argv.includes("--gold-only")) {
-    const gold = JSON.parse(await readFile(path.resolve(goldPath), "utf8")) as GoldFile;
-    const want = new Set(gold.notes.map(note => note.id));
-    rows = rows.filter(entry => want.has(entry.id));
+  if (wantIds.size) rows = rows.filter(entry => wantIds.has(entry.id));
+  else if (goldPath && process.argv.includes("--gold-only") && gold) {
+    const goldIds = new Set(gold.notes.map(note => note.id));
+    rows = rows.filter(entry => goldIds.has(entry.id));
   }
   if (limit) rows = rows.slice(0, limit);
 
@@ -171,6 +225,7 @@ async function main() {
       apiKey,
     );
   });
+  const byId = new Map(graded.map(row => [row.id, row]));
 
   const totals = emptyCounts();
   let guessed = 0;
@@ -184,28 +239,13 @@ async function main() {
   }
 
   say("");
-  say("## Totals");
+  say("## Totals (graded set)");
   for (const kind of SHELF_KINDS) say(`${kind}: ${totals[kind] ?? 0}`);
   say(`guessed: ${guessed}`);
   say(`downgraded: ${downgraded}`);
   say(`unreadable: ${unreadable}`);
 
-  say("");
-  say("## Per book");
-  const byBook = new Map<string, Record<string, number>>();
-  for (const row of graded) {
-    const bucket = byBook.get(row.book) ?? emptyCounts();
-    bucket[row.kind] = (bucket[row.kind] ?? 0) + 1;
-    byBook.set(row.book, bucket);
-  }
-  for (const [book, counts] of [...byBook.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    say(`${book}: ${SHELF_KINDS.map((kind: string) => `${kind}=${counts[kind] ?? 0}`).join(" ")}`);
-  }
-
-  if (goldPath) {
-    const gold = JSON.parse(await readFile(path.resolve(goldPath), "utf8")) as GoldFile;
-    if (!gold.confirmed) throw new Error("kind-gold.json is not confirmed yet (set confirmed: true).");
-    const byId = new Map(graded.map(row => [row.id, row]));
+  if (gold) {
     let hits = 0;
     const confusion = new Map<string, number>();
     const misses: string[] = [];
@@ -229,9 +269,75 @@ async function main() {
       say("Misses:");
       for (const line of misses) say(`  - ${line}`);
     }
-    if (hits < 24) say(`GATE FAIL: agreement ${hits}/30 < 24`);
+    if (hits < 27) say(`GATE FAIL: gold agreement ${hits}/30 < 27`);
     if (fluidAsIdea) say(`GATE FAIL: ${fluidAsIdea} fluid gold note(s) graded idea`);
-    if (hits >= 24 && !fluidAsIdea) say("GATE PASS");
+    if (hits >= 27 && !fluidAsIdea) say("GATE PASS (gold)");
+  }
+
+  if (heldOut) {
+    let hits = 0;
+    const misses: string[] = [];
+    for (const note of heldOut.notes) {
+      const got = byId.get(note.id);
+      const isBridge = got?.kind === "bridge";
+      const ok = note.bridge ? isBridge : !isBridge;
+      if (ok) {
+        hits += 1;
+        continue;
+      }
+      misses.push(
+        `${note.title} | label=${note.bridge ? "bridge" : "not-bridge"} graded=${got?.kind ?? "missing"} | ${got?.reason ?? ""}`,
+      );
+    }
+    say("");
+    say(`## Held-out bridge agreement: ${hits}/${heldOut.notes.length}`);
+    if (misses.length) {
+      say("Misses:");
+      for (const line of misses) say(`  - ${line}`);
+    }
+    if (hits < 17) say(`GATE FAIL: held-out ${hits}/20 < 17`);
+    else say("GATE PASS (held-out)");
+  }
+
+  if (onlyKind === "idea") {
+    const ideaRows = graded.filter(row => ideaIds.has(row.id));
+    let toBridge = 0;
+    let stayedIdea = 0;
+    const suggestedOther: string[] = [];
+    const toBridgeByBook = new Map<string, number>();
+    const flips: Graded[] = [];
+    const stayedWithHeading: Graded[] = [];
+    for (const row of ideaRows) {
+      if (row.kind === "bridge") {
+        toBridge += 1;
+        toBridgeByBook.set(row.book, (toBridgeByBook.get(row.book) ?? 0) + 1);
+        flips.push(row);
+      } else if (row.kind === "idea") {
+        stayedIdea += 1;
+        if (row.body && hasPracticeHeading(row.body)) stayedWithHeading.push(row);
+      } else {
+        suggestedOther.push(`${row.title} → ${row.kind}`);
+      }
+    }
+    say("");
+    say("## Idea-only regrade (dry run)");
+    say(`examined: ${ideaRows.length}`);
+    say(`toBridge: ${toBridge}`);
+    say(`stayedIdea: ${stayedIdea}`);
+    say(`suggestedOther: ${suggestedOther.length}`);
+    if (suggestedOther.length) {
+      for (const line of suggestedOther.slice(0, 30)) say(`  - ${line}`);
+    }
+    say("toBridgeByBook:");
+    for (const [book, n] of [...toBridgeByBook.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) {
+      say(`  ${book}: ${n}`);
+    }
+    say("");
+    say("## 15 random idea → bridge flips");
+    for (const row of pick(flips, 15)) say(`- ${row.title}: ${row.evidence ?? "(no evidence)"} | ${row.reason ?? ""}`);
+    say("");
+    say("## 10 stayed idea with an implications/practice heading");
+    for (const row of pick(stayedWithHeading, 10)) say(`- ${row.title}: ${row.reason ?? ""}`);
   }
 
   say("");
@@ -243,6 +349,9 @@ async function main() {
   for (const row of pick(graded.filter(row => row.kind === "bridge"), 10)) {
     say(`- ${row.title}: ${row.evidence ?? "(no evidence)"}`);
   }
+
+  // silence unused
+  void byManifest;
 }
 
 main().catch(error => {

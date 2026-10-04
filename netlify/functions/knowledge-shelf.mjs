@@ -13,7 +13,7 @@ export const config = { path: '/api/knowledge/shelf' };
 // POST { op: "book-delete", label }     take a book's own record off the shelf
 // POST { op: "facts-start", books: [] } Claude estimates facts for these titles (one Message Batch)
 // POST { op: "facts-check" }           check the batch; applies results once it has ended
-// POST { op: "kinds-start", ids?, regrade? } Claude grades book-note kinds (one Message Batch)
+// POST { op: "kinds-start", ids?, regrade?, onlyKind? } Claude grades book-note kinds (one Message Batch)
 // POST { op: "kinds-check" }           check the batch; applies kinds once it has ended
 // POST { op: "kind", pageId, regrade? } grade one note synchronously; keeps an existing kind unless regrade
 export function createKnowledgeShelfHandler(deps = {}) {
@@ -54,7 +54,13 @@ export function createKnowledgeShelfHandler(deps = {}) {
         return withCors(okResponse(200, { job: await checkFactsJob(store, claude) }), request, env);
       }
       if (body.op === 'kinds-start') {
-        return withCors(okResponse(200, { job: await startKindsJob(store, { ids: body.ids, regrade: Boolean(body.regrade) }, claude) }), request, env);
+        return withCors(okResponse(200, {
+          job: await startKindsJob(store, {
+            ids: body.ids,
+            regrade: Boolean(body.regrade),
+            onlyKind: body.onlyKind
+          }, claude)
+        }), request, env);
       }
       if (body.op === 'kinds-check') {
         return withCors(okResponse(200, { job: await checkKindsJob(store, claude) }), request, env);
