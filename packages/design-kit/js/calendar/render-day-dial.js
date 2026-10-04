@@ -1228,10 +1228,9 @@ function mountSide(side) {
   const date = state.day;
   const ghosts = ghostsNow();
   mountBookmarkPrompt(side, date);
-  mountTransport(side, date);
-  mountMio(side, date);
   mountReviewEntry(side, date);
-  mountMedication(side, date);
+  // Agenda before Dexy / offers: on phone the side stacks under the dial, and Due
+  // tasks from a Clare dump must not sit below the medication panel.
   const dayDue = (dayAt(date)?.due ?? [])
     .filter(item => item.kind !== 'allday' && item.kind !== 'promise')
     .map(item => ({ id: item.id, title: item.title, time: item.time, meta: item.meta, kind: item.kind }));
@@ -1277,6 +1276,9 @@ function mountSide(side) {
       suggestion: null
     })), ghosts);
   }
+  mountTransport(side, date);
+  mountMio(side, date);
+  mountMedication(side, date);
   const next = model.week[model.week.indexOf(date) + 1];
   if (!next) return;
   const nextDay = dayAt(next);

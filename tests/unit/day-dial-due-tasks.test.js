@@ -80,6 +80,11 @@ test('feedback loop: Week Due shows Clare dump tasks; Day Dial Tonight must too'
   assert.match(tonightPanel.textContent, /Pack swim bag/);
   assert.ok(tonightPanel.querySelector('[data-row-item="dump-emails"]'));
   assert.ok(tonightPanel.querySelector('[data-row-item="dump-pack"]'));
+  const med = dialHost.querySelector('[data-part="medication"]');
+  if (med) {
+    const pos = tonightPanel.compareDocumentPosition(med);
+    assert.equal(Boolean(pos & dialWin.Node.DOCUMENT_POSITION_FOLLOWING), true, 'Tonight (with Due) stacks above Dexy on phone');
+  }
   unmountDayDial();
   dialWin.close();
 });
