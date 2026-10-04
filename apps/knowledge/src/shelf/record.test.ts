@@ -11,9 +11,9 @@ import { placementForBookNote, placementForComposedPage, recordBookNote, recordC
 
 describe("placementForBookNote", () => {
   const body = "## In the book\nx\n\n## How this bears on the book\nThe web supports the claim.\n\n## Gaps\n- Replication?\n";
-  it("keeps page, stance and gaps from a From-a-book save", () => {
+  it("keeps page and gaps from a From-a-book save", () => {
     expect(placementForBookNote({ id: "p1", body }, { label: "Make It Stick", locus: "p. 28" })).toEqual({
-      pageId: "p1", page: 28, guessed: false, stance: "supports", gaps: ["Replication?"],
+      pageId: "p1", page: 28, guessed: false, gaps: ["Replication?"],
     });
   });
   it("reads an explicit Kind line as clementine", () => {
@@ -33,9 +33,9 @@ describe("placementForBookNote", () => {
     expect(placementForBookNote({ id: "p1", body }, { label: "X", locus: "Ch. 2" }, chapters)).toMatchObject({ page: 23, guessed: true });
     expect(placementForBookNote({ id: "p1", body }, { label: "X", locus: "chapter 3: Mix it up" }, chapters)).toMatchObject({ page: 46, guessed: true });
   });
-  it("trusts an explicit Verdict line over the prose", () => {
+  it("ignores old Verdict lines: the stance is gone, kinds replace it", () => {
     const verdict = "## How this bears on the book\nVerdict: complicates\nIt mostly supports the claim, but...\n";
-    expect(placementForBookNote({ id: "p1", body: verdict }, { label: "X" })).toMatchObject({ stance: "complicates" });
+    expect(placementForBookNote({ id: "p1", body: verdict }, { label: "X" })).toBeNull();
   });
 });
 

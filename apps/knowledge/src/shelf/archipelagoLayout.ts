@@ -199,9 +199,9 @@ function terrainModel(islands: Island[], width: number, height: number, bounds: 
     };
   });
   const towns: AtlasTown[] = islands.flatMap(island => {
-    // A few hills per island, peaks first: every note as a hill turns a big book into a dark knot of contours.
+    // A few hills per island, debate peaks first: every note as a hill turns a big book into a dark knot of contours.
     const all = [...island.book.placed, ...island.book.loose];
-    const notes = [...all.filter(n => n.stance === "complicates"), ...all.filter(n => n.stance !== "complicates")]
+    const notes = [...all.filter(n => n.kind === "debate"), ...all.filter(n => n.kind !== "debate")]
       .filter((_, j, list) => j < HILLS || list.length <= HILLS)
       .slice(0, HILLS);
     const turn = hash(island.key) * Math.PI * 2;
@@ -214,7 +214,7 @@ function terrainModel(islands: Island[], width: number, height: number, bounds: 
         x: island.x + Math.cos(a) * dist,
         y: island.y + Math.sin(a) * dist * 0.85,
         size: 3 + Math.min(4, note.connected.length),
-        peak: note.stance === "complicates",
+        peak: note.kind === "debate",
         faded: false,
         isNew: false,
         themes: [],
@@ -288,7 +288,7 @@ export function chartLandmarks(model: Pick<ArchipelagoModel, "islands">): Landma
       marks.push({ kind: "lighthouse", x: island.x + Math.cos(a) * island.r * 0.5, y: island.y + Math.sin(a) * island.r * 0.5 });
     }
     if (island.reading) marks.push({ kind: "camp", x: island.x - island.r * 0.18, y: island.y + island.r * 0.12 });
-    const count = notes.filter(n => n.stance === "complicates").length;
+    const count = notes.filter(n => n.kind === "debate").length;
     if (count >= 2 && count > (contested?.count ?? 0)) contested = { island, count };
   }
   // The great tree grows on the book you've written most in.

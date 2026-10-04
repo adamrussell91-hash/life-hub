@@ -72,13 +72,17 @@ export function clampKhz(khz: number) {
 
 // ── Running order ────────────────────────────────────────────────────
 
-export type Segment = "cold-open" | "feature" | "counterpoint" | "extends" | "crosstalk" | "phone-in";
+// Segment ids are stored in saved episodes' running orders, so they keep their old names:
+// feature = idea notes, backstory = person and case notes, counterpoint = debate notes,
+// extends = bridge notes.
+export type Segment = "cold-open" | "feature" | "backstory" | "counterpoint" | "extends" | "crosstalk" | "phone-in";
 
 export const SEGMENT_LABEL: Record<Segment, string> = {
   "cold-open": "Cold open",
-  feature: "Feature",
-  counterpoint: "Counterpoint",
-  extends: "Extends",
+  feature: "Explains",
+  backstory: "Backstory",
+  counterpoint: "Debate",
+  extends: "So what",
   crosstalk: "Crosstalk",
   "phone-in": "Phone-in",
 };
@@ -104,8 +108,9 @@ const NOTE_CAP: Record<PodcastDials["length"], number> = { short: 10, standard: 
 
 function segmentOf(note: BookNote, linked: Map<string, string>): Segment {
   if (linked.has(note.id)) return "crosstalk";
-  if (note.stance === "complicates") return "counterpoint";
-  if (note.stance === "extends") return "extends";
+  if (note.kind === "debate") return "counterpoint";
+  if (note.kind === "bridge") return "extends";
+  if (note.kind === "person" || note.kind === "case") return "backstory";
   return "feature";
 }
 
@@ -123,7 +128,7 @@ function byPage(a: BookNote, b: BookNote) {
 
 /**
  * Cut the book's notes into a programme: a cold open, then the kept notes in
- * book order (features, counterpoints, extensions and crosstalk where a note
+ * book order (explainers, backstory, debates, so-whats and crosstalk where a note
  * links out to another book), then a phone-in of open questions.
  */
 export function runningOrder(book: BookModel, mix: Mix): OrderEntry[] {
@@ -132,15 +137,16 @@ export function runningOrder(book: BookModel, mix: Mix): OrderEntry[] {
   const linked = new Map<string, string>();
   for (const link of book.links) if (!linked.has(link.fromId)) linked.set(link.fromId, link.toLabel);
 
-  const groups: Record<Exclude<Segment, "cold-open" | "phone-in">, BookNote[]> = { feature: [], counterpoint: [], extends: [], crosstalk: [] };
+  const groups: Record<Exclude<Segment, "cold-open" | "phone-in">, BookNote[]> = { feature: [], backstory: [], counterpoint: [], extends: [], crosstalk: [] };
   for (const note of notes) groups[segmentOf(note, linked) as keyof typeof groups].push(note);
 
-  // The cold open is the most-connected note the reader agreed with, or failing that any note.
+  // The cold open is the most-connected idea note, or failing that any note.
   const pool = groups.feature.length ? groups.feature : notes;
   const opener = [...pool].sort((a, b) => b.connected.length - a.connected.length || byPage(a, b))[0]!;
 
   const kept = new Set<string>([
     ...thin(groups.feature.filter(n => n !== opener), mix.supports / 100),
+    ...thin(groups.backstory.filter(n => n !== opener), mix.supports / 100),
     ...thin(groups.counterpoint.filter(n => n !== opener), mix.counter / 100),
     ...thin(groups.extends.filter(n => n !== opener), mix.extends / 100),
     ...thin(groups.crosstalk.filter(n => n !== opener), mix.crosstalk / 100),
@@ -180,9 +186,9 @@ export function mixCounts(book: BookModel) {
   const linked = new Set(book.links.map(link => link.fromId));
   const notes = [...book.placed, ...book.loose];
   return {
-    supports: notes.filter(n => !linked.has(n.id) && (n.stance === "supports" || !n.stance)).length,
-    counter: notes.filter(n => !linked.has(n.id) && n.stance === "complicates").length,
-    extends: notes.filter(n => !linked.has(n.id) && n.stance === "extends").length,
+    supports: notes.filter(n => !linked.has(n.id) && n.kind !== "debate" && n.kind !== "bridge").length,
+    counter: notes.filter(n => !linked.has(n.id) && n.kind === "debate").length,
+    extends: notes.filter(n => !linked.has(n.id) && n.kind === "bridge").length,
     crosstalk: new Set(book.links.map(link => link.toBook)).size,
   };
 }
@@ -227,7 +233,7 @@ export function latestBroadcast<T extends DialEpisode>(episodes: T[], key: strin
     .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
 }
 
-const SEGMENTS = new Set<Segment>(["cold-open", "feature", "counterpoint", "extends", "crosstalk", "phone-in"]);
+const SEGMENTS = new Set<Segment>(["cold-open", "feature", "backstory", "counterpoint", "extends", "crosstalk", "phone-in"]);
 
 /** Rebuilds a broadcast's running order from its `order` dial, reading titles and questions from the book as it is now. */
 export function orderFromDial(text: string, book: BookModel): OrderEntry[] {

@@ -1,4 +1,5 @@
 import { renderTerrain, type TerrainCanvas } from "./atlasTerrain";
+import { KIND_COLOUR, KIND_WORD, kindTally } from "./kinds";
 import { mountSeaLife, pickBottle, type Bottle, type Charter, type Land, type Landmark } from "./seaLife";
 import { MAP_SEA_HTML, MAP_SKY_HTML, mapControlsHtml, positionTerrain, positionWorld, revealAt, terrainLayers, wireFullScreen } from "./mapChrome";
 import { chartLandmarks, shorePoint, type ArchipelagoModel, type Island } from "./archipelagoLayout";
@@ -282,8 +283,7 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
       .map(p => ({ other: byKey.get(p.from === island.key ? p.to : p.from)!, count: p.count }))
       .filter(r => r.other)
       .sort((a, b) => b.count - a.count);
-    const stance = { supports: 0, complicates: 0, extends: 0 };
-    for (const note of notes) if (note.stance) stance[note.stance] += 1;
+    const tally = kindTally(notes);
     const sea = model.seas[island.sea]?.name;
     card.innerHTML = `
       <button class="hub-icon-btn atlas__card-close" type="button" data-close aria-label="Close">×</button>
@@ -296,7 +296,7 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
         </div>
       </div>
       <p class="isles-card__facts">${notes.length} ${notes.length === 1 ? "note" : "notes"}${book.loose.length ? ` · ${book.loose.length} without a page` : ""}${book.reading ? ` · reading${book.reading.page ? ` p.${book.reading.page}` : ", just started"}` : ""}</p>
-      ${notes.length ? `<p class="isles-card__stance"><span style="--k:var(--stance-supports)">${stance.supports} support</span><span style="--k:var(--stance-complicates)">${stance.complicates} complicate</span><span style="--k:var(--stance-extends)">${stance.extends} extend</span></p>` : `<p class="isles-card__facts">No notes yet: the island is still sand.</p>`}
+      ${notes.length ? (tally.length ? `<p class="isles-card__kinds">${tally.map(({ kind, count }) => `<span style="--k:${KIND_COLOUR[kind]}">${count} ${KIND_WORD[kind]}${count === 1 ? "" : "s"}</span>`).join("")}</p>` : "") : `<p class="isles-card__facts">No notes yet: the island is still sand.</p>`}
       ${topThemes.length ? `<p class="atlas__themes">${topThemes.map(t => `<span>${esc(t)}</span>`).join("")}</p>` : ""}
       ${routes.length ? `<p class="shelf-eyebrow" style="margin-top:var(--space-3)">Sea routes</p><ul class="isles-card__routes">${routes.slice(0, 6).map(r => `<li><button type="button" data-sail="${esc(r.other.key)}">${esc(r.other.label)}</button><span>${r.count} ${r.count === 1 ? "link" : "links"}</span></li>`).join("")}</ul>` : ""}
       <div class="descent-note__actions">

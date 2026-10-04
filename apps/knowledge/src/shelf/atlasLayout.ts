@@ -180,7 +180,7 @@ export function buildAtlas(book: BookModel, now = Date.now()): AtlasModel {
       x,
       y,
       size: 4 + Math.min(5, note.excerpt.length / 90) + note.connected.length * 0.6,
-      peak: note.stance === "complicates",
+      peak: note.kind === "debate",
       faded: lastTouch > 0 && now - lastTouch > sixMonths,
       isNew: !Number.isNaN(created) && now - created < week,
       themes: noteThemes(note),

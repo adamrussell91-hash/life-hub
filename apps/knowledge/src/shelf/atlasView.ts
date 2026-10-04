@@ -1,4 +1,5 @@
 import type { AtlasModel, AtlasTown } from "./atlasLayout";
+import { KIND_COLOUR, KIND_INK, KIND_MEANING, kindColour, kindLabel } from "./kinds";
 import { renderTerrain, type TerrainCanvas } from "./atlasTerrain";
 import { mostConnected } from "./archipelagoLayout";
 import { mountSeaLife, pickBottle } from "./seaLife";
@@ -14,7 +15,6 @@ export type AtlasHandlers = {
   focusNote?: string;
 };
 
-const STANCE_WORD = { supports: "supports the book", complicates: "complicates it", extends: "extends it" } as const;
 const terrainCache = new Map<string, TerrainCanvas>();
 
 function esc(value: unknown) {
@@ -42,10 +42,10 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
     <details class="atlas__legend">
       <summary>Key</summary>
       <ul>
-        <li><i class="atlas-key atlas-key--supports"></i>Town: a note that supports the book</li>
-        <li><i class="atlas-key atlas-key--extends"></i>Town: a note that extends it</li>
-        <li><i class="atlas-key atlas-key--peak"></i>Peak: the evidence complicates it</li>
-        <li><i class="atlas-key atlas-key--unread"></i>Town: stance not read yet</li>
+        <li><i class="atlas-key" style="background:${KIND_COLOUR.idea}"></i>Town: an idea, person or case, in its colour</li>
+        <li><i class="atlas-key atlas-key--bridge" style="background:${KIND_COLOUR.bridge}"></i>Town: a bridge out of the book</li>
+        <li><i class="atlas-key atlas-key--peak" style="background:${KIND_COLOUR.debate}"></i>Peak: a debate</li>
+        <li><i class="atlas-key atlas-key--unread"></i>Town: not sorted yet</li>
         <li><i class="atlas-key atlas-key--road"></i>Road: notes you linked</li>
         <li><i class="atlas-key atlas-key--fog"></i>Fog: a chapter you haven't written about, or an open question</li>
         <li><i class="atlas-key atlas-key--new"></i>Settled this week</li>
@@ -244,10 +244,10 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
       const c = S(town.x, town.y);
       if (c.x < -60 || c.y < -30 || c.x > w + 60 || c.y > h + 30) continue;
       const r = town.size * Math.max(0.7, Math.min(1.4, scale));
-      const stance = town.note.stance ?? "unread";
-      const classes = ["atlas-town", `atlas-town--${town.peak ? "peak" : stance}`, town.faded ? "is-faded" : "", town.isNew ? "is-new" : "", town.note.id === selected ? "is-selected" : ""].filter(Boolean).join(" ");
+      const kind = town.note.kind ?? "unread";
+      const classes = ["atlas-town", `atlas-town--${town.peak ? "peak" : kind}`, town.faded ? "is-faded" : "", town.isNew ? "is-new" : "", town.note.id === selected ? "is-selected" : ""].filter(Boolean).join(" ");
       const page = town.note.page ? `page ${town.note.guessed ? "about " : ""}${town.note.page}` : "no page yet";
-      parts.push(`<button type="button" class="${classes}" style="left:${c.x}px;top:${c.y}px;--r:${r}px" data-town="${esc(town.note.id)}" aria-label="${esc(`${town.note.title}, ${page}`)}"><i></i>${labelFor.get(town.note.id) ?? ""}</button>`);
+      parts.push(`<button type="button" class="${classes}" style="left:${c.x}px;top:${c.y}px;--r:${r}px;--t:${kindColour(town.note.kind)}" data-town="${esc(town.note.id)}" aria-label="${esc(`${town.note.title}, ${page}`)}"><i></i>${labelFor.get(town.note.id) ?? ""}</button>`);
     }
     marks.innerHTML = parts.join("") + routeLabels.join("");
   }
@@ -266,7 +266,7 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
       <button class="hub-icon-btn atlas__card-close" type="button" data-close aria-label="Close">×</button>
       <p class="shelf-eyebrow">${esc(where)}</p>
       <h3>${esc(note.title)}</h3>
-      ${note.stance ? `<p class="atlas__stance atlas__stance--${note.stance}">${town.peak ? "A peak: " : ""}${STANCE_WORD[note.stance]}</p>` : ""}
+      ${note.kind ? `<p class="atlas__kind" style="color:${KIND_INK[note.kind]}">${town.peak ? "A peak: " : ""}${esc(kindLabel(note))} · ${esc(KIND_MEANING[note.kind].toLowerCase())}</p>` : ""}
       ${note.excerpt ? `<p>${esc(note.excerpt)}</p>` : ""}
       ${note.gaps.length ? `<ul class="descent-note__gaps">${note.gaps.map(gap => `<li>${esc(gap)}</li>`).join("")}</ul>` : ""}
       ${town.themes.length ? `<p class="atlas__themes">${town.themes.map(t => `<span>${esc(t)}</span>`).join("")}</p>` : ""}

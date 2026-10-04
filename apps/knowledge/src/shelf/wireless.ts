@@ -1,4 +1,5 @@
 import "./wireless.css";
+import { KIND_INK } from "./kinds";
 import { getPodcast, getPodcastAudioUrl, listPodcasts, startPodcast } from "../api/client";
 import { PodcastDialsSchema, PodcastEpisodeSchema, type PodcastEpisode, type PodcastTurn } from "../podcast/schema";
 import type { BookModel } from "./model";
@@ -73,9 +74,10 @@ const PHONE = "(max-width: 720px)";
 
 const SEGMENT_COLOUR: Record<Segment, string> = {
   "cold-open": "var(--navy)",
-  feature: "var(--wave)",
-  counterpoint: "var(--high-sea-ink)",
-  extends: "var(--pastel-sage-ink)",
+  feature: KIND_INK.idea,
+  backstory: KIND_INK.case,
+  counterpoint: KIND_INK.debate,
+  extends: KIND_INK.bridge,
   crosstalk: "var(--pastel-lilac-ink)",
   "phone-in": "var(--orca)",
 };
@@ -488,10 +490,11 @@ export function createWireless(host: WirelessHost) {
     const blurb = !b.noteCount
       ? "No notes on this book yet, so there's nothing to broadcast. Write one from Chat with From a book."
       : `A programme cut from ${b.noteCount === 1 ? "your one note" : `your ${b.noteCount} notes`}: ${[
-          counts.supports ? plural(counts.supports, "feature") : "",
-          counts.counter ? plural(counts.counter, "counterpoint") : "",
+          counts.supports ? plural(counts.supports, "explainer") : "",
+          counts.counter ? plural(counts.counter, "debate") : "",
+          counts.extends ? plural(counts.extends, "so-what") : "",
           crossBooks.length ? `crosstalk from ${crossBooks.slice(0, 2).map(esc).join(" and ")}${crossBooks.length > 2 ? ` and ${crossBooks.length - 2} more` : ""}` : "",
-        ].filter(Boolean).join(", ") || "features only"}${order.some(o => o.segment === "phone-in") ? ", and a phone-in of your open questions" : ""}.`;
+        ].filter(Boolean).join(", ") || "explainers only"}${order.some(o => o.segment === "phone-in") ? ", and a phone-in of your open questions" : ""}.`;
     return `<div class="wl-readout__head">
         <div class="wl-readout__copy">
           <p class="shelf-eyebrow">In range · ${near.khz} kHz · ${esc(bandName(near))} band</p>
@@ -956,7 +959,7 @@ export function createWireless(host: WirelessHost) {
         <button class="btn btn--primary wl-play" type="button" data-play aria-label="${onAir!.playing ? "Pause" : "Play"}">${onAir!.playing ? "❚❚" : "▶"}</button>
         <button class="btn btn--ghost wl-tbtn" type="button" data-seg-step="1" aria-label="Next segment">⏭</button>
         <span class="wl-time" data-time>${clock(elapsedSeconds())} / ${clock(total)}</span>
-        <span class="wl-legend">${(["feature", "counterpoint", "extends", "crosstalk", "phone-in"] as Segment[]).filter(seg => onAir!.order.some(o => o.segment === seg)).map(seg => `<span style="--seg:${SEGMENT_COLOUR[seg]}">${SEGMENT_LABEL[seg]}</span>`).join("")}</span>
+        <span class="wl-legend">${(["feature", "backstory", "counterpoint", "extends", "crosstalk", "phone-in"] as Segment[]).filter(seg => onAir!.order.some(o => o.segment === seg)).map(seg => `<span style="--seg:${SEGMENT_COLOUR[seg]}">${SEGMENT_LABEL[seg]}</span>`).join("")}</span>
       </div>`;
   }
 
@@ -986,12 +989,12 @@ export function createWireless(host: WirelessHost) {
     const lengths: Array<Mix["length"]> = ["short", "standard", "deep"];
     return `<p class="shelf-eyebrow">Mix the next broadcast</p>
       <div class="wl-faders">
-        ${fader("supports", "Supports", plural(counts.supports, "note"), SEGMENT_COLOUR.feature)}
-        ${fader("counter", "Counter", plural(counts.counter, "note"), SEGMENT_COLOUR.counterpoint)}
-        ${fader("extends", "Extends", plural(counts.extends, "note"), SEGMENT_COLOUR.extends)}
+        ${fader("supports", "Explains", plural(counts.supports, "note"), SEGMENT_COLOUR.feature)}
+        ${fader("counter", "Debate", plural(counts.counter, "note"), SEGMENT_COLOUR.counterpoint)}
+        ${fader("extends", "So what", plural(counts.extends, "note"), SEGMENT_COLOUR.extends)}
         ${fader("crosstalk", "Crosstalk", plural(counts.crosstalk, "book"), SEGMENT_COLOUR.crosstalk)}
       </div>
-      <p class="wl-caption">Counter also sets how hard Ann argues with the book: <b data-argue>${disagreementFor(mix.counter)}</b>.</p>
+      <p class="wl-caption">Debate also sets how hard Ann argues with the book: <b data-argue>${disagreementFor(mix.counter)}</b>.</p>
       <div class="hub-pills wl-length" role="group" aria-label="Length">${lengths.map(l => `<button class="hub-pills__btn${mix.length === l ? " is-active" : ""}" type="button" data-length="${l}" aria-pressed="${mix.length === l}">${l[0]!.toUpperCase()}${l.slice(1)}</button>`).join("")}</div>
       <button class="btn btn--secondary wl-recut" type="button" data-wl-recut>Cut a new broadcast</button>`;
   }

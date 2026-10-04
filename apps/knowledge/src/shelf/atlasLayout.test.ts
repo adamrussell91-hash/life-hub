@@ -14,7 +14,7 @@ describe("buildAtlas", () => {
   const data = {
     books: [{ label, pages: 250, chapters }],
     placements: [
-      { pageId: "a", page: 5, stance: "complicates" as const, gaps: ["Novices?"] },
+      { pageId: "a", page: 5, kind: "debate" as const, gaps: ["Novices?"] },
       { pageId: "b", page: 40 },
       { pageId: "c", page: 45, lastOpened: "2025-01-01T00:00:00.000Z" },
     ],
