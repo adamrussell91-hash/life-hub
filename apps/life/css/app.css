@@ -2292,6 +2292,38 @@ main { max-width: 76rem; margin: 0 auto; }
 
 /* Challenge sprints on Home — hidden when empty (V1) */
 #home-sprints[hidden] { display: none; }
+/* Morning check-in: bubbles, gone once answered or skipped. */
+.checkin { margin: 0 0 var(--space-4); min-width: 0; }
+.checkin__card { display: grid; gap: var(--space-3); padding: 1.35rem; min-width: 0; }
+.checkin__head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
+.checkin__title { margin: 0; color: var(--depth); font-size: var(--font-size-card); font-weight: 700; line-height: 1.25; }
+.checkin__forecast { margin: 0; display: grid; justify-items: end; color: var(--muted); font-size: var(--text-2xs); white-space: nowrap; }
+.checkin__forecast strong { color: var(--ink); font-size: var(--text-xl); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.checkin__why { margin: 0; }
+.checkin__question { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; gap: var(--space-2); }
+.checkin__prompt { padding: 0; color: var(--ink); font-size: var(--text-base); font-weight: 600; }
+.checkin__bubbles { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.checkin__bubble {
+  min-height: 2.75rem;
+  padding: 0.55rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  text-align: left;
+}
+.checkin__bubble:hover { border-color: var(--wave); }
+.checkin__bubble:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+.checkin__bubble[aria-pressed="true"] { background: var(--pastel-blue); border-color: var(--wave); color: var(--pastel-blue-ink); font-weight: 600; }
+.checkin__actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.checkin__status { margin: 0; min-height: 1em; }
+.checkin__note { display: flex; gap: var(--space-2); }
+.checkin__note[hidden] { display: none; }
+.checkin__skip { justify-self: start; }
+
 .home-sprints {
   display: grid;
   gap: var(--space-3);

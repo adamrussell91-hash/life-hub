@@ -171,7 +171,7 @@ test('a diary in the life window moves that day off 80% no logs', async () => {
   assert.equal(thursday.forecast, false);
   assert.notEqual(thursday.note, 'no logs');
   // Meals are vitals, not a capacity log. Friday forecasts on from Thursday's diary.
-  assert.equal(friday.note, 'forecast');
+  assert.match(friday.note, /lingering$/);
   assert.equal(friday.forecast, true);
   assert.ok(friday.pct < 80);
 });

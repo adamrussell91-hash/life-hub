@@ -34,42 +34,53 @@ test('symptoms come from the diary field first, then from the text', () => {
 test('the real week: Thursday is the lowest day and is flagged to soften', () => {
   const cap = capacityForDates(EVENTS, WEEK, { isHoliday: HOLIDAY });
   const pct = WEEK.map(d => cap.get(d).pct);
-  assert.deepEqual(pct.slice(0, 4), [79, 51, 42, 34]);
+  assert.deepEqual(pct.slice(0, 4), [84, 50, 42, 36]);
   const thu = cap.get('2026-09-24');
   assert.equal(thu.note, 'sore throat, poor sleep');
   assert.equal(thu.soften, true);
   assert.equal(thu.forecast, false);
-  assert.ok(thu.factors.some(f => f.id === 'streak' && f.label === '3rd low day in a row'));
+  assert.ok(thu.low < thu.pct && thu.pct < thu.high, 'every day carries a band');
 });
 
-test('days after the last log are forecasts that recover, faster in the holidays', () => {
+test('days after the last log are forecasts that recover, and say what lingers', () => {
   const cap = capacityForDates(EVENTS, WEEK, { isHoliday: HOLIDAY });
   const fri = cap.get('2026-09-25');
   const sat = cap.get('2026-09-26');
   const sun = cap.get('2026-09-27');
   assert.equal(fri.forecast, true);
-  assert.equal(fri.note, 'forecast');
+  assert.match(fri.note, /lingering$/);
+  assert.notEqual(fri.note, 'forecast', 'never repeats the FORECAST label');
   assert.ok(fri.pct < sat.pct && sat.pct < sun.pct);
+  assert.ok(sun.high - sun.low > fri.high - fri.low, 'the band widens with distance from evidence');
   assert.equal(forecastCapacity(30, 1).pct, 50);
   assert.equal(forecastCapacity(30, 1, { holiday: true }).pct, 55);
 });
 
-test('no logs at all falls back to baseline, marked as a forecast', () => {
+test('no logs at all falls back to a normal day, marked as a forecast', () => {
   const cap = capacityForDates([], ['2026-09-21']);
   assert.equal(cap.get('2026-09-21').pct, CAPACITY.baseline);
+  assert.equal(cap.get('2026-09-21').note, 'no logs');
   assert.equal(cap.get('2026-09-21').forecast, true);
 });
 
-test('a good day says so and is clamped to the ceiling', () => {
+test('a good day says why, and the ceiling is 100', () => {
+  assert.equal(CAPACITY.ceiling, 100);
   const r = dayCapacity({ sleepHours: 8, diaries: [{ record: { energy: 'high' } }] });
-  assert.equal(r.pct, 88);
+  assert.ok(r.pct >= 90 && r.pct <= 100);
   assert.equal(r.note, 'good energy');
-  assert.equal(dayCapacity({ sleepHours: 8 }).note, 'steady');
+  assert.equal(dayCapacity({ sleepHours: 7.5 }).note, 'restorative sleep');
 });
 
 test('the worst logged energy of the day wins', () => {
-  const r = dayCapacity({ diaries: [{ record: { energy: 'high' } }, { record: { energy: 'low' } }] });
-  assert.equal(r.pct, 65);
+  const low = dayCapacity({ diaries: [{ record: { energy: 'high' } }, { record: { energy: 'low' } }] });
+  const high = dayCapacity({ diaries: [{ record: { energy: 'high' } }] });
+  assert.ok(low.pct < high.pct);
+  assert.equal(low.note, 'low energy');
+});
+
+test('a negated symptom is not a symptom', () => {
+  assert.deepEqual(symptomsIn({}, 'No headache today, finally'), []);
+  assert.deepEqual(symptomsIn({}, 'Headache again after lunch'), ['headache']);
 });
 
 test('load ignores classes, Corey time, protected walls, logs and ghosts', () => {

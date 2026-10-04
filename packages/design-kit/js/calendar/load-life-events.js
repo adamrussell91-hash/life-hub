@@ -106,7 +106,10 @@ export async function loadLifeCalendarEvents(apiFetch, opts = {}) {
 
   let visual = null;
   const events = [];
-  if (!wanted.length) return { events, visual };
+  if (!wanted.length) {
+    await appendCheckins(apiFetch, events, today);
+    return { events, visual };
+  }
 
   const files = [];
   for (const batch of batchLifeFileRequests(wanted)) {
@@ -157,7 +160,25 @@ export async function loadLifeCalendarEvents(apiFetch, opts = {}) {
     }
   }
 
+  await appendCheckins(apiFetch, events, today);
   return { events, visual };
+}
+
+/**
+ * Morning check-ins live in private Blobs, not the data repo. They join the events as
+ * `readiness_checkin` records so every capacity view (dial, tideline, almanac) uses them.
+ * A failed read never blocks the calendar.
+ */
+async function appendCheckins(apiFetch, events, today) {
+  try {
+    const from = addDaysKey(today, -16);
+    const payload = await readOkJson(apiFetch, `/api/readiness-checkin?from=${from}&to=${today}`);
+    for (const record of payload.data?.checkins ?? []) {
+      if (record?.type === 'readiness_checkin' && typeof record.date === 'string') events.push({ record, body: '', path: null });
+    }
+  } catch {
+    // Check-ins are an improvement, not a dependency.
+  }
 }
 
 /**

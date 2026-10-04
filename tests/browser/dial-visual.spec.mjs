@@ -83,12 +83,13 @@ test('dial phase 2: the day, its capacity, tonight and tomorrow come from the mo
   try {
     assert.match(await page.locator('[data-part="period"] b').textContent(), /^Thursday 24\/09\/26/);
     assert.equal(await page.locator('[data-part="zoom-pills"] button').first().getAttribute('aria-pressed'), 'true');
-    assert.equal(await page.locator('[data-part="gauge"]').getAttribute('data-pct'), '34');
+    // The static reference keeps its drawn 34%; the app computes the readiness model (36%).
+    assert.equal(await page.locator('[data-part="gauge"]').getAttribute('data-pct'), APP ? '36' : '34');
     assert.match(await page.locator('[data-part="time-left-label"]').textContent(), /3 h 55 m that's yours/);
     assert.deepEqual(await page.locator('[data-part="tonight"] [data-part="row"]').evaluateAll(n => n.map(x => x.dataset.title)),
       ['Workout · upper body', 'Dinner', 'Tea + TV with Corey', 'Wind down → lights out 10:00 pm']);
     assert.match(await page.locator('[data-part="tonight"]').textContent(), /Nothing logged since breakfast \(no lunch\)/);
-    assert.match(await page.locator('[data-part="tomorrow-headline"]').textContent(), /Forecast 52%.*Last day T3.*One big thing and 2 classes, then holidays for 17 days\./s);
+    assert.match(await page.locator('[data-part="tomorrow-headline"]').textContent(), APP ? /Forecast 46%.*Last day T3.*One big thing and 2 classes, then holidays for 17 days\./s : /Forecast 52%.*Last day T3.*One big thing and 2 classes, then holidays for 17 days\./s);
     assert.equal(await page.locator('[data-part="week"] button').count(), 7);
     assert.equal(await page.locator('[data-part="week"] button[data-day="2026-09-24"]').getAttribute('aria-pressed'), 'true');
     assert.equal(await page.locator('[data-part="log-dot"][data-id="log-nolunch"]').count(), 1, 'the missed lunch is a hollow dot');

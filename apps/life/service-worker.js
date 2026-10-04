@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v196';
+const CACHE_NAME = 'life-hub-shell-v197';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -171,6 +171,7 @@ const SHELL_FILES = [
   'js/app/tideline-model.js',
   'js/app/day-brief.js',
   'js/app/capacity-model.js',
+  'js/app/morning-checkin.js',
   'js/app/ghost-writes.js',
   'js/app/ghost-proposer.js',
   'packages/design-kit/js/calendar-bands.js',
@@ -180,6 +181,9 @@ const SHELL_FILES = [
   'packages/design-kit/js/term-river-geometry.js',
   'packages/design-kit/js/sydney-clock.js',
   'packages/design-kit/js/calendar/capacity-model.js',
+  'packages/design-kit/js/calendar/readiness-model.js',
+  'packages/design-kit/js/calendar/readiness-hourly.js',
+  'packages/design-kit/js/calendar/readiness-symptoms.js',
   'packages/design-kit/js/calendar/day-brief.js',
   'packages/design-kit/js/calendar/almanac-rules.js',
   'packages/design-kit/js/calendar/tideline-model.js',

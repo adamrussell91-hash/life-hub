@@ -1,0 +1,585 @@
+<meta charset="utf-8">
+<title>Dial Complications</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one watch on a stage, swipe between faces; the complications it wears are listed beside it. */
+:root {
+  --bg: #fbf8f2;
+  --paper: #ffffff;
+  --ink: #13233a;
+  --navy: #17375e;
+  --muted: #66727f;
+  --line: rgba(23, 55, 94, 0.12);
+  --wave: #376fb7;
+  --school: #e4effb;
+  --yours: #f6dfcc;
+  --track: rgba(23, 55, 94, 0.07);
+  --hand: #9b2c2c;
+  --good: #2f5a43;
+  --mid: #b0731e;
+  --low: #e0751a;
+  --gold: #b8913a;
+  --corey: #c4566a;
+  --gmt: #376fb7;
+  --sun: #e9b949; --breeze: #7fb8a4; --gust: #8ea3bd; --cloud: #a7adb6;
+  --fog: #b5a9c9; --rain: #5f8fc9; --storm: #6b4a7a; --clearing: #f0b38a;
+  --chip: #eef3fa; --chip-ink: #244f7c;
+  --font: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1626; --paper: #142036; --ink: #e7edf6; --navy: #c9d8ee; --muted: #93a1b5;
+    --line: rgba(201, 216, 238, 0.14); --wave: #7aa7e6; --school: #1d3352; --yours: #4a3426;
+    --track: rgba(201, 216, 238, 0.08); --hand: #ff7a6e; --good: #7cc29a; --mid: #e6a84a; --low: #ff9a4d;
+    --gold: #e0bd68; --corey: #f08a9c; --gmt: #7aa7e6; --chip: #1d2c46; --chip-ink: #b9cff0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1626; --paper: #142036; --ink: #e7edf6; --navy: #c9d8ee; --muted: #93a1b5;
+  --line: rgba(201, 216, 238, 0.14); --wave: #7aa7e6; --school: #1d3352; --yours: #4a3426;
+  --track: rgba(201, 216, 238, 0.08); --hand: #ff7a6e; --good: #7cc29a; --mid: #e6a84a; --low: #ff9a4d;
+  --gold: #e0bd68; --corey: #f08a9c; --gmt: #7aa7e6; --chip: #1d2c46; --chip-ink: #b9cff0;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 72rem; margin: 0 auto; padding-inline: 16px; padding-block: 1.5rem 3rem; display: grid; gap: 1.5rem; }
+header { display: grid; gap: 0.35rem; }
+.kicker { margin: 0; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.2rem); line-height: 1.1; color: var(--navy); text-wrap: balance; letter-spacing: -0.02em; }
+.lede { margin: 0; color: var(--muted); max-width: 62ch; }
+.stage { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+@media (max-width: 860px) { .stage { grid-template-columns: 1fr; } }
+.watch { background: var(--paper); border: 1px solid var(--line); border-radius: 1.25rem; padding: 1rem; display: grid; gap: 0.75rem; min-width: 0; }
+.facebar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.facename { display: grid; gap: 0.1rem; min-width: 0; }
+.facename b { font-size: 1.0625rem; color: var(--navy); }
+.facename span { font-size: 0.8125rem; color: var(--muted); }
+.nav { display: flex; gap: 0.4rem; align-items: center; }
+button { font: inherit; color: inherit; }
+.iconbtn { width: 2.5rem; height: 2.5rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--navy); cursor: pointer; font-size: 1.1rem; }
+.iconbtn:focus-visible, .pill:focus-visible, .dots button:focus-visible, .dialbtn:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+.auto { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.65rem; border-radius: 999px; background: var(--chip); color: var(--chip-ink); font-size: 0.75rem; font-weight: 600; border: 0; cursor: pointer; }
+.auto[aria-pressed="false"] { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
+.dialhost { position: relative; width: 100%; max-width: 30rem; margin: 0 auto; aspect-ratio: 1; perspective: 1400px; touch-action: pan-y; }
+.flip { position: absolute; inset: 0; transition: transform 0.7s cubic-bezier(.2,.7,.2,1); transform-style: preserve-3d; }
+.flip.is-back { transform: rotateY(180deg); }
+.side { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.side--back { transform: rotateY(180deg); background: var(--paper); border-radius: 1.5rem; border: 1px solid var(--line); display: grid; place-items: center; overflow: hidden; }
+svg { display: block; width: 100%; height: 100%; }
+.dialbtn { position: absolute; left: 32%; top: 32%; width: 36%; height: 36%; border-radius: 50%; background: transparent; border: 0; cursor: pointer; }
+.dots { display: flex; justify-content: center; gap: 0.5rem; }
+.dots button { width: 0.6rem; height: 0.6rem; border-radius: 999px; border: 0; background: var(--line); padding: 0; cursor: pointer; }
+.dots button[aria-current="true"] { background: var(--navy); width: 1.4rem; }
+.hint { margin: 0; text-align: center; font-size: 0.75rem; color: var(--muted); }
+.panel { display: grid; gap: 0.75rem; min-width: 0; }
+.panel h2 { margin: 0; font-size: 1.0625rem; color: var(--navy); }
+.list { display: grid; gap: 0.6rem; }
+.comp { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); gap: 0.75rem; padding: 0.75rem; border-radius: 0.9rem; background: var(--paper); border: 1px solid var(--line); }
+.comp svg { width: 2.25rem; height: 2.25rem; }
+.comp b { display: block; color: var(--ink); }
+.comp p { margin: 0.15rem 0 0; font-size: 0.8125rem; color: var(--muted); }
+.comp .watchword { font-weight: 500; color: var(--muted); font-size: 0.75rem; }
+.status { display: inline-block; margin-top: 0.35rem; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 999px; }
+.status--ready { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+.status--model { background: color-mix(in srgb, var(--mid) 16%, transparent); color: var(--mid); }
+.status--data { background: color-mix(in srgb, var(--wave) 14%, transparent); color: var(--wave); }
+.faces { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.75rem; }
+.facecard { text-align: left; padding: 0.85rem; border-radius: 0.9rem; background: var(--paper); border: 1px solid var(--line); cursor: pointer; display: grid; gap: 0.2rem; }
+.facecard[aria-pressed="true"] { border-color: var(--navy); box-shadow: inset 0 0 0 1px var(--navy); }
+.facecard b { color: var(--navy); }
+.facecard span { font-size: 0.8125rem; color: var(--muted); }
+.facecard em { font-style: normal; font-size: 0.75rem; color: var(--chip-ink); }
+.outlook { width: 90%; padding-block: 0.5rem; display: grid; gap: 0.5rem; justify-items: center; text-align: center; }
+.outlook .big { font-size: 2.4rem; font-weight: 700; color: var(--good); line-height: 1; font-variant-numeric: tabular-nums; }
+.outlook p { margin: 0; font-size: 0.8125rem; color: var(--muted); max-width: 30ch; }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; width: 100%; }
+.wcard { border: 1px solid var(--line); border-radius: 0.6rem; padding: 0.3rem 0.2rem; font-size: 0.6875rem; display: grid; gap: 0.1rem; justify-items: center; }
+.wcard b { font-size: 0.9375rem; font-variant-numeric: tabular-nums; color: var(--ink); }
+.wcard i { font-style: normal; color: var(--muted); line-height: 1.15; }
+.back { font-size: 0.75rem; border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 0.3rem 0.8rem; cursor: pointer; }
+.note { font-size: 0.8125rem; color: var(--muted); margin: 0; }
+.plaque { margin: 0 auto; padding: 0.35rem 0.9rem; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; }
+[hidden] { display: none !important; }
+.demo { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; }
+.pill { min-height: 2.5rem; padding: 0.45rem 1rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--navy); font-weight: 600; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .flip { transition: none; } .spin { animation: none !important; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { transform-box: fill-box; transform-origin: center; animation: spin 6s linear infinite; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="kicker">Life Hub · Day Dial · mockup</p>
+    <h1>The dial grows complications</h1>
+    <p class="lede">Your green dial stays exactly as it is. These faces add what a watch would: a dive bezel for medication, a GMT hand for Seoul and Corey, a moon for the term, a retrograde tally, and the day's weather on the Tool watch. Swipe or use the arrows to change face; tap the centre to flip to the caseback.</p>
+  </header>
+
+  <section class="stage" aria-label="Watch faces">
+    <div class="watch">
+      <div class="facebar">
+        <div class="facename"><b id="face-title">Tool watch</b><span id="face-sub">School day</span></div>
+        <div class="nav">
+          <button class="auto" id="auto" type="button" aria-pressed="true">Auto: picked for today</button>
+          <button class="iconbtn" id="prev" type="button" aria-label="Previous face">‹</button>
+          <button class="iconbtn" id="next" type="button" aria-label="Next face">›</button>
+        </div>
+      </div>
+      <div class="dialhost" id="dialhost">
+        <div class="flip" id="flip">
+          <div class="side side--front"><svg id="dial" viewBox="0 0 400 400" role="img" aria-labelledby="dial-desc"><desc id="dial-desc">Day dial</desc></svg>
+            <button class="dialbtn" id="flipbtn" type="button" aria-label="Flip to the caseback: why the number is what it is"></button>
+          </div>
+          <div class="side side--back" id="caseback" aria-hidden="true"></div>
+        </div>
+      </div>
+      <p class="plaque" id="plaque" hidden></p>
+      <div class="demo" id="demo" hidden>
+        <button class="pill" id="close-task" type="button">Close a task</button>
+        <button class="pill" id="midnight" type="button">Jump to midnight</button>
+      </div>
+      <div class="dots" id="dots" role="tablist" aria-label="Faces"></div>
+      <p class="hint" id="hint">Example data · Monday 5 October · T4 W1</p>
+    </div>
+
+    <div class="panel">
+      <h2>On this face</h2>
+      <div class="list" id="complist"></div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="faces-h">
+    <h2 id="faces-h">Faces, and when the dial picks each one</h2>
+    <div class="faces" id="facecards"></div>
+    <p class="note">Auto picks a face from the day and the time, like a Focus mode. You can always swipe to any face; a face you choose sticks until the next day type.</p>
+  </section>
+</div>
+
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const C = 200, R = 142;
+  const ring = { eventOuter: 0.88, eventInner: 0.7, ctxOuter: 0.66, ctxInner: 0.575, gauge: 0.43 };
+  const BEZEL = [R + 4, R + 19];
+  const ang = h => ((((h % 24) + 24) % 24 - 12) / 24) * 2 * Math.PI;
+  const pt = (r, h) => [C + r * Math.sin(ang(h)), C - r * Math.cos(ang(h))];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function arc(r1, r2, h1, h2) {
+    const span = ((h2 - h1) % 24 + 24) % 24 || 24;
+    const large = span > 12 ? 1 : 0;
+    const [a, b] = pt(r2, h1), [c, d] = pt(r2, h2), [e, f] = pt(r1, h2), [g, k] = pt(r1, h1);
+    return `M${a} ${b}A${r2} ${r2} 0 ${large} 1 ${c} ${d}L${e} ${f}A${r1} ${r1} 0 ${large} 0 ${g} ${k}Z`;
+  }
+  function el(tag, attrs, parent, text) {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs || {})) n.setAttribute(k, v);
+    if (text != null) n.textContent = text;
+    if (parent) parent.append(n);
+    return n;
+  }
+
+  /* --- Same battery and weather rules as readiness-hourly.js (inline copy for the mockup). --- */
+  const DEMAND = { class: 0.04, deep: 0.04, physical: 0.05, meeting: 0.03, shallow: 0.025, admin: 0.02 };
+  function demandOf(i) { if (i.kind === 'corey' || i.protected) return null; if (i.isClass) return 'class'; if (i.depth === 'deep') return 'deep'; return i.kind === 'task' ? 'shallow' : 'meeting'; }
+  function project(start, items, wake = 7, bed = 22.5) {
+    const pts = []; let level = start, free = 0; const ceil = start;
+    for (let h = wake; h <= bed + 1e-9; h += 0.5) {
+      const now = items.filter(i => demandOf(i) && i.start < h + 0.5 && i.end > h);
+      const starts = items.filter(i => demandOf(i) && i.start >= h - 1 && i.start < h + 1).length;
+      const tr = Math.max(0, starts - 1);
+      const rate = 0.008 + now.reduce((s, i) => s + DEMAND[demandOf(i)], 0) + (now.length > 1 ? 0.015 : 0) + Math.max(0, tr - 1) * 0.01;
+      free = now.length ? 0 : free + 0.5;
+      const to = ceil * 0.9, rec = !now.length && free >= 0.5 && level < to ? (to - level) * 0.15 : 0;
+      if (h > wake) level = level * (1 - rate * 0.5) + rec * 0.5;
+      const half = Math.min(30, 6 + 2.2 * Math.sqrt(h - wake));
+      pts.push({ h, pct: Math.round(level), low: Math.round(level - half), high: Math.round(level + half), demand: now.length, tr });
+    }
+    return pts;
+  }
+  const NAMES = { 1: 'Clear skies', 3: 'Morning sunshine', 4: 'Afternoon sunshine', 8: 'Gentle breeze', 9: 'Building breeze', 10: 'Gusty', 11: 'Strong headwind', 13: 'High cloud', 14: 'Increasing cloud', 15: 'Overcast', 16: 'Heavy cloud', 29: 'Cloud breaking', 30: 'Calm evening' };
+  const FAMILY = id => [1,2,3,4,5,6].includes(id) ? 'sun' : [7,8,9].includes(id) ? 'breeze' : [10,11,12].includes(id) ? 'gust' : [13,14,15,16,17].includes(id) ? 'cloud' : [29,30].includes(id) ? 'clearing' : 'breeze';
+  function weather(pts, i) {
+    const p = pts[i], ahead = pts[Math.min(pts.length - 1, i + 4)], trend = ahead.pct - p.pct;
+    const load = pts.slice(i, i + 4).filter(q => q.demand).length * 0.5, morning = p.h < 11;
+    if (p.tr >= 2) return 10;
+    if (p.pct >= 90) return 1;
+    if (p.h >= 19 && load === 0) return 30;
+    if (trend >= 4) return p.pct < 50 ? 29 : morning ? 9 : 4;
+    if (trend <= -4) return morning && p.pct >= 60 ? 3 : 14;
+    if (p.pct < 35) return 16; if (p.pct < 50) return 15;
+    if (p.pct < 60 && p.demand) return 11;
+    if (p.pct < 70) return 13; return 8;
+  }
+
+  /* --- Example day (invented). --- */
+  const ITEMS = [
+    { start: 8.67, end: 9.58, isClass: true }, { start: 10, end: 11, isClass: true },
+    { start: 11.83, end: 12.75, isClass: true }, { start: 13.67, end: 14.58, isClass: true },
+    { start: 15, end: 15.5, kind: 'meeting' }, { start: 15.5, end: 16, kind: 'meeting' }, { start: 16, end: 16.5, kind: 'meeting' },
+    { start: 16.5, end: 18, kind: 'task', depth: 'deep', title: 'HSC feedback' },
+    { start: 19.5, end: 21.5, kind: 'corey' }
+  ];
+  const DAY = { readiness: 74, note: 'short sleep', why: 'Your check-in said better but still tired. Three classes before lunch and back-to-back meetings at 3 pm will cost the most.' };
+  const PTS = project(DAY.readiness, ITEMS);
+  const TASKS_TOTAL = 6;
+  let tasksClosed = 3;
+
+  const FACES = [
+    { id: 'tool', title: 'Tool watch', sub: 'School day', when: 'Auto on school days, 6 am to 4 pm', now: 13.25, comps: ['weather', 'bezel', 'moon'] },
+    { id: 'focus', title: 'Focus', sub: 'Deep work · HSC feedback', when: 'Auto during a deep-work block you started', now: 17.1, dim: true, comps: ['retro', 'bezel'] },
+    { id: 'pilot', title: 'Pilot GMT', sub: 'Travelling · Seoul', when: 'Auto when a trip is on (KL, Seoul)', now: 15.5, gmt: true, comps: ['gmt', 'corey', 'bezel'] },
+    { id: 'dress', title: 'Dress watch', sub: 'Weekend', when: 'Auto on weekends and holidays', now: 11, dress: true, comps: [] },
+    { id: 'grand', title: 'Grand complication', sub: 'Wedding day', when: 'Auto on the wedding day only', now: 14.5, gold: true, comps: ['bezel', 'moon', 'tourbillon', 'gmt', 'countdown'] }
+  ];
+
+  const COMPS = {
+    weather: { name: 'Weather ring', watch: 'the quiet band', text: 'Hour-by-hour readiness, coloured by condition. Solid behind the hand, softer ahead. Tool watch only.', status: ['ready', 'Model built'] },
+    bezel: { name: 'Dive bezel', watch: 'dive watch', text: 'The outer ring. The blue pip is when you logged the dose; the band is its usual window, solid for time gone, and it turns orange for the last 45 minutes. Visual only: it never changes the forecast unless your check-ins show a pattern.', status: ['ready', 'Data ready'] },
+    moon: { name: 'Moon phase', watch: 'moonphase', text: 'Under the number. Where the term is: new moon in quiet weeks, full moon when it is all happening at once.', status: ['ready', 'Data ready'] },
+    tourbillon: { name: 'Tourbillon', watch: 'haute horlogerie', text: 'Its own window under the number, with the moon above. Spins only while Clare or Hammond is reworking your day.', status: ['data', 'Needs agent status'] },
+    retro: { name: 'Retrograde tally', watch: 'retrograde', text: 'Sweeps one step for each task you close today, then snaps back at midnight. Try the buttons under the dial.', status: ['ready', 'Data ready'] },
+    gmt: { name: 'GMT hand', watch: 'pilot / GMT', text: 'A second 24-hour hand for the other place. Home Sydney while you are away.', status: ['data', 'Needs trip dates'] },
+    corey: { name: 'Corey hand', watch: 'second time zone', text: 'Corey’s time at home while you are in KL or Seoul, with Corey’s evening shaded on the rim.', status: ['data', 'Needs trip dates'] },
+    countdown: { name: 'Countdown plaque', watch: 'regatta', text: 'Ceremony countdown, engraved under the dial so the face stays clear.', status: ['ready', 'Data ready'] }
+  };
+
+  const gaugeColour = pct => pct >= 60 ? 'var(--good)' : pct >= 40 ? 'var(--mid)' : 'var(--low)';
+  const clock = h => { const hh = Math.floor(h) % 24, mm = Math.round((h - Math.floor(h)) * 60); const s = hh >= 12 ? 'pm' : 'am'; return `${hh % 12 || 12}:${String(mm).padStart(2, '0')} ${s}`; };
+  const dur = h => { const m = Math.round(h * 60); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} m` : `${m} m`; };
+
+  function hatch(defs, id, colour) {
+    const pat = el('pattern', { id, width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+    el('rect', { width: 6, height: 6, fill: 'var(--track)' }, pat);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: colour, 'stroke-opacity': 0.35, 'stroke-width': 2 }, pat);
+  }
+
+  function drawBezel(svg, face) {
+    const [b1, b2] = BEZEL;
+    el('path', { d: `M${C - b2} ${C}A${b2} ${b2} 0 1 1 ${C + b2} ${C}A${b2} ${b2} 0 1 1 ${C - b2} ${C}ZM${C - b1} ${C}A${b1} ${b1} 0 1 0 ${C + b1} ${C}A${b1} ${b1} 0 1 0 ${C - b1} ${C}Z`, fill: 'var(--track)', 'fill-rule': 'evenodd' }, svg);
+    for (let h = 0; h < 24; h += 0.5) {
+      const major = h % 1 === 0;
+      const [x1, y1] = pt(b2 - 1, h), [x2, y2] = pt(b2 - (major ? 5 : 3), h);
+      el('line', { x1, y1, x2, y2, stroke: 'var(--muted)', 'stroke-opacity': major ? 0.55 : 0.3, 'stroke-width': 1 }, svg);
+    }
+    const doses = face.gmt ? [[8.5, 12.5]] : [[7.67, 11.67], [12.5, 16.5]];
+    for (const [a, b] of doses) {
+      el('path', { d: arc(b1 + 2, b2 - 2, a, b), fill: 'var(--wave)', 'fill-opacity': 0.22 }, svg);
+      const gone = Math.min(b, face.now);
+      if (gone > a) el('path', { d: arc(b1 + 2, b2 - 2, a, Math.min(gone, b - 0.75)), fill: 'var(--wave)' }, svg);
+      if (gone > b - 0.75) el('path', { d: arc(b1 + 2, b2 - 2, b - 0.75, gone), fill: 'var(--low)' }, svg);
+      else el('path', { d: arc(b1 + 2, b2 - 2, b - 0.75, b), fill: 'var(--low)', 'fill-opacity': 0.3 }, svg);
+      // Lume pip: a triangle at the dose time pointing inwards.
+      const [px, py] = pt(b2 + 1, a), [lx, ly] = pt(b1 + 1, a - 0.25), [rx, ry] = pt(b1 + 1, a + 0.25);
+      el('path', { d: `M${px} ${py}L${lx} ${ly}L${rx} ${ry}Z`, fill: 'var(--wave)', stroke: 'var(--paper)', 'stroke-width': 1.2 }, svg);
+      if (face.now > a && face.now < b) {
+        const mid = (face.now + b) / 2, [tx, ty] = pt(b2 + 8, mid);
+        const right = Math.sin(ang(mid)) > 0.2, left = Math.sin(ang(mid)) < -0.2;
+        el('text', { x: tx, y: ty + 3, 'text-anchor': right ? 'start' : left ? 'end' : 'middle', 'font-size': 9.5, 'font-weight': 700, fill: 'var(--wave)', 'paint-order': 'stroke', stroke: 'var(--paper)', 'stroke-width': 3 }, svg, `${dur(b - face.now)} left`);
+      }
+    }
+  }
+
+  function drawMoon(svg, cx, cy, r) {
+    // T4 W1: a thin waxing crescent. Full moon would be the busiest week.
+    el('circle', { cx, cy, r, fill: 'var(--navy)', 'fill-opacity': 0.9 }, svg);
+    el('path', { d: `M${cx} ${cy - r}A${r} ${r} 0 0 1 ${cx} ${cy + r}A${r * 0.55} ${r} 0 0 0 ${cx} ${cy - r}Z`, fill: 'var(--gold)' }, svg);
+    el('text', { x: cx, y: cy + r + 11, 'text-anchor': 'middle', 'font-size': 8.5, 'font-weight': 600, fill: 'var(--muted)', 'letter-spacing': '0.05em' }, svg, 'T4 W1');
+  }
+
+  let retroHand = null;
+  function retroAngle(n) { return Math.PI * (1 - n / TASKS_TOTAL); }
+  function drawRetro(svg) {
+    const cy = C + 34, rr = 24;
+    const g = el('g', {}, svg);
+    const p = t => [C + rr * Math.cos(t), cy - rr * Math.sin(t)];
+    const [ax, ay] = p(Math.PI), [bx, by] = p(0);
+    el('path', { d: `M${ax} ${ay}A${rr} ${rr} 0 0 1 ${bx} ${by}`, fill: 'none', stroke: 'var(--track)', 'stroke-width': 5, 'stroke-linecap': 'round' }, g);
+    for (let k = 0; k <= TASKS_TOTAL; k++) {
+      const [x1, y1] = [C + (rr + 4) * Math.cos(retroAngle(k)), cy - (rr + 4) * Math.sin(retroAngle(k))];
+      const [x2, y2] = [C + (rr + 8) * Math.cos(retroAngle(k)), cy - (rr + 8) * Math.sin(retroAngle(k))];
+      el('line', { x1, y1, x2, y2, stroke: 'var(--muted)', 'stroke-width': 1 }, g);
+    }
+    retroHand = el('line', { x1: C, y1: cy, x2: C, y2: cy, stroke: 'var(--good)', 'stroke-width': 2.4, 'stroke-linecap': 'round' }, g);
+    el('circle', { cx: C, cy, r: 2.6, fill: 'var(--ink)' }, g);
+    el('text', { x: C, y: cy + 14, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 600, fill: 'var(--muted)', id: 'retro-label' }, g, `${tasksClosed} of ${TASKS_TOTAL} closed`);
+    setRetro(tasksClosed, true);
+  }
+  let retroValue = 3, raf = 0;
+  function setRetro(target, instant) {
+    const cy = C + 34, rr = 21;
+    const place = v => { const a = retroAngle(v); retroHand?.setAttribute('x2', C + rr * Math.cos(a)); retroHand?.setAttribute('y2', cy - rr * Math.sin(a)); };
+    cancelAnimationFrame(raf);
+    if (instant || reduce) { retroValue = target; place(target); return; }
+    const from = retroValue, t0 = performance.now(), snap = target < from;
+    const len = snap ? 650 : 420;
+    const step = now => {
+      const t = Math.min(1, (now - t0) / len);
+      // Snap-back overshoots like a spring; a step forward eases in.
+      const e = snap ? 1 - Math.cos(t * Math.PI * 2.5) * Math.exp(-5 * t) : 1 - Math.pow(1 - t, 3);
+      retroValue = from + (target - from) * e;
+      place(retroValue);
+      if (t < 1) raf = requestAnimationFrame(step); else retroValue = target;
+    };
+    raf = requestAnimationFrame(step);
+  }
+
+  function drawDress(svg, face) {
+    // A deliberate single look: black lacquer, a rose-engine guilloché, gold. No words.
+    const defs = el('defs', {}, svg);
+    const grad = el('radialGradient', { id: 'lacquer', cx: '50%', cy: '42%', r: '60%' }, defs);
+    el('stop', { offset: '0%', 'stop-color': '#22334f' }, grad);
+    el('stop', { offset: '100%', 'stop-color': '#070d1b' }, grad);
+    const clip = el('clipPath', { id: 'dialclip' }, defs);
+    el('circle', { cx: C, cy: C, r: R + 19 }, clip);
+    el('circle', { cx: C, cy: C, r: R + 22, fill: '#c9a55a' }, svg);
+    el('circle', { cx: C, cy: C, r: R + 19, fill: 'url(#lacquer)' }, svg);
+    // Guilloché: circles turned around a small orbit, like a rose engine cutting the dial plate.
+    const g = el('g', { 'clip-path': 'url(#dialclip)', fill: 'none', stroke: '#e3c47d', 'stroke-width': 0.6 }, svg);
+    const turns = 64;
+    for (let k = 0; k < turns; k++) {
+      const a = (k / turns) * 2 * Math.PI;
+      el('circle', { cx: C + 22 * Math.cos(a), cy: C + 22 * Math.sin(a), r: R * 0.72, 'stroke-opacity': 0.07 }, g);
+    }
+    for (let k = 0; k < turns; k++) {
+      const a = (k / turns) * 2 * Math.PI + Math.PI / turns;
+      el('circle', { cx: C + 9 * Math.cos(a), cy: C + 9 * Math.sin(a), r: R * 0.3, 'stroke-opacity': 0.08 }, g);
+    }
+    // Commitments as small diamonds just inside the indices: filled for classes, outlined for
+    // tasks and meetings, champagne for Corey time. Quiet enough to ignore, there if you look.
+    const diamond = (h, r, size, attrs) => {
+      const [x, y] = pt(r, h), a = ang(h);
+      const ux = Math.sin(a), uy = -Math.cos(a), vx = Math.cos(a), vy = Math.sin(a);
+      const d = `M${x + ux * size} ${y + uy * size}L${x + vx * size * 0.6} ${y + vy * size * 0.6}L${x - ux * size} ${y - uy * size}L${x - vx * size * 0.6} ${y - vy * size * 0.6}Z`;
+      el('path', { d, ...attrs }, svg);
+    };
+    for (const i of ITEMS) {
+      const mid = (i.start + i.end) / 2;
+      if (i.kind === 'corey') diamond(mid, R * 0.76, 4.5, { fill: '#e8cf9a', 'fill-opacity': 0.55 });
+      else if (i.isClass) diamond(mid, R * 0.76, 3.6, { fill: '#e3c47d', 'fill-opacity': 0.5 });
+      else diamond(mid, R * 0.76, 3.6, { fill: 'none', stroke: '#e3c47d', 'stroke-opacity': 0.6, 'stroke-width': 0.9 });
+    }
+    // Yours: a whisper of champagne at the rim. Sleep: a darker crescent.
+    el('path', { d: arc(R * 0.9, R * 0.96, 17.5, 22.5), fill: '#e8cf9a', 'fill-opacity': 0.22 }, svg);
+    el('path', { d: arc(R * 0.9, R * 0.96, 22.5, 6.5), fill: '#000000', 'fill-opacity': 0.35 }, svg);
+    for (let h = 0; h < 24; h++) {
+      const major = h % 6 === 0;
+      const [x1, y1] = pt(R * 0.98, h), [x2, y2] = pt(R * (major ? 0.82 : 0.9), h);
+      el('line', { x1, y1, x2, y2, stroke: '#e3c47d', 'stroke-width': major ? 3.2 : 1.4, 'stroke-linecap': 'round' }, svg);
+    }
+    // Readiness as a fine gold arc and nothing else.
+    const gr = R * 0.36, circ = 2 * Math.PI * gr;
+    el('circle', { cx: C, cy: C, r: gr, fill: 'none', stroke: '#ffffff', 'stroke-opacity': 0.08, 'stroke-width': 2 }, svg);
+    el('circle', { cx: C, cy: C, r: gr, fill: 'none', stroke: '#e3c47d', 'stroke-width': 2, 'stroke-dasharray': `${circ * DAY.readiness / 100} ${circ}`, transform: `rotate(-90 ${C} ${C})` }, svg);
+    // Leaf hand pointing to now.
+    const [tx, ty] = pt(R * 0.8, face.now), [lx, ly] = pt(14, face.now - 1.2), [rx, ry] = pt(14, face.now + 1.2), [bx, by] = pt(18, face.now + 12);
+    el('path', { d: `M${bx} ${by}Q${lx} ${ly} ${tx} ${ty}Q${rx} ${ry} ${bx} ${by}Z`, fill: '#e3c47d' }, svg);
+    el('circle', { cx: C, cy: C, r: 4.5, fill: '#e3c47d' }, svg);
+    el('circle', { cx: C, cy: C, r: 1.6, fill: '#070d1b' }, svg);
+  }
+
+  function drawDial(face) {
+    const svg = document.getElementById('dial');
+    svg.replaceChildren(el('desc', { id: 'dial-desc' }, null, `${face.title}: readiness ${DAY.readiness}, ${DAY.note}, now ${clock(face.now)}`));
+    retroHand = null;
+    if (face.dress) return drawDress(svg, face);
+    const defs = el('defs', {}, svg);
+    hatch(defs, 'hatch', 'var(--muted)');
+    const dim = face.dim ? 0.35 : 1;
+
+    el('circle', { cx: C, cy: C, r: R + 22, fill: 'var(--paper)', stroke: face.gold ? 'var(--gold)' : 'var(--line)', 'stroke-width': face.gold ? 3 : 1 }, svg);
+    if (face.comps.includes('bezel')) drawBezel(svg, face);
+    for (let h = 0; h < 24; h += 1) {
+      const [x1, y1] = pt(R * 0.985, h), [x2, y2] = pt(R * (h % 6 === 0 ? 0.93 : 0.96), h);
+      el('line', { x1, y1, x2, y2, stroke: 'var(--muted)', 'stroke-opacity': h % 6 === 0 ? 0.6 : 0.3, 'stroke-width': h % 6 === 0 ? 1.6 : 1 }, svg);
+    }
+    for (const [h, t] of [[12, 'noon'], [18, '6 pm'], [0, 'midnight'], [6, '6 am']]) {
+      const [x, y] = pt(R + 38, h);
+      el('text', { x, y: y + 4, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 600, fill: 'var(--navy)' }, svg, t);
+    }
+
+    el('circle', { cx: C, cy: C, r: R * (ring.eventInner + ring.eventOuter) / 2, fill: 'none', stroke: 'var(--track)', 'stroke-width': R * (ring.eventOuter - ring.eventInner) }, svg);
+    for (const i of ITEMS) {
+      const focus = face.dim && i.title === 'HSC feedback';
+      el('path', { d: arc(R * (ring.eventInner + 0.02), R * (ring.eventOuter - 0.02), i.start + 0.03, i.end - 0.03),
+        fill: i.kind === 'corey' ? 'var(--yours)' : i.isClass ? 'var(--school)' : 'var(--chip)',
+        stroke: focus ? 'var(--navy)' : 'var(--line)', 'stroke-width': focus ? 2 : 1, opacity: face.dim && !focus ? 0.35 : 1 }, svg);
+    }
+    el('path', { d: arc(R * ring.ctxInner, R * ring.ctxOuter, 22.5, 6.5), fill: 'url(#hatch)', opacity: dim }, svg);
+    if (!face.gmt) el('path', { d: arc(R * ring.ctxInner, R * ring.ctxOuter, 8.5, 15.25), fill: 'var(--school)', opacity: dim }, svg);
+    el('path', { d: arc(R * ring.ctxInner, R * ring.ctxOuter, 17.5, 22.5), fill: 'var(--yours)', opacity: dim }, svg);
+
+    if (face.comps.includes('weather')) {
+      const r1 = R * 0.475, r2 = R * 0.545;
+      PTS.forEach((p, i) => {
+        if (i === PTS.length - 1) return;
+        const fam = FAMILY(weather(PTS, i));
+        const thick = (r2 - r1) * Math.max(0.35, p.pct / 100);
+        el('path', { d: arc(r1, r1 + thick, p.h, p.h + 0.5), fill: `var(--${fam})`, 'fill-opacity': p.h < face.now ? 0.95 : 0.5 }, svg);
+      });
+    }
+
+    // The green gauge, exactly as it is.
+    const gr = R * ring.gauge, circ = 2 * Math.PI * gr;
+    el('circle', { cx: C, cy: C, r: gr, fill: 'none', stroke: 'var(--track)', 'stroke-width': 10 }, svg);
+    el('circle', { cx: C, cy: C, r: gr, fill: 'none', stroke: gaugeColour(DAY.readiness), 'stroke-width': 10, 'stroke-linecap': 'round', 'stroke-dasharray': `${circ * DAY.readiness / 100} ${circ}`, transform: `rotate(-90 ${C} ${C})` }, svg);
+    const hasCentre = face.comps.includes('moon') || face.comps.includes('retro');
+    const tourbillon = face.comps.includes('tourbillon');
+    if (tourbillon) {
+      // Grand: moon above the number, tourbillon in its own window below. Nothing shares space.
+      el('text', { x: C, y: C + 8, 'text-anchor': 'middle', 'font-size': 26, 'font-weight': 700, fill: gaugeColour(DAY.readiness) }, svg, `${DAY.readiness}`);
+      const my = C - 30, mr = 8;
+      el('circle', { cx: C, cy: my, r: mr, fill: 'var(--navy)', 'fill-opacity': 0.9 }, svg);
+      el('path', { d: `M${C} ${my - mr}A${mr} ${mr} 0 0 1 ${C} ${my + mr}A${mr * 0.55} ${mr} 0 0 0 ${C} ${my - mr}Z`, fill: 'var(--gold)' }, svg);
+      const ty = C + 33;
+      el('circle', { cx: C, cy: ty, r: 12, fill: 'var(--paper)', stroke: 'var(--gold)', 'stroke-width': 1.4 }, svg);
+      const cage = el('g', { class: 'spin' }, svg);
+      el('circle', { cx: C, cy: ty, r: 7.5, fill: 'none', stroke: 'var(--gold)', 'stroke-width': 1.2 }, cage);
+      for (let k = 0; k < 3; k++) { const a = k * 2 * Math.PI / 3; el('line', { x1: C, y1: ty, x2: C + 7.5 * Math.cos(a), y2: ty + 7.5 * Math.sin(a), stroke: 'var(--gold)', 'stroke-width': 1 }, cage); }
+      el('title', {}, cage, 'Tourbillon: Clare is rebalancing this afternoon');
+    } else {
+      el('text', { x: C, y: C - (hasCentre ? 26 : 20), 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 600, 'letter-spacing': '0.08em', fill: 'var(--muted)' }, svg, 'READINESS');
+      el('text', { x: C, y: C + (hasCentre ? 4 : 12), 'text-anchor': 'middle', 'font-size': hasCentre ? 28 : 34, 'font-weight': 700, fill: gaugeColour(DAY.readiness) }, svg, `${DAY.readiness}`);
+    }
+    if (tourbillon) { /* drawn above */ }
+    else if (face.comps.includes('moon')) drawMoon(svg, C, C + 24, 9.5);
+    else if (face.comps.includes('retro')) drawRetro(svg);
+    else el('text', { x: C, y: C + 32, 'text-anchor': 'middle', 'font-size': 10.5, fill: 'var(--muted)' }, svg, DAY.note);
+
+    if (face.comps.includes('gmt')) {
+      const other = face.gmt ? face.now + 2 : face.now - 2; // Sydney is 2 h ahead of Seoul in October
+      const [x, y] = pt(R * 0.9, other), [bx, by] = pt(gr + 10, other);
+      el('line', { x1: bx, y1: by, x2: x, y2: y, stroke: 'var(--gmt)', 'stroke-width': 1.8 }, svg);
+      const [lx2, ly2] = pt(R * 0.82, other - 0.3), [rx2, ry2] = pt(R * 0.82, other + 0.3);
+      el('path', { d: `M${x} ${y}L${lx2} ${ly2}L${rx2} ${ry2}Z`, fill: 'var(--gmt)' }, svg);
+      const [tx, ty] = pt(R * 0.62, other - 0.9);
+      el('text', { x: tx, y: ty + 3, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: 'var(--gmt)', 'paint-order': 'stroke', stroke: 'var(--paper)', 'stroke-width': 3 }, svg, face.gmt ? 'Sydney' : 'Seoul');
+    }
+    if (face.comps.includes('corey')) {
+      const home = face.now + 2;
+      el('path', { d: arc(R * 0.885, R * 0.905, 18, 22.5), fill: 'var(--corey)', 'fill-opacity': 0.6 }, svg);
+      const [x, y] = pt(R * 0.8, home + 0.9);
+      el('circle', { cx: x, cy: y, r: 7, fill: 'var(--corey)' }, svg);
+      el('text', { x, y: y + 3, 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 700, fill: 'var(--paper)' }, svg, 'C');
+    }
+
+    const [hx, hy] = pt(R * ring.eventOuter + 6, face.now), [sx, sy] = pt(gr + 8, face.now);
+    el('line', { x1: sx, y1: sy, x2: hx, y2: hy, stroke: 'var(--hand)', 'stroke-width': 2.2 }, svg);
+    el('circle', { cx: hx, cy: hy, r: 4.5, fill: 'var(--hand)' }, svg);
+  }
+
+  function drawCaseback() {
+    const host = document.getElementById('caseback');
+    const w = 240, h = 90, x0 = 6, y0 = 6;
+    const X = t => x0 + (t - 7) / 15.5 * (w - 12), Y = v => y0 + (1 - v / 100) * (h - 12);
+    const band = PTS.map(p => `${X(p.h)},${Y(Math.min(100, p.high))}`).join(' ') + ' ' + PTS.slice().reverse().map(p => `${X(p.h)},${Y(Math.max(0, p.low))}`).join(' ');
+    const line = PTS.map(p => `${X(p.h)},${Y(p.pct)}`).join(' ');
+    const picks = [7, 9.5, 12, 15, 17.5, 20].map(hh => { const i = PTS.findIndex(p => p.h === hh); return { ...PTS[i], id: weather(PTS, i) }; });
+    host.innerHTML = `<div class="outlook">
+      <p class="kicker">Caseback · Today's outlook</p>
+      <div class="big">${DAY.readiness}</div>
+      <p>${DAY.why}</p>
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto" role="img" aria-label="Readiness across the day with its uncertainty band">
+        <line x1="${x0}" x2="${w - 6}" y1="${Y(50)}" y2="${Y(50)}" stroke="var(--line)"/>
+        <polygon points="${band}" fill="var(--wave)" fill-opacity="0.14"/>
+        <polyline points="${line}" fill="none" stroke="var(--good)" stroke-width="2"/>
+      </svg>
+      <div class="cards">${picks.map(p => `<div class="wcard"><span>${clock(p.h).replace(':00', '')}</span><b>${p.pct}</b><i>${NAMES[p.id] || ''}</i></div>`).join('')}</div>
+      <button class="back" type="button" id="flipback">Back to the dial</button>
+    </div>`;
+    document.getElementById('flipback').addEventListener('click', () => setFlip(false));
+  }
+
+  function compIcon(id) {
+    const s = document.createElementNS(NS, 'svg');
+    s.setAttribute('viewBox', '0 0 36 36'); s.setAttribute('aria-hidden', 'true');
+    el('circle', { cx: 18, cy: 18, r: 15, fill: 'var(--chip)' }, s);
+    const map = {
+      weather: () => { el('path', { d: 'M6 18A12 12 0 0 1 30 18', fill: 'none', stroke: 'var(--sun)', 'stroke-width': 4 }, s); el('path', { d: 'M30 18A12 12 0 0 1 18 30', fill: 'none', stroke: 'var(--cloud)', 'stroke-width': 4 }, s); },
+      bezel: () => { el('circle', { cx: 18, cy: 18, r: 11, fill: 'none', stroke: 'var(--wave)', 'stroke-width': 4, 'stroke-dasharray': '22 80' }, s); el('path', { d: 'M18 4L15 9L21 9Z', fill: 'var(--wave)' }, s); },
+      moon: () => { el('circle', { cx: 18, cy: 18, r: 8, fill: 'var(--navy)' }, s); el('path', { d: 'M18 10A8 8 0 0 1 18 26A4.4 8 0 0 0 18 10Z', fill: 'var(--gold)' }, s); },
+      tourbillon: () => { el('circle', { cx: 18, cy: 18, r: 7, fill: 'none', stroke: 'var(--gold)', 'stroke-width': 1.5 }, s); el('line', { x1: 18, y1: 11, x2: 18, y2: 25, stroke: 'var(--gold)' }, s); el('line', { x1: 12, y1: 22, x2: 24, y2: 14, stroke: 'var(--gold)' }, s); },
+      retro: () => { el('path', { d: 'M8 22A10 10 0 0 1 28 22', fill: 'none', stroke: 'var(--muted)', 'stroke-width': 2 }, s); el('line', { x1: 18, y1: 22, x2: 18, y2: 12, stroke: 'var(--good)', 'stroke-width': 2 }, s); },
+      gmt: () => { el('line', { x1: 18, y1: 18, x2: 26, y2: 9, stroke: 'var(--gmt)', 'stroke-width': 2 }, s); el('path', { d: 'M26 9L21 10L25 14Z', fill: 'var(--gmt)' }, s); },
+      corey: () => { el('circle', { cx: 18, cy: 18, r: 7, fill: 'var(--corey)' }, s); el('text', { x: 18, y: 21.5, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: 'var(--paper)' }, s, 'C'); },
+      countdown: () => { el('text', { x: 18, y: 22, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, fill: 'var(--gold)' }, s, '1:30'); }
+    };
+    map[id]?.();
+    return s;
+  }
+
+  let index = 0, auto = true;
+  function render() {
+    const face = FACES[index];
+    document.getElementById('face-title').textContent = face.title;
+    document.getElementById('face-sub').textContent = `${face.sub} · ${clock(face.now)}`;
+    drawDial(face);
+    document.getElementById('demo').hidden = !face.comps.includes('retro');
+    const plaque = document.getElementById('plaque');
+    plaque.hidden = !face.comps.includes('countdown');
+    plaque.textContent = 'Ceremony in 1 h 30 m';
+    const list = document.getElementById('complist');
+    const rows = face.comps.map(id => {
+      const c = COMPS[id];
+      const row = document.createElement('div'); row.className = 'comp';
+      const body = document.createElement('div');
+      body.innerHTML = `<b>${c.name} <span class="watchword">· ${c.watch}</span></b><p>${c.text}</p><span class="status status--${c.status[0]}">${c.status[1]}</span>`;
+      row.append(compIcon(id), body);
+      return row;
+    });
+    if (face.dress) {
+      const row = document.createElement('div'); row.className = 'comp';
+      row.innerHTML = '<span></span><div><b>No complications <span class="watchword">· dress watch</span></b><p>Black lacquer with a rose-engine guilloché, a gold leaf hand pointing to now and readiness as one fine gold arc. No words. Classes are small gold diamonds, tasks and meetings outlined ones, Corey time a champagne one. Your evening is a whisper of champagne at the rim; the night is the darker crescent.</p></div>';
+      rows.push(row);
+    }
+    list.replaceChildren(...rows);
+    document.querySelectorAll('#dots button').forEach((b, i) => b.setAttribute('aria-current', String(i === index)));
+    document.querySelectorAll('.facecard').forEach((b, i) => b.setAttribute('aria-pressed', String(i === index)));
+    const autoBtn = document.getElementById('auto');
+    autoBtn.setAttribute('aria-pressed', String(auto));
+    autoBtn.textContent = auto ? 'Auto: picked for today' : 'Chosen by you · tap for auto';
+  }
+  function go(i, manual = true) { index = (i + FACES.length) % FACES.length; if (manual) auto = false; setFlip(false); render(); }
+
+  const dots = document.getElementById('dots');
+  const cards = document.getElementById('facecards');
+  FACES.forEach((f, i) => {
+    const d = document.createElement('button'); d.type = 'button'; d.setAttribute('role', 'tab'); d.setAttribute('aria-label', f.title);
+    d.addEventListener('click', () => go(i)); dots.append(d);
+    const c = document.createElement('button'); c.type = 'button'; c.className = 'facecard';
+    c.innerHTML = `<b>${f.title}</b><span>${f.sub}</span><em>${f.when}</em>`;
+    c.addEventListener('click', () => go(i)); cards.append(c);
+  });
+  document.getElementById('prev').addEventListener('click', () => go(index - 1));
+  document.getElementById('next').addEventListener('click', () => go(index + 1));
+  document.getElementById('auto').addEventListener('click', () => { auto = true; go(0, false); });
+  document.getElementById('close-task').addEventListener('click', () => {
+    tasksClosed = Math.min(TASKS_TOTAL, tasksClosed + 1);
+    document.getElementById('retro-label').textContent = `${tasksClosed} of ${TASKS_TOTAL} closed`;
+    setRetro(tasksClosed);
+  });
+  document.getElementById('midnight').addEventListener('click', () => {
+    tasksClosed = 0;
+    document.getElementById('retro-label').textContent = 'Midnight · back to 0';
+    setRetro(0);
+  });
+  document.addEventListener('keydown', e => { if (e.target.closest('button')) return; if (e.key === 'ArrowRight') go(index + 1); if (e.key === 'ArrowLeft') go(index - 1); });
+  const host = document.getElementById('dialhost');
+  let sx = null;
+  host.addEventListener('pointerdown', e => { sx = e.clientX; });
+  host.addEventListener('pointerup', e => { if (sx == null) return; const dx = e.clientX - sx; sx = null; if (Math.abs(dx) > 50) go(index + (dx < 0 ? 1 : -1)); });
+
+  function setFlip(on) {
+    document.getElementById('flip').classList.toggle('is-back', on);
+    document.getElementById('caseback').setAttribute('aria-hidden', String(!on));
+    document.getElementById('flipbtn').tabIndex = on ? -1 : 0;
+  }
+  document.getElementById('flipbtn').addEventListener('click', () => setFlip(true));
+
+  drawCaseback();
+  render();
+})();
+</script>

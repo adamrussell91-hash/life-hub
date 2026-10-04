@@ -12,7 +12,7 @@ import { medicationDay, medicationLogs, usualDoseTimes } from './medication-mode
 import { actualSpans, dayCost } from './day-sense.js';
 
 const DAY_MS = 86_400_000;
-const LOG_TYPES = new Set(['meal', 'diary', 'sleep', 'skincare', 'heart', 'weight', 'composition', 'measurements', 'bloods', 'fragrance', 'medication', 'work_session']);
+const LOG_TYPES = new Set(['meal', 'diary', 'sleep', 'readiness_checkin', 'skincare', 'heart', 'weight', 'composition', 'measurements', 'bloods', 'fragrance', 'medication', 'work_session']);
 const SOURCE_ORDER = ['teaching', 'professional', 'task', 'health', 'fitness', 'corey', 'study'];
 const SOURCE_LABEL = {
   teaching: 'Teaching',
