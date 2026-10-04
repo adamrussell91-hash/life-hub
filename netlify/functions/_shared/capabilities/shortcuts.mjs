@@ -1338,7 +1338,7 @@ async function handleCoordinateRequestCnWrite(ctx, input) {
   }
   const patch = validateCentralNodePatchInput({ section: input.section, op: input.op, payload });
   if (!patch) {
-    return deny('Invalid patch: append_line needs text; upsert_field needs field and text (Today\'s Status only); delete_lines needs match; replace_section and condense need text.');
+    return deny('Invalid patch: append_line needs text; upsert_field needs field and text; delete_lines needs match; replace_section and condense need text.');
   }
   const contentError = centralNodePatchContentError(patch);
   if (contentError) {
@@ -1355,6 +1355,10 @@ async function handleCoordinateRequestCnWrite(ctx, input) {
   const tree = await currentTree(ctx);
   const centralNode = await readTextFile(ctx, tree, CENTRAL_NODE_PATH);
   if (centralNode.text == null) return deny('Central Node is not available.');
+
+  if (!auto && !applyCentralNodePatch(centralNode.text, patch)) {
+    return deny('This change could not be applied to Central Node. Re-propose it, e.g. append_line or replace_section.');
+  }
 
   if (auto) {
     const next = applyCentralNodePatch(centralNode.text, patch);

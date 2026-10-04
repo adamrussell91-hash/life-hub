@@ -1273,27 +1273,24 @@ describe('LEVEL 4 Weekly Review execution fence (WR19–WR27)', () => {
     );
     assert.ok(originalWrite);
 
-    // Keep allowlisted path/mode so validation + fence succeed; fail inside
-    // executeProposeActionWrites via invalid_blob_content (non-JSON body).
-    github.blobs.set(PENDING_ACTIONS_PATH, {
-      sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
-      content: JSON.stringify(
-        before.map((item) => {
-          if (item.id !== proposalEvent.id) return item;
-          return {
-            ...item,
-            proposal: {
-              ...item.proposal,
-              writes: item.proposal.writes.map((write) =>
-                write.path === originalWrite.path
-                  ? { ...write, content: 'NOT_JSON_BLOB_RECORD' }
-                  : write
-              )
-            }
-          };
-        })
-      )
-    });
+    // Post-fence, zero-side-effect failure the validator cannot catch up front:
+    // a record already sits at the task's key (and in the stored base snapshot,
+    // so the pre-fence stale check passes), so the stored `create` returns
+    // already_exists before anything is written. Non-JSON content, the old
+    // trigger, is now refused at validation and never reaches the executor.
+    assert.equal(originalWrite.mode, 'create');
+    const blockingKey = `tasks/${originalWrite.path.split(':')[2]}`;
+    store.data[blockingKey] = { id: 'placeholder', title: 'Blocking record' };
+    const setBase = (base) => {
+      const queue = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+      github.blobs.set(PENDING_ACTIONS_PATH, {
+        sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
+        content: JSON.stringify(queue.map((item) => (item.id === proposalEvent.id
+          ? { ...item, bases: { ...(item.bases ?? {}), [originalWrite.path]: base } }
+          : item)))
+      });
+    };
+    setBase({ updated_at: null, missing: false });
 
     const statuses = [];
     const fetchImpl = async (url, options) => {
@@ -1331,25 +1328,8 @@ describe('LEVEL 4 Weekly Review execution fence (WR19–WR27)', () => {
     assert.equal(isPendingActionExecutable(rolled.find((item) => item.id === proposalEvent.id)), true);
 
     // Repair the deterministic failure and retry the same pending id.
-    github.blobs.set(PENDING_ACTIONS_PATH, {
-      sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
-      content: JSON.stringify(
-        rolled.map((item) => {
-          if (item.id !== proposalEvent.id) return item;
-          return {
-            ...item,
-            proposal: {
-              ...item.proposal,
-              writes: item.proposal.writes.map((write) =>
-                write.path === originalWrite.path
-                  ? { ...write, content: originalWrite.content }
-                  : write
-              )
-            }
-          };
-        })
-      )
-    });
+    delete store.data[blockingKey];
+    setBase({ updated_at: null, missing: true });
 
     const retry = await confirm(
       confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
@@ -1594,25 +1574,24 @@ describe('LEVEL 4 Weekly Review execution fence (WR19–WR27)', () => {
       String(write.path).startsWith('tasks:task:')
     );
     assert.ok(originalWrite);
-    github.blobs.set(PENDING_ACTIONS_PATH, {
-      sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
-      content: JSON.stringify(
-        before.map((item) => {
-          if (item.id !== proposalEvent.id) return item;
-          return {
-            ...item,
-            proposal: {
-              ...item.proposal,
-              writes: item.proposal.writes.map((write) =>
-                write.path === originalWrite.path
-                  ? { ...write, content: 'NOT_JSON_BLOB_RECORD' }
-                  : write
-              )
-            }
-          };
-        })
-      )
-    });
+    // Post-fence, zero-side-effect failure the validator cannot catch up front:
+    // a record already sits at the task's key (and in the stored base snapshot,
+    // so the pre-fence stale check passes), so the stored `create` returns
+    // already_exists before anything is written. Non-JSON content, the old
+    // trigger, is now refused at validation and never reaches the executor.
+    assert.equal(originalWrite.mode, 'create');
+    const blockingKey = `tasks/${originalWrite.path.split(':')[2]}`;
+    store.data[blockingKey] = { id: 'placeholder', title: 'Blocking record' };
+    const setBase = (base) => {
+      const queue = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+      github.blobs.set(PENDING_ACTIONS_PATH, {
+        sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
+        content: JSON.stringify(queue.map((item) => (item.id === proposalEvent.id
+          ? { ...item, bases: { ...(item.bases ?? {}), [originalWrite.path]: base } }
+          : item)))
+      });
+    };
+    setBase({ updated_at: null, missing: false });
 
     const fetchImpl = async (url, options) => {
       if (

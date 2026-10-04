@@ -2933,6 +2933,16 @@ export function createChatHandler({
                   });
                 }
                 const risk = classifyCentralNodePatchRisk(patch);
+                // Dry-run against the live Central Node before queuing: a patch that
+                // cannot apply must go back to the agent now, not become a Confirm
+                // card that fails every time Adam taps it.
+                if (risk === 'confirm' && centralNodeMarkdown && !applyCentralNodePatch(centralNodeMarkdown, patch)) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: 'apply_failed',
+                    detail: 'This patch cannot apply to the current Central Node (section heading missing or payload empty). Re-propose it, e.g. append_line or replace_section.'
+                  });
+                }
                 if (risk === 'confirm') {
                   // Anthropic client swallows tool_call when executeTools returns
                   // non-null — emit Confirm SSE here (same as central_node_patched).

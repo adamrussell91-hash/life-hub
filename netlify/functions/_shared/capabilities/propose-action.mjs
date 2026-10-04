@@ -143,6 +143,21 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
       return { ok: false, error: 'write_path_denied', detail: path };
     }
     const writeTarget = classifyWriteTarget(path);
+    // Tasks / Teaching blobs: executeProposeActionWrites cannot delete them and
+    // rejects non-object JSON. Refuse here so the agent hears it at propose time
+    // instead of Adam getting a Confirm card that fails on every tap.
+    if (writeTarget.store === 'tasks' || writeTarget.store === 'teaching') {
+      if (mode === 'delete') return { ok: false, error: 'blob_delete_unsupported', detail: path };
+      let body = null;
+      try {
+        body = JSON.parse(content);
+      } catch {
+        body = null;
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return { ok: false, error: 'invalid_blob_content', detail: path };
+      }
+    }
     if (writeTarget.store === 'people'
       || writeTarget.store === 'travel'
       || writeTarget.store === 'knowledge'

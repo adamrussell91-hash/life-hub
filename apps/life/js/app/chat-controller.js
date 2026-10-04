@@ -1111,10 +1111,13 @@ export function createChatController({
       });
       moveConfirmReceiptToTranscript(root, proposal.card);
       onRecordWritten?.(result);
-    } catch {
+    } catch (error) {
       proposal.confirm.disabled = false;
       proposal.confirm.textContent = previousLabel;
-      showChatError(root, 'Saving that Central Node change failed. You can try again.');
+      const message = error?.message && error.message !== 'Confirm request failed'
+        ? `Saving that Central Node change failed: ${error.message}`
+        : 'Saving that Central Node change failed. You can try again.';
+      showChatError(root, message);
     }
   }
 
