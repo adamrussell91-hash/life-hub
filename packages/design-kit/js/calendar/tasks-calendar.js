@@ -41,6 +41,14 @@ function bookmarkOf(task) {
     : null;
 }
 
+/**
+ * A task with a due time and an estimate happens at that time: the calendar draws it
+ * as a block, and keeps it there (struck through) once it is ticked off.
+ */
+export function isScheduledTask(task) {
+  return TIME_KEY.test(task?.due_time ?? '') && Number(task?.estimated_duration) > 0;
+}
+
 export function tasksEventsFromTasks(tasks) {
   const deps = dependencyIndex(tasks);
   const stepsOf = new Map();
@@ -73,8 +81,8 @@ export function tasksEventsFromTasks(tasks) {
       task &&
       typeof task.id === 'string' &&
       DATE_KEY.test(task.due_date) &&
-      task.status !== 'done' &&
-      task.status !== 'dead'
+      task.status !== 'dead' &&
+      (task.status !== 'done' || isScheduledTask(task))
     )
     .map(task => ({
       path: `tasks:${task.id}`,

@@ -144,6 +144,10 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-bg--school{background:var(--cal-school-wash);cursor:zoom-in}
 .cal-bg--yours{background:var(--cal-yours-wash);cursor:zoom-in}
 .cal-line{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+/* Hour lines: faint hairlines, a touch firmer every 3 h. Fade with band height (--hl / --hlab from layout). */
+.cal-hour{position:absolute;left:0;right:0;height:0;border-top:1px dotted color-mix(in srgb,var(--navy) 13%,transparent);opacity:var(--hl,1);pointer-events:none}
+.cal-hour.is-major{border-top-style:solid;border-top-color:color-mix(in srgb,var(--navy) 9%,transparent)}
+.cal-hour span{position:absolute;left:8px;top:1px;font-size:0.5625rem;line-height:1;font-weight:var(--weight-medium);color:color-mix(in srgb,var(--muted) 85%,transparent);font-variant-numeric:tabular-nums;letter-spacing:.02em;opacity:var(--hlab,1)}
 .cal-sleep{position:absolute;left:0;right:0;background:var(--cal-hatch);border-top:1px solid color-mix(in srgb,var(--navy) 25%,transparent);display:flex;align-items:center;justify-content:center;gap:4px;font-size:var(--text-2xs);color:var(--navy);font-weight:var(--weight-medium)}
 .cal-sleep svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:1.2}
 .cal-free{position:absolute;left:6px;right:6px;border:1px dashed color-mix(in srgb,var(--navy) 18%,transparent);border-radius:9px;display:grid;place-items:center;color:var(--muted);font-size:var(--text-2xs);text-align:center;line-height:1.35;padding:var(--space-2)}
@@ -189,6 +193,11 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-chip.is-ghost:not(.is-accepted)::before{opacity:var(--solid,0)}
 .cal-chip.is-over-item{background:color-mix(in srgb,var(--warm-white) 88%,transparent)}
 .cal-chip.is-skipped .cal-chip__title{text-decoration:line-through;color:var(--muted)}
+/* A ticked-off task keeps its slot: pale, ticked, struck through. */
+.cal-chip.is-done{--chip-bg:color-mix(in srgb,var(--k-bg) 28%,#fff);background:var(--chip-bg);box-shadow:none}
+.cal-chip.is-done::before{opacity:.45}
+.cal-chip.is-done .cal-chip__title{text-decoration:line-through;color:var(--muted);font-weight:var(--weight-medium)}
+.cal-chip__tick{margin-right:4px;color:var(--pastel-sage-ink);font-weight:var(--weight-semibold);text-decoration:none;display:inline-block}
 .cal-chip.is-class{box-shadow:none;--chip-bg:color-mix(in srgb,#fff 80%,transparent);border-color:color-mix(in srgb,var(--wave) calc(var(--t,1) * 18%),transparent)}
 .cal-chip.is-corey{--chip-bg:color-mix(in srgb,var(--pastel-peach) 80%,#fff);background:linear-gradient(135deg,color-mix(in srgb,var(--pastel-peach) 62%,#fff),var(--pastel-peach));border-color:color-mix(in srgb,var(--pastel-peach-ink) 22%,transparent)}
 .cal-chip.is-corey.is-ghost{background:color-mix(in srgb,var(--pastel-peach) calc(35% + var(--solid,0) * 45%),transparent)}

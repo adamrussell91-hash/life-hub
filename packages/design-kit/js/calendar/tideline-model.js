@@ -135,12 +135,21 @@ export function withMeta(clock, record) {
   return [clock, who, where].filter(Boolean).join(' · ');
 }
 
+/**
+ * A task with a time and an estimate happens then: it is a block on the grid and the
+ * dial, not a Due row. A time with no estimate stays a deadline (Due row).
+ */
+export function isBlockTask(record) {
+  return record?.type === 'task' && Boolean(record.time)
+    && (Boolean(record.end_time) || Number(record.estimated_duration) > 0);
+}
+
 function chipFromEvent(event) {
   const record = event.record ?? {};
   if (!record.time || LOG_TYPES.has(record.type) || record.type === 'knowledge_page') return null;
   if (record.type === 'calendar_block' && (record.kind === 'wall' || record.kind === 'protected')) return null;
   if (record.type === 'calendar_block' && record.status === 'cancelled') return null;
-  if (record.type === 'task' && !record.end_time) return null;
+  if (record.type === 'task' && !isBlockTask(record)) return null;
   const workout = workoutOnGrid(record);
   if (workout === 'omit') return null;
   const start = toHour(record.time);
@@ -149,7 +158,9 @@ function chipFromEvent(event) {
     ? start + 0.4
     : record.end_time
       ? toHour(record.end_time)
-      : start + (Number(record.duration_min) || 60) / 60;
+      : start + (Number(record.duration_min) || Number(record.estimated_duration) || 60) / 60;
+  // A ticked-off task keeps its place on the day, struck through, and stops loading it.
+  const done = record.type === 'task' && record.status === 'done';
   const kind = eventKind(record);
   const isClass = record.type === 'scheduled_lesson' || record.isClass === true;
   const filterKey = kind === 'teaching' || isClass
@@ -182,7 +193,7 @@ function chipFromEvent(event) {
     kind,
     // Prefer lesson title for class chips; class name stays in meta.
     title: isClass ? (record.title || record.class_title || 'Class') : (record.title || kind),
-    meta: workout?.meta ?? feedMeta ?? peopleMeta ?? classMeta,
+    meta: workout?.meta ?? feedMeta ?? peopleMeta ?? (done ? `Done · ${classMeta}` : classMeta),
     isClass,
     protected: record.protected === true || kind === 'corey',
     provider: record.provider || record.clinician || '',
@@ -193,7 +204,8 @@ function chipFromEvent(event) {
     class_id: typeof record.class_id === 'string' ? record.class_id : undefined,
     record,
     ...(record.feed ? { feed: record.feed } : {}),
-    ...(record.ambient ? { ambient: true } : {}),
+    ...(record.ambient || done ? { ambient: true } : {}),
+    ...(done ? { done: true } : {}),
     ...(record.location ? { location: record.location } : {}),
     ...(workout?.skipped ? { skipped: true } : {})
   };
@@ -362,9 +374,11 @@ function taskDueRow(event, date) {
 }
 
 function liveTaskDues(events, date) {
-  // Untimed tasks, and timed tasks with no end (a due time is a deadline, not a block).
+  // Untimed tasks, and timed tasks with no estimate (a bare due time is a deadline).
+  // Tasks with a time and an estimate are grid blocks (isBlockTask), not Due rows.
   return (events ?? [])
-    .filter(event => event.record?.type === 'task' && event.record.date === date && !(event.record.time && event.record.end_time))
+    .filter(event => event.record?.type === 'task' && event.record.date === date
+      && event.record.status !== 'done' && !isBlockTask(event.record))
     .map(event => taskDueRow(event, date))
     .sort((a, b) => String(a.time ?? '').localeCompare(String(b.time ?? '')));
 }
@@ -373,7 +387,11 @@ function dueForHubs(visual, events, date, useVisual) {
   const promises = promiseDuesFromEvents(events, date);
   const live = liveTaskDues(events, date);
   if (useVisual) {
-    const visualDue = (visual.DUE ?? []).filter(item => item.date === date).map(item => {
+    const visualDue = (visual.DUE ?? []).filter(item => item.date === date).filter(item => {
+      // A live task that is now a block (time + estimate) is drawn on the grid instead.
+      const task = (events ?? []).find(event => event.record?.type === 'task' && event.record.id === item.id);
+      return !(task && task.record.date === date && isBlockTask(task.record));
+    }).map(item => {
       const task = (events ?? []).find(event => event.record?.type === 'task' && event.record.id === item.id);
       const actual = task?.record?.date;
       const withRecord = task?.record ? { ...item, source: 'task', record: task.record } : item;

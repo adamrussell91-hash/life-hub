@@ -791,7 +791,7 @@ function mountDial(size) {
     const proposal = ghosts.find(ghost => ghost.overItem === chip.id && ghost.status === 'pending');
     const inset = chip.isClass ? 4 : 2;
     const texture = chip.texture && !['fixed', 'focus', 'protected'].includes(chip.texture) ? `tx-${chip.texture}` : '';
-    const cls = ['dd-arc', `k-${chip.kind}`, chip.isClass ? 'is-class' : '', proposal ? 'is-proposal' : '', chip.skipped ? 'is-skipped' : '', texture, chip.regained ? 'is-regained' : ''].filter(Boolean).join(' ');
+    const cls = ['dd-arc', `k-${chip.kind}`, chip.isClass ? 'is-class' : '', proposal ? 'is-proposal' : '', chip.skipped ? 'is-skipped' : '', chip.done ? 'is-done' : '', texture, chip.regained ? 'is-regained' : ''].filter(Boolean).join(' ');
     nodes.set(`arc:${chip.id}`, s('path', {
       class: cls,
       tabindex: 0,
