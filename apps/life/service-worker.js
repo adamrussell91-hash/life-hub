@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v196';
+const CACHE_NAME = 'life-hub-shell-v197';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -106,6 +106,10 @@ const SHELL_FILES = [
   'js/app/chart-kit/columns.js',
   'js/app/chart-kit/heatmap.js',
   'js/app/chart-kit/pie.js',
+  'js/app/chart-kit/nested-rings.js',
+  'js/app/chart-kit/protein-climb.js',
+  'js/app/chart-kit/week-grid.js',
+  'js/app/chart-kit/consistency-strip.js',
   'js/app/chart-kit/ring.js',
   'js/app/chart-kit/stream.js',
   'js/app/chart-kit/sankey-flow.js',
@@ -158,6 +162,7 @@ const SHELL_FILES = [
   'js/app/mind-model.js',
   'js/app/muscle-maps.js',
   'js/app/nutrition-charts.js',
+  'js/app/render-nutrition-today.js',
   'js/app/nutrition-model.js',
   'js/app/render-agent-picker.js',
   'js/app/render-protocol-pills.js',

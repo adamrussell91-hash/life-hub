@@ -498,39 +498,26 @@
         </div>
 
         <section id="nutrition-dashboard" class="dashboard" aria-label="Nutrition" hidden>
-          <article class="metric-card chart-card macro-split-card" aria-labelledby="macro-split-label">
-            <div class="metric-heading">
-              <p class="metric-label" id="macro-split-label">Macro split</p>
-            </div>
-            <div class="macro-split">
-              <div class="metric-ring-wrap">
-                <svg id="nutrition-macro-split" class="metric-ring metric-ring--split" viewBox="0 0 96 96" role="img" aria-label="Protein and fat progress">
-                  <circle data-role="protein-track" class="metric-ring-track" fill="none"></circle>
-                  <circle data-role="protein-fill" class="metric-ring-fill metric-ring--protein" fill="none"></circle>
-                  <circle data-role="fat-track" class="metric-ring-track" fill="none"></circle>
-                  <circle data-role="fat-fill" class="metric-ring-fill metric-ring--fat" fill="none"></circle>
-                </svg>
+          <article id="nutrition-today" class="metric-card nutrition-today" aria-labelledby="nutrition-today-label">
+            <p class="metric-label nutrition-today__kicker" id="nutrition-today-label">Today</p>
+            <div class="nutrition-today__layout">
+              <div class="nutrition-rings">
+                <svg id="nutrition-rings" class="nutrition-rings__chart" viewBox="0 0 200 200" role="img" aria-label="Today against targets"></svg>
+                <div class="nutrition-rings__side">
+                  <ul id="nutrition-ring-legend" class="nutrition-rings__legend"></ul>
+                  <div id="nutrition-ring-chips" class="nutrition-rings__chips"></div>
+                </div>
               </div>
-              <dl class="macro-split__copy">
-                <div>
-                  <dt>Protein</dt>
-                  <dd><strong data-split="protein">—</strong><span data-split="protein-pct">—</span></dd>
+              <div class="protein-climb">
+                <h3 class="protein-climb__title">Protein climb</h3>
+                <p class="protein-climb__subtitle" data-nutrition="climb-subtitle"></p>
+                <div class="protein-climb__plot">
+                  <svg id="nutrition-climb" class="protein-climb__chart" role="img" aria-label="Protein running total through the day"></svg>
+                  <p class="protein-climb__empty" data-nutrition="climb-empty" hidden></p>
                 </div>
-                <div>
-                  <dt>Fat</dt>
-                  <dd><strong data-split="fat">—</strong><span data-split="fat-pct">—</span></dd>
-                </div>
-                <div>
-                  <dt>Energy</dt>
-                  <dd><strong data-split="energy">—</strong><span data-split="energy-pct">—</span></dd>
-                </div>
-              </dl>
-              <div class="macro-split__advice">
-                <p class="metric-label">Brisket notes</p>
-                <p data-nutrition="advice" class="macro-split__advice-body is-empty">Log a meal with Brisket and his notes show up here.</p>
               </div>
             </div>
-            <p class="metric-caption">Outer ring = protein target · inner ring = fat ceiling</p>
+            <p class="nutrition-today__note"><strong>Brisket</strong> <span data-nutrition="advice" class="is-empty"></span></p>
           </article>
 
           <article id="nutrition-surface-widgets" class="metric-card nutrition-surface-widgets-card" aria-labelledby="nutrition-surface-widgets-label" hidden>
@@ -539,125 +526,30 @@
             <div id="nutrition-surface-widgets-rail" class="nutrition-surface-widgets-rail"></div>
           </article>
 
-          <div class="nutrition-grid">
-            <article class="metric-card" aria-labelledby="nutrition-sodium-label">
-              <div class="metric-heading">
-                <p class="metric-label" id="nutrition-sodium-label">Sodium</p>
-                <span class="metric-icon" aria-hidden="true">Na</span>
-              </div>
-              <div class="metric-ring-wrap">
-                <svg class="metric-ring" data-nutrition-ring="sodium" viewBox="0 0 56 56" role="img" aria-label="Sodium progress">
-                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
-                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
-                </svg>
-                <p class="metric-value"><strong data-nutrition="sodium">—</strong><span data-target="nutrition-sodium">/ — mg</span></p>
-              </div>
+          <div class="nutrition-week-row">
+            <article class="metric-card week-grid-card" aria-labelledby="meal-log-label">
+              <div id="nutrition-meal-history"></div>
             </article>
-            <article class="metric-card" aria-labelledby="nutrition-calcium-label">
-              <div class="metric-heading">
-                <p class="metric-label" id="nutrition-calcium-label">Calcium</p>
-                <span class="metric-icon" aria-hidden="true">Ca</span>
-              </div>
-              <div class="metric-ring-wrap">
-                <svg class="metric-ring" data-nutrition-ring="calcium" viewBox="0 0 56 56" role="img" aria-label="Calcium progress">
-                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
-                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
-                </svg>
-                <p class="metric-value"><strong data-nutrition="calcium">—</strong><span data-target="nutrition-calcium">/ — mg</span></p>
-              </div>
-            </article>
-            <article class="metric-card" aria-labelledby="nutrition-polyphenol-label">
-              <div class="metric-heading">
-                <p class="metric-label" id="nutrition-polyphenol-label">Polyphenols</p>
-                <span class="metric-icon" aria-hidden="true">◆</span>
-              </div>
-              <p class="polyphenol-score">
-                <strong data-nutrition="polyphenol">—</strong>
-              </p>
-              <p class="polyphenol-pill" data-nutrition="polyphenol-pill" data-colour="muted">—</p>
-              <p class="metric-caption">Polyphenol score</p>
-            </article>
-            <article class="metric-card" aria-labelledby="nutrition-meal-protein-label">
-              <div class="metric-heading">
-                <p class="metric-label" id="nutrition-meal-protein-label">Protein by meal</p>
-              </div>
-              <p data-meal-protein-empty class="metric-caption" hidden>No meals logged yet.</p>
-              <div class="meal-protein-pie-wrap">
-                <svg id="nutrition-meal-protein-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Today protein by meal">
-                  <g data-role="slices"></g>
-                </svg>
-                <ul class="meal-protein-legend" data-role="meal-protein-legend"></ul>
-              </div>
+            <article class="metric-card meal-log-card" aria-labelledby="meal-history-date">
+              <div id="nutrition-meal-day"></div>
             </article>
           </div>
-
-          <article class="metric-card meal-log-card" aria-labelledby="meal-log-label">
-            <div id="nutrition-meal-history"></div>
-          </article>
 
           <section id="nutrition-challenges" class="nutrition-challenges" aria-label="Nutrition challenges" hidden>
             <p class="metric-label">Challenge trackers</p>
             <div id="nutrition-challenge-list" class="nutrition-challenge-list"></div>
           </section>
 
-          <div class="nutrition-week-charts nutrition-week-charts--macros">
-            <article class="metric-card chart-card" aria-labelledby="protein-trend-label">
-              <div class="metric-heading">
-                <p class="metric-label" id="protein-trend-label">7-day protein</p>
-                <span class="trend-badge" data-value="protein-trend">—</span>
+          <article id="nutrition-consistency" class="metric-card consistency-card" aria-labelledby="consistency-label">
+            <div class="consistency-card__header">
+              <div>
+                <p class="metric-label">30 days</p>
+                <h3 class="consistency-card__title" id="consistency-label">Protein target consistency</h3>
               </div>
-              <svg id="nutrition-protein-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Protein trend over the last 7 days">
-                <path data-role="area" d=""></path>
-                <path data-role="line" d=""></path>
-                <path data-role="rolling" d="" hidden></path>
-                <line data-role="guide" class="chart-guide" hidden></line>
-                <g data-role="guide-labels"></g>
-                <g data-role="value-labels"></g>
-                <g data-role="day-labels"></g>
-              </svg>
-            </article>
-
-            <article class="metric-card chart-card" aria-labelledby="fat-trend-label">
-              <p class="metric-label" id="fat-trend-label">7-day fat</p>
-              <svg id="nutrition-fat-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Fat trend over the last 7 days">
-                <path data-role="area" d=""></path>
-                <path data-role="line" d=""></path>
-                <line data-role="guide" class="chart-guide" hidden></line>
-                <g data-role="guide-labels"></g>
-                <g data-role="value-labels"></g>
-                <g data-role="day-labels"></g>
-                <g data-role="overage-markers"></g>
-              </svg>
-            </article>
-          </div>
-
-          <div class="nutrition-week-charts nutrition-week-charts--energy">
-            <article class="metric-card chart-card" aria-labelledby="calories-trend-label">
-              <p class="metric-label" id="calories-trend-label">7-day energy</p>
-              <svg id="nutrition-calories-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Calorie trend over the last 7 days">
-                <path data-role="area" d=""></path>
-                <path data-role="line" d=""></path>
-                <g data-role="value-labels"></g>
-                <g data-role="day-labels"></g>
-              </svg>
-            </article>
-
-            <article class="metric-card chart-card" aria-labelledby="carbs-trend-label">
-              <p class="metric-label" id="carbs-trend-label">7-day carbs</p>
-              <svg id="nutrition-carbs-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Carb trend over the last 7 days">
-                <path data-role="area" d=""></path>
-                <path data-role="line" d=""></path>
-                <g data-role="value-labels"></g>
-                <g data-role="day-labels"></g>
-              </svg>
-            </article>
-          </div>
-
-          <article class="metric-card chart-card" aria-labelledby="month-heatmap-label">
-            <p class="metric-label" id="month-heatmap-label">30-day protein target consistency</p>
-            <div id="nutrition-heatmap" class="heatmap-grid" aria-label="Whether the protein target was met each day, last 30 days"></div>
+              <p class="consistency-card__summary" data-nutrition="consistency-summary"></p>
+            </div>
+            <div id="nutrition-consistency-strip" class="consistency-strip" role="img" aria-label="Protein against target, last 30 days"></div>
           </article>
-
           <button id="nutrition-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Brisket">💬</button>
         </section>
 

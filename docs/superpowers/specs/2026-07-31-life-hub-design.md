@@ -107,11 +107,15 @@ Living overview of how every Life Hub chart should look. Product charts live in 
 
 | Primitive | File | Look | Where |
 |---|---|---|---|
-| Ring target | `ring.js` / `apply-ring.js` | Rounded track + `--success` or domain accent fill; centre value | Home macros, Nutrition macros, Central Node completeness, Bloods in-range, Mind streak |
-| Area line | `area-line.js` | Soft area + Wave stroke; optional sage reference **band**; optional **vertex dots** | Nutrition protein (no dots); Body scale/composition (small dots); Bloods series (dots + sage band) |
-| Columns | `columns.js` | Bars grow from 0; dual-tone week compare | Nutrition, Fitness volume |
-| Heatmap / hit strip | `heatmap.js` | Soft-medical tiles, not a new palette | Nutrition month, Fitness consistency, Skincare. **Not** Mind (cadence heatmap removed 16 Aug 2026) |
+| Ring target | `ring.js` / `apply-ring.js` | Rounded track + `--success` or domain accent fill; centre value | Home macros, Central Node completeness, Bloods in-range, Mind streak |
+| Area line | `area-line.js` | Soft area + Wave stroke; optional sage reference **band**; optional **vertex dots** | Body scale/composition (small dots); Bloods series (dots + sage band) |
+| Columns | `columns.js` | Bars grow from 0; dual-tone week compare | Fitness volume |
+| Heatmap / hit strip | `heatmap.js` | Soft-medical tiles, not a new palette | Fitness consistency, Skincare. **Not** Mind (cadence heatmap removed 16 Aug 2026) |
 | Pie / donut | `pie.js` | Kit pastels; legend with counts | Mind mood mix |
+| Nested rings | `nested-rings.js` | Four concentric target rings; past-ceiling rings draw a darker second lap with a shadowed cap | Nutrition Today (protein, energy, fat, sodium) |
+| Protein climb | `protein-climb.js` | Step line of running protein placed by meal **time**; goal band, "your usual" dotted line, now rule + dashed projection on today | Nutrition Today |
+| Week grid | `week-grid.js` (HTML bars) | 4 macro rows × 7 day-column buttons; per-row scale with dashed target; height morphs between weeks | Nutrition Meal history |
+| Consistency strip | `consistency-strip.js` (HTML bars) | 30 protein bars, hits in `--success`, dashed goal, this-week bracket | Nutrition month |
 | Masonry packer | `masonry.js` | Packing only, not a visual system | Mind board |
 | Stream / Sankey / chord / bump / horizon / radial year | `stream.js`, `sankey-flow.js`, `chord-layout.js`, `bump.js`, `horizon.js`, `radial-year.js` + vendored d3 | Clinical Glass strokes and pastels; one-line legend on the tile | Mind v2 analysis tiles |
 
@@ -121,7 +125,6 @@ Vendored d3 is layout only (no CDN). Do not add another chart library.
 
 | Surface | Dots on the line | Reference band |
 |---|---|---|
-| Nutrition 7-day protein | **None** (soft area only; no end-circle) | No lab band |
 | Body weight / composition / tape charts | Small vertices (`r` 2.5) on each observation | No pathology band |
 | Bloods series (≥3 numeric points) | **Dot on every vertex**; latest slightly larger; out-of-range latest uses `--danger` / `--high-sea-ink` | Sage `--pastel-sage` rectangle for current `ref_low`–`ref_high`; Wave stroke when in range |
 | Bloods sparse (1–2 points) | Not a line. **Range track** (below) | Sage in-range segment on a `--shore` track |

@@ -11,47 +11,41 @@ async function nutritionDashboardMarkup() {
   return html.slice(start, end);
 }
 
-test('nutrition-grid includes Sodium, Calcium, Polyphenols, and Protein by meal pie', async () => {
+test('the Today card holds the nested rings, the protein climb and the Brisket note', async () => {
   const dash = await nutritionDashboardMarkup();
-  assert.match(dash, /data-nutrition-ring="sodium"/);
-  assert.match(dash, /data-nutrition-ring="calcium"/);
-  assert.match(dash, /data-nutrition="polyphenol"/);
-  assert.match(dash, /id="nutrition-meal-protein-pie"/);
-  assert.match(dash, /Protein by meal/);
-  assert.doesNotMatch(dash, /class="meal-breakdown-card"/);
-  assert.doesNotMatch(dash, /class="meal-breakdown"/);
+  assert.match(dash, /id="nutrition-today"/);
+  assert.match(dash, /id="nutrition-rings"/);
+  assert.match(dash, /id="nutrition-ring-legend"/);
+  assert.match(dash, /id="nutrition-climb"/);
+  assert.match(dash, /data-nutrition="advice"/);
 });
 
-test('protein and fat week charts sit in a pair; energy and carbs sit in a pair', async () => {
+test('week grid and the chosen day share a row; the 30-day strip follows', async () => {
   const dash = await nutritionDashboardMarkup();
-  assert.match(dash, /id="nutrition-protein-chart"/);
-  assert.match(dash, /id="nutrition-fat-chart"/);
-  assert.match(dash, /id="nutrition-calories-chart"/);
-  assert.match(dash, /id="nutrition-carbs-chart"/);
-  assert.doesNotMatch(dash, /id="nutrition-hit-strip"/);
-  assert.match(dash, /nutrition-week-charts/);
-  assert.match(dash, /class="nutrition-week-charts nutrition-week-charts--macros"/);
-  assert.match(dash, /class="nutrition-week-charts nutrition-week-charts--energy"/);
+  const row = dash.indexOf('class="nutrition-week-row"');
+  assert.ok(row > dash.indexOf('id="nutrition-today"'));
+  assert.ok(dash.indexOf('id="nutrition-meal-history"') > row);
+  assert.ok(dash.indexOf('id="nutrition-meal-day"') > dash.indexOf('id="nutrition-meal-history"'));
+  assert.ok(dash.indexOf('id="nutrition-consistency-strip"') > dash.indexOf('id="nutrition-meal-day"'));
 });
 
-test('nutrition page does not include this-week vs prior protein compare', async () => {
+test('retired nutrition charts are removed, not hidden', async () => {
   const dash = await nutritionDashboardMarkup();
-  assert.doesNotMatch(dash, /week-compare/);
-  assert.doesNotMatch(dash, /This week vs prior/);
+  for (const retired of [
+    /nutrition-macro-split/, /data-split=/, /nutrition-grid/, /data-nutrition-ring=/, /nutrition-meal-protein-pie/,
+    /nutrition-(protein|fat|calories|carbs)-chart/, /nutrition-heatmap/, /week-compare/, /This week vs prior/
+  ]) {
+    assert.doesNotMatch(dash, retired);
+  }
 });
 
-test('nutrition-grid stays dense: smaller rings and 2×2 on narrow, not full-bleed stack', async () => {
+test('nutrition charts rest on final geometry and only animate while a card is playing', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
-  assert.match(css, /\.nutrition-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
-  assert.match(css, /\.nutrition-grid\s+\.metric-ring\s*\{[^}]*3\.5rem/);
-  assert.match(css, /\.nutrition-grid\s*\{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)\s*;\s*\}/);
-  assert.equal((css.match(/\.nutrition-grid\s*\{\s*grid-template-columns:\s*1fr\s*;\s*\}/g) || []).length, 0);
-});
-
-test('the macro split hero remains intact', async () => {
-  const dash = await nutritionDashboardMarkup();
-  assert.match(dash, /id="nutrition-macro-split"/);
-  assert.match(dash, /data-split="protein"/);
-  assert.match(dash, /data-split="fat"/);
-  assert.match(dash, /data-split="energy"/);
+  for (const selector of ['nutrition-ring__fill', 'climb-line', 'week-grid__bar', 'consistency-strip__bar']) {
+    const rule = new RegExp(`\\.is-playing \\.${selector}[^{]*\\{[^}]*animation:`);
+    assert.match(css, rule, `${selector} animates only under .is-playing`);
+  }
+  assert.match(css, /prefers-reduced-motion: reduce\)\s*\{\s*\.is-playing \* \{ animation: none !important; \}/);
+  assert.doesNotMatch(css, /\.nutrition-grid\b/);
+  assert.doesNotMatch(css, /\.macro-split\b/);
 });
