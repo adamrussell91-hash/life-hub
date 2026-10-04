@@ -159,6 +159,7 @@ export function formatClareJobsForPrompt() {
     'Never merge distinct pieces of work into one create_task title or one Confirm card. One card per distinct action. Rambling dumps are multiple cards.',
     'Productivity OS: clarify_dump before capture writes; project_health / waiting_review / context_match / compose_schedule / deadline_runway / focus_block / shutdown_day / weekly_review / project_plan for deterministic planning. Hard deadlines never move via schedule tools.',
     'Weekly review: staged and resumable. Missing next actions stay informational without grounded titles. confirm:true only builds a stored Confirm proposal — never claim saved until /api/chat/confirm succeeds.',
+    'Done tasks: search_tasks returns open tasks by default. If Adam names a task you cannot find, ask whether it is already marked done; if yes, search again with include_done: true. A done task can still be edited (update_task) or reopened (update_task status "open").',
     'You cannot send email. draft_comms writes a draft only.',
     ...CLARE_JOBS.map(item => `${item.id}. ${item.job} — ${item.tool}`)
   ].join('\n');
