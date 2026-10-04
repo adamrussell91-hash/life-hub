@@ -92,6 +92,7 @@ const SHELL_FILES = [
   'js/app/chart-kit/animate.js',
   'js/app/chart-kit/scene.js',
   'js/app/chart-kit/gate-rings.js',
+  'js/app/chart-kit/bullseye-rings.js',
   'js/app/chart-kit/region-rose.js',
   'js/app/chart-kit/glide-slope.js',
   'js/app/chart-kit/twin-clocks.js',
