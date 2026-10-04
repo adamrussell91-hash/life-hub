@@ -52,7 +52,7 @@ function overlap(a1, a2, b1, b2) {
 export function tonightFit({ day, nowHour, lightsOut, events = [] }) {
   if (!day || !(lightsOut > nowHour)) return null;
   const booked = (day.chips ?? [])
-    .filter((chip) => !chip.ghost)
+    .filter((chip) => !chip.ghost && !chip.done)
     .reduce((sum, chip) => sum + overlap(chip.start, chip.end, nowHour, lightsOut), 0);
   const free = Math.max(0, lightsOut - nowHour - booked);
   const blockedTasks = new Set((day.chips ?? [])

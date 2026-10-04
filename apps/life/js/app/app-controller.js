@@ -327,7 +327,9 @@ export function createAppController(dependencies) {
     const tasks = event?.detail;
     if (!Array.isArray(tasks) || !tasks.length) return;
     const incoming = tasksEventsFromTasks(tasks);
-    const ids = new Set(incoming.map(item => item.record?.id).filter(Boolean));
+    // Every task in the event, not just the ones still drawn: a task ticked off or
+    // undated must drop its old open copy.
+    const ids = new Set(tasks.map(task => task?.id).filter(Boolean));
     tasksEvents = [
       ...tasksEvents.filter(item => (item.record?.type !== 'task' && item.record?.type !== 'task_context') || !ids.has(item.record.id)),
       ...incoming

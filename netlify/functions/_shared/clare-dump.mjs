@@ -429,6 +429,59 @@ export function parseClockTime(token) {
   return `${String(Number(twentyFour[1])).padStart(2, '0')}:${twentyFour[2]}`;
 }
 
+const RANGE = /\b(?:from\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|–|—|to|until|till)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i;
+const FOR_SPAN = /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s+for\s+(\d+(?:\.\d+)?|an?|half an?)\s*(hours?|hrs?|h|minutes?|mins?|m)\b/i;
+
+function clockMinutes(hour, minute, mer) {
+  let h = Number(hour);
+  const m = minute ? Number(minute) : 0;
+  if (m > 59) return null;
+  if (mer) {
+    if (h < 1 || h > 12) return null;
+    h = (h % 12) + (mer.toLowerCase() === 'pm' ? 12 : 0);
+  } else if (h > 23) {
+    return null;
+  } else if (h >= 1 && h <= 6) {
+    // "3:00–3:15" with no am/pm: a teacher's afternoon, not 3 in the morning.
+    h += 12;
+  }
+  return h * 60 + m;
+}
+
+const hhmm = minutes => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+
+/**
+ * When Adam says when he will do something: "3–4pm", "3pm to 3:30pm", "3:00-3:15",
+ * "at 3pm for 15 min", "at 7 for an hour". Returns { start_time, end_time, match } or
+ * null. A bare number range ("Year 11-12", "Module 1-2") needs am/pm or a colon.
+ * A single clock ("by 5pm") is not a block: deadlines stay due_time.
+ */
+export function parseTimeBlock(text) {
+  const value = String(text ?? '');
+  const range = RANGE.exec(value);
+  if (range && (range[3] || range[6] || (range[2] && range[5]))) {
+    const endMer = range[6] || range[3];
+    const startMer = range[3] || range[6];
+    const end = clockMinutes(range[4], range[5], endMer);
+    let start = clockMinutes(range[1], range[2], startMer);
+    // "11-1pm": the start took the end's pm but is really the morning.
+    if (start != null && end != null && start >= end && !range[3] && start >= 12 * 60) start -= 12 * 60;
+    if (start != null && end != null && end > start) {
+      return { start_time: hhmm(start), end_time: hhmm(end), match: range[0] };
+    }
+  }
+  const span = FOR_SPAN.exec(value);
+  if (span && (span[3] || span[2] || /\bat\s/i.test(span[0]))) {
+    const start = clockMinutes(span[1], span[2], span[3]);
+    const amount = /^half/i.test(span[4]) ? 0.5 : /^an?$/i.test(span[4]) ? 1 : Number(span[4]);
+    const minutes = Math.round(/^h/i.test(span[5]) ? amount * 60 : amount);
+    if (start != null && minutes > 0 && start + minutes <= 24 * 60) {
+      return { start_time: hhmm(start), end_time: hhmm(start + minutes), match: span[0] };
+    }
+  }
+  return null;
+}
+
 export function formatClockTime(hhmm) {
   const [hourPart, minutePart] = String(hhmm ?? '').split(':');
   const hour = Number(hourPart);
@@ -656,7 +709,10 @@ export function parseBrainDump(text, options = {}) {
     const kind = inferKind(lower);
     const actionable = kind !== 'meta';
     const { due_date, hint } = inferDue(lower, now, timezone);
-    const title = titleCaseAction(line) || stripListPrefix(line);
+    // "Email Keith 3–3:15pm": the slot is a block, not part of the title.
+    const block = parseTimeBlock(line);
+    const titleLine = block ? line.replace(block.match, ' ').replace(/\s+(?:at|from|between)\s*$/i, '').replace(/\s{2,}/g, ' ').trim() : line;
+    const title = titleCaseAction(titleLine) || stripListPrefix(titleLine);
     const existing_title = actionable && !forceNew ? matchExisting(title, tasks) : null;
     const item = {
       raw: line,
@@ -678,6 +734,7 @@ export function parseBrainDump(text, options = {}) {
       domain: item.domain,
       priority: item.priority,
       due_date: item.due_date,
+      ...(block ? { start_time: block.start_time, end_time: block.end_time } : {}),
       parent_project_id: item.parent_project_id,
       existing_title: item.existing_title,
       question: questionFor(item)

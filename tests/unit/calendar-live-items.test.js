@@ -166,7 +166,9 @@ test('clicking a Due row opens the item card; Save writes to the Tasks API', asy
     calls.push([path, init?.method, init?.body ? JSON.parse(init.body) : null]);
     return new window.Response(JSON.stringify({ ok: true, data: {} }), { status: 200 });
   });
-  const due = host.querySelector('[data-part="due"][data-id="task-emails"]');
+  // task-emails has a block today (wb-1) and no deadline time: it is on the grid, not in Due.
+  assert.equal(host.querySelector('[data-part="due"][data-id="task-emails"]'), null);
+  const due = host.querySelector('[data-part="due"][data-id="task-timed"]');
   assert.ok(due, 'Due row rendered');
   assert.equal(due.getAttribute('role'), 'button');
   assert.match(due.getAttribute('title'), /Task/);
@@ -174,12 +176,12 @@ test('clicking a Due row opens the item card; Save writes to the Tasks API', asy
   due.click();
   const pop = host.querySelector('[data-part="chip-popover"]');
   assert.equal(pop.hidden, false);
-  assert.match(pop.textContent, /Respond to student emails/);
+  assert.match(pop.textContent, /Submit report/);
   assert.ok(pop.querySelector('[data-part="open-in-hub"]'));
   pop.querySelector('textarea[name="notes"]').value = 'Replied to 11B';
   pop.querySelector('[data-part="card-form"]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
   await new Promise((resolve) => setTimeout(resolve, 20));
-  assert.deepEqual(calls, [['/api/tasks?id=task-emails', 'PATCH', { description: 'Replied to 11B', due_date: TODAY }]]);
+  assert.deepEqual(calls, [['/api/tasks?id=task-timed', 'PATCH', { description: 'Replied to 11B', due_date: TODAY }]]);
   assert.equal(changed.length, 1);
 });
 

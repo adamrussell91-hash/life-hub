@@ -64,8 +64,8 @@ export function tonight({ date, now, chips = [], due = [], ghosts = [], logs = [
       title: c.title,
       kind: c.kind,
       itemId: c.id,
-      note: c.skipped ? 'Skipped' : c.protected ? `Protected · ${formatDuration((c.end - c.start) * 60)} · nothing else can book here` : c.meta ?? '',
-      struck: !!c.skipped,
+      note: c.skipped ? 'Skipped' : c.done ? 'Done' : c.protected ? `Protected · ${formatDuration((c.end - c.start) * 60)} · nothing else can book here` : c.meta ?? '',
+      struck: !!c.skipped || !!c.done,
       ghostId: proposal?.id ?? null,
       suggestion: proposal ? `${agentName(proposal.agent)}: ${proposal.label.toLowerCase()}` : null
     });
@@ -106,9 +106,9 @@ export function tonight({ date, now, chips = [], due = [], ghosts = [], logs = [
       title: d.title,
       kind: 'task',
       itemId: d.id,
-      note: d.meta || 'Tasks · open',
-      struck: false,
-      ghostId: move?.id ?? null,
+      note: d.meta || (d.done ? 'Done' : 'Tasks · open'),
+      struck: !!d.done,
+      ghostId: d.done ? null : move?.id ?? null,
       suggestion: move ? `${agentName(move.agent)}: move to ${move.label.replace(/^→\s*/, '')}` : null
     });
   }

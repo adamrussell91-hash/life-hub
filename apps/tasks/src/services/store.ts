@@ -106,6 +106,15 @@ import { DEFAULT_STALL_WEEKS, findStallCandidates, outcomeProjectStatus } from '
 import { computeProjectVariance, deriveProjectEndDate } from '@/domain/closure';
 import type { IndexDoc, SeedData, TasksStore } from './types';
 
+
+const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+/** Minutes from start to end ("HH:MM"), 0 when invalid or not later. */
+function blockMinutes(start?: string, end?: string): number {
+  if (!start || !end || !HHMM.test(start) || !HHMM.test(end)) return 0;
+  const mins = (value: string) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3));
+  return Math.max(0, mins(end) - mins(start));
+}
+
 export interface KvAdapter {
   getJSON<T>(key: string): Promise<T | null>;
   setJSON(key: string, value: unknown): Promise<void>;
@@ -1254,6 +1263,20 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         source: 'suggested_by_agent',
         tags
       });
+      // "Email Keith 3–3:15pm": the slot is planned time, a block linked to the task.
+      const span = blockMinutes(proposal.start_time, proposal.end_time);
+      if (span > 0 && proposal.start_time) {
+        await this.createWorkBlock({
+          task_id: task.id,
+          project_id: task.parent_project_id ?? null,
+          title: task.title,
+          date: proposal.due_date ?? toHubDateKey(new Date()),
+          start_time: proposal.start_time,
+          duration_minutes: span,
+          status: 'confirmed',
+          source: 'clare'
+        });
+      }
 
       const negotiation = ClareNegotiationLogSchema.parse({
         schema_version: 1,

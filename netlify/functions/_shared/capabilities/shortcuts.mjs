@@ -83,6 +83,7 @@ import {
 } from '../agent-memory.mjs';
 import { findMealDeletePaths, isMealSlot } from '../delete-meal.mjs';
 import { explodeCompoundDumpTitle } from '../clare-dump.mjs';
+import { DUE_TIME_FIELD, taskBlockWrite, TIME_BLOCK_FIELDS } from '../task-block-write.mjs';
 
 const CN_OPS = ['upsert_field', 'append_line', 'replace_section', 'delete_lines', 'condense'];
 
@@ -534,7 +535,7 @@ export function shortcutSchemas() {
     create_task: {
       name: 'create_task',
       description:
-        `Create one or more Tasks Hub rows immediately. Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (at most ${CREATE_TASK_MAX_ITEMS}; call again for more). Omit due_date only when the work is not for today — otherwise it lands on Today. NEVER merge distinct actions into one title — use items[] for related rows on one Confirm. Never mention this limit or the tool name in chat.`,
+        `Create one or more Tasks Hub rows immediately. Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (at most ${CREATE_TASK_MAX_ITEMS}; call again for more). Omit due_date only when the work is not for today — otherwise it lands on Today. due_time is a deadline only ("due by 5pm"). When Adam time-blocks ("3–4pm", "at 3 for 15 min"), pass start_time + end_time instead: the task gets a linked block on the calendar. NEVER merge distinct actions into one title — use items[] for related rows on one Confirm. Never mention this limit or the tool name in chat.`,
       input_schema: {
         type: 'object',
         properties: {
@@ -543,7 +544,8 @@ export function shortcutSchemas() {
           domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
           priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
           due_date: { type: 'string', description: 'YYYY-MM-DD' },
-          due_time: { type: 'string' },
+          due_time: DUE_TIME_FIELD,
+          ...TIME_BLOCK_FIELDS,
           parent_project_id: { type: 'string' },
           parent_task_id: { type: 'string' },
           estimated_duration: { type: 'number' },
@@ -577,7 +579,8 @@ export function shortcutSchemas() {
                 domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
                 priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
                 due_date: { type: 'string' },
-                due_time: { type: 'string' },
+                due_time: DUE_TIME_FIELD,
+          ...TIME_BLOCK_FIELDS,
                 parent_project_id: { type: 'string' },
                 parent_task_id: { type: 'string' },
                 estimated_duration: { type: 'number' },
@@ -603,7 +606,7 @@ export function shortcutSchemas() {
     update_task: {
       name: 'update_task',
       description:
-        'Patch an existing Tasks Hub row (Confirm). Call get_task first when appending so you know the current shape. Use append_description to add notes without replacing the rest of the task. To move several timed tasks in one Confirm, pass items[{task_id, due_date, due_time, ...}] — do not fire one update_task per row.',
+        'Patch an existing Tasks Hub row (Confirm). Call get_task first when appending so you know the current shape. Use append_description to add notes without replacing the rest of the task. due_time is a deadline only; to time-block a task pass start_time + end_time (adds a linked calendar block). To move or block several tasks in one Confirm, pass items[{task_id, due_date, due_time, start_time, end_time, ...}] — do not fire one update_task per row.',
       input_schema: {
         type: 'object',
         properties: {
@@ -615,7 +618,8 @@ export function shortcutSchemas() {
           priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
           domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
           due_date: { type: 'string' },
-          due_time: { type: 'string' },
+          due_time: DUE_TIME_FIELD,
+          ...TIME_BLOCK_FIELDS,
           target_date: { type: 'string' },
           review_at: { type: 'string' },
           parent_project_id: { type: 'string' },
@@ -641,7 +645,8 @@ export function shortcutSchemas() {
                 priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
                 domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
                 due_date: { type: 'string' },
-                due_time: { type: 'string' },
+                due_time: DUE_TIME_FIELD,
+          ...TIME_BLOCK_FIELDS,
                 target_date: { type: 'string' },
                 estimated_duration: { type: 'number' },
                 tags: { type: 'array', items: { type: 'string' } }
@@ -1818,6 +1823,9 @@ function normalizeTaskItem(raw) {
     priority,
     due_date: asOptionalString(raw.due_date),
     due_time: asOptionalString(raw.due_time),
+    start_time: asOptionalString(raw.start_time),
+    end_time: asOptionalString(raw.end_time),
+    block_date: asOptionalString(raw.block_date),
     parent_project_id: asOptionalString(raw.parent_project_id),
     parent_task_id: asOptionalString(raw.parent_task_id),
     estimated_duration: estimated,
@@ -1856,7 +1864,11 @@ function collectCreateTaskItems(input) {
         title: part.title,
         domain: part.domain || item.domain,
         priority: part.priority || item.priority,
-        due_date: part.due_date || item.due_date
+        due_date: part.due_date || item.due_date,
+        // One slot cannot hold several split-out tasks: they go on the day unblocked.
+        start_time: null,
+        end_time: null,
+        block_date: null
       });
     }
   }
@@ -1953,18 +1965,24 @@ async function handleCreateTask(ctx, input) {
 
   const now = new Date().toISOString();
   const today = typeof ctx.today === 'string' && ctx.today.trim() ? ctx.today.trim() : null;
-  const writes = kept.map(item => {
+  const blockWrites = [];
+  const taskWrites = kept.map(item => {
     const id = newTaskId();
     const twin = flagged.get(item);
+    const record = buildTaskRecord(item, { id, now, today });
+    const block = taskBlockWrite(record, item, now, { today });
+    if (block) blockWrites.push(block);
     return {
       path: `tasks:task:${id}`,
       mode: 'create',
-      content: serializeJson(buildTaskRecord(item, { id, now, today })),
+      content: serializeJson(record),
       diff: twin
         ? `new task: ${item.title} (possible duplicate of open task “${twin.title}”)`
         : `new task: ${item.title}`
     };
   });
+  // Task rows first: results[i] lines up with taskWrites[i] below.
+  const writes = [...taskWrites, ...blockWrites];
   const proposal = buildProposal({
     agentSlug: ctx.agentSlug,
     intent: kept.length === 1 ? `Create task: ${kept[0].title}` : `Create ${kept.length} tasks`,
@@ -1979,7 +1997,7 @@ async function handleCreateTask(ctx, input) {
       blobStores: { tasks: ctx.tasksStore }
     });
     if (!applied.ok) return deny(applied.error || 'create_failed');
-    const tasks = writes.map((write, index) => {
+    const tasks = taskWrites.map((write, index) => {
       const record = JSON.parse(write.content);
       const stamp = applied.results[index]?.updated_at;
       if (stamp) {
@@ -2026,6 +2044,20 @@ function buildUpdateTaskPatch(input) {
   return patch;
 }
 
+/** A linked work block for update_task's start_time + end_time (the deadline is untouched). */
+function updateBlockWrite(ctx, taskId, item, patch) {
+  const known = Array.isArray(ctx.openTasks) ? ctx.openTasks.find(task => task?.id === taskId) : null;
+  const task = {
+    id: taskId,
+    title: patch.title || known?.title || 'Planned work',
+    due_date: patch.due_date || known?.due_date || null,
+    parent_project_id: known?.parent_project_id ?? null,
+    depth: patch.depth || known?.depth || null
+  };
+  const today = typeof ctx.today === 'string' && ctx.today.trim() ? ctx.today.trim() : null;
+  return taskBlockWrite(task, item, new Date().toISOString(), { today });
+}
+
 function handleUpdateTask(ctx, input) {
   const batchItems = Array.isArray(input?.items)
     ? input.items.slice(0, CREATE_TASK_MAX_ITEMS)
@@ -2036,13 +2068,17 @@ function handleUpdateTask(ctx, input) {
       const taskId = asOptionalString(item?.task_id);
       if (!taskId) continue;
       const patch = buildUpdateTaskPatch(item);
-      if (!Object.keys(patch).length) continue;
-      writes.push({
-        path: `tasks:task:${taskId}`,
-        mode: 'append',
-        content: serializeJson(patch),
-        diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`
-      });
+      const block = updateBlockWrite(ctx, taskId, item, patch);
+      if (!Object.keys(patch).length && !block) continue;
+      if (Object.keys(patch).length) {
+        writes.push({
+          path: `tasks:task:${taskId}`,
+          mode: 'append',
+          content: serializeJson(patch),
+          diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`
+        });
+      }
+      if (block) writes.push(block);
     }
     if (!writes.length) return deny('update_task items[] need task_id and at least one field');
     return propose(
@@ -2059,18 +2095,22 @@ function handleUpdateTask(ctx, input) {
   const taskId = asOptionalString(input?.task_id);
   if (!taskId) return deny('task_id is required');
   const patch = buildUpdateTaskPatch(input);
-  if (!Object.keys(patch).length) return deny('update_task needs at least one field to change');
+  const block = updateBlockWrite(ctx, taskId, input, patch);
+  if (!Object.keys(patch).length && !block) return deny('update_task needs at least one field to change');
   return propose(
     buildProposal({
       agentSlug: ctx.agentSlug,
-      intent: `Update task ${taskId}`,
+      intent: block && !Object.keys(patch).length ? `Block time for task ${taskId}` : `Update task ${taskId}`,
       surfaces: ['confirm_card', 'governance_log'],
-      writes: [{
-        path: `tasks:task:${taskId}`,
-        mode: 'append',
-        content: serializeJson(patch),
-        diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`
-      }]
+      writes: [
+        ...(Object.keys(patch).length ? [{
+          path: `tasks:task:${taskId}`,
+          mode: 'append',
+          content: serializeJson(patch),
+          diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`
+        }] : []),
+        ...(block ? [block] : [])
+      ]
     })
   );
 }

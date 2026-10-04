@@ -8,6 +8,8 @@
  */
 import { formatDisplayDate } from '../format-display-date.js';
 import {
+  STATUS_CHOICES,
+  canTickItem,
   editableFields,
   itemRecord,
   itemType,
@@ -113,7 +115,8 @@ function contextRows(item, values) {
   if (record.class_title) rows.push(['Class', record.class_title]);
   if (typeof record.location === 'string' && record.location) rows.push(['Where', record.location]);
   if (record.feed) rows.push(['From', 'iCloud · read-only here']);
-  if (typeof record.status === 'string' && record.status) rows.push(['Status', record.status.replace(/_/g, ' ')]);
+  // Tasks and work blocks show their status as pills (statusHtml), not a row.
+  if (typeof record.status === 'string' && record.status && !canTickItem(item)) rows.push(['Status', record.status.replace(/_/g, ' ')]);
   const progress = record.progress ?? row.progress;
   if (progress?.total) rows.push(['Progress', `${progress.done} of ${progress.total} ${progress.unit}`]);
   const bookmark = record.bookmark?.note ?? row.bookmark?.note;
@@ -149,7 +152,7 @@ function contextRows(item, values) {
   return rows;
 }
 
-function fieldHtml(field, values) {
+function fieldHtml(field, values, type = '') {
   if (field === 'title') {
     return `<label class="cal-card__field cal-card__field--wide"><span>Title</span><input type="text" name="title" value="${escapeHtml(values.title)}" required></label>`;
   }
@@ -157,7 +160,8 @@ function fieldHtml(field, values) {
     return `<label class="cal-card__field"><span>Date</span><input type="date" name="date" value="${escapeHtml(values.date)}" required></label>`;
   }
   if (field === 'time') {
-    return `<label class="cal-card__field"><span>Start</span><input type="time" name="time" step="300" value="${escapeHtml(values.time)}"></label>`;
+    // A task's own time is its deadline; planned time is a work block (Plan time above).
+    return `<label class="cal-card__field"><span>${type === 'task' ? 'Due by' : 'Start'}</span><input type="time" name="time" step="300" value="${escapeHtml(values.time)}"></label>`;
   }
   if (field === 'duration') {
     return `<label class="cal-card__field"><span>End</span><input type="time" name="end" step="300" value="${escapeHtml(values.end)}"></label>`;
@@ -208,6 +212,8 @@ export function itemCardHtml(item, opts = {}) {
       + `<input type="text" name="drop_reason" maxlength="160" placeholder="Why, so the time remembers (optional)"></label>`
       + `<button type="submit" class="btn btn--secondary">I’ve dropped this</button><p class="cal-card__hint">Frees this weekly slot from ${escapeHtml(formatDisplayDate(record.date))}. Nothing changes in iCloud.</p></form>`
     : '';
+  const status = statusHtml(item);
+  const plan = planHtml(item, values);
   const fields = editableFields(item);
   if (!fields.length) {
     const notes = values.notes ? `<p class="cal-card__notes">${escapeHtml(values.notes)}</p>` : '';
@@ -215,10 +221,50 @@ export function itemCardHtml(item, opts = {}) {
     return `${head}${context}${notes}${drop}${note}`;
   }
   const form =
-    `<form class="cal-card__form" data-part="card-form" novalidate>${fields.map((field) => fieldHtml(field, values)).join('')}` +
+    `<form class="cal-card__form" data-part="card-form" novalidate>${fields.map((field) => fieldHtml(field, values, itemType(item))).join('')}` +
     `<p class="cal-card__error" data-part="card-error" role="alert" hidden></p>` +
     `<div class="cal-pop__acts"><button type="submit" class="btn btn--primary" data-part="card-save">Save</button></div></form>`;
-  return `${head}${context}${inferred}${form}`;
+  return `${head}${status}${context}${inferred}${plan}${form}`;
+}
+
+function addMinutes(hhmm, minutes) {
+  const start = toMinutes(hhmm);
+  if (start == null || !(minutes > 0)) return '';
+  const end = Math.min(23 * 60 + 55, start + Math.round(minutes));
+  return `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`;
+}
+
+/** Status pills: the same three columns as the Tasks board. One tap saves. */
+function statusHtml(item) {
+  if (!canTickItem(item)) return '';
+  const choices = STATUS_CHOICES[itemType(item)] ?? [];
+  const row = item && typeof item === 'object' ? item : {};
+  const current = row.done === true ? 'done' : String(itemRecord(item).status || choices[0]?.[0] || '');
+  const pills = choices.map(([value, label]) => {
+    const on = value === current || (value === choices[0][0] && !choices.some(([v]) => v === current));
+    return `<button type="button" class="cal-card__pill${on ? ' is-active' : ''}" data-status="${value}" aria-pressed="${on}">${value === 'done' ? '✓ ' : ''}${label}</button>`;
+  }).join('');
+  return `<div class="cal-card__status" role="group" aria-label="Status" data-part="card-status">${pills}</div>`;
+}
+
+/**
+ * Plan time for a task: a work block linked to it (start – end). The due date / time
+ * stays the deadline. A task whose due time was really its start (time + estimate)
+ * is prefilled, so it moves onto the grid in one tap.
+ */
+function planHtml(item, values) {
+  if (itemType(item) !== 'task' || !canTickItem(item)) return '';
+  const record = itemRecord(item);
+  const estimate = Number(record.estimated_duration);
+  const start = values.time || '';
+  const end = start ? addMinutes(start, estimate > 0 ? estimate : 30) : '';
+  return `<form class="cal-card__plan" data-part="card-plan" novalidate>`
+    + `<span class="cal-card__plan-label">Plan time</span>`
+    + `<label class="cal-card__field cal-card__field--wide"><span>Day</span><input type="date" name="plan_date" value="${escapeHtml(values.date)}"></label>`
+    + `<label class="cal-card__field"><span>Start</span><input type="time" name="plan_start" step="300" value="${escapeHtml(start)}"></label>`
+    + `<label class="cal-card__field"><span>End</span><input type="time" name="plan_end" step="300" value="${escapeHtml(end)}"></label>`
+    + `<button type="submit" class="btn btn--secondary">Add to calendar</button>`
+    + `<p class="cal-card__hint">Puts a block on the day for this task. The due date stays the deadline.</p></form>`;
 }
 
 function toMinutes(hhmm) {
@@ -325,6 +371,29 @@ export function bindItemCard(node, item, handlers = {}) {
         : { dismissed_inferred: [...list('dismissed_inferred'), after] });
     });
   }
+  for (const button of node.querySelectorAll?.('[data-status]') ?? []) {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (button.getAttribute('aria-pressed') === 'true') return;
+      void once(button, { status: button.getAttribute('data-status') });
+    });
+  }
+  const plan = node.querySelector?.('[data-part="card-plan"]');
+  plan?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const value = (name) => plan.querySelector(`input[name="${name}"]`)?.value ?? '';
+    const block = { date: value('plan_date'), start_time: value('plan_start'), end_time: value('plan_end') };
+    const button = plan.querySelector('button[type="submit"]');
+    const start = toMinutes(block.start_time);
+    const end = toMinutes(block.end_time);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(block.date) || start == null || end == null || end <= start) {
+      button.textContent = 'Pick a day, a start and a later end';
+      return;
+    }
+    void once(button, { block });
+  });
   const drop = node.querySelector?.('[data-part="card-drop"]');
   drop?.addEventListener('submit', (event) => {
     event.preventDefault();

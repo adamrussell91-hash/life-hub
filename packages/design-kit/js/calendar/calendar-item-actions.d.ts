@@ -4,6 +4,8 @@ export type CalendarItemPatch = {
   duration_min?: number;
   title?: string;
   notes?: string;
+  status?: string;
+  block?: { date: string; start_time: string; end_time: string };
 };
 
 export function itemRecord(item: unknown): Record<string, unknown>;
@@ -31,3 +33,20 @@ export function dragPatch(
   item: unknown,
   target: { date: string; start_time?: string | null; end_time?: string | null }
 ): CalendarItemPatch;
+
+export const STATUS_CHOICES: Readonly<Record<'task' | 'work_block', ReadonlyArray<readonly [string, string]>>>;
+export function canTickItem(item: unknown): boolean;
+export function isItemDone(item: unknown): boolean;
+export function statusRequests(
+  item: unknown,
+  status: string
+): Array<{ path: string; method: 'PATCH'; body: { status: string }; before: { status: string } }>;
+export function setItemStatus(
+  apiFetch: ((path: string, init?: RequestInit) => Promise<Response>) | undefined,
+  item: unknown,
+  status: string
+): Promise<() => Promise<void>>;
+export function toggleItemDone(
+  apiFetch: ((path: string, init?: RequestInit) => Promise<Response>) | undefined,
+  item: unknown
+): Promise<() => Promise<void>>;

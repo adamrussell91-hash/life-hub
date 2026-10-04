@@ -53,6 +53,9 @@ export type ClareProposal = {
   protocol_id?: ClareProtocolId;
   dump_kind?: DumpKind;
   question?: string | null;
+  /** Time-block from the dump ("3–3:15pm"): accepting adds a work block linked to the task. */
+  start_time?: string;
+  end_time?: string;
 };
 
 const BASE_BY_DOMAIN: Record<string, number> = {
@@ -362,11 +365,24 @@ function proposalFromDumpItem(
     frameworks,
     calibration
   );
+  // A dumped slot ("3–3:15pm") is planned time: its length is the estimate, and
+  // accepting the proposal adds a block linked to the task (store.acceptClareProposal).
+  const span = blockSpan(item.start_time, item.end_time);
   return {
     ...proposal,
+    ...(span && item.start_time && item.end_time
+      ? { start_time: item.start_time, end_time: item.end_time, proposed_minutes: span, suggested_accepted_minutes: span }
+      : {}),
     dump_kind: item.kind,
     question: item.question
   };
+}
+
+function blockSpan(start?: string, end?: string): number {
+  const hhmm = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  if (!start || !end || !hhmm.test(start) || !hhmm.test(end)) return 0;
+  const mins = (value: string) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3));
+  return Math.max(0, mins(end) - mins(start));
 }
 
 function proposalFromJudgmentRow(
