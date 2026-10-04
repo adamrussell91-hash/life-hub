@@ -4,6 +4,7 @@ import { comparePeriods } from '../../apps/life/js/core/trends.js';
 import {
   buildNutritionModel,
   PROTEIN_TREND_CONFIG,
+  mealMinutes,
   polyphenolVsAim
 } from '../../apps/life/js/app/nutrition-model.js';
 
@@ -263,4 +264,39 @@ test('active nutrition challenges appear on the model with day scoreboard cells'
   assert.equal(model.challenges[0].title, 'No refined sugar');
   assert.deepEqual(model.challenges[0].tally, { clean: 1, miss: 1, pending: 5, total: 7 });
   assert.equal(model.challenges[0].days.find(day => day.date === '2026-07-30').isToday, true);
+});
+
+test('mealMinutes uses the logged time, else the meal type slot flagged as an estimate', () => {
+  assert.deepEqual(mealMinutes({ meal: 'lunch', time: '12:45' }), { minutes: 765, timeKnown: true });
+  assert.deepEqual(mealMinutes({ meal: 'dinner' }), { minutes: 1140, timeKnown: false });
+  assert.deepEqual(mealMinutes({ meal: 'supper', time: 'late' }), { minutes: 720, timeKnown: false });
+});
+
+test('mealsToday carry clock minutes and whether the time was logged', () => {
+  const timed = [...events, { record: { type: 'meal', date: '2026-07-30', meal: 'snack', time: '15:30', protein_g: 8, calories: 100, fat_g: 2 }, body: '' }];
+  const model = buildNutritionModel({ events: timed, targetsConfig, date: '2026-07-30' });
+  const snack = model.mealsToday.find(meal => meal.meal === 'snack');
+  assert.equal(snack.minutes, 930);
+  assert.equal(snack.timeKnown, true);
+  assert.equal(model.mealsToday[0].timeKnown, false);
+});
+
+test('meal history days carry their own targets from the same target function', () => {
+  const model = buildNutritionModel({ events, targetsConfig, date: '2026-07-30' });
+  const day = model.mealHistory.days.find(entry => entry.date === '2026-07-24');
+  const series = model.week.find(entry => entry.date === '2026-07-24');
+  assert.equal(day.targets.protein_g, series.proteinTarget);
+  assert.equal(day.targets.fat_ceiling_g, 50);
+  assert.ok(day.targets.calories > 0);
+});
+
+test('usualClimb averages recent logged days and needs at least three', () => {
+  const model = buildNutritionModel({ events, targetsConfig, date: '2026-07-30' });
+  assert.equal(model.usualClimb.days, 3);
+  const at = minutes => model.usualClimb.points.find(point => point.minutes === minutes).protein_g;
+  assert.equal(at(360), 0);
+  assert.equal(at(480), Math.round((140 / 3) * 10) / 10);
+  assert.equal(at(1380), Math.round(((140 + 60 + 210) / 3) * 10) / 10);
+  const sparse = buildNutritionModel({ events: events.slice(0, 3), targetsConfig, date: '2026-07-30' });
+  assert.equal(sparse.usualClimb, null);
 });

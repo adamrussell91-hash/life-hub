@@ -143,3 +143,32 @@ test('settleMetricRings recovers when attribute already matches the stamp but th
   assert.equal(circle.getAttribute('stroke-dashoffset'), '40');
   assert.equal(circle.style.transition, 'none');
 });
+
+test('playCardMotion adds is-playing only when motion is allowed, and clears it', async () => {
+  const { playCardMotion } = await import('../../apps/life/js/app/chart-kit/animate.js');
+  const classes = new Set();
+  const card = { classList: { add: c => classes.add(c), remove: (...cs) => cs.forEach(c => classes.delete(c)) }, getBoundingClientRect() {} };
+  assert.equal(playCardMotion(card, { reducedMotion: false, durationMs: 5 }), true);
+  assert.equal(classes.has('is-playing'), true);
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(classes.has('is-playing'), false);
+  assert.equal(playCardMotion(card, { quiet: true }), false);
+  assert.equal(classes.has('is-playing'), false);
+});
+
+test('countUp snaps when quiet and finishes on the exact value with a clamped first frame', async () => {
+  const { countUp } = await import('../../apps/life/js/app/chart-kit/animate.js');
+  const quiet = { textContent: '' };
+  countUp(quiet, 90, { quiet: true });
+  assert.equal(quiet.textContent, '90');
+  const frames = [];
+  const el = { textContent: '' };
+  countUp(el, 90, { reducedMotion: false, delayMs: 300, durationMs: 1000, requestAnimationFrame: fn => frames.push(fn), cancelAnimationFrame() {} });
+  frames.shift()(1000);
+  assert.equal(el.textContent, '0');
+  frames.shift()(1100);
+  assert.equal(el.textContent, '0');
+  frames.shift()(2400);
+  assert.equal(el.textContent, '90');
+  assert.equal(frames.length, 0);
+});

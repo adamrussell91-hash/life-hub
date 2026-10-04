@@ -62,7 +62,7 @@ Default for board metrics, counts, targets, trends.
 - **Root:** `apps/life/js/app/chart-kit/ring.js`
 - **API:** `buildRingTarget({ value, target }, { size = 64, strokeWidth = 8 })` → `{ size, strokeWidth, center, radius, circumference, fraction, dashoffset, value, target }`. Fraction is capped at 1.
 - **DOM:** `applyRingTarget(svg, { value, target }, options)` in `apply-ring.js`. SVG needs `[data-role="track"]` and `[data-role="fill"]` circles. Fills with `animateRingFill`.
-- **Used on:** Home macros, Nutrition rings, Fitness labeled rings, Central Node completion, Tasks board copies.
+- **Used on:** Home macros, Fitness labeled rings, Central Node completion, Tasks board copies.
 
 ### `columns` — counts / comparison
 
@@ -78,7 +78,7 @@ Default for board metrics, counts, targets, trends.
 - **Root:** `apps/life/js/app/chart-kit/area-line.js`
 - **API:** `buildAreaLine(series, { width = 320, height = 120, padding = 12, paddingBottom, valueKey = 'value', rollingAverage = 0, guideValue, yDomain = 'zero' \| 'padded' \| 'fixed', includeValues, min, max })`. Also `smoothLinePath`, `straightLinePath`, `smoothAreaPath`.
 - **Motion:** `animateAreaReveal(svg)` — SVG `[data-role="line"]`.
-- **Used on:** Nutrition, Bloods, Body, Central Node, Fitness e1RM form overlay.
+- **Used on:** Bloods, Body, Central Node, Fitness e1RM form overlay.
 
 ### `animate` — shared motion
 
