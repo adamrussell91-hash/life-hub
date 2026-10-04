@@ -15,6 +15,8 @@ const API_VERSION = '2023-06-01';
 const MAX_NOTES = 1000;
 const BODY_CHARS = 6000;
 const UNREADABLE_GRADE = { kind: 'idea', kindGuessed: true, kindReason: 'Grader reply unreadable.' };
+// Unreadable batch rows get one synchronous retry each; capped so kinds-check stays inside the function timeout.
+const BATCH_RETRY_CAP = 20;
 
 export const KIND_SYSTEM = `You grade one book note with exactly one kind. A book note is information on something in a book.
 
@@ -252,7 +254,7 @@ export async function startKindsJob(store, { ids, regrade = false } = {}, {
   }
   if (!response.ok) throw failure(`Claude refused the kinds batch (HTTP ${response.status}).`, 502, 'anthropic_request_failed');
   const batch = await response.json();
-  const job = { status: 'running', batchId: batch.id, ids: idMap, total: notes.length, started_at: now };
+  const job = { status: 'running', batchId: batch.id, ids: idMap, total: notes.length, regrade: Boolean(regrade), started_at: now };
   await setJSON(store, KINDS_JOB_KEY, job);
   return publicJob(job);
 }
@@ -273,10 +275,21 @@ function gradeFromText(text, body) {
   return grade.unreadable ? { ...UNREADABLE_GRADE, unreadable: true } : grade;
 }
 
-async function applyKindPatch(store, pageId, grade, now) {
+/**
+ * A kind already on the placement wins over this grade when Adam set it, when
+ * Clementine wrote it (including one saved while a batch was running), or when
+ * the grade only fills gaps and someone else filled this one first.
+ */
+function keepsCurrentKind(current, { regrade }) {
+  if (!current?.kind) return false;
+  if (current.kindBy === 'adam' || current.kindBy === 'clementine') return true;
+  return !regrade;
+}
+
+async function applyKindPatch(store, pageId, grade, now, { regrade = false } = {}) {
   const placements = (await getJSON(store, PLACEMENTS_KEY)) ?? {};
   const current = placements[pageId] ?? { pageId };
-  if (current.kindBy === 'adam') return null;
+  if (keepsCurrentKind(current, { regrade })) return null;
   const patch = cleanPlacement({
     pageId,
     kind: grade.kind,
@@ -333,6 +346,7 @@ export async function checkKindsJob(store, {
   }
 
   const { getPage: pageLoader } = pageLoaders({ getPage, env, fetchImpl });
+  let retries = 0;
   const outcome = {
     applied: 0,
     byKind: Object.fromEntries(SHELF_KINDS.map(kind => [kind, 0])),
@@ -353,12 +367,17 @@ export async function checkKindsJob(store, {
     if (!pageId) continue;
 
     const extracted = gradeFromLine(line);
-    let grade;
-    if (extracted.unreadable) {
-      grade = { ...UNREADABLE_GRADE, unreadable: true };
-    } else {
-      const page = await pageLoader(pageId);
-      grade = gradeFromText(extracted.text, page?.body ?? '');
+    const page = await pageLoader(pageId);
+    let grade = extracted.unreadable ? { ...UNREADABLE_GRADE, unreadable: true } : gradeFromText(extracted.text, page?.body ?? '');
+    const note = noteFromPage(pageId, page);
+    if (grade.unreadable && note && retries < BATCH_RETRY_CAP) {
+      retries += 1;
+      try {
+        const retried = await requestGrade(note, { apiKey, fetchImpl });
+        if (!retried.unreadable) grade = retried;
+      } catch {
+        /* keep the unreadable default; it is counted below */
+      }
     }
 
     if (grade.unreadable) outcome.unreadable += 1;
@@ -367,7 +386,7 @@ export async function checkKindsJob(store, {
       if (grade.kindGuessed) outcome.guessed += 1;
     }
 
-    const saved = await applyKindPatch(store, pageId, grade, now);
+    const saved = await applyKindPatch(store, pageId, grade, now, { regrade: Boolean(job.regrade) });
     if (saved) {
       outcome.applied += 1;
       outcome.byKind[grade.kind] = (outcome.byKind[grade.kind] ?? 0) + 1;
@@ -379,39 +398,50 @@ export async function checkKindsJob(store, {
   return publicJob(done);
 }
 
-/** Grades one note synchronously. Retries once on an unreadable reply. */
+/** One synchronous grading call for a note; returns the parsed grade (possibly { unreadable }). */
+async function requestGrade(note, { apiKey, fetchImpl }) {
+  const response = await fetchImpl(`${ANTHROPIC_ORIGIN}/v1/messages`, {
+    method: 'POST',
+    headers: headers(apiKey),
+    body: JSON.stringify(kindsRequest('sync', note).params)
+  });
+  if (!response.ok) throw failure(`Claude refused to grade the kind (HTTP ${response.status}).`, 502, 'anthropic_request_failed');
+  const message = await response.json();
+  return parseKindGrade(textFromMessage(message), note.body);
+}
+
+function noteFromPage(pageId, page) {
+  const book = bookLabelFromOrigins(page?.origins);
+  if (!page || !book) return null;
+  return { id: pageId, title: page.title ?? '', bookLabel: book.label, locus: book.locus, body: page.body ?? '' };
+}
+
+/**
+ * Grades one note synchronously. Retries once on an unreadable reply.
+ * A note that already has a kind keeps it unless `regrade` is set; Adam's kind is never regraded.
+ */
 export async function gradeOneKind(store, pageId, {
   apiKey,
   fetchImpl = fetch,
   now = new Date().toISOString(),
   getPage,
   env
-} = {}) {
+} = {}, { regrade = false } = {}) {
   requireApiKey(apiKey);
   if (typeof pageId !== 'string' || !pageId.trim()) throw failure('A pageId is required.');
 
   const placements = (await getJSON(store, PLACEMENTS_KEY)) ?? {};
   const current = placements[pageId] ?? null;
-  if (current?.kindBy === 'adam') throw failure('This note already has a kind set by Adam.', 409, 'kind_locked');
-  if (current?.kindBy === 'clementine' && current?.kind) return current;
+  if (regrade && current?.kindBy === 'adam') throw failure('This note already has a kind set by Adam.', 409, 'kind_locked');
+  if (current?.kind && (!regrade || current.kindBy === 'clementine')) return current;
 
   const { getPage: pageLoader } = pageLoaders({ getPage, env, fetchImpl });
   const page = await pageLoader(pageId);
   if (!page) throw failure('Unknown pageId.', 404, 'page_not_found');
-  const book = bookLabelFromOrigins(page.origins);
-  if (!book) throw failure('That page is not a book note.', 400, 'not_book_note');
-  const note = { id: pageId, title: page.title ?? '', bookLabel: book.label, locus: book.locus, body: page.body ?? '' };
+  const note = noteFromPage(pageId, page);
+  if (!note) throw failure('That page is not a book note.', 400, 'not_book_note');
 
-  const call = async () => {
-    const response = await fetchImpl(`${ANTHROPIC_ORIGIN}/v1/messages`, {
-      method: 'POST',
-      headers: headers(apiKey),
-      body: JSON.stringify(kindsRequest('sync', note).params)
-    });
-    if (!response.ok) throw failure(`Claude refused to grade the kind (HTTP ${response.status}).`, 502, 'anthropic_request_failed');
-    const message = await response.json();
-    return parseKindGrade(textFromMessage(message), note.body);
-  };
+  const call = () => requestGrade(note, { apiKey, fetchImpl });
 
   let grade;
   try {
@@ -422,5 +452,5 @@ export async function gradeOneKind(store, pageId, {
     throw failure('Could not reach Claude to grade the kind.', 502, 'anthropic_unavailable');
   }
   if (grade.unreadable) grade = { ...UNREADABLE_GRADE };
-  return applyKindPatch(store, pageId, grade, now);
+  return (await applyKindPatch(store, pageId, grade, now, { regrade })) ?? current;
 }

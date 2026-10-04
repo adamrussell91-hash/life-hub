@@ -42,16 +42,22 @@ export async function recordBookNote(page: Pick<Page, "id" | "body">, book?: Boo
     }
     const placement = placementForBookNote(page, book, chapters);
     if (placement) await savePlacements([placement]);
-    // Kind: line already set by Clementine → keep it. Otherwise grade once; never fail the save.
-    if (placement?.kind) return;
-    try {
-      await gradeKind(page.id);
-    } catch (error) {
-      console.warn("Bookshelf: could not grade the note's kind.", error);
-    }
+    // Kind: line already set by Clementine → keep it. Otherwise grade in the background.
+    if (book?.label && !placement?.kind) gradeKindInBackground(page.id);
   } catch (error) {
     console.warn("Bookshelf: could not place the new note; it will show as a loose page.", error);
   }
+}
+
+/**
+ * Asks the server for this note's kind without holding up the save. The server
+ * keeps any kind the note already has, so re-saving a note never regrades it.
+ */
+export function gradeKindInBackground(pageId: string): Promise<void> {
+  return gradeKind(pageId).then(
+    () => undefined,
+    error => console.warn("Bookshelf: could not grade the note's kind.", error),
+  );
 }
 
 /** A "Write it yourself" note with a book origin and a page typed in compose. */
@@ -63,11 +69,15 @@ export function placementForComposedPage(pageId: string, origins: Array<{ kind: 
 }
 
 export async function recordComposedPage(pageId: string, origins: Array<{ kind: string }>, page?: string) {
+  if (!origins.some(origin => origin.kind === "book")) return;
   const placement = placementForComposedPage(pageId, origins, page);
-  if (!placement) return;
-  try {
-    await savePlacements([placement]);
-  } catch (error) {
-    console.warn("Bookshelf: could not place the note; it will show as a loose page.", error);
+  if (placement) {
+    try {
+      await savePlacements([placement]);
+    } catch (error) {
+      console.warn("Bookshelf: could not place the note; it will show as a loose page.", error);
+    }
   }
+  // Every book note gets a kind, typed page or not.
+  gradeKindInBackground(pageId);
 }

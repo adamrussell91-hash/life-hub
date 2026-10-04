@@ -1,5 +1,5 @@
 {
-  "_about": "Hand-labelled book-note kinds for the grading dry run (BOOK-NOTE-KINDS-BRIEF.md). Drafted by Claude on 03/10/26 from a seeded random sample: 3 notes from each of 10 books. Adam confirms or corrects each label before the dry run. confirmed stays false until he has.",
+  "_about": "Hand-labelled book-note kinds for the grading dry run (BOOK-NOTE-KINDS-BRIEF.md). Drafted by Claude on 03/10/26 from a seeded random sample: 3 notes from each of 10 books; confirmed by Adam on 03/10/26. v2 (04/10/26, BRIDGE-WIDENING-PROMPT.md): Bridge now counts a substantive teaching or learning section, so Math Anxiety and Engagement and Disaffection move from idea to bridge. Adam approved v2 with the bridge widening.",
   "confirmed": true,
   "notes": [
     { "id": "page_hub_229aab04e23c449cab463e7836e0ffa9", "book": "The Knowledge Gene", "title": "Paul G. Bahn on Prehistoric Art", "kind": "person" },
@@ -20,9 +20,9 @@
     { "id": "page_notion_39bf794f847681d28c7fe4e3b72ab9f3", "book": "Critical Thinking: The Basics", "title": "Argument Forms and Fallacies", "kind": "idea" },
     { "id": "page_notion_39bf794f847681aaae72cfd92a711718", "book": "Critical Thinking: The Basics", "title": "Causal Reasoning, Generalisations, and Arguments from Consequences", "kind": "idea" },
     { "id": "page_hub_1675cb4dfe794f88aadee6609a057d9e", "book": "Critical Thinking: The Basics", "title": "Arguments, Social Power, and Message Source", "kind": "case" },
-    { "id": "page_notion_3a1f794f847681d28ac2ec43c3a00a5f", "book": "Handbook of Motivation at School", "title": "Math Anxiety (Maloney)", "kind": "idea" },
+    { "id": "page_notion_3a1f794f847681d28ac2ec43c3a00a5f", "book": "Handbook of Motivation at School", "title": "Math Anxiety (Maloney)", "kind": "bridge" },
     { "id": "page_notion_3a1f794f847681b4a53cec1652c44f58", "book": "Handbook of Motivation at School", "title": "Interest and Curiosity in the Model of Domain Learning", "kind": "bridge" },
-    { "id": "page_notion_3a1f794f847681b199cde1fc3ce57344", "book": "Handbook of Motivation at School", "title": "Engagement and Disaffection as Organising Constructs", "kind": "idea" },
+    { "id": "page_notion_3a1f794f847681b199cde1fc3ce57344", "book": "Handbook of Motivation at School", "title": "Engagement and Disaffection as Organising Constructs", "kind": "bridge" },
     { "id": "page_notion_39ef794f847681ff85c7d5eeadc78afa", "book": "The Origins of Political Order", "title": "Explaining Latin America's Left Turn", "kind": "debate" },
     { "id": "page_notion_7767846d2e204876b4be3814a71a7705", "book": "The Origins of Political Order", "title": "The Grand Parti of 1557", "kind": "case" },
     { "id": "page_hub_dd349b39f5af493d92368b8885f6d3bd", "book": "The Origins of Political Order", "title": "The Partisan Sort: Consequences and Limitations", "kind": "debate" },

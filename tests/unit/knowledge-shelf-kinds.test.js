@@ -153,8 +153,11 @@ test('kinds-check applies results and keeps concurrent placement fields (W2/W5)'
 test('adam kinds are never overwritten; clementine kinds skip sync grade', async () => {
   const store = memoryStore();
   await savePlacements(store, [{ pageId: 'page_a', kind: 'person', kindBy: 'adam' }], { now: NOW });
-  const { fetchImpl } = fakeClaude([], { syncBodies: [{ kind: 'idea', fallback: 'idea', evidence: 'x', reason: 'x', confidence: 0.9 }] });
-  await assert.rejects(() => gradeOneKind(store, 'page_a', { apiKey: 'k', fetchImpl, now: NOW, ...pageDeps() }), /Adam/);
+  const { fetchImpl, calls } = fakeClaude([], { syncBodies: [{ kind: 'idea', fallback: 'idea', evidence: 'x', reason: 'x', confidence: 0.9 }] });
+  const asIs = await gradeOneKind(store, 'page_a', { apiKey: 'k', fetchImpl, now: NOW, ...pageDeps() });
+  assert.equal(asIs.kind, 'person', 'a save-time grade keeps the kind Adam set');
+  assert.equal(calls.length, 0, 'no Claude call for a note that already has a kind');
+  await assert.rejects(() => gradeOneKind(store, 'page_a', { apiKey: 'k', fetchImpl, now: NOW, ...pageDeps() }, { regrade: true }), /Adam/);
 
   await savePlacements(store, [{ pageId: 'page_b', kind: 'bridge', kindBy: 'clementine', kindGuessed: false }], { now: NOW });
   const kept = await gradeOneKind(store, 'page_b', { apiKey: 'k', fetchImpl, now: NOW, ...pageDeps() });
@@ -211,4 +214,64 @@ test('Shelf API kinds ops surface server error messages (V5) and run end-to-end'
   const read = await (await handler(new Request('https://example.test/api/knowledge/shelf'))).json();
   assert.equal(read.data.kindsJob.status, 'done');
   assert.equal(read.data.placements.filter(p => p.kind).length, 3);
+});
+
+test('a save-time grade keeps an existing claude kind; regrade replaces it', async () => {
+  const store = memoryStore();
+  await savePlacements(store, [{ pageId: 'page_b', kind: 'idea', kindBy: 'claude', kindGuessed: true }], { now: NOW });
+  const { fetchImpl, calls } = fakeClaude([], {
+    syncBodies: [{ kind: 'bridge', fallback: 'idea', evidence: 'sits against any pedagogy that begins with parts', reason: 'teaching', confidence: 0.9 }]
+  });
+  const kept = await gradeOneKind(store, 'page_b', { apiKey: 'k', fetchImpl, now: NOW, ...pageDeps() });
+  assert.equal(kept.kind, 'idea');
+  assert.equal(calls.length, 0, 're-saving a note never regrades it');
+
+  const regraded = await gradeOneKind(store, 'page_b', { apiKey: 'k', fetchImpl, now: NOW, ...pageDeps() }, { regrade: true });
+  assert.equal(regraded.kind, 'bridge');
+  assert.equal(regraded.kindBy, 'claude');
+});
+
+test('kinds-check keeps a kind Clementine wrote while the batch was running', async () => {
+  const store = memoryStore();
+  await startKindsJob(store, {}, { apiKey: 'k', fetchImpl: fakeClaude([]).fetchImpl, now: NOW, ...pageDeps() });
+  await savePlacements(store, [{ pageId: 'page_b', kind: 'bridge', kindBy: 'clementine', kindGuessed: false }], { now: NOW });
+
+  const ended = fakeClaude([
+    succeeded('note_0000', { kind: 'person', fallback: 'person', evidence: 'Paul Gerard Bahn is a British archaeologist', reason: 'who', confidence: 0.9 }),
+    succeeded('note_0001', { kind: 'idea', fallback: 'idea', evidence: 'x', reason: 'concept', confidence: 0.9 }),
+    succeeded('note_0002', { kind: 'idea', fallback: 'idea', evidence: 'x', reason: 'concept', confidence: 0.9 })
+  ]);
+  const done = await checkKindsJob(store, { apiKey: 'k', fetchImpl: ended.fetchImpl, now: NOW, ...pageDeps() });
+  assert.equal(done.applied, 2);
+
+  const { placements } = await readShelf(store);
+  const b = placements.find(p => p.pageId === 'page_b');
+  assert.equal(b.kind, 'bridge');
+  assert.equal(b.kindBy, 'clementine');
+});
+
+test('kinds-check retries an unreadable batch row once before defaulting', async () => {
+  const store = memoryStore();
+  await startKindsJob(store, { ids: ['page_a', 'page_c'] }, { apiKey: 'k', fetchImpl: fakeClaude([]).fetchImpl, now: NOW, ...pageDeps() });
+
+  const ended = fakeClaude([
+    succeeded('note_0000', 'not json at all'),
+    succeeded('note_0001', 'still not json')
+  ], {
+    syncBodies: [
+      { kind: 'person', fallback: 'person', evidence: 'Paul Gerard Bahn is a British archaeologist', reason: 'who', confidence: 0.9 },
+      'garbage'
+    ]
+  });
+  const done = await checkKindsJob(store, { apiKey: 'k', fetchImpl: ended.fetchImpl, now: NOW, ...pageDeps() });
+  assert.equal(done.applied, 2);
+  assert.equal(done.unreadable, 1, 'only the row whose retry also failed counts as unreadable');
+  assert.equal(ended.calls.filter(call => call.url.endsWith('/v1/messages')).length, 2, 'one retry per unreadable row');
+
+  const { placements } = await readShelf(store);
+  assert.equal(placements.find(p => p.pageId === 'page_a').kind, 'person');
+  const c = placements.find(p => p.pageId === 'page_c');
+  assert.equal(c.kind, 'idea');
+  assert.equal(c.kindGuessed, true);
+  assert.equal(c.kindReason, 'Grader reply unreadable.');
 });

@@ -121,8 +121,8 @@ export async function checkBookKinds(): Promise<KindsJob> {
   return KindsJobSchema.parse((await post<{ job: unknown }>({ op: "kinds-check" })).job);
 }
 
-/** Grades one note's kind synchronously. */
-export async function gradeKind(pageId: string): Promise<Placement> {
+/** Grades one note's kind. A note that already has a kind keeps it unless `regrade` is set. */
+export async function gradeKind(pageId: string, regrade = false): Promise<Placement> {
   if (USE_LOCAL_DATA) throw new Error("Grading kinds needs the live hub; local preview can't call Claude.");
-  return (await post<{ placement: Placement }>({ op: "kind", pageId })).placement;
+  return (await post<{ placement: Placement }>({ op: "kind", pageId, ...(regrade ? { regrade } : {}) })).placement;
 }

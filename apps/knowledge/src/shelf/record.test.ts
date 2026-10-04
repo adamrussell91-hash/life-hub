@@ -1,5 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { placementForBookNote, placementForComposedPage } from "./record";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const client = vi.hoisted(() => ({
+  getShelf: vi.fn(),
+  gradeKind: vi.fn(),
+  savePlacements: vi.fn(),
+}));
+vi.mock("./client", () => client);
+
+import { placementForBookNote, placementForComposedPage, recordBookNote, recordComposedPage } from "./record";
 
 describe("placementForBookNote", () => {
   const body = "## In the book\nx\n\n## How this bears on the book\nThe web supports the claim.\n\n## Gaps\n- Replication?\n";
@@ -37,5 +45,50 @@ describe("placementForComposedPage", () => {
     expect(placementForComposedPage("p1", [{ kind: "notebook" }], "42")).toBeNull();
     expect(placementForComposedPage("p1", [{ kind: "book" }], "")).toBeNull();
     expect(placementForComposedPage("p1", [{ kind: "book" }], "-3")).toBeNull();
+  });
+});
+
+describe("kind grading on save", () => {
+  beforeEach(() => {
+    client.getShelf.mockReset();
+    client.savePlacements.mockReset().mockResolvedValue([]);
+    client.gradeKind.mockReset();
+  });
+
+  it("does not hold up a From-a-book save while the kind is graded", async () => {
+    let finishGrading: () => void = () => {};
+    client.gradeKind.mockReturnValue(new Promise(resolve => { finishGrading = () => resolve({}); }));
+    await recordBookNote({ id: "p1", body: "## In the book\nx\n" }, { label: "Make It Stick", locus: "p. 28" });
+    expect(client.gradeKind).toHaveBeenCalledWith("p1");
+    finishGrading();
+  });
+
+  it("skips grading when Clementine wrote a Kind line", async () => {
+    await recordBookNote({ id: "p1", body: "Kind: case\n\n## In the book\nx\n" }, { label: "Make It Stick", locus: "p. 28" });
+    expect(client.gradeKind).not.toHaveBeenCalled();
+  });
+
+  it("grades a write-it-yourself book note, with or without a typed page", async () => {
+    client.gradeKind.mockResolvedValue({});
+    await recordComposedPage("p2", [{ kind: "book" }], "");
+    expect(client.savePlacements).not.toHaveBeenCalled();
+    expect(client.gradeKind).toHaveBeenCalledWith("p2");
+
+    await recordComposedPage("p3", [{ kind: "book" }], "42");
+    expect(client.savePlacements).toHaveBeenCalledWith([{ pageId: "p3", page: 42, guessed: false }]);
+    expect(client.gradeKind).toHaveBeenCalledWith("p3");
+  });
+
+  it("leaves notes without a book origin alone, and never throws when grading fails", async () => {
+    await recordComposedPage("p4", [{ kind: "notebook" }], "42");
+    expect(client.gradeKind).not.toHaveBeenCalled();
+
+    client.gradeKind.mockRejectedValue(new Error("offline"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(recordComposedPage("p5", [{ kind: "book" }], "")).resolves.toBeUndefined();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
