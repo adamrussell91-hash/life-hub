@@ -1,6 +1,7 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import { readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import '../../scripts/prepare-web.mjs';
 import { createStaticServer } from '../../scripts/serve.mjs';
@@ -14,7 +15,12 @@ let baseUrl;
 before(async () => {
   server = createStaticServer({
     root: new URL('../../dist/', import.meta.url),
-    apiRoot: new URL('../..', import.meta.url)
+    apiRoot: new URL('../..', import.meta.url),
+    extraFiles: [{
+      path: 'data/nutrition/2026/07/2026-07-23-lunch.md',
+      content: (await readFile(new URL('../fixtures/valid/data/nutrition/2026/07/2026-07-30-lunch.md', import.meta.url), 'utf8'))
+        .replaceAll('2026-07-30', '2026-07-23').replace('id: meal-2', 'id: history-lunch')
+    }]
   });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -142,6 +148,70 @@ test('the floating chat button opens the shared chat panel themed in Brisket\'s 
 
     await page.locator('#nutrition-chat-button').click();
     await page.locator('#chat-view').waitFor({ state: 'hidden' });
+  } finally {
+    await context.close();
+  }
+});
+
+test('meal history browses previous weeks and dates with working detail, empty and mobile states', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  try {
+    await signIn(page);
+    await page.locator('.desktop-rail [data-section="nutrition"]').click();
+    assert.equal(await page.locator('#meal-history-day').isHidden(), true);
+    assert.equal(await page.locator('#meal-history-day').evaluate(el => el.offsetHeight), 0);
+    await page.getByRole('button', { name: 'Today', exact: true }).click();
+    await page.locator('.meal-log__item').first().waitFor();
+    assert.equal(await page.locator('.meal-history__day').count(), 7);
+    await page.getByRole('button', { name: 'Previous week of meals' }).click();
+    await page.locator('#meal-history-date', { hasText: 'Thu 23/07/26' }).waitFor();
+    await page.locator('.meal-log__item').waitFor();
+    assert.match(await page.locator('.meal-log__macros').textContent(), /carbs/);
+    const detail = page.locator('.meal-log__item button');
+    await detail.press('Enter');
+    assert.equal(await detail.getAttribute('aria-expanded'), 'true');
+    await page.locator('.hub-disclosure__body').waitFor({ state: 'visible' });
+    assert.match(await page.locator('.hub-disclosure__body').textContent(), /Sodium/);
+    await page.locator('#refresh-button').click();
+    await page.locator('#app[data-state="ready"]').waitFor();
+    assert.equal(await page.locator('#meal-history-date').textContent(), 'Thu 23/07/26');
+    assert.equal(await detail.getAttribute('aria-expanded'), 'true');
+    await page.locator('[data-date="2026-07-23"]').press('Enter');
+    assert.equal(await page.locator('#meal-history-day').isHidden(), true);
+    assert.equal(await page.locator('#meal-history-day').evaluate(el => el.offsetHeight), 0);
+    await page.locator('[data-date="2026-07-23"]').press('Enter');
+    assert.equal(await detail.getAttribute('aria-expanded'), 'true');
+    await page.getByLabel('Jump to meal date').fill('2026-07-29');
+    await page.getByLabel('Jump to meal date').press('Tab');
+    await page.locator('.meal-log__empty').waitFor({ state: 'visible' });
+    assert.match(await page.locator('.meal-log__empty').textContent(), /No meals logged/);
+    assert.equal(await page.locator('.meal-history__totals').isHidden(), true);
+    await page.getByLabel('Jump to meal date').fill('2026-07-23');
+    await page.getByLabel('Jump to meal date').press('Tab');
+    await page.locator('.meal-log__item').waitFor();
+    for (const width of [390, 1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.waitForFunction(() => {
+        const frame = document.querySelector('.page-frame');
+        return innerWidth <= 720
+          ? getComputedStyle(frame).marginLeft === '0px'
+          : parseFloat(getComputedStyle(frame).marginLeft) > 0;
+      });
+      assert.equal(await page.locator('#meal-history-date').textContent(), 'Thu 23/07/26');
+      const dimensions = await page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth }));
+      assert.equal(dimensions.scroll, dimensions.width, `Nutrition must fit the ${width}px viewport`);
+      const sizes = await page.locator('.meal-history__day:is(button)').evaluateAll(elements => elements.map(el => el.getBoundingClientRect().height));
+      assert.ok(sizes.every(height => height >= 44));
+      assert.ok(await page.locator('input[type="date"]').evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 16));
+    }
+    await page.getByRole('button', { name: 'Today', exact: true }).click();
+    await page.locator('#meal-history-date', { hasText: 'Today' }).waitFor();
+    assert.equal(await page.locator('.meal-log__item').count(), 2);
+    assert.equal(await page.locator('.meal-history__day[data-selected="true"]').getAttribute('data-date'), '2026-07-30');
+    assert.deepEqual(errors, []);
   } finally {
     await context.close();
   }

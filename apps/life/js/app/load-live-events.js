@@ -78,6 +78,8 @@ export async function loadLiveEvents({
   const filesByPath = new Map();
   const warnings = [];
   const parsed = new Map();
+  let historyFrom = from;
+  let historyLoading = backfill !== false;
 
   // Returns whether the window carried anything new, so windows that add
   // nothing do not trigger another parse and repaint of everything.
@@ -100,6 +102,7 @@ export async function loadLiveEvents({
     const parsedFiles = parseFiles([...filesByPath.values()], loadYaml, parsed);
     return {
       events: parsedFiles.events,
+      history: { from: historyFrom, loading: historyLoading },
       targetsConfig: parsedFiles.targetsConfig,
       agentsConfig: parsedFiles.agentsConfig,
       centralNodeMarkdown: parsedFiles.centralNodeMarkdown,
@@ -145,10 +148,13 @@ export async function loadLiveEvents({
         await Promise.allSettled(pending.values());
         throw settled.reason;
       }
-      if (ingest(settled.value)) await onPartial?.(snapshot());
+      const changed = ingest(settled.value);
+      historyFrom = windows[index].from;
+      if (changed) await onPartial?.(snapshot());
     }
   }
 
+  historyLoading = false;
   return snapshot();
 }
 

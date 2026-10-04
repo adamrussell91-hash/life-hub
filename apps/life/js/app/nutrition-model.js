@@ -59,7 +59,7 @@ const averageProtein = days => (
   days.length === 0 ? 0 : days.reduce((sum, day) => sum + day.protein_g, 0) / days.length
 );
 
-export function buildNutritionModel({ events, targetsConfig, date, nutritionChallenges = null }) {
+export function buildNutritionModel({ events, targetsConfig, date, nutritionChallenges = null, history = null, freshness = null }) {
   if (!date) throw new RangeError('Nutrition display date is unavailable');
 
   const nutrition = aggregateNutrition(events, date);
@@ -75,6 +75,32 @@ export function buildNutritionModel({ events, targetsConfig, date, nutritionChal
     addCalendarDays(date, -(2 * WEEK_DAYS - 1)),
     addCalendarDays(date, -WEEK_DAYS)
   ).map(day => dailyNutrition(events, day, targetsConfig));
+
+  const mealDays = new Map();
+  for (const event of events) {
+    const record = event?.record;
+    if (record?.type !== 'meal' || record.date > date) continue;
+    const meals = mealDays.get(record.date) ?? [];
+    const body = String(event.body ?? '').trim();
+    const notes = typeof record.notes === 'string' ? record.notes.trim() : '';
+    meals.push({
+      ...record,
+      id: record.id || event.path || `${record.date}-${meals.length}`,
+      body,
+      notes,
+      summary: body.split('\n').find(Boolean) || notes || `${record.meal} logged`
+    });
+    mealDays.set(record.date, meals);
+  }
+  const mealHistory = {
+    ...history,
+    days: [...mealDays].sort(([a], [b]) => a.localeCompare(b)).map(([day, meals]) => ({
+      date: day,
+      meals: meals.sort((a, b) => String(a.time ?? '24:00').localeCompare(String(b.time ?? '24:00'))),
+      totals: aggregateNutrition(meals, day),
+      carbsKnown: meals.every(meal => Number.isFinite(meal.carbs_g))
+    }))
+  };
 
   const mealsToday = events
     .filter(event => event?.record?.type === 'meal' && event.record.date === date)
@@ -142,6 +168,8 @@ export function buildNutritionModel({ events, targetsConfig, date, nutritionChal
     overFatCeiling: targets.fat_ceiling_g > 0 && nutrition.fat_g > targets.fat_ceiling_g,
     polyphenolVsAim: polyphenolVsAim(nutrition.polyphenol_score, targets.polyphenol_daily_aim),
     mealsToday,
+    mealHistory,
+    freshness,
     advice,
     challenges,
     macroSplit: {
