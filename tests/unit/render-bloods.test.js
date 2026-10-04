@@ -968,6 +968,8 @@ test('Glucose/Diabetes renders the zone map and no marker tiles', () => {
   assert.match(String(root._host.textContent), /Insulin 7\.7/);
   assert.equal(root._host.querySelector('.bloods-metric-grid'), null);
   assert.equal(root._host.querySelector('.bloods-rows'), null);
+  const bullseyes = root._host.querySelectorAll('.bloods-bullseye').map(node => node.dataset.bloodsBullseye);
+  assert.deepEqual(bullseyes, ['hba1c_ngsp', 'fasting_glucose'], 'HbA1c and fasting glucose get closing-in rings');
   const map = root._host.querySelector('.bloods-glucose-map');
   const note = map.querySelector('[data-role="point-note"]');
   const dot = map.querySelector('[data-role="glucose-latest"]')

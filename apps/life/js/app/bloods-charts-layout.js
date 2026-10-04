@@ -1,4 +1,5 @@
 import { formatDisplayDate } from '../core/time.js';
+import { bandDistance } from './chart-kit/bullseye-rings.js';
 
 const BAND_PAD = 0.28;
 const VALUE_PAD = 0.06;
@@ -99,17 +100,8 @@ export function allowanceUsed({ value, refLow, refHigh, favourHigh = false } = {
   const low = refLow == null || refLow === '' || !Number.isFinite(Number(refLow))
     ? null
     : Number(refLow);
-  const high = refHigh == null || refHigh === '' || !Number.isFinite(Number(refHigh))
-    ? null
-    : Number(refHigh);
-  if (low == null && high == null) return null;
   if (favourHigh && low != null && low !== 0) return low / n;
-  if (low != null && high != null && high !== low) {
-    return Math.abs(2 * ((n - low) / (high - low)) - 1);
-  }
-  if (high != null && high !== 0) return n / high;
-  if (low != null && n !== 0) return low / n;
-  return null;
+  return bandDistance(n, { low, high: refHigh });
 }
 
 export function ifccToNgsp(mmolMol) {
@@ -188,6 +180,56 @@ export function buildGlucoseMap(markers = []) {
   return {
     points,
     insulin: insulinCaption(insulin)
+  };
+}
+
+/**
+ * Bullseye rings for the markers where "closing in on the range" is the story:
+ * HbA1c and fasting glucose on Glucose/Diabetes, LDL on Lipid Studies. One ring
+ * per test in the selected range; a marker needs two tests to draw.
+ * HbA1c and LDL only count the upper limit: lower is never the worry there.
+ */
+export function buildBloodsBullseyes(categoryId, markers = []) {
+  const picks = BULLSEYE_PICKS[categoryId] ?? [];
+  const charts = [];
+  for (const pick of picks) {
+    const marker = markers.find(item => pick.keys.has(item.key) && numericSeries(item).length);
+    const chart = marker ? markerBullseye(marker, pick) : null;
+    if (chart) charts.push(chart);
+  }
+  return charts;
+}
+
+const BULLSEYE_PICKS = {
+  'Glucose/Diabetes': [
+    { id: 'hba1c', keys: new Set([...HBA1C_PCT_KEYS, ...HBA1C_IFCC_KEYS]), upperOnly: true, zoneFallback: true },
+    { id: 'fasting_glucose', keys: FASTING_KEYS, upperOnly: false }
+  ],
+  'Lipid Studies': [
+    { id: 'ldl', keys: new Set(['ldl']), upperOnly: true, fallbackHigh: LIPID_FALLBACK_LIMIT.ldl }
+  ]
+};
+
+function markerBullseye(marker, { id, upperOnly, fallbackHigh = null, zoneFallback = false }) {
+  const rings = numericSeries(marker);
+  if (rings.length < 2) return null;
+  const unit = marker.latest?.unit ?? '';
+  const refHigh = Number(marker.latest?.ref_high);
+  const refLow = Number(marker.latest?.ref_low);
+  let high = marker.latest?.ref_high != null && Number.isFinite(refHigh) && refHigh > 0 ? refHigh : null;
+  const low = !upperOnly && marker.latest?.ref_low != null && Number.isFinite(refLow) ? refLow : null;
+  if (high == null && zoneFallback) high = glucoseZones(unit === '%' ? '%' : 'mmol/mol')[0].to;
+  if (high == null) high = fallbackHigh;
+  if (high == null && low == null) return null;
+  return {
+    status: 'ready',
+    id,
+    key: marker.key,
+    label: marker.label || marker.key,
+    unit,
+    digits: unit === 'mmol/mol' ? 0 : 1,
+    band: { low, high },
+    rings
   };
 }
 

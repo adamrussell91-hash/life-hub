@@ -1,5 +1,6 @@
 import { categoryNote, explainerFor } from './bloods-explainers.js';
 import {
+  buildBloodsBullseyes,
   buildFbcRadial,
   buildGlucoseMap,
   buildLipidRings,
@@ -10,6 +11,8 @@ import {
   markerVisual
 } from './bloods-charts.js';
 import { renderBiochemistryGroups } from './bloods-instruments.js';
+import { buildBullseyeRings } from './chart-kit/bullseye-rings.js';
+import { mountSceneChart } from './render-scene-chart.js';
 import { statusTone } from './bloods-model.js';
 import { formatDisplayDate } from '../core/time.js';
 
@@ -324,6 +327,7 @@ function categoryCard(root, category, model, flareOn) {
   if (category.id === 'Glucose/Diabetes') {
     const map = glucoseMapSvg(root, buildGlucoseMap(category.markers));
     if (map) body.append(map);
+    appendBullseyes(root, body, category);
     article.append(body);
     return article;
   }
@@ -331,6 +335,7 @@ function categoryCard(root, category, model, flareOn) {
   if (category.id === 'Lipid Studies') {
     const rings = lipidRingsSvg(root, buildLipidRings(category.markers));
     if (rings) body.append(rings);
+    appendBullseyes(root, body, category);
     article.append(body);
     return article;
   }
@@ -390,6 +395,44 @@ function categoryCard(root, category, model, flareOn) {
   }
   article.append(body);
   return article;
+}
+
+const BULLSEYE_MAX_WIDTH = 460;
+
+/**
+ * "Closing in" rings under the glucose map and lipid rings: one ring per test,
+ * the reference range as the bullseye. Mounted on the next frame, once the card
+ * is in the page, so the first paint measures its real width and animates once.
+ */
+function appendBullseyes(root, body, category) {
+  const charts = buildBloodsBullseyes(category.id, category.markers);
+  if (!charts.length) return;
+  const section = root.createElement('section');
+  section.className = 'bloods-bullseyes';
+  const head = root.createElement('p');
+  head.className = 'metric-caption bloods-bullseyes__head';
+  head.textContent = 'Closing in on the range · one ring per test, the range is the bullseye';
+  section.append(head);
+  const grid = root.createElement('div');
+  grid.className = 'bloods-bullseyes__grid';
+  for (const chart of charts) {
+    const figure = root.createElement('figure');
+    figure.className = 'bloods-bullseye';
+    figure.dataset.bloodsBullseye = chart.key;
+    const title = root.createElement('figcaption');
+    title.className = 'bloods-bullseye__title';
+    title.textContent = chart.label;
+    const host = root.createElement('div');
+    host.className = 'bloods-bullseye__chart';
+    figure.append(title, host);
+    grid.append(figure);
+    const mount = () => mountSceneChart(host, buildBullseyeRings, chart, { maxWidth: BULLSEYE_MAX_WIDTH });
+    const view = root.defaultView ?? globalThis;
+    if (typeof view.requestAnimationFrame === 'function') view.requestAnimationFrame(mount);
+    else mount();
+  }
+  section.append(grid);
+  body.append(section);
 }
 
 function hasTrend(marker) {
