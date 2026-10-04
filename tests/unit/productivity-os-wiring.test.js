@@ -8,7 +8,8 @@ import {
   composeDaySchedule,
   lessonToBusySpan,
   detectStaleScheduleCollisions,
-  buildAuthoritativeHardBusy
+  buildAuthoritativeHardBusy,
+  formatStaleScheduleCollisionMessage
 } from '../../netlify/functions/_shared/productivity-os.mjs';
 import { executeHammondProductivity } from '../../netlify/functions/_shared/hammond-productivity.mjs';
 import { executeClareWork, planWork } from '../../netlify/functions/_shared/clare-work.mjs';
@@ -107,6 +108,40 @@ describe('J: stale confirm detects new teaching collision', () => {
     assert.equal(check.ok, false);
     assert.equal(check.error, 'stale_schedule_collision');
     assert.match(check.conflicts[0].reason, /Collides/);
+  });
+
+  it('Adam screenshot: Korea 8:30–9:00 collides with a Monday lesson; 8:30 is inside the fallback workday', () => {
+    const workdayOk = detectStaleScheduleCollisions({
+      proposedBlocks: [{
+        temp_id: 'korea',
+        title: 'Korea itinerary',
+        date: '2026-10-05',
+        start_time: '08:30',
+        duration_minutes: 30,
+        selected: true
+      }],
+      hardBusy: [],
+      workday: { start: '08:00', end: '16:30' }
+    });
+    assert.equal(workdayOk.ok, true);
+
+    const vsLesson = detectStaleScheduleCollisions({
+      proposedBlocks: [{
+        temp_id: 'korea',
+        title: 'Korea itinerary',
+        date: '2026-10-05',
+        start_time: '08:30',
+        duration_minutes: 30,
+        selected: true
+      }],
+      hardBusy: buildAuthoritativeHardBusy({
+        date: '2026-10-05',
+        lessons: [{ title: 'Year 12 Advanced', date: '2026-10-05', start_time: '08:30', duration_minutes: 50 }]
+      })
+    });
+    assert.equal(vsLesson.ok, false);
+    assert.match(vsLesson.conflicts[0].reason, /Year 12 Advanced/);
+    assert.match(formatStaleScheduleCollisionMessage(vsLesson), /Year 12 Advanced/);
   });
 });
 
