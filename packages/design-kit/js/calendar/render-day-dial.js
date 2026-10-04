@@ -1228,13 +1228,24 @@ function mountSide(side) {
   const date = state.day;
   const ghosts = ghostsNow();
   mountBookmarkPrompt(side, date);
-  mountTransport(side, date);
-  mountMio(side, date);
   mountReviewEntry(side, date);
-  mountMedication(side, date);
+  // Agenda before Dexy / offers: on phone the side stacks under the dial, and Due
+  // tasks from a Clare dump must not sit below the medication panel.
+  const dayDue = (dayAt(date)?.due ?? [])
+    .filter(item => item.kind !== 'allday' && item.kind !== 'promise')
+    .map(item => ({ id: item.id, title: item.title, time: item.time, meta: item.meta, kind: item.kind }));
   if (date === input.today) {
     const plannedDinnerAt = dayAt(date)?.med?.evening?.rows?.find(row => row.at === MEDICATION.dinnerAt)?.at ?? null;
-    const brief = tonightBrief({ date, now: nowHour, chips: chipsFor(date), ghosts, logs: logsFor(date), profileSleep, plannedDinnerAt });
+    const brief = tonightBrief({
+      date,
+      now: nowHour,
+      chips: chipsFor(date),
+      due: dayDue,
+      ghosts,
+      logs: logsFor(date),
+      profileSleep,
+      plannedDinnerAt
+    });
     const section = el('section', '', undefined, side, { 'data-part': 'tonight' });
     el('h4', 'dd-h', 'Tonight', section);
     const by = brief.timeLeft.by ? ` (${escapeHtml(brief.timeLeft.by)})` : '';
@@ -1249,7 +1260,25 @@ function mountSide(side) {
         section, { 'data-part': 'overflow-note' });
     }
     renderRows(el('div', 'dd-rows', undefined, section), brief.rows, ghosts);
+  } else if (dayDue.length) {
+    // Browsing another day: timed work is on the ring; Due still needs a list (Week has one).
+    const section = el('section', '', undefined, side, { 'data-part': 'due' });
+    el('h4', 'dd-h', 'Due', section);
+    renderRows(el('div', 'dd-rows', undefined, section), dayDue.map(d => ({
+      at: 99,
+      time: 'Due',
+      title: d.title,
+      kind: 'task',
+      itemId: d.id,
+      note: d.meta || 'Tasks · open',
+      struck: false,
+      ghostId: null,
+      suggestion: null
+    })), ghosts);
   }
+  mountTransport(side, date);
+  mountMio(side, date);
+  mountMedication(side, date);
   const next = model.week[model.week.indexOf(date) + 1];
   if (!next) return;
   const nextDay = dayAt(next);
