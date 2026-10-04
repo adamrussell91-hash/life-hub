@@ -3,10 +3,8 @@
 .shelf-root,
 .descent,
 .shelf-sheet-backdrop {
-  --stance-supports: var(--wave);
-  --stance-complicates: var(--high-sea-ink);
-  --stance-extends: var(--pastel-sage-ink);
-  --stance-unknown: var(--shallow);
+  /* Kind colours come from kinds.ts as inline --m / --k / --t; this is only the unsorted fallback. */
+  --kind-unknown: var(--shallow);
 }
 
 .shelf-root {
@@ -255,7 +253,7 @@
   height: 2px;
   margin-top: -1px;
   border-radius: 1px;
-  background: var(--m, var(--stance-unknown));
+  background: var(--m, var(--kind-unknown));
   opacity: 0.85;
   pointer-events: none;
 }
@@ -577,7 +575,7 @@ body.is-bookshelf-immersive .local-banner {
   left: 5px;
   right: 5px;
   height: 2px;
-  background: var(--m, var(--stance-unknown));
+  background: var(--m, var(--kind-unknown));
 }
 
 .descent__bracket {
@@ -675,12 +673,12 @@ body.is-bookshelf-immersive .local-banner {
   height: 3px;
   margin-top: -1.5px;
   border-radius: 2px;
-  background: var(--m, var(--stance-unknown));
+  background: var(--m, var(--kind-unknown));
   z-index: 1;
 }
 
 .descent__tick--guess {
-  background: repeating-linear-gradient(90deg, var(--m, var(--stance-unknown)) 0 5px, transparent 5px 8px);
+  background: repeating-linear-gradient(90deg, var(--m, var(--kind-unknown)) 0 5px, transparent 5px 8px);
 }
 
 .descent__ruler {
@@ -753,7 +751,7 @@ body.is-bookshelf-immersive .local-banner {
   width: 10px;
   height: 3px;
   border-radius: 2px;
-  background: var(--m, var(--stance-unknown));
+  background: var(--m, var(--kind-unknown));
 }
 
 .descent-note.is-open {
@@ -777,6 +775,50 @@ body.is-bookshelf-immersive .local-banner {
 .descent-note__gaps {
   margin: 0 0 var(--space-3);
   padding-left: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.descent-note__kind {
+  margin: 0 0 var(--space-3);
+}
+
+.descent-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.descent-kinds .hub-pills__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 2.25rem;
+  padding: 0.25rem 0.65rem;
+}
+
+.descent-kinds .hub-pills__btn::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--k);
+}
+
+.descent-kinds .hub-pills__btn[aria-pressed="true"] {
+  border-color: var(--k);
+  background: color-mix(in srgb, var(--k) 12%, var(--paper));
+  color: var(--ink);
+}
+
+/* Claude's guess: picked, but dashed until Adam keeps it. */
+.descent-kinds .hub-pills__btn.is-guess {
+  border-style: dashed;
+}
+
+.descent-note__kind-hint {
+  margin: var(--space-1) 0 0;
   font-size: var(--text-xs);
   color: var(--muted);
 }
@@ -1029,7 +1071,7 @@ body.is-bookshelf-immersive .local-banner {
   top: 6px;
   bottom: 6px;
   width: 2px;
-  background: var(--m, var(--stance-unknown));
+  background: var(--m, var(--kind-unknown));
   opacity: 0.6;
 }
 
@@ -1202,6 +1244,8 @@ body.is-bookshelf-immersive .local-banner {
 /* Phone descent is an in-flow list: chapter dividers, notes in page order. */
 .descent-list {
   display: grid;
+  /* One column the phone's width: an auto track grew to the longest unbroken title and pushed cards off screen. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
 }
 
@@ -1225,6 +1269,7 @@ body.is-bookshelf-immersive .local-banner {
 
 .descent-list__exits {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   padding: 0 var(--space-3) var(--space-3);
 }
@@ -1234,6 +1279,8 @@ body.is-bookshelf-immersive .local-banner {
   top: auto;
   height: auto;
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1537,10 +1584,8 @@ body.is-bookshelf-immersive .local-banner {
   box-shadow: 0 0 0 2px var(--paper);
 }
 
-/* Each stance its own shape, not just its own dark colour: a city, a diamond, an unsurveyed ring. */
-.atlas-town--supports { --t: var(--navy); }
-.atlas-town--extends { --t: #4f8a69; }
-.atlas-town--extends > i {
+/* Each kind its colour (inline --t from kinds.ts); bridges also get a diamond, debates a peak, unsorted a ring. */
+.atlas-town--bridge > i {
   border-radius: 2px;
   transform: rotate(45deg) scale(0.92);
 }
@@ -1551,7 +1596,6 @@ body.is-bookshelf-immersive .local-banner {
 
 .atlas-town--peak > i {
   border-radius: 0;
-  background: var(--high-sea-ink);
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
   box-shadow: none;
   transform: scale(1.35);
@@ -1666,10 +1710,9 @@ body.is-bookshelf-immersive .local-banner {
   border-radius: 50%;
 }
 
-.atlas-key--supports { background: var(--navy); }
-.atlas-key--extends { background: #4f8a69; border-radius: 1px; transform: rotate(45deg) scale(0.85); }
+.atlas-key--bridge { border-radius: 1px; transform: rotate(45deg) scale(0.85); }
 .atlas-key--unread { background: var(--paper); box-shadow: inset 0 0 0 2px var(--orca); }
-.atlas-key--peak { border-radius: 0; background: var(--high-sea-ink); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.atlas-key--peak { border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 .atlas-key--road { height: 0; border-top: 2px dashed var(--navy); border-radius: 0; }
 .atlas-key--fog { background: var(--shore); box-shadow: inset 0 0 0 1px var(--line); }
 .atlas-key--new { background: var(--navy); outline: 2px solid var(--high-sea); outline-offset: 2px; width: 8px; height: 8px; }
@@ -1716,13 +1759,9 @@ body.is-bookshelf-immersive .local-banner {
   font-size: var(--text-lg);
 }
 
-.atlas__stance {
+.atlas__kind {
   font-weight: 600;
 }
-
-.atlas__stance--supports { color: var(--wave) !important; }
-.atlas__stance--complicates { color: var(--high-sea-ink) !important; }
-.atlas__stance--extends { color: var(--pastel-sage-ink) !important; }
 
 .atlas__themes {
   display: flex;
@@ -2205,20 +2244,20 @@ body.is-bookshelf-immersive .local-banner {
   font-size: var(--text-sm);
 }
 
-.isles-card__stance {
+.isles-card__kinds {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
   font-size: var(--text-xs);
 }
 
-.isles-card__stance span {
+.isles-card__kinds span {
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
 
-.isles-card__stance span::before {
+.isles-card__kinds span::before {
   content: "";
   width: 8px;
   height: 8px;

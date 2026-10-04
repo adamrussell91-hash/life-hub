@@ -1,7 +1,7 @@
 import type { PageManifestEntry } from "../domain/page";
 import { coverEntry, coverSrc } from "./covers";
 import { BOOK_PALETTE, bookSwatch, type BookSwatch } from "./palette";
-import type { Chapter, Placement, ShelfBook, ShelfData, ShelfKind, ShelfStance } from "./schema";
+import type { Chapter, KindBy, Placement, ShelfBook, ShelfData, ShelfKind } from "./schema";
 import { ShelfKindSchema } from "./schema";
 
 /** Page count assumed for a book whose facts have not been filled in yet. */
@@ -16,9 +16,10 @@ export type BookNote = {
   createdAt?: string;
   page?: number;
   guessed: boolean;
-  stance?: ShelfStance;
   kind?: ShelfKind;
   kindGuessed?: boolean;
+  kindBy?: KindBy;
+  kindReason?: string;
   gaps: string[];
   themes: string[];
   lastOpened?: string;
@@ -118,18 +119,6 @@ function section(body: string, heading: RegExp): string {
   return sectionText(body, heading);
 }
 
-/** Reads the stance from a book note's "How this bears on the book" section. */
-export function stanceFromBody(body: string): ShelfStance | undefined {
-  // The prompt asks for an explicit "Verdict: supports" line; trust it over prose.
-  const verdict = body.match(/^[\s>*_-]*verdict\s*[:：]?\s*\**\s*(supports?|complicates?|extends?)\b/im);
-  const text = verdict ? verdict[1]!.toLowerCase() : section(body, /how this bears/i).toLowerCase();
-  const hit = text.match(/\b(supports?|complicates?|extends?)\b/);
-  if (!hit) return undefined;
-  if (hit[1]!.startsWith("support")) return "supports";
-  if (hit[1]!.startsWith("complicat")) return "complicates";
-  return "extends";
-}
-
 /** Reads an explicit `Kind:` line. No prose fallback — missing line means undefined. */
 export function kindFromBody(body: string): ShelfKind | undefined {
   const hit = body.match(/^[\s>*_-]*\**\s*kind\s*[:：]\s*\**\s*(person|idea|case|debate|bridge)\b/im);
@@ -165,9 +154,10 @@ function toNote(entry: PageManifestEntry, placement?: Placement): BookNote {
     createdAt: entry.created_at,
     page: placement?.page,
     guessed: Boolean(placement?.guessed),
-    stance: placement?.stance,
     kind: placement?.kind,
     kindGuessed: placement?.kindGuessed,
+    kindBy: placement?.kindBy,
+    kindReason: placement?.kindReason,
     gaps: placement?.gaps ?? [],
     themes: placement?.themes ?? [],
     lastOpened: placement?.lastOpened,

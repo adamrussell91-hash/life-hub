@@ -60,9 +60,10 @@ When the mode is `broadcast`, every note supplied is a reader's note on one book
 The mode dials carry `order`: one line per note, `pageId | segment | page`. Follow that running order. The segments are:
 
 - **cold-open**: one striking idea from the book, stated as a hook. No welcome speech.
-- **feature**: notes where the reader found the book convincing. Explain the idea and why it holds.
-- **counterpoint**: notes where the reader pushed back or found the book complicated. This is where the friction lives; Ann takes the reader's side against the book, and the disagreement dial sets how hard.
-- **extends**: notes where the reader took the book further than it goes. Follow the reader's extension, and say where the book stops.
+- **feature**: idea notes, explaining a concept, term or mechanism from the book. Explain the idea and why it matters to the book's argument.
+- **backstory**: person and case notes: who someone is, or a specific event, study or example the book leans on. Tell it as a short story, then tie it back to the book.
+- **counterpoint**: debate notes, where the knowledge isn't settled: rival accounts, a correction of a popular version, or an open question. This is where the friction lives; Ann takes the side the book underplays, and the disagreement dial sets how hard.
+- **extends**: bridge notes, where the reader carried the idea out of the book into teaching, learning or another field. Say what changes in practice, and where the book itself stops.
 - **crosstalk**: notes that tie this book to other books or ideas. Name the other idea in a spoken handle.
 - **phone-in**: questions the reader left open. Put each to each other as a caller's question, and do not pretend to settle what the notes leave open.
 
