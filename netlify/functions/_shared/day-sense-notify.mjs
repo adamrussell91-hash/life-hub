@@ -83,7 +83,7 @@ export function decideNotifications({ today, nowHour, med, schoolDay, leave, rev
       key: 'checkin',
       title: 'How are you starting today?',
       body: 'A few taps to tune today’s capacity forecast. Skip any time.',
-      url: '/#/calendar/day?checkin=1'
+      url: '/#/home?checkin=1'
     });
   }
   if (schoolDay && !reviewDone && nowHour >= leave && nowHour < leave + REVIEW_WINDOW_H && unsent('review')) {

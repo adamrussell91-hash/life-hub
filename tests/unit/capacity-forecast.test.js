@@ -34,7 +34,7 @@ import {
 import { decideNotifications } from '../../netlify/functions/_shared/day-sense-notify.mjs';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { buildTidelineModel } from '../../packages/design-kit/js/calendar/tideline-model.js';
-import { mountReadinessPanel, resetReadinessPanel, todayForecast } from '../../packages/design-kit/js/calendar/readiness-panel.js';
+import { mountCheckinCard, mountReadinessPanel, resetReadinessPanel, todayForecast } from '../../packages/design-kit/js/calendar/readiness-panel.js';
 import { resetCheckins, withCheckins, recordObservation, checkinState, loadCheckins } from '../../packages/design-kit/js/calendar/readiness-checkins.js';
 import { checkinEvents, priorWorkload } from '../../packages/design-kit/js/calendar/readiness-model.js';
 import { capacityForDates } from '../../apps/life/js/app/capacity-model.js';
@@ -289,7 +289,7 @@ test('helpers: answers validation, liveness and the Central Node line', () => {
 test('7 am nudge: only without a check-in, in its window, once', () => {
   const base = { today: DATE, med: null, schoolDay: true, leave: 16.75, reviewDone: false, log: { sent: {} } };
   assert.deepEqual(decideNotifications({ ...base, nowHour: 7.1, checkinDone: false }).map(m => m.key), ['checkin']);
-  assert.equal(decideNotifications({ ...base, nowHour: 7.1, checkinDone: false })[0].url, '/#/calendar/day?checkin=1');
+  assert.equal(decideNotifications({ ...base, nowHour: 7.1, checkinDone: false })[0].url, '/#/home?checkin=1');
   assert.deepEqual(decideNotifications({ ...base, nowHour: 7.1, checkinDone: true }), []);
   assert.deepEqual(decideNotifications({ ...base, nowHour: 10, checkinDone: false }), []);
   assert.deepEqual(decideNotifications({ ...base, nowHour: 7.1, checkinDone: false, log: { sent: { checkin: 'x' } } }), []);
@@ -355,7 +355,7 @@ test('yesterday’s workload: tracked sessions are actual, classes and meetings 
   assert.deepEqual(meeting, { hours: 1.3, source: 'scheduled' }, 'meetings count at 0.65 of a class hour; cancelled ones not at all');
 });
 
-test('panel: forecast, chart, windows and bubbles render; bubbles start unpicked; saving posts the snapshot first', async () => {
+test('panel: forecast, chart and windows render in Day; the bubbles render on Home, start unpicked, and saving posts the snapshot first', async () => {
   resetReadinessPanel();
   resetCheckins();
   const window = new Window({ url: 'https://life.example/' });
@@ -383,8 +383,16 @@ test('panel: forecast, chart, windows and bubbles render; bubbles start unpicked
   assert.ok(side.querySelector('[data-part="readiness-why"]').textContent.length > 20);
   assert.ok(side.querySelector('svg.rf-chart path.rf-band'));
   assert.ok(side.querySelector('.rf-icon svg title'));
-  const form = side.querySelector('[data-part="checkin"]');
-  assert.ok(form, 'bubbles show in the morning window');
+  assert.equal(side.querySelector('[data-part="checkin"]'), null, 'no bubbles in the Day view');
+  assert.match(side.querySelector('[data-part="checkin-status"]').textContent, /Check in on Home/);
+  assert.equal(side.querySelector('[data-part="checkin-status"] a').getAttribute('href'), '#/home');
+  const home = doc.createElement('div');
+  doc.body.append(home);
+  const paintHome = () => { home.replaceChildren(); return mountCheckinCard(ctx, home); };
+  paintHome();
+  assert.match(home.querySelector('[data-part="home-forecast"]').textContent, /^Forecast \d+\/100 · /);
+  const form = home.querySelector('[data-part="checkin"]');
+  assert.ok(form, 'bubbles show on Home in the morning window');
   assert.equal(form.querySelectorAll('.rf-bubble[aria-pressed="true"]').length, 0, 'nothing preselected');
   assert.equal(form.querySelector('[data-checkin-save]').disabled, true);
   form.querySelector('[data-q="overall"] .rf-bubble[data-code="limited"]').click();
@@ -396,9 +404,10 @@ test('panel: forecast, chart, windows and bubbles render; bubbles start unpicked
   await new Promise(r => setTimeout(r, 0));
   const observe = calls.find(c => c.body?.action === 'observe');
   assert.deepEqual(observe.body.answers, { overall: 'limited' });
-  paint();
-  assert.ok(side.querySelector('[data-part="checkin-reason"]'), 'a big gap asks what we missed');
-  assert.match(side.querySelector('[data-part="checkin-reason"]').textContent, /already saved/);
+  paintHome();
+  assert.ok(home.querySelector('[data-part="checkin-reason"]'), 'a big gap asks what we missed');
+  assert.match(home.querySelector('[data-part="checkin-reason"]').textContent, /already saved/);
+  assert.equal(calls.filter(c => c.body?.action === 'snapshot').length, 1, 'Home and Day share one issued forecast');
   await window.happyDOM.close();
   resetReadinessPanel();
   resetCheckins();

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v200';
+const CACHE_NAME = 'life-hub-shell-v201';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -45,6 +45,7 @@ const SHELL_FILES = [
   'packages/design-kit/js/dial-geometry.js',
   'packages/design-kit/js/time-grid.js',
   'js/app/main.js',
+  'js/app/heal-shell-styles.js',
   'js/app/api-session.js',
   'js/app/app-controller.js',
   'js/app/agent-avatars.js',
@@ -212,6 +213,7 @@ const SHELL_FILES = [
   'packages/design-kit/js/calendar/readiness-model.js',
   'packages/design-kit/js/calendar/morning-bubbles.js',
   'packages/design-kit/js/calendar/readiness-panel.js',
+  'packages/design-kit/js/calendar/home-checkin.js',
   'packages/design-kit/js/calendar/readiness-checkins.js',
   'packages/design-kit/js/calendar/weather-icons.js',
   'packages/design-kit/js/push-client.js',
@@ -334,7 +336,9 @@ const INDEX_PATH = SCOPE_PATH + 'index.html';
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE_URLS))
+      // One file at a time: a single 404 (capture-inbox.html, 2–6 Oct) failed addAll,
+      // so no new worker ever installed and phones kept a stale shell.
+      .then(cache => Promise.allSettled(PRECACHE_URLS.map(url => cache.add(url))))
       .then(() => self.skipWaiting())
   );
 });
