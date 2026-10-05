@@ -17,6 +17,16 @@ function indexPrefix(owner) {
   return `${PREFIX}/${encodeURIComponent(owner)}/index/`;
 }
 
+function metaKey(owner, name) {
+  return `${PREFIX}/${encodeURIComponent(owner)}/_ops/${name}.json`;
+}
+
+export const INCOMPLETE_PROTOCOL_PURGE_MARKER = 'purged-incomplete-2026-10-05';
+
+export function isIncompleteProtocolRun(status) {
+  return status !== 'completed';
+}
+
 function etagOf(value) {
   return `"${randomUUID()}"`;
 }
@@ -40,6 +50,7 @@ export function sessionIndexRow(value) {
 
 export function createMemoryCognitiveStore() {
   const rows = new Map();
+  const meta = new Map();
   return {
     async read(owner, id) {
       const row = rows.get(keyFor(owner, id));
@@ -55,13 +66,20 @@ export function createMemoryCognitiveStore() {
     },
     async list(owner, limit = 1000, offset = 0) {
       return [...rows.entries()]
-        .filter(([key]) => key.startsWith(`${PREFIX}/${encodeURIComponent(owner)}/`) && !key.includes('/index/'))
+        .filter(([key]) => key.startsWith(`${PREFIX}/${encodeURIComponent(owner)}/`) && !key.includes('/index/') && !key.includes('/_ops/'))
         .map(([, row]) => ({ value: structuredClone(row.value), etag: row.etag }))
         .sort((a, b) => String(b.value.updatedAt).localeCompare(String(a.value.updatedAt)))
         .slice(offset, offset + limit);
     },
     async delete(owner, id) {
       rows.delete(keyFor(owner, id));
+    },
+    async getMeta(owner, name) {
+      const row = meta.get(metaKey(owner, name));
+      return row ? structuredClone(row) : null;
+    },
+    async setMeta(owner, name, value) {
+      meta.set(metaKey(owner, name), structuredClone(value));
     }
   };
 }
@@ -132,6 +150,23 @@ export function createR2CognitiveStore({ client, bucket, encryptionSecret = '' }
       // Index rows are deleted with the session so the Past runs list cannot retain orphans.
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: keyFor(owner, id) }));
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: indexKeyFor(owner, id) }));
+    },
+    async getMeta(owner, name) {
+      try {
+        const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: metaKey(owner, name) }));
+        return decrypt(await bodyText(result.Body), encryptionSecret);
+      } catch (error) {
+        if (error?.$metadata?.httpStatusCode === 404 || error?.name === 'NoSuchKey') return null;
+        throw error;
+      }
+    },
+    async setMeta(owner, name, value) {
+      await client.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: metaKey(owner, name),
+        Body: encrypt(value, encryptionSecret),
+        ContentType: 'application/json'
+      }));
     },
     async list(owner, limit = 1000, offset = 0) {
       // Past runs list from encrypted per-session index objects under .../<owner>/index/.

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { act, advance, createSession, fault, publicSession } from './cognitive-controller.mjs';
+import { INCOMPLETE_PROTOCOL_PURGE_MARKER, isIncompleteProtocolRun } from './cognitive-store.mjs';
 import { summariseCompletedSession, writeBackRetryable, writeProtocolCentralNodeLines } from './cognitive-writeback.mjs';
 import { getSydneyDateKey } from '../../../apps/life/js/core/time.js';
 import {
@@ -141,6 +142,30 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now,
         title: value.summary?.title || value.title || value.intake?.task || value.intake?.focus || value.intake?.claim || value.protocolId,
         summary: value.summary || (typeof value.summary === 'string' ? value.summary : null) || null
       }));
+    },
+    async purgeIncomplete(owner) {
+      const rows = await store.list(owner, 5000, 0);
+      const deleted = [];
+      for (const { value } of rows) {
+        if (!isIncompleteProtocolRun(value.status)) continue;
+        await store.delete(owner, value.id);
+        deleted.push({ id: value.id, status: value.status, protocolId: value.protocolId });
+      }
+      return { deleted, kept: rows.length - deleted.length };
+    },
+    async purgeIncompleteOnce(owner) {
+      if (typeof store.getMeta !== 'function' || typeof store.setMeta !== 'function') {
+        return this.purgeIncomplete(owner);
+      }
+      const marker = await store.getMeta(owner, INCOMPLETE_PROTOCOL_PURGE_MARKER);
+      if (marker) return { skipped: true, deleted: [], kept: null, marker };
+      const result = await this.purgeIncomplete(owner);
+      await store.setMeta(owner, INCOMPLETE_PROTOCOL_PURGE_MARKER, {
+        at: new Date(now()).toISOString(),
+        deleted: result.deleted.length,
+        kept: result.kept
+      });
+      return result;
     },
     async action(owner, input) {
       const row = await read(owner, input.sessionId);

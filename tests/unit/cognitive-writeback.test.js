@@ -149,6 +149,8 @@ test('forHammond clamps to the last full sentence or clause under 30 words', () 
 test('parseListPaging falls back and clamps', async () => {
   const { parseListPaging } = await import('../../netlify/functions/knowledge-protocols.mjs');
   assert.deepEqual(parseListPaging(new URL('https://x.test/api?limit=abc&offset=no')), { limit: 100, offset: 0 });
+  assert.deepEqual(parseListPaging(new URL('https://x.test/api')), { limit: 100, offset: 0 });
+  assert.deepEqual(parseListPaging(new URL('https://x.test/api?limit=0')), { limit: 100, offset: 0 });
   assert.deepEqual(parseListPaging(new URL('https://x.test/api?limit=500&offset=-3')), { limit: 200, offset: 0 });
   assert.deepEqual(parseListPaging(new URL('https://x.test/api?limit=12&offset=4')), { limit: 12, offset: 4 });
 });
