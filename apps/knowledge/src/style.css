@@ -5467,6 +5467,60 @@ body.is-universe-saver .graph-canvas {
   flex-wrap: wrap;
 }
 
+.neural-dock__grow + .neural-dock__segments {
+  margin-top: var(--space-2);
+}
+
+.neural-dock__steps button:has(small) {
+  display: block;
+}
+
+.neural-dock__steps button small {
+  display: block;
+  font-size: 11px;
+  opacity: 0.65;
+}
+
+.neural-dock__steps button.is-forgotten small {
+  color: #c25a14;
+  opacity: 1;
+}
+
+.neural-dock__spark {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.neural-dock__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 500 13px/1.2 Inter, ui-sans-serif, sans-serif;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.9);
+  color: #13233a;
+}
+
+.neural-dock__walking {
+  margin: 2px 0 var(--space-2);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.35;
+  min-height: 1.35em;
+  overflow-wrap: break-word;
+}
+
+.graph-wrap.is-neural .neural-dock__input {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #f4efe6;
+}
+
+.graph-wrap.is-neural .neural-dock__steps button.is-forgotten small {
+  color: #ffb070;
+}
+
 .graph-wrap.is-neural .neural-dock__row button,
 .graph-wrap.is-neural .neural-dock__panel button:not(.neural-dock__quiet) {
   background: rgba(20, 26, 40, 0.82);

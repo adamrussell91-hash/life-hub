@@ -2,14 +2,15 @@
  * The neural map's tool row: one short word per tool, one small panel at a time.
  * Pure DOM; the graph owns what each tool does.
  */
-export type DockTool = "grow" | "path" | "recent" | "walk" | "bridges" | "save" | "export";
+export type DockTool = "spark" | "grow" | "path" | "recent" | "walk" | "bridges" | "save" | "export";
 
 export const DOCK_TOOLS: ReadonlyArray<{ id: DockTool; label: string; hint: string }> = [
+  { id: "spark", label: "Spark", hint: "Drop a thought in and watch your notes answer" },
   { id: "grow", label: "Grow", hint: "Replay your notes in the order you wrote them" },
-  { id: "path", label: "Path", hint: "Pick two notes to see how they connect" },
+  { id: "path", label: "Path", hint: "Pick two notes and watch a signal run between them" },
   { id: "recent", label: "Recent", hint: "Light up what you wrote lately" },
-  { id: "walk", label: "Walk", hint: "Drift from note to linked note" },
-  { id: "bridges", label: "Bridges", hint: "Notes that join topics, and topics that never meet" },
+  { id: "walk", label: "Walk", hint: "Ride a slow signal from note to linked note" },
+  { id: "bridges", label: "Bridges", hint: "The notes that tie your topics together, and the gaps between them" },
   { id: "save", label: "Save", hint: "Save or return to a view" },
   { id: "export", label: "Export", hint: "Download this view as an image" },
 ];
@@ -115,6 +116,31 @@ export function readSavedViews(store: Pick<Storage, "getItem"> | null = storage(
 export function writeSavedViews(views: SavedView[], store: Pick<Storage, "setItem"> | null = storage()) {
   try {
     store?.setItem(VIEWS_KEY, JSON.stringify(views.slice(0, 8)));
+  } catch {
+    /* not remembered */
+  }
+}
+
+/** Whole-replay lengths for Grow: normal, half and quarter speed. */
+export const GROW_SPEEDS = [
+  { label: "1×", ms: 16000 },
+  { label: "½×", ms: 32000 },
+  { label: "¼×", ms: 64000 },
+] as const;
+const GROW_SPEED_KEY = "kh.showAll.growMs";
+
+export function readGrowSpeed(store: Pick<Storage, "getItem"> | null = storage()): number {
+  try {
+    const ms = Number(store?.getItem(GROW_SPEED_KEY));
+    return GROW_SPEEDS.some(speed => speed.ms === ms) ? ms : GROW_SPEEDS[0].ms;
+  } catch {
+    return GROW_SPEEDS[0].ms;
+  }
+}
+
+export function writeGrowSpeed(ms: number, store: Pick<Storage, "setItem"> | null = storage()) {
+  try {
+    store?.setItem(GROW_SPEED_KEY, String(ms));
   } catch {
     /* not remembered */
   }
