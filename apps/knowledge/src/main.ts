@@ -1795,6 +1795,7 @@ function renderCompose(state: ComposeState) {
         `<button class="btn btn--ghost reader__back" data-compose-cancel type="button">← Cancel</button>`,
       )}
       ${USE_LOCAL_DATA ? `<p class="local-banner">Saving and capture need the live API (npx netlify dev).</p>` : ""}
+      <div class="compose__scroll">
       <div class="compose__field">
         <label for="compose-title">Title</label>
         <input id="compose-title" value="${escapeHtml(state.title)}" />
@@ -1830,7 +1831,8 @@ function renderCompose(state: ComposeState) {
         <input id="compose-files" type="file" multiple />
       </div>
       <div id="compose-relationships-host"></div>
-      <div class="compose__savebar">
+      </div>
+      <div class="compose__savebar" data-part="form-actions">
         <button class="btn btn--primary compose__save" data-compose-save type="button" ${
           USE_LOCAL_DATA || state.busy || captureBusy ? "disabled" : ""
         }>${state.busy ? "Saving…" : "Save"}</button>
