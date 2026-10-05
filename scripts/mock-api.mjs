@@ -33,6 +33,7 @@ import { GitHubClientError } from '../netlify/functions/_shared/github-client.mj
 import { taskKey, TASKS_INDEX_KEY } from '../netlify/functions/_shared/tasks-blobs.mjs';
 import { DEFAULT_PLANNING_PROFILE } from '../netlify/functions/planning-profile.mjs';
 import { capacityCheckinsRoute } from '../netlify/functions/capacity-checkins.mjs';
+import { readinessInsightsRoute } from '../netlify/functions/readiness-insights.mjs';
 
 const PASSPHRASE = 'life-hub-local';
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
@@ -728,6 +729,26 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       const result = await route(new Request(new URL(url.pathname + url.search, 'http://localhost'), { method: request.method, headers: { 'content-type': 'application/json' }, body }), { env: {}, store });
       const payload = await result.json();
       json(response, result.status, payload, PRIVATE_HEADERS);
+      return true;
+    }
+
+    if (url.pathname === '/api/readiness-insights') {
+      // Real logic over the fixture repo and in-memory task store.
+      if (!readSession(request)) return unauthenticated(response);
+      const store = {
+        async get(key) { return taskData.has(key) ? structuredClone(taskData.get(key)) : null; },
+        async setJSON(key, value) { taskData.set(key, structuredClone(value)); },
+        async list({ prefix } = {}) { return { blobs: [...taskData.keys()].filter(k => k.startsWith(prefix ?? '')).map(key => ({ key })) }; }
+      };
+      const route = readinessInsightsRoute({
+        now: () => new Date(clock.now()),
+        openRepo,
+        loadLessons: async () => [],
+        loadMeetings: async () => []
+      });
+      const body = request.method === 'POST' ? JSON.stringify(await readJson(request)) : undefined;
+      const result = await route(new Request(new URL(url.pathname, 'http://localhost'), { method: request.method, headers: { 'content-type': 'application/json' }, body }), { env: {}, store });
+      json(response, result.status, await result.json(), PRIVATE_HEADERS);
       return true;
     }
 

@@ -79,3 +79,35 @@ To retune the colours, edit `FAMILIES` in the build script and re-run it. Every 
 - The weights are the comparison prototype's design weights. They have not been fitted or evaluated. The band is illustrative, not calibrated. Prospective evaluation and chronological holdouts (see `algorithm.md`) still need to be built from the stored snapshot and observation pairs once enough mornings exist.
 - No predicted Corey/social lift yet. The weather and explanation code supports one (`lifts`, state 7), but nothing in the stored data supports it yet, so none is shown.
 - `tests/browser/dial-visual.spec.mjs` (in `DIAL_APP=1` mode) and the calendar reference mock-ups still quote the old fixture values (34% Thursday). The fixture day now reads 51 by design. That spec is not in the default browser run, and its header says not to edit it, so this is flagged in the PR instead.
+
+## Agent insights (offer first, Adam decides)
+
+Patterns between capacity and the rest of life are worked out deterministically (no AI, no daily agent job) and cached for the Life agents. Agents only ever **offer** one. The finding reaches an agent only after Adam says yes, or when he asks outright ("any insights?", "noticed any patterns?").
+
+| Insight | Agent | Minimum evidence |
+|---|---|---|
+| Food on lower-energy days (takeaway/fast food, eating after 9 pm, very high-fat meals) | Brisket | 5+ low days with meals logged, 3+ hits, low-day rate ≥25 points above other days |
+| Poor or short sleep this week | Sara | 3+ poor nights in 7 |
+| Low mood this week | Penelope, Vera | 3+ low days in 7 |
+| Recovery after hard training / lingering soreness | Chadwick | 4+ sessions and an 8+ point gap, or 3+ soreness answers in 14 days |
+| Capacity this week vs last | Hammond | 4+ computed days each week, an 8+ point change (or a week under 60) |
+
+"Low days" are Adam's own bottom third, and below his median, using the same capacity number the calendar shows. A flat month has none. Deleted check-ins never count.
+
+**Files.**
+- `packages/design-kit/js/calendar/readiness-insights.js` finds the patterns.
+- `netlify/functions/_shared/readiness-insight-turn.mjs` handles offer and consent.
+- `netlify/functions/readiness-insights.mjs` (`/api/readiness-insights`) refreshes, lists topics and holds the off switch.
+- `netlify/functions/chat.mjs` adds the block to the agent's evidence.
+
+**When insights refresh.** In the background after each check-in. Saving the check-in never waits for this.
+
+**What agents see when offering.**
+- The topic only, e.g. "what you eat on your lower-energy days". The finding text never enters the prompt before a yes, and GET never returns it.
+- If Adam replies yes within 3 hours, the agent shares the finding as a pattern, not a cause or judgement, with no shaming. "No" quiets that insight for 30 days.
+- Each insight is offered at most once a week. An unanswered offer isn't repeated.
+- Agents are told to skip the offer if Adam is upset or busy.
+
+**Off switch.** "What's behind this" in the Day forecast → "Agents can offer insights … Turn off".
+
+**Privacy.** Everything stays in the private tasks store. Central Node still gets only the daily check-in line.

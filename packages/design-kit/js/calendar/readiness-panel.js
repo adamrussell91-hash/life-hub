@@ -23,6 +23,9 @@ import { weatherIconSvg } from './weather-icons.js';
 import { checkinState, loadCheckins, onCheckinsChange, recordObservation, recordSnapshot } from './readiness-checkins.js';
 
 const API = '/api/capacity-checkins';
+const INSIGHTS_API = '/api/readiness-insights';
+/** Adam's off switch for agent insights: { status, enabled }. Loaded once per session. */
+const insightSetting = { status: 'idle', enabled: true };
 const NS = 'http://www.w3.org/2000/svg';
 
 /** date → { status, payload, error, picks, notes, open, skipped, saving, reason, detail } */
@@ -40,6 +43,8 @@ function slot(date) {
 /** Test seam and unmount: forget everything. */
 export function resetReadinessPanel() {
   days.clear();
+  insightSetting.status = 'idle';
+  insightSetting.enabled = true;
   repaint = () => {};
   unsubPanel?.();
   unsubPanel = null;
@@ -253,6 +258,7 @@ export function mountReadinessPanel(ctx) {
     h(doc, 'li', '', `<span>${esc(c.label)}</span><span class="rf-src">${esc(c.source)}</span><b>${sign}</b>`, list);
   }
   h(doc, 'p', 'rf-foot', `Provisional model (${esc(r.modelVersion)}). The shaded band is an honest guess at uncertainty, not a calibrated interval. 100 means full capacity.`, why);
+  mountInsightSetting(ctx, why);
 
   mountCheckin(ctx, section, { s, last, pre, view });
   return section;
@@ -296,6 +302,41 @@ function paintDetail(doc, section, view, s) {
   ].filter(Boolean);
   const box = h(doc, 'div', 'rf-detail', `<b>${esc(clock(seg.from))}–${esc(clock(Math.min(seg.to, 23)))} · ${esc(meta.name)}</b>${lines.map(l => `<span>${l}</span>`).join('')}`, null, { 'data-part': 'rf-detail', role: 'status' });
   section.querySelector('.rf-windows')?.after(box);
+}
+
+/* ======================================================================== Insight setting */
+
+function mountInsightSetting(ctx, parent) {
+  const { doc } = ctx;
+  if (typeof ctx.apiFetch !== 'function') return;
+  if (insightSetting.status === 'idle') {
+    insightSetting.status = 'loading';
+    void (async () => {
+      try {
+        const response = await ctx.apiFetch(INSIGHTS_API);
+        const payload = await response.json().catch(() => null);
+        if (response.ok && payload?.ok !== false) insightSetting.enabled = (payload?.data ?? payload)?.enabled !== false;
+        insightSetting.status = 'ready';
+      } catch {
+        insightSetting.status = 'error';
+      }
+      repaint();
+    })();
+  }
+  if (insightSetting.status !== 'ready') return;
+  const row = h(doc, 'p', 'rf-foot rf-insight-setting', `Agents can offer insights from these patterns (you choose whether to hear them): <b>${insightSetting.enabled ? 'on' : 'off'}</b>. `, parent, { 'data-part': 'insight-setting' });
+  const toggle = h(doc, 'button', 'dd-link', insightSetting.enabled ? 'Turn off' : 'Turn on', row, { type: 'button' });
+  on(toggle, 'click', async () => {
+    const next = !insightSetting.enabled;
+    toggle.disabled = true;
+    try {
+      const response = await ctx.apiFetch(INSIGHTS_API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'settings', enabled: next }) });
+      if (response.ok) insightSetting.enabled = next;
+    } catch {
+      /* unchanged */
+    }
+    repaint();
+  });
 }
 
 /* ======================================================================== Check-in */
@@ -399,6 +440,8 @@ async function saveCheckin(ctx, s, questions, last, pre, card, save) {
     const obs = data.observation;
     if (data.snapshot) recordSnapshot(data.snapshot);
     recordObservation(obs); // every view repaints with the same new number
+    // Patterns for the agents to offer: recomputed in the background, never blocks the save.
+    void ctx.apiFetch?.(INSIGHTS_API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'refresh' }) })?.catch?.(() => {});
     s.open = false;
     s.picks = {};
     s.other = {};

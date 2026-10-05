@@ -43,6 +43,8 @@ import {
 } from './_shared/load-hub-protocols.mjs';
 import { activationForTurn, classifyIntent } from './_shared/capabilities/activation-policy.mjs';
 import { runSurfaceAgentTurn } from './_shared/agent-surface.mjs';
+import { insightTurn, insightsFor } from './_shared/readiness-insight-turn.mjs';
+import { INSIGHTS_KEY, INSIGHT_STATE_KEY, insightsEnabled } from './readiness-insights.mjs';
 import { proposeAction } from './_shared/agent-kernel.mjs';
 import {
   AGENT_TURNS_PATH,
@@ -236,7 +238,8 @@ import {
   TASK_PREFIX,
   defaultGetTasksStore,
   listJSON as listTasksJSON,
-  getJSON as getTasksJSON
+  getJSON as getTasksJSON,
+  setJSON as setTasksJSON
 } from './_shared/tasks-blobs.mjs';
 import {
   CLASS_PREFIX,
@@ -1694,6 +1697,27 @@ export function createChatHandler({
           flag: parsed.agentKernel
         });
         const evidencePack = surfaceTurn.pack;
+        // Readiness insights: offered first, revealed only after Adam says yes.
+        let insightBlock = '';
+        try {
+          const insightStore = await getTasksStore(env);
+          const insightDoc = await getTasksJSON(insightStore, INSIGHTS_KEY).catch(() => null);
+          if (insightsFor(slug, insightDoc?.insights).length) {
+            const insightState = (await getTasksJSON(insightStore, INSIGHT_STATE_KEY).catch(() => null)) ?? {};
+            const turn = insightTurn({
+              slug,
+              message: parsed.message,
+              insights: insightDoc.insights,
+              state: insightState,
+              now: nowInstant,
+              enabled: await insightsEnabled(insightStore)
+            });
+            insightBlock = turn.promptBlock;
+            if (turn.event) await setTasksJSON(insightStore, INSIGHT_STATE_KEY, turn.state);
+          }
+        } catch {
+          insightBlock = '';
+        }
         if (surfaceTurn.enabled && surfaceTurn.kernel?.plan?.workflow !== 'none') {
           tools = surfaceTurn.tools;
         }
@@ -1793,7 +1817,7 @@ export function createChatHandler({
           activationDirective: activation.activationBlock,
           visualIntelligenceBlock: sharedVisualIntelligenceBlock(),
           agentVisualCueBlock: agentVisualCueBlock(slug),
-          evidencePackBlock: surfaceTurn.promptBlock,
+          evidencePackBlock: [surfaceTurn.promptBlock, insightBlock].filter(Boolean).join('\n\n'),
           kernelBlock: surfaceTurn.interpretationBlock || ''
         });
 
