@@ -225,6 +225,21 @@ export function isPathAllowedForAgent(slug, path, { mode = 'write' } = {}) {
   return globs.some(glob => matchGlob(glob, path));
 }
 
+/**
+ * Agents whose allowlist covers this path. Used for Option A handoff: an agent
+ * proposing outside its own lane files the write under the owning agent instead
+ * of refusing Adam. Hammond first (umbrella), then alphabetical.
+ */
+export function ownerAgentsForPath(path, { mode = 'write' } = {}) {
+  const dir = join(CAPABILITIES_ROOT, 'allowlists');
+  if (!existsSync(dir)) return [];
+  const slugs = readdirSync(dir)
+    .filter(name => name.endsWith('.json'))
+    .map(name => name.slice(0, -5))
+    .sort((a, b) => (a === 'hammond' ? -1 : b === 'hammond' ? 1 : a.localeCompare(b)));
+  return slugs.filter(slug => isPathAllowedForAgent(slug, path, { mode }));
+}
+
 const SHORTCUT_CAPABILITY_IDS = new Set([
   'remember.set-week-flag',
   'remember.note-context',

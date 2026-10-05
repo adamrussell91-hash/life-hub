@@ -183,7 +183,23 @@ export function createTravelWriteExecutor({
   const repo = createRepo({ env, fetchImpl });
 
   return {
-    async apply(write) {
+    async apply(write, target) {
+      // Whole-trip delete: Adam approved it on the Confirm card.
+      if (write.mode === 'delete') {
+        const tripId = clean(target?.id, 64);
+        if (!TRIP_ID_RE.test(tripId)) return { ok: false, error: 'invalid_travel_write', detail: write.path };
+        let version;
+        try {
+          ({ version } = await repo.getTrip(tripId));
+        } catch (error) {
+          if (error?.code === 'not_found') {
+            return { ok: true, result: { path: write.path, mode: 'delete', id: tripId, skipped: true } };
+          }
+          throw error;
+        }
+        await repo.deleteTrip(tripId, version);
+        return { ok: true, result: { path: write.path, mode: 'delete', id: tripId, deleted: true } };
+      }
       let body;
       try {
         body = JSON.parse(write.content);

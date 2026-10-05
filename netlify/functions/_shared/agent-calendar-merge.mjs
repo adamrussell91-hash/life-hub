@@ -127,7 +127,8 @@ export function slotFromCalendarEvent(event, source) {
     end_minutes: endMin,
     all_day: allDay || startMin == null,
     kind: record.type || source,
-    id: record.id ?? null
+    id: record.id ?? null,
+    path: typeof event?.path === 'string' ? event.path : null
   };
 }
 
@@ -193,17 +194,23 @@ function rangesOverlap(aStart, aEnd, bStart, bEnd) {
 
 /**
  * Find occupied slots overlapping [start, end) on date.
- * All-day items on that date always conflict with a timed proposal.
+ * All-day items on that date conflict with a timed proposal, except Tasks
+ * due-date rows (a task due today is not busy time).
+ * excludePaths: the block being rescheduled, so it never conflicts with itself.
  */
-export function findSlotConflicts(slots, { date, start, end } = {}) {
+export function findSlotConflicts(slots, { date, start, end, excludePaths = [] } = {}) {
   if (!DATE_RE.test(date ?? '')) return [];
   const wantStart = minutesOf(start);
   const wantEnd = minutesOf(end);
   if (wantStart == null || wantEnd == null || !(wantEnd > wantStart)) return [];
+  const excluded = new Set((excludePaths ?? []).filter((p) => typeof p === 'string' && p));
 
   return (slots ?? []).filter((slot) => {
     if (slot.date !== date) return false;
-    if (slot.all_day || slot.start_minutes == null || slot.end_minutes == null) return true;
+    if (slot.path && excluded.has(slot.path)) return false;
+    if (slot.all_day || slot.start_minutes == null || slot.end_minutes == null) {
+      return slot.source !== 'tasks';
+    }
     return rangesOverlap(wantStart, wantEnd, slot.start_minutes, slot.end_minutes);
   });
 }

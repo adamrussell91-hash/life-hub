@@ -161,7 +161,9 @@ test('buildPeopleProposal turns add, edit and link into one Confirm proposal wit
   });
   const validated = validateProposeActionInput(built.proposal, { agentSlug: 'clare' });
   assert.equal(validated.ok, true, validated.error);
-  assert.equal(validateProposeActionInput(built.proposal, { agentSlug: 'brisket' }).error, 'write_path_denied');
+  const handedOff = validateProposeActionInput(built.proposal, { agentSlug: 'brisket' });
+  assert.equal(handedOff.ok, true, handedOff.error);
+  assert.ok(handedOff.proposal.writes.every(w => w.on_behalf_of));
 });
 
 test('buildPeopleProposal refuses unknown people, bad roles and wrong endpoint kinds', async () => {
@@ -388,4 +390,23 @@ test('propose_remember_fact Confirm creates an Adam-authored fact', async () => 
   const rememberId = result.results[0].remember_id;
   assert.equal(professionalStore._raw(rememberFactKey(rememberId)).author, 'adam');
   assert.equal(professionalStore._raw(rememberFactKey(rememberId)).text, 'Prefers email over phone');
+});
+
+test('people:person delete walks the lifecycle to deleted (redacted tombstone)', async () => {
+  const store = createMemoryStore();
+  const people = createPeopleWriteExecutor({ store, env: {}, resolveEntity: resolverFor(store), getImportedPerson: async () => null });
+  const created = await executeProposeActionWrites(null, {
+    agent: 'ann', intent: 'add', writes: [{ path: 'people:person:new-sam', mode: 'create', content: '{"display_name":"Sam Lee"}' }]
+  }, { blobStores: { people } });
+  assert.equal(created.ok, true, created.error);
+  const ref = created.results[0].ref;
+  const id = String(ref).split(':').pop();
+  const deleted = await executeProposeActionWrites(null, {
+    agent: 'ann', intent: 'delete Sam', writes: [{ path: `people:person:${id}`, mode: 'delete', content: '' }]
+  }, { blobStores: { people } });
+  assert.equal(deleted.ok, true, `${deleted.error} ${deleted.detail ?? ''}`);
+  const repo = createIdentityRepository({ store });
+  const record = await repo.loadEntity({ namespace: 'shared', kind: 'person', id });
+  assert.equal(record.lifecycle_status, 'deleted');
+  assert.notEqual(record.display_name, 'Sam Lee');
 });

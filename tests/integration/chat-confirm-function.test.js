@@ -1146,7 +1146,7 @@ test('action confirm writes allowlisted files and appends a Capability Action go
   assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('data/governance/governance-log.md')));
 });
 
-test('action confirm rejects out-of-allowlist writes', async () => {
+test('action confirm rejects writes no agent owns', async () => {
   const { calls, fetchImpl } = githubFetchStub();
   const handler = createChatConfirmHandler({
     env: validEnv,
@@ -1158,8 +1158,8 @@ test('action confirm rejects out-of-allowlist writes', async () => {
     kind: 'action',
     slug: 'brisket',
     candidate: {
-      intent: 'hack cn',
-      writes: [{ path: 'central-node.md', mode: 'overwrite', content: '# nope', diff: 'bad' }]
+      intent: 'rewrite server code',
+      writes: [{ path: 'netlify/functions/chat.mjs', mode: 'overwrite', content: '// nope', diff: 'bad' }]
     }
   }));
   const payload = await response.json();

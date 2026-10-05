@@ -5,7 +5,8 @@
 import {
   isSafeKnowledgePageId,
   newKnowledgePageId,
-  saveKnowledgePage
+  saveKnowledgePage,
+  deleteKnowledgePage
 } from './knowledge-data.mjs';
 import { clean, makeProposal } from './agent-propose-helpers.mjs';
 
@@ -77,10 +78,26 @@ export function createKnowledgeWriteExecutor({
   env,
   fetchImpl = fetch,
   nowIso = () => new Date().toISOString(),
-  savePage = saveKnowledgePage
+  savePage = saveKnowledgePage,
+  deletePage = deleteKnowledgePage
 } = {}) {
   return {
     async apply(write, target) {
+      if (write.mode === 'delete') {
+        // Adam approved the delete on the Confirm card.
+        if (!isSafeKnowledgePageId(target?.id)) {
+          return { ok: false, error: 'invalid_knowledge_write', detail: 'page id required' };
+        }
+        try {
+          const out = await deletePage(target.id, { env, fetchImpl });
+          return {
+            ok: true,
+            result: { path: write.path, mode: 'delete', id: target.id, ...(out?.deleted ? { deleted: true } : { skipped: true }) }
+          };
+        } catch (error) {
+          return { ok: false, error: error?.code || 'knowledge_write_failed', detail: error?.message || write.path };
+        }
+      }
       let body;
       try {
         body = JSON.parse(write.content);
