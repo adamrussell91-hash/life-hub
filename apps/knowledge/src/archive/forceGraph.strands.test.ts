@@ -54,6 +54,8 @@ function recordingContext() {
     },
     strokeText() {},
     drawImage() {},
+    fillRect() {},
+    globalCompositeOperation: "source-over",
     createLinearGradient() {
       return { addColorStop() {} };
     },

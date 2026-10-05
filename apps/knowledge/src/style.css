@@ -1285,6 +1285,12 @@
     var(--depth);
 }
 
+/* Show All is a neural map: light adds up on a black field. */
+.graph-wrap.is-neural {
+  background: #03050a;
+}
+
+.graph-wrap.is-neural .graph-toolbar__meta,
 .graph-wrap.is-universe-dark .graph-toolbar__meta,
 .graph-wrap.is-universe-dark .graph-speed__label,
 .graph-wrap.is-universe-dark .graph-speed__value {

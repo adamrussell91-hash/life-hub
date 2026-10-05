@@ -1,15 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { TOPIC_VOCABULARY } from "../tidy/vocabulary";
 import { nodeDegrees, noteToNoteLinks } from "./graphMetrics";
-import { SHOW_ALL_DEGREE_CAP, SHOW_ALL_DEGREE_FLOOR } from "./showAllEdges";
-import {
-  SHOW_ALL_DEFAULT_SHAPE,
-  buildShowAllGraph,
-  layoutShowAll,
-  showAllDiscRadius,
-  showAllHubTies,
-  showAllNoteRadius,
-} from "./showAllGraph";
+
+import { buildShowAllGraph, showAllHubTies, showAllNoteRadius } from "./showAllGraph";
+import { NEURAL_DEGREE_CAP, placeTopicAnchors } from "./showAllNeural";
+import { relaxNeural } from "./showAllRelax";
 
 function page(
   id: string,
@@ -56,7 +51,7 @@ describe("buildShowAllGraph", () => {
     expect(leaves.find(node => node.pageId === "p1")?.color).toBe(hubs.find(hub => hub.label === V[0])?.color);
 
     const degrees = [...noteDegrees(model).values()];
-    expect(Math.max(0, ...degrees)).toBeLessThanOrEqual(SHOW_ALL_DEGREE_CAP);
+    expect(Math.max(0, ...degrees)).toBeLessThanOrEqual(NEURAL_DEGREE_CAP);
   });
 
   it("does not invent note-to-note bridges just to force one component", () => {
@@ -74,28 +69,14 @@ describe("buildShowAllGraph", () => {
     expect(model.nodes.filter(node => node.kind === "major")).toHaveLength(2);
   });
 
-  it("never lets a note connect to more than 5 other notes", () => {
+  it("never lets a note gather more than the cap, even inside one huge topic", () => {
     const pages = Array.from({ length: 80 }, (_, index) => page(`n${index}`, `Note ${index}`, [V[0]]));
     const model = buildShowAllGraph(pages);
     const clique = (80 * 79) / 2;
     const noteLinks = noteToNoteLinks(model.links);
-    expect(noteLinks.length).toBeLessThan(clique / 4);
-    expect(noteLinks.length).toBeLessThanOrEqual(80 * SHOW_ALL_DEGREE_CAP / 2);
+    expect(noteLinks.length).toBeLessThan(clique / 10);
     const degrees = [...noteDegrees(model).values()];
-    expect(Math.max(0, ...degrees)).toBeLessThanOrEqual(SHOW_ALL_DEGREE_CAP);
-  });
-
-  it("gives every note at least 2 links when it has partners, and none more than 5", () => {
-    const pages = Array.from({ length: 60 }, (_, index) =>
-      page(`m${index}`, `Mesh ${index % 7} topic ${index}`, [V[index % 3]], { excerpt: `shared theme ${index % 5}` }),
-    );
-    const model = buildShowAllGraph(pages);
-    const degrees = noteDegrees(model);
-    for (const leaf of model.nodes.filter(node => node.kind === "leaf")) {
-      const degree = degrees.get(leaf.id) ?? 0;
-      expect(degree).toBeGreaterThanOrEqual(SHOW_ALL_DEGREE_FLOOR);
-      expect(degree).toBeLessThanOrEqual(SHOW_ALL_DEGREE_CAP);
-    }
+    expect(Math.max(0, ...degrees)).toBeLessThanOrEqual(NEURAL_DEGREE_CAP);
   });
 
   it("sizes notes by degree so hubs read larger than leaves", () => {
@@ -142,16 +123,23 @@ describe("buildShowAllGraph", () => {
     expect(pair).toBeTruthy();
   });
 
-  it("seeds each topic as its own island around that hub", () => {
+  it("keeps unrelated topics apart: a topic's notes sit around its own name", () => {
     const pages = [
-      ...Array.from({ length: 20 }, (_, index) => page(`a${index}`, `A ${index}`, [V[0]])),
-      ...Array.from({ length: 20 }, (_, index) => page(`b${index}`, `B ${index}`, [V[1]])),
+      ...Array.from({ length: 20 }, (_, index) => page(`a${index}`, `alpha river ${index % 4}`, [V[0]])),
+      ...Array.from({ length: 20 }, (_, index) => page(`b${index}`, `beta stone ${index % 4}`, [V[1]])),
     ];
     const model = buildShowAllGraph(pages);
-    const homes = new Set(
-      model.nodes.filter(node => node.kind === "leaf").map(node => `${node.homeX},${node.homeY}`),
-    );
-    expect(homes.size).toBe(2);
+    const hub = (label: string) => model.nodes.find(node => node.kind === "major" && node.label === label)!;
+    const d = (a: { x?: number; y?: number }, b: { x?: number; y?: number }) =>
+      Math.hypot((a.x ?? 0) - (b.x ?? 0), (a.y ?? 0) - (b.y ?? 0));
+    let own = 0;
+    let other = 0;
+    const leaves = model.nodes.filter(node => node.kind === "leaf");
+    for (const leaf of leaves) {
+      own += d(leaf, hub(leaf.parentKeyword!));
+      other += d(leaf, hub(leaf.parentKeyword === V[0] ? V[1] : V[0]));
+    }
+    expect(own / leaves.length).toBeLessThan((other / leaves.length) * 0.6);
     expect(model.nodes.filter(node => node.kind === "major")).toHaveLength(2);
   });
 
@@ -177,121 +165,129 @@ describe("buildShowAllGraph", () => {
   });
 });
 
-describe("Show All layout", () => {
+describe("Show All neural map", () => {
   const dist = (a: { x?: number; y?: number }, b: { x?: number; y?: number }) =>
     Math.hypot((a.x ?? 0) - (b.x ?? 0), (a.y ?? 0) - (b.y ?? 0));
 
-  function nexusPages() {
+  function neuralPages() {
     const pages = [];
-    // V[0] is the big topic. V[1] and V[2] share many notes; V[3] shares none with V[1].
-    for (let i = 0; i < 90; i++) pages.push(page(`big${i}`, `Big ${i}`, [V[0]]));
-    for (let i = 0; i < 30; i++) pages.push(page(`p${i}`, `Pair ${i}`, i < 18 ? [V[1], V[2]] : [V[1]]));
-    for (let i = 0; i < 30; i++) pages.push(page(`q${i}`, `Q ${i}`, [V[2]]));
-    for (let i = 0; i < 30; i++) pages.push(page(`r${i}`, `R ${i}`, i < 6 ? [V[3], V[0]] : [V[3]]));
-    for (let i = 0; i < 25; i++) pages.push(page(`s${i}`, `S ${i}`, [V[4]]));
+    // Five topics with their own vocabulary in three sub-themes; a share of notes carry a related second topic.
+    for (let i = 0; i < 300; i++) {
+      const topic = i % 5;
+      const sub = Math.floor(i / 5) % 3;
+      const words = Array.from({ length: 4 }, (_, w) => `t${topic}s${sub}w${(i + w) % 6}`).join(" ");
+      const tags = i % 4 === 0 ? [V[topic], V[(topic + 1) % 5]] : [V[topic]];
+      pages.push(page(`n${i}`, `${words} note ${i}`, tags, { excerpt: words }));
+    }
     return pages;
   }
 
-  it("lays out with no physics: positions are final, fixed and identical on every build", () => {
-    const first = buildShowAllGraph(nexusPages());
-    const second = buildShowAllGraph(nexusPages());
+  function degreesOf(model: ReturnType<typeof buildShowAllGraph>) {
+    const degree = new Map<string, number>();
+    for (const link of model.links) {
+      for (const end of [String(link.source), String(link.target)]) degree.set(end, (degree.get(end) ?? 0) + 1);
+    }
+    return model.nodes.filter(node => node.kind === "leaf").map(node => degree.get(node.id) ?? 0);
+  }
+
+  it("grows a branching backbone, not a mesh: tips, chains and a few knots, nothing huge", () => {
+    const model = buildShowAllGraph(neuralPages());
+    const degrees = degreesOf(model);
+    expect(Math.max(...degrees)).toBeLessThanOrEqual(NEURAL_DEGREE_CAP);
+    expect(degrees.filter(d => d >= 6).length).toBeGreaterThan(0);
+    expect(degrees.filter(d => d === 1).length).toBeGreaterThan(0);
+    expect(degrees.filter(d => d >= 1 && d <= 4).length / degrees.length).toBeGreaterThan(0.7);
+    expect(model.links.some(link => link.kind === "spoke")).toBe(false);
+  });
+
+  it("makes the backbone a forest: no loops inside it, cross-links on top", () => {
+    const model = buildShowAllGraph(neuralPages());
+    const leaves = model.nodes.filter(node => node.kind === "leaf");
+    const backbone = model.links.filter(link => link.kind === "backbone");
+    const cross = model.links.filter(link => link.kind === "overlap");
+    expect(backbone.length).toBeLessThan(leaves.length);
+    expect(cross.length).toBeGreaterThan(0);
+  });
+
+  it("is deterministic: same notes, same seed layout and links", () => {
+    const first = buildShowAllGraph(neuralPages());
+    const second = buildShowAllGraph(neuralPages());
+    expect(second.links.map(link => `${link.source}>${link.target}`)).toEqual(
+      first.links.map(link => `${link.source}>${link.target}`),
+    );
     for (const [index, node] of first.nodes.entries()) {
-      expect(node.x).toBeTypeOf("number");
-      expect(node.fx).toBe(node.x);
-      expect(node.fy).toBe(node.y);
+      expect(Number.isFinite(node.x)).toBe(true);
       expect(second.nodes[index]!.x).toBe(node.x);
       expect(second.nodes[index]!.y).toBe(node.y);
     }
   });
 
-  it("puts the biggest topic at the core of the nexus", () => {
-    const model = buildShowAllGraph(nexusPages());
-    const hubs = model.nodes.filter(node => node.kind === "major");
-    const cx = hubs.reduce((sum, hub) => sum + (hub.x ?? 0), 0) / hubs.length;
-    const cy = hubs.reduce((sum, hub) => sum + (hub.y ?? 0), 0) / hubs.length;
-    const fromCentre = hubs.map(hub => ({ label: hub.label, d: Math.hypot((hub.x ?? 0) - cx, (hub.y ?? 0) - cy) }));
-    fromCentre.sort((a, b) => a.d - b.d);
-    expect(fromCentre[0]!.label).toBe(V[0]);
-  });
+  function relaxed(spread = 1) {
+    const model = buildShowAllGraph(neuralPages());
+    const leaves = model.nodes.filter(node => node.kind === "leaf");
+    const positions = relaxNeural(
+      leaves.map(node => ({ id: node.id, x: node.x!, y: node.y! })),
+      model.links.map(link => ({ source: String(link.source), target: String(link.target), backbone: link.kind === "backbone" })),
+      { spread, gather: 1 },
+    );
+    leaves.forEach((node, i) => {
+      node.x = positions[i * 2];
+      node.y = positions[i * 2 + 1];
+    });
+    return { model, leaves };
+  }
 
-  it("pulls topics that share notes next to each other", () => {
-    const model = buildShowAllGraph(nexusPages());
-    const hub = (label: string) => model.nodes.find(node => node.kind === "major" && node.label === label)!;
-    expect(dist(hub(V[1]), hub(V[2]))).toBeLessThan(dist(hub(V[1]), hub(V[3])));
-    expect(model.hubTies?.[0]).toEqual({ a: [V[1], V[2]].sort()[0], b: [V[1], V[2]].sort()[1], weight: 18 });
-  });
-
-  it("keeps topic discs apart and every note inside its own disc", () => {
-    const model = buildShowAllGraph(nexusPages());
-    const hubs = model.nodes.filter(node => node.kind === "major");
-    const radius = new Map(hubs.map(hub => [hub.label, showAllDiscRadius(hub.count, hub.r)]));
-    for (let i = 0; i < hubs.length; i++) {
-      for (let j = i + 1; j < hubs.length; j++) {
-        expect(dist(hubs[i]!, hubs[j]!)).toBeGreaterThan(radius.get(hubs[i]!.label)! + radius.get(hubs[j]!.label)!);
-      }
-    }
-    for (const leaf of model.nodes.filter(node => node.kind === "leaf")) {
-      const hub = hubs.find(item => item.label === leaf.parentKeyword)!;
-      expect(dist(leaf, hub)).toBeLessThanOrEqual(radius.get(hub.label)! + 1);
-    }
-  });
-
-  it("seats linked notes next to each other inside a zone", () => {
-    const model = buildShowAllGraph(nexusPages());
-    const byId = new Map(model.nodes.map(node => [node.id, node]));
-    const linked: number[] = [];
-    for (const link of model.links) {
-      const a = byId.get(String(link.source))!;
-      const b = byId.get(String(link.target))!;
-      if (a.parentKeyword === V[0] && b.parentKeyword === V[0]) linked.push(dist(a, b));
-    }
-    const zone = model.nodes.filter(node => node.kind === "leaf" && node.parentKeyword === V[0]);
+  it("relaxes into one round mass where linked notes sit close", () => {
+    const { model, leaves } = relaxed();
+    const byId = new Map(leaves.map(node => [node.id, node]));
+    const linked = model.links
+      .filter(link => link.kind === "backbone")
+      .map(link => dist(byId.get(String(link.source))!, byId.get(String(link.target))!));
     let all = 0;
     let pairs = 0;
-    for (let i = 0; i < zone.length; i++) {
-      for (let j = i + 1; j < zone.length; j++) {
-        all += dist(zone[i]!, zone[j]!);
+    for (let i = 0; i < leaves.length; i += 3) {
+      for (let j = i + 1; j < leaves.length; j += 7) {
+        all += dist(leaves[i]!, leaves[j]!);
         pairs += 1;
       }
     }
-    const meanLinked = linked.reduce((sum, d) => sum + d, 0) / linked.length;
-    expect(linked.length).toBeGreaterThan(0);
-    expect(meanLinked).toBeLessThan((all / pairs) * 0.75);
+    expect(linked.reduce((sum, d) => sum + d, 0) / linked.length).toBeLessThan((all / pairs) * 0.25);
+    const xs = leaves.map(node => node.x!);
+    const ys = leaves.map(node => node.y!);
+    const w = Math.max(...xs) - Math.min(...xs);
+    const h = Math.max(...ys) - Math.min(...ys);
+    expect(Math.max(w, h) / Math.min(w, h)).toBeLessThan(1.8);
   });
 
-  it("never stacks two notes on the same spot", () => {
-    const model = buildShowAllGraph(nexusPages());
-    const leaves = model.nodes.filter(node => node.kind === "leaf");
-    for (let i = 0; i < leaves.length; i++) {
-      for (let j = i + 1; j < leaves.length; j++) {
-        expect(dist(leaves[i]!, leaves[j]!)).toBeGreaterThan(4);
-      }
+  it("relaxes the same way every time", () => {
+    const a = relaxed().leaves.map(node => `${node.x!.toFixed(6)},${node.y!.toFixed(6)}`);
+    const b = relaxed().leaves.map(node => `${node.x!.toFixed(6)},${node.y!.toFixed(6)}`);
+    expect(b).toEqual(a);
+  });
+
+  it("loosens the fibres when Spread goes up", () => {
+    const meanLink = ({ model, leaves }: ReturnType<typeof relaxed>) => {
+      const byId = new Map(leaves.map(node => [node.id, node]));
+      const lengths = model.links
+        .filter(link => link.kind === "backbone")
+        .map(link => dist(byId.get(String(link.source))!, byId.get(String(link.target))!));
+      return lengths.reduce((sum, d) => sum + d, 0) / lengths.length;
+    };
+    expect(meanLink(relaxed(1.6))).toBeGreaterThan(meanLink(relaxed(1)) * 1.2);
+  });
+
+  it("anchors each topic name on the cluster that holds most of its notes", () => {
+    const { model } = relaxed();
+    placeTopicAnchors(model.nodes, model.links);
+    for (const hub of model.nodes.filter(node => node.kind === "major")) {
+      const own = model.nodes.filter(node => node.kind === "leaf" && node.parentKeyword === hub.label);
+      const nearest = Math.min(...own.map(node => dist(node, hub)));
+      expect(Number.isFinite(hub.x)).toBe(true);
+      expect(nearest).toBeLessThan(200);
     }
   });
 
-  it("seats multi-topic notes on the rim facing their other topic", () => {
-    const model = buildShowAllGraph(nexusPages());
-    const home = model.nodes.find(node => node.kind === "major" && node.label === V[1])!;
-    const other = model.nodes.find(node => node.kind === "major" && node.label === V[2])!;
-    const leaves = model.nodes.filter(node => node.kind === "leaf" && node.parentKeyword === V[1]);
-    const bridging = leaves.filter(node => (node.hubLabels ?? []).includes(V[2]));
-    const solo = leaves.filter(node => !(node.hubLabels ?? []).includes(V[2]));
-    const mean = (list: typeof leaves) => list.reduce((sum, node) => sum + dist(node, other), 0) / list.length;
-    expect(bridging.length).toBeGreaterThan(0);
-    expect(mean(bridging)).toBeLessThan(mean(solo));
-  });
-
-  it("spreads notes further apart when Spread goes up", () => {
-    const model = buildShowAllGraph(nexusPages());
-    const leaves = () => model.nodes.filter(node => node.kind === "leaf" && node.parentKeyword === V[0]);
-    const hub = model.nodes.find(node => node.kind === "major" && node.label === V[0])!;
-    const reach = () => Math.max(...leaves().map(node => dist(node, hub)));
-    const before = reach();
-    layoutShowAll(model.nodes, model.hubTies ?? [], { ...SHOW_ALL_DEFAULT_SHAPE, spread: 1.5 });
-    expect(reach()).toBeGreaterThan(before * 1.3);
-  });
-
-  it("counts shared notes per hub pair once per note", () => {
+  it("counts shared notes per topic pair once per note", () => {
     const ties = showAllHubTies([[V[0], V[1], V[0]], [V[1], V[0]], [V[2]]], new Set([V[0], V[1], V[2]]));
     expect(ties).toHaveLength(1);
     expect(ties[0]!.weight).toBe(2);

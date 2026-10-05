@@ -1073,7 +1073,7 @@ function showAllMetaText() {
   const hubs = model.nodes.filter(node => node.kind === "major").length;
   const noteLinks = model.links.filter(link => link.kind === "overlap" || link.kind === "backbone").length;
   const hidden = Math.max(0, entries.length - notes);
-  const line = `${hubs} zones · ${notes} notes · ${noteLinks} links · 2–5 per note`;
+  const line = `${hubs} topics · ${notes} notes · ${noteLinks} links`;
   return hidden ? `${line} · ${hidden} still untagged` : line;
 }
 
@@ -1342,6 +1342,7 @@ function renderGraph() {
   const wrap = app.querySelector<HTMLElement>(".graph-wrap")!;
   const stage = app.querySelector<HTMLElement>(".graph-stage")!;
   applyUniverseViewState(wrap, document.body, graphMode === "universe" && universeDark, graphFullscreen);
+  wrap.classList.toggle("is-neural", graphMode === "showAll");
   if (graphMode === "universe") {
     bindUniverseKey(app, open => {
       universeKeyOpen = open;

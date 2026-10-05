@@ -2,6 +2,7 @@ import { tokenize } from "../lib/lexicalRetrieve";
 import type { PageManifestEntry } from "../domain/page";
 import type { GraphLinkDatum } from "./keywordGraph";
 import { UnionFind } from "./showAllCommunities";
+import { buildNeuralEdges } from "./showAllNeural";
 
 /** Each note reaches for its 4 closest notes… */
 export const SHOW_ALL_KNN = 4;
@@ -256,27 +257,16 @@ export function buildShowAllNoteEdges(
 
   const { candidates } = candidatePairs(tagSets, tokens);
   const scored = scoreCandidates(candidates, tagSets, tokens, tagFreq);
-  const knn = knnUnion(eligible.length, scored);
-  const knnKeys = new Set(knn.map(pair => pairKey(pair.a, pair.b)));
-  const tree = maximumSpanningTree(eligible.length, scored);
-  const protectedKeys = new Set(tree.map(pair => pairKey(pair.a, pair.b)));
-  const merged = new Map<string, ScoredPair>();
-  for (const pair of [...knn, ...tree]) merged.set(pairKey(pair.a, pair.b), pair);
-  const capped = liftDegreeFloor(eligible.length, capDegree([...merged.values()], protectedKeys), scored);
-
-  const degree = new Array<number>(eligible.length).fill(0);
-  const links: GraphLinkDatum[] = capped.map(pair => {
-    degree[pair.a] += 1;
-    degree[pair.b] += 1;
-    const key = pairKey(pair.a, pair.b);
-    return {
-      source: leafId(eligible[pair.a]!),
-      target: leafId(eligible[pair.b]!),
-      kind: protectedKeys.has(key) && !knnKeys.has(key) ? "backbone" : "overlap",
-      weight: Math.max(0.05, pair.score),
-      color: "rgba(160, 160, 160, 0.7)",
-    };
+  // A branching backbone (each note joins the note it is most like) plus a thin layer of
+  // cross-links between branches. See showAllNeural.ts for why this, not a k-nearest mesh.
+  const neural = buildNeuralEdges(eligible.length, scored);
+  const toLink = (pair: ScoredPair, kind: "backbone" | "overlap"): GraphLinkDatum => ({
+    source: leafId(eligible[pair.a]!),
+    target: leafId(eligible[pair.b]!),
+    kind,
+    weight: Math.max(0.05, pair.score),
+    color: "rgba(160, 160, 160, 0.7)",
   });
-
-  return { links, degree, pairs: capped };
+  const links = [...neural.tree.map(pair => toLink(pair, "backbone")), ...neural.cross.map(pair => toLink(pair, "overlap"))];
+  return { links, degree: neural.degree, pairs: [...neural.tree, ...neural.cross] };
 }

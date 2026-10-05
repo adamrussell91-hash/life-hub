@@ -101,7 +101,14 @@ export function hubLabelVariants(label: string, max = 30): string[] {
  * if nothing fits the label hides and the hover tip carries it. Hubs are placed in the order
  * given (biggest topic first), pinned ones before all others.
  */
-export function placeHubLabels(hubs: HubLabelInput[], lineHeight: number, gap: number, bounds?: LabelBox) {
+export function placeHubLabels(
+  hubs: HubLabelInput[],
+  lineHeight: number,
+  gap: number,
+  bounds?: LabelBox,
+  /** Extra clear space kept around every placed label. */
+  margin = 0,
+) {
   const placed = new Map<string, HubLabelPlacement>();
   const taken: LabelBox[] = hubs.map(
     hub =>
@@ -124,7 +131,8 @@ export function placeHubLabels(hubs: HubLabelInput[], lineHeight: number, gap: n
         if (bounds) x0 = Math.min(Math.max(x0, bounds.x0), bounds.x1 - candidate.width);
         const box = { x0, y0: top, x1: x0 + candidate.width, y1: top + lineHeight };
         if (bounds && !hub.pinned && (box.x0 < bounds.x0 || box.y0 < bounds.y0 || box.y1 > bounds.y1)) continue;
-        const clash = taken.some((other, index) => index !== own && boxesHit(box, other));
+        const padded = { x0: box.x0 - margin, y0: box.y0 - margin, x1: box.x1 + margin, y1: box.y1 + margin };
+        const clash = taken.some((other, index) => index !== own && boxesHit(padded, other));
         if (clash && !hub.pinned) continue;
         placed.set(hub.id, { text: candidate.text, side, box });
         taken.push(box);
