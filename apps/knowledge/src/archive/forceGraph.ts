@@ -51,7 +51,8 @@ import { selectionCluster } from "./graphFocus";
 import { hubLabelVariants, placeHubLabels, readShowAllTheme, type ShowAllTheme } from "./showAllDraw";
 import { layoutShowAll } from "./showAllGraph";
 import { branchLoads, placeTopicAnchors } from "./showAllNeural";
-import { createDock, el, readSavedViews, writeSavedViews, type Dock, type DockTool } from "./showAllDock";
+import { easeInOut, flipQuad, headAt, quadPoint, routeHops, signalLength, sparkEchoes, sparkSeeds, spreadSpark, subQuad, thoughtWords, type Hop, type Quad } from "./showAllPulse";
+import { GROW_SPEEDS, createDock, el, readGrowSpeed, readSavedViews, writeGrowSpeed, writeSavedViews, type Dock, type DockTool } from "./showAllDock";
 import {
   RECENT_WINDOWS,
   grownBy,
@@ -695,13 +696,31 @@ export function mountForceGraph(
     return (hash >>> 0) / 4294967296;
   }
 
-  /** A fibre: a gentle, stable bend per link so branches read organic, not ruled. */
-  function fibre(source: GraphNodeDatum, target: GraphNodeDatum, key: string) {
+  /**
+   * A fibre: a gentle, stable bend per link so branches read organic, not ruled. The bend is
+   * keyed to the sorted pair, so A→B and B→A trace the same curve (impulses can run either way).
+   */
+  function fibreQuad(from: GraphNodeDatum, to: GraphNodeDatum): Quad {
+    const flip = from.id > to.id;
+    const source = flip ? to : from;
+    const target = flip ? from : to;
     const dx = target.x! - source.x!;
     const dy = target.y! - source.y!;
-    const bend = (hashUnit(key) - 0.5) * 0.6;
-    ctx.moveTo(source.x!, source.y!);
-    ctx.quadraticCurveTo((source.x! + target.x!) / 2 - dy * bend, (source.y! + target.y!) / 2 + dx * bend, target.x!, target.y!);
+    const bend = (hashUnit(`${source.id}|${target.id}`) - 0.5) * 0.6;
+    const quad: Quad = {
+      p0: { x: source.x!, y: source.y! },
+      c: { x: (source.x! + target.x!) / 2 - dy * bend, y: (source.y! + target.y!) / 2 + dx * bend },
+      p2: { x: target.x!, y: target.y! },
+    };
+    return flip ? flipQuad(quad) : quad;
+  }
+
+  /** Trace a fibre, or the part of it from t0 to t1 (0 at `from`). */
+  function fibre(from: GraphNodeDatum, to: GraphNodeDatum, t0 = 0, t1 = 1) {
+    const whole = fibreQuad(from, to);
+    const quad = t0 <= 0 && t1 >= 1 ? whole : subQuad(whole, t0, t1);
+    ctx.moveTo(quad.p0.x, quad.p0.y);
+    ctx.quadraticCurveTo(quad.c.x, quad.c.y, quad.p2.x, quad.p2.y);
   }
 
   function drawShowAllFrame(map: Map<string, GraphNodeDatum>, emphasis: ReturnType<typeof drawArgs>) {
@@ -728,7 +747,8 @@ export function mountForceGraph(
     const highlighting = Boolean(hover || selected || options.search.trim()) && !pathSet;
     const base = overlapLinkAlpha();
     const widthScale = showAllStrandWidth() / SHOW_ALL_STRAND_WIDTH;
-    type Fibre = [GraphNodeDatum, GraphNodeDatum, string];
+    // [from, to, t0, t1]: a fibre, or the part of it that has grown so far.
+    type Fibre = [GraphNodeDatum, GraphNodeDatum, number, number];
     const batches = new Map<string, { color: string; alpha: number; width: number; fibres: Fibre[] }>();
     const active: Fibre[] = [];
     for (const link of simLinks) {
@@ -741,12 +761,22 @@ export function mountForceGraph(
       const sourceLayer = overlayOf(source);
       const targetLayer = overlayOf(target);
       if (!sourceLayer.show || !targetLayer.show) continue;
+      // While growing, a fibre extends out of the older note toward the newer one.
+      const grownS = sourceLayer.grow ?? 1;
+      const grownT = targetLayer.grow ?? 1;
+      const piece: Fibre =
+        grownS >= 1 && grownT >= 1
+          ? [source, target, 0, 1]
+          : grownS >= grownT
+            ? [source, target, 0, grownT]
+            : [target, source, 0, grownS];
+      if (piece[3] <= 0.01) continue;
       if (pathEdges?.has(key)) {
-        active.push([source, target, key]);
+        active.push(piece);
         continue;
       }
       if (highlighting && linkDrawState(link, source, target, emphasis).active) {
-        active.push([source, target, key]);
+        active.push(piece);
         continue;
       }
       const fade = Math.min(source.opacity ?? 1, target.opacity ?? 1) * Math.min(sourceLayer.weight, targetLayer.weight);
@@ -758,15 +788,17 @@ export function mountForceGraph(
       const alpha = Math.min(1, (highlighting ? 0.25 : 1) * (backbone ? base * 1.7 : base * 0.5) * fade);
       const bucket = `${color}|${alpha.toFixed(2)}|${width}`;
       const batch = batches.get(bucket) ?? { color, alpha, width, fibres: [] };
-      batch.fibres.push([source, target, key]);
+      batch.fibres.push(piece);
       batches.set(bucket, batch);
     }
-    ctx.globalCompositeOperation = dark ? "lighter" : "multiply";
+    // Lighten / darken, not add / multiply: where thousands of fibres cross, colour holds instead
+    // of burning out to a white (dark) or black (light) blot.
+    ctx.globalCompositeOperation = dark ? "lighten" : "darken";
     ctx.lineCap = "round";
     ctx.setLineDash([]);
     for (const batch of batches.values()) {
       ctx.beginPath();
-      for (const [source, target, key] of batch.fibres) fibre(source, target, key);
+      for (const [from, to, t0, t1] of batch.fibres) fibre(from, to, t0, t1);
       ctx.strokeStyle = batch.color;
       ctx.globalAlpha = batch.alpha;
       ctx.lineWidth = (batch.width * widthScale) / view.k;
@@ -782,34 +814,38 @@ export function mountForceGraph(
       const state = nodeDrawState(node, emphasis);
       const hot = state.hot || layer.mark;
       const dim = state.dim && !layer.mark;
+      const grown = easeInOut(layer.grow ?? 1);
       const fade = (node.opacity ?? 1) * (dim ? 0.25 : 1) * layer.weight;
       const degree = node.degree ?? 0;
       if (degree >= 5 || hot) {
-        const haloR = ((hot ? 10 : 3 + Math.min(degree, 14) * 1.1) * 0.7) / view.k;
+        const haloR = (((hot ? 10 : 3 + Math.min(degree, 14) * 1.1) * 0.7) / view.k) * grown;
         const halo = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, haloR);
-        halo.addColorStop(0, tint(node.color, dark ? 0.55 : 0.1));
+        halo.addColorStop(0, tint(node.color, dark ? 0.35 : 0.1));
         halo.addColorStop(1, dark ? "rgba(0, 0, 0, 0)" : "rgba(255, 255, 255, 0)");
         ctx.fillStyle = halo;
-        ctx.globalAlpha = (hot ? 0.9 : dark ? 0.32 : 0.45) * fade;
+        ctx.globalAlpha = (hot ? 0.75 : dark ? 0.4 : 0.45) * fade;
         ctx.beginPath();
         ctx.arc(node.x, node.y, haloR, 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.fillStyle = hot ? (dark ? "#fff3e6" : "#a8501a") : tint(node.color, dark ? 0.3 : 0.2);
+      ctx.fillStyle = hot ? (dark ? "#ffd2a8" : "#a8501a") : tint(node.color, dark ? 0.3 : 0.2);
       ctx.globalAlpha = (hot ? 1 : dark ? 0.85 : 0.75) * fade;
       ctx.beginPath();
-      ctx.arc(node.x, node.y, ((hot ? 2.6 : 0.9 + Math.min(degree, 10) * 0.18) * 1.1) / view.k, 0, Math.PI * 2);
+      ctx.arc(node.x, node.y, (((hot ? 2.6 : 0.9 + Math.min(degree, 10) * 0.18) * 1.1) / view.k) * grown, 0, Math.PI * 2);
       ctx.fill();
     }
 
+    ctx.globalCompositeOperation = "source-over";
     if (active.length) {
       ctx.beginPath();
-      for (const [source, target, key] of active) fibre(source, target, key);
+      for (const [from, to, t0, t1] of active) fibre(from, to, t0, t1);
       ctx.strokeStyle = dark ? "#ffb070" : "#c25a14";
-      ctx.globalAlpha = 0.95;
-      ctx.lineWidth = (2 * widthScale) / view.k;
+      // A path's route sits quietly underneath; the impulse running along it does the talking.
+      ctx.globalAlpha = pathEdges?.size ? 0.4 : 0.95;
+      ctx.lineWidth = ((pathEdges?.size ? 1.4 : 2) * widthScale) / view.k;
       ctx.stroke();
     }
+    drawSignals(map, dark);
     ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
 
@@ -940,30 +976,44 @@ export function mountForceGraph(
     ctx.globalAlpha = 1;
   }
 
-  // ---------- Map tools: grow, path, recent, walk, bridges, save, export ----------
+  // ---------- Map tools: spark, grow, path, recent, walk, bridges, save, export ----------
   let tool: DockTool | null = null;
   let growUntil: number | null = null;
   let growSpanWidth = 1;
   let growRaf = 0;
+  /** How long a full replay takes. Slower settings let you watch each branch reach out. */
+  let growPlayMs: number = GROW_SPEEDS[0].ms;
   let recentWindow: RecentWindow | null = null;
   let pathSet: Set<string> | null = null;
   let pathEdges: Set<string> | null = null;
   let pathPicks: string[] = [];
   let bridgeSet: Set<string> | null = null;
-  let walkTimer = 0;
-  const VISIBLE = { show: true, weight: 1, mark: false };
-  const HIDDEN = { show: false, weight: 0, mark: false };
+  let spark: { level: Map<string, number>; litAt: Map<string, number>; seeds: Set<string>; start: number } | null = null;
+  let toolTimer = 0;
+  type Overlay = { show: boolean; weight: number; mark: boolean; grow?: number };
+  const VISIBLE: Overlay = { show: true, weight: 1, mark: false };
+  const HIDDEN: Overlay = { show: false, weight: 0, mark: false };
 
-  function overlayOf(node: GraphNodeDatum) {
+  function overlayOf(node: GraphNodeDatum): Overlay {
     if (!tool || tool === "save" || tool === "export" || tool === "walk") return VISIBLE;
     if (growUntil != null) {
       if (!grownBy(node, growUntil)) return HIDDEN;
       const time = noteTime(node);
-      // Notes that have just grown glow for a moment.
-      return { show: true, weight: 1, mark: time != null && growUntil - time < growSpanWidth * 0.025 };
+      // A new note does not flash in: it buds, and its fibres reach out to it over a moment.
+      const ramp = Math.max(1, growSpanWidth * ((900 + growPlayMs * 0.02) / growPlayMs));
+      return { show: true, weight: 1, mark: false, grow: time == null ? 1 : Math.min(1, (growUntil - time) / ramp) };
     }
     let weight = 1;
     let mark = false;
+    if (spark) {
+      const lit = spark.litAt.get(node.id);
+      const level = spark.level.get(node.id) ?? 0;
+      if (lit == null || performance.now() - spark.start < lit) weight = 0.12;
+      else {
+        weight = 0.35 + 0.65 * level;
+        mark = spark.seeds.has(node.id);
+      }
+    }
     if (recentWindow) {
       if (isRecent(node, recentWindow, Date.now())) mark = true;
       else weight = 0.12;
@@ -979,6 +1029,157 @@ export function mountForceGraph(
     return { show: true, weight, mark };
   }
 
+  // ---------- Impulses: charges running down fibres ----------
+  type Signal = {
+    hops: Hop[];
+    start: number;
+    /** How long a fibre stays lit after the charge passes. */
+    afterglow: number;
+    /** Rest before playing again; omit to play once. */
+    loop?: number;
+    /** Camera rides the charge at this zoom (Walk). */
+    follow?: number;
+    onArrive?: (id: string) => void;
+    arrived: number;
+  };
+  let signals: Signal[] = [];
+  let signalRaf = 0;
+
+  function playSignal(signal: Omit<Signal, "arrived" | "start"> & { delay?: number }) {
+    signals.push({ ...signal, start: performance.now() + (signal.delay ?? 0), arrived: 0 });
+    if (!signalRaf) signalRaf = requestAnimationFrame(tickSignals);
+  }
+
+  function stopSignals() {
+    signals = [];
+    window.cancelAnimationFrame(signalRaf);
+    signalRaf = 0;
+  }
+
+  function headPoint(signal: Signal, t: number) {
+    const live = headAt(signal.hops, t);
+    if (live) {
+      const from = nodeMap.get(live.hop.from);
+      const to = nodeMap.get(live.hop.to);
+      if (from?.x != null && to?.x != null) return quadPoint(fibreQuad(from, to), live.at);
+    }
+    // Between hops (or before the first) the charge rests on the last note it reached.
+    const rested = [...signal.hops].reverse().find(hop => t >= hop.start + hop.duration);
+    const node = nodeMap.get(rested ? rested.to : (signal.hops[0]?.from ?? ""));
+    return node?.x != null && node.y != null ? { x: node.x, y: node.y } : null;
+  }
+
+  function tickSignals() {
+    signalRaf = 0;
+    const now = performance.now();
+    signals = signals.filter(signal => {
+      let t = now - signal.start;
+      const length = signalLength(signal.hops);
+      if (signal.loop != null && t > length + signal.loop) {
+        signal.start = now;
+        signal.arrived = 0;
+        t = 0;
+      }
+      while (signal.arrived < signal.hops.length) {
+        const hop = signal.hops[signal.arrived]!;
+        if (t < hop.start + hop.duration) break;
+        signal.arrived += 1;
+        signal.onArrive?.(hop.to);
+      }
+      if (signal.follow && t >= 0) {
+        const head = headPoint(signal, t);
+        if (head) {
+          // Glide, never jump: ease the camera a little of the way toward the charge each frame.
+          const k = view.k + (signal.follow - view.k) * 0.04;
+          const tx = width / 2 - head.x * k;
+          const ty = (topInset() + height) / 2 - head.y * k;
+          view.k = k;
+          view.x += (tx - view.x) * 0.05;
+          view.y += (ty - view.y) * 0.05;
+        }
+      }
+      return signal.loop != null || signal.follow != null || t < length + signal.afterglow;
+    });
+    draw();
+    if (signals.length) signalRaf = requestAnimationFrame(tickSignals);
+  }
+
+  /** Each live charge: a bright head with a fading tail, then the fibre it crossed glowing out. */
+  function drawSignals(map: Map<string, GraphNodeDatum>, dark: boolean) {
+    if (!signals.length) return;
+    const now = performance.now();
+    const head = dark ? "#fff4e3" : "#7a2e05";
+    const body = dark ? "#ffb070" : "#c25a14";
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.globalCompositeOperation = dark ? "lighter" : "source-over";
+    for (const signal of signals) {
+      const t = now - signal.start;
+      if (t < 0) continue;
+      for (const hop of signal.hops) {
+        if (t < hop.start) continue;
+        const from = map.get(hop.from);
+        const to = map.get(hop.to);
+        if (from?.x == null || to?.x == null || from.y == null || to.y == null) continue;
+        const raw = (t - hop.start) / hop.duration;
+        const strength = 0.35 + 0.65 * hop.strength;
+        if (raw < 1) {
+          const at = easeInOut(raw);
+          // Tail: three overlapping strokes, longest and faintest first.
+          for (const [length, alpha, w] of [
+            [0.45, 0.18, 3.2],
+            [0.22, 0.4, 2.2],
+            [0.08, 0.9, 1.6],
+          ] as const) {
+            ctx.beginPath();
+            fibre(from, to, Math.max(0, at - length), at);
+            ctx.strokeStyle = body;
+            ctx.globalAlpha = alpha * strength;
+            ctx.lineWidth = w / view.k;
+            ctx.stroke();
+          }
+          const point = quadPoint(fibreQuad(from, to), at);
+          const r = (9 + 6 * hop.strength) / view.k;
+          const glow = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, r);
+          glow.addColorStop(0, head);
+          glow.addColorStop(0.25, body);
+          glow.addColorStop(1, dark ? "rgba(0, 0, 0, 0)" : "rgba(247, 243, 234, 0)");
+          ctx.fillStyle = glow;
+          ctx.globalAlpha = 0.8 * strength;
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = head;
+          ctx.globalAlpha = strength;
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, (1.6 + 1.2 * hop.strength) / view.k, 0, Math.PI * 2);
+          ctx.fill();
+          continue;
+        }
+        const since = t - hop.start - hop.duration;
+        const left = 1 - since / signal.afterglow;
+        if (left <= 0) continue;
+        ctx.beginPath();
+        fibre(from, to);
+        ctx.strokeStyle = body;
+        ctx.globalAlpha = 0.55 * left * strength;
+        ctx.lineWidth = 1.4 / view.k;
+        ctx.stroke();
+        // The note it reached answers with a soft swell — a ring that opens and fades.
+        const swell = Math.min(1, since / 700);
+        if (swell < 1) {
+          ctx.beginPath();
+          ctx.arc(to.x, to.y, (3 + 7 * easeInOut(swell)) / view.k, 0, Math.PI * 2);
+          ctx.strokeStyle = body;
+          ctx.globalAlpha = (1 - swell) * 0.6 * strength;
+          ctx.lineWidth = 1 / view.k;
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
   const dock: Dock | null = showAllMode ? createDock(host, chooseTool) : null;
 
   function placeDock() {
@@ -988,14 +1189,16 @@ export function mountForceGraph(
   function clearTool() {
     window.cancelAnimationFrame(growRaf);
     growRaf = 0;
-    window.clearTimeout(walkTimer);
-    walkTimer = 0;
+    window.clearTimeout(toolTimer);
+    toolTimer = 0;
+    stopSignals();
     growUntil = null;
     recentWindow = null;
     pathSet = null;
     pathEdges = null;
     pathPicks = [];
     bridgeSet = null;
+    spark = null;
     tool = null;
     dock?.setActive(null);
     dock?.setPanel(null);
@@ -1013,6 +1216,7 @@ export function mountForceGraph(
     }
     tool = next;
     dock?.setActive(next);
+    if (next === "spark") openSpark();
     if (next === "grow") openGrow();
     if (next === "path") openPath();
     if (next === "recent") openRecent("month");
@@ -1042,6 +1246,95 @@ export function mountForceGraph(
     moveCamera(fitViewBelowInset(nodes, width, height, topInset() + 60, Math.min(160, width * 0.18), 0.04), 900);
   }
 
+  function monthYear(time: number | null) {
+    return time == null ? "" : new Date(time).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  }
+
+  // Spark: drop a thought in. It lands on the notes that mention it, then the charge spreads
+  // through their links, fading as it goes. What lights up is what your notes associate with it —
+  // and the panel names the ones you had forgotten.
+  function openSpark() {
+    const input = el("input", {
+      type: "text",
+      class: "neural-dock__input",
+      placeholder: selected ? "A thought, or blank for this note" : "Drop a thought in…",
+      "aria-label": "A thought to spark",
+      enterkeyhint: "go",
+    });
+    const go = el("button", { type: "submit", text: "Spark" });
+    const form = el("form", { class: "neural-dock__spark" }, input, go);
+    const answer = el("div", { class: "neural-dock__answer" });
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      fire(input.value.trim());
+    });
+    dock?.setPanel(
+      el(
+        "div",
+        {},
+        form,
+        el("p", { class: "neural-dock__note", text: "Watch where it travels. Your notes answer back." }),
+        answer,
+      ),
+    );
+    window.setTimeout(() => input.focus(), 0);
+
+    function fire(thought: string) {
+      stopSignals();
+      window.clearTimeout(toolTimer);
+      let seeds = thought
+        ? sparkSeeds(simNodes, thought, node => (node.pageId ? options.excerptFor(node.pageId) : ""), 8)
+        : [];
+      if (!seeds.length && !thought && selected) {
+        const picked = simNodes.find(node => node.kind === "leaf" && node.label === selected);
+        if (picked) seeds = [picked.id];
+      }
+      if (!seeds.length) {
+        spark = null;
+        answer.replaceChildren(el("p", { class: "neural-dock__note", text: thought ? "Nothing in your notes touches that yet." : "Type a thought, or pick a note first." }));
+        scheduleDraw();
+        return;
+      }
+      const hopMs = 950;
+      const result = spreadSpark(simLinks, seeds, { hopMs, decay: 0.7, fanOut: 5 });
+      spark = { level: result.level, litAt: result.litAt, seeds: new Set(seeds), start: performance.now() + 700 };
+      fitTo(result.level.keys());
+      playSignal({ hops: result.hops, afterglow: 5200, delay: 700 });
+      answer.replaceChildren(el("p", { class: "neural-dock__note", text: "Listening…" }));
+      // Name what came back once the wave has mostly spread.
+      toolTimer = window.setTimeout(() => {
+        const echoes = sparkEchoes(simNodes, result, seeds, Date.now(), 8, thoughtWords(thought));
+        const list = el("ol", { class: "neural-dock__steps" });
+        for (const echo of echoes) {
+          const node = leafById(echo.id);
+          if (!node) continue;
+          const meta = [monthYear(echo.written), echo.forgotten ? "forgotten" : ""].filter(Boolean).join(" · ");
+          const button = el(
+            "button",
+            { type: "button", class: echo.forgotten ? "is-forgotten" : "" },
+            el("span", { text: echo.label }),
+            meta ? el("small", { text: meta }) : null,
+          );
+          button.addEventListener("click", () => showNote(node));
+          list.append(el("li", {}, button));
+        }
+        const forgotten = echoes.filter(echo => echo.forgotten).length;
+        answer.replaceChildren(
+          el(
+            "div",
+            {},
+            el("p", { class: "neural-dock__head", text: echoes.length ? "Your notes answer" : "Only the notes you named lit up" }),
+            echoes.length ? list : null,
+            forgotten
+              ? el("p", { class: "neural-dock__note", text: `${forgotten} of these you wrote over a year ago.` })
+              : null,
+          ),
+        );
+      }, 700 + Math.min(4200, signalLength(result.hops) * 0.7));
+      scheduleDraw();
+    }
+  }
+
   // Grow: replay the map in the order notes were written.
   function openGrow() {
     const span = growthSpan(simNodes);
@@ -1053,19 +1346,20 @@ export function mountForceGraph(
     const slider = el("input", { type: "range", min: "0", max: "1000", value: "0", "aria-label": "Point in time" });
     const when = el("span", { class: "neural-dock__when" });
     const play = el("button", { type: "button", text: "Pause" });
-    const setAt = (fraction: number) => {
-      growUntil = span.first + growSpanWidth * fraction;
-      slider.value = String(Math.round(fraction * 1000));
-      when.textContent = new Date(growUntil).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+    let fraction = 0;
+    const setAt = (next: number) => {
+      fraction = next;
+      growUntil = span.first + growSpanWidth * next;
+      slider.value = String(Math.round(next * 1000));
+      when.textContent = monthYear(growUntil);
       scheduleDraw();
     };
     let started = 0;
     let from = 0;
-    const PLAY_MS = 16000;
     const frame = () => {
-      const fraction = Math.min(1, from + (performance.now() - started) / PLAY_MS);
-      setAt(fraction);
-      if (fraction < 1) growRaf = requestAnimationFrame(frame);
+      const next = Math.min(1, from + (performance.now() - started) / growPlayMs);
+      setAt(next);
+      if (next < 1) growRaf = requestAnimationFrame(frame);
       else {
         growRaf = 0;
         play.textContent = "Replay";
@@ -1093,15 +1387,37 @@ export function mountForceGraph(
       play.textContent = "Play";
       setAt(Number(slider.value) / 1000);
     });
-    dock?.setPanel(el("div", { class: "neural-dock__grow" }, play, slider, when));
+    const speeds = el("div", { class: "neural-dock__segments", role: "group", "aria-label": "Replay speed" });
+    const speedButtons = GROW_SPEEDS.map(speed => {
+      const button = el("button", { type: "button", text: speed.label, title: `Whole replay in ${Math.round(speed.ms / 1000)} seconds` });
+      button.addEventListener("click", () => {
+        growPlayMs = speed.ms;
+        writeGrowSpeed(speed.ms);
+        markSpeed();
+        // Keep going from here, at the new pace.
+        if (growRaf) start(fraction);
+      });
+      speeds.append(button);
+      return { button, ms: speed.ms };
+    });
+    const markSpeed = () => {
+      for (const { button, ms } of speedButtons) {
+        button.classList.toggle("is-active", ms === growPlayMs);
+        button.setAttribute("aria-pressed", String(ms === growPlayMs));
+      }
+    };
+    growPlayMs = readGrowSpeed();
+    markSpeed();
+    dock?.setPanel(el("div", {}, el("div", { class: "neural-dock__grow" }, play, slider, when), speeds));
     viewTouched = false;
     moveCamera(fitShowAll(), 500);
     setAt(0);
     start(0);
   }
 
-  // Path: click two notes (or a topic name) to see the chain that joins them.
+  // Path: click two notes (or a topic name) and watch a charge run the chain that joins them.
   function openPath() {
+    stopSignals();
     pathPicks = [];
     pathSet = new Set();
     pathEdges = new Set();
@@ -1137,6 +1453,7 @@ export function mountForceGraph(
     const leaf = node.kind === "leaf" ? node : topicRepresentative(simNodes, node.label, simLinks);
     if (!leaf) return;
     if (pathPicks.length >= 2) pathPicks = [];
+    stopSignals();
     pathPicks.push(leaf.id);
     pathSet = new Set(pathPicks);
     pathEdges = new Set();
@@ -1148,7 +1465,12 @@ export function mountForceGraph(
         const b = route[i]!;
         pathEdges.add(a < b ? `${a}|${b}` : `${b}|${a}`);
       }
-      if (route.length) fitTo(route);
+      if (route.length) {
+        fitTo(route);
+        // Long routes run a little quicker per step so the whole trip stays watchable.
+        const hopMs = Math.max(450, Math.min(950, 6500 / route.length));
+        playSignal({ hops: routeHops(route, hopMs, 60), afterglow: 2600, loop: 1800, delay: 800 });
+      }
       renderPathPanel(route);
     } else {
       renderPathPanel([]);
@@ -1172,39 +1494,80 @@ export function mountForceGraph(
     scheduleDraw();
   }
 
-  // Walk: drift from note to linked note, opening each one.
+  // Walk: ride a slow charge from note to linked note. The camera glides with it; the note it
+  // is resting on is named in the panel (open it from there), so nothing pops up mid-flight.
   function startWalk() {
     const start = selected ? simNodes.find(node => node.kind === "leaf" && node.label === selected)?.id : undefined;
     const route = walkRoute(simNodes, simLinks, 60, start);
-    let index = 0;
-    const stop = el("button", { type: "button", text: "Stop" });
+    if (route.length < 2) {
+      dock?.setPanel(el("p", { class: "neural-dock__note", text: "Not enough links to walk yet." }));
+      return;
+    }
+    const title = el("p", { class: "neural-dock__walking" });
+    const open = el("button", { type: "button", text: "Open" });
+    const stop = el("button", { type: "button", class: "neural-dock__quiet", text: "Stop" });
     stop.addEventListener("click", clearTool);
-    dock?.setPanel(el("div", { class: "neural-dock__grow" }, stop));
-    const step = () => {
-      const node = route[index] ? leafById(route[index]!) : null;
-      if (!node || tool !== "walk") {
-        if (tool === "walk") clearTool();
-        return;
-      }
-      showNote(node, Math.max(overviewK * 3.2, 0.3));
-      index += 1;
-      walkTimer = window.setTimeout(step, 3600);
+    let here = route[0]!;
+    open.addEventListener("click", () => {
+      const node = leafById(here);
+      if (node?.pageId) onNoteSelect({ pageId: node.pageId, title: node.label, excerpt: options.excerptFor(node.pageId) });
+    });
+    const name = (id: string) => {
+      here = id;
+      const node = leafById(id);
+      title.textContent = node?.label ?? "";
+      title.title = node?.parentKeyword ?? "";
     };
-    step();
+    name(here);
+    dock?.setPanel(el("div", {}, title, el("div", { class: "neural-dock__grow" }, open, stop)));
+    const first = leafById(here);
+    const k = Math.max(overviewK * 3.2, 0.3);
+    viewTouched = true;
+    if (first) moveCamera(focusShowAll(first, k), 1400);
+    playSignal({
+      hops: routeHops(route, 2600, 1100),
+      afterglow: 9000,
+      follow: k,
+      delay: 1500,
+      onArrive: id => {
+        name(id);
+        if (id === route[route.length - 1]) toolTimer = window.setTimeout(clearTool, 4000);
+      },
+    });
   }
 
-  // Bridges: the notes that join topics, and the topics that never meet.
+  // Bridges: the few notes that hold separate areas of your thinking together, each firing into
+  // the topics it joins; and the topics you tag together that never actually link.
   function openBridges() {
     const bridges = keyBridges(simNodes, simLinks);
     bridgeSet = new Set(bridges.map(item => item.id));
     const bridgeList = el("ol", { class: "neural-dock__steps" });
-    for (const bridge of bridges) {
+    bridges.forEach((bridge, index) => {
       const node = leafById(bridge.id);
-      if (!node) continue;
-      const button = el("button", { type: "button", text: bridge.label, title: bridge.topics.join(" · ") });
+      if (!node) return;
+      const button = el(
+        "button",
+        { type: "button", title: `Links into ${bridge.topics.join(", ")}` },
+        el("span", { text: bridge.label }),
+        el("small", { text: [node.parentKeyword, ...bridge.topics].filter(Boolean).map(topic => shortName(topic!)).join(" ↔ ") }),
+      );
       button.addEventListener("click", () => showNote(node));
       bridgeList.append(el("li", {}, button));
-    }
+      // Show the bridging: charges leave the note along each link into another topic.
+      const hops: Hop[] = [];
+      for (const link of simLinks) {
+        if (link.kind !== "backbone" && link.kind !== "overlap") continue;
+        const a = typeof link.source === "string" ? link.source : link.source.id;
+        const b = typeof link.target === "string" ? link.target : link.target.id;
+        const other = a === bridge.id ? b : b === bridge.id ? a : null;
+        if (!other) continue;
+        const topic = nodeMap.get(other)?.parentKeyword;
+        if (!topic || topic === node.parentKeyword) continue;
+        hops.push({ from: bridge.id, to: other, start: hops.length * 160, duration: 1300, strength: 0.8 });
+        if (hops.length >= 6) break;
+      }
+      if (hops.length) playSignal({ hops, afterglow: 1400, loop: 2200, delay: 600 + index * 450 });
+    });
     const gaps = missingLinks(simNodes, simLinks, liveModel.hubTies ?? []);
     const gapList = el("ul", { class: "neural-dock__steps" });
     for (const gap of gaps) {
@@ -1214,6 +1577,7 @@ export function mountForceGraph(
         const a = topicRepresentative(simNodes, gap.a, simLinks);
         const b = topicRepresentative(simNodes, gap.b, simLinks);
         if (!a || !b) return;
+        stopSignals();
         tool = "path";
         dock?.setActive("path");
         bridgeSet = null;
@@ -1226,9 +1590,16 @@ export function mountForceGraph(
       el(
         "div",
         {},
-        el("p", { class: "neural-dock__head", text: "Key bridges" }),
+        el("p", { class: "neural-dock__head", text: "Bridges" }),
+        el("p", {
+          class: "neural-dock__note",
+          text: "Notes that tie different topics together. Without them those areas of your thinking would never touch.",
+        }),
         bridgeList,
-        gaps.length ? el("p", { class: "neural-dock__head", text: "Missing links" }) : null,
+        gaps.length ? el("p", { class: "neural-dock__head", text: "Gaps" }) : null,
+        gaps.length
+          ? el("p", { class: "neural-dock__note", text: "Topics you tag together whose notes never link. Tap one to see how far apart they are — a note there could join them." })
+          : null,
         gaps.length ? gapList : null,
       ),
     );
@@ -1496,7 +1867,8 @@ export function mountForceGraph(
     () => {
       disposed = true;
       window.cancelAnimationFrame(growRaf);
-      window.clearTimeout(walkTimer);
+      window.clearTimeout(toolTimer);
+      stopSignals();
       resizeObserver?.disconnect();
       window.removeEventListener("keydown", onKeyDown);
       window.clearTimeout(retuneTimer);
