@@ -33,6 +33,8 @@ Register: new **S5** (dropdown under the next section) and **I10** (`window.prom
 
 ### Needs Adam (infra or data)
 
+Codex brief for all four: [`chatgpt-admin-actions-10.md`](chatgpt-admin-actions-10.md).
+
 - **Student share host has no DNS.** `class.adam-russell.com` is the intended student host (Worker `workers/class-site`, route in `wrangler.jsonc`) but does not resolve, so every Share / Copy link handed to students is dead. Deploy the Worker with its custom domain, or decide to share `/teaching/s/…` links instead.
 - **F09 Google Drive picker.** Set `VITE_GOOGLE_CLIENT_ID` and `VITE_GOOGLE_PICKER_API_KEY` (or the remote config) on Netlify.
 - **F11 Year 9 missing.** The years catalog only holds Year 12, and New class / New unit require a year with no way to add one. Either add the years, or add a "New year" path in those modals.
