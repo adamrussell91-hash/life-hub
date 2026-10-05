@@ -10,6 +10,8 @@ import {
   showAllLabelVisible,
   hubLabelVariants,
   placeHubLabels,
+  readShowAllTheme,
+  writeShowAllTheme,
 } from "./showAllDraw";
 
 function leaf(id: string, extra: Partial<GraphNodeDatum> = {}): GraphNodeDatum {
@@ -110,5 +112,25 @@ describe("hub label placement", () => {
     const hubs = [{ id: "a", x: 10, y: 100, coreR: 10, candidates: [box("A long edge label")] }];
     const placed = placeHubLabels(hubs, 16, 4, { x0: 0, y0: 0, x1: 500, y1: 500 });
     expect(placed.get("a")!.box.x0).toBe(0);
+  });
+});
+
+describe("Show All background", () => {
+  it("defaults to dark, remembers light, and survives broken storage", () => {
+    const store = new Map<string, string>();
+    const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+    expect(readShowAllTheme(storage)).toBe("dark");
+    writeShowAllTheme("light", storage);
+    expect(readShowAllTheme(storage)).toBe("light");
+    const broken = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+    };
+    expect(readShowAllTheme(broken)).toBe("dark");
+    expect(() => writeShowAllTheme("light", broken)).not.toThrow();
   });
 });

@@ -9,6 +9,8 @@ import {
 } from "d3-force";
 import {
   SHOW_ALL_RETUNE_MS,
+  SHOW_ALL_STRAND_WIDTH,
+  showAllStrandWidth,
   fitViewBelowInset,
   applyForceStageResize,
   applyShowAllStrandStroke,
@@ -48,9 +50,9 @@ import {
   type GraphNodeDatum,
 } from "./keywordGraph";
 import { selectionCluster } from "./graphFocus";
-import { hubLabelVariants, placeHubLabels } from "./showAllDraw";
+import { hubLabelVariants, placeHubLabels, readShowAllTheme, type ShowAllTheme } from "./showAllDraw";
 import { layoutShowAll } from "./showAllGraph";
-import { placeTopicAnchors } from "./showAllNeural";
+import { branchLoads, placeTopicAnchors } from "./showAllNeural";
 import type { RelaxLink, RelaxNode, RelaxShape } from "./showAllRelax";
 import { cachedRelax, relaxNow, relaxRunsInWorker, requestRelax } from "./showAllRelaxClient";
 import {
@@ -221,6 +223,7 @@ export function mountForceGraph(
   function startMorph(settled: GraphNodeDatum[], duration: number) {
     // Fit to where the notes are going, before the plan rewinds them to where they are now.
     const target = !viewTouched || duration >= SHOW_ALL_MORPH_MS ? fitShowAll(settled) : null;
+    if (target) overviewK = target.k;
     const plan = planShowAllMorph(simNodes, settled);
     simNodes = plan.nodes;
     refreshLookups();
@@ -237,6 +240,12 @@ export function mountForceGraph(
   }
 
   // Neural relax: seed (instant) → relaxed off-screen → shown. A token drops stale results.
+  let loads = new Map<string, number>();
+  let loadsFor: GraphLinkDatum[] | null = null;
+  /** The zoom the overview was fitted at; topic names wait until you zoom well past it. */
+  let overviewK = 0;
+  let zoneLabelBoxes = new Map<string, { x0: number; y0: number; x1: number; y1: number }>();
+  let theme: ShowAllTheme = readShowAllTheme();
   let relaxToken = 0;
   let disposed = false;
   let growing = false;
@@ -319,6 +328,7 @@ export function mountForceGraph(
         y: height / 2 - (height / 2 - fitted.y) * 0.94,
       });
       camera = { from: { ...view }, to: fitted, start: performance.now(), duration: SHOW_ALL_REVEAL_MS };
+      overviewK = fitted.k;
     }
     canvas.style.opacity = "0";
     revealStart = performance.now();
@@ -656,26 +666,44 @@ export function mountForceGraph(
     ctx.restore();
   }
 
-  let zoneLabelBoxes = new Map<string, { x0: number; y0: number; x1: number; y1: number }>();
 
-  /** Neural palette: topic colours lifted toward white so they glow on black. */
-  function glow(hex: string, lift = 0.32) {
+  /** Topic colour lifted toward white (dark field) or deepened (light field). */
+  function tint(hex: string, amount: number) {
     const m = /^#?([0-9a-f]{6})$/i.exec(hex);
     if (!m) return hex;
     const n = parseInt(m[1]!, 16);
-    const mix = (c: number) => Math.round(c + (255 - c) * lift);
-    return `rgb(${mix((n >> 16) & 255)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
+    const shift = (c: number) =>
+      theme === "dark" ? Math.round(c + (255 - c) * amount) : Math.round(c * (1 - amount));
+    return `rgb(${shift((n >> 16) & 255)}, ${shift((n >> 8) & 255)}, ${shift(n & 255)})`;
+  }
+
+  function hashUnit(seed: string) {
+    let hash = 2166136261;
+    for (let i = 0; i < seed.length; i++) {
+      hash ^= seed.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0) / 4294967296;
+  }
+
+  /** A fibre: a gentle, stable bend per link so branches read organic, not ruled. */
+  function fibre(source: GraphNodeDatum, target: GraphNodeDatum, key: string) {
+    const dx = target.x! - source.x!;
+    const dy = target.y! - source.y!;
+    const bend = (hashUnit(key) - 0.5) * 0.6;
+    ctx.moveTo(source.x!, source.y!);
+    ctx.quadraticCurveTo((source.x! + target.x!) / 2 - dy * bend, (source.y! + target.y!) / 2 + dx * bend, target.x!, target.y!);
   }
 
   function drawShowAllFrame(map: Map<string, GraphNodeDatum>, emphasis: ReturnType<typeof drawArgs>) {
-    // Black field: the glow only works when light adds up on dark.
+    const dark = theme === "dark";
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = "#03050a";
+    ctx.fillStyle = dark ? "#03050a" : "#f7f3ea";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (growing) {
       ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-      ctx.fillStyle = "rgba(244, 239, 230, 0.55)";
+      ctx.fillStyle = dark ? "rgba(244, 239, 230, 0.55)" : "rgba(19, 35, 58, 0.5)";
       ctx.font = "500 13px Inter, ui-sans-serif, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -684,44 +712,52 @@ export function mountForceGraph(
     ctx.restore();
     if (growing) return;
 
+    if (loadsFor !== simLinks) {
+      loads = branchLoads(simNodes, simLinks);
+      loadsFor = simLinks;
+    }
     const highlighting = Boolean(hover || selected || options.search.trim());
     const base = overlapLinkAlpha();
-    const batches = new Map<string, { color: string; alpha: number; pairs: Array<[GraphNodeDatum, GraphNodeDatum]> }>();
-    const active: Array<[GraphNodeDatum, GraphNodeDatum]> = [];
+    const widthScale = showAllStrandWidth() / SHOW_ALL_STRAND_WIDTH;
+    type Fibre = [GraphNodeDatum, GraphNodeDatum, string];
+    const batches = new Map<string, { color: string; alpha: number; width: number; fibres: Fibre[] }>();
+    const active: Fibre[] = [];
     for (const link of simLinks) {
       if (link.kind !== "overlap" && link.kind !== "backbone") continue;
       const { source, target } = linkEnds(link, map);
       if (!source || !target || source.x == null || target.x == null || source.y == null || target.y == null) continue;
       if (source.departing || target.departing) continue;
       if (!onScreen(source.x, source.y, 200) && !onScreen(target.x, target.y, 200)) continue;
+      const key = source.id < target.id ? `${source.id}|${target.id}` : `${target.id}|${source.id}`;
       if (highlighting && linkDrawState(link, source, target, emphasis).active) {
-        active.push([source, target]);
+        active.push([source, target, key]);
         continue;
       }
       const fade = Math.min(source.opacity ?? 1, target.opacity ?? 1);
-      const cross = link.kind === "overlap";
-      const color = glow(source.color, 0.08);
-      const alpha = Math.min(1, (highlighting ? 0.22 : 1) * (cross ? base * 0.6 : base * 1.5) * fade);
-      const key = `${color}|${alpha.toFixed(3)}`;
-      const batch = batches.get(key) ?? { color, alpha, pairs: [] };
-      batch.pairs.push([source, target]);
-      batches.set(key, batch);
+      const backbone = link.kind === "backbone";
+      // Trunks thick, twigs fine: width follows how many notes the branch carries.
+      const load = backbone ? (loads.get(key) ?? 1) : 0;
+      const width = backbone ? Math.round((0.5 + Math.min(3.2, Math.log2(1 + load) * 0.55)) * 4) / 4 : 0.6;
+      const color = tint(source.color, dark ? 0.08 : 0.15);
+      const alpha = Math.min(1, (highlighting ? 0.25 : 1) * (backbone ? base * 1.7 : base * 0.5) * fade);
+      const bucket = `${color}|${alpha.toFixed(2)}|${width}`;
+      const batch = batches.get(bucket) ?? { color, alpha, width, fibres: [] };
+      batch.fibres.push([source, target, key]);
+      batches.set(bucket, batch);
     }
-    ctx.globalCompositeOperation = "lighter";
-    applyShowAllStrandStroke(ctx, { active: false, viewK: view.k });
+    ctx.globalCompositeOperation = dark ? "lighter" : "multiply";
+    ctx.lineCap = "round";
+    ctx.setLineDash([]);
     for (const batch of batches.values()) {
       ctx.beginPath();
-      for (const [source, target] of batch.pairs) {
-        ctx.moveTo(source.x!, source.y!);
-        ctx.lineTo(target.x!, target.y!);
-      }
+      for (const [source, target, key] of batch.fibres) fibre(source, target, key);
       ctx.strokeStyle = batch.color;
       ctx.globalAlpha = batch.alpha;
+      ctx.lineWidth = (batch.width * widthScale) / view.k;
       ctx.stroke();
     }
 
-    // Notes are specks; well-linked notes get a soft halo — the bright knots in the web.
-    const speck = 1.3 / view.k;
+    // Notes: small cell bodies; well-linked ones get a soft glow (dark) or wash (light).
     for (const node of simNodes) {
       if (node.kind !== "leaf" || node.x == null || node.y == null) continue;
       if (!onScreen(node.x, node.y)) continue;
@@ -729,37 +765,36 @@ export function mountForceGraph(
       const fade = (node.opacity ?? 1) * (dim ? 0.25 : 1);
       const degree = node.degree ?? 0;
       if (degree >= 5 || hot) {
-        const haloR = (hot ? 9 : 3 + Math.min(10, degree) * 0.7) / view.k;
+        const haloR = ((hot ? 10 : 3 + Math.min(degree, 14) * 1.1) * 0.7) / view.k;
         const halo = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, haloR);
-        halo.addColorStop(0, glow(node.color, 0.4));
-        halo.addColorStop(1, "rgba(0, 0, 0, 0)");
+        halo.addColorStop(0, tint(node.color, dark ? 0.55 : 0.1));
+        halo.addColorStop(1, dark ? "rgba(0, 0, 0, 0)" : "rgba(255, 255, 255, 0)");
         ctx.fillStyle = halo;
-        ctx.globalAlpha = (hot ? 0.9 : 0.35) * fade;
+        ctx.globalAlpha = (hot ? 0.9 : dark ? 0.32 : 0.45) * fade;
         ctx.beginPath();
         ctx.arc(node.x, node.y, haloR, 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.fillStyle = hot ? "#fff3e6" : glow(node.color, 0.3);
-      ctx.globalAlpha = (hot ? 1 : 0.85) * fade;
+      ctx.fillStyle = hot ? (dark ? "#fff3e6" : "#a8501a") : tint(node.color, dark ? 0.3 : 0.2);
+      ctx.globalAlpha = (hot ? 1 : dark ? 0.85 : 0.75) * fade;
       ctx.beginPath();
-      ctx.arc(node.x, node.y, hot ? speck * 2.2 : speck * (1 + Math.min(degree, 8) * 0.12), 0, Math.PI * 2);
+      ctx.arc(node.x, node.y, ((hot ? 2.6 : 0.9 + Math.min(degree, 10) * 0.18) * 1.1) / view.k, 0, Math.PI * 2);
       ctx.fill();
     }
 
     if (active.length) {
-      applyShowAllStrandStroke(ctx, { active: true, viewK: view.k });
       ctx.beginPath();
-      for (const [source, target] of active) {
-        ctx.moveTo(source.x!, source.y!);
-        ctx.lineTo(target.x!, target.y!);
-      }
-      ctx.strokeStyle = "#ffb070";
+      for (const [source, target, key] of active) fibre(source, target, key);
+      ctx.strokeStyle = dark ? "#ffb070" : "#c25a14";
       ctx.globalAlpha = 0.95;
+      ctx.lineWidth = (2 * widthScale) / view.k;
       ctx.stroke();
     }
     ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
 
+    const ink = dark ? "#f4efe6" : "#13233a";
+    const halo = dark ? "rgba(3, 5, 10, 0.85)" : "rgba(247, 243, 234, 0.9)";
     for (const node of simNodes) {
       if (node.kind !== "leaf" || node.x == null || node.y == null || !onScreen(node.x, node.y)) continue;
       const { hot } = nodeDrawState(node, emphasis);
@@ -768,18 +803,26 @@ export function mountForceGraph(
         font: `500 ${11 / view.k}px Inter, ui-sans-serif, sans-serif`,
         align: "left",
         baseline: "middle",
-        color: "#f4efe6",
+        color: ink,
         alpha: node.opacity ?? 1,
-        halo: "rgba(3, 5, 10, 0.85)",
+        halo,
       });
     }
 
-    // Topic names float over the middle of their notes, through the collision pass (C1).
-    const zones = simNodes.filter(node => node.kind === "major" && !node.departing && node.x != null && node.y != null);
+    // Words stay out of the overview. Topic names appear only once you zoom in (or for the topic
+    // you are hovering or have selected), and then only where they do not collide (C1).
+    const zoomedIn = overviewK > 0 && view.k >= overviewK * 1.7;
+    const zones = simNodes.filter(
+      node =>
+        node.kind === "major" &&
+        !node.departing &&
+        node.x != null &&
+        node.y != null &&
+        (zoomedIn || node === hover || node.label === selected),
+    );
+    zones.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
     const labelFont = `600 ${12 / view.k}px Inter, ui-sans-serif, sans-serif`;
     ctx.font = labelFont;
-    // Biggest topics claim label space first; the rest appear on hover or as you zoom in.
-    zones.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
     const labels = placeHubLabels(
       zones.map(node => ({
         id: node.id,
@@ -797,7 +840,7 @@ export function mountForceGraph(
         x1: (width - 4 - view.x) / view.k,
         y1: (height - 4 - view.y) / view.k,
       },
-      22 / view.k,
+      28 / view.k,
     );
     zoneLabelBoxes = new Map([...labels].map(([id, label]) => [id, label.box]));
     for (const node of zones) {
@@ -808,9 +851,9 @@ export function mountForceGraph(
         font: labelFont,
         align: "center",
         baseline: "middle",
-        color: hot && hover === node ? "#ffb070" : glow(node.color, 0.55),
+        color: hot && hover === node ? (dark ? "#ffb070" : "#c25a14") : tint(node.color, dark ? 0.55 : 0.35),
         alpha: (dim ? 0.3 : hot ? 1 : 0.8) * (node.opacity ?? 1),
-        halo: "rgba(3, 5, 10, 0.8)",
+        halo,
       });
     }
   }
@@ -1037,5 +1080,9 @@ export function mountForceGraph(
     },
     setModel,
     setTuning,
+    next => {
+      theme = next;
+      scheduleDraw();
+    },
   );
 }

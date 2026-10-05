@@ -181,6 +181,7 @@ export type GraphMount = (() => void) & {
   setSearch: (query: string) => void;
   setModel: (model: ArchiveGraphModel) => void;
   setTuning: (partial: Partial<ShowAllTuning>) => void;
+  setTheme: (theme: "dark" | "light") => void;
 };
 
 export function attachGraphSearch(
@@ -188,11 +189,13 @@ export function attachGraphSearch(
   setSearch: (query: string) => void,
   setModel: (model: ArchiveGraphModel) => void = () => {},
   setTuning: (partial: Partial<ShowAllTuning>) => void = () => {},
+  setTheme: (theme: "dark" | "light") => void = () => {},
 ): GraphMount {
   const stop = teardown as GraphMount;
   stop.setSearch = setSearch;
   stop.setModel = setModel;
   stop.setTuning = setTuning;
+  stop.setTheme = setTheme;
   return stop;
 }
 

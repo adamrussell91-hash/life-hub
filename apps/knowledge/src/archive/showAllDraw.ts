@@ -144,3 +144,31 @@ export function placeHubLabels(
   }
   return placed;
 }
+
+export type ShowAllTheme = "dark" | "light";
+const THEME_KEY = "kh.showAll.theme";
+
+/** Dark by default: the glow needs a black field. Remembered per browser; never throws. */
+export function readShowAllTheme(storage: Pick<Storage, "getItem"> | null = safeStorage()): ShowAllTheme {
+  try {
+    return storage?.getItem(THEME_KEY) === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
+
+export function writeShowAllTheme(theme: ShowAllTheme, storage: Pick<Storage, "setItem"> | null = safeStorage()) {
+  try {
+    storage?.setItem(THEME_KEY, theme);
+  } catch {
+    /* the choice just isn't remembered */
+  }
+}
+
+function safeStorage() {
+  try {
+    return typeof localStorage === "undefined" ? null : localStorage;
+  } catch {
+    return null;
+  }
+}

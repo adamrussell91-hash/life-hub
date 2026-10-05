@@ -133,7 +133,7 @@ describe("Show All strand drawing", () => {
     vi.unstubAllGlobals();
   });
 
-  it("draws note-to-note links as solid rounded strokes, with no hub spokes", () => {
+  it("draws note-to-note links as solid, rounded, curved fibres, with no hub spokes", () => {
     stubFrame();
     const recorded = installCanvas();
     const host = document.createElement("div");
@@ -141,22 +141,18 @@ describe("Show All strand drawing", () => {
     document.body.appendChild(host);
 
     const stop = mountForceGraph(host, model(), {}, { variant: "showAll", search: "", excerptFor: () => "" });
-    // The view is fitted to the map, so the zoom is not a constant; every strand shares one width.
-    const strands = recorded.strokes.filter(stroke => stroke.strokeStyle !== "#fff");
-    const expected = strands[0]?.lineWidth ?? 0;
-
+    const strands = recorded.strokes;
     expect(strands.length).toBeGreaterThanOrEqual(1);
-    expect(strands.every(stroke => Math.abs(stroke.lineWidth - expected) < 0.01)).toBe(true);
     expect(strands.every(stroke => stroke.dash.length === 0)).toBe(true);
     expect(strands.every(stroke => stroke.lineCap === "round")).toBe(true);
-    // Two note-to-note links; the three hub spokes in the model are never drawn.
-    expect(recorded.paths.filter(path => path === "line").length).toBe(2);
-    expect(recorded.paths).not.toContain("curve");
+    // Two note-to-note links, each one gently curved fibre; the three hub spokes are never drawn.
+    expect(recorded.paths.filter(path => path === "curve").length).toBe(2);
+    expect(recorded.paths).not.toContain("line");
 
     stop();
   });
 
-  it("names every zone and links notes to notes, but never paints note titles", () => {
+  it("keeps words off the overview: no topic names and no note titles until you zoom or hover", () => {
     stubFrame();
     const recorded = installCanvas();
     const host = document.createElement("div");
@@ -180,11 +176,9 @@ describe("Show All strand drawing", () => {
 
     const stop = mountForceGraph(host, graph, {}, { variant: "showAll", search: "", excerptFor: () => "" });
     expect(recorded.paths.length).toBeGreaterThan(0);
-    // Links inside a zone are straight; links between zones bend into a shared thread.
-    expect(recorded.paths).toContain("line");
-    expect(recorded.paths.every(path => path === "line" || path === "curve")).toBe(true);
-    expect(hubs.every(hub => recorded.texts.some(text => hub.label.startsWith(text.replace(/…$/, ""))))).toBe(
-      true,
+    expect(recorded.paths.every(path => path === "curve")).toBe(true);
+    expect(hubs.some(hub => recorded.texts.some(text => text && hub.label.startsWith(text.replace(/…$/, ""))))).toBe(
+      false,
     );
     const leafTitles = new Set(graph.nodes.filter(node => node.kind === "leaf").map(node => node.label));
     expect(recorded.texts.some(text => leafTitles.has(text))).toBe(false);

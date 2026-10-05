@@ -3,7 +3,7 @@ import { TOPIC_VOCABULARY } from "../tidy/vocabulary";
 import { nodeDegrees, noteToNoteLinks } from "./graphMetrics";
 
 import { buildShowAllGraph, showAllHubTies, showAllNoteRadius } from "./showAllGraph";
-import { NEURAL_DEGREE_CAP, placeTopicAnchors } from "./showAllNeural";
+import { NEURAL_DEGREE_CAP, branchLoads, placeTopicAnchors } from "./showAllNeural";
 import { relaxNeural } from "./showAllRelax";
 
 function page(
@@ -285,6 +285,14 @@ describe("Show All neural map", () => {
       expect(Number.isFinite(hub.x)).toBe(true);
       expect(nearest).toBeLessThan(200);
     }
+  });
+
+  it("makes trunks carry more than twigs, so fibres can taper", () => {
+    const model = buildShowAllGraph(neuralPages());
+    const loads = [...branchLoads(model.nodes, model.links).values()];
+    expect(loads.length).toBeGreaterThan(0);
+    expect(Math.min(...loads)).toBe(1);
+    expect(Math.max(...loads)).toBeGreaterThan(20);
   });
 
   it("counts shared notes per topic pair once per note", () => {

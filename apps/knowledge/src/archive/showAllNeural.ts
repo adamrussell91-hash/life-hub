@@ -391,3 +391,50 @@ export function placeTopicAnchors(nodes: GraphNodeDatum[], links: GraphLinkDatum
     node.homeY = y;
   }
 }
+
+/**
+ * How much each backbone link carries: the number of notes beyond it, seen from its cluster's
+ * best-linked note. Drawn as thickness, so trunks taper into twigs like dendrites.
+ * Keyed by `${a}|${b}` with ids sorted.
+ */
+export function branchLoads(nodes: GraphNodeDatum[], links: GraphLinkDatum[]) {
+  const ids = nodes.filter(node => node.kind === "leaf" && !node.departing).map(node => node.id);
+  const adjacency = new Map<string, string[]>(ids.map(id => [id, []]));
+  const degree = new Map<string, number>(ids.map(id => [id, 0]));
+  for (const link of links) {
+    if (link.kind !== "backbone" && link.kind !== "overlap") continue;
+    const a = endId(link.source);
+    const b = endId(link.target);
+    if (!adjacency.has(a) || !adjacency.has(b)) continue;
+    degree.set(a, degree.get(a)! + 1);
+    degree.set(b, degree.get(b)! + 1);
+    if (link.kind !== "backbone") continue;
+    adjacency.get(a)!.push(b);
+    adjacency.get(b)!.push(a);
+  }
+  const loads = new Map<string, number>();
+  const seen = new Set<string>();
+  const starts = [...ids].sort((a, b) => degree.get(b)! - degree.get(a)! || a.localeCompare(b));
+  for (const start of starts) {
+    if (seen.has(start)) continue;
+    seen.add(start);
+    const order = [start];
+    const parent = new Map<string, string | null>([[start, null]]);
+    for (let i = 0; i < order.length; i++) {
+      for (const other of adjacency.get(order[i]!)!) {
+        if (seen.has(other)) continue;
+        seen.add(other);
+        parent.set(other, order[i]!);
+        order.push(other);
+      }
+    }
+    const size = new Map(order.map(id => [id, 1]));
+    for (let i = order.length - 1; i > 0; i--) {
+      const id = order[i]!;
+      const up = parent.get(id)!;
+      size.set(up, size.get(up)! + size.get(id)!);
+      loads.set(id < up ? `${id}|${up}` : `${up}|${id}`, size.get(id)!);
+    }
+  }
+  return loads;
+}
