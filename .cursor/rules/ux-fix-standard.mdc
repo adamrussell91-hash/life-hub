@@ -28,6 +28,7 @@ These are the incremental non-fixes. Do not ship them as the answer to a UX repo
 - Adding a media query patch for one width instead of making the layout genuinely responsive.
 - Rewording one label when the flow itself is confusing.
 - Declaring done from reading CSS without looking at the render.
+- Shipping a sheet/dialog/form whose Save/Add/Cancel/Confirm sit as tiny pills on the home-indicator or under the fold after the user filled the form (**R4** — docked ≥44px actions with safe-area padding, measured at 390).
 
 ## Required procedure
 
@@ -44,6 +45,7 @@ With the screenshots in front of you, list **every** problem on that surface, no
 - **Spacing and alignment**: consistent rhythm, aligned edges, no orphaned or crammed elements.
 - **Density**: not cramped, not a sea of empty space.
 - **Responsive**: no horizontal scroll, no overlap, touch targets at least 44px, nothing clipped at 390px.
+- **Form / sheet actions (R4 — every time)**: if the surface has Save/Add/Cancel/Confirm/Remove, those controls are docked (not scroll-sticky), ≥44px tall, share the row width on phone, padded by `env(safe-area-inset-bottom)`, and still tappable after scrolling a long form. Measure at 390; do not eyeball.
 - **Content resilience**: long names, empty lists, many items, missing data.
 - **States**: hover, focus-visible, active, disabled, loading, empty, error all exist and look intentional.
 - **Consistency**: does this match how the same pattern looks and behaves elsewhere in the hub?

@@ -102,9 +102,13 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
 
   const form = document.createElement('form');
   form.noValidate = true;
+  form.className = 'addform__form';
+  const scroll = document.createElement('div');
+  scroll.className = 'addform__scroll';
   const grid = document.createElement('div');
   grid.className = 'fgrid';
-  form.append(grid);
+  scroll.append(grid);
+  form.append(scroll);
 
   // Common fields
   const titleInput = document.createElement('input');
@@ -398,12 +402,12 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
   fillBtn.className = 'btn ghost';
   fillBtn.textContent = 'Fill from email';
   paste.append(pasteSummary, pasteTextarea, fillBtn);
-  form.append(paste);
+  scroll.append(paste);
 
   const errorNote = document.createElement('p');
   errorNote.className = 'hint';
   errorNote.hidden = true;
-  form.append(errorNote);
+  scroll.append(errorNote);
 
   function fieldFor(path: string): HTMLElement | null {
     const name = path.replace(/^item\./, '') === 'depart_time' ? 'time' : path.replace(/^item\./, '');
@@ -497,7 +501,8 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
   });
 
   const actions = document.createElement('div');
-  actions.className = 'row';
+  actions.className = 'addform__actions';
+  actions.setAttribute('data-part', 'form-actions');
   const saveBtn = document.createElement('button');
   saveBtn.type = 'submit';
   saveBtn.className = 'btn';
