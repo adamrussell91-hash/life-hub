@@ -12,7 +12,11 @@ import { BOOK_PALETTE } from "./palette";
 
 export type TerrainCanvas = HTMLCanvasElement & { surf?: HTMLCanvasElement };
 
-const SEA = 0.42;
+import { SEA_LEVEL } from "./islandShape";
+import type { TerrainFrame } from "./atlasLayout";
+
+const SEA = SEA_LEVEL;
+const NO_FRAME: TerrainFrame = { unit: 1, ox: 0, oy: 0 };
 const BAND = 0.17;
 const PAPER: [number, number, number] = [251, 248, 242];
 const NAVY: [number, number, number] = [23, 55, 94];
@@ -52,12 +56,21 @@ function noise(seed: number) {
   };
 }
 
-/** `stretch` > 1 draws the hill out along `angle`; round when absent. */
-type Source = { x: number; y: number; amp: number; sigma: number; region: number; cos: number; sin: number; along: number; across: number };
+/** Base hills shape the coast; relief (notes) only lifts land that is already land; seeds only claim colour. */
+const BASE = 0;
+const RELIEF = 1;
+const SEED = 2;
 
-function source(x: number, y: number, amp: number, sigma: number, region: number, stretch = 1, angle = 0): Source {
+/** `stretch` > 1 draws the hill out along `angle`; round when absent. */
+type Source = { kind: number; vote: boolean; x: number; y: number; amp: number; sigma: number; region: number; cos: number; sin: number; along: number; across: number };
+
+function source(kind: number, x: number, y: number, amp: number, sigma: number, region: number, vote: boolean, stretch = 1, angle = 0): Source {
   const k = Math.sqrt(Math.max(0.2, stretch));
-  return { x, y, amp, sigma, region, cos: Math.cos(angle), sin: Math.sin(angle), along: 1 / (k * k), across: k * k };
+  return { kind, vote, x, y, amp, sigma, region, cos: Math.cos(angle), sin: Math.sin(angle), along: 1 / (k * k), across: k * k };
+}
+
+function fade(c: [number, number, number]): [number, number, number] {
+  return [0, 1, 2].map(i => Math.round(c[i]! * 0.4 + UNEXPLORED[i]! * 0.6)) as [number, number, number];
 }
 
 function sources(atlas: AtlasModel): { list: Source[]; colours: Array<[number, number, number]> } {
@@ -65,21 +78,69 @@ function sources(atlas: AtlasModel): { list: Source[]; colours: Array<[number, n
   const index = new Map<string, number>();
   atlas.provinces.forEach(p => {
     index.set(p.id, colours.length);
-    colours.push(p.explored ? PASTELS[p.colour % PASTELS.length]! : UNEXPLORED);
+    const colour = PASTELS[p.colour % PASTELS.length]!;
+    colours.push(!p.explored ? UNEXPLORED : p.neighbour ? fade(colour) : colour);
   });
   index.set("loose", colours.length);
   colours.push(LOOSE);
   const list: Source[] = atlas.towns.map(t =>
-    source(t.x, t.y, (t.peak ? 1.5 : 1) * (0.62 + Math.min(0.5, t.size * 0.05)), t.peak ? 46 : 60, index.get(t.province)!));
-  for (const p of atlas.provinces) {
-    // Every province is land; unexplored ones are low and wide, waiting under fog.
-    list.push(source(p.x, p.y, p.explored ? 0.5 : 0.6, p.radius * (p.explored ? 1.25 : 1.05), index.get(p.id)!, p.stretch, p.angle));
-  }
+    source(RELIEF, t.x, t.y, (t.peak ? 1.5 : 1) * (0.62 + Math.min(0.5, t.size * 0.05)), t.peak ? 46 : 60, index.get(t.province) ?? -1, index.has(t.province)));
+  // Every province is a seed: it colours the land nearest it. Equal reach, so regions split evenly between seeds.
+  for (const p of atlas.provinces) list.push(source(SEED, p.x, p.y, 0, p.radius * 2, index.get(p.id)!, true));
   for (const l of atlas.land ?? []) {
-    const region = index.get(l.province);
-    if (region !== undefined) list.push(source(l.x, l.y, l.amp, l.sigma, region, l.stretch, l.angle));
+    const region = index.get(l.province) ?? -1;
+    list.push(source(BASE, l.x, l.y, l.amp, l.sigma, region, (l.vote ?? true) && region >= 0 && l.amp > 0, l.stretch, l.angle));
   }
   return { list, colours };
+}
+
+/** Height and region at a point, from the given sources. Noise is sampled in the frame's space. */
+function sampler(list: Source[], seed: number, frame: TerrainFrame) {
+  const n1 = noise(seed);
+  const n2 = noise(seed * 3 + 1);
+  const { unit, ox, oy } = frame;
+  return (candidates: Iterable<number>, x: number, y: number) => {
+    const nx = x / unit + ox;
+    const ny = y / unit + oy;
+    // Two octaves of warp: broad bends, then a craggier edge.
+    const wx = x + ((n1(nx / 70, ny / 70) - 0.5) * 70 + (n2(nx / 19 + 40, ny / 19) - 0.5) * 16) * unit;
+    const wy = y + ((n2(nx / 70, ny / 70) - 0.5) * 70 + (n1(nx / 19, ny / 19 + 40) - 0.5) * 16) * unit;
+    let base = (n1(nx / 24, ny / 24) - 0.5) * 0.14;
+    let relief = 0;
+    let best = Infinity;
+    let region = -1;
+    for (const k of candidates) {
+      const src = list[k]!;
+      const ex = wx - src.x;
+      const ey = wy - src.y;
+      const u = ex * src.cos + ey * src.sin;
+      const v = ey * src.cos - ex * src.sin;
+      const d2 = u * u * src.along + v * v * src.across;
+      if (src.kind !== SEED) {
+        const h = src.amp * Math.exp(-d2 / (2 * src.sigma * src.sigma));
+        if (src.kind === RELIEF) relief += h;
+        else base += h;
+      }
+      if (src.vote) {
+        const weighted = d2 / (src.sigma * src.sigma);
+        if (weighted < best) {
+          best = weighted;
+          region = src.region;
+        }
+      }
+    }
+    // Notes raise hills inland but never move the shore.
+    const t = Math.max(0, Math.min(1, (base - SEA) / 0.15));
+    return { e: base + relief * t * t * (3 - 2 * t), region };
+  };
+}
+
+/** The land as a function, for tests and anything that asks "is this land?" without a canvas. */
+export function terrainField(atlas: AtlasModel, seed = 7) {
+  const { list } = sources(atlas);
+  const sample = sampler(list, seed, atlas.frame ?? NO_FRAME);
+  const all = list.map((_, i) => i);
+  return (x: number, y: number) => sample(all, x, y);
 }
 
 export function renderTerrain(atlas: AtlasModel, resolution = 1.25, seed = 7): TerrainCanvas {
@@ -91,8 +152,8 @@ export function renderTerrain(atlas: AtlasModel, resolution = 1.25, seed = 7): T
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
   const { list, colours } = sources(atlas);
-  const n1 = noise(seed);
-  const n2 = noise(seed * 3 + 1);
+  const frame = atlas.frame ?? NO_FRAME;
+  const sample = sampler(list, seed, frame);
   const elevation = new Float32Array(w * h);
   const region = new Int16Array(w * h).fill(-1);
 
@@ -102,7 +163,7 @@ export function renderTerrain(atlas: AtlasModel, resolution = 1.25, seed = 7): T
   const bh = Math.ceil(h / BLOCK);
   const bins: number[][] = Array.from({ length: bw * bh }, () => []);
   list.forEach((src, i) => {
-    const reach = (src.sigma * 3 * Math.sqrt(Math.max(src.along, src.across)) + 60) * resolution;
+    const reach = (src.sigma * 3 * Math.sqrt(Math.max(src.along, src.across)) + 60 * frame.unit) * resolution;
     const x0 = Math.max(0, Math.floor((src.x * resolution - reach) / BLOCK));
     const x1 = Math.min(bw - 1, Math.floor((src.x * resolution + reach) / BLOCK));
     const y0 = Math.max(0, Math.floor((src.y * resolution - reach) / BLOCK));
@@ -112,31 +173,9 @@ export function renderTerrain(atlas: AtlasModel, resolution = 1.25, seed = 7): T
 
   for (let j = 0; j < h; j += 1) {
     for (let i = 0; i < w; i += 1) {
-      const x = i / resolution;
-      const y = j / resolution;
-      // Two octaves of warp: broad bends, then a craggier edge.
-      const wx = x + (n1(x / 70, y / 70) - 0.5) * 70 + (n2(x / 19 + 40, y / 19) - 0.5) * 16;
-      const wy = y + (n2(x / 70, y / 70) - 0.5) * 70 + (n1(x / 19, y / 19 + 40) - 0.5) * 16;
-      let e = 0;
-      let best = Infinity;
-      let reg = -1;
-      for (const k of bins[Math.floor(j / BLOCK) * bw + Math.floor(i / BLOCK)]!) {
-        const src = list[k]!;
-        const ex = wx - src.x;
-        const ey = wy - src.y;
-        const u = ex * src.cos + ey * src.sin;
-        const v = ey * src.cos - ex * src.sin;
-        const d2 = u * u * src.along + v * v * src.across;
-        e += src.amp * Math.exp(-d2 / (2 * src.sigma * src.sigma));
-        const weighted = d2 / (src.sigma * src.sigma);
-        if (weighted < best && src.amp > 0) {
-          best = weighted;
-          reg = src.region;
-        }
-      }
-      e += (n1(x / 24, y / 24) - 0.5) * 0.14;
-      elevation[j * w + i] = e;
-      region[j * w + i] = reg;
+      const at = sample(bins[Math.floor(j / BLOCK) * bw + Math.floor(i / BLOCK)]!, i / resolution, j / resolution);
+      elevation[j * w + i] = at.e;
+      region[j * w + i] = at.region;
     }
   }
 
