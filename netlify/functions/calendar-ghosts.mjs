@@ -213,6 +213,12 @@ export function calendarGhostFromToolInput(input, { agent, nowIso }) {
     if (!path.startsWith('data/calendar/')) {
       throw new TypeError(`${kind} path must start with data/calendar/`);
     }
+    // Cancel only needs the path; take the day from the block filename
+    // (data/calendar/YYYY/MM/YYYY-MM-DD-slug.md) when the agent omits it.
+    if (kind === 'cancel_block' && !input.date) {
+      const fromPath = path.match(/(\d{4}-\d{2}-\d{2})[^/]*$/)?.[1];
+      if (fromPath) input = { ...input, date: fromPath };
+    }
   }
   const dateKey = typeof input.date === 'string' && input.date
     ? input.date

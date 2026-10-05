@@ -252,3 +252,26 @@ test('check_calendars schema and Ann/Hammond get the tool; Clare workbench owns 
     assert.equal(names.filter((n) => n === 'check_calendars').length, 1, `${slug} duplicate check_calendars`);
   }
 });
+
+test('rescheduling a Life block does not conflict with its own current slot', () => {
+  const BRUNCH = {
+    path: 'data/calendar/2026/10/2026-10-01-brunch.md',
+    record: { type: 'calendar_block', id: 'brunch', date: DAY, time: '11:00', end_time: '13:00', title: 'Brunch' }
+  };
+  const merged = mergeAgentCalendarSlots({ lifeEvents: [BRUNCH] });
+  const self = findSlotConflicts(merged.slots, { date: DAY, start: '11:30', end: '13:30' });
+  assert.equal(self.length, 1, 'without exclusion the block collides with itself');
+  const moved = findSlotConflicts(merged.slots, {
+    date: DAY, start: '11:30', end: '13:30', excludePaths: [BRUNCH.path]
+  });
+  assert.equal(moved.length, 0);
+});
+
+test('all-day Tasks due-date rows do not block a timed slot; other all-day items still do', () => {
+  const merged = mergeAgentCalendarSlots({
+    tasksEvents: [{ path: 'tasks:t1', record: { type: 'task', id: 't1', date: DAY, title: 'Mark essays', all_day: true } }],
+    lifeEvents: [{ path: 'data/calendar/2026/10/2026-10-01-away.md', record: { type: 'calendar_block', date: DAY, title: 'Away', all_day: true } }]
+  });
+  const hit = findSlotConflicts(merged.slots, { date: DAY, start: '11:00', end: '12:00' });
+  assert.deepEqual(hit.map((s) => s.title), ['Away']);
+});

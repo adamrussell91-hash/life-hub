@@ -439,7 +439,7 @@ async function loadTurnCalendarMerge({
 }
 
 /** null = free; otherwise a tool-error payload. */
-function slotConflictOrUnavailable(merge, { date, start, end }) {
+function slotConflictOrUnavailable(merge, { date, start, end, excludePaths = [] }) {
   if (!merge) {
     return {
       ok: false,
@@ -450,7 +450,7 @@ function slotConflictOrUnavailable(merge, { date, start, end }) {
   if (mergeHasUnavailableSources(merge.sourceStatus)) {
     return unavailableCalendarToolError(merge.sourceStatus);
   }
-  const conflicts = findSlotConflicts(merge.slots, { date, start, end });
+  const conflicts = findSlotConflicts(merge.slots, { date, start, end, excludePaths });
   if (conflicts.length) return conflictToolError(conflicts, { sourceStatus: merge.sourceStatus });
   return null;
 }
@@ -3073,7 +3073,9 @@ export function createChatHandler({
                     const blocked = slotConflictOrUnavailable(merge, {
                       date: entry.date,
                       start: entry.start,
-                      end: entry.end
+                      end: entry.end,
+                      // Moving a block must not collide with its own current slot.
+                      excludePaths: entry.kind === 'reschedule_block' ? [entry.path] : []
                     });
                     if (blocked) return JSON.stringify(blocked);
                   } catch {
