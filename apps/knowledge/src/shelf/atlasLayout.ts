@@ -250,7 +250,8 @@ export function buildAtlas(book: BookModel, now = Date.now(), context?: AtlasCon
     const bearing = Math.atan2(islet.y, islet.x);
     const spread = 26 * Math.sqrt(book.loose.length);
     const sigma = Math.max(islet.sigma * VIEW_R, spread * 0.9 + 22);
-    const out = Math.max(Math.hypot(islet.x, islet.y) * VIEW_R, reach(bearing) + sigma * 1.25 + 30);
+    // Clear of the main coast by the islet's own reach plus the coast's noise wobble on both shores (2 × 35 Archipelago units).
+    const out = Math.max(Math.hypot(islet.x, islet.y) * VIEW_R, reach(bearing) + sigma * 1.2 + 70 * k);
     const hx = cx + Math.cos(bearing) * out;
     const hy = cy + Math.sin(bearing) * out;
     land.push({ province: "loose", x: hx, y: hy, amp: 0.85, sigma, vote: true });
@@ -278,9 +279,13 @@ export function buildAtlas(book: BookModel, now = Date.now(), context?: AtlasCon
   const islet = land.find(l => l.province === "loose");
   if (islet && loose.length) {
     let best = { x: islet.x, y: islet.y, e: -Infinity };
-    for (let i = -12; i <= 12; i += 1) for (let j = -12; j <= 12; j += 1) {
-      const x = islet.x + i * islet.sigma * 0.2;
-      const y = islet.y + j * islet.sigma * 0.2;
+    // Search near the islet, but only offshore of the main coast, so the main island's higher ground can't win.
+    // The noise can carry the islet up to one wobble (35 Archipelago units) from where it was set down.
+    const span = (islet.sigma + 35 * k) / 10;
+    for (let i = -10; i <= 10; i += 1) for (let j = -10; j <= 10; j += 1) {
+      const x = islet.x + i * span;
+      const y = islet.y + j * span;
+      if (Math.hypot(x - cx, y - cy) < reach(Math.atan2(y - cy, x - cx)) + islet.sigma * 0.6) continue;
       const e = ground(x, y).e;
       if (e > best.e) best = { x, y, e };
     }

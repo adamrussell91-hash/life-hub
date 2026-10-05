@@ -197,23 +197,24 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
     const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
     const font = Math.max(10, Math.min(17, 10 + scale * 6));
     const columnWidth = Math.max(110, Math.min(240, 260 * scale));
-    const provinceTop = new Map<string, number>();
-    for (const town of atlas.towns) provinceTop.set(town.province, Math.min(provinceTop.get(town.province) ?? Infinity, town.y));
     const named = [...atlas.provinces.filter(p => !p.neighbour).map(p => ({ id: p.id, label: p.label, explored: p.explored, x: p.x, y: p.y, r: p.radius, start: p.start, end: p.end }))];
     if (atlas.towns.some(t => t.province === "loose")) {
       const loose = atlas.towns.filter(t => t.province === "loose");
       named.push({ id: "loose", label: "Loose pages", explored: true, x: loose.reduce((s, t) => s + t.x, 0) / loose.length, y: loose.reduce((s, t) => s + t.y, 0) / loose.length, r: 60, start: undefined, end: undefined });
     }
-    for (const p of named) {
+    // Regions sit round the island like slices, so each name centres on its own region; written-in
+    // regions name themselves first, and a name that would overlap another waits for a closer zoom.
+    for (const p of [...named].sort((a, b) => Number(b.explored) - Number(a.explored))) {
       const c = S(p.x, p.y);
       const r = p.r * scale;
       if (!p.explored) parts.push(`<div class="atlas-fog" style="left:${c.x}px;top:${c.y}px;width:${r * 2.8}px;height:${r * 2.1}px"></div>`);
-      const topWorld = p.explored ? Math.min(provinceTop.get(p.id) ?? p.y - p.r, p.y - p.r * 0.4) - 22 : p.y - 8;
-      const top = S(p.x, topWorld).y;
       const textWidth = Math.min(columnWidth, p.label.length * font * 0.86);
       const lines = Math.ceil((p.label.length * font * 0.86) / columnWidth);
       const h = lines * font * 1.25 + (p.explored ? 0 : 16);
-      placed.push({ x: c.x - textWidth / 2, y: top - h, w: textWidth, h });
+      const top = c.y + h / 2;
+      const rect = { x: c.x - textWidth / 2, y: top - h, w: textWidth, h };
+      if (placed.some(o => rect.x < o.x + o.w && rect.x + rect.w > o.x && rect.y < o.y + o.h && rect.y + rect.h > o.y)) continue;
+      placed.push(rect);
       parts.push(`<div class="atlas-province${p.explored ? "" : " is-unexplored"}${p.id === "loose" ? " is-loose" : ""}" style="left:${c.x}px;top:${top}px;font-size:${font}px;width:${columnWidth}px"><span>${esc(p.label)}</span>${p.explored ? "" : `<small>Not written about yet${p.start ? ` · pp. ${p.start}–${p.end}` : ""}</small>`}</div>`);
     }
     for (const fog of atlas.fogs) {

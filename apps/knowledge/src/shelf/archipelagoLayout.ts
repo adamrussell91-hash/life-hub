@@ -58,7 +58,7 @@ export const JOIN_AT = 3;
 const JOIN_GAP = 14;
 const BRIDGE_GAP = 100;
 /** A strait wider than this gets no bridge: the link stays a faint route. */
-const MAX_STRAIT = 170;
+const MAX_STRAIT = 220;
 
 function hash(text: string) {
   let h = 2166136261;
@@ -129,50 +129,78 @@ export function crossingKind(count: number): MeetingKind {
   return count >= JOIN_AT ? "joined" : count === 2 ? "stone" : "rope";
 }
 
-/** Option C: inside one sea, linked books are pulled together; every other pair keeps its gap. Deterministic. */
-function relaxSea(list: BookModel[], centres: Map<string, { x: number; y: number }>, passages: Passage[]) {
+/**
+ * Option C: packs one sea with linked books shore to shore. Each linked book is set down
+ * against a partner already placed (joined books closest, bridged ones a strait apart);
+ * everything else takes the first free spot on the sunflower spiral, as packCircles does.
+ * Deterministic for a given shelf.
+ */
+function packSea(list: BookModel[], passages: Passage[], shape: "wide" | "tall"): Map<string, { x: number; y: number }> {
   const keys = new Set(list.map(b => b.key));
-  const radius = new Map(list.map(b => [b.key, islandRadius(b.noteCount)]));
+  const links = passages.filter(p => keys.has(p.from) && keys.has(p.to)).sort((a, b) => b.count - a.count || a.from.localeCompare(b.from));
+  const items = list.map(b => ({ id: b.key, r: islandRadius(b.noteCount) }));
+  if (!links.length) return packCircles(items, ISLAND_GAP, shape);
   const pairKey = (a: string, b: string) => [a, b].sort().join("\u0000");
-  const gapFor = new Map<string, number>();
-  for (const p of passages) {
-    if (keys.has(p.from) && keys.has(p.to)) gapFor.set(pairKey(p.from, p.to), crossingKind(p.count) === "joined" ? JOIN_GAP : BRIDGE_GAP);
+  const gapFor = new Map(links.map(p => [pairKey(p.from, p.to), crossingKind(p.count) === "joined" ? JOIN_GAP : BRIDGE_GAP]));
+  const gap = (a: string, b: string) => gapFor.get(pairKey(a, b)) ?? ISLAND_GAP;
+  const partners = new Map<string, string[]>();
+  for (const p of links) {
+    partners.set(p.from, [...(partners.get(p.from) ?? []), p.to]);
+    partners.set(p.to, [...(partners.get(p.to) ?? []), p.from]);
   }
-  if (!gapFor.size) return;
-  const ids = [...keys].sort();
-  const separate = () => {
-    for (let i = 0; i < ids.length; i += 1) for (let j = i + 1; j < ids.length; j += 1) {
-      const p = centres.get(ids[i]!)!;
-      const q = centres.get(ids[j]!)!;
-      const min = radius.get(ids[i]!)! + radius.get(ids[j]!)! + (gapFor.get(pairKey(ids[i]!, ids[j]!)) ?? ISLAND_GAP);
-      const dx = q.x - p.x;
-      const dy = q.y - p.y;
-      const d = Math.hypot(dx, dy) || 1;
-      if (d >= min) continue;
-      const push = (min - d) / 2;
-      p.x -= (dx / d) * push;
-      p.y -= (dy / d) * push;
-      q.x += (dx / d) * push;
-      q.y += (dy / d) * push;
+  const [sx, sy] = shape === "wide" ? [1.35, 1] : [1, 1.12];
+  const placed: Array<{ id: string; x: number; y: number; r: number }> = [];
+  const out = new Map<string, { x: number; y: number }>();
+  const fits = (id: string, x: number, y: number, r: number) => placed.every(p => Math.hypot(p.x - x, p.y - y) >= p.r + r + gap(p.id, id) - 0.5);
+  const put = (id: string, x: number, y: number, r: number) => {
+    placed.push({ id, x, y, r });
+    out.set(id, { x, y });
+  };
+  const spiral = (item: { id: string; r: number }) => {
+    if (!placed.length) return put(item.id, 0, 0, item.r);
+    const step = Math.max(6, item.r * 0.18);
+    const turn = hash(item.id) * Math.PI * 2;
+    for (let k = 1; k < 20000; k += 1) {
+      const dist = step * Math.sqrt(k) * 2.2;
+      const a = k * GOLDEN + turn;
+      const x = Math.cos(a) * dist * sx;
+      const y = Math.sin(a) * dist * sy;
+      if (fits(item.id, x, y, item.r)) return put(item.id, x, y, item.r);
     }
   };
-  for (let it = 0; it < 240; it += 1) {
-    for (const [pair, gap] of gapFor) {
-      const [a, b] = pair.split("\u0000") as [string, string];
-      const p = centres.get(a)!;
-      const q = centres.get(b)!;
-      const dx = q.x - p.x;
-      const dy = q.y - p.y;
-      const d = Math.hypot(dx, dy) || 1;
-      const pull = (d - (radius.get(a)! + radius.get(b)! + gap)) * 0.06;
-      p.x += (dx / d) * pull;
-      p.y += (dy / d) * pull;
-      q.x -= (dx / d) * pull;
-      q.y -= (dy / d) * pull;
+  const byId = new Map(items.map(i => [i.id, i]));
+  const sorted = [...items].sort((a, b) => b.r - a.r || a.id.localeCompare(b.id));
+  for (const root of sorted) {
+    if (out.has(root.id) || !partners.has(root.id)) continue;
+    spiral(root);
+    // Walk the linked group outward from the root, setting each book against the partner that brought it.
+    const queue = [root.id];
+    while (queue.length) {
+      const next = queue.shift()!;
+      const here = placed.find(p => p.id === next)!;
+      for (const id of partners.get(here.id) ?? []) {
+        if (out.has(id)) continue;
+        const item = byId.get(id)!;
+        const reach = here.r + item.r + gap(here.id, id);
+        const turn = hash(`${here.id}>${id}`) * Math.PI * 2;
+        let done = false;
+        for (let t = 0; t < 72 && !done; t += 1) {
+          // Alternate either side of a preferred bearing, widening by 5° each try.
+          const a = turn + Math.ceil(t / 2) * (t % 2 ? 1 : -1) * (Math.PI / 36);
+          const x = here.x + Math.cos(a) * reach;
+          const y = here.y + Math.sin(a) * reach;
+          if (fits(id, x, y, item.r)) {
+            put(id, x, y, item.r);
+            done = true;
+          }
+        }
+        if (!done) spiral(item);
+        queue.push(id);
+      }
     }
-    separate();
   }
-  for (let it = 0; it < 60; it += 1) separate();
+  for (const item of sorted) if (!out.has(item.id)) spiral(item);
+  return out;
 }
 
 /** Where island `i`'s coast faces a bearing, in world space. */
@@ -229,8 +257,7 @@ export function buildArchipelago(books: BookModel[], now = Date.now(), shape: "w
   // Pack each sea's islands locally, pull linked books together, then pack the seas.
   const local = names.map(name => {
     const list = groups.get(name)!;
-    const centres = packCircles(list.map(b => ({ id: b.key, r: islandRadius(b.noteCount) })), ISLAND_GAP, shape);
-    relaxSea(list, centres, passages);
+    const centres = packSea(list, passages, shape);
     const extent = Math.max(...list.map(b => {
       const c = centres.get(b.key)!;
       return Math.hypot(c.x, c.y) + islandRadius(b.noteCount);

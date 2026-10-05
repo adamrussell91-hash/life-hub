@@ -762,6 +762,8 @@ export function atlasContext(model: ArchipelagoModel, key: string): AtlasContext
 
 6. Delete `coastline()`. `rolls` stays, because `chartLandmarks` uses it.
 
+> **As built (found in Task 8 with real data):** `relaxSea` couldn't pull bridged pairs together in a crowded sea, because a gentle relaxation can't move a book past the islands between them (gaps stayed at 350–400). It was replaced by `packSea`: linked books are set down against an already-placed partner at the target gap, joined books first, and everything else spirals in after, as `packCircles` does. `MAX_STRAIT` went from 170 to 220 for margin.
+
 - [ ] **Step 5: Run the shelf tests**
 
 Run: `npx vitest run src/shelf`
