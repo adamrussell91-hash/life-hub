@@ -30,8 +30,8 @@ export type AtlasProvince = {
   angle?: number;
 };
 
-/** Extra land shaping a province: peninsulas, islets, and (with a negative amp) bays. */
-export type AtlasLand = { province: string; x: number; y: number; amp: number; sigma: number; stretch?: number; angle?: number };
+/** Extra land shaping a province: peninsulas, islets, and (with a negative amp) bays. `vote: false` shapes the coast without claiming colour. */
+export type AtlasLand = { province: string; x: number; y: number; amp: number; sigma: number; stretch?: number; angle?: number; vote?: boolean };
 
 export type AtlasTown = {
   note: BookNote;
