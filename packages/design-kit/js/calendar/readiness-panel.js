@@ -1,6 +1,7 @@
 /**
- * Capacity forecast panel for the Day view: today's readiness as weather, the morning
- * bubbles, and the "What did we miss?" step.
+ * Capacity forecast panel for the Day view (today's readiness as weather), and the
+ * morning check-in card for Life Home (the bubbles and the "What did we miss?" step).
+ * Adam answers the bubbles on Home, not in the Day view.
  *
  * Model: readiness-model.js. Questions: morning-bubbles.js. Persistence:
  * /api/capacity-checkins (immutable snapshot → append-only observation → reason).
@@ -50,7 +51,7 @@ export function resetReadinessPanel() {
   unsubPanel = null;
 }
 
-/** Notification tap (#/calendar/day?checkin=1): open the bubbles. */
+/** Notification tap (#/home?checkin=1): open the bubbles. */
 export function openCheckin(date) {
   const s = slot(date);
   s.open = true;
@@ -260,7 +261,45 @@ export function mountReadinessPanel(ctx) {
   h(doc, 'p', 'rf-foot', `Provisional model (${esc(r.modelVersion)}). The shaded band is an honest guess at uncertainty, not a calibrated interval. 100 means full capacity.`, why);
   mountInsightSetting(ctx, why);
 
-  mountCheckin(ctx, section, { s, last, pre, view });
+  mountCheckinStatus(ctx, section, last);
+  return section;
+}
+
+/** Day view: one line about today's check-in. The bubbles themselves live on Home. */
+function mountCheckinStatus(ctx, section, last) {
+  const { doc } = ctx;
+  const row = h(doc, 'div', 'rf-done', null, section, { 'data-part': 'checkin-status' });
+  if (last) {
+    const at = String(last.observed_local ?? '').slice(11, 16);
+    h(doc, 'span', '', `Checked in${at ? ` at ${esc(clock(Number(at.slice(0, 2)) + Number(at.slice(3)) / 60))}` : ''}. Forecast updated.`, row);
+  } else {
+    h(doc, 'span', '', 'No check-in yet today.', row);
+  }
+  h(doc, 'a', 'dd-link', last ? 'Change on Home' : 'Check in on Home', row, { href: '#/home' });
+}
+
+/**
+ * Life Home: the morning check-in card (bubbles, the done line, and "What did we miss?").
+ * ctx: { doc, date, nowHour, now, events, cap?, items, apiFetch, onRepaint, wake, lightsOut }
+ */
+export function mountCheckinCard(ctx, host) {
+  const { doc, date } = ctx;
+  const s = slot(date);
+  const rerender = typeof ctx.onRepaint === 'function' ? ctx.onRepaint : () => repaint();
+  const local = { ...ctx, rerender };
+  loadCheckins(ctx.apiFetch, date);
+  const { pre, view, last, stateName } = todayForecast(ctx);
+  void ensureSnapshot(ctx, date, pre);
+
+  const section = h(doc, 'section', 'rf rf--home', null, host, { 'data-part': 'home-checkin', 'aria-labelledby': `rf-home-h-${date}` });
+  const head = h(doc, 'div', `rf-home-head rf-fam--${WEATHER_STATES[view.state]?.family ?? 'cloud'}`, null, section);
+  h(doc, 'span', 'rf-icon', iconHtml(view.state, 40), head, { 'aria-hidden': 'true' });
+  const words = h(doc, 'div', 'rf-words', null, head);
+  h(doc, 'p', 'rf-kicker', 'Morning check-in', words, { id: `rf-home-h-${date}` });
+  h(doc, 'p', 'rf-home-score', `Forecast <b>${view.readiness.score}</b><small>/100</small> · ${esc(stateName)}`, words, { 'data-part': 'home-forecast' });
+  h(doc, 'a', 'dd-link rf-home-open', 'Day view', head, { href: '#/calendar/day' });
+
+  mountCheckin(local, section, { s, last, pre, view });
   return section;
 }
 
@@ -351,7 +390,7 @@ function mountCheckin(ctx, section, { s, last, pre }) {
     const at = String(last.observed_local ?? '').slice(11, 16);
     h(doc, 'span', '', `Checked in${at ? ` at ${esc(clock(Number(at.slice(0, 2)) + Number(at.slice(3)) / 60))}` : ''}. Forecast updated.`, done);
     const change = h(doc, 'button', 'dd-link', 'Change answers', done, { type: 'button' });
-    on(change, 'click', () => { s.open = true; s.picks = {}; s.other = {}; repaint(); });
+    on(change, 'click', () => { s.open = true; s.picks = {}; s.other = {}; ctx.rerender(); });
     return null;
   }
   if (status === 'error') {
@@ -365,7 +404,7 @@ function mountCheckin(ctx, section, { s, last, pre }) {
       const later = h(doc, 'div', 'rf-done', null, section);
       h(doc, 'span', '', 'No check-in today.', later);
       const open = h(doc, 'button', 'dd-link', 'Check in now', later, { type: 'button', 'data-checkin-open': '' });
-      on(open, 'click', () => { s.open = true; s.skipped = false; repaint(); });
+      on(open, 'click', () => { s.open = true; s.skipped = false; ctx.rerender(); });
     }
     return null;
   }
@@ -400,7 +439,7 @@ function mountCheckin(ctx, section, { s, last, pre }) {
   const save = h(doc, 'button', 'btn btn--primary', s.saving ? 'Saving…' : 'Save', actions, { type: 'submit', disabled: s.saving || !Object.keys(s.picks).length, 'data-checkin-save': '' });
   const skip = h(doc, 'button', 'btn btn--ghost', 'Skip', actions, { type: 'button', 'data-checkin-skip': '' });
   h(doc, 'p', 'rf-status', '', card, { role: 'status', 'aria-live': 'polite' });
-  on(skip, 'click', () => { s.open = false; s.skipped = true; s.picks = {}; repaint(); });
+  on(skip, 'click', () => { s.open = false; s.skipped = true; s.picks = {}; ctx.rerender(); });
   on(card, 'submit', event => {
     event.preventDefault();
     void saveCheckin(ctx, s, questions, last, pre, card, save);
@@ -455,7 +494,7 @@ async function saveCheckin(ctx, s, questions, last, pre, card, save) {
     return;
   }
   s.saving = false;
-  repaint();
+  ctx.rerender();
 }
 
 function mountReason(ctx, section, s) {
@@ -493,7 +532,7 @@ function mountReason(ctx, section, s) {
   const later = h(doc, 'button', 'btn btn--ghost', 'Not now', actions, { type: 'button' });
   h(doc, 'p', 'rf-status', '', card, { role: 'status', 'aria-live': 'polite' });
   sync();
-  on(later, 'click', () => { s.reason = null; repaint(); });
+  on(later, 'click', () => { s.reason = null; ctx.rerender(); });
   on(card, 'submit', async event => {
     event.preventDefault();
     if (!s.reason.picks.size) return;
@@ -502,7 +541,7 @@ function mountReason(ctx, section, s) {
     try {
       await post(ctx, { action: 'reason', date, observation_id: obs.id, reason_codes: [...s.reason.picks], ...(s.reason.note.trim() ? { note: s.reason.note.trim() } : {}) });
       s.reason = null;
-      repaint();
+      ctx.rerender();
     } catch (error) {
       s.reason.saving = false;
       sync();

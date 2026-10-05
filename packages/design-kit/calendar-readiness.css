@@ -164,3 +164,29 @@
 @media (prefers-reduced-motion: no-preference) {
   .rf-bubble, .rf-window { transition: background-color 120ms ease, border-color 120ms ease; }
 }
+
+/* Life Home: the morning check-in card. The bubbles live here, not in the Day view. */
+.rf--home {
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--hub-glass-fill, #fff);
+  border: 1px solid var(--line);
+  box-shadow: var(--hub-elev-card, none);
+  margin-bottom: var(--space-4);
+}
+.rf-home-head { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.rf-home-head .rf-icon, .rf-home-head .rf-icon svg { width: 40px; height: 40px; }
+.rf-home-head .rf-words { flex: 1; }
+.rf-kicker {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rf-home-score { margin: 2px 0 0; font-size: var(--text-base); color: var(--ink); overflow-wrap: anywhere; }
+.rf-home-score b { font-size: var(--text-lg, 1.25rem); color: var(--navy); font-variant-numeric: tabular-nums; }
+.rf-home-score small { color: var(--muted); }
+.rf-home-open { flex: none; align-self: flex-start; font-size: var(--text-sm); }
+.rf--home .rf-checkin { margin-top: var(--space-2); }

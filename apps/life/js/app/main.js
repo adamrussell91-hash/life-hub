@@ -41,6 +41,7 @@ import { renderGovernance } from './render-governance.js';
 import { setChatUnread } from './render-chat.js';
 import { renderFitness } from './render-fitness.js';
 import { renderHome, renderUnavailable, renderWarnings } from './render-home.js';
+import { healShellStyles } from './heal-shell-styles.js';
 import { renderMind } from './render-mind.js';
 import { renderNutrition } from './render-nutrition.js';
 import { createRepositoryCache } from './repository-cache.js';
@@ -288,3 +289,7 @@ attachVisualViewportInset();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('service-worker.js').catch(() => undefined);
 }
+// A stale cached shell can miss stylesheets the fresh JS needs (unstyled Day dial).
+void healShellStyles(document).then(added => {
+  if (added.length) navigator.serviceWorker?.getRegistration?.().then(reg => reg?.update()).catch(() => undefined);
+});

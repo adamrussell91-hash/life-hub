@@ -8,7 +8,8 @@ Adam approved the full build on 5 Oct 2026 and supplied the 30 icons. This page 
 |---|---|
 | Readiness model v2 (pure, versioned `readiness-2.0-provisional`) | `packages/design-kit/js/calendar/readiness-model.js` |
 | Morning bubbles (question choice, answer codes) | `packages/design-kit/js/calendar/morning-bubbles.js` |
-| Day view panel (forecast, hourly line, weather windows, bubbles, "What did we miss?") | `packages/design-kit/js/calendar/readiness-panel.js`, `packages/design-kit/calendar-readiness.css` |
+| Day view panel (forecast, hourly line, weather windows) | `packages/design-kit/js/calendar/readiness-panel.js`, `packages/design-kit/calendar-readiness.css` |
+| Home check-in card (bubbles, "What did we miss?") | `packages/design-kit/js/calendar/home-checkin.js` (`mountCheckinCard` in `readiness-panel.js`), wired in `apps/life/js/app/app-controller.js` |
 | Persistence: snapshots, observations, discrepancies, Central Node line | `netlify/functions/capacity-checkins.mjs` → `/api/capacity-checkins` |
 | 7 am phone nudge (`?checkin=1`) | `netlify/functions/_shared/day-sense-notify.mjs` (`checkin` rule) |
 | Icons: Adam's originals (never edited) | `packages/design-kit/icons/capacity-weather/src/1–30.svg` |
@@ -18,7 +19,9 @@ Adam approved the full build on 5 Oct 2026 and supplied the 30 icons. This page 
 
 ## Where Adam sees it
 
-Life → Calendar → **Day**. For today, a **Capacity forecast** block now opens the side column, and the dial's centre gauge shows the same number. Between 5 am and noon the bubbles appear under the forecast. Outside that window a "Check in now" link appears instead. Around 7:00–9:30 am, if no check-in exists yet, the phone gets one push ("How are you starting today?"). The push counts toward the existing cap of 4 a day and opens the bubbles directly.
+**Life → Home** holds the morning check-in card: today's forecast in one line, and between 5 am and noon the bubbles. Outside that window a "Check in now" link appears instead. Around 7:00–9:30 am, if no check-in exists yet, the phone gets one push ("How are you starting today?"). The push counts toward the existing cap of 4 a day and opens Home with the bubbles (`/#/home?checkin=1`; the old `#/calendar/day?checkin=1` link redirects there).
+
+Life → Calendar → **Day** keeps the **Capacity forecast** block at the top of the side column, and the dial's centre gauge shows the same number. Below it, one line says whether you've checked in, with a link to Home. The bubbles are not in the Day view (Adam, 6 Oct).
 
 ## One number everywhere
 

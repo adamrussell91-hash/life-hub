@@ -1212,14 +1212,14 @@ function handleDeepLink(view, side) {
     }
   };
   if (query.get('checkin') === '1') {
+    // The bubbles live on Life Home now; older pushes still point here.
     clean();
     openCheckin(input.today);
-    queueMicrotask(() => {
-      if (mountedFor) mount({ entrance: false });
-      const card = doc.querySelector?.('[data-part="checkin"]') ?? doc.querySelector?.('[data-part="forecast"]');
-      card?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
-      card?.querySelector?.('.rf-bubble')?.focus?.({ preventScroll: true });
-    });
+    try {
+      if (view?.location) view.location.hash = '#/home';
+    } catch {
+      /* not fatal */
+    }
   } else if (query.get('review') === '1') {
     clean();
     queueMicrotask(() => openReview());
