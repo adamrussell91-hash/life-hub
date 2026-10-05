@@ -10,7 +10,8 @@ import {
   gateRingFrame,
   gateTipAngle,
   gateTrendRadius,
-  gateValueAngle
+  gateValueAngle,
+  recentPaceTone
 } from '../../apps/life/js/app/chart-kit/gate-rings.js';
 import { buildRegionRose } from '../../apps/life/js/app/chart-kit/region-rose.js';
 import { buildGlideSlope } from '../../apps/life/js/app/chart-kit/glide-slope.js';
@@ -331,7 +332,7 @@ test('recent-pace arc starts at the average and ends at the recent tip', () => {
   }, { width: 358 });
   const trend = [];
   walk(scene.nodes, node => {
-    if (String(node.cls).includes('hc-gate-pace--met')) trend.push(node);
+    if (String(node.cls).includes('hc-gate-pace--good')) trend.push(node);
   });
   assert.equal(trend.length, 1);
   assert.equal(trend[0].anim, 'draw');
@@ -358,11 +359,58 @@ test('recent-pace arc starts at the average and ends at the recent tip', () => {
   }, { width: 358 });
   const back = [];
   walk(zero.nodes, node => {
-    if (String(node.cls).includes('hc-gate-pace--short')) back.push(node);
+    if (String(node.cls).includes('hc-gate-pace--bad')) back.push(node);
   });
   const [zx, zy] = polar(frame.cx, frame.cy, lane, -82);
   assert.ok(back[0].attrs.d.endsWith(`${fx(zx)} ${fx(zy)}`));
   assert.equal(back[0].attrs.d.includes(' 0 '), true);
+});
+
+test('recent-pace colour follows up/down, not whether recent still clears the gate', () => {
+  const fallingMet = {
+    key: 'sessions', label: 'Sessions / week', short: 'Sessions', value: 2.5, threshold: 2,
+    unit: '/wk', status: 'met', ratio: 1.25, note: 'Loaded sessions.',
+    recent: 2, recentStatus: 'met', recentWindow: 'Last 7 days', recentReason: null
+  };
+  const risingShort = {
+    key: 'protein', label: 'Protein g/kg/day', short: 'Protein', value: 1.24, threshold: 1.62,
+    unit: ' g/kg', status: 'short', ratio: 0.77, note: 'Protein.',
+    recent: 1.56, recentStatus: 'short', recentWindow: 'Last 4 logged days', recentReason: null
+  };
+  const cappedDrop = {
+    key: 'upper_sets', label: 'Upper sets / week', short: 'Upper sets', value: 24, threshold: 10,
+    unit: ' sets', status: 'met', ratio: 2.4, note: 'Upper sets.',
+    recent: 20, recentStatus: 'met', recentWindow: 'Last 7 days', recentReason: null
+  };
+  assert.equal(recentPaceTone(fallingMet), 'bad');
+  assert.equal(recentPaceTone(risingShort), 'good');
+  assert.equal(recentPaceTone(cappedDrop), 'bad');
+
+  const scene = buildGateRings({
+    keys: [fallingMet, cappedDrop, risingShort],
+    metCount: 2,
+    scoredCount: 3
+  }, { width: 358 });
+  const arrows = [];
+  const paces = [];
+  const dots = [];
+  walk(scene.nodes, node => {
+    if (String(node.cls).includes('hc-trend-arrow--')) arrows.push(node);
+    if (String(node.cls).startsWith('hc-gate-pace hc-gate-pace--')) paces.push(node);
+    if (String(node.cls).includes('hc-trend-dot--')) dots.push(node);
+  });
+  assert.deepEqual(arrows.map(node => [node.cls, node.text]), [
+    ['hc-trend-arrow hc-trend-arrow--bad', '↓ '],
+    ['hc-trend-arrow hc-trend-arrow--bad', '↓ '],
+    ['hc-trend-arrow hc-trend-arrow--good', '↑ ']
+  ]);
+  assert.deepEqual(paces.map(node => node.cls), [
+    'hc-gate-pace hc-gate-pace--bad',
+    'hc-gate-pace hc-gate-pace--good'
+  ]);
+  assert.equal(dots.filter(node => String(node.cls).includes('hc-trend-dot--steady')).length, 1);
+  assert.match(scene.hits['gate-sessions'].detail, /Last 7 days: 2\.0 sessions · above the gate/);
+  assert.match(scene.hits['gate-protein'].detail, /Last 4 logged days: 1\.56 · below the gate/);
 });
 
 test('scene helpers', () => {
