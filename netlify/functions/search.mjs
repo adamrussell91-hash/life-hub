@@ -21,6 +21,8 @@ import {
   searchTeachingRecords
 } from './_shared/teaching-search.mjs';
 
+import { withoutDeleted } from './_shared/record-liveness.mjs';
+
 export const config = { path: '/api/search' };
 
 const TITLE_CORPUS = [
@@ -41,11 +43,11 @@ export function createSearchHandler(deps = {}) {
 
     const q = new URL(request.url).searchParams.get('q') ?? '';
     const [lessons, units, compositions, ...titleGroups] = await Promise.all([
-      listJSON(store, DRAFT_LESSON_PREFIX),
-      listJSON(store, UNIT_PREFIX),
-      listJSON(store, COMPOSITION_PREFIX),
+      listJSON(store, DRAFT_LESSON_PREFIX).then(withoutDeleted),
+      listJSON(store, UNIT_PREFIX).then(withoutDeleted),
+      listJSON(store, COMPOSITION_PREFIX).then(withoutDeleted),
       ...TITLE_CORPUS.map(({ prefix, type }) =>
-        listJSON(store, prefix).then(records => searchTeachingRecords(q, records, type))
+        listJSON(store, prefix).then(records => searchTeachingRecords(q, withoutDeleted(records), type))
       )
     ]);
 

@@ -318,6 +318,10 @@ a:hover {
   box-shadow: var(--elev-3);
   backdrop-filter: blur(var(--hub-glass-blur)) saturate(115%);
   -webkit-backdrop-filter: blur(var(--hub-glass-blur)) saturate(115%);
+  /* backdrop-filter makes this bar its own stacking context; without a z-index the
+     canvas paints over its dropdowns (Lesson options, History) and eats their clicks. */
+  position: relative;
+  z-index: 20;
 }
 
 .teacher-layout__context-bar[hidden] {
@@ -7689,6 +7693,51 @@ input.scope-timeline__note-title:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+/* Phone: each trashed item is a card, actions full width and thumb-sized (R4). */
+@media (max-width: 640px) {
+  .trash-page__table,
+  .trash-page__table tbody,
+  .trash-page__table tr,
+  .trash-page__table td {
+    display: block;
+    width: 100%;
+  }
+
+  .trash-page__table thead {
+    display: none;
+  }
+
+  .trash-page__table tr {
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .trash-page__table td {
+    padding: var(--space-1) 0;
+    border-bottom: 0;
+  }
+
+  .trash-page__table .trash-page__type,
+  .trash-page__table .trash-page__when {
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
+  .trash-page__table .trash-page__title {
+    font-weight: var(--weight-semibold);
+    overflow-wrap: anywhere;
+  }
+
+  .trash-page__actions {
+    padding-top: var(--space-2);
+  }
+
+  .trash-page__actions .btn {
+    flex: 1 1 0;
+    min-height: 44px;
+  }
 }
 
 /* ── Version history panel ────────────────────────────────────────────── */

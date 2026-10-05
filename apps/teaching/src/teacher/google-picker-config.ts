@@ -26,6 +26,6 @@ export async function resolveGooglePickerConfig(options: {
   const fromRemote = remote ? pickerConfigFromValues(remote) : null;
   if (fromRemote) return fromRemote;
   throw new Error(
-    'Google Drive is not configured (missing VITE_GOOGLE_CLIENT_ID / VITE_GOOGLE_PICKER_API_KEY)'
+    'Google Drive is not configured yet. Upload the file or paste its link instead.'
   );
 }

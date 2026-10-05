@@ -5,7 +5,9 @@ import {
   withCors
 } from './_shared/http.mjs';
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
+import { isDeletedRecord } from './_shared/record-liveness.mjs';
 import {
+  draftLessonKey,
   getJSON,
   outcomeKey,
   PUBLISHED_LESSON_PREFIX,
@@ -40,7 +42,7 @@ export function createPublishedUnitHandler(deps = {}) {
     }
 
     const unit = await getJSON(store, unitKey(id));
-    if (!unit?.title) {
+    if (!unit?.title || isDeletedRecord(unit)) {
       return withCors(errorResponse(404, 'not_found', 'Unit not found', false), request, env);
     }
 
@@ -50,6 +52,8 @@ export function createPublishedUnitHandler(deps = {}) {
     for (const snapshot of snapshots) {
       if (!snapshot || snapshot.unit_id !== id) continue;
       if (!snapshot.lesson_id || !snapshot.title) continue;
+      const draft = await getJSON(store, draftLessonKey(snapshot.lesson_id));
+      if (!draft || isDeletedRecord(draft)) continue;
       matching.push({ lesson_id: snapshot.lesson_id, title: snapshot.title });
     }
 

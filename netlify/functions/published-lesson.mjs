@@ -5,7 +5,9 @@ import {
   withCors
 } from './_shared/http.mjs';
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
+import { isDeletedRecord } from './_shared/record-liveness.mjs';
 import {
+  draftLessonKey,
   getJSON,
   outcomeKey,
   publishedLessonKey,
@@ -30,7 +32,10 @@ export function createPublishedLessonHandler(deps = {}) {
     }
 
     const snapshot = await getJSON(store, publishedLessonKey(id));
-    if (!snapshot || typeof snapshot !== 'object') {
+    // The snapshot outlives the draft: a trashed or permanently deleted lesson
+    // must stop resolving for students even though its snapshot blob remains.
+    const draft = await getJSON(store, draftLessonKey(id));
+    if (!snapshot || typeof snapshot !== 'object' || !draft || isDeletedRecord(draft)) {
       return withCors(errorResponse(404, 'not_found', 'Lesson is not published', false), request, env);
     }
 
