@@ -58,7 +58,7 @@ export function showAllGroupingLabel(grouping: ShowAllGrouping) {
 export function showAllGroupingMeta(grouping: ShowAllGrouping) {
   if (grouping === "notebooks") return "Notebooks · university notes hidden";
   if (grouping === "degrees") return "University degrees · notebook notes hidden";
-  return "Twenty topics · click a note to see its connections · at most 3 per note";
+  return "Neural map · each note grows from the note it is most like · click one to follow it";
 }
 
 function unique(values: string[]) {
