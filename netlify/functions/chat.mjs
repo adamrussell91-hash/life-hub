@@ -3567,18 +3567,21 @@ async function persistOrProposeLogEntry({ client, slug, today, validation, send,
     exerciseLibraryEntries,
     today
   );
-  if (restrictionWarnings.length > 0) {
-    send({ type: 'record_rejected', errors: restrictionWarnings });
-    return { ok: false, status: 'rejected', error: 'shelved_exercise', errors: restrictionWarnings };
-  }
+  // Shelved exercises are a warning on the card, never a refusal: Adam asked for it.
   send({
     type: 'record_proposal',
     record: proposal.record,
     notes: proposal.notes,
     path,
-    warnings: lintWorkoutProposal(proposal.record)
+    warnings: [...restrictionWarnings, ...lintWorkoutProposal(proposal.record)]
   });
-  return { ok: true, status: 'awaiting_confirm' };
+  return {
+    ok: true,
+    status: 'awaiting_confirm',
+    ...(restrictionWarnings.length
+      ? { warnings: restrictionWarnings, tell_adam: 'Mention the shelved warning in one line. It does not block the proposal.' }
+      : {})
+  };
 }
 
 async function parseRequest(request) {

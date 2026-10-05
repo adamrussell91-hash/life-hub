@@ -83,7 +83,10 @@ test('buildGoalProposal and checkin validate for Hammond/Clare', () => {
   assert.match(goal.proposal.writes[0].diff, /Grow someday/);
   assert.equal(validateProposeActionInput(goal.proposal, { agentSlug: 'hammond' }).ok, true);
   assert.equal(validateProposeActionInput(goal.proposal, { agentSlug: 'clare' }).ok, true);
-  assert.equal(validateProposeActionInput(goal.proposal, { agentSlug: 'ann' }).ok, false);
+  // Option A: Ann is outside the Goals lane, so the write is handed off, not refused.
+  const handedOff = validateProposeActionInput(goal.proposal, { agentSlug: 'ann' });
+  assert.equal(handedOff.ok, true, handedOff.error);
+  assert.ok(handedOff.proposal.writes.every(w => w.on_behalf_of));
 
   const checkin = buildGoalCheckinProposal({
     summary: 'Week check-in',

@@ -430,6 +430,58 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
 }
 
 /**
+ * Permanently delete one Knowledge page and drop it from manifest.json.
+ * Only reached through a Confirm card Adam approved. Missing page = already gone.
+ */
+export async function deleteKnowledgePage(id, { env, fetchImpl = fetch } = {}) {
+  if (!isSafeKnowledgePageId(id)) {
+    throw knowledgeWriteError(400, 'validation_error', 'page id required');
+  }
+  const { repo, token } = requireBoundRepo(env);
+  const file = `pages/${id}.json`;
+  const existing = await getKnowledgeContent(file, { env, fetchImpl });
+  if (existing) {
+    const encoded = file.split('/').map(segment => encodeURIComponent(segment)).join('/');
+    const response = await githubRequest(
+      `${GITHUB_ORIGIN}/repos/${repo}/contents/${encoded}`,
+      {
+        token,
+        fetchImpl,
+        method: 'DELETE',
+        body: JSON.stringify({ message: `Delete ${id}`, sha: existing.sha })
+      }
+    );
+    if (response.status === 409) throw knowledgeWriteError(409, 'conflict', 'delete collided, try again');
+    if (response.status === 401 || response.status === 403) {
+      throw knowledgeWriteError(503, 'knowledge_repo_unbound', 'Knowledge data repository is not bound.');
+    }
+    if (!response.ok && response.status !== 404) {
+      throw knowledgeWriteError(502, 'github_unavailable', 'Knowledge data repository is unavailable.');
+    }
+  }
+  const manifestFile = await getKnowledgeContent('manifest.json', { env, fetchImpl });
+  if (manifestFile?.text) {
+    let rows = null;
+    try {
+      const raw = JSON.parse(manifestFile.text);
+      rows = Array.isArray(raw) ? raw : Array.isArray(raw?.pages) ? raw.pages : null;
+    } catch {
+      rows = null;
+    }
+    if (rows && rows.some(row => row?.id === id)) {
+      await putWithRetry(
+        'manifest.json',
+        JSON.stringify(rows.filter(row => row?.id !== id)),
+        { env, fetchImpl },
+        `Remove ${id}`,
+        manifestFile.sha
+      );
+    }
+  }
+  return { id, deleted: Boolean(existing) };
+}
+
+/**
  * Explicit relationship mutation for one Knowledge page.
  * Only intentional submissions create/suppress related_to links.
  */

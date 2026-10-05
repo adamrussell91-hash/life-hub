@@ -612,7 +612,48 @@ export function createPeopleWriteExecutor({
     }
   }
 
+  // Delete through the identity lifecycle (→ retained → deleted), which redacts
+  // the record and leaves a tombstone so links and history stay intact.
+  async function deleteIdentity(write, target) {
+    const ref = { namespace: 'shared', kind: target.kind, id: target.id };
+    let record;
+    try {
+      record = await identityRepo.loadEntity(ref);
+    } catch (error) {
+      if (error?.code !== 'entity_not_found') throw error;
+      const imported = target.kind === 'person' ? await getImportedPerson(target.id, github) : null;
+      if (!imported) {
+        return { ok: true, result: { path: write.path, mode: 'delete', ref: formatEntityRef(ref), skipped: true } };
+      }
+      await identityRepo.adoptImportedIdentity({ kind: 'person', record: imported });
+      record = await identityRepo.loadEntity(ref);
+    }
+    const status = record?.lifecycle_status ?? 'active';
+    if (status !== 'deleted') {
+      if (status !== 'retained' && status !== 'deidentified') {
+        await identityRepo.transitionLifecycle({
+          ref,
+          toStatus: 'retained',
+          retentionReason: 'Adam approved deletion in chat',
+          retentionReviewAt: (typeof now === 'function' ? new Date(now()) : new Date()).toISOString()
+        });
+      }
+      await identityRepo.transitionLifecycle({ ref, toStatus: 'deleted' });
+    }
+    return { ok: true, result: { path: write.path, mode: 'delete', ref: formatEntityRef(ref), deleted: true } };
+  }
+
   async function apply(write, target, created = new Map()) {
+    if (write.mode === 'delete') {
+      if (target.kind !== 'person' && target.kind !== 'organisation') {
+        return peopleError('invalid_people_write', write.path);
+      }
+      try {
+        return await deleteIdentity(write, target);
+      } catch (error) {
+        return peopleError(error?.code || 'people_delete_failed', error?.message || write.path);
+      }
+    }
     const body = parseBody(write);
     if (!body) return peopleError('invalid_people_write', write.path);
     try {

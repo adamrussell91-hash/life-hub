@@ -584,7 +584,8 @@ export async function queueCalendarGhostDualPath({
   findLivePendingByCalendarGhostId = null,
   extraWrites = null,
   intent = null,
-  surfaces = null
+  surfaces = null,
+  reopened = false
 }) {
   const tree = await client.resolveTree();
   const blob = (tree.tree ?? []).find(item => item.path === PENDING_CALENDAR_GHOSTS_PATH && item.type === 'blob');
@@ -598,13 +599,28 @@ export async function queueCalendarGhostDualPath({
       return { ok: false, error: 'ghost_conflict', detail: 'Could not bind to an existing calendar proposal.' };
     }
     const matchedStatus = statusOf(matched);
-    if (matchedStatus === 'accepted' || matchedStatus === 'dismissed') {
+    if (matchedStatus === 'accepted') {
+      // Already on the calendar — done, not an error. Re-queueing would twin it.
       return {
-        ok: false,
-        error: 'ghost_already_decided',
-        detail: `This calendar proposal was already ${matchedStatus}.`,
-        id: matched.id
+        ok: true,
+        id: matched.id,
+        ghost_status: 'already_accepted',
+        note: 'This exact proposal was already accepted — it is on the calendar. Tell Adam it is already there.'
       };
+    }
+    if (matchedStatus === 'dismissed' && !reopened) {
+      // Adam is asking again, so he wants it: reopen the dismissed proposal.
+      const reopenedList = list.map(item => (item.id === matched.id ? { ...entry, status: 'pending' } : item));
+      await client.writeFile({
+        path: PENDING_CALENDAR_GHOSTS_PATH,
+        content: serializePendingCalendarGhosts(reopenedList, parsePendingCalendarGhostsDoc(prior).last_run),
+        ...(blob?.sha ? { sha: blob.sha } : {}),
+        message: `chore(calendar): re-propose ${entry.id}`
+      });
+      return queueCalendarGhostDualPath({
+        client, entry, agentSlug, proposeOsAction, send, validateProposeActionInput,
+        findLivePendingByCalendarGhostId, extraWrites, intent, surfaces, reopened: true
+      });
     }
     if (ghostContentFingerprint(matched) !== ghostContentFingerprint(entry)) {
       return {
