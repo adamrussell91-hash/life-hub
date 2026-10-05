@@ -89,10 +89,13 @@ describe("Knowledge chat rail protocol affordances", () => {
 
     await vi.waitFor(() => {
       expect(host.app.querySelector<HTMLButtonElement>('button[type="submit"]')?.textContent).toBe(
-        "Checking the archive shelves…",
+        "thinking",
       );
     });
     expect(host.app.querySelectorAll(".chat__status")).toHaveLength(1);
+    expect(host.app.querySelector(".hub-ai-bar__aside .chat__status")?.textContent).toBe(
+      "Checking the archive shelves…",
+    );
     expect(host.app.textContent).not.toContain("Still working…");
 
     phase?.({ status: "writing" });
@@ -101,6 +104,9 @@ describe("Knowledge chat rail protocol affordances", () => {
         "Finding the argument underneath…",
       );
     });
+    expect(host.app.querySelector<HTMLButtonElement>('button[type="submit"]')?.textContent).toBe(
+      "thinking",
+    );
 
     finish?.({ status: "done", reply: "Here is the useful thread." });
     await vi.waitFor(() => expect(host.app.textContent).toContain("Here is the useful thread."));
