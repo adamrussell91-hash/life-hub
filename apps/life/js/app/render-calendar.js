@@ -4,6 +4,7 @@ import { resolveSchoolTerms } from '../../../../packages/design-kit/js/calendar/
 import { renderAlmanac, unmountAlmanac } from './render-almanac.js';
 import { renderDayDial, unmountDayDial } from './render-day-dial.js';
 import { renderTermRiver, unmountTermRiver } from './render-term-river.js';
+import { readinessFor } from '../../../../packages/design-kit/js/calendar/readiness-panel.js';
 import { candidateForLog, inferMealSlot, isWritableCalendarType, slugForLog } from './calendar-write.js';
 import {
   blockStyle,
@@ -125,6 +126,11 @@ export function renderCalendar(root, model, {
     now,
     dayProfile: planningProfile?.day_profile ?? null,
     terms,
+    // Today's readiness forecast, once the Day view has worked it out (check-ins included).
+    readiness: () => {
+      const today = readinessFor(model.date);
+      return today ? { [model.date]: today } : null;
+    },
     onShiftRange,
     onSelectDate,
     onSwitchView: next => {

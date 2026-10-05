@@ -32,6 +32,7 @@ import {
 import { GitHubClientError } from '../netlify/functions/_shared/github-client.mjs';
 import { taskKey, TASKS_INDEX_KEY } from '../netlify/functions/_shared/tasks-blobs.mjs';
 import { DEFAULT_PLANNING_PROFILE } from '../netlify/functions/planning-profile.mjs';
+import { capacityCheckinsRoute } from '../netlify/functions/capacity-checkins.mjs';
 
 const PASSPHRASE = 'life-hub-local';
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
@@ -711,6 +712,22 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
         const conflict = ghostError instanceof GitHubClientError && ghostError.code === 'write_conflict';
         error(response, conflict ? 409 : 503, conflict ? 'write_conflict' : 'github_unavailable', 'The repository is temporarily unavailable.', !conflict);
       }
+      return true;
+    }
+
+    if (url.pathname === '/api/capacity-checkins') {
+      // The real route over the in-memory task store; Central Node sync is off locally.
+      if (!readSession(request)) return unauthenticated(response);
+      const store = {
+        async get(key) { return taskData.has(key) ? structuredClone(taskData.get(key)) : null; },
+        async setJSON(key, value) { taskData.set(key, structuredClone(value)); },
+        async list({ prefix } = {}) { return { blobs: [...taskData.keys()].filter(k => k.startsWith(prefix ?? '')).map(key => ({ key })) }; }
+      };
+      const body = request.method === 'POST' ? JSON.stringify(await readJson(request)) : undefined;
+      const route = capacityCheckinsRoute({ now: () => clock.now(), openRepo: async () => { throw new Error('central node is not synced locally'); } });
+      const result = await route(new Request(new URL(url.pathname + url.search, 'http://localhost'), { method: request.method, headers: { 'content-type': 'application/json' }, body }), { env: {}, store });
+      const payload = await result.json();
+      json(response, result.status, payload, PRIVATE_HEADERS);
       return true;
     }
 

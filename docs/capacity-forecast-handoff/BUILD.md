@@ -1,0 +1,61 @@
+# Capacity forecast: what was built (October 2026)
+
+Adam approved the full build on 5 Oct 2026 and supplied the 30 icons. This page maps the handoff to the code and lists what is still provisional.
+
+## Where things live
+
+| Piece | File |
+|---|---|
+| Readiness model v2 (pure, versioned `readiness-2.0-provisional`) | `packages/design-kit/js/calendar/readiness-model.js` |
+| Morning bubbles (question choice, answer codes) | `packages/design-kit/js/calendar/morning-bubbles.js` |
+| Day view panel (forecast, hourly line, weather windows, bubbles, "What did we miss?") | `packages/design-kit/js/calendar/readiness-panel.js`, `packages/design-kit/calendar-readiness.css` |
+| Persistence: snapshots, observations, discrepancies, Central Node line | `netlify/functions/capacity-checkins.mjs` → `/api/capacity-checkins` |
+| 7 am phone nudge (`?checkin=1`) | `netlify/functions/_shared/day-sense-notify.mjs` (`checkin` rule) |
+| Icons: Adam's originals (never edited) | `packages/design-kit/icons/capacity-weather/src/1–30.svg` |
+| Icons: condition-coloured output | `packages/design-kit/icons/capacity-weather/1–30.svg`, `js/calendar/weather-icons.js` (generated) |
+| Icon build | `node scripts/build-weather-icons.mjs` |
+| Tests | `tests/unit/capacity-forecast.test.js` |
+
+## Where Adam sees it
+
+Life → Calendar → **Day**. For today, a **Capacity forecast** block now opens the side column, and the dial's centre gauge shows the same number. Between 5 am and noon the bubbles appear under the forecast. Outside that window a "Check in now" link appears instead. Around 7:00–9:30 am, if no check-in exists yet, the phone gets one push ("How are you starting today?"). The push counts toward the existing cap of 4 a day and opens the bubbles directly. Once the Day view has worked out today's readiness, the Week view's today column shows it too.
+
+## How the handoff rules map
+
+- **100 is reachable.** The readiness forecast has no 95 ceiling.
+- **Missing sleep is unknown.** It falls back to recent history. Staler sleep widens the band and never moves the estimate.
+- **Sleep, prior workload and strenuous exercise are kept after fresh answers.** Lingering soreness or mental fatigue scales those costs. "Recovered" shrinks them.
+- **Mood is one of five weighted inputs.** Physical, cognitive and emotional domains drive the weather separately. A domain nobody has reported on (an unanswered question with no log) is left out of the weather, so fog, rain or cloud never comes from a guess.
+- **Evidence is filtered by when it became knowable.** The model uses `recorded_at`/`created_at`, else the record's date and time. A diary with no time counts as written that evening, so it never enters that morning's forecast.
+- **Monday uses Sunday.** History, evidence and yesterday's workload are read from events by date, not from the displayed week.
+- **Workload.** Tracked work sessions count as *actual*. Classes and meetings count as *scheduled*. A task's time block alone does not count.
+- **Free time is opportunity, not proof of recovery.** There are no lunch or tea bumps and no title-based spikes. Grogginess at the start of the day is modelled only when poor sleep and foggy focus were actually reported.
+- **The snapshot is immutable.** It is issued once, before any answer. The server refuses to back-fill a forecast after the answer, and computes the residual against the stored snapshot, never against a client number.
+- **Observations are append-only.** Corrections supersede. Deletes set `deleted_at` and drop out of the forecast, history and the next morning's question choice.
+- **The discrepancy step comes after saving.** It is asked only after the observation is saved. It compares like with like: the overall readiness answer against the issued forecast. It fires at a 10+ point gap when the answer is outside the issued band, or at 20+ points regardless, because bubble anchors are 20 apart. "Not sure" is stored as `unexplained`.
+- **Central Node gets one line per day**, linked to the observation id, for example `**5 Oct:** Capacity: 07:05 morning check-in: readiness lower than forecast; sleep better, still tired. (check-in obs_…)`. A correction replaces the line rather than adding another. If GitHub is down, the observation is still saved.
+
+## Icons
+
+Shapes and numbering are exactly Adam's. Only colours changed, by condition family:
+
+| Family | States | Hue |
+|---|---|---|
+| clear | 1–7 | warm gold / amber |
+| steady | 8–9 | sage green |
+| wind | 10–12 | teal |
+| cloud | 13–17 | slate |
+| fog | 18–21 | lavender-grey |
+| rain | 22–25 | blue |
+| storm | 26–27 | violet with yellow bolt |
+| recovery | 28–29 | mint |
+| evening | 30 | indigo |
+
+To retune the colours, edit `FAMILIES` in the build script and re-run it. Every icon has a `<title>`, and the state name always appears as text next to it, so colour is never the only signal.
+
+## Still provisional / not done
+
+- The weights are the comparison prototype's design weights. They have not been fitted or evaluated. The band is illustrative, not calibrated. Prospective evaluation and chronological holdouts (see `algorithm.md`) still need to be built from the stored snapshot and observation pairs once enough mornings exist.
+- No predicted Corey/social lift yet. The weather and explanation code supports one (`lifts`, state 7), but nothing in the stored data supports it yet, so none is shown.
+- Other days in Week, Term and Almanac still use the old `capacity-model.js` (logged days and recovery forecast). Only today switches to readiness, and only once the Day view has loaded. Moving the multi-day planning maths onto readiness is a follow-up.
+- `tests/browser/dial-visual.spec.mjs` in `DIAL_APP=1` mode asserts the old gauge value (34) for the frozen fixture day. The readiness forecast now owns today's gauge, so that number changes by design. The spec is not in the default browser run.

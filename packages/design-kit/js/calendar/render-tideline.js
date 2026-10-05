@@ -494,7 +494,8 @@ function mount({ entrance = false } = {}) {
     nowHour,
     dayProfile: input.dayProfile ?? null,
     terms: input.terms ?? null,
-    lifeLogStatus: input.lifeLogStatus ?? 'live'
+    lifeLogStatus: input.lifeLogStatus ?? 'live',
+    readiness: typeof input.readiness === 'function' ? input.readiness() : input.readiness ?? null
   });
   bands = model.bands;
   if (!input.week.includes(state.phoneDay)) state.phoneDay = input.week.includes(input.today) ? input.today : input.week[0];

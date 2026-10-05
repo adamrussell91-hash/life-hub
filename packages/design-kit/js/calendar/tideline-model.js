@@ -506,7 +506,8 @@ export function buildTidelineModel({
   nowHour,
   dayProfile = null,
   terms = null,
-  lifeLogStatus = 'live'
+  lifeLogStatus = 'live',
+  readiness = null
 } = {}) {
   const schoolTerms = terms ?? visual?.school_terms ?? [];
   const bands = bandsFromProfile(dayProfile ?? visual?.day_profile ?? {});
@@ -522,6 +523,13 @@ export function buildTidelineModel({
       if (cap.note === 'no logs') {
         capacity.set(date, { ...cap, note: waiting ? 'logs unavailable' : 'loading logs' });
       }
+    }
+  }
+  // Life's readiness forecast (readiness-model.js) replaces the old estimate for the
+  // days it covers (today), so week and day views show one number.
+  for (const [date, value] of Object.entries(readiness ?? {})) {
+    if (value && Number.isFinite(value.pct) && capacity.has(date)) {
+      capacity.set(date, { ...capacity.get(date), pct: value.pct, note: value.note, factors: [], forecast: value.forecast !== false, readiness: true });
     }
   }
   // A block for a task that is ticked off reads as done too. The tick on a block also
