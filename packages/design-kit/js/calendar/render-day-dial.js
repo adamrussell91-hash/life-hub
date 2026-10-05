@@ -37,6 +37,8 @@ import { openRescueSheet } from './rescue-sheet.js';
 import { morphPairs, playArcs } from './rescue-morph.js';
 import { openDayReview } from './day-review-sheet.js';
 import { disablePush, enablePush, pushState } from '../push-client.js';
+import { mountReadinessPanel, openCheckin } from './readiness-panel.js';
+import { onCheckinsChange, withCheckins } from './readiness-checkins.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -92,6 +94,9 @@ let doc = null;
 let host = null;
 let input = null;
 let model = null;
+/** input.events plus shared check-ins, for this paint. */
+let events = [];
+let unsubCheckins = null;
 let engine = null;
 let root = null;
 let svg = null;
@@ -514,8 +519,10 @@ const sleepWall = bands => ({ id: 'sleep', h1: bands[bands.length - 1].to, h2: b
 
 function buildModel() {
   nowHour = Number.isFinite(input.nowHour) ? input.nowHour : getSydneyMinutesOfDay(input.now ?? new Date()) / 60;
+  // Check-ins ride along as events so the gauge, week and panel share one number.
+  events = withCheckins(input.events ?? [], { apiFetch: input?.apiFetch, today: input.today });
   model = buildTidelineModel({
-    events: input.events ?? [],
+    events,
     visual: input.visual ?? null,
     ghosts: ghostsNow().filter(ghost => ghost.status !== 'dismissed'),
     week: input.week,
@@ -524,6 +531,30 @@ function buildModel() {
     dayProfile: input.dayProfile ?? null,
     terms: input.terms ?? null
   });
+}
+
+/** Life's Day view: today's gauge shows the readiness forecast (and check-in) when known. */
+function readinessCtx() {
+  const today = dayAt(input.today);
+  if ((input?.hub || 'life') !== 'life' || !today) return null;
+  const hhmm = value => {
+    const m = /^(\d{2}):(\d{2})$/.exec(String(value ?? ''));
+    return m ? Number(m[1]) + Number(m[2]) / 60 : null;
+  };
+  const sleepAt = hhmm(input.dayProfile?.sleep);
+  return {
+    doc,
+    date: input.today,
+    nowHour,
+    now: input.now ?? new Date(),
+    events,
+    cap: today.cap,
+    items: (today.chips ?? []).filter(chip => !chip.ambient && !chip.ghost).map(chip => ({ start: chip.start, end: chip.end, kind: chip.kind, isClass: chip.isClass, protected: chip.protected, title: chip.title })),
+    apiFetch: input?.apiFetch,
+    wake: hhmm(input.dayProfile?.wake) ?? 6.5,
+    lightsOut: sleepAt != null ? Math.min(23.5, Math.max(20, sleepAt + 0.5)) : 22.5,
+    onRepaint: () => { if (mountedFor) repaintAfter(0); }
+  };
 }
 
 /** "Thursday 24/09/26 · T3 W10" and, for today, "6:05 pm · second-last school day of term". */
@@ -994,7 +1025,8 @@ function mountDial(size) {
   nodes.set('pct', s('text', { class: 'dd-t-pct', x: cx, y: (cy + big * 0.35).toFixed(1), 'font-size': big, fill: capColour(cap.pct) }, gauge, `${cap.pct}%`));
   const noteRoom = rings.gauge * 1.6; // inside the gauge ring, with air
   s('text', { class: 'dd-t-note', x: cx, y: cy + big * 0.38 + 22 }, gauge, fitText(cap.note, noteRoom, NOTE_FONT));
-  const streak = cap.factors?.find(factor => factor.id === 'streak');
+  // The old model's low-day streak does not apply to the readiness forecast.
+  const streak = cap.readiness ? null : cap.factors?.find(factor => factor.id === 'streak');
   if (streak && !rings.compact) {
     s('text', { class: 'dd-t-note', x: cx, y: cy + big * 0.38 + 38 }, gauge, fitText(streak.label, noteRoom, NOTE_FONT));
   }
@@ -1179,7 +1211,16 @@ function handleDeepLink(view, side) {
       /* not fatal */
     }
   };
-  if (query.get('review') === '1') {
+  if (query.get('checkin') === '1') {
+    clean();
+    openCheckin(input.today);
+    queueMicrotask(() => {
+      if (mountedFor) mount({ entrance: false });
+      const card = doc.querySelector?.('[data-part="checkin"]') ?? doc.querySelector?.('[data-part="forecast"]');
+      card?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+      card?.querySelector?.('.rf-bubble')?.focus?.({ preventScroll: true });
+    });
+  } else if (query.get('review') === '1') {
     clean();
     queueMicrotask(() => openReview());
   } else if (query.get('bookmark')) {
@@ -1228,6 +1269,10 @@ async function togglePush(button) {
 function mountSide(side) {
   const date = state.day;
   const ghosts = ghostsNow();
+  if (date === input.today) {
+    const ctx = readinessCtx();
+    if (ctx) mountReadinessPanel({ ...ctx, side });
+  }
   mountBookmarkPrompt(side, date);
   mountReviewEntry(side, date);
   // Agenda before Dexy / offers: on phone the side stacks under the dial, and Due
@@ -1879,6 +1924,8 @@ export function renderDayDial(nextDoc, dialHost, nextInput) {
     observer = null;
     mountedFor = dialHost;
     observe();
+    unsubCheckins?.();
+    unsubCheckins = onCheckinsChange(() => { if (mountedFor) repaintAfter(0); });
   }
   const entrance = !playedEntrance;
   if (!entrance && perfNow() < entranceGuardUntil) {
@@ -1897,6 +1944,9 @@ export function unmountDayDial() {
   repaintTimer = 0;
   observer?.disconnect();
   observer = null;
+  unsubCheckins?.();
+  unsubCheckins = null;
+  events = [];
   engine?.dispose();
   engine = null;
   nodes.clear();

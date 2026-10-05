@@ -181,7 +181,8 @@ test('clicking a Due row opens the item card; Save writes to the Tasks API', asy
   pop.querySelector('textarea[name="notes"]').value = 'Replied to 11B';
   pop.querySelector('[data-part="card-form"]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
   await new Promise((resolve) => setTimeout(resolve, 20));
-  assert.deepEqual(calls, [['/api/tasks?id=task-timed', 'PATCH', { description: 'Replied to 11B', due_date: TODAY }]]);
+  // The week also reads today's check-ins (one capacity number everywhere); only the save writes.
+  assert.deepEqual(calls.filter(([path]) => !path.startsWith('/api/capacity-checkins')), [['/api/tasks?id=task-timed', 'PATCH', { description: 'Replied to 11B', due_date: TODAY }]]);
   assert.equal(changed.length, 1);
 });
 

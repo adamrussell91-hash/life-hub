@@ -22,6 +22,8 @@ import { githubOpenCommit, readEvents } from './_shared/calendar-ghosts-propose.
 import { bindingFromEvents, buildSlotsFromEvents } from './_shared/goal-calendar-context.mjs';
 import { getSydneyDateKey } from '../../apps/life/js/core/time.js';
 import { addDays } from '../../packages/design-kit/js/lead-lines.js';
+import { readinessEvidenceEvents, READINESS_LOOKBACK_DAYS } from './_shared/readiness-evidence.mjs';
+import { loadTeachingLessonsFromBlobs, readSchoolTerms } from './almanac.mjs';
 
 export const config = { path: '/api/goal-reads' };
 const HUB_PREFS_KEY = 'meta/hub_prefs';
@@ -144,11 +146,21 @@ export async function defaultLoadCalendarContext({
     const { open } = githubOpenCommit(client, { decodeBlob: decode });
     const opened = await open();
     const paths = typeof opened.listPaths === 'function' ? opened.listPaths() : [];
-    const from = addDays(today, -7);
+    // Three weeks of history so capacity matches the calendar views.
+    const from = addDays(today, -(READINESS_LOOKBACK_DAYS + 2));
     const to = addDays(today, 14);
     const events = await readEvents(paths, path => opened.readFile(path), from, to, warn);
+    let readinessEvents = [];
+    let terms = [];
+    try {
+      const store = await defaultGetTasksStore(env);
+      terms = await readSchoolTerms(async () => store);
+      readinessEvents = await readinessEvidenceEvents({ store, today, lessons: await loadTeachingLessonsFromBlobs(env) });
+    } catch {
+      readinessEvents = [];
+    }
     return {
-      slots: buildSlotsFromEvents(events, today),
+      slots: buildSlotsFromEvents([...events, ...readinessEvents], today, { terms }),
       binding: bindingFromEvents(events, today),
       calendarLooked: true,
       lifeHubLooked: true

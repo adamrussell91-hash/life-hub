@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v197';
+const CACHE_NAME = 'life-hub-shell-v200';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -35,6 +35,7 @@ const SHELL_FILES = [
   'packages/design-kit/calendar-tideline.css',
   'packages/design-kit/calendar-almanac.css',
   'packages/design-kit/calendar-day-dial.css',
+  'packages/design-kit/calendar-readiness.css',
   'packages/design-kit/calendar-term-river.css',
   'packages/design-kit/calendar-zoom-bar.css',
   'packages/design-kit/js/hub-motion-engine.js',
@@ -208,6 +209,11 @@ const SHELL_FILES = [
   'packages/design-kit/js/calendar/rescue-sheet.js',
   'packages/design-kit/js/calendar/rescue-morph.js',
   'packages/design-kit/js/calendar/day-review-sheet.js',
+  'packages/design-kit/js/calendar/readiness-model.js',
+  'packages/design-kit/js/calendar/morning-bubbles.js',
+  'packages/design-kit/js/calendar/readiness-panel.js',
+  'packages/design-kit/js/calendar/readiness-checkins.js',
+  'packages/design-kit/js/calendar/weather-icons.js',
   'packages/design-kit/js/push-client.js',
   'packages/design-kit/js/calendar/render-day-dial.js',
   'packages/design-kit/js/calendar/render-almanac.js',
