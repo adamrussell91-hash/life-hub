@@ -25,6 +25,8 @@ export type AtlasProvince = {
   radius: number;
   explored: boolean;
   colour: number;
+  /** A linked neighbouring book shown at the edge of this book's map. */
+  neighbour?: boolean;
   /** Elongation of the province's land (1 = round) and the angle it runs at. */
   stretch?: number;
   angle?: number;
@@ -49,6 +51,10 @@ export type AtlasRoad = { from: string; to: string };
 export type AtlasRoute = { fromId: string; toBook: string; toLabel: string; count: number; side: "north" | "south" | "east" | "west"; x: number; y: number };
 export type AtlasFog = { x: number; y: number; text: string; noteId: string };
 
+type Pt = { x: number; y: number };
+/** Maps world space to noise space (noise = world / unit + offset), so one island's coast wobbles the same at any zoom. */
+export type TerrainFrame = { unit: number; ox: number; oy: number };
+
 export type AtlasModel = {
   width: number;
   height: number;
@@ -61,6 +67,9 @@ export type AtlasModel = {
   routes: AtlasRoute[];
   fogs: AtlasFog[];
   land?: AtlasLand[];
+  frame?: TerrainFrame;
+  /** The book's own island in this map's space: centre and coast radius. */
+  island?: { x: number; y: number; r: number };
 };
 
 function hash(text: string) {

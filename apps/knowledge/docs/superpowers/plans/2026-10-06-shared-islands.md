@@ -310,8 +310,8 @@ function model(over: Partial<AtlasModel> = {}): AtlasModel {
 const town = (id: string, x: number, y: number): AtlasTown =>
   ({ note: { id } as AtlasTown["note"], province: "peak", x, y, size: 6, peak: true, faded: false, isNew: false, themes: [] });
 const bearings = Array.from({ length: 24 }, (_, i) => (i / 24) * Math.PI * 2);
-function coastAlong(field: ReturnType<typeof terrainField>, cx: number, cy: number, angle: number, step: number) {
-  for (let r = step; r < 400 * step; r += step) if (field(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r).e < SEA_LEVEL) return r;
+function coastAlong(field: ReturnType<typeof terrainField>, cx: number, cy: number, angle: number, zoom = 1) {
+  for (let r = 1; r < 400 * zoom; r += 1) if (field(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r).e < SEA_LEVEL) return r;
   return Infinity;
 }
 
@@ -319,7 +319,7 @@ describe("terrainField", () => {
   it("draws the coast from the island's shape alone: notes raise hills but never move the shore", () => {
     const bare = terrainField(model());
     const settled = terrainField(model({ towns: [town("a", 1000, 1000), town("b", 1040, 990), town("c", 960, 1030), town("d", 1060, 1050)] }));
-    for (const a of bearings) expect(coastAlong(settled, 1000, 1000, a, 1)).toBe(coastAlong(bare, 1000, 1000, a, 1));
+    for (const a of bearings) expect(coastAlong(settled, 1000, 1000, a)).toBe(coastAlong(bare, 1000, 1000, a));
     expect(settled(1000, 1000).e).toBeGreaterThan(bare(1000, 1000).e);
   });
 
@@ -332,7 +332,7 @@ describe("terrainField", () => {
       land: landFor(shape, 1000 * k, 1000 * k, 100 * k, "peak"),
       frame: { unit: k, ox: 0, oy: 0 },
     }));
-    for (const a of bearings) expect(Math.abs(coastAlong(zoomed, 1000 * k, 1000 * k, a, 1) / k - coastAlong(near, 1000, 1000, a, 1))).toBeLessThanOrEqual(1.5);
+    for (const a of bearings) expect(Math.abs(coastAlong(zoomed, 1000 * k, 1000 * k, a, k) / k - coastAlong(near, 1000, 1000, a))).toBeLessThanOrEqual(1.5);
   });
 
   it("lets land shape the coast without claiming colour when it doesn't vote", () => {
