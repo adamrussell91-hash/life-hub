@@ -438,21 +438,51 @@ async function loadTurnCalendarMerge({
   return loadAgentCalendarMerge({ from, to, ...loaders });
 }
 
-/** null = free; otherwise a tool-error payload. */
-function slotConflictOrUnavailable(merge, { date, start, end, excludePaths = [] }) {
+/**
+ * Clashes never block: Adam wants the thing scheduled anyway and told about it.
+ * null = clear; otherwise a note the agent must relay alongside the proposal.
+ */
+export function slotClashNote(merge, { date, start, end, excludePaths = [] }) {
   if (!merge) {
-    return {
-      ok: false,
-      error: 'calendar_sources_unavailable',
-      message: 'Calendar could not be loaded. Refusing to treat the slot as free.'
-    };
+    return { warning: 'calendar_unchecked', message: 'Calendar could not be loaded, so clashes were not checked.' };
+  }
+  const notes = [];
+  const conflicts = findSlotConflicts(merge.slots, { date, start, end, excludePaths });
+  if (conflicts.length) {
+    const { message, conflicts: formatted } = conflictToolError(conflicts);
+    notes.push({ warning: 'calendar_conflict', message: `Scheduled anyway. ${message}`, conflicts: formatted });
   }
   if (mergeHasUnavailableSources(merge.sourceStatus)) {
-    return unavailableCalendarToolError(merge.sourceStatus);
+    notes.push({ warning: 'calendar_unchecked', message: unavailableCalendarToolError(merge.sourceStatus).message });
   }
-  const conflicts = findSlotConflicts(merge.slots, { date, start, end, excludePaths });
-  if (conflicts.length) return conflictToolError(conflicts, { sourceStatus: merge.sourceStatus });
-  return null;
+  if (!notes.length) return null;
+  return {
+    warning: notes[0].warning,
+    message: notes.map((n) => n.message).join(' '),
+    ...(conflicts.length ? { conflicts: notes[0].conflicts } : {})
+  };
+}
+
+async function clashNoteFor(loadMerge, slot) {
+  try {
+    return slotClashNote(await loadMerge(), slot);
+  } catch {
+    return slotClashNote(null, slot);
+  }
+}
+
+/** Attach a clash note to a tool result so the agent tells Adam. */
+export function withClashNote(result, note) {
+  if (!note) return typeof result === 'string' ? result : JSON.stringify(result);
+  let parsed = result;
+  if (typeof result === 'string') {
+    try { parsed = JSON.parse(result); } catch { return result; }
+  }
+  if (!parsed || typeof parsed !== 'object' || parsed.ok === false) return JSON.stringify(parsed);
+  return JSON.stringify({
+    ...parsed,
+    clash_note: { ...note, tell_adam: 'Mention this clash to Adam in one line. It does not block the proposal.' }
+  });
 }
 
 export const config = { path: '/api/chat' };
@@ -2221,36 +2251,28 @@ export function createChatHandler({
                 else if (event.name === 'propose_future') built = buildFutureProposal(event.input ?? {});
                 else built = buildTieDecisionProposal(event.input ?? {});
                 if (!built.ok) return respondConfirmProposal(built);
-                // Timed meetings/events: conflict-check against full multi-hub merge before queueing.
+                // Timed meetings/events: clash-check against the full multi-hub merge.
+                // A clash is a note to Adam, never a reason to refuse.
+                let clashNote = null;
                 if (built.ghostInput?.date && built.ghostInput?.start && built.ghostInput?.end) {
-                  try {
-                    const merge = await loadTurnCalendarMerge({
-                      from: built.ghostInput.date,
-                      to: built.ghostInput.date,
-                      client,
-                      repoTree,
-                      env,
-                      fetchImpl,
-                      hubLessons,
-                      hubClasses,
-                      hubTasks,
-                      hubWorkBlocks,
-                      getLifeEvents,
-                      getTasksStore
-                    });
-                    const blocked = slotConflictOrUnavailable(merge, {
-                      date: built.ghostInput.date,
-                      start: built.ghostInput.start,
-                      end: built.ghostInput.end
-                    });
-                    if (blocked) return JSON.stringify(blocked);
-                  } catch {
-                    return JSON.stringify({
-                      ok: false,
-                      error: 'calendar_sources_unavailable',
-                      message: 'Calendar could not be loaded. Refusing to treat the slot as free.'
-                    });
-                  }
+                  clashNote = await clashNoteFor(() => loadTurnCalendarMerge({
+                    from: built.ghostInput.date,
+                    to: built.ghostInput.date,
+                    client,
+                    repoTree,
+                    env,
+                    fetchImpl,
+                    hubLessons,
+                    hubClasses,
+                    hubTasks,
+                    hubWorkBlocks,
+                    getLifeEvents,
+                    getTasksStore
+                  }), {
+                    date: built.ghostInput.date,
+                    start: built.ghostInput.start,
+                    end: built.ghostInput.end
+                  });
                 }
                 // Timed meetings/events: Confirm + calendar ghost. Multi-day / overnight
                 // spans that fail validateGhost fall back to Confirm-only professional write.
@@ -2260,19 +2282,19 @@ export function createChatHandler({
                       agent: slug,
                       nowIso: getSydneyTimestamp(nowInstant)
                     });
-                    return JSON.stringify(await queueCalendarGhostDualPath({
+                    return withClashNote(await queueCalendarGhostDualPath({
                       client,
                       entry,
                       agentSlug: slug,
                       proposeOsAction,
                       send,
                       validateProposeActionInput
-                    }));
+                    }), clashNote);
                   } catch {
-                    return respondConfirmProposal(built);
+                    return withClashNote(await respondConfirmProposal(built), clashNote);
                   }
                 }
-                return respondConfirmProposal(built);
+                return withClashNote(await respondConfirmProposal(built), clashNote);
               }
               if (event.name === 'propose_goal' || event.name === 'propose_goal_checkin') {
                 return respondConfirmProposal(
@@ -3053,38 +3075,29 @@ export function createChatHandler({
                     detail: error instanceof Error ? error.message : 'invalid input'
                   });
                 }
-                // Timed ghosts: block stacking over occupied multi-hub slots.
+                // Timed ghosts: clashes are a note to Adam, never a refusal.
+                let clashNote = null;
                 if (entry?.date && entry?.start && entry?.end && event.name === 'propose_calendar_ghost') {
-                  try {
-                    const merge = await loadTurnCalendarMerge({
-                      from: entry.date,
-                      to: entry.date,
-                      client,
-                      repoTree,
-                      env,
-                      fetchImpl,
-                      hubLessons,
-                      hubClasses,
-                      hubTasks,
-                      hubWorkBlocks,
-                      getLifeEvents,
-                      getTasksStore
-                    });
-                    const blocked = slotConflictOrUnavailable(merge, {
-                      date: entry.date,
-                      start: entry.start,
-                      end: entry.end,
-                      // Moving a block must not collide with its own current slot.
-                      excludePaths: entry.kind === 'reschedule_block' ? [entry.path] : []
-                    });
-                    if (blocked) return JSON.stringify(blocked);
-                  } catch {
-                    return JSON.stringify({
-                      ok: false,
-                      error: 'calendar_sources_unavailable',
-                      message: 'Calendar could not be loaded. Refusing to treat the slot as free.'
-                    });
-                  }
+                  clashNote = await clashNoteFor(() => loadTurnCalendarMerge({
+                    from: entry.date,
+                    to: entry.date,
+                    client,
+                    repoTree,
+                    env,
+                    fetchImpl,
+                    hubLessons,
+                    hubClasses,
+                    hubTasks,
+                    hubWorkBlocks,
+                    getLifeEvents,
+                    getTasksStore
+                  }), {
+                    date: entry.date,
+                    start: entry.start,
+                    end: entry.end,
+                    // Moving a block must not report a clash with its own current slot.
+                    excludePaths: entry.kind === 'reschedule_block' ? [entry.path] : []
+                  });
                 }
                 try {
                   const queued = await queueCalendarGhostDualPath({
@@ -3095,7 +3108,7 @@ export function createChatHandler({
                     send,
                     validateProposeActionInput
                   });
-                  return JSON.stringify(queued);
+                  return withClashNote(queued, clashNote);
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }
