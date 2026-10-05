@@ -1,4 +1,6 @@
-import type { AtlasLand, AtlasModel, AtlasProvince, AtlasTown } from "./atlasLayout";
+import type { AtlasContext, AtlasLand, AtlasModel, AtlasProvince, AtlasTown, MeetingKind } from "./atlasLayout";
+import { COAST, islandRadius, islandShape, landFor, neckLand, shoreAt } from "./islandShape";
+export { islandRadius } from "./islandShape";
 import type { BookModel } from "./model";
 import { BOOK_PALETTE } from "./palette";
 import type { Landmark } from "./seaLife";
@@ -28,6 +30,10 @@ export type Sea = { name: string; x: number; y: number; r: number; islands: stri
 /** Links between two books' notes, in either direction. `from` holds the first link found. */
 export type Passage = { from: string; to: string; count: number; fromNote: string; toNote: string };
 
+export type CrossingKind = MeetingKind | "far";
+/** How two linked books meet. `a` and `b` are their facing shores (`a` on `from`). */
+export type Crossing = { from: string; to: string; count: number; kind: CrossingKind; a: { x: number; y: number }; b: { x: number; y: number } };
+
 export type ArchipelagoModel = {
   width: number;
   height: number;
@@ -35,6 +41,7 @@ export type ArchipelagoModel = {
   islands: Island[];
   seas: Sea[];
   passages: Passage[];
+  crossings: Crossing[];
   /** The same islands as Atlas provinces and towns, so the Atlas terrain renderer can paint them. */
   terrain: AtlasModel;
 };
@@ -46,6 +53,12 @@ const GOLDEN = 2.399963229728653;
 const HILLS = 5;
 const UNFILED = "Unfiled";
 const WEEK = 7 * 24 * 60 * 60 * 1000;
+/** Three or more links and two neighbouring books share one landmass. */
+export const JOIN_AT = 3;
+const JOIN_GAP = 14;
+const BRIDGE_GAP = 100;
+/** A strait wider than this gets no bridge: the link stays a faint route. */
+const MAX_STRAIT = 170;
 
 function hash(text: string) {
   let h = 2166136261;
@@ -54,10 +67,6 @@ function hash(text: string) {
     h = Math.imul(h, 16777619);
   }
   return (h >>> 0) / 4294967295;
-}
-
-export function islandRadius(noteCount: number) {
-  return Math.round(58 + Math.sqrt(Math.max(0, noteCount)) * 17);
 }
 
 /**
@@ -116,6 +125,98 @@ function passagesFor(books: BookModel[]): Passage[] {
   return [...byPair.values()];
 }
 
+export function crossingKind(count: number): MeetingKind {
+  return count >= JOIN_AT ? "joined" : count === 2 ? "stone" : "rope";
+}
+
+/** Option C: inside one sea, linked books are pulled together; every other pair keeps its gap. Deterministic. */
+function relaxSea(list: BookModel[], centres: Map<string, { x: number; y: number }>, passages: Passage[]) {
+  const keys = new Set(list.map(b => b.key));
+  const radius = new Map(list.map(b => [b.key, islandRadius(b.noteCount)]));
+  const pairKey = (a: string, b: string) => [a, b].sort().join("\u0000");
+  const gapFor = new Map<string, number>();
+  for (const p of passages) {
+    if (keys.has(p.from) && keys.has(p.to)) gapFor.set(pairKey(p.from, p.to), crossingKind(p.count) === "joined" ? JOIN_GAP : BRIDGE_GAP);
+  }
+  if (!gapFor.size) return;
+  const ids = [...keys].sort();
+  const separate = () => {
+    for (let i = 0; i < ids.length; i += 1) for (let j = i + 1; j < ids.length; j += 1) {
+      const p = centres.get(ids[i]!)!;
+      const q = centres.get(ids[j]!)!;
+      const min = radius.get(ids[i]!)! + radius.get(ids[j]!)! + (gapFor.get(pairKey(ids[i]!, ids[j]!)) ?? ISLAND_GAP);
+      const dx = q.x - p.x;
+      const dy = q.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d >= min) continue;
+      const push = (min - d) / 2;
+      p.x -= (dx / d) * push;
+      p.y -= (dy / d) * push;
+      q.x += (dx / d) * push;
+      q.y += (dy / d) * push;
+    }
+  };
+  for (let it = 0; it < 240; it += 1) {
+    for (const [pair, gap] of gapFor) {
+      const [a, b] = pair.split("\u0000") as [string, string];
+      const p = centres.get(a)!;
+      const q = centres.get(b)!;
+      const dx = q.x - p.x;
+      const dy = q.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const pull = (d - (radius.get(a)! + radius.get(b)! + gap)) * 0.06;
+      p.x += (dx / d) * pull;
+      p.y += (dy / d) * pull;
+      q.x -= (dx / d) * pull;
+      q.y -= (dy / d) * pull;
+    }
+    separate();
+  }
+  for (let it = 0; it < 60; it += 1) separate();
+}
+
+/** Where island `i`'s coast faces a bearing, in world space. */
+function shoreToward(i: Island, angle: number) {
+  const s = shoreAt(islandShape(i.key), angle);
+  return { x: i.x + s.x * i.r * COAST, y: i.y + s.y * i.r * COAST };
+}
+
+function crossingsFor(islands: Island[], passages: Passage[]): Crossing[] {
+  const byKey = new Map(islands.map(i => [i.key, i]));
+  return passages.flatMap(p => {
+    const a = byKey.get(p.from);
+    const b = byKey.get(p.to);
+    if (!a || !b) return [];
+    const angle = Math.atan2(b.y - a.y, b.x - a.x);
+    const pa = shoreToward(a, angle);
+    const pb = shoreToward(b, angle + Math.PI);
+    const strait = Math.hypot(pb.x - pa.x, pb.y - pa.y);
+    const kind: CrossingKind = a.sea === b.sea && strait <= MAX_STRAIT ? crossingKind(p.count) : "far";
+    return [{ from: p.from, to: p.to, count: p.count, kind, a: pa, b: pb }];
+  });
+}
+
+/** The terrain colour index for a book: five kit pastels, then the book palette. */
+function paletteColour(book: BookModel) {
+  return 5 + Math.max(0, BOOK_PALETTE.findIndex(s => s.fill === book.swatch.fill));
+}
+
+/** What a book's own map needs from the Archipelago: where its island sits and how its linked neighbours meet it. */
+export function atlasContext(model: ArchipelagoModel, key: string): AtlasContext | undefined {
+  const island = model.islands.find(i => i.key === key);
+  if (!island) return undefined;
+  const byKey = new Map(model.islands.map(i => [i.key, i]));
+  const neighbours = model.crossings.flatMap(c => {
+    if (c.kind === "far" || (c.from !== key && c.to !== key)) return [];
+    const other = byKey.get(c.from === key ? c.to : c.from)!;
+    return [{
+      key: other.key, label: other.label, kind: c.kind, count: c.count, x: other.x, y: other.y, r: other.r,
+      colour: paletteColour(other.book), a: c.from === key ? c.a : c.b, b: c.from === key ? c.b : c.a,
+    }];
+  });
+  return { island: { x: island.x, y: island.y, r: island.r }, neighbours };
+}
+
 export function buildArchipelago(books: BookModel[], now = Date.now(), shape: "wide" | "tall" = "wide"): ArchipelagoModel {
   const groups = new Map<string, BookModel[]>();
   for (const book of books) {
@@ -124,10 +225,12 @@ export function buildArchipelago(books: BookModel[], now = Date.now(), shape: "w
   }
   const names = [...groups.keys()].sort((a, b) => (a === UNFILED ? 1 : b === UNFILED ? -1 : a.localeCompare(b)));
 
-  // Pack each sea's islands locally, then pack the seas.
+  const passages = passagesFor(books);
+  // Pack each sea's islands locally, pull linked books together, then pack the seas.
   const local = names.map(name => {
     const list = groups.get(name)!;
     const centres = packCircles(list.map(b => ({ id: b.key, r: islandRadius(b.noteCount) })), ISLAND_GAP, shape);
+    relaxSea(list, centres, passages);
     const extent = Math.max(...list.map(b => {
       const c = centres.get(b.key)!;
       return Math.hypot(c.x, c.y) + islandRadius(b.noteCount);
@@ -176,28 +279,21 @@ export function buildArchipelago(books: BookModel[], now = Date.now(), shape: "w
     h: Math.max(...islands.map(i => i.y + i.r)) - top + 140,
   };
 
-  return { width, height, bounds, islands, seas, passages: passagesFor(books), terrain: terrainModel(islands, width, height, bounds) };
+  const crossings = crossingsFor(islands, passages);
+  return { width, height, bounds, islands, seas, passages, crossings, terrain: terrainModel(islands, crossings, width, height, bounds) };
 }
 
 /** Islands as Atlas provinces (land and colour) and notes as towns (hills; peaks where a note complicates the book). */
-function terrainModel(islands: Island[], width: number, height: number, bounds: ArchipelagoModel["bounds"]): AtlasModel {
-  const provinces: AtlasProvince[] = islands.map(island => {
-    const swatch = BOOK_PALETTE.findIndex(s => s.fill === island.book.swatch.fill);
-    const roll = rolls(island.key);
-    return {
-      id: island.key,
-      label: island.label,
-      x: island.x,
-      y: island.y,
-      radius: island.r * 0.6,
-      explored: island.book.noteCount > 0,
-      // renderTerrain's PASTELS: five kit pastels, then the book palette softened.
-      colour: 5 + Math.max(0, swatch),
-      // No two islands the same shape: some long, some round, each at its own heading.
-      stretch: 1 + roll() * 1.3,
-      angle: roll() * Math.PI,
-    };
-  });
+function terrainModel(islands: Island[], crossings: Crossing[], width: number, height: number, bounds: ArchipelagoModel["bounds"]): AtlasModel {
+  const provinces: AtlasProvince[] = islands.map(island => ({
+    id: island.key,
+    label: island.label,
+    x: island.x,
+    y: island.y,
+    radius: island.r * 0.6,
+    explored: island.book.noteCount > 0,
+    colour: paletteColour(island.book),
+  }));
   const towns: AtlasTown[] = islands.flatMap(island => {
     // A few hills per island, debate peaks first: every note as a hill turns a big book into a dark knot of contours.
     const all = [...island.book.placed, ...island.book.loose];
@@ -221,44 +317,17 @@ function terrainModel(islands: Island[], width: number, height: number, bounds: 
       };
     });
   });
-  return { width, height, bounds, source: "themes", provinces, towns, roads: [], routes: [], fogs: [], land: islands.flatMap(coastline) };
+  const byKey = new Map(islands.map(i => [i.key, i]));
+  const necks = crossings.filter(c => c.kind === "joined").flatMap(c =>
+    neckLand(c.a, c.b, 0.5 * Math.min(byKey.get(c.from)!.r, byKey.get(c.to)!.r) * COAST, c.from, c.to));
+  const land: AtlasLand[] = [...islands.flatMap(i => landFor(islandShape(i.key), i.x, i.y, i.r * COAST, i.key)), ...necks];
+  return { width, height, bounds, source: "themes", provinces, towns, roads: [], routes: [], fogs: [], land };
 }
 
 /** Deterministic dice for one island: the same book always rolls the same shape. */
 function rolls(key: string) {
   let n = 0;
   return () => hash(`${key}#${(n += 1)}`);
-}
-
-/**
- * Peninsulas, a bay and a few islets, so islands read as coastlines rather than
- * blobs. Everything stays within ISLAND_GAP / 2 of the shore, so neighbours never merge.
- */
-function coastline(island: Island): AtlasLand[] {
-  const roll = rolls(`${island.key}:coast`);
-  const r = island.r;
-  const land: AtlasLand[] = [];
-  const lobes = 2 + Math.floor(roll() * (r > 110 ? 3 : 2));
-  for (let k = 0; k < lobes; k += 1) {
-    const a = roll() * Math.PI * 2;
-    const sigma = r * (0.13 + roll() * 0.1);
-    const stretch = 1.8 + roll() * 1.6;
-    // Peninsulas: long, thin and reaching outward, but their tips stay within ~1.05r.
-    const dist = Math.min(r * (0.5 + roll() * 0.35), r * 1.05 - 1.1 * sigma * Math.sqrt(stretch));
-    land.push({ province: island.key, x: island.x + Math.cos(a) * dist, y: island.y + Math.sin(a) * dist, amp: 0.55 + roll() * 0.2, sigma, stretch, angle: a });
-  }
-  if (r > 80 && roll() < 0.7) {
-    // A bay: a dip pressed into one shore.
-    const a = roll() * Math.PI * 2;
-    land.push({ province: island.key, x: island.x + Math.cos(a) * r * 0.62, y: island.y + Math.sin(a) * r * 0.62, amp: -0.45, sigma: r * 0.18, stretch: 1.6, angle: a + Math.PI / 2 });
-  }
-  const islets = Math.floor(roll() * 4);
-  for (let k = 0; k < islets; k += 1) {
-    const a = roll() * Math.PI * 2;
-    const dist = r * 0.82 + 14 + roll() * 30;
-    land.push({ province: island.key, x: island.x + Math.cos(a) * dist, y: island.y + Math.sin(a) * dist, amp: 0.6 + roll() * 0.2, sigma: 7 + roll() * 9, stretch: 1 + roll() * 0.8, angle: roll() * Math.PI });
-  }
-  return land;
 }
 
 /** Where a sea route meets an island's shore, facing the other island. */

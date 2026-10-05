@@ -54,6 +54,12 @@ export type AtlasFog = { x: number; y: number; text: string; noteId: string };
 type Pt = { x: number; y: number };
 /** Maps world space to noise space (noise = world / unit + offset), so one island's coast wobbles the same at any zoom. */
 export type TerrainFrame = { unit: number; ox: number; oy: number };
+/** How a linked neighbour in the same sea meets a book: a rope bridge (1 link), a stone bridge (2) or shared land (3+). */
+export type MeetingKind = "rope" | "stone" | "joined";
+/** A neighbour as the Archipelago places it: centre, packing radius, terrain colour, and the facing shores (`a` on this book, `b` on theirs). */
+export type AtlasNeighbour = { key: string; label: string; kind: MeetingKind; count: number; x: number; y: number; r: number; colour: number; a: Pt; b: Pt };
+/** What a book's own map borrows from the Archipelago, in Archipelago space. */
+export type AtlasContext = { island: { x: number; y: number; r: number }; neighbours: AtlasNeighbour[] };
 
 export type AtlasModel = {
   width: number;

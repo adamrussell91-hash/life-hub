@@ -568,7 +568,10 @@ describe("crossings", () => {
       if (a.key >= b.key || joined.has(pair(a.key, b.key))) continue;
       const d = Math.hypot(b.x - a.x, b.y - a.y);
       const t = (a.r + (d - a.r - b.r) / 2) / d;
-      expect(field(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t).e).toBeLessThan(SEA_LEVEL);
+      const mid = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      // Skip pairs with a third island lying between them.
+      if (map.islands.some(i => i !== a && i !== b && Math.hypot(i.x - mid.x, i.y - mid.y) < i.r * 1.2)) continue;
+      expect(field(mid.x, mid.y).e).toBeLessThan(SEA_LEVEL);
     }
   });
 
