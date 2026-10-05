@@ -122,6 +122,8 @@ export type GraphNodeDatum = {
   homeY?: number;
   opacity?: number;
   departing?: boolean;
+  /** Show All: when the note was written (ISO), for growth replay and the recent filter. */
+  createdAt?: string;
 };
 
 export type GraphLinkKind = "backbone" | "orbit" | "spoke" | "overlap";

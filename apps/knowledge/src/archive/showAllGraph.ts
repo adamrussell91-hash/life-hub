@@ -136,6 +136,7 @@ export function buildShowAllGraph(
         soft: palette.soft,
         ink: palette.ink,
         r: showAllNoteRadius(degree),
+        ...(entry.created_at ? { createdAt: entry.created_at } : {}),
       });
     });
   }

@@ -13,7 +13,6 @@ import {
   showAllStrandWidth,
   fitViewBelowInset,
   applyForceStageResize,
-  applyShowAllStrandStroke,
   applyShowAllTuning,
   attachGraphSearch,
   canvasRadius,
@@ -30,7 +29,6 @@ import {
   nodeDrawState,
   nodeHoverTip,
   overlapLinkAlpha,
-  showAllLabelVisible,
   resolveBackgroundClick,
   resolveEnterKey,
   resolveNodeClick,
@@ -53,6 +51,20 @@ import { selectionCluster } from "./graphFocus";
 import { hubLabelVariants, placeHubLabels, readShowAllTheme, type ShowAllTheme } from "./showAllDraw";
 import { layoutShowAll } from "./showAllGraph";
 import { branchLoads, placeTopicAnchors } from "./showAllNeural";
+import { createDock, el, readSavedViews, writeSavedViews, type Dock, type DockTool } from "./showAllDock";
+import {
+  RECENT_WINDOWS,
+  grownBy,
+  growthSpan,
+  isRecent,
+  keyBridges,
+  missingLinks,
+  noteTime,
+  shortestNotePath,
+  topicRepresentative,
+  walkRoute,
+  type RecentWindow,
+} from "./showAllInsights";
 import type { RelaxLink, RelaxNode, RelaxShape } from "./showAllRelax";
 import { cachedRelax, relaxNow, relaxRunsInWorker, requestRelax } from "./showAllRelaxClient";
 import {
@@ -332,13 +344,10 @@ export function mountForceGraph(
     }
     canvas.style.opacity = "0";
     revealStart = performance.now();
+    placeDock();
     kickAnimations();
   }
 
-  if (showAllMode) {
-    growing = true;
-    growLayout(simNodes, simLinks, () => {});
-  }
 
 
   function scheduleDraw() {
@@ -716,7 +725,7 @@ export function mountForceGraph(
       loads = branchLoads(simNodes, simLinks);
       loadsFor = simLinks;
     }
-    const highlighting = Boolean(hover || selected || options.search.trim());
+    const highlighting = Boolean(hover || selected || options.search.trim()) && !pathSet;
     const base = overlapLinkAlpha();
     const widthScale = showAllStrandWidth() / SHOW_ALL_STRAND_WIDTH;
     type Fibre = [GraphNodeDatum, GraphNodeDatum, string];
@@ -729,11 +738,18 @@ export function mountForceGraph(
       if (source.departing || target.departing) continue;
       if (!onScreen(source.x, source.y, 200) && !onScreen(target.x, target.y, 200)) continue;
       const key = source.id < target.id ? `${source.id}|${target.id}` : `${target.id}|${source.id}`;
+      const sourceLayer = overlayOf(source);
+      const targetLayer = overlayOf(target);
+      if (!sourceLayer.show || !targetLayer.show) continue;
+      if (pathEdges?.has(key)) {
+        active.push([source, target, key]);
+        continue;
+      }
       if (highlighting && linkDrawState(link, source, target, emphasis).active) {
         active.push([source, target, key]);
         continue;
       }
-      const fade = Math.min(source.opacity ?? 1, target.opacity ?? 1);
+      const fade = Math.min(source.opacity ?? 1, target.opacity ?? 1) * Math.min(sourceLayer.weight, targetLayer.weight);
       const backbone = link.kind === "backbone";
       // Trunks thick, twigs fine: width follows how many notes the branch carries.
       const load = backbone ? (loads.get(key) ?? 1) : 0;
@@ -761,8 +777,12 @@ export function mountForceGraph(
     for (const node of simNodes) {
       if (node.kind !== "leaf" || node.x == null || node.y == null) continue;
       if (!onScreen(node.x, node.y)) continue;
-      const { hot, dim } = nodeDrawState(node, emphasis);
-      const fade = (node.opacity ?? 1) * (dim ? 0.25 : 1);
+      const layer = overlayOf(node);
+      if (!layer.show) continue;
+      const state = nodeDrawState(node, emphasis);
+      const hot = state.hot || layer.mark;
+      const dim = state.dim && !layer.mark;
+      const fade = (node.opacity ?? 1) * (dim ? 0.25 : 1) * layer.weight;
       const degree = node.degree ?? 0;
       if (degree >= 5 || hot) {
         const haloR = ((hot ? 10 : 3 + Math.min(degree, 14) * 1.1) * 0.7) / view.k;
@@ -795,20 +815,6 @@ export function mountForceGraph(
 
     const ink = dark ? "#f4efe6" : "#13233a";
     const halo = dark ? "rgba(3, 5, 10, 0.85)" : "rgba(247, 243, 234, 0.9)";
-    for (const node of simNodes) {
-      if (node.kind !== "leaf" || node.x == null || node.y == null || !onScreen(node.x, node.y)) continue;
-      const { hot } = nodeDrawState(node, emphasis);
-      if (!showAllLabelVisible(node, view.k, hover === node, hot && Boolean(selected))) continue;
-      drawHaloText(node.label.length > 32 ? `${node.label.slice(0, 31)}…` : node.label, node.x + 6 / view.k, node.y, {
-        font: `500 ${11 / view.k}px Inter, ui-sans-serif, sans-serif`,
-        align: "left",
-        baseline: "middle",
-        color: ink,
-        alpha: node.opacity ?? 1,
-        halo,
-      });
-    }
-
     // Words stay out of the overview. Topic names appear only once you zoom in (or for the topic
     // you are hovering or have selected), and then only where they do not collide (C1).
     const zoomedIn = overviewK > 0 && view.k >= overviewK * 1.7;
@@ -843,6 +849,60 @@ export function mountForceGraph(
       28 / view.k,
     );
     zoneLabelBoxes = new Map([...labels].map(([id, label]) => [id, label.box]));
+    // Zoom to reveal. Overview: no words. ~3× in: the knots (best-linked notes) are named.
+    // ~6× in: every note on screen. Always: the hovered note, the selected note and a path's ends.
+    // Every name goes through the collision pass, so nothing overprints (C1).
+    const zoom = overviewK > 0 ? view.k / overviewK : 1;
+    const noteFont = `500 ${11 / view.k}px Inter, ui-sans-serif, sans-serif`;
+    ctx.font = noteFont;
+    const wanted: Array<{ node: GraphNodeDatum; pinned: boolean }> = [];
+    for (const node of simNodes) {
+      if (node.kind !== "leaf" || node.x == null || node.y == null || !onScreen(node.x, node.y, 0)) continue;
+      if (!overlayOf(node).show) continue;
+      const pinned = node === hover || pathPicks.includes(node.id) || (Boolean(selected) && node.label === selected);
+      const knot = (node.degree ?? 0) >= 7 && zoom >= 3.5;
+      if (pinned || knot || zoom >= 8) wanted.push({ node, pinned });
+    }
+    wanted.sort((x, y) => Number(y.pinned) - Number(x.pinned) || (y.node.degree ?? 0) - (x.node.degree ?? 0) || x.node.id.localeCompare(y.node.id));
+    // Topic names were placed first; note names keep clear of them.
+    const topicBoxes = [...labels.values()].map((label, index) => ({
+      id: `zone-box:${index}`,
+      x: label.box.x0,
+      y: label.box.y0,
+      coreR: 0,
+      keepOut: label.box,
+      candidates: [],
+    }));
+    const noteLabels = placeHubLabels(
+      [
+        ...topicBoxes,
+        ...wanted.slice(0, 160).map(({ node, pinned }) => {
+          const text = node.label.length > 30 ? `${node.label.slice(0, 29)}…` : node.label;
+          return { id: node.id, x: node.x!, y: node.y!, coreR: 4 / view.k, pinned, candidates: [{ text, width: ctx.measureText(text).width }] };
+        }),
+      ],
+      14 / view.k,
+      2 / view.k,
+      {
+        x0: (4 - view.x) / view.k,
+        y0: (topInset() - view.y) / view.k,
+        x1: (width - 4 - view.x) / view.k,
+        y1: (height - 4 - view.y) / view.k,
+      },
+      3 / view.k,
+    );
+    for (const { node } of wanted) {
+      const label = noteLabels.get(node.id);
+      if (!label) continue;
+      drawHaloText(label.text, (label.box.x0 + label.box.x1) / 2, (label.box.y0 + label.box.y1) / 2, {
+        font: noteFont,
+        align: "center",
+        baseline: "middle",
+        color: ink,
+        alpha: (node.opacity ?? 1) * overlayOf(node).weight,
+        halo,
+      });
+    }
     for (const node of zones) {
       const label = labels.get(node.id);
       if (!label) continue;
@@ -856,6 +916,8 @@ export function mountForceGraph(
         halo,
       });
     }
+
+
   }
 
   function drawHaloText(
@@ -878,12 +940,363 @@ export function mountForceGraph(
     ctx.globalAlpha = 1;
   }
 
+  // ---------- Map tools: grow, path, recent, walk, bridges, save, export ----------
+  let tool: DockTool | null = null;
+  let growUntil: number | null = null;
+  let growSpanWidth = 1;
+  let growRaf = 0;
+  let recentWindow: RecentWindow | null = null;
+  let pathSet: Set<string> | null = null;
+  let pathEdges: Set<string> | null = null;
+  let pathPicks: string[] = [];
+  let bridgeSet: Set<string> | null = null;
+  let walkTimer = 0;
+  const VISIBLE = { show: true, weight: 1, mark: false };
+  const HIDDEN = { show: false, weight: 0, mark: false };
+
+  function overlayOf(node: GraphNodeDatum) {
+    if (!tool || tool === "save" || tool === "export" || tool === "walk") return VISIBLE;
+    if (growUntil != null) {
+      if (!grownBy(node, growUntil)) return HIDDEN;
+      const time = noteTime(node);
+      // Notes that have just grown glow for a moment.
+      return { show: true, weight: 1, mark: time != null && growUntil - time < growSpanWidth * 0.025 };
+    }
+    let weight = 1;
+    let mark = false;
+    if (recentWindow) {
+      if (isRecent(node, recentWindow, Date.now())) mark = true;
+      else weight = 0.12;
+    }
+    if (pathSet) {
+      if (pathSet.has(node.id)) mark = true;
+      else weight = Math.min(weight, pathPicks.length ? 0.4 : 0.14);
+    }
+    if (bridgeSet) {
+      if (bridgeSet.has(node.id)) mark = true;
+      else weight = Math.min(weight, 0.3);
+    }
+    return { show: true, weight, mark };
+  }
+
+  const dock: Dock | null = showAllMode ? createDock(host, chooseTool) : null;
+
+  function placeDock() {
+    dock?.setTop(topInset() + 10);
+  }
+
+  function clearTool() {
+    window.cancelAnimationFrame(growRaf);
+    growRaf = 0;
+    window.clearTimeout(walkTimer);
+    walkTimer = 0;
+    growUntil = null;
+    recentWindow = null;
+    pathSet = null;
+    pathEdges = null;
+    pathPicks = [];
+    bridgeSet = null;
+    tool = null;
+    dock?.setActive(null);
+    dock?.setPanel(null);
+    scheduleDraw();
+  }
+
+  function chooseTool(next: DockTool) {
+    if (growing) return;
+    const same = tool === next;
+    clearTool();
+    if (same && next !== "export") return;
+    if (next === "export") {
+      exportImage();
+      return;
+    }
+    tool = next;
+    dock?.setActive(next);
+    if (next === "grow") openGrow();
+    if (next === "path") openPath();
+    if (next === "recent") openRecent("month");
+    if (next === "walk") startWalk();
+    if (next === "bridges") openBridges();
+    if (next === "save") openSave();
+    scheduleDraw();
+  }
+
+  function leafById(id: string) {
+    const node = nodeMap.get(id);
+    return node && node.kind === "leaf" ? node : null;
+  }
+
+  function showNote(node: GraphNodeDatum, k?: number) {
+    selected = node.label;
+    if (node.pageId) onNoteSelect({ pageId: node.pageId, title: node.label, excerpt: options.excerptFor(node.pageId) });
+    viewTouched = true;
+    moveCamera(focusShowAll(node, k ?? Math.max(view.k, overviewK * 3)), 900);
+    scheduleDraw();
+  }
+
+  function fitTo(ids: Iterable<string>) {
+    const nodes = [...ids].map(id => nodeMap.get(id)).filter((node): node is GraphNodeDatum => Boolean(node));
+    if (!nodes.length) return;
+    viewTouched = true;
+    moveCamera(fitViewBelowInset(nodes, width, height, topInset() + 60, Math.min(160, width * 0.18), 0.04), 900);
+  }
+
+  // Grow: replay the map in the order notes were written.
+  function openGrow() {
+    const span = growthSpan(simNodes);
+    if (!span) {
+      dock?.setPanel(el("p", { class: "neural-dock__note", text: "These notes have no dates to replay." }));
+      return;
+    }
+    growSpanWidth = Math.max(1, span.last - span.first);
+    const slider = el("input", { type: "range", min: "0", max: "1000", value: "0", "aria-label": "Point in time" });
+    const when = el("span", { class: "neural-dock__when" });
+    const play = el("button", { type: "button", text: "Pause" });
+    const setAt = (fraction: number) => {
+      growUntil = span.first + growSpanWidth * fraction;
+      slider.value = String(Math.round(fraction * 1000));
+      when.textContent = new Date(growUntil).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+      scheduleDraw();
+    };
+    let started = 0;
+    let from = 0;
+    const PLAY_MS = 16000;
+    const frame = () => {
+      const fraction = Math.min(1, from + (performance.now() - started) / PLAY_MS);
+      setAt(fraction);
+      if (fraction < 1) growRaf = requestAnimationFrame(frame);
+      else {
+        growRaf = 0;
+        play.textContent = "Replay";
+      }
+    };
+    const start = (at: number) => {
+      from = at >= 1 ? 0 : at;
+      started = performance.now();
+      play.textContent = "Pause";
+      window.cancelAnimationFrame(growRaf);
+      growRaf = requestAnimationFrame(frame);
+    };
+    play.addEventListener("click", () => {
+      if (growRaf) {
+        window.cancelAnimationFrame(growRaf);
+        growRaf = 0;
+        play.textContent = "Play";
+        return;
+      }
+      start(Number(slider.value) / 1000);
+    });
+    slider.addEventListener("input", () => {
+      window.cancelAnimationFrame(growRaf);
+      growRaf = 0;
+      play.textContent = "Play";
+      setAt(Number(slider.value) / 1000);
+    });
+    dock?.setPanel(el("div", { class: "neural-dock__grow" }, play, slider, when));
+    viewTouched = false;
+    moveCamera(fitShowAll(), 500);
+    setAt(0);
+    start(0);
+  }
+
+  // Path: click two notes (or a topic name) to see the chain that joins them.
+  function openPath() {
+    pathPicks = [];
+    pathSet = new Set();
+    pathEdges = new Set();
+    renderPathPanel([]);
+  }
+
+  function renderPathPanel(route: string[]) {
+    if (!dock) return;
+    if (route.length < 2) {
+      const text =
+        pathPicks.length === 0
+          ? "Click a note to start."
+          : route.length === 0 && pathPicks.length === 2
+            ? "Those two never connect."
+            : "Now click the note to reach.";
+      dock.setPanel(el("p", { class: "neural-dock__note", text }));
+      return;
+    }
+    const list = el("ol", { class: "neural-dock__steps" });
+    for (const id of route) {
+      const node = leafById(id);
+      if (!node) continue;
+      const button = el("button", { type: "button", text: node.label });
+      button.addEventListener("click", () => showNote(node));
+      list.append(el("li", {}, button));
+    }
+    const again = el("button", { type: "button", class: "neural-dock__quiet", text: "New path" });
+    again.addEventListener("click", openPath);
+    dock.setPanel(el("div", {}, el("p", { class: "neural-dock__note", text: `${route.length - 1} steps` }), list, again));
+  }
+
+  function pickForPath(node: GraphNodeDatum) {
+    const leaf = node.kind === "leaf" ? node : topicRepresentative(simNodes, node.label, simLinks);
+    if (!leaf) return;
+    if (pathPicks.length >= 2) pathPicks = [];
+    pathPicks.push(leaf.id);
+    pathSet = new Set(pathPicks);
+    pathEdges = new Set();
+    if (pathPicks.length === 2) {
+      const route = shortestNotePath(simLinks, pathPicks[0]!, pathPicks[1]!);
+      pathSet = new Set(route.length ? route : pathPicks);
+      for (let i = 1; i < route.length; i++) {
+        const a = route[i - 1]!;
+        const b = route[i]!;
+        pathEdges.add(a < b ? `${a}|${b}` : `${b}|${a}`);
+      }
+      if (route.length) fitTo(route);
+      renderPathPanel(route);
+    } else {
+      renderPathPanel([]);
+    }
+    scheduleDraw();
+  }
+
+  // Recent: light up what was written in the last week / month / quarter / year.
+  function openRecent(window: RecentWindow) {
+    recentWindow = window;
+    const now = Date.now();
+    const count = simNodes.filter(node => node.kind === "leaf" && isRecent(node, window, now)).length;
+    const group = el("div", { class: "neural-dock__segments", role: "group", "aria-label": "How recent" });
+    for (const item of RECENT_WINDOWS) {
+      const button = el("button", { type: "button", text: item.label, "aria-pressed": String(item.id === window) });
+      if (item.id === window) button.classList.add("is-active");
+      button.addEventListener("click", () => openRecent(item.id));
+      group.append(button);
+    }
+    dock?.setPanel(el("div", {}, group, el("p", { class: "neural-dock__note", text: count ? `${count.toLocaleString()} notes` : "Nothing in that time." })));
+    scheduleDraw();
+  }
+
+  // Walk: drift from note to linked note, opening each one.
+  function startWalk() {
+    const start = selected ? simNodes.find(node => node.kind === "leaf" && node.label === selected)?.id : undefined;
+    const route = walkRoute(simNodes, simLinks, 60, start);
+    let index = 0;
+    const stop = el("button", { type: "button", text: "Stop" });
+    stop.addEventListener("click", clearTool);
+    dock?.setPanel(el("div", { class: "neural-dock__grow" }, stop));
+    const step = () => {
+      const node = route[index] ? leafById(route[index]!) : null;
+      if (!node || tool !== "walk") {
+        if (tool === "walk") clearTool();
+        return;
+      }
+      showNote(node, Math.max(overviewK * 3.2, 0.3));
+      index += 1;
+      walkTimer = window.setTimeout(step, 3600);
+    };
+    step();
+  }
+
+  // Bridges: the notes that join topics, and the topics that never meet.
+  function openBridges() {
+    const bridges = keyBridges(simNodes, simLinks);
+    bridgeSet = new Set(bridges.map(item => item.id));
+    const bridgeList = el("ol", { class: "neural-dock__steps" });
+    for (const bridge of bridges) {
+      const node = leafById(bridge.id);
+      if (!node) continue;
+      const button = el("button", { type: "button", text: bridge.label, title: bridge.topics.join(" · ") });
+      button.addEventListener("click", () => showNote(node));
+      bridgeList.append(el("li", {}, button));
+    }
+    const gaps = missingLinks(simNodes, simLinks, liveModel.hubTies ?? []);
+    const gapList = el("ul", { class: "neural-dock__steps" });
+    for (const gap of gaps) {
+      const button = el("button", { type: "button", text: `${shortName(gap.a)} · ${shortName(gap.b)}`, title: `${gap.a} and ${gap.b}` });
+      button.addEventListener("click", () => {
+        // Show the closest the two topics come: the path between their best-linked notes.
+        const a = topicRepresentative(simNodes, gap.a, simLinks);
+        const b = topicRepresentative(simNodes, gap.b, simLinks);
+        if (!a || !b) return;
+        tool = "path";
+        dock?.setActive("path");
+        bridgeSet = null;
+        pathPicks = [a.id];
+        pickForPath(b);
+      });
+      gapList.append(el("li", {}, button));
+    }
+    dock?.setPanel(
+      el(
+        "div",
+        {},
+        el("p", { class: "neural-dock__head", text: "Key bridges" }),
+        bridgeList,
+        gaps.length ? el("p", { class: "neural-dock__head", text: "Missing links" }) : null,
+        gaps.length ? gapList : null,
+      ),
+    );
+    fitTo(bridgeSet);
+  }
+
+  function shortName(label: string) {
+    return label.split(/\s+and\s+/i)[0]!;
+  }
+
+  // Save: keep views by world centre and zoom relative to the overview, so they survive resizes.
+  function openSave() {
+    const render = () => {
+      const views = readSavedViews();
+      const list = el("ul", { class: "neural-dock__steps" });
+      views.forEach((saved, index) => {
+        const go = el("button", { type: "button", text: saved.name });
+        go.addEventListener("click", () => {
+          const k = saved.zoom * (overviewK || view.k);
+          const centreY = topInset() + (height - topInset()) / 2;
+          viewTouched = true;
+          moveCamera({ k, x: width / 2 - saved.cx * k, y: centreY - saved.cy * k }, 800);
+        });
+        const remove = el("button", { type: "button", class: "neural-dock__quiet", text: "×", "aria-label": `Forget ${saved.name}` });
+        remove.addEventListener("click", () => {
+          writeSavedViews(views.filter((_, i) => i !== index));
+          render();
+        });
+        list.append(el("li", { class: "neural-dock__saved" }, go, remove));
+      });
+      const save = el("button", { type: "button", text: "Save this view" });
+      save.addEventListener("click", () => {
+        const centreY = topInset() + (height - topInset()) / 2;
+        const name = `View ${views.length + 1} · ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+        writeSavedViews([
+          { name, cx: (width / 2 - view.x) / view.k, cy: (centreY - view.y) / view.k, zoom: view.k / (overviewK || view.k), at: new Date().toISOString() },
+          ...views,
+        ]);
+        render();
+      });
+      dock?.setPanel(el("div", {}, save, views.length ? list : null));
+    };
+    render();
+  }
+
+  // Export: the current view, background included, as a PNG.
+  function exportImage() {
+    draw();
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `knowledge-map-${new Date().toISOString().slice(0, 10)}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }, "image/png");
+  }
+
   canvas.addEventListener(
     "wheel",
     event => {
       event.preventDefault();
       viewTouched = true;
       camera = null;
+      if (tool === "walk") clearTool();
       const world = toWorld(event.clientX, event.clientY);
       const minK = options.variant === "showAll" ? 0.05 : 0.28;
       const next = Math.min(2.4, Math.max(minK, view.k * (event.deltaY < 0 ? 1.08 : 0.92)));
@@ -983,6 +1396,11 @@ export function mountForceGraph(
     if (!(still && still.id === node.id)) return;
     if (event.detail >= 2 && (node.kind === "major" || node.kind === "minor")) return;
 
+    if (showAllMode && tool === "path") {
+      pickForPath(node);
+      return;
+    }
+    if (showAllMode && tool === "walk") clearTool();
     const action = resolveNodeClick(options.variant, node, selected, options.excerptFor);
     if (action.kind === "expandHub") {
       onNoteSelect(null);
@@ -1017,6 +1435,10 @@ export function mountForceGraph(
   });
 
   const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Escape" && tool) {
+      clearTool();
+      return;
+    }
     if (event.key !== "Enter") return;
     const note = resolveEnterKey(selected, simNodes, options.excerptFor);
     if (note) onNoteSelect(note);
@@ -1049,6 +1471,7 @@ export function mountForceGraph(
     canvas.height = Math.floor(height * devicePixelRatio);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    placeDock();
     scheduleDraw();
   }
 
@@ -1060,12 +1483,20 @@ export function mountForceGraph(
       : null;
   resizeObserver?.observe(host);
 
+  // Start growing the map only now, once every piece of state above exists: a cached or inline
+  // layout reveals synchronously.
+  if (showAllMode) {
+    growing = true;
+    growLayout(simNodes, simLinks, () => {});
+  }
   draw();
   if (showAllMode) kickAnimations();
 
   return attachGraphSearch(
     () => {
       disposed = true;
+      window.cancelAnimationFrame(growRaf);
+      window.clearTimeout(walkTimer);
       resizeObserver?.disconnect();
       window.removeEventListener("keydown", onKeyDown);
       window.clearTimeout(retuneTimer);
