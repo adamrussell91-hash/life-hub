@@ -2500,6 +2500,10 @@ body.is-universe-fullscreen .local-banner {
     min-height: 44px;
   }
 
+  .compose__save {
+    min-height: 3rem;
+  }
+
   .page-header__actions:not(:has(> :not(.hub-utilities))) {
     flex-wrap: nowrap;
     width: auto;
