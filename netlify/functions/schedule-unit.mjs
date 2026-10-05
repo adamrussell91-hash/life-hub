@@ -8,6 +8,7 @@ import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { applyScheduleUnit } from './_shared/teaching-schedule.mjs';
 import {
   classKey,
+  draftLessonKey,
   getJSON,
   listJSON,
   SCHEDULED_LESSON_PREFIX,
@@ -15,6 +16,7 @@ import {
   setJSON,
   unitKey
 } from './_shared/teaching-blobs.mjs';
+import { isDeletedRecord } from './_shared/record-liveness.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 
 export const config = { path: '/api/classes/:classId/schedule-unit' };
@@ -87,7 +89,13 @@ export function createScheduleUnitHandler(deps = {}) {
         env
       );
     }
-    if (!Array.isArray(unit.lesson_ids) || unit.lesson_ids.length === 0) {
+    // Trashed or deleted lessons stay in unit.lesson_ids for restore; never schedule them.
+    const liveLessonIds = [];
+    for (const lessonId of Array.isArray(unit.lesson_ids) ? unit.lesson_ids : []) {
+      const lesson = await getJSON(store, draftLessonKey(lessonId));
+      if (lesson && !isDeletedRecord(lesson)) liveLessonIds.push(lessonId);
+    }
+    if (liveLessonIds.length === 0) {
       return withCors(errorResponse(400, 'no_lessons', 'Unit has no lessons', false), request, env);
     }
 
@@ -97,7 +105,7 @@ export function createScheduleUnitHandler(deps = {}) {
     const nowIso = new Date().toISOString();
     const result = applyScheduleUnit({
       cls,
-      unit,
+      unit: { ...unit, lesson_ids: liveLessonIds },
       existing,
       startDate: start_date,
       meetingDays,

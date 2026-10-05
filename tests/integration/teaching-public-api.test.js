@@ -71,6 +71,7 @@ test('public student lesson returns the published snapshot without a session', a
   const handler = createPublishedLessonHandler({
     env,
     getContentStore: async () => memoryStore({
+      'lessons/week-1': { id: 'week-1', title: 'Week 1', status: 'active' },
       'published/lessons/week-1': {
         lesson_id: 'week-1',
         title: 'Week 1',
@@ -108,6 +109,7 @@ test('legacy published-lesson function path stays public', async () => {
   const handler = createPublishedLessonHandler({
     env,
     getContentStore: async () => memoryStore({
+      'lessons/week-1': { id: 'week-1', title: 'Week 1' },
       'published/lessons/week-1': { lesson_id: 'week-1', title: 'Week 1' }
     })
   });
@@ -129,6 +131,8 @@ test('published unit hides teacher-only blocks and orders lessons', async () => 
           { id: 's1', block_type: 'rich_text', visibility: 'student_teacher', content: { html: '<p>Student</p>' } }
         ]
       },
+      'lessons/lesson-a': { id: 'lesson-a', title: 'A', unit_id: 'unit-1' },
+      'lessons/lesson-b': { id: 'lesson-b', title: 'B', unit_id: 'unit-1' },
       'published/lessons/lesson-a': { lesson_id: 'lesson-a', title: 'A', unit_id: 'unit-1' },
       'published/lessons/lesson-b': { lesson_id: 'lesson-b', title: 'B', unit_id: 'unit-1' }
     })
@@ -180,6 +184,62 @@ test('published class is 404 when archived and omits unpublished current lessons
     title: 'Unit',
     lessons: [{ id: 'lesson-1', title: 'Draft title' }]
   });
+});
+
+test('trashed or deleted lessons stop resolving for students even with a snapshot left behind', async () => {
+  const entries = {
+    'units/unit-1': { id: 'unit-1', title: 'Unit 1', lesson_ids: ['live', 'trashed', 'gone'] },
+    'lessons/live': { id: 'live', title: 'Live', unit_id: 'unit-1' },
+    'lessons/trashed': { id: 'trashed', title: 'Trashed', unit_id: 'unit-1', status: 'trashed', trashed_at: '2026-10-05T00:00:00Z' },
+    'published/lessons/live': { lesson_id: 'live', title: 'Live', unit_id: 'unit-1' },
+    'published/lessons/trashed': { lesson_id: 'trashed', title: 'Trashed', unit_id: 'unit-1' },
+    'published/lessons/gone': { lesson_id: 'gone', title: 'Gone', unit_id: 'unit-1' },
+    'classes/class-1': {
+      id: 'class-1',
+      status: 'active',
+      code: '9SCI',
+      title: 'Science',
+      active_unit_ids: ['unit-1'],
+      current_unit_id: 'unit-1',
+      homepage: { announcements: [], resources: [], custom: [] }
+    },
+    'scheduled_lessons/s1': { id: 's1', class_id: 'class-1', lesson_id: 'live', unit_id: 'unit-1', date: '2026-10-12', schedule_order: 1 },
+    'scheduled_lessons/s2': { id: 's2', class_id: 'class-1', lesson_id: 'gone', unit_id: 'unit-1', date: '2026-10-16', schedule_order: 2 },
+    'scheduled_lessons/s3': { id: 's3', class_id: 'class-1', lesson_id: 'trashed', unit_id: 'unit-1', date: '2026-10-19', schedule_order: 3 }
+  };
+  const deps = { env, getContentStore: async () => memoryStore(entries) };
+
+  const lesson = createPublishedLessonHandler(deps);
+  for (const id of ['trashed', 'gone']) {
+    const response = await lesson(jsonRequest(`https://api.adam-russell.com/api/published/lessons/${id}`));
+    assert.equal(response.status, 404, id);
+  }
+  assert.equal(
+    (await lesson(jsonRequest('https://api.adam-russell.com/api/published/lessons/live'))).status,
+    200
+  );
+
+  const unitBody = await (await createPublishedUnitHandler(deps)(
+    jsonRequest('https://api.adam-russell.com/api/published/units/unit-1')
+  )).json();
+  assert.deepEqual(unitBody.data.lessons.map(row => row.lesson_id), ['live']);
+
+  const classBody = await (await createPublishedClassHandler(deps)(
+    jsonRequest('https://api.adam-russell.com/api/published/classes/class-1')
+  )).json();
+  assert.deepEqual(classBody.data.schedule.map(row => row.lesson_id), ['live']);
+  assert.deepEqual(classBody.data.current_unit.lessons.map(row => row.id), ['live']);
+});
+
+test('published unit is 404 once the unit is trashed', async () => {
+  const handler = createPublishedUnitHandler({
+    env,
+    getContentStore: async () => memoryStore({
+      'units/unit-1': { id: 'unit-1', title: 'Unit 1', status: 'trashed', lesson_ids: [] }
+    })
+  });
+  const response = await handler(jsonRequest('https://api.adam-russell.com/api/published/units/unit-1'));
+  assert.equal(response.status, 404);
 });
 
 test('media file is public for active media and 404 when archived', async () => {

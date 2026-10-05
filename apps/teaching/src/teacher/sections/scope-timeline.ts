@@ -1,3 +1,4 @@
+import { liveUnitLessonCount } from '@/curriculum/with-entity-status';
 import { navigate } from '@/app/router';
 import { pastelFromId } from '@/design/pastel';
 import type { ScopeSequence, TimelineItem, Unit } from '@/schemas';
@@ -590,7 +591,7 @@ export function renderScopeTimelineEditor(
     desc.className = 'scope-timeline__inspector-desc';
     desc.textContent = unit?.description?.trim() || 'No description yet.';
 
-    const lessonCount = unit?.lesson_ids.length ?? 0;
+    const lessonCount = unit ? liveUnitLessonCount(curriculum, unit) : 0;
     const lessonsStat = document.createElement('div');
     lessonsStat.className = 'scope-timeline__inspector-stat';
     const lessonsLabel = document.createElement('span');

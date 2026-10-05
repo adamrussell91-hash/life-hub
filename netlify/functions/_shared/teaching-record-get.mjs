@@ -40,7 +40,7 @@ function mergeRecord(existing, patch) {
   return next;
 }
 
-export function createTeachingRecordHandler({ keyFor, notFound, methods, versionKind }, deps = {}) {
+export function createTeachingRecordHandler({ keyFor, notFound, methods, versionKind, onDelete }, deps = {}) {
   const allowed = new Set(methods ?? WRITE_METHODS);
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
@@ -61,6 +61,7 @@ export function createTeachingRecordHandler({ keyFor, notFound, methods, version
     }
     if (request.method === 'DELETE') {
       await deleteKey(store, key);
+      if (onDelete) await onDelete(store, id, record);
       return withCors(okResponse(200, { id, deleted: true }), request, env);
     }
     const parsed = await readJsonObject(request);

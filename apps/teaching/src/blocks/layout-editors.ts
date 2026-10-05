@@ -11,7 +11,7 @@ import {
   SECTION_CHILD_TYPES,
   TAB_CHILD_TYPES
 } from '@/blocks/create-block';
-import { editorShell, type BlockChangeHandler } from '@/blocks/editors';
+import { editorShell, type BlockChangeHandler, type BlockEditorContext } from '@/blocks/editors';
 import { createNestedBlocksEditor } from '@/blocks/nested-blocks-editor';
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { CleanupFn } from '@atlaskit/pragmatic-drag-and-drop/types';
@@ -57,7 +57,8 @@ export function createSpacerEditor(
 export function createSectionEditor(
   block: Extract<Block, { block_type: 'section' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'section' }>>,
-  getLatest: () => Extract<Block, { block_type: 'section' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'section' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -94,6 +95,7 @@ export function createSectionEditor(
   const children = createNestedBlocksEditor({
     blocks: block.content.blocks,
     allowedTypes: SECTION_CHILD_TYPES,
+    context,
     idFactory: () => `${getLatest().id}_child`,
     onChange: (nextBlocks) => {
       onChange({
@@ -115,7 +117,8 @@ export function createSectionEditor(
 export function createColumnsEditor(
   block: Extract<Block, { block_type: 'columns' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'columns' }>>,
-  getLatest: () => Extract<Block, { block_type: 'columns' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'columns' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields block-editor__columns';
@@ -282,6 +285,7 @@ export function createColumnsEditor(
       const nested = createNestedBlocksEditor({
         blocks: col.blocks,
         allowedTypes: COLUMN_CHILD_TYPES,
+        context,
         idFactory: () => `${getLatest().id}_c${colIndex}`,
         onChange: (nextBlocks) => {
           const latest = getLatest();
@@ -319,7 +323,8 @@ export function createColumnsEditor(
 export function createTabsEditor(
   block: TabsBlock,
   onChange: BlockChangeHandler<TabsBlock>,
-  getLatest: () => TabsBlock = () => block
+  getLatest: () => TabsBlock = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields block-editor__tabs';
@@ -413,6 +418,7 @@ export function createTabsEditor(
       const nested = createNestedBlocksEditor({
         blocks: panel.blocks,
         allowedTypes: TAB_CHILD_TYPES,
+        context,
         idFactory: () => `${getLatest().id}_t${panelIndex}`,
         onChange: (nextBlocks) => {
           const latest = getLatest();

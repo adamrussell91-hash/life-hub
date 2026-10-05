@@ -77,6 +77,7 @@ export function searchCurriculumTitles(
   const match = (text: string | undefined) => fuzzyIncludes(text, q, fuzzyCache);
 
   for (const lesson of curriculum.lessons) {
+    if (lesson.status === 'trashed') continue;
     const hierarchy = lessonHierarchy(curriculum, lesson);
     const titleMatch = match(lesson.title);
     const hierarchyMatch = !titleMatch && match(hierarchy);
@@ -93,6 +94,7 @@ export function searchCurriculumTitles(
   }
 
   for (const unit of curriculum.units) {
+    if (unit.status === 'trashed') continue;
     const hierarchy = unitSearchHierarchy(curriculum, unit.id);
     const titleMatch = match(unit.title);
     const hierarchyMatch = !titleMatch && match(hierarchy);
@@ -109,6 +111,7 @@ export function searchCurriculumTitles(
   }
 
   for (const cls of curriculum.classes) {
+    if (cls.status === 'trashed') continue;
     const titleMatch = match(cls.title);
     const codeMatch = match(cls.code);
     if (titleMatch || codeMatch) {

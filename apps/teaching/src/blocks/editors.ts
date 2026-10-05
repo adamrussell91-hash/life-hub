@@ -86,7 +86,9 @@ export function createVisibilitySelect<T extends Block>(
 }
 
 function driveErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Google Drive is not configured.';
+  return error instanceof Error
+    ? error.message
+    : 'Google Drive is not configured yet. Upload the file or paste its link instead.';
 }
 
 function createDrivePickButton(options: {
@@ -472,7 +474,7 @@ export function createVideoEditor(
   status.className = 'block-editor__hint';
   status.textContent = block.content.external_id
     ? `${block.content.provider}: ${block.content.external_id}`
-    : 'Paste a YouTube or Vimeo link';
+    : 'Paste a YouTube or Vimeo link, or a direct .mp4 / .webm file';
 
   const title = document.createElement('input');
   title.type = 'text';
@@ -483,14 +485,18 @@ export function createVideoEditor(
   const emitChange = () => {
     const parsed = parseVideoInput(url.value);
     if (parsed) {
-      status.textContent = `${parsed.provider}: ${parsed.external_id}`;
+      status.textContent = parsed.start_seconds
+        ? `${parsed.provider}: ${parsed.external_id} · starts at ${parsed.start_seconds}s`
+        : `${parsed.provider}: ${parsed.external_id}`;
+      const { start_seconds: _previousStart, ...rest } = block.content;
       onChange({
         ...getLatest(),
         variant: sizeSelect.value as typeof block.variant,
         content: {
-          ...block.content,
+          ...rest,
           provider: parsed.provider,
           external_id: parsed.external_id,
+          ...(parsed.start_seconds ? { start_seconds: parsed.start_seconds } : {}),
           url: url.value,
           title: title.value || undefined
         }
@@ -3223,10 +3229,10 @@ export function createBlockEditor(
     case 'spacer':
       return createSpacerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'spacer' }>);
     case 'section':
-      return createSectionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'section' }>);
+      return createSectionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'section' }>, context);
     case 'columns':
-      return createColumnsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'columns' }>);
+      return createColumnsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'columns' }>, context);
     case 'tabs':
-      return createTabsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'tabs' }>);
+      return createTabsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'tabs' }>, context);
   }
 }

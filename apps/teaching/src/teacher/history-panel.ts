@@ -1,3 +1,4 @@
+import { askTextCard } from '@/teacher/confirm-dialog';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { ApiClientError } from '@/api/client';
 import type { VersionIndexEntry, VersionKind, VersionReason } from '@/schemas/version';
@@ -358,7 +359,12 @@ export function mountHistoryPanel(options: HistoryPanelOptions): HistoryPanelHan
   checkpointButton.addEventListener('click', () => {
     void (async () => {
       if (busy) return;
-      const labelRaw = window.prompt('Checkpoint label (optional)', '');
+      const labelRaw = await askTextCard({
+        title: 'Save checkpoint',
+        placeholder: 'Label (optional)',
+        confirmLabel: 'Save checkpoint',
+        optional: true
+      });
       if (labelRaw === null) return;
       const label = labelRaw.trim();
       setBusy(true);
