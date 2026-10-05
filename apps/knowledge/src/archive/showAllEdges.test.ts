@@ -3,6 +3,7 @@ import {
   SHOW_ALL_DEGREE_CAP,
   candidatePairs,
   capDegree,
+  liftDegreeFloor,
   knnUnion,
   maximumSpanningTree,
   tagIdf,
@@ -65,5 +66,22 @@ describe("show all edge helpers", () => {
       degree.set(pair.b, (degree.get(pair.b) ?? 0) + 1);
     }
     expect(Math.max(...degree.values())).toBeLessThanOrEqual(SHOW_ALL_DEGREE_CAP);
+  });
+});
+
+describe("degree floor", () => {
+  it("tops a lonely note up to two links without pushing a partner past the cap", () => {
+    const scored = [
+      { a: 0, b: 1, score: 3 },
+      { a: 0, b: 2, score: 2 },
+      { a: 0, b: 3, score: 1 },
+    ];
+    const lifted = liftDegreeFloor(4, [{ a: 0, b: 1, score: 3 }], scored, 2, 5);
+    const touching = (i: number) => lifted.filter(pair => pair.a === i || pair.b === i).length;
+    expect(touching(1)).toBe(1);
+    expect(touching(2)).toBe(1);
+    expect(touching(0)).toBeLessThanOrEqual(5);
+    const capped = liftDegreeFloor(3, [{ a: 0, b: 1, score: 3 }], [{ a: 0, b: 2, score: 1 }], 2, 1);
+    expect(capped).toHaveLength(1);
   });
 });

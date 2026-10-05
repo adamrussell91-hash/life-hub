@@ -378,7 +378,7 @@ describe("show all strand drawing", () => {
 
   it("scales strand width only from the Width slider, never from overlap weight", () => {
     applyShowAllTuning({ lineWidthScale: 1.5 });
-    expect(showAllStrandWidth()).toBe(3);
+    expect(showAllStrandWidth()).toBeCloseTo(SHOW_ALL_STRAND_WIDTH * 1.5, 10);
     resetShowAllTuning();
     expect(showAllStrandWidth()).toBe(SHOW_ALL_STRAND_WIDTH);
   });

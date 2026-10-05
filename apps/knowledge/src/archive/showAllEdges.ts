@@ -3,8 +3,12 @@ import type { PageManifestEntry } from "../domain/page";
 import type { GraphLinkDatum } from "./keywordGraph";
 import { UnionFind } from "./showAllCommunities";
 
-export const SHOW_ALL_KNN = 3;
-export const SHOW_ALL_DEGREE_CAP = 3;
+/** Each note reaches for its 4 closest notes… */
+export const SHOW_ALL_KNN = 4;
+/** …never holds more than 5 links… */
+export const SHOW_ALL_DEGREE_CAP = 5;
+/** …and gets at least 2 whenever two scored partners exist. */
+export const SHOW_ALL_DEGREE_FLOOR = 2;
 const SMALL_TAG = 48;
 /** Extra neighbours sampled per note inside a huge tag — avoids O(n²) Jaccard scans. */
 const LARGE_TAG_SAMPLE = SHOW_ALL_KNN + 16;
@@ -93,6 +97,47 @@ export function maximumSpanningTree(n: number, pairs: ScoredPair[]): ScoredPair[
     if (!reps.has(root)) reps.set(root, i);
   }
   return tree;
+}
+
+/**
+ * Tops up notes left with fewer than `floor` links from their best remaining candidates, never
+ * pushing either end past `cap`. A note with one link reads as a dangling spoke.
+ */
+export function liftDegreeFloor(
+  n: number,
+  kept: ScoredPair[],
+  scored: ScoredPair[],
+  floor = SHOW_ALL_DEGREE_FLOOR,
+  cap = SHOW_ALL_DEGREE_CAP,
+) {
+  const degree = new Array<number>(n).fill(0);
+  const have = new Set<string>();
+  for (const pair of kept) {
+    degree[pair.a] += 1;
+    degree[pair.b] += 1;
+    have.add(pairKey(pair.a, pair.b));
+  }
+  const byNote = Array.from({ length: n }, () => [] as ScoredPair[]);
+  for (const pair of scored) {
+    byNote[pair.a]!.push(pair);
+    byNote[pair.b]!.push(pair);
+  }
+  const out = [...kept];
+  for (let i = 0; i < n; i++) {
+    if (degree[i]! >= floor) continue;
+    const options = byNote[i]!.sort((x, y) => y.score - x.score || x.a - y.a || x.b - y.b);
+    for (const pair of options) {
+      if (degree[i]! >= floor || degree[i]! >= cap) break;
+      const other = pair.a === i ? pair.b : pair.a;
+      const key = pairKey(pair.a, pair.b);
+      if (have.has(key) || degree[other]! >= cap) continue;
+      have.add(key);
+      degree[i] += 1;
+      degree[other] += 1;
+      out.push(pair);
+    }
+  }
+  return out;
 }
 
 export function capDegree(pairs: ScoredPair[], _protectedKeys: Set<string> = new Set(), cap = SHOW_ALL_DEGREE_CAP) {
@@ -217,7 +262,7 @@ export function buildShowAllNoteEdges(
   const protectedKeys = new Set(tree.map(pair => pairKey(pair.a, pair.b)));
   const merged = new Map<string, ScoredPair>();
   for (const pair of [...knn, ...tree]) merged.set(pairKey(pair.a, pair.b), pair);
-  const capped = capDegree([...merged.values()], protectedKeys);
+  const capped = liftDegreeFloor(eligible.length, capDegree([...merged.values()], protectedKeys), scored);
 
   const degree = new Array<number>(eligible.length).fill(0);
   const links: GraphLinkDatum[] = capped.map(pair => {

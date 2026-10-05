@@ -23,7 +23,7 @@ export type ShowAllTuning = {
 export const SHOW_ALL_TUNING_DEFAULTS: ShowAllTuning = {
   leafCharge: -180,
   overlapLinkStrength: 0.28,
-  overlapLinkAlpha: 0.14,
+  overlapLinkAlpha: 0.32,
   lineWidthScale: 1,
 };
 
@@ -84,8 +84,8 @@ export const SHOW_ALL_TUNING_CONTROLS: readonly ShowAllTuningControl[] = [
 
 export const SHOW_ALL_SPOKE_ALPHA = 0.16;
 export const SHOW_ALL_RETUNE_MS = 60;
-/** CSS-pixel width. Thick enough that diagonals do not hairline into dots. */
-export const SHOW_ALL_STRAND_WIDTH = 2;
+/** CSS-pixel width. Every link is drawn, so keep it fine; still solid enough not to hairline into dots. */
+export const SHOW_ALL_STRAND_WIDTH = 1.2;
 const SHOW_ALL_STRAND_ACTIVE_BOOST = 0.6;
 
 export type ShowAllStrandStroke = {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TOPIC_VOCABULARY } from "../tidy/vocabulary";
 import { nodeDegrees, noteToNoteLinks } from "./graphMetrics";
-import { SHOW_ALL_DEGREE_CAP } from "./showAllEdges";
+import { SHOW_ALL_DEGREE_CAP, SHOW_ALL_DEGREE_FLOOR } from "./showAllEdges";
 import {
   SHOW_ALL_DEFAULT_SHAPE,
   buildShowAllGraph,
@@ -39,7 +39,7 @@ function noteDegrees(model: ReturnType<typeof buildShowAllGraph>) {
 }
 
 describe("buildShowAllGraph", () => {
-  it("organises the tags view around topic hubs, with spokes and capped note links", () => {
+  it("organises the tags view into topic zones of notes linked to notes, with no spokes", () => {
     const model = buildShowAllGraph([
       page("p1", "Alpha regulation", [V[0], V[2]]),
       page("p2", "Beta regulation", [V[0], V[2]]),
@@ -50,7 +50,7 @@ describe("buildShowAllGraph", () => {
     const hubs = model.nodes.filter(node => node.kind === "major");
     expect(leaves.map(node => node.pageId).sort()).toEqual(["p1", "p2", "p3"]);
     expect(hubs.map(node => node.label).sort()).toEqual([V[0], V[2], V[7]].sort());
-    expect(model.links.filter(link => link.kind === "spoke" && String(link.source) === "leaf:p1")).toHaveLength(1);
+    expect(model.links.some(link => link.kind === "spoke")).toBe(false);
     expect(leaves.find(node => node.pageId === "p1")?.hubLabels).toEqual([V[0], V[2]]);
     expect(leaves.find(node => node.pageId === "p1")?.parentKeyword).toBe(V[0]);
     expect(leaves.find(node => node.pageId === "p1")?.color).toBe(hubs.find(hub => hub.label === V[0])?.color);
@@ -74,7 +74,7 @@ describe("buildShowAllGraph", () => {
     expect(model.nodes.filter(node => node.kind === "major")).toHaveLength(2);
   });
 
-  it("never lets a note connect to more than 3 other notes", () => {
+  it("never lets a note connect to more than 5 other notes", () => {
     const pages = Array.from({ length: 80 }, (_, index) => page(`n${index}`, `Note ${index}`, [V[0]]));
     const model = buildShowAllGraph(pages);
     const clique = (80 * 79) / 2;
@@ -83,6 +83,19 @@ describe("buildShowAllGraph", () => {
     expect(noteLinks.length).toBeLessThanOrEqual(80 * SHOW_ALL_DEGREE_CAP / 2);
     const degrees = [...noteDegrees(model).values()];
     expect(Math.max(0, ...degrees)).toBeLessThanOrEqual(SHOW_ALL_DEGREE_CAP);
+  });
+
+  it("gives every note at least 2 links when it has partners, and none more than 5", () => {
+    const pages = Array.from({ length: 60 }, (_, index) =>
+      page(`m${index}`, `Mesh ${index % 7} topic ${index}`, [V[index % 3]], { excerpt: `shared theme ${index % 5}` }),
+    );
+    const model = buildShowAllGraph(pages);
+    const degrees = noteDegrees(model);
+    for (const leaf of model.nodes.filter(node => node.kind === "leaf")) {
+      const degree = degrees.get(leaf.id) ?? 0;
+      expect(degree).toBeGreaterThanOrEqual(SHOW_ALL_DEGREE_FLOOR);
+      expect(degree).toBeLessThanOrEqual(SHOW_ALL_DEGREE_CAP);
+    }
   });
 
   it("sizes notes by degree so hubs read larger than leaves", () => {
@@ -154,7 +167,7 @@ describe("buildShowAllGraph", () => {
     const notebooks = buildShowAllGraph(pages, "notebooks");
     expect(notebooks.nodes.filter(node => node.kind === "major").map(node => node.label)).toEqual(["Brown 2022"]);
     expect(notebooks.nodes.filter(node => node.kind === "leaf").map(node => node.pageId).sort()).toEqual(["n1", "n2"]);
-    expect(notebooks.links.some(link => link.kind === "spoke")).toBe(true);
+    expect(notebooks.links.some(link => link.kind === "spoke")).toBe(false);
 
     const degrees = buildShowAllGraph(pages, "degrees");
     expect(degrees.nodes.filter(node => node.kind === "major").map(node => node.label)).toEqual([
@@ -220,8 +233,30 @@ describe("Show All layout", () => {
     for (const leaf of model.nodes.filter(node => node.kind === "leaf")) {
       const hub = hubs.find(item => item.label === leaf.parentKeyword)!;
       expect(dist(leaf, hub)).toBeLessThanOrEqual(radius.get(hub.label)! + 1);
-      expect(dist(leaf, hub)).toBeGreaterThan(hub.r);
     }
+  });
+
+  it("seats linked notes next to each other inside a zone", () => {
+    const model = buildShowAllGraph(nexusPages());
+    const byId = new Map(model.nodes.map(node => [node.id, node]));
+    const linked: number[] = [];
+    for (const link of model.links) {
+      const a = byId.get(String(link.source))!;
+      const b = byId.get(String(link.target))!;
+      if (a.parentKeyword === V[0] && b.parentKeyword === V[0]) linked.push(dist(a, b));
+    }
+    const zone = model.nodes.filter(node => node.kind === "leaf" && node.parentKeyword === V[0]);
+    let all = 0;
+    let pairs = 0;
+    for (let i = 0; i < zone.length; i++) {
+      for (let j = i + 1; j < zone.length; j++) {
+        all += dist(zone[i]!, zone[j]!);
+        pairs += 1;
+      }
+    }
+    const meanLinked = linked.reduce((sum, d) => sum + d, 0) / linked.length;
+    expect(linked.length).toBeGreaterThan(0);
+    expect(meanLinked).toBeLessThan((all / pairs) * 0.75);
   });
 
   it("never stacks two notes on the same spot", () => {

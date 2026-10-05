@@ -9,7 +9,6 @@ import {
 } from "d3-force";
 import {
   SHOW_ALL_RETUNE_MS,
-  SHOW_ALL_SPOKE_ALPHA,
   fitViewBelowInset,
   applyForceStageResize,
   applyShowAllStrandStroke,
@@ -33,7 +32,6 @@ import {
   resolveBackgroundClick,
   resolveEnterKey,
   resolveNodeClick,
-  showAllLinkShouldDraw,
   showAllShape,
   showAllTuningRestarts,
   simulationNodes,
@@ -51,7 +49,7 @@ import {
 } from "./keywordGraph";
 import { selectionCluster } from "./graphFocus";
 import { hubLabelVariants, placeHubLabels, showAllDrawRings } from "./showAllDraw";
-import { layoutShowAll } from "./showAllGraph";
+import { SHOW_ALL_NOTE_SPACING, layoutShowAll } from "./showAllGraph";
 import {
   SHOW_ALL_MORPH_MS,
   SHOW_ALL_RETUNE_MORPH_MS,
@@ -237,7 +235,7 @@ export function mountForceGraph(
   }
 
   if (showAllMode) {
-    layoutShowAll(simNodes, model.hubTies ?? [], showAllShape());
+    layoutShowAll(simNodes, model.hubTies ?? [], showAllShape(), simLinks);
     const fitted = fitShowAll();
     if (fitted) {
       // Open slightly wide and settle in while fading up: one calm arrival, never a jump.
@@ -313,7 +311,7 @@ export function mountForceGraph(
     window.clearTimeout(retuneTimer);
     retuneTimer = window.setTimeout(() => {
       const settled = simNodes.filter(node => !node.departing).map(node => ({ ...node, opacity: 1 }));
-      layoutShowAll(settled, liveModel.hubTies ?? [], showAllShape());
+      layoutShowAll(settled, liveModel.hubTies ?? [], showAllShape(), simLinks);
       startMorph(settled, SHOW_ALL_RETUNE_MORPH_MS);
     }, SHOW_ALL_RETUNE_MS);
   }
@@ -321,8 +319,8 @@ export function mountForceGraph(
   function setModel(next: ArchiveGraphModel) {
     liveModel = next;
     const settled = next.nodes.map(node => ({ ...node, opacity: 1 }));
-    layoutShowAll(settled, next.hubTies ?? [], showAllShape());
     simLinks = next.links.map(link => ({ ...link }));
+    layoutShowAll(settled, next.hubTies ?? [], showAllShape(), simLinks);
     if (selected && !settled.some(node => node.label === selected)) {
       selected = null;
       onNoteSelect(null);
@@ -377,6 +375,7 @@ export function mountForceGraph(
     for (let i = simNodes.length - 1; i >= 0; i--) {
       const node = simNodes[i];
       if (node.departing) continue;
+      if (showAllMode && node.kind === "major") continue;
       const dx = (node.x ?? 0) - x;
       const dy = (node.y ?? 0) - y;
       const dist = Math.hypot(dx, dy);
@@ -386,6 +385,12 @@ export function mountForceGraph(
       if (dist <= hitR + pad && dist < best) {
         best = dist;
         hit = node;
+      }
+    }
+    if (!hit && showAllMode) {
+      // A zone is picked by its label.
+      for (const [id, box] of zoneLabelBoxes) {
+        if (x >= box.x0 && x <= box.x1 && y >= box.y0 && y <= box.y1) return nodeMap.get(id) ?? null;
       }
     }
     return hit;
@@ -405,76 +410,23 @@ export function mountForceGraph(
     ctx.scale(view.k, view.k);
 
     const emphasis = drawArgs();
-    const showAll = options.variant === "showAll";
-    const searching = Boolean(options.search.trim());
-    const highlightLinks = Boolean(hover || selected || searching);
-    const linksToDraw = simLinks;
-    const batchShowAll = showAll && !highlightLinks;
-
-    if (showAll) drawHubTies(map, emphasis);
-
-    if (batchShowAll) {
-      const spokesByColor = new Map<string, Array<{ x1: number; y1: number; x2: number; y2: number }>>();
-      for (const link of linksToDraw) {
-        if (link.kind !== "spoke") continue;
-        const { source, target } = linkEnds(link, map);
-        if (!source || !target || source.x == null || target.x == null || source.y == null || target.y == null) continue;
-        if (source.departing || target.departing) continue;
-        const leaf = source.kind === "leaf" ? source : target.kind === "leaf" ? target : null;
-        const leafOnScreen = Boolean(leaf && onScreen(leaf.x ?? 0, leaf.y ?? 0));
-        if (!showAllLinkShouldDraw(link.kind, view.k, leafOnScreen, false)) continue;
-        const bucket = spokesByColor.get(link.color) ?? [];
-        bucket.push({ x1: source.x, y1: source.y, x2: target.x, y2: target.y });
-        spokesByColor.set(link.color, bucket);
-      }
-      applyShowAllStrandStroke(ctx, { active: false, viewK: view.k });
-      ctx.globalAlpha = SHOW_ALL_SPOKE_ALPHA;
-      for (const [color, segments] of spokesByColor) {
-        ctx.beginPath();
-        for (const segment of segments) {
-          ctx.moveTo(segment.x1, segment.y1);
-          ctx.lineTo(segment.x2, segment.y2);
-        }
-        ctx.strokeStyle = color;
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
+    if (showAllMode) {
+      drawShowAllFrame(map, emphasis);
+      ctx.restore();
+      return;
     }
 
-    for (const link of batchShowAll ? [] : linksToDraw) {
+    for (const link of simLinks) {
       const { source, target } = linkEnds(link, map);
       if (!source || !target || source.x == null || target.x == null || source.y == null || target.y == null) continue;
       if (source.departing || target.departing) continue;
-      const leaf = source.kind === "leaf" ? source : target.kind === "leaf" ? target : null;
-      const leafOnScreen = Boolean(leaf && onScreen(leaf.x ?? 0, leaf.y ?? 0));
       const { active, dim } = linkDrawState(link, source, target, emphasis);
-      const emphasized = active && !dim;
-      if (showAll && dim && !emphasized) continue;
-      if (showAll && !showAllLinkShouldDraw(link.kind, view.k, leafOnScreen, emphasized)) continue;
-      if (showAll && link.kind !== "spoke" && !emphasized && !onScreen(source.x, source.y) && !onScreen(target.x, target.y)) continue;
       const fade = Math.min(source.opacity ?? 1, target.opacity ?? 1);
 
       ctx.beginPath();
-      if (showAll) {
-        ctx.moveTo(source.x, source.y);
-        ctx.lineTo(target.x, target.y);
-      } else {
-        curve(ctx, source.x, source.y, target.x, target.y);
-      }
+      curve(ctx, source.x, source.y, target.x, target.y);
 
-      if (showAll) {
-        applyShowAllStrandStroke(ctx, { active, viewK: view.k });
-        if (link.kind === "spoke") {
-          ctx.strokeStyle = active ? "#e07a2f" : link.color;
-          ctx.globalAlpha = (dim ? 0.05 : active ? 0.75 : SHOW_ALL_SPOKE_ALPHA) * fade;
-        } else if (active) {
-          ctx.strokeStyle = "#e07a2f";
-          ctx.globalAlpha = 0.9 * fade;
-        } else {
-          ctx.strokeStyle = link.color;
-          ctx.globalAlpha = (dim ? 0.05 : link.kind === "overlap" || link.kind === "backbone" ? overlapLinkAlpha() : 0.2) * fade;
-        }
-      } else if (link.kind === "spoke") {
+      if (link.kind === "spoke") {
         ctx.setLineDash([4 / view.k, 5 / view.k]);
         ctx.strokeStyle = active ? "#e07a2f" : link.color;
         ctx.globalAlpha = (dim ? 0.05 : active ? 0.75 : 0.4) * fade;
@@ -502,76 +454,6 @@ export function mountForceGraph(
       ctx.lineCap = "butt";
       ctx.lineJoin = "miter";
       ctx.globalAlpha = 1;
-    }
-
-    if (showAll) {
-      const drawRings = showAllDrawRings(view.k);
-      for (const node of simNodes) {
-        if (node.kind === "major" || node.x == null || node.y == null) continue;
-        if (!onScreen(node.x, node.y)) continue;
-        const { hot, dim } = nodeDrawState(node, emphasis);
-        const drawR = canvasRadius(node.r, view.k, 2.2);
-        const fade = node.opacity ?? 1;
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, drawR, 0, Math.PI * 2);
-        ctx.fillStyle = node.color;
-        ctx.globalAlpha = (dim ? 0.14 : hot ? 1 : 0.86) * fade;
-        ctx.fill();
-        if (drawRings || hot) {
-          ctx.globalAlpha = (dim ? 0.3 : 0.9) * fade;
-          ctx.lineWidth = (hot ? 2 : 1) / view.k;
-          ctx.strokeStyle = hot ? "#e07a2f" : "#fff";
-          ctx.stroke();
-        }
-        if (showAllLabelVisible(node, view.k, hover === node, hot && Boolean(selected))) {
-          drawHaloText(node.label.length > 32 ? `${node.label.slice(0, 31)}…` : node.label, node.x + drawR + 6 / view.k, node.y, {
-            font: `500 ${11 / view.k}px Inter, ui-sans-serif, sans-serif`,
-            align: "left",
-            baseline: "middle",
-            color: node.ink,
-            alpha: fade,
-          });
-        }
-        ctx.globalAlpha = 1;
-      }
-      const hubs = simNodes.filter(
-        node => node.kind === "major" && node.x != null && node.y != null && onScreen(node.x, node.y, 160),
-      );
-      const labelFont = `600 ${13 / view.k}px Inter, ui-sans-serif, sans-serif`;
-      ctx.font = labelFont;
-      const labels = placeHubLabels(
-        hubs.map(node => ({
-          id: node.id,
-          x: node.x!,
-          y: node.y!,
-          coreR: hubCoreRadius(node),
-          pinned: node === hover || node.label === selected,
-          candidates: hubLabelVariants(node.label).map(text => ({ text, width: ctx.measureText(text).width })),
-        })),
-        16 / view.k,
-        5 / view.k,
-        {
-          x0: (4 - view.x) / view.k,
-          y0: (topInset() - view.y) / view.k,
-          x1: (width - 4 - view.x) / view.k,
-          y1: (height - 4 - view.y) / view.k,
-        },
-      );
-      for (const node of hubs) drawShowAllHub(node, emphasis);
-      for (const node of hubs) {
-        const label = labels.get(node.id);
-        if (!label) continue;
-        const { dim } = nodeDrawState(node, emphasis);
-        drawHaloText(label.text, (label.box.x0 + label.box.x1) / 2, (label.box.y0 + label.box.y1) / 2, {
-          font: labelFont,
-          align: "center",
-          baseline: "middle",
-          color: node.ink,
-          alpha: (dim ? 0.4 : 1) * (node.opacity ?? 1),
-        });
-      }
-      ctx.restore();
-      return;
     }
 
     for (const node of simNodes) {
@@ -692,42 +574,208 @@ export function mountForceGraph(
     ctx.restore();
   }
 
-  function hubFocus(emphasis: ReturnType<typeof drawArgs>) {
-    const pick = (node: GraphNodeDatum | null | undefined) => (node?.kind === "major" ? node.label : null);
-    const selectedHub = selected ? pick(simNodes.find(node => node.kind === "major" && node.label === selected)) : null;
-    return selectedHub ?? pick(hover) ?? (emphasis.query.trim() ? "" : null);
+  let zoneLabelBoxes = new Map<string, { x0: number; y0: number; x1: number; y1: number }>();
+  let zoneLayer: HTMLCanvasElement | null = null;
+
+  /** Soft tinted areas behind each topic's notes: the zones. Painted solid offscreen, laid down translucent. */
+  function drawZones(emphasis: ReturnType<typeof drawArgs>) {
+    if (!zoneLayer) zoneLayer = document.createElement("canvas");
+    const pw = Math.floor(width * devicePixelRatio);
+    const ph = Math.floor(height * devicePixelRatio);
+    if (zoneLayer.width !== pw || zoneLayer.height !== ph) {
+      zoneLayer.width = pw;
+      zoneLayer.height = ph;
+    }
+    const layer = zoneLayer.getContext("2d");
+    if (!layer) return;
+    const pad = SHOW_ALL_NOTE_SPACING * showAllShape().spread * 1.6;
+    const byZone = new Map<string, GraphNodeDatum[]>();
+    for (const node of simNodes) {
+      if (node.kind !== "leaf" || node.departing || node.x == null || node.y == null || !node.parentKeyword) continue;
+      const list = byZone.get(node.parentKeyword) ?? [];
+      list.push(node);
+      byZone.set(node.parentKeyword, list);
+    }
+    const focus = selected && simNodes.some(node => node.kind === "major" && node.label === selected) ? selected : null;
+    for (const [label, members] of byZone) {
+      const hub = nodeMap.get(`major:${label}`);
+      if (!hub) continue;
+      layer.setTransform(1, 0, 0, 1, 0, 0);
+      layer.clearRect(0, 0, pw, ph);
+      layer.setTransform(devicePixelRatio * view.k, 0, 0, devicePixelRatio * view.k, devicePixelRatio * view.x, devicePixelRatio * view.y);
+      layer.fillStyle = hub.color;
+      layer.beginPath();
+      for (const node of members) {
+        layer.moveTo(node.x! + pad, node.y!);
+        layer.arc(node.x!, node.y!, pad, 0, Math.PI * 2);
+      }
+      layer.fill();
+      const { dim } = nodeDrawState(hub, emphasis);
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = (focus === label ? 0.26 : dim ? 0.06 : 0.16) * (hub.opacity ?? 1);
+      ctx.drawImage(zoneLayer, 0, 0);
+      ctx.restore();
+    }
   }
 
-  /** Shared notes between topics, drawn as soft bands under everything else — the nexus. */
-  function drawHubTies(map: Map<string, GraphNodeDatum>, emphasis: ReturnType<typeof drawArgs>) {
-    const ties = liveModel.hubTies ?? [];
-    if (!ties.length) return;
-    const max = ties[0]!.weight || 1;
-    const focus = hubFocus(emphasis);
-    const noteFocus = Boolean(selected) && focus == null;
-    ctx.save();
-    ctx.lineCap = "round";
-    ctx.setLineDash([]);
-    for (const tie of ties) {
-      const share = tie.weight / max;
-      if (share < 0.1) continue;
-      const a = map.get(`major:${tie.a}`);
-      const b = map.get(`major:${tie.b}`);
-      if (!a || !b || a.departing || b.departing || a.x == null || a.y == null || b.x == null || b.y == null) continue;
-      const touches = focus != null && focus !== "" && (tie.a === focus || tie.b === focus);
-      const dim = (focus != null && !touches) || noteFocus;
-      const fade = Math.min(a.opacity ?? 1, b.opacity ?? 1);
-      const gradient = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-      gradient.addColorStop(0, a.color);
-      gradient.addColorStop(1, b.color);
-      ctx.strokeStyle = gradient;
-      ctx.globalAlpha = (touches ? 0.55 + 0.35 * share : dim ? 0.035 : 0.08 + 0.3 * share) * fade;
-      ctx.lineWidth = (1 + 9 * Math.sqrt(share) + (touches ? 1.5 : 0)) / view.k;
+  /** Note-to-note links. Inside a zone they take its colour; between zones they are the threads. */
+  function drawShowAllLinks(map: Map<string, GraphNodeDatum>, emphasis: ReturnType<typeof drawArgs>) {
+    const highlighting = Boolean(hover || selected || options.search.trim());
+    const base = overlapLinkAlpha();
+    const batches = new Map<string, { color: string; alpha: number; pairs: Array<[GraphNodeDatum, GraphNodeDatum]> }>();
+    const active: Array<[GraphNodeDatum, GraphNodeDatum]> = [];
+    // Links between two zones all bend through one waypoint between them, so they read as a thread.
+    const waypoint = (source: GraphNodeDatum, target: GraphNodeDatum) => {
+      const a = source.parentKeyword ? map.get(`major:${source.parentKeyword}`) : undefined;
+      const b = target.parentKeyword ? map.get(`major:${target.parentKeyword}`) : undefined;
+      if (!a || !b || a === b || a.x == null || a.y == null || b.x == null || b.y == null) {
+        return { x: (source.x! + target.x!) / 2, y: (source.y! + target.y!) / 2 };
+      }
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    };
+    const path = (source: GraphNodeDatum, target: GraphNodeDatum) => {
+      ctx.moveTo(source.x!, source.y!);
+      if (source.parentKeyword === target.parentKeyword) {
+        ctx.lineTo(target.x!, target.y!);
+        return;
+      }
+      const via = waypoint(source, target);
+      // Quadratic through `via`: control point = 2·via − midpoint of the ends.
+      const cx = 2 * via.x - (source.x! + target.x!) / 2;
+      const cy = 2 * via.y - (source.y! + target.y!) / 2;
+      ctx.quadraticCurveTo(cx, cy, target.x!, target.y!);
+    };
+    for (const link of simLinks) {
+      if (link.kind !== "overlap" && link.kind !== "backbone") continue;
+      const { source, target } = linkEnds(link, map);
+      if (!source || !target || source.x == null || target.x == null || source.y == null || target.y == null) continue;
+      if (source.departing || target.departing) continue;
+      if (!onScreen(source.x, source.y) && !onScreen(target.x, target.y)) continue;
+      if (highlighting) {
+        const state = linkDrawState(link, source, target, emphasis);
+        if (state.active) {
+          active.push([source, target]);
+          continue;
+        }
+      }
+      const fade = Math.min(source.opacity ?? 1, target.opacity ?? 1);
+      const across = source.parentKeyword !== target.parentKeyword;
+      const color = across ? "#6f7f9c" : source.color;
+      const alpha = (highlighting ? 0.25 : 1) * (across ? base * 0.75 : base) * fade;
+      const key = `${color}|${alpha.toFixed(3)}`;
+      const batch = batches.get(key) ?? { color, alpha, pairs: [] as Array<[GraphNodeDatum, GraphNodeDatum]> };
+      batch.pairs.push([source, target]);
+      batches.set(key, batch);
+    }
+    applyShowAllStrandStroke(ctx, { active: false, viewK: view.k });
+    for (const batch of batches.values()) {
       ctx.beginPath();
-      curve(ctx, a.x, a.y, b.x, b.y);
+      for (const [source, target] of batch.pairs) path(source, target);
+      ctx.strokeStyle = batch.color;
+      ctx.globalAlpha = batch.alpha;
       ctx.stroke();
     }
-    ctx.restore();
+    if (active.length) {
+      applyShowAllStrandStroke(ctx, { active: true, viewK: view.k });
+      ctx.beginPath();
+      for (const [source, target] of active) path(source, target);
+      ctx.strokeStyle = "#e07a2f";
+      ctx.globalAlpha = 0.9;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function insetBox(box: { x0: number; y0: number; x1: number; y1: number }, fraction: number) {
+    const dx = (box.x1 - box.x0) * fraction;
+    const dy = (box.y1 - box.y0) * fraction;
+    return { x0: box.x0 + dx, y0: box.y0 + dy, x1: box.x1 - dx, y1: box.y1 - dy };
+  }
+
+  function drawShowAllFrame(map: Map<string, GraphNodeDatum>, emphasis: ReturnType<typeof drawArgs>) {
+    drawZones(emphasis);
+    drawShowAllLinks(map, emphasis);
+
+    const drawRings = showAllDrawRings(view.k);
+    const zoneTop = new Map<string, number>();
+    const zoneBox = new Map<string, { x0: number; y0: number; x1: number; y1: number }>();
+    for (const node of simNodes) {
+      if (node.kind !== "leaf" || node.x == null || node.y == null) continue;
+      if (node.parentKeyword && !node.departing) {
+        const top = node.y - node.r;
+        zoneTop.set(node.parentKeyword, Math.min(zoneTop.get(node.parentKeyword) ?? Infinity, top));
+        const box = zoneBox.get(node.parentKeyword) ?? { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+        box.x0 = Math.min(box.x0, node.x);
+        box.y0 = Math.min(box.y0, node.y);
+        box.x1 = Math.max(box.x1, node.x);
+        box.y1 = Math.max(box.y1, node.y);
+        zoneBox.set(node.parentKeyword, box);
+      }
+      if (!onScreen(node.x, node.y)) continue;
+      const { hot, dim } = nodeDrawState(node, emphasis);
+      const drawR = canvasRadius(node.r, view.k, 2.2);
+      const fade = node.opacity ?? 1;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, drawR, 0, Math.PI * 2);
+      ctx.fillStyle = node.color;
+      ctx.globalAlpha = (dim ? 0.14 : hot ? 1 : 0.9) * fade;
+      ctx.fill();
+      if (drawRings || hot) {
+        ctx.globalAlpha = (dim ? 0.3 : 0.9) * fade;
+        ctx.lineWidth = (hot ? 2 : 1) / view.k;
+        ctx.strokeStyle = hot ? "#e07a2f" : "#fff";
+        ctx.stroke();
+      }
+      if (showAllLabelVisible(node, view.k, hover === node, hot && Boolean(selected))) {
+        drawHaloText(node.label.length > 32 ? `${node.label.slice(0, 31)}…` : node.label, node.x + drawR + 6 / view.k, node.y, {
+          font: `500 ${11 / view.k}px Inter, ui-sans-serif, sans-serif`,
+          align: "left",
+          baseline: "middle",
+          color: node.ink,
+          alpha: fade,
+        });
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Zone names sit just above each zone, through the collision pass (C1).
+    const zones = simNodes.filter(node => node.kind === "major" && !node.departing && zoneTop.has(node.label) && node.x != null);
+    const labelFont = `600 ${13 / view.k}px Inter, ui-sans-serif, sans-serif`;
+    ctx.font = labelFont;
+    const labels = placeHubLabels(
+      zones.map(node => ({
+        id: node.id,
+        x: node.x!,
+        y: zoneTop.get(node.label)!,
+        coreR: 0,
+        // The inner part of each zone; a label may brush a zone's ragged edge but not cover its notes.
+        keepOut: insetBox(zoneBox.get(node.label)!, 0.18),
+        pinned: node === hover || node.label === selected,
+        candidates: hubLabelVariants(node.label).map(text => ({ text, width: ctx.measureText(text).width })),
+      })),
+      16 / view.k,
+      2 / view.k,
+      {
+        x0: (4 - view.x) / view.k,
+        y0: (topInset() - view.y) / view.k,
+        x1: (width - 4 - view.x) / view.k,
+        y1: (height - 4 - view.y) / view.k,
+      },
+    );
+    zoneLabelBoxes = new Map([...labels].map(([id, label]) => [id, label.box]));
+    for (const node of zones) {
+      const label = labels.get(node.id);
+      if (!label) continue;
+      const { hot, dim } = nodeDrawState(node, emphasis);
+      drawHaloText(label.text, (label.box.x0 + label.box.x1) / 2, (label.box.y0 + label.box.y1) / 2, {
+        font: labelFont,
+        align: "center",
+        baseline: "middle",
+        color: hot && hover === node ? "#e07a2f" : node.ink,
+        alpha: (dim ? 0.4 : 1) * (node.opacity ?? 1),
+      });
+    }
   }
 
   function drawHaloText(

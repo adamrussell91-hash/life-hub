@@ -53,6 +53,7 @@ function recordingContext() {
       return { width: text.length * 7 } as TextMetrics;
     },
     strokeText() {},
+    drawImage() {},
     createLinearGradient() {
       return { addColorStop() {} };
     },
@@ -130,7 +131,7 @@ describe("Show All strand drawing", () => {
     vi.unstubAllGlobals();
   });
 
-  it("batches Show All strands into one solid rounded stroke", () => {
+  it("draws note-to-note links as solid rounded strokes, with no hub spokes", () => {
     stubFrame();
     const recorded = installCanvas();
     const host = document.createElement("div");
@@ -146,13 +147,14 @@ describe("Show All strand drawing", () => {
     expect(strands.every(stroke => Math.abs(stroke.lineWidth - expected) < 0.01)).toBe(true);
     expect(strands.every(stroke => stroke.dash.length === 0)).toBe(true);
     expect(strands.every(stroke => stroke.lineCap === "round")).toBe(true);
-    expect(recorded.paths.filter(path => path === "line").length).toBe(3);
+    // Two note-to-note links; the three hub spokes in the model are never drawn.
+    expect(recorded.paths.filter(path => path === "line").length).toBe(2);
     expect(recorded.paths).not.toContain("curve");
 
     stop();
   });
 
-  it("draws the 20-tag hubs and spokes, but never paints note titles", () => {
+  it("names every zone and links notes to notes, but never paints note titles", () => {
     stubFrame();
     const recorded = installCanvas();
     const host = document.createElement("div");
@@ -171,12 +173,14 @@ describe("Show All strand drawing", () => {
     const graph = buildShowAllGraph(pages, "tags");
     const hubs = graph.nodes.filter(node => node.kind === "major");
     expect(hubs).toHaveLength(3);
-    expect(graph.links.some(link => link.kind === "spoke")).toBe(true);
+    expect(graph.links.some(link => link.kind === "spoke")).toBe(false);
     expect(graph.links.filter(link => link.kind === "overlap" || link.kind === "backbone").length).toBeGreaterThan(0);
 
     const stop = mountForceGraph(host, graph, {}, { variant: "showAll", search: "", excerptFor: () => "" });
     expect(recorded.paths.length).toBeGreaterThan(0);
-    expect(recorded.paths.every(path => path === "line")).toBe(true);
+    // Links inside a zone are straight; links between zones bend into a shared thread.
+    expect(recorded.paths).toContain("line");
+    expect(recorded.paths.every(path => path === "line" || path === "curve")).toBe(true);
     expect(hubs.every(hub => recorded.texts.some(text => hub.label.startsWith(text.replace(/…$/, ""))))).toBe(
       true,
     );

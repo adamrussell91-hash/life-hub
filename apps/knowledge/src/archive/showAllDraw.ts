@@ -77,6 +77,8 @@ export type HubLabelInput = {
   candidates: HubLabelCandidate[];
   /** Hovered or selected: placed first and never hidden. */
   pinned?: boolean;
+  /** An area this hub owns (its zone). Other hubs' labels may not cover it. */
+  keepOut?: LabelBox;
 };
 export type HubLabelPlacement = { text: string; side: "above" | "below"; box: LabelBox };
 export type LabelBox = { x0: number; y0: number; x1: number; y1: number };
@@ -101,12 +103,15 @@ export function hubLabelVariants(label: string, max = 30): string[] {
  */
 export function placeHubLabels(hubs: HubLabelInput[], lineHeight: number, gap: number, bounds?: LabelBox) {
   const placed = new Map<string, HubLabelPlacement>();
-  const taken: LabelBox[] = hubs.map(hub => ({
-    x0: hub.x - hub.coreR,
-    y0: hub.y - hub.coreR,
-    x1: hub.x + hub.coreR,
-    y1: hub.y + hub.coreR,
-  }));
+  const taken: LabelBox[] = hubs.map(
+    hub =>
+      hub.keepOut ?? {
+        x0: hub.x - hub.coreR,
+        y0: hub.y - hub.coreR,
+        x1: hub.x + hub.coreR,
+        y1: hub.y + hub.coreR,
+      },
+  );
   const order = [...hubs.filter(hub => hub.pinned), ...hubs.filter(hub => !hub.pinned)];
   for (const hub of order) {
     const own = hubs.indexOf(hub);

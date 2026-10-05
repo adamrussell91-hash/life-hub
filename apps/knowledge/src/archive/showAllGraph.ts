@@ -14,7 +14,7 @@ import {
 import { buildShowAllNoteEdges } from "./showAllEdges";
 
 const LAYOUT_CENTRE = { x: 760, y: 560 };
-export const SHOW_ALL_CLUSTER_GAP = 96;
+export const SHOW_ALL_CLUSTER_GAP = 140;
 /** World units between neighbouring notes in a topic disc at Spread 1. */
 export const SHOW_ALL_NOTE_SPACING = 13;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
@@ -37,10 +37,9 @@ function hubRadius(count: number) {
 }
 
 /** Radius of the disc a topic's notes fill, including the clear ring around the hub. */
-export function showAllDiscRadius(noteCount: number, hubR: number, spread = 1) {
+export function showAllDiscRadius(noteCount: number, _hubR = 0, spread = 1) {
   const c = SHOW_ALL_NOTE_SPACING * spread;
-  const inner = hubR + 14;
-  return Math.sqrt(inner * inner + c * c * Math.max(noteCount, 1)) + c;
+  return Math.sqrt(c * c * (Math.max(noteCount, 1) + 0.5)) + c;
 }
 
 function hashUnit(seed: string) {
@@ -91,6 +90,7 @@ export function placeShowAllHubs(majors: GraphNodeDatum[], ties: ShowAllHubTie[]
   if (bodies.length > 1) {
     const byLabel = new Map(bodies.map(body => [body.label, body]));
     const maxTie = Math.max(1, ...ties.map(tie => tie.weight));
+    const maxR = Math.max(...bodies.map(body => body.r));
     const springs: TieSpring[] = ties
       .filter(tie => byLabel.has(tie.a) && byLabel.has(tie.b))
       .map(tie => ({ source: tie.a, target: tie.b, weight: tie.weight }));
@@ -104,8 +104,9 @@ export function placeShowAllHubs(majors: GraphNodeDatum[], ties: ShowAllHubTie[]
           .strength(link => 0.03 + 0.45 * (link.weight / maxTie)),
       )
       .force("charge", forceManyBody<HubBody>().strength(-40))
-      .force("x", forceX<HubBody>(LAYOUT_CENTRE.x).strength(0.1))
-      .force("y", forceY<HubBody>(LAYOUT_CENTRE.y).strength(0.1))
+      // Bigger zones are pulled harder to the middle, so the largest topic forms the core.
+      .force("x", forceX<HubBody>(LAYOUT_CENTRE.x).strength(body => 0.04 + 0.2 * (body.r / maxR) ** 3))
+      .force("y", forceY<HubBody>(LAYOUT_CENTRE.y).strength(body => 0.04 + 0.2 * (body.r / maxR) ** 3))
       .force(
         "collide",
         forceCollide<HubBody>(body => body.r + SHOW_ALL_CLUSTER_GAP / 2)
@@ -148,8 +149,8 @@ export function blendedHome(hubs: Array<{ x?: number; y?: number }>, lean = SHOW
 /** Sunflower slots around a hub, with a little deterministic jitter so the disc reads organic. */
 function discSlots(hub: GraphNodeDatum, count: number, spread: number) {
   const c = SHOW_ALL_NOTE_SPACING * spread;
-  const inner = hub.r + 14;
-  const offset = (inner * inner) / (c * c);
+  // The zone has no drawn hub any more, so notes fill right to the middle.
+  const offset = 0.5;
   const slots: Array<{ x: number; y: number; taken: boolean }> = [];
   for (let i = 0; i < count; i++) {
     const jitterR = (hashUnit(`${hub.id}:r${i}`) - 0.5) * c * 0.55;
@@ -161,15 +162,43 @@ function discSlots(hub: GraphNodeDatum, count: number, spread: number) {
   return slots;
 }
 
+type Neighbour = { id: string; weight: number };
+
+function noteAdjacency(links: GraphLinkDatum[]) {
+  const adjacency = new Map<string, Neighbour[]>();
+  const add = (from: string, to: string, weight: number) => {
+    const list = adjacency.get(from) ?? [];
+    list.push({ id: to, weight });
+    adjacency.set(from, list);
+  };
+  for (const link of links) {
+    if (link.kind !== "overlap" && link.kind !== "backbone") continue;
+    const source = typeof link.source === "string" ? link.source : link.source.id;
+    const target = typeof link.target === "string" ? link.target : link.target.id;
+    const weight = Math.max(0.05, link.weight);
+    add(source, target, weight);
+    add(target, source, weight);
+  }
+  return adjacency;
+}
+
 /**
- * Lays the whole Show All map out with no physics: place hubs, then fill each topic's disc.
- * Notes that share topics take the rim facing those topics; the best-linked notes sit nearest
- * the hub. Same input, same picture — every time.
+ * Lays the whole Show All map out with no physics. Topics become zones: hubs are packed into one
+ * nexus, then each zone is grown outward from its best-linked note, every note taking the free
+ * seat nearest the notes it links to. Linked notes end up side by side, notes linked into another
+ * zone sit on the edge facing it, and the same input always gives the same picture.
  */
-export function layoutShowAll(nodes: GraphNodeDatum[], ties: ShowAllHubTie[], shape: ShowAllShape = SHOW_ALL_DEFAULT_SHAPE) {
+export function layoutShowAll(
+  nodes: GraphNodeDatum[],
+  ties: ShowAllHubTie[],
+  shape: ShowAllShape = SHOW_ALL_DEFAULT_SHAPE,
+  links: GraphLinkDatum[] = [],
+) {
   const majors = nodes.filter(node => node.kind === "major" && !node.departing);
   placeShowAllHubs(majors, ties, hub => showAllDiscRadius(hub.count, hub.r, shape.spread));
   const hubByLabel = new Map(majors.map(node => [node.label, node]));
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  const adjacency = noteAdjacency(links);
 
   const groups = new Map<string, GraphNodeDatum[]>();
   for (const node of nodes) {
@@ -179,6 +208,7 @@ export function layoutShowAll(nodes: GraphNodeDatum[], ties: ShowAllHubTie[], sh
     list.push(node);
     groups.set(key, list);
   }
+  const placed = new Set<string>();
 
   for (const [label, members] of groups) {
     const hub =
@@ -188,39 +218,89 @@ export function layoutShowAll(nodes: GraphNodeDatum[], ties: ShowAllHubTie[], sh
     const hy = hub.y ?? LAYOUT_CENTRE.y;
     const slots = discSlots(hub, members.length, shape.spread);
     const rim = showAllDiscRadius(members.length, hub.r, shape.spread);
+    const inZone = new Set(members.map(node => node.id));
 
-    const wants = members.map(node => {
-      const others = (node.hubLabels ?? []).filter(other => other !== label && hubByLabel.has(other));
-      if (!others.length || shape.lean <= 0) return { node, x: hx, y: hy, pull: 0 };
-      const toward = blendedHome([hub, ...others.map(other => hubByLabel.get(other)!)], shape.lean);
-      const dx = toward.x - hx;
-      const dy = toward.y - hy;
-      const dist = Math.hypot(dx, dy) || 1;
-      const reach = Math.min(1, shape.lean) * rim;
-      return { node, x: hx + (dx / dist) * reach, y: hy + (dy / dist) * reach, pull: others.length };
-    });
-    // Bridging notes claim their rim seats first; then the best-linked notes take the centre.
-    wants.sort(
-      (a, b) =>
-        b.pull - a.pull ||
-        (b.node.degree ?? 0) - (a.node.degree ?? 0) ||
-        a.node.id.localeCompare(b.node.id),
+    // Where a note wants to sit: among its placed neighbours, leaning toward other zones it links into.
+    const desire = (node: GraphNodeDatum) => {
+      let x = 0;
+      let y = 0;
+      let total = 0;
+      for (const next of adjacency.get(node.id) ?? []) {
+        const other = byId.get(next.id);
+        if (!other || other.departing) continue;
+        if (inZone.has(next.id)) {
+          if (!placed.has(next.id)) continue;
+          x += (other.x ?? hx) * next.weight;
+          y += (other.y ?? hy) * next.weight;
+          total += next.weight;
+          continue;
+        }
+        const zone = other.parentKeyword ? hubByLabel.get(other.parentKeyword) : undefined;
+        const ox = placed.has(next.id) ? other.x : zone?.x;
+        const oy = placed.has(next.id) ? other.y : zone?.y;
+        if (ox == null || oy == null) continue;
+        const weight = next.weight * shape.lean * 0.5;
+        x += ox * weight;
+        y += oy * weight;
+        total += weight;
+      }
+      // Topic overlap with no direct link still leans the note toward the shared zone.
+      for (const other of node.hubLabels ?? []) {
+        if (other === label) continue;
+        const zone = hubByLabel.get(other);
+        if (!zone || zone.x == null || zone.y == null) continue;
+        const weight = shape.lean * 0.35;
+        x += zone.x * weight;
+        y += zone.y * weight;
+        total += weight;
+      }
+      if (!total) return { x: hx, y: hy };
+      let dx = x / total - hx;
+      let dy = y / total - hy;
+      const reach = Math.hypot(dx, dy);
+      if (reach > rim) {
+        dx = (dx / reach) * rim;
+        dy = (dy / reach) * rim;
+      }
+      return { x: hx + dx, y: hy + dy };
+    };
+
+    const linkedWeight = (node: GraphNodeDatum) =>
+      (adjacency.get(node.id) ?? []).reduce((sum, next) => sum + (placed.has(next.id) && inZone.has(next.id) ? next.weight : 0), 0);
+    const strength = new Map(
+      members.map(node => [node.id, (adjacency.get(node.id) ?? []).reduce((sum, next) => sum + next.weight, 0)]),
     );
-    for (const want of wants) {
+    const waiting = [...members].sort(
+      (a, b) => (strength.get(b.id) ?? 0) - (strength.get(a.id) ?? 0) || a.id.localeCompare(b.id),
+    );
+
+    while (waiting.length) {
+      // Grow from what is already placed: the note most tied to placed notes goes next.
+      // If nothing waiting touches the placed set, start a new patch from the best-linked note.
+      let pick = 0;
       let best = -1;
-      let bestD = Infinity;
+      for (let i = 0; i < waiting.length; i++) {
+        const tied = linkedWeight(waiting[i]!);
+        if (tied > best) {
+          best = tied;
+          pick = i;
+        }
+      }
+      const node = waiting.splice(pick, 1)[0]!;
+      const want = desire(node);
+      let seat = -1;
+      let seatD = Infinity;
       for (let i = 0; i < slots.length; i++) {
         const slot = slots[i]!;
         if (slot.taken) continue;
         const d = (slot.x - want.x) ** 2 + (slot.y - want.y) ** 2;
-        if (d < bestD) {
-          bestD = d;
-          best = i;
+        if (d < seatD) {
+          seatD = d;
+          seat = i;
         }
       }
-      const slot = slots[best]!;
+      const slot = slots[seat]!;
       slot.taken = true;
-      const node = want.node;
       node.x = slot.x;
       node.y = slot.y;
       node.fx = slot.x;
@@ -229,6 +309,7 @@ export function layoutShowAll(nodes: GraphNodeDatum[], ties: ShowAllHubTie[], sh
       node.vy = 0;
       node.homeX = hx;
       node.homeY = hy;
+      placed.add(node.id);
     }
   }
 }
@@ -304,16 +385,6 @@ export function buildShowAllGraph(
         ink: palette.ink,
         r: showAllNoteRadius(degree),
       });
-      const home = group.hub;
-      if (home) {
-        links.push({
-          source: `leaf:${entry.id}`,
-          target: home.id,
-          kind: "spoke",
-          weight: 1,
-          color: home.color,
-        });
-      }
     });
   }
 
@@ -324,7 +395,7 @@ export function buildShowAllGraph(
     if (source) link.color = source.soft;
   }
   links.push(...overlaps);
-  layoutShowAll(nodes, hubTies);
+  layoutShowAll(nodes, hubTies, SHOW_ALL_DEFAULT_SHAPE, links);
 
   return {
     nodes,
