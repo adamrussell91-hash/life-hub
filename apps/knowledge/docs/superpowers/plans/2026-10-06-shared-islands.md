@@ -1266,6 +1266,8 @@ const START = -0.75 * Math.PI;
   };
 ```
 
+> **As built:** clamping to 0.86 × `reach` wasn't enough, because the noise wobble scales up with the island (±35 Archipelago units is about ±150 here). So after clamping, `buildAtlas` builds a `terrainField` of its own land. Towns in the sea walk back towards the centre until they're dry, and loose towns move to wherever their islet actually surfaced (the highest point near it).
+
 - [ ] **Step 5: Run the tests**
 
 Run: `npx vitest run src/shelf`

@@ -1,5 +1,7 @@
 import { topicKeywords } from "../archive/keywordGraph";
 import type { BookModel, BookNote, ChapterModel } from "./model";
+import { COAST, SEA_LEVEL, islandRadius, islandShape, landFor, neckLand, reachAt } from "./islandShape";
+import { terrainField } from "./atlasTerrain";
 
 /**
  * The Atlas: a book as a land you've settled. Provinces run west → east in
@@ -9,8 +11,12 @@ import type { BookModel, BookNote, ChapterModel } from "./model";
  * so a book's map only changes when its notes do.
  */
 
-export const WORLD_HEIGHT = 900;
-const PROVINCE_SPACING = 300;
+export const WORLD_HEIGHT = 1100;
+const MAP_WIDTH = 1500;
+/** The book's coast radius on its own map. */
+const VIEW_R = 340;
+/** Regions start in the north-west and run clockwise in reading order. */
+const START = -0.75 * Math.PI;
 const MAX_PROVINCES = 8;
 const MIN_TOWN_GAP = 30;
 
@@ -58,6 +64,8 @@ export type TerrainFrame = { unit: number; ox: number; oy: number };
 export type MeetingKind = "rope" | "stone" | "joined";
 /** A neighbour as the Archipelago places it: centre, packing radius, terrain colour, and the facing shores (`a` on this book, `b` on theirs). */
 export type AtlasNeighbour = { key: string; label: string; kind: MeetingKind; count: number; x: number; y: number; r: number; colour: number; a: Pt; b: Pt };
+/** A linked neighbour met at this book's coast, in this map's space: a bridge from shore to shore, or a road from a town over the border. */
+export type AtlasCrossing = { key: string; label: string; kind: MeetingKind; count: number; from: Pt; to: Pt; fromId?: string; toId?: string };
 /** What a book's own map borrows from the Archipelago, in Archipelago space. */
 export type AtlasContext = { island: { x: number; y: number; r: number }; neighbours: AtlasNeighbour[] };
 
@@ -76,6 +84,7 @@ export type AtlasModel = {
   frame?: TerrainFrame;
   /** The book's own island in this map's space: centre and coast radius. */
   island?: { x: number; y: number; r: number };
+  crossings?: AtlasCrossing[];
 };
 
 function hash(text: string) {
@@ -157,7 +166,7 @@ function themeBuckets(book: BookModel): Bucket[] {
   return buckets.sort((a, b) => Math.min(...a.notes.map(n => n.page!)) - Math.min(...b.notes.map(n => n.page!)));
 }
 
-export function buildAtlas(book: BookModel, now = Date.now()): AtlasModel {
+export function buildAtlas(book: BookModel, now = Date.now(), context?: AtlasContext): AtlasModel {
   let source: AtlasModel["source"] = "single";
   let buckets: Bucket[];
   if (book.chapters.length >= 2) {
@@ -171,17 +180,41 @@ export function buildAtlas(book: BookModel, now = Date.now()): AtlasModel {
     buckets = [];
   }
 
-  const count = Math.max(1, buckets.length);
-  const width = Math.max(1100, count * PROVINCE_SPACING + 260);
+  const width = MAP_WIDTH;
   const height = WORLD_HEIGHT;
+  const cx = width / 2;
+  const cy = height / 2;
   const seed = hash(book.key) * Math.PI * 2;
-  const provinces: AtlasProvince[] = buckets.map((bucket, i) => {
-    const x = 130 + (i + 0.5) * ((width - 260) / count);
-    const y = height * 0.5 + Math.sin(i * 1.15 + seed) * height * 0.2;
-    const radius = bucket.notes.length ? Math.min(PROVINCE_SPACING * 0.62, 58 + 24 * Math.sqrt(bucket.notes.length)) : 96;
-    return { id: bucket.id, label: bucket.label, detail: bucket.detail, start: bucket.start, end: bucket.end, x, y, radius, explored: bucket.notes.length > 0, colour: i };
-  });
+  const here = context?.island ?? { x: 0, y: 0, r: islandRadius(book.noteCount) };
+  // The book's island is the same shape as on the Archipelago, scaled so its coast sits at VIEW_R.
+  const k = VIEW_R / (here.r * COAST);
+  const view = (p: Pt) => ({ x: cx + (p.x - here.x) * k, y: cy + (p.y - here.y) * k });
+  const frame: TerrainFrame = { unit: k, ox: here.x - cx / k, oy: here.y - cy / k };
+  const shape = islandShape(book.key);
+  const reach = (angle: number) => reachAt(shape, angle) * VIEW_R;
+  const land: AtlasLand[] = landFor(shape, cx, cy, VIEW_R, book.key, false);
 
+  // Chapters (or themes) become wedges round the island, sized by their notes; empty ones keep a sliver.
+  const weights = buckets.map(b => Math.max(1, b.notes.length));
+  const total = weights.reduce((sum, n) => sum + n, 0) || 1;
+  let turn = START;
+  const spans = weights.map(weight => {
+    const from = turn;
+    const span = (weight / total) * Math.PI * 2;
+    turn += span;
+    return { from, span };
+  });
+  const provinces: AtlasProvince[] = buckets.map((bucket, i) => {
+    const { from, span } = spans[i]!;
+    const mid = from + span / 2;
+    const d = buckets.length > 1 ? reach(mid) * 0.55 : 0;
+    return { id: bucket.id, label: bucket.label, detail: bucket.detail, start: bucket.start, end: bucket.end, x: cx + Math.cos(mid) * d, y: cy + Math.sin(mid) * d, radius: VIEW_R * 0.32, explored: bucket.notes.length > 0, colour: i };
+  });
+  const regionAt = (angle: number) => {
+    const t = (((angle - START) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const i = spans.findIndex(s => t >= s.from - START && t < s.from - START + s.span);
+    return provinces[i < 0 ? provinces.length - 1 : i]?.id;
+  };
   const towns: AtlasTown[] = [];
   const sixMonths = 182 * 86_400_000;
   const week = 7 * 86_400_000;
@@ -202,25 +235,68 @@ export function buildAtlas(book: BookModel, now = Date.now()): AtlasModel {
     });
   };
   buckets.forEach((bucket, i) => {
-    const p = provinces[i]!;
+    const { from, span } = spans[i]!;
     bucket.notes.forEach((note, n) => {
-      // Sunflower spiral in page order: earlier pages sit nearer the centre.
-      const angle = n * 2.399963 + seed;
-      const dist = p.radius * 0.82 * Math.sqrt((n + 0.5) / Math.max(1, bucket.notes.length));
-      settle(note, p.id, p.x + Math.cos(angle) * dist * 1.15, p.y + Math.sin(angle) * dist * 0.85);
+      const t = (n + 0.5) / bucket.notes.length;
+      // Spread through the region's wedge, earlier pages nearer the middle of the island.
+      const a = buckets.length > 1 ? from + span * (0.1 + 0.8 * ((n * 0.618034 + 0.31) % 1)) : n * 2.399963 + seed;
+      const d = reach(a) * (buckets.length > 1 ? 0.22 + 0.58 * Math.sqrt(t) : 0.78 * Math.sqrt(t));
+      settle(note, provinces[i]!.id, cx + Math.cos(a) * d, cy + Math.sin(a) * d);
     });
   });
-  // Loose notes: an island south-east, offshore.
   if (book.loose.length) {
-    const cx = width - 170;
-    const cy = height - 150;
+    // Loose notes wait on the largest islet offshore, grown to hold them (or one raised south-east).
+    const islet = [...shape.islets].sort((a, b) => b.sigma - a.sigma)[0] ?? { x: 0.95, y: 0.95, sigma: 0.08 };
+    const bearing = Math.atan2(islet.y, islet.x);
+    const spread = 26 * Math.sqrt(book.loose.length);
+    const sigma = Math.max(islet.sigma * VIEW_R, spread * 0.9 + 22);
+    const out = Math.max(Math.hypot(islet.x, islet.y) * VIEW_R, reach(bearing) + sigma * 1.25 + 30);
+    const hx = cx + Math.cos(bearing) * out;
+    const hy = cy + Math.sin(bearing) * out;
+    land.push({ province: "loose", x: hx, y: hy, amp: 0.85, sigma, vote: true });
     book.loose.forEach((note, n) => {
       const angle = n * 2.399963;
       const dist = 26 * Math.sqrt(n + 0.5);
-      settle(note, "loose", cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist * 0.7);
+      settle(note, "loose", hx + Math.cos(angle) * dist, hy + Math.sin(angle) * dist * 0.7);
     });
   }
   relax(towns, provinces);
+  for (const town of towns) {
+    if (town.province === "loose") continue;
+    const a = Math.atan2(town.y - cy, town.x - cx);
+    const max = reach(a) * 0.86;
+    if (Math.hypot(town.x - cx, town.y - cy) > max) {
+      town.x = cx + Math.cos(a) * max;
+      town.y = cy + Math.sin(a) * max;
+    }
+  }
+  // The coast wobbles with the map's noise, so check the real land: towns that landed in the sea walk
+  // back towards the middle, and loose notes move to wherever their islet actually surfaced.
+  const ground = terrainField({ width, height, bounds: { x: 0, y: 0, w: width, h: height }, source, provinces: [], towns: [], roads: [], routes: [], fogs: [], land, frame });
+  const dry = (x: number, y: number) => ground(x, y).e > SEA_LEVEL + 0.04;
+  const loose = towns.filter(t => t.province === "loose");
+  const islet = land.find(l => l.province === "loose");
+  if (islet && loose.length) {
+    let best = { x: islet.x, y: islet.y, e: -Infinity };
+    for (let i = -12; i <= 12; i += 1) for (let j = -12; j <= 12; j += 1) {
+      const x = islet.x + i * islet.sigma * 0.2;
+      const y = islet.y + j * islet.sigma * 0.2;
+      const e = ground(x, y).e;
+      if (e > best.e) best = { x, y, e };
+    }
+    for (const town of loose) {
+      town.x += best.x - islet.x;
+      town.y += best.y - islet.y;
+    }
+  }
+  const looseMiddle = loose.reduce((m, t) => ({ x: m.x + t.x / loose.length, y: m.y + t.y / loose.length }), { x: 0, y: 0 });
+  for (const town of towns) {
+    const target = town.province === "loose" ? looseMiddle : { x: cx, y: cy };
+    for (let step = 0; step < 40 && !dry(town.x, town.y); step += 1) {
+      town.x += (target.x - town.x) * 0.08;
+      town.y += (target.y - town.y) * 0.08;
+    }
+  }
 
   const byId = new Map(towns.map(t => [t.note.id, t]));
   const roads: AtlasRoad[] = [];
@@ -235,6 +311,19 @@ export function buildAtlas(book: BookModel, now = Date.now()): AtlasModel {
     }
   }
 
+  // Linked neighbours at the edge: their own shapes (faded), and a neck of shared land for joined ones.
+  const neighbours = context?.neighbours ?? [];
+  for (const n of neighbours) {
+    const centre = view(n);
+    const coast = n.r * COAST * k;
+    land.push(...landFor(islandShape(n.key), centre.x, centre.y, coast, n.key));
+    provinces.push({ id: n.key, label: n.label, x: centre.x, y: centre.y, radius: coast * 0.5, explored: true, colour: n.colour, neighbour: true });
+    if (n.kind === "joined") {
+      const shore = view(n.a);
+      land.push(...neckLand(shore, view(n.b), 0.5 * Math.min(VIEW_R, coast), regionAt(Math.atan2(shore.y - cy, shore.x - cx)) ?? book.key, n.key));
+    }
+  }
+
   // Sea routes: one per other book, leaving from the town with the most links to it.
   const perBook = new Map<string, { label: string; count: number; from: Map<string, number> }>();
   for (const link of book.links) {
@@ -244,30 +333,49 @@ export function buildAtlas(book: BookModel, now = Date.now()): AtlasModel {
     entry.from.set(link.fromId, (entry.from.get(link.fromId) ?? 0) + 1);
     perBook.set(link.toBook, entry);
   }
-  const routes: AtlasRoute[] = [...perBook].map(([toBook, entry]) => {
-    const fromId = [...entry.from].sort((a, b) => b[1] - a[1])[0]![0];
+  const nextDoor = new Set(neighbours.map(n => n.key));
+  const busiest = (toBook: string) => {
+    const entry = perBook.get(toBook);
+    return entry ? [...entry.from].sort((a, b) => b[1] - a[1])[0]![0] : undefined;
+  };
+  const routes: AtlasRoute[] = [...perBook].filter(([toBook]) => !nextDoor.has(toBook)).map(([toBook, entry]) => {
+    const fromId = busiest(toBook)!;
     const town = byId.get(fromId)!;
     const side = town.y < height * 0.42 ? "north" : town.y > height * 0.62 ? "south" : town.x < width / 2 ? "west" : "east";
     return { fromId, toBook, toLabel: entry.label, count: entry.count, side, x: town.x, y: town.y };
   });
+  const crossings: AtlasCrossing[] = neighbours.map(n => {
+    const fromId = busiest(n.key);
+    const town = fromId ? byId.get(fromId) : undefined;
+    const toId = book.links.find(l => l.toBook === n.key && l.fromId === fromId)?.toId;
+    const here = view(n.a);
+    const there = view(n.b);
+    if (n.kind !== "joined") return { key: n.key, label: n.label, kind: n.kind, count: n.count, from: here, to: there, fromId, toId };
+    // The road runs from the town with most links to that book, over the border, into its land.
+    const centre = view(n);
+    const to = { x: there.x + (centre.x - there.x) * 0.45, y: there.y + (centre.y - there.y) * 0.45 };
+    return { key: n.key, label: n.label, kind: n.kind, count: n.count, from: town ? { x: town.x, y: town.y } : here, to, fromId, toId };
+  });
 
-  // Fog: open questions drift offshore, away from the middle of the land, beside the town that asked.
   const fogs: AtlasFog[] = [];
-  const midX = towns.reduce((sum, t) => sum + t.x, 0) / Math.max(1, towns.length);
   for (const town of towns) {
     if (!town.note.gaps.length || fogs.length >= 6) continue;
-    const province = provinces.find(p => p.id === town.province);
-    // Province names sit above the land, so questions drift south of it.
-    const reach = (province?.radius ?? 60) + 110;
-    fogs.push({ x: town.x + (town.x - midX) * 0.08, y: Math.min(height - 70, (province?.y ?? town.y) + reach), text: town.note.gaps[0]!, noteId: town.note.id });
+    // Open questions drift offshore, just beyond the coast nearest the town that asked.
+    const a = Math.atan2(town.y - cy, town.x - cx);
+    const d = Math.max(reach(a), Math.hypot(town.x - cx, town.y - cy)) + 110;
+    fogs.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, text: town.note.gaps[0]!, noteId: town.note.id });
   }
 
-  const xs = [...provinces.flatMap(p => [p.x - p.radius, p.x + p.radius]), ...towns.map(t => t.x), ...fogs.map(f => f.x)];
-  const ys = [...provinces.flatMap(p => [p.y - p.radius - 60, p.y + p.radius]), ...towns.map(t => t.y), ...fogs.map(f => f.y)];
-  const bx = Math.max(0, Math.min(...xs, width) - 40);
-  const by = Math.max(0, Math.min(...ys, height) - 40);
-  const bounds = { x: bx, y: by, w: Math.min(width, Math.max(...xs, 0) + 40) - bx, h: Math.min(height, Math.max(...ys, 0) + 40) - by };
-  return { width, height, bounds, source, provinces, towns, roads, routes, fogs };
+  const xs = [cx - VIEW_R * 1.15, cx + VIEW_R * 1.15, ...towns.map(t => t.x), ...fogs.map(f => f.x)];
+  const ys = [cy - VIEW_R * 1.15 - 40, cy + VIEW_R * 1.15, ...towns.map(t => t.y), ...fogs.map(f => f.y)];
+  const bx = Math.max(0, Math.min(...xs) - 40);
+  const by = Math.max(0, Math.min(...ys) - 40);
+  const bounds = { x: bx, y: by, w: Math.min(width, Math.max(...xs) + 40) - bx, h: Math.min(height, Math.max(...ys) + 40) - by };
+  return {
+    width, height, bounds, source, provinces, towns, roads, routes, fogs, land, crossings,
+    frame,
+    island: { x: cx, y: cy, r: VIEW_R },
+  };
 }
 
 /** Push towns apart until none are closer than MIN_TOWN_GAP, keeping each near its province. */
