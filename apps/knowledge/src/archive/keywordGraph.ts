@@ -141,6 +141,8 @@ export type ArchiveGraphModel = {
   minorCount: number;
   /** Sample notes under a minor (or major with no minors). */
   leaves: Map<string, PageManifestEntry[]>;
+  /** Show All only: how many notes each pair of topic hubs shares. */
+  hubTies?: Array<{ a: string; b: string; weight: number }>;
 };
 
 function pairKey(a: string, b: string) {

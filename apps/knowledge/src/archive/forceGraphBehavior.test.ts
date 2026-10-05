@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { GraphLinkDatum, GraphNodeDatum } from "./keywordGraph";
 import {
-  SHOW_ALL_SETTLE_TICKS,
   SHOW_ALL_TUNING_CONTROLS,
   SHOW_ALL_TUNING_DEFAULTS,
   SHOW_ALL_STRAND_WIDTH,
@@ -14,6 +13,7 @@ import {
   constellationLinkStrength,
   constellationNodeCharge,
   constellationTargetStrength,
+  fitViewBelowInset,
   fitViewToNodes,
   showAllLabelVisible,
   focusViewOnNode,
@@ -33,13 +33,9 @@ import {
   resolveEnterKey,
   resolveNodeClick,
   showAllLinkShouldDraw,
-  showAllCollisionRadius,
-  showAllLinkDistance,
-  showAllLinkStrength,
-  showAllNodeCharge,
+  showAllShape,
   showAllTuning,
   showAllTuningRestarts,
-  shouldLockShowAll,
   simulationNodes,
   sliderValueForTuning,
   tuningFromSlider,
@@ -319,34 +315,21 @@ describe("force graph chrome", () => {
 });
 
 describe("show all draw budget", () => {
-  it("includes leaves so note clouds can settle organically", () => {
+  it("hands every node to the constellation simulation", () => {
     expect(simulationNodes("showAll", nodes)).toEqual(nodes);
     expect(simulationNodes("constellation", nodes)).toEqual(nodes);
   });
 
-  it("lets tag-sharing overlaps pull harder and closer than hub spokes", () => {
-    expect(showAllLinkStrength("spoke")).toBeGreaterThan(0.2);
-    expect(showAllLinkStrength("overlap")).toBeGreaterThan(0.2);
-    expect(showAllLinkDistance("overlap")).toBeLessThan(showAllLinkDistance("spoke"));
-    expect(showAllLinkStrength("overlap")).toBeGreaterThanOrEqual(0.25);
-  });
-
-  it("lets busier hubs hold wider note clouds", () => {
-    const busy = { ...major, count: 100 };
-    const quiet = { ...major, count: 4 };
-    const busySpoke: GraphLinkDatum = { source: busy, target: leaf, kind: "spoke", weight: 1, color: busy.color };
-    const quietSpoke: GraphLinkDatum = { source: quiet, target: leaf, kind: "spoke", weight: 1, color: quiet.color };
-    expect(showAllLinkDistance(busySpoke)).toBeGreaterThan(showAllLinkDistance(quietSpoke));
-  });
-
-  it("gives hubs more collision clearance than notes", () => {
-    expect(showAllCollisionRadius(major)).toBeGreaterThan(showAllCollisionRadius(leaf));
-    expect(showAllCollisionRadius(minor)).toBeGreaterThan(showAllCollisionRadius(leaf));
-  });
-
-  it("locks the settled map at a bounded tick budget", () => {
-    expect(shouldLockShowAll(SHOW_ALL_SETTLE_TICKS - 1)).toBe(false);
-    expect(shouldLockShowAll(SHOW_ALL_SETTLE_TICKS)).toBe(true);
+  it("fits the map into the stage below a floating toolbar", () => {
+    const nodes = [
+      { x: 0, y: 0 },
+      { x: 1000, y: 1000 },
+    ];
+    const fitted = fitViewBelowInset(nodes, 1000, 800, 200, 40)!;
+    const topEdge = fitted.y + 0 * fitted.k;
+    const bottomEdge = fitted.y + 1000 * fitted.k;
+    expect(topEdge).toBeGreaterThanOrEqual(200 + 40 - 0.01);
+    expect(bottomEdge).toBeLessThanOrEqual(800 - 40 + 0.01);
   });
 });
 
@@ -431,25 +414,30 @@ describe("show all tuning sliders", () => {
     ]);
   });
 
-  it("reads charge, pull, and opacity from the live tuning object", () => {
-    applyShowAllTuning({ leafCharge: -240, overlapLinkStrength: 0.5, overlapLinkAlpha: 0.7 });
-    expect(showAllNodeCharge(leaf)).toBe(-240);
-    expect(showAllLinkStrength("overlap")).toBe(0.5);
+  it("turns Spread and Pull into the layout shape, with the defaults at spread 1", () => {
+    expect(showAllShape().spread).toBeCloseTo(1, 1);
+    expect(showAllShape().lean).toBeCloseTo(0.6, 5);
+    applyShowAllTuning({ leafCharge: -400, overlapLinkStrength: 0.8, overlapLinkAlpha: 0.7 });
+    expect(showAllShape().spread).toBeGreaterThan(1.5);
+    expect(showAllShape().lean).toBeLessThanOrEqual(1.2);
     expect(overlapLinkAlpha()).toBe(0.7);
-    expect(showAllNodeCharge(major)).toBe(-900);
+    applyShowAllTuning({ leafCharge: -20, overlapLinkStrength: 0.02 });
+    expect(showAllShape().spread).toBeCloseTo(0.6, 5);
+    expect(showAllShape().lean).toBeGreaterThanOrEqual(0);
   });
 
-  it("restarts the simulation only for repulsion and pull", () => {
+  it("re-lays the map out only for spread and pull", () => {
     expect(showAllTuningRestarts({ leafCharge: -200 })).toBe(true);
     expect(showAllTuningRestarts({ overlapLinkStrength: 0.4 })).toBe(true);
     expect(showAllTuningRestarts({ overlapLinkAlpha: 0.8 })).toBe(false);
     expect(showAllTuningRestarts({ lineWidthScale: 2 })).toBe(false);
   });
 
-  it("maps repulsion through a positive slider without leaving the safe range", () => {
-    const repulsion = SHOW_ALL_TUNING_CONTROLS[0]!;
-    expect(sliderValueForTuning(repulsion)).toBe(180);
-    expect(tuningFromSlider(repulsion, 300)).toBe(-300);
+  it("maps spread through a positive slider without leaving the safe range", () => {
+    const spread = SHOW_ALL_TUNING_CONTROLS[0]!;
+    expect(spread.label).toBe("Spread");
+    expect(sliderValueForTuning(spread)).toBe(180);
+    expect(tuningFromSlider(spread, 300)).toBe(-300);
     applyShowAllTuning({ leafCharge: -999, overlapLinkAlpha: 4, lineWidthScale: 0 });
     expect(showAllTuning.leafCharge).toBe(-400);
     expect(showAllTuning.overlapLinkAlpha).toBe(1);

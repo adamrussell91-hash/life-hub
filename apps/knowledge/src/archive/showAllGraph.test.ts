@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import { TOPIC_VOCABULARY } from "../tidy/vocabulary";
 import { nodeDegrees, noteToNoteLinks } from "./graphMetrics";
 import { SHOW_ALL_DEGREE_CAP } from "./showAllEdges";
-import { buildShowAllGraph, showAllNoteRadius } from "./showAllGraph";
+import {
+  SHOW_ALL_DEFAULT_SHAPE,
+  buildShowAllGraph,
+  layoutShowAll,
+  showAllDiscRadius,
+  showAllHubTies,
+  showAllNoteRadius,
+} from "./showAllGraph";
 
 function page(
   id: string,
@@ -154,5 +161,104 @@ describe("buildShowAllGraph", () => {
       "Master of Education (Gifted Education)",
     ]);
     expect(degrees.nodes.filter(node => node.kind === "leaf").map(node => node.pageId)).toEqual(["u1"]);
+  });
+});
+
+describe("Show All layout", () => {
+  const dist = (a: { x?: number; y?: number }, b: { x?: number; y?: number }) =>
+    Math.hypot((a.x ?? 0) - (b.x ?? 0), (a.y ?? 0) - (b.y ?? 0));
+
+  function nexusPages() {
+    const pages = [];
+    // V[0] is the big topic. V[1] and V[2] share many notes; V[3] shares none with V[1].
+    for (let i = 0; i < 90; i++) pages.push(page(`big${i}`, `Big ${i}`, [V[0]]));
+    for (let i = 0; i < 30; i++) pages.push(page(`p${i}`, `Pair ${i}`, i < 18 ? [V[1], V[2]] : [V[1]]));
+    for (let i = 0; i < 30; i++) pages.push(page(`q${i}`, `Q ${i}`, [V[2]]));
+    for (let i = 0; i < 30; i++) pages.push(page(`r${i}`, `R ${i}`, i < 6 ? [V[3], V[0]] : [V[3]]));
+    for (let i = 0; i < 25; i++) pages.push(page(`s${i}`, `S ${i}`, [V[4]]));
+    return pages;
+  }
+
+  it("lays out with no physics: positions are final, fixed and identical on every build", () => {
+    const first = buildShowAllGraph(nexusPages());
+    const second = buildShowAllGraph(nexusPages());
+    for (const [index, node] of first.nodes.entries()) {
+      expect(node.x).toBeTypeOf("number");
+      expect(node.fx).toBe(node.x);
+      expect(node.fy).toBe(node.y);
+      expect(second.nodes[index]!.x).toBe(node.x);
+      expect(second.nodes[index]!.y).toBe(node.y);
+    }
+  });
+
+  it("puts the biggest topic at the core of the nexus", () => {
+    const model = buildShowAllGraph(nexusPages());
+    const hubs = model.nodes.filter(node => node.kind === "major");
+    const cx = hubs.reduce((sum, hub) => sum + (hub.x ?? 0), 0) / hubs.length;
+    const cy = hubs.reduce((sum, hub) => sum + (hub.y ?? 0), 0) / hubs.length;
+    const fromCentre = hubs.map(hub => ({ label: hub.label, d: Math.hypot((hub.x ?? 0) - cx, (hub.y ?? 0) - cy) }));
+    fromCentre.sort((a, b) => a.d - b.d);
+    expect(fromCentre[0]!.label).toBe(V[0]);
+  });
+
+  it("pulls topics that share notes next to each other", () => {
+    const model = buildShowAllGraph(nexusPages());
+    const hub = (label: string) => model.nodes.find(node => node.kind === "major" && node.label === label)!;
+    expect(dist(hub(V[1]), hub(V[2]))).toBeLessThan(dist(hub(V[1]), hub(V[3])));
+    expect(model.hubTies?.[0]).toEqual({ a: [V[1], V[2]].sort()[0], b: [V[1], V[2]].sort()[1], weight: 18 });
+  });
+
+  it("keeps topic discs apart and every note inside its own disc", () => {
+    const model = buildShowAllGraph(nexusPages());
+    const hubs = model.nodes.filter(node => node.kind === "major");
+    const radius = new Map(hubs.map(hub => [hub.label, showAllDiscRadius(hub.count, hub.r)]));
+    for (let i = 0; i < hubs.length; i++) {
+      for (let j = i + 1; j < hubs.length; j++) {
+        expect(dist(hubs[i]!, hubs[j]!)).toBeGreaterThan(radius.get(hubs[i]!.label)! + radius.get(hubs[j]!.label)!);
+      }
+    }
+    for (const leaf of model.nodes.filter(node => node.kind === "leaf")) {
+      const hub = hubs.find(item => item.label === leaf.parentKeyword)!;
+      expect(dist(leaf, hub)).toBeLessThanOrEqual(radius.get(hub.label)! + 1);
+      expect(dist(leaf, hub)).toBeGreaterThan(hub.r);
+    }
+  });
+
+  it("never stacks two notes on the same spot", () => {
+    const model = buildShowAllGraph(nexusPages());
+    const leaves = model.nodes.filter(node => node.kind === "leaf");
+    for (let i = 0; i < leaves.length; i++) {
+      for (let j = i + 1; j < leaves.length; j++) {
+        expect(dist(leaves[i]!, leaves[j]!)).toBeGreaterThan(4);
+      }
+    }
+  });
+
+  it("seats multi-topic notes on the rim facing their other topic", () => {
+    const model = buildShowAllGraph(nexusPages());
+    const home = model.nodes.find(node => node.kind === "major" && node.label === V[1])!;
+    const other = model.nodes.find(node => node.kind === "major" && node.label === V[2])!;
+    const leaves = model.nodes.filter(node => node.kind === "leaf" && node.parentKeyword === V[1]);
+    const bridging = leaves.filter(node => (node.hubLabels ?? []).includes(V[2]));
+    const solo = leaves.filter(node => !(node.hubLabels ?? []).includes(V[2]));
+    const mean = (list: typeof leaves) => list.reduce((sum, node) => sum + dist(node, other), 0) / list.length;
+    expect(bridging.length).toBeGreaterThan(0);
+    expect(mean(bridging)).toBeLessThan(mean(solo));
+  });
+
+  it("spreads notes further apart when Spread goes up", () => {
+    const model = buildShowAllGraph(nexusPages());
+    const leaves = () => model.nodes.filter(node => node.kind === "leaf" && node.parentKeyword === V[0]);
+    const hub = model.nodes.find(node => node.kind === "major" && node.label === V[0])!;
+    const reach = () => Math.max(...leaves().map(node => dist(node, hub)));
+    const before = reach();
+    layoutShowAll(model.nodes, model.hubTies ?? [], { ...SHOW_ALL_DEFAULT_SHAPE, spread: 1.5 });
+    expect(reach()).toBeGreaterThan(before * 1.3);
+  });
+
+  it("counts shared notes per hub pair once per note", () => {
+    const ties = showAllHubTies([[V[0], V[1], V[0]], [V[1], V[0]], [V[2]]], new Set([V[0], V[1], V[2]]));
+    expect(ties).toHaveLength(1);
+    expect(ties[0]!.weight).toBe(2);
   });
 });

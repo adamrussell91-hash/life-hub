@@ -8,6 +8,8 @@ import {
   showAllDrawRings,
   showAllEdgeBudget,
   showAllLabelVisible,
+  hubLabelVariants,
+  placeHubLabels,
 } from "./showAllDraw";
 
 function leaf(id: string, extra: Partial<GraphNodeDatum> = {}): GraphNodeDatum {
@@ -61,5 +63,52 @@ describe("show all draw budget", () => {
     expect(showAllLabelVisible(note, 0.9, false, true)).toBe(true);
     expect(showAllDrawRings(0.16)).toBe(false);
     expect(showAllDrawRings(0.4)).toBe(true);
+  });
+});
+
+describe("hub label placement", () => {
+  const box = (text: string) => ({ text, width: text.length * 7 });
+
+  it("offers shorter topic names as fallbacks", () => {
+    expect(hubLabelVariants("Teacher Practice and Professional Learning")).toEqual([
+      "Teacher Practice and Professi…",
+      "Teacher Practice",
+    ]);
+    expect(hubLabelVariants("Wellbeing Mental Health and Trauma")).toContain("Wellbeing Mental");
+  });
+
+  it("never lets two labels overlap: flips below, then shortens, then hides", () => {
+    const hubs = [
+      { id: "a", x: 0, y: 0, coreR: 10, candidates: [box("Alpha topic long name"), box("Alpha")] },
+      { id: "b", x: 20, y: 0, coreR: 10, candidates: [box("Beta topic long name"), box("Beta")] },
+      { id: "c", x: 40, y: 0, coreR: 10, candidates: [box("Gamma topic long name"), box("Gamma")] },
+    ];
+    const placed = placeHubLabels(hubs, 16, 4);
+    expect(placed.get("a")!.side).toBe("above");
+    expect(placed.get("b")!.side).toBe("below");
+    const boxes = [...placed.values()].map(item => item.box);
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i]!;
+        const b = boxes[j]!;
+        expect(a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1).toBe(false);
+      }
+    }
+    expect(placed.has("c")).toBe(false);
+  });
+
+  it("always shows a hovered or selected hub's label", () => {
+    const hubs = [
+      { id: "a", x: 0, y: 0, coreR: 10, candidates: [box("Alpha")] },
+      { id: "b", x: 0, y: 1, coreR: 10, candidates: [box("Beta")], pinned: true },
+    ];
+    const placed = placeHubLabels(hubs, 16, 4);
+    expect(placed.get("b")!.text).toBe("Beta");
+  });
+
+  it("slides a label back inside the stage instead of clipping at the edge", () => {
+    const hubs = [{ id: "a", x: 10, y: 100, coreR: 10, candidates: [box("A long edge label")] }];
+    const placed = placeHubLabels(hubs, 16, 4, { x0: 0, y0: 0, x1: 500, y1: 500 });
+    expect(placed.get("a")!.box.x0).toBe(0);
   });
 });

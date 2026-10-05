@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mountForceGraph } from "./forceGraph";
-import { SHOW_ALL_STRAND_WIDTH, resetShowAllTuning } from "./forceGraphBehavior";
+import { resetShowAllTuning } from "./forceGraphBehavior";
 import type { ArchiveGraphModel, GraphLinkDatum, GraphNodeDatum } from "./keywordGraph";
 import { TOPIC_VOCABULARY } from "../tidy/vocabulary";
 import { buildArchiveGraph } from "./keywordGraph";
@@ -48,6 +48,13 @@ function recordingContext() {
         lineCap: ctx.lineCap,
         strokeStyle: String(ctx.strokeStyle),
       });
+    },
+    measureText(text: string) {
+      return { width: text.length * 7 } as TextMetrics;
+    },
+    strokeText() {},
+    createLinearGradient() {
+      return { addColorStop() {} };
     },
     fillText(text: string) {
       texts.push(text);
@@ -131,9 +138,9 @@ describe("Show All strand drawing", () => {
     document.body.appendChild(host);
 
     const stop = mountForceGraph(host, model(), {}, { variant: "showAll", search: "", excerptFor: () => "" });
-    const viewK = 0.16;
-    const expected = SHOW_ALL_STRAND_WIDTH / viewK;
+    // The view is fitted to the map, so the zoom is not a constant; every strand shares one width.
     const strands = recorded.strokes.filter(stroke => stroke.strokeStyle !== "#fff");
+    const expected = strands[0]?.lineWidth ?? 0;
 
     expect(strands.length).toBeGreaterThanOrEqual(1);
     expect(strands.every(stroke => Math.abs(stroke.lineWidth - expected) < 0.01)).toBe(true);
