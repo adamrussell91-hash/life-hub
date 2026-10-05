@@ -918,6 +918,16 @@
   font-size: var(--text-sm);
 }
 
+/* Status + static "thinking" button share one aside row. */
+.hub-ai-bar__aside > .chat__status {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
 .chat__fold {
   min-width: 0;
   border: 1px solid var(--line);
