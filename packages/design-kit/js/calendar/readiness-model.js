@@ -17,7 +17,6 @@
  * Every number lives in READINESS. They are provisional design weights from the
  * comparison prototype, not fitted or clinically validated coefficients.
  */
-import { symptomsIn } from './capacity-model.js';
 
 export const MODEL_VERSION = 'readiness-2.0-provisional';
 
@@ -155,6 +154,101 @@ export function availableAt(record) {
   return `${date}T${time}`;
 }
 
+/* ======================================================================== Symptoms */
+
+/**
+ * Symptom words recognised in diary text until the diary schema carries `symptoms`.
+ * Order matters for the note: the first match is named.
+ */
+const SYMPTOM_PATTERNS = [
+  ['sore throat', /\bsore throat\b/i],
+  ['sniffles', /\bsniffl(?:es|y)\b|\brunny nose\b/i],
+  ['run down', /\brun[- ]down\b/i],
+  ['viral', /\bviral\b|\bvirus\b|\bflu\b/i],
+  ['headache', /\bheadache\b|\bmigraine\b/i],
+  ['nausea', /\bnause(?:a|ous)\b/i],
+  ['flare', /\bflare(?:[- ]up)?\b/i],
+  ['cramps', /\bcramp(?:s|ing)?\b/i],
+  ['fatigue', /\bfatigue\b|\bexhausted\b|\bwiped out\b/i],
+  ['fever', /\bfever\b|\btemperature\b/i]
+];
+
+/** Symptoms from a diary record: its `symptoms` array if present, else words in its text. */
+export function symptomsIn(record, body = '') {
+  if (Array.isArray(record?.symptoms)) {
+    return record.symptoms.map(s => String(s).trim()).filter(Boolean);
+  }
+  const text = `${record?.title ?? ''}\n${record?.notes ?? ''}\n${body ?? ''}`;
+  return SYMPTOM_PATTERNS.filter(([, re]) => re.test(text)).map(([name]) => name);
+}
+
+/* ======================================================================== Check-ins as events */
+
+export const CHECKIN_TYPE = 'readiness_checkin';
+
+/**
+ * Morning check-in observations → calendar events, so every view that already receives
+ * events also receives the check-ins (and computes the same number). No `time`: they
+ * never draw as chips.
+ */
+export function checkinEvents(observations) {
+  return (observations ?? []).filter(o => o?.id && /^\d{4}-\d{2}-\d{2}$/.test(o.local_date ?? '')).map(o => ({
+    path: `checkin:${o.id}`,
+    record: {
+      type: CHECKIN_TYPE,
+      id: o.id,
+      date: o.local_date,
+      observed_at: o.observed_at ?? null,
+      answers: o.answers ?? {},
+      reported_estimate: Number.isFinite(o.reported_estimate) ? o.reported_estimate : null,
+      supersedes_observation_id: o.supersedes_observation_id ?? null,
+      ...(o.deleted_at ? { deleted_at: o.deleted_at } : {})
+    },
+    body: ''
+  }));
+}
+
+/** The live check-in per date: deleted ones and superseded ones never count. */
+export function checkinsByDate(events) {
+  const rows = (events ?? []).map(e => e?.record).filter(r => r?.type === CHECKIN_TYPE && !r.deleted_at);
+  const superseded = new Set(rows.map(r => r.supersedes_observation_id).filter(Boolean));
+  const out = new Map();
+  for (const r of rows.filter(r => !superseded.has(r.id)).sort((a, b) => String(a.observed_at).localeCompare(String(b.observed_at)))) {
+    out.set(r.date, r);
+  }
+  return out;
+}
+
+/* ======================================================================== Workload */
+
+const hourOf = hhmm => {
+  const m = /^(\d{2}):(\d{2})$/.exec(String(hhmm ?? ''));
+  return m ? Number(m[1]) + Number(m[2]) / 60 : null;
+};
+
+/**
+ * A day's workload in hours, from the evidence every view and server has alike:
+ * tracked work sessions (actual) and scheduled classes (scheduled). A task's time block
+ * alone is not proof that the work happened, so untracked blocks do not count.
+ */
+export function priorWorkload(events, date) {
+  let tracked = 0;
+  let scheduled = 0;
+  for (const event of events ?? []) {
+    const r = event?.record;
+    if (!r || r.date !== date) continue;
+    const start = hourOf(r.time ?? r.start_time);
+    if (start == null) continue;
+    const end = hourOf(r.end_time) ?? start + (Number(r.duration_min) || 60) / 60;
+    if (!(end > start)) continue;
+    if (r.type === 'work_session') tracked += end - start;
+    else if (r.type === 'scheduled_lesson' && r.delivery_status !== 'skipped' && r.delivery_status !== 'rescheduled') scheduled += end - start;
+  }
+  const hours = tracked + scheduled;
+  if (!hours) return { hours: null, source: null };
+  return { hours, source: tracked > 0 ? 'actual' : 'scheduled' };
+}
+
 /* ======================================================================== Evidence */
 
 const clamp = (v, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, v));
@@ -220,7 +314,8 @@ export function collectEvidence(events, { date, issuedLocal }) {
   const energies = diaries.map(d => READINESS.diaryEnergy[d.record.energy]).filter(Number.isFinite);
   const moods = diaries.map(d => d.record.mood_score).filter(Number.isFinite);
   // One episode, one count: the same symptom across diaries / days is named once.
-  const recentDiaries = [...on(addDays(date, -2), 'diary'), ...diaries];
+  // Newest first, so the note names what is going on now.
+  const recentDiaries = [...on(date, 'diary'), ...on(yesterday, 'diary'), ...on(addDays(date, -2), 'diary')];
   const symptoms = [...new Set(recentDiaries.flatMap(d => symptomsIn(d.record, d.body)))];
 
   const workouts = [...on(yesterday, 'workout'), ...on(date, 'workout')];
@@ -292,17 +387,23 @@ export function computeReadiness({
 
   // Prior-day diary state informs today only partially: blend toward history.
   const priorBlend = v => (v == null ? null : round(0.6 * v + 0.4 * H.value));
-  const energy = pick('energy', a('energy')?.anchor, priorBlend(ev.priorEnergy), 'yesterday’s diary');
+  const ill = (ev.symptoms?.length ?? 0) >= 3 && !a('symptoms');
+  const energyFallback = priorBlend(ev.priorEnergy) ?? (ill ? Math.min(H.value, 50) : null);
+  const energy = pick('energy', a('energy')?.anchor, energyFallback, ev.priorEnergy != null ? 'yesterday’s diary' : 'recent illness');
   const focus = pick('focus', a('focus')?.anchor, null, null);
   const mood = pick('mood', a('mood')?.anchor, priorBlend(ev.priorMood), 'yesterday’s diary');
 
-  // Health: an answered trend beats diary symptoms; no symptom evidence = no limitation.
+  // Health: an answered trend beats diary symptoms (one 65, two 45, three or more 30).
+  // With no symptom evidence, a check-in that day means no limitation; otherwise it is
+  // unknown and sits at history (so quiet days never drift upward on their own).
+  const checkedIn = Object.keys(answers ?? {}).length > 0;
   let health;
   if (a('symptoms')) { health = a('symptoms').anchor; sources.health = 'check-in'; }
   else if (ev.symptoms?.length) {
-    health = ev.symptoms.length > 1 ? 45 : 65;
+    health = ev.symptoms.length >= 3 ? 30 : ev.symptoms.length === 2 ? 45 : 65;
     sources.health = 'recent diary';
-  } else { health = 100; sources.health = 'no symptoms logged'; }
+  } else if (checkedIn) { health = 100; sources.health = 'no symptoms reported'; }
+  else { health = H.value; sources.health = 'history'; }
 
   // Sleep: answer > record > history. Missing never implies poor.
   const sleepAnswer = a('sleep');
@@ -342,7 +443,7 @@ export function computeReadiness({
   // Sleep speaks to body and mind only when it was poor; "okay" sleep is not a limitation.
   const poorSleep = sleepKnown && sleep < 60;
   const known = {
-    physical: sources.energy !== 'history' || poorSleep || sources.health !== 'no symptoms logged' || Boolean(workCost) || Boolean(exerciseCost),
+    physical: sources.energy !== 'history' || poorSleep || sources.health === 'recent diary' || sources.health === 'check-in' || Boolean(workCost) || Boolean(exerciseCost),
     cognitive: sources.focus !== 'history' || poorSleep,
     emotional: sources.mood !== 'history'
   };
@@ -363,6 +464,7 @@ export function computeReadiness({
 
   return {
     modelVersion: MODEL_VERSION,
+    evidence: ev,
     score,
     modelled: round(modelled),
     low: clamp(score - spread),
@@ -378,6 +480,7 @@ export function computeReadiness({
     sleepKnown,
     work,
     exercise,
+    ill: (ev.symptoms?.length ?? 0) >= 2 && !a('symptoms'),
     residualFatigue: Boolean(sleepAnswer?.residual) || answers?.lingering === 'soreness' || answers?.lingering === 'mental' || answers?.lingering === 'both',
     trend: H.yesterday == null || missing.length >= 3 ? 'steady' : score > H.yesterday + 8 ? 'improving' : score < H.yesterday - 8 ? 'declining' : 'steady',
     contributors: contributors.filter(c => c.effect !== 0 || c.source === 'check-in').sort((x, y) => x.effect - y.effect)
@@ -684,4 +787,112 @@ export function snapshotBody(r, { date, target = 'morning', state, explanation, 
 /** Score for an answered overall readiness bubble, for history. */
 export function reportedEstimate(answers) {
   return answerFor('overall', answers?.overall)?.anchor ?? null;
+}
+
+/* ======================================================================== Every view, one number */
+
+/** Days with no logs recover toward the personal baseline; holidays lift a little. */
+export const RECOVERY = Object.freeze({ rate: 0.6, holidayLift: 5 });
+
+export function forecastAhead(lastPct, daysAhead, { holiday = false } = {}) {
+  const gap = READINESS.baseline - lastPct;
+  const recovered = lastPct + gap * (1 - RECOVERY.rate ** Math.max(0, daysAhead));
+  return round(clamp(recovered + (holiday ? RECOVERY.holidayLift : 0)));
+}
+
+function shortNote(r) {
+  const drags = r.contributors.filter(c => c.effect <= -3 && c.source !== 'history' && c.source !== 'unconfirmed').slice(0, 2);
+  if (!drags.length) return r.score >= 85 ? 'good energy' : 'steady';
+  return drags.map(c => (c.id === 'health' && r.evidence?.symptoms?.length ? r.evidence.symptoms[0] : c.label).replace(/^Recent /, '').replace(/^Yesterday’s /, '').replace(/ \(as scheduled\)$/, '').toLowerCase()).join(', ');
+}
+
+function factorsOf(r, symptoms) {
+  return r.contributors.filter(c => c.effect < 0 && c.source !== 'history' && c.source !== 'unconfirmed').map(c => (
+    c.id === 'health' && symptoms.length
+      ? { id: 'symptoms', label: symptoms.slice(0, 2).join(', '), delta: c.effect, symptoms }
+      : { id: c.id, label: c.label.toLowerCase(), delta: c.effect }
+  ));
+}
+
+/**
+ * Readiness for every date in `dateKeys` — the one formula behind Day, Week, Term, Year,
+ * Almanac, every hub's calendar and the server planners.
+ *
+ * A day is computed (not just forecast) when something real speaks to it: a check-in,
+ * a sleep record or a diary that day — and today always is. Days after the last such
+ * day recover toward the baseline. History reaches 21 days back, across week edges.
+ *
+ * events: calendar events, including check-ins (checkinEvents) and work sessions/classes.
+ * Returns Map(date → { pct, low, high, note, factors, soften, forecast, checkedIn, readiness }).
+ */
+export function readinessForDates(events, dateKeys, { isHoliday = () => false, today = null } = {}) {
+  const out = new Map();
+  const wanted = [...new Set(dateKeys ?? [])].sort();
+  if (!wanted.length) return out;
+  const list = events ?? [];
+  const byDate = new Map();
+  for (const e of list) {
+    const d = e?.record?.date;
+    if (typeof d !== 'string') continue;
+    if (!byDate.has(d)) byDate.set(d, []);
+    byDate.get(d).push(e);
+  }
+  const near = d => [-2, -1, 0].flatMap(k => byDate.get(addDays(d, k)) ?? []);
+  const checkins = checkinsByDate(list);
+  const sleepOn = d => (byDate.get(d) ?? []).some(e => e.record.type === 'sleep');
+  const diaryOn = d => (byDate.get(d) ?? []).some(e => e.record.type === 'diary');
+
+  const history = [];
+  let last = null;
+  let lastSleepKnown = null;
+  const end = wanted.at(-1);
+  for (let d = addDays(wanted[0], -21); d <= end; d = addDays(d, 1)) {
+    const checkin = checkins.get(d) ?? null;
+    const answered = Boolean(checkin);
+    const future = today != null && d > today;
+    const logged = answered || sleepOn(d) || diaryOn(d);
+    let row;
+    if (!future && (logged || d === today)) {
+      const evidence = collectEvidence(near(d), { date: d, issuedLocal: null });
+      const work = priorWorkload(byDate.get(addDays(d, -1)) ?? [], addDays(d, -1));
+      const stale = lastSleepKnown ? Math.max(1, Math.round((Date.parse(d) - Date.parse(lastSleepKnown)) / 86_400_000)) : 14;
+      const r = computeReadiness({
+        evidence,
+        history,
+        answers: checkin?.answers ?? {},
+        priorWorkHours: work.hours,
+        priorWorkSource: work.source,
+        sleepStaleDays: stale
+      });
+      row = {
+        pct: r.score,
+        low: r.low,
+        high: r.high,
+        note: shortNote(r),
+        factors: factorsOf(r, evidence.symptoms ?? []),
+        // Soften: low, or unwell on known poor sleep, whatever the number says.
+        soften: r.score < 40 || (r.ill && r.sleepKnown && r.inputs.sleep < 60),
+        forecast: !logged,
+        checkedIn: answered,
+        readiness: r
+      };
+      if (logged) {
+        history.push({ date: d, score: r.score });
+        last = { date: d, pct: r.score, spread: r.spread };
+      }
+      const sleepAnswered = checkin?.answers?.sleep && checkin.answers.sleep !== 'premise_wrong';
+      if (sleepAnswered || sleepOn(d)) lastSleepKnown = d;
+    } else if (last) {
+      const ahead = Math.round((Date.parse(d) - Date.parse(last.date)) / 86_400_000);
+      const pct = forecastAhead(last.pct, ahead, { holiday: isHoliday(d) });
+      // The band keeps widening with distance: the forecast never pretends to know December.
+      const spread = (last.spread ?? READINESS.spread.base) + 1.2 * Math.sqrt(ahead);
+      row = { pct, low: round(clamp(pct - spread)), high: round(clamp(pct + spread)), note: 'forecast', factors: [], soften: pct < 40, forecast: true, checkedIn: false, readiness: null };
+    } else {
+      row = { pct: READINESS.baseline, note: 'no logs', factors: [], soften: false, forecast: true, checkedIn: false, readiness: null };
+    }
+    if (d >= wanted[0]) out.set(d, row);
+  }
+  for (const d of [...out.keys()]) if (!wanted.includes(d)) out.delete(d);
+  return out;
 }

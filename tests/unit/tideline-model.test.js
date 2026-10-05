@@ -30,7 +30,7 @@ test('a failed life-log fetch does not claim the week has no logs', () => {
     terms: TERMS,
     lifeLogStatus: 'error'
   });
-  assert.equal(built.days[0].cap.pct, 80);
+  assert.equal(built.days[0].cap.pct, 75, 'readiness baseline');
   assert.equal(built.days[0].cap.note, 'logs unavailable');
 });
 
@@ -38,9 +38,12 @@ test('tideline capacity, period and grid come from the fixture logs', () => {
   const built = model();
   assert.equal(built.period.title, 'T3 W10 · last week of term');
   assert.equal(built.period.range, '21/09/26 – 27/09/26');
-  assert.deepEqual(built.days.map(day => day.cap.pct), [79, 51, 42, 34, 52, 68, 75]);
-  assert.deepEqual(built.days.map(day => day.over), [false, false, false, true, false, false, false]);
-  assert.equal(built.days[3].cap.note, 'sore throat, poor sleep');
+  // Readiness v2 (one formula for every view): the run-down week slides 79 → 51, then
+  // recovers toward baseline. Thursday is flagged to soften (unwell on poor sleep).
+  assert.deepEqual(built.days.map(day => day.cap.pct), [79, 67, 56, 51, 61, 71, 75]);
+  assert.deepEqual(built.days.map(day => day.over), [false, false, false, false, false, false, false]);
+  assert.equal(built.days[3].cap.note, 'sore throat, energy reduced');
+  assert.equal(built.days[3].cap.soften, true);
   assert.equal(built.days[4].cap.forecast, true);
   assert.equal(built.days[3].chips.some(chip => /breakfast|Diary/i.test(chip.title)), false);
   assert.equal(built.days[3].chips.filter(chip => chip.id === 'gastro').length, 1);

@@ -39,6 +39,9 @@ const ID = /^[A-Za-z0-9_.:-]{1,80}$/;
 const TARGETS = new Set(['morning']);
 const DOMAINS = new Set(Object.keys(ANSWERS));
 const CENTRAL_NODE_PATH = 'central-node.md';
+/** The Almanac caches its view; a check-in changes capacity, so the cache must go. */
+const ALMANAC_SNAPSHOT_KEY = 'meta/almanac_snapshot';
+const dropAlmanacCache = store => setJSON(store, ALMANAC_SNAPSHOT_KEY, null).catch(() => {});
 
 export const snapshotKey = (date, target = 'morning') => `${CAPACITY_PREFIX}snapshots/${date}--${target}`;
 export const obsPrefix = date => `${CAPACITY_PREFIX}observations/${date}/`;
@@ -247,6 +250,7 @@ export function capacityCheckinsRoute(deps = {}) {
         });
         await writeIndex(store, `${dp}_index`, [...await readIndex(store, `${dp}_index`), id]);
       }
+      await dropAlmanacCache(store);
       let centralNode = { updated: false, reason: 'skipped' };
       try {
         centralNode = await syncCentralNode(openRepo, obs, snapshot);
@@ -283,6 +287,7 @@ export function capacityCheckinsRoute(deps = {}) {
       const dkey = `${discPrefix(date)}${body.observation_id}`;
       const disc = await getJSON(store, dkey);
       if (disc) await setJSON(store, dkey, { ...disc, deleted_at: at });
+      await dropAlmanacCache(store);
       return withCors(okResponse(200, { deleted: true }), request, env);
     }
 

@@ -18,7 +18,28 @@ Adam approved the full build on 5 Oct 2026 and supplied the 30 icons. This page 
 
 ## Where Adam sees it
 
-Life → Calendar → **Day**. For today, a **Capacity forecast** block now opens the side column, and the dial's centre gauge shows the same number. Between 5 am and noon the bubbles appear under the forecast. Outside that window a "Check in now" link appears instead. Around 7:00–9:30 am, if no check-in exists yet, the phone gets one push ("How are you starting today?"). The push counts toward the existing cap of 4 a day and opens the bubbles directly. Once the Day view has worked out today's readiness, the Week view's today column shows it too.
+Life → Calendar → **Day**. For today, a **Capacity forecast** block now opens the side column, and the dial's centre gauge shows the same number. Between 5 am and noon the bubbles appear under the forecast. Outside that window a "Check in now" link appears instead. Around 7:00–9:30 am, if no check-in exists yet, the phone gets one push ("How are you starting today?"). The push counts toward the existing cap of 4 a day and opens the bubbles directly.
+
+## One number everywhere
+
+Every capacity percentage, in every view and every server planner, comes from one function: `capacityForDates` in `capacity-model.js`, which is now the readiness model (`readinessForDates`). Each caller also feeds it the same evidence:
+
+| Caller | How check-ins and workload get in |
+|---|---|
+| Day dial, Day panel, Week (Tideline), Term / Year (river) — Life and every hub calendar | `withCheckins()` in `readiness-checkins.js` merges the shared check-ins into the view's events; each view repaints when check-ins change |
+| Almanac (server) | `readinessEvidenceEvents()` adds check-ins, tracked sessions and classes; a check-in clears the Almanac cache |
+| Sara's ghost proposer, Hammond's goal slots (server) | The same helper, with three weeks of sleep / diary / training history |
+
+The holiday rule is the same everywhere (`school-time.js`). `tests/unit/capacity-forecast.test.js` (“one number everywhere”) fails if Day, Week, Term/Year and the Almanac ever disagree for the same day.
+
+Removed to make that true:
+- The old penalty formula (baseline 80, ceiling 95, low-day streak).
+- The Almanac's placeholder term pattern (−12 on every future term day, −18 in week one).
+- The Term river's hand-made fixture numbers whenever real logs exist.
+
+Fixed along the way: Hammond's goal slots read the capacity Map as a plain object, so every day silently read 80%.
+
+Days are computed when a check-in, sleep record or diary speaks to them, and today always is. After the last such day, the forecast recovers toward the baseline (75), with a small holiday lift and a band that widens with distance. "No symptoms logged" counts as unknown (history), not perfect health, so quiet days don't drift upward. A day is flagged to soften below 40, or when illness and known poor sleep coincide.
 
 ## How the handoff rules map
 
@@ -57,5 +78,5 @@ To retune the colours, edit `FAMILIES` in the build script and re-run it. Every 
 
 - The weights are the comparison prototype's design weights. They have not been fitted or evaluated. The band is illustrative, not calibrated. Prospective evaluation and chronological holdouts (see `algorithm.md`) still need to be built from the stored snapshot and observation pairs once enough mornings exist.
 - No predicted Corey/social lift yet. The weather and explanation code supports one (`lifts`, state 7), but nothing in the stored data supports it yet, so none is shown.
-- Other days in Week, Term and Almanac still use the old `capacity-model.js` (logged days and recovery forecast). Only today switches to readiness, and only once the Day view has loaded. Moving the multi-day planning maths onto readiness is a follow-up.
-- `tests/browser/dial-visual.spec.mjs` in `DIAL_APP=1` mode asserts the old gauge value (34) for the frozen fixture day. The readiness forecast now owns today's gauge, so that number changes by design. The spec is not in the default browser run.
+- Professional meetings are not yet counted as workload. Only tracked sessions and classes are, because those reach every caller in the same shape.
+- `tests/browser/dial-visual.spec.mjs` (in `DIAL_APP=1` mode) and the calendar reference mock-ups still quote the old fixture values (34% Thursday). The fixture day now reads 51 by design. That spec is not in the default browser run, and its header says not to edit it, so this is flagged in the PR instead.

@@ -9,21 +9,18 @@
  * Bubble taps update the DOM in place (no repaint, focus stays put); saving repaints.
  */
 import {
-  addDays,
-  collectEvidence,
-  computeReadiness,
+  CHECKIN_TYPE,
   dayState,
   explainReadiness,
   projectDay,
-  sydneyLocal,
+  readinessForDates,
   snapshotBody,
-  workBand,
-  READINESS,
+    READINESS,
   WEATHER_STATES
 } from './readiness-model.js';
 import { DISCREPANCY_PROMPT, REASON_OPTIONS, selectQuestions, answersFrom } from './morning-bubbles.js';
 import { weatherIconSvg } from './weather-icons.js';
-import { actualSpans, trackedHours } from './day-sense.js';
+import { checkinState, loadCheckins, onCheckinsChange, recordObservation, recordSnapshot } from './readiness-checkins.js';
 
 const API = '/api/capacity-checkins';
 const NS = 'http://www.w3.org/2000/svg';
@@ -31,10 +28,11 @@ const NS = 'http://www.w3.org/2000/svg';
 /** date → { status, payload, error, picks, notes, open, skipped, saving, reason, detail } */
 const days = new Map();
 let repaint = () => {};
+let unsubPanel = null;
 
 function slot(date) {
   if (!days.has(date)) {
-    days.set(date, { status: 'idle', payload: null, error: null, picks: {}, other: {}, open: false, skipped: false, saving: false, reason: null, detail: null, snapshotPosted: false });
+    days.set(date, { picks: {}, other: {}, open: false, skipped: false, saving: false, reason: null, detail: null, snapshotPosted: false });
   }
   return days.get(date);
 }
@@ -43,6 +41,8 @@ function slot(date) {
 export function resetReadinessPanel() {
   days.clear();
   repaint = () => {};
+  unsubPanel?.();
+  unsubPanel = null;
 }
 
 /** Notification tap (#/calendar/day?checkin=1): open the bubbles. */
@@ -52,123 +52,41 @@ export function openCheckin(date) {
   s.skipped = false;
 }
 
-/* ======================================================================== Evidence glue */
-
-const SCHEDULED_WORK = new Set(['scheduled_lesson', 'professional_meeting', 'professional_event']);
-const hourOf = hhmm => {
-  const m = /^(\d{2}):(\d{2})$/.exec(String(hhmm ?? ''));
-  return m ? Number(m[1]) + Number(m[2]) / 60 : null;
-};
+/* ======================================================================== Today's numbers */
 
 /**
- * Yesterday's workload in hours. Tracked work sessions are actual evidence; classes and
- * meetings on the calendar are scheduled evidence. A task's time block alone is not
- * proof that the work happened, so untracked task blocks do not count.
+ * Today's readiness from the same calculation every view uses (capacityForDates on the
+ * calendar's events, check-ins included). `ctx.cap` is the calendar model's cap for
+ * today when the view already has it; otherwise it is computed here the same way.
  */
-export function priorWorkload(events, date) {
-  const tracked = trackedHours(actualSpans(events, date).filter(s => s.kind === 'work'));
-  let scheduled = 0;
-  for (const event of events ?? []) {
-    const r = event?.record;
-    if (!r || r.date !== date || !SCHEDULED_WORK.has(r.type) || r.status === 'cancelled') continue;
-    const start = hourOf(r.time);
-    const end = hourOf(r.end_time) ?? (start != null ? start + (Number(r.duration_min) || 60) / 60 : null);
-    if (start != null && end > start) scheduled += end - start;
-  }
-  const hours = tracked + scheduled;
-  if (!hours) return { hours: null, source: null };
-  return { hours, source: tracked > 0 ? 'actual' : 'scheduled' };
+function todayReadiness(ctx, events) {
+  if (events === ctx.events && ctx.cap?.readiness) return ctx.cap;
+  return readinessForDates(events, [ctx.date], { today: ctx.date }).get(ctx.date);
 }
 
-/** Latest live observation's answers for a date (corrections already applied server-side). */
-function latest(observations) {
-  return (observations ?? []).at(-1) ?? null;
-}
-
-/** History points: reported readiness per past day, else that day's logged capacity. */
-export function historyFrom(recent, fallback = []) {
-  const byDate = new Map();
-  for (const f of fallback) if (Number.isFinite(f?.score)) byDate.set(f.date, f.score);
-  const sorted = [...(recent ?? [])].sort((a, b) => String(a.observed_at).localeCompare(String(b.observed_at)));
-  for (const o of sorted) if (Number.isFinite(o.reported_estimate)) byDate.set(o.local_date, o.reported_estimate);
-  return [...byDate.entries()].map(([date, score]) => ({ date, score }));
-}
-
-/** Days since sleep was last known (answered or recorded), counting today as 1. */
-export function sleepStaleDays(recent, events, date) {
-  for (let i = 1; i <= 14; i += 1) {
-    const d = addDays(date, -i);
-    const answered = (recent ?? []).some(o => o.local_date === d && o.answers?.sleep && o.answers.sleep !== 'premise_wrong');
-    const recorded = (events ?? []).some(e => e?.record?.type === 'sleep' && e.record.date === d);
-    if (answered || recorded) return i;
-  }
-  return 14;
+function present(r, ctx) {
+  const projection = projectDay(r, { items: ctx.items ?? [], wake: ctx.wake ?? 6.5, lightsOut: ctx.lightsOut ?? 22.5, nowHour: ctx.nowHour });
+  return { readiness: r, projection, state: dayState(r, projection), explanation: explainReadiness(r) };
 }
 
 /**
- * Everything the panel shows for `date`, computed now.
- * answers: {} for the pre-answer forecast (the snapshot), or the day's latest answers.
- */
-export function forecastFor({ events, date, nowHour, now = new Date(), items = [], recent = [], fallbackHistory = [], answers = {}, wake = 6.5, lightsOut = 22.5 }) {
-  const issuedLocal = sydneyLocal(now.toISOString());
-  const evidence = collectEvidence(events, { date, issuedLocal });
-  const work = priorWorkload(events, addDays(date, -1));
-  const r = computeReadiness({
-    evidence,
-    history: historyFrom(recent, fallbackHistory),
-    answers,
-    priorWorkHours: work.hours,
-    priorWorkSource: work.source,
-    sleepStaleDays: sleepStaleDays(recent, events, date)
-  });
-  const projection = projectDay(r, { items, wake, lightsOut, nowHour });
-  const state = dayState(r, projection);
-  return { readiness: r, projection, state, explanation: explainReadiness(r), evidence, work };
-}
-
-/**
- * Today's forecast from what the panel knows so far (logs now; check-ins once loaded).
- * Returns { pre, view, readiness, state, stateName, answered } and remembers it so the
- * gauges and the panel agree. Kicks off the day's fetch if needed.
+ * { view, pre, last, answered }: `view` is what every gauge shows for today; `pre` is
+ * the same day without today's check-in — the forecast issued before the answer.
  */
 export function todayForecast(ctx) {
-  const s = slot(ctx.date);
-  if (typeof ctx.onRepaint === 'function') repaint = ctx.onRepaint;
-  void load(ctx, ctx.date);
-  const last = latest(s.payload?.observations ?? []);
-  const base = { events: ctx.events, date: ctx.date, nowHour: ctx.nowHour, now: ctx.now ?? new Date(), items: ctx.items, recent: s.payload?.recent ?? [], fallbackHistory: ctx.fallbackHistory, wake: ctx.wake, lightsOut: ctx.lightsOut };
-  const pre = forecastFor({ ...base, answers: {} });
-  const view = last ? forecastFor({ ...base, answers: last.answers ?? {} }) : pre;
-  s.last = view;
-  s.answered = Boolean(last);
-  return { pre, view, last, readiness: view.readiness, state: view.state, stateName: WEATHER_STATES[view.state]?.name ?? 'Forecast', answered: s.answered };
-}
-
-/** Capacity override for the week view once today's readiness is known (else null). */
-export function readinessFor(date) {
-  const s = days.get(date);
-  if (!s?.last) return null;
-  return { pct: s.last.readiness.score, note: (WEATHER_STATES[s.last.state]?.name ?? 'forecast').toLowerCase(), forecast: !s.answered };
+  const events = ctx.events ?? [];
+  const cap = todayReadiness(ctx, events);
+  const view = present(cap.readiness, ctx);
+  const today = checkinState().date === ctx.date ? checkinState().observations : [];
+  const last = today.at(-1) ?? null;
+  const withoutToday = events.filter(e => !(e?.record?.type === CHECKIN_TYPE && e.record.date === ctx.date));
+  const pre = cap.checkedIn || withoutToday.length !== events.length
+    ? present(readinessForDates(withoutToday, [ctx.date], { today: ctx.date }).get(ctx.date).readiness, ctx)
+    : view;
+  return { view, pre, last, answered: Boolean(cap.checkedIn), stateName: WEATHER_STATES[view.state]?.name ?? 'Forecast' };
 }
 
 /* ======================================================================== Server */
-
-async function load(ctx, date) {
-  const s = slot(date);
-  if (s.status !== 'idle' || typeof ctx.apiFetch !== 'function') return;
-  s.status = 'loading';
-  try {
-    const response = await ctx.apiFetch(`${API}?date=${date}&days=14`);
-    const payload = await response.json().catch(() => null);
-    if (!response.ok || payload?.ok === false) throw new Error(payload?.error?.message ?? `Check-ins unavailable (${response.status}).`);
-    s.payload = payload?.data ?? payload;
-    s.status = 'ready';
-  } catch (error) {
-    s.status = 'error';
-    s.error = error?.message ?? 'Could not reach the server.';
-  }
-  repaint();
-}
 
 async function post(ctx, body) {
   const response = await ctx.apiFetch(API, {
@@ -184,30 +102,28 @@ async function post(ctx, body) {
 /** Issue the pre-answer forecast once a day, before any answer exists. */
 async function ensureSnapshot(ctx, date, pre) {
   const s = slot(date);
-  if (s.snapshotPosted || s.payload?.snapshot || (s.payload?.observations ?? []).length) return;
+  const known = checkinState();
+  if (s.snapshotPosted || known.date !== date || known.status !== 'ready' || known.snapshot || known.observations.length) return;
   s.snapshotPosted = true;
   try {
     const data = await post(ctx, { action: 'snapshot', date, snapshot: preSnapshot(pre, date) });
-    if (s.payload) s.payload.snapshot = data.snapshot;
+    recordSnapshot(data.snapshot);
   } catch {
     s.snapshotPosted = false; // retried with the observation if still missing
   }
 }
 
 function preSnapshot(pre, date) {
-  return snapshotBody(pre.readiness, {
+  const r = pre.readiness;
+  return snapshotBody(r, {
     date,
     state: pre.state,
     explanation: pre.explanation,
     features: {
-      sleep: pre.evidence.sleep?.source ?? null,
-      prior_energy: pre.evidence.priorEnergy,
-      prior_mood: pre.evidence.priorMood,
-      symptoms: pre.evidence.symptoms,
-      exercise: pre.evidence.exercise,
-      prior_work_hours: pre.work.hours,
-      prior_work_source: pre.work.source,
-      evidence_as_of: pre.evidence.issuedLocal
+      sources: r.sources,
+      missing: r.missing,
+      prior_work: r.work,
+      exercise: r.exercise
     }
   });
 }
@@ -307,8 +223,11 @@ export function chartSvg(doc, projection, { nowHour = null, width = 320, height 
 export function mountReadinessPanel(ctx) {
   const { doc, side, date } = ctx;
   const s = slot(date);
+  if (typeof ctx.onRepaint === 'function') repaint = ctx.onRepaint;
+  if (!unsubPanel) unsubPanel = onCheckinsChange(() => repaint());
+  loadCheckins(ctx.apiFetch, date);
   const { pre, view, last } = todayForecast(ctx);
-  if (s.status === 'ready') void ensureSnapshot(ctx, date, pre);
+  void ensureSnapshot(ctx, date, pre);
 
   const section = h(doc, 'section', 'rf', null, side, { 'data-part': 'forecast', 'aria-labelledby': `rf-h-${date}` });
   h(doc, 'h4', 'dd-h', 'Capacity forecast', section, { id: `rf-h-${date}` });
@@ -383,6 +302,8 @@ function paintDetail(doc, section, view, s) {
 
 function mountCheckin(ctx, section, { s, last, pre }) {
   const { doc, date, nowHour } = ctx;
+  const known = checkinState();
+  const status = known.date === date ? known.status : 'loading';
   if (s.reason) return mountReason(ctx, section, s);
   if (last && !s.open) {
     const done = h(doc, 'div', 'rf-done', null, section, { 'data-part': 'checkin-done' });
@@ -392,14 +313,14 @@ function mountCheckin(ctx, section, { s, last, pre }) {
     on(change, 'click', () => { s.open = true; s.picks = {}; s.other = {}; repaint(); });
     return null;
   }
-  if (s.status === 'error') {
-    h(doc, 'p', 'rf-note', `Check-ins unavailable: ${esc(s.error)} The forecast above uses your logs only.`, section, { 'data-part': 'checkin-error' });
+  if (status === 'error') {
+    h(doc, 'p', 'rf-note', `Check-ins unavailable: ${esc(known.error)} The forecast above uses your logs only.`, section, { 'data-part': 'checkin-error' });
     return null;
   }
   const window = READINESS.checkinWindow;
   const inWindow = nowHour >= window.from && nowHour < window.to;
   if (!s.open && (!inWindow || s.skipped)) {
-    if (s.status === 'ready') {
+    if (status === 'ready') {
       const later = h(doc, 'div', 'rf-done', null, section);
       h(doc, 'span', '', 'No check-in today.', later);
       const open = h(doc, 'button', 'dd-link', 'Check in now', later, { type: 'button', 'data-checkin-open': '' });
@@ -407,16 +328,16 @@ function mountCheckin(ctx, section, { s, last, pre }) {
     }
     return null;
   }
-  if (s.status !== 'ready') {
+  if (status !== 'ready') {
     h(doc, 'p', 'rf-note', 'Loading your check-in…', section, { 'data-part': 'checkin-loading' });
     return null;
   }
 
   const { opening, questions } = selectQuestions({
     date,
-    observations: s.payload?.recent ?? [],
-    evidence: pre.evidence,
-    priorWork: workBand(pre.work.hours)
+    observations: known.recent,
+    evidence: pre.readiness.evidence ?? {},
+    priorWork: pre.readiness.work
   });
   const card = h(doc, 'form', 'rf-checkin', null, section, { 'data-part': 'checkin', 'aria-label': opening });
   h(doc, 'h5', 'rf-opening', esc(opening), card);
@@ -473,12 +394,11 @@ async function saveCheckin(ctx, s, questions, last, pre, card, save) {
       answers,
       ...(notes ? { notes } : {}),
       ...(last ? { supersedes_observation_id: last.id } : {}),
-      ...(s.payload?.snapshot ? {} : { snapshot: preSnapshot(pre, ctx.date) })
+      ...(checkinState().snapshot ? {} : { snapshot: preSnapshot(pre, ctx.date) })
     });
     const obs = data.observation;
-    s.payload = s.payload ?? { observations: [], recent: [] };
-    s.payload.observations = [...(s.payload.observations ?? []).filter(o => o.id !== obs.supersedes_observation_id), obs];
-    if (data.snapshot) s.payload.snapshot = data.snapshot;
+    if (data.snapshot) recordSnapshot(data.snapshot);
+    recordObservation(obs); // every view repaints with the same new number
     s.open = false;
     s.picks = {};
     s.other = {};

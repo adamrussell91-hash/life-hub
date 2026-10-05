@@ -37,7 +37,8 @@ import { openRescueSheet } from './rescue-sheet.js';
 import { morphPairs, playArcs } from './rescue-morph.js';
 import { openDayReview } from './day-review-sheet.js';
 import { disablePush, enablePush, pushState } from '../push-client.js';
-import { mountReadinessPanel, openCheckin, todayForecast } from './readiness-panel.js';
+import { mountReadinessPanel, openCheckin } from './readiness-panel.js';
+import { onCheckinsChange, withCheckins } from './readiness-checkins.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -93,6 +94,9 @@ let doc = null;
 let host = null;
 let input = null;
 let model = null;
+/** input.events plus shared check-ins, for this paint. */
+let events = [];
+let unsubCheckins = null;
 let engine = null;
 let root = null;
 let svg = null;
@@ -515,8 +519,10 @@ const sleepWall = bands => ({ id: 'sleep', h1: bands[bands.length - 1].to, h2: b
 
 function buildModel() {
   nowHour = Number.isFinite(input.nowHour) ? input.nowHour : getSydneyMinutesOfDay(input.now ?? new Date()) / 60;
+  // Check-ins ride along as events so the gauge, week and panel share one number.
+  events = withCheckins(input.events ?? [], { apiFetch: input?.apiFetch, today: input.today });
   model = buildTidelineModel({
-    events: input.events ?? [],
+    events,
     visual: input.visual ?? null,
     ghosts: ghostsNow().filter(ghost => ghost.status !== 'dismissed'),
     week: input.week,
@@ -525,7 +531,6 @@ function buildModel() {
     dayProfile: input.dayProfile ?? null,
     terms: input.terms ?? null
   });
-  applyReadiness();
 }
 
 /** Life's Day view: today's gauge shows the readiness forecast (and check-in) when known. */
@@ -542,23 +547,14 @@ function readinessCtx() {
     date: input.today,
     nowHour,
     now: input.now ?? new Date(),
-    events: input.events ?? [],
+    events,
+    cap: today.cap,
     items: (today.chips ?? []).filter(chip => !chip.ambient && !chip.ghost).map(chip => ({ start: chip.start, end: chip.end, kind: chip.kind, isClass: chip.isClass, protected: chip.protected, title: chip.title })),
-    fallbackHistory: (model?.days ?? []).filter(day => day.date < input.today && day.cap && !day.cap.forecast).map(day => ({ date: day.date, score: day.cap.pct })),
     apiFetch: input?.apiFetch,
     wake: hhmm(input.dayProfile?.wake) ?? 6.5,
     lightsOut: sleepAt != null ? Math.min(23.5, Math.max(20, sleepAt + 0.5)) : 22.5,
     onRepaint: () => { if (mountedFor) repaintAfter(0); }
   };
-}
-
-function applyReadiness() {
-  const ctx = readinessCtx();
-  if (!ctx) return;
-  const view = todayForecast(ctx);
-  const day = dayAt(input.today);
-  if (!view || !day) return;
-  day.cap = { ...(day.cap ?? {}), pct: view.readiness.score, note: view.stateName.toLowerCase(), factors: [], forecast: !view.answered, readiness: true };
 }
 
 /** "Thursday 24/09/26 · T3 W10" and, for today, "6:05 pm · second-last school day of term". */
@@ -1928,6 +1924,8 @@ export function renderDayDial(nextDoc, dialHost, nextInput) {
     observer = null;
     mountedFor = dialHost;
     observe();
+    unsubCheckins?.();
+    unsubCheckins = onCheckinsChange(() => { if (mountedFor) repaintAfter(0); });
   }
   const entrance = !playedEntrance;
   if (!entrance && perfNow() < entranceGuardUntil) {
@@ -1946,6 +1944,9 @@ export function unmountDayDial() {
   repaintTimer = 0;
   observer?.disconnect();
   observer = null;
+  unsubCheckins?.();
+  unsubCheckins = null;
+  events = [];
   engine?.dispose();
   engine = null;
   nodes.clear();

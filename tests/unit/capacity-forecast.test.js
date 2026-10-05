@@ -34,7 +34,11 @@ import {
 import { decideNotifications } from '../../netlify/functions/_shared/day-sense-notify.mjs';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { buildTidelineModel } from '../../packages/design-kit/js/calendar/tideline-model.js';
-import { forecastFor, mountReadinessPanel, priorWorkload, resetReadinessPanel } from '../../packages/design-kit/js/calendar/readiness-panel.js';
+import { mountReadinessPanel, resetReadinessPanel, todayForecast } from '../../packages/design-kit/js/calendar/readiness-panel.js';
+import { resetCheckins, withCheckins, recordObservation, checkinState, loadCheckins } from '../../packages/design-kit/js/calendar/readiness-checkins.js';
+import { checkinEvents, priorWorkload } from '../../packages/design-kit/js/calendar/readiness-model.js';
+import { capacityForDates } from '../../apps/life/js/app/capacity-model.js';
+import { buildAlmanac } from '../../netlify/functions/almanac.mjs';
 
 const DATE = '2026-10-05'; // Monday
 const ev = (extra = {}) => ({ date: DATE, symptoms: [], exercise: null, ...extra });
@@ -294,13 +298,44 @@ test('7 am nudge: only without a check-in, in its window, once', () => {
 
 /* ------------------------------------------------------------------ views */
 
-test('week view: today shows the readiness forecast when supplied', () => {
-  const week = ['2026-10-05', '2026-10-06'];
-  const plain = buildTidelineModel({ events: [], week, today: DATE, nowHour: 8 });
-  const withR = buildTidelineModel({ events: [], week, today: DATE, nowHour: 8, readiness: { [DATE]: { pct: 100, note: 'clear skies', forecast: false } } });
-  assert.notEqual(plain.days[0].cap.pct, 100);
-  assert.equal(withR.days[0].cap.pct, 100, 'no 95 ceiling for the readiness forecast');
-  assert.equal(withR.days[1].cap.pct, plain.days[1].cap.pct, 'other days untouched');
+test('one number everywhere: Day panel, Week model, Term river input and Almanac agree for the same day', () => {
+  const today = '2026-10-08';
+  const events = [
+    { record: { type: 'sleep', date: '2026-10-06', duration_h: 7.5 } },
+    { record: { type: 'diary', date: '2026-10-07', energy: 'low', mood_score: 4 }, body: 'Sore throat starting' },
+    { record: { type: 'workout', date: '2026-10-07', status: 'completed', session_kind: 'strength', duration_min: 60, title: 'Upper', exercises: [{ name: 'Press' }] } },
+    { path: 'teaching:l1', record: { type: 'scheduled_lesson', date: '2026-10-07', time: '09:00', duration_min: 60 } },
+    { path: 'ws:1', record: { type: 'work_session', date: '2026-10-07', time: '13:00', end_time: '17:30' } },
+    ...checkinEvents([{ id: 'o1', local_date: today, observed_at: '2026-10-07T20:05:00Z', answers: { sleep: 'better_still_tired', overall: 'manageable' }, reported_estimate: 60 }])
+  ];
+  const week = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'];
+  const tideline = buildTidelineModel({ events, week, today, nowHour: 9 });
+  const fromWeek = new Map(tideline.days.map(d => [d.date, d.cap.pct]));
+  const yearDays = [];
+  for (let d = '2026-09-01'; d <= '2026-12-31'; d = new Date(Date.parse(d) + 86_400_000).toISOString().slice(0, 10)) yearDays.push(d);
+  const river = capacityForDates(events, yearDays, { today, isHoliday: () => false });
+  const almanac = buildAlmanac({ today, from: today, to: '2026-10-11', anchors: [], logs: events.filter(e => ['sleep', 'diary', 'workout'].includes(e.record.type)), readinessEvents: events.filter(e => !['sleep', 'diary', 'workout'].includes(e.record.type)) });
+  const fromAlmanac = new Map(almanac.series.map(p => [p.date, p.pct]));
+  const panel = todayForecast({ events, date: today, nowHour: 9, items: [] });
+  assert.equal(panel.view.readiness.score, fromWeek.get(today), 'Day panel = Week');
+  for (const d of week) assert.equal(river.get(d).pct, fromWeek.get(d), `Term/Year = Week on ${d}`);
+  for (const d of ['2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11']) assert.equal(fromAlmanac.get(d), fromWeek.get(d), `Almanac = Week on ${d}`);
+  assert.equal(tideline.days.find(d => d.date === today).cap.checkedIn, true);
+});
+
+test('views merge the shared check-ins themselves, so no hub can miss them', async () => {
+  resetCheckins();
+  const obs = { id: 'o9', local_date: DATE, observed_at: '2026-10-04T20:00:00Z', answers: { overall: 'empty' }, reported_estimate: 20 };
+  const apiFetch = async () => new Response(JSON.stringify({ ok: true, data: { snapshot: null, observations: [obs], recent: [] } }), { status: 200 });
+  assert.deepEqual(withCheckins([], { apiFetch, today: DATE }), [], 'nothing until loaded');
+  await new Promise(r => setTimeout(r, 0));
+  const merged = withCheckins([], { apiFetch, today: DATE });
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].record.type, 'readiness_checkin');
+  assert.equal(buildTidelineModel({ events: [], week: [DATE], today: DATE, nowHour: 8 }).days[0].cap.chips, undefined);
+  recordObservation({ ...obs, id: 'o10', supersedes_observation_id: 'o9', answers: { overall: 'full' } });
+  assert.deepEqual(checkinState().observations.map(o => o.id), ['o10'], 'a correction replaces what it supersedes');
+  resetCheckins();
 });
 
 test('yesterday’s workload: tracked sessions are actual, classes and meetings scheduled, task blocks alone are not', () => {
@@ -316,6 +351,7 @@ test('yesterday’s workload: tracked sessions are actual, classes and meetings 
 
 test('panel: forecast, chart, windows and bubbles render; bubbles start unpicked; saving posts the snapshot first', async () => {
   resetReadinessPanel();
+  resetCheckins();
   const window = new Window({ url: 'https://life.example/' });
   const doc = window.document;
   const side = doc.createElement('div');
@@ -359,12 +395,13 @@ test('panel: forecast, chart, windows and bubbles render; bubbles start unpicked
   assert.match(side.querySelector('[data-part="checkin-reason"]').textContent, /already saved/);
   await window.happyDOM.close();
   resetReadinessPanel();
+  resetCheckins();
 });
 
-test('forecastFor: an answer moves the number; the pre-answer forecast stays answer-free', () => {
-  const base = { events: [], date: DATE, nowHour: 7, now: new Date('2026-10-05T07:00:00+11:00') };
-  const pre = forecastFor({ ...base });
-  const post = forecastFor({ ...base, answers: { overall: 'empty' } });
-  assert.ok(post.readiness.score < pre.readiness.score);
-  assert.equal(pre.readiness.reported, null);
+test('todayForecast: the pre-answer forecast leaves out today’s check-in', () => {
+  const events = checkinEvents([{ id: 'o1', local_date: DATE, observed_at: '2026-10-04T20:00:00Z', answers: { overall: 'empty' }, reported_estimate: 20 }]);
+  const f = todayForecast({ events, date: DATE, nowHour: 7, items: [] });
+  assert.ok(f.view.readiness.score < f.pre.readiness.score);
+  assert.equal(f.pre.readiness.reported, null);
+  assert.equal(f.answered, true);
 });
