@@ -15,6 +15,13 @@ test('chat rail eases the page header shut and keeps tokens', async () => {
   assert.match(css, /@starting-style/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /\.chat-view__toolbar \.date-chip/);
+  // Phone chrome uses flex: 1 0 100% on labelled actions; the chat rail must
+  // keep New chat intrinsic or it overflows past the canvas at 390.
+  assert.match(
+    css,
+    /\.page-header\.is-chat-rail \.page-header__actions\s*\{[^}]*flex:\s*0 0 auto/
+  );
+  assert.match(css, /\.page-header\.is-chat-rail \.page-header__copy\s*\{[^}]*min-width:\s*0/);
 });
 
 function mount(html) {
