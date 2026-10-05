@@ -1,5 +1,7 @@
 # Capacity forecast redesign — Claude Code handoff
 
+**Built:** see [BUILD.md](BUILD.md) for the implementation (Oct 2026), file map and what remains provisional.
+
 This folder captures Adam's agreed direction, research, code audit and interactive prototypes from the 4 October 2026 design conversation. **This is a design/documentation PR. It does not replace the production algorithm or wire the prototypes into Life Hub.**
 
 Start with [implementation-brief.md](implementation-brief.md), then [algorithm.md](algorithm.md), [check-ins-and-logging.md](check-ins-and-logging.md), [weather-states.md](weather-states.md), and [research-and-audit.md](research-and-audit.md).
@@ -14,7 +16,7 @@ The fragment files are the original source used in the conversation. The standal
 
 ## Icon delivery
 
-**Adam will provide the final 30 weather icons.** Separate 1–30 SVG and transparent PNG files were designed and saved on Adam's Desktop under `Capacity Weather Icons`; do not assume that local folder exists in Claude's environment. The number-to-state contract is in `weather-states.md`. This PR intentionally documents the assets rather than committing them. Use temporary fallbacks while awaiting delivery; integrate the supplied assets without redesigning or renumbering them.
+**Delivered 5 Oct 2026:** the 30 icons are committed under `packages/design-kit/icons/capacity-weather/src/` and recoloured by condition family (see BUILD.md). Original note: **Adam will provide the final 30 weather icons.** Separate 1–30 SVG and transparent PNG files were designed and saved on Adam's Desktop under `Capacity Weather Icons`; do not assume that local folder exists in Claude's environment. The number-to-state contract is in `weather-states.md`. This PR intentionally documents the assets rather than committing them. Use temporary fallbacks while awaiting delivery; integrate the supplied assets without redesigning or renumbering them.
 
 ## Scope and provenance
 

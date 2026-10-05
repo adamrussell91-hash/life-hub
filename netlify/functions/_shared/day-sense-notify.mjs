@@ -6,6 +6,7 @@
  *   dexy   — a usual dose (learned from Adam's logs) is 30–60 min overdue with no log
  *   review — the train-home pass: school day, around leave time, review not done
  *   bookmark — a task's work block (30 min+) ends within 10 min: leave a way back in (max 2/day)
+ *   checkin — around 7 am, no morning check-in yet: "How are you starting today?"
  *
  * Cap: 4 a day. Each key once a day. An ignored notification changes nothing.
  */
@@ -17,6 +18,8 @@ import { getJSON, listJSON } from './tasks-blobs.mjs';
 import { PUSH_DAILY_CAP, readPushLog, readSubscriptions, sendToAll, writePushLog } from './push.mjs';
 
 export const DAY_REVIEW_PREFIX = 'meta/day_review/';
+/** Morning bubbles window (Sydney hours): from 7:00 until 9:30. */
+export const CHECKIN_WINDOW = Object.freeze({ from: 7, to: 9.5 });
 const DEX_PATH = /^data\/body\/\d{4}\/\d{2}\/(\d{4}-\d{2}-\d{2})-dex-[a-z0-9-]+\.md$/;
 const LEAVE_BEFORE_HOME_H = 0.75;
 const REVIEW_WINDOW_H = 1;
@@ -56,7 +59,7 @@ export function isSchoolDay(date, terms) {
  * Pure: which notifications are due now.
  * @returns {Array<{ key: string, title: string, body: string, url: string }>}
  */
-export function decideNotifications({ today, nowHour, med, schoolDay, leave, reviewDone, log, blocks = [], sprintNudges = [] }) {
+export function decideNotifications({ today, nowHour, med, schoolDay, leave, reviewDone, checkinDone = true, log, blocks = [], sprintNudges = [] }) {
   const out = [];
   const sentCount = Object.keys(log?.sent ?? {}).length;
   const unsent = (key) => !log?.sent?.[key];
@@ -74,6 +77,14 @@ export function decideNotifications({ today, nowHour, med, schoolDay, leave, rev
         url: '/#/calendar/day?sheet=dexy'
       });
     }
+  }
+  if (!checkinDone && nowHour >= CHECKIN_WINDOW.from && nowHour < CHECKIN_WINDOW.to && unsent('checkin')) {
+    out.push({
+      key: 'checkin',
+      title: 'How are you starting today?',
+      body: 'A few taps to tune today’s capacity forecast. Skip any time.',
+      url: '/#/calendar/day?checkin=1'
+    });
   }
   if (schoolDay && !reviewDone && nowHour >= leave && nowHour < leave + REVIEW_WINDOW_H && unsent('review')) {
     out.push({
@@ -203,6 +214,12 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
   const profile = await loadProfile().catch(() => null);
   const terms = await loadTerms().catch(() => []);
   const review = await getJSON(store, `${DAY_REVIEW_PREFIX}${today}`).catch(() => null);
+  // Only read in the morning window: any observation id today means the bubbles are done.
+  let checkinDone = true;
+  if (nowHour >= CHECKIN_WINDOW.from && nowHour < CHECKIN_WINDOW.to && !log.sent?.checkin) {
+    const ids = await getJSON(store, `capacity/observations/${today}/_index`).catch(() => null);
+    checkinDone = Array.isArray(ids) && ids.length > 0;
+  }
   let sprintNudges = [];
   try {
     if (!Array.isArray(log.sprintDocs)) {
@@ -242,6 +259,7 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
     schoolDay: isSchoolDay(today, terms),
     leave: leaveHour(profile),
     reviewDone: Boolean(review),
+    checkinDone,
     log,
     blocks: log.blocks ?? [],
     sprintNudges

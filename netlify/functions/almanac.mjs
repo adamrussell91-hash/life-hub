@@ -23,7 +23,9 @@ import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/ti
 import { addDays, almanacSummary, leadLines } from '../../packages/design-kit/js/lead-lines.js';
 import { findOpenings } from '../../packages/design-kit/js/openings.js';
 import { ALMANAC_RULES, ALMANAC_WANTS } from '../../apps/life/js/app/almanac-rules.js';
-import { CAPACITY, capacityForDates, forecastSeries } from '../../apps/life/js/app/capacity-model.js';
+import { capacityForDates } from '../../apps/life/js/app/capacity-model.js';
+import { isHoliday as isSchoolHoliday } from '../../packages/design-kit/js/school-time.js';
+import { readinessEvidenceEvents, READINESS_LOOKBACK_DAYS } from './_shared/readiness-evidence.mjs';
 import { medicationContext } from '../../packages/design-kit/js/calendar/medication-model.js';
 
 export const ALMANAC_ANCHORS_PATH = 'almanac-anchors.yml';
@@ -35,7 +37,7 @@ export const config = { path: '/api/almanac' };
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const STEP_ID = /^[a-z0-9][a-z0-9:-]*$/i;
 const KINDS = new Set(['trip', 'medical', 'event', 'term', 'dream']);
-const LOG_PATH = /^data\/(?:sleep|mind)\/\d{4}\/\d{2}\/(\d{4}-\d{2}-\d{2})-[a-z0-9-]+\.md$/;
+const LOG_PATH = /^data\/(?:sleep|mind|fitness)\/\d{4}\/\d{2}\/(\d{4}-\d{2}-\d{2})-[a-z0-9-]+\.md$/;
 const DEX_PATH = /^data\/body\/\d{4}\/\d{2}\/(\d{4}-\d{2}-\d{2})-dex-[a-z0-9-]+\.md$/;
 const BLOCK_PATH = /^data\/calendar\/\d{4}\/\d{2}\/(\d{4}-\d{2}-\d{2})-[a-z0-9-]+\.md$/;
 const DAY_START = 8 * 60;
@@ -316,22 +318,6 @@ function inTerm(date, terms) {
   return terms.some(term => date >= term.starts_on && date <= term.ends_on);
 }
 
-/** Term time −12 and first week back −6, until two terms of logs exist. */
-function termPattern(date, terms, historyTerms) {
-  if (historyTerms >= 2) return 0;
-  let delta = 0;
-  for (const term of terms) {
-    if (date >= term.starts_on && date <= term.ends_on) delta -= 12;
-    // Fixture first week is the start day through five days later (13/10–18/10).
-    if (date >= term.starts_on && date <= addDays(term.starts_on, 5)) delta -= 6;
-  }
-  return delta;
-}
-
-function historyTermCount(terms, logDates) {
-  return terms.filter(term => logDates.some(date => date >= term.starts_on && date <= term.ends_on)).length;
-}
-
 function horizonEnd(today, anchors) {
   let end = addDays(today, 105);
   for (const anchor of anchors) {
@@ -471,24 +457,19 @@ export function buildAlmanac({
   lessons = [],
   professionalEvents = [],
   horizonCadence = null,
-  medicationLogs = []
+  medicationLogs = [],
+  readinessEvents = []
 }) {
   const dates = dateKeys(from, to);
-  const logEvents = (logs ?? []).filter(event => event?.record && (event.record.type === 'sleep' || event.record.type === 'diary') && event.record.date <= today);
-  const logDates = [...new Set(logEvents.map(event => event.record.date))].sort();
-  const capacity = capacityForDates(logEvents, logDates, { isHoliday: date => !inTerm(date, terms) });
-  let last = null;
-  for (const date of logDates) {
+  // Capacity: the same capacityForDates the Day and Week views use, fed the same
+  // evidence (Life logs, check-ins, tracked sessions, classes), so a day reads the same
+  // number in the Almanac as anywhere else.
+  const logEvents = (logs ?? []).filter(event => event?.record && event.record.date <= today);
+  // Same holiday rule as the Week view (school-time.js), so the holiday lift matches too.
+  const capacity = capacityForDates([...logEvents, ...(readinessEvents ?? [])], dates, { isHoliday: date => isSchoolHoliday(date, terms ?? []), today });
+  const series = dates.map(date => {
     const row = capacity.get(date);
-    if (row && row.forecast !== true) last = { date, pct: row.pct };
-  }
-  if (!last) last = { date: today, pct: CAPACITY.baseline };
-  const historyTerms = historyTermCount(terms, logDates);
-  const series = forecastSeries(dates, {
-    lastPct: last.pct,
-    lastDate: last.date,
-    isHoliday: date => !inTerm(date, terms),
-    pattern: date => termPattern(date, terms, historyTerms)
+    return { date, pct: row.pct, low: row.low ?? row.pct, high: row.high ?? row.pct };
   });
 
   const busy = new Set();
@@ -647,6 +628,7 @@ export async function readAlmanac({
   lessons = [],
   professionalEvents = [],
   horizon = null,
+  readinessEvents = [],
   warn = console.warn
 }) {
   const anchors = parseAlmanacAnchors(await readFile(ALMANAC_ANCHORS_PATH) ?? '', { warn });
@@ -654,19 +636,12 @@ export async function readAlmanac({
   const rangeFrom = from ?? today;
   const rangeTo = to ?? horizonEnd(today, anchors);
   const paths = typeof listPaths === 'function' ? listPaths() : [];
-  // ponytail: streak penalty caps after two below-par days, so only the latest
-  // handful of sleep/diary days are read. Upgrade: pass the caller's log window.
-  const logPaths = paths
-    .map(path => ({ path, date: pathDate(path, LOG_PATH) }))
-    .filter(item => item.date && item.date <= today)
-    .sort((a, b) => b.date.localeCompare(a.date) || a.path.localeCompare(b.path));
-  const kept = [];
-  const seen = new Set();
-  for (const item of logPaths) {
-    if (!seen.has(item.date) && seen.size >= 14) continue;
-    seen.add(item.date);
-    kept.push(item.path);
-  }
+  // Readiness reads three weeks of history (plus two days of symptom carry-over).
+  const since = addDays(today, -(READINESS_LOOKBACK_DAYS + 2));
+  const kept = paths.filter(path => {
+    const date = pathDate(path, LOG_PATH);
+    return date && date >= since && date <= today;
+  });
   const logs = await readMatching(kept, readFile, () => true, warn);
   const dexSince = new Date(Date.parse(`${today}T00:00:00Z`) - 13 * 86_400_000).toISOString().slice(0, 10);
   const medicationLogs = (await readMatching(paths, readFile, path => {
@@ -695,7 +670,8 @@ export async function readAlmanac({
     lessons,
     professionalEvents,
     horizonCadence: horizon,
-    medicationLogs
+    medicationLogs,
+    readinessEvents
   });
 }
 
@@ -844,6 +820,13 @@ export async function computeAlmanac({
     readAlmanacTasked(tasksStore),
     loadHorizonAlmanacContext(env, { getCognitiveStore })
   ]);
+  let store = null;
+  try {
+    store = typeof tasksStore === 'function' ? await tasksStore() : null;
+  } catch {
+    store = null;
+  }
+  const readinessEvents = await readinessEvidenceEvents({ store, today, lessons });
   const view = await readAlmanac({
     readFile: path => opened.readFile(path),
     listPaths: () => opened.listPaths(),
@@ -853,7 +836,8 @@ export async function computeAlmanac({
     terms,
     lessons,
     professionalEvents,
-    horizon
+    horizon,
+    readinessEvents
   });
   return { view, tasked };
 }

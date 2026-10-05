@@ -3,6 +3,7 @@
  * mount creates the DOM once per paint, layout(heights) is pure,
  * apply(id, props) is the only function that writes geometry.
  */
+import { onCheckinsChange, withCheckins } from './readiness-checkins.js';
 import { createMotion, EASE } from '../hub-motion-engine.js';
 import { CAL } from '../calendar-tideline-geometry.js';
 import { applyHubPillsThumb } from '../hub-motion.js';
@@ -146,6 +147,8 @@ function paintKey(inp) {
     state.phone ? state.phoneDay : 'desk'
   ].join('|');
 }
+
+let unsubCheckins = null;
 
 function repaintAfter(ms) {
   clearTimeout(repaintTimer);
@@ -457,6 +460,8 @@ export function renderTideline(doc, calendarHost, nextInput) {
     clearTimeout(repaintTimer);
     repaintTimer = 0;
     mountedFor = calendarHost;
+    unsubCheckins?.();
+    unsubCheckins = onCheckinsChange(() => { lastPaintKey = null; repaintAfter(0); });
     playedEntrance = false;
     entranceGuardUntil = 0;
     lastPaintKey = key;
@@ -486,7 +491,8 @@ function mount({ entrance = false } = {}) {
   state.phone = view?.matchMedia?.('(max-width: 719px)')?.matches === true;
   nowHour = Number.isFinite(input.nowHour) ? input.nowHour : getSydneyMinutesOfDay(input.now ?? new Date()) / 60;
   model = buildTidelineModel({
-    events: input.events ?? [],
+    // Check-ins ride along so today's number matches the Day view exactly.
+    events: withCheckins(input.events ?? [], { apiFetch: input.apiFetch, today: input.today }),
     visual: input.visual ?? null,
     ghosts: ghostsForPaint(input.ghosts),
     week: input.week,

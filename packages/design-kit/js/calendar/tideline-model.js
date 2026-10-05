@@ -513,7 +513,7 @@ export function buildTidelineModel({
   const useVisual = visualCovers(visual, week);
   const ghostList = Array.isArray(ghosts) ? ghosts : (useVisual ? (visual?.GHOSTS ?? []) : []);
   const holiday = date => isSchoolHoliday(date, schoolTerms);
-  const capacity = capacityForDates(events, week, { isHoliday: holiday });
+  const capacity = capacityForDates(events, week, { isHoliday: holiday, today });
   // A failed or in-flight Life fetch has no diaries yet. "no logs" would
   // claim Adam didn't write them. Keep a real diary day's note when one arrived.
   if (lifeLogStatus !== 'live') {

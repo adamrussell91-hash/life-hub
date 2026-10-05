@@ -24,7 +24,9 @@ import {
   weeklyLoad,
   weeksBetween
 } from './term-river.js';
-import { forecastSeries } from './capacity-model.js';
+import { capacityForDates, forecastSeries } from './capacity-model.js';
+import { isHoliday as isSchoolHoliday } from '../school-time.js';
+import { onCheckinsChange, withCheckins } from './readiness-checkins.js';
 import { acceptPlan } from './ghost-writes.js';
 import {
   countByFilterKey,
@@ -119,6 +121,7 @@ let lastHostW = 0;
 let lastZoomInput = null;
 /** Skips no-op remounts when the controller re-renders with the same river inputs. */
 let lastPaintKey = null;
+let unsubCheckins = null;
 /**
  * Nav ‹ › override of the term/year windows. Cleared by Today.
  * Seeded `RIVER.ZOOMS` still wins when this is null.
@@ -313,10 +316,22 @@ function buildModel() {
   for (let date = YEAR.from; date <= YEAR.to; date = addDays(date, 1)) ALL_DAYS.push(date);
 
   // Capacity per day: logged where known, else the forecast (the Almanac's rule).
+  // Real logs always win: the hand-authored LOGGED fixture only paints the reference
+  // mock-up, which has no sleep / diary / check-in events of its own.
+  const liveEvents = withCheckins(input?.events ?? [], { apiFetch: input?.apiFetch, today: TODAY });
+  const hasLogs = liveEvents.some(e => ['sleep', 'diary', 'readiness_checkin'].includes(e?.record?.type));
+  if (hasLogs) LOGGED = {};
   const loggedKeys = Object.keys(LOGGED).sort();
   lastLogged = loggedKeys[loggedKeys.length - 1] ?? null;
   const pattern = date => PATTERN.filter(p => date >= p.from && date <= p.to).reduce((sum, p) => sum + p.delta, 0);
   CAP = new Map();
+  if (!loggedKeys.length) {
+    // Live data: the same capacityForDates every other view uses, check-ins included,
+    // so a day reads the same number here as in Day and Week.
+    for (const [date, row] of capacityForDates(liveEvents, ALL_DAYS, { isHoliday: date => isSchoolHoliday(date, TERMS), today: TODAY })) {
+      CAP.set(date, { pct: row.pct, low: row.low, high: row.high, forecast: row.forecast });
+    }
+  }
   for (const date of ALL_DAYS) if (LOGGED[date] != null) CAP.set(date, { pct: LOGGED[date], forecast: false });
   if (lastLogged) {
     const future = forecastSeries(ALL_DAYS.filter(date => date > lastLogged), {
@@ -1248,6 +1263,7 @@ function publish(view) {
     state,
     TR,
     loads: LOADS,
+    capacity: date => CAP.get(date)?.pct ?? null,
     lanes: () => Object.fromEntries(Object.entries(GROUPED).map(([lane, items]) => [lane, items.map(item => item.id)])),
     setZoom,
     stepRiver,
@@ -1316,6 +1332,8 @@ export function renderTermRiver(nextDoc, riverHost, nextInput) {
     entranceGuardUntil = 0;
     mountedFor = riverHost;
     observe();
+    unsubCheckins?.();
+    unsubCheckins = onCheckinsChange(() => { if (mountedFor) repaintAfter(0); });
     state.zoom = nextZoom;
     lastZoomInput = input.zoom;
     lastPaintKey = key;
@@ -1351,6 +1369,8 @@ export function unmountTermRiver() {
   repaintTimer = 0;
   observer?.disconnect();
   observer = null;
+  unsubCheckins?.();
+  unsubCheckins = null;
   engine?.dispose();
   engine = null;
   nodes.clear();

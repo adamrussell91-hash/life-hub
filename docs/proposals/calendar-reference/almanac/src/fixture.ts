@@ -8,7 +8,7 @@
 
 export const TODAY = '2026-09-24';
 export const RANGE = { from: '2026-09-24', to: '2027-01-10' };
-export const LAST_LOG = { date: '2026-09-24', pct: 34 }; // capacity-model on the Tideline fixture
+export const LAST_LOG = { date: '2026-09-24', pct: 51 }; // capacity-model (readiness v2) on the Tideline fixture
 
 export const TERMS = [
   { term: 3, starts_on: '2026-07-21', ends_on: '2026-09-25' },

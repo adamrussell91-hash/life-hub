@@ -23,6 +23,10 @@ import { proposeDeadlineRunwayGhosts } from './deadline-runway-ghosts.mjs';
 import { MIO, wantedAreas } from '../../../packages/design-kit/js/calendar/mio-model.js';
 import { proposeWaitingFollowUpGhosts } from './waiting-follow-up-ghosts.mjs';
 import { listJSON, TASK_PREFIX } from './tasks-blobs.mjs';
+import { readinessEvidenceEvents, READINESS_LOOKBACK_DAYS } from './readiness-evidence.mjs';
+
+/** Life logs the readiness model reads (sleep, diary, training). */
+const READINESS_LOG_PATH = /^data\/(?:sleep|mind|fitness)\//;
 
 const WORK_BLOCK_PREFIX = 'work_blocks/';
 const DAY_MS = 86_400_000;
@@ -239,7 +243,18 @@ export async function runCalendarGhostsPropose({
     ? !schoolTerms.some(term => date >= term.starts_on && date <= term.ends_on)
     : false;
   const capacityDates = [...new Set([...week, ...Array.from({ length: 14 }, (_, i) => addDays(today, i))])].sort();
-  const capacity = capacityForDates(events, capacityDates, { isHoliday });
+  // Same capacityForDates and evidence as the calendar views: three weeks of sleep /
+  // diary / training history before the window, plus check-ins, sessions and classes.
+  const historyFrom = addDays(capacityDates[0], -(READINESS_LOOKBACK_DAYS + 2));
+  const history = await readEvents(paths.filter(path => READINESS_LOG_PATH.test(path)), path => opened.readFile(path), historyFrom, addDays(from, -8), warn);
+  let readinessStore = null;
+  try {
+    readinessStore = typeof getTasksStore === 'function' ? await getTasksStore() : null;
+  } catch {
+    readinessStore = null;
+  }
+  const readinessEvents = await readinessEvidenceEvents({ store: readinessStore, today, lessons, now: clockMs });
+  const capacity = capacityForDates([...history, ...events, ...readinessEvents], capacityDates, { isHoliday, today });
 
   const view = await readAlmanac({
     readFile: path => opened.readFile(path),

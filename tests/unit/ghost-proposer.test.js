@@ -97,7 +97,7 @@ test('bedtimeFromSleep subtracts 30 minutes and caps at 22:00', () => {
   assert.equal(bedtimeFromSleep('22:00'), '21:30');
 });
 
-test('Thursday 34% yields Sara skip_workout and bedtime; Monday yields nothing', () => {
+test('Thursday 51% (unwell on poor sleep) yields Sara skip_workout and bedtime; Monday yields nothing', () => {
   const ghosts = proposeGhosts(baseInput());
   for (const ghost of ghosts) validateGhost(ghost);
 
@@ -107,7 +107,7 @@ test('Thursday 34% yields Sara skip_workout and bedtime; Monday yields nothing',
   assert.equal(skip.id, ghostId('sara', 'skip_workout', '2026-09-24'));
   assert.equal(skip.agent, 'sara');
   assert.equal(skip.date, '2026-09-24');
-  assert.equal(skip.reason, 'capacity 34%, sore throat');
+  assert.equal(skip.reason, 'capacity 51%, sore throat');
   assert.equal(skip.workoutPath, 'records/2026/09/24/workout-1815.md');
   assert.equal(skip.overItem, 'thu-workout');
 
