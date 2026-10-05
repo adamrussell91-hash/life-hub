@@ -28,8 +28,13 @@ Anything dead, trashed, deleted or removed must never reach an agent, tool, or l
 - A new deleted state (e.g. `status: 'discarded'`) goes into `record-liveness.mjs`, not into one caller.
 - Only Trash / restore screens read deleted records on purpose.
 
+## Phone form / sheet actions (mandatory)
+
+Any sheet, dialog, modal, or long form with Save / Add / Cancel / Confirm / Remove: before claiming done, run failure-register **R4** at 390. Actions must be docked (not lost under the fold), each button ≥ 44px tall, clear of the home indicator (`env(safe-area-inset-bottom)`). Untappable bottom pills after data entry are a ship blocker — see `docs/CURSOR-UI-FAILURES.md` R4 and `.cursor/rules/ui-failure-register.mdc`.
+
 ## Read also
 
 - Root `CLAUDE.md` (stress test / consolidation overseer roles)
 - `packages/design-kit/AGENTS.md` before UI work
 - Hub-specific `apps/*/AGENTS.md` when working in that app
+- `docs/CURSOR-UI-FAILURES.md` before any UI change

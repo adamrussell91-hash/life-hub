@@ -241,6 +241,52 @@ details.tobook[open] summary::after { content: "Hide"; }
 /* sheets — above hub mobile bar (z-index 40) so actions stay tappable */
 .sheet-back { position: fixed; inset: 0; background: rgba(10,21,54,.4); display: grid; place-items: end center; z-index: 50; padding: 16px; }
 .sheet { background: var(--paper); border-radius: var(--radius-lg); width: min(520px, 100%); padding: 20px; box-shadow: var(--elev-2); max-height: 85vh; overflow: auto; margin-bottom: env(safe-area-inset-bottom, 0px); }
+/* Form sheets: title + type stay up; fields scroll; Add/Cancel dock above the home indicator. */
+.sheet.addform {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+.addform__form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.addform__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+.addform__actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: stretch;
+  margin: 0;
+  padding: 12px 0 calc(16px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  z-index: 2;
+}
+.addform__actions .btn,
+.sheet .row .btn {
+  min-height: 2.75rem;
+  padding: 0.75rem 1.1rem;
+  font-size: 1rem;
+  justify-content: center;
+}
+.addform__actions .btn { flex: 1 1 0; min-width: 0; }
+.addform__actions .btn.ghost.danger {
+  flex: 1 1 100%;
+  margin-left: 0;
+}
 @media (max-width: 719px) {
   /* Phone: a real bottom sheet — full width, flush to the bottom, never taller than the visible viewport. */
   .sheet-back { padding: 0; place-items: end stretch; }
@@ -248,14 +294,25 @@ details.tobook[open] summary::after { content: "Hide"; }
     width: 100%;
     max-height: calc(100dvh - 48px);
     margin: 0;
-    padding: 16px 16px 0;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     overscroll-behavior: contain;
   }
-  .addform .row { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .sheet.addform {
+    padding-bottom: 0;
+    max-height: 100dvh;
+  }
+  .addform__actions {
+    padding: 14px 0 calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+  .addform__actions .btn,
+  .sheet .row .btn {
+    min-height: 3rem;
+  }
 }
 @media (min-width: 700px) { .sheet-back { place-items: center; } }
-.sheet h3 { font-size: 1.125rem; }
+.sheet h3 { font-size: 1.125rem; flex: 0 0 auto; }
+.sheet.addform > .seg { flex: 0 0 auto; }
 .sheet p { font-size: .875rem; color: var(--muted); }
 .sheet .driver { background: var(--depth); color: #fff; border-radius: var(--radius-md); padding: 18px; margin: 12px 0; }
 .sheet .driver .big { font-size: 1.4rem; font-weight: 700; line-height: 1.25; }
@@ -263,21 +320,11 @@ details.tobook[open] summary::after { content: "Hide"; }
 .sheet .driver .phrase { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.16); font-size: 1rem; }
 .sheet .driver .phrase small { display: block; color: rgba(255,255,255,.66); font-size: .75rem; }
 .sheet .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-.addform .row {
-  position: sticky;
-  bottom: -1px;
-  background: var(--paper);
-  padding: 12px 0 4px;
-  margin-top: 16px;
-  border-top: 1px solid var(--line);
-  z-index: 2;
-}
 .addform .remove-confirm {
-  position: sticky;
-  bottom: 52px;
+  flex: 0 0 auto;
   background: var(--paper);
   margin: 0;
-  padding-top: 10px;
+  padding: 10px 0 0;
   color: #9b2c2c;
   font-weight: 600;
   z-index: 2;
