@@ -64,12 +64,31 @@ function recentTip(item) {
   return `${item.recentWindow}: ${formatNumber(item.recent, digits)}${noun} · ${where}`;
 }
 
+const PACE = {
+  good: { arrow: '↑', colour: 'var(--success)' },
+  bad: { arrow: '↓', colour: 'var(--danger)' },
+  steady: { arrow: '•', colour: 'var(--muted)' }
+};
+
+/** Higher is better on every stimulus key, so up is good and down is bad. */
+export function recentPaceTone(item) {
+  if (item.value == null || item.recent == null) return null;
+  const digits = item.key === 'protein' ? 2 : 1;
+  const delta = Number(Number(item.recent).toFixed(digits)) - Number(Number(item.value).toFixed(digits));
+  if (delta === 0) return 'steady';
+  return delta > 0 ? 'good' : 'bad';
+}
+
 function trendMark(item) {
   if (item.value == null || item.recent == null || !item.threshold) return null;
   const tail = gateValueAngle(item.value, item.threshold);
   const tip = gateTipAngle(item.recent, item.threshold);
-  const steady = Math.abs(tip - tail) < TREND_STEADY_DEG;
-  return { tail, tip, steady, met: item.recentStatus === 'met' };
+  return {
+    tail,
+    tip,
+    visualSteady: Math.abs(tip - tail) < TREND_STEADY_DEG,
+    tone: recentPaceTone(item)
+  };
 }
 
 export function buildGateRings(chart, { width = 520, stroke = 15, gap = 9 } = {}) {
@@ -152,7 +171,7 @@ export function buildGateRings(chart, { width = 520, stroke = 15, gap = 9 } = {}
     if (!mark) return;
     const lane = gateTrendRadius(radii[index], stroke, gap);
     const delay = 120 * index + 600;
-    if (mark.steady) {
+    if (mark.visualSteady) {
       const [x, y] = polar(cx, cy, lane, mark.tail);
       nodes.push(node('circle', { cx: fx(x), cy: fx(y), r: 2.6, fill: 'var(--muted)' }, {
         cls: 'hc-trend-dot hc-trend-dot--steady',
@@ -161,8 +180,7 @@ export function buildGateRings(chart, { width = 520, stroke = 15, gap = 9 } = {}
       }));
       return;
     }
-    const tone = mark.met ? 'met' : 'short';
-    const colour = mark.met ? 'var(--success)' : 'var(--danger)';
+    const colour = PACE[mark.tone]?.colour ?? PACE.steady.colour;
     const [x0, y0] = polar(cx, cy, lane, mark.tail);
     const [x1, y1] = polar(cx, cy, lane, mark.tip);
     const gradId = `trend-${item.key}`;
@@ -190,13 +208,13 @@ export function buildGateRings(chart, { width = 520, stroke = 15, gap = 9 } = {}
       'stroke-width': 3,
       pathLength: 1
     }, {
-      cls: `hc-gate-pace hc-gate-pace--${tone}`,
+      cls: `hc-gate-pace hc-gate-pace--${mark.tone}`,
       anim: 'draw',
       delay,
       dur: 700
     }));
     nodes.push(node('circle', { cx: fx(x1), cy: fx(y1), r: 2.4, fill: colour }, {
-      cls: `hc-trend-dot hc-trend-dot--${tone}`,
+      cls: `hc-trend-dot hc-trend-dot--${mark.tone}`,
       anim: 'fade',
       delay,
       dur: 280
@@ -292,12 +310,10 @@ function recentRowLine(x, y, item, digits) {
     line.text = `${item.recentWindow}: ${item.recentReason}`;
     return line;
   }
-  const mark = trendMark(item);
-  const arrow = !mark || mark.steady ? '•' : mark.tip > mark.tail ? '↑' : '↓';
-  const tone = arrow === '•' ? 'steady' : mark.met ? 'met' : 'short';
-  const fill = tone === 'met' ? 'var(--success)' : tone === 'short' ? 'var(--danger)' : 'var(--muted)';
+  const tone = recentPaceTone(item) ?? 'steady';
+  const pace = PACE[tone];
   line.children = [
-    node('tspan', { fill, 'font-weight': 700 }, { cls: `hc-trend-arrow hc-trend-arrow--${tone}`, text: `${arrow} ` }),
+    node('tspan', { fill: pace.colour, 'font-weight': 700 }, { cls: `hc-trend-arrow hc-trend-arrow--${tone}`, text: `${pace.arrow} ` }),
     node('tspan', {}, { text: `${item.recentWindow}: ${formatNumber(item.recent, digits)}` })
   ];
   return line;

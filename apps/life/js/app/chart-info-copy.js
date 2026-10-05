@@ -10,7 +10,7 @@ export function stimulusGateInfo(windowDays) {
     id: 'life.home.stimulus.gate',
     title: 'Stimulus',
     what: 'Whether your training and protein are enough for the forecast to assume you keep muscle while losing fat. Miss a key and the forecast assumes some loss is muscle, so your body-fat date moves later.',
-    how: `Each ring is your average over ${window}, scaled from zero to twice the pass mark so every pass mark sits on the orange spoke. Sessions count completed workouts with a set above 0 kg and 0 reps. Upper sets count chest, shoulders, arms, back and full-body sets. Protein is typical daily protein ÷ current weight. A white dot means the ring is off the scale. The thin line is your last 7 days of training, or your last 4 fully logged protein days, fading from your average to a dot: green clears the gate, red does not, and unlogged days are skipped.`
+    how: `Each ring is your average over ${window}, scaled from zero to twice the pass mark so every pass mark sits on the orange spoke. Sessions count completed workouts with a set above 0 kg and 0 reps. Upper sets count chest, shoulders, arms, back and full-body sets. Protein is typical daily protein ÷ current weight. A white dot means the ring is off the scale. The thin line is your last 7 days of training, or your last 4 fully logged protein days, fading from your average to a dot: green when that pace is up on the average, red when it is down. Unlogged days are skipped. Whether the average itself clears the gate is the Met / Short pill.`
   };
 }
 

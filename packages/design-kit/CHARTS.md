@@ -236,6 +236,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-10-05 | `gate-rings` | Recent-pace arrows and arcs colour by whether recent is up or down on the average (green up, red down). Met / Short stays on the key pills and still means the average vs the gate. |
 | 2026-10-04 | `bullseye-rings` | Promoted from `future-charts/`. Scene builder `chart-kit/bullseye-rings.js`, `bandDistance` shared with Bloods `allowanceUsed`. Used on Bloods Glucose/Diabetes (HbA1c, fasting glucose) and Lipid Studies (LDL) via `buildBloodsBullseyes`; HbA1c and LDL count the upper limit only. Classes `hc-bull-*`, `bloods-bullseye*` in `app.css`, tokens only. |
 | 2026-10-01 | `gate-rings`, `hub-chart-info` | Stimulus gate rings gain a thin recent-pace arc (last 7 training days, last 4 complete protein days). Protein ring ink moves to `--pastel-gold-ink`. `hub-chart-info` is the shared "i"; Home macro rings and forecast cards mount it. |
 | 2026-09-30 | catalog | Added `CHART-CATALOG.md` — flat super-list (purpose, limits, where used, code paths) for choosing types. Agents consult it when adding graphs/charts; this file stays APIs / tokens / log. Includes bullseye + vis-timeline as documented-only rows. |
