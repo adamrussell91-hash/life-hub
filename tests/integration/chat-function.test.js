@@ -4142,7 +4142,7 @@ test('every agent receives os_propose_action and Brisket can propose an allowlis
   assert.ok(puts.some(put => put.url.includes('data/os/pending-actions.json')));
 });
 
-test('os_propose_action rejects Brisket writes outside allowlist without a Confirm card', async () => {
+test('os_propose_action rejects Brisket writes no agent owns without a Confirm card', async () => {
   const liveHandler = createChatHandler({
     env: validEnv,
     now: () => Date.parse('2026-08-01T06:00:00Z'),
@@ -4153,8 +4153,8 @@ test('os_propose_action rejects Brisket writes outside allowlist without a Confi
           id: 'call_bad',
           name: 'os_propose_action',
           input: {
-            intent: 'rewrite medical constraints',
-            writes: [{ path: 'central-node.md', mode: 'overwrite', content: '# nope' }]
+            intent: 'rewrite server code',
+            writes: [{ path: 'netlify/functions/chat.mjs', mode: 'overwrite', content: '// nope' }]
           }
         });
         assert.equal(JSON.parse(result).error, 'write_path_denied');

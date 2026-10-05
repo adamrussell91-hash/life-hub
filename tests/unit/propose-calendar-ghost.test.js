@@ -125,3 +125,11 @@ test('log_comm via propose_calendar_ghost still builds Confirm proposal', () => 
   const validated = validateProposeActionInput(calendarGhostConfirmProposal(entry), { agentSlug: 'clare' });
   assert.equal(validated.ok, true, validated.error);
 });
+
+test('cancel_block without a date takes the day from the block path', () => {
+  const entry = calendarGhostFromToolInput(
+    { kind: 'cancel_block', path: 'data/calendar/2026/10/2026-10-05-brunch.md', title: 'Brunch' },
+    { agent: 'clare', nowIso: '2026-10-05T09:00:00+11:00' }
+  );
+  assert.equal(entry.date, '2026-10-05');
+});

@@ -1,13 +1,14 @@
 import { randomBytes } from 'node:crypto';
-import { isPathAllowedForAgent } from './registry.mjs';
+import { isPathAllowedForAgent, ownerAgentsForPath } from './registry.mjs';
 import {
+  deleteKey as deleteTasksKey,
   getJSON as getTasksJSON,
   readIndex,
   setJSON as setTasksJSON,
   TASKS_INDEX_KEY,
   writeIndex
 } from '../tasks-blobs.mjs';
-import { getJSON as getTeachingJSON, setJSON as setTeachingJSON } from '../teaching-blobs.mjs';
+import { deleteKey as deleteTeachingKey, getJSON as getTeachingJSON, setJSON as setTeachingJSON } from '../teaching-blobs.mjs';
 import { mergeHubPrefsPatch } from '../hub-prefs-agent.mjs';
 
 const BLOB_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
@@ -89,6 +90,10 @@ function isSafePath(path) {
  * Validate + allowlist-check a propose-action payload.
  * Returns { ok: true, proposal } or { ok: false, error, detail? }.
  */
+function agentDisplayName(slug) {
+  return slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : slug;
+}
+
 export function validateProposeActionInput(input, { agentSlug } = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return { ok: false, error: 'invalid_input' };
@@ -112,7 +117,8 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
 
   for (const readPath of reads) {
     // Logical slices like central_node.active_challenges are informational.
-    if (readPath.includes('/') && !isPathAllowedForAgent(agentSlug, readPath, { mode: 'read' })) {
+    if (readPath.includes('/') && !isPathAllowedForAgent(agentSlug, readPath, { mode: 'read' })
+      && !ownerAgentsForPath(readPath, { mode: 'read' }).length) {
       return { ok: false, error: 'read_path_denied', detail: readPath };
     }
   }
@@ -139,15 +145,28 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
     if (content.length > MAX_WRITE_CONTENT_CHARS) {
       return { ok: false, error: 'content_too_large', detail: path };
     }
+    // Outside this agent's lane: hand off to the agent that owns the path
+    // (filed under them, shown on the card) instead of refusing Adam.
+    let onBehalfOf = null;
     if (!isPathAllowedForAgent(agentSlug, path, { mode: 'write' })) {
-      return { ok: false, error: 'write_path_denied', detail: path };
+      onBehalfOf = ownerAgentsForPath(path, { mode: 'write' })[0] ?? null;
+      if (!onBehalfOf) return { ok: false, error: 'write_path_denied', detail: path };
     }
     const writeTarget = classifyWriteTarget(path);
-    // Tasks / Teaching blobs: executeProposeActionWrites cannot delete them and
-    // rejects non-object JSON. Refuse here so the agent hears it at propose time
-    // instead of Adam getting a Confirm card that fails on every tap.
-    if (writeTarget.store === 'tasks' || writeTarget.store === 'teaching') {
-      if (mode === 'delete') return { ok: false, error: 'blob_delete_unsupported', detail: path };
+    // Tasks / Teaching blobs reject non-object JSON. Refuse here so the agent hears
+    // it at propose time instead of Adam getting a Confirm card that fails on every
+    // tap. Deletes carry no body: Adam's Confirm on the card is the approval.
+    if (mode === 'delete' && (
+      (writeTarget.store === 'people' && writeTarget.kind !== 'person' && writeTarget.kind !== 'organisation')
+      || (writeTarget.store === 'professional' && writeTarget.kind === 'tie')
+    )) {
+      // Nothing durable to delete at these paths (new-* drafts / tie decisions).
+      return { ok: false, error: 'delete_not_applicable', detail: path };
+    }
+    if (writeTarget.store === 'tasks' && writeTarget.kind === 'meta' && mode === 'delete') {
+      return { ok: false, error: 'blob_delete_unsupported', detail: path };
+    }
+    if ((writeTarget.store === 'tasks' || writeTarget.store === 'teaching') && mode !== 'delete') {
       let body = null;
       try {
         body = JSON.parse(content);
@@ -158,17 +177,17 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
         return { ok: false, error: 'invalid_blob_content', detail: path };
       }
     }
-    if (writeTarget.store === 'people'
+    if ((writeTarget.store === 'people'
       || writeTarget.store === 'travel'
       || writeTarget.store === 'knowledge'
-      || writeTarget.store === 'professional') {
+      || writeTarget.store === 'professional') && mode !== 'delete') {
       let body = null;
       try {
         body = JSON.parse(content);
       } catch {
         body = null;
       }
-      if (!body || typeof body !== 'object' || Array.isArray(body) || mode === 'delete' || mode === 'append') {
+      if (!body || typeof body !== 'object' || Array.isArray(body) || mode === 'append') {
         return {
           ok: false,
           error: writeTarget.store === 'people'
@@ -183,11 +202,13 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
       }
     }
 
+    const baseDiff = diff || defaultDiffSummary(mode, path, content);
     writes.push({
       path,
       mode,
       content,
-      diff: diff || defaultDiffSummary(mode, path, content),
+      diff: onBehalfOf ? `${baseDiff} (handed off to ${agentDisplayName(onBehalfOf)})` : baseDiff,
+      ...(onBehalfOf ? { on_behalf_of: onBehalfOf } : {}),
       ...(typeof entry.title === 'string' && entry.title.trim()
         ? { title: entry.title.trim() }
         : {})
@@ -206,13 +227,16 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
       intent: input.intent.trim(),
       reads,
       writes,
-      surfaces
+      surfaces,
+      ...(writes.some(w => w.on_behalf_of)
+        ? { handed_off_to: [...new Set(writes.map(w => w.on_behalf_of).filter(Boolean))] }
+        : {})
     }
   };
 }
 
 function defaultDiffSummary(mode, path, content) {
-  if (mode === 'delete') return `delete ${path}`;
+  if (mode === 'delete') return `permanently delete ${path}`;
   const lines = content.split('\n').length;
   const bytes = Buffer.byteLength(content, 'utf8');
   if (mode === 'create') return `new file (${bytes} bytes, ${lines} lines)`;
@@ -755,6 +779,29 @@ async function executeBlobWrite(write, target, {
 }
 
 /**
+ * Delete one Tasks/Teaching blob record and drop its id from the sibling
+ * `{prefix}_index` (e.g. tasks/_index) so lists stop showing it.
+ * Missing record = already gone: reported as skipped, not an error.
+ */
+async function executeBlobDelete(write, target, { store, getJSON, deleteKey }) {
+  if (target.kind === 'meta') {
+    return { ok: false, error: 'blob_delete_unsupported', detail: write.path };
+  }
+  const existing = await getJSON(store, target.key).catch(() => null);
+  if (!existing) {
+    return { ok: true, result: { path: write.path, mode: 'delete', id: target.id, skipped: true } };
+  }
+  await deleteKey(store, target.key);
+  const slash = target.key.lastIndexOf('/');
+  if (slash > 0) {
+    const indexKey = `${target.key.slice(0, slash)}/_index`;
+    const ids = await readIndex(store, indexKey).catch(() => []);
+    if (ids.includes(target.id)) await writeIndex(store, indexKey, ids.filter(id => id !== target.id));
+  }
+  return { ok: true, result: { path: write.path, mode: 'delete', id: target.id, deleted: true } };
+}
+
+/**
  * Apply validated writes against a GitHub client and optional Tasks/Teaching blob stores.
  * `files` maps path → { sha?, content?, record? } for existing targets.
  */
@@ -766,7 +813,8 @@ export async function executeProposeActionWrites(client, proposal, {
   if (!proposal?.writes?.length) return { ok: false, error: 'missing_writes' };
 
   const needsGithub = proposal.writes.some(write => classifyWriteTarget(write.path).store === 'github');
-  const needsDelete = proposal.writes.some(write => write.mode === 'delete');
+  const needsDelete = proposal.writes.some(write =>
+    write.mode === 'delete' && classifyWriteTarget(write.path).store === 'github');
   if (needsGithub && (!client || typeof client.writeFile !== 'function')) {
     return { ok: false, error: 'missing_client' };
   }
@@ -787,9 +835,6 @@ export async function executeProposeActionWrites(client, proposal, {
     }
 
     if (target.store === 'people') {
-      if (write.mode === 'delete') {
-        return { ok: false, error: 'people_delete_unsupported', detail: write.path, results };
-      }
       const people = blobStores.people;
       if (!people || typeof people.apply !== 'function') {
         return { ok: false, error: 'people_store_unbound', detail: write.path, results };
@@ -801,9 +846,6 @@ export async function executeProposeActionWrites(client, proposal, {
     }
 
     if (target.store === 'travel') {
-      if (write.mode === 'delete') {
-        return { ok: false, error: 'travel_delete_unsupported', detail: write.path, results };
-      }
       const travel = blobStores.travel;
       if (!travel || typeof travel.apply !== 'function') {
         return { ok: false, error: 'travel_store_unbound', detail: write.path, results };
@@ -815,9 +857,6 @@ export async function executeProposeActionWrites(client, proposal, {
     }
 
     if (target.store === 'knowledge') {
-      if (write.mode === 'delete') {
-        return { ok: false, error: 'knowledge_delete_unsupported', detail: write.path, results };
-      }
       const knowledge = blobStores.knowledge;
       if (!knowledge || typeof knowledge.apply !== 'function') {
         return { ok: false, error: 'knowledge_store_unbound', detail: write.path, results };
@@ -829,9 +868,6 @@ export async function executeProposeActionWrites(client, proposal, {
     }
 
     if (target.store === 'professional') {
-      if (write.mode === 'delete') {
-        return { ok: false, error: 'professional_delete_unsupported', detail: write.path, results };
-      }
       const professional = blobStores.professional;
       if (!professional || typeof professional.apply !== 'function') {
         return { ok: false, error: 'professional_store_unbound', detail: write.path, results };
@@ -842,10 +878,22 @@ export async function executeProposeActionWrites(client, proposal, {
       continue;
     }
 
+    // Blob deletes (Tasks, Goals, Teaching): Adam approved on the Confirm card.
+    if ((target.store === 'tasks' || target.store === 'teaching') && write.mode === 'delete') {
+      const store = blobStores[target.store];
+      if (!store) return { ok: false, error: `${target.store}_blobs_unbound`, detail: write.path, results };
+      const deleted = await executeBlobDelete(write, target, {
+        store,
+        getJSON: target.store === 'tasks' ? getTasksJSON : getTeachingJSON,
+        deleteKey: target.store === 'tasks' ? deleteTasksKey : deleteTeachingKey
+      });
+      if (!deleted.ok) return { ...deleted, results };
+      results.push(deleted.result);
+      delete state[write.path];
+      continue;
+    }
+
     if (target.store === 'tasks' && (target.kind === 'goal' || target.kind === 'goal_checkin')) {
-      if (write.mode === 'delete') {
-        return { ok: false, error: 'blob_delete_unsupported', detail: write.path, results };
-      }
       const goals = blobStores.goals;
       if (!goals || typeof goals.apply !== 'function') {
         return { ok: false, error: 'goals_store_unbound', detail: write.path, results };
@@ -857,9 +905,6 @@ export async function executeProposeActionWrites(client, proposal, {
     }
 
     if (target.store === 'tasks' || target.store === 'teaching') {
-      if (write.mode === 'delete') {
-        return { ok: false, error: 'blob_delete_unsupported', detail: write.path, results };
-      }
       const store = blobStores[target.store];
       if (!store) return { ok: false, error: `${target.store}_blobs_unbound`, detail: write.path, results };
       const existing = state[write.path]?.record
