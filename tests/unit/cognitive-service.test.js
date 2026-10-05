@@ -62,3 +62,102 @@ test('polling a completed session still held by its runner does not call the mod
   assert.equal(got.status,'completed');assert.equal(got.summary,undefined);
   assert.equal((await store.read('owner',s.id)).etag,before,'GET must not commit while the runner finishes');
 });
+
+function seedRun(store, owner, { status, title = 'Run' }) {
+  const id = randomUUID();
+  const stamp = '2026-10-01T00:00:00.000Z';
+  return store.write(owner, id, {
+    id,
+    protocolId: 'fates',
+    mode: 'sprint',
+    status,
+    stage: status === 'completed' ? 'close' : 'briefing',
+    createdAt: stamp,
+    updatedAt: stamp,
+    completedAt: status === 'completed' ? stamp : null,
+    intake: { task: title },
+    summary: status === 'completed' ? { title, keyFinding: 'Kept finding', summary: 'Completed data.', openQuestions: [], forHammond: null } : undefined
+  }, null).then(() => id);
+}
+
+test('purgeIncomplete deletes non-completed runs and keeps completed session data', async () => {
+  const { store, service } = setup();
+  const completedId = await seedRun(store, 'owner', { status: 'completed', title: 'Keep me' });
+  const waitingId = await seedRun(store, 'owner', { status: 'waiting', title: 'Drop waiting' });
+  const cancelledId = await seedRun(store, 'owner', { status: 'cancelled', title: 'Drop cancelled' });
+  const failedId = await seedRun(store, 'owner', { status: 'failed', title: 'Drop failed' });
+  const result = await service.purgeIncomplete('owner');
+  assert.equal(result.kept, 1);
+  assert.equal(result.deleted.length, 3);
+  assert.deepEqual(new Set(result.deleted.map(row => row.id)), new Set([waitingId, cancelledId, failedId]));
+  assert.equal(await store.read('owner', waitingId), null);
+  assert.equal(await store.read('owner', cancelledId), null);
+  assert.equal(await store.read('owner', failedId), null);
+  const kept = await store.read('owner', completedId);
+  assert.equal(kept.value.status, 'completed');
+  assert.equal(kept.value.summary.keyFinding, 'Kept finding');
+  assert.equal(kept.value.intake.task, 'Keep me');
+});
+
+test('Past runs list permanently removes incomplete runs once and leaves completed rows', async () => {
+  const store = createMemoryCognitiveStore();
+  const completedId = await seedRun(store, 'operator', { status: 'completed', title: 'Real run' });
+  const incompleteId = await seedRun(store, 'operator', { status: 'waiting', title: 'Test leftover' });
+  const handler = createKnowledgeProtocolsHandler({
+    env,
+    verifySessionToken: () => ({ valid: true }),
+    getStore: async () => store,
+    model: goodModel,
+    retrieve: retrieval
+  });
+  const list = () => handler(new Request('https://example.test/api/knowledge/protocols?list=1&limit=20'));
+  const first = await (await list()).json();
+  assert.equal(first.data.sessions.length, 1);
+  assert.equal(first.data.sessions[0].id, completedId);
+  assert.equal(first.data.sessions[0].status, 'completed');
+  assert.equal(await store.read('operator', incompleteId), null);
+  const second = await (await list()).json();
+  assert.equal(second.data.sessions.length, 1);
+  assert.equal(second.data.sessions[0].id, completedId);
+  const laterIncomplete = await seedRun(store, 'operator', { status: 'cancelled', title: 'After purge' });
+  const third = await (await list()).json();
+  assert.ok(await store.read('operator', laterIncomplete), 'later incomplete runs stay after the one-shot marker');
+  assert.equal(third.data.sessions.length, 2);
+});
+
+test('R2 purge deletes session body and index for incomplete runs only', async () => {
+  const objects = new Map();
+  const client = {
+    send: async cmd => {
+      const name = cmd?.constructor?.name;
+      const Key = cmd.input?.Key;
+      if (name === 'PutObjectCommand' || cmd.input?.Body) {
+        objects.set(Key, { Body: cmd.input.Body, ETag: '"v1"' });
+        return { ETag: '"v1"' };
+      }
+      if (name === 'DeleteObjectCommand') {
+        objects.delete(Key);
+        return {};
+      }
+      if (name === 'ListObjectsV2Command' || cmd.input?.Prefix) {
+        const prefix = cmd.input.Prefix;
+        const Contents = [...objects.keys()].filter(k => k.startsWith(prefix)).map(k => ({ Key: k }));
+        return { Contents, IsTruncated: false };
+      }
+      if (name === 'GetObjectCommand' || Key) {
+        const row = objects.get(Key);
+        if (!row) throw Object.assign(new Error('missing'), { name: 'NoSuchKey', $metadata: { httpStatusCode: 404 } });
+        return { Body: { transformToString: async () => String(row.Body) }, ETag: row.ETag };
+      }
+      throw new Error(`unexpected command ${name}`);
+    }
+  };
+  const store = createR2CognitiveStore({ client, bucket: 'test', encryptionSecret: 'x'.repeat(32) });
+  const service = createCognitiveService({ store, model: goodModel, retrieve: retrieval });
+  const completedId = await seedRun(store, 'owner', { status: 'completed', title: 'Keep' });
+  const dropId = await seedRun(store, 'owner', { status: 'waiting', title: 'Drop' });
+  await service.purgeIncomplete('owner');
+  const keys = [...objects.keys()];
+  assert.ok(keys.some(key => key.endsWith(`${completedId}.json`)));
+  assert.equal(keys.some(key => key.endsWith(`${dropId}.json`)), false);
+});
