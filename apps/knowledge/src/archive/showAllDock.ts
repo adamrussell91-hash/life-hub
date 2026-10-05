@@ -2,12 +2,14 @@
  * The neural map's tool row: one short word per tool, one small panel at a time.
  * Pure DOM; the graph owns what each tool does.
  */
-export type DockTool = "spark" | "grow" | "path" | "recent" | "walk" | "bridges" | "save" | "export";
+export type DockTool = "spark" | "grow" | "path" | "recall" | "sharpen" | "recent" | "walk" | "bridges" | "save" | "export";
 
 export const DOCK_TOOLS: ReadonlyArray<{ id: DockTool; label: string; hint: string }> = [
   { id: "spark", label: "Spark", hint: "Drop a thought in and watch your notes answer" },
   { id: "grow", label: "Grow", hint: "Replay your notes in the order you wrote them" },
   { id: "path", label: "Path", hint: "Pick two notes and watch a signal run between them" },
+  { id: "recall", label: "Recall", hint: "Click a note to bring back what you were thinking about when you wrote it" },
+  { id: "sharpen", label: "Sharpen", hint: "Notes so alike they compete: merge the copies, sharpen the twins" },
   { id: "recent", label: "Recent", hint: "Light up what you wrote lately" },
   { id: "walk", label: "Walk", hint: "Ride a slow signal from note to linked note" },
   { id: "bridges", label: "Bridges", hint: "The notes that tie your topics together, and the gaps between them" },
@@ -141,6 +143,26 @@ export function readGrowSpeed(store: Pick<Storage, "getItem"> | null = storage()
 export function writeGrowSpeed(ms: number, store: Pick<Storage, "setItem"> | null = storage()) {
   try {
     store?.setItem(GROW_SPEED_KEY, String(ms));
+  } catch {
+    /* not remembered */
+  }
+}
+
+export const LINES_KEY = "kh.showAll.lines";
+export const SETTLE_KEY = "kh.showAll.settle";
+
+/** An on/off option remembered per browser. Off unless set; never throws. */
+export function readFlag(key: string, store: Pick<Storage, "getItem"> | null = storage()) {
+  try {
+    return store?.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function writeFlag(key: string, on: boolean, store: Pick<Storage, "setItem"> | null = storage()) {
+  try {
+    store?.setItem(key, on ? "1" : "0");
   } catch {
     /* not remembered */
   }

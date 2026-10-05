@@ -52,7 +52,18 @@ import { hubLabelVariants, placeHubLabels, readShowAllTheme, type ShowAllTheme }
 import { layoutShowAll } from "./showAllGraph";
 import { branchLoads, placeTopicAnchors } from "./showAllNeural";
 import { easeInOut, flipQuad, headAt, quadPoint, routeHops, signalLength, sparkEchoes, sparkSeeds, spreadSpark, subQuad, thoughtWords, type Hop, type Quad } from "./showAllPulse";
-import { GROW_SPEEDS, createDock, el, readGrowSpeed, readSavedViews, writeGrowSpeed, writeSavedViews, type Dock, type DockTool } from "./showAllDock";
+import {
+  buildMemoryIndex,
+  findTwins,
+  inferLatentCauses,
+  linesOfThinking,
+  reinstate,
+  settleAttractor,
+  type LatentCauses,
+  type MemoryIndex,
+  type Twin,
+} from "./showAllMemory";
+import { GROW_SPEEDS, LINES_KEY, SETTLE_KEY, createDock, el, readFlag, readGrowSpeed, writeFlag, readSavedViews, writeGrowSpeed, writeSavedViews, type Dock, type DockTool } from "./showAllDock";
 import {
   RECENT_WINDOWS,
   grownBy,
@@ -988,7 +999,13 @@ export function mountForceGraph(
   let pathEdges: Set<string> | null = null;
   let pathPicks: string[] = [];
   let bridgeSet: Set<string> | null = null;
-  let spark: { level: Map<string, number>; litAt: Map<string, number>; seeds: Set<string>; start: number } | null = null;
+  /** Spark's lit state: how bright a note is at a moment, or null while still dark. */
+  let spark: { levelAt: (id: string, now: number) => number | null; seeds: Set<string>; settled?: Set<string> } | null = null;
+  /** Recall / Sharpen: the notes in play, and how dim everything else goes. */
+  let litSet: Set<string> | null = null;
+  /** Grow with lines of thinking on: notes that began a line, ringing as they appear. */
+  let ignitions: Array<{ id: string; at: number; label: string }> = [];
+  let memory: { key: unknown; mem: MemoryIndex; causes?: LatentCauses } | null = null;
   let toolTimer = 0;
   type Overlay = { show: boolean; weight: number; mark: boolean; grow?: number };
   const VISIBLE: Overlay = { show: true, weight: 1, mark: false };
@@ -1006,13 +1023,16 @@ export function mountForceGraph(
     let weight = 1;
     let mark = false;
     if (spark) {
-      const lit = spark.litAt.get(node.id);
-      const level = spark.level.get(node.id) ?? 0;
-      if (lit == null || performance.now() - spark.start < lit) weight = 0.12;
+      const level = spark.levelAt(node.id, performance.now());
+      if (level == null) weight = 0.12;
       else {
-        weight = 0.35 + 0.65 * level;
-        mark = spark.seeds.has(node.id);
+        weight = 0.3 + 0.7 * level;
+        mark = spark.settled ? spark.settled.has(node.id) : spark.seeds.has(node.id);
       }
+    }
+    if (litSet) {
+      if (litSet.has(node.id)) mark = true;
+      else weight = Math.min(weight, 0.16);
     }
     if (recentWindow) {
       if (isRecent(node, recentWindow, Date.now())) mark = true;
@@ -1101,16 +1121,39 @@ export function mountForceGraph(
       return signal.loop != null || signal.follow != null || t < length + signal.afterglow;
     });
     draw();
-    if (signals.length) signalRaf = requestAnimationFrame(tickSignals);
+    if (signals.length || ignitions.length) signalRaf = requestAnimationFrame(tickSignals);
   }
 
   /** Each live charge: a bright head with a fading tail, then the fibre it crossed glowing out. */
   function drawSignals(map: Map<string, GraphNodeDatum>, dark: boolean) {
-    if (!signals.length) return;
+    if (!signals.length && !ignitions.length) return;
     const now = performance.now();
     const head = dark ? "#fff4e3" : "#7a2e05";
     const body = dark ? "#ffb070" : "#c25a14";
     ctx.save();
+    // A new line of thinking: a slow ring opens around its first note, and it is named.
+    for (const ignition of ignitions) {
+      const node = map.get(ignition.id);
+      if (node?.x == null || node.y == null) continue;
+      const age = (now - ignition.at) / 4000;
+      if (age >= 1) continue;
+      const open = easeInOut(Math.min(1, age * 1.6));
+      ctx.globalCompositeOperation = "source-over";
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, (4 + 22 * open) / view.k, 0, Math.PI * 2);
+      ctx.strokeStyle = body;
+      ctx.globalAlpha = 0.7 * (1 - age);
+      ctx.lineWidth = 1.4 / view.k;
+      ctx.stroke();
+      if (ignition.label) drawHaloText(ignition.label, node.x, node.y - 30 / view.k, {
+        font: `600 ${12 / view.k}px Inter, ui-sans-serif, sans-serif`,
+        align: "center",
+        baseline: "middle",
+        color: dark ? "#ffd2a8" : "#7a2e05",
+        alpha: Math.min(1, (1 - age) * 1.8),
+        halo: dark ? "rgba(3, 5, 10, 0.85)" : "rgba(247, 243, 234, 0.9)",
+      });
+    }
     ctx.lineCap = "round";
     ctx.globalCompositeOperation = dark ? "lighter" : "source-over";
     for (const signal of signals) {
@@ -1199,6 +1242,8 @@ export function mountForceGraph(
     pathPicks = [];
     bridgeSet = null;
     spark = null;
+    litSet = null;
+    ignitions = [];
     tool = null;
     dock?.setActive(null);
     dock?.setPanel(null);
@@ -1222,6 +1267,8 @@ export function mountForceGraph(
     if (next === "recent") openRecent("month");
     if (next === "walk") startWalk();
     if (next === "bridges") openBridges();
+    if (next === "recall") openRecall();
+    if (next === "sharpen") openSharpen();
     if (next === "save") openSave();
     scheduleDraw();
   }
@@ -1229,6 +1276,59 @@ export function mountForceGraph(
   function leafById(id: string) {
     const node = nodeMap.get(id);
     return node && node.kind === "leaf" ? node : null;
+  }
+
+  /** The similarity index behind Spark's settle mode, lines of thinking, Recall and Sharpen. */
+  function memoryIndex() {
+    if (memory?.key !== liveModel) {
+      memory = {
+        key: liveModel,
+        mem: buildMemoryIndex(simNodes, node => (node.pageId ? options.excerptFor(node.pageId) : "")),
+      };
+    }
+    return memory;
+  }
+
+  /** Index on the next tick, after a "Reading your notes…" line has had a chance to paint. */
+  function withMemory(panel: HTMLElement | null, run: (entry: NonNullable<typeof memory>) => void) {
+    if (memory?.key === liveModel) {
+      run(memory);
+      return;
+    }
+    panel?.replaceChildren(el("p", { class: "neural-dock__note", text: "Reading your notes…" }));
+    const forTool = tool;
+    window.clearTimeout(toolTimer);
+    toolTimer = window.setTimeout(() => {
+      if (tool !== forTool) return;
+      run(memoryIndex());
+    }, 30);
+  }
+
+  function fill(panel: HTMLElement, ...children: Array<Node | null | false>) {
+    panel.replaceChildren(...children.filter((child): child is Node => Boolean(child)));
+  }
+
+  function noteName(id: string) {
+    return leafById(id)?.label ?? "";
+  }
+
+  function noteButton(id: string, meta?: string) {
+    const node = leafById(id);
+    const button = el("button", { type: "button" }, el("span", { text: node?.label ?? "" }), meta ? el("small", { text: meta }) : null);
+    if (node) button.addEventListener("click", () => showNote(node));
+    return button;
+  }
+
+  function toggle(label: string, on: boolean, hint: string, onChange: (on: boolean) => void) {
+    const button = el("button", { type: "button", class: "neural-dock__toggle", title: hint, "aria-pressed": String(on) }, label);
+    button.classList.toggle("is-active", on);
+    button.addEventListener("click", () => {
+      const next = button.getAttribute("aria-pressed") !== "true";
+      button.setAttribute("aria-pressed", String(next));
+      button.classList.toggle("is-active", next);
+      onChange(next);
+    });
+    return button;
   }
 
   function showNote(node: GraphNodeDatum, k?: number) {
@@ -1264,24 +1364,28 @@ export function mountForceGraph(
     const go = el("button", { type: "submit", text: "Spark" });
     const form = el("form", { class: "neural-dock__spark" }, input, go);
     const answer = el("div", { class: "neural-dock__answer" });
+    let settle = readFlag(SETTLE_KEY);
+    const mode = toggle("Settle", settle, "Attractor mode: let the activity settle into the one memory it belongs to", on => {
+      settle = on;
+      writeFlag(SETTLE_KEY, on);
+      if (input.value.trim() || selected) fire(input.value.trim());
+    });
     form.addEventListener("submit", event => {
       event.preventDefault();
       fire(input.value.trim());
     });
-    dock?.setPanel(
-      el(
-        "div",
-        {},
-        form,
-        el("p", { class: "neural-dock__note", text: "Watch where it travels. Your notes answer back." }),
-        answer,
-      ),
-    );
+    const hint = el("p", { class: "neural-dock__note" });
+    const setHint = () => {
+      hint.textContent = settle
+        ? "Settle: activity sloshes between ideas, then falls into the one memory your thought belongs to."
+        : "Watch where it travels. Your notes answer back.";
+    };
+    setHint();
+    mode.addEventListener("click", setHint);
+    dock?.setPanel(el("div", {}, form, el("div", { class: "neural-dock__modes" }, mode), hint, answer));
     window.setTimeout(() => input.focus(), 0);
 
-    function fire(thought: string) {
-      stopSignals();
-      window.clearTimeout(toolTimer);
+    function seedsFor(thought: string) {
       let seeds = thought
         ? sparkSeeds(simNodes, thought, node => (node.pageId ? options.excerptFor(node.pageId) : ""), 8)
         : [];
@@ -1289,15 +1393,34 @@ export function mountForceGraph(
         const picked = simNodes.find(node => node.kind === "leaf" && node.label === selected);
         if (picked) seeds = [picked.id];
       }
+      return seeds;
+    }
+
+    function fire(thought: string) {
+      stopSignals();
+      window.clearTimeout(toolTimer);
+      const seeds = seedsFor(thought);
       if (!seeds.length) {
         spark = null;
         answer.replaceChildren(el("p", { class: "neural-dock__note", text: thought ? "Nothing in your notes touches that yet." : "Type a thought, or pick a note first." }));
         scheduleDraw();
         return;
       }
+      if (settle) withMemory(answer, entry => fireSettle(entry.mem, seeds));
+      else fireSpread(thought, seeds);
+    }
+
+    function fireSpread(thought: string, seeds: string[]) {
       const hopMs = 950;
       const result = spreadSpark(simLinks, seeds, { hopMs, decay: 0.7, fanOut: 5 });
-      spark = { level: result.level, litAt: result.litAt, seeds: new Set(seeds), start: performance.now() + 700 };
+      const start = performance.now() + 700;
+      spark = {
+        seeds: new Set(seeds),
+        levelAt: (id, now) => {
+          const lit = result.litAt.get(id);
+          return lit == null || now - start < lit ? null : (result.level.get(id) ?? 0);
+        },
+      };
       fitTo(result.level.keys());
       playSignal({ hops: result.hops, afterglow: 5200, delay: 700 });
       answer.replaceChildren(el("p", { class: "neural-dock__note", text: "Listening…" }));
@@ -1306,16 +1429,9 @@ export function mountForceGraph(
         const echoes = sparkEchoes(simNodes, result, seeds, Date.now(), 8, thoughtWords(thought));
         const list = el("ol", { class: "neural-dock__steps" });
         for (const echo of echoes) {
-          const node = leafById(echo.id);
-          if (!node) continue;
           const meta = [monthYear(echo.written), echo.forgotten ? "forgotten" : ""].filter(Boolean).join(" · ");
-          const button = el(
-            "button",
-            { type: "button", class: echo.forgotten ? "is-forgotten" : "" },
-            el("span", { text: echo.label }),
-            meta ? el("small", { text: meta }) : null,
-          );
-          button.addEventListener("click", () => showNote(node));
+          const button = noteButton(echo.id, meta);
+          if (echo.forgotten) button.classList.add("is-forgotten");
           list.append(el("li", {}, button));
         }
         const forgotten = echoes.filter(echo => echo.forgotten).length;
@@ -1333,6 +1449,74 @@ export function mountForceGraph(
       }, 700 + Math.min(4200, signalLength(result.hops) * 0.7));
       scheduleDraw();
     }
+
+    // Attractor mode: replay the settling step by step. Activity eases between frames; charges
+    // run from the most active note toward each note that switches on.
+    function fireSettle(mem: MemoryIndex, seeds: string[]) {
+      const settling = settleAttractor(mem, seeds);
+      const frameMs = 850;
+      const start = performance.now() + 600;
+      const last = settling.frames.length - 1;
+      const final = new Set(settling.attractor);
+      spark = {
+        seeds: new Set(seeds),
+        levelAt: (id, now) => {
+          const t = (now - start) / frameMs;
+          if (t < 0) return settling.frames[0]!.get(id) ?? null;
+          const f = Math.min(last, Math.floor(t));
+          const here = settling.frames[f]!.get(id);
+          const next = settling.frames[Math.min(last, f + 1)]!.get(id);
+          if (here == null && next == null) return null;
+          const mix = easeInOut(t - f);
+          return (here ?? 0) * (1 - mix) + (next ?? 0) * mix;
+        },
+      };
+      const hops: Hop[] = [];
+      for (let f = 1; f <= last; f++) {
+        const before = settling.frames[f - 1]!;
+        let added = 0;
+        for (const [id, level] of settling.frames[f]!) {
+          if (before.has(id) || added >= 24) continue;
+          // Charge comes from the active partner that pushed it on hardest.
+          const i = mem.index.get(id)!;
+          let from = "";
+          let push = 0;
+          for (const { j, score } of mem.partners[i]!) {
+            const value = (before.get(mem.ids[j]!) ?? 0) * score;
+            if (value > push) {
+              push = value;
+              from = mem.ids[j]!;
+            }
+          }
+          if (!from) continue;
+          hops.push({ from, to: id, start: (f - 1) * frameMs + added * 25, duration: frameMs * 0.9, strength: Math.max(0.3, level) });
+          added += 1;
+        }
+      }
+      playSignal({ hops, afterglow: 2200, delay: 600 });
+      fitTo([...seeds, ...settling.attractor]);
+      answer.replaceChildren(el("p", { class: "neural-dock__note", text: "Settling…" }));
+      toolTimer = window.setTimeout(() => {
+        if (spark) spark.settled = final;
+        const list = el("ol", { class: "neural-dock__steps" });
+        for (const id of settling.attractor.slice(0, 10)) list.append(el("li", {}, noteButton(id)));
+        const competing = settling.competing.map(shortName);
+        const settledInto = settling.settledTopic ? shortName(settling.settledTopic) : "";
+        answer.replaceChildren(
+          el(
+            "div",
+            {},
+            competing.length > 1
+              ? el("p", { class: "neural-dock__note", text: `Pulled between ${competing.join(", ")} — settled into ${settledInto}.` })
+              : el("p", { class: "neural-dock__note", text: `Settled into ${settledInto || "one memory"} in ${last} steps.` }),
+            el("p", { class: "neural-dock__head", text: "The memory it fell into" }),
+            list,
+          ),
+        );
+        scheduleDraw();
+      }, 600 + frameMs * last + 300);
+      scheduleDraw();
+    }
   }
 
   // Grow: replay the map in the order notes were written.
@@ -1347,9 +1531,76 @@ export function mountForceGraph(
     const when = el("span", { class: "neural-dock__when" });
     const play = el("button", { type: "button", text: "Pause" });
     let fraction = 0;
+    let lines = readFlag(LINES_KEY);
+    let causes: LatentCauses | null = null;
+    const linesPanel = el("div", { class: "neural-dock__lines" });
+    const founders = new Map<string, string>();
+    const fireCrossed = (from: number, to: number) => {
+      if (!causes || to <= from) return;
+      const now = performance.now();
+      let sent = 0;
+      for (const step of causes.steps) {
+        const node = leafById(step.note);
+        const time = node ? noteTime(node) : null;
+        if (time == null || time <= from || time > to) continue;
+        const line = founders.get(step.note);
+        if (line != null) {
+          // Name a line as it begins only while few others are speaking, so names never pile up.
+          const speaking = ignitions.filter(item => item.label && now - item.at < 2600).length;
+          ignitions.push({ id: step.note, at: now, label: speaking < 2 ? line : "" });
+          continue;
+        }
+        // Joining notes get a quiet charge from the note that explained them; a stretch is brighter.
+        if (!step.via || sent >= 6 || signals.length > 40) continue;
+        if (step.kind === "join" && Math.random() > 0.35) continue;
+        playSignal({
+          hops: [{ from: step.via, to: step.note, start: 0, duration: 900, strength: step.kind === "stretch" ? 0.9 : 0.4 }],
+          afterglow: 900,
+        });
+        sent += 1;
+      }
+      ignitions = ignitions.filter(item => now - item.at < 4200);
+    };
+    const showLines = () => {
+      if (!lines) {
+        causes = null;
+        founders.clear();
+        ignitions = [];
+        linesPanel.replaceChildren();
+        return;
+      }
+      withMemory(linesPanel, entry => {
+        entry.causes ??= inferLatentCauses(entry.mem);
+        causes = entry.causes;
+        const named = linesOfThinking(causes);
+        founders.clear();
+        for (const line of named) {
+          const name = shortName(noteName(line.founder));
+          founders.set(line.founder, name.length > 40 ? `${name.slice(0, 39)}…` : name);
+        }
+        const list = el("ol", { class: "neural-dock__steps" });
+        for (const line of named) {
+          const button = noteButton(line.founder, [monthYear(line.born), `${line.members.length} notes`, line.topic ? shortName(line.topic) : ""].filter(Boolean).join(" · "));
+          button.addEventListener("click", () => {
+            // Jump the replay to just before this line began, and play on from there.
+            if (line.born == null) return;
+            const at = Math.max(0, (line.born - span.first) / growSpanWidth - 0.004);
+            setAt(at);
+            start(at);
+          });
+          list.append(el("li", {}, button));
+        }
+        linesPanel.replaceChildren(
+          el("p", { class: "neural-dock__note", text: `Each new note either fits a line of thinking you already had, stretches it, or starts a new one. ${named.length} lines began here:` }),
+          list,
+        );
+      });
+    };
     const setAt = (next: number) => {
+      const before = growUntil;
       fraction = next;
       growUntil = span.first + growSpanWidth * next;
+      if (growRaf && before != null) fireCrossed(before, growUntil);
       slider.value = String(Math.round(next * 1000));
       when.textContent = monthYear(growUntil);
       scheduleDraw();
@@ -1408,7 +1659,15 @@ export function mountForceGraph(
     };
     growPlayMs = readGrowSpeed();
     markSpeed();
-    dock?.setPanel(el("div", {}, el("div", { class: "neural-dock__grow" }, play, slider, when), speeds));
+    const linesToggle = toggle("Lines of thinking", lines, "Latent cause inference: mark where each new line of thinking began", on => {
+      lines = on;
+      writeFlag(LINES_KEY, on);
+      showLines();
+    });
+    dock?.setPanel(
+      el("div", {}, el("div", { class: "neural-dock__grow" }, play, slider, when), speeds, el("div", { class: "neural-dock__modes" }, linesToggle), linesPanel),
+    );
+    showLines();
     viewTouched = false;
     moveCamera(fitShowAll(), 500);
     setAt(0);
@@ -1606,6 +1865,94 @@ export function mountForceGraph(
     fitTo(bridgeSet);
   }
 
+  // Recall (reinstatement): click a note to bring back what was active when you wrote it —
+  // the notes around it in time and the ones it calls up.
+  function openRecall() {
+    dock?.setPanel(el("p", { class: "neural-dock__note", text: "Click a note to bring back what you were thinking about when you wrote it." }));
+  }
+
+  function recall(node: GraphNodeDatum) {
+    const leaf = node.kind === "leaf" ? node : topicRepresentative(simNodes, node.label, simLinks);
+    if (!leaf) return;
+    const panel = el("div", {});
+    dock?.setPanel(panel);
+    withMemory(panel, entry => {
+      stopSignals();
+      const back = reinstate(entry.mem, leaf.id);
+      litSet = new Set([leaf.id, ...back.context, ...back.associations]);
+      // The index fires and the scattered pieces light up: one charge out to each.
+      const hops: Hop[] = [
+        ...back.context.map((id, index) => ({ from: leaf.id, to: id, start: index * 90, duration: 1400, strength: 0.75 })),
+        ...back.associations.map((id, index) => ({ from: leaf.id, to: id, start: 300 + index * 120, duration: 1100, strength: 0.5 })),
+      ];
+      playSignal({ hops, afterglow: 3000, delay: 300 });
+      fitTo(litSet);
+      const contextList = el("ol", { class: "neural-dock__steps" });
+      for (const id of back.context.slice(0, 12)) {
+        const other = leafById(id);
+        contextList.append(el("li", {}, noteButton(id, other?.parentKeyword ? shortName(other.parentKeyword) : "")));
+      }
+      const callList = el("ol", { class: "neural-dock__steps" });
+      for (const id of back.associations) callList.append(el("li", {}, noteButton(id)));
+      const topics = back.topics.slice(0, 4).map(item => `${shortName(item.topic)} (${item.count})`).join(", ");
+      fill(
+        panel,
+        el("p", { class: "neural-dock__head", text: leaf.label }),
+        el("p", { class: "neural-dock__note", text: back.written ? `Written ${new Date(back.written).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}.` : "No date on this note." }),
+        topics ? el("p", { class: "neural-dock__note", text: `That week you were also in: ${topics}.` }) : null,
+        back.context.length ? el("p", { class: "neural-dock__head", text: "Around the same time" }) : null,
+        back.context.length ? contextList : null,
+        el("p", { class: "neural-dock__head", text: "What it calls up" }),
+        callList,
+      );
+      scheduleDraw();
+    });
+  }
+
+  // Sharpen (representational differentiation): notes so alike they compete. Copies can merge;
+  // near-twins get the words only each one uses — the difference worth making sharper.
+  function openSharpen() {
+    const panel = el("div", {});
+    dock?.setPanel(panel);
+    withMemory(panel, entry => {
+      const twins = findTwins(entry.mem, { limit: 14 });
+      const copies = twins.filter(twin => twin.alike >= 0.95);
+      const near = twins.filter(twin => twin.alike < 0.95);
+      const row = (twin: Twin) => {
+        const pick = el("button", { type: "button", class: "neural-dock__pair" }, el("span", { text: `${noteName(twin.a)}` }), el("small", { text: "and" }), el("span", { text: noteName(twin.b) }));
+        pick.addEventListener("click", () => {
+          stopSignals();
+          litSet = new Set([twin.a, twin.b]);
+          // Two memories competing: a charge runs back and forth between them.
+          playSignal({
+            hops: [
+              { from: twin.a, to: twin.b, start: 0, duration: 1100, strength: 0.9 },
+              { from: twin.b, to: twin.a, start: 1300, duration: 1100, strength: 0.9 },
+            ],
+            afterglow: 1200,
+            loop: 600,
+          });
+          fitTo(litSet);
+          scheduleDraw();
+        });
+        const differ =
+          twin.onlyA.length || twin.onlyB.length
+            ? el("p", { class: "neural-dock__differ", text: `Only the first: ${twin.onlyA.join(", ") || "—"} · Only the second: ${twin.onlyB.join(", ") || "—"}` })
+            : null;
+        return el("li", {}, pick, differ);
+      };
+      fill(
+        panel,
+        el("p", { class: "neural-dock__note", text: "Notes so alike they compete for the same place in your memory. Merge the copies; for the rest, sharpen what makes each one its own." }),
+        copies.length ? el("p", { class: "neural-dock__head", text: "Copies — merge these" }) : null,
+        copies.length ? el("ul", { class: "neural-dock__steps neural-dock__pairs" }, ...copies.map(row)) : null,
+        near.length ? el("p", { class: "neural-dock__head", text: "Twins — sharpen the difference" }) : null,
+        near.length ? el("ul", { class: "neural-dock__steps neural-dock__pairs" }, ...near.map(row)) : null,
+        twins.length ? null : el("p", { class: "neural-dock__note", text: "No two notes compete. Every memory has its own place." }),
+      );
+    });
+  }
+
   function shortName(label: string) {
     return label.split(/\s+and\s+/i)[0]!;
   }
@@ -1769,6 +2116,10 @@ export function mountForceGraph(
 
     if (showAllMode && tool === "path") {
       pickForPath(node);
+      return;
+    }
+    if (showAllMode && tool === "recall") {
+      recall(node);
       return;
     }
     if (showAllMode && tool === "walk") clearTool();
