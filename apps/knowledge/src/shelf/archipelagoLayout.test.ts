@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { PageManifestEntry } from "../domain/page";
-import { buildArchipelago, islandRadius, packCircles } from "./archipelagoLayout";
-import { buildShelf } from "./model";
+import { atlasContext, buildArchipelago, islandRadius, packCircles } from "./archipelagoLayout";
+import { terrainField } from "./atlasTerrain";
+import { SEA_LEVEL } from "./islandShape";
 
 function entry(id: string, book: string, extra: Partial<PageManifestEntry> = {}): PageManifestEntry {
   return { id, title: id, area: "notes", tags: [], excerpt: "", origins: [{ kind: "book", label: book }], ...extra };
@@ -73,3 +74,57 @@ describe("packCircles", () => {
     }
   });
 });
+
+describe("crossings", () => {
+  // One notebook: Hub shares 3 links with Three, 2 with Two, 1 with One. Far is in another notebook, linked 4 times.
+  const linked = (from: string, to: string, n: number) => Array.from({ length: n }, (_, i) => [
+    entry(`${from}-${to}-${i}`, from, { connected: [`${to}-${from}-${i}`] }),
+    entry(`${to}-${from}-${i}`, to, { connected: [`${from}-${to}-${i}`] }),
+  ]).flat();
+  const shelf = buildShelf([...linked("Hub", "Three", 3), ...linked("Hub", "Two", 2), ...linked("Hub", "One", 1), ...linked("Hub", "Far", 4), entry("h", "Hub")], {
+    books: [
+      { label: "Hub", notebook: "Sea" }, { label: "Three", notebook: "Sea" }, { label: "Two", notebook: "Sea" },
+      { label: "One", notebook: "Sea" }, { label: "Far", notebook: "Other" },
+    ],
+    placements: [],
+  });
+  const map = buildArchipelago(shelf, Date.parse("2026-10-03T00:00:00Z"));
+  const kind = (other: string) => map.crossings.find(c => [c.from, c.to].includes(other))!.kind;
+  const field = terrainField(map.terrain, 13);
+  const pair = (a: string, b: string) => [a, b].sort().join("|");
+  const joined = new Set(map.crossings.filter(c => c.kind === "joined").map(c => pair(c.from, c.to)));
+
+  it("bridges or joins neighbours in one sea by how many links they share, and leaves other seas to faint routes", () => {
+    expect(kind("one")).toBe("rope");
+    expect(kind("two")).toBe("stone");
+    expect(kind("three")).toBe("joined");
+    expect(kind("far")).toBe("far");
+  });
+
+  it("pulls joined books shore to shore", () => {
+    const hub = map.islands.find(i => i.key === "hub")!;
+    const three = map.islands.find(i => i.key === "three")!;
+    expect(Math.hypot(hub.x - three.x, hub.y - three.y) - hub.r - three.r).toBeLessThan(20);
+  });
+
+  it("joins land across the neck of joined books and keeps open sea between every other pair", () => {
+    for (const c of map.crossings.filter(c => c.kind === "joined")) expect(field((c.a.x + c.b.x) / 2, (c.a.y + c.b.y) / 2).e).toBeGreaterThan(SEA_LEVEL);
+    for (const a of map.islands) for (const b of map.islands) {
+      if (a.key >= b.key || joined.has(pair(a.key, b.key))) continue;
+      const d = Math.hypot(b.x - a.x, b.y - a.y);
+      const t = (a.r + (d - a.r - b.r) / 2) / d;
+      const mid = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      // Skip pairs with a third island lying between them.
+      if (map.islands.some(i => i !== a && i !== b && Math.hypot(i.x - mid.x, i.y - mid.y) < i.r * 1.2)) continue;
+      expect(field(mid.x, mid.y).e).toBeLessThan(SEA_LEVEL);
+    }
+  });
+
+  it("tells a book's own map where its island sits and which neighbours meet it", () => {
+    const ctx = atlasContext(map, "hub")!;
+    const hub = map.islands.find(i => i.key === "hub")!;
+    expect(ctx.island).toEqual({ x: hub.x, y: hub.y, r: hub.r });
+    expect(ctx.neighbours.map(n => [n.key, n.kind, n.count]).sort()).toEqual([["one", "rope", 1], ["three", "joined", 3], ["two", "stone", 2]]);
+  });
+});
+import { buildShelf } from "./model";

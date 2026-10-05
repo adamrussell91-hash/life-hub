@@ -3,6 +3,7 @@ import { KIND_COLOUR, KIND_WORD, kindTally } from "./kinds";
 import { mountSeaLife, pickBottle, type Bottle, type Charter, type Land, type Landmark } from "./seaLife";
 import { MAP_SEA_HTML, MAP_SKY_HTML, mapControlsHtml, positionTerrain, positionWorld, revealAt, terrainLayers, wireFullScreen } from "./mapChrome";
 import { chartLandmarks, shorePoint, type ArchipelagoModel, type Island } from "./archipelagoLayout";
+import { borderRoadSvg, bridgeSvg } from "./crossingsSvg";
 import { noteThemes } from "./atlasLayout";
 
 export type ArchipelagoHandlers = {
@@ -34,7 +35,7 @@ export function mapNames(labels: Array<{ key: string; label: string }>): Map<str
 }
 
 function terrainKey(model: ArchipelagoModel) {
-  return model.islands.map(i => `${i.key}:${i.x},${i.y},${i.book.noteCount}`).join("|");
+  return `${model.islands.map(i => `${i.key}:${i.x},${i.y},${i.book.noteCount}`).join("|")}#${model.crossings.map(c => c.kind[0]).join("")}`;
 }
 
 /** Pan/zoom map of the whole shelf. Shares the Atlas's chrome classes (failure register S1: one surface, one set of styles). */
@@ -56,7 +57,9 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
       <ul>
         <li><i class="atlas-key isles-key--island"></i>Island: a book, sized by your notes</li>
         <li><i class="atlas-key atlas-key--peak"></i>Peaks: notes that complicate the book</li>
-        <li><i class="atlas-key atlas-key--road"></i>Sea route: notes linked across two books</li>
+        <li><i class="atlas-key atlas-key--road"></i>Rope bridge: a neighbouring book you linked once; stone bridge: twice</li>
+        <li><i class="atlas-key atlas-key--road"></i>Shared land and a border road: neighbours you linked three or more times</li>
+        <li><i class="atlas-key atlas-key--road"></i>Dotted route: links to a book across the sea</li>
         <li><i class="atlas-key isles-key--flag"></i>Flag: a book you're reading</li>
         <li><i class="atlas-key atlas-key--new"></i>A note added this week</li>
         <li><i class="atlas-key atlas-key--fog"></i>Sand-grey under mist: no notes yet</li>
@@ -185,30 +188,48 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
     const free = (x: number, y: number, bw: number, bh: number) =>
       !placed.some(o => x < o.x + o.w && x + bw > o.x && y < o.y + o.h && y + bh > o.y);
 
-    // Sea routes first, under everything.
+    // Bridges, border roads and far routes first, under everything.
     let svg = "";
-    for (const passage of model.passages) {
-      const a = byKey.get(passage.from);
-      const b = byKey.get(passage.to);
+    const focus = selected ?? hovered;
+    // Bridge decks are about four world units across each side, kept legible at any zoom.
+    const deck = Math.max(1.6, Math.min(9, 4 * scale));
+    for (const crossing of model.crossings) {
+      const a = byKey.get(crossing.from);
+      const b = byKey.get(crossing.to);
       if (!a || !b) continue;
-      const p = S(shorePoint(a, b).x, shorePoint(a, b).y);
-      const q = S(shorePoint(b, a).x, shorePoint(b, a).y);
-      const bend = 0.18 * Math.hypot(q.x - p.x, q.y - p.y);
-      const nx = -(q.y - p.y) / (Math.hypot(q.x - p.x, q.y - p.y) || 1);
-      const ny = (q.x - p.x) / (Math.hypot(q.x - p.x, q.y - p.y) || 1);
-      const c = { x: (p.x + q.x) / 2 + nx * bend, y: (p.y + q.y) / 2 + ny * bend };
-      // Routes are a faint web until you pick (or point at) an island; then its own routes come up.
-      const focus = selected ?? hovered;
-      const on = focus === passage.from || focus === passage.to;
+      const on = focus === crossing.from || focus === crossing.to;
       const dim = Boolean(focus) && !on;
-      svg += `<path class="isles-route${on ? " is-on" : ""}${dim ? " is-dim" : ""}" d="M${p.x},${p.y} Q${c.x},${c.y} ${q.x},${q.y}" style="stroke-width:${(0.6 + Math.log2(passage.count + 1) * (on ? 0.5 : 0.28)).toFixed(2)}px" />`;
-      const mid = { x: (p.x + 2 * c.x + q.x) / 4, y: (p.y + 2 * c.y + q.y) / 4 };
+      const state = `${on ? " is-on" : ""}${dim ? " is-dim" : ""}`;
+      let mid: { x: number; y: number };
+      if (crossing.kind === "rope" || crossing.kind === "stone") {
+        const p = S(crossing.a.x, crossing.a.y);
+        const q = S(crossing.b.x, crossing.b.y);
+        svg += bridgeSvg(crossing.kind, p, q, deck, state);
+        mid = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 - deck * 3 };
+      } else if (crossing.kind === "joined") {
+        // From a little inland on one side, over the border, to a little inland on the other.
+        const inland = (i: Island, shore: { x: number; y: number }) => S(i.x + (shore.x - i.x) * 0.55, i.y + (shore.y - i.y) * 0.55);
+        const p = inland(a, crossing.a);
+        const q = inland(b, crossing.b);
+        svg += borderRoadSvg(p, q, deck, state);
+        mid = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 - deck * 3 };
+      } else {
+        const p = S(shorePoint(a, b).x, shorePoint(a, b).y);
+        const q = S(shorePoint(b, a).x, shorePoint(b, a).y);
+        const bend = 0.18 * Math.hypot(q.x - p.x, q.y - p.y);
+        const nx = -(q.y - p.y) / (Math.hypot(q.x - p.x, q.y - p.y) || 1);
+        const ny = (q.x - p.x) / (Math.hypot(q.x - p.x, q.y - p.y) || 1);
+        const c = { x: (p.x + q.x) / 2 + nx * bend, y: (p.y + q.y) / 2 + ny * bend };
+        // Far routes are a faint web until you pick (or point at) an island; then its own routes come up.
+        svg += `<path class="isles-route${state}" d="M${p.x},${p.y} Q${c.x},${c.y} ${q.x},${q.y}" style="stroke-width:${(0.6 + Math.log2(crossing.count + 1) * (on ? 0.5 : 0.28)).toFixed(2)}px" />`;
+        mid = { x: (p.x + 2 * c.x + q.x) / 4, y: (p.y + 2 * c.y + q.y) / 4 };
+      }
       // Counts only for the island in focus: on the whole shelf they'd bury the map.
       if (on) {
-        const text = `${passage.count} ${passage.count === 1 ? "link" : "links"}`;
+        const text = `${crossing.count} ${crossing.count === 1 ? "link" : "links"}`;
         const bw = text.length * 6.6 + 14;
         placed.push({ x: mid.x - bw / 2, y: mid.y - 10, w: bw, h: 20 });
-        parts.push(`<button type="button" class="isles-route-count${on ? " is-on" : ""}" style="left:${mid.x}px;top:${mid.y}px" data-passage="${esc(passage.from)}|${esc(passage.to)}" aria-label="${esc(`${passage.count} linked notes between ${byKey.get(passage.from)?.label} and ${byKey.get(passage.to)?.label}`)}">${text}</button>`);
+        parts.push(`<button type="button" class="isles-route-count is-on" style="left:${mid.x}px;top:${mid.y}px" data-passage="${esc(crossing.from)}|${esc(crossing.to)}" aria-label="${esc(`${crossing.count} linked notes between ${a.label} and ${b.label}`)}">${text}</button>`);
       }
     }
     lines.innerHTML = svg;
@@ -529,7 +550,7 @@ export function mountArchipelago(host: HTMLElement, model: ArchipelagoModel, han
     bounds: model.bounds,
     lands: [...shores.values()],
     harbours: [...shores.values()],
-    passages: model.passages.flatMap(p => {
+    passages: model.crossings.filter(c => c.kind === "far").flatMap(p => {
       const a = shores.get(p.from);
       const b = shores.get(p.to);
       const charter: Charter = { key: `${p.from}|${p.to}`, name: `The ${names.get(p.from)}–${names.get(p.to)} Passage`, count: p.count };

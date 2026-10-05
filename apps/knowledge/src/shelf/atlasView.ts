@@ -2,6 +2,7 @@ import type { AtlasModel, AtlasTown } from "./atlasLayout";
 import { KIND_COLOUR, KIND_INK, KIND_MEANING, kindColour, kindLabel } from "./kinds";
 import { renderTerrain, type TerrainCanvas } from "./atlasTerrain";
 import { mostConnected } from "./archipelagoLayout";
+import { borderRoadSvg, bridgeSvg } from "./crossingsSvg";
 import { mountSeaLife, pickBottle } from "./seaLife";
 import { MAP_SEA_HTML, MAP_SKY_HTML, mapControlsHtml, positionTerrain, positionWorld, revealAt, terrainLayers, wireFullScreen } from "./mapChrome";
 import type { BookModel } from "./model";
@@ -23,7 +24,7 @@ function esc(value: unknown) {
 
 /** The cache key changes whenever anything that shapes the land changes. */
 function terrainKey(book: BookModel, atlas: AtlasModel) {
-  return `${book.key}|${atlas.width}|${atlas.towns.map(t => `${t.note.id}:${t.x.toFixed(0)},${t.y.toFixed(0)}:${t.peak ? 1 : 0}`).join(";")}|${atlas.provinces.map(p => `${p.id}${p.explored ? 1 : 0}`).join(",")}`;
+  return `${book.key}|${atlas.width}|${atlas.towns.map(t => `${t.note.id}:${t.x.toFixed(0)},${t.y.toFixed(0)}:${t.peak ? 1 : 0}`).join(";")}|${atlas.provinces.map(p => `${p.id}${p.explored ? 1 : 0}${p.neighbour ? "n" : ""}`).join(",")}|${(atlas.crossings ?? []).map(c => c.kind).join(",")}`;
 }
 
 export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel, handlers: AtlasHandlers): () => void {
@@ -47,6 +48,8 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
         <li><i class="atlas-key atlas-key--peak" style="background:${KIND_COLOUR.debate}"></i>Peak: a debate</li>
         <li><i class="atlas-key atlas-key--unread"></i>Town: not sorted yet</li>
         <li><i class="atlas-key atlas-key--road"></i>Road: notes you linked</li>
+        <li><i class="atlas-key atlas-key--road"></i>Bridge: a neighbouring book you linked once or twice</li>
+        <li><i class="atlas-key atlas-key--road"></i>Border road: a neighbour you linked three or more times shares your land</li>
         <li><i class="atlas-key atlas-key--fog"></i>Fog: a chapter you haven't written about, or an open question</li>
         <li><i class="atlas-key atlas-key--new"></i>Settled this week</li>
         <li><i class="atlas-key atlas-key--faded"></i>Faded: untouched for six months</li>
@@ -174,30 +177,44 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
       svg += `<path d="M${from.x} ${from.y} Q ${(from.x + end.x) / 2} ${(from.y + end.y) / 2 + 40} ${end.x} ${end.y}" class="atlas-route${hot ? " is-hot" : ""}"/>`;
       routeLabels.push(`<button type="button" class="atlas-route-label" style="left:${x}px;top:${y}px;max-width:${lw}px;--c:${handlers.swatchFor(route.toBook)?.fill ?? "var(--shallow)"}" data-route="${esc(route.toBook)}">To ${esc(route.toLabel)}<span> · ${route.count}</span></button>`);
     }
+    const deck = Math.max(2.5, Math.min(12, 10 * scale));
+    for (const crossing of atlas.crossings ?? []) {
+      const p = S(crossing.from.x, crossing.from.y);
+      const q = S(crossing.to.x, crossing.to.y);
+      const hot = selected && selected === crossing.fromId ? " is-on" : "";
+      svg += crossing.kind === "joined" ? borderRoadSvg(p, q, deck, hot) : bridgeSvg(crossing.kind, p, q, deck, hot);
+      const text = `${crossing.kind === "joined" ? "Over the border:" : "Bridge to"} ${crossing.label}`;
+      const lw = Math.min(w - 24, text.length * 7.2 + 40);
+      const x = Math.min(w - lw - 8, Math.max(8, q.x - lw / 2));
+      const y = Math.min(h - 38, Math.max(10, q.y + 12));
+      routeRects.push({ x, y, w: lw, h: 28 });
+      routeLabels.push(`<button type="button" class="atlas-route-label" style="left:${x}px;top:${y}px;max-width:${lw}px;--c:${handlers.swatchFor(crossing.key)?.fill ?? "var(--shallow)"}" data-route="${esc(crossing.key)}">${esc(text)}<span> · ${crossing.count}</span></button>`);
+    }
     lines.innerHTML = svg;
 
     const parts: string[] = [];
     // Province names first: they claim their space before any town label does.
     const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
     const font = Math.max(10, Math.min(17, 10 + scale * 6));
-    const columnWidth = Math.max(110, ((atlas.width - 260) / Math.max(1, atlas.provinces.length)) * scale * 0.92);
-    const provinceTop = new Map<string, number>();
-    for (const town of atlas.towns) provinceTop.set(town.province, Math.min(provinceTop.get(town.province) ?? Infinity, town.y));
-    const named = [...atlas.provinces.map(p => ({ id: p.id, label: p.label, explored: p.explored, x: p.x, y: p.y, r: p.radius, start: p.start, end: p.end }))];
+    const columnWidth = Math.max(110, Math.min(240, 260 * scale));
+    const named = [...atlas.provinces.filter(p => !p.neighbour).map(p => ({ id: p.id, label: p.label, explored: p.explored, x: p.x, y: p.y, r: p.radius, start: p.start, end: p.end }))];
     if (atlas.towns.some(t => t.province === "loose")) {
       const loose = atlas.towns.filter(t => t.province === "loose");
       named.push({ id: "loose", label: "Loose pages", explored: true, x: loose.reduce((s, t) => s + t.x, 0) / loose.length, y: loose.reduce((s, t) => s + t.y, 0) / loose.length, r: 60, start: undefined, end: undefined });
     }
-    for (const p of named) {
+    // Regions sit round the island like slices, so each name centres on its own region; written-in
+    // regions name themselves first, and a name that would overlap another waits for a closer zoom.
+    for (const p of [...named].sort((a, b) => Number(b.explored) - Number(a.explored))) {
       const c = S(p.x, p.y);
       const r = p.r * scale;
       if (!p.explored) parts.push(`<div class="atlas-fog" style="left:${c.x}px;top:${c.y}px;width:${r * 2.8}px;height:${r * 2.1}px"></div>`);
-      const topWorld = p.explored ? Math.min(provinceTop.get(p.id) ?? p.y - p.r, p.y - p.r * 0.4) - 22 : p.y - 8;
-      const top = S(p.x, topWorld).y;
       const textWidth = Math.min(columnWidth, p.label.length * font * 0.86);
       const lines = Math.ceil((p.label.length * font * 0.86) / columnWidth);
       const h = lines * font * 1.25 + (p.explored ? 0 : 16);
-      placed.push({ x: c.x - textWidth / 2, y: top - h, w: textWidth, h });
+      const top = c.y + h / 2;
+      const rect = { x: c.x - textWidth / 2, y: top - h, w: textWidth, h };
+      if (placed.some(o => rect.x < o.x + o.w && rect.x + rect.w > o.x && rect.y < o.y + o.h && rect.y + rect.h > o.y)) continue;
+      placed.push(rect);
       parts.push(`<div class="atlas-province${p.explored ? "" : " is-unexplored"}${p.id === "loose" ? " is-loose" : ""}" style="left:${c.x}px;top:${top}px;font-size:${font}px;width:${columnWidth}px"><span>${esc(p.label)}</span>${p.explored ? "" : `<small>Not written about yet${p.start ? ` · pp. ${p.start}–${p.end}` : ""}</small>`}</div>`);
     }
     for (const fog of atlas.fogs) {
@@ -326,8 +343,10 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
       const target = hit?.closest<HTMLElement>("[data-town], [data-route]");
       if (target?.dataset.town) showCard(target.dataset.town);
       else if (target?.dataset.route) {
-        const route = atlas.routes.find(r => r.toBook === target.dataset.route);
-        handlers.goBook(target.dataset.route, book.links.find(l => l.toBook === route?.toBook && l.fromId === route?.fromId)?.toId);
+        const key = target.dataset.route;
+        const route = atlas.routes.find(r => r.toBook === key);
+        const crossing = atlas.crossings?.find(c => c.key === key);
+        handlers.goBook(key, crossing?.toId ?? book.links.find(l => l.toBook === route?.toBook && l.fromId === route?.fromId)?.toId);
       } else showCard(undefined);
     }
   };
@@ -411,7 +430,11 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
     },
     bounds: { x: x0, y: y0, w: Math.min(atlas.width, b.x + b.w + 220) - x0, h: Math.min(atlas.height, b.y + b.h + 160) - y0 },
     // Land reaches well past its towns once the hills spread; keep beasts a long way off.
-    lands: [...atlas.provinces.map(p => ({ x: p.x, y: p.y, r: p.radius * 1.6 + 70 })), ...atlas.towns.map(t => ({ x: t.x, y: t.y, r: 150 }))],
+    lands: [
+      ...(atlas.island ? [{ x: atlas.island.x, y: atlas.island.y, r: atlas.island.r * 1.35 + 60 }] : []),
+      ...atlas.provinces.map(p => ({ x: p.x, y: p.y, r: p.neighbour ? p.radius * 2.8 + 60 : p.radius * 1.6 + 70 })),
+      ...atlas.towns.map(t => ({ x: t.x, y: t.y, r: 150 })),
+    ],
     harbours: [],
     size: 0.9,
     seed: book.key,

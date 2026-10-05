@@ -9,7 +9,7 @@ import { notesToRead, readNotesForShelf } from "./backfill";
 import { buildAtlas } from "./atlasLayout";
 import { mountAtlas } from "./atlasView";
 import { AIR_ROUTE, createWireless } from "./wireless";
-import { buildArchipelago } from "./archipelagoLayout";
+import { atlasContext, buildArchipelago } from "./archipelagoLayout";
 import { mountArchipelago } from "./archipelagoView";
 import type { FactsJob, ShelfData } from "./schema";
 import { KIND_COLOUR, KIND_MEANING, KIND_ORDER, KIND_UNKNOWN, KIND_WORD, kindColour, kindLabel } from "./kinds";
@@ -870,7 +870,8 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     if (onMap) {
       const bar = shell.querySelector<HTMLElement>(".descent__bar")!;
       shell.style.setProperty("--descent-bar", `${bar.offsetHeight}px`);
-      atlasTeardown = mountAtlas(shell.querySelector<HTMLElement>("[data-map]")!, book, buildAtlas(book), {
+      const context = atlasContext(buildArchipelago(books, Date.now(), phone.matches ? "tall" : "wide"), book.key);
+      atlasTeardown = mountAtlas(shell.querySelector<HTMLElement>("[data-map]")!, book, buildAtlas(book, Date.now(), context), {
         openNote: id => {
           void savePlacements([{ pageId: id, lastOpened: new Date().toISOString() }]).catch(() => undefined);
           document.body.classList.remove("is-bookshelf-immersive");
