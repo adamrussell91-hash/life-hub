@@ -679,7 +679,7 @@ export function renderChatRail(host: ChatRailHost) {
     ${host.pageHeader(
       CLEMENTINE.shortName,
       fromBook ? "From a book" : makeNote ? "Ask Clementine" : "Chat",
-      `<button class="btn btn--ghost" data-new-chat type="button" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>New chat</button>`,
+      `<button class="btn btn--ghost chat-new-button" data-new-chat type="button" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>New chat</button>`,
       { portraitSrc: CLEMENTINE.avatarSrc, portraitAlt: CLEMENTINE.name },
     )}
     <section class="coach chat${fileNote ? " chat--from-book" : ""}">
