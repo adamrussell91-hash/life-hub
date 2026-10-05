@@ -5471,7 +5471,7 @@ body.is-universe-saver .graph-canvas {
   margin-top: var(--space-2);
 }
 
-.neural-dock__steps button:has(small) {
+.neural-dock__steps button {
   display: block;
 }
 
@@ -5519,6 +5519,41 @@ body.is-universe-saver .graph-canvas {
 
 .graph-wrap.is-neural .neural-dock__steps button.is-forgotten small {
   color: #ffb070;
+}
+
+.neural-dock__modes {
+  display: flex;
+  gap: 4px;
+  margin-top: var(--space-2);
+}
+
+.neural-dock__panel .neural-dock__toggle.is-active {
+  background: #13233a;
+  border-color: #13233a;
+  color: #fbf8f2;
+}
+
+.neural-dock__pairs {
+  padding-left: 0;
+  list-style: none;
+  gap: var(--space-2);
+}
+
+.neural-dock__pair small {
+  display: inline;
+  margin: 0 0.35em;
+}
+
+.neural-dock__differ {
+  margin: 2px 0 0;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.graph-wrap.is-neural .neural-dock__panel .neural-dock__toggle.is-active {
+  background: #f4efe6;
+  border-color: #f4efe6;
+  color: #03050a;
 }
 
 .graph-wrap.is-neural .neural-dock__row button,
