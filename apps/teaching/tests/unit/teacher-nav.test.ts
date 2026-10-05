@@ -203,7 +203,8 @@ describe('fetchCurriculum', () => {
     const result = await fetchCurriculum();
 
     expect(apiGet).toHaveBeenCalledWith('/api/curriculum');
-    expect(result).toBe(curriculum);
+    // Scope terms are normalised on the way in, so compare by value.
+    expect(result).toEqual(curriculum);
   });
 });
 

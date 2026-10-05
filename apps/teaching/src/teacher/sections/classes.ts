@@ -1,4 +1,4 @@
-import { absolutePublicUrl } from '@/teacher/public-link';
+import { teacherPreviewUrl } from '@/teacher/public-link';
 import { ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { CollectionResolveContext } from '@/blocks/collection-resolve';
@@ -192,7 +192,7 @@ export function renderClassPage(
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
   let classTitle = classDisplayTitle(pageClass, yearsById, subjectsById);
-  const studentPath = absolutePublicUrl('class', cls.id);
+  const studentPath = teacherPreviewUrl('class', cls.id);
 
   const optionsMenu = mountPageOptionsMenu(
     [
@@ -243,8 +243,17 @@ export function renderClassPage(
     curriculum.units.filter((unit) => unit.status !== 'trashed').map((unit) => unit.id)
   );
 
+  // A slot whose lesson is trashed or gone would paint as a raw-id orphan.
+  const liveLessonIds = new Set(
+    curriculum.lessons.filter((lesson) => lesson.status !== 'trashed').map((lesson) => lesson.id)
+  );
   const classScheduled = curriculum.scheduled_lessons
-    .filter((entry) => entry.class_id === cls.id && visibleUnitIds.has(entry.unit_id))
+    .filter(
+      (entry) =>
+        entry.class_id === cls.id &&
+        visibleUnitIds.has(entry.unit_id) &&
+        liveLessonIds.has(entry.lesson_id)
+    )
     .sort(compareScheduledLessons);
 
   const lessonTitles = new Map(

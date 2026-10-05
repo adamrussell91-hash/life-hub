@@ -43,7 +43,7 @@ export const BlockTypeSchema = z.enum([
 export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33', 'custom']);
 export const SpacerSizeSchema = z.enum(['small', 'medium', 'large']);
 
-export const VideoProviderSchema = z.enum(['youtube', 'vimeo']);
+export const VideoProviderSchema = z.enum(['youtube', 'vimeo', 'file']);
 export const EmbedProviderSchema = z.enum([
   'google_maps',
   'google_slides',
@@ -190,6 +190,7 @@ export const VideoBlockSchema = z.object({
     provider: VideoProviderSchema,
     external_id: z.string(),
     url: z.string().optional(),
+    start_seconds: z.number().int().positive().optional(),
     title: z.string().optional(),
     caption: z.string().optional()
   }),

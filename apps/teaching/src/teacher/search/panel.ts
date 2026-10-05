@@ -267,7 +267,16 @@ export function openSearchPanel(options: SearchPanelOptions): void {
 
   const renderEmptyState = (): void => {
     const rows: ListRow[] = [];
-    const recent = readRecent();
+    const { lessons, units, classes } = options.curriculum;
+    const live = (rows: Array<{ id: string; status?: string }>, id: string) =>
+      rows.some((row) => row.id === id && row.status !== 'trashed');
+    const recent = readRecent().filter((item) =>
+      item.type === 'lesson'
+        ? live(lessons, item.id)
+        : item.type === 'unit'
+          ? live(units, item.id)
+          : live(classes, item.id)
+    );
     if (recent.length > 0) {
       rows.push({ kind: 'heading', label: 'Recent' });
       for (const item of recent) {

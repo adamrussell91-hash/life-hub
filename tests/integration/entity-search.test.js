@@ -582,3 +582,36 @@ test('page kind delegates to the Knowledge manifest through an injectable lister
     }
   ]);
 });
+
+test('one failing provider does not blank the other kinds the tagger asked for', async () => {
+  const store = memoryStore();
+  const teachingStore = memoryStore();
+  await teachingStore.setJSON(draftLessonKey('lesson_cdx10_b'), {
+    id: 'lesson_cdx10_b',
+    title: 'CDX10 Lesson B',
+    status: 'active'
+  });
+  await teachingStore.setJSON(draftLessonKey('lesson_cdx10_c'), {
+    id: 'lesson_cdx10_c',
+    title: 'CDX10 Lesson C',
+    status: 'active',
+    trashed_at: '2026-10-05T00:00:00Z'
+  });
+  const handler = createEntitySearchHandler(baseDeps(store, {
+    getTeachingStore: async () => teachingStore,
+    getTasksStore: async () => {
+      throw new Error('tasks store down');
+    },
+    listKnowledgePages: async () => {
+      throw new Error('knowledge down');
+    }
+  }));
+
+  const response = await handler(request({
+    url: 'https://api.adam-russell.com/api/entities/search?q=CDX10&kinds=task,page,unit,lesson,class'
+  }));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.data.groups.lesson.map(row => row.ref), ['teaching:lesson:lesson_cdx10_b']);
+  assert.deepEqual(body.data.unavailable, ['page', 'task']);
+});

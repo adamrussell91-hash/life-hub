@@ -8,6 +8,7 @@ import {
   scheduledLessonKey,
   setJSON
 } from './_shared/teaching-blobs.mjs';
+import { isDeletedRecord } from './_shared/record-liveness.mjs';
 import { createTeachingCollectionHandler, teachingWriteError } from './_shared/teaching-create.mjs';
 
 export const config = { path: '/api/scheduled-lessons' };
@@ -24,10 +25,12 @@ export async function createScheduledLessonRecord(store, body) {
   }
 
   const cls = await getJSON(store, classKey(class_id));
-  if (!cls) throw teachingWriteError(404, 'not_found', 'Class not found');
+  if (!cls || isDeletedRecord(cls)) throw teachingWriteError(404, 'not_found', 'Class not found');
 
   const lesson = await getJSON(store, draftLessonKey(lesson_id));
-  if (!lesson) throw teachingWriteError(404, 'not_found', 'Lesson not found');
+  if (!lesson || isDeletedRecord(lesson)) {
+    throw teachingWriteError(404, 'not_found', 'Lesson not found');
+  }
 
   const unit_id = typeof body.unit_id === 'string' && body.unit_id.trim()
     ? body.unit_id.trim()

@@ -12,13 +12,16 @@ import { readJsonObject } from './_shared/teaching-record-get.mjs';
 
 export const config = { path: '/api/scope-sequences' };
 
+/** Same shape the Teaching client reads (title + term_number), four equal terms. */
 export function defaultScopeTerms(weekCount, academicYear) {
-  return [
-    { id: `term1_${academicYear}`, label: 'Term 1', start_week: 1, end_week: 10 },
-    { id: `term2_${academicYear}`, label: 'Term 2', start_week: 11, end_week: 20 },
-    { id: `term3_${academicYear}`, label: 'Term 3', start_week: 21, end_week: 30 },
-    { id: `term4_${academicYear}`, label: 'Term 4', start_week: 31, end_week: weekCount }
-  ];
+  const termWeeks = Math.floor(weekCount / 4);
+  return [1, 2, 3, 4].map(term_number => ({
+    id: `term${term_number}_${academicYear}`,
+    title: `Term ${term_number}`,
+    term_number,
+    start_week: (term_number - 1) * termWeeks + 1,
+    end_week: term_number === 4 ? weekCount : term_number * termWeeks
+  }));
 }
 
 export async function createScopeSequenceRecord(store, body) {

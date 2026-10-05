@@ -3,7 +3,7 @@ import {
   dropTargetForElements
 } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { CleanupFn } from '@atlaskit/pragmatic-drag-and-drop/types';
-import { createBlockEditor } from '@/blocks/editors';
+import { createBlockEditor, type BlockEditorContext } from '@/blocks/editors';
 import {
   BLOCK_GROUPS,
   INSERT_MENU_LABEL,
@@ -26,6 +26,8 @@ export interface NestedBlocksEditorOptions {
   allowedTypes: readonly NewBlockType[];
   onChange: (blocks: Block[]) => void;
   idFactory: () => string;
+  /** Passed to every child editor so nested image/library pickers see the same media. */
+  context?: BlockEditorContext;
   columnMove?: {
     columnCount: number;
     columnIndex: number;
@@ -226,7 +228,8 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
           blocks = next;
           options.onChange(next);
         },
-        () => blocks[index]!
+        () => blocks[index]!,
+        options.context
       );
 
       row.append(controls, editor);

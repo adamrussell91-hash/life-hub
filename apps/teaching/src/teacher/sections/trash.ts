@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
 import { applyEntityStatus } from '@/app/curriculum-state';
 import { ApiClientError } from '@/api/client';
 import type { CurriculumEntityType } from '@/curriculum/with-entity-status';
@@ -33,7 +34,7 @@ function formatTrashedAt(value?: string): string {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return formatDisplayDate(date);
 }
 
 export function renderTrashSection(canvas: HTMLElement): { dispose: () => void } {
@@ -134,16 +135,23 @@ export function renderTrashSection(canvas: HTMLElement): { dispose: () => void }
       tr.dataset.trashType = row.type;
 
       const typeCell = document.createElement('td');
+      typeCell.className = 'trash-page__type';
       typeCell.textContent = typeLabel(row.type);
 
       const titleCell = document.createElement('td');
+      titleCell.className = 'trash-page__title';
       titleCell.textContent = row.title;
 
       const whenCell = document.createElement('td');
+      whenCell.className = 'trash-page__when';
       whenCell.textContent = formatTrashedAt(row.trashed_at);
 
+      // The cell stays a table cell; the flex row lives inside it.
       const actionsCell = document.createElement('td');
-      actionsCell.className = 'trash-page__actions';
+      actionsCell.className = 'trash-page__actions-cell';
+      const actions = document.createElement('div');
+      actions.className = 'trash-page__actions';
+      actionsCell.append(actions);
 
       const restoreBtn = document.createElement('button');
       restoreBtn.type = 'button';
@@ -229,7 +237,7 @@ export function renderTrashSection(canvas: HTMLElement): { dispose: () => void }
         });
       });
 
-      actionsCell.append(restoreBtn, deleteBtn);
+      actions.append(restoreBtn, deleteBtn);
       tr.append(typeCell, titleCell, whenCell, actionsCell);
       tbody.append(tr);
     }

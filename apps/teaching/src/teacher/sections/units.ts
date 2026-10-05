@@ -1,3 +1,4 @@
+import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import { isActiveLibraryStatus } from '@/curriculum/with-entity-status';
@@ -615,7 +616,7 @@ export function renderUnitPage(
 
 async function saveUnitAsTemplate(unit: Unit): Promise<void> {
   const suggested = unit.title.trim() || 'Unit template';
-  const title = window.prompt('Unit template name', suggested);
+  const title = await askTextCard({ title: 'Save as unit template', value: suggested });
   if (title === null) return;
   const trimmed = title.trim();
   if (!trimmed) {

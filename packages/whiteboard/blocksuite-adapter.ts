@@ -22,8 +22,15 @@ async function loadRuntime() {
     runtimePromise = Promise.all([
       import('@blocksuite/presets'),
       import('@blocksuite/store'),
+      import('@blocksuite/blocks/effects'),
       import('@blocksuite/presets/effects')
-    ]).then(([presets, store, presetEffects]) => {
+    ]).then(([presets, store, blockEffects, presetEffects]) => {
+      // presets/effects only imports blocks/effects; it never calls it. Without
+      // blocks' effects() the core elements (editor-host, block widgets) are never
+      // defined and the first render throws "Illegal constructor".
+      if (!customElements.get('editor-host')) {
+        blockEffects.effects();
+      }
       if (!customElements.get('edgeless-editor')) {
         presetEffects.effects();
       }

@@ -554,8 +554,12 @@ test('schedule-unit expands a unit across meeting days behind the Life session',
       type: 'unit',
       title: 'Cognition',
       subject_id: 'subject_1',
-      lesson_ids: ['lesson_1', 'lesson_2']
-    }
+      lesson_ids: ['lesson_1', 'lesson_2', 'lesson_trashed']
+    },
+    'lessons/lesson_1': { id: 'lesson_1', title: 'One', unit_id: 'unit_1', status: 'active' },
+    'lessons/lesson_2': { id: 'lesson_2', title: 'Two', unit_id: 'unit_1', status: 'active' },
+    // Kept in lesson_ids for restore; must never be scheduled.
+    'lessons/lesson_trashed': { id: 'lesson_trashed', title: 'Gone', unit_id: 'unit_1', status: 'trashed' }
   });
   const deps = {
     env,
@@ -679,4 +683,49 @@ test('drive picker config reports misconfigured when the Netlify env values are 
   );
 
   assert.equal(response.status, 503);
+});
+
+test('permanently deleting a lesson purges its snapshot, schedule slots and unit order', async () => {
+  const store = memoryStore({
+    'units/unit-1': { id: 'unit-1', title: 'Unit', lesson_ids: ['lesson-a', 'lesson-c'] },
+    'lessons/lesson-a': { id: 'lesson-a', title: 'A', unit_id: 'unit-1' },
+    'lessons/lesson-c': { id: 'lesson-c', title: 'C', unit_id: 'unit-1', status: 'trashed' },
+    'published/lessons/lesson-c': { lesson_id: 'lesson-c', title: 'C' },
+    'scheduled_lessons/s-a': { id: 's-a', class_id: 'class-1', lesson_id: 'lesson-a', date: '2026-10-12' },
+    'scheduled_lessons/s-c': { id: 's-c', class_id: 'class-1', lesson_id: 'lesson-c', date: '2026-10-16' }
+  });
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+
+  const response = await createLessonHandler(deps)(
+    request({ method: 'DELETE', url: 'https://api.adam-russell.com/api/lessons/lesson-c' })
+  );
+  assert.equal(response.status, 200);
+  assert.equal(await store.get('lessons/lesson-c'), null);
+  assert.equal(await store.get('published/lessons/lesson-c'), null);
+  assert.equal(await store.get('scheduled_lessons/s-c'), null);
+  assert.ok(await store.get('scheduled_lessons/s-a'));
+  assert.deepEqual((await store.get('units/unit-1', { type: 'json' })).lesson_ids, ['lesson-a']);
+});
+
+test('scheduling refuses a trashed lesson', async () => {
+  const store = memoryStore({
+    'classes/class-1': { id: 'class-1', title: 'Class', status: 'active' },
+    'lessons/lesson-b2': { id: 'lesson-b2', title: 'B copy', unit_id: 'unit-1', status: 'trashed' }
+  });
+  const response = await createScheduledLessonsHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  })(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/scheduled-lessons',
+      body: { class_id: 'class-1', lesson_id: 'lesson-b2', date: '2026-10-19' }
+    })
+  );
+  assert.equal(response.status, 404);
 });

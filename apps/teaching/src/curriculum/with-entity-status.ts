@@ -37,6 +37,19 @@ export function isActiveLibraryStatus(status?: string | null): boolean {
   return status !== 'archived' && status !== 'trashed';
 }
 
+/** Lessons a unit actually holds — trashed or deleted ids stay in lesson_ids for restore only. */
+export function liveUnitLessonCount(
+  curriculum: Pick<CurriculumResponse, 'lessons'>,
+  unit: { lesson_ids: string[] }
+): number {
+  const live = new Set(
+    curriculum.lessons
+      .filter((lesson) => isActiveLibraryStatus(lesson.status))
+      .map((lesson) => lesson.id)
+  );
+  return unit.lesson_ids.filter((id) => live.has(id)).length;
+}
+
 export function readCurriculumEntityStatus(
   curriculum: CurriculumResponse,
   type: CurriculumEntityType,

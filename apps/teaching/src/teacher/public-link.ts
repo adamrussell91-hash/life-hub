@@ -28,6 +28,16 @@ export function absolutePublicUrl(kind: PublicEntityKind, id: string): string {
   return `${CLASS_SITE_ORIGIN}${bareStudentPath(kind, id)}`;
 }
 
+/**
+ * URL a signed-in teacher opens to see the student page. Same origin as the
+ * teacher app, so preview works wherever the teacher already is — the shared
+ * student host is only for links handed to students.
+ */
+export function teacherPreviewUrl(kind: PublicEntityKind, id: string): string {
+  const path = publicStudentPath(kind, id);
+  return typeof location === 'undefined' ? path : `${location.origin}${path}`;
+}
+
 export interface PublicLinkControlOptions {
   kind: PublicEntityKind;
   id: string;

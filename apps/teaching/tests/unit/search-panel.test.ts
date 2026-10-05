@@ -45,6 +45,23 @@ function emptyCurriculum(): CurriculumResponse {
   };
 }
 
+function curriculumWithLesson(status: 'active' | 'trashed'): CurriculumResponse {
+  const curriculum = emptyCurriculum();
+  curriculum.lessons = [
+    {
+      id: 'l1',
+      title: 'Recent Lesson',
+      slug: 'recent',
+      unit_id: 'u1',
+      sequence: 1,
+      status,
+      published: true,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    }
+  ] as CurriculumResponse['lessons'];
+  return curriculum;
+}
+
 function baseOptions(overrides: Partial<SearchPanelOptions> = {}): SearchPanelOptions {
   return {
     curriculum: emptyCurriculum(),
@@ -88,10 +105,24 @@ describe('openSearchPanel', () => {
         { type: 'lesson', id: 'l1', title: 'Recent Lesson', opened_at: '2026-08-11T00:00:00.000Z' }
       ])
     );
-    openSearchPanel(baseOptions());
+    openSearchPanel(baseOptions({ curriculum: curriculumWithLesson('active') }));
     const text = document.body.textContent ?? '';
     expect(text).toContain('Recent Lesson');
     expect(text).toMatch(/New Lesson/i);
+  });
+
+  it('drops recents whose lesson is trashed or gone', () => {
+    localStorage.setItem(
+      RECENT_STORAGE_KEY,
+      JSON.stringify([
+        { type: 'lesson', id: 'l1', title: 'Recent Lesson', opened_at: '2026-08-11T00:00:00.000Z' },
+        { type: 'lesson', id: 'gone', title: 'Deleted Lesson', opened_at: '2026-08-10T00:00:00.000Z' }
+      ])
+    );
+    openSearchPanel(baseOptions({ curriculum: curriculumWithLesson('trashed') }));
+    const text = document.body.textContent ?? '';
+    expect(text).not.toContain('Recent Lesson');
+    expect(text).not.toContain('Deleted Lesson');
   });
 
   it('focuses existing input when opened again', () => {
@@ -131,7 +162,7 @@ describe('openSearchPanel', () => {
       ])
     );
     const onNavigate = vi.fn();
-    openSearchPanel(baseOptions({ onNavigate }));
+    openSearchPanel(baseOptions({ onNavigate, curriculum: curriculumWithLesson('active') }));
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(onNavigate).toHaveBeenCalledWith('/lessons/l1');
   });

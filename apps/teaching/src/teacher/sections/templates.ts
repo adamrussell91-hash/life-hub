@@ -5,11 +5,12 @@ import {
   listUnitTemplates,
   patchLessonTemplate,
   patchUnitTemplate,
-  useLessonTemplate,
   useUnitTemplate
 } from '@/teacher/template-api';
 import type { LessonTemplateSummary, UnitTemplateSummary } from '@/schemas';
 import { navigate } from '@/app/router';
+import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
+import { promptLessonFromTemplate } from '@/teacher/lessons-library/from-template';
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { renderPageHeader } from '@/teacher/page-header';
@@ -20,39 +21,30 @@ export interface TemplatesPageOptions {
   onCreated?: () => void | Promise<void>;
 }
 
-function pickUnitId(curriculum: CurriculumResponse): string | null {
-  const units = [...curriculum.units].sort((a, b) => a.title.localeCompare(b.title));
-  if (units.length === 0) return null;
-  const labels = units.map((u, i) => `${i + 1}. ${u.title}`).join('\n');
-  const answer = window.prompt(`Create lesson in which unit?\n${labels}\nEnter number:`, '1');
-  if (!answer) return null;
-  const index = Number.parseInt(answer, 10) - 1;
-  return units[index]?.id ?? null;
-}
-
-function pickSubject(curriculum: CurriculumResponse): { yearId: string; subjectId: string } | null {
-  const subjects = [...curriculum.subjects].sort((a, b) => a.title.localeCompare(b.title));
+async function pickSubject(
+  curriculum: CurriculumResponse
+): Promise<{ yearId: string; subjectId: string } | null> {
+  const subjects = curriculum.subjects
+    .filter((subject) => subject.status !== 'trashed')
+    .sort((a, b) => a.title.localeCompare(b.title));
   if (subjects.length === 0) return null;
-  const labels = subjects.map((s, i) => `${i + 1}. ${s.title}`).join('\n');
-  const answer = window.prompt(`Create unit under which subject?\n${labels}\nEnter number:`, '1');
-  if (!answer) return null;
-  const index = Number.parseInt(answer, 10) - 1;
-  const subject = subjects[index];
-  if (!subject) return null;
+  const subjectId = await askSelectCard({
+    title: 'Create unit under which subject?',
+    choices: subjects.map((subject) => ({ value: subject.id, label: subject.title }))
+  });
+  if (!subjectId) return null;
 
   const years = [...curriculum.years].sort(
     (a, b) => a.year_level - b.year_level || a.title.localeCompare(b.title)
   );
   if (years.length === 0) return null;
-  if (years.length === 1) return { yearId: years[0]!.id, subjectId: subject.id };
+  if (years.length === 1) return { yearId: years[0]!.id, subjectId };
 
-  const yearLabels = years.map((y, i) => `${i + 1}. ${y.title}`).join('\n');
-  const yearAnswer = window.prompt(`Year level for this unit?\n${yearLabels}\nEnter number:`, '1');
-  if (!yearAnswer) return null;
-  const yearIndex = Number.parseInt(yearAnswer, 10) - 1;
-  const year = years[yearIndex];
-  if (!year) return null;
-  return { yearId: year.id, subjectId: subject.id };
+  const yearId = await askSelectCard({
+    title: 'Year level for this unit?',
+    choices: years.map((year) => ({ value: year.id, label: year.title }))
+  });
+  return yearId ? { yearId, subjectId } : null;
 }
 
 export function renderTemplatesPage(
@@ -151,17 +143,16 @@ export function renderTemplatesPage(
                 try {
                   setStatus('Creating…');
                   if (tab === 'lessons') {
-                    const unitId = pickUnitId(curriculum);
-                    if (!unitId) {
-                      setStatus('');
-                      return;
-                    }
-                    const lesson = await useLessonTemplate({ templateId: row.id, unitId });
+                    // The kit dialog picks an active unit; a typed-number prompt listed trashed
+                    // units and fails outright in browsers that block window.prompt.
+                    setStatus('');
+                    const lesson = await promptLessonFromTemplate(curriculum, row.id);
+                    if (!lesson) return;
                     applyCreatedEntity('lesson', lesson);
                     navigate(`/lessons/${lesson.id}`);
                     void options.onCreated?.();
                   } else {
-                    const parent = pickSubject(curriculum);
+                    const parent = await pickSubject(curriculum);
                     if (!parent) {
                       setStatus('');
                       return;
@@ -185,7 +176,7 @@ export function renderTemplatesPage(
             label: 'Rename',
             onSelect: () => {
               void (async () => {
-                const next = window.prompt('New title', row.title);
+                const next = await askTextCard({ title: 'Rename template', value: row.title });
                 if (!next?.trim()) return;
                 try {
                   if (tab === 'lessons') await patchLessonTemplate(row.id, { title: next.trim() });

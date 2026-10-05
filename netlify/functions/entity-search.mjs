@@ -38,6 +38,8 @@ import {
   listGithubPersonCandidates
 } from './_shared/github-professional-data.mjs';
 
+import { isDeletedRecord } from './_shared/record-liveness.mjs';
+
 export const config = { path: '/api/entities/search' };
 
 const MIN_QUERY_LENGTH = 2;
@@ -392,7 +394,7 @@ async function searchTeachingRecordsKind(getTeachingStore, prefix, kind, query) 
   const out = [];
   for (const record of records) {
     if (!record || typeof record !== 'object' || typeof record.id !== 'string') continue;
-    if (record.status === 'trashed' || record.status === 'deleted') continue;
+    if (isDeletedRecord(record)) continue;
     const title = typeof record.title === 'string' ? record.title : '';
     const rank = matchRank(query, title, null);
     if (rank === null) continue;
@@ -469,47 +471,73 @@ export function createEntitySearchHandler(deps = {}) {
     const includeArchived = url.searchParams.get('include_archived') === 'true';
     const github = { env };
 
+    // One provider failing (GitHub, Knowledge, a store) must not blank every other
+    // kind — the picker would show nothing at all. Failed kinds are reported instead.
+    const unavailable = [];
+    const settle = (kind, work) =>
+      Promise.resolve()
+        .then(() => work())
+        .catch(() => {
+          unavailable.push(kind);
+          return [];
+        });
     const perKind = await Promise.all([
       requestedKinds.has('person')
-        ? Promise.all([
+        ? settle('person', () => Promise.all([
           searchIdentityKind(store, 'person', listPersonIndexKeys, personKey, parsePersonRecord, query, includeArchived),
-          searchGithubIdentityKind('person', query, includeArchived, github)
-        ]).then(([native, githubMatches]) => mergeNativeFirst(native, githubMatches))
+          searchGithubIdentityKind('person', query, includeArchived, github).catch(() => {
+            unavailable.push('github');
+            return [];
+          })
+        ]).then(([native, githubMatches]) => mergeNativeFirst(native, githubMatches)))
         : [],
       requestedKinds.has('organisation')
-        ? Promise.all([
+        ? settle('organisation', () => Promise.all([
           searchIdentityKind(store, 'organisation', listOrganisationIndexKeys, organisationKey, parseOrganisationRecord, query, includeArchived),
-          searchGithubIdentityKind('organisation', query, includeArchived, github)
-        ]).then(([native, githubMatches]) => mergeNativeFirst(native, githubMatches))
+          searchGithubIdentityKind('organisation', query, includeArchived, github).catch(() => {
+            unavailable.push('github');
+            return [];
+          })
+        ]).then(([native, githubMatches]) => mergeNativeFirst(native, githubMatches)))
         : [],
-      requestedKinds.has('task') ? searchTaskKind(getTasksStore, query) : [],
-      requestedKinds.has('application') ? searchApplicationKind(getProfessionalStore, query) : [],
-      requestedKinds.has('program') ? searchProgramKind(getTasksStore, query) : [],
+      requestedKinds.has('task')
+        ? settle('task', () => searchTaskKind(getTasksStore, query))
+        : [],
+      requestedKinds.has('application')
+        ? settle('application', () => searchApplicationKind(getProfessionalStore, query))
+        : [],
+      requestedKinds.has('program')
+        ? settle('program', () => searchProgramKind(getTasksStore, query))
+        : [],
       requestedKinds.has('goal')
-        ? searchTasksCollectionKind(getTasksStore, query, {
+        ? settle('goal', () => searchTasksCollectionKind(getTasksStore, query, {
           indexKey: 'goals/_index', prefix: 'goals/', kind: 'goal',
           supporting: record => (typeof record.sphere === 'string' ? record.sphere : null)
-        })
+        }))
         : [],
       requestedKinds.has('project')
-        ? searchTasksCollectionKind(getTasksStore, query, {
+        ? settle('project', () => searchTasksCollectionKind(getTasksStore, query, {
           indexKey: 'projects/_index', prefix: 'projects/', kind: 'project',
           supporting: record => (typeof record.status === 'string' ? record.status : null)
-        })
+        }))
         : [],
-      requestedKinds.has('event') ? searchEventKind(getProfessionalStore, query) : [],
-      requestedKinds.has('meeting') ? searchMeetingKind(getProfessionalStore, query) : [],
+      requestedKinds.has('event')
+        ? settle('event', () => searchEventKind(getProfessionalStore, query))
+        : [],
+      requestedKinds.has('meeting')
+        ? settle('meeting', () => searchMeetingKind(getProfessionalStore, query))
+        : [],
       requestedKinds.has('page')
-        ? searchKnowledgePageKind(query, { env, fetchImpl: deps.fetchImpl, listPages: deps.listKnowledgePages })
+        ? settle('page', () => searchKnowledgePageKind(query, { env, fetchImpl: deps.fetchImpl, listPages: deps.listKnowledgePages }))
         : [],
       requestedKinds.has('unit')
-        ? searchTeachingRecordsKind(getTeachingStore, 'units/', 'unit', query)
+        ? settle('unit', () => searchTeachingRecordsKind(getTeachingStore, 'units/', 'unit', query))
         : [],
       requestedKinds.has('lesson')
-        ? searchTeachingRecordsKind(getTeachingStore, 'lessons/', 'lesson', query)
+        ? settle('lesson', () => searchTeachingRecordsKind(getTeachingStore, 'lessons/', 'lesson', query))
         : [],
       requestedKinds.has('class')
-        ? searchTeachingRecordsKind(getTeachingStore, 'classes/', 'class', query)
+        ? settle('class', () => searchTeachingRecordsKind(getTeachingStore, 'classes/', 'class', query))
         : []
     ]);
 
@@ -539,7 +567,11 @@ export function createEntitySearchHandler(deps = {}) {
     };
     for (const result of ranked) groups[result.kind].push(result);
 
-    return withCors(okResponse(200, { groups }), request, env);
+    return withCors(
+      okResponse(200, unavailable.length ? { groups, unavailable: [...new Set(unavailable)].sort() } : { groups }),
+      request,
+      env
+    );
   }, {
     ...deps,
     unboundCode: deps.unboundCode ?? 'universal_link_blobs_unbound',

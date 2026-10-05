@@ -50,7 +50,7 @@ function unit(id: string, title: string, status: Unit['status']): Unit {
     schema_version: 1,
     year_id: year.id,
     subject_id: subject.id,
-    lesson_ids: id === 'unit_live' ? ['lesson_1', 'lesson_2'] : [],
+    lesson_ids: id === 'unit_live' ? ['lesson_1', 'lesson_2', 'lesson_3'] : [],
     primary_term: id === 'unit_live' ? 2 : undefined
   };
 }
@@ -89,7 +89,17 @@ const curriculum: CurriculumResponse = {
   years: [year],
   subjects: [subject],
   units: [live, trashed, archived, placed],
-  lessons: [],
+  // lesson_3 is trashed: it stays in lesson_ids for restore but is not counted.
+  lessons: (['lesson_1', 'lesson_2', 'lesson_3'] as const).map((id) => ({
+    id,
+    title: id,
+    slug: id,
+    unit_id: 'unit_live',
+    sequence: 1,
+    status: id === 'lesson_3' ? 'trashed' : 'active',
+    published: false,
+    updated_at: '2026-01-01T00:00:00.000Z'
+  })) as CurriculumResponse['lessons'],
   classes: [],
   scheduled_lessons: [],
   scope_sequences: [scope],

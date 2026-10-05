@@ -240,7 +240,7 @@ export function renderResourcesIndex(
         }
         return;
       }
-      setStatus('Google Drive is not configured.', true);
+      setStatus('Google Drive is not configured yet. Upload the file or paste its link instead.', true);
     })();
   });
 

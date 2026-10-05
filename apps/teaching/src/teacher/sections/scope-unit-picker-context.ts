@@ -1,3 +1,4 @@
+import { liveUnitLessonCount } from '@/curriculum/with-entity-status';
 import type { Unit } from '@/schemas';
 import type { CurriculumResponse } from '@/teacher/nav';
 
@@ -11,6 +12,10 @@ function timelineUnitIds(curriculum: CurriculumResponse, subjectId: string): Set
       .filter((item) => item.kind === 'unit')
       .map((item) => item.unit_id)
   );
+}
+
+function lessonCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'lesson' : 'lessons'}`;
 }
 
 export function pickerUnits(
@@ -83,7 +88,7 @@ export function enhanceScopeUnitPicker(
       yearLabel(curriculum, unit),
       subject?.title ?? null,
       unit.primary_term ? `Term ${unit.primary_term}` : null,
-      `${unit.lesson_ids.length} ${unit.lesson_ids.length === 1 ? 'lesson' : 'lessons'}`
+      lessonCountLabel(liveUnitLessonCount(curriculum, unit))
     ]
       .filter(Boolean)
       .join(' · ');
