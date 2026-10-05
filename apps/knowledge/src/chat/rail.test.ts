@@ -24,6 +24,7 @@ describe("Chat rail layout", () => {
     expect(rail).toContain("sittingLibrary");
     expect(rail).toContain("data-hub-scroll-hide");
     expect(rail).toContain("data-new-chat");
+    expect(rail).toContain("chat-new-button");
     expect(rail).toContain("New chat");
     expect(rail).not.toContain("data-open-visualiser");
     expect(rail).not.toContain("Portrait ideas");

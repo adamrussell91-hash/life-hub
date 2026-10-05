@@ -593,7 +593,7 @@ function overlayHtml() {
           </div>
         </div>
         <div class="chat-overlay__tools">
-          <button class="btn btn--ghost" type="button" data-new-chat ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>New chat</button>
+          <button class="btn btn--ghost chat-new-button" type="button" data-new-chat ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>New chat</button>
           <button class="hub-icon-btn chat-overlay__close" type="button" data-close-overlay aria-label="Close chat">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
               <path d="M6 6l12 12M18 6 6 18" />
