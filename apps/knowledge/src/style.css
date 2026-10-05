@@ -1285,6 +1285,12 @@
     var(--depth);
 }
 
+/* Show All is a neural map: light adds up on a black field. */
+.graph-wrap.is-neural {
+  background: #03050a;
+}
+
+.graph-wrap.is-neural .graph-toolbar__meta,
 .graph-wrap.is-universe-dark .graph-toolbar__meta,
 .graph-wrap.is-universe-dark .graph-speed__label,
 .graph-wrap.is-universe-dark .graph-speed__value {
@@ -5329,5 +5335,171 @@ body.is-universe-saver .graph-canvas {
   .universe-replay__label {
     min-width: 0;
     flex: 1 1 auto;
+  }
+}
+
+/* Neural map tools: one short word per tool, one small panel at a time. */
+.neural-dock {
+  position: absolute;
+  right: var(--space-3);
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  max-width: min(460px, calc(100% - 2 * var(--space-3)));
+  pointer-events: none;
+}
+
+.neural-dock__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.neural-dock__row button,
+.neural-dock__panel button {
+  font: 600 12px/1 Inter, ui-sans-serif, sans-serif;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(251, 248, 242, 0.88);
+  color: var(--ink, #13233a);
+  cursor: pointer;
+  min-height: 30px;
+}
+
+.neural-dock__row button.is-active,
+.neural-dock__segments button.is-active {
+  background: #13233a;
+  border-color: #13233a;
+  color: #fbf8f2;
+}
+
+.neural-dock__panel {
+  pointer-events: auto;
+  width: min(320px, 100%);
+  max-height: min(52vh, 420px);
+  overflow: auto;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(251, 248, 242, 0.92);
+  backdrop-filter: blur(8px);
+  color: #13233a;
+  font-size: 13px;
+}
+
+.neural-dock__panel[hidden] {
+  display: none;
+}
+
+.neural-dock__note,
+.neural-dock__head {
+  margin: 4px 0;
+}
+
+.neural-dock__head {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  margin-top: var(--space-2);
+}
+
+.neural-dock__steps {
+  margin: 4px 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: 2px;
+}
+
+.neural-dock__steps button {
+  all: unset;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+}
+
+.neural-dock__steps button:hover,
+.neural-dock__steps button:focus-visible {
+  text-decoration: underline;
+}
+
+.neural-dock__saved {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.neural-dock__panel .neural-dock__quiet {
+  border-color: transparent;
+  background: transparent;
+  min-height: 0;
+  padding: 4px 8px;
+}
+
+.neural-dock__grow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.neural-dock__grow input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.neural-dock__when {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 6.5em;
+  text-align: right;
+}
+
+.neural-dock__segments {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.graph-wrap.is-neural .neural-dock__row button,
+.graph-wrap.is-neural .neural-dock__panel button:not(.neural-dock__quiet) {
+  background: rgba(20, 26, 40, 0.82);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f4efe6;
+}
+
+.graph-wrap.is-neural .neural-dock__row button.is-active,
+.graph-wrap.is-neural .neural-dock__segments button.is-active {
+  background: #f4efe6;
+  border-color: #f4efe6;
+  color: #03050a;
+}
+
+.graph-wrap.is-neural .neural-dock__panel {
+  background: rgba(10, 14, 24, 0.88);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f4efe6;
+}
+
+.graph-wrap.is-neural .neural-dock__panel .neural-dock__steps button,
+.graph-wrap.is-neural .neural-dock__panel .neural-dock__quiet {
+  color: #f4efe6;
+  background: transparent;
+}
+
+@media (max-width: 720px) {
+  .neural-dock {
+    right: var(--space-2);
+    max-width: calc(100% - 2 * var(--space-2));
+  }
+
+  .neural-dock__row button {
+    padding: 6px 9px;
   }
 }

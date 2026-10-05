@@ -11,62 +11,59 @@ import {
   type ShowAllGrouping,
 } from "./showAllScope";
 import { buildShowAllNoteEdges } from "./showAllEdges";
+import { layoutNeural } from "./showAllNeural";
 
-const LAYOUT_CENTRE = { x: 760, y: 560 };
-export const SHOW_ALL_CLUSTER_GAP = 72;
-const CLUSTER_MIN_RADIUS = 110;
-const CLUSTER_RADIUS_PER_ROOT_NOTE = 14;
-const CLUSTER_MAX_RADIUS = 220;
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+export type ShowAllShape = {
+  /** Multiplies link lengths and spacing. 1 is the default. */
+  spread: number;
+  /** How tightly the map gathers into one mass (Pull). */
+  lean: number;
+};
 
-export function showAllClusterRadius(noteCount: number) {
-  return Math.min(
-    CLUSTER_MAX_RADIUS,
-    CLUSTER_MIN_RADIUS + Math.sqrt(Math.max(noteCount, 1)) * CLUSTER_RADIUS_PER_ROOT_NOTE,
-  );
-}
+export const SHOW_ALL_DEFAULT_SHAPE: ShowAllShape = { spread: 1, lean: 0.6 };
 
 export function showAllNoteRadius(degree: number) {
   return 3.2 + Math.sqrt(Math.max(degree, 0)) * 1.7;
 }
 
-function hashUnit(id: string) {
-  let hash = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    hash ^= id.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0) / 4294967296;
-}
-
-function organicSeed(id: string, index: number, count: number, radiusScale = 1) {
-  const footprint = showAllClusterRadius(count) * radiusScale;
-  const radius = Math.min(footprint * 0.84, 90 + Math.sqrt(index + 1) * 74);
-  const angle = index * GOLDEN_ANGLE + hashUnit(id) * Math.PI * 2;
-  return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
-}
-
 function hubRadius(count: number) {
-  return Math.max(16, Math.min(28, 16 + Math.sqrt(Math.max(count, 1)) * 1.1));
+  return Math.max(16, Math.min(30, 14 + Math.sqrt(Math.max(count, 1)) * 1.2));
 }
 
-function placeHubs(nodes: GraphNodeDatum[]) {
-  const majors = nodes.filter(node => node.kind === "major");
-  const maxFootprint = Math.max(...majors.map(node => showAllClusterRadius(node.count)), CLUSTER_MIN_RADIUS);
-  const adjacentAngle = majors.length > 1 ? Math.sin(Math.PI / majors.length) : 1;
-  const ringRadius =
-    majors.length > 1
-      ? (maxFootprint * 2 + SHOW_ALL_CLUSTER_GAP) / (2 * adjacentAngle) + 20
-      : 0;
-  majors.forEach((node, index) => {
-    const angle = (Math.PI * 2 * index) / Math.max(majors.length, 1) - Math.PI / 2;
-    node.x = LAYOUT_CENTRE.x + Math.cos(angle) * ringRadius;
-    node.y = LAYOUT_CENTRE.y + Math.sin(angle) * ringRadius;
-    node.homeX = node.x;
-    node.homeY = node.y;
-    node.fx = node.x;
-    node.fy = node.y;
-  });
+export type ShowAllHubTie = { a: string; b: string; weight: number };
+
+/** How many notes each pair of topics shares. */
+export function showAllHubTies(labelsByEntry: string[][], hubLabels: Set<string>): ShowAllHubTie[] {
+  const shared = new Map<string, ShowAllHubTie>();
+  for (const labels of labelsByEntry) {
+    const hubs = [...new Set(labels)].filter(label => hubLabels.has(label)).sort();
+    for (let i = 0; i < hubs.length; i++) {
+      for (let j = i + 1; j < hubs.length; j++) {
+        const key = `${hubs[i]}\u0000${hubs[j]}`;
+        const tie = shared.get(key) ?? { a: hubs[i]!, b: hubs[j]!, weight: 0 };
+        tie.weight += 1;
+        shared.set(key, tie);
+      }
+    }
+  }
+  return [...shared.values()].sort((x, y) => y.weight - x.weight || x.a.localeCompare(y.a) || x.b.localeCompare(y.b));
+}
+
+
+/**
+ * Lays the whole Show All map out with no physics. Topics become zones: hubs are packed into one
+ * nexus, then each zone is grown outward from its best-linked note, every note taking the free
+ * seat nearest the notes it links to. Linked notes end up side by side, notes linked into another
+ * zone sit on the edge facing it, and the same input always gives the same picture.
+ */
+export function layoutShowAll(
+  nodes: GraphNodeDatum[],
+  _ties: ShowAllHubTie[],
+  shape: ShowAllShape = SHOW_ALL_DEFAULT_SHAPE,
+  links: GraphLinkDatum[] = [],
+) {
+  // Neural layout: positions grow from the link backbone, not from topic discs.
+  layoutNeural(nodes, links, { spread: shape.spread, fan: 0.6 + shape.lean * 0.67 });
 }
 
 function buildHubs(counts: Map<string, number>): GraphNodeDatum[] {
@@ -100,7 +97,7 @@ export function buildShowAllGraph(
   }
 
   const hubNodes = buildHubs(counts);
-  placeHubs(hubNodes);
+  const hubTies = showAllHubTies(labelsByEntry, new Set(counts.keys()));
   const hubByLabel = new Map(hubNodes.map(node => [node.label, node]));
   const nodes: GraphNodeDatum[] = [...hubNodes];
   const links: GraphLinkDatum[] = [];
@@ -120,11 +117,7 @@ export function buildShowAllGraph(
   const degreeById = new Map(eligible.map((entry, index) => [`leaf:${entry.id}`, built.degree[index] ?? 0]));
 
   for (const group of byHub.values()) {
-    group.entries.forEach((entry, index) => {
-      const origin = group.hub ?? LAYOUT_CENTRE;
-      const seed = organicSeed(entry.id, index, group.entries.length);
-      const x = (origin.x ?? LAYOUT_CENTRE.x) + seed.x;
-      const y = (origin.y ?? LAYOUT_CENTRE.y) + seed.y;
+    group.entries.forEach(entry => {
       const hubLabels = [...new Set(labelsById.get(entry.id) ?? [])].filter(label => hubByLabel.has(label));
       const degree = degreeById.get(`leaf:${entry.id}`) ?? 0;
       const palette = group.hub
@@ -143,21 +136,8 @@ export function buildShowAllGraph(
         soft: palette.soft,
         ink: palette.ink,
         r: showAllNoteRadius(degree),
-        x,
-        y,
-        homeX: origin.x ?? LAYOUT_CENTRE.x,
-        homeY: origin.y ?? LAYOUT_CENTRE.y,
+        ...(entry.created_at ? { createdAt: entry.created_at } : {}),
       });
-      const home = group.hub;
-      if (home) {
-        links.push({
-          source: `leaf:${entry.id}`,
-          target: home.id,
-          kind: "spoke",
-          weight: 1,
-          color: home.color,
-        });
-      }
     });
   }
 
@@ -168,6 +148,7 @@ export function buildShowAllGraph(
     if (source) link.color = source.soft;
   }
   links.push(...overlaps);
+  layoutShowAll(nodes, hubTies, SHOW_ALL_DEFAULT_SHAPE, links);
 
   return {
     nodes,
@@ -175,5 +156,6 @@ export function buildShowAllGraph(
     majorCount: hubNodes.length,
     minorCount: 0,
     leaves: new Map(),
+    hubTies,
   };
 }

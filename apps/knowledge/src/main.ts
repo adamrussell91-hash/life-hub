@@ -78,6 +78,7 @@ import {
   type GraphMount,
 } from "./archive/forceGraphBehavior";
 import { buildShowAllGraph } from "./archive/showAllGraph";
+import { readShowAllTheme, writeShowAllTheme, type ShowAllTheme } from "./archive/showAllDraw";
 import {
   SHOW_ALL_GROUPINGS,
   showAllGroupingLabel,
@@ -268,6 +269,7 @@ let graphTeardown: (() => void) | null = null;
 let graphMount: GraphMount | null = null;
 let graphMode: GraphMode = "constellation";
 let showAllGrouping: ShowAllGrouping = "tags";
+let showAllTheme: ShowAllTheme = readShowAllTheme();
 let graphSearch = "";
 let orbitSpeed = 0.5;
 let universeKeyOpen = false;
@@ -1070,11 +1072,9 @@ function showAllMetaText() {
   if (showAllGrouping !== "tags") return showAllGroupingMeta(showAllGrouping);
   const model = showAllModel();
   const notes = model.nodes.filter(node => node.kind === "leaf").length;
-  const hubs = model.nodes.filter(node => node.kind === "major").length;
-  const noteLinks = model.links.filter(link => link.kind === "overlap" || link.kind === "backbone").length;
   const hidden = Math.max(0, entries.length - notes);
-  const line = `${hubs} topics · ${notes} notes · ${noteLinks} links waiting on a click · at most 3 per note`;
-  return hidden ? `${line} · ${hidden} still untagged` : line;
+  const line = `${notes.toLocaleString()} notes`;
+  return hidden ? `${line} · ${hidden.toLocaleString()} untagged` : line;
 }
 
 function graphMetaText() {
@@ -1269,6 +1269,11 @@ function renderGraph() {
           <input class="graph-search" type="search" placeholder="Search keywords and notes" value="${escapeHtml(graphSearch)}" />
           ${graphMode === "showAll" ? showAllTuningHtml() : ""}
           ${
+            graphMode === "showAll"
+              ? `<div class="graph-modes" role="group" aria-label="Show All background"><button type="button" data-show-all-theme aria-pressed="${showAllTheme === "light"}">${showAllTheme === "dark" ? "Light" : "Dark"}</button></div>`
+              : ""
+          }
+          ${
             graphMode === "universe"
               ? `<label class="graph-speed">
                   <span class="graph-speed__label">Orbit speed</span>
@@ -1342,6 +1347,16 @@ function renderGraph() {
   const wrap = app.querySelector<HTMLElement>(".graph-wrap")!;
   const stage = app.querySelector<HTMLElement>(".graph-stage")!;
   applyUniverseViewState(wrap, document.body, graphMode === "universe" && universeDark, graphFullscreen);
+  wrap.classList.toggle("is-neural", graphMode === "showAll" && showAllTheme === "dark");
+  app.querySelector<HTMLButtonElement>("[data-show-all-theme]")?.addEventListener("click", event => {
+    showAllTheme = showAllTheme === "dark" ? "light" : "dark";
+    writeShowAllTheme(showAllTheme);
+    const button = event.currentTarget as HTMLButtonElement;
+    button.textContent = showAllTheme === "dark" ? "Light" : "Dark";
+    button.setAttribute("aria-pressed", String(showAllTheme === "light"));
+    wrap.classList.toggle("is-neural", showAllTheme === "dark");
+    graphMount?.setTheme(showAllTheme);
+  });
   if (graphMode === "universe") {
     bindUniverseKey(app, open => {
       universeKeyOpen = open;

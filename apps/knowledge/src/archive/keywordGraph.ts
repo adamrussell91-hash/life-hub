@@ -122,6 +122,8 @@ export type GraphNodeDatum = {
   homeY?: number;
   opacity?: number;
   departing?: boolean;
+  /** Show All: when the note was written (ISO), for growth replay and the recent filter. */
+  createdAt?: string;
 };
 
 export type GraphLinkKind = "backbone" | "orbit" | "spoke" | "overlap";
@@ -141,6 +143,8 @@ export type ArchiveGraphModel = {
   minorCount: number;
   /** Sample notes under a minor (or major with no minors). */
   leaves: Map<string, PageManifestEntry[]>;
+  /** Show All only: how many notes each pair of topic hubs shares. */
+  hubTies?: Array<{ a: string; b: string; weight: number }>;
 };
 
 function pairKey(a: string, b: string) {
