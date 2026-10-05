@@ -226,23 +226,27 @@ const hourOf = hhmm => {
   return m ? Number(m[1]) + Number(m[2]) / 60 : null;
 };
 
+/** Meetings count, but lighter than teaching: usually less cognitively consuming. */
+export const MEETING_WEIGHT = 0.65;
+
 /**
- * A day's workload in hours, from the evidence every view and server has alike:
- * tracked work sessions (actual) and scheduled classes (scheduled). A task's time block
- * alone is not proof that the work happened, so untracked blocks do not count.
+ * A day's workload in class-equivalent hours, from evidence every view and server has
+ * alike: tracked work sessions (actual), scheduled classes, and Professional meetings at
+ * MEETING_WEIGHT. A task's time block alone is not proof that the work happened.
  */
 export function priorWorkload(events, date) {
   let tracked = 0;
   let scheduled = 0;
   for (const event of events ?? []) {
     const r = event?.record;
-    if (!r || r.date !== date) continue;
+    if (!r || r.date !== date || r.all_day) continue;
     const start = hourOf(r.time ?? r.start_time);
     if (start == null) continue;
     const end = hourOf(r.end_time) ?? start + (Number(r.duration_min) || 60) / 60;
     if (!(end > start)) continue;
     if (r.type === 'work_session') tracked += end - start;
     else if (r.type === 'scheduled_lesson' && r.delivery_status !== 'skipped' && r.delivery_status !== 'rescheduled') scheduled += end - start;
+    else if (r.type === 'professional_meeting' && r.status !== 'cancelled' && r.status !== 'rescheduled') scheduled += (end - start) * MEETING_WEIGHT;
   }
   const hours = tracked + scheduled;
   if (!hours) return { hours: null, source: null };
@@ -650,7 +654,8 @@ export function weatherState(ctx) {
 /** Demand per hour by item kind (points of readiness). Free time is opportunity, not proof. */
 export const DEMAND = Object.freeze({
   // Calendar chip kinds (tideline-model eventKind). Teaching is routine but real work.
-  professional: 4, meeting: 4, event: 3, task: 3, study: 3, work: 3, teaching: 2.5,
+  // Meetings drain about two-thirds as fast as teaching (MEETING_WEIGHT).
+  teaching: 3, professional: 3 * MEETING_WEIGHT, meeting: 3 * MEETING_WEIGHT, event: 2, task: 3, study: 3, work: 3,
   comm: 1.5, fitness: 2, health: 1.5, social: 1, family: 1, default: 2
 });
 const RECOVERY_PER_FREE_HOUR = 1.5;

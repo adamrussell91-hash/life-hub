@@ -49,7 +49,7 @@ Days are computed when a check-in, sleep record or diary speaks to them, and tod
 - **Mood is one of five weighted inputs.** Physical, cognitive and emotional domains drive the weather separately. A domain nobody has reported on (an unanswered question with no log) is left out of the weather, so fog, rain or cloud never comes from a guess.
 - **Evidence is filtered by when it became knowable.** The model uses `recorded_at`/`created_at`, else the record's date and time. A diary with no time counts as written that evening, so it never enters that morning's forecast.
 - **Monday uses Sunday.** History, evidence and yesterday's workload are read from events by date, not from the displayed week.
-- **Workload.** Tracked work sessions count as *actual*. Classes and meetings count as *scheduled*. A task's time block alone does not count.
+- **Workload.** Tracked work sessions count as *actual*. Classes count as *scheduled*. Professional meetings count at 0.65× a class hour (`MEETING_WEIGHT`), because they're usually less cognitively consuming; in today's hourly line they drain at the same ratio. Server planners load meetings through the same projection the calendar uses. A task's time block alone does not count.
 - **Free time is opportunity, not proof of recovery.** There are no lunch or tea bumps and no title-based spikes. Grogginess at the start of the day is modelled only when poor sleep and foggy focus were actually reported.
 - **The snapshot is immutable.** It is issued once, before any answer. The server refuses to back-fill a forecast after the answer, and computes the residual against the stored snapshot, never against a client number.
 - **Observations are append-only.** Corrections supersede. Deletes set `deleted_at` and drop out of the forecast, history and the next morning's question choice.
@@ -78,5 +78,4 @@ To retune the colours, edit `FAMILIES` in the build script and re-run it. Every 
 
 - The weights are the comparison prototype's design weights. They have not been fitted or evaluated. The band is illustrative, not calibrated. Prospective evaluation and chronological holdouts (see `algorithm.md`) still need to be built from the stored snapshot and observation pairs once enough mornings exist.
 - No predicted Corey/social lift yet. The weather and explanation code supports one (`lifts`, state 7), but nothing in the stored data supports it yet, so none is shown.
-- Professional meetings are not yet counted as workload. Only tracked sessions and classes are, because those reach every caller in the same shape.
 - `tests/browser/dial-visual.spec.mjs` (in `DIAL_APP=1` mode) and the calendar reference mock-ups still quote the old fixture values (34% Thursday). The fixture day now reads 51 by design. That spec is not in the default browser run, and its header says not to edit it, so this is flagged in the PR instead.

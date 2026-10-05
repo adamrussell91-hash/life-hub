@@ -5,15 +5,29 @@
  *   - morning check-ins (tasks store, capacity/observations/…)
  *   - tracked work sessions (tasks store, work_sessions/)
  *   - scheduled lessons (teaching store rows, passed in by the caller)
+ *   - Professional meetings (professional store, projected exactly as the calendar does)
  * Best effort: a store failure returns what it could read, never throws.
  */
 import { addDays, checkinEvents } from '../../../packages/design-kit/js/calendar/readiness-model.js';
 import { tasksEventsFromWorkSessions } from '../../../packages/design-kit/js/calendar/tasks-calendar.js';
 import { teachingEventsFromCurriculum } from '../../../packages/design-kit/js/calendar/teaching-calendar.js';
+import { professionalEventsFromProjections } from '../../../packages/design-kit/js/calendar/professional-calendar.js';
 import { getJSON, listJSON, readIndex } from './tasks-blobs.mjs';
 import { withoutDeleted } from './record-liveness.mjs';
 
 export const READINESS_LOOKBACK_DAYS = 25;
+
+/** Meetings as calendar events, through the same projection /api/schedule-projections uses. */
+export async function loadMeetingEvents(env = process.env) {
+  try {
+    const { createMeetingRepository } = await import('./meeting-repository.mjs');
+    const { defaultGetProfessionalStore } = await import('./professional-blobs.mjs');
+    const repo = createMeetingRepository({ store: await defaultGetProfessionalStore(env), now: () => new Date().toISOString() });
+    return professionalEventsFromProjections(await repo.listScheduleProjections({}));
+  } catch {
+    return [];
+  }
+}
 
 /** Live check-in observations for [from, to] (deleted ones dropped; supersede handled by the model). */
 export async function loadObservations(store, from, to) {
@@ -28,11 +42,16 @@ export async function loadObservations(store, from, to) {
 }
 
 /**
- * @param {{ store?: object|null, today: string, lessons?: object[], now?: number, lookback?: number }} opts
+ * @param {{ store?: object|null, today: string, lessons?: object[], now?: number, lookback?: number, loadMeetings?: Function, env?: object }} opts
  * @returns {Promise<Array<{ path: string, record: object, body: string }>>}
  */
-export async function readinessEvidenceEvents({ store = null, today, lessons = [], now = Date.now(), lookback = READINESS_LOOKBACK_DAYS }) {
+export async function readinessEvidenceEvents({ store = null, today, lessons = [], now = Date.now(), lookback = READINESS_LOOKBACK_DAYS, loadMeetings = loadMeetingEvents, env = process.env }) {
   const events = [];
+  try {
+    events.push(...(await loadMeetings(env)).filter(e => e?.record?.type === 'professional_meeting'));
+  } catch {
+    /* no meetings: workload counts classes and sessions only */
+  }
   if (Array.isArray(lessons) && lessons.length) {
     events.push(...teachingEventsFromCurriculum({ scheduled_lessons: withoutDeleted(lessons) }));
   }

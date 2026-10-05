@@ -306,6 +306,7 @@ test('one number everywhere: Day panel, Week model, Term river input and Almanac
     { record: { type: 'workout', date: '2026-10-07', status: 'completed', session_kind: 'strength', duration_min: 60, title: 'Upper', exercises: [{ name: 'Press' }] } },
     { path: 'teaching:l1', record: { type: 'scheduled_lesson', date: '2026-10-07', time: '09:00', duration_min: 60 } },
     { path: 'ws:1', record: { type: 'work_session', date: '2026-10-07', time: '13:00', end_time: '17:30' } },
+    { path: 'professional:m1', record: { type: 'professional_meeting', date: '2026-10-07', time: '10:00', duration_min: 90, status: 'scheduled' } },
     ...checkinEvents([{ id: 'o1', local_date: today, observed_at: '2026-10-07T20:05:00Z', answers: { sleep: 'better_still_tired', overall: 'manageable' }, reported_estimate: 60 }])
   ];
   const week = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'];
@@ -347,6 +348,11 @@ test('yesterday’s workload: tracked sessions are actual, classes and meetings 
     { record: { type: 'work_session', date: y, time: '13:00', end_time: '15:00' } }
   ], y);
   assert.deepEqual(both, { hours: 5, source: 'actual' });
+  const meeting = priorWorkload([
+    { record: { type: 'professional_meeting', date: y, time: '15:00', duration_min: 120, status: 'scheduled' } },
+    { record: { type: 'professional_meeting', date: y, time: '17:00', duration_min: 60, status: 'cancelled' } }
+  ], y);
+  assert.deepEqual(meeting, { hours: 1.3, source: 'scheduled' }, 'meetings count at 0.65 of a class hour; cancelled ones not at all');
 });
 
 test('panel: forecast, chart, windows and bubbles render; bubbles start unpicked; saving posts the snapshot first', async () => {
