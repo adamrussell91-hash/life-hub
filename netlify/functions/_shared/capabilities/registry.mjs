@@ -49,6 +49,8 @@ import {
   searchMedicalRecordsSchema,
   briefMedicalAppointmentSchema
 } from '../medical-overview-read.mjs';
+import { saraAnalystToolSchemas } from '../sara-analyst-tools.mjs';
+import { saraRecordToolSchemas } from '../sara-records-tools.mjs';
 import { proposeCentralNodePatchSchema, appendGovernanceLogSchema, proposeCalendarGhostSchema } from '../hammond-tools.mjs';
 import { proposeActionToolSchema } from './propose-action.mjs';
 import { shortcutSchemas } from './shortcuts.mjs';
@@ -353,7 +355,7 @@ export function buildAgentTools({
   }
 
   if (needsSaraMedicalTools) {
-    tools.push(searchMedicalRecordsSchema(), briefMedicalAppointmentSchema());
+    tools.push(searchMedicalRecordsSchema(), briefMedicalAppointmentSchema(), ...saraAnalystToolSchemas(), ...saraRecordToolSchemas());
     // Body tools for Sara (Chadwick already has get_body_state via fitness pack).
     if (!needsExerciseLibrary) tools.push(getBodyStateSchema());
   }

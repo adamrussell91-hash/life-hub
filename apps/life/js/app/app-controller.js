@@ -530,9 +530,9 @@ export function createAppController(dependencies) {
         if (currentSection === 'fitness') renderFitnessSection();
         if (currentSection === 'skincare') renderSkincareSection();
         if (currentSection === 'calendar') renderCalendarSection();
-        if (currentSection === 'body') renderBodySection();
-        if (currentSection === 'body-bloods') renderBloodsSection();
-        if (currentSection === 'body-medical') renderMedicalSection();
+        if (currentSection === 'body') keepScroll(renderBodySection);
+        if (currentSection === 'body-bloods') keepScroll(renderBloodsSection);
+        if (currentSection === 'body-medical') keepScroll(renderMedicalSection);
         if (currentSection === 'mind') renderMindSection();
         if (currentSection === 'central-node') renderCentralNodeSection();
         syncQuiet = false;
@@ -1830,6 +1830,18 @@ export function createAppController(dependencies) {
       },
       quiet: syncQuiet
     });
+  }
+
+  // A background refresh rebuilds these sections; without this the page jumps to the top
+  // and the whole view appears to reload on every save.
+  function keepScroll(render) {
+    const scroller = globalThis.document?.scrollingElement;
+    const top = scroller?.scrollTop ?? 0;
+    const main = root.querySelector?.('main');
+    const mainTop = main?.scrollTop ?? 0;
+    render();
+    if (scroller && scroller.scrollTop !== top) scroller.scrollTop = top;
+    if (main && main.scrollTop !== mainTop) main.scrollTop = mainTop;
   }
 
   function renderMedicalSection() {

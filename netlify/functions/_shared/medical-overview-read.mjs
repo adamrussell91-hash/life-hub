@@ -1,4 +1,5 @@
 import { isCalendarDate } from '../../../apps/life/js/core/time.js';
+import { compareBloods } from './sara-analyst.mjs';
 
 const MEDICAL_PATH =
   /^data\/body\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-medical-[a-z0-9-]+\.md$/;
@@ -367,11 +368,17 @@ export function analyseMedicalEvidence(events = [], {
   }
   if (labs.length >= 2) {
     const sorted = [...labs].sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
+    const markerLevel = compareBloods(events, { today });
     comparisons.push({
       kind: 'bloods',
       latest: sorted[0],
       previous: sorted[1],
-      dates_preserved: Boolean(sorted[0]?.date && sorted[1]?.date)
+      dates_preserved: Boolean(sorted[0]?.date && sorted[1]?.date),
+      // Marker-level change so "what moved" never has to be worked out from two raw panels.
+      newly_abnormal: markerLevel.newly_abnormal ?? [],
+      normalised: markerLevel.normalised ?? [],
+      still_abnormal: markerLevel.still_abnormal ?? [],
+      biggest_moves: markerLevel.biggest_moves ?? []
     });
   }
 

@@ -140,7 +140,7 @@ const fitnessTemplateLibrary = createFitnessTemplateLibrary({
 const surfaceWidgetLibrary = createSurfaceWidgetLibrary({ widgetsApi: surfaceWidgetsApi });
 function notifyLogged() {
   showHubToast('Logged', { tone: 'success' });
-  void controller.refresh({ manual: true, force: true });
+  void controller.refresh({ force: true });
 }
 
 const skincareController = createSkincareController({
@@ -160,7 +160,8 @@ const medicalController = createMedicalController({
   chatApi,
   tasksApi,
   getDate: () => controller.getDisplayDate?.() ?? null,
-  onRecordWritten: notifyLogged
+  onRecordWritten: notifyLogged,
+  onError: message => showHubToast(message, { tone: 'danger' })
 });
 
 controller = createAppController({
