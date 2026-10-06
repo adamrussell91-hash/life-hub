@@ -2,7 +2,7 @@ import { TYPE_DOMAINS } from '../../../apps/life/js/core/records.js';
 import { validateRecord } from '../../../apps/life/js/core/validate.js';
 import { isCalendarDate } from '../../../apps/life/js/core/time.js';
 import { buildMedicalSlug } from '../../../apps/life/js/app/medical-model.js';
-import { coerceCalendarDate, normalizeMedicalFields } from '../../../apps/life/js/app/medical-normalize.js';
+import { coerceCalendarDate, normalizeMedicalFields, splitLongTitle } from '../../../apps/life/js/app/medical-normalize.js';
 import { collapseSetSplitExercises } from './workout-history.mjs';
 import { slugifyWorkoutTitle } from './workout-templates.mjs';
 
@@ -236,10 +236,10 @@ const DOMAIN_PROPERTIES = {
     source_agent: { type: 'string', enum: ['vera', 'import'] }
   },
   medical: {
-    title: { type: 'string', description: 'Short visit label, e.g. "Stelara injection". Required.' },
+    title: { type: 'string', description: 'Short visit label of a few words, e.g. "Stelara injection". Required. Put detail, symptoms and context in notes, never in the title.' },
     record_type: {
       type: 'string',
-      description: 'Optional — Life Hub infers this from the title/notes when omitted. One of Appointment, Consultation, Lab Work, Test Result, Imaging, Surgery/Hospital, Prescription, Referral, Vaccination, Symptom.',
+      description: 'Set this explicitly — the automatic guess from title/notes is unreliable (symptoms get filed as Prescription). Symptoms and feelings are always Symptom. One of Appointment, Consultation, Lab Work, Test Result, Imaging, Surgery/Hospital, Prescription, Referral, Vaccination, Symptom.',
       enum: [
         'Appointment', 'Consultation', 'Lab Work', 'Test Result', 'Imaging',
         'Surgery/Hospital', 'Prescription', 'Referral', 'Vaccination', 'Symptom'
@@ -261,7 +261,7 @@ const DOMAIN_PROPERTIES = {
     status: {
       type: 'string',
       description: 'Optional. planned | to_book | booked | done. Use to_book for ordered-but-unbooked items.',
-      enum: ['planned', 'to_book', 'booked', 'done']
+      enum: ['planned', 'to_book', 'booked', 'done', 'cancelled']
     },
     date_precision: {
       type: 'string',
@@ -288,6 +288,7 @@ const DOMAIN_PROPERTIES = {
       type: 'string',
       description: 'Optional follow-up date. Prefer YYYY-MM-DD; AU forms like 27/10 or 27/10/2026 are accepted. Omit when unknown. This stays on the same visit — a future maintenance dose on a new day is a separate medical visit with that date, not follow_up_date.'
     },
+    duration_min: { type: 'number', description: 'Optional appointment length in minutes (shown on the calendar). Omit when unknown.' },
     cost_aud: { type: 'number', description: 'Optional out-of-pocket cost in AUD. Omit when unknown.' },
     insurance_status: { type: 'string', description: 'Optional insurance note. Omit when unknown.' },
     episode: {
@@ -333,6 +334,7 @@ export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
         type: { type: 'string', enum: allowedTypes },
         date: { type: 'string', description: 'Visit/log date. Prefer YYYY-MM-DD; AU forms like 27/10 or 27/10/2026 are accepted for medical visits.' },
         time: { type: 'string', description: 'HH:MM, optional' },
+        new_visit: { type: 'boolean', description: 'Medical only. log_entry refuses a visit that looks like one already on record and names it. To add detail, change status, time or date, use update_medical_visit. Set true ONLY for a genuinely separate visit.' },
         notes: { type: 'string', description: 'Optional free-text note saved as the record body, e.g. what food was eaten or how a workout felt. Not a domain field — do not put this in fields.' },
         fields: fieldsSchema
       },
@@ -441,19 +443,27 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
     ? (coerceCalendarDate(date, { today }) ?? date)
     : date;
 
+  // A visit logged without a time is all-day (it lands in the calendar's All day row).
+  // Stamping it with the moment it was logged invented appointments at "15:42".
+  const resolvedTime = time ?? (type === 'medical' ? '00:00' : now.slice(11, 16));
+  const overflow = type === 'medical' ? splitLongTitle(fields?.title).overflow : '';
+  const resolvedNotes = overflow
+    ? [overflow, notes].filter(part => typeof part === 'string' && part.trim()).join('\n\n')
+    : notes;
+
   const record = {
     ...normalizedFields,
     schema_version: 1,
     id,
     type,
     date: resolvedDate,
-    time: time ?? now.slice(11, 16),
+    time: resolvedTime,
     created_at: now,
     updated_at: now,
     source
   };
   const errors = validateRecord(record);
-  return errors.length ? { valid: false, errors } : { valid: true, record, notes: notes ?? null };
+  return errors.length ? { valid: false, errors } : { valid: true, record, notes: resolvedNotes ?? null };
 }
 
 export { DOMAIN_PROPERTIES };
@@ -463,7 +473,7 @@ export function logEntryRetryHint(input) {
     return 'Fix the payload and call log_entry again in this turn before telling Adam it failed.';
   }
   if (input.type === 'medical') {
-    return 'Call log_entry again with type medical, date (YYYY-MM-DD or AU D/M/YYYY), fields: { title }, and notes only. For a future maintenance dose use that day as date (new visit). Omit lane, record_type, and every other optional field. Do not mention schema errors to Adam.';
+    return 'Call log_entry again with type medical, date (YYYY-MM-DD or AU D/M/YYYY), fields: { title, record_type }, and notes only (title is a 2–6 word label; detail goes in notes). For a future maintenance dose use that day as date (new visit). Omit lane and every other optional field. Do not mention schema errors to Adam.';
   }
   if (input.type === 'meal') {
     return 'Call log_entry again with every required meal macro, valid time in HH:MM, and notes.';

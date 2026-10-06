@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { loadSaraProtocol } from '../../netlify/functions/_shared/load-sara-protocol.mjs';
+import { SARA_ANALYST_TOOL_NAMES } from '../../netlify/functions/_shared/sara-analyst-tools.mjs';
+import { SARA_RECORD_TOOL_NAMES } from '../../netlify/functions/_shared/sara-records-tools.mjs';
 
 test('loads the checked-in Sara protocol markdown', () => {
   const text = loadSaraProtocol();
@@ -33,3 +35,13 @@ test('central node constraints point full medical history at Life Hub', () => {
   assert.doesNotMatch(text, /2d0f794f847680cfbd95ef30837b5b66/);
 });
 
+
+test('protocol covers all three jobs and names every tool she has', () => {
+  const text = loadSaraProtocol();
+  for (const job of ['Record keeper', 'Analyst', 'Assistant']) assert.match(text, new RegExp(job));
+  for (const tool of [...SARA_ANALYST_TOOL_NAMES, ...SARA_RECORD_TOOL_NAMES]) assert.ok(text.includes(`\`${tool}\``), `protocol should name ${tool}`);
+  assert.match(text, /Status never changes the date/);
+  assert.match(text, /enough_to_infer: false/);
+  assert.match(text, /2–6 words/);
+  assert.match(text, /Escalate, don't analyse/);
+});

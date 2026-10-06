@@ -12,7 +12,7 @@ const MEDICAL_LANES = [
   'dental', 'therapy', 'eye', 'appointment', 'symptom'
 ];
 
-const MEDICAL_STATUSES = ['planned', 'to_book', 'booked', 'done'];
+const MEDICAL_STATUSES = ['planned', 'to_book', 'booked', 'done', 'cancelled'];
 const DATE_PRECISIONS = ['day', 'month', 'tbd'];
 const EPISODE_STATUSES = ['active', 'resolved'];
 
@@ -181,8 +181,23 @@ export function inferRecordType(recordType, title, notes) {
   const cleaned = cleanString(recordType);
   if (cleaned && RECORD_TYPE_SET.has(cleaned)) return cleaned;
 
+  // The title says what the entry *is*; notes only decide when the title is silent.
+  // Otherwise "Sore throat" + a note mentioning a dose/script files as a Prescription.
+  const fromTitle = recordTypeFromText(String(title ?? ''));
+  if (fromTitle) return fromTitle;
+  if (SYMPTOM_LANGUAGE.test(String(title ?? '')) && !VISIT_OR_PROVIDER_LANGUAGE.test(String(title ?? ''))) {
+    return 'Symptom';
+  }
   const blob = `${title ?? ''} ${notes ?? ''} ${cleaned ?? ''}`;
-  const lower = blob.toLowerCase();
+  const fromBlob = recordTypeFromText(blob);
+  if (fromBlob) return fromBlob;
+  // Symptom when feeling language is present and there are no provider/visit words.
+  if (SYMPTOM_LANGUAGE.test(blob) && !VISIT_OR_PROVIDER_LANGUAGE.test(blob)) return 'Symptom';
+  return 'Appointment';
+}
+
+function recordTypeFromText(text) {
+  const lower = text.toLowerCase();
   if (/vaccin|immunis|flu shot|covid shot/i.test(lower)) return 'Vaccination';
   if (/referr/i.test(lower)) return 'Referral';
   if (/\bx-?ray\b|\bmri\b|\bct\b|\bultrasound\b|\bimaging\b|\bscan\b/i.test(lower)) return 'Imaging';
@@ -192,9 +207,28 @@ export function inferRecordType(recordType, title, notes) {
     /injection|infusion|stelara|ustekinumab|humira|adalimumab|biologic|prescription|script|medication|dose\b/i.test(lower)
   ) return 'Prescription';
   if (/consult/i.test(lower)) return 'Consultation';
-  // Symptom when feeling language is present and there are no provider/visit words.
-  if (SYMPTOM_LANGUAGE.test(blob) && !VISIT_OR_PROVIDER_LANGUAGE.test(blob)) return 'Symptom';
-  return 'Appointment';
+  return null;
+}
+
+const TITLE_MAX = 60;
+
+/**
+ * A title is a short label. Long agent-written titles carry the whole story
+ * ("…; cramping attributed to bacon/egg breakfast…"), so cut at the first clause
+ * break and hand the remainder back to be kept as notes.
+ */
+export function splitLongTitle(title) {
+  const text = String(title ?? '').trim();
+  if (text.length <= TITLE_MAX) return { title: text, overflow: '' };
+  const cut = text.search(/\s[—–]\s|;|:\s|,\s/);
+  let head = cut > 0 ? text.slice(0, cut).trim() : text;
+  let overflow = cut > 0 ? text.slice(cut).replace(/^\s*[—–;:,]\s*/, '').trim() : '';
+  if (head.length > TITLE_MAX) {
+    const space = head.lastIndexOf(' ', TITLE_MAX - 1);
+    head = `${head.slice(0, space > 20 ? space : TITLE_MAX - 1).trim()}…`;
+    overflow = text;
+  }
+  return { title: head, overflow };
 }
 
 function slugifyEpisodeId(title) {
@@ -253,7 +287,7 @@ export function normalizeMedicalFields(fields, { notes, today, activeEpisodes } 
     return { title: 'Medical visit' };
   }
 
-  const title = cleanString(fields.title) ?? inferTitleFromNotes(notes) ?? 'Medical visit';
+  const title = splitLongTitle(cleanString(fields.title) ?? inferTitleFromNotes(notes) ?? 'Medical visit').title;
   const provider = cleanString(fields.provider);
   const location = cleanString(fields.location);
   const record_type = inferRecordType(fields.record_type, title, notes);
@@ -300,6 +334,9 @@ export function normalizeMedicalFields(fields, { notes, today, activeEpisodes } 
 
   const follow_up_date = parseCalendarDate(fields.follow_up_date, { today });
   if (follow_up_date) normalized.follow_up_date = follow_up_date;
+
+  const duration_min = parseFiniteNumber(fields.duration_min);
+  if (duration_min != null && duration_min >= 1) normalized.duration_min = Math.round(duration_min);
 
   const cost_aud = parseFiniteNumber(fields.cost_aud);
   if (cost_aud != null) normalized.cost_aud = cost_aud;
@@ -348,6 +385,7 @@ export function mergeMedicalFields(existing, incoming, { notes, existingNotes, t
     task_id: next.task_id ?? base.task_id,
     date_end: next.date_end ?? base.date_end,
     follow_up_date: next.follow_up_date ?? base.follow_up_date,
+    duration_min: next.duration_min ?? base.duration_min,
     cost_aud: next.cost_aud ?? base.cost_aud,
     insurance_status: next.insurance_status ?? base.insurance_status,
     episode: next.episode ?? base.episode

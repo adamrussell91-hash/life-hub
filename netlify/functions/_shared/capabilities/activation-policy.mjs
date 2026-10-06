@@ -223,6 +223,8 @@ const CATALOGUES = {
   sara: [
     'Body composition/weight/tape — get_body_state, get_weight_trend',
     'Medical Overview — search_medical_records, brief_medical_appointment, analyse_medical_evidence',
+    'Records — list_medical_visits (ids, duplicates), get_medical_visit, update_medical_visit (notes_append/status/time/duration save at once; date/type/title/replace need Confirm), delete_medical_visit, merge_medical_visits (Confirm)',
+    'Analyst — get_marker_trend (any blood marker or group over time), compare_bloods, get_treatment_timeline (Stelara cycle), get_symptom_timeline (episodes vs cycle day), get_cross_signals (food/training/mood/weight around events), get_open_loops, build_appointment_brief (questions to ask)',
     'Never answer personalised body/medical questions from generic knowledge when these tools can retrieve Adam\'s records.'
   ],
   penelope: [

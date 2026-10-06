@@ -1,4 +1,5 @@
 import { formatDisplayDate } from '../core/time.js';
+import { MEDICAL_RECORD_TYPES } from './medical-normalize.js';
 import { createHubFilter } from '../../../../packages/design-kit/js/hub-filter-menu.js';
 import { createViewOnMap } from '../../../../packages/design-kit/js/view-on-map.js';
 import { openMorphingDialog } from '../../../../packages/design-kit/js/morphing-dialog.js';
@@ -339,7 +340,32 @@ function renderTimeline(root, model, { onSelect, onToggleYear } = {}) {
   if (!host) return;
   host.className = `medical-timeline is-density-${model.density}`;
   host.replaceChildren();
+  host.append(renderLaneLegend(root));
   for (const item of model.items) appendTimelineItem(root, host, item, model, { onSelect, onToggleYear });
+}
+
+/** Colour key — the same thread colours as the Health Threads strip above. */
+const THREAD_LEGEND = [
+  { thread: 'IBD', label: 'IBD / gut' },
+  { thread: 'Liver', label: 'Liver' },
+  { thread: 'Mind', label: 'Mind' },
+  { thread: 'Acute', label: 'Acute' },
+  { thread: 'Other', label: 'Other' }
+];
+
+function renderLaneLegend(root) {
+  const list = root.createElement('ul');
+  list.className = 'medical-legend';
+  list.setAttribute('aria-label', 'Colour key');
+  for (const { thread, label } of THREAD_LEGEND) {
+    const item = root.createElement('li');
+    item.className = 'medical-legend__item';
+    item.dataset.thread = thread;
+    item.setAttribute('data-thread', thread);
+    item.textContent = label;
+    list.append(item);
+  }
+  return list;
 }
 
 function appendTimelineItem(root, host, item, model, hooks) {
@@ -466,6 +492,7 @@ function visitCard(root, visit, model, onSelect) {
     'medical-card',
     weight === 'major' ? 'medical-card--major' : 'medical-card--routine',
     planned ? 'medical-card--planned' : '',
+    visit.status === 'cancelled' ? 'medical-card--cancelled' : '',
     (weight === 'major' && (visit.lab || detailPills(visit, model).length)) ? 'medical-card--has-detail' : ''
   ].filter(Boolean).join(' ');
   card.dataset.visitId = visit.id;
@@ -473,6 +500,7 @@ function visitCard(root, visit, model, onSelect) {
   card.dataset.weight = weight;
   card.setAttribute('data-visit-id', visit.id);
   card.setAttribute('data-lane', visit.lane);
+  card.setAttribute('data-thread', visit.thread || 'Other');
   if (model.selected?.id === visit.id) card.classList.add('is-selected');
   card.addEventListener('click', () => onSelect?.(visit.id));
 
@@ -503,7 +531,8 @@ function visitCard(root, visit, model, onSelect) {
     : (visit.provider || visit.location || visit.record_type);
   const metaBits = [
     visit.displayDate || formatDisplayDate(visit.date),
-    typeLabel
+    typeLabel,
+    visit.status === 'cancelled' ? 'Cancelled' : null
   ].filter(Boolean);
   meta.textContent = metaBits.join(' · ');
   card.append(meta);
@@ -573,6 +602,7 @@ function minorRow(root, visit, model, onSelect, planned) {
   row.dataset.weight = 'minor';
   row.setAttribute('data-visit-id', visit.id);
   row.setAttribute('data-lane', visit.lane);
+  row.setAttribute('data-thread', visit.thread || 'Other');
   if (model.selected?.id === visit.id) row.classList.add('is-selected');
   row.addEventListener('click', () => onSelect?.(visit.id));
   const when = root.createElement('strong');
@@ -640,7 +670,10 @@ function renderSheet(root, model, hooks) {
   title.textContent = visit.title;
   const meta = root.createElement('p');
   meta.className = 'metric-caption';
-  meta.textContent = [visit.displayDate, visit.record_type, visit.provider].filter(Boolean).join(' · ');
+  const slot = visit.time
+    ? `${visit.time}${visit.durationMin ? `, ${visit.durationMin} min` : ''}`
+    : null;
+  meta.textContent = [visit.displayDate, slot, visit.record_type, visit.provider].filter(Boolean).join(' · ');
   host.append(kicker, title, meta);
 
   if (visit.episode?.id) {
@@ -757,7 +790,9 @@ function writeForm(root, draft, hooks) {
   });
   const title = field(root, 'title', 'Title', draft?.title ?? '');
   const date = field(root, 'date', 'Date', draft?.date ?? '', 'date');
-  const type = field(root, 'record_type', 'Type', draft?.record_type ?? 'Appointment');
+  const time = field(root, 'time', 'Start time', draft?.time ?? '', 'time');
+  const duration = durationField(root, draft?.durationMin ?? draft?.duration_min ?? '');
+  const type = typeField(root, draft?.record_type ?? 'Appointment');
   const provider = field(root, 'provider', 'Provider', draft?.provider ?? '');
   const location = field(root, 'location', 'Location', draft?.location ?? '');
   const notes = field(root, 'notes', 'Overview', draft?.notes ?? '', 'textarea');
@@ -773,7 +808,7 @@ function writeForm(root, draft, hooks) {
   cancel.textContent = 'Cancel';
   cancel.addEventListener('click', () => hooks.onCancel?.());
   actions.append(save, cancel);
-  form.append(title, date, type, provider, location, notes, actions);
+  form.append(title, date, time, duration, type, provider, location, notes, actions);
   return form;
 }
 
@@ -789,6 +824,57 @@ function field(root, name, label, value, kind = 'text') {
   wrap.append(caption, input);
   wrap._input = input;
   wrap.dataset.field = name;
+  return wrap;
+}
+
+const DURATION_PRESETS = [15, 30, 45, 60, 90];
+
+/** A fixed list — a free-text Type is how entries ended up mis-filed. */
+function typeField(root, value) {
+  const wrap = root.createElement('label');
+  wrap.className = 'medical-form__field';
+  const caption = root.createElement('span');
+  caption.textContent = 'Type';
+  const select = root.createElement('select');
+  select.name = 'record_type';
+  for (const optionValue of MEDICAL_RECORD_TYPES) {
+    const option = root.createElement('option');
+    option.value = optionValue;
+    option.textContent = optionValue;
+    select.append(option);
+  }
+  select.value = MEDICAL_RECORD_TYPES.includes(value) ? value : 'Appointment';
+  wrap.append(caption, select);
+  wrap._input = select;
+  wrap.dataset.field = 'record_type';
+  return wrap;
+}
+
+function durationField(root, value) {
+  const wrap = root.createElement('div');
+  wrap.className = 'medical-form__field medical-form__duration';
+  wrap.dataset.field = 'duration_min';
+  const caption = root.createElement('span');
+  caption.textContent = 'Length (minutes)';
+  const input = root.createElement('input');
+  input.type = 'number';
+  input.name = 'duration_min';
+  input.min = '1';
+  input.step = '5';
+  input.inputMode = 'numeric';
+  input.value = value ?? '';
+  const chips = root.createElement('div');
+  chips.className = 'medical-form__chips';
+  for (const minutes of DURATION_PRESETS) {
+    const chip = root.createElement('button');
+    chip.type = 'button';
+    chip.className = 'btn btn--ghost medical-form__chip';
+    chip.textContent = `${minutes}m`;
+    chip.addEventListener('click', () => { input.value = String(minutes); });
+    chips.append(chip);
+  }
+  wrap.append(caption, chips, input);
+  wrap._input = input;
   return wrap;
 }
 

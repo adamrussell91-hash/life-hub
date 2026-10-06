@@ -56,6 +56,7 @@ import {
   isHammondProductivityTool
 } from './hammond-productivity.mjs';
 import { searchMedicalRecords, briefMedicalAppointment, analyseMedicalEvidence, statedHealthConstraints } from './medical-overview-read.mjs';
+import { appointmentBrief, treatmentTimeline, openLoops, compareBloods } from './sara-analyst.mjs';
 import { searchMindRecords } from './mind-session-read.mjs';
 import { planWork, statedPlannerInputs } from './clare-work.mjs';
 import { composeEvidenceClaims } from './evidence-packs.mjs';
@@ -135,7 +136,12 @@ const HEALTH = new Set([
   'health', 'medical', 'appointment', 'timeline', 'weight', 'flare',
   'bloods', 'visit', 'clinic', 'gp', 'doctor', 'symptom', 'symptoms', 'medication',
   'medications', 'meds', 'body', 'unusual', 'history', 'pathology', 'lab', 'labs',
-  'brief', 'result', 'results', 'compare', 'trend'
+  'brief', 'result', 'results', 'compare', 'trend',
+  // Specifics Adam actually says: the analysis must not depend on him saying "health".
+  'stelara', 'ustekinumab', 'injection', 'dose', 'cramp', 'cramping', 'cramps', 'sore', 'pain',
+  'fatigue', 'tired', 'unwell', 'sick', 'nausea', 'headache', 'fever', 'ggt', 'alt', 'ast', 'crp',
+  'ferritin', 'iron', 'liver', 'calprotectin', 'mrcp', 'colonoscopy', 'crohn', 'crohns', 'scan',
+  'referral', 'script', 'prescription', 'specialist', 'gastro', 'bone', 'steroid', 'entocort'
 ]);
 const LESSON = new Set([
   'lesson', 'lessons', 'class', 'unit', 'teach', 'teaching', 'improve',
@@ -257,8 +263,11 @@ export function planTurn({ slug, message } = {}) {
 
   if (slug === 'sara' && !greetingOnly && hits(words, HEALTH)) {
     const appointment = words.some(word => ['appointment', 'visit', 'clinic', 'gp', 'doctor'].includes(word));
-    const required = ['get_body_state', 'get_weight_trend', 'search_medical_records', 'analyse_medical_evidence'];
-    if (appointment) required.push('brief_medical_appointment');
+    const required = [
+      'get_body_state', 'get_weight_trend', 'search_medical_records', 'analyse_medical_evidence',
+      'get_treatment_timeline', 'get_open_loops'
+    ];
+    if (appointment) required.push('build_appointment_brief');
     const stated = statedHealthConstraints(message);
     return validatePlan({
       workflow: 'health_timeline',
@@ -470,6 +479,16 @@ function emptyStores() {
   };
 }
 
+/** Date of the soonest non-symptom visit on or after today, or null. */
+function nextMedicalVisitDate(events, today) {
+  const dates = (events ?? [])
+    .map(event => event?.record)
+    .filter(record => record?.type === 'medical' && record.record_type !== 'Symptom' && record.date >= today)
+    .map(record => record.date)
+    .sort();
+  return dates[0] ?? null;
+}
+
 function runTool(name, stores, today, now, message, options = {}) {
   const workouts = stores.workouts ?? [];
   const tasks = stores.tasks ?? [];
@@ -555,8 +574,18 @@ function runTool(name, stores, today, now, message, options = {}) {
     return searchMedicalRecords(stores.medicalEvents ?? [], { query: query || 'medical', limit: limit ?? 8 });
   }
   if (name === 'brief_medical_appointment') {
-    return briefMedicalAppointment(stores.medicalEvents ?? [], { date: today });
+    // The visit's own date, not today: a brief for next week's GP must read next week's visit.
+    return briefMedicalAppointment(stores.medicalEvents ?? [], {
+      date: options.date ?? nextMedicalVisitDate(stores.medicalEvents ?? [], today) ?? today
+    });
   }
+  if (name === 'build_appointment_brief') {
+    const date = options.date ?? nextMedicalVisitDate(stores.medicalEvents ?? [], today);
+    return appointmentBrief(stores.medicalEvents ?? [], { visit_id: options.visit_id ?? null, date, today });
+  }
+  if (name === 'get_treatment_timeline') return treatmentTimeline(stores.medicalEvents ?? [], { today });
+  if (name === 'get_open_loops') return openLoops(stores.medicalEvents ?? [], { today });
+  if (name === 'compare_bloods') return compareBloods(stores.medicalEvents ?? [], { today });
   if (name === 'analyse_medical_evidence') {
     return analyseMedicalEvidence(stores.medicalEvents ?? [], {
       today,

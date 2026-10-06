@@ -1,5 +1,23 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mergeMedicalFields, resolveMedicalLogCandidate, parseMedicalEventTolerant } from '../../apps/life/js/app/medical-normalize.js';
+import { isSaraAnalystTool, executeSaraAnalystTool, createHistoryLoader } from './_shared/sara-analyst-tools.mjs';
+import { isSaraRecordTool, executeSaraRecordTool } from './_shared/sara-records-tools.mjs';
+import { findLikelyDuplicate } from './_shared/sara-records.mjs';
+
+const SARA_ANALYST_STATUS = {
+  get_marker_trend: 'Reading your blood trends…',
+  compare_bloods: 'Comparing your blood results…',
+  get_treatment_timeline: 'Checking your Stelara cycle…',
+  get_symptom_timeline: 'Lining up your symptoms…',
+  get_cross_signals: 'Looking across food, training and mood…',
+  get_open_loops: 'Checking what is outstanding…',
+  build_appointment_brief: 'Preparing your appointment brief…',
+  list_medical_visits: 'Listing your visits…',
+  get_medical_visit: 'Opening the visit…',
+  update_medical_visit: 'Updating the visit…',
+  delete_medical_visit: 'Preparing the delete…',
+  merge_medical_visits: 'Preparing the merge…'
+};
 import { verifySessionToken, serializeExpiredSessionCookie } from './_shared/auth-security.mjs';
 import {
   errorResponse,
@@ -2514,6 +2532,47 @@ export function createChatHandler({
                 if (hammondCard) send(hammondCard);
                 return JSON.stringify(hammondResult);
               }
+              if (slug === 'sara' && isSaraRecordTool(event.name)) {
+                send({ type: 'status', text: SARA_ANALYST_STATUS[event.name] ?? 'Updating Medical Overview…' });
+                try {
+                  return JSON.stringify(await executeSaraRecordTool(event.name, event.input ?? {}, {
+                    medicalEvents,
+                    today,
+                    nowIso: getSydneyTimestamp(nowInstant),
+                    save: async ({ path, record, notes }) => {
+                      const current = await client.resolveTree();
+                      const existingSha = current.tree.find(entry => entry.path === path && entry.type === 'blob')?.sha;
+                      const persisted = await persistLogEntry(client, { record, notes, path, existingSha, nowDateKey: today });
+                      // The chat receipt: what was just saved, so Adam sees the change land.
+                      send({
+                        type: 'record_saved',
+                        record,
+                        notes,
+                        path,
+                        summary: describeRecordForLog(record, notes, { medicalAppend: true }),
+                        centralNodeUpdated: persisted.centralNodeUpdated
+                      });
+                    },
+                    propose: proposal => proposeOsAction(proposal),
+                    validateProposal: input => validateProposeActionInput(input, { agentSlug: slug })
+                  }));
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+              if (slug === 'sara' && isSaraAnalystTool(event.name)) {
+                send({ type: 'status', text: SARA_ANALYST_STATUS[event.name] ?? 'Analysing your records…' });
+                const loadRecords = createHistoryLoader({
+                  tree: repoTree,
+                  readBlob: async sha => decodeBlob(await client.readBlob(sha)),
+                  parse: (content, path) => parseEventDocument(content, path, loadYaml)
+                });
+                return JSON.stringify(await executeSaraAnalystTool(event.name, event.input ?? {}, {
+                  medicalEvents,
+                  today,
+                  loadRecords
+                }));
+              }
               if (event.name === 'search_medical_records') {
                 send({ type: 'status', text: 'Searching Medical Overview…' });
                 return JSON.stringify(searchMedicalRecords(medicalEvents, event.input ?? {}));
@@ -2895,6 +2954,18 @@ export function createChatHandler({
                   send({ type: 'status', text: 'Saving your session…' });
                 }
                 let medicalInput = event.input;
+                if (slug === 'sara' && event.input?.type === 'medical' && event.input?.new_visit !== true) {
+                  // log_entry creates. If this visit is already on record, say where — never make a second one.
+                  const existingVisit = findLikelyDuplicate(medicalEvents, event.input, { today });
+                  if (existingVisit) {
+                    return JSON.stringify({
+                      ok: false,
+                      error: 'possible_duplicate',
+                      existing_visit: existingVisit,
+                      instruction: 'This visit is already on record. To add detail, mark it booked/done/cancelled, or change its time or date, call update_medical_visit with this visit id. Call log_entry again with new_visit: true only if this is genuinely a separate visit.'
+                    });
+                  }
+                }
                 if (event.input?.type === 'medical') {
                   try {
                     medicalInput = await resolveMedicalLogCandidate(client, event.input, {
