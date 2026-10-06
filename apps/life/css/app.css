@@ -8387,6 +8387,9 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 .medical-sheet {
   position: sticky;
   top: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   padding: var(--space-4);
   border: 1px solid rgba(20, 43, 81, 0.08);
   border-radius: var(--radius-lg);
@@ -8402,9 +8405,11 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-tight);
 }
+.medical-sheet__body { min-width: 0; }
 .medical-sheet__notes { margin: 0 0 var(--space-3); color: var(--orca); font-size: var(--text-md); }
 .medical-sheet__line { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
-.medical-sheet__episode {
+.medical-sheet__episode,
+.medical-sheet__estimated {
   margin: 0 0 var(--space-2);
   color: var(--muted);
   font-size: var(--text-sm);
@@ -8424,7 +8429,13 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 .medical-sheet__close {
   display: none;
 }
-.medical-form { display: grid; gap: var(--space-3); }
+.medical-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.medical-form__body { display: grid; gap: var(--space-3); min-width: 0; }
 .medical-form__field { display: grid; gap: 0.25rem; font-size: var(--text-sm); color: var(--muted); }
 .medical-form__field input,
 .medical-form__field select,
@@ -8436,7 +8447,17 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   color: var(--ink);
   font: inherit;
 }
-.medical-form__actions { display: flex; gap: var(--space-2); }
+.medical-sheet [data-part="form-actions"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex: none;
+  margin-top: var(--space-3);
+}
+.medical-sheet [data-part="form-actions"] .btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
 .medical-form__chips { display: flex; flex-wrap: wrap; gap: var(--space-1, 0.25rem); }
 .medical-form__chip { min-height: 2.75rem; padding-inline: var(--space-3, 0.75rem); }
 
@@ -8459,11 +8480,37 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   .medical-layout { grid-template-columns: minmax(0, 1fr); }
   .medical-sheet {
     position: fixed;
-    inset: 8vh 1rem 1rem;
-    z-index: 20;
-    overflow: auto;
+    inset: 8vh 0 0 0;
+    z-index: 30;
+    overflow: hidden;
+    padding: var(--space-4) var(--space-4) 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     background: var(--paper);
     backdrop-filter: none;
+  }
+  .medical-sheet__body,
+  .medical-form__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+  .medical-form {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .medical-sheet [data-part="form-actions"] {
+    margin-top: 0;
+    padding: var(--space-3) 0 calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+    background: var(--paper);
+  }
+  .medical-sheet [data-part="form-actions"] .btn {
+    min-height: 2.75rem;
+  }
+  .medical-form__field input,
+  .medical-form__field select,
+  .medical-form__field textarea {
+    font-size: var(--text-md);
   }
   .medical-sheet:not([hidden]) + .medical-sheet__close,
   #body-medical-dashboard:has(#medical-sheet:not([hidden])) .medical-sheet__close {
@@ -8471,7 +8518,7 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
     position: fixed;
     top: calc(8vh + 0.6rem);
     right: 1.6rem;
-    z-index: 21;
+    z-index: 31;
     place-items: center;
     width: 2rem;
     height: 2rem;

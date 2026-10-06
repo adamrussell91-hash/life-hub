@@ -260,6 +260,7 @@ function decorateVisit(record, event, bloods, today) {
     cost_aud: record.cost_aud ?? null,
     insurance_status: record.insurance_status ?? null,
     episode: record.episode ?? null,
+    path: event?.path ?? record.path ?? null,
     displayDate: null,
     thread: null,
     lab: labSummary(bloods),
@@ -291,7 +292,9 @@ export function formatMedicalDisplayDate(visit) {
 
 /**
  * Cadence-derived virtual next dose (MO-07). Never written to storage.
- * Last Stelara 27/08 cadence 56 → ~22/10. Real record within ±7 days suppresses it.
+ * Last Stelara 27/08 cadence 56 → ~22/10.
+ * A real record within ±7 days of that date, or any real upcoming / planned /
+ * booked / to-book visit for the same medication, suppresses the ghost.
  */
 export function deriveVirtualDoses(visits, today) {
   const virtuals = [];
@@ -306,12 +309,7 @@ export function deriveVirtualDoses(visits, today) {
   for (const [, last] of byMed) {
     const nextDate = addDays(last.date, last.cadence_days);
     if (!nextDate) continue;
-    const suppressed = visits.some(visit => {
-      if (medicationKey(visit) !== medicationKey(last)) return false;
-      if (!isCalendarDate(visit.date) || !isCalendarDate(nextDate)) return false;
-      return Math.abs(daysBetween(visit.date, nextDate)) <= 7;
-    });
-    if (suppressed) continue;
+    if (visits.some(visit => suppressesVirtualDose(visit, last, nextDate, today))) continue;
     const virtual = {
       ...last,
       id: `virtual-${last.id}-${nextDate}`,
@@ -320,9 +318,10 @@ export function deriveVirtualDoses(visits, today) {
       date_precision: 'day',
       planned: true,
       virtual: true,
+      path: null,
       record_type: 'Dose',
       title: last.title,
-      notes: `~${formatDisplayDate(nextDate)} · auto from cadence ${last.cadence_days}d`,
+      notes: `Estimated next dose · auto from cadence ${last.cadence_days}d`,
       lab: null,
       bloods: null,
       task_id: null
@@ -331,6 +330,17 @@ export function deriveVirtualDoses(visits, today) {
     virtuals.push(virtual);
   }
   return virtuals;
+}
+
+function suppressesVirtualDose(visit, last, nextDate, today) {
+  if (!visit || visit.virtual || visit.id === last.id) return false;
+  if (medicationKey(visit) !== medicationKey(last)) return false;
+  if (visit.status === 'cancelled' || visit.status === 'done') return false;
+  if (isCalendarDate(visit.date) && isCalendarDate(nextDate)
+    && Math.abs(daysBetween(visit.date, nextDate)) <= 7) {
+    return true;
+  }
+  return isPlannedVisit(visit, today);
 }
 
 function medicationKey(visit) {

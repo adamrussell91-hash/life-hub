@@ -138,6 +138,30 @@ test('confirm passes id through when provided, and can omit candidate entirely',
   assert.equal('candidate' in sentBody, false);
 });
 
+test('confirm passes path for delete_log without a candidate', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (_url, init) => {
+    sentBody = JSON.parse(init.body);
+    return Response.json({
+      ok: true,
+      data: { deleted: true, path: sentBody.path, id: sentBody.id }
+    });
+  });
+  const path = 'data/body/2026/11/2026-11-10-medical-stelara-injection-0000.md';
+  const result = await chatApi.confirm({
+    kind: 'delete_log',
+    slug: 'sara',
+    path,
+    id: 'stelara-2'
+  });
+  assert.equal(sentBody.kind, 'delete_log');
+  assert.equal(sentBody.slug, 'sara');
+  assert.equal(sentBody.path, path);
+  assert.equal(sentBody.id, 'stelara-2');
+  assert.equal('candidate' in sentBody, false);
+  assert.equal(result.deleted, true);
+});
+
 test('confirm omits id from the body when not provided', async () => {
   let sentBody;
   const chatApi = createChatApi(async (_url, init) => {

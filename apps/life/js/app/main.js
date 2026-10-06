@@ -160,7 +160,15 @@ const medicalController = createMedicalController({
   chatApi,
   tasksApi,
   getDate: () => controller.getDisplayDate?.() ?? null,
-  onRecordWritten: notifyLogged,
+  onRecordWritten: result => {
+    if (result?.deleted) {
+      showHubToast('Deleted', { tone: 'success' });
+      controller?.removeLoggedEvent?.(result);
+      return;
+    }
+    showHubToast('Logged', { tone: 'success' });
+    controller?.applyLoggedEvent?.(result);
+  },
   onError: message => showHubToast(message, { tone: 'danger' })
 });
 

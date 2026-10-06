@@ -1563,6 +1563,49 @@ export function createAppController(dependencies) {
     if (currentSection === 'skincare') renderSkincareSection();
   }
 
+  function loggedEventFrom(incoming) {
+    const record = incoming?.record;
+    if (!record || typeof record !== 'object') return null;
+    return {
+      record,
+      path: incoming.path ?? null,
+      body: incoming.body ?? incoming.notes ?? record.notes ?? '',
+      sha: incoming.sha,
+      legacy: incoming.legacy === true
+    };
+  }
+
+  function sameLoggedEvent(existing, incoming) {
+    if (incoming.path && existing.path === incoming.path) return true;
+    const id = incoming.record?.id;
+    return Boolean(id) && existing.record?.id === id;
+  }
+
+  // Confirm already wrote the file. Patch the in-memory list and repaint this
+  // section so a new medical card appears without a whole-app live sync.
+  function applyLoggedEvent(incoming) {
+    if (!latestResult) return;
+    const event = loggedEventFrom(incoming);
+    if (!event) return;
+    const events = [...(latestResult.events ?? [])];
+    const index = events.findIndex(item => sameLoggedEvent(item, event));
+    if (index >= 0) events[index] = { ...events[index], ...event, record: { ...events[index].record, ...event.record } };
+    else events.push(event);
+    latestResult = { ...latestResult, events };
+    if (currentSection === 'body-medical') keepScroll(renderMedicalSection);
+  }
+
+  function removeLoggedEvent(incoming) {
+    if (!latestResult) return;
+    const event = {
+      path: incoming?.path ?? null,
+      record: { id: incoming?.record?.id ?? incoming?.id }
+    };
+    const events = (latestResult.events ?? []).filter(item => !sameLoggedEvent(item, event));
+    latestResult = { ...latestResult, events };
+    if (currentSection === 'body-medical') keepScroll(renderMedicalSection);
+  }
+
   function visibleWeekRange() {
     if (!latestResult || typeof buildCalendarModel !== 'function') return null;
     const date = calendarSelectedDate || latestResult.date;
@@ -2254,6 +2297,8 @@ export function createAppController(dependencies) {
     getAgentsConfig: () => latestResult?.agentsConfig ?? null,
     getFitnessLibraryContext: () => fitnessLibraryContext(),
     applySkincareShelf,
+    applyLoggedEvent,
+    removeLoggedEvent,
     openCalendarCompose: () => {
       calendarFocusCompose = true;
       if (currentSection !== 'calendar') showSection('calendar');
