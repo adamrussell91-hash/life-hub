@@ -49,6 +49,8 @@
 
 **S5 · Dropdown painted under the next section.** **Seen:** Teaching lesson editor (Codex run 10, 05/10/26): the context bar has `backdrop-filter` (its own stacking context) and no `z-index`, so the canvas below painted over the Lesson options menu; clicking History hit the Connections section instead and "did nothing". **Rule:** Any bar that owns a dropdown or popover and has `backdrop-filter`, `transform`, `filter` or `opacity < 1` also gets `position: relative` and a `z-index` above the content it overlaps. **Check:** open every menu in the bar at 1440 and run `document.elementFromPoint` on the centre of each item; it returns the item, not something underneath.
 
+**W7 · Kit chart mounted without its stylesheet.** **Seen:** Tasks Day Dial caseback / capacity forecast (2026-10): `chartSvg` painted `.rf-band` / `.rf-line` but Tasks never imported `calendar-readiness.css` (Life did), so SVG defaulted to black fill (same class as S4) and the prediction looked like a solid bar. Professional had the same gap. **Rule:** When a hub mounts kit JS that emits classed SVG/HTML (`rf-*`, etc.), that hub must load the matching kit CSS in the same PR. Grep the entry `main` / `index.html` for the stylesheet next to the feature import. **Check:** at 390 on Tasks `#/day` caseback, `.rf-band` computed `fill` is not `rgb(0,0,0)` and `.rf-line` has `fill: none` plus a coloured stroke; `apps/tasks/tests/unit/readiness-css-wired.test.ts` stays green.
+
 ## V: Visibility and state
 
 **V1 · `[hidden]` doesn't hide.** **Seen:** Goals Direction editor (G-18). **Rule:** Any element toggled with `hidden` that has a `display:` rule also gets `.x[hidden]{display:none}`. **Check:** after hiding, `offsetHeight === 0`.
