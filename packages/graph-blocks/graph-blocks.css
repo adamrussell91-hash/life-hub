@@ -898,6 +898,18 @@
   display: none;
 }
 
+.graph-canvas .graph-verbs__actions {
+  display: flex;
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--line);
+}
+
+.graph-canvas .graph-verbs__actions .btn {
+  min-height: 2rem;
+  padding: 0 var(--space-3);
+  font-size: var(--text-xs);
+}
+
 /* Phone panels are appended to <body>; above the hub tab bar (z 30) and kit sheets (z 40). */
 .graph-sheet {
   position: fixed;
