@@ -7,6 +7,12 @@
 [data-c="lilac"] { --fill-c: var(--pastel-lilac); --ink-c: var(--pastel-lilac-ink); }
 [data-c="navy"] { --fill-c: var(--pastel-blue); --ink-c: var(--navy); }
 
+/* Size containment keeps the block from forcing its grid parent wider than the editor column. */
+.graph-block {
+  container: graph-block / inline-size;
+  min-width: 0;
+}
+
 .graph-block [hidden],
 .graph-float[hidden],
 .graph-rename[hidden],
@@ -645,6 +651,13 @@
   box-shadow: var(--elev-2);
   backdrop-filter: blur(8px);
   cursor: default;
+  max-width: calc(100% - 2 * var(--space-2));
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.graph-tools > * {
+  flex: 0 0 auto;
 }
 
 .graph-tools__sep {
@@ -963,6 +976,51 @@
   width: 100%;
   min-height: 2.75rem;
   margin-top: var(--space-2);
+}
+
+/* Narrow editor columns: each link becomes a small card (from / verb / to). */
+@container graph-block (max-width: 30rem) {
+  .graph-links {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .graph-link {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "from swap remove"
+      "verb verb verb"
+      "to to to"
+      "suggest suggest suggest";
+    border: 1px solid var(--line);
+  }
+
+  .graph-link__pick {
+    max-width: 100%;
+  }
+
+  .graph-link__pick[data-end="from"] { grid-area: from; }
+  .graph-link__pick[data-end="to"] { grid-area: to; }
+  .graph-link__verb { grid-area: verb; text-align: left; }
+  .graph-link__swap { grid-area: swap; }
+  .graph-link__remove { grid-area: remove; }
+  .graph-link__suggest { grid-area: suggest; }
+
+  .graph-link__arrow {
+    display: none;
+  }
+
+  .graph-outline__row {
+    flex-wrap: wrap;
+  }
+
+  .graph-outline__row .graph-outline__input {
+    flex-basis: 0;
+  }
+
+  .graph-outline__row:focus-within .graph-outline__tools {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
 }
 
 @media (max-width: 719px) {
