@@ -152,3 +152,32 @@ test('saving while offline says so instead of doing nothing', async () => {
   await hooks.onSave({ title: 'Dentist', date: '2026-10-20' });
   assert.match(errors[0], /offline/i);
 });
+
+test('choosing a different Type on a new visit changes its lane (Lab Work is not filed as an appointment)', async () => {
+  let payload = null;
+  const controller = createMedicalController({
+    chatApi: { async confirm(next) { payload = next; return { record: { id: 'new-1' } }; } },
+    getDate: () => '2026-10-06',
+    isOnline: () => true
+  });
+  const hooks = controller.hooks(() => {});
+  hooks.onAdd();
+  await hooks.onSave({ title: 'Blood Tests', date: '2026-10-22', record_type: 'Lab Work', time: '09:00', duration_min: '16' });
+  assert.equal(payload.candidate.fields.record_type, 'Lab Work');
+  assert.equal(payload.candidate.fields.lane, 'lab');
+  assert.equal(payload.candidate.fields.duration_min, 16);
+  assert.equal(payload.candidate.time, '09:00');
+});
+
+test('editing a visit without changing its type keeps its lane', async () => {
+  let payload = null;
+  const controller = createMedicalController({
+    chatApi: { async confirm(next) { payload = next; return { record: { id: 'x' } }; } },
+    getDate: () => '2026-10-06',
+    isOnline: () => true
+  });
+  const hooks = controller.hooks(() => {});
+  hooks.onEdit({ id: 'x', title: 'Therapy', date: '2026-10-07', record_type: 'Appointment', lane: 'therapy' });
+  await hooks.onSave({ title: 'Therapy', date: '2026-10-07', record_type: 'Appointment' });
+  assert.equal(payload.candidate.fields.lane, 'therapy');
+});
