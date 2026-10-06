@@ -548,10 +548,10 @@ function buildModel() {
   });
 }
 
-/** Life's Day view: today's gauge shows the readiness forecast (and check-in) when known. */
+/** Today's gauge and caseback show the readiness forecast on every hub; check-ins load from whichever API the hub has. */
 function readinessCtx() {
   const today = dayAt(input.today);
-  if ((input?.hub || 'life') !== 'life' || !today) return null;
+  if (!today) return null;
   const hhmm = value => {
     const m = /^(\d{2}):(\d{2})$/.exec(String(value ?? ''));
     return m ? Number(m[1]) + Number(m[2]) / 60 : null;
@@ -620,9 +620,9 @@ function chooseFace(choice) {
   announce(`${faceById(face.id).title}${face.auto ? ', picked for this day' : ''}`);
 }
 
-/** Pilot GMT needs Travel's trips (with each city's time zone). Life only; fetched once a session. */
+/** Pilot GMT needs Travel's trips (with each city's time zone). Every hub; fetched once a session. */
 function loadTrips() {
-  if (trips.status !== 'idle' || typeof input?.apiFetch !== 'function' || (input?.hub || 'life') !== 'life') return;
+  if (trips.status !== 'idle' || typeof input?.apiFetch !== 'function') return;
   trips.status = 'loading';
   const fetchJson = async url => {
     const response = await input.apiFetch(url);
