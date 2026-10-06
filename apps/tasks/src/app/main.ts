@@ -6,6 +6,7 @@ import '../../design-kit/filters.css';
 import '../../design-kit/calendar.css';
 import '../../design-kit/calendar-tideline.css';
 import '../../design-kit/calendar-day-dial.css';
+import '../../design-kit/calendar-readiness.css';
 import '../../design-kit/calendar-almanac.css';
 import '../../design-kit/calendar-term-river.css';
 import '../../design-kit/calendar-zoom-bar.css';
