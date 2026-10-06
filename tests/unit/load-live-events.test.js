@@ -7,6 +7,7 @@ import {
   MAX_LOOKBACK_DAYS,
   INITIAL_LOOKAHEAD_DAYS,
   FORWARD_LOOKAHEAD_DAYS,
+  planForwardWindows,
   loadLiveEvents as loadLiveEventsRaw,
   planBackfillWindows
 } from '../../apps/life/js/app/load-live-events.js';
@@ -77,9 +78,9 @@ test('loads the current Sydney date window through existing parsers and exact Ho
   const result = await loadLiveEvents({ sync, loadYaml: load, date });
   const model = buildHomeModel({ ...result, date: '2026-07-30' });
 
-  // first window + two history windows + the forward (future) window
+  // first window + two history windows, plus the chunked forward (future) windows
   assert.equal(calls.filter(call => call.from <= firstTo('2026-07-30')).length, 3);
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 3 + planForwardWindows('2026-07-30', firstTo('2026-07-30')).length);
   assert.equal(calls[0].from, '2026-07-24');
   assert.equal(calls[0].to, firstTo('2026-07-30'));
   assert.equal(calls[1].from, '2026-06-24');
@@ -166,7 +167,7 @@ test('first sync is seven inclusive days and the next slice does not overlap', a
 
   const history = calls.filter(call => call.from <= firstTo(date));
   assert.equal(history.length, 3);
-  assert.equal(calls.length, 4, 'plus one forward window for future records');
+  assert.equal(calls.length, 3 + planForwardWindows(date, firstTo(date)).length, 'plus the forward windows for future records');
   assert.deepEqual(calls[0], { from: '2026-07-26', to: firstTo('2026-08-01') });
   assert.deepEqual(calls[1], { from: '2026-06-26', to: '2026-07-25' });
   assert.ok(history.every(call => call.to < calls[0].from || call === calls[0] || call.to === firstTo(date)));
@@ -693,7 +694,7 @@ test('a visit booked weeks or months ahead is loaded (it used to save but never 
   const calls = [];
   const sync = async options => {
     calls.push({ from: options.from, to: options.to });
-    const files = [medicalVisit('2026-10-22'), medicalVisit('2026-10-26'), medicalVisit('2027-03-01')]
+    const files = [medicalVisit('2026-10-22'), medicalVisit('2026-10-26'), medicalVisit('2027-03-01'), medicalVisit('2030-06-15'), medicalVisit('2031-12-01')]
       .filter(file => {
         const d = file.path.match(/(\d{4}-\d{2}-\d{2})-medical/)[1];
         return d >= options.from && d <= options.to;
@@ -704,19 +705,29 @@ test('a visit booked weeks or months ahead is loaded (it used to save but never 
   const result = await loadLiveEvents({ sync, loadYaml: load, date, onPartial: s => partials.push(s) });
 
   const dates = result.events.map(e => e.record.date).sort();
-  assert.deepEqual(dates, ['2026-10-22', '2026-10-26', '2027-03-01']);
-  const forward = calls.find(c => c.from === addCalendarDays(firstTo(date), 1));
-  assert.ok(forward, 'a forward window must be requested');
-  assert.equal(forward.to, addCalendarDays(date, FORWARD_LOOKAHEAD_DAYS));
-  assert.ok(daysBetween(forward.from, forward.to) < 366, 'must stay under the manifest span cap');
+  assert.deepEqual(dates, ['2026-10-22', '2026-10-26', '2027-03-01', '2030-06-15']);
+  const forwardCalls = calls.filter(c => c.from > firstTo(date));
+  assert.ok(forwardCalls.length >= 5, 'five years needs several chunked windows');
+  assert.equal(forwardCalls[0].from, addCalendarDays(firstTo(date), 1));
+  assert.equal(forwardCalls.at(-1).to, addCalendarDays(date, FORWARD_LOOKAHEAD_DAYS));
+  assert.ok(forwardCalls.every(c => daysBetween(c.from, c.to) < 366), 'each request must stay under the manifest span cap');
   // Upcoming items arrive early, not after the whole history walk.
   assert.ok(partials.some(s => s.events.some(e => e.record.date === '2026-10-22')));
+});
+
+test('forward windows are contiguous, never overlap, and end exactly five years out', () => {
+  const date = '2026-10-06';
+  const windows = planForwardWindows(date, firstTo(date));
+  assert.equal(windows[0].from, addCalendarDays(firstTo(date), 1));
+  assert.equal(windows.at(-1).to, addCalendarDays(date, 5 * 365));
+  for (let i = 1; i < windows.length; i += 1) assert.equal(windows[i].from, addCalendarDays(windows[i - 1].to, 1));
+  assert.ok(windows.every(w => daysBetween(w.from, w.to) < 366 && w.from <= w.to));
 });
 
 test('a failing forward window rejects like any other window (no silent missing future)', async () => {
   const date = '2026-10-06';
   const sync = async options => {
-    if (options.from === addCalendarDays(firstTo(date), 1)) throw new Error('forward failed');
+    if (options.from > firstTo(date) && options.from === addCalendarDays(firstTo(date), 1)) throw new Error('forward failed');
     return { files: [], warnings: [], commitSha: 'c'.repeat(40), manifestId: 'm', changed: true, freshness: 'confirmed' };
   };
   await assert.rejects(() => loadLiveEvents({ sync, loadYaml: load, date }), /forward failed/);

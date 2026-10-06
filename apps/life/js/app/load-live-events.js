@@ -24,7 +24,22 @@ const FIRST_EXTENSION_DAYS = 30;
  * history only walks backwards, so without this a visit booked more than two weeks out was saved
  * correctly but never loaded -- it vanished on refresh. Kept under the manifest's 366-day span cap.
  */
-export const FORWARD_LOOKAHEAD_DAYS = 360;
+export const FORWARD_LOOKAHEAD_DAYS = 5 * 365;
+/** One request may span at most 365 days; stay a little under. */
+const FORWARD_CHUNK_DAYS = 360;
+
+/** Contiguous windows from the day after the first window out to FORWARD_LOOKAHEAD_DAYS (5 years). */
+export function planForwardWindows(date, firstTo, lookahead = FORWARD_LOOKAHEAD_DAYS) {
+  const windows = [];
+  const end = addCalendarDays(date, lookahead);
+  let from = addCalendarDays(firstTo, 1);
+  while (from <= end) {
+    const to = addCalendarDays(from, FORWARD_CHUNK_DAYS - 1);
+    windows.push({ from, to: to < end ? to : end });
+    from = addCalendarDays(to, 1);
+  }
+  return windows;
+}
 // The manifest endpoint rejects a span of 366 days or more, so windows stay
 // well under that even as they widen.
 const MAX_EXTENSION_DAYS = 300;
@@ -145,21 +160,23 @@ export async function loadLiveEvents({
     // Future records (booked visits, planned doses) sit beyond the first window and ahead of history.
     // Started after the first history windows so the existing request order is unchanged, and
     // ingested right after the first history window so upcoming items appear early.
-    const forwardFrom = addCalendarDays(to, 1);
-    const forwardTo = addCalendarDays(date, FORWARD_LOOKAHEAD_DAYS);
+    const forwardWindows = planForwardWindows(date, to);
     let forward = null;
     const startForward = () => {
       if (forward) return;
-      forward = sync({ from: forwardFrom, to: forwardTo, lane, validateFile })
-        .then(value => ({ value }), reason => ({ reason }));
+      forward = forwardWindows.map(window => sync({ ...window, lane, validateFile })
+        .then(value => ({ value }), reason => ({ reason })));
     };
+    // Ingested in date order; any failure rejects (a silently missing future is the bug being fixed).
     const settleForward = async () => {
-      const result = await forward;
-      if (result.reason) {
-        await Promise.allSettled(pending.values());
-        throw result.reason;
+      for (const request of forward) {
+        const result = await request;
+        if (result.reason) {
+          await Promise.allSettled([...pending.values(), ...forward]);
+          throw result.reason;
+        }
+        if (ingest(result.value)) await onPartial?.(snapshot());
       }
-      if (ingest(result.value)) await onPartial?.(snapshot());
     };
     if (!windows.length) {
       startForward();
