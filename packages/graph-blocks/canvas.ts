@@ -546,6 +546,9 @@ export function mountCanvas(
       return;
     }
     if (!rename.hidden) endRename();
+    /* The press would otherwise move focus to the canvas after we focus the rename / verb input. */
+    e.preventDefault();
+    host.focus({ preventScroll: true });
     const target = e.target as Element;
     const port = target.closest<SVGGElement>('[data-port]');
     const handle = target.closest('[data-act="add-child"]');
