@@ -620,9 +620,9 @@ function chooseFace(choice) {
   announce(`${faceById(face.id).title}${face.auto ? ', picked for this day' : ''}`);
 }
 
-/** Pilot GMT needs Travel's trips (with each city's time zone). Life only; fetched once a session. */
+/** Pilot GMT needs Travel's trips (with each city's time zone). Every hub; fetched once a session. */
 function loadTrips() {
-  if (trips.status !== 'idle' || typeof input?.apiFetch !== 'function' || (input?.hub || 'life') !== 'life') return;
+  if (trips.status !== 'idle' || typeof input?.apiFetch !== 'function') return;
   trips.status = 'loading';
   const fetchJson = async url => {
     const response = await input.apiFetch(url);
