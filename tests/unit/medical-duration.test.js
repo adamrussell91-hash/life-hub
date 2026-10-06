@@ -80,3 +80,14 @@ test('a long chat title is shortened and the remainder lands in the notes', () =
   assert.match(v.notes, /painful at the injection site/);
   assert.match(v.notes, /Next dose in 8 weeks/);
 });
+
+import { spaceTicks } from '../../apps/life/js/app/medical-strip.js';
+
+test('axis ticks are thinned so labels never run together', () => {
+  const ticks = Array.from({ length: 24 }, (_, i) => ({ label: 'NOV ’25', x: 100 + i * 48 }));
+  const kept = spaceTicks(ticks);
+  for (let i = 1; i < kept.length; i += 1) {
+    assert.ok(kept[i].x - kept[i - 1].x >= 'NOV ’25'.length * 6.8 + 14 - 0.001);
+  }
+  assert.ok(kept.length < ticks.length && kept.length > 4);
+});

@@ -339,7 +339,33 @@ function renderTimeline(root, model, { onSelect, onToggleYear } = {}) {
   if (!host) return;
   host.className = `medical-timeline is-density-${model.density}`;
   host.replaceChildren();
+  host.append(renderLaneLegend(root));
   for (const item of model.items) appendTimelineItem(root, host, item, model, { onSelect, onToggleYear });
+}
+
+/** Colour key for the card edge + timeline dot, so the colour coding is readable. */
+const LANE_LEGEND = [
+  { lane: 'appointment', label: 'Appointment' },
+  { lane: 'lab', label: 'Tests & scans' },
+  { lane: 'prescription', label: 'Medication' },
+  { lane: 'hospital', label: 'Procedure' },
+  { lane: 'therapy', label: 'Therapy' },
+  { lane: 'symptom', label: 'Symptom' }
+];
+
+function renderLaneLegend(root) {
+  const list = root.createElement('ul');
+  list.className = 'medical-legend';
+  list.setAttribute('aria-label', 'Colour key');
+  for (const { lane, label } of LANE_LEGEND) {
+    const item = root.createElement('li');
+    item.className = 'medical-legend__item';
+    item.dataset.lane = lane;
+    item.setAttribute('data-lane', lane);
+    item.textContent = label;
+    list.append(item);
+  }
+  return list;
 }
 
 function appendTimelineItem(root, host, item, model, hooks) {

@@ -393,11 +393,30 @@ function collectRibbonLabelBoxes(lane, zoom, width, y0, railY) {
   return boxes;
 }
 
-function drawAxis(root, svg, zoom, width) {
-  const ticks = monthTicks(zoom);
+/**
+ * Keep only ticks whose labels fit side by side. At year zoom there are two years of
+ * months in ~1000px, so "NOV ’25DEC ’25JAN ’26" ran together.
+ */
+export function spaceTicks(ticks, minGap = (tick) => tick.label.length * 6.8 + 14) {
+  const kept = [];
+  let lastRight = -Infinity;
   for (const tick of ticks) {
-    const x = dateToX(tick.date, zoom, width);
-    if (x < GUTTER || x > width - PAD_R) continue;
+    const half = minGap(tick) / 2;
+    if (tick.x - half < lastRight) continue;
+    kept.push(tick);
+    lastRight = tick.x + half;
+  }
+  return kept;
+}
+
+function drawAxis(root, svg, zoom, width) {
+  const ticks = spaceTicks(
+    monthTicks(zoom)
+      .map(tick => ({ ...tick, x: dateToX(tick.date, zoom, width) }))
+      .filter(tick => tick.x >= GUTTER && tick.x <= width - PAD_R)
+  );
+  for (const tick of ticks) {
+    const x = tick.x;
     const text = svgEl(root, 'text');
     text.setAttribute('data-strip-axis-tick', '1');
     text.setAttribute('x', String(x));
@@ -661,12 +680,13 @@ function drawMarker(root, svg, event, x, y, colour, hooks) {
 }
 
 function placeLabel(root, svg, event, x, y, width, existing, xToday = null) {
-  const short = String(event.title || '').split(/[—-]/)[0].trim().slice(0, 18);
+  const full = String(event.title || '').split(/[—-]/)[0].trim();
+  const short = full.length > 16 ? `${full.slice(0, 15).trim()}…` : full;
   if (!short) return null;
   const nearRight = x > width - PAD_R - 60;
   const nearLeft = x < GUTTER + 40;
   let ty = y - 12;
-  const approxW = short.length * 5.8;
+  const approxW = short.length * 6.4 + 8;
   const makeBox = (topY) => ({
     x: nearRight ? x - approxW : nearLeft ? x : x - approxW / 2,
     y: topY - 10,
