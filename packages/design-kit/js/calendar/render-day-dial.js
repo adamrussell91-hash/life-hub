@@ -673,9 +673,12 @@ function faceSubtitle(date) {
 function mountFaceBar(cell) {
   const def = faceById(face.id);
   const bar = el('div', 'dd-face', undefined, cell, { 'data-part': 'face-bar' });
-  el('button', 'dd__round dd-face__step', ICON.prev, bar, { type: 'button', 'aria-label': 'Previous face', 'data-face-step': '-1' });
-  el('div', 'dd-face__name', `<b>${escapeHtml(def.title)}</b><span>${escapeHtml(faceSubtitle(state.day))}</span>`, bar, { 'data-part': 'face-name', 'aria-live': 'polite' });
-  el('button', 'dd__round dd-face__step', ICON.next, bar, { type: 'button', 'aria-label': 'Next face', 'data-face-step': '1' });
+  // ‹ title › sits in the centre column so the name lines up with the dial;
+  // Auto lives in the trailing 1fr and must not pull the title left.
+  const nav = el('div', 'dd-face__nav', undefined, bar, { 'data-part': 'face-nav' });
+  el('button', 'dd__round dd-face__step', ICON.prev, nav, { type: 'button', 'aria-label': 'Previous face', 'data-face-step': '-1' });
+  el('div', 'dd-face__name', `<b>${escapeHtml(def.title)}</b><span>${escapeHtml(faceSubtitle(state.day))}</span>`, nav, { 'data-part': 'face-name', 'aria-live': 'polite' });
+  el('button', 'dd__round dd-face__step', ICON.next, nav, { type: 'button', 'aria-label': 'Next face', 'data-face-step': '1' });
   el('button', 'dd-face__auto', face.auto ? 'Auto' : 'Auto off', bar, {
     type: 'button',
     'aria-pressed': String(face.auto),
