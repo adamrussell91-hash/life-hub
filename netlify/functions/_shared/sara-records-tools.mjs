@@ -13,6 +13,7 @@ import {
 } from './sara-records.mjs';
 
 export const SARA_RECORD_TOOL_NAMES = [
+  'create_health_task',
   'list_medical_visits',
   'get_medical_visit',
   'update_medical_visit',
@@ -28,6 +29,24 @@ const IDS_NOTE = 'Use the id from list_medical_visits / search_medical_records r
 
 export function saraRecordToolSchemas() {
   return [
+    {
+      name: 'create_health_task',
+      description:
+        'Create a Tasks Hub task (domain health) for something Adam has to do about his health: book a visit or test, repeat bloods, collect a script, ask a clinician. One task per action. Pass visit_id to link it to the visit (a to_book visit, say) on the same Confirm card. Always needs Adam\'s Confirm. Give a due_date for retests and bookings so they surface.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Short action, e.g. "Book MRCP".' },
+          due_date: { type: 'string', description: 'YYYY-MM-DD. Set for bookings and retests.' },
+          due_time: { type: 'string', description: 'HH:MM 24-hour (optional).' },
+          estimated_duration: { type: 'number', description: 'Minutes (optional).' },
+          description: { type: 'string', description: 'What to do and why, one or two lines.' },
+          priority: { type: 'string', enum: ['low', 'medium', 'high'] },
+          visit_id: { type: 'string', description: 'Link this task to a Medical Overview visit.' }
+        },
+        required: ['title']
+      }
+    },
     {
       name: 'list_medical_visits',
       description:
@@ -109,6 +128,30 @@ export function saraRecordToolSchemas() {
   ];
 }
 
+const newId = prefix => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+function buildHealthTask(args, nowIso) {
+  const record = {
+    schema_version: 1,
+    id: newId('task'),
+    kind: 'task',
+    bucket: 'active',
+    status: 'open',
+    priority: ['low', 'medium', 'high'].includes(args.priority) ? args.priority : 'medium',
+    domain: 'health',
+    title: String(args.title).trim(),
+    description: typeof args.description === 'string' ? args.description : '',
+    tags: ['health', 'sara'],
+    created_at: nowIso,
+    completed_at: null,
+    source: 'sara_chat'
+  };
+  if (typeof args.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.due_date.trim())) record.due_date = args.due_date.trim();
+  if (typeof args.due_time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(args.due_time.trim())) record.due_time = args.due_time.trim();
+  if (Number.isFinite(Number(args.estimated_duration)) && Number(args.estimated_duration) > 0) record.estimated_duration = Number(args.estimated_duration);
+  return record;
+}
+
 const eventById = (events, id) => (events ?? []).find(event => event?.record?.type === 'medical' && event.record.id === id);
 
 const diffText = diff => diff.map(d => `${d.field}: ${d.from ?? '—'} → ${d.to ?? '—'}`).join('; ');
@@ -158,6 +201,26 @@ export async function executeSaraRecordTool(name, input = {}, ctx = {}) {
       ...(pendingId ? { pendingId } : {})
     };
   };
+
+  if (name === 'create_health_task') {
+    const title = typeof args.title === 'string' ? args.title.trim() : '';
+    if (!title) return { ok: false, error: 'missing_title' };
+    const record = buildHealthTask(args, nowIso);
+    const writes = [{ path: `tasks:task:${record.id}`, mode: 'create', content: JSON.stringify(record, null, 2), diff: `new task "${title}"${record.due_date ? ` due ${record.due_date}` : ''}` }];
+    const reads = [];
+    const visitId = typeof args.visit_id === 'string' ? args.visit_id.trim() : '';
+    if (visitId) {
+      const existing = eventById(medicalEvents, visitId);
+      if (!existing) return { ok: false, error: 'unknown_visit_id' };
+      const link = planVisitUpdate(existing, { task_id: record.id }, { nowIso, today });
+      if (link.ok && !link.noop) {
+        writes.push({ path: link.newPath, mode: 'overwrite', content: link.content, diff: `link visit to task ${record.id}` });
+        reads.push(link.oldPath);
+      }
+    }
+    const result = await proposeStructural({ intent: `Create task: ${title}`, reads, writes });
+    return result.ok ? { ...result, task_id: record.id } : result;
+  }
 
   if (name === 'update_medical_visit') {
     const existing = eventById(medicalEvents, String(args.visit_id ?? '').trim());

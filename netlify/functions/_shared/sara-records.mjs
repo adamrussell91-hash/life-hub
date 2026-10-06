@@ -206,7 +206,7 @@ export function planVisitUpdate(existing, changes = {}, { nowIso, today } = {}) 
   if (has('weight')) {
     if (!WEIGHTS.includes(changes.weight)) errors.push(`weight must be one of ${WEIGHTS.join(', ')}`); else set('weight', changes.weight);
   }
-  for (const field of ['provider', 'location', 'insurance_status']) {
+  for (const field of ['provider', 'location', 'insurance_status', 'task_id']) {
     if (has(field)) set(field, text(changes[field]));
   }
   if (has('follow_up_date')) {

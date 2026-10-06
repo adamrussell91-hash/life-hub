@@ -97,3 +97,20 @@ test('reads go through the same dispatch', async () => {
   const one = await executeSaraRecordTool('get_medical_visit', { visit_id: 'gp-2026-10-26' }, h.ctx);
   assert.equal(one.possible_duplicates.length, 2);
 });
+
+test('create_health_task proposes one health task, linked to its visit on the same card', async () => {
+  const h = harness();
+  const r = await executeSaraRecordTool('create_health_task', { title: 'Book MRCP', due_date: '2026-10-20', visit_id: 'mrcp', estimated_duration: 10 }, h.ctx);
+  assert.equal(r.status, 'awaiting_confirm');
+  assert.match(r.task_id, /^task_/);
+  const [p] = h.proposed;
+  assert.equal(p.writes.length, 2);
+  const task = JSON.parse(p.writes[0].content);
+  assert.equal(task.domain, 'health');
+  assert.equal(task.due_date, '2026-10-20');
+  assert.equal(task.estimated_duration, 10);
+  assert.match(p.writes[0].path, /^tasks:task:task_/);
+  assert.match(p.writes[1].content, new RegExp(`task_id: "${r.task_id}"`));
+  assert.equal((await executeSaraRecordTool('create_health_task', { title: '' }, h.ctx)).error, 'missing_title');
+  assert.equal((await executeSaraRecordTool('create_health_task', { title: 'x', visit_id: 'nope' }, h.ctx)).error, 'unknown_visit_id');
+});
