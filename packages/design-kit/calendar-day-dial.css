@@ -216,11 +216,12 @@
 /* Watch faces (js/calendar/dial-faces.js, dial-complications.js; mockup: docs/capacity-forecast-handoff/mockups/dial-complications.html). */
 .dd{--dd-gold:#b8913a;--dd-gmt:var(--wave);--dd-corey:#c4566a;--wx-clear:#e9b949;--wx-steady:#7fb8a4;--wx-wind:#5fb3bd;--wx-cloud:#a7adb6;--wx-fog:#b5a9c9;--wx-rain:#5f8fc9;--wx-storm:#6b4a7a;--wx-recovery:#6cc4a4;--wx-evening:#7d84c9}
 .dd__dialcell{gap:var(--space-2);justify-items:center;align-content:start}
-.dd-face{display:flex;align-items:center;gap:var(--space-2);width:100%;max-width:30rem;padding:0 var(--space-3);flex-wrap:wrap}
-.dd-face__name{flex:1;min-width:0;display:grid;line-height:1.2;text-align:center}
+.dd-face{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;column-gap:var(--space-2);width:100%;max-width:30rem;padding:0 var(--space-3);box-sizing:border-box}
+.dd-face__nav{grid-column:2;display:flex;align-items:center;justify-content:center;gap:var(--space-2);min-width:0;max-width:100%}
+.dd-face__name{min-width:0;display:grid;line-height:1.2;text-align:center}
 .dd-face__name b{font-size:var(--text-md);color:var(--navy);font-weight:var(--weight-semibold)}
 .dd-face__name span{font-size:var(--text-xs);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dd-face__auto{font:inherit;font-size:var(--text-xs);font-weight:600;padding:4px 10px;min-height:32px;border-radius:var(--radius-full);border:0;background:color-mix(in srgb,var(--wave) 12%,#fff);color:var(--navy);cursor:pointer}
+.dd-face__auto{grid-column:3;justify-self:end;font:inherit;font-size:var(--text-xs);font-weight:600;padding:4px 10px;min-height:32px;border-radius:var(--radius-full);border:0;background:color-mix(in srgb,var(--wave) 12%,#fff);color:var(--navy);cursor:pointer;white-space:nowrap}
 .dd-face__auto[aria-pressed="false"]{background:transparent;border:1px dashed var(--line);color:var(--muted)}
 .dd-face__auto:focus-visible,.dd-face__dots button:focus-visible,.dd-gauge-btn:focus-visible{outline:2px solid var(--wave);outline-offset:2px}
 .dd-face__dots{display:flex;justify-content:center;gap:8px}
@@ -279,7 +280,7 @@
 .dd-fx-corey-eve{fill:var(--dd-corey);fill-opacity:.6}.dd-fx-corey-dot{fill:var(--dd-corey)}
 .dd-fx-corey-c{font-size:8px;font-weight:700;fill:#fff;text-anchor:middle}
 @media (prefers-reduced-motion:reduce){.dd-watch__front,.dd-watch__back{transition:none}.dd-fx-tb-cage.is-spinning{animation:none}.dd-face__dots button::before{transition:none}}
-/* The phone nav rule pulls every .dd__round to the front; the face bar keeps ‹ name › order. */
-.dd-face > .dd__round{order:0}
+/* Phone zoom-bar sets order:-1 on every .dd__round; keep ‹ title › here. */
+.dd-face__nav > .dd-face__step{order:0}
 /* The caseback reuses the readiness chart, whose line colours live on .rf. */
 .dd-cb{--rf-clear:#d9801c;--rf-steady:#3f9460;--rf-wind:#1c8f9d;--rf-cloud:#6e8199;--rf-fog:#8178ab;--rf-rain:#3b7dd8;--rf-storm:#5b4c9c;--rf-recovery:#2e9c7a;--rf-evening:#5a63b5}
