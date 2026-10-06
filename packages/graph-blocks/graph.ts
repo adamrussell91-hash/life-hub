@@ -66,6 +66,20 @@ export function nextId(prefix: string, taken: Iterable<string>): string {
 export const esc = (s: string): string =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
+/** Some generated mind maps only say who hangs off whom through edges; read those as parents. */
+export function withParents(kind: GraphKind, content: GraphContent): GraphContent {
+  if (kind !== 'mind') return content;
+  const ids = new Set(content.nodes.map((n) => n.id));
+  const parentOf = new Map<string, string>();
+  for (const e of content.edges ?? []) if (ids.has(e.from) && e.from !== e.to && !parentOf.has(e.to)) parentOf.set(e.to, e.from);
+  if (!content.nodes.some((n) => n.parent_id == null && parentOf.has(n.id))) return content;
+  const root = content.nodes.find((n) => n.parent_id == null && !parentOf.has(n.id));
+  return {
+    ...content,
+    nodes: content.nodes.map((n) => (n.parent_id == null && n !== root && parentOf.has(n.id) ? { ...n, parent_id: parentOf.get(n.id)! } : n))
+  };
+}
+
 /* ── Tree ── */
 
 export type TreeNode = GraphNode & { kids: TreeNode[]; depth: number; branch: Colour | 'navy' };

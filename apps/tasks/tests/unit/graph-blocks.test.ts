@@ -4,7 +4,7 @@ import { createBlockEditor } from '@/blocks/editors';
 import { renderBlock } from '@/blocks/render';
 import { BlockSchema } from '@/schemas/block';
 import type { Block } from '@/schemas/block';
-import { buildTree, colourOf, modeOf, type GraphContent } from '../../../../packages/graph-blocks/graph';
+import { buildTree, colourOf, modeOf, withParents, type GraphContent } from '../../../../packages/graph-blocks/graph';
 
 type MindBlock = Extract<Block, { block_type: 'mind_map' }>;
 type ConceptBlock = Extract<Block, { block_type: 'concept_map' }>;
@@ -69,6 +69,27 @@ describe('graph model', () => {
     const ids = (n: typeof root): string[] => [n.id, ...n.kids.flatMap(ids)];
     expect(ids(root).sort()).toEqual(['a', 'b', 'c', 'x', 'y']);
     expect(root.kids.map((k) => k.id)).toEqual(['c', 'b', 'x']);
+  });
+
+  it('reads parents from edges when a generated mind map leaves parent_id out', () => {
+    const content = withParents('mind', {
+      nodes: [
+        { id: 'r', label: 'Cheese' },
+        { id: 'a', label: 'Soft' },
+        { id: 'b', label: 'Brie' }
+      ],
+      edges: [
+        { id: 'e1', from: 'r', to: 'a' },
+        { id: 'e2', from: 'a', to: 'b' }
+      ]
+    });
+    expect(content.nodes.map((n) => n.parent_id ?? null)).toEqual([null, 'r', 'a']);
+    const { latest } = mountEditor(mindBlock(content));
+    const row = document.querySelectorAll<HTMLInputElement>('.graph-outline__input')[2]!;
+    expect(row.closest<HTMLElement>('.graph-outline__row')!.dataset.d).toBe('2');
+    row.value = 'Camembert';
+    row.dispatchEvent(new Event('input'));
+    expect(latest().content.nodes[2]).toMatchObject({ label: 'Camembert', parent_id: 'a' });
   });
 
   it('opens fully placed concept maps on the canvas and everything else as an outline', () => {

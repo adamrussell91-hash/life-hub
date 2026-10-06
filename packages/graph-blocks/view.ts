@@ -1,4 +1,4 @@
-import { drawForRoom, svgMarkup, type GraphContent, type GraphKind, type Scene } from './graph';
+import { drawForRoom, svgMarkup, withParents, type GraphContent, type GraphKind, type Scene } from './graph';
 
 type PaintState = Parameters<typeof drawForRoom>[3];
 
@@ -87,7 +87,8 @@ export function openFullView(kind: GraphKind, content: GraphContent): void {
 }
 
 /** Read-only picture of a block: the student view, the teacher preview and print all use this. */
-export function renderGraphView(host: HTMLElement, kind: GraphKind, content: GraphContent): void {
+export function renderGraphView(host: HTMLElement, kind: GraphKind, block: GraphContent): void {
+  const content = withParents(kind, block);
   const stage = document.createElement('div');
   stage.className = 'graph-stage graph-stage--read';
   stage.dataset.kind = kind;

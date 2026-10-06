@@ -1,6 +1,6 @@
 import './graph-blocks.css';
 import { mountCanvas } from './canvas';
-import { modeOf, type GraphContent, type GraphKind, type GraphMode } from './graph';
+import { modeOf, withParents, type GraphContent, type GraphKind, type GraphMode } from './graph';
 import { mountOutline, type EditorHandle } from './outline';
 
 export { renderGraphView } from './view';
@@ -27,11 +27,11 @@ const MODES: Array<{ mode: GraphMode; label: string; hint: string }> = [
  */
 export function mountGraphEditor(host: HTMLElement, opts: GraphEditorOptions): EditorHandle {
   const { kind, idPrefix } = opts;
-  let content: GraphContent = {
+  let content: GraphContent = withParents(kind, {
     ...opts.content,
     nodes: opts.content.nodes.map((n) => ({ ...n })),
     edges: (opts.content.edges ?? []).map((e) => ({ ...e }))
-  };
+  });
   let mode = modeOf(kind, content);
   let body: EditorHandle | null = null;
 
