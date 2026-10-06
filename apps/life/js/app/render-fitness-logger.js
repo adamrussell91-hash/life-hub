@@ -14,6 +14,7 @@ import {
   createMorphingValuesPopover
 } from '../../../../packages/design-kit/js/morphing-popover.js';
 import { describeSet, resolveTrackingType } from '../core/exercise-tracking.js';
+import { compareToGhost, ghostForSet } from './fitness-progression.js';
 import {
   blockMemberCode,
   formatBlockResult,
@@ -120,7 +121,7 @@ function setFields(exercise) {
   ];
 }
 
-function stepper(root, { exercise, set, exerciseIndex, setIndex, spec, compact = false, actions }) {
+function stepper(root, { exercise, set, exerciseIndex, setIndex, spec, compact = false, actions, onCommitted = null }) {
   const wrap = el(root, 'div', {
     className: `gym-stepper${compact ? ' gym-stepper--compact' : ''}${spec.optional ? ' gym-stepper--optional' : ''}`,
     data: { field: spec.field }
@@ -137,6 +138,7 @@ function stepper(root, { exercise, set, exerciseIndex, setIndex, spec, compact =
   const commit = value => {
     const next = Math.max(0, Math.round(Number(value) * 100) / 100);
     actions.setField?.(exerciseIndex, setIndex, spec.field, Number.isFinite(next) ? next : 0);
+    onCommitted?.();
   };
   input.addEventListener('input', () => {
     if (input.value === '') return;
@@ -433,7 +435,68 @@ function renderSetDots(root, draft, { exerciseIndex, setIndex, actions }) {
   return row;
 }
 
-function renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, actions }) {
+function describeGhostSet(ghost, exercise) {
+  const tracking = resolveTrackingType(exercise);
+  const text = describeSet(ghost, tracking) || `${formatNumber(ghost.weight_kg)} kg × ${ghost.reps ?? '—'}`;
+  return ghost.failed ? `${text} (failure)` : text;
+}
+
+function verdictText(result) {
+  if (!result) return '';
+  if (result.verdict === 'beat') return `Beating it: ${result.label}`;
+  if (result.verdict === 'matched') return 'Level with it — one more rep beats it';
+  return `Behind it: ${result.label}`;
+}
+
+/** Ghost mode: the same set from last time, with a live verdict as you adjust. */
+function renderGhost(root, { exercise, set, setIndex, previous }) {
+  const ghost = ghostForSet(previous, setIndex);
+  if (!ghost) return null;
+  const tracking = resolveTrackingType(exercise);
+  const wrap = el(root, 'div', { className: 'gym-ghost', data: { fitnessLogger: 'ghost' } });
+  const date = formatShortDate(previous.date);
+  wrap.append(el(root, 'p', {
+    className: 'gym-ghost__line',
+    text: `Ghost · set ${setIndex + 1} last time${date ? ` (${date})` : ''}: ${describeGhostSet(ghost, exercise)}`
+  }));
+  const verdict = el(root, 'p', { className: 'gym-ghost__verdict', data: { fitnessLogger: 'ghost-verdict' } });
+  const update = () => {
+    const result = compareToGhost(set, ghost, tracking);
+    verdict.textContent = verdictText(result);
+    verdict.dataset.verdict = result?.verdict ?? '';
+    wrap.dataset.verdict = result?.verdict ?? '';
+  };
+  update();
+  wrap.append(verdict);
+  return { node: wrap, update };
+}
+
+function renderTarget(root, { exercise, set, exerciseIndex, setIndex, target, actions }) {
+  if (!target || set?.done) return null;
+  const tracking = resolveTrackingType(exercise);
+  const weighted = tracking === 'weighted';
+  const label = weighted ? `${formatNumber(target.weight_kg)} kg × ${target.reps}` : `${target.reps} reps`;
+  const wrap = el(root, 'div', { className: `gym-target gym-target--${target.action}`, data: { fitnessLogger: 'target' } });
+  const copy = el(root, 'div', { className: 'gym-target__copy' });
+  copy.append(
+    el(root, 'strong', { text: `Target ${label}` }),
+    el(root, 'span', { text: target.reason })
+  );
+  wrap.append(copy);
+  const already = (weighted ? Number(set?.weight_kg) === target.weight_kg : true) && Number(set?.reps) === target.reps;
+  if (!already) {
+    wrap.append(button(root, {
+      className: 'gym-chip gym-chip--strong',
+      text: 'Use',
+      marker: 'use-target',
+      label: `Use target ${label}`,
+      onClick: () => actions.applyTarget?.(exerciseIndex, setIndex)
+    }));
+  }
+  return wrap;
+}
+
+function renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, targetFor, actions }) {
   const { exerciseIndex, setIndex } = step.members[0];
   const exercise = draft.exercises?.[exerciseIndex];
   const set = exercise?.sets?.[setIndex];
@@ -461,10 +524,15 @@ function renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, ac
     }));
   }
 
-  const previous = describeLastTime(lastTimeFor(lastPerformance, exercise), exercise);
-  if (previous) {
+  const previousEntry = lastTimeFor(lastPerformance, exercise);
+  const previous = describeLastTime(previousEntry, exercise);
+  const ghost = set ? renderGhost(root, { exercise, set, setIndex, previous: previousEntry }) : null;
+  if (ghost) card.append(ghost.node);
+  else if (previous) {
     card.append(el(root, 'p', { className: 'gym-card__last', text: `Last time: ${previous}`, data: { fitnessLogger: 'last-time' } }));
   }
+  const target = set && targetFor ? renderTarget(root, { exercise, set, exerciseIndex, setIndex, target: targetFor(exerciseIndex, setIndex), actions }) : null;
+  if (target) card.append(target);
 
   if (!set) {
     card.append(el(root, 'p', { className: 'gym-card__empty', text: 'No sets planned for this move yet.' }));
@@ -479,7 +547,7 @@ function renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, ac
 
   const fields = el(root, 'div', { className: 'gym-card__fields' });
   for (const spec of setFields(exercise)) {
-    fields.append(stepper(root, { exercise, set, exerciseIndex, setIndex, spec, actions }));
+    fields.append(stepper(root, { exercise, set, exerciseIndex, setIndex, spec, actions, onCommitted: ghost?.update }));
   }
   card.append(fields);
 
@@ -929,6 +997,8 @@ export function renderFitnessLogger(root, draft, {
   rest = null,
   circuits = {},
   lastPerformance = null,
+  celebration = null,
+  targetFor = null,
   actions = {}
 } = {}) {
   const host = root.querySelector('#fitness-logger');
@@ -1003,6 +1073,18 @@ export function renderFitnessLogger(root, draft, {
 
   const stage = el(root, 'main', { className: 'gym__stage', data: { fitnessLogger: 'stage' } });
   const step = steps[stepIndex];
+  if (celebration) {
+    const moment = el(root, 'section', {
+      className: `gym-moment gym-moment--${celebration.kind}`,
+      data: { fitnessLogger: 'celebration', kind: celebration.kind },
+      attrs: { role: 'status', 'aria-live': 'assertive' }
+    });
+    moment.append(
+      el(root, 'p', { className: 'gym-moment__title', text: celebration.title }),
+      el(root, 'p', { className: 'gym-moment__detail', text: celebration.detail })
+    );
+    stage.append(moment);
+  }
   if (rest && rest.remainingMs > 0) stage.append(renderRest(root, rest, actions));
   const block = step ? blocks[step.blockIndex] : null;
   if (block && isGroupedBlock(block)) {
@@ -1016,7 +1098,7 @@ export function renderFitnessLogger(root, draft, {
   } else if (step.kind === 'round') {
     stage.append(renderRoundCard(root, draft, { step, block, noteOpen, actions }));
   } else {
-    stage.append(renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, actions }));
+    stage.append(renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, targetFor, actions }));
   }
   const upcoming = steps[stepIndex + 1];
   if (upcoming) {
@@ -1036,6 +1118,150 @@ export function renderFitnessLogger(root, draft, {
 
   if (panel === 'plan') shell.append(renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, actions }));
 
+  layer.append(shell);
+}
+
+function reportLayer(root) {
+  const body = ownerDoc(root)?.body;
+  if (!body?.append || typeof root.querySelector !== 'function') return root.querySelector?.('#fitness-logger') ?? null;
+  let layer = root.querySelector('#fitness-report');
+  if (!layer) {
+    layer = root.createElement('div');
+    layer.id = 'fitness-report';
+    layer.className = 'gym gym-report-layer';
+    body.append(layer);
+  }
+  return layer;
+}
+
+function statTile(root, value, label) {
+  const tile = el(root, 'div', { className: 'pump-stat' });
+  tile.append(el(root, 'strong', { text: value }), el(root, 'span', { text: label }));
+  return tile;
+}
+
+/** Build Board bars: done before today (solid) + today's sets (bright). */
+export function renderBuildBoardRows(root, rows, { live = true } = {}) {
+  const list = el(root, 'ol', { className: 'build-board', data: { fitnessLogger: 'build-board' } });
+  for (const row of rows ?? []) {
+    const today = live ? (row.today ?? 0) : 0;
+    const total = row.done + today;
+    const item = el(root, 'li', { className: `build-board__row${total >= row.target ? ' is-hit' : ''}` });
+    const head = el(root, 'div', { className: 'build-board__head' });
+    head.append(
+      el(root, 'span', { className: 'build-board__label', text: row.label }),
+      el(root, 'span', {
+        className: 'build-board__count',
+        text: `${total}/${row.target}${today ? ` (+${today} today)` : ''}${total >= row.target ? ' ✓' : ''}`
+      })
+    );
+    const bar = el(root, 'div', { className: 'build-board__bar', attrs: { role: 'presentation' } });
+    const before = el(root, 'span', { className: 'build-board__fill' });
+    const now = el(root, 'span', { className: 'build-board__fill build-board__fill--today' });
+    if (before.style?.setProperty) {
+      before.style.setProperty('--w', `${Math.min(100, (row.done / row.target) * 100)}%`);
+      now.style.setProperty('--w', `${Math.max(0, Math.min(100 - (row.done / row.target) * 100, (today / row.target) * 100))}%`);
+    }
+    bar.append(before, now);
+    item.append(head, bar);
+    list.append(item);
+  }
+  return list;
+}
+
+/**
+ * The Pump Report — the end of the session is what you remember (peak-end),
+ * so it ends on everything you won. Pass null to close.
+ */
+export function renderPumpReport(root, report, { onClose } = {}) {
+  const layer = reportLayer(root);
+  if (!layer) return;
+  const body = ownerDoc(root)?.body;
+  if (!report) {
+    layer.replaceChildren();
+    layer.setAttribute?.('hidden', '');
+    body?.classList?.toggle?.('is-gym-mode', false);
+    return;
+  }
+  layer.replaceChildren();
+  layer.removeAttribute?.('hidden');
+  body?.classList?.toggle?.('is-gym-mode', true);
+
+  const shell = el(root, 'div', {
+    className: 'gym__shell pump',
+    data: { fitnessLogger: 'pump-report' },
+    attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Pump report' }
+  });
+  const stage = el(root, 'main', { className: 'gym__stage pump__stage' });
+  const hero = el(root, 'header', { className: 'pump__hero' });
+  hero.append(
+    el(root, 'p', { className: 'pump__eyebrow', text: 'PUMP REPORT' }),
+    el(root, 'h2', { className: 'pump__title', text: report.title })
+  );
+  if (report.ghostsRaced) {
+    hero.append(el(root, 'p', {
+      className: 'pump__ghosts',
+      text: `Beat your ghost on ${report.ghostsBeaten} of ${report.ghostsRaced} sets`,
+      data: { fitnessLogger: 'pump-ghosts' }
+    }));
+  }
+  stage.append(hero);
+
+  const quote = el(root, 'blockquote', { className: 'pump__chadwick', data: { fitnessLogger: 'pump-chadwick' } });
+  quote.append(el(root, 'p', { text: report.chadwick }), el(root, 'cite', { text: 'Chadwick' }));
+  stage.append(quote);
+
+  const stats = el(root, 'div', { className: 'pump__stats' });
+  stats.append(statTile(root, `${report.volume.toLocaleString?.('en-AU') ?? report.volume} kg`, report.volumeDeltaPct != null
+    ? `volume · ${report.volumeDeltaPct > 0 ? '+' : ''}${report.volumeDeltaPct}% vs last`
+    : 'volume'));
+  if (report.minutes != null) stats.append(statTile(root, `${report.minutes} min`, 'session'));
+  if (report.density != null) stats.append(statTile(root, `${report.density}`, 'kg per minute'));
+  stats.append(statTile(root, `${report.setsLogged}`, `sets · ${report.failureSets} to failure`));
+  stage.append(stats);
+
+  if (report.prs.length) {
+    const prs = el(root, 'section', { className: 'pump__section pump__prs', data: { fitnessLogger: 'pump-prs' } });
+    prs.append(el(root, 'h3', { text: report.prs.length === 1 ? 'Personal best' : `${report.prs.length} personal bests` }));
+    const list = el(root, 'ul');
+    for (const pr of report.prs) list.append(el(root, 'li', { text: `${pr.name} — ${pr.label}` }));
+    prs.append(list);
+    stage.append(prs);
+  }
+  if (report.beats.length) {
+    const beats = el(root, 'section', { className: 'pump__section' });
+    beats.append(el(root, 'h3', { text: 'Ghosts beaten' }));
+    const list = el(root, 'ul');
+    for (const beat of report.beats) list.append(el(root, 'li', { text: `${beat.name} · ${beat.label}` }));
+    beats.append(list);
+    stage.append(beats);
+  }
+  if (report.circuits.length) {
+    const circuits = el(root, 'section', { className: 'pump__section' });
+    circuits.append(el(root, 'h3', { text: 'Circuits' }));
+    const list = el(root, 'ul');
+    for (const circuit of report.circuits) {
+      list.append(el(root, 'li', { text: `${circuit.name}: ${formatBlockResult({ result: circuit.result })}` }));
+    }
+    circuits.append(list);
+    stage.append(circuits);
+  }
+  if (report.buildBoard.length) {
+    const board = el(root, 'section', { className: 'pump__section' });
+    board.append(el(root, 'h3', { text: 'Build Board · this week' }));
+    board.append(renderBuildBoardRows(root, report.buildBoard));
+    stage.append(board);
+  }
+  shell.append(stage);
+
+  const dock = el(root, 'footer', { className: 'gym__dock pump__dock', data: { part: 'form-actions' } });
+  dock.append(button(root, {
+    className: 'gym__primary',
+    text: 'Done',
+    marker: 'close-report',
+    onClick: () => onClose?.()
+  }));
+  shell.append(dock);
   layer.append(shell);
 }
 

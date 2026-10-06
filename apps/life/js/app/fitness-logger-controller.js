@@ -13,7 +13,16 @@ import {
   saveDraft,
   toConfirmPayload
 } from './fitness-logger-draft.js';
-import { hideFitnessLogger, renderFitnessLogger, updateLoggerChrome } from './render-fitness-logger.js';
+import { hideFitnessLogger, renderFitnessLogger, renderPumpReport, updateLoggerChrome } from './render-fitness-logger.js';
+import {
+  buildPumpReport,
+  compareToGhost,
+  detectPersonalBest,
+  exerciseKey,
+  ghostForSet,
+  suggestTarget
+} from './fitness-progression.js';
+import { resolveTrackingType } from '../core/exercise-tracking.js';
 import { DEFAULT_REST_SEC, buildLoggerSteps } from '../core/workout-plan-groups.js';
 
 const NUMERIC_SET_FIELDS = ['reps', 'weight_kg', 'duration_sec', 'time_cap_sec'];
@@ -63,6 +72,11 @@ export function createFitnessLoggerController({
   let rest = null; // { endsAt, cue }
   let restTimerId = null;
   let lastPerformance = null;
+  let motivation = { exerciseBests: null, buildBoard: null, lastSessionVolume: null, libraryByName: null };
+  let sessionBests = {};
+  let celebration = null; // { kind, title, detail }
+  let celebrationTimerId = null;
+  let lastReport = null;
   const circuits = new Map(); // blockIndex → { accumulatedMs, startedAt }
   let layout = { blocks: [], steps: [] };
 
@@ -481,6 +495,85 @@ export function createFitnessLoggerController({
     touchDraft({ rerenderAfter: true });
   }
 
+  // ── Ghosts, PRs, targets ───────────────────────────────────────────────
+
+  function previousFor(exercise) {
+    return lastPerformance?.[exerciseKey(exercise?.name)] ?? null;
+  }
+
+  function celebrate(next) {
+    celebration = next;
+    if (celebrationTimerId != null) clearTimeoutImpl(celebrationTimerId);
+    celebrationTimerId = setTimeoutImpl(() => {
+      celebrationTimerId = null;
+      celebration = null;
+      rerender();
+    }, 4000);
+  }
+
+  /** Race each ticked set against its ghost and the all-time best. */
+  function judgeStep(step) {
+    let headline = null;
+    for (const { exerciseIndex, setIndex } of step.members) {
+      const exercise = draft.exercises?.[exerciseIndex];
+      const set = exercise?.sets?.[setIndex];
+      if (!set) continue;
+      const tracking = resolveTrackingType(exercise);
+      const key = exerciseKey(exercise.name);
+      const best = sessionBests[key];
+      const pr = detectPersonalBest(set, best, tracking);
+      if (pr) {
+        const kg = Number(set.weight_kg) || 0;
+        const reps = Number(set.reps) || 0;
+        sessionBests[key] = {
+          ...(best ?? {}),
+          maxKg: Math.max(best?.maxKg ?? 0, kg),
+          maxE1rm: Math.max(best?.maxE1rm ?? 0, kg * (1 + reps / 30)),
+          maxReps: Math.max(best?.maxReps ?? 0, reps),
+          maxSec: Math.max(best?.maxSec ?? 0, Number(set.duration_sec) || 0)
+        };
+        headline = { kind: 'pr', title: 'PERSONAL BEST', detail: `${exercise.name} — ${pr.label}` };
+        continue;
+      }
+      const result = compareToGhost(set, ghostForSet(previousFor(exercise), setIndex), tracking);
+      if (result?.verdict === 'beat' && headline?.kind !== 'pr') {
+        headline = { kind: 'beat', title: 'GHOST BEATEN', detail: `${exercise.name} · ${result.label} on last time` };
+      } else if (result?.verdict === 'matched' && !headline) {
+        headline = { kind: 'matched', title: 'Matched your ghost', detail: `${exercise.name} — next time, one more` };
+      }
+    }
+    if (!headline) return;
+    celebrate(headline);
+    if (headline.kind === 'pr') vibrate([60, 40, 60, 40, 220]);
+    else if (headline.kind === 'beat') vibrate([40, 30, 90]);
+  }
+
+  /**
+   * The auto-target belongs on the working (top-weight) sets only — a pyramid's
+   * 30 kg opener is not where 38 kg × 9 goes. Without a set index, any set.
+   */
+  function targetFor(exerciseIndex, setIndex = null) {
+    const exercise = draft?.exercises?.[exerciseIndex];
+    if (!exercise) return null;
+    if (setIndex != null && resolveTrackingType(exercise) === 'weighted') {
+      const top = Math.max(0, ...(exercise.sets ?? []).map(set => Number(set?.weight_kg) || 0));
+      if ((Number(exercise.sets?.[setIndex]?.weight_kg) || 0) < top) return null;
+    }
+    return suggestTarget(previousFor(exercise), exercise);
+  }
+
+  /** One tap: put the auto-target on this set (later matching sets follow). */
+  function applyTarget(exerciseIndex, setIndex) {
+    const target = targetFor(exerciseIndex, setIndex);
+    const set = draft?.exercises?.[exerciseIndex]?.sets?.[setIndex];
+    if (!target || !set) return;
+    if (resolveTrackingType(draft.exercises[exerciseIndex]) === 'weighted') {
+      setField(exerciseIndex, setIndex, 'weight_kg', target.weight_kg);
+    }
+    setField(exerciseIndex, setIndex, 'reps', target.reps);
+    rerender();
+  }
+
   // ── Navigation & progress ──────────────────────────────────────────────
 
   function currentMember() {
@@ -528,6 +621,7 @@ export function createFitnessLoggerController({
       const set = draft.exercises?.[exerciseIndex]?.sets?.[setIndex];
       if (set) set.done = true;
     }
+    judgeStep(step);
     if (!everStarted || timerState === 'paused') startTimer({ quiet: true });
 
     const block = layout.blocks[step.blockIndex];
@@ -714,6 +808,7 @@ export function createFitnessLoggerController({
     },
     toggleCircuitClock,
     addRound,
+    applyTarget,
     setCircuitResult,
     finish: () => void finish().catch(() => {}),
     start: () => startTimer(),
@@ -744,6 +839,8 @@ export function createFitnessLoggerController({
       rest: restSnapshot(),
       circuits: circuitState,
       lastPerformance,
+      celebration,
+      targetFor,
       actions
     });
   }
@@ -797,8 +894,18 @@ export function createFitnessLoggerController({
       if (!isOnline()) throw Object.assign(new Error('offline'), { code: 'offline' });
       const payload = toConfirmPayload(draft, { status: 'completed' });
       const result = await chatApi.confirm(payload);
+      const report = buildPumpReport(draft, {
+        lastPerformance,
+        exerciseBests: motivation.exerciseBests,
+        board: motivation.buildBoard,
+        libraryByName: motivation.libraryByName,
+        previousVolume: motivation.lastSessionVolume,
+        elapsedMs: elapsedMs()
+      });
       clearDraft(storage, draft.date, draft.path);
       unmount();
+      lastReport = report;
+      renderPumpReport(root, report, { onClose: () => renderPumpReport(root, null) });
       onSessionWritten?.(result);
       return result;
     } catch (error) {
@@ -817,6 +924,9 @@ export function createFitnessLoggerController({
 
   function unmount({ keepVoice = false } = {}) {
     clearIdle();
+    if (celebrationTimerId != null) clearTimeoutImpl(celebrationTimerId);
+    celebrationTimerId = null;
+    celebration = null;
     resetTimer();
     clearRest();
     circuits.clear();
@@ -838,12 +948,21 @@ export function createFitnessLoggerController({
     if (!keepVoice) voice?.hide?.();
   }
 
-  function mount(session, { lastPerformance: previous = null } = {}) {
+  function mount(session, {
+    lastPerformance: previous = null,
+    exerciseBests = null,
+    buildBoard = null,
+    lastSessionVolume = null,
+    libraryByName = null
+  } = {}) {
     if (!session || session.status !== 'planned') {
       unmount();
       return;
     }
     if (previous) lastPerformance = previous;
+    if (exerciseBests || buildBoard) {
+      motivation = { exerciseBests, buildBoard, lastSessionVolume, libraryByName };
+    }
 
     const nextDraft = resolveDraft(session, storage);
     const sameSession = mountedPath && nextDraft.path && mountedPath === nextDraft.path && draft;
@@ -855,6 +974,7 @@ export function createFitnessLoggerController({
 
     unmount({ keepVoice: true });
     if (previous) lastPerformance = previous;
+    sessionBests = Object.fromEntries(Object.entries(motivation.exerciseBests ?? {}).map(([key, value]) => [key, { ...value }]));
     draft = nextDraft;
     mountedPath = draft.path;
     syncedFingerprint = draftFingerprint(cloneLoggerDraft(session));
@@ -886,6 +1006,10 @@ export function createFitnessLoggerController({
     getSteps: () => layout.steps,
     getView: () => view,
     getRest: restSnapshot,
+    getCelebration: () => celebration,
+    getLastReport: () => lastReport,
+    applyTarget,
+    getTarget: targetFor,
     getTimerState,
     startTimer: () => startTimer(),
     pauseTimer,

@@ -3517,6 +3517,141 @@ body.is-gym-mode { overflow: hidden; }
 }
 .gym-plan__technique .gym-pills { flex-wrap: wrap; }
 
+/* Ghost mode: race last time's same set. */
+.gym-ghost {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px dashed var(--on-dark-line);
+  border-radius: 0.75rem;
+}
+.gym-ghost__line { margin: 0; color: var(--on-dark-muted); font-size: var(--text-sm); }
+.gym-ghost__verdict { margin: 0; font-size: var(--text-sm); font-weight: 750; }
+.gym-ghost[data-verdict="beat"] { border-style: solid; border-color: var(--high-sea); }
+.gym-ghost__verdict[data-verdict="beat"] { color: var(--high-sea); }
+.gym-ghost__verdict[data-verdict="matched"] { color: var(--on-dark); }
+.gym-ghost__verdict[data-verdict="below"] { color: var(--on-dark-muted); }
+
+/* Auto-target: double progression, one tap to use. */
+.gym-target {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  padding: 0.55rem 0.6rem 0.55rem 0.8rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--fitness-accent) 24%, transparent);
+}
+.gym-target--up { background: color-mix(in srgb, var(--high-sea) 22%, transparent); }
+.gym-target__copy { display: grid; gap: 0.1rem; min-width: 0; }
+.gym-target__copy span { color: var(--on-dark-muted); font-size: var(--text-xs); }
+
+/* The moment a set beats the ghost or sets a PR. */
+.gym-moment {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  background: var(--fitness-accent);
+  color: white;
+  text-align: center;
+  animation: gym-moment-in 420ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.gym-moment--pr {
+  background: linear-gradient(135deg, var(--high-sea), color-mix(in srgb, var(--high-sea) 60%, var(--pastel-gold)));
+  color: var(--depth);
+}
+.gym-moment--matched { background: var(--marine); color: var(--on-dark); }
+.gym-moment__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+.gym-moment__detail { margin: 0; font-size: var(--text-sm); font-weight: 600; }
+@keyframes gym-moment-in {
+  from { opacity: 0; transform: scale(0.8) translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Build Board — light on the Fitness card, dark inside gym mode / report. */
+.fitness-build { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+.fitness-build[hidden] { display: none; }
+.build-board { display: grid; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
+.build-board__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+}
+.build-board__label { font-weight: 700; color: var(--depth); }
+.build-board__count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.build-board__row.is-hit .build-board__count { color: var(--success); font-weight: 700; }
+.build-board__bar {
+  display: flex;
+  height: 8px;
+  margin-top: 0.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wave) 12%, transparent);
+}
+.build-board__fill { width: var(--w, 0%); background: var(--fitness-accent); }
+.build-board__fill--today { background: var(--high-sea); }
+.gym .build-board__label { color: var(--on-dark); }
+.gym .build-board__count { color: var(--on-dark-muted); }
+.gym .build-board__row.is-hit .build-board__count { color: var(--high-sea); }
+.gym .build-board__bar { background: var(--on-dark-line); }
+
+/* Pump Report. */
+.gym-report-layer { z-index: 95; }
+.pump { grid-template-rows: minmax(0, 1fr) auto; }
+.pump__stage { padding-top: calc(env(safe-area-inset-top) + 1.25rem); gap: 1rem; }
+.pump__hero { display: grid; gap: 0.25rem; text-align: center; }
+.pump__eyebrow {
+  margin: 0;
+  color: var(--high-sea);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+.pump__title { margin: 0; font-size: clamp(var(--text-lg), 7vw, 2.1rem); line-height: 1.1; }
+.pump__ghosts { margin: 0.2rem 0 0; font-size: var(--text-md); font-weight: 700; }
+.pump__chadwick {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-left: 4px solid var(--fitness-accent);
+  border-radius: 0.8rem;
+  background: var(--marine);
+}
+.pump__chadwick p { margin: 0; font-size: var(--text-md); font-style: italic; line-height: 1.4; }
+.pump__chadwick cite {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--on-dark-muted);
+  font-size: var(--text-xs);
+  font-style: normal;
+  font-weight: 700;
+}
+.pump__stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+.pump-stat {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.75rem;
+  border-radius: 0.8rem;
+  background: var(--marine);
+}
+.pump-stat strong { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+.pump-stat span { color: var(--on-dark-muted); font-size: var(--text-xs); }
+.pump__section { display: grid; gap: 0.45rem; }
+.pump__section h3 { margin: 0; font-size: var(--text-base); }
+.pump__section ul { display: grid; gap: 0.3rem; margin: 0; padding-left: 1.1rem; font-size: var(--text-sm); }
+.pump__prs { padding: 0.8rem 0.9rem; border-radius: 0.9rem; background: color-mix(in srgb, var(--high-sea) 22%, var(--depth)); }
+.pump__dock { grid-template-columns: minmax(0, 1fr); }
+
+@media (prefers-reduced-motion: reduce) {
+  .gym-moment { animation: none; }
+}
+
 /* Minimised: a compact bar on the Fitness card. */
 .gym-mini {
   display: flex;

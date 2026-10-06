@@ -434,3 +434,74 @@ test('removeExercise drops a movement from the draft', () => {
   assert.deepEqual(controller.getDraft().exercises.map(item => item.name), ['Push-Up']);
   controller.destroy();
 });
+
+test('Done on a set that beats its ghost celebrates; a heavier-than-ever set is a PR', () => {
+  const buzz = [];
+  const { controller } = makeController({ vibrate: pattern => buzz.push(pattern) });
+  const plan = session();
+  plan.exercises = [{ name: 'Bench', sets: [
+    { reps: 9, weight_kg: 36, cable_type: 'constant_force' },
+    { reps: 8, weight_kg: 40, cable_type: 'constant_force' }
+  ] }];
+  controller.mount(plan, {
+    lastPerformance: { bench: { date: '2026-08-01', sets: [{ reps: 8, weight_kg: 36 }, { reps: 8, weight_kg: 38 }] } },
+    exerciseBests: { bench: { maxKg: 38, maxE1rm: 38 * (1 + 8 / 30), maxReps: 8, maxSec: 0 } },
+    buildBoard: { weekStart: '2026-08-03', regions: [] }
+  });
+  controller.doneStep();
+  assert.equal(controller.getCelebration().kind, 'beat');
+  assert.match(controller.getCelebration().detail, /\+1 rep/);
+  controller.doneStep();
+  assert.equal(controller.getCelebration().kind, 'pr');
+  assert.match(controller.getCelebration().detail, /Heaviest ever: 40 kg × 8/);
+  assert.equal(buzz.length, 2);
+  controller.destroy();
+});
+
+test('Use target puts the auto-progression on the set and later sets follow', () => {
+  const { controller } = makeController();
+  const plan = session();
+  plan.exercises = [{ name: 'Bench', sets: [
+    { reps: 10, weight_kg: 36, cable_type: 'constant_force' },
+    { reps: 10, weight_kg: 36, cable_type: 'constant_force' }
+  ] }];
+  controller.mount(plan, {
+    lastPerformance: { bench: { sets: [{ reps: 10, weight_kg: 36 }, { reps: 10, weight_kg: 36 }] } }
+  });
+  assert.equal(controller.getTarget(0).action, 'up');
+  controller.applyTarget(0, 0);
+  assert.deepEqual(controller.getDraft().exercises[0].sets.map(set => set.weight_kg), [37, 37]);
+  controller.destroy();
+});
+
+test('a pyramid keeps its opener: the target only lands on top-weight sets', () => {
+  const { controller } = makeController();
+  const plan = session();
+  plan.exercises = [{ name: 'Bench', sets: [
+    { reps: 10, weight_kg: 30, cable_type: 'constant_force' },
+    { reps: 8, weight_kg: 38, cable_type: 'constant_force' }
+  ] }];
+  controller.mount(plan, { lastPerformance: { bench: { sets: [{ reps: 10, weight_kg: 30 }, { reps: 8, weight_kg: 38 }] } } });
+  assert.equal(controller.getTarget(0, 0), null);
+  assert.equal(controller.getTarget(0, 1).weight_kg, 39);
+  controller.destroy();
+});
+
+test('finishing builds a Pump Report from what happened', async () => {
+  const { controller } = makeController();
+  controller.mount(session(), {
+    lastPerformance: { bench: { sets: [{ reps: 7, weight_kg: 36 }] } },
+    exerciseBests: { bench: { maxKg: 40, maxE1rm: 50, maxReps: 10, maxSec: 0 } },
+    buildBoard: { weekStart: '2026-08-03', regions: [{ region: 'chest', label: 'Chest', done: 4, target: 12 }] },
+    lastSessionVolume: 200
+  });
+  controller.doneStep();
+  await controller.finish();
+  const report = controller.getLastReport();
+  assert.equal(report.ghostsBeaten, 1);
+  assert.equal(report.volume, 288);
+  assert.equal(report.volumeDeltaPct, 44);
+  assert.equal(report.buildBoard[0].today, 1);
+  assert.match(report.chadwick, /last week's you|New ground|showed up|more work/);
+  controller.destroy();
+});

@@ -185,18 +185,6 @@ test('a circuit round is one card with every move and a round clock', () => {
   assert.equal(byMarker(root.logger, 'done-step')[0].textContent, 'Round done ✓');
 });
 
-test('last time shows what the move did in the previous session', () => {
-  const root = render(draftWithCues(), {
-    lastPerformance: {
-      bench: { date: '2026-07-30', sets: [{ reps: 10, weight_kg: 34, cable_type: 'constant_force' }, { reps: 7, weight_kg: 36, cable_type: 'constant_force', failed: true }] }
-    }
-  });
-  const last = byMarker(root.logger, 'last-time')[0];
-  assert.match(last.textContent, /^Last time: /);
-  assert.match(last.textContent, /\(failure\)/);
-  assert.match(last.textContent, /30\/07\/26/);
-});
-
 test('the plan sheet keeps add-exercise, reorder, session details and a docked Finish', () => {
   const root = render(draftWithCues(), { panel: 'plan' });
   const sheet = byMarker(root.logger, 'plan-sheet')[0];
@@ -223,4 +211,29 @@ test('minimised gym mode leaves a Back to workout bar on the Fitness card', () =
   const root = render(draftWithCues(), { view: 'docked' });
   assert.equal(byMarker(root.logger, 'gym').length, 0);
   assert.equal(byMarker(root.logger, 'open-gym')[0].textContent, 'Back to workout');
+});
+
+test('ghost mode shows last time\'s same set with a live verdict, plus the target', () => {
+  const draft = draftWithCues(undefined, [{ reps: 8, weight_kg: 36, cable_type: 'constant_force' }]);
+  const root = render(draft, {
+    lastPerformance: { bench: { date: '2026-07-30', sets: [{ reps: 7, weight_kg: 36, failed: true }] } },
+    targetFor: () => ({ action: 'hold', weight_kg: 36, reps: 8, reason: 'Failure at 36 kg last time — stay and own it' }),
+    actions: { setField: (e, s, field, value) => { draft.exercises[e].sets[s][field] = value; } }
+  });
+  const ghost = byMarker(root.logger, 'ghost')[0];
+  assert.match(ghost.children[0].textContent, /Ghost · set 1 last time \(30\/07\/26\): .*36.*(failure)/);
+  const verdict = byMarker(ghost, 'ghost-verdict')[0];
+  assert.equal(verdict.textContent, 'Beating it: +1 rep');
+  byMarker(root.logger, 'less-reps')[0].click();
+  byMarker(root.logger, 'less-reps')[0].click();
+  assert.equal(verdict.textContent, 'Behind it: -1 reps', 'verdict follows the stepper live');
+  const target = byMarker(root.logger, 'target')[0];
+  assert.match(target.children[0].children[0].textContent, /Target 36 kg × 8/);
+});
+
+test('a celebration banner leads the stage', () => {
+  const root = render(draftWithCues(), { celebration: { kind: 'pr', title: 'PERSONAL BEST', detail: 'Bench — Heaviest ever' } });
+  const moment = byMarker(root.logger, 'celebration')[0];
+  assert.equal(moment.dataset.kind, 'pr');
+  assert.equal(moment.children[0].textContent, 'PERSONAL BEST');
 });
