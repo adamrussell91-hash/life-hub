@@ -50,11 +50,38 @@ const DOMAIN_PROPERTIES = {
           equipment: { type: 'string' },
           superset_group: {
             type: 'number',
-            description: 'Exercises sharing the same superset_group are performed back-to-back before resting.'
+            description: 'Exercises sharing the same superset_group form one block and are performed set-for-set, round by round: sets[0] of every member is round 1, sets[1] round 2. Two members = superset (B1 B2, B1 B2…); three or more = circuit. List members next to each other. Never split one move into "set 1 / set 2" entries to fake alternation.'
           },
           superset_label: {
             type: 'string',
-            description: 'Optional card label for the pair, e.g. "1&2 superset".'
+            description: 'Optional short name for the block shown on cards and in the logger, e.g. "Press + Curl" or "Cindy". Put it on the first member.'
+          },
+          block: {
+            type: 'object',
+            description: 'Optional block settings, on the FIRST member of a superset_group only. Omit for a plain superset with default rest.',
+            properties: {
+              kind: { type: 'string', enum: ['superset', 'circuit'], description: 'superset = 2 moves alternated set-for-set; circuit = 3+ moves done back-to-back as a round (e.g. a Cindy-style finisher).' },
+              format: { type: 'string', enum: ['rounds', 'for_time', 'amrap'], description: 'rounds = fixed rounds (= sets per member); for_time = fixed rounds as fast as possible, logger runs a stopwatch; amrap = as many rounds as possible inside time_cap_sec.' },
+              rest_sec: { type: 'number', description: 'Rest after each full round (not between members).' },
+              time_cap_sec: { type: 'number', description: 'amrap / for_time window in seconds.' },
+              result: {
+                type: 'object',
+                description: 'Completed sessions only: what the circuit scored.',
+                properties: {
+                  rounds: { type: 'number' },
+                  extra_reps: { type: 'number', description: 'Reps into the unfinished round (AMRAP "5 + 8").' },
+                  time_sec: { type: 'number', description: 'Total time for the block.' }
+                }
+              }
+            }
+          },
+          rest_sec: {
+            type: 'number',
+            description: 'Optional rest after each set of this exercise (straight sets). Default 90.'
+          },
+          notes: {
+            type: 'string',
+            description: 'Completed sessions: Adam\'s note for this exercise (form, feel, swaps). Keep the session-level notes for the whole-day story.'
           },
           between_sets: {
             type: 'object',
@@ -102,6 +129,8 @@ const DOMAIN_PROPERTIES = {
                 weight_kg: { type: 'number', description: 'Load in kg. Required for weighted sets; optional added load otherwise.' },
                 duration_sec: { type: 'number', description: 'timed sets: hold / work time in seconds.' },
                 time_cap_sec: { type: 'number', description: 'reps_in_time sets: the window in seconds (e.g. 60).' },
+                failed: { type: 'boolean', description: 'Completed sessions: true when Adam hit failure on this set. Only set on the set where it happened.' },
+                note: { type: 'string', description: 'Completed sessions: short per-set note, e.g. "failure on rep 7", "form broke".' },
                 cable_type: {
                   type: 'string',
                   enum: ['constant_force', 'concentric', 'eccentric', 'elastic', 'rowing', 'none'],
@@ -437,7 +466,7 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
   const normalizedFields = type === 'medical'
     ? normalizeMedicalFields(fields, { notes, today })
     : type === 'workout' && Array.isArray(fields.exercises)
-      ? { ...fields, exercises: collapseSetSplitExercises(fields.exercises) }
+      ? { ...fields, exercises: collapseSetSplitExercises(fields.exercises, { keepGroups: true }) }
       : fields;
   const resolvedDate = type === 'medical'
     ? (coerceCalendarDate(date, { today }) ?? date)

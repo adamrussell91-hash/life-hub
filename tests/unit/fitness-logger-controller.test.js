@@ -274,17 +274,155 @@ test('add, reorder, and session extras land on the completed confirm payload', a
   controller.destroy();
 });
 
-test('adding an exercise jumps the swipe to the new card', () => {
+test('adding an exercise jumps gym mode to its first set', () => {
   const { controller } = makeController();
   controller.mount(session());
   assert.equal(controller.getExerciseIndex(), 0);
   controller.addExercise('Cable fly');
   assert.equal(controller.getExerciseIndex(), 1);
-  assert.equal(controller.getExpandedExerciseIndex(), 1);
   controller.addExercise('Curl');
   assert.equal(controller.getExerciseIndex(), 2);
   controller.removeExercise(2);
   assert.equal(controller.getExerciseIndex(), 1);
+  controller.destroy();
+});
+
+const supersetSession = () => ({
+  ...session(),
+  exercises: [
+    {
+      name: 'Bar Press',
+      superset_group: 1,
+      superset_label: 'Press + Curl',
+      coach_cues: { rest: 'Breathe.' },
+      sets: [
+        { reps: 10, weight_kg: 30, cable_type: 'constant_force' },
+        { reps: 10, weight_kg: 30, cable_type: 'constant_force' },
+        { reps: 8, weight_kg: 34, cable_type: 'constant_force' }
+      ]
+    },
+    {
+      name: 'Bar Curl',
+      superset_group: 1,
+      sets: [
+        { reps: 12, weight_kg: 10, cable_type: 'constant_force' },
+        { reps: 12, weight_kg: 10, cable_type: 'constant_force' },
+        { reps: 12, weight_kg: 10, cable_type: 'constant_force' }
+      ]
+    }
+  ]
+});
+
+test('supersets run set-for-set: B1 B2, B1 B2 — not AAA BBB', () => {
+  const { controller } = makeController();
+  controller.mount(supersetSession());
+  const order = controller.getSteps().map(step => {
+    const { exerciseIndex, setIndex } = step.members[0];
+    return `${controller.getDraft().exercises[exerciseIndex].name}#${setIndex + 1}`;
+  });
+  assert.deepEqual(order, [
+    'Bar Press#1', 'Bar Curl#1',
+    'Bar Press#2', 'Bar Curl#2',
+    'Bar Press#3', 'Bar Curl#3'
+  ]);
+  controller.destroy();
+});
+
+test('Done advances to the partner with no rest, then rests after the round', () => {
+  const { controller } = makeController();
+  controller.mount(supersetSession());
+  controller.doneStep();
+  assert.equal(controller.getStepIndex(), 1);
+  assert.equal(controller.getRest(), null, 'no rest between superset partners');
+  assert.equal(controller.getTimerState().state, 'running', 'first Done starts the session clock');
+  controller.doneStep();
+  assert.equal(controller.getStepIndex(), 2);
+  const rest = controller.getRest();
+  assert.ok(rest && rest.remainingMs === 90_000, 'default rest after the round');
+  assert.equal(rest.cue, 'Breathe.');
+  controller.destroy();
+});
+
+test('failure, set notes and exercise notes reach the completed record; done ticks do not', async () => {
+  const { controller, confirms } = makeController();
+  controller.mount(supersetSession());
+  controller.setField(0, 1, 'reps', 7);
+  controller.toggleFailure(0, 1);
+  controller.setNote(0, 1, 'failure on rep 8');
+  controller.setExerciseNote(1, 'Grip slipped on round 3');
+  controller.doneStep();
+  await controller.finish();
+  const [press, curl] = confirms[0].candidate.fields.exercises;
+  assert.equal(press.superset_group, 1, 'superset survives the logger');
+  assert.equal(press.superset_label, 'Press + Curl');
+  assert.equal(curl.superset_group, 1);
+  assert.equal(press.sets[1].reps, 7);
+  assert.equal(press.sets[1].failed, true);
+  assert.equal(press.sets[1].note, 'failure on rep 8');
+  assert.equal(curl.notes, 'Grip slipped on round 3');
+  assert.equal(press.sets.some(set => 'done' in set), false, 'done is logger-only state');
+  controller.destroy();
+});
+
+test('changing kg carries forward to later matching sets but keeps a planned jump', () => {
+  const { controller } = makeController();
+  controller.mount(supersetSession());
+  controller.setField(0, 0, 'weight_kg', 32);
+  const sets = controller.getDraft().exercises[0].sets;
+  assert.deepEqual(sets.map(set => set.weight_kg), [32, 32, 34]);
+  controller.destroy();
+});
+
+test('a circuit logs one round per tap and scores rounds + time', async () => {
+  const sets = n => Array.from({ length: n }, () => ({ reps: 5, weight_kg: 0, cable_type: 'none' }));
+  const { controller, confirms, advance } = makeController();
+  controller.mount({
+    ...session(),
+    exercises: [
+      { name: 'Push-Up', tracking: 'bodyweight_reps', superset_group: 2, superset_label: 'Cindy', block: { kind: 'circuit', format: 'for_time' }, sets: sets(3) },
+      { name: 'Bench Dip', tracking: 'bodyweight_reps', superset_group: 2, sets: sets(3) },
+      { name: 'Reverse Crunch', tracking: 'bodyweight_reps', superset_group: 2, sets: sets(3) }
+    ]
+  });
+  const steps = controller.getSteps();
+  assert.equal(steps.length, 3, 'three rounds, one step each');
+  assert.equal(steps[0].members.length, 3);
+  controller.handleKeydown({ key: 'Enter', target: { tagName: 'BODY' } });
+  advance(32_000);
+  controller.doneStep();
+  advance(32_000);
+  controller.doneStep();
+  assert.equal(controller.getRest(), null, 'no rest mid-circuit when racing the clock');
+  await controller.finish();
+  const owner = confirms[0].candidate.fields.exercises[0];
+  assert.equal(owner.block.kind, 'circuit');
+  assert.equal(owner.block.result.rounds, 3);
+  controller.destroy();
+});
+
+test('Escape while typing leaves the field instead of closing gym mode (I8)', () => {
+  const { controller } = makeController();
+  controller.mount(session());
+  let blurred = false;
+  controller.handleKeydown({ key: 'Escape', target: { tagName: 'TEXTAREA', blur: () => { blurred = true; } } });
+  assert.equal(blurred, true);
+  assert.equal(controller.getView(), 'gym');
+  controller.handleKeydown({ key: 'Escape', target: { tagName: 'BODY' } });
+  assert.equal(controller.getView(), 'docked');
+  controller.openGym();
+  assert.equal(controller.getView(), 'gym');
+  controller.destroy();
+});
+
+test('arrow keys move between sets on desktop', () => {
+  const { controller } = makeController();
+  controller.mount(supersetSession());
+  controller.handleKeydown({ key: 'ArrowRight', target: { tagName: 'BODY' } });
+  assert.equal(controller.getStepIndex(), 1);
+  controller.handleKeydown({ key: 'ArrowLeft', target: { tagName: 'BODY' } });
+  assert.equal(controller.getStepIndex(), 0);
+  controller.handleKeydown({ key: 'ArrowRight', target: { tagName: 'TEXTAREA' } });
+  assert.equal(controller.getStepIndex(), 0, 'typing a note never flips the set');
   controller.destroy();
 });
 

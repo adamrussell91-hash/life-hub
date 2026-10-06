@@ -470,6 +470,38 @@ function buildWorkingWeights(events, date) {
     .slice(0, 10);
 }
 
+/**
+ * What each move looked like the last time it was completed (strictly before
+ * `date`), keyed by normalized name. The gym-mode logger shows it as "Last time"
+ * so progressive overload is one glance away, not a history dig.
+ */
+export function buildLastPerformance(events, date) {
+  const latest = new Map();
+  for (const { record } of workoutEvents(events)) {
+    if (record.status !== 'completed' || !record.date || record.date >= date) continue;
+    for (const exercise of record.exercises ?? []) {
+      const display = canonicalExerciseName(exercise.name) || String(exercise.name ?? '').trim();
+      const key = normalizeExerciseName(display);
+      const sets = Array.isArray(exercise.sets) ? exercise.sets : [];
+      if (!key || !sets.length) continue;
+      const existing = latest.get(key);
+      if (existing && existing.date > record.date) continue;
+      if (existing && existing.date === record.date) {
+        existing.sets = [...existing.sets, ...sets];
+        continue;
+      }
+      latest.set(key, {
+        name: display,
+        date: record.date,
+        tracking: exercise.tracking ?? null,
+        sets: sets.map(set => ({ ...set })),
+        notes: typeof exercise.notes === 'string' ? exercise.notes : ''
+      });
+    }
+  }
+  return Object.fromEntries(latest);
+}
+
 function buildRecentSessions(events, date, limit = 4) {
   return events
     .filter(({ record }) => record.status === 'completed' && record.date <= date)
@@ -597,6 +629,7 @@ export function buildFitnessModel({ events, date, libraryByName = null, targetsC
     weekRemaining: Math.max(0, WORKOUT_TARGET_PER_WEEK - weekCompletedCount),
     nextPlanned: selectNextPlanned(workoutEvts, date),
     workingWeights: buildWorkingWeights(workoutEvts, date),
+    lastPerformance: buildLastPerformance(workoutEvts, date),
     recentSessions: buildRecentSessions(workoutEvts, date),
     volumeWeeks: buildVolumeWeeks(longTerm.weeklyVolume),
     longTerm,

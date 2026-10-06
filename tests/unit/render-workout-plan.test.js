@@ -67,9 +67,84 @@ test('appendWorkoutPlanCard groups superset pairs under a labelled block', () =>
   const list = card.children[3];
   assert.equal(list.children.length, 2);
   assert.equal(list.children[0].className, 'workout-plan-card__group workout-plan-card__group--superset');
-  assert.equal(list.children[0].children[0].textContent, '1&2 superset');
-  assert.equal(list.children[0].children[1].children.length, 3);
+  const [head, scheme, members] = list.children[0].children;
+  assert.equal(head.children[0].textContent, 'A');
+  assert.equal(head.children[1].textContent, '1&2 superset');
+  assert.match(scheme.textContent, /A1 → A2/);
+  assert.equal(members.children.length, 2);
+  assert.equal(members.children[0].children[1].children[0].children[0].textContent, 'A1');
+  assert.equal(members.children[1].children[1].children[0].children[0].textContent, 'A2');
   assert.equal(list.children[1].className, 'workout-plan-card__row');
+});
+
+test('a completed superset shows its sets round by round (AB, AB), not AAA BBB', () => {
+  const root = new FakeRoot();
+  const host = new FakeEl('div');
+  appendWorkoutPlanCard(root, host, {
+    record: {
+      date: '2026-07-30',
+      title: 'Chest and Arms',
+      status: 'completed',
+      exercises: [
+        { name: 'Bar Row', sets: [{ reps: 10, weight_kg: 36, cable_type: 'constant_force' }] },
+        {
+          name: 'Bar Press',
+          superset_group: 1,
+          sets: [
+            { reps: 10, weight_kg: 30, cable_type: 'constant_force' },
+            { reps: 8, weight_kg: 34, cable_type: 'constant_force', failed: true }
+          ]
+        },
+        {
+          name: 'Cable Curl',
+          superset_group: 1,
+          sets: [
+            { reps: 12, weight_kg: 10, cable_type: 'constant_force' },
+            { reps: 12, weight_kg: 10, cable_type: 'constant_force' }
+          ]
+        }
+      ]
+    }
+  });
+  const list = host.children[0].children[3];
+  const group = list.children[1];
+  const rounds = group.children.find(child => child.className === 'workout-plan-card__rounds');
+  assert.ok(rounds, 'grouped completed block lists rounds');
+  assert.equal(rounds.children.length, 2);
+  assert.equal(rounds.children[0].children[0].textContent, 'Round 1');
+  assert.equal(rounds.children[0].children[1].textContent, 'B1 30 kg × 10 → B2 10 kg × 12');
+  assert.equal(rounds.children[1].children[1].textContent, 'B1 34 kg × 8 (failure) → B2 10 kg × 12');
+});
+
+test('a circuit block reads as rounds with its score', () => {
+  const root = new FakeRoot();
+  const host = new FakeEl('div');
+  const sets = n => Array.from({ length: n }, () => ({ reps: 5, weight_kg: 0, cable_type: 'none' }));
+  appendWorkoutPlanCard(root, host, {
+    record: {
+      date: '2026-10-04',
+      title: 'Glow Up',
+      status: 'completed',
+      exercises: [
+        {
+          name: 'Push-Up',
+          superset_group: 3,
+          superset_label: 'Cindy',
+          block: { kind: 'circuit', format: 'for_time', result: { rounds: 3, time_sec: 96 } },
+          sets: sets(3)
+        },
+        { name: 'Bench Dip', superset_group: 3, sets: sets(3) },
+        { name: 'Reverse Crunch', superset_group: 3, sets: sets(3) }
+      ]
+    }
+  });
+  const group = host.children[0].children[3].children[0];
+  assert.match(group.className, /workout-plan-card__group--circuit/);
+  const [head, scheme] = group.children;
+  assert.equal(head.children[1].textContent, 'Cindy');
+  assert.equal(scheme.textContent, '3 rounds for time · A1 → A2 → A3');
+  const score = group.children.find(child => String(child.className).includes('workout-plan-card__score'));
+  assert.equal(score.textContent, 'Score: 3 rounds in 1:36');
 });
 
 test('appendWorkoutPlanCard writes weekday, title, duration, and rows', () => {

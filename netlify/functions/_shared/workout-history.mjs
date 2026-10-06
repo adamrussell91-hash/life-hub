@@ -1,6 +1,7 @@
 import { addCalendarDays, daysBetween, isCalendarDate } from '../../../apps/life/js/core/time.js';
 import { buildFitnessModel, REGION_KEYS } from '../../../apps/life/js/app/fitness-model.js';
 import { buildLibraryByName } from '../../../apps/life/js/app/muscle-maps.js';
+import { copyExerciseStructure } from '../../../apps/life/js/core/workout-plan-groups.js';
 
 export const FITNESS_SESSION_PATH =
   /^data\/fitness\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
@@ -20,26 +21,68 @@ export function normalizeExerciseName(name) {
     .trim();
 }
 
-export function collapseSetSplitExercises(exercises) {
+/**
+ * Fold "Bar Press set 1 / Bar Press set 2" style rows back into one move.
+ *
+ * Stats callers (library, PRs) want one entry per name. Plan / record callers
+ * pass `keepGroups` so a move that appears in two different supersets stays in
+ * both, and an ungrouped A, B, A, B alternation is kept as a superset (it gets a
+ * shared superset_group) instead of being flattened to AAA BBB.
+ */
+export function collapseSetSplitExercises(exercises, { keepGroups = false } = {}) {
   if (!Array.isArray(exercises)) return [];
   const out = [];
   const indexByKey = new Map();
-  for (const exercise of exercises) {
-    if (!exercise || typeof exercise !== 'object') continue;
+  const positionsByOut = [];
+  exercises.forEach((exercise, position) => {
+    if (!exercise || typeof exercise !== 'object') return;
     const name = normalizeExerciseName(exercise.name);
-    if (!name) continue;
-    const key = name.toLowerCase();
+    if (!name) return;
+    const group = keepGroups && exercise.superset_group != null ? String(exercise.superset_group) : '';
+    const key = `${name.toLowerCase()}|${group}`;
     const sets = Array.isArray(exercise.sets) ? exercise.sets.slice() : [];
     const existingIndex = indexByKey.get(key);
     if (existingIndex == null) {
       indexByKey.set(key, out.length);
+      positionsByOut.push([position]);
       out.push({ ...exercise, name, sets });
-      continue;
+      return;
     }
+    positionsByOut[existingIndex].push(position);
     const existing = out[existingIndex];
     existing.sets = [...(existing.sets ?? []), ...sets];
-  }
+  });
+  if (keepGroups) inferAlternationGroups(out, positionsByOut);
   return out;
+}
+
+function inferAlternationGroups(out, positionsByOut) {
+  const candidates = out
+    .map((exercise, index) => ({ exercise, index, positions: positionsByOut[index] }))
+    .filter(({ exercise, positions }) => exercise.superset_group == null && positions.length > 1);
+  if (candidates.length < 2) return;
+  const parent = candidates.map((_, index) => index);
+  const find = index => (parent[index] === index ? index : (parent[index] = find(parent[index])));
+  for (let a = 0; a < candidates.length; a += 1) {
+    for (let b = a + 1; b < candidates.length; b += 1) {
+      const pa = candidates[a].positions;
+      const pb = candidates[b].positions;
+      const overlap = pa[0] < pb.at(-1) && pb[0] < pa.at(-1);
+      if (overlap) parent[find(a)] = find(b);
+    }
+  }
+  const components = new Map();
+  candidates.forEach((candidate, index) => {
+    const root = find(index);
+    if (!components.has(root)) components.set(root, []);
+    components.get(root).push(candidate);
+  });
+  let nextGroup = Math.max(0, ...out.map(exercise => Number(exercise.superset_group) || 0)) + 1;
+  for (const members of components.values()) {
+    if (members.length < 2) continue;
+    for (const { exercise } of members) exercise.superset_group = nextGroup;
+    nextGroup += 1;
+  }
 }
 
 export function selectRecentWorkoutEntries(tree, { limit = MAX_RECENT_WORKOUTS } = {}) {
@@ -142,7 +185,7 @@ export function combineSessionAdherenceDays(fromRecords, fromLibrary) {
 }
 
 function summarizeExercises(exercises) {
-  return collapseSetSplitExercises(exercises)
+  return collapseSetSplitExercises(exercises, { keepGroups: true })
     .map(exercise => {
       const sets = Array.isArray(exercise.sets) ? exercise.sets : [];
       const details = [];
@@ -151,7 +194,18 @@ function summarizeExercises(exercises) {
       const cableTypes = [...new Set(sets.map(set => set?.cable_type).filter(Boolean))];
       if (cableTypes.length) details.push(`cable ${cableTypes.join('/')}`);
       if (exercise.intensification) details.push(String(exercise.intensification).replace(/_/g, ' '));
-      if (exercise.superset_group != null) details.push(`superset ${exercise.superset_group}`);
+      if (exercise.superset_group != null) {
+        details.push(`${exercise.block?.kind === 'circuit' ? 'circuit' : 'superset'} ${exercise.superset_group}`);
+      }
+      const failedSets = sets
+        .map((set, index) => (set?.failed === true ? index + 1 : null))
+        .filter(Boolean);
+      if (failedSets.length) details.push(`failure on set ${failedSets.join('/')}`);
+      const setNotes = sets
+        .map((set, index) => (typeof set?.note === 'string' && set.note.trim() ? `set ${index + 1}: ${set.note.trim()}` : null))
+        .filter(Boolean);
+      if (setNotes.length) details.push(compactNote(setNotes.join('; '), 80));
+      if (typeof exercise.notes === 'string' && exercise.notes.trim()) details.push(`note: ${compactNote(exercise.notes, 80)}`);
       return details.length ? `${exercise.name} (${details.join(' · ')})` : exercise.name;
     })
     .filter(Boolean);
@@ -224,7 +278,7 @@ export function formatRecentWorkoutsForPrompt(records) {
 }
 
 function formatSession(record) {
-  const collapsed = collapseSetSplitExercises(record.exercises);
+  const collapsed = collapseSetSplitExercises(record.exercises, { keepGroups: true });
   return {
     date: record.date,
     time: record.time,
@@ -244,8 +298,7 @@ function formatSession(record) {
       ...(exercise.intensification != null ? { intensification: exercise.intensification } : {}),
       ...(exercise.equipment != null ? { equipment: exercise.equipment } : {}),
       ...(exercise.coach_cues != null ? { coach_cues: exercise.coach_cues } : {}),
-      ...(exercise.superset_group != null ? { superset_group: exercise.superset_group } : {}),
-      ...(exercise.between_sets != null ? { between_sets: exercise.between_sets } : {})
+      ...copyExerciseStructure(exercise)
     }))
   };
 }

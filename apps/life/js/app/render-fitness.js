@@ -75,7 +75,7 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
   } else {
     empty?.setAttribute('hidden', '');
     heroWrap?.removeAttribute('hidden');
-    renderHero(root, model.heroSession, { logger, libraryByName });
+    renderHero(root, model.heroSession, { logger, libraryByName, lastPerformance: model.lastPerformance });
   }
 
   renderTemplateRail(root, templates, { libraryByName, onSelectTemplate });
@@ -391,7 +391,7 @@ function setHidden(element, hidden) {
   else element.removeAttribute('hidden');
 }
 
-function renderHero(root, session, { logger, libraryByName } = {}) {
+function renderHero(root, session, { logger, libraryByName, lastPerformance = null } = {}) {
   setText(root, '#fitness-hero-label', session.status === 'planned' ? 'Current session' : 'Last session');
   setText(root, '[data-fitness="hero-day"]', formatWeekday(session.date) || '');
   setText(root, '[data-fitness="hero-title"]', session.title ?? 'Session');
@@ -443,10 +443,10 @@ function renderHero(root, session, { logger, libraryByName } = {}) {
       notesEl.setAttribute('hidden', '');
     }
     if (started) {
-      logger.mount(session);
+      logger.mount(session, { lastPerformance });
     } else if (startBtn) {
       startBtn.onclick = () => {
-        logger.mount(session);
+        logger.mount(session, { lastPerformance });
         logger.startTimer();
         setHidden(preview, true);
         setHidden(startBtn, true);
