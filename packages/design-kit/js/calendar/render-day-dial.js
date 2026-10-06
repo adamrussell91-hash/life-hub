@@ -548,10 +548,10 @@ function buildModel() {
   });
 }
 
-/** Life's Day view: today's gauge shows the readiness forecast (and check-in) when known. */
+/** Today's gauge and caseback show the readiness forecast on every hub; check-ins load from whichever API the hub has. */
 function readinessCtx() {
   const today = dayAt(input.today);
-  if ((input?.hub || 'life') !== 'life' || !today) return null;
+  if (!today) return null;
   const hhmm = value => {
     const m = /^(\d{2}):(\d{2})$/.exec(String(value ?? ''));
     return m ? Number(m[1]) + Number(m[2]) / 60 : null;
