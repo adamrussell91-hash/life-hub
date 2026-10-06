@@ -14,12 +14,12 @@ export const UNIVERSE_KEY_ITEMS: readonly UniverseKeyItem[] = [
   {
     id: "planet",
     title: "Planet",
-    meaning: "A major topic. Bigger means more notes carry that tag.",
+    meaning: "A major topic, named for a god of that subject. Bigger means more notes. Double-click it, or pick it on the solar map, to open its system.",
   },
   {
     id: "giant",
     title: "Gas giant",
-    meaning: "The most connected topic: largest, with bands and a ring.",
+    meaning: "The most connected topic: largest, wearing a ring.",
   },
   {
     id: "ringed",

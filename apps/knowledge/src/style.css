@@ -5485,24 +5485,86 @@ body.is-stars-fullscreen .stars-sky-wrap {
 }
 
 .universe-replay__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
   color: var(--navy);
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.universe-replay__title:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* A small chevron: points down while open (tap to fold away), right while folded. */
+.universe-replay__chevron {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  rotate: 45deg;
+  translate: 0 -0.1rem;
+  transition: rotate 0.25s ease;
+}
+
+.universe-replay.is-folded .universe-replay__chevron {
+  rotate: -45deg;
+  translate: -0.1rem 0;
+}
+
+/* The controls lay out as direct children of the bar, so the bar reads the same as before folding existed. */
+.universe-replay__controls {
+  display: contents;
 }
 
 .universe-replay__scrub {
+  order: 1;
   flex: 1 1 6rem;
   min-width: 4rem;
   accent-color: var(--navy);
 }
 
 .universe-replay__label {
+  order: 2;
   min-width: 9rem;
   color: var(--navy);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
+}
+
+.universe-replay .btn {
+  order: 3;
+}
+
+/* Folded: just the title (and the replay date while one is running), as a small pill. */
+.universe-replay.is-folded {
+  width: max-content;
+  max-width: calc(100% - 2rem);
+  padding-right: var(--space-4);
+}
+
+.universe-replay.is-folded .universe-replay__controls {
+  display: none;
+}
+
+.universe-replay.is-folded:not(.is-playing) .universe-replay__label {
+  display: none;
+}
+
+.universe-replay.is-folded .universe-replay__label {
+  min-width: 0;
 }
 
 .universe-replay .btn {
@@ -5540,20 +5602,487 @@ body.is-universe-saver .graph-canvas {
     bottom: calc(5.2rem + env(safe-area-inset-bottom, 0px));
     width: auto;
     border-radius: var(--radius-md);
-    padding: var(--space-2);
-  }
-
-  .universe-replay__title {
-    display: none;
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
   }
 
   .universe-replay__scrub {
+    order: 4;
     flex-basis: 100%;
   }
 
   .universe-replay__label {
     min-width: 0;
     flex: 1 1 auto;
+  }
+
+  .universe-replay.is-folded {
+    right: auto;
+    width: max-content;
+    border-radius: 999px;
+    padding: var(--space-1) var(--space-4);
+  }
+}
+
+/* ---------- Solar map drawer, planet system card and link arrows ---------- */
+.universe-side {
+  position: absolute;
+  z-index: 4;
+  top: 8.5rem;
+  right: var(--space-4);
+  bottom: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+.graph-wrap.is-universe-fullscreen .universe-side {
+  top: 4.25rem;
+  bottom: var(--space-4);
+}
+
+/* With the full-screen controls unfolded, the toolbar runs across the top. */
+.graph-wrap.is-universe-fullscreen:not(.is-chrome-tucked) .universe-side {
+  top: 9.5rem;
+}
+
+/* The full-screen chrome column is only a layout box: its empty area must not swallow clicks meant for the map. */
+.graph-wrap.is-universe-fullscreen .graph-chrome {
+  pointer-events: none;
+}
+
+.universe-side > * {
+  pointer-events: auto;
+}
+
+body.is-universe-saver .universe-side,
+body.is-universe-saver .universe-exits {
+  display: none !important;
+}
+
+.universe-orrery {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 3rem;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  color: var(--navy);
+  transition: width 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.universe-orrery.is-open {
+  width: 17rem;
+}
+
+.universe-orrery__tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: none;
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.universe-orrery.is-open .universe-orrery__tab {
+  justify-content: flex-start;
+}
+
+.universe-orrery__heading,
+.universe-orrery__chevron {
+  display: none;
+}
+
+.universe-orrery.is-open .universe-orrery__heading {
+  display: inline;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.universe-orrery.is-open .universe-orrery__chevron {
+  display: block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  rotate: -45deg;
+}
+
+.universe-orrery__tab:focus-visible,
+.universe-orrery__item:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.universe-orrery__sun {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 38%, #fff6d6, #f2c46a 45%, #e59a3a 100%);
+  box-shadow: 0 0 0.6rem rgba(242, 180, 80, 0.7);
+}
+
+/* Even spacing on purpose: the map keeps orbit order, not orbit distance. */
+.universe-orrery__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  scrollbar-width: thin;
+}
+
+.universe-orrery__list > li {
+  flex: none;
+}
+
+.universe-orrery__item {
+  --icon: 24px;
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.15rem var(--space-3) 0.15rem var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.universe-orrery__item:hover {
+  background: rgba(23, 55, 94, 0.06);
+}
+
+.universe-orrery__item[aria-current="true"] {
+  background: rgba(23, 55, 94, 0.11);
+}
+
+.universe-orrery__icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.universe-orrery__icon canvas {
+  display: block;
+  width: min(var(--icon), 3rem);
+  height: min(var(--icon), 3rem);
+}
+
+.universe-orrery__text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.universe-orrery__text strong {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.universe-orrery__text small,
+.universe-orrery__count {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.universe-orrery__count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Closed: a thin strip of the same planets, in the same order, no labels. */
+.universe-orrery:not(.is-open) .universe-orrery__item {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  min-height: 1.1rem;
+  padding: 0.1rem 0;
+}
+
+.universe-orrery:not(.is-open) .universe-orrery__text,
+.universe-orrery:not(.is-open) .universe-orrery__count,
+.universe-orrery:not(.is-open) .universe-orrery__item--sun {
+  display: none;
+}
+
+.universe-orrery:not(.is-open) .universe-orrery__icon {
+  width: 1.75rem;
+  height: auto;
+  min-height: 0.9rem;
+}
+
+.universe-orrery:not(.is-open) .universe-orrery__icon canvas {
+  width: min(calc(var(--icon) * 0.6), 1.9rem);
+  height: min(calc(var(--icon) * 0.6), 1.9rem);
+}
+
+.universe-system {
+  --icon: 32px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2) var(--space-3);
+  flex: none;
+  width: 17rem;
+  box-sizing: border-box;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--navy);
+}
+
+.universe-system[hidden] {
+  display: none;
+}
+
+.universe-system__icon canvas {
+  display: block;
+  width: var(--icon);
+  height: var(--icon);
+}
+
+.universe-system__text {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.universe-system__name {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.universe-system__byline,
+.universe-system__meta {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.universe-system__topic {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.universe-system__byline[hidden] {
+  display: none;
+}
+
+.universe-system__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.universe-system__actions .btn {
+  min-height: 2rem;
+  padding: 0.25rem 0.75rem;
+  font-size: var(--text-xs);
+}
+
+.universe-exits {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.universe-exit-arrow {
+  position: absolute;
+  translate: -50% -50%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 11rem;
+  padding: 0.3rem 0.7rem 0.3rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--planet, var(--navy)) 55%, white);
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: var(--elev-2);
+  color: var(--navy);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-xs);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.universe-exit-arrow:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.universe-exit-arrow__dart {
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  background: var(--planet, var(--navy));
+  clip-path: polygon(0 18%, 100% 50%, 0 82%, 28% 50%);
+  rotate: var(--angle, 0rad);
+}
+
+.universe-exit-arrow__text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.universe-exit-arrow__text strong,
+.universe-exit-arrow__text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.universe-exit-arrow__text small {
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .universe-orrery,
+  .universe-replay__chevron {
+    transition: none;
+  }
+}
+
+@media (max-width: 720px) {
+  /* Phone: the strip becomes a round button under the zoom buttons, and opens as a sideways sheet. */
+  .universe-side {
+    display: contents;
+  }
+
+  .universe-orrery {
+    position: absolute;
+    z-index: 5;
+    top: calc(var(--space-2) + 9.2rem);
+    right: var(--space-2);
+    width: 2.75rem;
+    height: 2.75rem;
+    flex: none;
+    border-radius: 999px;
+  }
+
+  .universe-orrery:not(.is-open) .universe-orrery__list {
+    display: none;
+  }
+
+  .universe-orrery.is-open {
+    top: auto;
+    left: var(--space-2);
+    right: var(--space-2);
+    bottom: calc(5.2rem + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    height: auto;
+    border-radius: var(--radius-md);
+  }
+
+  .universe-orrery.is-open .universe-orrery__list {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-1);
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 var(--space-2) var(--space-2);
+    scroll-snap-type: x proximity;
+  }
+
+  .universe-orrery.is-open .universe-orrery__item {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 2.75rem auto auto;
+    justify-items: center;
+    width: 5.25rem;
+    padding: var(--space-1);
+    text-align: center;
+    scroll-snap-align: start;
+  }
+
+  .universe-orrery.is-open .universe-orrery__icon {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .universe-orrery.is-open .universe-orrery__text {
+    width: 100%;
+  }
+
+  .universe-orrery.is-open .universe-orrery__text small {
+    display: none;
+  }
+
+  .universe-orrery.is-open .universe-orrery__text strong {
+    overflow: hidden;
+    font-size: var(--text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .universe-system {
+    position: absolute;
+    z-index: 5;
+    top: calc(var(--space-2) + 3.25rem);
+    left: var(--space-2);
+    right: calc(var(--space-2) + 3.25rem);
+    width: auto;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .universe-system__byline,
+  .universe-system__topic {
+    display: none;
+  }
+
+  .graph-wrap:has(.universe-orrery.is-open) .universe-replay {
+    visibility: hidden;
+  }
+
+  /* Leave room to scroll the last planets out from under the floating chat button. */
+  .universe-orrery.is-open .universe-orrery__list {
+    padding-right: 4.5rem;
+  }
+
+  /* Outside full screen the toolbar fills the top of the stage, so the system card sits at the bottom
+     in the replay bar's place. Full screen keeps both. */
+  .graph-wrap:not(.is-universe-fullscreen) .universe-system {
+    top: auto;
+    right: var(--space-2);
+    bottom: calc(5.2rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .graph-wrap:not(.is-universe-fullscreen) .is-in-system .universe-replay,
+  .graph-wrap:not(.is-universe-fullscreen):has(.graph-preview:not([hidden])) .universe-system {
+    visibility: hidden;
   }
 }
 
