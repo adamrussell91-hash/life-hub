@@ -1,4 +1,5 @@
 import { formatDisplayDate } from '../core/time.js';
+import { MEDICAL_RECORD_TYPES } from './medical-normalize.js';
 import { createHubFilter } from '../../../../packages/design-kit/js/hub-filter-menu.js';
 import { createViewOnMap } from '../../../../packages/design-kit/js/view-on-map.js';
 import { openMorphingDialog } from '../../../../packages/design-kit/js/morphing-dialog.js';
@@ -343,25 +344,24 @@ function renderTimeline(root, model, { onSelect, onToggleYear } = {}) {
   for (const item of model.items) appendTimelineItem(root, host, item, model, { onSelect, onToggleYear });
 }
 
-/** Colour key for the card edge + timeline dot, so the colour coding is readable. */
-const LANE_LEGEND = [
-  { lane: 'appointment', label: 'Appointment' },
-  { lane: 'lab', label: 'Tests & scans' },
-  { lane: 'prescription', label: 'Medication' },
-  { lane: 'hospital', label: 'Procedure' },
-  { lane: 'therapy', label: 'Therapy' },
-  { lane: 'symptom', label: 'Symptom' }
+/** Colour key — the same thread colours as the Health Threads strip above. */
+const THREAD_LEGEND = [
+  { thread: 'IBD', label: 'IBD / gut' },
+  { thread: 'Liver', label: 'Liver' },
+  { thread: 'Mind', label: 'Mind' },
+  { thread: 'Acute', label: 'Acute' },
+  { thread: 'Other', label: 'Other' }
 ];
 
 function renderLaneLegend(root) {
   const list = root.createElement('ul');
   list.className = 'medical-legend';
   list.setAttribute('aria-label', 'Colour key');
-  for (const { lane, label } of LANE_LEGEND) {
+  for (const { thread, label } of THREAD_LEGEND) {
     const item = root.createElement('li');
     item.className = 'medical-legend__item';
-    item.dataset.lane = lane;
-    item.setAttribute('data-lane', lane);
+    item.dataset.thread = thread;
+    item.setAttribute('data-thread', thread);
     item.textContent = label;
     list.append(item);
   }
@@ -499,6 +499,7 @@ function visitCard(root, visit, model, onSelect) {
   card.dataset.weight = weight;
   card.setAttribute('data-visit-id', visit.id);
   card.setAttribute('data-lane', visit.lane);
+  card.setAttribute('data-thread', visit.thread || 'Other');
   if (model.selected?.id === visit.id) card.classList.add('is-selected');
   card.addEventListener('click', () => onSelect?.(visit.id));
 
@@ -599,6 +600,7 @@ function minorRow(root, visit, model, onSelect, planned) {
   row.dataset.weight = 'minor';
   row.setAttribute('data-visit-id', visit.id);
   row.setAttribute('data-lane', visit.lane);
+  row.setAttribute('data-thread', visit.thread || 'Other');
   if (model.selected?.id === visit.id) row.classList.add('is-selected');
   row.addEventListener('click', () => onSelect?.(visit.id));
   const when = root.createElement('strong');
@@ -788,7 +790,7 @@ function writeForm(root, draft, hooks) {
   const date = field(root, 'date', 'Date', draft?.date ?? '', 'date');
   const time = field(root, 'time', 'Start time', draft?.time ?? '', 'time');
   const duration = durationField(root, draft?.durationMin ?? draft?.duration_min ?? '');
-  const type = field(root, 'record_type', 'Type', draft?.record_type ?? 'Appointment');
+  const type = typeField(root, draft?.record_type ?? 'Appointment');
   const provider = field(root, 'provider', 'Provider', draft?.provider ?? '');
   const location = field(root, 'location', 'Location', draft?.location ?? '');
   const notes = field(root, 'notes', 'Overview', draft?.notes ?? '', 'textarea');
@@ -824,6 +826,27 @@ function field(root, name, label, value, kind = 'text') {
 }
 
 const DURATION_PRESETS = [15, 30, 45, 60, 90];
+
+/** A fixed list — a free-text Type is how entries ended up mis-filed. */
+function typeField(root, value) {
+  const wrap = root.createElement('label');
+  wrap.className = 'medical-form__field';
+  const caption = root.createElement('span');
+  caption.textContent = 'Type';
+  const select = root.createElement('select');
+  select.name = 'record_type';
+  for (const optionValue of MEDICAL_RECORD_TYPES) {
+    const option = root.createElement('option');
+    option.value = optionValue;
+    option.textContent = optionValue;
+    select.append(option);
+  }
+  select.value = MEDICAL_RECORD_TYPES.includes(value) ? value : 'Appointment';
+  wrap.append(caption, select);
+  wrap._input = select;
+  wrap.dataset.field = 'record_type';
+  return wrap;
+}
 
 function durationField(root, value) {
   const wrap = root.createElement('div');

@@ -71,6 +71,11 @@ export function buildMedicalPayload(fields, { notes } = {}) {
   };
 }
 
+/** The condition thread a visit belongs to (first rule that matches), or null. */
+export function primaryThread(visit, bloods) {
+  return THREAD_RULES.find(rule => rule.test(visit, bloods))?.thread ?? null;
+}
+
 export function isPlannedVisit(visit, today) {
   if (!visit) return false;
   if (visit.status === 'planned' || visit.status === 'to_book') return true;
@@ -255,12 +260,14 @@ function decorateVisit(record, event, bloods, today) {
     insurance_status: record.insurance_status ?? null,
     episode: record.episode ?? null,
     displayDate: null,
+    thread: null,
     lab: labSummary(bloods),
     bloods,
     mapsUrl: null,
     virtual: false,
     planned: false
   };
+  visit.thread = primaryThread(visit, bloods);
   visit.planned = isPlannedVisit(visit, today);
   visit.mapsUrl = mapsUrl(visit);
   visit.displayDate = formatMedicalDisplayDate(visit);

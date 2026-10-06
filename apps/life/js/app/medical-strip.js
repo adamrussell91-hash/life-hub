@@ -8,7 +8,7 @@ const PAD_R = 24;
 const AXIS_TODAY_H = 16;
 const AXIS_TICK_H = 18;
 const AXIS_H = AXIS_TODAY_H + AXIS_TICK_H;
-const LANE_H = 48;
+const LANE_H = 58;
 const STORAGE_OPEN = 'life-hub-medical-strip-open';
 const ZOOM_SPANS = { weeks: 42, months: 180, years: 730 };
 const stripStateByRoot = new WeakMap();
@@ -145,6 +145,9 @@ export function renderMedicalStrip(root, model, hooks = {}) {
     resolveLabelCollisions(canvas.querySelector('svg'));
   };
 
+  // Gestures and zoom animation repaint only the chart, not the header, observers and handlers.
+  state.repaint = paint;
+
   if (typeof ResizeObserver === 'function') {
     state.observer?.disconnect?.();
     state.observer = new ResizeObserver(() => paint());
@@ -164,6 +167,12 @@ export function renderMedicalStrip(root, model, hooks = {}) {
   }
 }
 
+function scrub(root, model, hooks) {
+  const state = stripStateByRoot.get(root);
+  if (state?.repaint) state.repaint();
+  else renderMedicalStrip(root, model, hooks);
+}
+
 function setSpan(root, model, hooks, nextDays, animate) {
   const state = stripStateByRoot.get(root);
   if (!state) return;
@@ -177,13 +186,18 @@ function setSpan(root, model, hooks, nextDays, animate) {
   }
   const from = state.zoom.spanDays;
   const start = performance.now?.() ?? Date.now();
-  const dur = 180;
+  const dur = 320;
   const tick = now => {
-    const t = Math.min(1, (now - start) / dur);
-    state.zoom.spanDays = from + (clamped - from) * t;
-    renderMedicalStrip(root, model, hooks);
-    if (t < 1) requestAnimationFrame?.(tick);
-    else state.zoom.spanDays = clamped;
+    const t = Math.min(1, Math.max(0, (now - start) / dur));
+    const eased = 1 - (1 - t) ** 3; // ease-out: quick start, soft landing
+    state.zoom.spanDays = from + (clamped - from) * eased;
+    if (t < 1) {
+      scrub(root, model, hooks);
+      requestAnimationFrame?.(tick);
+    } else {
+      state.zoom.spanDays = clamped;
+      renderMedicalStrip(root, model, hooks); // full render once so the zoom buttons settle
+    }
   };
   requestAnimationFrame?.(tick) ?? (() => { state.zoom.spanDays = clamped; renderMedicalStrip(root, model, hooks); })();
 }
@@ -240,7 +254,7 @@ function bindGestures(canvas, root, model, hooks, state) {
       const plotW = Math.max(1, (state.width || 720) - GUTTER - PAD_R);
       const dayShift = -(dx / plotW) * state.zoom.spanDays;
       state.zoom.centerDate = shiftDate(state.drag.center0, dayShift);
-      renderMedicalStrip(root, model, hooks);
+      scrub(root, model, hooks);
     }
   });
   const endPointer = event => {
@@ -326,6 +340,19 @@ function buildSvg(root, model, lanes, zoom, width, hooks) {
     label.textContent = lane.label;
     svg.append(label);
 
+    const summary = threadSummary(lane.events, model.today);
+    const subline = (text, dy) => {
+      const el = svgEl(root, 'text');
+      el.setAttribute('x', '12');
+      el.setAttribute('y', String(y0 + dy));
+      el.setAttribute('fill', 'var(--muted)');
+      el.setAttribute('font-size', '10');
+      el.textContent = text;
+      svg.append(el);
+    };
+    if (summary.last) subline(`Last ${shortDate(summary.last.date)}`, 33);
+    if (summary.next) subline(`Next ${shortDate(summary.next.date)}`, 45);
+
     const rail = svgEl(root, 'line');
     rail.setAttribute('x1', String(GUTTER));
     rail.setAttribute('x2', String(width - PAD_R));
@@ -333,6 +360,32 @@ function buildSvg(root, model, lanes, zoom, width, hooks) {
     rail.setAttribute('y2', String(railY));
     rail.setAttribute('stroke', 'var(--line)');
     svg.append(rail);
+
+    // The thread itself: a solid line through the visits so far, dashed on to the next one.
+    const threadLine = (from, to, dashed) => {
+      if (!from || !to) return;
+      const x1 = Math.max(GUTTER, Math.min(width - PAD_R, dateToX(from.date, zoom, width)));
+      const x2 = Math.max(GUTTER, Math.min(width - PAD_R, dateToX(to.date, zoom, width)));
+      if (x2 <= x1) return;
+      const seg = svgEl(root, 'line');
+      seg.setAttribute('data-role', dashed ? 'thread-next' : 'thread');
+      seg.setAttribute('x1', String(x1));
+      seg.setAttribute('x2', String(x2));
+      seg.setAttribute('y1', String(railY));
+      seg.setAttribute('y2', String(railY));
+      seg.setAttribute('stroke', colour);
+      seg.setAttribute('stroke-width', '3');
+      seg.setAttribute('stroke-linecap', 'round');
+      if (dashed) {
+        seg.setAttribute('stroke-dasharray', '2 7');
+        seg.setAttribute('opacity', '0.8');
+      } else {
+        seg.setAttribute('opacity', '0.55');
+      }
+      svg.append(seg);
+    };
+    threadLine(summary.first, summary.last, false);
+    threadLine(summary.last ?? summary.first, summary.next, true);
 
     drawRibbons(root, svg, lane, zoom, width, y0, colour, railY);
     const labelBoxes = [];
@@ -348,7 +401,9 @@ function buildSvg(root, model, lanes, zoom, width, hooks) {
 
     for (const { event, x } of markers) {
       const shape = drawMarker(root, svg, event, x, railY, colour, hooks);
-      const lab = placeLabel(root, svg, event, x, railY, width, labelBoxes, xToday);
+      // Only name the latest and the next visit; every other dot is read from the tooltip.
+      const named = event === summary.last || event === summary.next;
+      const lab = named ? placeLabel(root, svg, event, x, railY, width, labelBoxes, xToday) : null;
       if (lab) labelBoxes.push(lab);
       shape?.addEventListener?.('keydown', ev => {
         if (ev.key === 'Enter' || ev.key === ' ') {
@@ -407,6 +462,24 @@ export function spaceTicks(ticks, minGap = (tick) => tick.label.length * 6.8 + 1
     lastRight = tick.x + half;
   }
   return kept;
+}
+
+/** Latest event up to today and the next one after it — what a thread reads as at a glance. */
+export function threadSummary(events, today) {
+  const dated = (events || [])
+    .filter(event => event?.date && isCalendarDate(event.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const past = dated.filter(event => event.date <= today && !event.planned && !event.virtual);
+  const ahead = dated.filter(event => event.date > today || event.planned || event.virtual)
+    .filter(event => event.date >= today);
+  return { first: dated[0] ?? null, last: past[past.length - 1] ?? null, next: ahead[0] ?? null };
+}
+
+const MONTH_TITLE = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export function shortDate(dateKey) {
+  if (!isCalendarDate(dateKey)) return '';
+  const [, m, d] = dateKey.split('-').map(Number);
+  return `${d} ${MONTH_TITLE[m - 1]}`;
 }
 
 function drawAxis(root, svg, zoom, width) {
@@ -680,7 +753,7 @@ function drawMarker(root, svg, event, x, y, colour, hooks) {
 }
 
 function placeLabel(root, svg, event, x, y, width, existing, xToday = null) {
-  const full = String(event.title || '').split(/[—-]/)[0].trim();
+  const full = String(event.title || '').split(/\s[—–-]\s/)[0].trim();
   const short = full.length > 16 ? `${full.slice(0, 15).trim()}…` : full;
   if (!short) return null;
   const nearRight = x > width - PAD_R - 60;

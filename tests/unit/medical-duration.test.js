@@ -91,3 +91,18 @@ test('axis ticks are thinned so labels never run together', () => {
   }
   assert.ok(kept.length < ticks.length && kept.length > 4);
 });
+
+import { threadSummary, shortDate } from '../../apps/life/js/app/medical-strip.js';
+
+test('threadSummary finds the first, latest-so-far and next visit', () => {
+  const events = [
+    { id: 'a', date: '2026-07-02' }, { id: 'b', date: '2026-09-24' },
+    { id: 'c', date: '2026-10-26', planned: true }, { id: 'd', date: '2026-12-01', planned: true }
+  ];
+  const s = threadSummary(events, '2026-10-06');
+  assert.equal(s.first.id, 'a');
+  assert.equal(s.last.id, 'b');
+  assert.equal(s.next.id, 'c');
+  assert.deepEqual(threadSummary([], '2026-10-06'), { first: null, last: null, next: null });
+  assert.equal(shortDate('2026-10-06'), '6 Oct');
+});
