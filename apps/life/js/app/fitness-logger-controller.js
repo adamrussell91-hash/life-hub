@@ -557,14 +557,14 @@ export function createFitnessLoggerController({
           maxReps: Math.max(best?.maxReps ?? 0, reps),
           maxSec: Math.max(best?.maxSec ?? 0, Number(set.duration_sec) || 0)
         };
-        headline = { kind: 'pr', title: 'PERSONAL BEST', detail: `${exercise.name} — ${pr.label}` };
+        headline = { kind: 'pr', title: 'PERSONAL BEST', detail: `${exercise.name} — ${pr.label}`, exerciseIndex };
         continue;
       }
       const result = compareToGhost(set, ghostForSet(previousFor(exercise), setIndex), tracking);
       if (result?.verdict === 'beat' && headline?.kind !== 'pr') {
-        headline = { kind: 'beat', title: 'GHOST BEATEN', detail: `${exercise.name} · ${result.label} on last time` };
+        headline = { kind: 'beat', title: 'GHOST BEATEN', detail: `${exercise.name} · ${result.label} on last time`, exerciseIndex };
       } else if (result?.verdict === 'matched' && !headline) {
-        headline = { kind: 'matched', title: 'Matched your ghost', detail: `${exercise.name} — next time, one more` };
+        headline = { kind: 'matched', title: 'Matched your ghost', detail: `${exercise.name} — next time, one more`, exerciseIndex };
       }
     }
     if (!headline) return;
@@ -982,6 +982,8 @@ export function createFitnessLoggerController({
       lastPainFlags: motivation.lastPainFlags,
       twingeOffer,
       treat: readTreat(),
+      libraryByName: motivation.libraryByName,
+      boardRows: motivation.buildBoard ? projectBuildBoard(motivation.buildBoard, draft, motivation.libraryByName) : null,
       actions
     });
   }

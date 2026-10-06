@@ -15,6 +15,8 @@ import {
 } from '../../../../packages/design-kit/js/morphing-popover.js';
 import { describeSet, resolveTrackingType } from '../core/exercise-tracking.js';
 import { TWINGE_SITES, compareToGhost, focusCue, ghostForSet, readinessAdvice } from './fitness-progression.js';
+import { resolveExerciseThumbSrc } from './muscle-maps.js';
+import { REGION_LABELS, resolveExerciseRegion } from './fitness-model.js';
 import {
   blockMemberCode,
   formatBlockResult,
@@ -65,6 +67,42 @@ function button(root, { className = '', text, marker, label = null, onClick, pre
   node.disabled = Boolean(disabled);
   if (onClick) node.addEventListener('click', onClick);
   return node;
+}
+
+// ── Anatomy art ────────────────────────────────────────────────────────────
+// The muscle drawings are black-on-white. In gym mode they are inverted and
+// screen-blended (CSS) so the figure glows out of the dark and the worked
+// muscle lights up — the same pictures as the plan cards, made to motivate.
+
+let anatomyLibrary = null;
+
+function anatomyImage(root, src, className) {
+  if (!src) return null;
+  const img = root.createElement('img');
+  img.className = className;
+  img.alt = '';
+  img.decoding = 'async';
+  img.src = src;
+  img.addEventListener?.('error', () => img.remove?.());
+  return img;
+}
+
+/** The arm drawings are a wide forearm crop — in a tall tile the flexing arm reads far better. */
+const WIDE_ART = /\/muscles\/arm-(?:bicep|forearm)\.png$/;
+
+function exerciseArt(exercise) {
+  if (!exercise) return null;
+  const src = resolveExerciseThumbSrc(exercise, anatomyLibrary);
+  return WIDE_ART.test(src) ? 'assets/fitness/regions/arms.png' : src;
+}
+
+function exerciseRegion(exercise, draft) {
+  return exercise ? resolveExerciseRegion(exercise, draft?.focus, anatomyLibrary) : null;
+}
+
+/** The flexing figure for a region — reserved for PRs and the Pump Report. */
+function regionArt(region) {
+  return region && REGION_LABELS[region] ? `assets/fitness/regions/${region}.png` : null;
 }
 
 function formatNumber(value) {
@@ -266,16 +304,24 @@ function renderBlockBanner(root, draft, { block, step, circuit, actions }) {
   head.append(copy);
   banner.append(head);
 
-  const order = el(root, 'ol', { className: 'gym-block__order', data: { fitnessLogger: 'block-order' } });
+  const order = el(root, 'ol', {
+    className: `gym-block__order${block.kind === 'superset' ? ' gym-split' : ''}`,
+    data: { fitnessLogger: 'block-order' }
+  });
   block.exercises.forEach((exercise, memberIndex) => {
     const item = el(root, 'li', { className: 'gym-block__member' });
     const set = exercise?.sets?.[step.setIndex];
+    const current = step.members.some(member => member.exerciseIndex === block.indexes[memberIndex]);
     if (set?.done) item.className += ' is-done';
-    if (step.members.some(member => member.exerciseIndex === block.indexes[memberIndex])) item.className += ' is-current';
-    item.append(
-      el(root, 'span', { className: 'gym-block__code', text: blockMemberCode(block, memberIndex) }),
-      el(root, 'span', { className: 'gym-block__name', text: exercise?.name ?? 'Exercise' })
-    );
+    if (current) item.className += ' is-current';
+    item.append(el(root, 'span', { className: 'gym-block__code', text: blockMemberCode(block, memberIndex) }));
+    if (block.kind === 'superset') {
+      const art = anatomyImage(root, exerciseArt(exercise), 'gym-art gym-split__art');
+      if (art) item.append(art);
+      const tag = set?.done ? 'DONE' : current ? 'NOW' : 'NEXT · no rest';
+      item.append(el(root, 'span', { className: `gym-split__tag${current ? ' is-now' : ''}`, text: tag }));
+    }
+    item.append(el(root, 'span', { className: 'gym-block__name', text: exercise?.name ?? 'Exercise' }));
     order.append(item);
   });
   banner.append(order);
@@ -532,22 +578,48 @@ function renderTwingeOffer(root, { exercise, exerciseIndex, site, actions }) {
   return box;
 }
 
-function renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, targetFor, twingeOffer, actions }) {
+function renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, targetFor, twingeOffer, boardRows, actions }) {
   const { exerciseIndex, setIndex } = step.members[0];
   const exercise = draft.exercises?.[exerciseIndex];
   const set = exercise?.sets?.[setIndex];
   const card = el(root, 'article', { className: 'gym-card', data: { fitnessLogger: 'set-card' } });
-  const head = el(root, 'header', { className: 'gym-card__head' });
   const memberIndex = Math.max(0, block?.indexes?.indexOf(exerciseIndex) ?? 0);
-  head.append(el(root, 'span', { className: 'gym-card__code', text: blockMemberCode(block, memberIndex) }));
+  // Supersets already show both muscles side by side in the banner.
+  const art = block?.kind === 'superset' ? null : exerciseArt(exercise);
+  const head = el(root, 'header', { className: art ? 'gym-card__head gym-hero' : 'gym-card__head' });
+  if (art) {
+    card.className += ' gym-card--hero';
+    head.dataset.fitnessLogger = 'hero';
+    const image = anatomyImage(root, art, 'gym-art gym-hero__art');
+    if (image) head.append(image);
+    head.append(el(root, 'span', { className: 'gym-hero__glow', attrs: { 'aria-hidden': 'true' } }));
+    const region = exerciseRegion(exercise, draft);
+    const row = region ? (boardRows ?? []).find(item => item.region === region) : null;
+    if (row) {
+      const total = row.done + (row.todayDone ?? 0);
+      const meter = el(root, 'div', { className: 'gym-hero__meter', data: { fitnessLogger: 'hero-meter' } });
+      meter.append(
+        el(root, 'strong', { text: `${total}/${row.target}` }),
+        el(root, 'span', { text: `${row.label.toUpperCase()} THIS WEEK` })
+      );
+      head.append(meter);
+    }
+  }
   const titleWrap = el(root, 'div', { className: 'gym-card__title' });
-  titleWrap.append(el(root, 'h2', { text: exercise?.name ?? 'Exercise', data: { fitnessLogger: 'exercise-name' } }));
-  const metaBits = [];
-  if (setIndex >= 0) metaBits.push(`Set ${setIndex + 1} of ${exercise?.sets?.length ?? 0}`);
-  if (exercise?.equipment) metaBits.push(exercise.equipment);
-  if (exercise?.bench_angle_deg != null) metaBits.push(`bench ${exercise.bench_angle_deg}°`);
-  if (exercise?.intensification) metaBits.push(intensificationLabel(exercise.intensification));
-  titleWrap.append(el(root, 'p', { className: 'gym-card__meta', text: metaBits.join(' · '), data: { fitnessLogger: 'set-meta' } }));
+  const nameRow = el(root, 'div', { className: 'gym-card__name' });
+  nameRow.append(
+    el(root, 'span', { className: 'gym-card__code', text: blockMemberCode(block, memberIndex) }),
+    el(root, 'h2', { text: exercise?.name ?? 'Exercise', data: { fitnessLogger: 'exercise-name' } })
+  );
+  titleWrap.append(nameRow);
+  const chips = el(root, 'div', { className: 'gym-card__chips' });
+  if (setIndex >= 0) {
+    chips.append(el(root, 'span', { className: 'gym-card__chip', text: `Set ${setIndex + 1} of ${exercise?.sets?.length ?? 0}`, data: { fitnessLogger: 'set-meta' } }));
+  }
+  if (exercise?.equipment) chips.append(el(root, 'span', { className: 'gym-card__chip', text: exercise.equipment }));
+  if (exercise?.bench_angle_deg != null) chips.append(el(root, 'span', { className: 'gym-card__chip', text: `bench ${exercise.bench_angle_deg}°` }));
+  if (exercise?.intensification) chips.append(el(root, 'span', { className: 'gym-card__chip gym-card__chip--hot', text: intensificationLabel(exercise.intensification) }));
+  titleWrap.append(chips);
   head.append(titleWrap);
   card.append(head);
 
@@ -624,10 +696,11 @@ function renderRoundCard(root, draft, { step, block, noteOpen, actions }) {
     const memberIndex = Math.max(0, block.indexes.indexOf(exerciseIndex));
     const item = el(root, 'li', { className: 'gym-round__item' });
     const head = el(root, 'div', { className: 'gym-round__head' });
-    head.append(
-      el(root, 'span', { className: 'gym-card__code', text: blockMemberCode(block, memberIndex) }),
-      el(root, 'strong', { text: exercise?.name ?? 'Exercise' })
-    );
+    const thumb = el(root, 'span', { className: 'gym-round__thumb' });
+    const thumbArt = anatomyImage(root, exerciseArt(exercise), 'gym-art');
+    if (thumbArt) thumb.append(thumbArt);
+    thumb.append(el(root, 'span', { className: 'gym-card__code', text: blockMemberCode(block, memberIndex) }));
+    head.append(thumb, el(root, 'strong', { text: exercise?.name ?? 'Exercise' }));
     item.append(head);
     const fields = el(root, 'div', { className: 'gym-round__fields' });
     for (const spec of setFields(exercise).filter(item => !item.optional || Number(set?.[item.field]) > 0)) {
@@ -1137,6 +1210,8 @@ export function renderFitnessLogger(root, draft, {
   celebration = null,
   targetFor = null,
   readinessOpen = false,
+  libraryByName = null,
+  boardRows = null,
   lastPainFlags = null,
   twingeOffer = null,
   treat = '',
@@ -1145,6 +1220,7 @@ export function renderFitnessLogger(root, draft, {
   const host = root.querySelector('#fitness-logger');
   if (!host || !draft) return;
 
+  anatomyLibrary = libraryByName;
   // Hold the voice player before any clear — it may sit inside the last gym render.
   const voice = root.querySelector?.('#chadwick-voice') ?? null;
   host.replaceChildren();
@@ -1220,6 +1296,16 @@ export function renderFitnessLogger(root, draft, {
       data: { fitnessLogger: 'celebration', kind: celebration.kind },
       attrs: { role: 'status', 'aria-live': 'assertive' }
     });
+    const hero = draft.exercises?.[celebration.exerciseIndex];
+    const momentArt = celebration.kind === 'pr'
+      ? (regionArt(exerciseRegion(hero, draft)) ?? exerciseArt(hero))
+      : exerciseArt(hero);
+    const image = anatomyImage(root, momentArt, 'gym-art gym-moment__art');
+    if (image) {
+      moment.className += ' gym-moment--art';
+      moment.append(image);
+    }
+    if (celebration.kind === 'pr') moment.append(el(root, 'span', { className: 'gym-moment__spark', attrs: { 'aria-hidden': 'true' } }));
     moment.append(
       el(root, 'p', { className: 'gym-moment__title', text: celebration.title }),
       el(root, 'p', { className: 'gym-moment__detail', text: celebration.detail })
@@ -1242,7 +1328,7 @@ export function renderFitnessLogger(root, draft, {
   } else if (step.kind === 'round') {
     stage.append(renderRoundCard(root, draft, { step, block, noteOpen, actions }));
   } else {
-    stage.append(renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, targetFor, twingeOffer, actions }));
+    stage.append(renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, targetFor, twingeOffer, boardRows, actions }));
   }
   const upcoming = steps[stepIndex + 1];
   if (upcoming) {
@@ -1338,6 +1424,12 @@ export function renderPumpReport(root, report, { onClose } = {}) {
   });
   const stage = el(root, 'main', { className: 'gym__stage pump__stage' });
   const hero = el(root, 'header', { className: 'pump__hero' });
+  const topRegion = (report.buildBoard ?? []).reduce((best, row) => ((row.today ?? 0) > (best?.today ?? 0) ? row : best), null);
+  const pumpArt = anatomyImage(root, regionArt(topRegion?.region ?? (report.prs.length ? 'arms' : 'full_body')), 'gym-art pump__art');
+  if (pumpArt) {
+    hero.className += ' pump__hero--art';
+    hero.append(pumpArt);
+  }
   hero.append(
     el(root, 'p', { className: 'pump__eyebrow', text: 'PUMP REPORT' }),
     el(root, 'h2', { className: 'pump__title', text: report.title })

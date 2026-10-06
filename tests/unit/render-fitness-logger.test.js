@@ -235,7 +235,7 @@ test('a celebration banner leads the stage', () => {
   const root = render(draftWithCues(), { celebration: { kind: 'pr', title: 'PERSONAL BEST', detail: 'Bench — Heaviest ever' } });
   const moment = byMarker(root.logger, 'celebration')[0];
   assert.equal(moment.dataset.kind, 'pr');
-  assert.equal(moment.children[0].textContent, 'PERSONAL BEST');
+  assert.equal(moment.children.find(child => child.className === 'gym-moment__title').textContent, 'PERSONAL BEST');
 });
 
 test('readiness check-in leads the first set and shows advice once answered', () => {
@@ -272,4 +272,30 @@ test('twinge offer and rest win render; all-done shows the AEKE wrap-up', () => 
   assert.equal(byMarker(root.logger, 'rest-win')[0].textContent, 'Bench: 30 kg → 36 kg since 01/03/26.');
   const wrap = byMarker(root.logger, 'wrap-up')[0];
   assert.ok(byMarker(wrap, 'aeke-score')[0]);
+});
+
+test('anatomy art: a straight set gets the muscle hero with its weekly meter; a superset shows both muscles', () => {
+  const draft = draftWithCues();
+  draft.exercises[0].name = 'Bar Hip Thrust';
+  const root = render(draft, {
+    libraryByName: { 'Bar Hip Thrust': { name: 'Bar Hip Thrust', target_area: 'glutes' } },
+    boardRows: [{ region: 'legs', label: 'Legs', done: 5, target: 8, today: 4, todayDone: 1 }]
+  });
+  const hero = byMarker(root.logger, 'hero')[0];
+  assert.ok(hero, 'hero header');
+  assert.match(walk(hero).find(node => node.tagName === 'img').src, /muscles\/glutes\.png/);
+  assert.equal(byMarker(hero, 'hero-meter')[0].children[0].textContent, '6/8');
+
+  const sets = [{ reps: 10, weight_kg: 30, cable_type: 'constant_force' }];
+  draft.exercises = [
+    { name: 'Bar Press', superset_group: 1, sets },
+    { name: 'Cable Bar Wide Grip Curl', superset_group: 1, sets }
+  ];
+  const split = render(draft, { stepIndex: 0, libraryByName: null });
+  assert.equal(byMarker(split.logger, 'hero').length, 0, 'no duplicate hero inside a superset');
+  const order = byMarker(split.logger, 'block-order')[0];
+  assert.match(order.className, /gym-split/);
+  const images = walk(order).filter(node => node.tagName === 'img').map(node => node.src);
+  assert.deepEqual(images, ['assets/fitness/muscles/chest-whole.png', 'assets/fitness/regions/arms.png'], 'curls use the flexing arm');
+  assert.ok(walk(order).some(node => node.textContent === 'NOW'));
 });
