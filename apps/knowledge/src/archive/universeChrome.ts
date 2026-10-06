@@ -24,8 +24,36 @@ export function graphFullscreenButtonHtml(fullscreen: boolean) {
   return `<button type="button" data-universe-fullscreen aria-pressed="${fullscreen}" class="${fullscreen ? "is-active" : ""}">${fullscreen ? "Exit" : "Full screen"}</button>`;
 }
 
+/** Full screen only: folds the controls back into their token. */
+export function graphChromeTuckButtonHtml() {
+  return `<button type="button" class="graph-chrome-tuck" data-chrome-tuck title="Fold the controls into a small disk">Hide</button>`;
+}
+
+/** The translucent disk the controls fold into in full screen; tap it to bring them back. */
+export function graphChromeTokenHtml(tucked: boolean) {
+  return `<button type="button" class="graph-chrome-token" data-chrome-token aria-label="Show controls" aria-expanded="${!tucked}"></button>`;
+}
+
+export function applyGraphChromeTuck(wrap: HTMLElement, tucked: boolean) {
+  wrap.classList.toggle("is-chrome-tucked", tucked);
+  wrap.querySelector("[data-chrome-token]")?.setAttribute("aria-expanded", String(!tucked));
+}
+
+export function bindGraphChromeTuck(wrap: HTMLElement, setTucked: (tucked: boolean) => void) {
+  const token = wrap.querySelector<HTMLButtonElement>("[data-chrome-token]");
+  const tuck = wrap.querySelector<HTMLButtonElement>("[data-chrome-tuck]");
+  if (token) token.onclick = () => setTucked(false);
+  if (tuck) {
+    tuck.onclick = () => {
+      setTucked(true);
+      token?.focus({ preventScroll: true });
+    };
+  }
+}
+
 export function graphFullscreenToolsHtml(fullscreen: boolean) {
   return `<div class="universe-view-tools graph-modes" role="group" aria-label="Graph view">
+    ${graphChromeTuckButtonHtml()}
     ${graphFullscreenButtonHtml(fullscreen)}
   </div>`;
 }
@@ -33,6 +61,7 @@ export function graphFullscreenToolsHtml(fullscreen: boolean) {
 export function universeViewToolsHtml(dark: boolean, fullscreen: boolean) {
   return `<div class="universe-view-tools graph-modes" role="group" aria-label="Universe view">
     <button type="button" data-universe-dark aria-pressed="${dark}" class="${dark ? "is-active" : ""}">${dark ? "Light" : "Dark"}</button>
+    ${graphChromeTuckButtonHtml()}
     ${graphFullscreenButtonHtml(fullscreen)}
   </div>`;
 }

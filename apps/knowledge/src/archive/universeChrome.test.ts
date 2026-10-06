@@ -2,7 +2,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   UNIVERSE_DARK_KEY,
+  applyGraphChromeTuck,
   applyUniverseViewState,
+  bindGraphChromeTuck,
+  graphChromeTokenHtml,
   bindUniverseView,
   readUniverseDark,
   shouldExitUniverseFullscreen,
@@ -165,5 +168,28 @@ describe("universe effects toolbar", () => {
     document.querySelector<HTMLButtonElement>("[data-universe-comet]")!.click();
     document.querySelector<HTMLButtonElement>("[data-universe-saver]")!.click();
     expect(calls).toEqual(["sound:true", "ambient:3", "lens:true", "comet", "saver"]);
+  });
+
+  it("folds the full-screen controls into a token and opens them again", () => {
+    const wrap = document.createElement("div");
+    wrap.className = "graph-wrap is-universe-fullscreen is-chrome-tucked";
+    wrap.innerHTML = `${graphFullscreenToolsHtml(true)}${graphChromeTokenHtml(true)}`;
+    document.body.appendChild(wrap);
+    let tucked = true;
+    bindGraphChromeTuck(wrap, next => {
+      tucked = next;
+      applyGraphChromeTuck(wrap, next);
+    });
+    const token = wrap.querySelector<HTMLButtonElement>("[data-chrome-token]")!;
+    expect(token.getAttribute("aria-expanded")).toBe("false");
+    token.click();
+    expect(tucked).toBe(false);
+    expect(wrap.classList.contains("is-chrome-tucked")).toBe(false);
+    expect(token.getAttribute("aria-expanded")).toBe("true");
+    wrap.querySelector<HTMLButtonElement>("[data-chrome-tuck]")!.click();
+    expect(tucked).toBe(true);
+    expect(wrap.classList.contains("is-chrome-tucked")).toBe(true);
+    expect(document.activeElement).toBe(token);
+    wrap.remove();
   });
 });
