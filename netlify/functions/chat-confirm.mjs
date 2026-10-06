@@ -472,6 +472,8 @@ export function createChatConfirmHandler({
           sha,
           commitSha,
           centralNodeUpdated,
+          record: validation.record,
+          notes: validation.notes ?? null,
           ...(exercisePersonalBests !== undefined ? { personalBests: exercisePersonalBests } : {}),
           ...(dayoneSent != null ? { dayoneSent, ...(dayoneReason ? { dayoneReason } : {}) } : {})
         }

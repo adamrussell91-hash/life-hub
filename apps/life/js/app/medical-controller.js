@@ -16,6 +16,27 @@ function writeShowMinor(value) {
   } catch { /* ignore */ }
 }
 
+function loggedMedicalEvent(visit, payload, result = {}) {
+  const built = payload ?? buildMedicalPayload(visit ?? {}, { notes: visit?.notes });
+  const record = {
+    schema_version: 1,
+    type: 'medical',
+    id: result.record?.id ?? visit?.id,
+    date: built.candidate.date,
+    time: built.candidate.time || visit?.time || '00:00',
+    ...built.candidate.fields,
+    ...(result.record ?? {})
+  };
+  if (!record.id) record.id = result.path || `medical-${record.date}`;
+  return {
+    record,
+    path: result.path ?? null,
+    body: result.notes ?? built.candidate.notes ?? '',
+    sha: result.sha,
+    legacy: false
+  };
+}
+
 export function createMedicalController({
   chatApi,
   tasksApi,
@@ -70,6 +91,33 @@ export function createMedicalController({
       return { ...model, mode, draft };
     },
     hooks(paint) {
+      async function persistVisit(visit) {
+        if (!chatApi || !visit || visit.virtual) return;
+        if (!isOnline()) return fail(OFFLINE_MESSAGE);
+        const payload = buildMedicalPayload(visit, { notes: visit.notes });
+        try {
+          const result = await chatApi.confirm({
+            candidate: payload.candidate,
+            slug: payload.slug,
+            overwrite: true
+          });
+          if (result?.ok === false) {
+            paint();
+            return result;
+          }
+          const event = loggedMedicalEvent(visit, payload, result);
+          mode = 'read';
+          draft = null;
+          selectedId = event.record.id;
+          onRecordWritten?.(event);
+          paint();
+          return result;
+        } catch (error) {
+          fail(error);
+          paint();
+        }
+      }
+
       return {
         onSelect: id => {
           selectedId = id;
@@ -134,74 +182,10 @@ export function createMedicalController({
           draft = null;
           paint();
         },
-        onWeightChange: async (visit, weight) => {
-          if (!chatApi || !visit || visit.virtual) return;
-          if (!isOnline()) return fail(OFFLINE_MESSAGE);
-          const payload = buildMedicalPayload({ ...visit, weight }, { notes: visit.notes });
-          try {
-            const result = await chatApi.confirm({
-              candidate: payload.candidate,
-              slug: payload.slug,
-              overwrite: true
-            });
-            if (result?.ok === false) return result;
-            selectedId = result?.record?.id ?? visit.id;
-            onRecordWritten?.(result);
-            paint();
-            return result;
-          } catch (error) {
-            fail(error);
-            paint();
-          }
-        },
-        onMarkBooked: async visit => {
-          if (!chatApi || !visit || visit.virtual) return;
-          if (!isOnline()) return fail(OFFLINE_MESSAGE);
-          // Booking confirms the appointment where it is; it must never re-date it to today.
-          const payload = buildMedicalPayload({
-            ...visit,
-            status: 'booked',
-            date_precision: 'day'
-          }, { notes: visit.notes });
-          try {
-            const result = await chatApi.confirm({
-              candidate: payload.candidate,
-              slug: payload.slug,
-              overwrite: true
-            });
-            if (result?.ok === false) return result;
-            selectedId = result?.record?.id ?? visit.id;
-            onRecordWritten?.(result);
-            paint();
-            return result;
-          } catch (error) {
-            fail(error);
-            paint();
-          }
-        },
-        onMarkDone: async visit => {
-          if (!chatApi || !visit || visit.virtual) return;
-          if (!isOnline()) return fail(OFFLINE_MESSAGE);
-          const payload = buildMedicalPayload({
-            ...visit,
-            status: 'done'
-          }, { notes: visit.notes });
-          try {
-            const result = await chatApi.confirm({
-              candidate: payload.candidate,
-              slug: payload.slug,
-              overwrite: true
-            });
-            if (result?.ok === false) return result;
-            selectedId = result?.record?.id ?? visit.id;
-            onRecordWritten?.(result);
-            paint();
-            return result;
-          } catch (error) {
-            fail(error);
-            paint();
-          }
-        },
+        onWeightChange: (visit, weight) => persistVisit({ ...visit, weight }),
+        // Booking confirms the appointment where it is; it must never re-date it to today.
+        onMarkBooked: visit => persistVisit({ ...visit, status: 'booked', date_precision: 'day' }),
+        onMarkDone: visit => persistVisit({ ...visit, status: 'done' }),
         onAddToTasks: async visit => {
           if (!visit || visit.task_id || visit.virtual) return;
           if (!tasksApi?.createTask) return;
@@ -212,36 +196,18 @@ export function createMedicalController({
               domain: 'health'
             });
             const taskId = created?.task?.id ?? created?.id ?? created?.task_id;
-            if (!taskId) {
+            if (!taskId || !chatApi) {
               paint();
               return;
             }
-            if (!chatApi) {
-              paint();
-              return;
-            }
-            const payload = buildMedicalPayload({
-              ...visit,
-              task_id: taskId
-            }, { notes: visit.notes });
-            const result = await chatApi.confirm({
-              candidate: payload.candidate,
-              slug: payload.slug,
-              overwrite: true
-            });
-            if (result?.ok === false) return result;
-            selectedId = result?.record?.id ?? visit.id;
-            onRecordWritten?.(result);
-            paint();
-            return result;
+            return persistVisit({ ...visit, task_id: taskId });
           } catch (error) {
             fail(error);
             paint();
           }
         },
-        onSave: async fields => {
+        onSave: fields => {
           if (!chatApi) return;
-          if (!isOnline()) return fail(OFFLINE_MESSAGE);
           const recordType = fields.record_type || 'Appointment';
           // The lane follows the type: keep an existing one only while the type is unchanged, otherwise
           // let it be derived (a "Lab Work" visit was being filed in the appointment lane).
@@ -253,27 +219,7 @@ export function createMedicalController({
             record_type: recordType,
             lane: keepLane ? draft.lane : undefined
           };
-          const payload = buildMedicalPayload(draft, { notes: fields.notes });
-          try {
-            const result = await chatApi.confirm({
-              candidate: payload.candidate,
-              slug: payload.slug,
-              overwrite: true
-            });
-            if (result?.ok === false) {
-              paint();
-              return result;
-            }
-            mode = 'read';
-            draft = null;
-            selectedId = result?.record?.id ?? selectedId;
-            onRecordWritten?.(result);
-            paint();
-            return result;
-          } catch (error) {
-            fail(error);
-            paint();
-          }
+          return persistVisit(draft);
         }
       };
     }

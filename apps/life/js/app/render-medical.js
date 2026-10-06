@@ -801,7 +801,7 @@ function writeForm(root, draft, hooks) {
   const form = root.createElement('form');
   form.className = 'medical-form';
   form.addEventListener('submit', event => {
-    event.preventDefault?.();
+    event.preventDefault();
     hooks.onSave?.(readDraft(form));
   });
   const title = field(root, 'title', 'Title', draft?.title ?? '');
