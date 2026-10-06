@@ -3652,6 +3652,109 @@ body.is-gym-mode { overflow: hidden; }
   .gym-moment { animation: none; }
 }
 
+/* Tier 2/3: readiness, focus, twinge, rest wins, wrap-up. */
+.gym-rest__win {
+  margin: 0.2rem 0 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.6rem;
+  background: var(--on-dark-hover);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.gym-focus {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.65rem;
+  background: var(--on-dark-hover);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+.gym-focus strong { color: var(--high-sea); }
+.gym-focus--external strong { color: var(--pastel-blue); }
+.gym-chip--twinge.is-active { border-color: var(--danger-line); background: var(--danger); color: white; }
+.gym-twinge { display: grid; gap: 0.45rem; }
+.gym-twinge-offer {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 60%, transparent);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+.gym-twinge-offer p { margin: 0; font-size: var(--text-sm); }
+.gym-ready { gap: 0.7rem; }
+.gym-ready__title { margin: 0; font-size: var(--text-lg); }
+.gym-ready__row {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.2rem 0.6rem;
+}
+.gym-ready__label { font-weight: 700; font-size: var(--text-sm); }
+.gym-ready__pills { flex-wrap: nowrap; }
+.gym .gym-ready__pills .hub-pills__btn { min-width: 44px; justify-content: center; padding-inline: 0.5rem; }
+.gym-ready__hint { grid-column: 2; color: var(--on-dark-muted); font-size: var(--text-xs); }
+.gym-ready__pain,
+.gym-ready__treat { margin: 0; font-size: var(--text-sm); color: var(--on-dark-muted); }
+.gym-ready__treat { color: var(--high-sea); font-weight: 650; }
+.gym-ready__advice {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--on-dark-hover);
+}
+.gym-ready__advice p { margin: 0; font-size: var(--text-sm); color: var(--on-dark-muted); }
+.gym-ready__advice--push { background: color-mix(in srgb, var(--high-sea) 22%, transparent); }
+.gym-ready__advice--lighter { background: color-mix(in srgb, var(--wave) 30%, transparent); }
+.gym-wrap__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+.gym-wrap__field { display: grid; gap: 0.25rem; color: var(--on-dark-muted); font-size: var(--text-xs); }
+.gym-wrap h2,
+.gym-wrap p { margin: 0; }
+.gym-wrap__field { min-width: 0; }
+.gym-wrap__field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--on-dark-line);
+  border-radius: 0.6rem;
+  background: var(--depth);
+  color: var(--on-dark);
+  font: inherit;
+  font-size: 16px;
+}
+.pump__streak { margin: 0; color: var(--high-sea); font-size: var(--text-sm); font-weight: 700; }
+
+/* Fitness page: week streak note, Season, Benchmark Wall. */
+.fitness-streak-note[hidden] { display: none; }
+.fitness-season { display: grid; gap: var(--space-1); margin-top: var(--space-3); }
+.fitness-season[hidden] { display: none; }
+.fitness-season__name { color: var(--depth); font-size: var(--text-md); }
+.fitness-season__mission { margin: 0; color: var(--depth); font-size: var(--text-sm); }
+.fitness-season__bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wave) 12%, transparent);
+}
+.fitness-season__bar span { display: block; width: var(--w, 0%); height: 100%; background: var(--high-sea); }
+.bench-wall { display: grid; gap: var(--space-2); }
+.bench-wall__row {
+  display: grid;
+  gap: 0.15rem;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+.bench-wall__row:first-child { border-top: 0; }
+.bench-wall__head { display: flex; justify-content: space-between; gap: var(--space-2); }
+.bench-wall__head strong { color: var(--depth); font-size: var(--text-sm); }
+.bench-wall__latest { color: var(--depth); font-weight: 700; font-variant-numeric: tabular-nums; font-size: var(--text-sm); }
+.bench-wall__latest[data-trend="up"] { color: var(--success); }
+.bench-wall__latest[data-trend="down"] { color: var(--high-sea-ink); }
+.bench-wall__row[data-best="true"] .bench-wall__head strong::after { content: ' · PB'; color: var(--high-sea-ink); }
+.bench-wall__history { margin: 0; }
+
 /* Minimised: a compact bar on the Fitness card. */
 .gym-mini {
   display: flex;

@@ -505,3 +505,61 @@ test('finishing builds a Pump Report from what happened', async () => {
   assert.match(report.chadwick, /last week's you|New ground|showed up|more work/);
   controller.destroy();
 });
+
+test('readiness: a flat day lightens not-done K1 loads and is saved on the record', async () => {
+  const { controller, confirms } = makeController();
+  controller.mount(session());
+  controller.setReadiness('sleep', 2);
+  controller.setReadiness('soreness', 2);
+  controller.setReadiness('energy', 2);
+  controller.applyReadiness();
+  assert.equal(controller.getDraft().exercises[0].sets[0].weight_kg, 32.5);
+  await controller.finish();
+  assert.deepEqual(confirms[0].candidate.fields.readiness, { sleep: 2, soreness: 2, energy: 2, adjusted: 'lighter' });
+  controller.destroy();
+});
+
+test('twinge flags pain for Sara, tags the set, and can lighten the rest of the move', async () => {
+  const { controller, confirms } = makeController();
+  const plan = session();
+  plan.exercises = [{ name: 'Bar Row', sets: [
+    { reps: 10, weight_kg: 36, cable_type: 'constant_force' },
+    { reps: 10, weight_kg: 36, cable_type: 'constant_force' }
+  ] }];
+  controller.mount(plan);
+  controller.doneStep();
+  controller.twinge(0, 0, 'Right shoulder');
+  controller.lightenRemaining(0);
+  const draft = controller.getDraft();
+  assert.deepEqual(draft.pain_flags, [{ site: 'Right shoulder', note: 'twinge on Bar Row, set 1' }]);
+  assert.equal(draft.exercises[0].sets[0].note, 'twinge: right shoulder');
+  assert.deepEqual(draft.exercises[0].sets.map(set => set.weight_kg), [36, 29]);
+  assert.match(draft.exercises[0].notes, /lightened after a twinge/);
+  await controller.finish();
+  assert.equal(confirms[0].candidate.fields.pain_flags[0].site, 'Right shoulder');
+  controller.destroy();
+});
+
+test('AEKE stats land on the record; an AMRAP drops the rounds you never played', async () => {
+  const sets = n => Array.from({ length: n }, () => ({ reps: 5, weight_kg: 0, cable_type: 'none' }));
+  const { controller, confirms } = makeController();
+  controller.mount({
+    ...session(),
+    exercises: [
+      { name: 'Push Up', tracking: 'bodyweight_reps', superset_group: 1, block: { kind: 'circuit', format: 'amrap', time_cap_sec: 180 }, sets: sets(5) },
+      { name: 'Bench Dip', tracking: 'bodyweight_reps', superset_group: 1, sets: sets(5) }
+    ]
+  });
+  controller.doneStep();
+  controller.doneStep();
+  controller.setAeke('volume_kg', '4842');
+  controller.setAeke('score', '99');
+  controller.setAeke('strength_region', 'arms');
+  await controller.finish();
+  const fields = confirms[0].candidate.fields;
+  assert.deepEqual(fields.aeke, { volume_kg: 4842, score: 99, strength_region: 'arms' });
+  assert.equal(fields.exercises[0].sets.length, 2);
+  assert.equal(fields.exercises[1].sets.length, 2);
+  assert.equal(fields.exercises[0].block.result.rounds, 2);
+  controller.destroy();
+});

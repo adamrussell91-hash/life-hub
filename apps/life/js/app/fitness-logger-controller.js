@@ -20,6 +20,10 @@ import {
   detectPersonalBest,
   exerciseKey,
   ghostForSet,
+  lighterLoad,
+  projectBuildBoard,
+  readinessAdvice,
+  restWins,
   suggestTarget
 } from './fitness-progression.js';
 import { resolveTrackingType } from '../core/exercise-tracking.js';
@@ -77,6 +81,12 @@ export function createFitnessLoggerController({
   let celebration = null; // { kind, title, detail }
   let celebrationTimerId = null;
   let lastReport = null;
+  // Tier 2/3 state.
+  let readinessOpen = true;
+  let twingeOffer = null; // { exerciseIndex, site }
+  let ghostsBeatenCount = 0;
+  let prsToday = 0;
+  let restCount = 0;
   const circuits = new Map(); // blockIndex → { accumulatedMs, startedAt }
   let layout = { blocks: [], steps: [] };
 
@@ -98,7 +108,7 @@ export function createFitnessLoggerController({
 
   function restSnapshot() {
     if (!rest) return null;
-    return { remainingMs: Math.max(0, rest.endsAt - now()), cue: rest.cue, label: rest.label };
+    return { remainingMs: Math.max(0, rest.endsAt - now()), cue: rest.cue, label: rest.label, win: rest.win };
   }
 
   function circuitElapsed(blockIndex) {
@@ -211,9 +221,24 @@ export function createFitnessLoggerController({
     refreshChrome();
   }
 
-  function startRest(seconds, { cue = null, label = 'Rest' } = {}) {
+  function pickRestWin(exercise) {
+    const wins = restWins({
+      exercise,
+      bests: motivation.exerciseBests,
+      buildBoard: motivation.buildBoard && draft ? projectBuildBoard(motivation.buildBoard, draft, motivation.libraryByName) : null,
+      weekStreak: motivation.weekStreak,
+      ghostsBeaten: ghostsBeatenCount,
+      prsToday
+    });
+    if (!wins.length) return null;
+    const win = wins[restCount % wins.length];
+    restCount += 1;
+    return win;
+  }
+
+  function startRest(seconds, { cue = null, label = 'Rest', exercise = null } = {}) {
     if (!(seconds > 0)) return;
-    rest = { endsAt: now() + seconds * 1000, cue, label };
+    rest = { endsAt: now() + seconds * 1000, cue, label, win: pickRestWin(exercise) };
     stopRestInterval();
     restTimerId = setIntervalImpl(restTick, 1000);
   }
@@ -543,6 +568,8 @@ export function createFitnessLoggerController({
       }
     }
     if (!headline) return;
+    if (headline.kind === 'pr') prsToday += 1;
+    if (headline.kind === 'beat') ghostsBeatenCount += 1;
     celebrate(headline);
     if (headline.kind === 'pr') vibrate([60, 40, 60, 40, 220]);
     else if (headline.kind === 'beat') vibrate([40, 30, 90]);
@@ -572,6 +599,106 @@ export function createFitnessLoggerController({
     }
     setField(exerciseIndex, setIndex, 'reps', target.reps);
     rerender();
+  }
+
+  // ── Readiness, twinges, AEKE stats ─────────────────────────────────────
+
+  function setReadiness(field, value) {
+    if (!draft) return;
+    draft.readiness = { ...(draft.readiness ?? {}), [field]: value };
+    delete draft.readiness.adjusted;
+    touchDraft({ rerenderAfter: true });
+  }
+
+  /** Commit the check-in; a flat day drops not-done weighted loads ~10%. */
+  function applyReadiness() {
+    if (!draft) return;
+    const advice = readinessAdvice(draft.readiness);
+    if (!advice) return;
+    if (advice.adjusted === 'lighter') {
+      for (const exercise of draft.exercises ?? []) {
+        if (resolveTrackingType(exercise) !== 'weighted') continue;
+        for (const set of exercise.sets ?? []) {
+          if (!set.done) set.weight_kg = lighterLoad(set.weight_kg);
+        }
+      }
+    }
+    draft.readiness = { ...draft.readiness, adjusted: advice.adjusted };
+    readinessOpen = false;
+    touchDraft({ rerenderAfter: true });
+  }
+
+  function skipReadiness() {
+    readinessOpen = false;
+    rerender();
+  }
+
+  /** Twinge: pain flag for Sara + a note on the set, then offer to lighten the move. */
+  function twinge(exerciseIndex, setIndex, site) {
+    const exercise = draft?.exercises?.[exerciseIndex];
+    if (!exercise || !site) return;
+    const where = setIndex >= 0 ? `${exercise.name}, set ${setIndex + 1}` : exercise.name;
+    const already = (draft.pain_flags ?? []).some(flag => flag?.site === site && String(flag?.note ?? '').includes(exercise.name));
+    if (!already) draft.pain_flags = [...(draft.pain_flags ?? []), { site, note: `twinge on ${where}` }];
+    const set = exercise.sets?.[setIndex];
+    if (set) {
+      const tag = `twinge: ${site.toLowerCase()}`;
+      set.note = set.note ? (set.note.includes(tag) ? set.note : `${set.note}; ${tag}`) : tag;
+    }
+    noteOpen = null;
+    twingeOffer = { exerciseIndex, site };
+    touchDraft({ rerenderAfter: true });
+  }
+
+  function lightenRemaining(exerciseIndex) {
+    const exercise = draft?.exercises?.[exerciseIndex];
+    if (!exercise) return;
+    for (const set of exercise.sets ?? []) {
+      if (set.done) continue;
+      set.weight_kg = Math.max(0, Math.round((Number(set.weight_kg) || 0) * 0.8 * 2) / 2);
+    }
+    exercise.notes = exercise.notes
+      ? `${exercise.notes}; lightened after a twinge`
+      : 'lightened after a twinge — swap the pattern next time';
+    twingeOffer = null;
+    touchDraft({ rerenderAfter: true });
+  }
+
+  function dismissTwinge() {
+    twingeOffer = null;
+    rerender();
+  }
+
+  function setAeke(field, value) {
+    if (!draft) return;
+    const next = { ...(draft.aeke ?? {}) };
+    if (field === 'strength_region') {
+      const text = String(value ?? '').trim();
+      if (text) next.strength_region = text;
+      else delete next.strength_region;
+    } else {
+      const number = optionalNumber(value);
+      if (number == null) delete next[field];
+      else next[field] = number;
+    }
+    draft.aeke = next;
+    touchDraft();
+  }
+
+  const TREAT_KEY = 'life-hub:gym-treat';
+  function readTreat() {
+    try {
+      return storage?.getItem?.(TREAT_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  }
+  function setTreat(value) {
+    try {
+      storage?.setItem?.(TREAT_KEY, String(value ?? '').slice(0, 120));
+    } catch {
+      // Per-device convenience only.
+    }
   }
 
   // ── Navigation & progress ──────────────────────────────────────────────
@@ -634,12 +761,14 @@ export function createFitnessLoggerController({
     }
 
     const finishedAll = layout.steps.every(stepDone);
+    if (finishedAll) clearRest();
     if (step.restAfter && !finishedAll && !(block?.kind === 'circuit' && block.format !== 'rounds' && !blockFinished)) {
       const exercise = draft.exercises?.[step.members[0].exerciseIndex];
       const blockCue = block?.exercises?.find(item => item?.coach_cues?.rest)?.coach_cues?.rest;
       startRest(restSecondsFor(step), {
         cue: exercise?.coach_cues?.rest ?? blockCue ?? null,
-        label: block?.kind === 'circuit' ? 'Rest — round done' : (block?.kind === 'superset' ? 'Rest — round done' : 'Rest')
+        label: block?.kind === 'circuit' ? 'Rest — round done' : (block?.kind === 'superset' ? 'Rest — round done' : 'Rest'),
+        exercise
       });
     } else if (!step.restAfter) {
       clearRest();
@@ -810,6 +939,14 @@ export function createFitnessLoggerController({
     addRound,
     applyTarget,
     setCircuitResult,
+    setReadiness,
+    applyReadiness,
+    skipReadiness,
+    twinge,
+    lightenRemaining,
+    dismissTwinge,
+    setAeke,
+    setTreat,
     finish: () => void finish().catch(() => {}),
     start: () => startTimer(),
     pause: pauseTimer,
@@ -841,6 +978,10 @@ export function createFitnessLoggerController({
       lastPerformance,
       celebration,
       targetFor,
+      readinessOpen: readinessOpen && !draft.readiness?.adjusted && !layout.steps.some(stepDone),
+      lastPainFlags: motivation.lastPainFlags,
+      twingeOffer,
+      treat: readTreat(),
       actions
     });
   }
@@ -871,6 +1012,19 @@ export function createFitnessLoggerController({
     }
   }
 
+  /** An AMRAP plans more rounds than you'll play; unplayed rounds don't get logged. */
+  function trimUnplayedAmrapRounds() {
+    for (const block of layout.blocks) {
+      if (block.kind !== 'circuit' || block.format !== 'amrap') continue;
+      const played = layout.steps.filter(step => step.blockIndex === layout.blocks.indexOf(block) && stepDone(step)).length;
+      if (!played) continue;
+      for (const index of block.indexes) {
+        const exercise = draft.exercises[index];
+        if (exercise?.sets?.length > played) exercise.sets = exercise.sets.slice(0, played);
+      }
+    }
+  }
+
   async function finish() {
     if (!draft || finishing) return;
     finishing = true;
@@ -883,6 +1037,7 @@ export function createFitnessLoggerController({
       stopCircuitClock(index);
       writeCircuitResult(index);
     });
+    trimUnplayedAmrapRounds();
     const mins = Math.round(elapsedMs() / 60_000);
     if (mins > 0 && draft.duration_min == null) draft.duration_min = mins;
     setSaveState('Finishing…');
@@ -900,7 +1055,8 @@ export function createFitnessLoggerController({
         board: motivation.buildBoard,
         libraryByName: motivation.libraryByName,
         previousVolume: motivation.lastSessionVolume,
-        elapsedMs: elapsedMs()
+        elapsedMs: elapsedMs(),
+        weekStreak: motivation.weekStreak
       });
       clearDraft(storage, draft.date, draft.path);
       unmount();
@@ -927,6 +1083,11 @@ export function createFitnessLoggerController({
     if (celebrationTimerId != null) clearTimeoutImpl(celebrationTimerId);
     celebrationTimerId = null;
     celebration = null;
+    readinessOpen = true;
+    twingeOffer = null;
+    ghostsBeatenCount = 0;
+    prsToday = 0;
+    restCount = 0;
     resetTimer();
     clearRest();
     circuits.clear();
@@ -953,15 +1114,17 @@ export function createFitnessLoggerController({
     exerciseBests = null,
     buildBoard = null,
     lastSessionVolume = null,
-    libraryByName = null
+    libraryByName = null,
+    weekStreak = null,
+    lastPainFlags = null
   } = {}) {
     if (!session || session.status !== 'planned') {
       unmount();
       return;
     }
     if (previous) lastPerformance = previous;
-    if (exerciseBests || buildBoard) {
-      motivation = { exerciseBests, buildBoard, lastSessionVolume, libraryByName };
+    if (exerciseBests || buildBoard || weekStreak) {
+      motivation = { exerciseBests, buildBoard, lastSessionVolume, libraryByName, weekStreak, lastPainFlags };
     }
 
     const nextDraft = resolveDraft(session, storage);
@@ -1010,6 +1173,11 @@ export function createFitnessLoggerController({
     getLastReport: () => lastReport,
     applyTarget,
     getTarget: targetFor,
+    setReadiness,
+    applyReadiness,
+    twinge,
+    lightenRemaining,
+    setAeke,
     getTimerState,
     startTimer: () => startTimer(),
     pauseTimer,

@@ -111,8 +111,15 @@ export function cloneLoggerDraft(session) {
       };
     }),
     notes: typeof source.notes === 'string' ? source.notes : '',
+    ...(isPlainObject(source.season) ? { season: { ...source.season } } : {}),
+    ...(isPlainObject(source.readiness) ? { readiness: { ...source.readiness } } : {}),
+    ...(isPlainObject(source.aeke) ? { aeke: { ...source.aeke } } : {}),
     path: source.path ?? null
   };
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function draftStorageKey(date, path) {
@@ -186,7 +193,10 @@ export function toConfirmPayload(draft, { status = 'planned' } = {}) {
       ...(working.duration_min != null ? { duration_min: working.duration_min } : {}),
       ...(working.avg_hr != null ? { avg_hr: working.avg_hr } : {}),
       ...(working.calories_kcal != null ? { calories_kcal: working.calories_kcal } : {}),
-      ...(working.distance_km != null ? { distance_km: working.distance_km } : {})
+      ...(working.distance_km != null ? { distance_km: working.distance_km } : {}),
+      ...(working.season ? { season: working.season } : {}),
+      ...(working.readiness ? { readiness: working.readiness } : {}),
+      ...(working.aeke && Object.keys(working.aeke).length ? { aeke: working.aeke } : {})
     }
   };
   return { candidate, slug, overwrite: true };

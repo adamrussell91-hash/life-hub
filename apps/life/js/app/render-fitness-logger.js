@@ -14,7 +14,7 @@ import {
   createMorphingValuesPopover
 } from '../../../../packages/design-kit/js/morphing-popover.js';
 import { describeSet, resolveTrackingType } from '../core/exercise-tracking.js';
-import { compareToGhost, ghostForSet } from './fitness-progression.js';
+import { TWINGE_SITES, compareToGhost, focusCue, ghostForSet, readinessAdvice } from './fitness-progression.js';
 import {
   blockMemberCode,
   formatBlockResult,
@@ -236,6 +236,7 @@ function renderRest(root, rest, actions) {
   });
   panel.append(head, clock);
   if (rest.cue) panel.append(el(root, 'p', { className: 'gym-rest__cue fitness-logger__cue fitness-logger__cue--rest', text: rest.cue, data: { fitnessLogger: 'cue-rest' } }));
+  if (rest.win) panel.append(el(root, 'p', { className: 'gym-rest__win', text: rest.win, data: { fitnessLogger: 'rest-win' } }));
   const row = el(root, 'div', { className: 'gym-rest__actions' });
   row.append(
     button(root, { className: 'gym-chip', text: '−15s', marker: 'rest-less', onClick: () => actions.adjustRest?.(-15) }),
@@ -383,9 +384,30 @@ function renderSetFlags(root, { exercise, set, exerciseIndex, setIndex, noteOpen
       marker: 'open-exercise-note',
       pressed: noteOpen === 'exercise',
       onClick: () => actions.toggleNote?.('exercise')
+    }),
+    button(root, {
+      className: `gym-chip gym-chip--twinge${noteOpen === 'twinge' ? ' is-active' : ''}`,
+      text: 'Twinge',
+      marker: 'open-twinge',
+      pressed: noteOpen === 'twinge',
+      onClick: () => actions.toggleNote?.('twinge')
     })
   );
   wrap.append(row);
+  if (noteOpen === 'twinge') {
+    const picker = el(root, 'div', { className: 'gym-twinge', data: { fitnessLogger: 'twinge-picker' } });
+    picker.append(el(root, 'p', { className: 'gym-note__title', text: 'Where? It goes to Sara as a pain flag.' }));
+    const sites = el(root, 'div', { className: 'gym-note__chips' });
+    for (const site of TWINGE_SITES) {
+      sites.append(button(root, {
+        className: 'gym-chip',
+        text: site,
+        onClick: () => actions.twinge?.(exerciseIndex, setIndex, site)
+      }));
+    }
+    picker.append(sites);
+    wrap.append(picker);
+  }
   if (set?.failed) {
     wrap.append(el(root, 'p', {
       className: 'gym-flags__hint',
@@ -496,7 +518,21 @@ function renderTarget(root, { exercise, set, exerciseIndex, setIndex, target, ac
   return wrap;
 }
 
-function renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, targetFor, actions }) {
+function renderTwingeOffer(root, { exercise, exerciseIndex, site, actions }) {
+  const box = el(root, 'div', { className: 'gym-twinge-offer', data: { fitnessLogger: 'twinge-offer' } });
+  box.append(el(root, 'p', {
+    text: `${site} flagged for Sara on ${exercise?.name ?? 'this move'}. Lighten the rest of it, or carry on if it settled?`
+  }));
+  const row = el(root, 'div', { className: 'gym-flags__row' });
+  row.append(
+    button(root, { className: 'gym-chip gym-chip--strong', text: 'Lighten remaining −20%', marker: 'twinge-lighten', onClick: () => actions.lightenRemaining?.(exerciseIndex) }),
+    button(root, { className: 'gym-chip', text: 'It settled — carry on', marker: 'twinge-dismiss', onClick: () => actions.dismissTwinge?.() })
+  );
+  box.append(row);
+  return box;
+}
+
+function renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, targetFor, twingeOffer, actions }) {
   const { exerciseIndex, setIndex } = step.members[0];
   const exercise = draft.exercises?.[exerciseIndex];
   const set = exercise?.sets?.[setIndex];
@@ -515,6 +551,15 @@ function renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, ta
   head.append(titleWrap);
   card.append(head);
 
+  if (twingeOffer && twingeOffer.exerciseIndex === exerciseIndex) {
+    card.append(renderTwingeOffer(root, { exercise, exerciseIndex, site: twingeOffer.site, actions }));
+  }
+  const focus = focusCue(exercise);
+  if (focus) {
+    const chip = el(root, 'p', { className: `gym-focus gym-focus--${focus.kind}`, data: { fitnessLogger: 'focus-cue' } });
+    chip.append(el(root, 'strong', { text: 'Focus ' }), el(root, 'span', { text: focus.text }));
+    card.append(chip);
+  }
   const cue = setIndex >= 0 ? cueFor(exercise, setIndex) : null;
   if (cue) {
     card.append(el(root, 'p', {
@@ -623,6 +668,89 @@ function renderRoundCard(root, draft, { step, block, noteOpen, actions }) {
   return card;
 }
 
+const READINESS_ROWS = [
+  ['sleep', 'Sleep', ['Rough', '', 'OK', '', 'Great']],
+  ['soreness', 'Body', ['Very sore', '', 'Some', '', 'Fresh']],
+  ['energy', 'Energy', ['Flat', '', 'OK', '', 'Buzzing']]
+];
+
+/** 10-second check-in before the first set; the answer shapes the session. */
+function renderReadiness(root, draft, { lastPainFlags, treat, actions }) {
+  const card = el(root, 'section', { className: 'gym-card gym-ready', data: { fitnessLogger: 'readiness' } });
+  card.append(el(root, 'h2', { className: 'gym-ready__title', text: 'How are you walking in?' }));
+  const values = draft.readiness ?? {};
+  for (const [field, label, hints] of READINESS_ROWS) {
+    const row = el(root, 'div', { className: 'gym-ready__row' });
+    row.append(el(root, 'span', { className: 'gym-ready__label', text: label }));
+    const group = pills(root, {
+      label,
+      marker: `readiness-${field}`,
+      value: values[field] ?? null,
+      options: [1, 2, 3, 4, 5].map(value => ({ value, label: String(value) })),
+      onPick: value => actions.setReadiness?.(field, value)
+    });
+    group.className += ' gym-ready__pills';
+    row.append(group);
+    const hint = hints[(values[field] ?? 0) - 1];
+    row.append(el(root, 'span', { className: 'gym-ready__hint', text: hint || `${hints[0]} → ${hints[4]}` }));
+    card.append(row);
+  }
+  if (lastPainFlags?.flags?.length) {
+    const sites = lastPainFlags.flags.map(flag => (typeof flag === 'string' ? flag : flag?.site)).filter(Boolean).join(', ');
+    card.append(el(root, 'p', {
+      className: 'gym-ready__pain',
+      text: `Last session flagged: ${sites} (${formatShortDate(lastPainFlags.date)}). Stop at any twinge — the Twinge button lightens the move.`
+    }));
+  }
+  const advice = readinessAdvice(values);
+  const actionsRow = el(root, 'div', { className: 'gym-flags__row' });
+  if (advice) {
+    const box = el(root, 'div', { className: `gym-ready__advice gym-ready__advice--${advice.adjusted}`, data: { fitnessLogger: 'readiness-advice' } });
+    box.append(el(root, 'strong', { text: advice.title }), el(root, 'p', { text: advice.detail }));
+    card.append(box);
+    actionsRow.append(button(root, {
+      className: 'gym-chip gym-chip--strong',
+      text: advice.adjusted === 'lighter' ? 'Go lighter (−10%)' : "Let's go",
+      marker: 'readiness-apply',
+      onClick: () => actions.applyReadiness?.()
+    }));
+  }
+  actionsRow.append(button(root, { className: 'gym-chip', text: 'Skip', marker: 'readiness-skip', onClick: () => actions.skipReadiness?.() }));
+  card.append(actionsRow);
+  if (treat) {
+    card.append(el(root, 'p', { className: 'gym-ready__treat', text: `Gym-only treat: ${treat} — press play now.`, data: { fitnessLogger: 'treat' } }));
+  }
+  return card;
+}
+
+/** Last set done: grab the AEKE numbers while they're on screen, then finish. */
+function renderWrapUp(root, draft, { actions }) {
+  const card = el(root, 'section', { className: 'gym-card gym-wrap', data: { fitnessLogger: 'wrap-up' } });
+  card.append(el(root, 'h2', { text: 'All sets done' }));
+  card.append(el(root, 'p', { className: 'gym-card__meta', text: 'Copy the AEKE numbers in (optional), then hit Finish for your Pump Report.' }));
+  const aeke = draft.aeke ?? {};
+  const grid = el(root, 'div', { className: 'gym-wrap__grid' });
+  const field = (key, label, { text = false } = {}) => {
+    const wrap = el(root, 'label', { className: 'gym-wrap__field' });
+    wrap.append(el(root, 'span', { text: label }));
+    const input = el(root, 'input', { data: { fitnessLogger: `aeke-${key}` } });
+    input.type = text ? 'text' : 'number';
+    if (!text) input.inputMode = 'decimal';
+    input.value = aeke[key] ?? '';
+    input.addEventListener('input', () => actions.setAeke?.(key, input.value));
+    wrap.append(input);
+    return wrap;
+  };
+  grid.append(
+    field('volume_kg', 'AEKE volume (kg)'),
+    field('score', 'AEKE score'),
+    field('strength_delta_pct', 'Strength change %'),
+    field('strength_region', 'Which region', { text: true })
+  );
+  card.append(grid);
+  return card;
+}
+
 function renderDock(root, draft, { steps, stepIndex, allDone, actions }) {
   const dock = el(root, 'footer', { className: 'gym__dock', data: { part: 'form-actions', fitnessLogger: 'dock' } });
   const step = steps[stepIndex];
@@ -673,7 +801,7 @@ function renderDock(root, draft, { steps, stepIndex, allDone, actions }) {
   return dock;
 }
 
-function renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, actions }) {
+function renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, treat = '', actions }) {
   const sheet = el(root, 'section', {
     className: 'gym-sheet',
     data: { fitnessLogger: 'plan-sheet' },
@@ -792,6 +920,15 @@ function renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, actions
   body.append(addExercise);
 
   body.append(renderSessionDetails(root, draft, { timer, actions }));
+  const treatWrap = el(root, 'label', { className: 'fitness-logger__field gym-plan__treat' });
+  treatWrap.append(el(root, 'span', { text: 'Gym-only treat (a podcast or playlist you only allow yourself while training)' }));
+  const treatInput = el(root, 'input', { data: { fitnessLogger: 'treat-input' } });
+  treatInput.type = 'text';
+  treatInput.value = treat;
+  treatInput.placeholder = 'e.g. the new Huberman episode';
+  treatInput.addEventListener('input', () => actions.setTreat?.(treatInput.value));
+  treatWrap.append(treatInput);
+  body.append(treatWrap);
   sheet.append(body);
 
   const dock = el(root, 'footer', { className: 'gym-sheet__dock', data: { part: 'form-actions' } });
@@ -999,6 +1136,10 @@ export function renderFitnessLogger(root, draft, {
   lastPerformance = null,
   celebration = null,
   targetFor = null,
+  readinessOpen = false,
+  lastPainFlags = null,
+  twingeOffer = null,
+  treat = '',
   actions = {}
 } = {}) {
   const host = root.querySelector('#fitness-logger');
@@ -1086,6 +1227,9 @@ export function renderFitnessLogger(root, draft, {
     stage.append(moment);
   }
   if (rest && rest.remainingMs > 0) stage.append(renderRest(root, rest, actions));
+  const finishedAll = steps.length > 0 && steps.every(item => stepDone(draft, item));
+  if (readinessOpen && steps.length) stage.append(renderReadiness(root, draft, { lastPainFlags, treat, actions }));
+  if (finishedAll) stage.append(renderWrapUp(root, draft, { actions }));
   const block = step ? blocks[step.blockIndex] : null;
   if (block && isGroupedBlock(block)) {
     stage.append(renderBlockBanner(root, draft, { block, step, circuit: circuits[step.blockIndex], actions }));
@@ -1098,7 +1242,7 @@ export function renderFitnessLogger(root, draft, {
   } else if (step.kind === 'round') {
     stage.append(renderRoundCard(root, draft, { step, block, noteOpen, actions }));
   } else {
-    stage.append(renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, targetFor, actions }));
+    stage.append(renderSetCard(root, draft, { step, block, lastPerformance, noteOpen, targetFor, twingeOffer, actions }));
   }
   const upcoming = steps[stepIndex + 1];
   if (upcoming) {
@@ -1116,7 +1260,7 @@ export function renderFitnessLogger(root, draft, {
   const allDone = steps.length > 0 && steps.every(item => stepDone(draft, item));
   shell.append(renderDock(root, draft, { steps, stepIndex, allDone, actions }));
 
-  if (panel === 'plan') shell.append(renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, actions }));
+  if (panel === 'plan') shell.append(renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, treat, actions }));
 
   layer.append(shell);
 }
@@ -1205,6 +1349,7 @@ export function renderPumpReport(root, report, { onClose } = {}) {
       data: { fitnessLogger: 'pump-ghosts' }
     }));
   }
+  if (report.streak) hero.append(el(root, 'p', { className: 'pump__streak', text: report.streak, data: { fitnessLogger: 'pump-streak' } }));
   stage.append(hero);
 
   const quote = el(root, 'blockquote', { className: 'pump__chadwick', data: { fitnessLogger: 'pump-chadwick' } });
@@ -1218,6 +1363,12 @@ export function renderPumpReport(root, report, { onClose } = {}) {
   if (report.minutes != null) stats.append(statTile(root, `${report.minutes} min`, 'session'));
   if (report.density != null) stats.append(statTile(root, `${report.density}`, 'kg per minute'));
   stats.append(statTile(root, `${report.setsLogged}`, `sets · ${report.failureSets} to failure`));
+  if (report.aeke?.score != null) {
+    const delta = report.aeke.strength_delta_pct != null
+      ? ` · ${report.aeke.strength_delta_pct > 0 ? '+' : ''}${report.aeke.strength_delta_pct}% ${report.aeke.strength_region ?? 'strength'}`
+      : '';
+    stats.append(statTile(root, `${report.aeke.score}`, `AEKE score${delta}`));
+  }
   stage.append(stats);
 
   if (report.prs.length) {

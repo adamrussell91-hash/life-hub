@@ -284,7 +284,7 @@ test('the workout tool schema advertises coach_cues on each exercise so Chadwick
   assert.ok(exerciseProps.coach_cues, 'coach_cues should be a declared exercise property');
   assert.deepEqual(
     Object.keys(exerciseProps.coach_cues.properties).sort(),
-    ['final_set', 'rest', 'start']
+    ['final_set', 'focus', 'rest', 'start']
   );
 });
 

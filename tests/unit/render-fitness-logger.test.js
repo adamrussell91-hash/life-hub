@@ -237,3 +237,39 @@ test('a celebration banner leads the stage', () => {
   assert.equal(moment.dataset.kind, 'pr');
   assert.equal(moment.children[0].textContent, 'PERSONAL BEST');
 });
+
+test('readiness check-in leads the first set and shows advice once answered', () => {
+  const draft = draftWithCues();
+  draft.readiness = { sleep: 2, soreness: 2, energy: 2 };
+  const root = render(draft, {
+    readinessOpen: true,
+    lastPainFlags: { date: '2026-10-04', flags: [{ site: 'Right shoulder' }] },
+    treat: 'Huberman'
+  });
+  const card = byMarker(root.logger, 'readiness')[0];
+  assert.ok(card);
+  assert.match(byMarker(card, 'readiness-advice')[0].children[0].textContent, /go lighter/i);
+  assert.equal(byMarker(card, 'readiness-apply')[0].textContent, 'Go lighter (−10%)');
+  assert.ok(walk(card).some(node => /Right shoulder/.test(node.textContent ?? '')));
+  assert.match(byMarker(card, 'treat')[0].textContent, /Huberman/);
+});
+
+test('every set shows a focus cue and the twinge picker offers body sites', () => {
+  const root = render(draftWithCues({ focus: 'Drive the bar away.' }), { noteOpen: 'twinge' });
+  assert.match(byMarker(root.logger, 'focus-cue')[0].children[1].textContent, /Drive the bar away/);
+  const picker = byMarker(root.logger, 'twinge-picker')[0];
+  assert.ok(walk(picker).some(node => node.textContent === 'Right shoulder'));
+});
+
+test('twinge offer and rest win render; all-done shows the AEKE wrap-up', () => {
+  const draft = draftWithCues();
+  draft.exercises[0].sets[0].done = true;
+  const root = render(draft, {
+    twingeOffer: { exerciseIndex: 0, site: 'Right shoulder' },
+    rest: { remainingMs: 60_000, label: 'Rest', win: 'Bench: 30 kg → 36 kg since 01/03/26.' }
+  });
+  assert.ok(byMarker(root.logger, 'twinge-offer')[0]);
+  assert.equal(byMarker(root.logger, 'rest-win')[0].textContent, 'Bench: 30 kg → 36 kg since 01/03/26.');
+  const wrap = byMarker(root.logger, 'wrap-up')[0];
+  assert.ok(byMarker(wrap, 'aeke-score')[0]);
+});
