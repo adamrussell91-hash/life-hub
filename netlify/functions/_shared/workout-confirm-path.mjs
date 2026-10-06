@@ -3,6 +3,38 @@ import { decodeBlob } from './decode-blob.mjs';
 
 const STATUS_RE = /^status:\s*["']?(planned|completed|skipped)["']?/m;
 const TITLE_RE = /^title:\s*["']?(.+?)["']?\s*$/m;
+export const WORKOUT_AMEND_PATH = /^data\/fitness\/(\d{4})\/(\d{2})\/(\d{4}-\d{2}-\d{2})-workout-[a-z0-9-]+\.md$/;
+export const FINISHED_SESSION_PLAN_ERROR = "That session is already finished — I won't replace it with a plan";
+export const ADDED_AFTER_FINISH_HEADING = 'Added after finish';
+
+export class WorkoutWriteBlockedError extends Error {
+  constructor(message = FINISHED_SESSION_PLAN_ERROR) {
+    super(message);
+    this.name = 'WorkoutWriteBlockedError';
+    this.code = 'session_already_finished';
+    this.retryable = false;
+  }
+}
+
+export function workoutStatusFromMarkdown(text) {
+  return STATUS_RE.exec(text ?? '')?.[1] ?? null;
+}
+
+export function plannedWriteWouldDowngrade(existingStatus, incomingStatus) {
+  return incomingStatus === 'planned'
+    && (existingStatus === 'completed' || existingStatus === 'skipped');
+}
+
+export function parseWorkoutAmendPath(path, { date } = {}) {
+  if (typeof path !== 'string' || !path) return null;
+  if (path.includes('..') || path.includes('\\') || path.startsWith('/')) return null;
+  const match = WORKOUT_AMEND_PATH.exec(path);
+  if (!match) return null;
+  const [, year, month, fileDate] = match;
+  if (!fileDate.startsWith(`${year}-${month}-`)) return null;
+  if (date && fileDate !== date) return null;
+  return path;
+}
 
 export function sameDayWorkoutEntries(tree, date) {
   if (!Array.isArray(tree) || typeof date !== 'string' || !date) return [];
@@ -63,28 +95,201 @@ export function pickSameDayPlannedWorkout(entries) {
   return [...planned].sort((a, b) => String(a.path).localeCompare(String(b.path))).at(-1);
 }
 
-async function annotateWorkoutEntries(client, entries) {
+export async function annotateWorkoutEntries(client, entries) {
   const annotated = [];
   for (const entry of entries) {
     let status = null;
     let title = null;
+    let text = null;
     try {
-      const text = decodeBlob(await client.readBlob(entry.sha));
+      text = decodeBlob(await client.readBlob(entry.sha));
       if (text) {
-        status = STATUS_RE.exec(text)?.[1] ?? null;
+        status = workoutStatusFromMarkdown(text);
         const rawTitle = TITLE_RE.exec(text)?.[1];
         title = rawTitle ? rawTitle.replace(/^["']|["']$/g, '').trim() : null;
       }
     } catch {
       status = null;
       title = null;
+      text = null;
     }
-    annotated.push({ ...entry, status, title });
+    annotated.push({ ...entry, status, title, text });
   }
   return annotated;
 }
 
-export async function resolveWorkoutConfirmTarget(client, { record, slug, overwrite = false } = {}) {
+function exerciseNames(record) {
+  return (Array.isArray(record?.exercises) ? record.exercises : [])
+    .map(exercise => String(exercise?.name ?? '').trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function planLooksLikeCompletedSession(planInput, completedWorkouts = []) {
+  const fields = planInput?.fields ?? planInput ?? {};
+  const planTitle = String(fields.title ?? '').trim().toLowerCase();
+  const planNames = exerciseNames(fields);
+  for (const entry of completedWorkouts) {
+    const title = String(entry.title ?? entry.record?.title ?? '').trim().toLowerCase();
+    if (planTitle && title && (planTitle === title || title.includes(planTitle) || planTitle.includes(title))) {
+      return true;
+    }
+    const recordNames = exerciseNames(entry.record ?? entry);
+    if (planNames.length < 2 || recordNames.length < 2) continue;
+    const planSet = new Set(planNames);
+    const overlap = recordNames.filter(name => planSet.has(name)).length;
+    const floor = Math.min(planNames.length, recordNames.length);
+    if (overlap >= 2 || (floor > 0 && overlap / floor >= 0.5)) return true;
+  }
+  return false;
+}
+
+export async function loadCompletedWorkoutsForDate(client, date, { tree, parseDocument } = {}) {
+  const currentTree = tree ?? (await client.resolveTree()).tree;
+  const sameDay = await annotateWorkoutEntries(client, sameDayWorkoutEntries(currentTree, date));
+  const completed = sameDay.filter(entry => entry.status === 'completed');
+  if (typeof parseDocument !== 'function') return completed;
+  const detailed = [];
+  for (const entry of completed) {
+    const text = entry.text;
+    if (!text) {
+      detailed.push(entry);
+      continue;
+    }
+    try {
+      const parsed = parseDocument(text, entry.path);
+      detailed.push({
+        ...entry,
+        title: parsed.record?.title ?? entry.title,
+        record: parsed.record,
+        notes: parsed.body ?? '',
+        exercises: parsed.record?.exercises ?? []
+      });
+    } catch {
+      detailed.push(entry);
+    }
+  }
+  return detailed;
+}
+
+function titlesOf(entries) {
+  return entries.map(entry => entry.title || workoutSlugFromPath(entry.path));
+}
+
+export function pickCompletedWorkoutForNotes(entries, { title } = {}) {
+  const completed = (entries ?? []).filter(entry => entry.status === 'completed' && entry.path);
+  if (completed.length === 0) {
+    return { error: 'no_completed', message: 'No completed workout for that date.' };
+  }
+  const needle = String(title ?? '').trim().toLowerCase();
+  if (needle) {
+    const slugNeedle = needle.replace(/\s+/g, '-');
+    const match = completed.filter(entry => {
+      const entryTitle = String(entry.title ?? '').trim().toLowerCase();
+      const pathSlug = workoutSlugFromPath(entry.path);
+      return entryTitle === needle
+        || entryTitle.includes(needle)
+        || needle.includes(entryTitle)
+        || pathSlug.includes(slugNeedle);
+    });
+    if (match.length === 1) return { entry: match[0] };
+    if (match.length === 0) {
+      return {
+        error: 'not_found',
+        message: `No completed workout titled "${title}".`,
+        titles: titlesOf(completed)
+      };
+    }
+    return {
+      error: 'ambiguous',
+      message: `Several completed sessions match "${title}". Name which one: ${titlesOf(match).join(', ')}.`,
+      titles: titlesOf(match)
+    };
+  }
+  if (completed.length === 1) return { entry: completed[0] };
+  return {
+    error: 'ambiguous',
+    message: `Several completed sessions that day. Name which one: ${titlesOf(completed).join(', ')}.`,
+    titles: titlesOf(completed)
+  };
+}
+
+export function appendWorkoutNotes(existingNotes, addition) {
+  const extra = String(addition ?? '').trim();
+  if (!extra) return { error: 'empty_notes', message: 'notes must be a non-empty string.' };
+  const current = String(existingNotes ?? '').trim();
+  const heading = `## ${ADDED_AFTER_FINISH_HEADING}`;
+  if (!current) return { notes: `${heading}\n\n${extra}` };
+  if (current.includes(heading)) return { notes: `${current}\n\n${extra}` };
+  return { notes: `${current}\n\n${heading}\n\n${extra}` };
+}
+
+export async function buildWorkoutNotesAmend(client, {
+  date,
+  notes,
+  workoutTitle,
+  tree,
+  parseDocument
+} = {}) {
+  const extra = String(notes ?? '').trim();
+  if (!extra) {
+    return { ok: false, error: 'empty_notes', message: 'notes must be a non-empty string.' };
+  }
+  if (typeof date !== 'string' || !date) {
+    return { ok: false, error: 'invalid_date', message: 'date must be YYYY-MM-DD.' };
+  }
+  let completed;
+  try {
+    completed = await loadCompletedWorkoutsForDate(client, date, { tree, parseDocument });
+  } catch {
+    return { ok: false, error: 'github_unavailable', message: 'Could not read today\'s workouts.' };
+  }
+  const picked = pickCompletedWorkoutForNotes(completed, { title: workoutTitle });
+  if (picked.error) {
+    return { ok: false, error: picked.error, message: picked.message, titles: picked.titles ?? [] };
+  }
+  const entry = picked.entry;
+  if (!entry.record) {
+    return { ok: false, error: 'unreadable', message: 'Could not parse that completed workout.' };
+  }
+  const merged = appendWorkoutNotes(entry.notes, extra);
+  if (merged.error) {
+    return { ok: false, error: merged.error, message: merged.message };
+  }
+  const record = {
+    ...entry.record,
+    status: 'completed',
+    exercises: Array.isArray(entry.record.exercises) ? entry.record.exercises : []
+  };
+  return {
+    ok: true,
+    record,
+    notes: merged.notes,
+    path: entry.path,
+    existingSha: entry.sha,
+    overwrite: true,
+    amend_path: entry.path
+  };
+}
+
+function refuseIfDowngrade(entry, incomingStatus, path) {
+  if (plannedWriteWouldDowngrade(entry?.status, incomingStatus)) {
+    return {
+      blocked: true,
+      path,
+      existingSha: entry?.sha,
+      existingStatus: entry.status,
+      error: FINISHED_SESSION_PLAN_ERROR
+    };
+  }
+  return null;
+}
+
+export async function resolveWorkoutConfirmTarget(client, {
+  record,
+  slug,
+  overwrite = false,
+  amendPath = null
+} = {}) {
   const fallbackPath = buildCanonicalPath({
     type: record.type,
     date: record.date,
@@ -100,15 +305,36 @@ export async function resolveWorkoutConfirmTarget(client, { record, slug, overwr
     }
 
     const sameDay = await annotateWorkoutEntries(client, sameDayWorkoutEntries(current.tree, record.date));
+    const validAmend = parseWorkoutAmendPath(amendPath, { date: record.date });
+    if (validAmend) {
+      const existing = sameDay.find(entry => entry.path === validAmend);
+      if (!existing) {
+        return { blocked: true, path: validAmend, error: 'That workout file is not on this date.' };
+      }
+      if (existing.status !== 'completed') {
+        return { blocked: true, path: validAmend, error: 'add_workout_notes can only amend a completed session.' };
+      }
+      if (record.status !== 'completed') {
+        return refuseIfDowngrade(existing, record.status, validAmend)
+          ?? { blocked: true, path: validAmend, error: FINISHED_SESSION_PLAN_ERROR };
+      }
+      return {
+        path: existing.path,
+        existingSha: existing.sha,
+        existingStatus: existing.status,
+        notesAmend: true
+      };
+    }
+
     const matched = pickMatchingPlannedWorkout(sameDay, { slug, title: record.title });
 
     if (matched && record.status === 'planned') {
-      return { path: matched.path, existingSha: matched.sha };
+      return { path: matched.path, existingSha: matched.sha, existingStatus: matched.status };
     }
     if (matched && (record.status === 'completed' || record.status === 'skipped')) {
       // Reuse today's matching plan file. A different completed session (walk, EP,
       // second lift) must not overwrite another plan.
-      return { path: matched.path, existingSha: matched.sha };
+      return { path: matched.path, existingSha: matched.sha, existingStatus: matched.status };
     }
 
     // Completing with no title/slug match: still allow legacy generic planned file
@@ -122,16 +348,31 @@ export async function resolveWorkoutConfirmTarget(client, { record, slug, overwr
         const generic = plannedSlug === PLANNED_WORKOUT_SLUG
           || ['planned', 'planned-session', 'strength-session'].includes(plannedSlug);
         if (generic || !recordSlug || plannedSlug === recordSlug || only.path.includes(recordSlug)) {
-          return { path: only.path, existingSha: only.sha };
+          return { path: only.path, existingSha: only.sha, existingStatus: only.status };
         }
       }
     }
 
     if (overwrite) {
-      const existingSha = current.tree.find(entry => entry.path === fallbackPath && entry.type === 'blob')?.sha;
-      return { path: fallbackPath, existingSha };
+      const existing = sameDay.find(entry => entry.path === fallbackPath)
+        ?? current.tree.find(entry => entry.path === fallbackPath && entry.type === 'blob');
+      const blocked = refuseIfDowngrade(existing, record.status, fallbackPath);
+      if (blocked) return blocked;
+      const existingSha = existing?.sha
+        ?? current.tree.find(entry => entry.path === fallbackPath && entry.type === 'blob')?.sha;
+      const notesAmend = record.status === 'completed' && existing?.status === 'completed';
+      return {
+        path: fallbackPath,
+        existingSha,
+        existingStatus: existing?.status,
+        ...(notesAmend ? { notesAmend: true } : {})
+      };
     }
-    return { path: fallbackPath };
+
+    const existingAtFallback = sameDay.find(entry => entry.path === fallbackPath);
+    const blocked = refuseIfDowngrade(existingAtFallback, record.status, fallbackPath);
+    if (blocked) return blocked;
+    return { path: fallbackPath, existingStatus: existingAtFallback?.status };
   } catch (error) {
     if (overwrite) throw error;
     return { path: fallbackPath };

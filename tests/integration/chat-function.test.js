@@ -523,14 +523,10 @@ test('a Chadwick lock-in with no log_entry forces a second round that can propos
 
 test('lock it onto Fitness builds a Confirm card from history without calling the model', async () => {
   let rounds = 0;
-  let githubCalls = 0;
   const handler = createChatHandler({
     env: validEnv,
     now: () => Date.parse('2026-08-01T06:00:00Z'),
-    fetchImpl: async url => {
-      githubCalls += 1;
-      return githubFetchStub()(url);
-    },
+    fetchImpl: githubFetchStub(),
     createAnthropicClient: () => ({
       streamMessage: () => {
         rounds += 1;
@@ -554,7 +550,6 @@ test('lock it onto Fitness builds a Confirm card from history without calling th
   }))));
 
   assert.equal(rounds, 0, 'must not wait on Anthropic when the plan is already in history');
-  assert.equal(githubCalls, 0, 'must not load logs before emitting the Confirm card');
   const proposal = events.find(event => event.type === 'record_proposal');
   assert.ok(proposal, 'expected a Confirm card built from the last plan in history');
   assert.equal(proposal.record.status, 'planned');
@@ -4722,4 +4717,155 @@ test('Clare propose_people_changes queues one Confirm card with readable people 
   assert.deepEqual(card.proposal.writes.map(write => write.path), ['people:person:new-sam', 'people:link:new-1']);
   assert.ok(puts.some(put => put.url.includes('data/os/pending-actions.json')));
   assert.equal(peopleStoreTouched, false, 'proposing must not touch the People store');
+});
+
+const CHADWICK_PLAN = [
+  'Here\'s the plan:',
+  '1. Bar Press — Set 1: 10 reps x 30kg (cable: constant force)',
+  '2. Bar Row — Set 1: 10 reps x 27kg (cable: constant force)',
+  '3. Bar Squat — Set 1: 10 reps x 25kg (cable: none)',
+  '4. Seated Curl — Set 1: 12 reps x 8kg (cable: constant force)'
+].join('\n');
+
+function completedSessionMarkdown(date = '2026-08-01') {
+  return [
+    '---',
+    'schema_version: 1',
+    'id: "workout-2026-08-01-full-send"',
+    'type: workout',
+    `date: ${date}`,
+    'time: "16:28"',
+    'created_at: 2026-08-01T16:28:00+10:00',
+    'updated_at: 2026-08-01T16:28:00+10:00',
+    'source: chat',
+    'title: "The Full Send"',
+    'session_kind: strength',
+    'day_type: workout_30',
+    'status: completed',
+    'duration_min: 30',
+    'exercises:',
+    '  - name: Bar Press',
+    '    sets:',
+    '      - { reps: 10, weight_kg: 30, cable_type: constant_force }',
+    '  - name: Bar Row',
+    '    sets:',
+    '      - { reps: 10, weight_kg: 27, cable_type: constant_force }',
+    '  - name: Bar Squat',
+    '    sets:',
+    '      - { reps: 10, weight_kg: 25, cable_type: none }',
+    '  - name: Seated Curl',
+    '    sets:',
+    '      - { reps: 12, weight_kg: 8, cable_type: constant_force }',
+    '---',
+    'Matched loads.'
+  ].join('\n');
+}
+
+function fitnessTreeFetch({ path, sha, markdown }) {
+  return async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path, type: 'blob', sha, size: markdown.length }]
+      });
+    }
+    if (url.includes(`/git/blobs/${sha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(markdown, 'utf8').toString('base64')
+      });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+}
+
+test('W2: post-workout notes through chat.mjs do not emit a forced planned card', async () => {
+  const path = 'data/fitness/2026/08/2026-08-01-workout-the-full-send.md';
+  const sha = 'a'.repeat(40);
+  const markdown = completedSessionMarkdown();
+  const userMessage = 'I accidentally hit finish before adding notes — avg HR 142, 410 kcal, it didn\'t save';
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: fitnessTreeFetch({ path, sha, markdown }),
+    createAnthropicClient: () => ({
+      streamMessage: () => mockedStream([
+        { type: 'text', delta: 'I can add those notes to the finished session.' },
+        { type: 'done' }
+      ])
+    })
+  });
+  const events = contentEvents(await readSse(await handler(request({
+    message: userMessage,
+    priorAgentSlug: 'chadwick',
+    history: [
+      { role: 'assistant', content: CHADWICK_PLAN }
+    ]
+  }))));
+  assert.equal(events.some(event => event.type === 'record_proposal'), false);
+  assert.equal(events.some(event => event.type === 'tool_call' && event.name === 'log_entry'), false);
+});
+
+test('W2: bare log this after today\'s completed session does not force a planned card', async () => {
+  const path = 'data/fitness/2026/08/2026-08-01-workout-the-full-send.md';
+  const sha = 'a'.repeat(40);
+  const markdown = completedSessionMarkdown();
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: fitnessTreeFetch({ path, sha, markdown }),
+    createAnthropicClient: () => ({
+      streamMessage: () => mockedStream([
+        { type: 'text', delta: 'That session is already on Fitness.' },
+        { type: 'done' }
+      ])
+    })
+  });
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'log this',
+    priorAgentSlug: 'chadwick',
+    history: [
+      { role: 'assistant', content: CHADWICK_PLAN }
+    ]
+  }))));
+  assert.equal(events.some(event => event.type === 'record_proposal'), false);
+  assert.equal(events.some(event => event.type === 'tool_call' && event.name === 'log_entry'), false);
+});
+
+test('W2: add_workout_notes through chat.mjs proposes the existing completed file', async () => {
+  const path = 'data/fitness/2026/08/2026-08-01-workout-the-full-send.md';
+  const sha = 'a'.repeat(40);
+  const markdown = completedSessionMarkdown();
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: fitnessTreeFetch({ path, sha, markdown }),
+    createAnthropicClient: () => ({
+      streamMessage: () => mockedStream([
+        {
+          type: 'tool_call',
+          id: 'call_notes',
+          name: 'add_workout_notes',
+          input: { notes: 'avg HR 142, 410 kcal, it went well' }
+        },
+        { type: 'done' }
+      ])
+    })
+  });
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'I accidentally hit finish before adding notes — avg HR 142, 410 kcal',
+    priorAgentSlug: 'chadwick'
+  }))));
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal, 'expected a Confirm card for the finished session');
+  assert.equal(proposal.path, path);
+  assert.equal(proposal.overwrite, true);
+  assert.equal(proposal.amend_path, path);
+  assert.equal(proposal.record.status, 'completed');
+  assert.equal(proposal.record.exercises[0].name, 'Bar Press');
+  assert.equal(proposal.record.exercises[0].sets[0].weight_kg, 30);
+  assert.match(proposal.notes, /Added after finish/);
+  assert.match(proposal.notes, /avg HR 142, 410 kcal/);
 });

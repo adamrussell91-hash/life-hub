@@ -18,6 +18,11 @@ import {
 import { AGENTS } from './agent-directory.mjs';
 import { decodeBlob } from './decode-blob.mjs';
 import { loadCentralNodeSeed } from './load-central-node-seed.mjs';
+import {
+  plannedWriteWouldDowngrade,
+  WorkoutWriteBlockedError,
+  workoutStatusFromMarkdown
+} from './workout-confirm-path.mjs';
 
 const CENTRAL_NODE_PATH = 'central-node.md';
 
@@ -98,6 +103,17 @@ export function shouldSyncCentralNode(record) {
 }
 
 export async function persistLogEntry(client, { record, notes, path, existingSha, nowDateKey }) {
+  if (record?.type === 'workout' && record.status === 'planned' && existingSha) {
+    try {
+      const text = decodeBlob(await client.readBlob(existingSha));
+      const existingStatus = workoutStatusFromMarkdown(text);
+      if (plannedWriteWouldDowngrade(existingStatus, record.status)) {
+        throw new WorkoutWriteBlockedError();
+      }
+    } catch (error) {
+      if (error instanceof WorkoutWriteBlockedError) throw error;
+    }
+  }
   const result = await client.writeFile({
     path,
     content: renderMarkdown(record, notes),

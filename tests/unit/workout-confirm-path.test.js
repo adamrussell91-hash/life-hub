@@ -1,8 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { load as loadYaml } from 'js-yaml';
+import { parseEventDocument } from '../../apps/life/js/core/records.js';
 import {
+  ADDED_AFTER_FINISH_HEADING,
+  appendWorkoutNotes,
+  buildWorkoutNotesAmend,
+  FINISHED_SESSION_PLAN_ERROR,
+  pickCompletedWorkoutForNotes,
   pickMatchingPlannedWorkout,
   pickSameDayPlannedWorkout,
+  planLooksLikeCompletedSession,
   resolveWorkoutConfirmTarget,
   sameDayWorkoutEntries,
   workoutSlugFromPath
@@ -135,4 +143,162 @@ test('planned confirm amends the matching titled plan', async () => {
   });
   assert.equal(target.path, existing);
   assert.equal(target.existingSha, 'abc');
+});
+
+test('planned confirm refuses to overwrite a completed file at the same path', async () => {
+  const path = 'data/fitness/2026/10/2026-10-06-workout-the-full-send.md';
+  const target = await resolveWorkoutConfirmTarget(clientWith({
+    path,
+    sha: 'abc',
+    body: '---\nstatus: completed\ntitle: The Full Send\n---\n'
+  }), {
+    record: { type: 'workout', date: '2026-10-06', status: 'planned', title: 'The Full Send' },
+    slug: 'workout-the-full-send',
+    overwrite: true
+  });
+  assert.equal(target.blocked, true);
+  assert.equal(target.error, FINISHED_SESSION_PLAN_ERROR);
+  assert.equal(target.path, path);
+});
+
+test('skipped files are also protected from planned overwrite', async () => {
+  const path = 'data/fitness/2026/10/2026-10-06-workout-easy-walk.md';
+  const target = await resolveWorkoutConfirmTarget(clientWith({
+    path,
+    sha: 'abc',
+    body: '---\nstatus: skipped\ntitle: Easy Walk\n---\n'
+  }), {
+    record: { type: 'workout', date: '2026-10-06', status: 'planned', title: 'Easy Walk' },
+    slug: 'workout-easy-walk',
+    overwrite: true
+  });
+  assert.equal(target.blocked, true);
+});
+
+test('appendWorkoutNotes adds an Added after finish heading', () => {
+  const first = appendWorkoutNotes('Chest — AC clear', 'avg HR 142, 410 kcal');
+  assert.match(first.notes, new RegExp(ADDED_AFTER_FINISH_HEADING));
+  assert.match(first.notes, /Chest — AC clear/);
+  assert.match(first.notes, /avg HR 142/);
+  const second = appendWorkoutNotes(first.notes, 'felt strong');
+  assert.equal((second.notes.match(new RegExp(ADDED_AFTER_FINISH_HEADING, 'g')) || []).length, 1);
+  assert.match(second.notes, /felt strong/);
+});
+
+test('pickCompletedWorkoutForNotes asks which session when two exist and no title is given', () => {
+  const picked = pickCompletedWorkoutForNotes([
+    { path: 'data/fitness/2026/10/2026-10-06-workout-a.md', status: 'completed', title: 'The Full Send' },
+    { path: 'data/fitness/2026/10/2026-10-06-workout-b.md', status: 'completed', title: 'Dog Walk' }
+  ]);
+  assert.equal(picked.error, 'ambiguous');
+  assert.deepEqual(picked.titles, ['The Full Send', 'Dog Walk']);
+});
+
+test('planLooksLikeCompletedSession matches the session that came from the chat plan', () => {
+  assert.equal(planLooksLikeCompletedSession({
+    fields: {
+      title: 'The Full Send',
+      exercises: [
+        { name: 'Bar Press' },
+        { name: 'Bar Row' },
+        { name: 'Bar Squat' }
+      ]
+    }
+  }, [{
+    title: 'The Full Send',
+    record: {
+      title: 'The Full Send',
+      exercises: [{ name: 'Bar Press' }, { name: 'Bar Row' }]
+    }
+  }]), true);
+  assert.equal(planLooksLikeCompletedSession({
+    fields: {
+      title: 'Evening Walk',
+      exercises: [{ name: 'Easy Walk' }, { name: 'Calf Raise' }]
+    }
+  }, [{
+    title: 'The Full Send',
+    record: { title: 'The Full Send', exercises: [{ name: 'Bar Press' }, { name: 'Bar Row' }] }
+  }]), false);
+});
+
+function completedWorkoutMarkdown({
+  date = '2026-10-06',
+  title = 'The Full Send',
+  notes = 'Matched loads.'
+} = {}) {
+  return [
+    '---',
+    'schema_version: 1',
+    'id: "workout-2026-10-06-full-send"',
+    'type: workout',
+    `date: ${date}`,
+    'time: "16:28"',
+    'created_at: 2026-10-06T16:28:00+11:00',
+    'updated_at: 2026-10-06T16:28:00+11:00',
+    'source: chat',
+    `title: ${JSON.stringify(title)}`,
+    'session_kind: strength',
+    'day_type: workout_30',
+    'status: completed',
+    'duration_min: 30',
+    'exercises:',
+    '  - name: Bar Press',
+    '    sets:',
+    '      - { reps: 10, weight_kg: 40, cable_type: constant_force }',
+    '  - name: Cable Curl',
+    '    sets:',
+    '      - { reps: 8, weight_kg: 37, cable_type: constant_force }',
+    '---',
+    notes
+  ].join('\n');
+}
+
+test('buildWorkoutNotesAmend proposes the existing completed file with notes appended', async () => {
+  const path = 'data/fitness/2026/10/2026-10-06-workout-the-full-send.md';
+  const exercises = [
+    { name: 'Bar Press', sets: [{ reps: 10, weight_kg: 40, cable_type: 'constant_force' }] },
+    { name: 'Cable Curl', sets: [{ reps: 8, weight_kg: 37, cable_type: 'constant_force' }] }
+  ];
+  const result = await buildWorkoutNotesAmend(clientWith({
+    path,
+    sha: 'abc',
+    body: completedWorkoutMarkdown()
+  }), {
+    date: '2026-10-06',
+    notes: 'avg HR 142, 410 kcal',
+    parseDocument: (content, filePath) => parseEventDocument(content, filePath, loadYaml)
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.path, path);
+  assert.equal(result.overwrite, true);
+  assert.equal(result.amend_path, path);
+  assert.equal(result.record.status, 'completed');
+  assert.deepEqual(result.record.exercises, exercises);
+  assert.match(result.notes, /Matched loads/);
+  assert.match(result.notes, /Added after finish/);
+  assert.match(result.notes, /avg HR 142, 410 kcal/);
+});
+
+test('buildWorkoutNotesAmend with two completed workouts and no title asks which one', async () => {
+  const result = await buildWorkoutNotesAmend(clientWith([
+    {
+      path: 'data/fitness/2026/10/2026-10-06-workout-the-full-send.md',
+      sha: 'aaa',
+      body: completedWorkoutMarkdown({ title: 'The Full Send' })
+    },
+    {
+      path: 'data/fitness/2026/10/2026-10-06-workout-dog-walk.md',
+      sha: 'bbb',
+      body: completedWorkoutMarkdown({ title: 'Dog Walk' })
+    }
+  ]), {
+    date: '2026-10-06',
+    notes: 'avg HR 142',
+    parseDocument: (content, filePath) => parseEventDocument(content, filePath, loadYaml)
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'ambiguous');
+  assert.ok(result.titles.includes('The Full Send'));
+  assert.ok(result.titles.includes('Dog Walk'));
 });
