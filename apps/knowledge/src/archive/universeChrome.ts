@@ -66,10 +66,6 @@ export function universeViewToolsHtml(dark: boolean, fullscreen: boolean) {
   </div>`;
 }
 
-export function universeExitHtml(fullscreen: boolean) {
-  return `<button type="button" class="universe-exit btn btn--ghost" data-universe-exit${fullscreen ? "" : " hidden"}>Exit full screen</button>`;
-}
-
 export function syncUniverseViewButtons(root: ParentNode, dark: boolean, fullscreen: boolean) {
   const darkBtn = root.querySelector<HTMLButtonElement>("[data-universe-dark]");
   if (darkBtn) {
@@ -83,8 +79,6 @@ export function syncUniverseViewButtons(root: ParentNode, dark: boolean, fullscr
     fullBtn.setAttribute("aria-pressed", String(fullscreen));
     fullBtn.textContent = fullscreen ? "Exit" : "Full screen";
   }
-  const exit = root.querySelector<HTMLButtonElement>("[data-universe-exit]");
-  if (exit) exit.hidden = !fullscreen;
 }
 
 export function applyUniverseViewState(
@@ -114,15 +108,11 @@ export function bindUniverseView(
 ) {
   const darkBtn = root.querySelector<HTMLButtonElement>("[data-universe-dark]");
   const fullBtn = root.querySelector<HTMLButtonElement>("[data-universe-fullscreen]");
-  const exit = root.querySelector<HTMLButtonElement>("[data-universe-exit]");
   if (darkBtn) {
     darkBtn.onclick = () => options.setDark(!options.getDark());
   }
   if (fullBtn) {
     fullBtn.onclick = () => options.setFullscreen(!options.getFullscreen());
-  }
-  if (exit) {
-    exit.onclick = () => options.setFullscreen(false);
   }
 }
 

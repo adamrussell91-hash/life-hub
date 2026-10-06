@@ -216,10 +216,9 @@ describe("Knowledge Hub rail", () => {
     expect(css).toContain(".graph-wrap.is-universe-dark");
     expect(css).toContain(".graph-wrap.is-universe-fullscreen");
     expect(css).toContain("body.is-universe-fullscreen");
-    expect(css).toContain(".universe-exit");
     expect(main).toContain("universeViewToolsHtml");
     expect(main).toContain("graphFullscreenToolsHtml");
-    expect(main).toContain("universeExitHtml");
+    expect(main).not.toContain("universeExitHtml");
     expect(main).toContain("graphFullscreen");
     expect(main).toContain("shouldExitUniverseFullscreen");
     expect(main).toContain("applyUniverseViewState");
