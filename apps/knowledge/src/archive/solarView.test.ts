@@ -24,6 +24,7 @@ import {
   solarZoomClamp,
   zoomBand,
 } from "./solarView";
+import { orreryOrder, systemCounts } from "./universeSystem";
 
 function page(id: string, title: string, tags: string[]): PageManifestEntry {
   return { id, title, area: "notes", tags, excerpt: "" };
@@ -77,7 +78,7 @@ class FakePath2D {
 function recordingContext() {
   const arcs: Arc[] = [];
   const fullCircleStrokes: Arc[] = [];
-  const images: Array<{ w: number; h: number }> = [];
+  const images: Array<{ w: number; h: number; planet: boolean }> = [];
   const fillGroups: number[] = [];
   let pending: Arc | null = null;
   const ctx = {
@@ -96,6 +97,13 @@ function recordingContext() {
     restore() {},
     translate() {},
     scale() {},
+    // Planet sprites paint into their own canvases with clips, rects and curves.
+    clip() {},
+    rect() {},
+    fillRect() {},
+    ellipse() {},
+    bezierCurveTo() {},
+    lineCap: "butt",
     beginPath() {
       pending = null;
     },
@@ -115,8 +123,8 @@ function recordingContext() {
     moveTo() {},
     lineTo() {},
     closePath() {},
-    drawImage(_img: unknown, _x: number, _y: number, w: number, h: number) {
-      images.push({ w, h });
+    drawImage(img: unknown, _x: number, _y: number, w: number, h: number) {
+      images.push({ w, h, planet: (img as HTMLCanvasElement | null)?.dataset?.planetSprite === "1" });
     },
     measureText(text: string) {
       return { width: text.length * 6 };
@@ -169,7 +177,7 @@ function worldPos(body: Body, model: ReturnType<typeof buildSolarModel>) {
 
 describe("presence and bands", () => {
   it("exposes a build number so a stale Universe bundle is obvious", () => {
-    expect(UNIVERSE_BUILD).toBe(21);
+    expect(UNIVERSE_BUILD).toBe(22);
   });
 
   it("maps band thresholds onto KIND_DEPTH cutoffs", () => {
@@ -396,7 +404,8 @@ describe("mountSolarView", () => {
     expect(model.planets.length).toBeGreaterThan(1);
     const stop = mountSolarView(host, model, { search: "", onNoteSelect() {} });
     frames.pump(16);
-    expect(recorded.images).toHaveLength(1);
+    // One glow (the sun's); planet surfaces are textures, not additive glow.
+    expect(recorded.images.filter(image => !image.planet)).toHaveLength(1);
     stop();
   });
 
@@ -764,6 +773,138 @@ describe("universe effects in the mounted view", () => {
     expect(recorded.fullCircleStrokes).toHaveLength(0);
     expect(recorded.arcs.length).toBeGreaterThan(300);
     stop();
+  });
+
+  describe("solar map, planet systems and the Big Bang fold", () => {
+    const [A, Bt] = [TOPIC_VOCABULARY[0]!, TOPIC_VOCABULARY[1]!];
+
+    function twoSystems() {
+      const entries = [...tagged("a", A, 8, i => (i === 0 ? "Zebra Unique Page" : `A note ${i}`)), ...tagged("b", Bt, 8)];
+      entries[0]!.connected = ["b2", "b3", "a4"];
+      return { entries, model: buildSolarModel(entries) };
+    }
+
+    function planetButton(host: HTMLElement, model: ReturnType<typeof buildSolarModel>, topic: string) {
+      const idx = model.planets.find(planet => planet.label === topic)!.idx;
+      return host.querySelector<HTMLButtonElement>(`[data-orrery-planet="${idx}"]`)!;
+    }
+
+    it("lists the Hub then every planet by its god's name, innermost first", () => {
+      stubFrame();
+      const host = stage();
+      const { model } = twoSystems();
+      const stop = mountSolarView(host, model, { search: "", onNoteSelect() {}, storage: memory() });
+      const items = [...host.querySelectorAll<HTMLButtonElement>(".universe-orrery__item")];
+      expect(items[0]!.hasAttribute("data-orrery-hub")).toBe(true);
+      const ids = items.slice(1).map(button => Number(button.dataset.orreryPlanet));
+      expect(ids).toEqual(orreryOrder(model).map(planet => planet.idx));
+      expect(items.slice(1).map(button => button.querySelector("strong")!.textContent).sort()).toEqual(["Mnemosyne", "Sophrosyne"]);
+      for (const button of items.slice(1)) {
+        const notes = systemCounts(model.bodies, Number(button.dataset.orreryPlanet)).notes;
+        expect(button.querySelector(".universe-orrery__count")!.textContent).toBe(String(notes));
+      }
+      stop();
+    });
+
+    it("opens a planet's system from the map and returns to the universe on Escape without leaving full screen", () => {
+      const frames = stubFrame();
+      const host = stage();
+      document.body.appendChild(host);
+      const { model } = twoSystems();
+      const stop = mountSolarView(host, model, { search: "", onNoteSelect() {}, storage: memory() });
+      frames.pump(16);
+      const card = host.querySelector<HTMLElement>(".universe-system")!;
+      expect(card.hidden).toBe(true);
+      planetButton(host, model, A).click();
+      expect(card.hidden).toBe(false);
+      expect(card.querySelector("[data-system-name]")!.textContent).toBe("Mnemosyne");
+      expect(card.querySelector("[data-system-topic]")!.textContent).toBe(A);
+      expect(planetButton(host, model, A).getAttribute("aria-current")).toBe("true");
+      expect(host.querySelector("canvas")!.getAttribute("aria-label")).toMatch(/Escape/);
+      frames.pump(32);
+
+      const pageLevel = vi.fn();
+      document.addEventListener("keydown", pageLevel);
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(card.hidden).toBe(true);
+      expect(pageLevel).not.toHaveBeenCalled();
+      // Back in the universe, Escape belongs to the page again (it leaves full screen).
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(pageLevel).toHaveBeenCalledTimes(1);
+      document.removeEventListener("keydown", pageLevel);
+      stop();
+      host.remove();
+    });
+
+    it("pauses the orbits from the system card", () => {
+      stubFrame();
+      const host = stage();
+      const { model } = twoSystems();
+      const stop = mountSolarView(host, model, { search: "", onNoteSelect() {}, storage: memory() });
+      planetButton(host, model, Bt).click();
+      const pause = host.querySelector<HTMLButtonElement>("[data-system-pause]")!;
+      pause.click();
+      expect(pause.textContent).toBe("Resume");
+      expect(pause.getAttribute("aria-pressed")).toBe("true");
+      host.querySelector<HTMLButtonElement>("[data-system-exit]")!.click();
+      expect(host.querySelector<HTMLElement>(".universe-system")!.hidden).toBe(true);
+      stop();
+    });
+
+    it("turns links that leave the system into arrows that fly to the other system and select the note", () => {
+      const frames = stubFrame();
+      const host = stage();
+      const { entries, model } = twoSystems();
+      const onNoteSelect = vi.fn();
+      const stop = mountSolarView(host, model, { search: "Zebra Unique", onNoteSelect, entries, storage: memory() });
+      frames.pump(16);
+      planetButton(host, model, A).click();
+      frames.pump(32);
+      expect(stop.flyToNearestHit()).toBe(true);
+      expect(onNoteSelect).toHaveBeenLastCalledWith(expect.objectContaining({ pageId: "a0" }));
+      frames.pump(48);
+      const arrows = [...host.querySelectorAll<HTMLButtonElement>(".universe-exit-arrow")];
+      expect(arrows).toHaveLength(1);
+      expect(arrows[0]!.getAttribute("aria-label")).toBe("2 links to Sophrosyne");
+      arrows[0]!.click();
+      expect(host.querySelector("[data-system-name]")!.textContent).toBe("Sophrosyne");
+      expect(onNoteSelect).toHaveBeenLastCalledWith(expect.objectContaining({ pageId: "b2" }));
+      stop();
+    });
+
+    it("folds the Big Bang bar to a pill and remembers it", () => {
+      stubFrame();
+      const store = memory();
+      const host = stage();
+      const stop = mountSolarView(host, buildSolarModel(tagged("g", V0, 6)), { search: "", onNoteSelect() {}, storage: store });
+      const bar = host.querySelector<HTMLElement>(".universe-replay")!;
+      const fold = bar.querySelector<HTMLButtonElement>("[data-replay-fold]")!;
+      expect(bar.classList.contains("is-folded")).toBe(false);
+      fold.click();
+      expect(bar.classList.contains("is-folded")).toBe(true);
+      expect(fold.getAttribute("aria-expanded")).toBe("false");
+      stop();
+      const again = stage();
+      const stop2 = mountSolarView(again, buildSolarModel(tagged("g", V0, 6)), { search: "", onNoteSelect() {}, storage: store });
+      expect(again.querySelector(".universe-replay")!.classList.contains("is-folded")).toBe(true);
+      stop2();
+    });
+
+    it("opens and closes the solar map and remembers it on desktop", () => {
+      stubFrame();
+      const store = memory();
+      const host = stage();
+      const stop = mountSolarView(host, buildSolarModel(tagged("g", V0, 6)), { search: "", onNoteSelect() {}, storage: store });
+      const toggle = host.querySelector<HTMLButtonElement>("[data-orrery-toggle]")!;
+      expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      toggle.click();
+      expect(host.querySelector(".universe-orrery")!.classList.contains("is-open")).toBe(true);
+      stop();
+      const again = stage();
+      const stop2 = mountSolarView(again, buildSolarModel(tagged("g", V0, 6)), { search: "", onNoteSelect() {}, storage: store });
+      expect(again.querySelector("[data-orrery-toggle]")!.getAttribute("aria-expanded")).toBe("true");
+      stop2();
+    });
   });
 });
 
