@@ -181,7 +181,7 @@ Consumers are not a second catalog. Open them only to wire data, not to restyle.
 | Life | `nutrition-charts.js`, `bloods-charts.js`, `central-node-charts.js`, `fitness-charts-model.js`, `render-fitness-charts.js`, `render-home.js`, `render-nutrition.js`, `render-mind.js`, `render-skincare.js`, `render-body.js`, `render-bloods.js`, `render-central-node.js` (all under `apps/life/js/app/`) | — |
 | Knowledge | — | `apps/knowledge/src/archive/` (library root) |
 | Tasks | `apps/tasks/src/chart-kit/{ring,apply-ring,columns,area-line,animate,mood-mix}.ts`, `blocks/chart-svg.ts`, `views/project-portfolio-chart.ts`, `views/dashboard-overview.ts` | `apps/tasks/src/views/graph.ts` — Lines (`transit-lines`), Branch (`flowchart-lanes`), Orbit (`orbit-radar`) |
-| Teaching | `apps/teaching/src/blocks/chart-svg.ts` | `blocks/graph-svg.ts`, `graph-layout.ts`, `graph-maker/` |
+| Teaching | `apps/teaching/src/blocks/chart-svg.ts` | Mind / concept map blocks: `packages/graph-blocks/` (shared with Tasks); publish checks `blocks/graph-layout.ts` |
 
 Tasks Graph is a rail page, not home. Charts on Tasks are board blocks (counts, trends).
 

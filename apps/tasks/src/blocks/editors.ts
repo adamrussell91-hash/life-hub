@@ -2,7 +2,7 @@ import katex from 'katex';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/ai/models';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildChartSvg, CHART_SERIES_COLOR_OPTIONS } from '@/blocks/chart-svg';
-import { buildConceptMapSvg, buildMindMapSvg } from '@/blocks/graph-svg';
+import { mountGraphEditor } from '../../../../packages/graph-blocks';
 import {
   createColumnsEditor,
   createSectionEditor,
@@ -2934,388 +2934,47 @@ export function createDiagramEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
-type MindMapNodeDraft = { id: string; label: string; parent_id?: string | null };
+type GraphBlock = Extract<Block, { block_type: 'mind_map' | 'concept_map' }>;
+
+function createGraphBlockEditor<T extends GraphBlock>(
+  block: T,
+  onChange: BlockChangeHandler<T>,
+  getLatest: () => T
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields block-editor__graph-fields';
+  const kind = block.block_type === 'mind_map' ? 'mind' : 'concept';
+  mountGraphEditor(fields, {
+    kind,
+    content: block.content,
+    idPrefix: block.id,
+    titleClassName: kind === 'mind' ? 'block-editor__mind-map-title' : 'block-editor__concept-map-title',
+    onChange: (content) =>
+      onChange({
+        ...getLatest(),
+        content: {
+          ...content,
+          edges: content.edges.map(({ label, ...edge }) => (label?.trim() ? { ...edge, label } : edge))
+        }
+      } as T)
+  });
+  return editorShell(block, onChange, fields, getLatest);
+}
 
 export function createMindMapEditor(
   block: Extract<Block, { block_type: 'mind_map' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'mind_map' }>>,
   getLatest: () => Extract<Block, { block_type: 'mind_map' }> = () => block
 ): HTMLElement {
-  const fields = document.createElement('div');
-  fields.className = 'block-editor__fields';
-
-  let nodes: MindMapNodeDraft[] = block.content.nodes.map((node) => ({ ...node }));
-  let nodeCounter = nodes.length;
-
-  const title = document.createElement('input');
-  title.type = 'text';
-  title.className = 'block-editor__mind-map-title';
-  title.value = block.content.title ?? '';
-  title.placeholder = 'Title (optional)';
-  title.setAttribute('aria-label', 'Mind map title');
-
-  const nodesContainer = document.createElement('div');
-  nodesContainer.className = 'block-editor__mind-map-nodes';
-
-  const preview = document.createElement('div');
-  preview.className = 'block-editor__viz-preview block-editor__mind-map-preview';
-  preview.setAttribute('aria-label', 'Mind map preview');
-
-  const emitChange = () => {
-    const latest = getLatest();
-    const content = {
-      title: title.value.trim() || undefined,
-      nodes: nodes.map((node) => ({
-        id: node.id,
-        label: node.label,
-        parent_id: node.parent_id ?? null
-      })),
-      edges: latest.content.edges ?? []
-    };
-    preview.innerHTML = buildMindMapSvg(content);
-    onChange({
-      ...latest,
-      content
-    });
-  };
-
-  function parentOptionsFor(nodeId: string) {
-    return [
-      { value: '', label: 'None' },
-      ...nodes
-        .filter((other) => other.id !== nodeId)
-        .map((other) => ({
-          value: other.id,
-          label: other.label.trim() || other.id
-        }))
-    ];
-  }
-
-  function renderNodes(): void {
-    nodesContainer.replaceChildren();
-    const atMin = nodes.length <= 1;
-    const atMax = nodes.length >= 24;
-    const parentFilters: HubFilterControl[] = [];
-
-    nodes.forEach((node, index) => {
-      const row = document.createElement('div');
-      row.className = 'block-editor__mind-map-node';
-
-      const label = document.createElement('input');
-      label.type = 'text';
-      label.className = 'block-editor__mind-map-label';
-      label.value = node.label;
-      label.placeholder = 'Node label';
-      label.setAttribute('aria-label', `Mind map node ${index + 1} label`);
-
-      const parent = createEditorFilter({
-        key: 'Parent',
-        value: node.parent_id ?? '',
-        options: parentOptionsFor(node.id),
-        className: 'block-editor__mind-map-parent',
-        ariaLabel: `Mind map node ${index + 1} parent`,
-        onChange: (value) => {
-          nodes[index] = {
-            ...nodes[index]!,
-            parent_id: value ? value : null
-          };
-          emitChange();
-        }
-      });
-      parentFilters.push(parent);
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn btn--ghost block-editor__mind-map-remove';
-      remove.textContent = 'Remove';
-      remove.disabled = atMin;
-      remove.addEventListener('click', () => {
-        if (nodes.length <= 1) return;
-        const removedId = nodes[index]!.id;
-        nodes = nodes
-          .filter((_, i) => i !== index)
-          .map((entry) =>
-            entry.parent_id === removedId ? { ...entry, parent_id: null } : entry
-          );
-        emitChange();
-        renderNodes();
-      });
-
-      label.addEventListener('input', () => {
-        nodes[index] = { ...nodes[index]!, label: label.value };
-        emitChange();
-        parentFilters.forEach((filter, i) => {
-          const current = nodes[i]!;
-          filter.setOptions(parentOptionsFor(current.id), current.parent_id ?? '');
-        });
-      });
-
-      row.append(label, parent.el, remove);
-      nodesContainer.append(row);
-    });
-
-    addButton.disabled = atMax;
-  }
-
-  const addButton = document.createElement('button');
-  addButton.type = 'button';
-  addButton.className = 'btn btn--secondary block-editor__mind-map-add';
-  addButton.textContent = 'Add node';
-  addButton.addEventListener('click', () => {
-    if (nodes.length >= 24) return;
-    nodeCounter += 1;
-    const root = nodes.find((n) => n.parent_id == null) ?? nodes[0];
-    nodes = [
-      ...nodes,
-      {
-        id: `${getLatest().id}_n${nodeCounter}`,
-        label: '',
-        parent_id: root?.id ?? null
-      }
-    ];
-    emitChange();
-    renderNodes();
-  });
-
-  title.addEventListener('input', emitChange);
-
-  renderNodes();
-  preview.innerHTML = buildMindMapSvg({
-    title: title.value.trim() || undefined,
-    nodes: nodes.map((node) => ({
-      id: node.id,
-      label: node.label,
-      parent_id: node.parent_id ?? null
-    })),
-    edges: []
-  });
-  fields.append(title, nodesContainer, addButton, preview);
-  return editorShell(block, onChange, fields, getLatest);
+  return createGraphBlockEditor(block, onChange, getLatest);
 }
-
-type ConceptNodeDraft = { id: string; label: string };
-type ConceptEdgeDraft = { id: string; from: string; to: string; label?: string };
 
 export function createConceptMapEditor(
   block: Extract<Block, { block_type: 'concept_map' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'concept_map' }>>,
   getLatest: () => Extract<Block, { block_type: 'concept_map' }> = () => block
 ): HTMLElement {
-  const fields = document.createElement('div');
-  fields.className = 'block-editor__fields';
-
-  let nodes: ConceptNodeDraft[] = block.content.nodes.map((node) => ({
-    id: node.id,
-    label: node.label
-  }));
-  let edges: ConceptEdgeDraft[] = block.content.edges.map((edge) => ({ ...edge }));
-  let nodeCounter = nodes.length;
-  let edgeCounter = edges.length;
-
-  const title = document.createElement('input');
-  title.type = 'text';
-  title.className = 'block-editor__concept-map-title';
-  title.value = block.content.title ?? '';
-  title.placeholder = 'Title (optional)';
-  title.setAttribute('aria-label', 'Concept map title');
-
-  const nodesContainer = document.createElement('div');
-  nodesContainer.className = 'block-editor__concept-map-nodes';
-
-  const edgesContainer = document.createElement('div');
-  edgesContainer.className = 'block-editor__concept-map-edges';
-
-  const preview = document.createElement('div');
-  preview.className = 'block-editor__viz-preview block-editor__concept-map-preview';
-  preview.setAttribute('aria-label', 'Concept map preview');
-
-  const emitChange = () => {
-    const content = {
-      title: title.value.trim() || undefined,
-      nodes: nodes.map((node) => ({ id: node.id, label: node.label })),
-      edges: edges.map((edge) => ({
-        id: edge.id,
-        from: edge.from,
-        to: edge.to,
-        label: edge.label?.trim() ? edge.label : undefined
-      }))
-    };
-    preview.innerHTML = buildConceptMapSvg(content);
-    onChange({
-      ...getLatest(),
-      content
-    });
-  };
-
-  function nodeOptions() {
-    return nodes.map((node) => ({
-      value: node.id,
-      label: node.label.trim() || node.id
-    }));
-  }
-
-  function fillNodeSelect(filter: HubFilterControl, selectedId: string): void {
-    const options = nodeOptions();
-    filter.setOptions(
-      options.length > 0 ? options : [{ value: '', label: 'No nodes' }],
-      selectedId
-    );
-  }
-
-  const edgeFilters: Array<{ from: HubFilterControl; to: HubFilterControl }> = [];
-
-  function renderEdges(): void {
-    edgesContainer.replaceChildren();
-    edgeFilters.length = 0;
-
-    edges.forEach((edge, index) => {
-      const row = document.createElement('div');
-      row.className = 'block-editor__concept-map-edge';
-
-      const from = createEditorFilter({
-        key: 'From',
-        value: edge.from,
-        options: nodeOptions().length ? nodeOptions() : [{ value: '', label: 'No nodes' }],
-        className: 'block-editor__concept-map-edge-from',
-        ariaLabel: `Concept map edge ${index + 1} from`,
-        onChange: (value) => {
-          edges[index] = { ...edges[index]!, from: value };
-          emitChange();
-        }
-      });
-
-      const to = createEditorFilter({
-        key: 'To',
-        value: edge.to,
-        options: nodeOptions().length ? nodeOptions() : [{ value: '', label: 'No nodes' }],
-        className: 'block-editor__concept-map-edge-to',
-        ariaLabel: `Concept map edge ${index + 1} to`,
-        onChange: (value) => {
-          edges[index] = { ...edges[index]!, to: value };
-          emitChange();
-        }
-      });
-      edgeFilters.push({ from, to });
-
-      const label = document.createElement('input');
-      label.type = 'text';
-      label.className = 'block-editor__concept-map-edge-label';
-      label.value = edge.label ?? '';
-      label.placeholder = 'Edge label';
-      label.setAttribute('aria-label', `Concept map edge ${index + 1} label`);
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn btn--ghost block-editor__concept-map-edge-remove';
-      remove.textContent = 'Remove edge';
-      remove.addEventListener('click', () => {
-        edges = edges.filter((_, i) => i !== index);
-        emitChange();
-        renderEdges();
-      });
-
-      label.addEventListener('input', () => {
-        edges[index] = { ...edges[index]!, label: label.value };
-        emitChange();
-      });
-
-      row.append(from.el, to.el, label, remove);
-      edgesContainer.append(row);
-    });
-
-    addEdgeButton.disabled = edges.length >= 40 || nodes.length === 0;
-  }
-
-  function renderNodes(): void {
-    nodesContainer.replaceChildren();
-    const atMin = nodes.length <= 1;
-    const atMax = nodes.length >= 24;
-
-    nodes.forEach((node, index) => {
-      const row = document.createElement('div');
-      row.className = 'block-editor__concept-map-node';
-
-      const label = document.createElement('input');
-      label.type = 'text';
-      label.className = 'block-editor__concept-map-node-label';
-      label.value = node.label;
-      label.placeholder = 'Node label';
-      label.setAttribute('aria-label', `Concept map node ${index + 1} label`);
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn btn--ghost block-editor__concept-map-node-remove';
-      remove.textContent = 'Remove';
-      remove.disabled = atMin;
-      remove.addEventListener('click', () => {
-        if (nodes.length <= 1) return;
-        const removedId = nodes[index]!.id;
-        nodes = nodes.filter((_, i) => i !== index);
-        edges = edges.filter((edge) => edge.from !== removedId && edge.to !== removedId);
-        emitChange();
-        renderNodes();
-        renderEdges();
-      });
-
-      label.addEventListener('input', () => {
-        nodes[index] = { ...nodes[index]!, label: label.value };
-        emitChange();
-        edgeFilters.forEach((pair) => {
-          fillNodeSelect(pair.from, pair.from.getValue());
-          fillNodeSelect(pair.to, pair.to.getValue());
-        });
-      });
-
-      row.append(label, remove);
-      nodesContainer.append(row);
-    });
-
-    addNodeButton.disabled = atMax;
-  }
-
-  const addNodeButton = document.createElement('button');
-  addNodeButton.type = 'button';
-  addNodeButton.className = 'btn btn--secondary block-editor__concept-map-node-add';
-  addNodeButton.textContent = 'Add node';
-  addNodeButton.addEventListener('click', () => {
-    if (nodes.length >= 24) return;
-    nodeCounter += 1;
-    nodes = [...nodes, { id: `${getLatest().id}_n${nodeCounter}`, label: '' }];
-    emitChange();
-    renderNodes();
-    renderEdges();
-  });
-
-  const addEdgeButton = document.createElement('button');
-  addEdgeButton.type = 'button';
-  addEdgeButton.className = 'btn btn--secondary block-editor__concept-map-edge-add';
-  addEdgeButton.textContent = 'Add edge';
-  addEdgeButton.addEventListener('click', () => {
-    if (edges.length >= 40 || nodes.length === 0) return;
-    edgeCounter += 1;
-    const from = nodes[0]!.id;
-    const to = nodes[1]?.id ?? nodes[0]!.id;
-    edges = [...edges, { id: `${getLatest().id}_e${edgeCounter}`, from, to, label: '' }];
-    emitChange();
-    renderEdges();
-  });
-
-  title.addEventListener('input', emitChange);
-
-  renderNodes();
-  renderEdges();
-  preview.innerHTML = buildConceptMapSvg({
-    title: title.value.trim() || undefined,
-    nodes: nodes.map((node) => ({ id: node.id, label: node.label })),
-    edges: edges.map((edge) => ({
-      id: edge.id,
-      from: edge.from,
-      to: edge.to,
-      label: edge.label?.trim() ? edge.label : undefined
-    }))
-  });
-  fields.append(title, nodesContainer, addNodeButton, edgesContainer, addEdgeButton, preview);
-  return editorShell(block, onChange, fields, getLatest);
+  return createGraphBlockEditor(block, onChange, getLatest);
 }
 
 export function createWhiteboardEditor(

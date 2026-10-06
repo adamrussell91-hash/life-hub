@@ -411,8 +411,8 @@ describe('mountLessonPage', () => {
     expect(onSelect).toHaveBeenCalledWith('mm1');
     expect(host.querySelector('.lesson-page__preview')).toBeNull();
     expect(host.querySelector('.lesson-page__inspector')).toBeNull();
-    expect(host.querySelector('.block-graph-maker-host .block-graph-maker')).not.toBeNull();
-    expect(host.querySelectorAll('.block-graph-maker')).toHaveLength(1);
+    expect(host.querySelectorAll('.graph-block')).toHaveLength(1);
+    expect(host.querySelector('.graph-stage--read')).toBeNull();
     expect(host.querySelector('.lesson-page__toolbar')).not.toBeNull();
   });
 
@@ -422,8 +422,8 @@ describe('mountLessonPage', () => {
 
     expect(host.querySelector('.lesson-page__preview')).toBeNull();
     expect(host.querySelector('.lesson-page__inspector')).toBeNull();
-    expect(host.querySelector('.block-graph-maker-host .block-graph-maker')).not.toBeNull();
-    expect(host.querySelectorAll('.block-graph-maker')).toHaveLength(1);
+    expect(host.querySelectorAll('.graph-block')).toHaveLength(1);
+    expect(host.querySelector('.graph-stage--read')).toBeNull();
   });
 
   it('deletes a video block from the menu without entering edit first', () => {

@@ -2,7 +2,7 @@ import { FAILURE } from '@/app/failure';
 import katex from 'katex';
 import { getApiBaseUrl } from '@/api/config';
 import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
-import { buildConceptMapSvg, buildMindMapSvg } from '@/blocks/graph-svg';
+import { renderGraphView } from '../../../../packages/graph-blocks';
 import { mountHubWhiteboard } from '@/blocks/whiteboard-runtime';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildHtmlAppSrcdoc } from '@/blocks/html-app-srcdoc';
@@ -2023,8 +2023,8 @@ export function renderMindMapBlock(
   }
 
   const wrap = document.createElement('div');
-  wrap.className = 'block-mind-map__svg';
-  wrap.innerHTML = buildMindMapSvg(block.content);
+  wrap.className = 'block-mind-map__map';
+  renderGraphView(wrap, 'mind', block.content);
   root.append(wrap);
 
   return wrapBlock(root, block, mode);
@@ -2045,8 +2045,8 @@ export function renderConceptMapBlock(
   }
 
   const wrap = document.createElement('div');
-  wrap.className = 'block-concept-map__svg';
-  wrap.innerHTML = buildConceptMapSvg(block.content);
+  wrap.className = 'block-concept-map__map';
+  renderGraphView(wrap, 'concept', block.content);
   root.append(wrap);
 
   return wrapBlock(root, block, mode);
