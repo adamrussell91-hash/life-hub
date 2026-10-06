@@ -188,6 +188,28 @@ describe('renderPeoplePage (W2 real entry)', () => {
     expect(full?.open).toBe(false);
   });
 
+  it('typing in search filters in place without a hashchange repaint', async () => {
+    vi.useFakeTimers();
+    try {
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, {});
+      const onHash = vi.fn();
+      window.addEventListener('hashchange', onHash);
+      const search = canvas.querySelector<HTMLInputElement>('input.people-page__search')!;
+      search.value = 'Hen';
+      search.dispatchEvent(new Event('input'));
+      await vi.advanceTimersByTimeAsync(400);
+      await Promise.resolve();
+      expect(onHash).not.toHaveBeenCalled();
+      expect(location.hash).toContain('q=Hen');
+      expect(canvas.querySelector('input.people-page__search')).toBe(search);
+      window.removeEventListener('hashchange', onHash);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('Edit opens the full person form (identity + organisation/job title/how you know them/notes/LinkedIn)', async () => {
     const canvas = document.createElement('div');
     document.body.append(canvas);

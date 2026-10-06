@@ -11,6 +11,7 @@ import {
   declineLinkProposal,
   fetchLinkProposals,
   fetchPeopleDirectory,
+  peekPeopleDirectory,
   fetchPersonLedger,
   fetchRememberFacts,
   fetchTodayStrip,
@@ -94,8 +95,17 @@ function hashQuery(): string {
   return i >= 0 ? hash.slice(i) : '';
 }
 
+// Keep the URL in step without firing hashchange. Assigning location.hash
+// repainted the whole page — refetching the directory and rebuilding the
+// search box — after every letter typed, so a full name could not be typed in one go.
 function writeHash(selectedId: string | null, query: DirectoryQueryState): void {
-  location.hash = peopleRoute(selectedId, serializeDirectoryQuery(query));
+  const next = peopleRoute(selectedId, serializeDirectoryQuery(query));
+  if (location.hash !== next) history.replaceState(history.state, '', next);
+}
+
+function directoryCountLabel(d: PeopleDirectoryResponse): string {
+  const { people, organisations } = d.counts;
+  return `${people} ${people === 1 ? 'person' : 'people'} · ${organisations} ${organisations === 1 ? 'organisation' : 'organisations'}`;
 }
 
 function isPhone(): boolean {
@@ -1695,11 +1705,18 @@ export async function renderPeoplePage(
   };
   mq.addEventListener('change', onMq);
 
-  async function reloadDirectory(): Promise<void> {
+  async function reloadDirectory(options: { allowCached?: boolean } = {}): Promise<void> {
     try {
-      directory = await fetchPeopleDirectory();
+      // Stale-while-revalidate: paint the last directory at once, then refresh.
+      const cached = options.allowCached ? peekPeopleDirectory() : null;
+      if (cached) {
+        directory = cached;
+        count.textContent = directoryCountLabel(cached);
+        await paintLayout();
+      }
+      directory = await fetchPeopleDirectory({ fresh: !options.allowCached });
       if (!isCurrent()) return;
-      count.textContent = `${directory.counts.people} ${directory.counts.people === 1 ? 'person' : 'people'} · ${directory.counts.organisations} ${directory.counts.organisations === 1 ? 'organisation' : 'organisations'}`;
+      count.textContent = directoryCountLabel(directory);
       if (!selectedId && directory.people[0] && !phone) {
         // Desktop: leave unselected until click — mockup shows a selection; pick first for empty hash? Plan: `#/people` is directory; selection optional.
       }
@@ -1714,7 +1731,7 @@ export async function renderPeoplePage(
   }
 
   syncControlLabels();
-  await reloadDirectory();
+  await reloadDirectory({ allowCached: true });
 }
 
 /** @deprecated Use renderPeoplePage — kept for import compatibility during migration. */
