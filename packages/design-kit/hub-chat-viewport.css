@@ -98,7 +98,9 @@
   body:has(.chat-view:not([hidden]) .hub-ai-bar--thread:focus-within) .hub-mobile-nav,
   body:has(.chat-overlay:not([hidden]) .chat-form:focus-within) .hub-mobile-nav,
   body:has(.coach.chat .chat__composer:focus-within) .hub-mobile-nav,
-  body:has(.coach.chat .chat-floor:focus-within) .hub-mobile-nav {
+  body:has(.coach.chat .chat-floor:focus-within) .hub-mobile-nav,
+  html.vv-keyboard-open:has(.compose) .hub-mobile-nav,
+  body:has(.compose:focus-within) .hub-mobile-nav {
     display: none;
   }
 

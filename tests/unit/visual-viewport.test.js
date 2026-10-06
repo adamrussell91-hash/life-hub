@@ -202,6 +202,27 @@ test('composer focus forces vv-keyboard-open even when inset math is zero', () =
   detachVisualViewportInset();
 });
 
+test('Knowledge compose focus forces vv-keyboard-open like chat composers', () => {
+  const { classList, docListeners } = mockDocument();
+  globalThis.innerHeight = 844;
+  mockVisualViewport({ height: 844 });
+
+  attachVisualViewportInset();
+  docListeners.get('focusin')({
+    target: {
+      closest(selector) {
+        return String(selector).includes('.compose') ? {} : null;
+      }
+    }
+  });
+  assert.equal(
+    classList.contains('vv-keyboard-open'),
+    true,
+    'focusing New note fields must open keyboard mode'
+  );
+  detachVisualViewportInset();
+});
+
 test('visualViewport jitter smaller than the stick threshold does not rewrite --vv-height', () => {
   const { style, docListeners } = mockDocument();
   const vvListeners = new Map();

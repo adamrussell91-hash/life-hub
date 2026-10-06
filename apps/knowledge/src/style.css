@@ -90,11 +90,20 @@
   padding: var(--space-8) var(--space-6) var(--space-10);
 }
 
-.canvas:has(> .compose),
 .canvas:has(> .reader) {
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
+}
+
+/* New note / Edit note: header + scroll fields + docked Save (not sticky). */
+.canvas:has(> .compose) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
 }
 
 .canvas:has(> .protocols-root .protocol-intake),
@@ -2206,6 +2215,39 @@ body.is-universe-fullscreen .local-banner {
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
+  /* Room above the tab bar; keyboard mode pins to --vv-height and hides nav. */
+  .canvas:has(> .compose) {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  html.vv-keyboard-open .canvas:has(> .compose),
+  body:has(.compose:focus-within) .canvas:has(> .compose) {
+    padding-bottom: var(--space-4);
+  }
+
+  html.vv-keyboard-open .canvas:has(> .compose) {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: var(--vv-offset-top, 0px);
+    height: var(--vv-height, 100dvh);
+    max-height: var(--vv-height, 100dvh);
+    z-index: 40;
+  }
+
+  body:has(.compose) .floating-chat-button {
+    display: none;
+  }
+
+  .compose__savebar {
+    padding: var(--space-3) 0 calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .compose__scroll :is(input, select, textarea, .compose__tiptap-surface, .option-picker) {
+    scroll-margin-top: 1rem;
+    scroll-margin-bottom: 5rem;
+  }
+
   .file {
     grid-template-columns: 2.75rem 1fr;
   }
@@ -2426,6 +2468,7 @@ body.is-universe-fullscreen .local-banner {
   .compose input,
   .compose select,
   .compose textarea,
+  .compose__tiptap-surface,
   .chat-overlay .chat-form textarea,
   .chat-overlay .chat-form input,
   .chat-overlay__book input {
@@ -2440,7 +2483,6 @@ body.is-universe-fullscreen .local-banner {
   .coach.chat .alchemist__actions .btn,
   .coach.chat.chat--from-book .chat__note-form .btn,
   .compose__capture .btn,
-  .compose__save,
   .reader__actions .btn,
   .origin-add .btn,
   .origin-add select,
@@ -2875,6 +2917,20 @@ body.is-universe-fullscreen .local-banner {
   min-height: 0;
   width: 100%;
   max-width: none;
+  overflow: hidden;
+}
+
+.compose > .page-header,
+.compose > .local-banner {
+  flex: 0 0 auto;
+}
+
+.compose__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .compose label {
@@ -3142,7 +3198,7 @@ body.is-universe-fullscreen .local-banner {
 }
 
 .compose__field--body {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -3173,13 +3229,30 @@ body.is-universe-fullscreen .local-banner {
   border-bottom: 1px solid var(--line);
 }
 
+/* Docked outside .compose__scroll — never sticky (R4). Do not pad with
+ * --vv-offset-bottom; keyboard inset is the canvas --vv-height pin. */
 .compose__savebar {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  margin-top: auto;
-  padding: var(--space-3) 0 max(var(--space-3), calc(env(safe-area-inset-bottom, 0px) + var(--vv-offset-bottom, 0px)));
-  background: linear-gradient(180deg, transparent, var(--paper) 1.25rem);
+  flex: 0 0 auto;
+  position: static;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) 0 max(var(--space-3), env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.compose__save {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 2.75rem;
+  justify-content: center;
+}
+
+/* After base 2.75rem so phone wins the cascade (R4 ≥44px → 3rem). */
+@media (max-width: 720px) {
+  .compose__save {
+    min-height: 3rem;
+  }
 }
 
 .compose__save[disabled] {
@@ -4076,10 +4149,12 @@ body.is-universe-fullscreen .local-banner {
 .compose__body-host,
 .compose__tiptap {
   min-height: 16rem;
+  min-width: 0;
 }
 
 .compose__tiptap-surface {
   min-height: 16rem;
+  min-width: 0;
   padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -4087,6 +4162,8 @@ body.is-universe-fullscreen .local-banner {
   color: var(--ink);
   font: inherit;
   line-height: 1.5;
+  /* Avoid iOS zoom on focus — inherit alone can land under 16px. */
+  font-size: max(1rem, 16px);
 }
 
 .compose__tiptap-surface:focus {
