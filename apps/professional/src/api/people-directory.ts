@@ -57,8 +57,23 @@ export interface PeopleDirectoryResponse {
   counts: { people: number; organisations: number; students?: number };
 }
 
-export function fetchPeopleDirectory(options: { signal?: AbortSignal } = {}): Promise<PeopleDirectoryResponse> {
-  return apiGet<PeopleDirectoryResponse>('/api/people/directory', { signal: options.signal });
+let lastDirectory: PeopleDirectoryResponse | null = null;
+
+/** Last directory fetched this session, for instant first paint while a refresh runs. */
+export function peekPeopleDirectory(): PeopleDirectoryResponse | null {
+  return lastDirectory;
+}
+
+/** `fresh` skips the server's short directory cache — use after the operator changes something. */
+export async function fetchPeopleDirectory(
+  options: { signal?: AbortSignal; fresh?: boolean } = {}
+): Promise<PeopleDirectoryResponse> {
+  const data = await apiGet<PeopleDirectoryResponse>(
+    options.fresh ? '/api/people/directory?fresh=1' : '/api/people/directory',
+    { signal: options.signal }
+  );
+  lastDirectory = data;
+  return data;
 }
 
 export interface UpdateOrganisationInput {
