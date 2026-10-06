@@ -45,6 +45,18 @@ A lab appointment or pathology encounter may also belong on Medical Overview as 
 - **"It's gone / I'm better"** → set the active episode `status: resolved` with today as `resolved`.
 Never append a new day's symptom update to an older record; a new day is a new dated entry in the episode.
 
+### How a medical card is written (title, type, time, duplicates)
+
+These rules exist because cards were arriving with whole stories as titles, symptoms filed as Prescriptions, and the same appointment logged on several dates.
+
+- **`title` is a label of 2–6 words, always** — visits as well as symptoms. "Stelara injection", "GP review (GGT results)", "Gastro follow-up", "Sore throat". Never put a verdict, a cause, a symptom aside, a dose commentary, a clinician's full name plus clinic, or a second clause after a dash/semicolon in the title. "Stelara 90mg — painful at site; cramping attributed to breakfast, not Stelara" is wrong: title `Stelara injection`, and the rest goes in `notes`.
+- **Who and where go in `provider` and `location`**, not the title. The reason for the visit and what was said go in `notes`.
+- **Always set `record_type` explicitly** from the list (Appointment, Consultation, Lab Work, Test Result, Imaging, Surgery/Hospital, Prescription, Referral, Vaccination, Symptom). Life Hub's guess from your words is unreliable — a sore throat whose notes mention a dose gets filed as a Prescription. Symptoms and feelings are always `Symptom`; a GP/specialist visit is `Appointment` or `Consultation`; a biologic dose is `Prescription`.
+- **Always set `weight`**: `major` for specialists, procedures, imaging, biologics; `routine` for GP, therapy, scripts; `minor` for symptoms and small things. Weight drives how big the card is — a head cold must never look like a colonoscopy.
+- **Time and length.** When Adam gives a time ("2pm", "9am"), pass it as `time` (HH:MM, 24-hour) and, if he gives or you know the length, `duration_min` (e.g. 30). These put the visit on the Calendar at the right slot and size. When he gives no time, **omit `time`** — the visit shows as all-day. Never put the time only in the notes ("9am") and never invent one.
+- **One appointment = one record.** Before you log a visit that is planned, booked, or "coming up", call `search_medical_records` for it. If a matching visit already exists (same clinician or purpose, near that date), update **that** record on **its own date** — set `status: booked` when he says it is booked — instead of creating another. If he moves it, say so and log the new date once; never log the same appointment on several dates, and never date a future appointment as today.
+- **A `booked` update never changes the date.** `status` and `date` are separate facts.
+
 Life Hub accepts AU dates like `27/10` or `27/10/2026` as well as `YYYY-MM-DD`. Life Hub fills in `record_type`, `lane`, `location_kind`, and `weight` when you omit them — do not send empty strings or placeholder values for optional fields; omit them entirely. For a biologic dose like "had my Stelara today", set `cadence_days: 56` on the dose record.
 
 **New visits, planned procedures, and tasks still use a Confirm card.** Multiple planned items from one message arrive as **one batched card**. Symptom logs and episode appends save immediately (no Confirm card).

@@ -239,7 +239,7 @@ const DOMAIN_PROPERTIES = {
     title: { type: 'string', description: 'Short visit label of a few words, e.g. "Stelara injection". Required. Put detail, symptoms and context in notes, never in the title.' },
     record_type: {
       type: 'string',
-      description: 'Optional — Life Hub infers this from the title/notes when omitted. One of Appointment, Consultation, Lab Work, Test Result, Imaging, Surgery/Hospital, Prescription, Referral, Vaccination, Symptom.',
+      description: 'Set this explicitly — the automatic guess from title/notes is unreliable (symptoms get filed as Prescription). Symptoms and feelings are always Symptom. One of Appointment, Consultation, Lab Work, Test Result, Imaging, Surgery/Hospital, Prescription, Referral, Vaccination, Symptom.',
       enum: [
         'Appointment', 'Consultation', 'Lab Work', 'Test Result', 'Imaging',
         'Surgery/Hospital', 'Prescription', 'Referral', 'Vaccination', 'Symptom'
@@ -472,7 +472,7 @@ export function logEntryRetryHint(input) {
     return 'Fix the payload and call log_entry again in this turn before telling Adam it failed.';
   }
   if (input.type === 'medical') {
-    return 'Call log_entry again with type medical, date (YYYY-MM-DD or AU D/M/YYYY), fields: { title }, and notes only. For a future maintenance dose use that day as date (new visit). Omit lane, record_type, and every other optional field. Do not mention schema errors to Adam.';
+    return 'Call log_entry again with type medical, date (YYYY-MM-DD or AU D/M/YYYY), fields: { title, record_type }, and notes only (title is a 2–6 word label; detail goes in notes). For a future maintenance dose use that day as date (new visit). Omit lane and every other optional field. Do not mention schema errors to Adam.';
   }
   if (input.type === 'meal') {
     return 'Call log_entry again with every required meal macro, valid time in HH:MM, and notes.';
