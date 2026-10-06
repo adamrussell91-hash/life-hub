@@ -8,6 +8,7 @@ import { daysBetween, isCalendarDate } from '../../../apps/life/js/core/time.js'
 import {
   coerceCalendarDate,
   inferRecordType,
+  laneFor,
   MEDICAL_RECORD_TYPES,
   scoreMedicalTitleMatch
 } from '../../../apps/life/js/app/medical-normalize.js';
@@ -241,11 +242,21 @@ export function planVisitUpdate(existing, changes = {}, { nowIso, today } = {}) 
   if (has('record_type')) {
     if (!MEDICAL_RECORD_TYPES.includes(changes.record_type)) errors.push(`record_type must be one of ${MEDICAL_RECORD_TYPES.join(', ')}`); else set('record_type', changes.record_type);
   }
+  if (has('lane')) {
+    if (typeof changes.lane !== 'string' || !changes.lane.trim()) errors.push('lane must be text'); else set('lane', changes.lane.trim());
+  } else if (has('record_type') && MEDICAL_RECORD_TYPES.includes(changes.record_type) && changes.record_type !== current.record_type) {
+    // The lane drives the card colour and grouping, so a retyped visit must move lane with it.
+    set('lane', laneFor(changes.record_type, changes.title ?? current.title, changes.provider ?? current.provider, changes.location ?? current.location));
+  }
   if (has('weight')) {
     if (!WEIGHTS.includes(changes.weight)) errors.push(`weight must be one of ${WEIGHTS.join(', ')}`); else set('weight', changes.weight);
   }
   for (const field of ['provider', 'location', 'insurance_status', 'task_id']) {
     if (has(field)) set(field, text(changes[field]));
+  }
+  if (has('date_end')) {
+    const v = changes.date_end === null ? null : coerceCalendarDate(changes.date_end, { today });
+    if (changes.date_end !== null && !v) errors.push('date_end must be a valid date or null'); else set('date_end', v);
   }
   if (has('follow_up_date')) {
     const v = changes.follow_up_date === null ? null : coerceCalendarDate(changes.follow_up_date, { today });

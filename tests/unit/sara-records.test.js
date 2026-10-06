@@ -153,3 +153,20 @@ test('same title on the same day is a duplicate even if the time and clinician d
   const b = visit('d2', '2026-10-22', { title: 'Stelara injection', record_type: 'Appointment', time: '15:42', provider: 'Nurse' });
   assert.equal(findDuplicateGroups([a, b], { today: TODAY }).length, 1);
 });
+
+test('retyping a visit moves its lane with it, so a symptom is not left in the prescription lane', () => {
+  const misfiled = visit('m', '2026-09-24', { title: 'Sore throat, sniffles, poor sleep', record_type: 'Prescription', lane: 'prescription' }, 'Rest.');
+  const plan = planVisitUpdate(misfiled, { record_type: 'Symptom', weight: 'minor' }, { nowIso: NOW, today: TODAY });
+  assert.equal(plan.ok, true);
+  assert.equal(plan.record.lane, 'symptom');
+  assert.equal(plan.record.weight, 'minor');
+  assert.equal(plan.risk, 'structural');
+  assert.ok(plan.diff.some(d => d.field === 'lane'));
+});
+
+test('stale date estimates can be cleared (date_end / follow_up_date to null)', () => {
+  const v = visit('s', '2026-08-27', { title: 'Stelara injection', date_end: '2026-10-27', follow_up_date: '2026-12-22' });
+  const plan = planVisitUpdate(v, { date_end: null, follow_up_date: null }, { nowIso: NOW, today: TODAY });
+  assert.equal(plan.record.date_end, undefined);
+  assert.equal(plan.record.follow_up_date, undefined);
+});
