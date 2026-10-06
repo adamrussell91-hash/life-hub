@@ -292,6 +292,67 @@ test('MO-07 cadence virtual dose from last Redacted 27/08 + 56d', () => {
   assert.ok(model.visits.some(v => v.virtual && v.date === '2026-10-22'));
 });
 
+test('a real upcoming Redacted visit suppresses the cadence ghost even when it is not within 7 days', () => {
+  const last = {
+    id: 'Redacted-1',
+    date: '2026-08-27',
+    title: 'Redacted injection',
+    record_type: 'Prescription',
+    cadence_days: 56,
+    notes: '',
+    planned: false,
+    virtual: false
+  };
+  // Cadence due date is 22/10. A booked visit on 10/11 is 19 days later.
+  const booked = {
+    id: 'Redacted-2',
+    date: '2026-11-10',
+    title: 'Redacted injection',
+    record_type: 'Prescription',
+    status: 'booked',
+    notes: '',
+    planned: true,
+    virtual: false
+  };
+  assert.equal(deriveVirtualDoses([last], '2026-10-06').length, 1);
+  assert.equal(deriveVirtualDoses([last, booked], '2026-10-06').length, 0);
+
+  const bookedPath = 'data/body/2026/11/2026-11-10-medical-Redacted-injection-0000.md';
+  const model = buildMedicalModel({
+    today: '2026-10-06',
+    events: [
+      visit({
+        id: 'Redacted-1',
+        date: '2026-08-27',
+        title: 'Redacted injection',
+        record_type: 'Prescription',
+        cadence_days: 56,
+        weight: 'major'
+      }),
+      {
+        path: bookedPath,
+        record: {
+          type: 'medical',
+          id: 'Redacted-2',
+          date: '2026-11-10',
+          title: 'Redacted injection',
+          record_type: 'Prescription',
+          status: 'booked',
+          lane: 'appointment',
+          weight: 'major'
+        }
+      }
+    ]
+  });
+  const upcoming = model.visits.filter(item => item.title === 'Redacted injection' && (item.planned || item.date > '2026-10-06'));
+  assert.equal(upcoming.length, 1);
+  assert.equal(upcoming[0].id, 'Redacted-2');
+  assert.equal(upcoming[0].virtual, false);
+  assert.equal(upcoming[0].path, bookedPath);
+  const ghost = deriveVirtualDoses([{ ...last, path: 'data/body/2026/08/2026-08-27-medical-Redacted-injection-0000.md' }], '2026-10-06');
+  assert.equal(ghost[0].path, null);
+});
+
 test('Health Brief cycle prefers Redacted dose title over notes that mention Redacted', () => {
   const model = buildMedicalModel({
     today: '2026-09-26',

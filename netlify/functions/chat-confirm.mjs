@@ -131,7 +131,10 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const BODY_TOO_LARGE = Symbol('body_too_large');
 const CENTRAL_NODE_PATH = 'central-node.md';
 const HAMMOND_SLUG = 'hammond';
+const SARA_SLUG = 'sara';
 const BODY_LOG_TYPES = new Set(['weight', 'composition', 'measurements', 'medication']);
+const CONFIRM_KINDS = new Set(['cn_patch', 'cn_patch_dismiss', 'action', 'action_dismiss', 'delete_log']);
+const MEDICAL_DELETE_PATH = /^data\/body\/(\d{4})\/(\d{2})\/(\d{4}-\d{2}-\d{2})-medical-[a-z0-9-]+\.md$/;
 
 export const config = { path: '/api/chat/confirm' };
 
@@ -313,6 +316,9 @@ export function createChatConfirmHandler({
     if (parsed.kind === 'action_dismiss') {
       return handleActionDismiss(parsed);
     }
+    if (parsed.kind === 'delete_log') {
+      return handleDeleteLog(parsed);
+    }
 
     const validation = validateLogEntry(parsed.candidate, {
       id: `${parsed.candidate.type}-${parsed.candidate.date}-${randomBytes(3).toString('hex')}`,
@@ -472,6 +478,8 @@ export function createChatConfirmHandler({
           sha,
           commitSha,
           centralNodeUpdated,
+          record: validation.record,
+          notes: validation.notes ?? null,
           ...(exercisePersonalBests !== undefined ? { personalBests: exercisePersonalBests } : {}),
           ...(dayoneSent != null ? { dayoneSent, ...(dayoneReason ? { dayoneReason } : {}) } : {})
         }
@@ -483,6 +491,56 @@ export function createChatConfirmHandler({
       return mapRepositoryError(error);
     }
   };
+
+  async function handleDeleteLog(parsed) {
+    if (parsed.slug !== SARA_SLUG) {
+      return errorResponse(400, 'invalid_request', 'Medical deletes require the sara slug.', false, PRIVATE_CACHE);
+    }
+    if (!isAllowedMedicalDeletePath(parsed.path)) {
+      return errorResponse(400, 'invalid_request', 'This file cannot be deleted.', false, PRIVATE_CACHE);
+    }
+
+    let client;
+    try {
+      client = createClient({ env, fetchImpl });
+    } catch (error) {
+      if (error instanceof GitHubConfigurationError) return withPrivateCache(misconfiguredResponse());
+      return repositoryError('github_unavailable', true);
+    }
+
+    let sha;
+    try {
+      const current = await client.resolveTree();
+      sha = current.tree.find(entry => entry.path === parsed.path && entry.type === 'blob')?.sha;
+    } catch (error) {
+      return mapRepositoryError(error);
+    }
+    if (!sha) {
+      return errorResponse(404, 'not_found', 'That visit is no longer in the repository.', false, PRIVATE_CACHE);
+    }
+
+    try {
+      const deleted = await client.deleteFile({
+        path: parsed.path,
+        sha,
+        message: `medical: delete ${parsed.id || parsed.path}`
+      });
+      return jsonResponse(200, {
+        ok: true,
+        data: {
+          deleted: true,
+          path: parsed.path,
+          id: parsed.id,
+          commitSha: deleted.commitSha
+        }
+      }, PRIVATE_CACHE);
+    } catch (error) {
+      if (error instanceof GitHubClientError && error.code === 'write_conflict') {
+        return errorResponse(409, 'write_conflict', 'That visit changed while deleting. Try again.', true, PRIVATE_CACHE);
+      }
+      return mapRepositoryError(error);
+    }
+  }
 
   async function handleCnPatchConfirm(parsed) {
     if (parsed.slug !== HAMMOND_SLUG) {
@@ -2043,15 +2101,7 @@ async function parseRequest(request) {
   }
 
   const id = typeof body.id === 'string' && body.id.trim() !== '' ? body.id.trim() : null;
-  const kind = body.kind === 'cn_patch'
-    ? 'cn_patch'
-    : body.kind === 'cn_patch_dismiss'
-      ? 'cn_patch_dismiss'
-      : body.kind === 'action'
-        ? 'action'
-        : body.kind === 'action_dismiss'
-          ? 'action_dismiss'
-          : 'log';
+  const kind = CONFIRM_KINDS.has(body.kind) ? body.kind : 'log';
 
   const extras = parseActionDecisionFields(body);
 
@@ -2060,6 +2110,14 @@ async function parseRequest(request) {
       return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
     }
     return { slug: body.slug, kind, id, ...extras };
+  }
+
+  if (kind === 'delete_log') {
+    const path = typeof body.path === 'string' ? body.path.trim() : '';
+    if (!path) {
+      return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
+    }
+    return { slug: body.slug, kind, id, path };
   }
 
   const hasCandidate = body.candidate && typeof body.candidate === 'object' && !Array.isArray(body.candidate);
@@ -2104,6 +2162,15 @@ function parseActionDecisionFields(body) {
     reason: typeof body.reason === 'string' ? body.reason : null,
     revisit: typeof body.revisit === 'string' ? body.revisit : null
   };
+}
+
+function isAllowedMedicalDeletePath(path) {
+  if (typeof path !== 'string' || path.includes('..') || path.includes('\\') || path.startsWith('/')) {
+    return false;
+  }
+  const match = MEDICAL_DELETE_PATH.exec(path);
+  if (!match) return false;
+  return match[3].startsWith(`${match[1]}-${match[2]}-`);
 }
 
 async function loadBlobStoresForWrites(writes, {
