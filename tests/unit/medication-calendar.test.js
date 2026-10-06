@@ -119,7 +119,10 @@ test('Day dial: dose band drawn, prompt shown, Taken now posts a medication reco
     onSelectDate: () => {}
   });
   await new Promise((resolve) => setTimeout(resolve, 30));
-  assert.ok(host.querySelector('[data-part="med-ring"] .dd-med'), 'morning dose band drawn');
+  // A school day wears the Tool watch: the logged dose moves out to the dive bezel.
+  assert.equal(host.querySelector('[data-part="day-dial"]').getAttribute('data-face'), 'tool');
+  assert.ok(host.querySelector('[data-part="bezel"] .dd-fx-pip'), 'morning dose on the dive bezel');
+  assert.ok(host.querySelector('[data-part="bezel"] .dd-fx-dose'), 'morning dose window drawn');
   const panel = host.querySelector('[data-part="medication"]');
   assert.ok(panel?.classList.contains('is-prompt'), 'afternoon prompt showing');
   assert.match(panel.textContent, /usually take it around 4 pm/);
