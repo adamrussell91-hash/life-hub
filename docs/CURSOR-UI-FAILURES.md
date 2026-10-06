@@ -49,6 +49,8 @@
 
 **S5 · Dropdown painted under the next section.** **Seen:** Teaching lesson editor (Codex run 10, 05/10/26): the context bar has `backdrop-filter` (its own stacking context) and no `z-index`, so the canvas below painted over the Lesson options menu; clicking History hit the Connections section instead and "did nothing". **Rule:** Any bar that owns a dropdown or popover and has `backdrop-filter`, `transform`, `filter` or `opacity < 1` also gets `position: relative` and a `z-index` above the content it overlaps. **Check:** open every menu in the bar at 1440 and run `document.elementFromPoint` on the centre of each item; it returns the item, not something underneath.
 
+**S6 · Phone touch-target rule widened every chip.** **Seen:** Tasks Board domain pills (2026-10): Goals mobile CSS listed bare `.hub-chip { min-width: 2.75rem }`, so short Board labels ("Life", "Other") sat in 44px capsules with left-aligned text while longer pills ("Teaching") looked fine. **Rule:** A 44px touch-target rule scopes to the surface that needs it (Goals sheets / runway / check-in), never a bare kit class that Board cards reuse. Pill chips use `justify-content: center`, and densified Board chips reset `min-width: 0`. **Check:** at 390, Board `.hub-chip[data-area="life"]` has equal left/right content gaps (±1px) and computed `min-width` is `0px`; `apps/tasks/tests/unit/chip-centering.test.ts` stays green.
+
 ## V: Visibility and state
 
 **V1 · `[hidden]` doesn't hide.** **Seen:** Goals Direction editor (G-18). **Rule:** Any element toggled with `hidden` that has a `display:` rule also gets `.x[hidden]{display:none}`. **Check:** after hiding, `offsetHeight === 0`.

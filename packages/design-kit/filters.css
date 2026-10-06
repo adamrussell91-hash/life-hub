@@ -207,6 +207,7 @@ input.hub-search::placeholder {
 .hub-chip {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   padding: 0.2rem 0.55rem;
   border: 0;
   border-radius: var(--radius-full);
