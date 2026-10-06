@@ -58,7 +58,7 @@ function applyImgSrc(img, src) {
 }
 
 export function renderFitness(root, model, { logger, templates, libraryByName, onSelectTemplate } = {}) {
-  setText(root, '[data-fitness="streak"]', model.streak);
+  renderWeekStreak(root, model.weekStreak, model.streak);
   setText(root, '[data-fitness="day-type"]', DAY_TYPE_LABELS[model.dayType] ?? model.dayType ?? '—');
 
   renderStatus(root, model);
@@ -85,17 +85,118 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
         exerciseBests: model.exerciseBests,
         buildBoard: model.buildBoard,
         lastSessionVolume: model.lastSessionVolume,
-        libraryByName
+        libraryByName,
+        weekStreak: model.weekStreak,
+        lastPainFlags: model.lastPainFlags
       }
     });
   }
 
   renderBuildBoard(root, model, libraryByName);
+  renderSeason(root, model.season);
+  renderBenchmarkWall(root, model.benchmarks);
   renderTemplateRail(root, templates, { libraryByName, onSelectTemplate });
   renderFocusStrip(root, model.focusHits);
   renderRunWidget(root, model);
 
   root.querySelector('#fitness-dashboard')?.removeAttribute('hidden');
+}
+
+/** Week streak: 3+ sessions a week; illness weeks freeze it instead of breaking it. */
+function renderWeekStreak(root, weekStreak, dailyStreak) {
+  if (!weekStreak) {
+    setText(root, '[data-fitness="streak"]', dailyStreak);
+    return;
+  }
+  setText(root, '[data-fitness="streak"]', `${weekStreak.current} wk`);
+  setText(root, '[data-fitness="week-longest"]', `${weekStreak.longest} wk`);
+  const note = root.querySelector('[data-fitness="streak-note"]');
+  if (!note) return;
+  const week = weekStreak.thisWeek;
+  let text;
+  if (week.protected) text = 'Illness logged this week — your streak is frozen, not broken. Rest up.';
+  else if (week.remaining === 0) text = `This week: ${week.sessions}/${week.target} — streak secured. Anything more is a bonus.`;
+  else text = `This week: ${week.sessions}/${week.target} — ${week.remaining} to go, ${week.daysLeft} day${week.daysLeft === 1 ? '' : 's'} left.`;
+  if (weekStreak.protectedWeeks) {
+    text += ` ${weekStreak.protectedWeeks} sick week${weekStreak.protectedWeeks === 1 ? '' : 's'} protected in this run.`;
+  }
+  note.textContent = text;
+  note.removeAttribute('hidden');
+}
+
+function renderSeason(root, season) {
+  const card = root.querySelector('#fitness-season-card');
+  const host = root.querySelector('#fitness-season');
+  if (!card || !host) return;
+  if (!season) {
+    card.setAttribute('hidden', '');
+    host.replaceChildren();
+    return;
+  }
+  const title = root.createElement('strong');
+  title.className = 'fitness-season__name';
+  title.textContent = season.name;
+  const meta = root.createElement('p');
+  meta.className = 'metric-caption';
+  meta.textContent = season.finished
+    ? `Finished · ${season.sessions} sessions · ${season.benchmarkSessions} benchmark tests`
+    : `Week ${season.week} of ${season.weeks} · ${season.daysLeft} days left · ${season.sessions} sessions so far`;
+  const bar = root.createElement('div');
+  bar.className = 'fitness-season__bar';
+  bar.setAttribute('role', 'progressbar');
+  bar.setAttribute('aria-valuemin', '0');
+  bar.setAttribute('aria-valuemax', '100');
+  bar.setAttribute('aria-valuenow', String(Math.round(season.progress * 100)));
+  bar.setAttribute('aria-label', `${season.name} progress`);
+  const fill = root.createElement('span');
+  fill.style?.setProperty?.('--w', `${Math.round(season.progress * 100)}%`);
+  bar.append(fill);
+  const nodes = [title];
+  if (season.mission) {
+    const mission = root.createElement('p');
+    mission.className = 'fitness-season__mission';
+    mission.textContent = season.mission;
+    nodes.push(mission);
+  }
+  nodes.push(meta, bar);
+  host.replaceChildren(...nodes);
+  card.removeAttribute('hidden');
+}
+
+function renderBenchmarkWall(root, benchmarks) {
+  const card = root.querySelector('#fitness-bench-card');
+  const host = root.querySelector('#fitness-bench');
+  if (!card || !host) return;
+  const rows = (benchmarks ?? []).slice(0, 8);
+  if (!rows.length) {
+    card.setAttribute('hidden', '');
+    host.replaceChildren();
+    return;
+  }
+  host.replaceChildren(...rows.map(row => {
+    const item = root.createElement('div');
+    item.className = 'bench-wall__row';
+    if (row.isBest) item.dataset.best = 'true';
+    const head = root.createElement('div');
+    head.className = 'bench-wall__head';
+    const name = root.createElement('strong');
+    name.textContent = row.name;
+    const latest = root.createElement('span');
+    latest.className = 'bench-wall__latest';
+    const arrow = row.improved == null ? '' : (row.improved ? ' ▲' : ' ▼');
+    latest.textContent = `${row.latest.label}${arrow}`;
+    if (row.improved != null) latest.dataset.trend = row.improved ? 'up' : 'down';
+    head.append(name, latest);
+    const history = root.createElement('p');
+    history.className = 'metric-caption bench-wall__history';
+    const trail = row.points.slice(-5).map(point => point.label).join(' → ');
+    history.textContent = row.points.length > 1
+      ? `${trail} · best ${row.best.label}${row.isBest ? ' (today’s the best)' : ''}`
+      : `First result: ${row.latest.label} — beat it next time`;
+    item.append(head, history);
+    return item;
+  }));
+  card.removeAttribute('hidden');
 }
 
 /** Weekly hard sets per muscle; a planned session shows what it will add. */

@@ -235,5 +235,67 @@ test('a celebration banner leads the stage', () => {
   const root = render(draftWithCues(), { celebration: { kind: 'pr', title: 'PERSONAL BEST', detail: 'Bench — Heaviest ever' } });
   const moment = byMarker(root.logger, 'celebration')[0];
   assert.equal(moment.dataset.kind, 'pr');
-  assert.equal(moment.children[0].textContent, 'PERSONAL BEST');
+  assert.equal(moment.children.find(child => child.className === 'gym-moment__title').textContent, 'PERSONAL BEST');
+});
+
+test('readiness check-in leads the first set and shows advice once answered', () => {
+  const draft = draftWithCues();
+  draft.readiness = { sleep: 2, soreness: 2, energy: 2 };
+  const root = render(draft, {
+    readinessOpen: true,
+    lastPainFlags: { date: '2026-10-04', flags: [{ site: 'Right shoulder' }] },
+    treat: 'Huberman'
+  });
+  const card = byMarker(root.logger, 'readiness')[0];
+  assert.ok(card);
+  assert.match(byMarker(card, 'readiness-advice')[0].children[0].textContent, /go lighter/i);
+  assert.equal(byMarker(card, 'readiness-apply')[0].textContent, 'Go lighter (−10%)');
+  assert.ok(walk(card).some(node => /Right shoulder/.test(node.textContent ?? '')));
+  assert.match(byMarker(card, 'treat')[0].textContent, /Huberman/);
+});
+
+test('every set shows a focus cue and the twinge picker offers body sites', () => {
+  const root = render(draftWithCues({ focus: 'Drive the bar away.' }), { noteOpen: 'twinge' });
+  assert.match(byMarker(root.logger, 'focus-cue')[0].children[1].textContent, /Drive the bar away/);
+  const picker = byMarker(root.logger, 'twinge-picker')[0];
+  assert.ok(walk(picker).some(node => node.textContent === 'Right shoulder'));
+});
+
+test('twinge offer and rest win render; all-done shows the AEKE wrap-up', () => {
+  const draft = draftWithCues();
+  draft.exercises[0].sets[0].done = true;
+  const root = render(draft, {
+    twingeOffer: { exerciseIndex: 0, site: 'Right shoulder' },
+    rest: { remainingMs: 60_000, label: 'Rest', win: 'Bench: 30 kg → 36 kg since 01/03/26.' }
+  });
+  assert.ok(byMarker(root.logger, 'twinge-offer')[0]);
+  assert.equal(byMarker(root.logger, 'rest-win')[0].textContent, 'Bench: 30 kg → 36 kg since 01/03/26.');
+  const wrap = byMarker(root.logger, 'wrap-up')[0];
+  assert.ok(byMarker(wrap, 'aeke-score')[0]);
+});
+
+test('anatomy art: a straight set gets the muscle hero with its weekly meter; a superset shows both muscles', () => {
+  const draft = draftWithCues();
+  draft.exercises[0].name = 'Bar Hip Thrust';
+  const root = render(draft, {
+    libraryByName: { 'Bar Hip Thrust': { name: 'Bar Hip Thrust', target_area: 'glutes' } },
+    boardRows: [{ region: 'legs', label: 'Legs', done: 5, target: 8, today: 4, todayDone: 1 }]
+  });
+  const hero = byMarker(root.logger, 'hero')[0];
+  assert.ok(hero, 'hero header');
+  assert.match(walk(hero).find(node => node.tagName === 'img').src, /muscles\/glutes\.png/);
+  assert.equal(byMarker(hero, 'hero-meter')[0].children[0].textContent, '6/8');
+
+  const sets = [{ reps: 10, weight_kg: 30, cable_type: 'constant_force' }];
+  draft.exercises = [
+    { name: 'Bar Press', superset_group: 1, sets },
+    { name: 'Cable Bar Wide Grip Curl', superset_group: 1, sets }
+  ];
+  const split = render(draft, { stepIndex: 0, libraryByName: null });
+  assert.equal(byMarker(split.logger, 'hero').length, 0, 'no duplicate hero inside a superset');
+  const order = byMarker(split.logger, 'block-order')[0];
+  assert.match(order.className, /gym-split/);
+  const images = walk(order).filter(node => node.tagName === 'img').map(node => node.src);
+  assert.deepEqual(images, ['assets/fitness/muscles/chest-whole.png', 'assets/fitness/regions/arms.png'], 'curls use the flexing arm');
+  assert.ok(walk(order).some(node => node.textContent === 'NOW'));
 });

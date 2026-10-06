@@ -194,6 +194,11 @@ function summarizeExercises(exercises) {
       const cableTypes = [...new Set(sets.map(set => set?.cable_type).filter(Boolean))];
       if (cableTypes.length) details.push(`cable ${cableTypes.join('/')}`);
       if (exercise.intensification) details.push(String(exercise.intensification).replace(/_/g, ' '));
+      if (exercise.benchmark) details.push('benchmark');
+      if (exercise.block?.result) {
+        const result = exercise.block.result;
+        details.push(`score ${result.rounds ?? '?'} rounds${result.extra_reps ? ` + ${result.extra_reps}` : ''}${result.time_sec ? ` in ${result.time_sec}s` : ''}`);
+      }
       if (exercise.superset_group != null) {
         details.push(`${exercise.block?.kind === 'circuit' ? 'circuit' : 'superset'} ${exercise.superset_group}`);
       }
@@ -256,7 +261,24 @@ function sessionPromptLine(record) {
   const noteBit = noteText ? ` — notes: ${noteText}` : '';
   const painBit = formatPainFlags(record.pain_flags);
   const painSuffix = painBit ? ` — ${painBit}` : '';
-  return `${record.date} · ${title}${moveBit}${noteBit}${painSuffix}`;
+  const extras = [];
+  if (record.season?.name) {
+    extras.push(`season: ${record.season.name}${record.season.benchmark ? ' (benchmark test)' : ''}`);
+  }
+  const readiness = record.readiness;
+  if (readiness && ['sleep', 'soreness', 'energy'].some(key => readiness[key] != null)) {
+    extras.push(`readiness sleep ${readiness.sleep ?? '—'}/5, body ${readiness.soreness ?? '—'}/5, energy ${readiness.energy ?? '—'}/5${readiness.adjusted ? ` → ${readiness.adjusted.replace('_', ' ')}` : ''}`);
+  }
+  const aeke = record.aeke;
+  if (aeke && Object.keys(aeke).length) {
+    const bits = [];
+    if (aeke.volume_kg != null) bits.push(`${aeke.volume_kg} kg volume`);
+    if (aeke.score != null) bits.push(`score ${aeke.score}`);
+    if (aeke.strength_delta_pct != null) bits.push(`${aeke.strength_delta_pct > 0 ? '+' : ''}${aeke.strength_delta_pct}% ${aeke.strength_region ?? 'strength'}`);
+    if (bits.length) extras.push(`AEKE ${bits.join(', ')}`);
+  }
+  const extraSuffix = extras.length ? ` — ${extras.join(' · ')}` : '';
+  return `${record.date} · ${title}${moveBit}${noteBit}${painSuffix}${extraSuffix}`;
 }
 
 export function formatRecentWorkoutsForPrompt(records) {
@@ -290,6 +312,9 @@ function formatSession(record) {
     focus: record.focus,
     notes: record.notes,
     pain_flags: Array.isArray(record.pain_flags) ? record.pain_flags : [],
+    ...(record.season ? { season: record.season } : {}),
+    ...(record.readiness ? { readiness: record.readiness } : {}),
+    ...(record.aeke ? { aeke: record.aeke } : {}),
     exercises: collapsed.map(exercise => ({
       name: exercise.name,
       sets: exercise.sets,

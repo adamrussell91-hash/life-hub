@@ -3568,7 +3568,8 @@ body.is-gym-mode { overflow: hidden; }
   font-weight: 900;
   letter-spacing: 0.08em;
 }
-.gym-moment__detail { margin: 0; font-size: var(--text-sm); font-weight: 600; }
+.gym-moment__detail { margin: 0; font-size: var(--text-sm); font-weight: 600; text-wrap: balance; }
+.gym-art[src$="regions/arms.png"] { object-position: 72% 18%; }
 @keyframes gym-moment-in {
   from { opacity: 0; transform: scale(0.8) translateY(-8px); }
   to { opacity: 1; transform: none; }
@@ -3650,6 +3651,283 @@ body.is-gym-mode { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   .gym-moment { animation: none; }
+}
+
+/* Tier 2/3: readiness, focus, twinge, rest wins, wrap-up. */
+.gym-rest__win {
+  margin: 0.2rem 0 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.6rem;
+  background: var(--on-dark-hover);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.gym-focus {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.65rem;
+  background: var(--on-dark-hover);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+.gym-focus strong { color: var(--high-sea); }
+.gym-focus--external strong { color: var(--pastel-blue); }
+.gym-chip--twinge.is-active { border-color: var(--danger-line); background: var(--danger); color: white; }
+.gym-twinge { display: grid; gap: 0.45rem; }
+.gym-twinge-offer {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 60%, transparent);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+.gym-twinge-offer p { margin: 0; font-size: var(--text-sm); }
+.gym-ready { gap: 0.7rem; }
+.gym-ready__title { margin: 0; font-size: var(--text-lg); }
+.gym-ready__row {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.2rem 0.6rem;
+}
+.gym-ready__label { font-weight: 700; font-size: var(--text-sm); }
+.gym-ready__pills { flex-wrap: nowrap; }
+.gym .gym-ready__pills .hub-pills__btn { min-width: 44px; justify-content: center; padding-inline: 0.5rem; }
+.gym-ready__hint { grid-column: 2; color: var(--on-dark-muted); font-size: var(--text-xs); }
+.gym-ready__pain,
+.gym-ready__treat { margin: 0; font-size: var(--text-sm); color: var(--on-dark-muted); }
+.gym-ready__treat { color: var(--high-sea); font-weight: 650; }
+.gym-ready__advice {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--on-dark-hover);
+}
+.gym-ready__advice p { margin: 0; font-size: var(--text-sm); color: var(--on-dark-muted); }
+.gym-ready__advice--push { background: color-mix(in srgb, var(--high-sea) 22%, transparent); }
+.gym-ready__advice--lighter { background: color-mix(in srgb, var(--wave) 30%, transparent); }
+.gym-wrap__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+.gym-wrap__field { display: grid; gap: 0.25rem; color: var(--on-dark-muted); font-size: var(--text-xs); }
+.gym-wrap h2,
+.gym-wrap p { margin: 0; }
+.gym-wrap__field { min-width: 0; }
+.gym-wrap__field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--on-dark-line);
+  border-radius: 0.6rem;
+  background: var(--depth);
+  color: var(--on-dark);
+  font: inherit;
+  font-size: 16px;
+}
+.pump__streak { margin: 0; color: var(--high-sea); font-size: var(--text-sm); font-weight: 700; }
+
+/* Fitness page: week streak note, Season, Benchmark Wall. */
+.fitness-streak-note[hidden] { display: none; }
+.fitness-season { display: grid; gap: var(--space-1); margin-top: var(--space-3); }
+.fitness-season[hidden] { display: none; }
+.fitness-season__name { color: var(--depth); font-size: var(--text-md); }
+.fitness-season__mission { margin: 0; color: var(--depth); font-size: var(--text-sm); }
+.fitness-season__bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wave) 12%, transparent);
+}
+.fitness-season__bar span { display: block; width: var(--w, 0%); height: 100%; background: var(--high-sea); }
+.bench-wall { display: grid; gap: var(--space-2); }
+.bench-wall__row {
+  display: grid;
+  gap: 0.15rem;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+.bench-wall__row:first-child { border-top: 0; }
+.bench-wall__head { display: flex; justify-content: space-between; gap: var(--space-2); }
+.bench-wall__head strong { color: var(--depth); font-size: var(--text-sm); }
+.bench-wall__latest { color: var(--depth); font-weight: 700; font-variant-numeric: tabular-nums; font-size: var(--text-sm); }
+.bench-wall__latest[data-trend="up"] { color: var(--success); }
+.bench-wall__latest[data-trend="down"] { color: var(--high-sea-ink); }
+.bench-wall__row[data-best="true"] .bench-wall__head strong::after { content: ' · PB'; color: var(--high-sea-ink); }
+.bench-wall__history { margin: 0; }
+
+/* Anatomy art: the black-on-white muscle drawings, inverted and screen-blended
+   so the figure glows out of the dark and the worked muscle lights up blue. */
+.gym-art {
+  filter: invert(1) hue-rotate(180deg) contrast(1.15) brightness(1.05);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  user-select: none;
+}
+.gym-card--hero { padding-top: 0; overflow: hidden; }
+.gym-hero {
+  position: relative;
+  display: grid;
+  align-items: end;
+  min-height: 17rem;
+  margin: 0 -1rem;
+  padding: 0 1rem 0.9rem;
+  overflow: hidden;
+  isolation: isolate;
+  background: radial-gradient(120% 90% at 50% 40%, color-mix(in srgb, var(--fitness-accent) 30%, var(--depth)) 0%, var(--marine) 72%);
+}
+.gym-hero__art {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+}
+.gym-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, transparent 40%, color-mix(in srgb, var(--marine) 94%, transparent) 90%);
+}
+.gym-hero__glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(40% 35% at 50% 50%, color-mix(in srgb, var(--fitness-accent) 45%, transparent), transparent 70%);
+  mix-blend-mode: screen;
+  animation: gym-glow 2.4s ease-in-out infinite;
+}
+@keyframes gym-glow { 50% { opacity: 0.4; } }
+.gym-hero__meter {
+  position: absolute;
+  top: 0.9rem;
+  right: 1rem;
+  display: grid;
+  justify-items: end;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+.gym-hero__meter strong { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+.gym-hero__meter span { color: var(--on-dark-muted); font-size: var(--text-2xs); font-weight: 800; letter-spacing: 0.1em; }
+.gym-card__name { display: flex; align-items: center; gap: 0.6rem; }
+.gym-hero .gym-card__title h2 { text-shadow: 0 2px 18px rgba(0, 0, 0, 0.75); }
+.gym-card__chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
+.gym-card__chip {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--on-dark-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--depth) 45%, transparent);
+  backdrop-filter: blur(8px);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+.gym-card__chip--hot { border-color: var(--high-sea); background: var(--high-sea); color: var(--depth); text-transform: capitalize; }
+
+/* Superset split: both muscles side by side, the one you're on lit. */
+.gym-split {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.gym-split .gym-block__member {
+  position: relative;
+  display: grid;
+  align-content: end;
+  gap: 0.25rem;
+  min-height: 11rem;
+  padding: 0.6rem;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 1rem;
+  background: radial-gradient(120% 90% at 50% 40%, color-mix(in srgb, var(--fitness-accent) 28%, var(--depth)), var(--depth) 75%);
+  color: var(--on-dark);
+}
+.gym-split__art { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
+.gym-split .gym-block__member::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, transparent 40%, color-mix(in srgb, var(--depth) 95%, transparent) 92%);
+}
+.gym-split .gym-block__code { position: absolute; top: 0.5rem; left: 0.5rem; z-index: 1; background: var(--fitness-accent); }
+.gym-split .gym-block__name { font-size: var(--text-sm); font-weight: 800; line-height: 1.2; }
+.gym-split__tag {
+  justify-self: start;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--on-dark-hover);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.gym-split__tag.is-now { background: var(--high-sea); color: var(--depth); }
+.gym-split .gym-block__member.is-current { box-shadow: inset 0 0 0 2px var(--on-dark); }
+.gym-split .gym-block__member:not(.is-current) { opacity: 0.6; }
+.gym-split .gym-block__member.is-done .gym-block__name::after { content: ''; }
+
+/* Circuit rows: a small glowing thumbnail per move. */
+.gym-round__thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  flex: none;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 0.7rem;
+  background: var(--depth);
+}
+.gym-round__thumb .gym-art { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; }
+.gym-round__thumb .gym-card__code { min-width: 1.6rem; height: 1.6rem; font-size: var(--text-2xs); opacity: 0.92; }
+
+/* PR / ghost moments with the art behind them. */
+.gym-moment--art { position: relative; min-height: 9rem; align-content: end; overflow: hidden; isolation: isolate; }
+.gym-moment__art { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; object-position: center 25%; opacity: 0.55; }
+.gym-moment--pr.gym-moment--art {
+  min-height: 15rem;
+  background: radial-gradient(90% 70% at 50% 35%, var(--high-sea) 0%, color-mix(in srgb, var(--high-sea) 40%, var(--depth)) 50%, var(--depth) 90%);
+  color: white;
+}
+.gym-moment--pr .gym-moment__art { opacity: 0.9; }
+.gym-moment--pr .gym-moment__title { font-size: var(--text-xl); text-shadow: 0 4px 30px var(--high-sea); }
+.gym-moment__spark {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(2px 2px at 20% 30%, white, transparent),
+    radial-gradient(2px 2px at 75% 22%, white, transparent),
+    radial-gradient(3px 3px at 60% 60%, var(--pastel-gold), transparent),
+    radial-gradient(2px 2px at 30% 70%, white, transparent),
+    radial-gradient(2px 2px at 85% 55%, white, transparent);
+  animation: gym-glow 1.6s ease-in-out infinite;
+}
+
+/* Pump Report hero art. */
+.pump__hero--art {
+  position: relative;
+  min-height: 15rem;
+  align-content: end;
+  padding: 1rem;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 1.2rem;
+  background: radial-gradient(90% 70% at 50% 35%, color-mix(in srgb, var(--high-sea) 70%, var(--depth)) 0%, var(--depth) 85%);
+}
+.pump__art { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; opacity: 0.85; }
+.pump__hero--art::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, transparent 35%, var(--depth) 95%); }
+
+/* The voice companion isn't running: don't carry a dead player into gym mode. */
+.gym__stage .chadwick-voice:has([data-chadwick-voice="retry"]),
+.gym__stage .chadwick-voice[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gym-hero__glow,
+  .gym-moment__spark { animation: none; }
 }
 
 /* Minimised: a compact bar on the Fitness card. */

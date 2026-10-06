@@ -2,7 +2,13 @@ import { calculateWorkoutStreak, resolveDayType } from '../core/aggregate.js';
 import { addCalendarDays, enumerateDateKeys, getSydneyWeekStart } from '../core/time.js';
 import { buildFitnessCharts } from './fitness-charts-model.js';
 import { resolveMuscleMapKeys } from './muscle-maps.js';
-import { buildBuildBoard, buildExerciseBests } from './fitness-progression.js';
+import {
+  buildBenchmarkWall,
+  buildBuildBoard,
+  buildExerciseBests,
+  buildSeasonStatus,
+  buildWeekStreak
+} from './fitness-progression.js';
 
 const WEEK_DAYS = 7;
 const MONTH_DAYS = 30;
@@ -503,6 +509,14 @@ export function buildLastPerformance(events, date) {
   return Object.fromEntries(latest);
 }
 
+function lastPainFlags(events, date) {
+  const last = events
+    .filter(({ record }) => record.status === 'completed' && record.date && record.date < date)
+    .sort((a, b) => b.record.date.localeCompare(a.record.date))[0];
+  const flags = Array.isArray(last?.record?.pain_flags) ? last.record.pain_flags : [];
+  return flags.length ? { date: last.record.date, flags } : null;
+}
+
 function lastSessionVolume(events, date) {
   const last = events
     .filter(({ record }) => record.status === 'completed' && record.date && record.date < date && sessionVolume(record) > 0)
@@ -641,6 +655,10 @@ export function buildFitnessModel({ events, date, libraryByName = null, targetsC
     exerciseBests: buildExerciseBests(workoutEvts, date),
     buildBoard: buildBuildBoard(workoutEvts, date, libraryByName),
     lastSessionVolume: lastSessionVolume(workoutEvts, date),
+    weekStreak: buildWeekStreak(events, date),
+    season: buildSeasonStatus(workoutEvts, date),
+    benchmarks: buildBenchmarkWall(workoutEvts, date),
+    lastPainFlags: lastPainFlags(workoutEvts, date),
     recentSessions: buildRecentSessions(workoutEvts, date),
     volumeWeeks: buildVolumeWeeks(longTerm.weeklyVolume),
     longTerm,

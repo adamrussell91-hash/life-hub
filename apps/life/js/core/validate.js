@@ -272,11 +272,12 @@ function validateWorkout(record, errors) {
           }
         }
       }
+      booleanField(exercise, 'benchmark', errors);
       if (exercise.coach_cues != null) {
         if (!isObject(exercise.coach_cues)) {
           errors.push(`${prefix}.coach_cues must be an object`);
         } else {
-          for (const field of ['start', 'rest', 'final_set']) {
+          for (const field of ['start', 'rest', 'final_set', 'focus']) {
             optionalString(exercise.coach_cues, field, errors);
           }
         }
@@ -339,6 +340,35 @@ function validateWorkout(record, errors) {
     }
   }
   crossAgentNote(record, 'cross_agent_note', errors, { senderName: 'Chadwick' });
+  if (record.season != null) {
+    if (!isObject(record.season)) {
+      errors.push('season must be an object');
+    } else {
+      requireString(record.season, 'name', errors);
+      if (!isCalendarDate(record.season.start)) errors.push('season.start must be YYYY-MM-DD');
+      finiteNumber(record.season, 'weeks', errors, { required: true, minimum: 1, maximum: 26 });
+      optionalString(record.season, 'mission', errors);
+      booleanField(record.season, 'benchmark', errors);
+    }
+  }
+  if (record.readiness != null) {
+    if (!isObject(record.readiness)) {
+      errors.push('readiness must be an object');
+    } else {
+      for (const field of ['sleep', 'soreness', 'energy']) finiteNumber(record.readiness, field, errors, { minimum: 1, maximum: 5 });
+      enumeration(record.readiness, 'adjusted', ['lighter', 'as_planned', 'push'], errors);
+    }
+  }
+  if (record.aeke != null) {
+    if (!isObject(record.aeke)) {
+      errors.push('aeke must be an object');
+    } else {
+      finiteNumber(record.aeke, 'volume_kg', errors, { minimum: 0 });
+      finiteNumber(record.aeke, 'score', errors, { minimum: 0 });
+      finiteNumber(record.aeke, 'strength_delta_pct', errors);
+      optionalString(record.aeke, 'strength_region', errors);
+    }
+  }
 }
 
 function validateDiary(record, errors) {

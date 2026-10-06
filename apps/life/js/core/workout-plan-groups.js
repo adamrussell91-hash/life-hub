@@ -241,6 +241,7 @@ export function copyExerciseStructure(exercise, { withResults = true } = {}) {
   const block = cleanBlock(exercise?.block, { withResults });
   if (block) out.block = block;
   if (positiveNumber(exercise?.rest_sec)) out.rest_sec = Number(exercise.rest_sec);
+  if (exercise?.benchmark === true) out.benchmark = true;
   if (exercise?.between_sets && typeof exercise.between_sets === 'object' && exercise.between_sets.name) {
     out.between_sets = {
       ...exercise.between_sets,
