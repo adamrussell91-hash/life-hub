@@ -1,6 +1,7 @@
 import { isCalendarDate } from './time.js';
 import { laneFor, locationKindFor } from '../app/medical-normalize.js';
 import { TRACKING_TYPES, resolveTrackingType } from './exercise-tracking.js';
+import { BLOCK_FORMATS, BLOCK_KINDS } from './workout-plan-groups.js';
 
 const COMMON_FIELDS = [
   'schema_version', 'id', 'type', 'date', 'time', 'created_at', 'updated_at', 'source'
@@ -227,6 +228,28 @@ function validateWorkout(record, errors) {
       }
       finiteNumber(exercise, 'superset_group', errors, { minimum: 1 });
       optionalString(exercise, 'superset_label', errors);
+      optionalString(exercise, 'notes', errors);
+      finiteNumber(exercise, 'rest_sec', errors, { minimum: 0, maximum: 3600 });
+      if (exercise.block != null) {
+        if (!isObject(exercise.block)) {
+          errors.push(`${prefix}.block must be an object`);
+        } else {
+          const block = exercise.block;
+          if (block.kind != null) enumeration(block, 'kind', BLOCK_KINDS, errors);
+          if (block.format != null) enumeration(block, 'format', BLOCK_FORMATS, errors);
+          finiteNumber(block, 'rest_sec', errors, { minimum: 0, maximum: 3600 });
+          finiteNumber(block, 'time_cap_sec', errors, { minimum: 1, maximum: 7200 });
+          if (block.result != null) {
+            if (!isObject(block.result)) {
+              errors.push(`${prefix}.block.result must be an object`);
+            } else {
+              for (const field of ['rounds', 'extra_reps', 'time_sec']) {
+                finiteNumber(block.result, field, errors, { minimum: 0 });
+              }
+            }
+          }
+        }
+      }
       if (exercise.between_sets != null) {
         if (!isObject(exercise.between_sets)) {
           errors.push(`${prefix}.between_sets must be an object`);
@@ -295,6 +318,8 @@ function validateWorkout(record, errors) {
         }
         finiteNumber(set, 'weight_kg', errors, { required: weighted, minimum: 0 });
         enumeration(set, 'cable_type', CABLE_TYPES, errors, weighted);
+        booleanField(set, 'failed', errors);
+        optionalString(set, 'note', errors);
       });
     });
   }

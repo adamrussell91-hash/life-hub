@@ -7,6 +7,7 @@
  */
 import { copyWorkoutSet, resolveTrackingType } from '../core/exercise-tracking.js';
 import { normalizeLoggerCableType, slugifyWorkoutTitle } from './fitness-logger-draft.js';
+import { copyExerciseStructure } from '../core/workout-plan-groups.js';
 
 /** Matches netlify chat-schema buildPlannedWorkoutSlug (client-safe copy). */
 function buildPlannedWorkoutSlug(title) {
@@ -46,6 +47,7 @@ export function buildPlannedCandidateFromTemplate(template, { date, time = '07:3
           ...(exercise?.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
           ...(exercise?.intensification != null ? { intensification: exercise.intensification } : {}),
           ...(exercise?.equipment != null ? { equipment: exercise.equipment } : {}),
+          ...copyExerciseStructure(exercise, { withResults: false }),
           sets: (Array.isArray(exercise?.sets) ? exercise.sets : []).map(set => copyWorkoutSet(set, {
             cableType: resolveTrackingType(exercise) === 'weighted'
               ? normalizeLoggerCableType(set?.cable_type)
