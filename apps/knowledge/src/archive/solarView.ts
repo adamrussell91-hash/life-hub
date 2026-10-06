@@ -8,6 +8,27 @@ import { decayInertia, glideAt, lensMap, startGlide, LENS_RADIUS, type Glide } f
 import { ambientDelay, universeChimes, type AmbientLevel } from "./universeChimes";
 import { buildComets, cometMeanAnomaly, cometOffset, COMET_TAIL_WINDOW } from "./universeComets";
 import { drawCorona, FLARE_MS } from "./universeCorona";
+import { drawPlanetBody, paintPlanetIcon, planetIconBox, planetName } from "./universePlanets";
+import {
+  clearEdgePoint,
+  escapeText,
+  orreryIconRadius,
+  orreryOrder,
+  planetByline,
+  notesLabel,
+  planetTip,
+  readOrreryOpen,
+  readReplayFolded,
+  subtreeEnd,
+  systemCounts,
+  systemExits,
+  systemFitK,
+  systemPlanetScale,
+  writeOrreryOpen,
+  writeReplayFolded,
+  type Rect,
+  type SystemExit,
+} from "./universeSystem";
 import { easeInOut, easeOut, paintDot } from "./universeDraw";
 import { buildSkyLayers, drawSky, skyFigures, type SkyFigure } from "./universeSky";
 import {
@@ -32,7 +53,7 @@ import {
   writeVisit,
 } from "./universeTime";
 
-export const UNIVERSE_BUILD = 21;
+export const UNIVERSE_BUILD = 22;
 
 export type SolarNotePayload = { pageId: string; title: string; excerpt: string };
 
@@ -325,6 +346,8 @@ export function fillDots(
 type Dot = { x: number; y: number; r: number; color: string; alpha: number };
 
 const ENTER_MS = 2200;
+const SYSTEM_FADE_MS = 700;
+const SYSTEM_GLIDE_MS = 1500;
 const HOLD_MS = 380;
 const SAVER_MS = 14_000;
 const ROCK_COLOR = "#c4b48a";
@@ -385,7 +408,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
   canvas.style.height = `${height}px`;
   canvas.setAttribute(
     "aria-label",
-    "Universe view. Click a body to select it, double-click to fly to it, press and hold a planet to gather its moons.",
+    "Universe view. Click a body to select it, double-click to fly to it (a planet opens its own system), press and hold a planet to gather its moons.",
   );
   host.appendChild(canvas);
 
@@ -412,14 +435,76 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
   replayBar.setAttribute("role", "group");
   replayBar.setAttribute("aria-label", "Big Bang replay");
   replayBar.innerHTML = `
-    <span class="universe-replay__title">Big Bang</span>
-    <input class="universe-replay__scrub" type="range" min="0" max="1000" value="1000" aria-label="Replay position" data-replay-scrub />
+    <button class="universe-replay__title" type="button" data-replay-fold aria-expanded="true" aria-controls="universe-replay-controls" title="Hide the Big Bang controls">
+      <span>Big Bang</span><span class="universe-replay__chevron" aria-hidden="true"></span>
+    </button>
     <output class="universe-replay__label" data-replay-label>Today</output>
-    <button class="btn btn--ghost" type="button" data-replay-play>Play</button>
-    <button class="btn btn--ghost" type="button" data-replay-speed aria-label="Replay speed">×1</button>
-    <button class="btn btn--ghost" type="button" data-replay-exit hidden>Back to today</button>
+    <div class="universe-replay__controls" id="universe-replay-controls">
+      <input class="universe-replay__scrub" type="range" min="0" max="1000" value="1000" aria-label="Replay position" data-replay-scrub />
+      <button class="btn btn--ghost" type="button" data-replay-play>Play</button>
+      <button class="btn btn--ghost" type="button" data-replay-speed aria-label="Replay speed">×1</button>
+      <button class="btn btn--ghost" type="button" data-replay-exit hidden>Back to today</button>
+    </div>
   `;
   host.appendChild(replayBar);
+
+  // ---------- orrery drawer and system bar ----------
+  const side = document.createElement("div");
+  side.className = "universe-side";
+  const orreryPlanets = orreryOrder(model);
+  // One count per planet, used by the drawer, the hover tip and the system card alike.
+  const planetCounts = new Map(model.planets.map(planet => [planet.idx, systemCounts(B, planet.idx)]));
+  const notesIn = (planet: Body) => planetCounts.get(planet.idx)?.notes ?? 0;
+  side.innerHTML = `
+    <section class="universe-system glass-panel" aria-label="Planet system" hidden>
+      <span class="universe-system__icon" aria-hidden="true"><canvas></canvas></span>
+      <span class="universe-system__text">
+        <small class="universe-system__topic" data-system-topic></small>
+        <strong class="universe-system__name" data-system-name></strong>
+        <small class="universe-system__byline" data-system-byline></small>
+        <small class="universe-system__meta" data-system-meta></small>
+      </span>
+      <span class="universe-system__actions">
+        <button class="btn btn--ghost" type="button" data-system-exit>← Universe</button>
+        <button class="btn btn--ghost" type="button" data-system-pause aria-pressed="false">Pause</button>
+      </span>
+    </section>
+    <nav class="universe-orrery glass-panel" aria-label="Solar map">
+      <button class="universe-orrery__tab" type="button" data-orrery-toggle aria-expanded="false" aria-controls="universe-orrery-list" title="Open the solar map">
+        <span class="universe-orrery__sun" aria-hidden="true"></span>
+        <span class="universe-orrery__heading">Solar map</span>
+        <span class="universe-orrery__chevron" aria-hidden="true"></span>
+      </button>
+      <ol class="universe-orrery__list" id="universe-orrery-list">
+        <li><button class="universe-orrery__item universe-orrery__item--sun" type="button" data-orrery-hub title="The whole universe">
+          <span class="universe-orrery__icon" aria-hidden="true"><span class="universe-orrery__sun"></span></span>
+          <span class="universe-orrery__text"><strong>The Hub</strong><small>Whole universe</small></span>
+        </button></li>
+        ${orreryPlanets
+          .map(
+            planet => `<li><button class="universe-orrery__item" type="button" data-orrery-planet="${planet.idx}" title="${escapeText(planetTip(planet, notesIn(planet)))}">
+          <span class="universe-orrery__icon" aria-hidden="true"><canvas></canvas></span>
+          <span class="universe-orrery__text"><strong>${escapeText(planetName(planet.label))}</strong><small>${escapeText(planet.label)}</small></span>
+          <span class="universe-orrery__count" title="${escapeText(notesLabel(notesIn(planet)))}">${notesIn(planet).toLocaleString("en-AU")}</span>
+        </button></li>`,
+          )
+          .join("")}
+      </ol>
+    </nav>
+  `;
+  host.appendChild(side);
+  const maxPlanetCount = Math.max(1, ...model.planets.map(planet => planet.count));
+  side.querySelectorAll<HTMLButtonElement>("[data-orrery-planet]").forEach(button => {
+    const planet = B[Number(button.dataset.orreryPlanet)]!;
+    const r = orreryIconRadius(planet, maxPlanetCount);
+    const box = planetIconBox(r, !!planet.ringed);
+    button.style.setProperty("--icon", `${box}px`);
+    const icon = button.querySelector("canvas");
+    if (icon) paintPlanetIcon(icon, planet.label, planet.color, r, !!planet.ringed);
+  });
+  const exitLayer = document.createElement("div");
+  exitLayer.className = "universe-exits";
+  host.appendChild(exitLayer);
 
   const ctx = canvas.getContext("2d")!;
 
@@ -445,7 +530,8 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
   let glide: Glide | null = null;
   let inertia = { vx: 0, vy: 0 };
   let lock: { kind: "body" | "comet"; idx: number; k: number } | null = null;
-  let dial: { src: number; srcComet: number; targets: number[]; t0: number; framed: boolean } | null = null;
+  type Dial = { src: number; srcComet: number; targets: number[]; t0: number; framed: boolean };
+  let dial: Dial | null = null;
   let gather = { planet: -1, g: 0, holding: false };
   let glint: { t0: number; planets: number[] } | null = null;
   let lastAlignCheck = 0;
@@ -459,6 +545,24 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
   let saverTimer = 0;
   let frameCount = 0;
   const timers: number[] = [];
+  // System view: the world is drawn in the frame of `focus` (its position subtracted), the rest of the
+  // universe fades out, and the drawer/edge arrows navigate between systems.
+  let focus = -1;
+  const focusAt = { x: 0, y: 0 };
+  let scope: {
+    planet: number;
+    end: number;
+    fade: number;
+    target: 0 | 1;
+    prev: number;
+    prevEnd: number;
+    prevFade: number;
+    scale: number;
+  } | null = null;
+  let sysK = { fitK, kMin, reach: model.reach };
+  let paused = false;
+  let exits: SystemExit[] = [];
+  let exitsFor: Dial | null = null;
 
   const X = new Float64Array(n);
   const Y = new Float64Array(n);
@@ -518,8 +622,25 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
   const zNow = () => view.k / fitK;
   const centre = () => ({ cx: (width / 2 - view.x) / view.k, cy: (height / 2 - view.y) / view.k });
 
+  /** Zoom limits: a system view may zoom in past the universe's floor-fit, but not out past its own. */
+  function clampK(k: number) {
+    return focus >= 0 ? solarZoomClamp(k, sysK.kMin, Math.max(kMax, sysK.fitK * 4)) : solarZoomClamp(k, kMin, kMax);
+  }
+
+  function inScope(i: number) {
+    return !!scope && i >= scope.planet && i < scope.end;
+  }
+
+  /** Alpha the rest of the universe keeps while a system view fades in (1 = no system view). */
+  function outsideAlpha(i: number) {
+    if (!scope) return 1;
+    const out = 1 - easeInOut(scope.fade);
+    if (scope.prev >= 0 && i >= scope.prev && i < scope.prevEnd) return Math.max(out, scope.prevFade);
+    return out;
+  }
+
   function glideTo(cx: number, cy: number, k: number, dur = 1100) {
-    const next = solarZoomClamp(k, kMin, kMax);
+    const next = clampK(k);
     if (freeze) {
       Object.assign(view, solarCamera({ x: cx, y: cy }, next, width, height));
       return;
@@ -578,6 +699,14 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     const pos = worldPositions(B, orbitSeconds);
     X.set(pos.x);
     Y.set(pos.y);
+    if (focus >= 0) {
+      focusAt.x = X[focus]!;
+      focusAt.y = Y[focus]!;
+      for (let i = 0; i < n; i++) {
+        X[i] = X[i]! - focusAt.x;
+        Y[i] = Y[i]! - focusAt.y;
+      }
+    }
     if (gather.g > 0.001 && gather.planet >= 0) {
       const p = gather.planet;
       const px = X[p]!;
@@ -643,10 +772,13 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     for (let i = 0; i < n; i++) {
       const b = B[i]!;
       if (replay.on && b.kind !== "sun" && timeline.firstDay[i]! > tDay) continue;
+      const scopeAlpha = inScope(i) ? 1 : outsideAlpha(i);
+      if (scopeAlpha < 0.01) continue;
       const forced =
         searching || replay.on || inDial(i) || i === selectedIdx || capturing(i, now) || (shower?.order.has(i) ?? false);
       if (KIND_DEPTH[b.kind] > band && !forced) continue;
       let pr = presence(b, z, view.k, maxTag);
+      if (scope && i === scope.planet) pr = Math.max(pr, pr + (b.r * scope.scale - pr) * easeInOut(scope.fade));
       if (replay.on && (b.kind === "planet" || b.kind === "moon" || b.kind === "minor" || b.kind === "sun")) {
         const list = timeline.dayLists[i]!;
         pr *= Math.max(b.kind === "sun" ? 0.35 : 0.25, Math.sqrt(countUpTo(list, tDay) / Math.max(1, list.length)));
@@ -668,7 +800,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
       let sr = pr * view.k;
       const margin = sr + 60;
       if (sx < -margin || sy < -margin || sx > width + margin || sy > height + margin) continue;
-      let a = alphaFor(i, searching);
+      let a = alphaFor(i, searching) * scopeAlpha;
       if (replay.on && b.kind === "planet") a *= Math.min(1, Math.max(0.05, (now - born[i]!) / 4000));
       if (searching && b.kind !== "sun" && !hits.has(i)) {
         sx = cx + (sx - cx) * 0.9;
@@ -778,7 +910,12 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
         cometScreen[c] = { x: -1e6, y: -1e6 };
         continue;
       }
-      const dim = (dial && dial.srcComet >= 0 && dial.srcComet !== c) || (selectedIdx != null && selectedComet !== c) ? 0.35 : 1;
+      const fadeOut = scope ? 1 - easeInOut(scope.fade) : 1;
+      if (fadeOut < 0.02) {
+        cometScreen[c] = { x: -1e6, y: -1e6 };
+        continue;
+      }
+      const dim = ((dial && dial.srcComet >= 0 && dial.srcComet !== c) || (selectedIdx != null && selectedComet !== c) ? 0.35 : 1) * fadeOut;
       const window = comet.period * COMET_TAIL_WINDOW;
       for (let s = 34; s >= 1; s--) {
         const u = s / 34;
@@ -831,7 +968,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     }
     if (!dial.framed && dial.srcComet < 0) {
       dial.framed = true;
-      frameWorldPoints([dial.src, ...dial.targets].map(i => ({ x: X[i]!, y: Y[i]! })));
+      frameWorldPoints([dial.src, ...dial.targets].filter(i => !scope || inScope(i)).map(i => ({ x: X[i]!, y: Y[i]! })));
     }
     dial.targets.forEach((t, j) => {
       if (!DRAWN[t]) return;
@@ -864,11 +1001,17 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
 
   function draw(now: number) {
     const dt = Math.min(64, Math.max(0, now - lastFrame));
-    orbitSeconds = advanceOrbitClock(orbitSeconds, now - lastFrame, options.clock?.speed ?? 1, freeze);
+    if (!paused) orbitSeconds = advanceOrbitClock(orbitSeconds, now - lastFrame, options.clock?.speed ?? 1, freeze);
     lastFrame = now;
     realSeconds += dt / 1000;
     frameCount++;
     gather.g = Math.max(0, Math.min(1, gather.g + ((gather.holding ? 1 : -1) * dt) / 650));
+    if (scope) {
+      const step = freeze ? 1 : dt / SYSTEM_FADE_MS;
+      scope.fade = clamp01(scope.fade + (scope.target ? step : -step));
+      scope.prevFade = Math.max(0, scope.prevFade - step * 1.6);
+      if (!scope.target && scope.fade <= 0) scope = null;
+    }
 
     if (replay.on && replay.playing) {
       replay.u = Math.min(1, replay.u + (dt / REPLAY_MS) * replay.speed);
@@ -903,7 +1046,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
       if (cometLastM[c]! > 5.5 && m < 0.8) chime(12 + (c % 3), 0.18);
       cometLastM[c] = m;
     }
-    if (!freeze && !glint && now - lastAlignCheck > 1000) {
+    if (!freeze && !glint && !scope && now - lastAlignCheck > 1000) {
       lastAlignCheck = now;
       const triple = alignedTriple(model.planets, orbitSeconds);
       if (triple) {
@@ -944,35 +1087,15 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     for (const body of model.planets) {
       if (body.ringed && DRAWN[body.idx]) fillDots(ctx, ringDust(body, SX[body.idx]!, SY[body.idx]!, SR[body.idx]!, 1, true));
     }
+    const sunX = view.x + X[sunIdx]! * view.k;
+    const sunY = view.y + Y[sunIdx]! * view.k;
     for (const body of model.planets) {
       const i = body.idx;
       if (!DRAWN[i]) continue;
-      const pr = SR[i]!;
-      const alpha = SA[i]!;
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = body.color;
-      ctx.beginPath();
-      ctx.arc(SX[i]!, SY[i]!, pr, 0, TAU);
-      ctx.fill();
-      if (body.giant) {
-        ctx.save();
-        ctx.translate(SX[i]!, SY[i]!);
-        ctx.scale(1, 0.42);
-        ctx.fillStyle = body.ink;
-        ctx.globalAlpha = alpha * 0.28;
-        ctx.beginPath();
-        ctx.arc(0, -pr * 0.18, pr * 0.92, 0, TAU);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(0, pr * 0.28, pr * 0.78, 0, TAU);
-        ctx.fill();
-        ctx.restore();
-        ctx.globalAlpha = alpha * 0.4;
-        ctx.fillStyle = body.ink;
-        ctx.beginPath();
-        ctx.arc(SX[i]! + pr * 0.32, SY[i]! - pr * 0.12, pr * 0.2, 0, TAU);
-        ctx.fill();
-      }
+      const dx = sunX - SX[i]!;
+      const dy = sunY - SY[i]!;
+      const d = Math.hypot(dx, dy);
+      drawPlanetBody(ctx, body.label, body.color, SX[i]!, SY[i]!, SR[i]!, SA[i]!, d > 1 ? { x: dx / d, y: dy / d } : null, dpr);
     }
     for (const body of model.planets) {
       if (body.ringed && DRAWN[body.idx]) fillDots(ctx, ringDust(body, SX[body.idx]!, SY[body.idx]!, SR[body.idx]!, 1, false));
@@ -990,7 +1113,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
       ctx.fill();
       const flareU = flare && !freeze ? (now - flare.t0) / FLARE_MS : null;
       if (flareU != null && flareU >= 1) flare = null;
-      drawCorona(ctx, sx, sy, pr, coronaLoops, freeze ? 0 : realSeconds, flare && flareU != null && flareU >= 0 ? { u: flareU, angle: flare.angle } : null, dark);
+      if (!scope) drawCorona(ctx, sx, sy, pr, coronaLoops, freeze ? 0 : realSeconds, flare && flareU != null && flareU >= 0 ? { u: flareU, angle: flare.angle } : null, dark);
     }
 
     if (replay.on) drawDust(tDay);
@@ -998,6 +1121,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     drawCaptures(now);
     drawComets(dark, tDay);
     drawDial(now, dark);
+    syncExits();
     if (searching && hits.size) {
       const pins: Dot[] = [];
       for (const i of hits) {
@@ -1010,7 +1134,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     if (glint) {
       const u = (now - glint.t0) / ALIGNMENT_MS;
       if (u >= 1) glint = null;
-      else if (DRAWN[sunIdx]) {
+      else if (DRAWN[sunIdx] && !scope) {
         drawAlignment(
           ctx,
           { x: SX[sunIdx]!, y: SY[sunIdx]! },
@@ -1116,6 +1240,226 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     onNoteSelect(null);
   }
 
+  // ---------- system view ----------
+  const systemBar = side.querySelector<HTMLElement>(".universe-system")!;
+  const systemIcon = systemBar.querySelector("canvas")!;
+  const systemName = systemBar.querySelector<HTMLElement>("[data-system-name]")!;
+  const systemTopic = systemBar.querySelector<HTMLElement>("[data-system-topic]")!;
+  const systemByline = systemBar.querySelector<HTMLElement>("[data-system-byline]")!;
+  const systemMeta = systemBar.querySelector<HTMLElement>("[data-system-meta]")!;
+  const pauseBtn = systemBar.querySelector<HTMLButtonElement>("[data-system-pause]")!;
+  const orrery = side.querySelector<HTMLElement>(".universe-orrery")!;
+  const orreryToggle = side.querySelector<HTMLButtonElement>("[data-orrery-toggle]")!;
+  const universeLabel = canvas.getAttribute("aria-label") ?? "";
+
+  function setOrreryOpen(open: boolean, remember = true) {
+    orrery.classList.toggle("is-open", open);
+    orreryToggle.setAttribute("aria-expanded", String(open));
+    orreryToggle.title = open ? "Close the solar map" : "Open the solar map";
+    if (remember) writeOrreryOpen(open, storage);
+  }
+
+  function syncSystemUi() {
+    const p = scope && scope.target ? scope.planet : -1;
+    systemBar.hidden = p < 0;
+    host.classList.toggle("is-in-system", p >= 0);
+    side.querySelectorAll<HTMLButtonElement>("[data-orrery-planet]").forEach(button => {
+      if (Number(button.dataset.orreryPlanet) === p) button.setAttribute("aria-current", "true");
+      else button.removeAttribute("aria-current");
+    });
+    const hubBtn = side.querySelector<HTMLButtonElement>("[data-orrery-hub]");
+    if (p < 0) hubBtn?.setAttribute("aria-current", "true");
+    else hubBtn?.removeAttribute("aria-current");
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+    pauseBtn.setAttribute("aria-pressed", String(paused));
+    if (p < 0) {
+      canvas.setAttribute("aria-label", universeLabel);
+      return;
+    }
+    const planet = B[p]!;
+    const counts = planetCounts.get(p) ?? systemCounts(B, p);
+    const name = planetName(planet.label);
+    systemName.textContent = name;
+    systemByline.textContent = planetByline(planet.label);
+    systemByline.hidden = !systemByline.textContent;
+    systemTopic.textContent = planet.label;
+    systemMeta.textContent = `${notesLabel(counts.notes)} · ${counts.moons} moon${counts.moons === 1 ? "" : "s"}`;
+    paintPlanetIcon(systemIcon, planet.label, planet.color, 13, !!planet.ringed);
+    systemBar.style.setProperty("--icon", `${planetIconBox(13, !!planet.ringed)}px`);
+    canvas.setAttribute("aria-label", `${name} system: ${planet.label}. Click a note to see its links. Press Escape to return to the universe.`);
+  }
+
+  /** Re-centre the world on a planet and fly in. Nothing on screen jumps: the camera absorbs the change of frame. */
+  function enterSystem(p: number) {
+    const planet = B[p];
+    if (!planet || planet.kind !== "planet") return;
+    exitSaver();
+    lock = null;
+    inertia = { vx: 0, vy: 0 };
+    if (scope && scope.target && scope.planet === p) {
+      glideTo(0, 0, sysK.fitK, 900);
+      return;
+    }
+    view.x += X[p]! * view.k;
+    view.y += Y[p]! * view.k;
+    glide = null;
+    const end = subtreeEnd(B, p);
+    let reach = planet.r * 3;
+    for (let i = p + 1; i < end; i++) reach = Math.max(reach, Math.hypot(X[i]! - X[p]!, Y[i]! - Y[p]!) + B[i]!.r);
+    reach *= 1.08;
+    const fit = systemFitK(reach, width, height);
+    sysK = { fitK: fit, kMin: fit * 0.45, reach };
+    const prev = scope && scope.target ? scope : null;
+    scope = {
+      planet: p,
+      end,
+      fade: prev ? 1 : (scope?.fade ?? 0),
+      target: 1,
+      prev: prev?.planet ?? -1,
+      prevEnd: prev?.end ?? -1,
+      prevFade: prev ? 1 : 0,
+      scale: systemPlanetScale(planet),
+    };
+    focus = p;
+    if (!prev) paused = false;
+    if (selectedIdx != null && !inScope(selectedIdx)) clearSelection();
+    if (selectedComet >= 0) clearSelection();
+    glideTo(0, 0, fit, SYSTEM_GLIDE_MS);
+    chime(planetStep(model, p), 0.6);
+    chime(planetStep(model, p) + 4, 0.35, 0.45);
+    if (isNarrowViewport(window.innerWidth)) setOrreryOpen(false, false);
+    syncSystemUi();
+  }
+
+  function exitSystem() {
+    if (!scope || !scope.target) return;
+    view.x -= focusAt.x * view.k;
+    view.y -= focusAt.y * view.k;
+    glide = null;
+    focus = -1;
+    scope.target = 0;
+    scope.prev = -1;
+    paused = false;
+    clearExits();
+    glideTo(0, 0, fitK, SYSTEM_GLIDE_MS);
+    syncSystemUi();
+  }
+
+  function clearExits() {
+    exits = [];
+    exitsFor = null;
+    exitLayer.replaceChildren();
+  }
+
+  /** Links from the selected note to other systems become arrows on the stage edge, pointing toward them. */
+  function syncExits() {
+    const active = !!scope && scope.target === 1 && scope.fade > 0.98 && !!dial && dial.src >= 0;
+    if (!active) {
+      if (exitsFor) clearExits();
+      return;
+    }
+    if (exitsFor !== dial) {
+      exitsFor = dial;
+      exits = systemExits(dial!.targets, planetOf, B, scope!.planet);
+      exitLayer.replaceChildren(
+        ...exits.map(exit => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "universe-exit-arrow";
+          button.dataset.exitPlanet = String(exit.planet);
+          const links = `${exit.targets.length} link${exit.targets.length === 1 ? "" : "s"}`;
+          button.setAttribute("aria-label", `${links} to ${exit.label}`);
+          button.innerHTML = `<span class="universe-exit-arrow__dart" aria-hidden="true"></span><span class="universe-exit-arrow__text"><strong>${escapeText(exit.label)}</strong><small>${links}</small></span>`;
+          if (exit.planet >= 0) button.style.setProperty("--planet", B[exit.planet]!.color);
+          button.addEventListener("click", event => {
+            event.stopPropagation();
+            travel(exit);
+          });
+          return button;
+        }),
+      );
+    }
+    const panels = overlayPanels();
+    const cx = DRAWN[scope!.planet] ? SX[scope!.planet]! : width / 2;
+    const cy = DRAWN[scope!.planet] ? SY[scope!.planet]! : height / 2;
+    exits.forEach((exit, j) => {
+      const button = exitLayer.children[j] as HTMLElement | undefined;
+      if (!button) return;
+      let dx = 0;
+      let dy = 0;
+      if (exit.planet >= 0) {
+        dx = X[exit.planet]!;
+        dy = Y[exit.planet]!;
+      } else {
+        for (const t of exit.targets) {
+          dx += X[t]!;
+          dy += Y[t]!;
+        }
+      }
+      const at = clearEdgePoint(cx, cy, dx, dy, width, height, 56, panels);
+      button.style.left = `${at.x}px`;
+      button.style.top = `${at.y}px`;
+      button.style.setProperty("--angle", `${at.angle}rad`);
+    });
+  }
+
+  /** Panels floating over the stage, in canvas coordinates, that exit arrows must not sit under. */
+  function overlayPanels(): Rect[] {
+    const wrap = host.closest(".graph-wrap") ?? host;
+    const origin = canvas.getBoundingClientRect();
+    const out: Rect[] = [];
+    wrap.querySelectorAll<HTMLElement>(".graph-toolbar, .universe-system, .universe-orrery, .graph-preview, .universe-replay, .universe-key").forEach(el => {
+      if (el.hidden || getComputedStyle(el).visibility === "hidden") return;
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) return;
+      out.push({ left: r.left - origin.left, top: r.top - origin.top, right: r.right - origin.left, bottom: r.bottom - origin.top });
+    });
+    return out;
+  }
+
+  /** Follow a link out of this system: fly to the system it lands in and select the linked note there. */
+  function travel(exit: SystemExit) {
+    const target = exit.targets[0];
+    if (target == null) return;
+    if (exit.planet >= 0) {
+      enterSystem(exit.planet);
+      selectBody(target);
+    } else {
+      exitSystem();
+      selectBody(target);
+    }
+    if (dial) dial.framed = exit.planet >= 0;
+  }
+
+  function onSystemKey(event: KeyboardEvent) {
+    if (event.key !== "Escape" || !scope || !scope.target) return;
+    const el = event.target as HTMLElement | null;
+    if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    exitSystem();
+  }
+
+  orreryToggle.addEventListener("click", () => setOrreryOpen(!orrery.classList.contains("is-open")));
+  side.querySelectorAll<HTMLButtonElement>("[data-orrery-planet]").forEach(button => {
+    button.addEventListener("click", () => enterSystem(Number(button.dataset.orreryPlanet)));
+  });
+  side.querySelector<HTMLButtonElement>("[data-orrery-hub]")!.addEventListener("click", () => {
+    if (scope && scope.target) exitSystem();
+    else {
+      lock = null;
+      glideTo(0, 0, fitK, 1200);
+    }
+  });
+  systemBar.querySelector<HTMLButtonElement>("[data-system-exit]")!.addEventListener("click", () => exitSystem());
+  pauseBtn.addEventListener("click", () => {
+    paused = !paused;
+    syncSystemUi();
+  });
+  setOrreryOpen(readOrreryOpen(storage) && !isNarrowViewport(window.innerWidth), false);
+  syncSystemUi();
+  window.addEventListener("keydown", onSystemKey, true);
+
   function selectAt(clientX: number, clientY: number) {
     const hit = pick(clientX, clientY);
     if (hit.comet >= 0) {
@@ -1131,7 +1475,8 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     lastClickIdx = hit.body;
     lastClickAt = now;
     if (doubled) {
-      frameBody(hit.body);
+      if (B[hit.body]!.kind === "planet") enterSystem(hit.body);
+      else frameBody(hit.body);
       return;
     }
     selectBody(hit.body);
@@ -1162,7 +1507,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     lock = null;
     glide = null;
     const world = toWorld(clientX, clientY);
-    const next = solarZoomClamp(view.k * factor, kMin, kMax);
+    const next = clampK(view.k * factor);
     Object.assign(view, cameraFromWorld(world, next, clientX, clientY, canvas.getBoundingClientRect()));
   }
 
@@ -1208,7 +1553,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     if (!pinch || pointers.size < 2 || pinch.dist < 1) return;
     const [a, b] = [...pointers.values()] as [{ x: number; y: number }, { x: number; y: number }];
     const mid = pinchMidpoint(a, b);
-    const next = solarZoomClamp(pinch.k * (pinchDistance(a, b) / pinch.dist), kMin, kMax);
+    const next = clampK(pinch.k * (pinchDistance(a, b) / pinch.dist));
     Object.assign(view, cameraFromWorld(pinch.world, next, mid.x, mid.y, canvas.getBoundingClientRect()));
   }
 
@@ -1304,7 +1649,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     } else if (hit.body >= 0) {
       const body = B[hit.body]!;
       tip.hidden = false;
-      tip.textContent = `${body.label} · ${kindLabel(body.kind)} · ${body.count}`;
+      tip.textContent = body.kind === "planet" ? planetTip(body, notesIn(body)) : `${body.label} · ${kindLabel(body.kind)} · ${body.count}`;
       if (body.kind === "planet" && previous !== hit.body) chime(planetStep(model, hit.body), 0.35);
     } else {
       tip.hidden = true;
@@ -1352,7 +1697,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
       replay.prevDay = timeline.minDay - 1;
       born.fill(-1e12);
       lock = null;
-      glideTo(0, 0, fitK, 900);
+      glideTo(0, 0, focus >= 0 ? sysK.fitK : fitK, 900);
       replay.playing = true;
     } else {
       replay.playing = !replay.playing;
@@ -1380,6 +1725,18 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     replay.u = 1;
     syncReplay();
   });
+  const foldBtn = replayBar.querySelector<HTMLButtonElement>("[data-replay-fold]")!;
+  function setReplayFolded(folded: boolean) {
+    replayBar.classList.toggle("is-folded", folded);
+    foldBtn.setAttribute("aria-expanded", String(!folded));
+    foldBtn.title = folded ? "Show the Big Bang controls" : "Hide the Big Bang controls";
+  }
+  setReplayFolded(readReplayFolded(storage));
+  foldBtn.addEventListener("click", () => {
+    const folded = !replayBar.classList.contains("is-folded");
+    setReplayFolded(folded);
+    writeReplayFolded(folded, storage);
+  });
 
   // ---------- resize ----------
   function applyHostSize() {
@@ -1402,6 +1759,8 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     canvas.height = Math.floor(height * dpr);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    const sysFit = systemFitK(sysK.reach, width, height);
+    sysK = { fitK: sysFit, kMin: sysFit * 0.45, reach: sysK.reach };
   }
 
   const resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(() => applyHostSize()) : null;
@@ -1462,6 +1821,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
       timers.forEach(timer => clearTimeout(timer));
       exitSaver();
       document.removeEventListener("keydown", onSaverKey);
+      window.removeEventListener("keydown", onSystemKey, true);
       window.removeEventListener("pointermove", onGestureMove);
       window.removeEventListener("pointerup", onGestureUp);
       window.removeEventListener("pointercancel", onGestureUp);
@@ -1486,16 +1846,19 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
   };
   mount.followNextComet = () => {
     if (!comets.length) return;
+    exitSystem();
     const next = (followIdx + 1) % comets.length;
     selectComet(next);
     followComet(next);
   };
   mount.flyToNearestHit = () => {
     if (!hits.size) return false;
+    const local = scope && scope.target ? [...hits].filter(inScope) : [];
+    if (scope && scope.target && !local.length) exitSystem();
     const { cx, cy } = centre();
     let best = -1;
     let bestD = Infinity;
-    for (const i of hits) {
+    for (const i of local.length ? local : hits) {
       const d = Math.hypot(X[i]! - cx, Y[i]! - cy);
       if (d > 1e-6 && d < bestD) {
         bestD = d;
@@ -1510,6 +1873,7 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
   };
   mount.startScreensaver = () => {
     if (!comets.length || saverTimer) return;
+    exitSystem();
     clearSelection();
     document.body.classList.add("is-universe-saver");
     let c = Math.floor(Math.random() * comets.length);
