@@ -50,21 +50,26 @@ export function renderMedical(root, model, {
   const dashboard = root.querySelector('#body-medical-dashboard');
   if (!dashboard || !model) return;
 
-  bindOnce(root, '#medical-search', 'input', event => onSearch?.(event.target.value));
+  // These handlers are attached once, so they must read the LATEST model and hooks on every click.
+  // Closing over this render's values made "Show minor" always send "show" (it never saw it was on).
+  const live = liveFor(root);
+  live.model = model;
+  live.hooks = { onSearch, onDensityChange, onToday, onAdd, onClose, onShowMinor };
+  bindOnce(root, '#medical-search', 'input', event => live.hooks.onSearch?.(event.target.value));
   bindOnce(root, '#medical-density', 'click', event => {
     const target = event.target;
     const btn = target?.closest?.('[data-medical-density]')
       || (target?.dataset?.medicalDensity ? target : null);
     const value = btn?.dataset?.medicalDensity;
-    if (value) onDensityChange?.(value);
+    if (value) live.hooks.onDensityChange?.(value);
   });
-  bindOnce(root, '#medical-today', 'click', () => onToday?.());
-  bindOnce(root, '#medical-add', 'click', () => onAdd?.());
+  bindOnce(root, '#medical-today', 'click', () => live.hooks.onToday?.());
+  bindOnce(root, '#medical-add', 'click', () => live.hooks.onAdd?.());
   bindOnce(root, '#medical-places', 'click', event => {
-    openMedicalPlacesMap(root, model, event.currentTarget);
+    openMedicalPlacesMap(root, live.model, event.currentTarget);
   });
-  bindOnce(root, '#medical-sheet-close', 'click', () => onClose?.());
-  bindOnce(root, '#medical-show-minor', 'click', () => onShowMinor?.(!model.showMinor));
+  bindOnce(root, '#medical-sheet-close', 'click', () => live.hooks.onClose?.());
+  bindOnce(root, '#medical-show-minor', 'click', () => live.hooks.onShowMinor?.(!live.model.showMinor));
   bindOnce(root, '#medical-filters', 'click', () => {
     const toolbar = root.querySelector('.medical-toolbar');
     const btn = root.querySelector('#medical-filters');
@@ -109,6 +114,17 @@ export function renderMedical(root, model, {
   });
   dashboard.hidden = false;
   dashboard.removeAttribute?.('hidden');
+}
+
+const liveByRoot = new WeakMap();
+
+function liveFor(root) {
+  let live = liveByRoot.get(root);
+  if (!live) {
+    live = { model: null, hooks: {} };
+    liveByRoot.set(root, live);
+  }
+  return live;
 }
 
 function bindOnce(root, selector, type, handler) {
@@ -860,7 +876,7 @@ function durationField(root, value) {
   input.type = 'number';
   input.name = 'duration_min';
   input.min = '1';
-  input.step = '5';
+  input.step = '1'; // step 5 from min 1 only allowed 1, 6, 11, 16… so 15 was rejected as invalid
   input.inputMode = 'numeric';
   input.value = value ?? '';
   const chips = root.createElement('div');

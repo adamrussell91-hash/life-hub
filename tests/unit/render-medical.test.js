@@ -419,3 +419,45 @@ test('renderMedical write form has start time and length fields prefilled and sa
   assert.equal(saved.time, '10:30');
   assert.equal(saved.duration_min, '90');
 });
+
+test('Show minor toggles on AND off: the click handler reads the latest model, not the first render', () => {
+  const root = fakeRoot();
+  const calls = [];
+  const onShowMinor = value => calls.push(value);
+  renderMedical(root, sampleModel({ showMinor: false }), { onShowMinor });
+  const button = root.querySelector('#medical-show-minor');
+  const click = () => button.listeners.find(entry => entry[0] === 'click')[1]({ currentTarget: button, target: button });
+
+  click();                                   // shown -> asks to turn on
+  renderMedical(root, sampleModel({ showMinor: true }), { onShowMinor });
+  assert.equal(button.textContent, 'Hide minor');
+  click();                                   // now on -> must ask to turn OFF
+  renderMedical(root, sampleModel({ showMinor: false }), { onShowMinor });
+  click();
+  assert.deepEqual(calls, [true, false, true]);
+});
+
+test('re-rendering with new hooks does not leave the buttons calling the first hooks', () => {
+  const root = fakeRoot();
+  const seen = [];
+  renderMedical(root, sampleModel(), { onSearch: v => seen.push(`old:${v}`) });
+  renderMedical(root, sampleModel(), { onSearch: v => seen.push(`new:${v}`) });
+  const search = root.querySelector('#medical-search');
+  search.listeners.find(entry => entry[0] === 'input')[1]({ target: { value: 'gp' } });
+  assert.deepEqual(seen, ['new:gp']);
+});
+
+test('the length field accepts any whole minute (15 was rejected by step 5 from min 1)', () => {
+  const visit = { ...sampleModel().items[1].visit, time: '10:30', durationMin: 15 };
+  const root = fakeRoot();
+  renderMedical(root, sampleModel({ selected: visit, mode: 'write', draft: visit }), {});
+  const form = root.querySelector('#medical-sheet').children[0];
+  const input = form.children.find(c => c.dataset?.field === 'duration_min')._input;
+  assert.equal(input.step, '1');
+  assert.equal(input.min, '1');
+  // HTML validity: a value is valid when (value - min) is a multiple of step.
+  for (const minutes of [5, 10, 15, 20, 25, 30, 45, 60, 90]) {
+    assert.equal((minutes - Number(input.min)) % Number(input.step), 0, `${minutes} must be a valid length`);
+  }
+  assert.equal(input.value, 15);
+});

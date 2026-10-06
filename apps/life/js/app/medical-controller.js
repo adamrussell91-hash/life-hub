@@ -242,12 +242,16 @@ export function createMedicalController({
         onSave: async fields => {
           if (!chatApi) return;
           if (!isOnline()) return fail(OFFLINE_MESSAGE);
+          const recordType = fields.record_type || 'Appointment';
+          // The lane follows the type: keep an existing one only while the type is unchanged, otherwise
+          // let it be derived (a "Lab Work" visit was being filed in the appointment lane).
+          const keepLane = draft?.lane && (!draft.record_type || draft.record_type === recordType);
           draft = {
             ...draft,
             ...fields,
             date: fields.date || draft?.date || today(),
-            record_type: fields.record_type || 'Appointment',
-            lane: draft?.lane || 'appointment'
+            record_type: recordType,
+            lane: keepLane ? draft.lane : undefined
           };
           const payload = buildMedicalPayload(draft, { notes: fields.notes });
           try {
