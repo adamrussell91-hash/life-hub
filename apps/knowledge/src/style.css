@@ -3266,6 +3266,12 @@ body.is-universe-fullscreen .local-banner {
   justify-content: center;
 }
 
+@media (max-width: 720px) {
+  .compose__save {
+    min-height: 3rem;
+  }
+}
+
 .compose__save[disabled] {
   opacity: 0.55;
   cursor: not-allowed;

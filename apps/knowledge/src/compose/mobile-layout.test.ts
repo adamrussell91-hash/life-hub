@@ -26,7 +26,10 @@ describe("compose mobile docked Save (R4)", () => {
     expect(css).not.toMatch(/\.compose__savebar\s*\{[^}]*--vv-offset-bottom/);
     expect(css).toMatch(/\.compose__savebar\s*\{[^}]*safe-area-inset-bottom/);
     expect(css).toMatch(/\.compose__save\s*\{[^}]*min-height:\s*2\.75rem/);
-    expect(css).toMatch(/@media \(max-width: 720px\)[\s\S]*?\.compose__save\s*\{[^}]*min-height:\s*3rem/);
+    // Mobile 3rem must win cascade over the base 2.75rem (later in the file).
+    const base = css.search(/\.compose__save\s*\{[^}]*min-height:\s*2\.75rem/);
+    const phone = css.search(/@media \(max-width: 720px\)\s*\{\s*\.compose__save\s*\{[^}]*min-height:\s*3rem/);
+    expect(phone).toBeGreaterThan(base);
   });
 
   it("pins compose to the visual viewport and hides the phone chrome while typing", () => {
