@@ -10,12 +10,7 @@ import {
 } from '@/blocks/create-block';
 import { sanitizeSvgMarkup, svgHasMeaningfulContent } from '@/blocks/sanitize-svg';
 import { sanitizeBlocksDeep } from '@/blocks/sanitize-blocks';
-import {
-  validateMindMap,
-  validateConceptMap,
-  layoutMindMap,
-  layoutConceptMap
-} from '@/blocks/graph-layout';
+import { validateMindMap, validateConceptMap } from '@/blocks/graph-layout';
 import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
 import {
   createBlockEditor,
@@ -417,39 +412,6 @@ describe('graph-layout validators', () => {
       })
     ).toMatch(/label/i);
   });
-
-  it('layout helpers return deterministic positioned nodes', () => {
-    const mindNodes = [
-      { id: 'b', label: 'B', parent_id: 'a' },
-      { id: 'a', label: 'A', parent_id: null },
-      { id: 'c', label: 'C', parent_id: 'a' }
-    ];
-    const mindLayout = layoutMindMap(mindNodes);
-    expect(mindLayout).toHaveLength(mindNodes.length);
-    for (const node of mindLayout) {
-      expect(Number.isFinite(node.x)).toBe(true);
-      expect(Number.isFinite(node.y)).toBe(true);
-    }
-    expect(layoutMindMap(mindNodes)).toEqual(mindLayout);
-
-    const conceptNodes = [
-      { id: 'b', label: 'B' },
-      { id: 'a', label: 'A' }
-    ];
-    const conceptEdges = [{ id: 'e1', from: 'a', to: 'b', label: 'to' }];
-    const conceptLayout = layoutConceptMap(conceptNodes, conceptEdges);
-    expect(conceptLayout.nodes).toHaveLength(conceptNodes.length);
-    for (const node of conceptLayout.nodes) {
-      expect(Number.isFinite(node.x)).toBe(true);
-      expect(Number.isFinite(node.y)).toBe(true);
-    }
-    expect(conceptLayout.edges).toHaveLength(1);
-    expect(Number.isFinite(conceptLayout.edges[0].x1)).toBe(true);
-    expect(Number.isFinite(conceptLayout.edges[0].y1)).toBe(true);
-    expect(Number.isFinite(conceptLayout.edges[0].x2)).toBe(true);
-    expect(Number.isFinite(conceptLayout.edges[0].y2)).toBe(true);
-    expect(layoutConceptMap(conceptNodes, conceptEdges)).toEqual(conceptLayout);
-  });
 });
 
 describe('chart-svg', () => {
@@ -547,14 +509,16 @@ describe('visualisation renderers', () => {
     );
   });
 
-  it('renders mind_map and concept_map canvases', () => {
+  it('renders mind_map and concept_map as static maps students can open full screen', () => {
     const mind = renderBlock(createBlock('mind_map', 'm1'), 'student');
-    expect(mind.querySelector('.block-mind-map__canvas .block-graph-maker')).toBeTruthy();
-    expect(mind.querySelector('.node')).toBeTruthy();
+    expect(mind.querySelector('.block-mind-map__map .graph-stage--read svg.graph-svg')).toBeTruthy();
+    expect(mind.querySelectorAll('.graph-svg__node')).toHaveLength(3);
+    expect(mind.querySelector('.graph-svg__ring')).toBeNull();
+    expect(mind.querySelector('.graph-stage__expand')).toBeTruthy();
 
     const concept = renderBlock(createBlock('concept_map', 'cm1'), 'student');
-    expect(concept.querySelector('.block-concept-map__canvas .block-graph-maker')).toBeTruthy();
-    expect(concept.querySelector('.graph-edge')).toBeTruthy();
+    expect(concept.querySelector('.block-concept-map__map .graph-stage--read svg.graph-svg')).toBeTruthy();
+    expect(concept.querySelector('.graph-svg__chip')?.textContent).toBe('relates to');
   });
 
   it('keeps the mind map title in HTML and renders labelled nodes on the canvas', () => {
@@ -583,8 +547,8 @@ describe('visualisation renderers', () => {
     };
     const el = renderBlock(block, 'teacher');
     expect(el.querySelector('.block-mind-map__title')?.textContent).toBe('The Spacing Effect');
-    expect(el.querySelector('.block-mind-map__canvas .node')).not.toBeNull();
-    const labels = [...el.querySelectorAll('.node__text')].map((node) => node.textContent ?? '');
+    expect(el.querySelector('.block-mind-map__map .graph-svg__node')).not.toBeNull();
+    const labels = [...el.querySelectorAll('.graph-svg__node > title')].map((node) => node.textContent ?? '');
     expect(labels.some((text) => text.includes('Why it works'))).toBe(true);
     expect(labels.some((text) => text.includes('Spacing Effect'))).toBe(true);
   });
@@ -703,14 +667,15 @@ describe('visualisation editors', () => {
       });
 
       expect(el.querySelector('.block-editor__mind-map-title')).not.toBeNull();
-      expect(el.querySelector('.block-graph-maker-host .block-graph-maker')).not.toBeNull();
-      const connectors = [...el.querySelectorAll('.graph-maker__edges path')];
-      expect(connectors.length).toBeGreaterThan(0);
-      for (const path of connectors) {
-        expect(path.getAttribute('fill')).toBe('none');
-        expect(path.getAttribute('stroke-width')).toBe('2');
-        expect(path.getAttribute('d') ?? '').toMatch(/^M /);
-      }
+      expect(el.querySelector('.graph-block[data-mode="outline"]')).not.toBeNull();
+      expect(el.querySelectorAll('.graph-outline__row')).toHaveLength(3);
+      expect(el.querySelectorAll('.graph-stage .graph-svg__node')).toHaveLength(3);
+
+      const row = el.querySelectorAll<HTMLInputElement>('.graph-outline__input')[1]!;
+      row.value = 'Retrieval';
+      row.dispatchEvent(new Event('input'));
+      expect(latest.content.nodes[1]).toMatchObject({ label: 'Retrieval', parent_id: 'm1_n1' });
+      expect(latest.content.mode).toBe('outline');
 
       const title = el.querySelector('.block-editor__mind-map-title') as HTMLInputElement;
       title.value = 'Unit map';
@@ -729,17 +694,18 @@ describe('visualisation editors', () => {
       });
 
       expect(el.querySelector('.block-editor__concept-map-title')).not.toBeNull();
-      expect(el.querySelector('.block-graph-maker-host .block-graph-maker')).not.toBeNull();
-      expect(el.querySelector('.block-graph-maker .graph-edge')).not.toBeNull();
-      const lines = [...el.querySelectorAll('.graph-maker__edges line')];
-      expect(lines.length).toBeGreaterThan(0);
-      for (const line of lines) {
-        expect(line.getAttribute('fill')).toBe('none');
-        expect(line.getAttribute('stroke-width')).toBe('2');
-      }
-      const labelBg = el.querySelector('.graph-edge__label-bg');
-      expect(labelBg).not.toBeNull();
-      expect(labelBg?.getAttribute('fill')).toBe('#fbf8f2');
+      expect(el.querySelectorAll('.graph-concept')).toHaveLength(2);
+      expect(el.querySelectorAll('.graph-link')).toHaveLength(1);
+
+      const verb = el.querySelector<HTMLInputElement>('.graph-link__verb')!;
+      expect(verb.value).toBe('relates to');
+      verb.value = 'causes';
+      verb.dispatchEvent(new Event('input'));
+      expect(latest.content.edges[0]).toMatchObject({ from: 'cm1_n1', to: 'cm1_n2', label: 'causes' });
+
+      (el.querySelector('.graph-block__modes [data-mode="canvas"]') as HTMLButtonElement).click();
+      expect(latest.content.mode).toBe('canvas');
+      expect(el.querySelector('.graph-canvas .graph-svg__chip')?.textContent).toBe('causes');
     });
   });
 

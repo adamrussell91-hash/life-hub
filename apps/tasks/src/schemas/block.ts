@@ -520,8 +520,14 @@ export const DiagramBlockSchema = z.object({
 export const GraphNodeSchema = z.object({
   id: z.string().min(1),
   label: z.string(),
-  parent_id: z.string().nullable().optional()
+  parent_id: z.string().nullable().optional(),
+  color: z.string().optional(),
+  x: z.number().optional(),
+  y: z.number().optional()
 });
+
+/** How the block is built: a written outline laid out automatically, or a free canvas. */
+export const GraphBuildModeSchema = z.enum(['outline', 'canvas']);
 
 export const GraphEdgeSchema = z.object({
   id: z.string().min(1),
@@ -539,7 +545,8 @@ export const MindMapBlockSchema = z.object({
   content: z.object({
     title: z.string().optional(),
     nodes: z.array(GraphNodeSchema).min(1).max(24),
-    edges: z.array(GraphEdgeSchema).max(40)
+    edges: z.array(GraphEdgeSchema).max(40),
+    mode: GraphBuildModeSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -554,7 +561,8 @@ export const ConceptMapBlockSchema = z.object({
   content: z.object({
     title: z.string().optional(),
     nodes: z.array(GraphNodeSchema).min(1).max(24),
-    edges: z.array(GraphEdgeSchema).max(40)
+    edges: z.array(GraphEdgeSchema).max(40),
+    mode: GraphBuildModeSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
