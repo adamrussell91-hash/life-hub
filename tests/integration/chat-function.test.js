@@ -1073,7 +1073,93 @@ test('Vera mind_session log_entry writes immediately and emits record_saved', as
   assert.equal(events.find(e => e.type === 'record_proposal'), undefined);
 });
 
-test('Sara medical append to an existing visit writes immediately and emits record_saved', async () => {
+test('Sara adds detail to an existing visit with update_medical_visit: written at once, with a record_saved receipt', async () => {
+  const medicalPath = 'data/body/2026/08/2026-08-01-medical-stelara-maintenance-injection-0930.md';
+  const medicalYaml = `---
+schema_version: 1
+id: "stored-stelara"
+type: "medical"
+date: "2026-08-01"
+time: "09:30"
+created_at: "2026-08-01T09:30:00+10:00"
+updated_at: "2026-08-01T09:30:00+10:00"
+source: "chat"
+title: "Stelara maintenance injection"
+record_type: "Prescription"
+lane: "prescription"
+location_kind: "place"
+provider: "Dr Chris Keily"
+---
+Maintenance dose logged.
+`;
+  const medicalSha = '1'.repeat(40);
+  const puts = [];
+  const fetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: medicalPath, type: 'blob', sha: medicalSha, size: medicalYaml.length },
+          { path: 'central-node.md', type: 'blob', sha: '5'.repeat(40), size: 20 }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${medicalSha}`)) {
+      return Response.json({
+        content: Buffer.from(medicalYaml).toString('base64'),
+        encoding: 'base64'
+      });
+    }
+    if (url.includes('/git/blobs/')) {
+      return Response.json({ content: Buffer.from('# Purpose\n').toString('base64'), encoding: 'base64' });
+    }
+    if (options?.method === 'PUT') {
+      puts.push(url);
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  let toolResult;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        toolResult = await executeTools({
+          id: 'call_1',
+          name: 'update_medical_visit',
+          input: {
+            visit_id: 'stored-stelara',
+            notes_append: 'Mild site pain; same-morning cramping likely diet/anxiety, not Stelara.'
+          }
+        });
+        yield { type: 'done' };
+      }
+    })
+  });
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Sara, add that note to the Stelara record',
+    priorAgentSlug: 'sara'
+  }))));
+  const parsed = JSON.parse(toolResult);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.status, 'written');
+  const saved = events.find(e => e.type === 'record_saved');
+  assert.ok(saved, JSON.stringify(events.map(e => e.type)));
+  assert.equal(saved.record.type, 'medical');
+  assert.equal(saved.record.date, '2026-08-01');
+  assert.match(saved.notes, /Maintenance dose logged\./);
+  assert.match(saved.notes, /Mild site pain/);
+  assert.match(saved.summary, /Updated medical visit/i);
+  assert.ok(puts.some(url => url.includes(medicalPath)));
+  assert.equal(events.find(e => e.type === 'record_proposal'), undefined);
+});
+
+
+test('Sara log_entry refuses a visit already on record and points at update_medical_visit', async () => {
   const medicalPath = 'data/body/2026/08/2026-08-01-medical-stelara-maintenance-injection-0930.md';
   const medicalYaml = `---
 schema_version: 1
@@ -1147,14 +1233,119 @@ Maintenance dose logged.
     priorAgentSlug: 'sara'
   }))));
   const parsed = JSON.parse(toolResult);
-  assert.equal(parsed.ok, true);
-  assert.equal(parsed.status, 'written');
-  const saved = events.find(e => e.type === 'record_saved');
-  assert.ok(saved, JSON.stringify(events.map(e => e.type)));
-  assert.equal(saved.record.type, 'medical');
-  assert.match(saved.summary, /Updated medical visit/i);
-  assert.ok(puts.some(url => url.includes(medicalPath)));
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.error, 'possible_duplicate');
+  assert.equal(parsed.existing_visit.id, 'stored-stelara');
+  assert.match(parsed.instruction, /update_medical_visit/);
+  assert.equal(puts.length, 0, 'nothing may be written');
+  assert.equal(events.find(e => e.type === 'record_saved'), undefined);
   assert.equal(events.find(e => e.type === 'record_proposal'), undefined);
+});
+
+// --- Sara record keeper, end to end through the real chat handler -------------------------------
+
+function saraVisitHarness({ calls }) {
+  const gpPath = 'data/body/2026/10/2026-10-15-medical-gp-review-ggt-results-1400.md';
+  const gpYaml = `---
+schema_version: 1
+id: "gp-visit"
+type: "medical"
+date: "2026-10-15"
+time: "14:00"
+created_at: "2026-09-21T07:21:40+10:00"
+updated_at: "2026-09-21T07:21:40+10:00"
+source: "chat"
+title: "GP review (GGT results)"
+record_type: "Consultation"
+lane: "appointment"
+location_kind: "place"
+provider: "Dr Nerida McDonald"
+---
+Discuss GGT 233.
+`;
+  const gpSha = '2'.repeat(40);
+  const puts = [];
+  const deletes = [];
+  const fetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [
+        { path: gpPath, type: 'blob', sha: gpSha, size: gpYaml.length },
+        { path: 'central-node.md', type: 'blob', sha: '5'.repeat(40), size: 20 }
+      ] });
+    }
+    if (url.includes(`/git/blobs/${gpSha}`)) return Response.json({ content: Buffer.from(gpYaml).toString('base64'), encoding: 'base64' });
+    if (url.includes('/git/blobs/')) return Response.json({ content: Buffer.from('# Purpose\n').toString('base64'), encoding: 'base64' });
+    if (options?.method === 'PUT') { puts.push({ url, body: options.body }); return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } }); }
+    if (options?.method === 'DELETE') { deletes.push(url); return Response.json({ commit: { sha: 'b'.repeat(40) } }); }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const results = [];
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        for (const [index, call] of calls.entries()) {
+          results.push(JSON.parse(await executeTools({ id: `call_${index}`, ...call })));
+        }
+        yield { type: 'done' };
+      }
+    })
+  });
+  return { handler, results, puts, deletes, gpPath };
+}
+
+test('Sara "it is booked": status changes on the SAME file, the date is untouched, and a receipt is sent', async () => {
+  const h = saraVisitHarness({ calls: [{ name: 'update_medical_visit', input: { visit_id: 'gp-visit', status: 'booked', time: '14:00', duration_min: 30 } }] });
+  const events = contentEvents(await readSse(await h.handler(request({ message: 'the GP appointment is booked', priorAgentSlug: 'sara' }))));
+  assert.equal(h.results[0].status, 'written');
+  const body = JSON.parse(h.puts.find(p => p.url.includes(h.gpPath)).body);
+  const written = Buffer.from(body.content, 'base64').toString('utf8');
+  assert.match(written, /status: "booked"/);
+  assert.match(written, /date: "2026-10-15"/);
+  assert.match(written, /duration_min: 30/);
+  assert.equal(h.puts.filter(p => /2026-08-01-medical/.test(p.url)).length, 0, 'must not create a copy dated today');
+  assert.ok(events.find(e => e.type === 'record_saved'));
+});
+
+test('Sara reschedule is one Confirm card (new file + old file removed); nothing is written yet', async () => {
+  const h = saraVisitHarness({ calls: [{ name: 'update_medical_visit', input: { visit_id: 'gp-visit', date: '30/10/2026' } }] });
+  const events = contentEvents(await readSse(await h.handler(request({ message: 'GP moved to the 30th', priorAgentSlug: 'sara' }))));
+  assert.equal(h.results[0].status, 'awaiting_confirm');
+  const proposal = events.find(e => e.type === 'action_proposal');
+  assert.ok(proposal, JSON.stringify(events.map(e => e.type)));
+  assert.deepEqual(proposal.proposal.writes.map(w => w.mode), ['create', 'delete']);
+  assert.match(proposal.proposal.writes[0].path, /2026-10-30-medical-/);
+  assert.equal(h.puts.filter(p => /2026-10-30|2026-10-15-medical/.test(p.url)).length, 0, 'no visit file may change before Confirm');
+});
+
+test('Sara delete is a Confirm card, and an unknown id is refused rather than guessed', async () => {
+  const h = saraVisitHarness({ calls: [
+    { name: 'delete_medical_visit', input: { visit_id: 'gp-visit', reason: 'duplicate' } },
+    { name: 'update_medical_visit', input: { visit_id: 'not-a-real-id', status: 'done' } }
+  ] });
+  const events = contentEvents(await readSse(await h.handler(request({ message: 'delete the duplicate GP', priorAgentSlug: 'sara' }))));
+  assert.equal(h.results[0].status, 'awaiting_confirm');
+  assert.deepEqual(events.find(e => e.type === 'action_proposal').proposal.writes.map(w => w.mode), ['delete']);
+  assert.equal(h.results[1].error, 'unknown_visit_id');
+  assert.equal(h.deletes.length, 0);
+});
+
+test('Sara analyst tools run inside a turn: marker trend, treatment cycle, brief for a visit id', async () => {
+  const h = saraVisitHarness({ calls: [
+    { name: 'get_treatment_timeline', input: {} },
+    { name: 'get_open_loops', input: {} },
+    { name: 'build_appointment_brief', input: { visit_id: 'gp-visit' } },
+    { name: 'list_medical_visits', input: { upcoming: true } }
+  ] });
+  await readSse(await h.handler(request({ message: 'brief me for the GP', priorAgentSlug: 'sara' })));
+  assert.equal(h.results[0].ok, true);
+  assert.equal(h.results[1].ok, true);
+  assert.equal(h.results[2].found, true);
+  assert.equal(h.results[2].as_of, '2026-10-15');
+  assert.equal(h.results[3].visits[0].id, 'gp-visit');
 });
 
 test('Sara future same-title Stelara dose with AU date stays a new Confirm visit', async () => {

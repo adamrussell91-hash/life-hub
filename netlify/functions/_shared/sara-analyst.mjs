@@ -70,7 +70,12 @@ function markerMatches(marker, query) {
     || norm(marker.label).includes(q) || norm(marker.category) === q;
 }
 
-function slopePerMonth(points) {
+const SLOPE_WINDOW_DAYS = 365;
+
+/** Straight-line change per month over the last 12 months (years of old values would drown the recent direction). */
+function slopePerMonth(allPoints, today) {
+  const cutoff = new Date(Date.parse(`${today}T00:00:00Z`) - SLOPE_WINDOW_DAYS * DAY).toISOString().slice(0, 10);
+  const points = allPoints.filter(p => p.date >= cutoff);
   if (points.length < 3) return null;
   const t0 = Date.parse(`${points[0].date}T00:00:00Z`);
   const xs = points.map(p => (Date.parse(`${p.date}T00:00:00Z`) - t0) / DAY);
@@ -120,7 +125,9 @@ function describeMarker(points, meta, today) {
     delta_vs_previous: previous ? round(latest.value - previous.value, 2) : null,
     pct_vs_previous: previous && previous.value ? round(((latest.value - previous.value) / previous.value) * 100, 1) : null,
     delta_vs_first: points.length > 1 ? round(latest.value - first.value, 2) : null,
-    per_month: slopePerMonth(points),
+    per_month: slopePerMonth(points, today),
+    per_month_basis: 'last 12 months',
+    history_span_days: daysBetween(first.date, latest.date),
     range_position: position,
     direction_vs_range: direction,
     days_since_last: gap,
@@ -158,7 +165,7 @@ export function markerTrend(events, { query, today, from = null, to = null } = {
     markers,
     how_to_read: 'direction_vs_range compares distance outside the reference range between the last two tests. '
       + 'A falling value that is still above range is moving_toward_range, not normal. '
-      + 'per_month is a straight-line slope and only given with 3+ points over 30+ days.'
+      + 'per_month is a straight-line slope over the last 12 months, only given with 3+ points in that window spanning 30+ days. Use points for the full history.'
   };
 }
 
@@ -225,6 +232,18 @@ function doseKind(visit, index) {
   return index === 0 ? 'first' : 'maintenance';
 }
 
+/** The same dose is often logged twice (once by Adam, once by Sara). Keep the earliest within `days`. */
+function dedupeNearby(sorted, days) {
+  const out = [];
+  for (const v of sorted) {
+    const prev = out[out.length - 1];
+    if (prev && Math.abs(daysBetween(prev.date, v.date)) <= days && isPlannedLike(prev) === isPlannedLike(v)) continue;
+    out.push(v);
+  }
+  return out;
+}
+const isPlannedLike = v => v.status === 'planned' || v.status === 'to_book';
+
 /**
  * Stelara dose history and where today sits in the cycle. Cycle day 0 is dose day.
  * A dose is any non-planned Stelara visit on or before today; planned/future ones
@@ -233,7 +252,11 @@ function doseKind(visit, index) {
 export function treatmentTimeline(events, { today } = {}) {
   if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date' };
   const visits = medicalRecords(events);
-  const stelara = visits.filter(v => STELARA_RE.test(`${v.title ?? ''} ${v.notes_body ?? ''}`) && v.record_type !== 'Symptom');
+  // A dose is a visit TITLED as Stelara and as a dose. A gastro visit whose notes mention Stelara is not one.
+  const isDose = v => STELARA_RE.test(v.title ?? '')
+    && v.record_type !== 'Symptom'
+    && (v.record_type === 'Prescription' || v.record_type === 'Vaccination' || /injection|infusion|dose|maintenance|induction/i.test(v.title ?? ''));
+  const stelara = dedupeNearby(visits.filter(isDose), 7);
   const doses = stelara.filter(v => !isPlanned(v, today))
     .map((v, i) => ({ id: v.id, date: v.date, title: v.title, kind: doseKind(v, i), cadence_days: v.cadence_days ?? null }));
   const planned = stelara.filter(v => isPlanned(v, today) && v.date >= today).sort(byDateAsc);

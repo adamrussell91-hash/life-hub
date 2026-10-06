@@ -11,27 +11,28 @@ const NOW = '2026-10-06T16:00:00+11:00';
 // The exact failure from 6 Oct 2026: one GP appointment logged on three dates.
 const gp = (date, extra = {}) => visit(`gp-${date}`, date, {
   title: 'GP Appointment - Dr Nerida McDonald (GGT results review)',
-  record_type: 'Consultation', provider: 'Dr Nerida McDonald', time: '14:00', ...extra
+  record_type: 'Consultation', provider: 'Dr Nerida McDonald', time: '14:00',
+  created_at: '2026-10-06T15:40:00+11:00', ...extra   // all saved in the same sitting, as happened
 }, 'General appointment to discuss 17 Sep GGT result.');
 const DUPES = [gp('2026-10-06'), gp('2026-10-15'), gp('2026-10-26')];
 const BASE = MEDICAL.filter(v => v.record.id !== 'gp-ggt');
 const all = [...BASE, ...DUPES];
 
 test('findDuplicateGroups catches the triplicated GP appointment and ignores recurring doses', () => {
-  const groups = findDuplicateGroups(all);
+  const groups = findDuplicateGroups(all, { today: TODAY });
   assert.equal(groups.length, 1);
   assert.deepEqual(groups[0].map(v => v.date), ['2026-10-06', '2026-10-15', '2026-10-26']);
   // Stelara doses 56 days apart share a title and must not be flagged.
-  assert.equal(findDuplicateGroups(BASE).length, 0);
+  assert.equal(findDuplicateGroups(BASE, { today: TODAY }).length, 0);
 });
 
 test('findLikelyDuplicate guards log_entry: same appointment on another date is refused, a new one is not', () => {
   const again = { type: 'medical', date: '2026-10-20', time: '14:00', fields: { title: 'GP Appointment - Dr Nerida McDonald (GGT results review)', provider: 'Dr Nerida McDonald' } };
-  assert.ok(findLikelyDuplicate(all, again));
+  assert.ok(findLikelyDuplicate(all, again, { today: TODAY }));
   const fresh = { type: 'medical', date: '2026-12-01', fields: { title: 'Dentist check-up' } };
-  assert.equal(findLikelyDuplicate(all, fresh), null);
+  assert.equal(findLikelyDuplicate(all, fresh, { today: TODAY }), null);
   const dose = { type: 'medical', date: '2026-12-17', fields: { title: 'Stelara injection', cadence_days: 56 } };
-  assert.equal(findLikelyDuplicate(all, dose), null);
+  assert.equal(findLikelyDuplicate(all, dose, { today: TODAY }), null);
 });
 
 test('listMedicalVisits filters by status/upcoming and flags duplicates; ids are returned', () => {
@@ -123,5 +124,32 @@ test('planVisitDelete and planVisitMerge are structural and name exactly what go
 
 test('findLikelyDuplicate never treats a symptom as a duplicate visit', () => {
   const sore = { type: 'medical', date: '2026-10-06', fields: { title: 'Sore throat' }, notes: 'throat is sore' };
-  assert.equal(findLikelyDuplicate([...MEDICAL, visit('x', '2026-10-06', { title: 'Sore throat', record_type: 'Appointment' })], sore), null);
+  assert.equal(findLikelyDuplicate([...MEDICAL, visit('x', '2026-10-06', { title: 'Sore throat', record_type: 'Appointment' })], sore, { today: TODAY }), null);
+});
+
+test('years of genuine weekly sessions are not duplicates (only recent/upcoming, saved-together visits are)', () => {
+  const weekly = Array.from({ length: 10 }, (_, i) => {
+    const d = new Date(Date.UTC(2018, 5, 21 + i * 7)).toISOString().slice(0, 10);
+    return visit(`psych-${i}`, d, { title: 'Psychological Assessment (Dr M)', provider: 'Dr M', time: '10:00', record_type: 'Appointment' });
+  });
+  assert.equal(findDuplicateGroups(weekly, { today: TODAY }).length, 0);
+  // A visit created today for next week's session still gets the log_entry guard (one retry), not silent duplication.
+  const upcomingSession = visit('s1', '2026-10-12', { title: 'Therapy session', provider: 'Kate', time: '10:00' });
+  const next = { type: 'medical', date: '2026-10-19', time: '10:00', fields: { title: 'Therapy session', provider: 'Kate' } };
+  assert.ok(findLikelyDuplicate([upcomingSession], next, { today: TODAY }));
+  assert.equal(findLikelyDuplicate([upcomingSession], { ...next, date: '2026-12-01' }, { today: TODAY }), null);
+});
+
+test('the same dose logged twice on one day IS a duplicate even though doses recur', () => {
+  const a = visit('d1', '2026-10-22', { title: 'Stelara (ustekinumab) subcutaneous maintenance injection — 90mg', record_type: 'Prescription', cadence_days: 56, provider: 'Walker St Doctors', time: '09:00' });
+  const b = visit('d2', '2026-10-22', { title: 'stelara (ustekinumab) 90 mg - subcutaneous injection', record_type: 'Appointment', provider: 'Nurse', time: '09:00' });
+  assert.equal(findDuplicateGroups([a, b], { today: TODAY }).length, 1);
+  const later = visit('d3', '2026-12-17', { title: 'Stelara injection', record_type: 'Prescription', cadence_days: 56, time: '09:00' });
+  assert.equal(findDuplicateGroups([a, later], { today: TODAY }).length, 0);
+});
+
+test('same title on the same day is a duplicate even if the time and clinician differ (the "stamped with now" case)', () => {
+  const a = visit('d1', '2026-10-22', { title: 'Stelara injection', record_type: 'Prescription', time: '09:00', provider: 'Walker St Doctors' });
+  const b = visit('d2', '2026-10-22', { title: 'Stelara injection', record_type: 'Appointment', time: '15:42', provider: 'Nurse' });
+  assert.equal(findDuplicateGroups([a, b], { today: TODAY }).length, 1);
 });

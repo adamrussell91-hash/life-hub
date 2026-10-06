@@ -46,20 +46,57 @@ function summarise(event) {
 
 // ---------- duplicates ----------
 
-function likelySame(a, b) {
-  const ra = recordOf(a);
-  const rb = recordOf(b);
+const RECENT_DAYS = 14;
+
+// Recurring doses repeat by design, so on different days they are never duplicates;
+// on the SAME day the same dose twice is.
+const recurringOnDifferentDays = (ra, rb) => Boolean(ra.cadence_days || rb.cadence_days) && ra.date !== rb.date;
+const SAME_SITTING_MS = 36 * 3600 * 1000;
+
+function similarTitle(ra, rb) {
   if (ra.id && ra.id === rb.id) return false;
   if (ra.record_type === 'Symptom' || rb.record_type === 'Symptom') return false;
-  if (ra.cadence_days || rb.cadence_days) return false; // recurring doses repeat by design
-  if (scoreMedicalTitleMatch(ra.title, rb.title) < 70) return false;
-  if ((ra.time ?? '00:00') !== (rb.time ?? '00:00') && ra.provider !== rb.provider) return false;
+  return scoreMedicalTitleMatch(ra.title, rb.title) >= 70;
+}
+
+function baseLikeness(ra, rb) {
+  if (!similarTitle(ra, rb)) return false;
+  // The same title on the same day is a duplicate whatever time or clinician got typed;
+  // across days it also needs the same time or clinician.
+  return ra.date === rb.date
+    || (ra.time ?? '00:00') === (rb.time ?? '00:00')
+    || ra.provider === rb.provider;
+}
+
+/**
+ * Duplicates among existing records: one appointment saved more than once. Years of genuine
+ * weekly sessions share a title, clinician and time, so this only looks at recent/upcoming
+ * visits and only calls two a duplicate when they are the same day or were saved together.
+ */
+function sameAppointmentLoggedTwice(a, b, today) {
+  const ra = recordOf(a);
+  const rb = recordOf(b);
+  if (!baseLikeness(ra, rb) || recurringOnDifferentDays(ra, rb)) return false;
+  const cutoff = new Date(Date.parse(`${today}T00:00:00Z`) - RECENT_DAYS * 86400000).toISOString().slice(0, 10);
+  if (ra.date < cutoff && rb.date < cutoff) return false;
   const gap = Math.abs(daysBetween(ra.date, rb.date));
-  return gap <= DUPLICATE_WINDOW_DAYS;
+  if (gap === 0) return true;
+  if (gap > DUPLICATE_WINDOW_DAYS) return false;
+  const created = Math.abs(Date.parse(ra.created_at) - Date.parse(rb.created_at));
+  return Number.isFinite(created) && created <= SAME_SITTING_MS;
+}
+
+/** A visit about to be created vs one already on record: stricter, because refusing costs one retry. */
+function wouldDuplicate(incoming, existing, today) {
+  if (!baseLikeness(incoming, existing) || recurringOnDifferentDays(incoming, existing)) return false;
+  const cutoff = new Date(Date.parse(`${today}T00:00:00Z`) - RECENT_DAYS * 86400000).toISOString().slice(0, 10);
+  if (existing.date < cutoff) return false;
+  return Math.abs(daysBetween(incoming.date, existing.date)) <= RECENT_DAYS;
 }
 
 /** Groups of visits that look like one appointment logged more than once. */
-export function findDuplicateGroups(events) {
+export function findDuplicateGroups(events, { today } = {}) {
+  const asOf = today && isCalendarDate(today) ? today : new Date().toISOString().slice(0, 10);
   const visits = visitEvents(events).filter(e => recordOf(e).status !== 'cancelled');
   const seen = new Set();
   const groups = [];
@@ -67,7 +104,7 @@ export function findDuplicateGroups(events) {
     if (seen.has(i)) return;
     const members = [i];
     visits.forEach((other, j) => {
-      if (j !== i && !seen.has(j) && likelySame(event, other)) members.push(j);
+      if (j !== i && !seen.has(j) && sameAppointmentLoggedTwice(event, other, asOf)) members.push(j);
     });
     if (members.length > 1) {
       members.forEach(m => seen.add(m));
@@ -78,7 +115,8 @@ export function findDuplicateGroups(events) {
 }
 
 /** For log_entry: is this new visit already on record? Returns the existing one or null. */
-export function findLikelyDuplicate(events, candidate) {
+export function findLikelyDuplicate(events, candidate, { today } = {}) {
+  const asOf = today && isCalendarDate(today) ? today : new Date().toISOString().slice(0, 10);
   const date = coerceCalendarDate(candidate?.date, {}) ?? candidate?.date;
   if (!isCalendarDate(date)) return null;
   const incoming = {
@@ -97,7 +135,7 @@ export function findLikelyDuplicate(events, candidate) {
   if (inferRecordType(candidate?.fields?.record_type, incoming.record.title, candidate?.notes) === 'Symptom') return null;
   const match = visitEvents(events)
     .filter(event => recordOf(event).status !== 'cancelled')
-    .find(event => likelySame(incoming, event));
+    .find(event => wouldDuplicate(incoming.record, recordOf(event), asOf));
   return match ? summarise(match) : null;
 }
 
@@ -124,7 +162,7 @@ export function listMedicalVisits(events, {
     ? recordOf(a).date.localeCompare(recordOf(b).date)
     : recordOf(b).date.localeCompare(recordOf(a).date)));
   const cap = Math.min(Math.max(Number(limit) || 25, 1), 60);
-  const duplicates = findDuplicateGroups(events);
+  const duplicates = findDuplicateGroups(events, { today });
   const dupIds = new Set(duplicates.flat().map(v => v.id));
   return {
     ok: true,
@@ -136,10 +174,10 @@ export function listMedicalVisits(events, {
   };
 }
 
-export function getMedicalVisit(events, { id } = {}) {
+export function getMedicalVisit(events, { id, today } = {}) {
   const event = visitEvents(events).find(e => recordOf(e).id === id);
   if (!event) return { ok: true, found: false, reason: 'unknown_visit_id' };
-  const same = findDuplicateGroups(events).find(group => group.some(v => v.id === id));
+  const same = findDuplicateGroups(events, { today }).find(group => group.some(v => v.id === id));
   return {
     ok: true,
     found: true,

@@ -2461,7 +2461,16 @@ export function createChatHandler({
                     save: async ({ path, record, notes }) => {
                       const current = await client.resolveTree();
                       const existingSha = current.tree.find(entry => entry.path === path && entry.type === 'blob')?.sha;
-                      await persistLogEntry(client, { record, notes, path, existingSha, nowDateKey: today });
+                      const persisted = await persistLogEntry(client, { record, notes, path, existingSha, nowDateKey: today });
+                      // The chat receipt: what was just saved, so Adam sees the change land.
+                      send({
+                        type: 'record_saved',
+                        record,
+                        notes,
+                        path,
+                        summary: describeRecordForLog(record, notes, { medicalAppend: true }),
+                        centralNodeUpdated: persisted.centralNodeUpdated
+                      });
                     },
                     propose: proposal => proposeOsAction(proposal),
                     validateProposal: input => validateProposeActionInput(input, { agentSlug: slug })
@@ -2866,7 +2875,7 @@ export function createChatHandler({
                 let medicalInput = event.input;
                 if (slug === 'sara' && event.input?.type === 'medical' && event.input?.new_visit !== true) {
                   // log_entry creates. If this visit is already on record, say where — never make a second one.
-                  const existingVisit = findLikelyDuplicate(medicalEvents, event.input);
+                  const existingVisit = findLikelyDuplicate(medicalEvents, event.input, { today });
                   if (existingVisit) {
                     return JSON.stringify({
                       ok: false,

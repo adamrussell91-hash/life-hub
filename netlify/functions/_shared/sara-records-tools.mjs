@@ -185,7 +185,7 @@ export async function executeSaraRecordTool(name, input = {}, ctx = {}) {
     });
   }
   if (name === 'get_medical_visit') {
-    return getMedicalVisit(medicalEvents, { id: String(args.visit_id ?? '').trim() });
+    return getMedicalVisit(medicalEvents, { id: String(args.visit_id ?? '').trim(), today });
   }
 
   const proposeStructural = async ({ intent, writes, reads }) => {

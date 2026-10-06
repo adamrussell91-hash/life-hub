@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   markerTrend, compareBloods, treatmentTimeline, symptomTimeline, openLoops, crossSignals, appointmentBrief
 } from '../../netlify/functions/_shared/sara-analyst.mjs';
-import { TODAY, BLOODS, MEDICAL, MEALS, DIARY, WORKOUTS, WEIGHTS } from '../support/sara-fixtures.mjs';
+import { TODAY, BLOODS, MEDICAL, MEALS, DIARY, WORKOUTS, WEIGHTS, visit } from '../support/sara-fixtures.mjs';
 
 const all = [...BLOODS, ...MEDICAL];
 
@@ -187,4 +187,27 @@ test('analyse_medical_evidence now carries marker-level blood change', () => {
   const bloodsCmp = r.comparisons.find(c => c.kind === 'bloods');
   assert.equal(bloodsCmp.biggest_moves[0].key, 'ggt');
   assert.deepEqual(bloodsCmp.still_abnormal.map(m => m.key).sort(), ['alt', 'ggt']);
+});
+
+test('a visit that only MENTIONS Stelara in its notes is not a dose, and a dose logged twice counts once', () => {
+  const events = [
+    visit('dose-a', '2026-08-27', { title: 'Stelara injection', record_type: 'Prescription', cadence_days: 56 }),
+    visit('dose-b', '2026-08-27', { title: 'Stelara (ustekinumab) maintenance injection — 90mg', record_type: 'Prescription' }),
+    visit('gastro-2', '2026-09-24', { title: 'Gastro follow-up' }, 'Continue Stelara. Next Stelara due October.'),
+    visit('bloods-visit', '2026-09-17', { title: 'Blood Tests - Comprehensive Panel', record_type: 'Lab Work' }, 'Pre-Stelara bloods.')
+  ];
+  const r = treatmentTimeline(events, { today: TODAY });
+  assert.deepEqual(r.stelara.doses.map(d => d.date), ['2026-08-27']);
+  assert.equal(r.stelara.cycle.cycle_day, 40);
+});
+
+test('the monthly slope only uses the last 12 months, so old values cannot flip the direction', () => {
+  const rows = [['2019-07-19', 639], ['2023-03-21', 120], ['2026-01-28', 162], ['2026-05-19', 131], ['2026-09-17', 233]].map(([date, value]) => ({
+    path: `data/body/${date.slice(0, 4)}/${date.slice(5, 7)}/${date}-bloods.md`,
+    record: { type: 'bloods', date, markers: [{ key: 'ggt', label: 'GGT', category: 'Liver Function', value, ref_high: 51, status: 'High' }] }
+  }));
+  const ggt = markerTrend(rows, { query: 'ggt', today: TODAY }).markers[0];
+  assert.ok(ggt.per_month > 0, `slope should follow the last year, got ${ggt.per_month}`);
+  assert.equal(ggt.points.length, 5);
+  assert.ok(ggt.history_span_days > 2000);
 });

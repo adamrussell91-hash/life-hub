@@ -5,7 +5,8 @@ import { validateProposeActionInput } from '../../netlify/functions/_shared/capa
 import { MEDICAL, TODAY, visit } from '../support/sara-fixtures.mjs';
 
 const gp = date => visit(`gp-${date}`, date, {
-  title: 'GP review (GGT results)', record_type: 'Consultation', provider: 'Dr Nerida McDonald', time: '14:00'
+  title: 'GP review (GGT results)', record_type: 'Consultation', provider: 'Dr Nerida McDonald', time: '14:00',
+  created_at: '2026-10-06T15:40:00+11:00'
 }, 'Discuss GGT.');
 const BASE = MEDICAL.filter(v => v.record.id !== 'gp-ggt');
 
