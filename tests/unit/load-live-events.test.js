@@ -6,6 +6,7 @@ import { buildHomeModel } from '../../apps/life/js/app/home-model.js';
 import {
   MAX_LOOKBACK_DAYS,
   INITIAL_LOOKAHEAD_DAYS,
+  FORWARD_LOOKAHEAD_DAYS,
   loadLiveEvents as loadLiveEventsRaw,
   planBackfillWindows
 } from '../../apps/life/js/app/load-live-events.js';
@@ -76,7 +77,9 @@ test('loads the current Sydney date window through existing parsers and exact Ho
   const result = await loadLiveEvents({ sync, loadYaml: load, date });
   const model = buildHomeModel({ ...result, date: '2026-07-30' });
 
-  assert.equal(calls.length, 3);
+  // first window + two history windows + the forward (future) window
+  assert.equal(calls.filter(call => call.from <= firstTo('2026-07-30')).length, 3);
+  assert.equal(calls.length, 4);
   assert.equal(calls[0].from, '2026-07-24');
   assert.equal(calls[0].to, firstTo('2026-07-30'));
   assert.equal(calls[1].from, '2026-06-24');
@@ -161,10 +164,12 @@ test('first sync is seven inclusive days and the next slice does not overlap', a
     sync, loadYaml: load, date, maxLookbackDays: 70, onPartial: snapshot => partials.push(snapshot)
   });
 
-  assert.equal(calls.length, 3);
+  const history = calls.filter(call => call.from <= firstTo(date));
+  assert.equal(history.length, 3);
+  assert.equal(calls.length, 4, 'plus one forward window for future records');
   assert.deepEqual(calls[0], { from: '2026-07-26', to: firstTo('2026-08-01') });
   assert.deepEqual(calls[1], { from: '2026-06-26', to: '2026-07-25' });
-  assert.ok(calls.every(call => call.to < calls[0].from || call === calls[0] || call.to === firstTo(date)));
+  assert.ok(history.every(call => call.to < calls[0].from || call === calls[0] || call.to === firstTo(date)));
   assert.equal(calls[1].to, '2026-07-25');
   assert.ok(partials.length >= 1);
   assert.equal(partials[0].events.every(event => event.record.date >= '2026-07-26'), true);
@@ -177,6 +182,9 @@ test('onPartial fires after the first window before older files exist', async ()
   const gate = new Promise(resolve => { release = resolve; });
   let olderCalls = 0;
   const sync = async ({ from, to }) => {
+    if (from > firstTo(date)) {
+      return { files: [], warnings: [], commitSha: 'c'.repeat(40), manifestId: `fwd-${from}`, changed: true, freshness: 'confirmed' };
+    }
     if (to !== firstTo(date)) {
       olderCalls += 1;
       if (olderCalls === 1) await gate;
@@ -219,12 +227,13 @@ test('a config-only older slice still extends until the lookback cap', async () 
     };
   };
   await loadLiveEvents({ sync, loadYaml: load, date });
-  assert.equal(calls.length, 3);
+  assert.equal(calls.filter(call => call.from <= firstTo(date)).length, 3);
   assert.deepEqual(
     { from: calls[1].from, to: calls[1].to },
     { from: '2026-06-26', to: '2026-07-25' }
   );
-  assert.equal(calls.at(-1).from, addCalendarDays(date, -39));
+  const history = calls.filter(call => call.from <= firstTo(date));
+  assert.equal(history.at(-1).from, addCalendarDays(date, -39));
 });
 
 test('repeated boundary expansion never sends an individual range over 366 days', async () => {
@@ -246,13 +255,14 @@ test('repeated boundary expansion never sends an individual range over 366 days'
   await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', maxLookbackDays: 160 });
 
   assert.ok(calls.every(call => daysBetween(call.from, call.to) < 366));
-  assert.deepEqual(calls[0], { from: '2026-07-26', to: firstTo('2026-08-01') });
-  assert.deepEqual(calls[1], { from: '2026-06-26', to: '2026-07-25' });
+  const history = calls.filter(call => call.from <= firstTo('2026-08-01'));
+  assert.deepEqual(history[0], { from: '2026-07-26', to: firstTo('2026-08-01') });
+  assert.deepEqual(history[1], { from: '2026-06-26', to: '2026-07-25' });
   // Windows widen as they go back, and the oldest one lands exactly on the cap.
-  assert.ok(daysBetween(calls[2].from, calls[2].to) > daysBetween(calls[1].from, calls[1].to));
-  assert.equal(calls.at(-1).from, addCalendarDays('2026-08-01', -159));
-  for (let index = 1; index < calls.length; index += 1) {
-    assert.equal(calls[index].to, addCalendarDays(calls[index - 1].from, -1));
+  assert.ok(daysBetween(history[2].from, history[2].to) > daysBetween(history[1].from, history[1].to));
+  assert.equal(history.at(-1).from, addCalendarDays('2026-08-01', -159));
+  for (let index = 1; index < history.length; index += 1) {
+    assert.equal(history[index].to, addCalendarDays(history[index - 1].from, -1));
   }
 });
 
@@ -281,10 +291,11 @@ test('older windows are fetched concurrently but ingested oldest-last', async ()
     started.push(from);
     live += 1;
     peak = Math.max(peak, live);
-    if (to !== firstTo(date)) await new Promise(resolve => finish.set(from, resolve));
+    const forwardWindow = from > firstTo(date);
+    if (to !== firstTo(date) && !forwardWindow) await new Promise(resolve => finish.set(from, resolve));
     live -= 1;
     return {
-      files: [bodyWeight(to, 80)], warnings: [], commitSha: 'c'.repeat(40),
+      files: forwardWindow ? [] : [bodyWeight(to, 80)], warnings: [], commitSha: 'c'.repeat(40),
       manifestId: from, changed: true, freshness: 'confirmed'
     };
   };
@@ -658,4 +669,55 @@ test('pendingCnPatches defaults to an empty queue when the file is absent', asyn
   const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', backfill: false });
 
   assert.deepEqual(result.pendingCnPatches, []);
+});
+
+function medicalVisit(date) {
+  return raw(`data/body/${date.slice(0, 4)}/${date.slice(5, 7)}/${date}-medical-blood-tests-0900.md`, `---
+schema_version: 1
+id: medical-${date}-x
+type: medical
+date: '${date}'
+time: '09:00'
+created_at: '2026-10-06T17:05:43+11:00'
+updated_at: '2026-10-06T17:05:43+11:00'
+source: chat
+title: Blood Tests
+record_type: Lab Work
+lane: lab
+---
+Ordered by Dr K.`);
+}
+
+test('a visit booked weeks or months ahead is loaded (it used to save but never appear)', async () => {
+  const date = '2026-10-06';
+  const calls = [];
+  const sync = async options => {
+    calls.push({ from: options.from, to: options.to });
+    const files = [medicalVisit('2026-10-22'), medicalVisit('2026-10-26'), medicalVisit('2027-03-01')]
+      .filter(file => {
+        const d = file.path.match(/(\d{4}-\d{2}-\d{2})-medical/)[1];
+        return d >= options.from && d <= options.to;
+      });
+    return { files, warnings: [], commitSha: 'c'.repeat(40), manifestId: `r-${calls.length}`, changed: true, freshness: 'confirmed' };
+  };
+  const partials = [];
+  const result = await loadLiveEvents({ sync, loadYaml: load, date, onPartial: s => partials.push(s) });
+
+  const dates = result.events.map(e => e.record.date).sort();
+  assert.deepEqual(dates, ['2026-10-22', '2026-10-26', '2027-03-01']);
+  const forward = calls.find(c => c.from === addCalendarDays(firstTo(date), 1));
+  assert.ok(forward, 'a forward window must be requested');
+  assert.equal(forward.to, addCalendarDays(date, FORWARD_LOOKAHEAD_DAYS));
+  assert.ok(daysBetween(forward.from, forward.to) < 366, 'must stay under the manifest span cap');
+  // Upcoming items arrive early, not after the whole history walk.
+  assert.ok(partials.some(s => s.events.some(e => e.record.date === '2026-10-22')));
+});
+
+test('a failing forward window rejects like any other window (no silent missing future)', async () => {
+  const date = '2026-10-06';
+  const sync = async options => {
+    if (options.from === addCalendarDays(firstTo(date), 1)) throw new Error('forward failed');
+    return { files: [], warnings: [], commitSha: 'c'.repeat(40), manifestId: 'm', changed: true, freshness: 'confirmed' };
+  };
+  await assert.rejects(() => loadLiveEvents({ sync, loadYaml: load, date }), /forward failed/);
 });
