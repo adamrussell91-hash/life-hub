@@ -640,7 +640,10 @@ function renderSheet(root, model, hooks) {
   title.textContent = visit.title;
   const meta = root.createElement('p');
   meta.className = 'metric-caption';
-  meta.textContent = [visit.displayDate, visit.record_type, visit.provider].filter(Boolean).join(' · ');
+  const slot = visit.time
+    ? `${visit.time}${visit.durationMin ? `, ${visit.durationMin} min` : ''}`
+    : null;
+  meta.textContent = [visit.displayDate, slot, visit.record_type, visit.provider].filter(Boolean).join(' · ');
   host.append(kicker, title, meta);
 
   if (visit.episode?.id) {
@@ -757,6 +760,8 @@ function writeForm(root, draft, hooks) {
   });
   const title = field(root, 'title', 'Title', draft?.title ?? '');
   const date = field(root, 'date', 'Date', draft?.date ?? '', 'date');
+  const time = field(root, 'time', 'Start time', draft?.time ?? '', 'time');
+  const duration = durationField(root, draft?.durationMin ?? draft?.duration_min ?? '');
   const type = field(root, 'record_type', 'Type', draft?.record_type ?? 'Appointment');
   const provider = field(root, 'provider', 'Provider', draft?.provider ?? '');
   const location = field(root, 'location', 'Location', draft?.location ?? '');
@@ -773,7 +778,7 @@ function writeForm(root, draft, hooks) {
   cancel.textContent = 'Cancel';
   cancel.addEventListener('click', () => hooks.onCancel?.());
   actions.append(save, cancel);
-  form.append(title, date, type, provider, location, notes, actions);
+  form.append(title, date, time, duration, type, provider, location, notes, actions);
   return form;
 }
 
@@ -789,6 +794,36 @@ function field(root, name, label, value, kind = 'text') {
   wrap.append(caption, input);
   wrap._input = input;
   wrap.dataset.field = name;
+  return wrap;
+}
+
+const DURATION_PRESETS = [15, 30, 45, 60, 90];
+
+function durationField(root, value) {
+  const wrap = root.createElement('div');
+  wrap.className = 'medical-form__field medical-form__duration';
+  wrap.dataset.field = 'duration_min';
+  const caption = root.createElement('span');
+  caption.textContent = 'Length (minutes)';
+  const input = root.createElement('input');
+  input.type = 'number';
+  input.name = 'duration_min';
+  input.min = '1';
+  input.step = '5';
+  input.inputMode = 'numeric';
+  input.value = value ?? '';
+  const chips = root.createElement('div');
+  chips.className = 'medical-form__chips';
+  for (const minutes of DURATION_PRESETS) {
+    const chip = root.createElement('button');
+    chip.type = 'button';
+    chip.className = 'btn btn--ghost medical-form__chip';
+    chip.textContent = `${minutes}m`;
+    chip.addEventListener('click', () => { input.value = String(minutes); });
+    chips.append(chip);
+  }
+  wrap.append(caption, chips, input);
+  wrap._input = input;
   return wrap;
 }
 

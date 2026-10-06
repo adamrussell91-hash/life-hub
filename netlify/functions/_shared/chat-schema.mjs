@@ -288,6 +288,7 @@ const DOMAIN_PROPERTIES = {
       type: 'string',
       description: 'Optional follow-up date. Prefer YYYY-MM-DD; AU forms like 27/10 or 27/10/2026 are accepted. Omit when unknown. This stays on the same visit — a future maintenance dose on a new day is a separate medical visit with that date, not follow_up_date.'
     },
+    duration_min: { type: 'number', description: 'Optional appointment length in minutes (shown on the calendar). Omit when unknown.' },
     cost_aud: { type: 'number', description: 'Optional out-of-pocket cost in AUD. Omit when unknown.' },
     insurance_status: { type: 'string', description: 'Optional insurance note. Omit when unknown.' },
     episode: {

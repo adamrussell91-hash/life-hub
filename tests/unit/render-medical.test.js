@@ -390,3 +390,32 @@ test('renderMedical expands a year into nested visit cards', () => {
   assert.match(timeline.textContent, /May 2026/);
   assert.match(timeline.textContent, /Gastroenterologist Follow-up/);
 });
+
+test('renderMedical shows time and length in the sheet meta', () => {
+  const visit = { ...sampleModel().items[1].visit, time: '10:30', durationMin: 45 };
+  const root = fakeRoot();
+  renderMedical(root, sampleModel({ selected: visit }));
+  assert.match(root.querySelector('#medical-sheet').textContent, /10:30, 45 min/);
+});
+
+test('renderMedical write form has start time and length fields prefilled and saves them', () => {
+  const visit = { ...sampleModel().items[1].visit, time: '10:30', durationMin: 45 };
+  const root = fakeRoot();
+  let saved = null;
+  renderMedical(root, sampleModel({ selected: visit, mode: 'write', draft: visit }), {
+    onSave: fields => { saved = fields; }
+  });
+  const form = root.querySelector('#medical-sheet').children[0];
+  const byField = name => form.children.find(c => c.dataset?.field === name);
+  assert.equal(byField('time')._input.type, 'time');
+  assert.equal(byField('time')._input.value, '10:30');
+  assert.equal(byField('duration_min')._input.value, 45);
+  const chip90 = byField('duration_min').children
+    .find(c => c.children?.some?.(x => x.textContent === '90m'))
+    .children.find(x => x.textContent === '90m');
+  chip90.listeners.find(e => e[0] === 'click')[1]();
+  assert.equal(byField('duration_min')._input.value, '90');
+  form.listeners.find(e => e[0] === 'submit')[1]({ preventDefault() {} });
+  assert.equal(saved.time, '10:30');
+  assert.equal(saved.duration_min, '90');
+});

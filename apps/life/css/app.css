@@ -8511,6 +8511,8 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   font: inherit;
 }
 .medical-form__actions { display: flex; gap: var(--space-2); }
+.medical-form__chips { display: flex; flex-wrap: wrap; gap: var(--space-1, 0.25rem); }
+.medical-form__chip { min-height: 2.75rem; padding-inline: var(--space-3, 0.75rem); }
 
 @media (max-width: 1023px) {
   .medical-brief-row {

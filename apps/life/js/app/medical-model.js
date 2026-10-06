@@ -237,6 +237,7 @@ function decorateVisit(record, event, bloods, today) {
     date: record.date,
     dateEnd: record.date_end ?? null,
     time: record.time ?? null,
+    durationMin: record.duration_min ?? null,
     title: record.title,
     record_type: record.record_type,
     lane: record.lane || 'appointment',

@@ -472,6 +472,7 @@ function validateMedical(record, errors) {
   optionalString(record, 'task_id', errors);
   finiteNumber(record, 'cost_aud', errors, { minimum: 0 });
   finiteNumber(record, 'cadence_days', errors, { minimum: 1 });
+  finiteNumber(record, 'duration_min', errors, { minimum: 1 });
   if (record.date_end != null && !isCalendarDate(record.date_end)) {
     errors.push('date_end must be a valid calendar date in YYYY-MM-DD form');
   }

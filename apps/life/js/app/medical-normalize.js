@@ -301,6 +301,9 @@ export function normalizeMedicalFields(fields, { notes, today, activeEpisodes } 
   const follow_up_date = parseCalendarDate(fields.follow_up_date, { today });
   if (follow_up_date) normalized.follow_up_date = follow_up_date;
 
+  const duration_min = parseFiniteNumber(fields.duration_min);
+  if (duration_min != null && duration_min >= 1) normalized.duration_min = Math.round(duration_min);
+
   const cost_aud = parseFiniteNumber(fields.cost_aud);
   if (cost_aud != null) normalized.cost_aud = cost_aud;
 
@@ -348,6 +351,7 @@ export function mergeMedicalFields(existing, incoming, { notes, existingNotes, t
     task_id: next.task_id ?? base.task_id,
     date_end: next.date_end ?? base.date_end,
     follow_up_date: next.follow_up_date ?? base.follow_up_date,
+    duration_min: next.duration_min ?? base.duration_min,
     cost_aud: next.cost_aud ?? base.cost_aud,
     insurance_status: next.insurance_status ?? base.insurance_status,
     episode: next.episode ?? base.episode
