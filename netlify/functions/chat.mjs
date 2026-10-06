@@ -1,5 +1,16 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mergeMedicalFields, resolveMedicalLogCandidate, parseMedicalEventTolerant } from '../../apps/life/js/app/medical-normalize.js';
+import { isSaraAnalystTool, executeSaraAnalystTool, createHistoryLoader } from './_shared/sara-analyst-tools.mjs';
+
+const SARA_ANALYST_STATUS = {
+  get_marker_trend: 'Reading your blood trends…',
+  compare_bloods: 'Comparing your blood results…',
+  get_treatment_timeline: 'Checking your Stelara cycle…',
+  get_symptom_timeline: 'Lining up your symptoms…',
+  get_cross_signals: 'Looking across food, training and mood…',
+  get_open_loops: 'Checking what is outstanding…',
+  build_appointment_brief: 'Preparing your appointment brief…'
+};
 import { verifySessionToken, serializeExpiredSessionCookie } from './_shared/auth-security.mjs';
 import {
   errorResponse,
@@ -2432,6 +2443,19 @@ export function createChatHandler({
                 const hammondCard = buildProductivityCardEvent(event.name, hammondResult);
                 if (hammondCard) send(hammondCard);
                 return JSON.stringify(hammondResult);
+              }
+              if (slug === 'sara' && isSaraAnalystTool(event.name)) {
+                send({ type: 'status', text: SARA_ANALYST_STATUS[event.name] ?? 'Analysing your records…' });
+                const loadRecords = createHistoryLoader({
+                  tree: repoTree,
+                  readBlob: async sha => decodeBlob(await client.readBlob(sha)),
+                  parse: (content, path) => parseEventDocument(content, path, loadYaml)
+                });
+                return JSON.stringify(await executeSaraAnalystTool(event.name, event.input ?? {}, {
+                  medicalEvents,
+                  today,
+                  loadRecords
+                }));
               }
               if (event.name === 'search_medical_records') {
                 send({ type: 'status', text: 'Searching Medical Overview…' });
