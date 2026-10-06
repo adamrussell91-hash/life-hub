@@ -262,7 +262,15 @@ textarea.goal-field { resize: vertical; min-height: 3.5rem; }
   .goal-page__main { order: 1; }
   .hammond-strip { grid-template-columns: 1fr; }
   .goals-plan-sheet, .goals-checkin-sheet { padding: var(--space-4); }
-  .goals-plan-card__choices .btn, .goals-checkin__nav .btn, .hub-chip, .runway-phone__card {
+  /* Touch targets for Goals controls only — bare `.hub-chip` was forcing every
+   * domain pill on Board/Today (e.g. "Life", "Other") to 44px wide with
+   * left-aligned text. */
+  .goals-plan-card__choices .btn,
+  .goals-checkin__nav .btn,
+  .goals-checkin .hub-chip,
+  .goal-page .hub-chip,
+  .goals-plan-card .hub-chip,
+  .runway-phone__card {
     min-height: 2.75rem;
     min-width: 2.75rem;
   }

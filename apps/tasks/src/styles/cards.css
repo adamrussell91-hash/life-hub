@@ -697,6 +697,7 @@ button.hub-chip {
 .priority-chip {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   flex: none;
   padding: 0.2rem 0.55rem;
   border-radius: var(--radius-full);
@@ -1182,6 +1183,8 @@ button.hub-chip {
     line-height: 1.15;
     letter-spacing: 0;
     min-height: 0;
+    min-width: 0;
+    justify-content: center;
   }
 
   .hub-canvas .date-badge svg,
