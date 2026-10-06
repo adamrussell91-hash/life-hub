@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TOPIC_VOCABULARY } from "../tidy/vocabulary";
-import { PLANET_LOOKS, planetIconBox, planetLook, planetName, spriteBucket } from "./universePlanets";
+import { PLANET_FLATTEN, PLANET_LOOKS, flattenLayer, planetIconBox, planetLook, planetName, spriteBucket } from "./universePlanets";
 
 describe("the twenty planets", () => {
   it("gives every topic in the vocabulary exactly one named look", () => {
@@ -55,5 +55,20 @@ describe("the twenty planets", () => {
   it("leaves room for a ring around ringed drawer icons", () => {
     expect(planetIconBox(10, false)).toBe(24);
     expect(planetIconBox(10, true)).toBe(48);
+  });
+});
+
+describe("flattened planet surfaces", () => {
+  it("eases each layer about a third toward flat without dropping it", () => {
+    const bands = flattenLayer({ kind: "bands", n: 16, colors: ["#fff"], wobble: 0.02, alpha: 0.5 });
+    expect(bands.n).toBe(13);
+    expect(bands.alpha).toBeCloseTo(0.35);
+    expect(bands.wobble).toBeCloseTo(0.014);
+    const speckle = flattenLayer({ kind: "speckle", n: 40, color: "#fff", alpha: 0.8, min: 0.01, max: 0.03 });
+    expect(speckle.n).toBe(28);
+    expect(speckle.alpha).toBeCloseTo(0.56);
+    expect(flattenLayer({ kind: "craters", n: 1, min: 0.1, max: 0.2 }).n).toBe(1);
+    expect(PLANET_FLATTEN).toBeGreaterThan(0);
+    expect(PLANET_FLATTEN).toBeLessThan(0.5);
   });
 });

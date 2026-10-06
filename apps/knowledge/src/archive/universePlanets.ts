@@ -549,6 +549,24 @@ export function spriteBucket(radiusPx: number) {
 type Sprites = { surface: HTMLCanvasElement; lights: HTMLCanvasElement | null; size: number };
 const spriteCache = new Map<string, Sprites | null>();
 
+/**
+ * How far the painted surfaces lean toward the flat moon dots: texture marks are this much
+ * fainter and fewer, and the sphere shading is this much softer. 0 = fully painted, 1 = flat disc.
+ */
+export const PLANET_FLATTEN = 0.3;
+
+/** A layer with its detail eased toward flat: fewer marks, lower alpha, gentler wobble. */
+export function flattenLayer<T extends { kind: string }>(layer: T, f = PLANET_FLATTEN): T {
+  const out: Record<string, unknown> = { ...layer };
+  if (typeof out.alpha === "number") out.alpha = (out.alpha as number) * (1 - f);
+  if (typeof out.n === "number" && layer.kind !== "bands") out.n = Math.max(1, Math.round((out.n as number) * (1 - f)));
+  if (layer.kind === "bands") {
+    out.n = Math.max(3, Math.round((out.n as number) * (1 - f * 0.6)));
+    out.wobble = (out.wobble as number) * (1 - f);
+  }
+  return out as T;
+}
+
 function seedFor(key: string) {
   return Math.floor(hashUnit(key) * 4294967296);
 }
@@ -582,7 +600,7 @@ function sprites(topic: string, base: string, r: number): Sprites | null {
   g.fillStyle = base;
   g.fillRect(-r, -r, size, size);
   const rng = mulberry(seedFor(`planet:${topic}`));
-  for (const layer of look?.surface(base) ?? []) paintSurface(g, r, rng, base, layer);
+  for (const layer of look?.surface(base) ?? []) paintSurface(g, r, rng, base, flattenLayer(layer));
   g.restore();
 
   let lights: HTMLCanvasElement | null = null;
@@ -595,7 +613,7 @@ function sprites(topic: string, base: string, r: number): Sprites | null {
       l.arc(0, 0, r, 0, TAU);
       l.clip();
       const lrng = mulberry(seedFor(`planet-lights:${topic}`));
-      for (const layer of look.lights) paintLight(l, r, lrng, layer);
+      for (const layer of look.lights) paintLight(l, r, lrng, flattenLayer(layer));
     } else {
       lights = null;
     }
@@ -636,9 +654,9 @@ export function drawPlanetBody(
     const lx = lightDir?.x ?? -0.62;
     const ly = lightDir?.y ?? -0.7;
     const shade = ctx.createRadialGradient(x + lx * pr * 0.45, y + ly * pr * 0.45, pr * 0.05, x + lx * pr * 0.1, y + ly * pr * 0.1, pr * 1.35);
-    shade.addColorStop(0, "rgba(255,255,255,0.22)");
+    shade.addColorStop(0, `rgba(255,255,255,${0.22 * (1 - PLANET_FLATTEN)})`);
     shade.addColorStop(0.45, "rgba(0,0,0,0)");
-    shade.addColorStop(1, "rgba(0,0,0,0.7)");
+    shade.addColorStop(1, `rgba(0,0,0,${0.7 * (1 - PLANET_FLATTEN)})`);
     ctx.fillStyle = shade;
     ctx.beginPath();
     ctx.arc(x, y, pr, 0, TAU);

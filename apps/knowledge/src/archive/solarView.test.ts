@@ -177,7 +177,7 @@ function worldPos(body: Body, model: ReturnType<typeof buildSolarModel>) {
 
 describe("presence and bands", () => {
   it("exposes a build number so a stale Universe bundle is obvious", () => {
-    expect(UNIVERSE_BUILD).toBe(22);
+    expect(UNIVERSE_BUILD).toBe(23);
   });
 
   it("maps band thresholds onto KIND_DEPTH cutoffs", () => {
@@ -650,6 +650,44 @@ describe("mountSolarView", () => {
     window.dispatchEvent(pointer("pointerup", 1, sx, sy));
     window.dispatchEvent(pointer("pointerup", 2, sx + 90, sy));
     expect(onNoteSelect).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("keeps the camera still when one finger lifts out of a pinch", () => {
+    const frames = stubFrame();
+    const host = document.createElement("div");
+    Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
+    const entries = tagged("g", V0, 12, i => (i === 0 ? "Zebra Unique Page" : `Note ${i}`));
+    const model = buildSolarModel(entries);
+    const onNoteSelect = vi.fn();
+    const stop = mountSolarView(host, model, { search: "Zebra Unique", onNoteSelect });
+    frames.pump(16);
+    const target = model.bodies.find(body => body.pageId === "g0")!;
+    const world = worldPos(target, model);
+    const width = 800;
+    const height = Math.max(720, Math.floor(window.innerHeight * 0.8));
+    const { fitK } = solarScales(model.reach, model.tightest, width, height);
+    const sx = width / 2 + world.x * fitK;
+    const sy = height / 2 + world.y * fitK;
+    const canvas = host.querySelector("canvas")!;
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width, height, right: width, bottom: height, x: 0, y: 0, toJSON() {} });
+    const pointer = (type: string, pointerId: number, clientX: number, clientY: number) => {
+      const event = new MouseEvent(type, { clientX, clientY, bubbles: true });
+      Object.defineProperty(event, "pointerId", { value: pointerId });
+      return event;
+    };
+    // Two fingers 120px apart pinch without changing their spread (zoom stays ×1), then the
+    // first lifts and the second creeps 6px: the view may move 6px, not snap 120px.
+    canvas.dispatchEvent(pointer("pointerdown", 1, sx - 200, sy));
+    canvas.dispatchEvent(pointer("pointerdown", 2, sx - 80, sy));
+    window.dispatchEvent(pointer("pointermove", 2, sx - 80, sy));
+    window.dispatchEvent(pointer("pointerup", 1, sx - 200, sy));
+    window.dispatchEvent(pointer("pointermove", 2, sx - 74, sy));
+    window.dispatchEvent(pointer("pointerup", 2, sx - 74, sy));
+    frames.pump(32);
+    canvas.dispatchEvent(pointer("pointerdown", 3, sx + 6, sy));
+    window.dispatchEvent(pointer("pointerup", 3, sx + 6, sy));
+    expect(onNoteSelect).toHaveBeenCalledWith(expect.objectContaining({ pageId: "g0" }));
     stop();
   });
 });

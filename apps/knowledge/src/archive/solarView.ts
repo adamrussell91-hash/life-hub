@@ -53,7 +53,7 @@ import {
   writeVisit,
 } from "./universeTime";
 
-export const UNIVERSE_BUILD = 22;
+export const UNIVERSE_BUILD = 23;
 
 export type SolarNotePayload = { pageId: string; title: string; excerpt: string };
 
@@ -1546,7 +1546,18 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     const mid = pinchMidpoint(a, b);
     pinch = { dist: pinchDistance(a, b), k: view.k, world: toWorld(mid.x, mid.y) };
     panned = true;
+    lock = null;
+    glide = null;
     clearTimeout(holdTimer);
+  }
+
+  /** A finger left a pinch: the one still down pans on from here, not from where the gesture began. */
+  function reanchorPan() {
+    const [id, at] = [...pointers.entries()][0]!;
+    gesturePointerId = id;
+    gestureStart = { x: at.x, y: at.y };
+    gestureOrigin = { x: view.x, y: view.y };
+    velocity = { vx: 0, vy: 0, at: performance.now(), x: at.x, y: at.y };
   }
 
   function applyPinch() {
@@ -1588,7 +1599,10 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     const id = pointerIdOf(up);
     if (!pointers.has(id)) return;
     pointers.delete(id);
-    if (pointers.size < 2) pinch = null;
+    if (pointers.size < 2 && pinch) {
+      pinch = null;
+      if (pointers.size === 1) reanchorPan();
+    }
     if (pointers.size > 0) return;
     clearTimeout(holdTimer);
     window.removeEventListener("pointermove", onGestureMove);
