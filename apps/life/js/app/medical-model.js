@@ -78,6 +78,7 @@ export function primaryThread(visit, bloods) {
 
 export function isPlannedVisit(visit, today) {
   if (!visit) return false;
+  if (visit.status === 'cancelled' || visit.status === 'done') return false;
   if (visit.status === 'planned' || visit.status === 'to_book') return true;
   if (visit.virtual) return true;
   return Boolean(today && visit.date && visit.date > today);

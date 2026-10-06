@@ -2,6 +2,9 @@
 
 export const TODAY = '2026-10-06';
 
+// Sydney offset for fixture dates (DST runs early Oct to early Apr).
+const offset = date => { const m = Number(date.slice(5, 7)); return m >= 10 || m <= 3 ? '+11:00' : '+10:00'; };
+
 const marker = (key, label, category, value, unit, ref_low, ref_high) => ({
   key, label, category, value, unit, ref_low, ref_high,
   status: ref_high != null && value > ref_high ? 'High' : ref_low != null && value < ref_low ? 'Low' : 'Normal'
@@ -29,7 +32,8 @@ export function visit(id, date, fields = {}, body = '') {
     path: `data/body/${date.slice(0, 4)}/${date.slice(5, 7)}/${date}-medical-${id}.md`,
     body,
     record: {
-      id, type: 'medical', date, time: '00:00', record_type: 'Appointment', lane: 'appointment',
+      schema_version: 1, id, type: 'medical', date, time: '00:00', record_type: 'Appointment', lane: 'appointment',
+      created_at: `${date}T09:00:00${offset(date)}`, updated_at: `${date}T09:00:00${offset(date)}`, source: 'test_fixture',
       title: id, ...fields
     }
   };

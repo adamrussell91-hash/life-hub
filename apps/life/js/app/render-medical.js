@@ -492,6 +492,7 @@ function visitCard(root, visit, model, onSelect) {
     'medical-card',
     weight === 'major' ? 'medical-card--major' : 'medical-card--routine',
     planned ? 'medical-card--planned' : '',
+    visit.status === 'cancelled' ? 'medical-card--cancelled' : '',
     (weight === 'major' && (visit.lab || detailPills(visit, model).length)) ? 'medical-card--has-detail' : ''
   ].filter(Boolean).join(' ');
   card.dataset.visitId = visit.id;
@@ -530,7 +531,8 @@ function visitCard(root, visit, model, onSelect) {
     : (visit.provider || visit.location || visit.record_type);
   const metaBits = [
     visit.displayDate || formatDisplayDate(visit.date),
-    typeLabel
+    typeLabel,
+    visit.status === 'cancelled' ? 'Cancelled' : null
   ].filter(Boolean);
   meta.textContent = metaBits.join(' · ');
   card.append(meta);

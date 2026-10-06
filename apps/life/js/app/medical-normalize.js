@@ -12,7 +12,7 @@ const MEDICAL_LANES = [
   'dental', 'therapy', 'eye', 'appointment', 'symptom'
 ];
 
-const MEDICAL_STATUSES = ['planned', 'to_book', 'booked', 'done'];
+const MEDICAL_STATUSES = ['planned', 'to_book', 'booked', 'done', 'cancelled'];
 const DATE_PRECISIONS = ['day', 'month', 'tbd'];
 const EPISODE_STATUSES = ['active', 'resolved'];
 

@@ -9156,3 +9156,6 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 .medical-minor, .medical-minor span { font-size: var(--text-sm); font-weight: 500; }
 .medical-year__label { font-size: var(--text-base); }
 .medical-year__caption { font-size: var(--text-sm); }
+
+.medical-card--cancelled { opacity: 0.6; }
+.medical-card--cancelled .medical-card__title { text-decoration: line-through; text-decoration-thickness: 1px; }

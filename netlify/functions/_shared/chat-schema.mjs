@@ -261,7 +261,7 @@ const DOMAIN_PROPERTIES = {
     status: {
       type: 'string',
       description: 'Optional. planned | to_book | booked | done. Use to_book for ordered-but-unbooked items.',
-      enum: ['planned', 'to_book', 'booked', 'done']
+      enum: ['planned', 'to_book', 'booked', 'done', 'cancelled']
     },
     date_precision: {
       type: 'string',
@@ -334,6 +334,7 @@ export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
         type: { type: 'string', enum: allowedTypes },
         date: { type: 'string', description: 'Visit/log date. Prefer YYYY-MM-DD; AU forms like 27/10 or 27/10/2026 are accepted for medical visits.' },
         time: { type: 'string', description: 'HH:MM, optional' },
+        new_visit: { type: 'boolean', description: 'Medical only. log_entry refuses a visit that looks like one already on record and names it. To add detail, change status, time or date, use update_medical_visit. Set true ONLY for a genuinely separate visit.' },
         notes: { type: 'string', description: 'Optional free-text note saved as the record body, e.g. what food was eaten or how a workout felt. Not a domain field — do not put this in fields.' },
         fields: fieldsSchema
       },

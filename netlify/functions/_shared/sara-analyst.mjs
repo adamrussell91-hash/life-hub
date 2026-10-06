@@ -24,7 +24,7 @@ const recordOf = event => event?.record ?? event ?? {};
 function medicalRecords(events) {
   return (events ?? [])
     .map(event => ({ event, record: recordOf(event) }))
-    .filter(({ record }) => record.type === 'medical' && isCalendarDate(record.date))
+    .filter(({ record }) => record.type === 'medical' && isCalendarDate(record.date) && record.status !== 'cancelled')
     .map(({ event, record }) => ({ ...record, path: event.path ?? record.path ?? null, notes_body: event.body ?? '' }))
     .sort(byDateAsc);
 }
