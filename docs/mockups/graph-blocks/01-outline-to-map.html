@@ -1,0 +1,1234 @@
+<!doctype html>
+<html lang="en" data-hub="teaching">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Concept A · Outline → Map — graph block mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../../packages/design-kit/tokens.css" />
+<link rel="stylesheet" href="../../../packages/design-kit/overlays.css" />
+<link rel="stylesheet" href="../../../packages/design-kit/actions.css" />
+<link rel="stylesheet" href="../../../packages/design-kit/filters.css" />
+<link rel="stylesheet" href="mock-page.css" />
+<style>
+  /* ── Block head ── */
+  .ga-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .ga-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: var(--space-1) 0;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    background: transparent;
+    font: inherit;
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    color: var(--navy);
+  }
+
+  .ga-title::placeholder {
+    color: var(--shallow);
+  }
+
+  .ga-title:hover {
+    border-bottom-color: var(--line);
+  }
+
+  .ga-title:focus-visible {
+    outline: none;
+    border-bottom-color: var(--wave);
+  }
+
+  .ga-view {
+    display: none;
+  }
+
+  .ga-caption {
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    color: var(--navy);
+  }
+
+  /* ── Map stage ── */
+  .ga-stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: 12rem;
+    padding: var(--space-5) var(--space-4);
+    overflow: hidden;
+    border-radius: var(--radius-sm);
+    background:
+      radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--navy) 9%, transparent) 1px, transparent 0) 0 0 / 18px 18px,
+      color-mix(in srgb, var(--cotton) 65%, #fff);
+    border: 1px solid var(--line);
+  }
+
+  .ga-stage .gm-svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .ga-expand {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+  }
+
+  .ga-node {
+    cursor: pointer;
+  }
+
+  .ga-ring {
+    fill: none;
+    stroke: var(--wave);
+    stroke-width: 2;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .ga-node.is-selected .ga-ring {
+    opacity: 1;
+  }
+
+  /* ── Outline ── */
+  .ga-panel-label {
+    margin: var(--space-5) 0 var(--space-2);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .ga-outline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .ga-row {
+    --indent: 1.5rem;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 2.5rem;
+    padding-left: calc(var(--d) * var(--indent) + var(--space-2));
+    border-radius: var(--radius-xs);
+    background-image: repeating-linear-gradient(
+      to right,
+      transparent 0 calc(var(--space-2) + 4px),
+      var(--line) calc(var(--space-2) + 4px) calc(var(--space-2) + 5px),
+      transparent calc(var(--space-2) + 5px) var(--indent)
+    );
+    background-size: calc(var(--d) * var(--indent)) 100%;
+    background-repeat: no-repeat;
+  }
+
+  .ga-row:hover {
+    background-color: color-mix(in srgb, var(--shore) 45%, transparent);
+  }
+
+  .ga-row:focus-within {
+    background-color: color-mix(in srgb, var(--pastel-blue) 55%, transparent);
+  }
+
+  .ga-bullet {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    border-radius: var(--radius-full);
+    background: var(--ink-c);
+    box-shadow: 0 0 0 3px var(--fill-c);
+  }
+
+  .ga-row[data-d="0"] .ga-bullet {
+    width: 12px;
+    height: 12px;
+    box-shadow: 0 0 0 3px var(--pastel-blue);
+  }
+
+  .ga-row[data-d="0"] .ga-input {
+    font-weight: var(--weight-semibold);
+    color: var(--navy);
+  }
+
+  .ga-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: var(--space-2) var(--space-1);
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: var(--text-base);
+    color: var(--ink);
+  }
+
+  .ga-input:focus-visible {
+    outline: none;
+  }
+
+  .ga-input::placeholder {
+    color: var(--shallow);
+  }
+
+  .ga-row__tools {
+    display: flex;
+    gap: var(--space-1);
+    padding-right: var(--space-1);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .ga-row:hover .ga-row__tools,
+  .ga-row:focus-within .ga-row__tools {
+    opacity: 1;
+  }
+
+  .ga-mini {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .ga-mini:hover {
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: var(--elev-1);
+  }
+
+  .ga-mini svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .ga-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+  }
+
+  .ga-keys {
+    flex: 1 1 14rem;
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+
+  .ga-keys kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-xs);
+    background: var(--paper);
+    font: inherit;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-semibold);
+    color: var(--orca);
+  }
+
+  /* ── Concept builder ── */
+  .ga-concepts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .ga-concept {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    max-width: 100%;
+    padding: 0 var(--space-1) 0 var(--space-2);
+    min-height: 2.5rem;
+    border-radius: var(--radius-sm);
+    background: var(--fill-c);
+    border: 1px solid color-mix(in srgb, var(--ink-c) 18%, transparent);
+  }
+
+  .ga-concept:focus-within {
+    box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px color-mix(in srgb, var(--wave) 55%, transparent);
+  }
+
+  .ga-swatch {
+    flex: 0 0 auto;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: transparent;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+
+  .ga-swatch::after {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: var(--radius-full);
+    background: var(--ink-c);
+  }
+
+  .ga-concept .ga-input {
+    field-sizing: content;
+    min-width: 4ch;
+    max-width: 16rem;
+    padding: var(--space-1) var(--space-1);
+    font-weight: var(--weight-semibold);
+    color: var(--ink-c);
+  }
+
+  .ga-concept .ga-mini {
+    width: 1.75rem;
+    height: 1.75rem;
+    color: var(--ink-c);
+  }
+
+  .ga-add-concept {
+    min-height: 2.5rem;
+    border-style: dashed;
+  }
+
+  .ga-links {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) auto max-content auto auto;
+    gap: var(--space-2);
+  }
+
+  .ga-link {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    justify-items: start;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-1) var(--space-1) var(--space-1);
+    border-radius: var(--radius-sm);
+  }
+
+  .ga-link:hover,
+  .ga-link:focus-within {
+    background: color-mix(in srgb, var(--shore) 40%, transparent);
+  }
+
+  .ga-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    max-width: 12rem;
+    min-height: 2.25rem;
+    padding: 0 var(--space-3) 0 var(--space-2);
+    border: 1px solid color-mix(in srgb, var(--ink-c) 18%, transparent);
+    border-radius: var(--radius-full);
+    background: var(--fill-c);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--ink-c);
+    cursor: pointer;
+  }
+
+  .ga-pick span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .ga-pick::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--ink-c);
+  }
+
+  .ga-verb {
+    width: 100%;
+    min-width: 0;
+    padding: var(--space-2) var(--space-1);
+    border: 0;
+    border-bottom: 1.5px solid var(--line);
+    background: transparent;
+    font: inherit;
+    font-size: var(--text-base);
+    font-style: italic;
+    color: var(--orca);
+    text-align: center;
+  }
+
+  .ga-verb:focus-visible {
+    outline: none;
+    border-bottom-color: var(--wave);
+  }
+
+  .ga-verb.is-empty {
+    border-bottom: 1.5px dashed var(--high-sea-ink);
+  }
+
+  .ga-arrow {
+    color: var(--shallow);
+  }
+
+  .ga-suggest {
+    grid-column: 1 / -1;
+    display: none;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    padding: 0 var(--space-1) var(--space-1);
+  }
+
+  .ga-link:focus-within .ga-suggest {
+    display: flex;
+  }
+
+  .ga-suggest button {
+    min-height: 1.75rem;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-full);
+    background: var(--paper);
+    font: inherit;
+    font-size: var(--text-xs);
+    color: var(--orca);
+    cursor: pointer;
+  }
+
+  .ga-suggest button:hover {
+    border-color: color-mix(in srgb, var(--wave) 45%, transparent);
+    color: var(--pastel-blue-ink);
+  }
+
+  .ga-menu {
+    position: absolute;
+    z-index: 20;
+    min-width: 12rem;
+    padding: var(--space-1);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--elev-4);
+  }
+
+  .ga-menu button {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: transparent;
+    font: inherit;
+    font-size: var(--text-sm);
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .ga-menu button:hover,
+  .ga-menu button:focus-visible {
+    background: var(--shore);
+  }
+
+  .ga-menu button::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--ink-c);
+  }
+
+  /* Colour pairs per branch / concept */
+  [data-c="blue"] { --fill-c: var(--pastel-blue); --ink-c: var(--pastel-blue-ink); }
+  [data-c="sage"] { --fill-c: var(--pastel-sage); --ink-c: var(--pastel-sage-ink); }
+  [data-c="peach"] { --fill-c: var(--pastel-peach); --ink-c: var(--pastel-peach-ink); }
+  [data-c="gold"] { --fill-c: var(--pastel-gold); --ink-c: var(--pastel-gold-ink); }
+  [data-c="lilac"] { --fill-c: var(--pastel-lilac); --ink-c: var(--pastel-lilac-ink); }
+  [data-c="navy"] { --fill-c: var(--pastel-blue); --ink-c: var(--navy); }
+
+  /* ── Expanded view ── */
+  .ga-full {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    background: var(--warm-white);
+  }
+
+  .ga-full[hidden] {
+    display: none;
+  }
+
+  .ga-full__bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+    padding-top: max(var(--space-3), env(safe-area-inset-top));
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ga-full__bar h2 {
+    flex: 1 1 auto;
+    margin: 0;
+    font-size: var(--text-md);
+    color: var(--navy);
+  }
+
+  .ga-full .ga-stage {
+    border: 0;
+    border-radius: 0;
+  }
+
+  @media (max-width: 719px) {
+    .ga-view {
+      display: inline-flex;
+    }
+
+    .ga-head {
+      flex-wrap: wrap;
+    }
+
+    .ga-title {
+      flex-basis: 100%;
+    }
+
+    .ga-editor[data-view="build"] [data-part="map"] {
+      display: none;
+    }
+
+    .ga-editor[data-view="map"] [data-part="build"] {
+      display: none;
+    }
+
+    .ga-editor[data-view="build"] .ga-panel-label:first-of-type {
+      margin-top: var(--space-1);
+    }
+
+    .ga-row {
+      --indent: 1.25rem;
+      min-height: 2.75rem;
+    }
+
+    .ga-row__tools {
+      opacity: 1;
+    }
+
+    .ga-mini {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+
+    .ga-input,
+    .ga-verb,
+    .ga-title {
+      font-size: 1rem;
+    }
+
+    .ga-concept {
+      min-height: 2.75rem;
+    }
+
+    .ga-concept .ga-mini {
+      width: 2.25rem;
+      height: 2.25rem;
+    }
+
+    .ga-links {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ga-link {
+      grid-template-columns: auto minmax(0, 1fr) auto auto;
+      column-gap: var(--space-1);
+      row-gap: 0;
+      padding: var(--space-2);
+      border: 1px solid var(--line);
+    }
+
+    .ga-link .ga-pick[data-end="from"] {
+      grid-area: 1 / 1 / 2 / 3;
+      justify-self: start;
+    }
+
+    .ga-link .ga-swap {
+      grid-area: 1 / 3;
+    }
+
+    .ga-link .ga-remove {
+      grid-area: 1 / 4;
+    }
+
+    .ga-link .ga-verb {
+      grid-area: 2 / 1 / 3 / -1;
+      text-align: left;
+      padding-left: var(--space-6);
+    }
+
+    .ga-link .ga-arrow {
+      grid-area: 3 / 1;
+      padding: 0 var(--space-1) 0 var(--space-2);
+    }
+
+    .ga-link .ga-pick[data-end="to"] {
+      grid-area: 3 / 2 / 4 / -1;
+      justify-self: start;
+      margin-top: var(--space-1);
+    }
+
+    .ga-row__tools {
+      display: none;
+    }
+
+    .ga-row:focus-within .ga-row__tools {
+      display: flex;
+    }
+
+    .ga-pick {
+      min-height: 2.75rem;
+      max-width: 100%;
+      font-size: var(--text-base);
+    }
+
+    .ga-foot .btn {
+      flex: 1 1 0;
+      min-height: 2.75rem;
+    }
+
+    .ga-keys {
+      display: none;
+    }
+  }
+</style>
+</head>
+<body>
+<main class="mock">
+  <header class="mock-head">
+    <p class="mock-head__eyebrow">Graph block mockup · Concept A</p>
+    <h1>Outline → Map</h1>
+    <p>Write it like notes, and the map draws itself. A mind map is an indented outline. A concept map is a list of concepts and the sentences that link them. You never drag, zoom or tidy anything.</p>
+    <div class="mock-head__switch">
+      <a class="btn btn--secondary" href="02-build-on-canvas.html">See Concept B →</a>
+    </div>
+  </header>
+
+  <section class="mock-section">
+    <h2>Editing a mind map</h2>
+    <p>Type in the outline. <kbd>Tab</kbd> makes an idea a sub-idea, and each branch keeps its own colour. Click a box on the map to jump to its line.</p>
+    <div class="mock-block is-editing ga-editor" id="mind-editor" data-view="build">
+      <button class="mock-block__menu" type="button" aria-label="Mind map block menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="19" r="1.6" fill="currentColor"/></svg></button>
+      <div class="ga-head">
+        <input class="ga-title" data-role="title" aria-label="Mind map title" placeholder="Add a title" />
+        <div class="hub-pills ga-view" role="group" aria-label="Show">
+          <button class="hub-pills__btn" type="button" data-value="build" aria-pressed="true">Outline</button>
+          <button class="hub-pills__btn" type="button" data-value="map" aria-pressed="false">Map</button>
+        </div>
+      </div>
+      <div class="ga-stage" data-part="map" data-role="stage">
+        <button class="hub-icon-btn ga-expand" type="button" data-role="expand" aria-label="Open the map full screen" title="Full screen"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      </div>
+      <div data-part="build">
+        <p class="ga-panel-label">Outline</p>
+        <div class="ga-outline" role="tree" aria-label="Mind map outline" data-role="outline"></div>
+        <div class="ga-foot">
+          <button class="btn btn--secondary" type="button" data-role="add">+ Add idea</button>
+          <p class="ga-keys"><kbd>Enter</kbd> new idea · <kbd>Tab</kbd> sub-idea · <kbd>Shift</kbd>+<kbd>Tab</kbd> move out · <kbd>⌫</kbd> on an empty line deletes</p>
+          <button class="btn btn--secondary" type="button">Done</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mock-section">
+    <h2>Editing a concept map</h2>
+    <p>Each link is a sentence: <em>Imperial propaganda — built → Ono’s reputation</em>. Pick both ends from your concepts and write the verb, or tap a suggestion. A link with no verb gets an orange underline, because a concept map can’t be published without one.</p>
+    <div class="mock-block is-editing ga-editor" id="concept-editor" data-view="build">
+      <button class="mock-block__menu" type="button" aria-label="Concept map block menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="19" r="1.6" fill="currentColor"/></svg></button>
+      <div class="ga-head">
+        <input class="ga-title" data-role="title" aria-label="Concept map title" placeholder="Add a title" />
+        <div class="hub-pills ga-view" role="group" aria-label="Show">
+          <button class="hub-pills__btn" type="button" data-value="build" aria-pressed="true">Build</button>
+          <button class="hub-pills__btn" type="button" data-value="map" aria-pressed="false">Map</button>
+        </div>
+      </div>
+      <div class="ga-stage" data-part="map" data-role="stage">
+        <button class="hub-icon-btn ga-expand" type="button" data-role="expand" aria-label="Open the map full screen" title="Full screen"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      </div>
+      <div data-part="build">
+        <p class="ga-panel-label">Concepts</p>
+        <div class="ga-concepts" data-role="concepts"></div>
+        <p class="ga-panel-label">Links</p>
+        <div class="ga-links" data-role="links"></div>
+        <div class="ga-foot">
+          <button class="btn btn--secondary" type="button" data-role="add-link">+ Add link</button>
+          <p class="ga-keys">Tap the dot on a concept to change its colour.</p>
+          <button class="btn btn--secondary" type="button">Done</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mock-section">
+    <h2>What students see</h2>
+    <p>The whole map fits at its real size, with no zoom buttons and nothing cut off. On a phone the mind map changes to a top-down tree rather than shrinking.</p>
+    <figure class="mock-block" style="margin:0">
+      <figcaption class="ga-caption" data-role="read-mind-title"></figcaption>
+      <div class="ga-stage" id="read-mind"></div>
+    </figure>
+    <figure class="mock-block" style="margin:var(--space-4) 0 0">
+      <figcaption class="ga-caption" data-role="read-concept-title"></figcaption>
+      <div class="ga-stage" id="read-concept"></div>
+    </figure>
+  </section>
+
+  <aside class="mock-notes">
+    <h2>What changes, what stays</h2>
+    <ul>
+      <li><strong>Same block data.</strong> Nodes stay <code>{ id, label, parent_id }</code> and links stay <code>{ from, to, label }</code>. The outline is just another way of editing <code>parent_id</code>, so existing blocks open as they are.</li>
+      <li><strong>Same block shell.</strong> The grip, ⋮ menu, Done, autosave and publish checks don’t change. Only the editor inside the block and the drawing change.</li>
+      <li><strong>One renderer.</strong> Tasks and Teaching would share one drawing function for the editor, the student view and print. Today Tasks has a form with an SVG preview and Teaching has a separate drag canvas.</li>
+      <li><strong>Trade-off.</strong> You can’t place boxes by hand. The layout is always automatic.</li>
+    </ul>
+  </aside>
+</main>
+
+<div class="ga-full" id="full" hidden role="dialog" aria-modal="true" aria-labelledby="full-title">
+  <div class="ga-full__bar">
+    <h2 id="full-title"></h2>
+    <button class="btn btn--secondary" type="button" data-role="close">Close</button>
+  </div>
+  <div class="ga-stage" data-role="stage"></div>
+</div>
+
+<script src="graph-mock.js"></script>
+<script>
+(function () {
+  const G = GraphMock;
+  const COLOURS = G.BRANCH_COLOURS;
+  const svgNS = 'http://www.w3.org/2000/svg';
+
+  /* ── Drawing ── */
+  const STYLE_MIND = (n) =>
+    n.depth === 0
+      ? { font: '600 16px Inter', size: 16, weight: 600, padX: 18, padY: 12, lineH: 21, maxW: 210 }
+      : n.depth === 1
+        ? { font: '600 14px Inter', size: 14, weight: 600, padX: 14, padY: 9, lineH: 19, maxW: 190 }
+        : { font: '500 13px Inter', size: 13, weight: 500, padX: 2, padY: 7, lineH: 18, maxW: 190 };
+
+  const inkOf = (c) => (c === 'navy' ? 'var(--navy)' : `var(--pastel-${c}-ink)`);
+  const fillOf = (c) => `var(--pastel-${c})`;
+  const fmt = (v) => v.toFixed(1);
+
+  function drawMind(content, mode, selectedId) {
+    const root = G.buildTree(content.nodes);
+    if (!root) return { svg: '', w: 0 };
+    const list = G.layoutTidyTree(root, { mode, styleFor: STYLE_MIND });
+    const byId = new Map(list.map((n) => [n.id, n]));
+    let links = '';
+    let boxes = '';
+    for (const n of list) {
+      if (!n.depth) continue;
+      const p = byId.get(n.parent_id) || root;
+      const stroke = `style="stroke: color-mix(in srgb, ${inkOf(n.branch)} 55%, transparent)"`;
+      const width = n.depth === 1 ? 2.25 : 1.6;
+      let d;
+      if (mode === 'indent') {
+        const px = p.x - p.w / 2 + (p.depth >= 2 ? 6 : 14);
+        const py = p.y + p.h / 2;
+        const cx = n.x - n.w / 2;
+        const cy = n.depth >= 2 ? n.y + n.h / 2 : n.y;
+        d = `M${fmt(px)} ${fmt(py)} V${fmt(cy - 8)} Q${fmt(px)} ${fmt(cy)} ${fmt(px + 8)} ${fmt(cy)} H${fmt(cx)}`;
+      } else {
+        const sx = p.x + n.side * (p.w / 2);
+        const sy = p.depth >= 2 ? p.y + p.h / 2 : p.y;
+        const ex = n.x - n.side * (n.w / 2);
+        const ey = n.depth >= 2 ? n.y + n.h / 2 : n.y;
+        const mx = (sx + ex) / 2;
+        d = `M${fmt(sx)} ${fmt(sy)} C${fmt(mx)} ${fmt(sy)} ${fmt(mx)} ${fmt(ey)} ${fmt(ex)} ${fmt(ey)}`;
+      }
+      links += `<path d="${d}" fill="none" ${stroke} stroke-width="${width}" stroke-linecap="round"/>`;
+    }
+    for (const n of list) {
+      const l = n.x - n.w / 2;
+      const t = n.y - n.h / 2;
+      const sel = n.id === selectedId ? ' is-selected' : '';
+      let body;
+      if (n.depth === 0) {
+        body = `<rect x="${fmt(l)}" y="${fmt(t)}" width="${n.w}" height="${n.h}" rx="14" fill="var(--navy)"/>` + G.textLines(n, n.x, '#fff');
+      } else if (n.depth === 1) {
+        body =
+          `<rect x="${fmt(l)}" y="${fmt(t)}" width="${n.w}" height="${n.h}" rx="12" fill="${fillOf(n.branch)}" style="stroke: color-mix(in srgb, ${inkOf(n.branch)} 22%, transparent)"/>` +
+          G.textLines(n, n.x, inkOf(n.branch));
+      } else {
+        body =
+          `<rect x="${fmt(l)}" y="${fmt(t)}" width="${n.w}" height="${n.h}" fill="transparent"/>` +
+          `<path d="M${fmt(l)} ${fmt(t + n.h)} H${fmt(l + n.w)}" style="stroke: color-mix(in srgb, ${inkOf(n.branch)} 60%, transparent)" stroke-width="2" stroke-linecap="round"/>` +
+          G.textLines(n, l + n.style.padX, 'var(--ink)', 'start');
+      }
+      const ring = `<rect class="ga-ring" x="${fmt(l - 4)}" y="${fmt(t - 4)}" width="${n.w + 8}" height="${n.h + 8}" rx="${n.depth >= 2 ? 8 : 16}"/>`;
+      boxes += `<g class="ga-node${sel}" data-id="${n.id}">${ring}${body}</g>`;
+    }
+    const b = G.boundsOf(list, 6);
+    return { svg: G.svgOpen(b, 'gm-svg') + links + boxes + '</svg>', w: b.w };
+  }
+
+  const STYLE_CONCEPT = () => ({ font: '600 14px Inter', size: 14, weight: 600, padX: 14, padY: 9, lineH: 19, maxW: 170 });
+
+  let markerSeq = 0;
+  function drawConcept(content, compact) {
+    const marker = `ga-arrow-${++markerSeq}`;
+    const { nodes, edges, byId } = G.layoutLayered(content, { styleFor: STYLE_CONCEPT, colGap: compact ? 18 : 40, rowGap: compact ? 78 : 86 });
+    const attach = new Map();
+    const geo = edges.map((e) => {
+      const s = byId.get(e.from);
+      const t = byId.get(e.to);
+      const dir = t.y > s.y + 1 ? 1 : -1;
+      const g = { e, s, t, dir };
+      const sk = `${s.id}:${dir > 0 ? 'b' : 't'}`;
+      const tk = `${t.id}:${dir > 0 ? 't' : 'b'}`;
+      (attach.get(sk) || attach.set(sk, []).get(sk)).push({ g, end: 's', other: t });
+      (attach.get(tk) || attach.set(tk, []).get(tk)).push({ g, end: 't', other: s });
+      return g;
+    });
+    for (const [key, list] of attach) {
+      const n = byId.get(key.split(':')[0]);
+      list.sort((a, b) => a.other.x - b.other.x);
+      const step = Math.min(22, (n.w - 28) / Math.max(1, list.length));
+      list.forEach((a, i) => (a.g[a.end + 'dx'] = (i - (list.length - 1) / 2) * step));
+    }
+    let paths = '';
+    const chips = [];
+    for (const g of geo) {
+      const x0 = g.s.x + (g.sdx || 0);
+      const y0 = g.s.y + (g.dir * g.s.h) / 2;
+      const x3 = g.t.x + (g.tdx || 0);
+      const y3 = g.t.y - (g.dir * g.t.h) / 2 - g.dir * 3;
+      const dy = Math.max(28, Math.abs(y3 - y0) * 0.45) * g.dir;
+      const pts = [{ x: x0, y: y0 }, { x: x0, y: y0 + dy }, { x: x3, y: y3 - dy }, { x: x3, y: y3 }];
+      const missing = !String(g.e.label || '').trim();
+      paths += `<path d="M${fmt(x0)} ${fmt(y0)} C${fmt(x0)} ${fmt(y0 + dy)} ${fmt(x3)} ${fmt(y3 - dy)} ${fmt(x3)} ${fmt(y3)}" fill="none" stroke="var(--orca)" stroke-width="1.5" ${missing ? 'stroke-dasharray="4 4"' : ''} marker-end="url(#${marker})" opacity="0.85"/>`;
+      chips.push({ ...G.chipFor(missing ? 'add a verb' : g.e.label), at: (t) => G.cubicAt(pts, t), missing });
+    }
+    G.placeChips(chips, nodes.map((n) => ({ x: n.x, y: n.y, w: n.w, h: n.h })));
+    const chipSvg = chips
+      .map((c) =>
+        c.missing
+          ? G.chipSvg(c).replace('stroke="var(--line)"', 'stroke="var(--high-sea-ink)" stroke-dasharray="3 3"').replace('fill="var(--orca)"', 'fill="var(--high-sea-ink)"')
+          : G.chipSvg(c)
+      )
+      .join('');
+    const boxes = nodes
+      .map((n) => {
+        const c = n.color || 'blue';
+        return (
+          `<g data-id="${n.id}"><rect x="${fmt(n.x - n.w / 2)}" y="${fmt(n.y - n.h / 2)}" width="${n.w}" height="${n.h}" rx="12" fill="${fillOf(c)}" style="stroke: color-mix(in srgb, ${inkOf(c)} 25%, transparent)"/>` +
+          G.textLines(n, n.x, inkOf(c)) +
+          '</g>'
+        );
+      })
+      .join('');
+    const b = G.boundsOf([...nodes, ...chips], 8);
+    return { svg: G.svgOpen(b, 'gm-svg') + G.arrowDefs(marker) + paths + boxes + chipSvg + '</svg>', w: b.w };
+  }
+
+  /* Pick the layout that fits instead of shrinking: one-sided tree, else top-down tree. */
+  function paintMind(stage, content, selectedId, prefer) {
+    const room = stage.clientWidth - 32;
+    let out = drawMind(content, prefer || 'right', selectedId);
+    if (!prefer && out.w > room) out = drawMind(content, 'indent', selectedId);
+    setSvg(stage, out.svg);
+  }
+
+  function paintConcept(stage, content) {
+    const room = stage.clientWidth - 32;
+    let out = drawConcept(content, false);
+    if (out.w > room) out = drawConcept(content, true);
+    setSvg(stage, out.svg);
+  }
+
+  function setSvg(stage, markup) {
+    stage.querySelector(':scope > svg')?.remove();
+    stage.insertAdjacentHTML('afterbegin', markup);
+  }
+
+  /* ── Mind map editor: outline rows in pre-order, parent derived from depth ── */
+  function rowsFromNodes(nodes) {
+    const root = G.buildTree(nodes);
+    return G.flatten(root).map((n) => ({ id: n.id, label: n.label, depth: n.depth }));
+  }
+
+  function nodesFromRows(rows) {
+    const stack = [];
+    return rows.map((r) => {
+      stack[r.depth] = r.id;
+      return { id: r.id, label: r.label, parent_id: r.depth === 0 ? null : stack[r.depth - 1] };
+    });
+  }
+
+  function subtreeEnd(rows, i) {
+    let j = i + 1;
+    while (j < rows.length && rows[j].depth > rows[i].depth) j++;
+    return j;
+  }
+
+  function mountMindEditor(el) {
+    const stage = el.querySelector('[data-role="stage"]');
+    const outline = el.querySelector('[data-role="outline"]');
+    const title = el.querySelector('[data-role="title"]');
+    let rows = rowsFromNodes(G.MIND.nodes);
+    let selected = null;
+    let counter = rows.length;
+    title.value = G.MIND.title;
+
+    const content = () => ({ title: title.value, nodes: nodesFromRows(rows), edges: [] });
+    const branchOf = (i) => {
+      if (rows[i].depth === 0) return 'navy';
+      let k = i;
+      while (rows[k].depth > 1) k--;
+      let n = 0;
+      for (let j = 1; j < k; j++) if (rows[j].depth === 1) n++;
+      return COLOURS[n % COLOURS.length];
+    };
+
+    function paint() {
+      paintMind(stage, content(), selected);
+    }
+
+    function render(focusIndex, caret) {
+      outline.replaceChildren(
+        ...rows.map((r, i) => {
+          const row = document.createElement('div');
+          row.className = 'ga-row';
+          row.dataset.d = r.depth;
+          row.dataset.c = branchOf(i);
+          row.style.setProperty('--d', r.depth);
+          row.setAttribute('role', 'treeitem');
+          row.setAttribute('aria-level', r.depth + 1);
+          row.innerHTML =
+            '<span class="ga-bullet" aria-hidden="true"></span>' +
+            `<input class="ga-input" value="${G.esc(r.label)}" placeholder="${r.depth ? 'New idea' : 'Central idea'}" aria-label="${r.depth ? 'Idea' : 'Central idea'}" />` +
+            (r.depth
+              ? '<span class="ga-row__tools">' +
+                '<button class="ga-mini" type="button" data-act="out" aria-label="Move out" title="Move out (Shift+Tab)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>' +
+                '<button class="ga-mini" type="button" data-act="in" aria-label="Make sub-idea" title="Sub-idea (Tab)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>' +
+                '<button class="ga-mini" type="button" data-act="del" aria-label="Delete idea" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+                '</span>'
+              : '');
+          const input = row.querySelector('input');
+          input.addEventListener('input', () => {
+            rows[i].label = input.value;
+            paint();
+          });
+          input.addEventListener('focus', () => {
+            selected = r.id;
+            paint();
+          });
+          input.addEventListener('keydown', (e) => onKey(e, i, input));
+          row.querySelectorAll('[data-act]').forEach((b) =>
+            b.addEventListener('click', () => {
+              if (b.dataset.act === 'in') indent(i, 1);
+              if (b.dataset.act === 'out') indent(i, -1);
+              if (b.dataset.act === 'del') remove(i);
+            })
+          );
+          return row;
+        })
+      );
+      paint();
+      if (focusIndex != null) {
+        const input = outline.children[focusIndex]?.querySelector('input');
+        input?.focus();
+        if (input && caret != null) input.setSelectionRange(caret, caret);
+      }
+    }
+
+    function insertAfter(i) {
+      if (rows.length >= 24) return;
+      const next = rows[i + 1];
+      const depth = i === 0 ? 1 : next && next.depth > rows[i].depth ? rows[i].depth + 1 : rows[i].depth;
+      counter += 1;
+      rows.splice(i + 1, 0, { id: `m_new${counter}`, label: '', depth });
+      render(i + 1);
+    }
+
+    function indent(i, by) {
+      if (i === 0) return;
+      const end = subtreeEnd(rows, i);
+      if (by > 0 && !(rows[i - 1].depth >= rows[i].depth)) return;
+      if (by < 0 && rows[i].depth <= 1) return;
+      for (let j = i; j < end; j++) rows[j].depth += by;
+      render(i);
+    }
+
+    function remove(i) {
+      if (i === 0) return;
+      const end = subtreeEnd(rows, i);
+      for (let j = i + 1; j < end; j++) rows[j].depth -= 1;
+      rows.splice(i, 1);
+      render(Math.max(0, i - 1));
+    }
+
+    function onKey(e, i, input) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        insertAfter(i);
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        indent(i, e.shiftKey ? -1 : 1);
+      } else if (e.key === 'Backspace' && !input.value && i > 0) {
+        e.preventDefault();
+        remove(i);
+      } else if (e.key === 'ArrowUp' && i > 0) {
+        e.preventDefault();
+        render(i - 1);
+      } else if (e.key === 'ArrowDown' && i < rows.length - 1) {
+        e.preventDefault();
+        render(i + 1);
+      }
+    }
+
+    stage.addEventListener('click', (e) => {
+      const g = e.target.closest('[data-id]');
+      if (!g) return;
+      const i = rows.findIndex((r) => r.id === g.dataset.id);
+      if (el.dataset.view === 'map' && matchMedia('(max-width: 719px)').matches) {
+        el.dataset.view = 'build';
+        el.querySelectorAll('.ga-view .hub-pills__btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === 'build')));
+      }
+      render(i);
+    });
+    el.querySelector('[data-role="add"]').addEventListener('click', () => insertAfter(rows.length - 1));
+    title.addEventListener('input', paint);
+    G.wirePills(el.querySelector('.ga-view'), (v) => {
+      el.dataset.view = v;
+      paint();
+    });
+    new ResizeObserver(paint).observe(stage);
+    el.querySelector('[data-role="expand"]').addEventListener('click', () =>
+      openFull(title.value, (s) => paintMind(s, content(), null, 'both'))
+    );
+    render();
+    return { content };
+  }
+
+  /* ── Concept map editor: concept chips + sentence links ── */
+  function mountConceptEditor(el) {
+    const stage = el.querySelector('[data-role="stage"]');
+    const conceptsEl = el.querySelector('[data-role="concepts"]');
+    const linksEl = el.querySelector('[data-role="links"]');
+    const title = el.querySelector('[data-role="title"]');
+    const data = G.clone(G.CONCEPT);
+    title.value = data.title;
+    let counter = 0;
+    let menu = null;
+
+    const paint = () => paintConcept(stage, data);
+    const label = (id) => data.nodes.find((n) => n.id === id)?.label || 'Pick a concept';
+    const colour = (id) => data.nodes.find((n) => n.id === id)?.color || 'blue';
+
+    function renderConcepts(focusId) {
+      conceptsEl.replaceChildren(
+        ...data.nodes.map((n) => {
+          const chip = document.createElement('span');
+          chip.className = 'ga-concept';
+          chip.dataset.c = n.color || 'blue';
+          chip.innerHTML =
+            '<button class="ga-swatch" type="button" aria-label="Change colour" title="Change colour"></button>' +
+            `<input class="ga-input" value="${G.esc(n.label)}" aria-label="Concept" placeholder="Concept" />` +
+            '<button class="ga-mini" type="button" aria-label="Delete concept" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></button>';
+          const [swatch, input, del] = [chip.children[0], chip.children[1], chip.children[2]];
+          swatch.addEventListener('click', () => {
+            n.color = COLOURS[(COLOURS.indexOf(n.color) + 1) % COLOURS.length];
+            chip.dataset.c = n.color;
+            renderLinks();
+            paint();
+          });
+          input.addEventListener('input', () => {
+            n.label = input.value;
+            renderLinks();
+            paint();
+          });
+          del.addEventListener('click', () => {
+            data.nodes = data.nodes.filter((x) => x !== n);
+            data.edges = data.edges.filter((e) => e.from !== n.id && e.to !== n.id);
+            renderConcepts();
+            renderLinks();
+            paint();
+          });
+          if (n.id === focusId) requestAnimationFrame(() => input.focus());
+          return chip;
+        }),
+        Object.assign(document.createElement('button'), {
+          className: 'btn btn--ghost ga-add-concept',
+          type: 'button',
+          textContent: '+ Concept',
+          onclick: () => {
+            counter += 1;
+            const id = `c_new${counter}`;
+            data.nodes.push({ id, label: '', color: COLOURS[data.nodes.length % COLOURS.length] });
+            renderConcepts(id);
+            paint();
+          }
+        })
+      );
+    }
+
+    function closeMenu() {
+      menu?.remove();
+      menu = null;
+    }
+
+    function openMenu(btn, edge, end) {
+      closeMenu();
+      menu = document.createElement('div');
+      menu.className = 'ga-menu';
+      menu.setAttribute('role', 'menu');
+      data.nodes.forEach((n) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.setAttribute('role', 'menuitem');
+        item.dataset.c = n.color || 'blue';
+        item.textContent = n.label || 'Untitled';
+        item.addEventListener('click', () => {
+          edge[end] = n.id;
+          closeMenu();
+          renderLinks();
+          paint();
+        });
+        menu.append(item);
+      });
+      document.body.append(menu);
+      const r = btn.getBoundingClientRect();
+      menu.style.left = `${Math.min(r.left + scrollX, innerWidth - menu.offsetWidth - 8)}px`;
+      menu.style.top = `${r.bottom + scrollY + 4}px`;
+      menu.querySelector('button')?.focus();
+    }
+
+    document.addEventListener('pointerdown', (e) => menu && !menu.contains(e.target) && !e.target.closest('.ga-pick') && closeMenu());
+    document.addEventListener('keydown', (e) => e.key === 'Escape' && closeMenu());
+
+    function renderLinks(focusId) {
+      linksEl.replaceChildren(
+        ...data.edges.map((edge) => {
+          const row = document.createElement('div');
+          row.className = 'ga-link';
+          row.innerHTML =
+            `<button class="ga-pick" type="button" data-end="from" data-c="${colour(edge.from)}" aria-haspopup="menu"><span>${G.esc(label(edge.from))}</span></button>` +
+            `<input class="ga-verb${edge.label?.trim() ? '' : ' is-empty'}" value="${G.esc(edge.label || '')}" placeholder="how are they linked?" aria-label="Relationship" />` +
+            '<span class="ga-arrow" aria-hidden="true">→</span>' +
+            `<button class="ga-pick" type="button" data-end="to" data-c="${colour(edge.to)}" aria-haspopup="menu"><span>${G.esc(label(edge.to))}</span></button>` +
+            '<button class="ga-mini ga-swap" type="button" aria-label="Swap direction" title="Swap direction"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></button>' +
+            '<button class="ga-mini ga-remove" type="button" aria-label="Delete link" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></button>' +
+            `<div class="ga-suggest">${G.LINK_VERBS.map((v) => `<button type="button">${v}</button>`).join('')}</div>`;
+          const verb = row.querySelector('.ga-verb');
+          row.querySelectorAll('.ga-pick').forEach((b) => b.addEventListener('click', () => openMenu(b, edge, b.dataset.end)));
+          verb.addEventListener('input', () => {
+            edge.label = verb.value;
+            verb.classList.toggle('is-empty', !verb.value.trim());
+            paint();
+          });
+          row.querySelector('.ga-swap').addEventListener('click', () => {
+            [edge.from, edge.to] = [edge.to, edge.from];
+            renderLinks();
+            paint();
+          });
+          row.querySelector('.ga-remove').addEventListener('click', () => {
+            data.edges = data.edges.filter((x) => x !== edge);
+            renderLinks();
+            paint();
+          });
+          row.querySelectorAll('.ga-suggest button').forEach((b) =>
+            b.addEventListener('pointerdown', (e) => {
+              e.preventDefault();
+              verb.value = b.textContent;
+              verb.dispatchEvent(new Event('input'));
+            })
+          );
+          if (edge.id === focusId) requestAnimationFrame(() => verb.focus());
+          return row;
+        })
+      );
+    }
+
+    el.querySelector('[data-role="add-link"]').addEventListener('click', () => {
+      if (data.edges.length >= 40 || data.nodes.length < 2) return;
+      counter += 1;
+      const edge = { id: `e_new${counter}`, from: data.nodes[0].id, to: data.nodes[1].id, label: '' };
+      data.edges.push(edge);
+      renderLinks(edge.id);
+      paint();
+    });
+    G.wirePills(el.querySelector('.ga-view'), (v) => {
+      el.dataset.view = v;
+      paint();
+    });
+    new ResizeObserver(paint).observe(stage);
+    el.querySelector('[data-role="expand"]').addEventListener('click', () => openFull(title.value, (s) => paintConcept(s, data)));
+    renderConcepts();
+    renderLinks();
+    paint();
+  }
+
+  /* ── Full screen ── */
+  const full = document.getElementById('full');
+  let fullPaint = null;
+  function openFull(name, painter) {
+    full.querySelector('#full-title').textContent = name || 'Map';
+    full.hidden = false;
+    fullPaint = () => painter(full.querySelector('[data-role="stage"]'));
+    fullPaint();
+    full.querySelector('[data-role="close"]').focus();
+  }
+  full.querySelector('[data-role="close"]').addEventListener('click', () => (full.hidden = true));
+  document.addEventListener('keydown', (e) => e.key === 'Escape' && !full.hidden && (full.hidden = true));
+  new ResizeObserver(() => !full.hidden && fullPaint?.()).observe(full);
+
+  /* ── Read-only (student) view ── */
+  function mountRead() {
+    const mindStage = document.getElementById('read-mind');
+    const conceptStage = document.getElementById('read-concept');
+    document.querySelector('[data-role="read-mind-title"]').textContent = G.MIND.title;
+    document.querySelector('[data-role="read-concept-title"]').textContent = G.CONCEPT.title;
+    const paint = () => {
+      paintMind(mindStage, G.MIND, null);
+      paintConcept(conceptStage, G.CONCEPT);
+    };
+    new ResizeObserver(paint).observe(mindStage);
+    paint();
+  }
+
+  document.fonts.ready.then(() => {
+    mountMindEditor(document.getElementById('mind-editor'));
+    mountConceptEditor(document.getElementById('concept-editor'));
+    mountRead();
+    document.documentElement.dataset.ready = 'true';
+  });
+})();
+</script>
+</body>
+</html>
