@@ -90,7 +90,6 @@
   padding: var(--space-8) var(--space-6) var(--space-10);
 }
 
-.canvas:has(> .compose),
 .canvas:has(> .reader) {
   display: flex;
   flex-direction: column;
@@ -99,6 +98,8 @@
 
 /* New note / Edit note: header + scroll fields + docked Save (not sticky). */
 .canvas:has(> .compose) {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   height: 100dvh;
   max-height: 100dvh;
@@ -2204,14 +2205,8 @@ body.is-universe-fullscreen .local-banner {
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
-  /* New note: fill the phone window; docked Save sits above the tab bar.
-   * Keyboard mode (html.vv-keyboard-open / :focus-within) hides the tab bar
-   * and pins this canvas to the visual viewport so fields stop jumping. */
+  /* Room above the tab bar; keyboard mode pins to --vv-height and hides nav. */
   .canvas:has(> .compose) {
-    height: 100dvh;
-    max-height: 100dvh;
-    min-height: 0;
-    overflow: hidden;
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
@@ -2236,20 +2231,6 @@ body.is-universe-fullscreen .local-banner {
 
   .compose__savebar {
     padding: var(--space-3) 0 calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
-  }
-
-  .compose__save {
-    min-height: 3rem;
-  }
-
-  .compose__body-host,
-  .compose__tiptap,
-  .compose__tiptap-surface {
-    min-height: 12rem;
-  }
-
-  .compose__tiptap-surface {
-    font-size: 16px;
   }
 
   .compose__scroll :is(input, select, textarea, .compose__tiptap-surface, .option-picker) {
@@ -2492,16 +2473,11 @@ body.is-universe-fullscreen .local-banner {
   .coach.chat .alchemist__actions .btn,
   .coach.chat.chat--from-book .chat__note-form .btn,
   .compose__capture .btn,
-  .compose__save,
   .reader__actions .btn,
   .origin-add .btn,
   .origin-add select,
   .origin-add input {
     min-height: 44px;
-  }
-
-  .compose__save {
-    min-height: 3rem;
   }
 
   .page-header__actions:not(:has(> :not(.hub-utilities))) {
@@ -3243,17 +3219,13 @@ body.is-universe-fullscreen .local-banner {
   border-bottom: 1px solid var(--line);
 }
 
-/* Docked outside .compose__scroll — never sticky (R4). Keyboard inset is
- * handled by pinning .canvas:has(> .compose) to --vv-height, not by padding
- * this bar with --vv-offset-bottom (that floated Save into the body field). */
+/* Docked outside .compose__scroll — never sticky (R4). Do not pad with
+ * --vv-offset-bottom; keyboard inset is the canvas --vv-height pin. */
 .compose__savebar {
   flex: 0 0 auto;
   position: static;
-  z-index: 2;
-  margin-top: 0;
   display: flex;
   gap: var(--space-2);
-  align-items: stretch;
   padding: var(--space-3) 0 max(var(--space-3), env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--line);
   background: var(--paper);
@@ -3266,6 +3238,7 @@ body.is-universe-fullscreen .local-banner {
   justify-content: center;
 }
 
+/* After base 2.75rem so phone wins the cascade (R4 ≥44px → 3rem). */
 @media (max-width: 720px) {
   .compose__save {
     min-height: 3rem;

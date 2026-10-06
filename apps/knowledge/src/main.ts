@@ -1796,41 +1796,41 @@ function renderCompose(state: ComposeState) {
       )}
       ${USE_LOCAL_DATA ? `<p class="local-banner">Saving and capture need the live API (npx netlify dev).</p>` : ""}
       <div class="compose__scroll">
-      <div class="compose__field">
-        <label for="compose-title">Title</label>
-        <input id="compose-title" value="${escapeHtml(state.title)}" />
-        ${state.titleError ? `<p class="compose__error">${escapeHtml(state.titleError)}</p>` : ""}
-      </div>
-      <div class="compose__field">
-        <label id="compose-tags-label">Tags</label>
-        <p class="compose__hint">Up to 3.</p>
-        <div role="group" aria-labelledby="compose-tags-label">
-          ${topicTagPickerHtml(state.tags, composeTagQuery, composeTagOpen)}
+        <div class="compose__field">
+          <label for="compose-title">Title</label>
+          <input id="compose-title" value="${escapeHtml(state.title)}" />
+          ${state.titleError ? `<p class="compose__error">${escapeHtml(state.titleError)}</p>` : ""}
         </div>
-      </div>
-      ${originComposeFieldHtml(
-        state.origins,
-        composeOriginDraft,
-        originLabelsForKind(entries, composeOriginDraft?.kind ?? composeOriginKind).map(item => item.label),
-        composeOriginKind,
-      )}
-      ${composeBookPageHtml(state)}
-      <div class="compose__field compose__field--body">
-        <label id="compose-body-label">Body (markdown)</label>
-        <div id="compose-body-host" class="compose__body-host" aria-labelledby="compose-body-label"></div>
-      </div>
-      ${captureFieldHtml({
-        busy: state.busy,
-        captureBusy: state.captureBusy,
-        recording: state.recording,
-        localData: USE_LOCAL_DATA,
-      })}
-      <div class="compose__field">
-        <label>Attachments</label>
-        <ul class="compose__files">${files || "<li>None</li>"}</ul>
-        <input id="compose-files" type="file" multiple />
-      </div>
-      <div id="compose-relationships-host"></div>
+        <div class="compose__field">
+          <label id="compose-tags-label">Tags</label>
+          <p class="compose__hint">Up to 3.</p>
+          <div role="group" aria-labelledby="compose-tags-label">
+            ${topicTagPickerHtml(state.tags, composeTagQuery, composeTagOpen)}
+          </div>
+        </div>
+        ${originComposeFieldHtml(
+          state.origins,
+          composeOriginDraft,
+          originLabelsForKind(entries, composeOriginDraft?.kind ?? composeOriginKind).map(item => item.label),
+          composeOriginKind,
+        )}
+        ${composeBookPageHtml(state)}
+        <div class="compose__field compose__field--body">
+          <label id="compose-body-label">Body (markdown)</label>
+          <div id="compose-body-host" class="compose__body-host" aria-labelledby="compose-body-label"></div>
+        </div>
+        ${captureFieldHtml({
+          busy: state.busy,
+          captureBusy: state.captureBusy,
+          recording: state.recording,
+          localData: USE_LOCAL_DATA,
+        })}
+        <div class="compose__field">
+          <label>Attachments</label>
+          <ul class="compose__files">${files || "<li>None</li>"}</ul>
+          <input id="compose-files" type="file" multiple />
+        </div>
+        <div id="compose-relationships-host"></div>
       </div>
       <div class="compose__savebar" data-part="form-actions">
         <button class="btn btn--primary compose__save" data-compose-save type="button" ${

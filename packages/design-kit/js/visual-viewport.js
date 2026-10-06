@@ -134,9 +134,7 @@ function syncVisualViewportSoon() {
 function isComposerTarget(target) {
   return Boolean(
     target?.closest?.(
-      // Chat composers + Knowledge New note / Edit note (.compose) — same
-      // keyboard-mode contract so phone typing pins the shell and hides the
-      // bottom bar instead of shoving sticky Save into the body field.
+      // Chat composers + Knowledge .compose (New/Edit note).
       '.chat-form, #chat-form, .chat__composer, .hub-ai-bar--thread, .compose'
     )
   );

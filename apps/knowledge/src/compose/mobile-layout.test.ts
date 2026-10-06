@@ -14,10 +14,9 @@ const kitChat = readFileSync(resolve(root, "design-kit/hub-chat-viewport.css"), 
 
 describe("compose mobile docked Save (R4)", () => {
   it("keeps Save outside the scroll region", () => {
-    expect(main).toContain('class="compose__scroll"');
-    expect(main).toContain('data-part="form-actions"');
-    expect(main).toMatch(/compose__scroll[\s\S]*compose-title[\s\S]*compose-body-host[\s\S]*compose-relationships-host[\s\S]*<\/div>\s*<div class="compose__savebar"/);
-    expect(main).toMatch(/compose__savebar" data-part="form-actions"/);
+    expect(main).toMatch(
+      /compose__scroll[\s\S]*compose-title[\s\S]*compose-body-host[\s\S]*compose-relationships-host[\s\S]*<\/div>\s*<div class="compose__savebar" data-part="form-actions"/,
+    );
   });
 
   it("docks the savebar without sticky or keyboard-inset padding", () => {
@@ -25,10 +24,9 @@ describe("compose mobile docked Save (R4)", () => {
     expect(css).not.toMatch(/\.compose__savebar\s*\{[^}]*position:\s*sticky/);
     expect(css).not.toMatch(/\.compose__savebar\s*\{[^}]*--vv-offset-bottom/);
     expect(css).toMatch(/\.compose__savebar\s*\{[^}]*safe-area-inset-bottom/);
-    expect(css).toMatch(/\.compose__save\s*\{[^}]*min-height:\s*2\.75rem/);
-    // Mobile 3rem must win cascade over the base 2.75rem (later in the file).
     const base = css.search(/\.compose__save\s*\{[^}]*min-height:\s*2\.75rem/);
     const phone = css.search(/@media \(max-width: 720px\)\s*\{\s*\.compose__save\s*\{[^}]*min-height:\s*3rem/);
+    expect(base).toBeGreaterThan(-1);
     expect(phone).toBeGreaterThan(base);
   });
 
