@@ -100,7 +100,6 @@ import {
   readUniverseLens,
   shouldExitUniverseFullscreen,
   universeEffectToolsHtml,
-  universeExitHtml,
   universeViewToolsHtml,
   universeWrapClass,
   writeUniverseDark,
@@ -280,8 +279,8 @@ let universeDark = readUniverseDark(typeof localStorage === "undefined" ? null :
 let universeLens = readUniverseLens(typeof localStorage === "undefined" ? null : localStorage);
 let universeSound = readSoundPrefs(typeof localStorage === "undefined" ? null : localStorage);
 let graphFullscreen = false;
-/** In full screen the controls fold into a token; each entry to full screen starts folded. */
-let graphChromeTucked = true;
+/** In full screen the controls can fold into a token; each entry to full screen starts with them open. */
+let graphChromeTucked = false;
 let solarModelCache: { source: PageManifestEntry[]; model: SolarModel } | null = null;
 let showAllModelCache: { source: PageManifestEntry[]; grouping: ShowAllGrouping; model: ReturnType<typeof buildShowAllGraph> } | null = null;
 
@@ -1295,7 +1294,6 @@ function renderGraph() {
       </div>
       <div class="graph-stage"></div>
       ${graphChromeTokenHtml(graphChromeTucked)}
-      ${universeExitHtml(graphFullscreen)}
     </div>
   `);
 
@@ -1379,8 +1377,8 @@ function renderGraph() {
     },
     setFullscreen: on => {
       graphFullscreen = on;
-      graphChromeTucked = true;
-      applyGraphChromeTuck(wrap, true);
+      graphChromeTucked = false;
+      applyGraphChromeTuck(wrap, false);
       applyUniverseViewState(wrap, document.body, graphMode === "universe" && universeDark, graphFullscreen);
     },
   });

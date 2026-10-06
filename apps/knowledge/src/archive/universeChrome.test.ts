@@ -11,7 +11,6 @@ import {
   shouldExitUniverseFullscreen,
   syncUniverseViewButtons,
   graphFullscreenToolsHtml,
-  universeExitHtml,
   universeViewToolsHtml,
   universeWrapClass,
   writeUniverseDark,
@@ -25,42 +24,43 @@ describe("universe view chrome", () => {
     expect(universeWrapClass(true, true)).toBe("graph-wrap is-universe-dark is-universe-fullscreen");
   });
 
+  it("has one way out of full screen: the toolbar toggle, with no second Exit pill", () => {
+    document.body.innerHTML = universeViewToolsHtml(true, true);
+    expect(document.querySelector("[data-universe-exit]")).toBeNull();
+    expect(document.querySelectorAll("[data-universe-fullscreen]")).toHaveLength(1);
+  });
+
   it("gives constellation and Show All a Full screen toggle without the Universe dark control", () => {
-    document.body.innerHTML = graphFullscreenToolsHtml(false) + universeExitHtml(false);
+    document.body.innerHTML = graphFullscreenToolsHtml(false);
     expect(document.querySelector("[data-universe-dark]")).toBeNull();
     const full = document.querySelector<HTMLButtonElement>("[data-universe-fullscreen]")!;
     expect(full.textContent).toBe("Full screen");
     expect(full.getAttribute("aria-pressed")).toBe("false");
-    expect(document.querySelector<HTMLButtonElement>("[data-universe-exit]")!.hidden).toBe(true);
-    document.body.innerHTML = graphFullscreenToolsHtml(true) + universeExitHtml(true);
+    document.body.innerHTML = graphFullscreenToolsHtml(true);
     expect(document.querySelector("[data-universe-fullscreen]")!.textContent).toBe("Exit");
-    expect(document.querySelector<HTMLButtonElement>("[data-universe-exit]")!.hidden).toBe(false);
   });
 
   it("renders Dark and Full screen as unpressed toggles by default", () => {
-    document.body.innerHTML = universeViewToolsHtml(false, false) + universeExitHtml(false);
+    document.body.innerHTML = universeViewToolsHtml(false, false);
     const dark = document.querySelector<HTMLButtonElement>("[data-universe-dark]")!;
     const full = document.querySelector<HTMLButtonElement>("[data-universe-fullscreen]")!;
-    const exit = document.querySelector<HTMLButtonElement>("[data-universe-exit]")!;
     expect(dark.textContent).toBe("Dark");
     expect(dark.getAttribute("aria-pressed")).toBe("false");
     expect(dark.classList.contains("is-active")).toBe(false);
     expect(full.textContent).toBe("Full screen");
     expect(full.getAttribute("aria-pressed")).toBe("false");
-    expect(exit.hidden).toBe(true);
   });
 
   it("labels the active modes so they stay exitable", () => {
-    document.body.innerHTML = universeViewToolsHtml(true, true) + universeExitHtml(true);
+    document.body.innerHTML = universeViewToolsHtml(true, true);
     expect(document.querySelector("[data-universe-dark]")!.textContent).toBe("Light");
     expect(document.querySelector("[data-universe-fullscreen]")!.textContent).toBe("Exit");
-    expect(document.querySelector<HTMLButtonElement>("[data-universe-exit]")!.hidden).toBe(false);
   });
 
   it("applies classes on the wrap without rewriting its children", () => {
     const wrap = document.createElement("div");
     wrap.className = "graph-wrap";
-    wrap.innerHTML = `<canvas class="graph-canvas"></canvas>${universeViewToolsHtml(false, false)}${universeExitHtml(false)}`;
+    wrap.innerHTML = `<canvas class="graph-canvas"></canvas>${universeViewToolsHtml(false, false)}`;
     const canvas = wrap.querySelector("canvas");
     applyUniverseViewState(wrap, document.body, true, true);
     expect(wrap.className).toBe("graph-wrap is-universe-dark is-universe-fullscreen");
@@ -74,7 +74,7 @@ describe("universe view chrome", () => {
 
   it("toggles dark and fullscreen through the buttons without remounting", () => {
     const host = document.createElement("div");
-    host.innerHTML = `<div class="graph-wrap">${universeViewToolsHtml(false, false)}${universeExitHtml(false)}</div>`;
+    host.innerHTML = `<div class="graph-wrap">${universeViewToolsHtml(false, false)}</div>`;
     const wrap = host.querySelector<HTMLElement>(".graph-wrap")!;
     let dark = false;
     let fullscreen = false;
@@ -97,7 +97,7 @@ describe("universe view chrome", () => {
     expect(wrap.classList.contains("is-universe-dark")).toBe(true);
     host.querySelector<HTMLButtonElement>("[data-universe-fullscreen]")!.click();
     expect(setFullscreen).toHaveBeenCalledWith(true);
-    host.querySelector<HTMLButtonElement>("[data-universe-exit]")!.click();
+    host.querySelector<HTMLButtonElement>("[data-universe-fullscreen]")!.click();
     expect(setFullscreen).toHaveBeenLastCalledWith(false);
     expect(wrap.classList.contains("is-universe-fullscreen")).toBe(false);
   });
@@ -126,11 +126,10 @@ describe("universe view chrome", () => {
   });
 
   it("syncs button copy if the wrap already has the markup", () => {
-    document.body.innerHTML = universeViewToolsHtml(false, false) + universeExitHtml(false);
+    document.body.innerHTML = universeViewToolsHtml(false, false);
     syncUniverseViewButtons(document.body, true, true);
     expect(document.querySelector("[data-universe-dark]")!.textContent).toBe("Light");
     expect(document.querySelector("[data-universe-fullscreen]")!.textContent).toBe("Exit");
-    expect(document.querySelector<HTMLButtonElement>("[data-universe-exit]")!.hidden).toBe(false);
   });
 });
 
