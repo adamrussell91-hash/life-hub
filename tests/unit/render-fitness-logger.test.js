@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { renderFitnessLogger } from '../../apps/life/js/app/render-fitness-logger.js';
+import { buildLoggerSteps } from '../../apps/life/js/core/workout-plan-groups.js';
 
 class FakeEl {
   constructor(tag = 'div') {
@@ -15,8 +16,9 @@ class FakeEl {
   append(...nodes) { for (const n of nodes) this.children.push(n); }
   replaceChildren(...nodes) { this.children = nodes; }
   removeAttribute() {}
-  setAttribute() {}
-  addEventListener() {}
+  setAttribute(name, value) { this.attributes = { ...(this.attributes ?? {}), [name]: value }; }
+  addEventListener(type, fn) { (this.listeners ??= {})[type] = fn; }
+  click() { this.listeners?.click?.(); }
   querySelector() { return null; }
 }
 
@@ -61,144 +63,177 @@ function walk(node) {
   return list;
 }
 
-function findExerciseCard(logger) {
-  return walk(logger).find(child => child.className === 'fitness-logger__exercise');
+function byMarker(node, marker) {
+  return walk(node).filter(child => child.dataset?.fitnessLogger === marker);
 }
 
-function cuesIn(node, marker) {
-  return node.children.filter(child => child.dataset?.fitnessLogger === marker);
+function render(draft, extra = {}) {
+  const root = new FakeRoot();
+  const { blocks, steps } = buildLoggerSteps(draft.exercises);
+  renderFitnessLogger(root, draft, { blocks, steps, ...extra });
+  return root;
 }
 
-test('renders the start cue at the top of the exercise card when starting the exercise', () => {
-  const root = new FakeRoot();
-  const draft = draftWithCues({ start: "Let's get that chest pumped, big guy." });
-  renderFitnessLogger(root, draft, { expandedExerciseIndex: 0 });
-
-  const card = findExerciseCard(root.logger);
-  const startCues = cuesIn(card, 'cue-start');
-  assert.equal(startCues.length, 1);
-  assert.equal(startCues[0].textContent, "Let's get that chest pumped, big guy.");
-});
-
-test('renders the rest cue between sets, not after the final set', () => {
-  const root = new FakeRoot();
-  const draft = draftWithCues(
-    { rest: 'Shake it out, next set is coming.' },
-    [
-      { reps: 8, weight_kg: 36, cable_type: 'constant_force' },
-      { reps: 8, weight_kg: 36, cable_type: 'constant_force' },
-      { reps: 8, weight_kg: 36, cable_type: 'constant_force' }
-    ]
-  );
-  renderFitnessLogger(root, draft, { expandedExerciseIndex: 0 });
-
-  const card = findExerciseCard(root.logger);
-  const table = card.children.find(child => child.className === 'fitness-logger__sets');
-  const restCues = cuesIn(table, 'cue-rest');
-  // Rest happens after set 1 and set 2 (before the next set), never after the last set.
-  assert.equal(restCues.length, 2);
-  assert.ok(restCues.every(cue => cue.textContent === 'Shake it out, next set is coming.'));
-});
-
-test('renders the final_set cue attached to the final set, not as a rest cue', () => {
-  const root = new FakeRoot();
-  const draft = draftWithCues(
-    { rest: 'Shake it out.', final_set: '1-2 reps in the tank, this is the one that counts.' },
-    [
-      { reps: 8, weight_kg: 36, cable_type: 'constant_force' },
-      { reps: 8, weight_kg: 36, cable_type: 'constant_force' }
-    ]
-  );
-  renderFitnessLogger(root, draft, { expandedExerciseIndex: 0 });
-
-  const card = findExerciseCard(root.logger);
-  const table = card.children.find(child => child.className === 'fitness-logger__sets');
-  const finalCues = cuesIn(table, 'cue-final-set');
-  const restCues = cuesIn(table, 'cue-rest');
-  assert.equal(finalCues.length, 1);
-  assert.equal(finalCues[0].textContent, '1-2 reps in the tank, this is the one that counts.');
-  assert.equal(restCues.length, 1, 'only one rest cue -- between set 1 and set 2, not after the final set');
-});
-
-test('renders no cue elements at all when the exercise has no coach_cues', () => {
-  const root = new FakeRoot();
-  const draft = draftWithCues(undefined, [
+test('gym mode opens on the current set with big kg / reps steppers and a docked Done', () => {
+  const root = render(draftWithCues(undefined, [
     { reps: 8, weight_kg: 36, cable_type: 'constant_force' },
     { reps: 8, weight_kg: 36, cable_type: 'constant_force' }
-  ]);
-  renderFitnessLogger(root, draft, { expandedExerciseIndex: 0 });
-
-  const card = findExerciseCard(root.logger);
-  assert.equal(cuesIn(card, 'cue-start').length, 0);
-  const table = card.children.find(child => child.className === 'fitness-logger__sets');
-  assert.equal(cuesIn(table, 'cue-rest').length, 0);
-  assert.equal(cuesIn(table, 'cue-final-set').length, 0);
+  ]));
+  assert.equal(byMarker(root.logger, 'gym').length, 1);
+  assert.equal(byMarker(root.logger, 'exercise-name')[0].textContent, 'Bench');
+  assert.equal(byMarker(root.logger, 'set-meta')[0].textContent, 'Set 1 of 2');
+  assert.equal(byMarker(root.logger, 'value-weight_kg')[0].value, '36');
+  assert.equal(byMarker(root.logger, 'value-reps')[0].value, '8');
+  const dock = byMarker(root.logger, 'dock')[0];
+  assert.equal(dock.dataset.part, 'form-actions');
+  assert.equal(byMarker(dock, 'done-step')[0].textContent, 'Set done ✓');
+  assert.equal(byMarker(dock, 'prev')[0].disabled, true);
+  assert.equal(byMarker(dock, 'next')[0].disabled, false);
 });
 
-test('logger shows add-exercise, reorder controls, and session detail fields', () => {
-  const root = new FakeRoot();
-  renderFitnessLogger(root, draftWithCues(undefined, [{ reps: 8, weight_kg: 36, cable_type: 'constant_force' }]), {
-    expandedExerciseIndex: 0
+test('stepper buttons nudge the value and report the change', () => {
+  const changes = [];
+  const root = render(draftWithCues(), {
+    actions: { setField: (...args) => changes.push(args) }
   });
+  byMarker(root.logger, 'more-weight_kg')[0].click();
+  byMarker(root.logger, 'less-reps')[0].click();
+  assert.deepEqual(changes, [[0, 0, 'weight_kg', 36.5], [0, 0, 'reps', 7]]);
+  assert.equal(byMarker(root.logger, 'value-weight_kg')[0].value, '36.5');
+});
 
-  const add = root.logger.children.find(child => child.className === 'fitness-logger__add-exercise');
-  assert.ok(add);
-  assert.equal(add.children[1].textContent, 'Add exercise');
+test('the start cue shows on the first set and final_set on the last', () => {
+  const cues = { start: "Let's get that chest pumped, big guy.", final_set: 'This is the one.' };
+  const sets = [
+    { reps: 8, weight_kg: 36, cable_type: 'constant_force' },
+    { reps: 8, weight_kg: 36, cable_type: 'constant_force' }
+  ];
+  const first = render(draftWithCues(cues, sets), { stepIndex: 0 });
+  assert.equal(byMarker(first.logger, 'cue-start')[0].textContent, cues.start);
+  assert.equal(byMarker(first.logger, 'cue-final-set').length, 0);
+  const last = render(draftWithCues(cues, sets), { stepIndex: 1 });
+  assert.equal(byMarker(last.logger, 'cue-final-set')[0].textContent, cues.final_set);
+  assert.equal(byMarker(last.logger, 'cue-start').length, 0);
+});
 
-  const card = findExerciseCard(root.logger);
-  const tools = card.children[0].children[1];
-  assert.equal(tools.children[0].dataset.fitnessLogger, 'move-up');
-  assert.equal(tools.children[1].dataset.fitnessLogger, 'move-down');
-  assert.equal(tools.children[2].dataset.fitnessLogger, 'remove-exercise');
+test('a single-set exercise gets the final_set cue, never a rest cue', () => {
+  const root = render(draftWithCues({ rest: 'Shake it out.', final_set: 'This is the one.' }));
+  assert.equal(byMarker(root.logger, 'cue-rest').length, 0);
+  assert.equal(byMarker(root.logger, 'cue-final-set').length, 1);
+});
 
-  const details = root.logger.children.find(child => child.className === 'fitness-logger__details');
-  assert.ok(details);
+test('the rest cue rides the rest timer', () => {
+  const root = render(draftWithCues({ rest: 'Shake it out.' }), {
+    rest: { remainingMs: 75_000, cue: 'Shake it out.', label: 'Rest' }
+  });
+  assert.equal(byMarker(root.logger, 'rest-clock')[0].textContent, '01:15');
+  assert.equal(byMarker(root.logger, 'cue-rest')[0].textContent, 'Shake it out.');
+});
+
+test('no cue elements at all when the exercise has no coach_cues', () => {
+  const root = render(draftWithCues());
+  for (const marker of ['cue-start', 'cue-rest', 'cue-final-set']) {
+    assert.equal(byMarker(root.logger, marker).length, 0);
+  }
+});
+
+test('hit failure and notes are one tap away on every set', () => {
+  const draft = draftWithCues();
+  draft.exercises[0].sets[0].failed = true;
+  draft.exercises[0].sets[0].reps = 7;
+  const root = render(draft, { noteOpen: 'set' });
+  const failure = byMarker(root.logger, 'toggle-failure')[0];
+  assert.equal(failure.attributes['aria-pressed'], 'true');
+  assert.match(failure.textContent, /Hit failure/);
+  const note = byMarker(root.logger, 'set-note')[0];
+  assert.ok(note, 'set note editor opens');
+  assert.ok(walk(note).some(child => child.textContent === 'Form broke'), 'quick chips offered');
+});
+
+test('a superset shows its block letter, round and B1 / B2 order', () => {
+  const sets = [{ reps: 10, weight_kg: 30, cable_type: 'constant_force' }, { reps: 10, weight_kg: 30, cable_type: 'constant_force' }];
+  const draft = draftWithCues(undefined, sets);
+  draft.exercises = [
+    { name: 'Bar Row', sets: [{ reps: 10, weight_kg: 36, cable_type: 'constant_force' }] },
+    { name: 'Bar Press', superset_group: 1, superset_label: 'Press + Curl', sets },
+    { name: 'Bar Curl', superset_group: 1, sets }
+  ];
+  const root = render(draft, { stepIndex: 2 });
+  const block = byMarker(root.logger, 'block')[0];
+  assert.equal(block.dataset.blockKind, 'superset');
+  assert.equal(byMarker(block, 'round')[0].textContent, 'Round 1 of 2');
+  const order = byMarker(block, 'block-order')[0];
+  assert.deepEqual(order.children.map(item => item.children[0].textContent), ['B1', 'B2']);
+  assert.match(order.children[1].className, /is-current/);
+  assert.equal(byMarker(root.logger, 'exercise-name')[0].textContent, 'Bar Curl');
+  assert.match(byMarker(root.logger, 'up-next')[0].textContent, /B1 Bar Press · set 2/);
+});
+
+test('a circuit round is one card with every move and a round clock', () => {
+  const sets = n => Array.from({ length: n }, () => ({ reps: 5, weight_kg: 0, cable_type: 'none' }));
+  const draft = draftWithCues();
+  draft.exercises = [
+    { name: 'Push-Up', tracking: 'bodyweight_reps', superset_group: 2, superset_label: 'Cindy', block: { kind: 'circuit', format: 'for_time' }, sets: sets(3) },
+    { name: 'Bench Dip', tracking: 'bodyweight_reps', superset_group: 2, sets: sets(3) },
+    { name: 'Reverse Crunch', tracking: 'bodyweight_reps', superset_group: 2, sets: sets(3) }
+  ];
+  const root = render(draft, { circuits: { 0: { elapsedMs: 32_000, running: true } } });
+  const card = byMarker(root.logger, 'round-card')[0];
+  assert.ok(card);
+  assert.equal(byMarker(card, 'value-reps').length, 3);
+  assert.equal(byMarker(root.logger, 'circuit-clock')[0].textContent, '00:32');
+  assert.equal(byMarker(root.logger, 'done-step')[0].textContent, 'Round done ✓');
+});
+
+test('the plan sheet keeps add-exercise, reorder, session details and a docked Finish', () => {
+  const root = render(draftWithCues(), { panel: 'plan' });
+  const sheet = byMarker(root.logger, 'plan-sheet')[0];
+  assert.ok(sheet);
+  assert.equal(byMarker(sheet, 'add-exercise')[0].textContent, 'Add exercise');
+  for (const marker of ['move-up', 'move-down', 'remove-exercise']) {
+    assert.equal(byMarker(sheet, marker).length, 1, marker);
+  }
+  const details = walk(sheet).find(child => child.className === 'fitness-logger__details');
   assert.match(details.children[0].textContent, /Session details/);
+  const dock = walk(sheet).find(child => child.className === 'gym-sheet__dock');
+  assert.equal(dock.dataset.part, 'form-actions');
+  assert.ok(byMarker(dock, 'finish-sheet')[0]);
 });
 
-test('multiple exercises sit in a compact swipe deck until a card is expanded', () => {
-  const root = new FakeRoot();
+test('all sets done swaps Done for the Finish button', () => {
+  const draft = draftWithCues();
+  draft.exercises[0].sets[0].done = true;
+  const root = render(draft);
+  assert.equal(byMarker(root.logger, 'finish')[0].textContent, 'Pump finished');
+});
+
+test('minimised gym mode leaves a Back to workout bar on the Fitness card', () => {
+  const root = render(draftWithCues(), { view: 'docked' });
+  assert.equal(byMarker(root.logger, 'gym').length, 0);
+  assert.equal(byMarker(root.logger, 'open-gym')[0].textContent, 'Back to workout');
+});
+
+test('ghost mode shows last time\'s same set with a live verdict, plus the target', () => {
   const draft = draftWithCues(undefined, [{ reps: 8, weight_kg: 36, cable_type: 'constant_force' }]);
-  draft.exercises.push({
-    name: 'Cable fly',
-    sets: [{ reps: 12, weight_kg: 12, cable_type: 'constant_force' }]
+  const root = render(draft, {
+    lastPerformance: { bench: { date: '2026-07-30', sets: [{ reps: 7, weight_kg: 36, failed: true }] } },
+    targetFor: () => ({ action: 'hold', weight_kg: 36, reps: 8, reason: 'Failure at 36 kg last time — stay and own it' }),
+    actions: { setField: (e, s, field, value) => { draft.exercises[e].sets[s][field] = value; } }
   });
-  renderFitnessLogger(root, draft, { exerciseIndex: 1 });
-
-  const swipe = root.logger.children.find(child => String(child.className || '').includes('fitness-logger__swipe'));
-  assert.ok(swipe, 'logger mounts the kit swipe deck');
-  assert.equal(swipe.dataset.cardSwipeIndex, '1');
-  const peeks = walk(swipe).filter(child => String(child.className || '').split(/\s+/).includes('fitness-logger__peek'));
-  assert.equal(peeks.length, 2);
-  assert.equal(peeks[0].children[0].textContent, 'Bench');
-  assert.equal(peeks[1].children[0].textContent, 'Cable fly');
-  assert.equal(walk(root.logger).filter(child => child.className === 'fitness-logger__exercise').length, 0);
+  const ghost = byMarker(root.logger, 'ghost')[0];
+  assert.match(ghost.children[0].textContent, /Ghost · set 1 last time \(30\/07\/26\): .*36.*(failure)/);
+  const verdict = byMarker(ghost, 'ghost-verdict')[0];
+  assert.equal(verdict.textContent, 'Beating it: +1 rep');
+  byMarker(root.logger, 'less-reps')[0].click();
+  byMarker(root.logger, 'less-reps')[0].click();
+  assert.equal(verdict.textContent, 'Behind it: -1 reps', 'verdict follows the stepper live');
+  const target = byMarker(root.logger, 'target')[0];
+  assert.match(target.children[0].children[0].textContent, /Target 36 kg × 8/);
 });
 
-test('selecting a swipe card expands the set editor for that exercise', () => {
-  const root = new FakeRoot();
-  const draft = draftWithCues(undefined, [{ reps: 8, weight_kg: 36, cable_type: 'constant_force' }]);
-  draft.exercises.push({
-    name: 'Cable fly',
-    sets: [{ reps: 12, weight_kg: 12, cable_type: 'constant_force' }]
-  });
-  renderFitnessLogger(root, draft, { exerciseIndex: 1, expandedExerciseIndex: 1 });
-
-  const card = findExerciseCard(root.logger);
-  assert.equal(card.children[0].children[0].textContent, 'Cable fly');
-  const table = card.children.find(child => child.className === 'fitness-logger__sets');
-  assert.ok(table);
-  const weight = walk(table).find(node => node.tagName === 'input' && node.step === '0.5');
-  assert.equal(weight?.value, 12);
-});
-
-test('a single-set exercise gets the final_set cue on that only set, never a rest cue', () => {
-  const root = new FakeRoot();
-  const draft = draftWithCues({ rest: 'Shake it out.', final_set: 'This is the one.' });
-  renderFitnessLogger(root, draft, { expandedExerciseIndex: 0 });
-
-  const card = findExerciseCard(root.logger);
-  const table = card.children.find(child => child.className === 'fitness-logger__sets');
-  assert.equal(cuesIn(table, 'cue-rest').length, 0);
-  assert.equal(cuesIn(table, 'cue-final-set').length, 1);
+test('a celebration banner leads the stage', () => {
+  const root = render(draftWithCues(), { celebration: { kind: 'pr', title: 'PERSONAL BEST', detail: 'Bench — Heaviest ever' } });
+  const moment = byMarker(root.logger, 'celebration')[0];
+  assert.equal(moment.dataset.kind, 'pr');
+  assert.equal(moment.children[0].textContent, 'PERSONAL BEST');
 });

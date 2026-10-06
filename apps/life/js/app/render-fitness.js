@@ -1,4 +1,6 @@
 import { fillExercisePlanList } from './render-workout-plan.js';
+import { renderBuildBoardRows } from './render-fitness-logger.js';
+import { projectBuildBoard } from './fitness-progression.js';
 import { muscleAssetPath, resolveMuscleMapKeys } from './muscle-maps.js';
 import { formatDisplayDate, formatWeekday } from '../core/time.js';
 import { applyRingTarget } from './chart-kit/apply-ring.js';
@@ -75,14 +77,41 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
   } else {
     empty?.setAttribute('hidden', '');
     heroWrap?.removeAttribute('hidden');
-    renderHero(root, model.heroSession, { logger, libraryByName });
+    renderHero(root, model.heroSession, {
+      logger,
+      libraryByName,
+      motivation: {
+        lastPerformance: model.lastPerformance,
+        exerciseBests: model.exerciseBests,
+        buildBoard: model.buildBoard,
+        lastSessionVolume: model.lastSessionVolume,
+        libraryByName
+      }
+    });
   }
 
+  renderBuildBoard(root, model, libraryByName);
   renderTemplateRail(root, templates, { libraryByName, onSelectTemplate });
   renderFocusStrip(root, model.focusHits);
   renderRunWidget(root, model);
 
   root.querySelector('#fitness-dashboard')?.removeAttribute('hidden');
+}
+
+/** Weekly hard sets per muscle; a planned session shows what it will add. */
+function renderBuildBoard(root, model, libraryByName) {
+  const card = root.querySelector('#fitness-build-card');
+  const host = root.querySelector('#fitness-build-board');
+  if (!card || !host) return;
+  const board = model.buildBoard;
+  if (!board?.regions?.length) {
+    card.setAttribute('hidden', '');
+    return;
+  }
+  const planned = model.heroSession?.status === 'planned' ? model.heroSession : null;
+  const rows = planned ? projectBuildBoard(board, planned, libraryByName) : board.regions;
+  host.replaceChildren(renderBuildBoardRows(root, rows, { live: Boolean(planned) }));
+  card.removeAttribute('hidden');
 }
 
 function renderRunWidget(root, model) {
@@ -391,7 +420,7 @@ function setHidden(element, hidden) {
   else element.removeAttribute('hidden');
 }
 
-function renderHero(root, session, { logger, libraryByName } = {}) {
+function renderHero(root, session, { logger, libraryByName, motivation = {} } = {}) {
   setText(root, '#fitness-hero-label', session.status === 'planned' ? 'Current session' : 'Last session');
   setText(root, '[data-fitness="hero-day"]', formatWeekday(session.date) || '');
   setText(root, '[data-fitness="hero-title"]', session.title ?? 'Session');
@@ -443,10 +472,10 @@ function renderHero(root, session, { logger, libraryByName } = {}) {
       notesEl.setAttribute('hidden', '');
     }
     if (started) {
-      logger.mount(session);
+      logger.mount(session, motivation);
     } else if (startBtn) {
       startBtn.onclick = () => {
-        logger.mount(session);
+        logger.mount(session, motivation);
         logger.startTimer();
         setHidden(preview, true);
         setHidden(startBtn, true);

@@ -1,9 +1,14 @@
 import { formatExerciseSetCount, formatExerciseSets, formatExerciseTitle } from './format-exercise.js';
 import { exercisePoseImagePath, resolveExerciseThumbSrc } from './muscle-maps.js';
 import { formatWeekday } from '../core/time.js';
+import { describeSet, resolveTrackingType } from '../core/exercise-tracking.js';
 import {
+  blockMemberCode,
+  formatBlockResult,
+  formatBlockScheme,
   formatSupersetBlockLabel,
-  groupWorkoutPlanExercises
+  groupWorkoutPlanExercises,
+  isGroupedBlock
 } from '../core/workout-plan-groups.js';
 
 function create(root, name) {
@@ -50,7 +55,8 @@ export function renderExercisePlanRow(root, exercise, libraryByName, {
   detail = 'count',
   extraClass = '',
   showBetweenSets = true,
-  reuseThumb = null
+  reuseThumb = null,
+  code = ''
 } = {}) {
   const row = create(root, tag);
   row.className = classNames('workout-plan-card__row', extraClass);
@@ -75,7 +81,16 @@ export function renderExercisePlanRow(root, exercise, libraryByName, {
   const copy = create(root, 'div');
   copy.className = 'workout-plan-card__copy';
   const title = create(root, 'strong');
-  title.textContent = formatExerciseTitle(exercise);
+  if (code) {
+    const badge = create(root, 'span');
+    badge.className = 'workout-plan-card__code';
+    badge.textContent = code;
+    const name = create(root, 'span');
+    name.textContent = formatExerciseTitle(exercise);
+    title.append(badge, name);
+  } else {
+    title.textContent = formatExerciseTitle(exercise);
+  }
   copy.append(title);
   if (detail === 'sets') {
     const setsDetail = formatExerciseSets(exercise);
@@ -106,44 +121,123 @@ export function renderExercisePlanRow(root, exercise, libraryByName, {
   return row;
 }
 
-function renderSupersetConnector(root) {
-  const connector = create(root, 'li');
-  connector.className = 'workout-plan-card__connector';
-  connector.setAttribute?.('aria-hidden', 'true');
-  connector.textContent = '↔';
-  return connector;
+function formatRoundSet(exercise, set) {
+  const tracking = resolveTrackingType(exercise);
+  if (tracking === 'bodyweight_reps' && !(Number(set?.weight_kg) > 0) && set?.reps != null) {
+    return `${set.reps} reps`;
+  }
+  const described = describeSet(set, tracking);
+  if (described) return described;
+  const weight = set?.weight_kg != null ? `${set.weight_kg} kg` : 'bodyweight';
+  return `${weight} × ${set?.reps ?? '—'}`;
 }
 
-function appendPlanBlock(root, list, block, libraryByName, detail, blockIndex) {
-  if (block.kind === 'single' && !block.exercises[0]?.superset_group) {
+/**
+ * Round-by-round order for a superset / circuit: "Round 1 · B1 30 kg × 10 → B2 7 kg × 8".
+ * This is the AB, AB, AB the session is actually performed in.
+ */
+function renderRoundsList(root, block) {
+  const list = create(root, 'ol');
+  list.className = 'workout-plan-card__rounds';
+  const rows = [];
+  for (let round = 0; round < block.rounds; round += 1) {
+    const text = block.exercises
+      .map((exercise, memberIndex) => {
+        const set = exercise?.sets?.[round];
+        if (!set) return null;
+        return `${blockMemberCode(block, memberIndex)} ${formatRoundSet(exercise, set)}${set.failed ? ' (failure)' : ''}`;
+      })
+      .filter(Boolean)
+      .join(' → ');
+    const previous = rows.at(-1);
+    if (previous && previous.text === text) previous.last = round + 1;
+    else rows.push({ first: round + 1, last: round + 1, text });
+  }
+  for (const row of rows) {
+    const item = create(root, 'li');
+    item.className = 'workout-plan-card__round';
+    const label = create(root, 'span');
+    label.className = 'workout-plan-card__round-label';
+    label.textContent = row.first === row.last ? `Round ${row.first}` : `Rounds ${row.first}–${row.last}`;
+    const steps = create(root, 'span');
+    steps.className = 'workout-plan-card__round-steps';
+    steps.textContent = row.text;
+    item.append(label, steps);
+    list.append(item);
+  }
+  return list;
+}
+
+function renderGroupedBlock(root, block, libraryByName, {
+  tag = 'li',
+  detail = 'count',
+  extraClass = '',
+  thumbPool = null
+} = {}) {
+  const grouped = isGroupedBlock(block);
+  const wrap = create(root, tag);
+  wrap.className = classNames(
+    'workout-plan-card__group',
+    grouped ? `workout-plan-card__group--${block.kind}` : 'workout-plan-card__group--between',
+    grouped && block.kind === 'circuit' ? 'workout-plan-card__group--superset' : '',
+    extraClass
+  );
+  if (grouped && wrap.dataset) wrap.dataset.blockKind = block.kind;
+
+  const head = create(root, 'div');
+  head.className = 'workout-plan-card__group-head';
+  if (grouped) {
+    const letter = create(root, 'span');
+    letter.className = 'workout-plan-card__letter';
+    letter.textContent = block.letter;
+    head.append(letter);
+  }
+  const label = create(root, 'p');
+  label.className = 'workout-plan-card__group-label';
+  label.textContent = formatSupersetBlockLabel(block);
+  head.append(label);
+  wrap.append(head);
+
+  const scheme = formatBlockScheme(block);
+  if (scheme) {
+    const line = create(root, 'p');
+    line.className = 'workout-plan-card__scheme';
+    line.textContent = scheme;
+    wrap.append(line);
+  }
+
+  const innerTag = tag === 'li' ? 'ul' : 'div';
+  const inner = create(root, innerTag);
+  inner.className = 'workout-plan-card__group-exercises';
+  block.exercises.forEach((exercise, memberIndex) => {
+    inner.append(renderExercisePlanRow(root, exercise, libraryByName, {
+      tag: innerTag === 'ul' ? 'li' : 'div',
+      detail: grouped ? 'count' : detail,
+      extraClass: 'workout-plan-card__row--paired',
+      showBetweenSets: !grouped,
+      code: grouped ? blockMemberCode(block, memberIndex) : '',
+      reuseThumb: thumbPool ? takeThumb(thumbPool, resolveExerciseThumbSrc(exercise, libraryByName)) : null
+    }));
+  });
+  wrap.append(inner);
+
+  if (grouped && detail === 'sets' && block.rounds > 0) wrap.append(renderRoundsList(root, block));
+  const result = formatBlockResult(block);
+  if (result) {
+    const score = create(root, 'p');
+    score.className = 'workout-plan-card__scheme workout-plan-card__score';
+    score.textContent = `Score: ${result}`;
+    wrap.append(score);
+  }
+  return wrap;
+}
+
+function appendPlanBlock(root, list, block, libraryByName, detail) {
+  if (block.kind === 'single') {
     list.append(renderExercisePlanRow(root, block.exercises[0], libraryByName, { detail }));
     return;
   }
-
-  const group = create(root, 'li');
-  group.className = classNames(
-    'workout-plan-card__group',
-    block.kind === 'between' ? 'workout-plan-card__group--between' : 'workout-plan-card__group--superset'
-  );
-
-  const label = create(root, 'p');
-  label.className = 'workout-plan-card__group-label';
-  label.textContent = formatSupersetBlockLabel(block, blockIndex);
-  group.append(label);
-
-  const inner = create(root, 'ul');
-  inner.className = 'workout-plan-card__group-exercises';
-  block.exercises.forEach((exercise, index) => {
-    if (index > 0) inner.append(renderSupersetConnector(root));
-    inner.append(renderExercisePlanRow(root, exercise, libraryByName, {
-      tag: 'li',
-      detail,
-      extraClass: 'workout-plan-card__row--paired',
-      showBetweenSets: block.kind === 'between'
-    }));
-  });
-  group.append(inner);
-  list.append(group);
+  list.append(renderGroupedBlock(root, block, libraryByName, { tag: 'li', detail }));
 }
 
 export function appendWorkoutPlanCard(root, host, {
@@ -179,8 +273,8 @@ export function appendWorkoutPlanCard(root, host, {
   const list = create(root, 'ul');
   list.className = 'workout-plan-card__exercises record-proposal__exercises';
   const blocks = groupWorkoutPlanExercises(record.exercises ?? []);
-  blocks.forEach((block, index) => {
-    appendPlanBlock(root, list, block, libraryByName, resolvedDetail, index);
+  blocks.forEach(block => {
+    appendPlanBlock(root, list, block, libraryByName, resolvedDetail);
   });
   card.append(list);
   host.append(card);
@@ -198,8 +292,8 @@ export function fillExercisePlanList(root, host, {
   host.replaceChildren();
   const tag = /^(ul|ol)$/i.test(host.tagName ?? '') ? 'li' : 'div';
   const blocks = groupWorkoutPlanExercises(exercises);
-  for (const [index, block] of blocks.entries()) {
-    if (block.kind === 'single' && !block.exercises[0]?.superset_group) {
+  for (const block of blocks) {
+    if (block.kind === 'single') {
       const exercise = block.exercises[0];
       host.append(renderExercisePlanRow(root, exercise, libraryByName, {
         tag,
@@ -209,30 +303,12 @@ export function fillExercisePlanList(root, host, {
       }));
       continue;
     }
-    const wrap = create(root, tag === 'li' ? 'li' : 'div');
-    wrap.className = classNames(
-      'workout-plan-card__group',
-      block.kind === 'between' ? 'workout-plan-card__group--between' : 'workout-plan-card__group--superset',
-      extraClass
-    );
-    const label = create(root, 'p');
-    label.className = 'workout-plan-card__group-label';
-    label.textContent = formatSupersetBlockLabel(block, index);
-    wrap.append(label);
-    const inner = create(root, tag === 'li' ? 'ul' : 'div');
-    inner.className = 'workout-plan-card__group-exercises';
-    block.exercises.forEach((exercise, exerciseIndex) => {
-      if (exerciseIndex > 0) inner.append(renderSupersetConnector(root));
-      inner.append(renderExercisePlanRow(root, exercise, libraryByName, {
-        tag: tag === 'li' ? 'li' : 'div',
-        detail,
-        extraClass: 'workout-plan-card__row--paired',
-        showBetweenSets: block.kind === 'between',
-        reuseThumb: takeThumb(thumbPool, resolveExerciseThumbSrc(exercise, libraryByName))
-      }));
-    });
-    wrap.append(inner);
-    host.append(wrap);
+    host.append(renderGroupedBlock(root, block, libraryByName, {
+      tag: tag === 'li' ? 'li' : 'div',
+      detail,
+      extraClass,
+      thumbPool
+    }));
   }
 }
 

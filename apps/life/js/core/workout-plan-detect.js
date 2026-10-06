@@ -1,3 +1,5 @@
+import { parseLetteredWorkoutChat } from './parse-workout-chat.js';
+
 const LOCK_IN_RE = /\b(?:put (?:it|this) into action|lock(?:ed|ing)? (?:it|this|the plan) (?:in|onto(?:\s+\w+)?)|lock(?:ed|ing)? (?:it|this) onto fitness|let'?s (?:do|run|go) (?:it|this)|go crush it|that'?s the one|save (?:this |the )?(?:workout|plan|session)|log this (?:in|as|now)|use this (?:one|plan)|go with this|is (?:it|this) ready(?: to go)?|ready to go|start (?:the |this )?(?:workout|session)|put (?:it|this) on(?:to)? fitness|(?:it(?:'?s| is)|not) (?:there|on fitness)|(?:didn'?t|did not|hasn'?t|has not|never) (?:save|show|land|appear)|where(?:'?s| is) (?:the )?(?:plan|workout|session))\b/i;
 
 // Short approvals that only mean "go" when they are (nearly) the whole message.
@@ -82,6 +84,7 @@ export function claimedPlanLocked(text) {
 
 export function looksLikeWorkoutPlan(text) {
   if (typeof text !== 'string' || text.trim() === '') return false;
+  if (parseLetteredWorkoutChat(text)) return true;
   const supersetLines = (text.match(/^\s*\d+(?:&\d+)?\s+(?:superset|straight after[^:]*):/gim) || []).length;
   if (supersetLines >= 2) return true;
   const numbered = (text.match(/(?:^|\n|\s)(\d+)[\.)]\s+\S+/g) || []).length;

@@ -219,3 +219,50 @@ test('setsAreIdentical is true only when every set shares load and cable', () =>
   assert.equal(setsAreIdentical(mixed), false);
   assert.equal(setsAreIdentical([{ reps: 10 }]), false);
 });
+
+import { parseLetteredWorkoutChat } from '../../apps/life/js/core/parse-workout-chat.js';
+import { looksLikeWorkoutPlan as looksLikePlanForLettered } from '../../apps/life/js/core/workout-plan-detect.js';
+
+const LETTERED = `Here's tonight, big guy.
+
+A  Bar Hip Thrust — 30 kg × 10, 35 kg × 10
+B1 Bar Press — 30 kg × 10 (cable: eccentric)
+B2 Cable Bar Curl — 10 kg × 12
+   ↳ 3 rounds: B1 → B2, rest 90 s after each round
+C  Cindy (circuit, 3 rounds for time)
+C1 Push-ups — 5 reps · C2 Bench dips — 10 reps · C3 Reverse crunch — 15 reps
+
+Lock it in?`;
+
+test('lettered coach notation becomes superset / circuit blocks in round order', () => {
+  const plan = parseLetteredWorkoutChat(LETTERED);
+  assert.equal(plan.intro, "Here's tonight, big guy.");
+  assert.equal(plan.outro, 'Lock it in?');
+  const [thrust, press, curl, push, dips, crunch] = plan.exercises;
+  assert.equal(thrust.superset_group, undefined);
+  assert.equal(thrust.sets.length, 2);
+  assert.equal(press.superset_group, 1);
+  assert.equal(curl.superset_group, 1);
+  assert.equal(press.sets.length, 3, 'one round load repeated for 3 rounds');
+  assert.equal(press.sets[0].cable_type, 'eccentric');
+  assert.deepEqual(press.block, { rest_sec: 90 });
+  assert.equal(push.superset_group, 2);
+  assert.equal(push.superset_label, 'Cindy');
+  assert.deepEqual(push.block, { kind: 'circuit', format: 'for_time' });
+  assert.equal(push.tracking, 'bodyweight_reps');
+  assert.deepEqual(dips.sets.map(set => set.reps), [10, 10, 10]);
+  assert.equal(crunch.sets[0].cable_type, 'none');
+});
+
+test('lettered drafts count as a plan, and the go path builds the Confirm card from them', () => {
+  assert.equal(looksLikePlanForLettered(LETTERED), true);
+  const input = buildPlannedWorkoutInput(LETTERED, { date: '2026-10-07' });
+  assert.equal(input.fields.status, 'planned');
+  assert.equal(input.fields.exercises.length, 6);
+  assert.equal(input.fields.exercises[3].block.kind, 'circuit');
+});
+
+test('prose that merely starts with "A" is not a lettered plan', () => {
+  assert.equal(parseLetteredWorkoutChat('A solid week, mate. 3 rounds of rest is plenty.'), null);
+  assert.equal(parseLetteredWorkoutChat('1. Bench — 10x30kg\n2. Row — 10x30kg\n3. Curl — 10x10kg'), null);
+});

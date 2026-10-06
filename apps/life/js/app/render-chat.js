@@ -3,7 +3,7 @@ import { formatExerciseSets, formatExerciseTitle, humanizeFieldLabel } from './f
 import { applyAgentAvatarToBubble } from './render-agent-picker.js';
 import { showEphemeralMessage } from './ephemeral-message.js';
 import { appendWorkoutPlanCard } from './render-workout-plan.js';
-import { parseWorkoutChat, setsAreIdentical } from '../core/parse-workout-chat.js';
+import { parseLetteredWorkoutChat, parseWorkoutChat, setsAreIdentical } from '../core/parse-workout-chat.js';
 import { formatDisplayDate } from '../core/time.js';
 import { syncChatChrome } from './chat-chrome.js';
 import { notifyChatViewport } from './visual-viewport.js';
@@ -399,10 +399,40 @@ function renderWorkoutChat(root, container, plan) {
   container.append(card);
 }
 
+// A lettered draft (A · B1 B2 · C1–C3) renders as the same block card Fitness
+// and the Confirm card use, so a superset reads B1 → B2 per round in chat too.
+function renderLetteredWorkoutChat(root, container, plan) {
+  if (plan.intro) {
+    const intro = root.createElement('div');
+    intro.className = 'chat-workout__intro';
+    renderInlineMarkdown(root, intro, plan.intro, { multiline: true });
+    container.append(intro);
+  }
+  const card = root.createElement('div');
+  card.className = 'chat-workout chat-workout--blocks';
+  appendWorkoutPlanCard(root, card, {
+    record: { status: 'planned', exercises: plan.exercises },
+    includeHeader: false,
+    detail: 'sets'
+  });
+  container.append(card);
+  if (plan.outro) {
+    const outro = root.createElement('div');
+    outro.className = 'chat-workout__outro';
+    renderInlineMarkdown(root, outro, plan.outro, { multiline: true });
+    container.append(outro);
+  }
+}
+
 // Chat bubbles always opt into multiline lists, and turn a dumped workout
 // prescription into stacked exercise rows instead of one run-on paragraph.
 export function renderChatMarkdown(root, container, text) {
   container.replaceChildren();
+  const lettered = parseLetteredWorkoutChat(text);
+  if (lettered) {
+    renderLetteredWorkoutChat(root, container, lettered);
+    return;
+  }
   const plan = parseWorkoutChat(text);
   if (plan) {
     renderWorkoutChat(root, container, plan);

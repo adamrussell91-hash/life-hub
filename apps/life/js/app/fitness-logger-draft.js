@@ -1,4 +1,5 @@
 import { resolveTrackingType } from '../core/exercise-tracking.js';
+import { copyExerciseStructure, copySetExtras } from '../core/workout-plan-groups.js';
 
 export const DEFAULT_CABLE_TYPE = 'constant_force';
 
@@ -63,7 +64,18 @@ function cloneLoggerSet(set, tracking) {
   };
   if (tracking === 'timed') out.duration_sec = Number(set?.duration_sec) || 0;
   if (tracking === 'reps_in_time') out.time_cap_sec = Number(set?.time_cap_sec) || 60;
+  Object.assign(out, copySetExtras(set));
+  // `done` is logger-only progress (which sets are ticked). It lives in the
+  // device draft so a reload keeps your place, and never reaches the record.
+  if (set?.done === true) out.done = true;
   return out;
+}
+
+function withoutDone(exercises) {
+  return (exercises ?? []).map(exercise => ({
+    ...exercise,
+    sets: (exercise.sets ?? []).map(({ done: _done, ...set }) => set)
+  }));
 }
 
 export function cloneLoggerDraft(session) {
@@ -94,6 +106,7 @@ export function cloneLoggerDraft(session) {
         ...(exercise.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
         ...(exercise.intensification != null ? { intensification: exercise.intensification } : {}),
         ...(exercise.coach_cues != null ? { coach_cues: { ...exercise.coach_cues } } : {}),
+        ...copyExerciseStructure(exercise),
         sets: (exercise.sets ?? []).map(set => cloneLoggerSet(set, tracking))
       };
     }),
@@ -168,7 +181,7 @@ export function toConfirmPayload(draft, { status = 'planned' } = {}) {
       status: working.status,
       focus: working.focus,
       recovery_flag_next_day: working.recovery_flag_next_day,
-      exercises: working.exercises,
+      exercises: withoutDone(working.exercises),
       pain_flags: working.pain_flags,
       ...(working.duration_min != null ? { duration_min: working.duration_min } : {}),
       ...(working.avg_hr != null ? { avg_hr: working.avg_hr } : {}),
@@ -181,7 +194,7 @@ export function toConfirmPayload(draft, { status = 'planned' } = {}) {
 
 export function draftFingerprint(draft) {
   const { path: _path, ...rest } = cloneLoggerDraft(draft);
-  return JSON.stringify(rest);
+  return JSON.stringify({ ...rest, exercises: withoutDone(rest.exercises) });
 }
 
 /** Fingerprint of the server plan shape — stale local drafts must not beat a newly confirmed plan. */
@@ -191,7 +204,9 @@ export function planFingerprint(session) {
     sets: exercise?.sets,
     coach_cues: exercise?.coach_cues,
     intensification: exercise?.intensification,
-    bench_angle_deg: exercise?.bench_angle_deg
+    bench_angle_deg: exercise?.bench_angle_deg,
+    superset_group: exercise?.superset_group,
+    block: exercise?.block
   }));
   return JSON.stringify({
     title: session?.title ?? '',

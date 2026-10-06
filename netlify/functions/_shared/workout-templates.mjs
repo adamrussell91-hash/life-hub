@@ -3,6 +3,7 @@ import {
   describeSet,
   resolveTrackingType
 } from '../../../apps/life/js/core/exercise-tracking.js';
+import { copyExerciseStructure } from '../../../apps/life/js/core/workout-plan-groups.js';
 
 export const TEMPLATES_PREFIX = 'data/fitness/templates/';
 export const TEMPLATE_PATH = /^data\/fitness\/templates\/[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
@@ -43,6 +44,7 @@ export function buildTemplateRecord(session, sourceSessionDate) {
       ...(exercise?.tracking != null ? { tracking: exercise.tracking } : {}),
       ...(exercise?.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
       ...(exercise?.intensification != null ? { intensification: exercise.intensification } : {}),
+      ...copyExerciseStructure(exercise, { withResults: false }),
       sets: (Array.isArray(exercise?.sets) ? exercise.sets : []).map(set => copyWorkoutSet(set))
     }))
   };
@@ -101,7 +103,10 @@ function templateDetailLines(template) {
     const tracking = resolveTrackingType(exercise);
     const setSummary = sets.length ? sets.map(set => formatTemplateSet(set, tracking)).join(', ') : 'no logged sets';
     const intensification = exercise?.intensification ? ` [${exercise.intensification}]` : '';
-    return `    · ${exercise?.name ?? 'unnamed move'}${intensification}: ${setSummary}`;
+    const group = exercise?.superset_group != null
+      ? ` {${exercise?.block?.kind === 'circuit' ? 'circuit' : 'superset'} ${exercise.superset_group}}`
+      : '';
+    return `    · ${exercise?.name ?? 'unnamed move'}${intensification}${group}: ${setSummary}`;
   });
   return [`${templateSummaryLine(template)}:`, ...exerciseLines];
 }
