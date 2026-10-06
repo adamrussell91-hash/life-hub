@@ -161,6 +161,11 @@ const medicalController = createMedicalController({
   tasksApi,
   getDate: () => controller.getDisplayDate?.() ?? null,
   onRecordWritten: result => {
+    if (result?.deleted) {
+      showHubToast('Deleted', { tone: 'success' });
+      controller?.removeLoggedEvent?.(result);
+      return;
+    }
     showHubToast('Logged', { tone: 'success' });
     controller?.applyLoggedEvent?.(result);
   },

@@ -2583,3 +2583,81 @@ test('abandoned executing fence recovers on Confirm then applies the write', asy
   assert.equal(store.data['tasks/task_recover']?.title, 'Recover me');
   assert.equal(queue[0].status, 'consumed');
 });
+
+const MEDICAL_DELETE_PATH = 'data/body/2026/11/2026-11-10-medical-stelara-injection-0000.md';
+const MEDICAL_DELETE_SHA = 'e'.repeat(40);
+
+function medicalDeleteFetch({ tree = [{ path: MEDICAL_DELETE_PATH, type: 'blob', sha: MEDICAL_DELETE_SHA }] } = {}) {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree });
+    }
+    if (options?.method === 'DELETE') {
+      return Response.json({ commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  return { calls, fetchImpl };
+}
+
+test('delete_log removes an allowlisted medical visit file', async () => {
+  const { calls, fetchImpl } = medicalDeleteFetch();
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+  const response = await handler(request({
+    kind: 'delete_log',
+    slug: 'sara',
+    path: MEDICAL_DELETE_PATH,
+    id: 'stelara-2'
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(payload));
+  assert.equal(payload.data.deleted, true);
+  assert.equal(payload.data.path, MEDICAL_DELETE_PATH);
+  assert.equal(payload.data.id, 'stelara-2');
+  const del = calls.find(call => call.options?.method === 'DELETE');
+  assert.ok(del);
+  assert.match(String(del.url), /2026-11-10-medical-stelara-injection-0000\.md/);
+  assert.equal(JSON.parse(del.options.body).sha, MEDICAL_DELETE_SHA);
+});
+
+test('delete_log refuses a non-medical path without contacting GitHub', async () => {
+  const { calls, fetchImpl } = medicalDeleteFetch();
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+  const response = await handler(request({
+    kind: 'delete_log',
+    slug: 'sara',
+    path: 'data/nutrition/2026/08/2026-08-01-breakfast.md',
+    id: 'meal-1'
+  }));
+  assert.equal(response.status, 400);
+  assert.equal(calls.length, 0);
+});
+
+test('delete_log 404s when the medical file is not in the tree', async () => {
+  const { fetchImpl } = medicalDeleteFetch({ tree: [] });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+  const response = await handler(request({
+    kind: 'delete_log',
+    slug: 'sara',
+    path: MEDICAL_DELETE_PATH,
+    id: 'stelara-2'
+  }));
+  assert.equal(response.status, 404);
+});

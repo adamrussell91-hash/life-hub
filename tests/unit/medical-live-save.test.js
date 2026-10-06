@@ -126,6 +126,7 @@ test('source: medical logging applies the record instead of force-refreshing the
   assert.ok(start >= 0 && end > start);
   const block = main.slice(start, end);
   assert.match(block, /applyLoggedEvent/);
+  assert.match(block, /removeLoggedEvent/);
   assert.doesNotMatch(block, /notifyLogged/);
 });
 
@@ -291,4 +292,70 @@ test('createMedicalController selects the saved record id for a new visit', asyn
   await hooks.onSave({ title: 'GP', date: '2026-10-06', record_type: 'Appointment', notes: 'Check-in' });
   assert.equal(controller.filters().selectedId, 'med-gp-1');
   assert.equal(controller.view().mode, 'read');
+});
+
+test('removeLoggedEvent drops a medical card without a live sync', async () => {
+  const root = new FakeDocument();
+  const calls = { home: 0, medical: 0, syncs: 0, lastMedical: null };
+  const controller = createAppController({
+    root,
+    windowTarget: Object.assign(new EventTarget(), { location: { hostname: '', hash: '#/body-medical' } }),
+    documentTarget: root,
+    navigatorTarget: { onLine: true },
+    sessionStorage: memoryStorage({ 'life-hub:session-expiry': EXPIRY }),
+    localStorage: memoryStorage(),
+    now: () => new Date(NOW),
+    setIntervalImpl: () => 1,
+    clearIntervalImpl() {},
+    setTimeoutImpl: () => 1,
+    clearTimeoutImpl() {},
+    sessionApi: {
+      async getSession() { return { authenticated: true, expiresAt: EXPIRY }; },
+      async signIn() { return { authenticated: true, expiresAt: EXPIRY }; },
+      async signOut() {}
+    },
+    cache: { async clear() {}, async read() { return null; } },
+    async loadLive() {
+      calls.syncs += 1;
+      return {
+        events: [GP_EVENT],
+        targetsConfig: {},
+        warnings: [],
+        commitSha: 'b'.repeat(40),
+        changed: true,
+        freshness: 'confirmed'
+      };
+    },
+    async loadCached() { throw new Error('unused'); },
+    buildHomeModel: input => ({ date: input.date }),
+    renderHome() {
+      calls.home += 1;
+      root.querySelector('#home-dashboard').hidden = false;
+    },
+    renderWarnings() {},
+    renderUnavailable() {},
+    renderMedical(_root, model) {
+      calls.medical += 1;
+      calls.lastMedical = model;
+      root.querySelector('#body-medical-dashboard').hidden = false;
+    },
+    medicalController: createMedicalController({ getDate: () => '2026-10-06' })
+  });
+
+  await controller.start();
+  assert.equal(calls.lastMedical.visits.some(visit => visit.id === 'med-gp-1'), true);
+  const homeAfterStart = calls.home;
+  const syncsAfterStart = calls.syncs;
+  const medicalAfterStart = calls.medical;
+
+  controller.removeLoggedEvent({
+    deleted: true,
+    path: GP_EVENT.path,
+    record: { id: GP_EVENT.record.id }
+  });
+
+  assert.equal(calls.syncs, syncsAfterStart);
+  assert.equal(calls.home, homeAfterStart);
+  assert.ok(calls.medical > medicalAfterStart);
+  assert.equal(calls.lastMedical.visits.some(visit => visit.id === 'med-gp-1'), false);
 });

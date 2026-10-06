@@ -204,3 +204,50 @@ test('a new save hands the written visit to onRecordWritten even when confirm om
   assert.equal(written[0].path, 'data/body/2026/10/2026-10-20-medical-dentist-0000.md');
   assert.equal(controller.filters().selectedId, written[0].record.id);
 });
+
+test('deleting a visit confirms through chatApi and clears the selection', async () => {
+  const calls = [];
+  const written = [];
+  const controller = createMedicalController({
+    chatApi: {
+      async confirm(next) {
+        calls.push(next);
+        return { deleted: true, path: next.path, id: 'stelara-2' };
+      }
+    },
+    getDate: () => '2026-10-06',
+    isOnline: () => true,
+    onRecordWritten: event => written.push(event)
+  });
+  const hooks = controller.hooks(() => {});
+  await hooks.onDelete({
+    id: 'stelara-2',
+    title: 'Stelara injection',
+    date: '2026-11-10',
+    record_type: 'Prescription',
+    path: 'data/body/2026/11/2026-11-10-medical-stelara-injection-0000.md'
+  });
+  assert.equal(calls[0].kind, 'delete_log');
+  assert.equal(calls[0].slug, 'sara');
+  assert.equal(calls[0].id, 'stelara-2');
+  assert.equal(calls[0].path, 'data/body/2026/11/2026-11-10-medical-stelara-injection-0000.md');
+  assert.equal(controller.filters().selectedId, null);
+  assert.equal(written[0].deleted, true);
+  assert.equal(written[0].record.id, 'stelara-2');
+});
+
+test('deleting a visit without a path is reported and does not confirm', async () => {
+  const calls = [];
+  const errors = [];
+  const controller = createMedicalController({
+    chatApi: { async confirm(next) { calls.push(next); return { deleted: true }; } },
+    getDate: () => '2026-10-06',
+    isOnline: () => true,
+    onError: message => errors.push(message)
+  });
+  const hooks = controller.hooks(() => {});
+  await hooks.onDelete({ id: 'stelara-2', title: 'Stelara injection', date: '2026-11-10' });
+  assert.equal(calls.length, 0);
+  assert.equal(errors.length, 1);
+});
+

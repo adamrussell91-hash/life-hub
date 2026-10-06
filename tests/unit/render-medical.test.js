@@ -55,6 +55,7 @@ function el(tag = 'div') {
       if (name === 'data-visit-id') this.dataset.visitId = String(value);
       if (name === 'data-year') this.dataset.year = String(value);
       if (name === 'data-medical-density') this.dataset.medicalDensity = String(value);
+      if (name === 'data-part') this.dataset.part = String(value);
     },
     getAttribute(name) { return this.attributes[name]; },
     removeAttribute(name) {
@@ -103,6 +104,8 @@ function matches(node, selector) {
   if (selector === '[data-visit-id]') return node.dataset.visitId != null;
   if (selector === '[data-medical-density]') return node.dataset.medicalDensity != null;
   if (selector === '[data-year]') return node.dataset.year != null;
+  const part = /^\[data-part="(.+)"\]$/.exec(selector);
+  if (part) return node.dataset.part === part[1] || node.attributes['data-part'] === part[1];
   return false;
 }
 
@@ -406,7 +409,7 @@ test('renderMedical write form has start time and length fields prefilled and sa
     onSave: fields => { saved = fields; }
   });
   const form = root.querySelector('#medical-sheet').children[0];
-  const byField = name => form.children.find(c => c.dataset?.field === name);
+  const byField = name => formField(form, name);
   assert.equal(byField('time')._input.type, 'time');
   assert.equal(byField('time')._input.value, '10:30');
   assert.equal(byField('duration_min')._input.value, 45);
@@ -452,7 +455,7 @@ test('the length field accepts any whole minute (15 was rejected by step 5 from 
   const root = fakeRoot();
   renderMedical(root, sampleModel({ selected: visit, mode: 'write', draft: visit }), {});
   const form = root.querySelector('#medical-sheet').children[0];
-  const input = form.children.find(c => c.dataset?.field === 'duration_min')._input;
+  const input = formField(form, 'duration_min')._input;
   assert.equal(input.step, '1');
   assert.equal(input.min, '1');
   // HTML validity: a value is valid when (value - min) is a multiple of step.
@@ -461,3 +464,91 @@ test('the length field accepts any whole minute (15 was rejected by step 5 from 
   }
   assert.equal(input.value, 15);
 });
+
+function formField(form, name) {
+  let found = null;
+  const walk = node => {
+    if (found) return;
+    if (node.dataset?.field === name) {
+      found = node;
+      return;
+    }
+    for (const child of node.children ?? []) walk(child);
+  };
+  walk(form);
+  return found;
+}
+
+function sheetButtons(root) {
+  const sheet = root.querySelector('#medical-sheet');
+  const found = [];
+  const walk = node => {
+    if (node.tagName === 'BUTTON') found.push(node);
+    for (const child of node.children ?? []) walk(child);
+  };
+  walk(sheet);
+  return found;
+}
+
+test('a saved visit sheet has Delete; a cadence ghost does not', () => {
+  const visit = { ...sampleModel().items[1].visit, virtual: false };
+  const root = fakeRoot();
+  renderMedical(root, sampleModel({ selected: visit }));
+  assert.ok(sheetButtons(root).some(btn => btn.textContent === 'Delete'));
+
+  const ghost = {
+    ...visit,
+    id: 'virtual-stelara-2026-10-22',
+    virtual: true,
+    planned: true,
+    title: 'Stelara injection'
+  };
+  renderMedical(root, sampleModel({ selected: ghost }));
+  assert.equal(sheetButtons(root).some(btn => btn.textContent === 'Delete'), false);
+  assert.equal(sheetButtons(root).some(btn => /Mark booked|Mark done|^Edit$/.test(btn.textContent)), false);
+  assert.match(root.querySelector('#medical-sheet').textContent, /estimated/i);
+});
+
+test('Delete asks once, then calls onDelete', () => {
+  const visit = { ...sampleModel().items[1].visit, path: 'data/body/2026/05/2026-05-01-medical-visit.md' };
+  const root = fakeRoot();
+  const deleted = [];
+  renderMedical(root, sampleModel({ selected: visit }), {
+    onDelete: next => deleted.push(next.id)
+  });
+  const first = sheetButtons(root).find(btn => btn.textContent === 'Delete');
+  first.listeners.find(entry => entry[0] === 'click')[1]();
+  assert.equal(deleted.length, 0);
+  const confirm = sheetButtons(root).find(btn => btn.textContent === 'Delete visit');
+  assert.ok(confirm);
+  confirm.listeners.find(entry => entry[0] === 'click')[1]();
+  assert.deepEqual(deleted, [visit.id]);
+});
+
+test('Delete confirm Cancel restores the sheet without deleting', () => {
+  const visit = { ...sampleModel().items[1].visit, path: 'data/body/2026/05/2026-05-01-medical-visit.md' };
+  const root = fakeRoot();
+  const deleted = [];
+  renderMedical(root, sampleModel({ selected: visit }), {
+    onDelete: next => deleted.push(next.id)
+  });
+  sheetButtons(root).find(btn => btn.textContent === 'Delete').listeners.find(entry => entry[0] === 'click')[1]();
+  const cancel = sheetButtons(root).find(btn => btn.textContent === 'Cancel');
+  assert.ok(cancel);
+  cancel.listeners.find(entry => entry[0] === 'click')[1]();
+  assert.equal(deleted.length, 0);
+  assert.ok(sheetButtons(root).some(btn => btn.textContent === 'Delete'));
+  assert.equal(sheetButtons(root).some(btn => btn.textContent === 'Delete visit'), false);
+});
+
+test('saved visit actions sit in a docked form-actions row', () => {
+  const visit = { ...sampleModel().items[1].visit, path: 'data/body/2026/05/2026-05-01-medical-visit.md' };
+  const root = fakeRoot();
+  renderMedical(root, sampleModel({ selected: visit }));
+  const actions = root.querySelector('#medical-sheet').querySelector('[data-part="form-actions"]');
+  assert.ok(actions);
+  const labels = sheetButtons(root).map(btn => btn.textContent);
+  assert.ok(labels.includes('Edit'));
+  assert.ok(labels.includes('Delete'));
+});
+

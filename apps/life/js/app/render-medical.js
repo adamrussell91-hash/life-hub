@@ -45,6 +45,7 @@ export function renderMedical(root, model, {
   onWeightChange,
   onMarkBooked,
   onMarkDone,
+  onDelete,
   renderLabSnapshot
 } = {}) {
   const dashboard = root.querySelector('#body-medical-dashboard');
@@ -110,6 +111,7 @@ export function renderMedical(root, model, {
     onWeightChange,
     onMarkBooked,
     onMarkDone,
+    onDelete,
     renderLabSnapshot
   });
   dashboard.hidden = false;
@@ -656,12 +658,15 @@ function miniLabPanel(root, visit) {
   return panel;
 }
 
+const sheetConfirming = new WeakMap();
+
 function renderSheet(root, model, hooks) {
   const host = root.querySelector('#medical-sheet');
   if (!host) return;
   host.replaceChildren();
   const visit = model.selected;
   if (!visit && model.mode !== 'write') {
+    sheetConfirming.delete(host);
     host.hidden = true;
     host.setAttribute('hidden', '');
     const empty = root.createElement('p');
@@ -675,9 +680,15 @@ function renderSheet(root, model, hooks) {
   host.className = 'medical-sheet';
 
   if (model.mode === 'write') {
+    sheetConfirming.delete(host);
     host.append(writeForm(root, model.draft || visit, hooks));
     return;
   }
+
+  if (sheetConfirming.get(host) !== visit.id) sheetConfirming.delete(host);
+
+  const body = root.createElement('div');
+  body.className = 'medical-sheet__body';
 
   const kicker = root.createElement('p');
   kicker.className = 'metric-label';
@@ -690,7 +701,14 @@ function renderSheet(root, model, hooks) {
     ? `${visit.time}${visit.durationMin ? `, ${visit.durationMin} min` : ''}`
     : null;
   meta.textContent = [visit.displayDate, slot, visit.record_type, visit.provider].filter(Boolean).join(' · ');
-  host.append(kicker, title, meta);
+  body.append(kicker, title, meta);
+
+  if (visit.virtual) {
+    const estimated = root.createElement('p');
+    estimated.className = 'medical-sheet__estimated';
+    estimated.textContent = 'Estimated next dose from cadence — not a saved visit.';
+    body.append(estimated);
+  }
 
   if (visit.episode?.id) {
     const epCtx = root.createElement('p');
@@ -700,10 +718,10 @@ function renderSheet(root, model, hooks) {
       .sort((a, b) => a.date.localeCompare(b.date));
     const index = Math.max(1, siblings.findIndex(v => v.id === visit.id) + 1);
     epCtx.textContent = `Part of ${visit.episode.title}, entry ${index} of ${siblings.length || 1}`;
-    host.append(epCtx);
+    body.append(epCtx);
   }
 
-  if (visit.planned || visit.status === 'planned' || visit.status === 'to_book' || visit.virtual) {
+  if (!visit.virtual && (visit.planned || visit.status === 'planned' || visit.status === 'to_book')) {
     const planned = root.createElement('div');
     planned.className = 'medical-sheet__planned';
     const book = root.createElement('button');
@@ -717,35 +735,37 @@ function renderSheet(root, model, hooks) {
     done.textContent = 'Mark done';
     done.addEventListener('click', () => hooks.onMarkDone?.(visit));
     planned.append(book, done);
-    host.append(planned);
+    body.append(planned);
   }
 
-  const weightRow = root.createElement('div');
-  weightRow.className = 'medical-sheet__weight hub-pills';
-  weightRow.setAttribute('role', 'group');
-  weightRow.setAttribute('aria-label', 'Weight');
-  for (const value of ['major', 'routine', 'minor']) {
-    const btn = root.createElement('button');
-    btn.type = 'button';
-    btn.className = 'hub-pills__btn';
-    btn.textContent = value;
-    const on = (visit.weight || 'routine') === value;
-    btn.classList.toggle('is-active', on);
-    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    btn.addEventListener('click', () => hooks.onWeightChange?.(visit, value));
-    weightRow.append(btn);
+  if (!visit.virtual) {
+    const weightRow = root.createElement('div');
+    weightRow.className = 'medical-sheet__weight hub-pills';
+    weightRow.setAttribute('role', 'group');
+    weightRow.setAttribute('aria-label', 'Weight');
+    for (const value of ['major', 'routine', 'minor']) {
+      const btn = root.createElement('button');
+      btn.type = 'button';
+      btn.className = 'hub-pills__btn';
+      btn.textContent = value;
+      const on = (visit.weight || 'routine') === value;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.addEventListener('click', () => hooks.onWeightChange?.(visit, value));
+      weightRow.append(btn);
+    }
+    body.append(weightRow);
   }
-  host.append(weightRow);
 
   if (visit.notes) {
     const notes = root.createElement('p');
     notes.className = 'medical-sheet__notes';
     notes.textContent = visit.notes;
-    host.append(notes);
+    body.append(notes);
   }
-  addLine(root, host, 'Follow-up', visit.follow_up_date ? formatDisplayDate(visit.follow_up_date) : null);
-  addLine(root, host, 'Cost', visit.cost_aud != null ? `A$${visit.cost_aud}` : null);
-  addLine(root, host, 'Insurance', visit.insurance_status);
+  addLine(root, body, 'Follow-up', visit.follow_up_date ? formatDisplayDate(visit.follow_up_date) : null);
+  addLine(root, body, 'Cost', visit.cost_aud != null ? `A$${visit.cost_aud}` : null);
+  addLine(root, body, 'Insurance', visit.insurance_status);
 
   if (visit.location_kind === 'place' && visit.mapsUrl) {
     const map = createViewOnMap({
@@ -758,7 +778,7 @@ function renderSheet(root, model, hooks) {
     });
     if (map) {
       map.place.className = [map.place.className, 'medical-sheet__map'].filter(Boolean).join(' ');
-      host.append(map.el);
+      body.append(map.el);
     } else {
       const link = root.createElement('a');
       link.className = 'medical-sheet__map';
@@ -767,26 +787,58 @@ function renderSheet(root, model, hooks) {
       link.target = '_blank';
       link.rel = 'noreferrer';
       link.textContent = visit.location;
-      host.append(link);
+      body.append(link);
     }
   } else if (visit.location) {
-    addLine(root, host, 'Location', visit.location);
+    addLine(root, body, 'Location', visit.location);
   }
 
   if (visit.lab) {
     const labHost = root.createElement('div');
     labHost.id = 'medical-bloods-host';
     labHost.className = 'medical-sheet__labs';
-    host.append(labHost);
+    body.append(labHost);
     hooks.renderLabSnapshot?.(labHost, visit);
   }
 
-  const edit = root.createElement('button');
-  edit.type = 'button';
-  edit.className = 'btn btn--secondary';
-  edit.textContent = 'Edit';
-  edit.addEventListener('click', () => hooks.onEdit?.(visit));
-  host.append(edit);
+  host.append(body);
+
+  if (visit.virtual) return;
+
+  const actions = root.createElement('div');
+  actions.className = 'medical-sheet__actions';
+  actions.setAttribute('data-part', 'form-actions');
+  const confirming = sheetConfirming.get(host) === visit.id;
+  if (confirming) {
+    actions.append(
+      sheetButton(root, 'btn btn--ghost', 'Cancel', () => {
+        sheetConfirming.delete(host);
+        renderSheet(root, model, hooks);
+      }),
+      sheetButton(root, 'btn btn--decisive', 'Delete visit', () => {
+        sheetConfirming.delete(host);
+        hooks.onDelete?.(visit);
+      })
+    );
+  } else {
+    actions.append(
+      sheetButton(root, 'btn btn--secondary', 'Edit', () => hooks.onEdit?.(visit)),
+      sheetButton(root, 'btn btn--ghost', 'Delete', () => {
+        sheetConfirming.set(host, visit.id);
+        renderSheet(root, model, hooks);
+      })
+    );
+  }
+  host.append(actions);
+}
+
+function sheetButton(root, className, text, onClick) {
+  const btn = root.createElement('button');
+  btn.type = 'button';
+  btn.className = className;
+  btn.textContent = text;
+  btn.addEventListener('click', onClick);
+  return btn;
 }
 
 function addLine(root, host, label, value) {
@@ -804,6 +856,8 @@ function writeForm(root, draft, hooks) {
     event.preventDefault();
     hooks.onSave?.(readDraft(form));
   });
+  const fields = root.createElement('div');
+  fields.className = 'medical-form__body';
   const title = field(root, 'title', 'Title', draft?.title ?? '');
   const date = field(root, 'date', 'Date', draft?.date ?? '', 'date');
   const time = field(root, 'time', 'Start time', draft?.time ?? '', 'time');
@@ -812,19 +866,16 @@ function writeForm(root, draft, hooks) {
   const provider = field(root, 'provider', 'Provider', draft?.provider ?? '');
   const location = field(root, 'location', 'Location', draft?.location ?? '');
   const notes = field(root, 'notes', 'Overview', draft?.notes ?? '', 'textarea');
+  fields.append(title, date, time, duration, type, provider, location, notes);
   const actions = root.createElement('div');
   actions.className = 'medical-form__actions';
+  actions.setAttribute('data-part', 'form-actions');
   const save = root.createElement('button');
   save.type = 'submit';
   save.className = 'btn btn--primary';
   save.textContent = 'Save';
-  const cancel = root.createElement('button');
-  cancel.type = 'button';
-  cancel.className = 'btn btn--ghost';
-  cancel.textContent = 'Cancel';
-  cancel.addEventListener('click', () => hooks.onCancel?.());
-  actions.append(save, cancel);
-  form.append(title, date, time, duration, type, provider, location, notes, actions);
+  actions.append(save, sheetButton(root, 'btn btn--ghost', 'Cancel', () => hooks.onCancel?.()));
+  form.append(fields, actions);
   return form;
 }
 
@@ -896,8 +947,10 @@ function durationField(root, value) {
 
 function readDraft(form) {
   const draft = {};
-  for (const child of form.children ?? []) {
-    if (child.dataset?.field && child._input) draft[child.dataset.field] = child._input.value;
-  }
+  const walk = node => {
+    if (node.dataset?.field && node._input) draft[node.dataset.field] = node._input.value;
+    for (const child of node.children ?? []) walk(child);
+  };
+  walk(form);
   return draft;
 }

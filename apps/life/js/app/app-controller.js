@@ -1595,6 +1595,17 @@ export function createAppController(dependencies) {
     if (currentSection === 'body-medical') keepScroll(renderMedicalSection);
   }
 
+  function removeLoggedEvent(incoming) {
+    if (!latestResult) return;
+    const event = {
+      path: incoming?.path ?? null,
+      record: { id: incoming?.record?.id ?? incoming?.id }
+    };
+    const events = (latestResult.events ?? []).filter(item => !sameLoggedEvent(item, event));
+    latestResult = { ...latestResult, events };
+    if (currentSection === 'body-medical') keepScroll(renderMedicalSection);
+  }
+
   function visibleWeekRange() {
     if (!latestResult || typeof buildCalendarModel !== 'function') return null;
     const date = calendarSelectedDate || latestResult.date;
@@ -2287,6 +2298,7 @@ export function createAppController(dependencies) {
     getFitnessLibraryContext: () => fitnessLibraryContext(),
     applySkincareShelf,
     applyLoggedEvent,
+    removeLoggedEvent,
     openCalendarCompose: () => {
       calendarFocusCompose = true;
       if (currentSection !== 'calendar') showSection('calendar');

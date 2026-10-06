@@ -186,6 +186,38 @@ export function createMedicalController({
         // Booking confirms the appointment where it is; it must never re-date it to today.
         onMarkBooked: visit => persistVisit({ ...visit, status: 'booked', date_precision: 'day' }),
         onMarkDone: visit => persistVisit({ ...visit, status: 'done' }),
+        onDelete: async visit => {
+          if (!visit || visit.virtual) return;
+          if (!visit.path) return fail('This visit has no file to delete.');
+          if (!chatApi) return;
+          if (!isOnline()) return fail(OFFLINE_MESSAGE);
+          try {
+            const result = await chatApi.confirm({
+              kind: 'delete_log',
+              slug: 'sara',
+              path: visit.path,
+              id: visit.id
+            });
+            if (result?.ok === false) {
+              paint();
+              return result;
+            }
+            selectedId = null;
+            mode = 'read';
+            draft = null;
+            onRecordWritten?.({
+              deleted: true,
+              path: visit.path,
+              record: { id: visit.id, type: 'medical' },
+              ...(result && typeof result === 'object' ? result : {})
+            });
+            paint();
+            return result;
+          } catch (error) {
+            fail(error);
+            paint();
+          }
+        },
         onAddToTasks: async visit => {
           if (!visit || visit.task_id || visit.virtual) return;
           if (!tasksApi?.createTask) return;
