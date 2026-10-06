@@ -871,6 +871,32 @@ export function analyseTrainingEvidenceSchema() {
   };
 }
 
+export function addWorkoutNotesSchema() {
+  return {
+    name: 'add_workout_notes',
+    description:
+      'Add notes, heart rate, calories, or how-it-went detail to a workout Adam already finished (status completed). Appends under "Added after finish" and shows a Confirm card for THAT existing file. Use this whenever he sends notes after hitting Finish — never log_entry and never a new planned session. If two completed sessions exist that day, pass workout_title; do not pick silently.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        date: {
+          type: 'string',
+          description: 'YYYY-MM-DD. Defaults to today (Sydney) when omitted.'
+        },
+        notes: {
+          type: 'string',
+          description: 'The notes to append (heart rate, calories, how it went, anything he forgot before Finish).'
+        },
+        workout_title: {
+          type: 'string',
+          description: 'Optional title to pick between multiple completed sessions on that date.'
+        }
+      },
+      required: ['notes']
+    }
+  };
+}
+
 export function chadwickFitnessToolSchemas() {
   return [
     getFitnessSnapshotSchema(),

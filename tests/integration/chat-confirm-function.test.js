@@ -664,6 +664,181 @@ test('planned workout confirm amends the matching titled plan instead of a diffe
   )), 'must create a second same-day planned file');
   assert.ok(!calls.some(call => call.options?.method === 'PUT' && call.url.includes(existingPath)));
 });
+
+test('planned confirm refuses to overwrite a completed workout and leaves the file unchanged', async () => {
+  const existingPath = 'data/fitness/2026/08/2026-08-01-workout-the-full-send.md';
+  const existingSha = 'e'.repeat(40);
+  const existingMarkdown = [
+    '---',
+    'schema_version: 1',
+    'id: "workout-finished"',
+    'type: "workout"',
+    'date: "2026-08-01"',
+    'time: "16:07"',
+    'created_at: "2026-08-01T16:07:00+10:00"',
+    'updated_at: "2026-08-01T16:07:00+10:00"',
+    'source: "chat"',
+    'title: "The Full Send"',
+    'session_kind: "strength"',
+    'day_type: "workout_45_60"',
+    'status: "completed"',
+    'duration_min: 48',
+    'recovery_flag_next_day: false',
+    'exercises:',
+    '  - name: Bar Press',
+    '    sets:',
+    '      - { reps: 10, weight_kg: 40, cable_type: constant_force }',
+    '---',
+    'Matched loads.'
+  ].join('\n');
+  const plannedCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'The Full Send',
+      session_kind: 'strength',
+      day_type: 'workout_45_60',
+      status: 'planned',
+      recovery_flag_next_day: false,
+      exercises: [
+        { name: 'Bar Squat', sets: [{ reps: 10, weight_kg: 35, cable_type: 'none' }] }
+      ],
+      pain_flags: []
+    }
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: existingPath, type: 'blob', sha: existingSha }]
+      });
+    }
+    if (url.includes(`/git/blobs/${existingSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(existingMarkdown, 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T16:00:00+10:00')
+  });
+  const response = await handler(request({
+    candidate: plannedCandidate,
+    slug: 'workout-the-full-send',
+    overwrite: true
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 409);
+  assert.equal(payload.error.code, 'session_already_finished');
+  assert.match(payload.error.message, /already finished/);
+  assert.ok(!calls.some(call => call.options?.method === 'PUT'), 'must not write the completed file');
+});
+
+test('confirming add_workout_notes overwrites the same path and skips template and library upserts', async () => {
+  const existingPath = 'data/fitness/2026/08/2026-08-01-workout-the-full-send.md';
+  const existingSha = 'e'.repeat(40);
+  const existingMarkdown = [
+    '---',
+    'schema_version: 1',
+    'id: "workout-finished"',
+    'type: "workout"',
+    'date: "2026-08-01"',
+    'time: "16:07"',
+    'created_at: "2026-08-01T16:07:00+10:00"',
+    'updated_at: "2026-08-01T16:07:00+10:00"',
+    'source: "chat"',
+    'title: "The Full Send"',
+    'session_kind: "strength"',
+    'day_type: "workout_45_60"',
+    'status: "completed"',
+    'duration_min: 48',
+    'recovery_flag_next_day: false',
+    'exercises:',
+    '  - name: Bar Press',
+    '    sets:',
+    '      - { reps: 10, weight_kg: 40, cable_type: constant_force }',
+    '---',
+    'Matched loads.'
+  ].join('\n');
+  const amendCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    notes: 'Matched loads.\n\n## Added after finish\n\navg HR 142, 410 kcal',
+    fields: {
+      title: 'The Full Send',
+      session_kind: 'strength',
+      day_type: 'workout_45_60',
+      status: 'completed',
+      duration_min: 48,
+      recovery_flag_next_day: false,
+      exercises: [
+        { name: 'Bar Press', sets: [{ reps: 10, weight_kg: 40, cable_type: 'constant_force' }] }
+      ],
+      pain_flags: []
+    }
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: existingPath, type: 'blob', sha: existingSha },
+          { path: 'central-node.md', type: 'blob', sha: 'f'.repeat(40) }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${existingSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(existingMarkdown, 'utf8').toString('base64')
+      });
+    }
+    if (url.includes(`/git/blobs/${'f'.repeat(40)}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from('# Purpose\nIntro.\n', 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T16:00:00+10:00')
+  });
+  const response = await handler(request({
+    candidate: amendCandidate,
+    slug: 'workout-the-full-send',
+    overwrite: true,
+    path: existingPath
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, existingPath);
+  const workoutPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes(existingPath));
+  assert.ok(workoutPut, 'must overwrite the completed session file');
+  assert.equal(JSON.parse(workoutPut.options.body).sha, existingSha);
+  assert.ok(!calls.some(call => call.url.includes('data/fitness/templates/')), 'notes amend must not upsert templates');
+  assert.ok(!calls.some(call => call.url.includes('data/exercise-library.json')), 'notes amend must not upsert the exercise library');
+});
 test('a failing template upsert never fails the confirm response', async () => {
   const workoutCandidate = {
     type: 'workout',
@@ -1530,7 +1705,7 @@ function koreaLeadWrites({ koreaStart = '08:30', surfaces = ['confirm_card', 'go
     id: 'wblock_lead',
     task_id: 'task_mut921wb_bya2jc',
     title: 'Lead accreditation',
-    date: '2026-10-06',
+    date: '2026-08-01',
     start_time: '10:30',
     duration_minutes: 60,
     status: 'confirmed',

@@ -15,7 +15,12 @@ import {
 import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { buildCanonicalPath, buildRecordSlug, validateLogEntry } from './_shared/chat-schema.mjs';
-import { resolveWorkoutConfirmTarget } from './_shared/workout-confirm-path.mjs';
+import {
+  FINISHED_SESSION_PLAN_ERROR,
+  parseWorkoutAmendPath,
+  resolveWorkoutConfirmTarget,
+  WorkoutWriteBlockedError
+} from './_shared/workout-confirm-path.mjs';
 import { buildTemplateRecord, renderTemplateMarkdown, templatePathForTitle } from './_shared/workout-templates.mjs';
 import {
   applyCompletedWorkoutToLibrary,
@@ -356,15 +361,27 @@ export function createChatConfirmHandler({
     }
 
     let existingSha;
+    let workoutNotesAmend = false;
     try {
       if (validation.record.type === 'workout') {
         const target = await resolveWorkoutConfirmTarget(client, {
           record: validation.record,
           slug: parsed.slug,
-          overwrite: parsed.overwrite
+          overwrite: parsed.overwrite,
+          amendPath: parsed.amendPath
         });
+        if (target.blocked) {
+          return errorResponse(
+            409,
+            'session_already_finished',
+            target.error || FINISHED_SESSION_PLAN_ERROR,
+            false,
+            PRIVATE_CACHE
+          );
+        }
         path = target.path;
         existingSha = target.existingSha;
+        workoutNotesAmend = target.notesAmend === true || target.existingStatus === 'completed';
       } else if (validation.record.type === 'meal' && parsed.overwrite) {
         const current = await client.resolveTree();
         const target = resolveMealWritePath(current.tree, {
@@ -415,7 +432,11 @@ export function createChatConfirmHandler({
         persisted = await persistConfirmedRecord(refreshedSha);
       }
       let exercisePersonalBests;
-      if (validation.record.type === 'workout' && validation.record.status === 'completed') {
+      if (
+        validation.record.type === 'workout'
+        && validation.record.status === 'completed'
+        && !workoutNotesAmend
+      ) {
         try {
           await upsertWorkoutTemplate(client, validation.record);
         } catch {
@@ -485,6 +506,9 @@ export function createChatConfirmHandler({
         }
       }, PRIVATE_CACHE);
     } catch (error) {
+      if (error instanceof WorkoutWriteBlockedError) {
+        return errorResponse(409, error.code, error.message, false, PRIVATE_CACHE);
+      }
       if (error instanceof GitHubClientError && error.code === 'write_conflict') {
         return errorResponse(409, 'write_conflict', 'A record already exists at this path.', true, PRIVATE_CACHE);
       }
@@ -2148,6 +2172,9 @@ async function parseRequest(request) {
     candidate: body.candidate,
     slug: body.slug,
     overwrite: body.overwrite === true,
+    amendPath: parseWorkoutAmendPath(body.path, {
+      date: typeof body.candidate?.date === 'string' ? body.candidate.date : undefined
+    }),
     kind,
     id,
     accept: kind === 'action' && Array.isArray(body.accept) ? body.accept : null,

@@ -5,6 +5,7 @@ import {
   coerceChatWorkoutProposal,
   isPureWorkoutLockIn,
   isWorkoutLockIn,
+  looksLikePostWorkoutNotes,
   looksLikeWorkoutActualsReport,
   looksLikeWorkoutPlan,
   shouldForceChadwickPlanProposal,
@@ -228,4 +229,45 @@ test('coerceChatWorkoutProposal keeps completed when notes or pain_flags already
     }
   }, { userMessage: 'save workout' });
   assert.equal(withPain.record.status, 'completed');
+});
+
+const NOTES_AFTER_FINISH = 'I accidentally hit finish before adding notes — avg HR 142, 410 kcal, it didn\'t save';
+
+test('looksLikePostWorkoutNotes matches notes, HR, calories, and finish-misses', () => {
+  assert.equal(looksLikePostWorkoutNotes(NOTES_AFTER_FINISH), true);
+  assert.equal(looksLikePostWorkoutNotes('avg HR 142, 410 kcal'), true);
+  assert.equal(looksLikePostWorkoutNotes('forgot to add notes after I pressed finish'), true);
+  assert.equal(looksLikePostWorkoutNotes('I just finished the session'), true);
+  assert.equal(looksLikePostWorkoutNotes('lock it in'), false);
+  assert.equal(looksLikePostWorkoutNotes('save the workout'), false);
+});
+
+test('shouldForceChadwickPlanProposal does not fire on post-workout notes even with lock-in phrases', () => {
+  assert.equal(shouldForceChadwickPlanProposal({
+    userMessage: NOTES_AFTER_FINISH,
+    assistantText: PLAN,
+    sawLogEntry: false
+  }), false);
+  assert.equal(shouldForceChadwickPlanProposal({
+    userMessage: 'it didn\'t save — here are notes, avg HR 140',
+    assistantText: 'Alright king, LOCKED IN.',
+    sawLogEntry: false
+  }), false);
+});
+
+test('shouldNudgeUnsavedWorkoutPlan does not fire on post-workout notes', () => {
+  assert.equal(shouldNudgeUnsavedWorkoutPlan({
+    agentSlug: 'chadwick',
+    userMessage: NOTES_AFTER_FINISH,
+    assistantText: PLAN,
+    sawRecordProposal: false
+  }), false);
+});
+
+test('shouldForceChadwickPlanProposal still fires on claimed save when the message has no notes', () => {
+  assert.equal(shouldForceChadwickPlanProposal({
+    userMessage: 'it\'s not there',
+    assistantText: 'Alright king, LOCKED IN.',
+    sawLogEntry: false
+  }), true);
 });

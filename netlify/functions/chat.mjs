@@ -405,6 +405,10 @@ import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic
 import { FORCED_PLAN_TEXT, resolveForcedChadwickPlan } from './_shared/chadwick-plan-force.mjs';
 import { coerceChatWorkoutProposal } from '../../apps/life/js/core/workout-plan-detect.js';
 import {
+  buildWorkoutNotesAmend,
+  loadCompletedWorkoutsForDate
+} from './_shared/workout-confirm-path.mjs';
+import {
   forceStatusFor,
   isLogFinalize,
   isThinMindTurn,
@@ -666,16 +670,35 @@ export function createChatHandler({
         // Skip Anthropic + GitHub so "lock it onto Fitness" stays instant. Cue-less
         // cards are acceptable here — Adam already agreed the list in chat; the late
         // force path still runs when lock-in needs a model pass for a fresh plan.
-        const forcedPlan = resolveForcedChadwickPlan({
+        const forceMessages = [
+          ...materializeHistoryWithVisualEvidence(parsed.history),
+          { role: 'user', content: parsed.userContent ?? parsed.message }
+        ];
+        let forcedPlan = resolveForcedChadwickPlan({
           slug,
           userMessage: parsed.message,
           today,
           pureLockInOnly: true,
-          messages: [
-            ...materializeHistoryWithVisualEvidence(parsed.history),
-            { role: 'user', content: parsed.userContent ?? parsed.message }
-          ]
+          messages: forceMessages
         });
+        if (forcedPlan && slug === 'chadwick') {
+          try {
+            const completedToday = await loadCompletedWorkoutsForDate(client, today, {
+              parseDocument: (content, path) => parseEventDocument(content, path, loadYaml)
+            });
+            forcedPlan = resolveForcedChadwickPlan({
+              slug,
+              userMessage: parsed.message,
+              today,
+              pureLockInOnly: true,
+              messages: forceMessages,
+              completedWorkouts: completedToday
+            });
+          } catch {
+            // Cannot prove today's completed session is safe — do not skip the model.
+            forcedPlan = null;
+          }
+        }
         if (forcedPlan) {
           send({ type: 'status', text: 'Locking the plan onto Fitness…' });
           send({ type: 'text', delta: FORCED_PLAN_TEXT });
@@ -812,6 +835,7 @@ export function createChatHandler({
         let mindEvents = [];
         let medicalEvents = [];
         let repoTree = [];
+        let completedWorkoutsToday = [];
         try {
           const current = await client.resolveTree();
           repoTree = current.tree ?? [];
@@ -1547,6 +1571,18 @@ export function createChatHandler({
           mindEvents = [];
           medicalEvents = [];
           repoTree = [];
+          completedWorkoutsToday = [];
+        }
+
+        if (slug === 'chadwick' && repoTree.length) {
+          try {
+            completedWorkoutsToday = await loadCompletedWorkoutsForDate(client, today, {
+              tree: repoTree,
+              parseDocument: (content, path) => parseEventDocument(content, path, loadYaml)
+            });
+          } catch {
+            completedWorkoutsToday = [];
+          }
         }
 
         try {
@@ -2124,6 +2160,7 @@ export function createChatHandler({
             slug,
             userMessage: parsed.message,
             today,
+            completedWorkouts: completedWorkoutsToday,
             system,
             messages: [
               ...materializeHistoryWithVisualEvidence(parsed.history),
@@ -2949,6 +2986,17 @@ export function createChatHandler({
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }
               }
+              if (event.name === 'add_workout_notes') {
+                send({ type: 'status', text: 'Updating the finished session…' });
+                return JSON.stringify(await proposeWorkoutNotesAmend({
+                  client,
+                  today,
+                  input: event.input,
+                  repoTree,
+                  send: emit,
+                  exerciseLibraryEntries
+                }));
+              }
               if (event.name === 'log_entry') {
                 if (event.input?.type === 'mind_session') {
                   send({ type: 'status', text: 'Saving your session…' });
@@ -3447,7 +3495,23 @@ export function createChatHandler({
             keepFullDomainTools: visualCtx.keepFullDomainTools,
             hasVisualEvidence: visualCtx.hasVisualEvidence
           })) {
-            if (event.type === 'tool_call' && event.name === 'log_entry') {
+            if (event.type === 'tool_call' && event.name === 'add_workout_notes') {
+              try {
+                await proposeWorkoutNotesAmend({
+                  client,
+                  today,
+                  input: event.input,
+                  repoTree,
+                  send: emit,
+                  exerciseLibraryEntries
+                });
+              } catch {
+                send({
+                  type: 'record_rejected',
+                  errors: ['Could not add notes to that workout.']
+                });
+              }
+            } else if (event.type === 'tool_call' && event.name === 'log_entry') {
               let medicalInput = event.input;
               if (event.input?.type === 'medical') {
                 try {
@@ -3564,6 +3628,52 @@ export function createChatHandler({
       headers: { 'content-type': 'text/event-stream', ...PRIVATE_CACHE, connection: 'keep-alive' }
     });
   };
+}
+
+async function proposeWorkoutNotesAmend({
+  client,
+  today,
+  input,
+  repoTree,
+  send,
+  exerciseLibraryEntries = []
+}) {
+  const date = typeof input?.date === 'string' && input.date.trim()
+    ? input.date.trim()
+    : today;
+  const result = await buildWorkoutNotesAmend(client, {
+    date,
+    notes: input?.notes,
+    workoutTitle: input?.workout_title,
+    tree: repoTree,
+    parseDocument: (content, path) => parseEventDocument(content, path, loadYaml)
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.error,
+      message: result.message,
+      ...(result.titles ? { titles: result.titles } : {}),
+      instruction: result.error === 'ambiguous'
+        ? 'Ask Adam which completed session these notes belong to, then call add_workout_notes again with workout_title. Do not call log_entry.'
+        : 'Do not call log_entry and do not propose a new planned workout. Use add_workout_notes on the finished session.'
+    };
+  }
+  const restrictionWarnings = shelvedExerciseWarnings(
+    result.record,
+    exerciseLibraryEntries,
+    today
+  );
+  send({
+    type: 'record_proposal',
+    record: result.record,
+    notes: result.notes,
+    path: result.path,
+    overwrite: true,
+    amend_path: result.amend_path,
+    warnings: [...restrictionWarnings, ...lintWorkoutProposal(result.record)]
+  });
+  return { ok: true, status: 'awaiting_confirm', path: result.path, overwrite: true };
 }
 
 async function persistOrProposeLogEntry({ client, slug, today, validation, send, userMessage, exerciseLibraryEntries = [] }) {

@@ -39,3 +39,42 @@ test('planned workout persist skips Central Node and still reports a successful 
   assert.equal(client.writes.length, 1);
   assert.equal(client.writes[0].path, 'data/fitness/2026/09/2026-09-05-workout-planned.md');
 });
+
+test('planned persist refuses to overwrite a completed session at the same sha', async () => {
+  const completed = [
+    '---',
+    'status: "completed"',
+    'title: "The Full Send"',
+    '---',
+    ''
+  ].join('\n');
+  const writes = [];
+  const client = {
+    writes,
+    async writeFile(args) {
+      writes.push(args);
+      return { sha: 'a'.repeat(40), commitSha: 'b'.repeat(40) };
+    },
+    async resolveTree() {
+      throw new Error('must not write');
+    },
+    async readBlob() {
+      return { encoding: 'base64', content: Buffer.from(completed, 'utf8').toString('base64') };
+    }
+  };
+  await assert.rejects(
+    () => persistLogEntry(client, {
+      record: {
+        type: 'workout',
+        date: '2026-10-06',
+        title: 'The Full Send',
+        status: 'planned'
+      },
+      notes: '',
+      path: 'data/fitness/2026/10/2026-10-06-workout-the-full-send.md',
+      existingSha: 'e'.repeat(40),
+      nowDateKey: '2026-10-06'
+    }),
+    error => error.code === 'session_already_finished' && writes.length === 0
+  );
+});

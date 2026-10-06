@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CHADWICK_FORCE_PLAN_NUDGE,
+  resolveForcedChadwickPlan,
   streamWithChadwickPlanForce
 } from '../../netlify/functions/_shared/chadwick-plan-force.mjs';
 
@@ -227,4 +228,112 @@ test('a bare approval with no plan in the conversation never forces a workout ro
   }));
   assert.equal(calls, 1);
   assert.equal(events.some(event => event.type === 'tool_call'), false);
+});
+
+const FORCE_PLAN = [
+  '1. Bar Press — 10x30kg (cable: none)',
+  '2. Bar Row — 10x27kg (cable: none)',
+  '3. Bar Squat — 10x25kg (cable: none)'
+].join('\n');
+
+const COMPLETED_FROM_PLAN = [{
+  status: 'completed',
+  title: 'Bar Press / Bar Row',
+  record: {
+    title: 'Bar Press / Bar Row',
+    exercises: [
+      { name: 'Bar Press', sets: [{ reps: 10, weight_kg: 30 }] },
+      { name: 'Bar Row', sets: [{ reps: 10, weight_kg: 27 }] },
+      { name: 'Bar Squat', sets: [{ reps: 10, weight_kg: 25 }] }
+    ]
+  }
+}];
+
+test('post-workout notes with a plan in history do not late-force a planned card', async () => {
+  const anthropic = {
+    async *streamMessage() {
+      yield { type: 'text', delta: 'Got the notes, king.' };
+      yield { type: 'done' };
+    }
+  };
+  const userMessage = 'I accidentally hit finish before adding notes — avg HR 142, 410 kcal, it didn\'t save';
+  const events = await collect(streamWithChadwickPlanForce(anthropic, {
+    slug: 'chadwick',
+    userMessage,
+    today: '2026-10-06',
+    messages: [
+      { role: 'assistant', content: FORCE_PLAN },
+      { role: 'user', content: userMessage }
+    ],
+    completedWorkouts: COMPLETED_FROM_PLAN
+  }));
+  assert.equal(events.some(event => event.type === 'tool_call' && event.name === 'log_entry'), false);
+});
+
+test('bare log this after a completed session matching the old plan does not force a planned card', async () => {
+  assert.equal(resolveForcedChadwickPlan({
+    slug: 'chadwick',
+    userMessage: 'log this',
+    today: '2026-10-06',
+    pureLockInOnly: true,
+    messages: [
+      { role: 'assistant', content: FORCE_PLAN },
+      { role: 'user', content: 'log this' }
+    ],
+    completedWorkouts: COMPLETED_FROM_PLAN
+  }), null);
+
+  const anthropic = {
+    async *streamMessage() {
+      yield { type: 'text', delta: 'That session is already on Fitness.' };
+      yield { type: 'done' };
+    }
+  };
+  const events = await collect(streamWithChadwickPlanForce(anthropic, {
+    slug: 'chadwick',
+    userMessage: 'log this',
+    today: '2026-10-06',
+    messages: [
+      { role: 'assistant', content: FORCE_PLAN },
+      { role: 'user', content: 'log this' }
+    ],
+    completedWorkouts: COMPLETED_FROM_PLAN
+  }));
+  assert.equal(events.some(event => event.type === 'tool_call' && event.name === 'log_entry'), false);
+});
+
+test('a later distinct plan after a completed session still late-forces', async () => {
+  const walkPlan = [
+    '1. Easy Walk — 20 min',
+    '2. Calf Raise — 15x20kg (cable: none)',
+    '3. Hip Hinge — 10x30kg (cable: none)'
+  ].join('\n');
+  const anthropic = {
+    async *streamMessage() {
+      yield { type: 'text', delta: 'On it.' };
+      yield { type: 'done' };
+    }
+  };
+  const events = await collect(streamWithChadwickPlanForce(anthropic, {
+    slug: 'chadwick',
+    userMessage: 'lock it in',
+    today: '2026-10-06',
+    messages: [
+      { role: 'assistant', content: FORCE_PLAN },
+      { role: 'assistant', content: walkPlan },
+      { role: 'user', content: 'lock it in' }
+    ],
+    completedWorkouts: COMPLETED_FROM_PLAN
+  }));
+  const proposal = events.find(event => event.type === 'tool_call' && event.name === 'log_entry');
+  assert.ok(proposal, 'a second session planned later in chat must still force a card');
+  assert.equal(proposal.input.fields.status, 'planned');
+  assert.ok(
+    proposal.input.fields.exercises.some(exercise => exercise.name === 'Calf Raise'),
+    'must propose the later walk plan, not the finished lift'
+  );
+  assert.equal(
+    proposal.input.fields.exercises.some(exercise => exercise.name === 'Bar Press'),
+    false
+  );
 });

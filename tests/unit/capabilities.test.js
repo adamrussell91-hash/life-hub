@@ -198,6 +198,7 @@ test('buildAgentTools gives Chadwick last-workout read tools with the exercise l
     assert.ok(names.includes(name), name);
   }
   assert.ok(names.includes('search_exercise_library'));
+  assert.ok(names.includes('add_workout_notes'));
   const brisket = buildAgentTools({ slug: 'brisket', allowedTypes: ['meal'] }).map(tool => tool.name);
   assert.ok(!brisket.includes('get_last_workout'));
   assert.ok(!brisket.includes('compare_workout_windows'));
