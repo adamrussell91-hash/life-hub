@@ -106,3 +106,108 @@ test('chadwickLine falls back to honest, earned lines', () => {
   assert.match(chadwickLine({ failureSets: 3 }), /3 sets taken to failure/);
   assert.match(chadwickLine({}), /showed up/);
 });
+
+import {
+  buildBenchmarkWall,
+  buildSeasonStatus,
+  buildWeekStreak,
+  focusCue,
+  lighterLoad,
+  readinessAdvice,
+  restWins
+} from '../../apps/life/js/app/fitness-progression.js';
+
+const done = (date, extra = {}) => ({ record: { type: 'workout', status: 'completed', session_kind: 'strength', date, title: `S ${date}`, exercises: [], ...extra } });
+
+test('week streak counts 3-session weeks and freezes an illness week instead of breaking', () => {
+  const events = [
+    // week of 14 Sep: 3 sessions
+    done('2026-09-14'), done('2026-09-16'), done('2026-09-18'),
+    // week of 21 Sep: sick — 1 session + a skipped-for-flu day
+    done('2026-09-21'),
+    { record: { type: 'workout', status: 'skipped', date: '2026-09-23', title: 'Push', notes: 'Skipped — flu, Sara cancelled training' } },
+    // week of 28 Sep: 3 sessions (a walk doesn't count)
+    done('2026-09-28'), done('2026-09-30'), done('2026-10-02'), done('2026-10-03', { session_kind: 'walk' }),
+    // this week (5 Oct): 1 so far
+    done('2026-10-05')
+  ];
+  const streak = buildWeekStreak(events, '2026-10-07');
+  assert.equal(streak.current, 2, 'this week in progress, 28 Sep hit, 21 Sep frozen, 14 Sep hit');
+  assert.equal(streak.protectedWeeks, 1);
+  assert.equal(streak.thisWeek.sessions, 1);
+  assert.equal(streak.thisWeek.remaining, 2);
+  assert.equal(streak.thisWeek.daysLeft, 4);
+  const broken = buildWeekStreak([done('2026-09-14'), done('2026-09-16'), done('2026-09-18'), done('2026-09-28')], '2026-10-07');
+  assert.equal(broken.current, 0, 'a lazy week (not sick) breaks it');
+  assert.equal(broken.longest, 1);
+});
+
+test('season status reads the stamped season and where we are in it', () => {
+  const season = { name: 'Season 3: Operation V-Taper', start: '2026-09-28', weeks: 6, mission: 'Widen the lats' };
+  const status = buildSeasonStatus([
+    done('2026-09-28', { season: { ...season, benchmark: true } }),
+    done('2026-10-02', { season })
+  ], '2026-10-07');
+  assert.equal(status.name, 'Season 3: Operation V-Taper');
+  assert.equal(status.week, 2);
+  assert.equal(status.sessions, 2);
+  assert.equal(status.benchmarkSessions, 1);
+  assert.equal(status.daysLeft, 32);
+  assert.equal(buildSeasonStatus([done('2026-01-05', { season: { ...season, start: '2026-01-05' } })], '2026-10-07'), null, 'a long-finished season disappears');
+});
+
+test('benchmark wall tracks circuits by label, rep tests, flagged lifts and AEKE score', () => {
+  const cindy = time => ({
+    name: 'Push Up', superset_group: 1, superset_label: 'Cindy',
+    block: { kind: 'circuit', format: 'for_time', result: { rounds: 3, time_sec: time } },
+    sets: [{ reps: 5 }]
+  });
+  const wall = buildBenchmarkWall([
+    done('2026-09-20', { exercises: [cindy(110), { name: 'Push-ups', tracking: 'reps_in_time', sets: [{ reps: 25, time_cap_sec: 60 }] }], aeke: { score: 90 } }),
+    done('2026-10-04', { exercises: [cindy(96), { name: 'Bar Press', benchmark: true, sets: [{ weight_kg: 46, reps: 8 }] }], aeke: { score: 99 } })
+  ], '2026-10-07');
+  const circuit = wall.find(row => row.name.startsWith('Cindy'));
+  assert.equal(circuit.better, 'lower');
+  assert.equal(circuit.latest.label, '1:36');
+  assert.equal(circuit.improved, true);
+  assert.equal(circuit.isBest, true);
+  assert.ok(wall.find(row => row.name === 'Push-ups in 60s'));
+  assert.ok(wall.find(row => row.key === 'lift:bar press'));
+  assert.equal(wall.find(row => row.key === 'aeke:score').latest.value, 99);
+});
+
+test('readiness advice and the lighter load', () => {
+  assert.equal(readinessAdvice({ sleep: 2, soreness: 2, energy: 3 }).adjusted, 'lighter');
+  assert.equal(readinessAdvice({ sleep: 5, soreness: 1, energy: 5 }).adjusted, 'lighter', 'any 1 means go easy');
+  assert.equal(readinessAdvice({ sleep: 5, soreness: 4, energy: 5 }).adjusted, 'push');
+  assert.equal(readinessAdvice({ sleep: 3, soreness: 4, energy: 3 }).adjusted, 'as_planned');
+  assert.equal(readinessAdvice({ sleep: 3 }), null);
+  assert.equal(lighterLoad(46), 41.5);
+});
+
+test('focus cues: Chadwick wins, isolation internal, compound external', () => {
+  assert.deepEqual(focusCue({ name: 'Bar Curl', coach_cues: { focus: 'Pin the elbows.' } }), { kind: 'coach', text: 'Pin the elbows.' });
+  assert.equal(focusCue({ name: 'Cable Bar Wide Grip Curl' }).kind, 'internal');
+  assert.equal(focusCue({ name: 'Bar Press' }).kind, 'external');
+  assert.equal(focusCue({ name: 'Bar Hip Thrust' }).kind, 'external');
+  assert.equal(focusCue({ name: 'Downward Dog' }), null);
+});
+
+test('rest wins are built only from real numbers', () => {
+  const wins = restWins({
+    exercise: { name: 'Bar Press' },
+    bests: { 'bar press': { firstDate: '2026-03-12', firstKg: 32, maxKg: 46 } },
+    buildBoard: [{ label: 'Chest', done: 9, target: 12, today: 4, todayDone: 3 }],
+    weekStreak: { current: 4 },
+    ghostsBeaten: 2,
+    prsToday: 1
+  });
+  assert.deepEqual(wins, [
+    '1 personal best already today.',
+    'Ghosts beaten so far: 2. Keep the run going.',
+    'Bar Press: 32 kg → 46 kg since 12/03/26.',
+    'Chest target for the week: done (12/12).',
+    '4-week streak. This session protects it.'
+  ]);
+  assert.deepEqual(restWins({}), []);
+});

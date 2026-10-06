@@ -79,6 +79,10 @@ const DOMAIN_PROPERTIES = {
             type: 'number',
             description: 'Optional rest after each set of this exercise (straight sets). Default 90.'
           },
+          benchmark: {
+            type: 'boolean',
+            description: 'This move is a Season benchmark test (e.g. push-ups in 60 s, a Cindy, a top-set PR attempt). It lands on the Benchmark Wall.'
+          },
           notes: {
             type: 'string',
             description: 'Completed sessions: Adam\'s note for this exercise (form, feel, swaps). Keep the session-level notes for the whole-day story.'
@@ -112,7 +116,8 @@ const DOMAIN_PROPERTIES = {
             properties: {
               start: { type: 'string', description: 'Shown when Adam opens this exercise.' },
               rest: { type: 'string', description: 'Shown between sets while he rests.' },
-              final_set: { type: 'string', description: 'Shown on the last set, e.g. "1-2 reps in the tank, this is the one that counts."' }
+              final_set: { type: 'string', description: 'Shown on the last set, e.g. "1-2 reps in the tank, this is the one that counts."' },
+              focus: { type: 'string', description: 'Attentional cue shown on every set. Isolation moves: internal ("squeeze the biceps hard at the top"). Compound moves: external ("push the bar away from you").' }
             }
           },
           tracking: {
@@ -154,6 +159,38 @@ const DOMAIN_PROPERTIES = {
     cross_agent_note: {
       type: 'string',
       description: 'Optional one-line Chadwick→Sara/Brisket directive when another agent must act. Format: Chadwick→Sara: ...'
+    },
+    season: {
+      type: 'object',
+      description: 'The training Season this session belongs to — stamp it on every session while a Season runs (same name/start/weeks as the coaching profile). benchmark: true on the test sessions in week 1 and the finale.',
+      properties: {
+        name: { type: 'string', description: 'e.g. "Season 3: Operation V-Taper"' },
+        start: { type: 'string', description: 'YYYY-MM-DD the Season began' },
+        weeks: { type: 'number', description: 'Season length, 4–8' },
+        mission: { type: 'string', description: 'One-line goal for the block' },
+        benchmark: { type: 'boolean', description: 'This session is a benchmark test (week 1 or finale)' }
+      },
+      required: ['name', 'start', 'weeks']
+    },
+    readiness: {
+      type: 'object',
+      description: 'Pre-session check-in, 1 (bad) – 5 (great). Gym mode writes it; copy it when Adam tells you how he feels before a logged session.',
+      properties: {
+        sleep: { type: 'number' },
+        soreness: { type: 'number', description: '5 = fresh, 1 = very sore' },
+        energy: { type: 'number' },
+        adjusted: { type: 'string', enum: ['lighter', 'as_planned', 'push'], description: 'What the session did with it' }
+      }
+    },
+    aeke: {
+      type: 'object',
+      description: 'Numbers the AEKE app reported for this session. Put them here, not only in notes.',
+      properties: {
+        volume_kg: { type: 'number' },
+        score: { type: 'number', description: 'AEKE session / strength score' },
+        strength_delta_pct: { type: 'number', description: 'e.g. 3.1 for "+3.1% arm strength"' },
+        strength_region: { type: 'string', description: 'e.g. "arms"' }
+      }
     }
   },
   diary: {

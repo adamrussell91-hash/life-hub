@@ -11,7 +11,7 @@
  *                 density, Build Board gains, and a Chadwick line built from real facts.
  */
 import { resolveTrackingType } from '../core/exercise-tracking.js';
-import { getSydneyWeekStart } from '../core/time.js';
+import { addCalendarDays, daysBetween, getSydneyWeekStart } from '../core/time.js';
 import {
   REGION_LABELS,
   canonicalExerciseName,
@@ -120,7 +120,12 @@ export function buildExerciseBests(events, date) {
       const key = exerciseKey(exercise?.name);
       if (!key) continue;
       const tracking = resolveTrackingType(exercise);
-      const entry = bests[key] ?? (bests[key] = { name: canonicalExerciseName(exercise.name), tracking, maxKg: 0, maxE1rm: 0, maxReps: 0, maxSec: 0 });
+      const entry = bests[key] ?? (bests[key] = { name: canonicalExerciseName(exercise.name), tracking, maxKg: 0, maxE1rm: 0, maxReps: 0, maxSec: 0, firstDate: null, firstKg: 0, firstReps: 0 });
+      if (!entry.firstDate || record.date < entry.firstDate) {
+        entry.firstDate = record.date;
+        entry.firstKg = Math.max(0, ...(exercise.sets ?? []).map(set => positive(set?.weight_kg) ?? 0));
+        entry.firstReps = Math.max(0, ...(exercise.sets ?? []).map(set => positive(set?.reps) ?? 0));
+      }
       for (const set of exercise.sets ?? []) {
         const kg = positive(set?.weight_kg) ?? 0;
         const reps = positive(set?.reps) ?? 0;
@@ -299,7 +304,8 @@ export function buildPumpReport(draft, {
   board = null,
   libraryByName = null,
   previousVolume = null,
-  elapsedMs = 0
+  elapsedMs = 0,
+  weekStreak = null
 } = {}) {
   const exercises = draft?.exercises ?? [];
   let ghostsBeaten = 0;
@@ -342,8 +348,20 @@ export function buildPumpReport(draft, {
     .filter(exercise => exercise?.block?.result)
     .map(exercise => ({ name: exercise.superset_label || exercise.name, result: exercise.block.result }));
 
+  let streak = null;
+  if (weekStreak?.thisWeek && draft?.session_kind !== 'walk') {
+    const sessions = weekStreak.thisWeek.sessions + 1;
+    const target = weekStreak.thisWeek.target;
+    const secured = sessions >= target;
+    const run = secured && weekStreak.thisWeek.sessions < target ? weekStreak.current + 1 : weekStreak.current;
+    streak = secured
+      ? `Week ${sessions}/${target} — streak secured: ${run} week${run === 1 ? '' : 's'}.`
+      : `Week ${sessions}/${target} — ${target - sessions} more keeps the ${weekStreak.current}-week streak alive.`;
+  }
   return {
     title: draft?.title ?? 'Session',
+    streak,
+    aeke: draft?.aeke && Object.keys(draft.aeke).length ? { ...draft.aeke } : null,
     minutes: elapsedMs > 0 ? minutes : (num(draft?.duration_min) ?? null),
     volume,
     volumeDeltaPct,
@@ -384,4 +402,315 @@ export function chadwickLine({ prs = [], beats = [], ghostsBeaten = 0, ghostsRac
   }
   if (beats.length) return `New ground on ${beats[0].name} (${beats[0].label}). Stack another one next time.`;
   return 'You showed up and did the work. Banked. Next one we hunt the ghost.';
+}
+
+// ── Tier 2: protected week streaks ─────────────────────────────────────────
+
+const ILLNESS_RE = /\b(?:ill|illness|sick|unwell|fever|flu|cold|covid|virus|infection|flare|migraine|hospital|surgery|injur(?:y|ed)|gastro|vomit|bedridden)\b/i;
+
+/** Sessions that count toward the weekly streak — a dog walk is movement, not a session. */
+function countsTowardStreak(record) {
+  return record.status === 'completed' && record.session_kind !== 'walk';
+}
+
+function illnessDay(record) {
+  if (record?.type === 'workout' && record.status === 'skipped') {
+    return ILLNESS_RE.test(`${record.title ?? ''} ${record.notes ?? ''}`);
+  }
+  if (record?.type === 'diary') {
+    return Array.isArray(record.symptoms) && record.symptoms.length > 0
+      && ILLNESS_RE.test(`${record.symptoms.join(' ')} ${record.challenges ?? ''} ${record.notes ?? ''}`);
+  }
+  return false;
+}
+
+/**
+ * Weekly streak: a Mon–Sun week that hits `target` sessions extends it. A week
+ * with illness days (a skipped session for illness, or diary symptoms) is
+ * frozen — it neither breaks nor extends the run. The current week never breaks
+ * the streak while it is still in progress.
+ */
+export function buildWeekStreak(events, date, { target = 3 } = {}) {
+  const sessions = new Map();
+  const ill = new Map();
+  let earliest = null;
+  for (const { record } of events ?? []) {
+    if (!record?.date || record.date > date) continue;
+    const week = getSydneyWeekStart(record.date);
+    if (record.type === 'workout' && countsTowardStreak(record)) {
+      const days = sessions.get(week) ?? new Set();
+      days.add(`${record.date}|${record.title ?? ''}`);
+      sessions.set(week, days);
+      if (!earliest || record.date < earliest) earliest = record.date;
+    }
+    if (illnessDay(record)) {
+      const days = ill.get(week) ?? new Set();
+      days.add(record.date);
+      ill.set(week, days);
+    }
+  }
+  const thisWeek = getSydneyWeekStart(date);
+  const weekInfo = week => {
+    const count = sessions.get(week)?.size ?? 0;
+    const illDays = ill.get(week)?.size ?? 0;
+    return { week, count, hit: count >= target, protected: count < target && illDays > 0 };
+  };
+  const current = weekInfo(thisWeek);
+  let streak = current.hit ? 1 : 0;
+  let protectedWeeks = 0;
+  const firstWeek = earliest ? getSydneyWeekStart(earliest) : thisWeek;
+  for (let week = addCalendarDays(thisWeek, -7); week >= firstWeek; week = addCalendarDays(week, -7)) {
+    const info = weekInfo(week);
+    if (info.hit) streak += 1;
+    else if (info.protected) protectedWeeks += 1;
+    else break;
+  }
+  let longest = 0;
+  let run = 0;
+  for (let week = firstWeek; week <= thisWeek; week = addCalendarDays(week, 7)) {
+    const info = weekInfo(week);
+    if (info.hit) {
+      run += 1;
+      longest = Math.max(longest, run);
+    } else if (!info.protected && week !== thisWeek) {
+      run = 0;
+    }
+  }
+  return {
+    current: streak,
+    longest: Math.max(longest, streak),
+    target,
+    protectedWeeks,
+    thisWeek: {
+      sessions: current.count,
+      target,
+      remaining: Math.max(0, target - current.count),
+      protected: current.protected,
+      daysLeft: 6 - daysBetween(thisWeek, date)
+    }
+  };
+}
+
+// ── Tier 2: Seasons ────────────────────────────────────────────────────────
+
+/** The Season Chadwick stamped on the most recent session, with where we are in it. */
+export function buildSeasonStatus(events, date) {
+  const stamped = (events ?? [])
+    .map(({ record }) => record)
+    .filter(record => record?.type === 'workout' && record.season?.name && record.date <= addCalendarDays(date, 7))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const latest = stamped[0]?.season;
+  if (!latest?.start || !latest.weeks) return null;
+  const end = addCalendarDays(latest.start, latest.weeks * 7 - 1);
+  if (date > addCalendarDays(end, 7)) return null;
+  const inSeason = stamped.filter(record => record.season?.name === latest.name);
+  const completed = inSeason.filter(record => record.status === 'completed');
+  const elapsed = Math.max(0, daysBetween(latest.start, date));
+  return {
+    name: latest.name,
+    mission: latest.mission ?? '',
+    start: latest.start,
+    end,
+    weeks: latest.weeks,
+    week: Math.min(latest.weeks, Math.floor(elapsed / 7) + 1),
+    daysLeft: Math.max(0, daysBetween(date, end)),
+    progress: Math.min(1, (elapsed + 1) / (latest.weeks * 7)),
+    sessions: completed.length,
+    benchmarkSessions: completed.filter(record => record.season?.benchmark).length,
+    finished: date > end
+  };
+}
+
+// ── Tier 2: Benchmark Wall ─────────────────────────────────────────────────
+
+function circuitName(exercises, owner) {
+  if (owner.superset_label) return owner.superset_label;
+  return exercises.filter(item => item.superset_group === owner.superset_group).map(item => item.name).join(' + ');
+}
+
+/**
+ * Every repeatable test, over time: circuits with a score, reps-in-a-window
+ * tests, anything Chadwick flagged `benchmark`, and the AEKE score.
+ * Each row: { key, name, unit, better: 'higher' | 'lower', points[{date, value, label}], latest, best, delta }.
+ */
+export function buildBenchmarkWall(events, date) {
+  const rows = new Map();
+  const add = (key, name, unit, better, point) => {
+    const row = rows.get(key) ?? { key, name, unit, better, points: [] };
+    row.points.push(point);
+    rows.set(key, row);
+  };
+  for (const { record } of events ?? []) {
+    if (record?.type !== 'workout' || record.status !== 'completed' || !record.date || record.date > date) continue;
+    const exercises = record.exercises ?? [];
+    for (const exercise of exercises) {
+      const result = exercise.block?.result;
+      if (exercise.block?.kind === 'circuit' && result && (positive(result.rounds) || positive(result.time_sec))) {
+        const name = circuitName(exercises, exercise);
+        if (exercise.block.format === 'for_time' && positive(result.time_sec)) {
+          const rounds = positive(result.rounds) ?? 0;
+          const mins = Math.floor(result.time_sec / 60);
+          const secs = String(result.time_sec % 60).padStart(2, '0');
+          add(`circuit:${exerciseKey(name)}:${rounds}`, `${name} (${rounds} rounds)`, 'time', 'lower',
+            { date: record.date, value: result.time_sec, label: `${mins}:${secs}` });
+        } else {
+          const rounds = positive(result.rounds) ?? 0;
+          const extra = positive(result.extra_reps) ?? 0;
+          add(`circuit:${exerciseKey(name)}`, name, 'rounds', 'higher',
+            { date: record.date, value: rounds * 1000 + extra, label: extra ? `${rounds} + ${extra}` : `${rounds} rounds` });
+        }
+      }
+      const tracking = resolveTrackingType(exercise);
+      const sets = exercise.sets ?? [];
+      if (tracking === 'reps_in_time') {
+        const byCap = new Map();
+        for (const set of sets) {
+          const cap = positive(set?.time_cap_sec);
+          const reps = positive(set?.reps);
+          if (cap && reps) byCap.set(cap, Math.max(byCap.get(cap) ?? 0, reps));
+        }
+        for (const [cap, reps] of byCap) {
+          add(`rit:${exerciseKey(exercise.name)}:${cap}`, `${canonicalExerciseName(exercise.name)} in ${cap}s`, 'reps', 'higher',
+            { date: record.date, value: reps, label: `${reps} reps` });
+        }
+      } else if (exercise.benchmark) {
+        if (tracking === 'timed') {
+          const sec = Math.max(0, ...sets.map(set => positive(set?.duration_sec) ?? 0));
+          if (sec) add(`hold:${exerciseKey(exercise.name)}`, canonicalExerciseName(exercise.name), 'sec', 'higher', { date: record.date, value: sec, label: `${sec}s` });
+        } else if (tracking === 'bodyweight_reps') {
+          const reps = Math.max(0, ...sets.map(set => positive(set?.reps) ?? 0));
+          if (reps) add(`reps:${exerciseKey(exercise.name)}`, canonicalExerciseName(exercise.name), 'reps', 'higher', { date: record.date, value: reps, label: `${reps} reps` });
+        } else {
+          let best = null;
+          for (const set of sets) {
+            const e1rm = estimateOneRepMax(set?.weight_kg, set?.reps);
+            if (e1rm != null && (!best || e1rm > best.e1rm)) best = { e1rm, set };
+          }
+          if (best) {
+            add(`lift:${exerciseKey(exercise.name)}`, canonicalExerciseName(exercise.name), 'e1RM kg', 'higher',
+              { date: record.date, value: Math.round(best.e1rm * 10) / 10, label: `${formatKg(best.set.weight_kg)} × ${best.set.reps}` });
+          }
+        }
+      }
+    }
+    const score = positive(record.aeke?.score);
+    if (score) add('aeke:score', 'AEKE score', 'score', 'higher', { date: record.date, value: score, label: String(score) });
+  }
+  return [...rows.values()]
+    .map(row => {
+      const points = row.points.sort((a, b) => a.date.localeCompare(b.date));
+      const pick = row.better === 'lower'
+        ? points.reduce((best, point) => (point.value < best.value ? point : best))
+        : points.reduce((best, point) => (point.value > best.value ? point : best));
+      const latest = points.at(-1);
+      const previous = points.at(-2) ?? null;
+      const improved = previous
+        ? (row.better === 'lower' ? latest.value < previous.value : latest.value > previous.value)
+        : null;
+      return { ...row, points, latest, best: pick, previous, improved, isBest: latest === pick && points.length > 1 };
+    })
+    .sort((a, b) => b.latest.date.localeCompare(a.latest.date) || a.name.localeCompare(b.name));
+}
+
+// ── Tier 2: readiness ──────────────────────────────────────────────────────
+
+/** 1–5 check-in → what to do with the plan. */
+export function readinessAdvice(readiness) {
+  const values = ['sleep', 'soreness', 'energy'].map(key => Number(readiness?.[key])).filter(value => value >= 1 && value <= 5);
+  if (values.length < 3) return null;
+  const score = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const worst = Math.min(...values);
+  if (score <= 2.4 || worst === 1) {
+    return {
+      adjusted: 'lighter',
+      score,
+      title: 'Flat day — go lighter',
+      detail: 'Loads drop about 10% and every set stops 2 reps short of failure. You still bank the session; the streak still counts.'
+    };
+  }
+  if (score >= 4.3) {
+    return {
+      adjusted: 'push',
+      score,
+      title: 'Green light — chase the targets',
+      detail: 'You are fresh. Use the targets, hunt the ghosts, take the last set close to failure.'
+    };
+  }
+  return {
+    adjusted: 'as_planned',
+    score,
+    title: 'Solid — run it as planned',
+    detail: 'Hit the plan, beat a ghost or two, keep 1–2 reps in the tank until the last set.'
+  };
+}
+
+/** K1-friendly 10% drop, rounded to 0.5 kg. */
+export function lighterLoad(kg) {
+  const value = Number(kg) || 0;
+  return Math.max(0, Math.round(value * 0.9 * 2) / 2);
+}
+
+// ── Tier 3: attentional focus cues ─────────────────────────────────────────
+
+const FOCUS_RULES = [
+  // Isolation → internal focus (mind–muscle): more growth in the target muscle.
+  [/\bcurl\b/i, 'internal', 'Squeeze the biceps hard at the top — feel them do all of it, slow on the way down.'],
+  [/\b(?:tricep|triceps|pushdown|kickback|extension)\b/i, 'internal', 'Lock out and squeeze the triceps — feel the back of the arm, not the shoulder.'],
+  [/\b(?:fly|flye|pec deck|crossover)\b/i, 'internal', 'Hug a tree — squeeze the pecs together and feel the stretch open them.'],
+  [/\b(?:lateral raise|rear delt|reverse fly|face pull)\b/i, 'internal', 'Lead with the elbows and feel the side of the shoulder lift the weight.'],
+  [/\b(?:crunch|twist|woodchop|serratus|leg raise)\b/i, 'internal', 'Ribs to hips — feel the abs shorten, breathe out hard at the squeeze.'],
+  [/\b(?:shrug|calf)\b/i, 'internal', 'Pause at the top and feel the muscle hold it there.'],
+  // Compound → external focus: better force and performance.
+  [/\b(?:hip thrust|glute bridge)\b/i, 'external', 'Drive the bar up toward the ceiling through your heels.'],
+  [/\b(?:press|push up|push-up|pushup|dip)\b/i, 'external', 'Push the bar (or the floor) away from you, fast and strong.'],
+  [/\b(?:row|pulldown|pull-down|pull up|pull-up|pullup)\b/i, 'external', 'Drive your elbows back toward the wall behind you.'],
+  [/\b(?:squat|lunge|split|leg press|step up)\b/i, 'external', 'Push the floor away — drive straight up.'],
+  [/\b(?:deadlift|rdl|hinge|good morning)\b/i, 'external', 'Push your hips back to the wall, then drive them forward to stand tall.']
+];
+
+/** Chadwick's `coach_cues.focus` wins; otherwise a cue chosen by move type. */
+export function focusCue(exercise) {
+  const written = exercise?.coach_cues?.focus;
+  if (typeof written === 'string' && written.trim()) return { kind: 'coach', text: written.trim() };
+  const name = String(exercise?.name ?? '');
+  for (const [pattern, kind, text] of FOCUS_RULES) {
+    if (pattern.test(name)) return { kind, text };
+  }
+  return null;
+}
+
+// ── Tier 3: twinge sites ───────────────────────────────────────────────────
+
+export const TWINGE_SITES = [
+  'Right shoulder', 'Left shoulder', 'Right elbow', 'Left elbow', 'Wrist',
+  'Lower back', 'Neck', 'Right knee', 'Left knee', 'Hip'
+];
+
+// ── Tier 3: rest-time wins ─────────────────────────────────────────────────
+
+/**
+ * Short, true progress facts to read while the rest clock runs. Every fact is
+ * built from real numbers; nothing is invented when the data is thin.
+ */
+export function restWins({ exercise = null, bests = null, buildBoard = null, weekStreak = null, ghostsBeaten = 0, prsToday = 0 } = {}) {
+  const wins = [];
+  if (prsToday > 0) wins.push(`${prsToday} personal best${prsToday === 1 ? '' : 's'} already today.`);
+  if (ghostsBeaten > 0) wins.push(`Ghosts beaten so far: ${ghostsBeaten}. Keep the run going.`);
+  const best = exercise ? bests?.[exerciseKey(exercise.name)] : null;
+  if (best?.firstDate && best.firstKg > 0 && best.maxKg > best.firstKg) {
+    const [y, m, d] = best.firstDate.split('-');
+    wins.push(`${canonicalExerciseName(exercise.name)}: ${formatKg(best.firstKg)} → ${formatKg(best.maxKg)} since ${d}/${m}/${y.slice(2)}.`);
+  } else if (best?.firstDate && best.maxReps > best.firstReps && best.firstReps > 0) {
+    wins.push(`${canonicalExerciseName(exercise.name)}: ${best.firstReps} → ${best.maxReps} reps since you started it.`);
+  }
+  for (const row of buildBoard ?? []) {
+    const total = row.done + (row.todayDone ?? 0);
+    if (row.target && total >= row.target && row.done < row.target) {
+      wins.push(`${row.label} target for the week: done (${total}/${row.target}).`);
+    } else if (row.target && total > 0 && total < row.target && (row.todayDone ?? 0) > 0) {
+      wins.push(`${row.label}: ${total}/${row.target} hard sets this week — ${row.target - total} to go.`);
+    }
+  }
+  if (weekStreak?.current > 1) wins.push(`${weekStreak.current}-week streak. This session protects it.`);
+  return wins;
 }

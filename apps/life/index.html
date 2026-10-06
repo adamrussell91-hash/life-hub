@@ -613,11 +613,16 @@
               </div>
               <div id="fitness-week-columns" class="fitness-share-list" aria-label="This week versus last week volume"></div>
             </div>
-            <p class="metric-caption">Streak <strong data-fitness="streak">—</strong> · longest <span data-fitness="longest-streak">—</span></p>
+            <p class="metric-caption" data-fitness="streak-line">Week streak <strong data-fitness="streak">—</strong> · longest <span data-fitness="week-longest">—</span></p>
+            <p class="metric-caption fitness-streak-note" data-fitness="streak-note" hidden></p>
             <p class="metric-caption" data-fitness="next-planned" hidden></p>
             <div id="fitness-focus-card" hidden>
               <div id="fitness-focus-strip" class="fitness-focus-strip"></div>
             </div>
+            <section id="fitness-season-card" class="fitness-season" aria-labelledby="fitness-season-heading" hidden>
+              <p class="metric-label" id="fitness-season-heading">Season</p>
+              <div id="fitness-season"></div>
+            </section>
             <section id="fitness-build-card" class="fitness-build" aria-labelledby="fitness-build-heading" hidden>
               <p class="metric-label" id="fitness-build-heading">Build Board</p>
               <p class="metric-caption">Hard sets per muscle this week vs the growth target.</p>
@@ -625,6 +630,12 @@
             </section>
           </article>
           </div>
+
+          <article id="fitness-bench-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Benchmark Wall</p>
+            <p class="metric-caption">Your repeatable tests over time — circuits, rep tests, flagged lifts, AEKE score.</p>
+            <div id="fitness-bench" class="bench-wall"></div>
+          </article>
 
           <article id="fitness-loads-card" class="metric-card fitness-panel" hidden>
             <p class="metric-label">Working weights</p>
