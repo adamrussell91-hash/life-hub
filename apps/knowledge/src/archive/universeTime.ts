@@ -7,6 +7,17 @@ import { easeInOut, TAU } from "./universeDraw";
 export const DAY_MS = 86_400_000;
 export const INFALL_MS = 9000;
 export const REPLAY_MS = 210_000;
+/** Big Bang speeds the button cycles through; ¼ stretches the whole replay to 14 minutes. */
+export const REPLAY_SPEEDS = [1, 4, 12, 0.25] as const;
+
+export function nextReplaySpeed(speed: number) {
+  const at = REPLAY_SPEEDS.indexOf(speed as (typeof REPLAY_SPEEDS)[number]);
+  return REPLAY_SPEEDS[(at + 1) % REPLAY_SPEEDS.length]!;
+}
+
+export function replaySpeedLabel(speed: number) {
+  return speed === 0.25 ? "×¼" : `×${speed}`;
+}
 export const SHOWER_STAGGER_MS = 1600;
 export const SHOWER_FLIGHT_MS = 5200;
 export const SHOWER_CAP = 12;

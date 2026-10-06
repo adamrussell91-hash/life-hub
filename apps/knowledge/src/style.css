@@ -1391,6 +1391,133 @@ body.is-universe-fullscreen .local-banner {
   display: none;
 }
 
+/* Full screen folds the controls into a small glass disk at their top-left corner. */
+.graph-chrome-token,
+.graph-chrome-tuck {
+  display: none;
+}
+
+.graph-wrap.is-universe-fullscreen .graph-chrome-tuck {
+  display: inline-block;
+}
+
+.graph-wrap.is-universe-fullscreen .graph-chrome-token {
+  --token-size: 2.75rem;
+  display: block;
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 7;
+  width: var(--token-size);
+  height: var(--token-size);
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(23, 55, 94, 0.14);
+  background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.06) 72%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.6);
+  pointer-events: none;
+  transition:
+    opacity 0.3s ease,
+    transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.graph-wrap.is-universe-fullscreen.is-universe-dark .graph-chrome-token,
+.graph-wrap.is-universe-fullscreen.is-neural .graph-chrome-token {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.02) 72%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.graph-wrap.is-universe-fullscreen.is-chrome-tucked .graph-chrome-token {
+  opacity: 0.5;
+  transform: scale(1);
+  pointer-events: auto;
+  transition-delay: 0.35s;
+}
+
+.graph-wrap.is-universe-fullscreen.is-chrome-tucked .graph-chrome-token:hover,
+.graph-wrap.is-universe-fullscreen.is-chrome-tucked .graph-chrome-token:focus-visible {
+  opacity: 0.95;
+  transition-delay: 0s;
+}
+
+/* The panel opens out of the token and shrinks back into it. */
+.graph-wrap.is-universe-fullscreen .graph-toolbar {
+  clip-path: circle(142% at 1.375rem 1.375rem);
+  transition:
+    clip-path 0.6s cubic-bezier(0.65, 0, 0.25, 1),
+    opacity 0.3s ease,
+    visibility 0s;
+}
+
+.graph-wrap.is-universe-fullscreen.is-chrome-tucked .graph-toolbar {
+  clip-path: circle(1.375rem at 1.375rem 1.375rem);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    clip-path 0.6s cubic-bezier(0.65, 0, 0.25, 1),
+    opacity 0.3s ease 0.3s,
+    visibility 0s linear 0.6s;
+}
+
+.graph-wrap.is-universe-fullscreen .universe-key,
+.graph-wrap.is-universe-fullscreen .neural-dock,
+.graph-wrap.is-universe-fullscreen .universe-exit {
+  transition:
+    opacity 0.35s ease,
+    translate 0.45s cubic-bezier(0.65, 0, 0.25, 1),
+    visibility 0s;
+}
+
+.graph-wrap.is-universe-fullscreen .universe-key {
+  transition:
+    width 0.52s var(--universe-key-ease),
+    border-radius 0.52s var(--universe-key-ease),
+    border-color 0.52s var(--universe-key-ease),
+    opacity 0.35s ease,
+    translate 0.45s cubic-bezier(0.65, 0, 0.25, 1),
+    visibility 0s;
+}
+
+.graph-wrap.is-universe-fullscreen.is-chrome-tucked .universe-key,
+.graph-wrap.is-universe-fullscreen.is-chrome-tucked .neural-dock,
+.graph-wrap.is-universe-fullscreen.is-chrome-tucked .universe-exit {
+  opacity: 0;
+  translate: 0 -0.5rem;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.35s ease,
+    translate 0.45s cubic-bezier(0.65, 0, 0.25, 1),
+    visibility 0s linear 0.45s;
+}
+
+.graph-wrap.is-universe-fullscreen.is-chrome-tucked .universe-key {
+  transition:
+    width 0.52s var(--universe-key-ease),
+    border-radius 0.52s var(--universe-key-ease),
+    border-color 0.52s var(--universe-key-ease),
+    opacity 0.35s ease,
+    translate 0.45s cubic-bezier(0.65, 0, 0.25, 1),
+    visibility 0s linear 0.45s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-wrap.is-universe-fullscreen .graph-chrome-token,
+  .graph-wrap.is-universe-fullscreen .graph-toolbar,
+  .graph-wrap.is-universe-fullscreen .universe-key,
+  .graph-wrap.is-universe-fullscreen .neural-dock,
+  .graph-wrap.is-universe-fullscreen .universe-exit {
+    transition: none;
+  }
+}
+
 .graph-toolbar {
   position: absolute;
   top: var(--space-4);
@@ -2349,6 +2476,11 @@ body.is-universe-fullscreen .local-banner {
   }
 
   .graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-chrome {
+    top: var(--space-2);
+    left: var(--space-2);
+  }
+
+  .graph-wrap.is-universe-fullscreen .graph-chrome-token {
     top: var(--space-2);
     left: var(--space-2);
   }

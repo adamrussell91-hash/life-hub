@@ -91,7 +91,10 @@ import { readSoundPrefs, universeChimes, writeSoundPrefs, type AmbientLevel } fr
 import {
   applyUniverseViewState,
   bindUniverseEffects,
+  applyGraphChromeTuck,
+  bindGraphChromeTuck,
   bindUniverseView,
+  graphChromeTokenHtml,
   graphFullscreenToolsHtml,
   readUniverseDark,
   readUniverseLens,
@@ -277,6 +280,8 @@ let universeDark = readUniverseDark(typeof localStorage === "undefined" ? null :
 let universeLens = readUniverseLens(typeof localStorage === "undefined" ? null : localStorage);
 let universeSound = readSoundPrefs(typeof localStorage === "undefined" ? null : localStorage);
 let graphFullscreen = false;
+/** In full screen the controls fold into a token; each entry to full screen starts folded. */
+let graphChromeTucked = true;
 let solarModelCache: { source: PageManifestEntry[]; model: SolarModel } | null = null;
 let showAllModelCache: { source: PageManifestEntry[]; grouping: ShowAllGrouping; model: ReturnType<typeof buildShowAllGraph> } | null = null;
 
@@ -1247,7 +1252,7 @@ function renderGraph() {
         <button class="viewbar__btn is-active" type="button">Graph</button>
       </div>`,
     )}
-    <div class="${universeWrapClass(graphMode === "universe" && universeDark, graphFullscreen)}">
+    <div class="${universeWrapClass(graphMode === "universe" && universeDark, graphFullscreen)}${graphChromeTucked ? " is-chrome-tucked" : ""}">
       <div class="graph-chrome">
         <div class="graph-toolbar glass-panel">
           <div class="graph-modes" role="group" aria-label="Graph mode">
@@ -1289,6 +1294,7 @@ function renderGraph() {
         ${graphMode === "universe" ? universeKeyHtml(universeKeyOpen) : ""}
       </div>
       <div class="graph-stage"></div>
+      ${graphChromeTokenHtml(graphChromeTucked)}
       ${universeExitHtml(graphFullscreen)}
     </div>
   `);
@@ -1373,8 +1379,14 @@ function renderGraph() {
     },
     setFullscreen: on => {
       graphFullscreen = on;
+      graphChromeTucked = true;
+      applyGraphChromeTuck(wrap, true);
       applyUniverseViewState(wrap, document.body, graphMode === "universe" && universeDark, graphFullscreen);
     },
+  });
+  bindGraphChromeTuck(wrap, tucked => {
+    graphChromeTucked = tucked;
+    applyGraphChromeTuck(wrap, tucked);
   });
   const preview = mountGraphPreview(wrap, { onOpen: openPageInNewTab });
   const onNoteSelect = (note: { pageId: string; title: string; excerpt: string } | null) => {

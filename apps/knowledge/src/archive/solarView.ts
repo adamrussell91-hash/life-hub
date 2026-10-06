@@ -15,6 +15,8 @@ import {
   DAY_MS,
   INFALL_MS,
   REPLAY_MS,
+  nextReplaySpeed,
+  replaySpeedLabel,
   SHOWER_FLIGHT_MS,
   SHOWER_STAGGER_MS,
   buildDustField,
@@ -1359,8 +1361,8 @@ export function mountSolarView(host: HTMLElement, model: SolarModel, options: So
     syncReplay();
   });
   speedBtn.addEventListener("click", () => {
-    replay.speed = replay.speed === 1 ? 4 : replay.speed === 4 ? 12 : 1;
-    speedBtn.textContent = `×${replay.speed}`;
+    replay.speed = nextReplaySpeed(replay.speed);
+    speedBtn.textContent = replaySpeedLabel(replay.speed);
   });
   scrub.addEventListener("input", () => {
     if (!replay.on) {

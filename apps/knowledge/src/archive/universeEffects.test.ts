@@ -15,8 +15,10 @@ import {
   capturedRocks,
   countUpTo,
   infallOffset,
+  nextReplaySpeed,
   notesThisWeek,
   readVisit,
+  replaySpeedLabel,
   shouldFlare,
   showerPageIds,
   writeVisit,
@@ -254,5 +256,14 @@ describe("camera", () => {
     expect(rim[2]).toBeCloseTo(1, 2);
     expect(lensMap(400, 100, p)).toEqual([400, 100, 1]);
     expect(lensMap(130, 100, null)).toEqual([130, 100, 1]);
+  });
+});
+
+describe("Big Bang replay speeds", () => {
+  it("cycles ×1 → ×4 → ×12 → ×¼ and back, so the slowest is four times slower than ×1", () => {
+    const seen = [1];
+    for (let i = 0; i < 4; i++) seen.push(nextReplaySpeed(seen.at(-1)!));
+    expect(seen).toEqual([1, 4, 12, 0.25, 1]);
+    expect(seen.map(replaySpeedLabel)).toEqual(["×1", "×4", "×12", "×¼", "×1"]);
   });
 });
