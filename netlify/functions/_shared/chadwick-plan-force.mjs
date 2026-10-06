@@ -10,6 +10,7 @@ import {
   buildPlannedWorkoutInput,
   findLatestWorkoutPlanText
 } from '../../../apps/life/js/core/parse-workout-chat.js';
+import { planLooksLikeCompletedSession } from './workout-confirm-path.mjs';
 
 export { CHADWICK_FORCE_PLAN_NUDGE, isPureWorkoutLockIn, shouldForceChadwickPlanProposal };
 
@@ -40,7 +41,8 @@ export function resolveForcedChadwickPlan({
   messages,
   assistantText = '',
   sawLogEntry = false,
-  pureLockInOnly = false
+  pureLockInOnly = false,
+  completedWorkouts = []
 } = {}) {
   if (slug !== 'chadwick' || sawLogEntry) return null;
   // Pre-model shortcut: only a bare "go" may skip the model. An approval that
@@ -50,7 +52,13 @@ export function resolveForcedChadwickPlan({
     return null;
   }
   const source = latestPlanSource({ assistantText, messages, userMessage });
-  return buildPlannedWorkoutInput(source, { date: today });
+  const input = buildPlannedWorkoutInput(source, { date: today });
+  if (input && planLooksLikeCompletedSession(input, completedWorkouts)) {
+    // Latest plan in history is the one that already finished today — never
+    // rebuild it as a planned card. A newer distinct plan still forces.
+    return null;
+  }
+  return input;
 }
 
 function forcedPlanEvents(input) {
@@ -65,6 +73,7 @@ export async function* streamWithChadwickPlanForce(anthropic, {
   slug,
   userMessage,
   today,
+  completedWorkouts = [],
   ...streamOpts
 } = {}) {
   // Always give the model the first pass with full Central Node / history /
@@ -80,7 +89,9 @@ export async function* streamWithChadwickPlanForce(anthropic, {
     streamOpts = {
       ...streamOpts,
       executeTools: async (toolCall) => {
-        if (toolCall?.name === 'log_entry') sawLogEntry = true;
+        if (toolCall?.name === 'log_entry' || toolCall?.name === 'add_workout_notes') {
+          sawLogEntry = true;
+        }
         return innerExecute(toolCall);
       }
     };
@@ -90,7 +101,7 @@ export async function* streamWithChadwickPlanForce(anthropic, {
     if (event.type === 'text' && typeof event.delta === 'string') {
       assistantText += event.delta;
     }
-    if (event.type === 'tool_call' && event.name === 'log_entry') {
+    if (event.type === 'tool_call' && (event.name === 'log_entry' || event.name === 'add_workout_notes')) {
       sawLogEntry = true;
     }
     yield event;
@@ -102,7 +113,8 @@ export async function* streamWithChadwickPlanForce(anthropic, {
     today,
     messages: streamOpts.messages,
     assistantText,
-    sawLogEntry
+    sawLogEntry,
+    completedWorkouts
   });
   if (late) {
     for (const event of forcedPlanEvents(late)) yield event;

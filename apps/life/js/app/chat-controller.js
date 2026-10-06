@@ -961,7 +961,7 @@ export function createChatController({
   function bindProposal(proposal, event) {
     if (!proposal) return;
     proposal.confirm.addEventListener('click', () => {
-      const overwrite = proposal.confirm.dataset.overwrite === '1';
+      const overwrite = proposal.confirm.dataset.overwrite === '1' || event.overwrite === true;
       void confirmProposal(proposal, event, overwrite);
     });
     proposal.discard.addEventListener('click', () => {
@@ -1128,7 +1128,14 @@ export function createChatController({
     try {
       const edited = collectEdits(event.record, proposal.inputs);
       const slug = slugFromPath(event.path);
-      const result = await chatApi.confirm({ candidate: toCandidate(edited), slug, overwrite });
+      const result = await chatApi.confirm({
+        candidate: toCandidate(edited),
+        slug,
+        overwrite,
+        ...(typeof event.amend_path === 'string' && event.amend_path.trim()
+          ? { path: event.amend_path.trim() }
+          : {})
+      });
       lockConfirmCardReceipt(proposal.card, {
         createElement: root.createElement.bind(root),
         summary: 'Saved.',
@@ -1172,6 +1179,13 @@ export function createChatController({
           details
             ? `Record validation failed: ${details}`
             : 'Record validation failed. Ask the agent to propose the record again.'
+        );
+      } else if (error.code === 'session_already_finished') {
+        showChatError(
+          root,
+          error.message && error.message !== 'Confirm request failed'
+            ? error.message
+            : 'That session is already finished — I won\'t replace it with a plan'
         );
       } else if (error.code === 'github_unavailable' || error.code === 'repository_not_found') {
         showChatError(root, `The record was not saved because the data store was unavailable (${error.code}). Confirm again.`);

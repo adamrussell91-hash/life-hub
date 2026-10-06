@@ -445,6 +445,7 @@ test('Chadwick prompt requires planned log_entry after design and CN-shaped prog
   assert.match(prompt, /AMEND it/i);
   assert.match(prompt, /put it into action|lock it in/i);
   assert.match(prompt, /Never say locked in/i);
+  assert.match(prompt, /add_workout_notes/i);
 });
 
 test('the checked-in Chadwick protocol resolves the Job/stay-in-chat conflict', () => {

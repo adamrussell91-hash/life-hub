@@ -14,6 +14,9 @@ const BARE_LOG_RE = /^\s*log(?:\s+(?:it|this|now))?[!?.]*\s*$/i;
 
 const WORKOUT_ACTUALS_RE = /\b(?:i (?:just )?(?:did|finished|completed|trained)|just (?:did|finished|trained)|(?:session|workout)(?:'s| is)? (?:done|finished|over)|finished (?:lifting|training|the session|the workout)|done training|log(?:ged)? actuals|here(?:'s| is) what i (?:lifted|did|actually)|what i actually (?:lifted|did)|actually lifted|how (?:the session|it) went|i skipped|skipped (?:today|the session))\b/i;
 
+// Post-session notes sent after Finish — not a request to lock a new plan.
+const POST_WORKOUT_NOTES_RE = /\b(?:notes?|heart[\s-]?rate|\bhr\b|\bbpm\b|avg(?:erage)?(?:\s+heart)?\s*rate|avg(?:erage)?\s*hr|calories?|\bkcal\b|forgot to (?:add|log)|(?:hit|pressed) finish|finished early|accidentally)\b/i;
+
 const CLAIMED_LOCKED_RE = /\b(?:locked in|locking (?:it|this|the plan|this in now)(?: in| onto)?|logging this as (?:your|the) plan|saved as (?:your|the) plan(?: for today)?|actually saved|get this actually saved|(?:it'?s|plan'?s|plan is|session is) (?:now )?on fitness)\b/i;
 
 // A sentence that offers or conditions the save is not a claim that it happened.
@@ -48,6 +51,16 @@ export function isPureWorkoutLockIn(text) {
 
 export function looksLikeWorkoutActualsReport(text) {
   return WORKOUT_ACTUALS_RE.test(text ?? '');
+}
+
+export function looksLikePostWorkoutNotes(text) {
+  const value = text ?? '';
+  if (WORKOUT_ACTUALS_RE.test(value)) return true;
+  return POST_WORKOUT_NOTES_RE.test(value);
+}
+
+function messageHasNotesOrActuals(text) {
+  return looksLikeWorkoutActualsReport(text) || looksLikePostWorkoutNotes(text);
 }
 
 function looksLikeCompletedWorkoutPayload(record) {
@@ -99,6 +112,10 @@ export function looksLikeSupersetPairing(text) {
 
 export function shouldForceChadwickPlanProposal({ userMessage, assistantText, sawLogEntry } = {}) {
   if (sawLogEntry) return false;
+  // Notes / actuals after a finished session are not a lock-in of a new plan.
+  // Exception: still fire when Chadwick claimed a save and this message has no
+  // notes or actuals signals ("it's not there" after a false "locked in").
+  if (messageHasNotesOrActuals(userMessage)) return false;
   // Only two things turn a chat plan into a Confirm card: Adam approving it, or
   // Chadwick claiming he already saved it. A plan that is still being argued
   // over stays as chat text — a card on every draft was the spam Adam hated.
@@ -109,6 +126,7 @@ export function shouldForceChadwickPlanProposal({ userMessage, assistantText, sa
 export function shouldNudgeUnsavedWorkoutPlan({ agentSlug, userMessage, assistantText, sawRecordProposal } = {}) {
   if (sawRecordProposal) return false;
   if (agentSlug && agentSlug !== 'chadwick') return false;
+  if (messageHasNotesOrActuals(userMessage)) return false;
   if (claimedPlanLocked(assistantText)) return true;
   // Adam said go but no card came back: tell him instead of failing silently.
   return isWorkoutLockIn(userMessage) && looksLikeWorkoutPlan(assistantText);
