@@ -106,3 +106,49 @@ test('createMedicalController toggles showMinor and links Next items to Tasks', 
   assert.equal(created.title, 'Book MRCP');
   assert.equal(confirmPayload.candidate.fields.task_id, 'task-9');
 });
+
+test('Mark booked keeps the visit on its own date (never moves it to today)', async () => {
+  let payload = null;
+  const controller = createMedicalController({
+    chatApi: { async confirm(next) { payload = next; return { record: { id: 'gp' } }; } },
+    getDate: () => '2026-10-06',
+    isOnline: () => true
+  });
+  const hooks = controller.hooks(() => {});
+  await hooks.onMarkBooked({
+    id: 'gp', date: '2026-10-15', time: '14:00', title: 'GP Appointment',
+    record_type: 'Appointment', lane: 'appointment', notes: ''
+  });
+  assert.equal(payload.candidate.date, '2026-10-15');
+  assert.equal(payload.candidate.fields.status, 'booked');
+});
+
+test('a failed save is reported, not swallowed, and keeps the form open', async () => {
+  const errors = [];
+  const controller = createMedicalController({
+    chatApi: { async confirm() { throw new Error('GitHub unavailable'); } },
+    getDate: () => '2026-10-06',
+    isOnline: () => true,
+    onError: message => errors.push(message)
+  });
+  const hooks = controller.hooks(() => {});
+  hooks.onAdd();
+  await hooks.onSave({ title: 'Dentist', date: '2026-10-20' });
+  assert.equal(controller.view().mode, 'write');
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /GitHub unavailable/);
+});
+
+test('saving while offline says so instead of doing nothing', async () => {
+  const errors = [];
+  const controller = createMedicalController({
+    chatApi: { async confirm() { throw new Error('should not be called'); } },
+    getDate: () => '2026-10-06',
+    isOnline: () => false,
+    onError: message => errors.push(message)
+  });
+  const hooks = controller.hooks(() => {});
+  hooks.onAdd();
+  await hooks.onSave({ title: 'Dentist', date: '2026-10-20' });
+  assert.match(errors[0], /offline/i);
+});

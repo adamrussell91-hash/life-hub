@@ -59,3 +59,24 @@ test('calendar draws a medical record at its time for its length', () => {
   assert.equal(item.time, '10:30');
   assert.equal(item.durationMin, 45);
 });
+
+import { validateLogEntry } from '../../netlify/functions/_shared/chat-schema.mjs';
+
+test('a medical visit logged without a time is all-day (00:00), not stamped with the logging time', () => {
+  const v = validateLogEntry(
+    { type: 'medical', date: '2026-10-20', fields: { title: 'Dentist' }, notes: '' },
+    { id: 'medical-x', now: '2026-10-06T15:42:00+11:00' }
+  );
+  assert.equal(v.valid, true);
+  assert.equal(v.record.time, '00:00');
+});
+
+test('a long chat title is shortened and the remainder lands in the notes', () => {
+  const v = validateLogEntry(
+    { type: 'medical', date: '2026-10-20', fields: { title: 'Stelara 90mg — painful at the injection site; same-morning cramping was the bacon and egg breakfast' }, notes: 'Next dose in 8 weeks.' },
+    { id: 'medical-x', now: '2026-10-06T15:42:00+11:00' }
+  );
+  assert.equal(v.record.title, 'Stelara 90mg');
+  assert.match(v.notes, /painful at the injection site/);
+  assert.match(v.notes, /Next dose in 8 weeks/);
+});

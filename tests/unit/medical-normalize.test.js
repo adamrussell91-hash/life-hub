@@ -13,7 +13,8 @@ import {
   normalizeMedicalFields,
   parseMedicalEventTolerant,
   resolveMedicalLogCandidate,
-  scoreMedicalTitleMatch
+  scoreMedicalTitleMatch,
+  splitLongTitle
 } from '../../apps/life/js/app/medical-normalize.js';
 import { validateLogEntry } from '../../netlify/functions/_shared/chat-schema.mjs';
 import { validateRecord } from '../../apps/life/js/core/validate.js';
@@ -406,4 +407,24 @@ Sore throat, sniffles, poor sleep
   assert.equal(resolved.fields.episode.id, 'ep-head-cold');
   assert.notEqual(resolved.date, '2026-09-24');
   assert.equal(resolved.notes, 'still congested, throat better');
+});
+
+test('a symptom titled by feeling is not reclassified by words in its notes', () => {
+  assert.equal(
+    inferRecordType('', 'Sore throat, sniffles, poor sleep', 'Took a dose of paracetamol, no script needed'),
+    'Symptom'
+  );
+  assert.equal(inferRecordType('', 'Feeling run down, possible viral illness', 'saw nothing, medication later'), 'Symptom');
+  assert.equal(inferRecordType('', 'Stelara injection', 'felt a bit tired'), 'Prescription');
+  assert.equal(inferRecordType('', 'GP appointment', 'sore throat'), 'Appointment');
+});
+
+test('an over-long title is cut to a short label and the rest is kept as notes', () => {
+  const long = 'Stelara (ustekinumab) 90mg — first subcutaneous maintenance injection, painful at site; same-morning cramping attributed to bacon/egg breakfast + anxiety, not Stelara';
+  const out = normalizeMedicalFields({ title: long }, { notes: 'Original note.' });
+  assert.equal(out.title, 'Stelara (ustekinumab) 90mg');
+  const split = splitLongTitle(long);
+  assert.equal(split.title, 'Stelara (ustekinumab) 90mg');
+  assert.match(split.overflow, /first subcutaneous maintenance injection/);
+  assert.deepEqual(splitLongTitle('Gastro follow-up'), { title: 'Gastro follow-up', overflow: '' });
 });

@@ -2,7 +2,7 @@ import { TYPE_DOMAINS } from '../../../apps/life/js/core/records.js';
 import { validateRecord } from '../../../apps/life/js/core/validate.js';
 import { isCalendarDate } from '../../../apps/life/js/core/time.js';
 import { buildMedicalSlug } from '../../../apps/life/js/app/medical-model.js';
-import { coerceCalendarDate, normalizeMedicalFields } from '../../../apps/life/js/app/medical-normalize.js';
+import { coerceCalendarDate, normalizeMedicalFields, splitLongTitle } from '../../../apps/life/js/app/medical-normalize.js';
 import { collapseSetSplitExercises } from './workout-history.mjs';
 import { slugifyWorkoutTitle } from './workout-templates.mjs';
 
@@ -236,7 +236,7 @@ const DOMAIN_PROPERTIES = {
     source_agent: { type: 'string', enum: ['vera', 'import'] }
   },
   medical: {
-    title: { type: 'string', description: 'Short visit label, e.g. "Stelara injection". Required.' },
+    title: { type: 'string', description: 'Short visit label of a few words, e.g. "Stelara injection". Required. Put detail, symptoms and context in notes, never in the title.' },
     record_type: {
       type: 'string',
       description: 'Optional — Life Hub infers this from the title/notes when omitted. One of Appointment, Consultation, Lab Work, Test Result, Imaging, Surgery/Hospital, Prescription, Referral, Vaccination, Symptom.',
@@ -442,19 +442,27 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
     ? (coerceCalendarDate(date, { today }) ?? date)
     : date;
 
+  // A visit logged without a time is all-day (it lands in the calendar's All day row).
+  // Stamping it with the moment it was logged invented appointments at "15:42".
+  const resolvedTime = time ?? (type === 'medical' ? '00:00' : now.slice(11, 16));
+  const overflow = type === 'medical' ? splitLongTitle(fields?.title).overflow : '';
+  const resolvedNotes = overflow
+    ? [overflow, notes].filter(part => typeof part === 'string' && part.trim()).join('\n\n')
+    : notes;
+
   const record = {
     ...normalizedFields,
     schema_version: 1,
     id,
     type,
     date: resolvedDate,
-    time: time ?? now.slice(11, 16),
+    time: resolvedTime,
     created_at: now,
     updated_at: now,
     source
   };
   const errors = validateRecord(record);
-  return errors.length ? { valid: false, errors } : { valid: true, record, notes: notes ?? null };
+  return errors.length ? { valid: false, errors } : { valid: true, record, notes: resolvedNotes ?? null };
 }
 
 export { DOMAIN_PROPERTIES };

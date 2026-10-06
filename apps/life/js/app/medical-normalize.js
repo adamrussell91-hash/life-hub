@@ -181,8 +181,23 @@ export function inferRecordType(recordType, title, notes) {
   const cleaned = cleanString(recordType);
   if (cleaned && RECORD_TYPE_SET.has(cleaned)) return cleaned;
 
+  // The title says what the entry *is*; notes only decide when the title is silent.
+  // Otherwise "Sore throat" + a note mentioning a dose/script files as a Prescription.
+  const fromTitle = recordTypeFromText(String(title ?? ''));
+  if (fromTitle) return fromTitle;
+  if (SYMPTOM_LANGUAGE.test(String(title ?? '')) && !VISIT_OR_PROVIDER_LANGUAGE.test(String(title ?? ''))) {
+    return 'Symptom';
+  }
   const blob = `${title ?? ''} ${notes ?? ''} ${cleaned ?? ''}`;
-  const lower = blob.toLowerCase();
+  const fromBlob = recordTypeFromText(blob);
+  if (fromBlob) return fromBlob;
+  // Symptom when feeling language is present and there are no provider/visit words.
+  if (SYMPTOM_LANGUAGE.test(blob) && !VISIT_OR_PROVIDER_LANGUAGE.test(blob)) return 'Symptom';
+  return 'Appointment';
+}
+
+function recordTypeFromText(text) {
+  const lower = text.toLowerCase();
   if (/vaccin|immunis|flu shot|covid shot/i.test(lower)) return 'Vaccination';
   if (/referr/i.test(lower)) return 'Referral';
   if (/\bx-?ray\b|\bmri\b|\bct\b|\bultrasound\b|\bimaging\b|\bscan\b/i.test(lower)) return 'Imaging';
@@ -192,9 +207,28 @@ export function inferRecordType(recordType, title, notes) {
     /injection|infusion|stelara|ustekinumab|humira|adalimumab|biologic|prescription|script|medication|dose\b/i.test(lower)
   ) return 'Prescription';
   if (/consult/i.test(lower)) return 'Consultation';
-  // Symptom when feeling language is present and there are no provider/visit words.
-  if (SYMPTOM_LANGUAGE.test(blob) && !VISIT_OR_PROVIDER_LANGUAGE.test(blob)) return 'Symptom';
-  return 'Appointment';
+  return null;
+}
+
+const TITLE_MAX = 60;
+
+/**
+ * A title is a short label. Long agent-written titles carry the whole story
+ * ("…; cramping attributed to bacon/egg breakfast…"), so cut at the first clause
+ * break and hand the remainder back to be kept as notes.
+ */
+export function splitLongTitle(title) {
+  const text = String(title ?? '').trim();
+  if (text.length <= TITLE_MAX) return { title: text, overflow: '' };
+  const cut = text.search(/\s[—–]\s|;|:\s|,\s/);
+  let head = cut > 0 ? text.slice(0, cut).trim() : text;
+  let overflow = cut > 0 ? text.slice(cut).replace(/^\s*[—–;:,]\s*/, '').trim() : '';
+  if (head.length > TITLE_MAX) {
+    const space = head.lastIndexOf(' ', TITLE_MAX - 1);
+    head = `${head.slice(0, space > 20 ? space : TITLE_MAX - 1).trim()}…`;
+    overflow = text;
+  }
+  return { title: head, overflow };
 }
 
 function slugifyEpisodeId(title) {
@@ -253,7 +287,7 @@ export function normalizeMedicalFields(fields, { notes, today, activeEpisodes } 
     return { title: 'Medical visit' };
   }
 
-  const title = cleanString(fields.title) ?? inferTitleFromNotes(notes) ?? 'Medical visit';
+  const title = splitLongTitle(cleanString(fields.title) ?? inferTitleFromNotes(notes) ?? 'Medical visit').title;
   const provider = cleanString(fields.provider);
   const location = cleanString(fields.location);
   const record_type = inferRecordType(fields.record_type, title, notes);

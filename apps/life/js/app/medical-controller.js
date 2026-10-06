@@ -21,6 +21,7 @@ export function createMedicalController({
   tasksApi,
   getDate,
   onRecordWritten,
+  onError,
   isOnline = () => globalThis.navigator?.onLine !== false
 } = {}) {
   let query = '';
@@ -32,6 +33,15 @@ export function createMedicalController({
   let mode = 'read';
   let draft = null;
   let showMinor = readShowMinor();
+
+  const OFFLINE_MESSAGE = 'You are offline, so nothing was saved. Try again when you are back online.';
+
+  function fail(reason) {
+    const message = typeof reason === 'string'
+      ? reason
+      : `Could not save: ${reason?.message ?? 'unknown error'}`;
+    onError?.(message);
+  }
 
   function today() {
     return getDate?.() ?? null;
@@ -126,7 +136,7 @@ export function createMedicalController({
         },
         onWeightChange: async (visit, weight) => {
           if (!chatApi || !visit || visit.virtual) return;
-          if (!isOnline()) return;
+          if (!isOnline()) return fail(OFFLINE_MESSAGE);
           const payload = buildMedicalPayload({ ...visit, weight }, { notes: visit.notes });
           try {
             const result = await chatApi.confirm({
@@ -139,18 +149,18 @@ export function createMedicalController({
             onRecordWritten?.(result);
             paint();
             return result;
-          } catch {
+          } catch (error) {
+            fail(error);
             paint();
           }
         },
         onMarkBooked: async visit => {
           if (!chatApi || !visit || visit.virtual) return;
-          if (!isOnline()) return;
-          const date = today();
+          if (!isOnline()) return fail(OFFLINE_MESSAGE);
+          // Booking confirms the appointment where it is; it must never re-date it to today.
           const payload = buildMedicalPayload({
             ...visit,
             status: 'booked',
-            date: date || visit.date,
             date_precision: 'day'
           }, { notes: visit.notes });
           try {
@@ -164,13 +174,14 @@ export function createMedicalController({
             onRecordWritten?.(result);
             paint();
             return result;
-          } catch {
+          } catch (error) {
+            fail(error);
             paint();
           }
         },
         onMarkDone: async visit => {
           if (!chatApi || !visit || visit.virtual) return;
-          if (!isOnline()) return;
+          if (!isOnline()) return fail(OFFLINE_MESSAGE);
           const payload = buildMedicalPayload({
             ...visit,
             status: 'done'
@@ -186,14 +197,15 @@ export function createMedicalController({
             onRecordWritten?.(result);
             paint();
             return result;
-          } catch {
+          } catch (error) {
+            fail(error);
             paint();
           }
         },
         onAddToTasks: async visit => {
           if (!visit || visit.task_id || visit.virtual) return;
           if (!tasksApi?.createTask) return;
-          if (!isOnline()) return;
+          if (!isOnline()) return fail(OFFLINE_MESSAGE);
           try {
             const created = await tasksApi.createTask({
               title: visit.title,
@@ -222,13 +234,14 @@ export function createMedicalController({
             onRecordWritten?.(result);
             paint();
             return result;
-          } catch {
+          } catch (error) {
+            fail(error);
             paint();
           }
         },
         onSave: async fields => {
           if (!chatApi) return;
-          if (!isOnline()) return;
+          if (!isOnline()) return fail(OFFLINE_MESSAGE);
           draft = {
             ...draft,
             ...fields,
@@ -253,7 +266,8 @@ export function createMedicalController({
             onRecordWritten?.(result);
             paint();
             return result;
-          } catch {
+          } catch (error) {
+            fail(error);
             paint();
           }
         }
