@@ -169,6 +169,8 @@ test('Day Dial: blocks are arcs (done ones is-done); Tonight rows carry a tick t
   const { calls, apiFetch } = fakeApi();
   const win = new Window({ url: 'https://life-hub.adam-russell.com/#/calendar/day' });
   win.requestAnimationFrame = undefined;
+  // A Sunday wears the Dress watch (no tappable arcs); this test is about the Tool face's arcs.
+  win.localStorage.setItem('hub-calendar:dial-face:life', 'tool');
   const host = win.document.createElement('div');
   win.document.body.append(host);
   renderDayDial(win.document, host, {

@@ -114,3 +114,21 @@ Patterns between capacity and the rest of life are worked out deterministically 
 **Off switch.** "What's behind this" in the Day forecast → "Agents can offer insights … Turn off".
 
 **Privacy.** Everything stays in the private tasks store. Central Node still gets only the daily check-in line.
+
+## Watch faces (Day dial)
+
+Built from `mockups/dial-complications.html` (first committed with #682, which merged into the handoff branch rather than `main`; the mockup is now on `main` too).
+
+| Face | Auto when | Complications |
+|---|---|---|
+| Tool watch | School days | Weather ring (today), dive bezel, moon phase |
+| Focus | Today, while a tracked work session is running | Retrograde tally, dive bezel; everything but the current block steps back |
+| Pilot GMT | A Travel trip covers the day | GMT hand (trip city), Corey hand, dive bezel |
+| Dress watch | Weekends and school holidays | None: lacquer and gold, readiness as one gold arc |
+| Grand complication | A big day: wedding, ceremony or graduation on the calendar, or the anniversary (13 July) | Dive bezel, moon, tourbillon, GMT hand, countdown plaque |
+
+- Change face with the arrows, the dots or a sideways swipe on the dial. A face picked by hand sticks on that device until **Auto** is tapped.
+- Tap the centre to turn the watch over: the caseback shows today's outlook (score, why, hourly chart, windows).
+- Data: weather ring = today's readiness projection; bezel = logged dexy doses (the log moves off the inner medication ring on bezel faces; skipped/unlogged gaps stay there); moon = committed hours in the shown week (30 h = full); tally = today's tasks closed; tourbillon spins while Clare or Hammond has a pending change on the day; GMT/Corey = Travel trips (`/api/travel-trips`, `/api/travel-trip`).
+- Deviations from the mockup: the dial itself stays on Sydney time on Pilot GMT (the second hand shows the trip city). The wedding has happened, so Grand triggers on big days instead of one date.
+- Code: `js/calendar/dial-faces.js` (pure), `js/calendar/dial-complications.js` (drawing), wired in `render-day-dial.js`; styles at the end of `calendar-day-dial.css`. Tests: `tests/unit/dial-faces.test.js`.
