@@ -2,7 +2,7 @@ import katex from 'katex';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/ai/models';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildChartSvg, CHART_SERIES_COLOR_OPTIONS } from '@/blocks/chart-svg';
-import { mountGraphMaker } from '@/blocks/graph-maker/mount';
+import { mountGraphEditor } from '../../../../packages/graph-blocks';
 import {
   createColumnsEditor,
   createSectionEditor,
@@ -2916,54 +2916,30 @@ export function createDiagramEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
-type MindMapNodeDraft = { id: string; label: string; parent_id?: string | null };
+type GraphBlock = Extract<Block, { block_type: 'mind_map' | 'concept_map' }>;
 
-function createGraphBlockEditor<T extends Block>(
+function createGraphBlockEditor<T extends GraphBlock>(
   block: T,
-  mode: 'mindmap' | 'conceptmap',
   onChange: BlockChangeHandler<T>,
   getLatest: () => T
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields block-editor__graph-fields';
-
-  const title = document.createElement('input');
-  title.type = 'text';
-  title.className =
-    mode === 'mindmap' ? 'block-editor__mind-map-title' : 'block-editor__concept-map-title';
-  title.value = (block.content as { title?: string }).title ?? '';
-  title.placeholder = 'Title (optional)';
-  title.setAttribute('aria-label', mode === 'mindmap' ? 'Mind map title' : 'Concept map title');
-
-  const canvasHost = document.createElement('div');
-  canvasHost.className = 'block-graph-maker-host';
-
-  fields.append(title, canvasHost);
-
-  mountGraphMaker(canvasHost, {
-    mode,
-    content: block.content as never,
-    onChange: (content) => {
+  const kind = block.block_type === 'mind_map' ? 'mind' : 'concept';
+  mountGraphEditor(fields, {
+    kind,
+    content: block.content,
+    idPrefix: block.id,
+    titleClassName: kind === 'mind' ? 'block-editor__mind-map-title' : 'block-editor__concept-map-title',
+    onChange: (content) =>
       onChange({
         ...getLatest(),
         content: {
           ...content,
-          title: title.value.trim() || undefined
+          edges: content.edges.map(({ label, ...edge }) => (label?.trim() ? { ...edge, label } : edge))
         }
-      } as T);
-    }
+      } as T)
   });
-
-  title.addEventListener('input', () => {
-    onChange({
-      ...getLatest(),
-      content: {
-        ...(getLatest().content as object),
-        title: title.value.trim() || undefined
-      }
-    } as T);
-  });
-
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -2972,7 +2948,7 @@ export function createMindMapEditor(
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'mind_map' }>>,
   getLatest: () => Extract<Block, { block_type: 'mind_map' }> = () => block
 ): HTMLElement {
-  return createGraphBlockEditor(block, 'mindmap', onChange, getLatest);
+  return createGraphBlockEditor(block, onChange, getLatest);
 }
 
 export function createConceptMapEditor(
@@ -2980,7 +2956,7 @@ export function createConceptMapEditor(
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'concept_map' }>>,
   getLatest: () => Extract<Block, { block_type: 'concept_map' }> = () => block
 ): HTMLElement {
-  return createGraphBlockEditor(block, 'conceptmap', onChange, getLatest);
+  return createGraphBlockEditor(block, onChange, getLatest);
 }
 
 export function createWhiteboardEditor(

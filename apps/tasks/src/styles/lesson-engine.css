@@ -2766,9 +2766,7 @@
 }
 
 .block-chart__svg svg,
-.block-diagram__svg svg,
-.block-mind-map__svg svg,
-.block-concept-map__svg svg {
+.block-diagram__svg svg {
   max-width: 100%;
   height: auto;
   display: block;
@@ -2776,9 +2774,7 @@
   color: var(--ink);
 }
 
-.block-chart__svg,
-.block-mind-map__svg,
-.block-concept-map__svg {
+.block-chart__svg {
   overflow: visible;
 }
 
