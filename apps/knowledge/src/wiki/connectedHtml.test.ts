@@ -22,9 +22,10 @@ describe("connectedLinksHtml", () => {
     );
     expect(html).toContain("data-open-page=\"page_aotfw\"");
     expect(html).toContain("Artist of the Floating World — sources");
-    expect(html).toContain("href=\"https://teaching-hub.adam-russell.com/units/unit_aotfw\"");
+    // Umbrella-relative: every hub shares the life-hub.adam-russell.com origin.
+    expect(html).toContain("href=\"/teaching/units/unit_aotfw\"");
     expect(html).toContain("Teaching unit unit_aotfw");
-    expect(html).toContain("href=\"https://tasks-hub.adam-russell.com/#/project/proj_aotfw\"");
+    expect(html).toContain("href=\"/tasks/#/project/proj_aotfw\"");
     expect(html).toContain("Tasks project proj_aotfw");
     expect(html).not.toContain("data-open-page=\"teaching:unit:unit_aotfw\"");
     expect(html).not.toContain("data-open-page=\"tasks:project:proj_aotfw\"");
@@ -35,7 +36,7 @@ describe("connectedLinksHtml", () => {
       { connected: ["life:decision:aotfw-sources"] },
       [],
     );
-    expect(html).toContain("href=\"https://life-hub.adam-russell.com/#central-node\"");
+    expect(html).toContain("href=\"/#central-node\"");
     expect(html).toContain("Decision aotfw-sources");
     expect(html).not.toContain("data-open-page=\"life:decision:aotfw-sources\"");
   });

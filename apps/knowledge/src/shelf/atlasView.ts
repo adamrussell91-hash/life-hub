@@ -1,5 +1,10 @@
 import type { AtlasModel, AtlasTown } from "./atlasLayout";
-import { renderTerrain } from "./atlasTerrain";
+import { KIND_COLOUR, KIND_INK, KIND_MEANING, kindColour, kindLabel } from "./kinds";
+import { renderTerrain, type TerrainCanvas } from "./atlasTerrain";
+import { mostConnected } from "./archipelagoLayout";
+import { borderRoadSvg, bridgeSvg } from "./crossingsSvg";
+import { mountSeaLife, pickBottle } from "./seaLife";
+import { MAP_SEA_HTML, MAP_SKY_HTML, mapControlsHtml, positionTerrain, positionWorld, revealAt, terrainLayers, wireFullScreen } from "./mapChrome";
 import type { BookModel } from "./model";
 import type { BookSwatch } from "./palette";
 
@@ -11,8 +16,7 @@ export type AtlasHandlers = {
   focusNote?: string;
 };
 
-const STANCE_WORD = { supports: "supports the book", complicates: "complicates it", extends: "extends it" } as const;
-const terrainCache = new Map<string, HTMLCanvasElement>();
+const terrainCache = new Map<string, TerrainCanvas>();
 
 function esc(value: unknown) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
@@ -20,34 +24,41 @@ function esc(value: unknown) {
 
 /** The cache key changes whenever anything that shapes the land changes. */
 function terrainKey(book: BookModel, atlas: AtlasModel) {
-  return `${book.key}|${atlas.width}|${atlas.towns.map(t => `${t.note.id}:${t.x.toFixed(0)},${t.y.toFixed(0)}:${t.peak ? 1 : 0}`).join(";")}|${atlas.provinces.map(p => `${p.id}${p.explored ? 1 : 0}`).join(",")}`;
+  return `${book.key}|${atlas.width}|${atlas.towns.map(t => `${t.note.id}:${t.x.toFixed(0)},${t.y.toFixed(0)}:${t.peak ? 1 : 0}`).join(";")}|${atlas.provinces.map(p => `${p.id}${p.explored ? 1 : 0}${p.neighbour ? "n" : ""}`).join(",")}|${(atlas.crossings ?? []).map(c => c.kind).join(",")}`;
 }
 
 export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel, handlers: AtlasHandlers): () => void {
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   host.innerHTML = `<div class="atlas${reduceMotion ? "" : " is-unfolding"}">
     <div class="atlas__viewport" tabindex="0" role="application" aria-label="Map of ${esc(book.label)}. Drag or use the arrow keys to move, plus and minus to zoom.">
+      ${MAP_SEA_HTML}
       <div class="atlas__land" data-land></div>
+      <div class="atlas__world" data-world aria-hidden="true"></div>
+      <div class="atlas__world atlas__ink" data-ink aria-hidden="true"></div>
+      ${MAP_SKY_HTML}
       <svg class="atlas__lines" data-lines aria-hidden="true"></svg>
       <div class="atlas__marks" data-marks></div>
     </div>
-    <div class="atlas__controls" role="group" aria-label="Zoom">
-      <button class="hub-icon-btn atlas__zoom" type="button" data-zoom="in" aria-label="Zoom in">+</button>
-      <button class="hub-icon-btn atlas__zoom" type="button" data-zoom="out" aria-label="Zoom out">−</button>
-      <button class="hub-icon-btn atlas__zoom" type="button" data-zoom="fit" aria-label="Fit the whole map">⤢</button>
-    </div>
+    ${mapControlsHtml("Fit the whole map")}
     <details class="atlas__legend">
       <summary>Key</summary>
       <ul>
-        <li><i class="atlas-key atlas-key--supports"></i>Town: a note that supports the book</li>
-        <li><i class="atlas-key atlas-key--extends"></i>Town: a note that extends it</li>
-        <li><i class="atlas-key atlas-key--peak"></i>Peak: the evidence complicates it</li>
-        <li><i class="atlas-key atlas-key--unread"></i>Town: stance not read yet</li>
+        <li><i class="atlas-key" style="background:${KIND_COLOUR.idea}"></i>Town: an idea, person or case, in its colour</li>
+        <li><i class="atlas-key atlas-key--bridge" style="background:${KIND_COLOUR.bridge}"></i>Town: a bridge out of the book</li>
+        <li><i class="atlas-key atlas-key--peak" style="background:${KIND_COLOUR.debate}"></i>Peak: a debate</li>
+        <li><i class="atlas-key atlas-key--unread"></i>Town: not sorted yet</li>
         <li><i class="atlas-key atlas-key--road"></i>Road: notes you linked</li>
+        <li><i class="atlas-key atlas-key--road"></i>Bridge: a neighbouring book you linked once or twice</li>
+        <li><i class="atlas-key atlas-key--road"></i>Border road: a neighbour you linked three or more times shares your land</li>
         <li><i class="atlas-key atlas-key--fog"></i>Fog: a chapter you haven't written about, or an open question</li>
         <li><i class="atlas-key atlas-key--new"></i>Settled this week</li>
         <li><i class="atlas-key atlas-key--faded"></i>Faded: untouched for six months</li>
+        <li><i class="atlas-key isles-key--bottle"></i>Bottle: one of this book's old notes, washed up today</li>
+        <li><i class="atlas-key isles-key--treasure"></i>Golden X: this book's most-connected note</li>
+        <li><i class="atlas-key isles-key--bloom"></i>Ink bloom: a note added since you last looked</li>
       </ul>
+      <p class="isles-key__hint">The compass turns the hours and the word beneath it turns the seasons. Everything else at sea is just for fun: zoom in to find it, then try tapping it.</p>
+      <p class="isles-key__hint">Ships and monsters from Olaus Magnus, <i>Carta Marina</i> (1539).</p>
     </details>
     <aside class="atlas__card" data-card hidden></aside>
   </div>`;
@@ -57,12 +68,16 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
   const lines = root.querySelector<SVGSVGElement>("[data-lines]")!;
   const marks = root.querySelector<HTMLElement>("[data-marks]")!;
   const card = root.querySelector<HTMLElement>("[data-card]")!;
+  const world = root.querySelector<HTMLElement>("[data-world]")!;
+  const inkLayer = root.querySelector<HTMLElement>("[data-ink]")!;
+  /** The scale that fits the whole map: the god's-eye view. */
+  let home = 1;
   const byId = new Map(atlas.towns.map(t => [t.note.id, t]));
   const provinceName = new Map(atlas.provinces.map(p => [p.id, p.label]));
   provinceName.set("loose", "Loose pages");
 
   // Terrain: rendered once per shape of the book, after the shell paints.
-  let terrain: HTMLCanvasElement | null = null;
+  let terrain: TerrainCanvas | null = null;
   const key = terrainKey(book, atlas);
   const placeTerrain = () => {
     // Small maps get more pixels per unit so the coast stays crisp when zoomed.
@@ -71,8 +86,7 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
     terrainCache.delete(key);
     terrainCache.set(key, terrain);
     while (terrainCache.size > 3) terrainCache.delete(terrainCache.keys().next().value!);
-    terrain.className = "atlas__terrain";
-    land.replaceChildren(terrain);
+    land.replaceChildren(...terrainLayers(terrain));
     apply();
   };
   land.innerHTML = `<p class="atlas__drawing">Drawing the land…</p>`;
@@ -89,6 +103,7 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
     const b = atlas.bounds;
     const fitted = Math.min(w / b.w, h / b.h) * 0.94;
     scale = Math.min(1.15, Math.max(fitted, Math.min(0.56, (h / b.h) * 0.9)));
+    home = scale;
     ox = (w - b.w * scale) / 2 - b.x * scale;
     oy = (h - b.h * scale) / 2 - b.y * scale;
     if (b.w * scale > w) {
@@ -118,10 +133,10 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
   };
 
   function apply() {
-    if (terrain) {
-      const res = terrain.width / atlas.width;
-      terrain.style.transform = `translate(${ox}px, ${oy}px) scale(${scale / res})`;
-    }
+    if (terrain) positionTerrain(terrain, atlas.width, scale, ox, oy);
+    positionWorld(world, scale, ox, oy);
+    positionWorld(inkLayer, scale, ox, oy);
+    revealAt(root, scale / home);
     drawMarks();
   }
 
@@ -162,30 +177,44 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
       svg += `<path d="M${from.x} ${from.y} Q ${(from.x + end.x) / 2} ${(from.y + end.y) / 2 + 40} ${end.x} ${end.y}" class="atlas-route${hot ? " is-hot" : ""}"/>`;
       routeLabels.push(`<button type="button" class="atlas-route-label" style="left:${x}px;top:${y}px;max-width:${lw}px;--c:${handlers.swatchFor(route.toBook)?.fill ?? "var(--shallow)"}" data-route="${esc(route.toBook)}">To ${esc(route.toLabel)}<span> · ${route.count}</span></button>`);
     }
+    const deck = Math.max(2.5, Math.min(12, 10 * scale));
+    for (const crossing of atlas.crossings ?? []) {
+      const p = S(crossing.from.x, crossing.from.y);
+      const q = S(crossing.to.x, crossing.to.y);
+      const hot = selected && selected === crossing.fromId ? " is-on" : "";
+      svg += crossing.kind === "joined" ? borderRoadSvg(p, q, deck, hot) : bridgeSvg(crossing.kind, p, q, deck, hot);
+      const text = `${crossing.kind === "joined" ? "Over the border:" : "Bridge to"} ${crossing.label}`;
+      const lw = Math.min(w - 24, text.length * 7.2 + 40);
+      const x = Math.min(w - lw - 8, Math.max(8, q.x - lw / 2));
+      const y = Math.min(h - 38, Math.max(10, q.y + 12));
+      routeRects.push({ x, y, w: lw, h: 28 });
+      routeLabels.push(`<button type="button" class="atlas-route-label" style="left:${x}px;top:${y}px;max-width:${lw}px;--c:${handlers.swatchFor(crossing.key)?.fill ?? "var(--shallow)"}" data-route="${esc(crossing.key)}">${esc(text)}<span> · ${crossing.count}</span></button>`);
+    }
     lines.innerHTML = svg;
 
     const parts: string[] = [];
     // Province names first: they claim their space before any town label does.
     const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
     const font = Math.max(10, Math.min(17, 10 + scale * 6));
-    const columnWidth = Math.max(110, ((atlas.width - 260) / Math.max(1, atlas.provinces.length)) * scale * 0.92);
-    const provinceTop = new Map<string, number>();
-    for (const town of atlas.towns) provinceTop.set(town.province, Math.min(provinceTop.get(town.province) ?? Infinity, town.y));
-    const named = [...atlas.provinces.map(p => ({ id: p.id, label: p.label, explored: p.explored, x: p.x, y: p.y, r: p.radius, start: p.start, end: p.end }))];
+    const columnWidth = Math.max(110, Math.min(240, 260 * scale));
+    const named = [...atlas.provinces.filter(p => !p.neighbour).map(p => ({ id: p.id, label: p.label, explored: p.explored, x: p.x, y: p.y, r: p.radius, start: p.start, end: p.end }))];
     if (atlas.towns.some(t => t.province === "loose")) {
       const loose = atlas.towns.filter(t => t.province === "loose");
       named.push({ id: "loose", label: "Loose pages", explored: true, x: loose.reduce((s, t) => s + t.x, 0) / loose.length, y: loose.reduce((s, t) => s + t.y, 0) / loose.length, r: 60, start: undefined, end: undefined });
     }
-    for (const p of named) {
+    // Regions sit round the island like slices, so each name centres on its own region; written-in
+    // regions name themselves first, and a name that would overlap another waits for a closer zoom.
+    for (const p of [...named].sort((a, b) => Number(b.explored) - Number(a.explored))) {
       const c = S(p.x, p.y);
       const r = p.r * scale;
       if (!p.explored) parts.push(`<div class="atlas-fog" style="left:${c.x}px;top:${c.y}px;width:${r * 2.8}px;height:${r * 2.1}px"></div>`);
-      const topWorld = p.explored ? Math.min(provinceTop.get(p.id) ?? p.y - p.r, p.y - p.r * 0.4) - 22 : p.y - 8;
-      const top = S(p.x, topWorld).y;
       const textWidth = Math.min(columnWidth, p.label.length * font * 0.86);
       const lines = Math.ceil((p.label.length * font * 0.86) / columnWidth);
       const h = lines * font * 1.25 + (p.explored ? 0 : 16);
-      placed.push({ x: c.x - textWidth / 2, y: top - h, w: textWidth, h });
+      const top = c.y + h / 2;
+      const rect = { x: c.x - textWidth / 2, y: top - h, w: textWidth, h };
+      if (placed.some(o => rect.x < o.x + o.w && rect.x + rect.w > o.x && rect.y < o.y + o.h && rect.y + rect.h > o.y)) continue;
+      placed.push(rect);
       parts.push(`<div class="atlas-province${p.explored ? "" : " is-unexplored"}${p.id === "loose" ? " is-loose" : ""}" style="left:${c.x}px;top:${top}px;font-size:${font}px;width:${columnWidth}px"><span>${esc(p.label)}</span>${p.explored ? "" : `<small>Not written about yet${p.start ? ` · pp. ${p.start}–${p.end}` : ""}</small>`}</div>`);
     }
     for (const fog of atlas.fogs) {
@@ -232,10 +261,10 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
       const c = S(town.x, town.y);
       if (c.x < -60 || c.y < -30 || c.x > w + 60 || c.y > h + 30) continue;
       const r = town.size * Math.max(0.7, Math.min(1.4, scale));
-      const stance = town.note.stance ?? "unread";
-      const classes = ["atlas-town", `atlas-town--${town.peak ? "peak" : stance}`, town.faded ? "is-faded" : "", town.isNew ? "is-new" : "", town.note.id === selected ? "is-selected" : ""].filter(Boolean).join(" ");
+      const kind = town.note.kind ?? "unread";
+      const classes = ["atlas-town", `atlas-town--${town.peak ? "peak" : kind}`, town.faded ? "is-faded" : "", town.isNew ? "is-new" : "", town.note.id === selected ? "is-selected" : ""].filter(Boolean).join(" ");
       const page = town.note.page ? `page ${town.note.guessed ? "about " : ""}${town.note.page}` : "no page yet";
-      parts.push(`<button type="button" class="${classes}" style="left:${c.x}px;top:${c.y}px;--r:${r}px" data-town="${esc(town.note.id)}" aria-label="${esc(`${town.note.title}, ${page}`)}"><i></i>${labelFor.get(town.note.id) ?? ""}</button>`);
+      parts.push(`<button type="button" class="${classes}" style="left:${c.x}px;top:${c.y}px;--r:${r}px;--t:${kindColour(town.note.kind)}" data-town="${esc(town.note.id)}" aria-label="${esc(`${town.note.title}, ${page}`)}"><i></i>${labelFor.get(town.note.id) ?? ""}</button>`);
     }
     marks.innerHTML = parts.join("") + routeLabels.join("");
   }
@@ -254,7 +283,7 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
       <button class="hub-icon-btn atlas__card-close" type="button" data-close aria-label="Close">×</button>
       <p class="shelf-eyebrow">${esc(where)}</p>
       <h3>${esc(note.title)}</h3>
-      ${note.stance ? `<p class="atlas__stance atlas__stance--${note.stance}">${town.peak ? "A peak: " : ""}${STANCE_WORD[note.stance]}</p>` : ""}
+      ${note.kind ? `<p class="atlas__kind" style="color:${KIND_INK[note.kind]}">${town.peak ? "A peak: " : ""}${esc(kindLabel(note))} · ${esc(KIND_MEANING[note.kind].toLowerCase())}</p>` : ""}
       ${note.excerpt ? `<p>${esc(note.excerpt)}</p>` : ""}
       ${note.gaps.length ? `<ul class="descent-note__gaps">${note.gaps.map(gap => `<li>${esc(gap)}</li>`).join("")}</ul>` : ""}
       ${town.themes.length ? `<p class="atlas__themes">${town.themes.map(t => `<span>${esc(t)}</span>`).join("")}</p>` : ""}
@@ -307,11 +336,17 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
     if (moved < 6 && event.type === "pointerup") {
       // Pointer capture retargets to the viewport, so find what was actually under the finger.
       const hit = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
+      const rect = viewport.getBoundingClientRect();
+      // Treasure and sea life sit under the islands' hit areas; they answer first.
+      const found = document.elementsFromPoint(event.clientX, event.clientY).find(el => el.closest("[data-sl]")) ?? hit;
+      if (life.tap(found, { x: (event.clientX - rect.left - ox) / scale, y: (event.clientY - rect.top - oy) / scale })) return;
       const target = hit?.closest<HTMLElement>("[data-town], [data-route]");
       if (target?.dataset.town) showCard(target.dataset.town);
       else if (target?.dataset.route) {
-        const route = atlas.routes.find(r => r.toBook === target.dataset.route);
-        handlers.goBook(target.dataset.route, book.links.find(l => l.toBook === route?.toBook && l.fromId === route?.fromId)?.toId);
+        const key = target.dataset.route;
+        const route = atlas.routes.find(r => r.toBook === key);
+        const crossing = atlas.crossings?.find(c => c.key === key);
+        handlers.goBook(key, crossing?.toId ?? book.links.find(l => l.toBook === route?.toBook && l.fromId === route?.fromId)?.toId);
       } else showCard(undefined);
     }
   };
@@ -359,8 +394,51 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
       }
     };
   });
-  const resize = new ResizeObserver(() => schedule());
+  // Going full screen resizes over a few frames; keep refitting until it settles.
+  let refitUntil = 0;
+  const resize = new ResizeObserver(() => {
+    if (performance.now() < refitUntil) fit();
+    schedule();
+  });
   resize.observe(viewport);
+  const leaveFullScreen = wireFullScreen(root, () => {
+    refitUntil = performance.now() + 900;
+    fit();
+    schedule();
+  });
+
+  const b = atlas.bounds;
+  const x0 = Math.max(0, b.x - 220);
+  const y0 = Math.max(0, b.y - 160);
+  const bottle = pickBottle([{ key: book.key, label: book.label, notes: [...book.placed, ...book.loose] }]);
+  const treasure = mostConnected(atlas.towns);
+  const life = mountSeaLife(world, {
+    root,
+    inkLayer,
+    bottle,
+    landmarks: treasure ? [{ kind: "treasure", x: treasure.x + 16, y: treasure.y - 10, noteId: treasure.note.id, links: treasure.note.connected.length }] : [],
+    onTreasure: mark => {
+      const town = byId.get(mark.noteId);
+      if (town) centreOn(town);
+      showCard(mark.noteId);
+    },
+    notesAt: atlas.towns.map(t => ({ id: t.note.id, x: t.x, y: t.y })),
+    onBottle: found => {
+      const town = byId.get(found.noteId);
+      if (town) centreOn(town);
+      showCard(found.noteId);
+    },
+    bounds: { x: x0, y: y0, w: Math.min(atlas.width, b.x + b.w + 220) - x0, h: Math.min(atlas.height, b.y + b.h + 160) - y0 },
+    // Land reaches well past its towns once the hills spread; keep beasts a long way off.
+    lands: [
+      ...(atlas.island ? [{ x: atlas.island.x, y: atlas.island.y, r: atlas.island.r * 1.35 + 60 }] : []),
+      ...atlas.provinces.map(p => ({ x: p.x, y: p.y, r: p.neighbour ? p.radius * 2.8 + 60 : p.radius * 1.6 + 70 })),
+      ...atlas.towns.map(t => ({ x: t.x, y: t.y, r: 150 })),
+    ],
+    harbours: [],
+    size: 0.9,
+    seed: book.key,
+  });
 
   fit();
   if (selected) {
@@ -375,5 +453,7 @@ export function mountAtlas(host: HTMLElement, book: BookModel, atlas: AtlasModel
     window.clearTimeout(idle);
     cancelAnimationFrame(frame);
     resize.disconnect();
+    leaveFullScreen();
+    life.stop();
   };
 }

@@ -73,7 +73,7 @@ describe("show all grouping scope", () => {
   it("names the exclusive views in the toolbar copy", () => {
     expect(showAllGroupingMeta("notebooks")).toContain("university notes hidden");
     expect(showAllGroupingMeta("degrees")).toContain("notebook notes hidden");
-    expect(showAllGroupingMeta("tags")).toContain("Twenty topics");
-    expect(showAllGroupingMeta("tags")).toContain("click a note to see its connections");
+    expect(showAllGroupingMeta("tags")).toContain("Neural map");
+    expect(showAllGroupingMeta("tags")).toContain("click one to follow it");
   });
 });

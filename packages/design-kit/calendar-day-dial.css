@@ -42,6 +42,8 @@
 .dd-arc.is-proposal{stroke:var(--dd-ghost-line);stroke-width:1.5;stroke-dasharray:4 3}
 .dd-arc.is-ghost{fill:var(--dd-ghost-fill);stroke:var(--dd-ghost-line);stroke-width:1.4;stroke-dasharray:3 3}
 .dd-arc.is-skipped{opacity:.35}
+/* A ticked-off task keeps its slot: pale, so the day still shows when it happened. */
+.dd-arc.k-task.is-done{fill:color-mix(in srgb,var(--pastel-sage) 30%,#fff);stroke:color-mix(in srgb,var(--pastel-sage-ink) 35%,#fff);stroke-dasharray:2 2}
 .dd-arc:focus-visible{outline:none;stroke:var(--wave);stroke-width:2.5;stroke-dasharray:none}
 .dd-left{fill:var(--high-sea);opacity:.85}
 .dd-log{stroke-width:1.6}
@@ -211,3 +213,73 @@
 .dd-mio-offer .dd-acts{flex-wrap:wrap}
 /* Rescue morph on the dial. */
 .dd-arc.is-moving-out{opacity:.35;stroke-dasharray:3 3}
+/* Watch faces (js/calendar/dial-faces.js, dial-complications.js; mockup: docs/capacity-forecast-handoff/mockups/dial-complications.html). */
+.dd{--dd-gold:#b8913a;--dd-gmt:var(--wave);--dd-corey:#c4566a;--wx-clear:#e9b949;--wx-steady:#7fb8a4;--wx-wind:#5fb3bd;--wx-cloud:#a7adb6;--wx-fog:#b5a9c9;--wx-rain:#5f8fc9;--wx-storm:#6b4a7a;--wx-recovery:#6cc4a4;--wx-evening:#7d84c9}
+.dd__dialcell{gap:var(--space-2);justify-items:center;align-content:start}
+.dd-face{display:flex;align-items:center;gap:var(--space-2);width:100%;max-width:30rem;padding:0 var(--space-3);flex-wrap:wrap}
+.dd-face__name{flex:1;min-width:0;display:grid;line-height:1.2;text-align:center}
+.dd-face__name b{font-size:var(--text-md);color:var(--navy);font-weight:var(--weight-semibold)}
+.dd-face__name span{font-size:var(--text-xs);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dd-face__auto{font:inherit;font-size:var(--text-xs);font-weight:600;padding:4px 10px;min-height:32px;border-radius:var(--radius-full);border:0;background:color-mix(in srgb,var(--wave) 12%,#fff);color:var(--navy);cursor:pointer}
+.dd-face__auto[aria-pressed="false"]{background:transparent;border:1px dashed var(--line);color:var(--muted)}
+.dd-face__auto:focus-visible,.dd-face__dots button:focus-visible,.dd-gauge-btn:focus-visible{outline:2px solid var(--wave);outline-offset:2px}
+.dd-face__dots{display:flex;justify-content:center;gap:8px}
+.dd-face__dots button{width:24px;height:24px;padding:0;border:0;background:transparent;cursor:pointer;display:grid;place-items:center}
+.dd-face__dots button::before{content:"";width:8px;height:8px;border-radius:999px;background:var(--line);transition:width .2s}
+.dd-face__dots button[aria-current="true"]::before{width:20px;background:var(--navy)}
+.dd-face__hint{margin:0;font-size:var(--text-xs);color:var(--muted);text-align:center;padding:0 var(--space-3)}
+.dd-face__plaque{margin:0;padding:4px 14px;border-radius:var(--radius-full);border:1px solid color-mix(in srgb,var(--dd-gold) 55%,transparent);color:color-mix(in srgb,var(--dd-gold),var(--ink) 35%);font-size:var(--text-sm);font-weight:600;letter-spacing:.02em}
+.dd-face__about{width:100%;max-width:30rem;padding:0 var(--space-3);font-size:var(--text-sm)}
+.dd-face__about summary{cursor:pointer;color:var(--navy);font-weight:600;min-height:32px;display:flex;align-items:center}
+.dd-face__about ul{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-2)}
+.dd-face__about li b{color:var(--ink)}
+.dd-face__about li span{color:var(--muted);font-size:var(--text-xs)}
+.dd-face__about li p,.dd-face__when{margin:2px 0 0;color:var(--muted);font-size:var(--text-xs);line-height:1.45}
+.dd-face__about em{color:var(--navy);font-style:normal;font-weight:600}
+.dd-watch{position:relative;perspective:1400px;touch-action:pan-y;max-width:100%}
+.dd-watch__front,.dd-watch__back{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:transform .7s cubic-bezier(.2,.7,.2,1)}
+.dd-watch__back{transform:rotateY(180deg);background:var(--glass,#fff);border:1px solid var(--line);border-radius:var(--radius-md);overflow:auto;display:grid;place-items:center}
+.dd-watch.is-back .dd-watch__front{transform:rotateY(-180deg)}
+.dd-watch.is-back .dd-watch__back{transform:rotateY(0)}
+.dd-watch:not(.is-back) .dd-watch__back,.dd-watch.is-back .dd-watch__front{pointer-events:none}
+.dd-cb{display:grid;gap:var(--space-2);padding:var(--space-4);max-width:22rem;width:100%;justify-items:start}
+.dd-cb__big{font-size:2.25rem;font-weight:700;color:var(--navy);line-height:1;font-variant-numeric:tabular-nums}
+.dd-cb__big small{font-size:var(--text-sm);font-weight:500;color:var(--muted)}
+.dd-cb__why{margin:0;font-size:var(--text-sm);line-height:1.45;color:var(--ink)}
+.dd-cb .rf-chart{width:100%}
+.dd-cb__cards{display:flex;flex-wrap:wrap;gap:6px}
+.dd-cb__card{display:grid;padding:4px 8px;border-radius:10px;background:color-mix(in srgb,var(--navy) 5%,transparent);font-size:var(--text-xs);line-height:1.25}
+.dd-cb__card b{font-size:var(--text-sm);color:var(--navy)}
+.dd-cb__card i{font-style:normal;color:var(--muted)}
+.dd-gauge-btn{cursor:pointer;outline:none}
+.dd-gauge-hit{fill:transparent}
+.dd-disc.is-gold{stroke:var(--dd-gold);stroke-width:3}
+.dd-arc.is-dimmed{opacity:.35}
+.dd-arc.is-focus{stroke:var(--navy);stroke-width:2}
+.dd [data-part="context-ring"].is-dimmed{opacity:.35}
+.dd-fx-wx{fill-opacity:.5}.dd-fx-wx.is-past{fill-opacity:.95}
+.dd-fx-wx.is-clear{fill:var(--wx-clear)}.dd-fx-wx.is-steady{fill:var(--wx-steady)}.dd-fx-wx.is-wind{fill:var(--wx-wind)}.dd-fx-wx.is-cloud{fill:var(--wx-cloud)}.dd-fx-wx.is-fog{fill:var(--wx-fog)}.dd-fx-wx.is-rain{fill:var(--wx-rain)}.dd-fx-wx.is-storm{fill:var(--wx-storm)}.dd-fx-wx.is-recovery{fill:var(--wx-recovery)}.dd-fx-wx.is-evening{fill:var(--wx-evening)}
+.dd-fx-bezel-track{fill:color-mix(in srgb,var(--navy) 7%,transparent)}
+.dd-fx-bezel-tick{stroke:var(--muted);stroke-opacity:.3;stroke-width:1}.dd-fx-bezel-tick.is-major{stroke-opacity:.55}
+.dd-fx-dose{fill:var(--wave);fill-opacity:.22}.dd-fx-dose.is-gone{fill-opacity:1}
+.dd-fx-dose.is-late{fill:var(--high-sea);fill-opacity:1}.dd-fx-dose.is-late.is-ahead{fill-opacity:.3}
+.dd-fx-pip{fill:var(--wave);stroke:#fff;stroke-width:1.2}
+.dd-fx-moon-dark{fill:var(--navy);fill-opacity:.9}.dd-fx-moon-lit{fill:var(--dd-gold)}
+.dd-fx-small{font-size:9px;font-weight:600;letter-spacing:.05em;fill:var(--muted);text-anchor:middle}
+.dd-fx-retro-track{fill:none;stroke:color-mix(in srgb,var(--navy) 8%,transparent);stroke-width:5;stroke-linecap:round}
+.dd-fx-retro-tick{stroke:var(--muted);stroke-width:1}
+.dd-fx-retro-hand{stroke:var(--pastel-sage-ink);stroke-width:2.4;stroke-linecap:round}
+.dd-fx-pin{fill:var(--ink)}
+.dd-fx-tb-window{fill:#fff;stroke:var(--dd-gold);stroke-width:1.4}
+.dd-fx-tb-line{fill:none;stroke:var(--dd-gold);stroke-width:1.1}
+.dd-fx-tb-cage.is-spinning{animation:dd-tourbillon 6s linear infinite}
+@keyframes dd-tourbillon{to{transform:rotate(360deg)}}
+.dd-fx-gmt-line{stroke:var(--dd-gmt);stroke-width:1.8}.dd-fx-gmt-tip{fill:var(--dd-gmt)}
+.dd-fx-gmt-label{font-size:9.5px;font-weight:700;fill:var(--dd-gmt);text-anchor:middle;paint-order:stroke;stroke:#fff;stroke-width:3}
+.dd-fx-corey-eve{fill:var(--dd-corey);fill-opacity:.6}.dd-fx-corey-dot{fill:var(--dd-corey)}
+.dd-fx-corey-c{font-size:8px;font-weight:700;fill:#fff;text-anchor:middle}
+@media (prefers-reduced-motion:reduce){.dd-watch__front,.dd-watch__back{transition:none}.dd-fx-tb-cage.is-spinning{animation:none}.dd-face__dots button::before{transition:none}}
+/* The phone nav rule pulls every .dd__round to the front; the face bar keeps ‹ name › order. */
+.dd-face > .dd__round{order:0}
+/* The caseback reuses the readiness chart, whose line colours live on .rf. */
+.dd-cb{--rf-clear:#d9801c;--rf-steady:#3f9460;--rf-wind:#1c8f9d;--rf-cloud:#6e8199;--rf-fog:#8178ab;--rf-rain:#3b7dd8;--rf-storm:#5b4c9c;--rf-recovery:#2e9c7a;--rf-evening:#5a63b5}

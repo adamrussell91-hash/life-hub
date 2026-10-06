@@ -56,8 +56,14 @@ import { proposeActionToolSchema } from './propose-action.mjs';
 import { shortcutSchemas } from './shortcuts.mjs';
 import { selectCapabilityIdsForTurn } from './intent-router.mjs';
 import { domainRetrievalSchemasFor } from '../domain-retrieval.mjs';
+import { specialistReadSchemasFor } from '../domain-analysis.mjs';
 import { selectClareWorkSchemas } from '../clare-work.mjs';
 import { selectHammondProductivitySchemas } from '../hammond-productivity.mjs';
+import {
+  listNutritionChallengesSchema,
+  upsertNutritionChallengeSchema,
+  markNutritionChallengeDaySchema
+} from '../../../../apps/life/js/core/nutrition-challenges.js';
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -142,7 +148,8 @@ export const OS_FLOOR_CAPABILITY_IDS = Object.freeze([
   'intuition.edit-pack',
   'os.promote-shortcut',
   'os.list-promoted-shortcuts',
-  'os.run-promoted-shortcut'
+  'os.run-promoted-shortcut',
+  'remember.write-memory'
 ]);
 
 export function capabilityIdsForAgent(slug) {
@@ -218,6 +225,21 @@ export function isPathAllowedForAgent(slug, path, { mode = 'write' } = {}) {
   if (!allowlist) return false;
   const globs = mode === 'read' ? (allowlist.read_globs ?? []) : (allowlist.write_globs ?? []);
   return globs.some(glob => matchGlob(glob, path));
+}
+
+/**
+ * Agents whose allowlist covers this path. Used for Option A handoff: an agent
+ * proposing outside its own lane files the write under the owning agent instead
+ * of refusing Adam. Hammond first (umbrella), then alphabetical.
+ */
+export function ownerAgentsForPath(path, { mode = 'write' } = {}) {
+  const dir = join(CAPABILITIES_ROOT, 'allowlists');
+  if (!existsSync(dir)) return [];
+  const slugs = readdirSync(dir)
+    .filter(name => name.endsWith('.json'))
+    .map(name => name.slice(0, -5))
+    .sort((a, b) => (a === 'hammond' ? -1 : b === 'hammond' ? 1 : a.localeCompare(b)));
+  return slugs.filter(slug => isPathAllowedForAgent(slug, path, { mode }));
 }
 
 const SHORTCUT_CAPABILITY_IDS = new Set([
@@ -403,6 +425,24 @@ export function buildAgentTools({
     if (!schema?.name || attached.has(schema.name)) continue;
     tools.push(schema);
     attached.add(schema.name);
+  }
+
+  for (const schema of specialistReadSchemasFor(slug)) {
+    if (!schema?.name || attached.has(schema.name)) continue;
+    tools.push(schema);
+    attached.add(schema.name);
+  }
+
+  if (slug === 'brisket') {
+    for (const schema of [
+      listNutritionChallengesSchema(),
+      upsertNutritionChallengeSchema(),
+      markNutritionChallengeDaySchema()
+    ]) {
+      if (!schema?.name || attached.has(schema.name)) continue;
+      tools.push(schema);
+      attached.add(schema.name);
+    }
   }
 
   if (slug === 'clare') {

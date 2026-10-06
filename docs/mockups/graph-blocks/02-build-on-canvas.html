@@ -1,0 +1,1315 @@
+<!doctype html>
+<html lang="en" data-hub="teaching">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Concept B · Build on the canvas — graph block mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../../packages/design-kit/tokens.css" />
+<link rel="stylesheet" href="../../../packages/design-kit/overlays.css" />
+<link rel="stylesheet" href="../../../packages/design-kit/actions.css" />
+<link rel="stylesheet" href="../../../packages/design-kit/filters.css" />
+<link rel="stylesheet" href="mock-page.css" />
+<style>
+  .gb-title {
+    width: 100%;
+    margin-bottom: var(--space-3);
+    padding: var(--space-1) 0;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    background: transparent;
+    font: inherit;
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    color: var(--navy);
+  }
+
+  .gb-title:hover {
+    border-bottom-color: var(--line);
+  }
+
+  .gb-title:focus-visible {
+    outline: none;
+    border-bottom-color: var(--wave);
+  }
+
+  .gb-caption {
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    color: var(--navy);
+  }
+
+  /* ── Canvas ── */
+  .gb-canvas {
+    position: relative;
+    height: 29rem;
+    overflow: hidden;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background:
+      radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--navy) 10%, transparent) 1px, transparent 0) 0 0 / 20px 20px,
+      color-mix(in srgb, var(--cotton) 60%, #fff);
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .gb-canvas.is-panning {
+    cursor: grabbing;
+  }
+
+  .gb-canvas.is-linking {
+    cursor: crosshair;
+  }
+
+  .gb-canvas--read {
+    height: auto;
+    aspect-ratio: 16 / 10;
+    cursor: default;
+    touch-action: auto;
+  }
+
+  .gb-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .gb-node {
+    cursor: pointer;
+  }
+
+  .gb-node .gb-card {
+    filter: drop-shadow(0 1px 1.5px rgba(20, 35, 70, 0.10)) drop-shadow(0 3px 8px rgba(20, 35, 70, 0.07));
+  }
+
+  .gb-node .gb-ring {
+    fill: none;
+    stroke: var(--wave);
+    stroke-width: 2;
+    opacity: 0;
+  }
+
+  .gb-node:hover .gb-ring {
+    opacity: 0.35;
+  }
+
+  .gb-node.is-selected .gb-ring,
+  .gb-node.is-target .gb-ring {
+    opacity: 1;
+  }
+
+  .gb-handle {
+    cursor: pointer;
+  }
+
+  .gb-handle circle {
+    fill: var(--paper);
+    stroke: var(--wave);
+    stroke-width: 1.5;
+  }
+
+  .gb-handle path {
+    stroke: var(--wave);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    fill: none;
+  }
+
+  .gb-handle:hover circle {
+    fill: var(--wave);
+  }
+
+  .gb-handle:hover path {
+    stroke: #fff;
+  }
+
+  .gb-port {
+    cursor: crosshair;
+  }
+
+  .gb-edge-chip {
+    cursor: pointer;
+  }
+
+  .gb-edge-chip:hover rect {
+    stroke: var(--wave);
+  }
+
+  .gb-edge-chip.is-selected rect {
+    stroke: var(--wave);
+    stroke-width: 1.5;
+  }
+
+  /* ── Canvas chrome ── */
+  .gb-toolbar {
+    position: absolute;
+    top: var(--space-2);
+    left: var(--space-2);
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    box-shadow: var(--elev-2);
+    backdrop-filter: blur(8px);
+  }
+
+  .gb-toolbar__sep {
+    width: 1px;
+    align-self: stretch;
+    margin: var(--space-1) var(--space-1);
+    background: var(--line);
+  }
+
+  .gb-tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    min-width: 2.25rem;
+    height: 2.25rem;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: calc(var(--radius-sm) - 4px);
+    background: transparent;
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--orca);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .gb-tool:hover {
+    background: var(--shore);
+    color: var(--ink);
+  }
+
+  .gb-tool:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .gb-tool:disabled:hover {
+    background: transparent;
+  }
+
+  .gb-tool svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+  }
+
+  .gb-tool.is-danger {
+    color: var(--danger);
+  }
+
+  .gb-tool.is-on {
+    background: color-mix(in srgb, var(--pastel-blue) 70%, #fff);
+    color: var(--pastel-blue-ink);
+  }
+
+  .gb-zoom {
+    min-width: 3rem;
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  .gb-corner {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    z-index: 3;
+  }
+
+  .gb-hint {
+    position: absolute;
+    left: 50%;
+    bottom: var(--space-3);
+    z-index: 2;
+    transform: translateX(-50%);
+    margin: 0;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--paper) 85%, transparent);
+    border: 1px solid var(--line);
+    font-size: var(--text-xs);
+    color: var(--muted);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .gb-float,
+  .gb-verbs {
+    position: absolute;
+    left: 50%;
+    bottom: var(--space-3);
+    z-index: 4;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    max-width: calc(100% - var(--space-4));
+    padding: var(--space-1);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    box-shadow: var(--elev-4);
+  }
+
+  .gb-canvas.has-context .gb-hint {
+    display: none;
+  }
+
+  .gb-float__name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    max-width: 11rem;
+    padding: 0 var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--ink);
+  }
+
+  .gb-float__name span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .gb-float__name::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--ink-c, var(--navy));
+  }
+
+  .gb-float[hidden],
+  .gb-rename[hidden],
+  .gb-verbs[hidden],
+  .gb-sheet[hidden] {
+    display: none;
+  }
+
+  .gb-swatches {
+    display: flex;
+    gap: 2px;
+    padding: 0 var(--space-1);
+  }
+
+  .gb-swatch {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .gb-swatch::after {
+    content: "";
+    width: 16px;
+    height: 16px;
+    border-radius: var(--radius-full);
+    background: var(--fill-c);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink-c) 35%, transparent);
+  }
+
+  .gb-swatch[aria-pressed="true"]::after {
+    box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--ink-c);
+  }
+
+  .gb-rename {
+    position: absolute;
+    z-index: 5;
+    padding: 0 var(--space-2);
+    border: 2px solid var(--wave);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    font: inherit;
+    font-weight: var(--weight-semibold);
+    color: var(--ink);
+    text-align: center;
+    box-shadow: var(--elev-3);
+  }
+
+  .gb-rename:focus-visible {
+    outline: none;
+  }
+
+  .gb-verbs {
+    width: max-content;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  }
+
+  .gb-verbs__label {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .gb-verbs__label strong {
+    color: var(--ink);
+    font-weight: var(--weight-semibold);
+  }
+
+  .gb-verbs__row {
+    display: none;
+    gap: var(--space-1);
+  }
+
+  .gb-verbs input {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 2.25rem;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    font: inherit;
+    font-size: var(--text-base);
+    color: var(--ink);
+  }
+
+  .gb-verbs input:focus-visible {
+    outline: none;
+    border-color: var(--wave);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--wave) 15%, transparent);
+  }
+
+  .gb-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+
+  .gb-chips button {
+    min-height: 1.625rem;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-full);
+    background: var(--warm-white);
+    font: inherit;
+    font-size: var(--text-xs);
+    color: var(--orca);
+    cursor: pointer;
+  }
+
+  .gb-chips button:hover {
+    border-color: color-mix(in srgb, var(--wave) 45%, transparent);
+    color: var(--pastel-blue-ink);
+  }
+
+  .gb-verbs__actions {
+    display: none;
+  }
+
+  .gb-verbs__actions .btn {
+    min-height: 2.25rem;
+    font-size: var(--text-sm);
+  }
+
+  .gb-foot {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-4);
+  }
+
+  /* ── Phone sheet (R4: docked, ≥44px actions, safe-area padding) ── */
+  .gb-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    max-height: 70dvh;
+    padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: var(--paper);
+    border-top: 1px solid var(--line);
+    box-shadow: var(--elev-4);
+  }
+
+  .gb-sheet__grab {
+    width: 2.5rem;
+    height: 4px;
+    margin: 0 auto var(--space-3);
+    border-radius: var(--radius-full);
+    background: var(--shallow);
+    opacity: 0.6;
+  }
+
+  .gb-sheet input {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: var(--weight-semibold);
+    color: var(--ink);
+  }
+
+  .gb-sheet input:focus-visible {
+    outline: none;
+    border-color: var(--wave);
+  }
+
+  .gb-sheet .gb-swatches {
+    justify-content: space-between;
+    padding: var(--space-2) 0;
+  }
+
+  .gb-sheet .gb-swatch {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .gb-sheet .gb-swatch::after {
+    width: 24px;
+    height: 24px;
+  }
+
+  .gb-sheet__actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .gb-sheet__actions .btn {
+    min-height: 2.75rem;
+    padding: 0 var(--space-2);
+  }
+
+  .gb-sheet__actions .is-danger {
+    color: var(--danger);
+  }
+
+  .gb-sheet__done {
+    width: 100%;
+    min-height: 2.75rem;
+    margin-top: var(--space-2);
+  }
+
+  [data-c="blue"] { --fill-c: var(--pastel-blue); --ink-c: var(--pastel-blue-ink); }
+  [data-c="sage"] { --fill-c: var(--pastel-sage); --ink-c: var(--pastel-sage-ink); }
+  [data-c="peach"] { --fill-c: var(--pastel-peach); --ink-c: var(--pastel-peach-ink); }
+  [data-c="gold"] { --fill-c: var(--pastel-gold); --ink-c: var(--pastel-gold-ink); }
+  [data-c="lilac"] { --fill-c: var(--pastel-lilac); --ink-c: var(--pastel-lilac-ink); }
+
+  @media (max-width: 719px) {
+    .gb-canvas {
+      height: 26rem;
+      margin: 0 calc(-1 * var(--space-1));
+    }
+
+    .gb-canvas--read {
+      height: auto;
+      aspect-ratio: 4 / 5;
+    }
+
+    .gb-float {
+      display: none;
+    }
+
+    .gb-tool {
+      min-width: 2.75rem;
+      height: 2.75rem;
+    }
+
+    .gb-tool__label {
+      display: none;
+    }
+
+    .gb-title,
+    .gb-rename,
+    .gb-verbs input {
+      font-size: 1rem;
+    }
+
+    .gb-verbs {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      transform: none;
+      flex-direction: column;
+      align-items: stretch;
+      width: auto;
+      max-width: none;
+      z-index: 41;
+      padding: var(--space-4) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+
+    .gb-verbs__row {
+      display: flex;
+    }
+
+    .gb-verbs > .gb-tool {
+      display: none;
+    }
+
+    .gb-chips button {
+      min-height: 2.75rem;
+      font-size: var(--text-sm);
+    }
+
+    .gb-verbs__actions {
+      display: flex;
+      margin-top: var(--space-3);
+    }
+
+    .gb-verbs__actions .btn {
+      flex: 1 1 0;
+      min-height: 2.75rem;
+    }
+
+    .gb-verbs input {
+      min-height: 2.75rem;
+    }
+
+    .gb-foot .btn {
+      width: 100%;
+      min-height: 2.75rem;
+    }
+
+    .gb-hint {
+      font-size: var(--text-2xs);
+    }
+  }
+</style>
+</head>
+<body>
+<main class="mock">
+  <header class="mock-head">
+    <p class="mock-head__eyebrow">Graph block mockup · Concept B</p>
+    <h1>Build on the canvas</h1>
+    <p>Work on the map itself. Click an idea to get a small toolbar next to it, use the + handle to grow a branch, drag to move things, and drag from a concept’s dot to another concept to link them. Branches taper like a hand-drawn map.</p>
+    <div class="mock-head__switch">
+      <a class="btn btn--secondary" href="01-outline-to-map.html">← See Concept A</a>
+    </div>
+  </header>
+
+  <section class="mock-section">
+    <h2>Editing a mind map</h2>
+    <p>On desktop <em>Art and propaganda</em> starts selected. Try + to add a sub-idea, double-click to rename, or drag a branch and its sub-ideas move with it. <em>Tidy</em> lays everything out again.</p>
+    <div class="mock-block is-editing" id="mind-editor">
+      <button class="mock-block__menu" type="button" aria-label="Mind map block menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="19" r="1.6" fill="currentColor"/></svg></button>
+      <input class="gb-title" data-role="title" aria-label="Mind map title" placeholder="Add a title" />
+      <div class="gb-canvas" data-role="canvas"></div>
+      <div class="gb-foot"><button class="btn btn--secondary" type="button">Done</button></div>
+    </div>
+  </section>
+
+  <section class="mock-section">
+    <h2>Editing a concept map</h2>
+    <p>Pre-opened: the link label editor, with verb suggestions. Drag the blue dot on any concept to another concept to start a new link, then pick or type the verb.</p>
+    <div class="mock-block is-editing" id="concept-editor">
+      <button class="mock-block__menu" type="button" aria-label="Concept map block menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="19" r="1.6" fill="currentColor"/></svg></button>
+      <input class="gb-title" data-role="title" aria-label="Concept map title" placeholder="Add a title" />
+      <div class="gb-canvas" data-role="canvas"></div>
+      <div class="gb-foot"><button class="btn btn--secondary" type="button">Done</button></div>
+    </div>
+  </section>
+
+  <section class="mock-section">
+    <h2>What students see</h2>
+    <p>The map fits the frame when it opens, with no grey zoom buttons. Students can pinch or use full screen to look closer.</p>
+    <figure class="mock-block" style="margin:0">
+      <figcaption class="gb-caption" data-role="read-mind-title"></figcaption>
+      <div class="gb-canvas gb-canvas--read" id="read-mind"></div>
+    </figure>
+    <figure class="mock-block" style="margin:var(--space-4) 0 0">
+      <figcaption class="gb-caption" data-role="read-concept-title"></figcaption>
+      <div class="gb-canvas gb-canvas--read" id="read-concept"></div>
+    </figure>
+  </section>
+
+  <aside class="mock-notes">
+    <h2>What changes, what stays</h2>
+    <ul>
+      <li><strong>Same block data, plus position.</strong> Nodes keep <code>{ id, label, parent_id }</code> and add the optional <code>color</code>, <code>x</code> and <code>y</code> that Teaching’s schema already allows. Tasks would add the same three optional fields. Blocks with no saved positions get laid out automatically.</li>
+      <li><strong>Same block shell.</strong> The grip, ⋮ menu, Done, autosave and publish checks don’t change. This replaces Tasks’ form rows and reskins Teaching’s existing canvas engine with kit controls (no more raw grey zoom buttons or the empty pill top-left).</li>
+      <li><strong>Phone.</strong> Tapping an idea opens a docked bottom sheet: a 16px name field, ≥44px actions and safe-area padding. In the hub it sits above the tab bar.</li>
+      <li><strong>Trade-off.</strong> It’s more expressive, but the layout is yours to keep tidy, and big maps need pan and zoom on a phone.</li>
+    </ul>
+  </aside>
+</main>
+
+<script src="graph-mock.js"></script>
+<script>
+(function () {
+  const G = GraphMock;
+  const COLOURS = G.BRANCH_COLOURS;
+  const fmt = (v) => v.toFixed(1);
+  const phone = () => matchMedia('(max-width: 719px)').matches;
+  const ICON = {
+    child: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5v8a3 3 0 0 0 3 3h11M15 12l4 4-4 4"/></svg>',
+    sibling: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    del: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>',
+    link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+    minus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 12h12"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>',
+    fit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+    tidy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z"/></svg>',
+    concept: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="10" rx="4"/><path d="M12 10v4M10 12h4"/></svg>'
+  };
+
+  /* ── Drawing ── */
+  const STYLE_MIND = (n) =>
+    n.depth === 0
+      ? { font: '600 17px Inter', size: 17, weight: 600, padX: 22, padY: 14, lineH: 22, maxW: 220 }
+      : n.depth === 1
+        ? { font: '600 14px Inter', size: 14, weight: 600, padX: 16, padY: 9, lineH: 19, maxW: 190 }
+        : { font: '500 13px Inter', size: 13, weight: 500, padX: 12, padY: 7, lineH: 17, maxW: 150 };
+  const STYLE_CONCEPT = () => ({ font: '600 14px Inter', size: 14, weight: 600, padX: 16, padY: 11, lineH: 19, maxW: 180 });
+
+  function mindScene(state) {
+    const root = G.buildTree(state.nodes);
+    const list = G.flatten(root);
+    G.sizeNodes(list, STYLE_MIND);
+    for (const n of list) Object.assign(n, state.pos[n.id]);
+    const byId = new Map(list.map((n) => [n.id, n]));
+    let ribbons = '';
+    for (const n of list) {
+      if (!n.depth) continue;
+      const p = byId.get(n.parent_id) || root;
+      const dx = n.x - p.x;
+      const dy = n.y - p.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const bend = len * 0.12;
+      const px = -dy / len;
+      const py = dx / len;
+      const pts = [
+        { x: p.x, y: p.y },
+        { x: p.x + dx * 0.35 + px * bend, y: p.y + dy * 0.35 + py * bend },
+        { x: p.x + dx * 0.7 + px * bend * 0.35, y: p.y + dy * 0.7 + py * bend * 0.35 },
+        { x: n.x, y: n.y }
+      ];
+      const [w0, w1] = n.depth === 1 ? [13, 4] : [5, 1.6];
+      ribbons += `<path d="${G.taperedPath(pts, w0, w1)}" style="fill: color-mix(in srgb, var(--pastel-${n.branch}-ink) 42%, transparent)"/>`;
+    }
+    let boxes = '';
+    for (const n of list) {
+      const l = n.x - n.w / 2;
+      const t = n.y - n.h / 2;
+      const sel = n.id === state.selected ? ' is-selected' : '';
+      let card;
+      if (n.depth === 0) {
+        card = `<rect class="gb-card" x="${fmt(l)}" y="${fmt(t)}" width="${n.w}" height="${n.h}" rx="20" fill="var(--navy)"/>` + G.textLines(n, n.x, '#fff');
+      } else if (n.depth === 1) {
+        card =
+          `<rect class="gb-card" x="${fmt(l)}" y="${fmt(t)}" width="${n.w}" height="${n.h}" rx="${Math.min(n.h / 2, 18)}" fill="var(--pastel-${n.branch})" stroke="#fff" stroke-width="2"/>` +
+          G.textLines(n, n.x, `var(--pastel-${n.branch}-ink)`);
+      } else {
+        card =
+          `<rect class="gb-card" x="${fmt(l)}" y="${fmt(t)}" width="${n.w}" height="${n.h}" rx="${Math.min(n.h / 2, 16)}" fill="#fff" style="stroke: color-mix(in srgb, var(--pastel-${n.branch}-ink) 40%, transparent)" stroke-width="1.5"/>` +
+          G.textLines(n, n.x, 'var(--ink)');
+      }
+      const ring = `<rect class="gb-ring" x="${fmt(l - 5)}" y="${fmt(t - 5)}" width="${n.w + 10}" height="${n.h + 10}" rx="${n.depth === 0 ? 24 : Math.min(n.h / 2 + 5, 22)}"/>`;
+      boxes += `<g class="gb-node${sel}" data-id="${n.id}">${ring}${card}</g>`;
+    }
+    let extra = '';
+    const s = byId.get(state.selected);
+    if (s && !state.readOnly) {
+      const exit = { x: s.x, y: s.y + s.h / 2 + 16 };
+      extra = `<g class="gb-handle" data-act="add-child"><title>Add a sub-idea (Tab)</title><circle cx="${fmt(exit.x)}" cy="${fmt(exit.y)}" r="12"/><path d="M${fmt(exit.x - 5)} ${fmt(exit.y)} H${fmt(exit.x + 5)} M${fmt(exit.x)} ${fmt(exit.y - 5)} V${fmt(exit.y + 5)}"/></g>`;
+    }
+    return { markup: ribbons + boxes + extra, rects: list, byId, root };
+  }
+
+  function conceptScene(state) {
+    const nodes = state.nodes.map((n) => ({ ...n, depth: 1 }));
+    G.sizeNodes(nodes, STYLE_CONCEPT);
+    nodes.forEach((n) => {
+      n.w += 14;
+      Object.assign(n, state.pos[n.id]);
+    });
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    let paths = '';
+    const chips = [];
+    for (const e of state.edges) {
+      const s = byId.get(e.from);
+      const t = byId.get(e.to);
+      if (!s || !t) continue;
+      const mx = (s.x + t.x) / 2;
+      const my = (s.y + t.y) / 2;
+      const dx = t.x - s.x;
+      const dy = t.y - s.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const ctrl = { x: mx - (dy / len) * len * 0.12, y: my + (dx / len) * len * 0.12 };
+      const a = G.rectExit(s, ctrl.x, ctrl.y, 2);
+      const b = G.rectExit(t, ctrl.x, ctrl.y, 5);
+      const pts = [a, ctrl, b];
+      const missing = !String(e.label || '').trim();
+      paths += `<path d="M${fmt(a.x)} ${fmt(a.y)} Q${fmt(ctrl.x)} ${fmt(ctrl.y)} ${fmt(b.x)} ${fmt(b.y)}" fill="none" stroke="var(--orca)" stroke-width="1.6" opacity="0.8" ${missing ? 'stroke-dasharray="4 4"' : ''} marker-end="url(#${state.marker})"/>`;
+      chips.push({ ...G.chipFor(missing ? 'add a verb' : e.label), at: (tt) => G.quadAt(pts, tt), id: e.id, missing });
+    }
+    G.placeChips(chips, nodes.map((n) => ({ x: n.x, y: n.y, w: n.w, h: n.h })));
+    const chipMarkup = chips
+      .map((c) => {
+        let svg = G.chipSvg(c, `class="gb-edge-chip${c.id === state.selectedEdge ? ' is-selected' : ''}" data-edge="${c.id}"`).replace('class="gm-chip" ', '');
+        if (c.missing) svg = svg.replace('stroke="var(--line)"', 'stroke="var(--high-sea-ink)" stroke-dasharray="3 3"').replace('fill="var(--orca)"', 'fill="var(--high-sea-ink)"');
+        return svg;
+      })
+      .join('');
+    const boxes = nodes
+      .map((n) => {
+        const l = n.x - n.w / 2;
+        const t = n.y - n.h / 2;
+        const c = n.color || 'blue';
+        const sel = n.id === state.selected ? ' is-selected' : '';
+        const target = n.id === state.linkTarget ? ' is-target' : '';
+        const textX = n.x + 7;
+        const port =
+          !state.readOnly && (n.id === state.selected || n.id === state.hover)
+            ? `<g class="gb-port" data-port="${n.id}"><title>Drag to another concept to link</title><circle cx="${fmt(n.x + n.w / 2)}" cy="${fmt(n.y)}" r="9" fill="var(--paper)" stroke="var(--wave)" stroke-width="1.5"/><circle cx="${fmt(n.x + n.w / 2)}" cy="${fmt(n.y)}" r="4" fill="var(--wave)"/></g>`
+            : '';
+        return (
+          `<g class="gb-node${sel}${target}" data-id="${n.id}">` +
+          `<rect class="gb-ring" x="${fmt(l - 5)}" y="${fmt(t - 5)}" width="${n.w + 10}" height="${n.h + 10}" rx="18"/>` +
+          `<rect class="gb-card" x="${fmt(l)}" y="${fmt(t)}" width="${n.w}" height="${n.h}" rx="14" fill="#fff" stroke="var(--line)"/>` +
+          `<rect x="${fmt(l)}" y="${fmt(t)}" width="${n.w}" height="${n.h}" rx="14" fill="var(--pastel-${c})" opacity="0.45"/>` +
+          `<circle cx="${fmt(l + 16)}" cy="${fmt(n.y)}" r="5" fill="var(--pastel-${c}-ink)"/>` +
+          G.textLines(n, textX, 'var(--ink)') +
+          port +
+          '</g>'
+        );
+      })
+      .join('');
+    let ghost = '';
+    if (state.linkFrom && state.pointer) {
+      const s = byId.get(state.linkFrom);
+      ghost = `<path d="M${fmt(s.x + s.w / 2)} ${fmt(s.y)} L${fmt(state.pointer.x)} ${fmt(state.pointer.y)}" stroke="var(--wave)" stroke-width="2" stroke-dasharray="5 5" fill="none" marker-end="url(#${state.marker})"/>`;
+    }
+    return { markup: G.arrowDefs(state.marker) + paths + boxes + chipMarkup + ghost, rects: [...nodes, ...chips], byId, chips };
+  }
+
+  /* ── Canvas controller ── */
+  let markerSeq = 0;
+  function mountCanvas(host, opts) {
+    const state = {
+      kind: opts.kind,
+      readOnly: !!opts.readOnly,
+      nodes: G.clone(opts.content.nodes),
+      edges: G.clone(opts.content.edges || []),
+      pos: {},
+      view: { x: 0, y: 0, k: 1 },
+      selected: opts.selected || null,
+      selectedEdge: null,
+      marker: `gb-arrow-${++markerSeq}`
+    };
+    let counter = 0;
+    let scene = null;
+
+    host.innerHTML = `<svg class="gm-svg gb-svg" xmlns="http://www.w3.org/2000/svg"><g data-role="world"></g></svg>`;
+    const svg = host.querySelector('svg');
+    const world = svg.querySelector('[data-role="world"]');
+
+    if (opts.kind === 'mind') tidy();
+    else state.nodes.forEach((n) => (state.pos[n.id] = { ...opts.positions[n.id] }));
+
+    function tidy() {
+      const root = G.buildTree(state.nodes);
+      const list = G.layoutRadial(root, { styleFor: STYLE_MIND, rings: [[0, 0], [185, 112], [350, 196]] });
+      list.forEach((n) => (state.pos[n.id] = { x: n.x, y: n.y }));
+    }
+
+    function draw() {
+      scene = state.kind === 'mind' ? mindScene(state) : conceptScene(state);
+      world.innerHTML = scene.markup;
+      world.setAttribute('transform', `translate(${fmt(state.view.x)} ${fmt(state.view.y)}) scale(${state.view.k.toFixed(3)})`);
+      ui.zoom && (ui.zoom.textContent = `${Math.round(state.view.k * 100)}%`);
+      placeFloat();
+    }
+
+    function fit(animate) {
+      draw();
+      const b = G.boundsOf(scene.rects, 28);
+      const W = host.clientWidth;
+      const H = host.clientHeight;
+      const top = state.readOnly ? 0 : 52;
+      const bottom = state.readOnly ? 0 : 56;
+      // Phones never fit below a readable zoom; the map is centred on its middle and panned from there.
+      const k = Math.max(phone() ? 0.8 : 0, Math.min(1.15, W / b.w, (H - top - bottom) / b.h));
+      const target = { k, x: W / 2 - (b.x + b.w / 2) * k, y: top + (H - top - bottom) / 2 - (b.y + b.h / 2) * k };
+      if (!animate) {
+        state.view = target;
+        return draw();
+      }
+      const from = { ...state.view };
+      const t0 = performance.now();
+      const step = (now) => {
+        const t = Math.min(1, Math.max(0, now - t0) / 260);
+        const e = 1 - Math.pow(1 - t, 3);
+        state.view = { k: from.k + (target.k - from.k) * e, x: from.x + (target.x - from.x) * e, y: from.y + (target.y - from.y) * e };
+        draw();
+        if (t < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+
+    function toWorld(e) {
+      const r = host.getBoundingClientRect();
+      return { x: (e.clientX - r.left - state.view.x) / state.view.k, y: (e.clientY - r.top - state.view.y) / state.view.k };
+    }
+
+    function toScreen(x, y) {
+      return { x: x * state.view.k + state.view.x, y: y * state.view.k + state.view.y };
+    }
+
+    function zoomBy(f) {
+      const cx = host.clientWidth / 2;
+      const cy = host.clientHeight / 2;
+      const k = Math.min(2, Math.max(0.3, state.view.k * f));
+      state.view = { k, x: cx - ((cx - state.view.x) * k) / state.view.k, y: cy - ((cy - state.view.y) * k) / state.view.k };
+      draw();
+    }
+
+    /* ── Chrome ── */
+    const ui = {};
+    if (state.readOnly) {
+      host.insertAdjacentHTML('beforeend', `<button class="hub-icon-btn gb-corner" type="button" aria-label="Open the map full screen" title="Full screen">${ICON.fit}</button>`);
+    } else {
+      const isMind = state.kind === 'mind';
+      host.insertAdjacentHTML(
+        'beforeend',
+        `<div class="gb-toolbar" role="toolbar" aria-label="Map tools">
+          <button class="gb-tool" type="button" data-act="zoom-out" aria-label="Zoom out" title="Zoom out">${ICON.minus}</button>
+          <span class="gb-zoom" aria-live="polite"></span>
+          <button class="gb-tool" type="button" data-act="zoom-in" aria-label="Zoom in" title="Zoom in">${ICON.plus}</button>
+          <button class="gb-tool" type="button" data-act="fit" aria-label="Fit to view" title="Fit to view">${ICON.fit}</button>
+          <span class="gb-toolbar__sep" aria-hidden="true"></span>
+          ${isMind
+            ? `<button class="gb-tool" type="button" data-act="tidy" title="Lay the map out again">${ICON.tidy}<span class="gb-tool__label">Tidy</span></button>`
+            : `<button class="gb-tool" type="button" data-act="add-concept" title="Add a concept">${ICON.concept}<span class="gb-tool__label">Concept</span></button>`}
+        </div>
+        <p class="gb-hint">${phone() ? 'Tap an idea to edit · drag to pan' : isMind ? 'Double-click to rename · drag to move · Tab adds a sub-idea' : 'Drag from ● to link · double-click to rename'}</p>
+        <div class="gb-float" role="toolbar" aria-label="Selected idea" hidden>
+          <span class="gb-float__name" data-role="float-name"><span></span></span>
+          <span class="gb-toolbar__sep" aria-hidden="true"></span>
+          ${isMind
+            ? `<button class="gb-tool" type="button" data-act="add-child" title="Add a sub-idea (Tab)">${ICON.child}<span>Sub-idea</span></button>
+               <button class="gb-tool" type="button" data-act="add-sibling" title="Add an idea beside (Enter)">${ICON.sibling}<span>Beside</span></button>`
+            : `<button class="gb-tool" type="button" data-act="link" title="Link to another concept">${ICON.link}<span>Link</span></button>`}
+          <span class="gb-toolbar__sep" aria-hidden="true"></span>
+          <span class="gb-swatches">${COLOURS.map((c) => `<button class="gb-swatch" type="button" data-c="${c}" data-colour="${c}" aria-label="${c}" aria-pressed="false"></button>`).join('')}</span>
+          <span class="gb-toolbar__sep" aria-hidden="true"></span>
+          <button class="gb-tool is-danger" type="button" data-act="delete" aria-label="Delete" title="Delete (Del)">${ICON.del}</button>
+        </div>
+        <input class="gb-rename" hidden aria-label="Rename" />
+        <div class="gb-verbs" hidden role="dialog" aria-label="Link label">
+          <p class="gb-verbs__label" data-role="verb-label"></p>
+          <div class="gb-verbs__row">
+            <input data-role="verb-input" placeholder="How are they linked?" />
+            <button class="gb-tool is-danger" type="button" data-act="delete-edge" aria-label="Delete link" title="Delete link">${ICON.del}</button>
+          </div>
+          <div class="gb-chips">${G.LINK_VERBS.map((v) => `<button type="button" data-verb="${v}">${v}</button>`).join('')}</div>
+          <button class="gb-tool is-danger" type="button" data-act="delete-edge" aria-label="Delete link" title="Delete link">${ICON.del}</button>
+          <div class="gb-verbs__actions">
+            <button class="btn btn--primary" type="button" data-act="verb-done">Done</button>
+          </div>
+        </div>`
+      );
+      ui.zoom = host.querySelector('.gb-zoom');
+      ui.float = host.querySelector('.gb-float');
+      ui.rename = host.querySelector('.gb-rename');
+      ui.verbs = host.querySelector('.gb-verbs');
+      ui.verbInput = ui.verbs.querySelector('[data-role="verb-input"]');
+      ui.sheet = document.createElement('div');
+      ui.sheet.className = 'gb-sheet';
+      ui.sheet.hidden = true;
+      ui.sheet.setAttribute('role', 'dialog');
+      ui.sheet.setAttribute('aria-label', 'Edit idea');
+      ui.sheet.innerHTML =
+        '<div class="gb-sheet__grab" aria-hidden="true"></div>' +
+        '<input data-role="sheet-name" aria-label="Name" />' +
+        `<div class="gb-swatches">${COLOURS.map((c) => `<button class="gb-swatch" type="button" data-c="${c}" data-colour="${c}" aria-label="${c}" aria-pressed="false"></button>`).join('')}</div>` +
+        '<div class="gb-sheet__actions" data-part="form-actions">' +
+        (isMind
+          ? '<button class="btn btn--secondary" type="button" data-act="add-child">Sub-idea</button><button class="btn btn--secondary" type="button" data-act="add-sibling">Beside</button>'
+          : '<button class="btn btn--secondary" type="button" data-act="link">Link</button><button class="btn btn--secondary" type="button" data-act="add-concept">Concept</button>') +
+        '<button class="btn btn--secondary is-danger" type="button" data-act="delete">Delete</button>' +
+        '</div>' +
+        '<button class="btn btn--primary gb-sheet__done" type="button" data-act="deselect">Done</button>';
+      document.body.append(ui.sheet);
+      ui.sheetName = ui.sheet.querySelector('[data-role="sheet-name"]');
+      ui.sheetName.addEventListener('input', () => {
+        const n = state.nodes.find((x) => x.id === state.selected);
+        if (n) n.label = ui.sheetName.value;
+        draw();
+      });
+      [host, ui.sheet].forEach((root) => root.addEventListener('click', onChromeClick));
+    }
+
+    function colourOf(id) {
+      if (state.kind === 'concept') return state.nodes.find((n) => n.id === id)?.color || 'blue';
+      return scene?.byId.get(id)?.branch;
+    }
+
+    function placeFloat() {
+      if (!ui.float) return;
+      const n = scene?.byId.get(state.selected);
+      const usePhone = phone();
+      ui.float.hidden = !n || usePhone || !!state.linkFrom;
+      ui.sheet.hidden = !n || !usePhone || !!state.linkFrom || !ui.verbs.hidden;
+      host.classList.toggle('has-context', !ui.float.hidden || !ui.verbs.hidden);
+      if (!n) return;
+      const c = colourOf(n.id);
+      [ui.float, ui.sheet].forEach((root) =>
+        root.querySelectorAll('[data-colour]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.colour === c)))
+      );
+      const disableAdd = state.kind === 'mind' && n.depth === 0;
+      [ui.float, ui.sheet].forEach((root) => root.querySelector('[data-act="add-sibling"]')?.toggleAttribute('disabled', disableAdd));
+      [ui.float, ui.sheet].forEach((root) => root.querySelector('[data-act="delete"]')?.toggleAttribute('disabled', disableAdd));
+      const name = ui.float.querySelector('[data-role="float-name"]');
+      name.dataset.c = c || '';
+      name.firstElementChild.textContent = n.label;
+      if (usePhone && document.activeElement !== ui.sheetName) ui.sheetName.value = n.label;
+    }
+
+    function select(id) {
+      state.selected = id;
+      state.selectedEdge = null;
+      if (ui.verbs) ui.verbs.hidden = true;
+      draw();
+    }
+
+    function addNode(kind) {
+      if (state.nodes.length >= 24) return;
+      const sel = state.nodes.find((n) => n.id === state.selected);
+      counter += 1;
+      const id = `n_new${counter}`;
+      if (state.kind === 'concept') {
+        const c = toWorldCentre();
+        state.nodes.push({ id, label: 'New concept', color: COLOURS[state.nodes.length % COLOURS.length] });
+        state.pos[id] = { x: c.x + (counter % 3) * 24, y: c.y + 120 };
+      } else {
+        const parentId = kind === 'child' ? sel.id : sel.parent_id;
+        const parent = scene.byId.get(parentId);
+        const root = scene.root;
+        const siblings = state.nodes.filter((n) => n.parent_id === parentId).length;
+        const base = parent.depth === 0 ? -Math.PI / 2 + siblings * 1.1 : Math.atan2(parent.y - root.y, parent.x - root.x);
+        const spread = parent.depth === 0 ? 0 : (siblings % 2 ? 1 : -1) * Math.ceil(siblings / 2) * 0.32;
+        const r = parent.depth === 0 ? 250 : 190;
+        state.nodes.push({ id, label: 'New idea', parent_id: parentId });
+        state.pos[id] = { x: Math.round(parent.x + Math.cos(base + spread) * r), y: Math.round(parent.y + Math.sin(base + spread) * r * 0.7) };
+      }
+      select(id);
+      if (!phone()) startRename(id);
+    }
+
+    function toWorldCentre() {
+      return { x: (host.clientWidth / 2 - state.view.x) / state.view.k, y: (host.clientHeight / 2 - state.view.y) / state.view.k };
+    }
+
+    function removeSelected() {
+      const n = state.nodes.find((x) => x.id === state.selected);
+      if (!n || (state.kind === 'mind' && n.parent_id == null)) return;
+      if (state.kind === 'mind') {
+        const gone = new Set([n.id]);
+        let grew = true;
+        while (grew) {
+          grew = false;
+          for (const x of state.nodes) if (!gone.has(x.id) && gone.has(x.parent_id)) { gone.add(x.id); grew = true; }
+        }
+        state.nodes = state.nodes.filter((x) => !gone.has(x.id));
+      } else {
+        state.nodes = state.nodes.filter((x) => x !== n);
+        state.edges = state.edges.filter((e) => e.from !== n.id && e.to !== n.id);
+      }
+      select(null);
+    }
+
+    function setColour(c) {
+      const n = state.nodes.find((x) => x.id === state.selected);
+      if (!n) return;
+      if (state.kind === 'concept') n.color = c;
+      else {
+        let top = n;
+        while (top.parent_id && state.nodes.find((x) => x.id === top.parent_id)?.parent_id != null) top = state.nodes.find((x) => x.id === top.parent_id);
+        if (top.parent_id != null) top.color = c;
+      }
+      draw();
+    }
+
+    function startRename(id) {
+      const n = scene.byId.get(id);
+      if (!n || !ui.rename) return;
+      const tl = toScreen(n.x - n.w / 2, n.y - n.h / 2);
+      const w = Math.max(160, n.w * state.view.k + 24);
+      Object.assign(ui.rename.style, { left: `${tl.x - 12}px`, top: `${tl.y - 4}px`, width: `${w}px`, height: `${n.h * state.view.k + 8}px`, fontSize: `${Math.max(14, n.style.size * state.view.k)}px` });
+      ui.rename.value = n.label;
+      ui.rename.hidden = false;
+      ui.rename.dataset.id = id;
+      placeFloat();
+      ui.rename.focus();
+      ui.rename.select();
+    }
+
+    function endRename() {
+      if (!ui.rename || ui.rename.hidden) return;
+      if (ui.rename.dataset.edge) {
+        ui.rename.hidden = true;
+        delete ui.rename.dataset.edge;
+        return closeVerbs();
+      }
+      const n = state.nodes.find((x) => x.id === ui.rename.dataset.id);
+      if (n) n.label = ui.rename.value.trim() || n.label;
+      ui.rename.hidden = true;
+      draw();
+    }
+
+    function openVerbs(edgeId) {
+      const e = state.edges.find((x) => x.id === edgeId);
+      const chip = scene.chips?.find((c) => c.id === edgeId);
+      if (!e || !chip || !ui.verbs) return;
+      state.selectedEdge = edgeId;
+      state.selected = null;
+      const name = (id) => state.nodes.find((n) => n.id === id)?.label;
+      ui.verbs.querySelector('[data-role="verb-label"]').innerHTML = `<strong>${G.esc(name(e.from))}</strong> → <strong>${G.esc(name(e.to))}</strong>`;
+      ui.verbInput.value = e.label || '';
+      ui.verbs.hidden = false;
+      draw();
+      if (phone()) return;
+      const p = toScreen(chip.x, chip.y);
+      const w = Math.max(150, chip.w * state.view.k + 40);
+      Object.assign(ui.rename.style, { left: `${p.x - w / 2}px`, top: `${p.y - 17}px`, width: `${w}px`, height: '34px', fontSize: '14px' });
+      ui.rename.value = e.label || '';
+      ui.rename.placeholder = 'How are they linked?';
+      ui.rename.dataset.edge = edgeId;
+      ui.rename.hidden = false;
+      ui.rename.focus();
+      ui.rename.select();
+    }
+
+    function closeVerbs() {
+      if (!ui.verbs) return;
+      if (!ui.rename.hidden && ui.rename.dataset.edge) {
+        ui.rename.hidden = true;
+        delete ui.rename.dataset.edge;
+      }
+      ui.verbs.hidden = true;
+      state.selectedEdge = null;
+      draw();
+    }
+
+    function onChromeClick(e) {
+      const b = e.target.closest('[data-act], [data-colour], [data-verb]');
+      if (!b || b.disabled) return;
+      if (b.dataset.colour) return setColour(b.dataset.colour);
+      if (b.dataset.verb) {
+        const edge = state.edges.find((x) => x.id === state.selectedEdge);
+        if (edge) edge.label = b.dataset.verb;
+        ui.verbInput.value = b.dataset.verb;
+        ui.rename.value = b.dataset.verb;
+        return draw();
+      }
+      const act = b.dataset.act;
+      if (act === 'zoom-in') zoomBy(1.2);
+      if (act === 'zoom-out') zoomBy(1 / 1.2);
+      if (act === 'fit') fit(true);
+      if (act === 'tidy') { tidy(); fit(true); }
+      if (act === 'add-concept') addNode('concept');
+      if (act === 'add-child' && state.selected) addNode('child');
+      if (act === 'add-sibling' && state.selected) addNode('sibling');
+      if (act === 'delete') removeSelected();
+      if (act === 'deselect') select(null);
+      if (act === 'link' && state.selected) {
+        state.linkFrom = state.selected;
+        state.pointer = null;
+        host.classList.add('is-linking');
+        draw();
+      }
+      if (act === 'verb-done') closeVerbs();
+      if (act === 'delete-edge') {
+        state.edges = state.edges.filter((x) => x.id !== state.selectedEdge);
+        closeVerbs();
+      }
+    }
+
+    function finishLink(targetId) {
+      const from = state.linkFrom;
+      state.linkFrom = null;
+      state.linkTarget = null;
+      state.pointer = null;
+      host.classList.remove('is-linking');
+      if (targetId && targetId !== from) {
+        counter += 1;
+        const id = `e_new${counter}`;
+        state.edges.push({ id, from, to: targetId, label: '' });
+        draw();
+        openVerbs(id);
+      } else draw();
+    }
+
+    /* ── Pointer: pan, drag nodes (mind: with sub-ideas), link from a port ── */
+    if (!state.readOnly) {
+      let drag = null;
+      svg.addEventListener('pointerdown', (e) => {
+        if (e.button) return;
+        endRename();
+        const port = e.target.closest('[data-port]');
+        const handle = e.target.closest('[data-act="add-child"]');
+        const chip = e.target.closest('[data-edge]');
+        const node = e.target.closest('[data-id]');
+        svg.setPointerCapture(e.pointerId);
+        if (handle) {
+          drag = { type: 'none' };
+          addNode('child');
+        } else if (port) {
+          state.linkFrom = port.dataset.port;
+          state.pointer = toWorld(e);
+          host.classList.add('is-linking');
+          drag = { type: 'link' };
+          draw();
+        } else if (state.linkFrom) {
+          drag = { type: 'none' };
+          finishLink(node?.dataset.id);
+        } else if (chip) {
+          drag = { type: 'none' };
+          openVerbs(chip.dataset.edge);
+        } else if (node) {
+          const id = node.dataset.id;
+          const moving = [id];
+          if (state.kind === 'mind') {
+            for (let i = 0; i < moving.length; i++) state.nodes.forEach((n) => n.parent_id === moving[i] && moving.push(n.id));
+          }
+          drag = { type: 'node', id, moving, start: toWorld(e), orig: moving.map((m) => ({ ...state.pos[m] })), moved: false };
+          if (state.selected !== id) select(id);
+          closeVerbs();
+        } else {
+          drag = { type: 'pan', sx: e.clientX, sy: e.clientY, ox: state.view.x, oy: state.view.y, moved: false };
+          host.classList.add('is-panning');
+        }
+      });
+      svg.addEventListener('pointermove', (e) => {
+        if (!drag) {
+          if (state.kind === 'concept') {
+            const id = e.target.closest('[data-id]')?.dataset.id || null;
+            if (id !== state.hover) { state.hover = id; draw(); }
+          }
+          return;
+        }
+        if (drag.type === 'pan') {
+          state.view.x = drag.ox + e.clientX - drag.sx;
+          state.view.y = drag.oy + e.clientY - drag.sy;
+          drag.moved ||= Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 3;
+          draw();
+        } else if (drag.type === 'node') {
+          const p = toWorld(e);
+          const dx = p.x - drag.start.x;
+          const dy = p.y - drag.start.y;
+          drag.moved ||= Math.hypot(dx, dy) > 3;
+          drag.moving.forEach((m, i) => (state.pos[m] = { x: drag.orig[i].x + dx, y: drag.orig[i].y + dy }));
+          draw();
+        } else if (drag.type === 'link') {
+          state.pointer = toWorld(e);
+          const under = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-id]');
+          state.linkTarget = under && under.dataset.id !== state.linkFrom ? under.dataset.id : null;
+          draw();
+        }
+      });
+      const up = (e) => {
+        if (drag?.type === 'link') finishLink(state.linkTarget);
+        if (drag?.type === 'pan' && !drag.moved) select(null);
+        host.classList.remove('is-panning');
+        drag = null;
+      };
+      svg.addEventListener('pointerup', up);
+      svg.addEventListener('pointercancel', up);
+      svg.addEventListener('dblclick', (e) => {
+        const node = e.target.closest('[data-id]');
+        if (node) startRename(node.dataset.id);
+      });
+      host.addEventListener('wheel', (e) => {
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1);
+      }, { passive: false });
+      ui.rename.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); endRename(); host.focus(); }
+      });
+      ui.rename.addEventListener('blur', (e) => {
+        if (ui.rename.dataset.edge && ui.verbs.contains(e.relatedTarget)) return;
+        endRename();
+      });
+      ui.rename.addEventListener('input', () => {
+        const edge = ui.rename.dataset.edge && state.edges.find((x) => x.id === ui.rename.dataset.edge);
+        if (!edge) return;
+        edge.label = ui.rename.value;
+        draw();
+      });
+      ui.verbs.addEventListener('pointerdown', (e) => e.target.closest('button') && e.preventDefault());
+      ui.verbInput.addEventListener('input', () => {
+        const edge = state.edges.find((x) => x.id === state.selectedEdge);
+        if (edge) edge.label = ui.verbInput.value;
+        draw();
+      });
+      ui.verbInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') closeVerbs();
+        if (e.key === 'Escape') { e.stopPropagation(); closeVerbs(); }
+      });
+      host.tabIndex = 0;
+      host.addEventListener('keydown', (e) => {
+        if (e.target !== host || !state.selected) return;
+        if (e.key === 'Tab' && state.kind === 'mind') { e.preventDefault(); addNode('child'); }
+        else if (e.key === 'Enter') { e.preventDefault(); state.kind === 'mind' ? addNode('sibling') : startRename(state.selected); }
+        else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSelected(); }
+        else if (e.key === 'Escape') select(null);
+      });
+    }
+
+    new ResizeObserver(() => fit(false)).observe(host);
+    fit(false);
+    return { state, draw, fit, openVerbs, select };
+  }
+
+  const CONCEPT_POSITIONS = {
+    c3: { x: -250, y: -115 },
+    c6: { x: 215, y: -125 },
+    c1: { x: 0, y: 0 },
+    c4: { x: -255, y: 135 },
+    c2: { x: 95, y: 160 },
+    c5: { x: 330, y: 55 }
+  };
+
+  document.fonts.ready.then(() => {
+    const mindEl = document.getElementById('mind-editor');
+    mindEl.querySelector('[data-role="title"]').value = G.MIND.title;
+    mountCanvas(mindEl.querySelector('[data-role="canvas"]'), { kind: 'mind', content: G.MIND, selected: phone() ? null : 'm3' });
+
+    const conceptEl = document.getElementById('concept-editor');
+    conceptEl.querySelector('[data-role="title"]').value = G.CONCEPT.title;
+    const concept = mountCanvas(conceptEl.querySelector('[data-role="canvas"]'), { kind: 'concept', content: G.CONCEPT, positions: CONCEPT_POSITIONS });
+    if (!phone()) concept.openVerbs('e5');
+
+    document.querySelector('[data-role="read-mind-title"]').textContent = G.MIND.title;
+    document.querySelector('[data-role="read-concept-title"]').textContent = G.CONCEPT.title;
+    mountCanvas(document.getElementById('read-mind'), { kind: 'mind', content: G.MIND, readOnly: true });
+    mountCanvas(document.getElementById('read-concept'), { kind: 'concept', content: G.CONCEPT, positions: CONCEPT_POSITIONS, readOnly: true });
+    document.documentElement.dataset.ready = 'true';
+  });
+})();
+</script>
+</body>
+</html>

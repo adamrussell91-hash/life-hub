@@ -41,6 +41,11 @@ function bookmarkOf(task) {
     : null;
 }
 
+/** Closed the same way task-liveness reads it: status, the Done bucket, or a completion stamp. */
+function isDoneTask(task) {
+  return task?.status === 'done' || task?.bucket === 'done' || Boolean(task?.completed_at);
+}
+
 export function tasksEventsFromTasks(tasks) {
   const deps = dependencyIndex(tasks);
   const stepsOf = new Map();
@@ -73,7 +78,6 @@ export function tasksEventsFromTasks(tasks) {
       task &&
       typeof task.id === 'string' &&
       DATE_KEY.test(task.due_date) &&
-      task.status !== 'done' &&
       task.status !== 'dead'
     )
     .map(task => ({
@@ -84,7 +88,8 @@ export function tasksEventsFromTasks(tasks) {
         date: task.due_date,
         time: typeof task.due_time === 'string' && TIME_KEY.test(task.due_time) ? task.due_time : undefined,
         title: typeof task.title === 'string' && task.title ? task.title : task.id,
-        status: typeof task.status === 'string' ? task.status : undefined,
+        // Ticked-off tasks stay on their day (struck through), so status is normalised.
+        status: isDoneTask(task) ? 'done' : typeof task.status === 'string' ? task.status : undefined,
         // Context for the calendar item card (click a Due row or chip).
         priority: typeof task.priority === 'string' ? task.priority : undefined,
         description: typeof task.description === 'string' ? task.description : '',

@@ -1,0 +1,25 @@
+{
+  "_about": "Held-out check for the bridge widening (BRIDGE-WIDENING-PROMPT.md). 20 book notes not in kind-gold.json, seeded random (seed 4242): 14 with a practice or implications heading, 6 without. Labelled by Claude on 04/10/26 against the widened definition: bridge true means the note should be bridge, false means it should not. Never use these notes or their wording in the grader prompt (failure register P6).",
+  "notes": [
+    { "id": "page_notion_387f794f8476810f8167d763aa9d1d4e", "book": "Neuroscience: Exploring the Brain", "title": "Brain Regions, Aphasia, and Language Lateralisation", "bridge": true, "why": "second-language teaching and reading" },
+    { "id": "page_notion_388f794f847681cfb14ed54f64c10ce8", "book": "A Textbook of Neuroanatomy", "title": "The Hypothalamus: Organisation, Function, and Educational Implications", "bridge": true, "why": "school start times, stress in schools" },
+    { "id": "page_notion_387f794f847681449ce3e3e6c08b2aa8", "book": "Neuroscience: Exploring the Brain", "title": "Neurobiological Mechanisms of Mental Illness", "bridge": true, "why": "educational settings and school environments" },
+    { "id": "page_notion_172f794f847680ef8f87d29cf77a1b96", "book": "Atomic Habits", "title": "Why Environment Matters More Than Motivation", "bridge": false, "why": "restates the book's own habit advice" },
+    { "id": "page_notion_388f794f847681faabfee97cd2db74e5", "book": "A Textbook of Neuroanatomy", "title": "Vestibular System", "bridge": false, "why": "clinical" },
+    { "id": "page_notion_389f794f8476816496f1cb6d949ac43a", "book": "Color Atlas of Neuroscience (Greenstein)", "title": "Central and Peripheral Nervous System: Gross Anatomy, Blood Supply", "bridge": false, "why": "clinical localisation and pharmacology" },
+    { "id": "page_notion_388f794f847681259b50dd38fd25496a", "book": "A Textbook of Neuroanatomy", "title": "The Auditory System: Structure, Function, and Clinical Relevance", "bridge": true, "why": "reading development and hearing in schools" },
+    { "id": "page_notion_389f794f84768146b934e408db5e992f", "book": "Neuroscience (Purves et al., 3rd Ed)", "title": "Modulation of Movement by the Basal Ganglia", "bridge": false, "why": "borderline: mostly clinical, one paragraph on skill learning" },
+    { "id": "page_notion_386f794f847681ab883aeeb46761de79", "book": "Developing Curriculum for Deep Thinking", "title": "Curriculum as a Pendulum: Knowledge-Heavy and Skills-Based Extremes", "bridge": true, "why": "school leaders and curriculum design" },
+    { "id": "page_notion_1f8f794f8476803d8c36f7009e312aea", "book": "Ausubel's Meaningful Learning in Action", "title": "Ausubel's Theory of Meaningful Learning and Cognitive Structure", "bridge": true, "why": "constructivist teaching implications" },
+    { "id": "page_notion_3a1f794f84768106830cfde61585d843", "book": "Handbook of Motivation at School", "title": "Peer Relationships, Social Climate, and Achievement Motivation", "bridge": true, "why": "implications for teaching" },
+    { "id": "page_notion_39bf794f8476813da82af15a5729fe5d", "book": "Critical Thinking: The Basics", "title": "Character, Authority, and Persuasion: Ad Hominem, Tu Quoque, and Ad Populum", "bridge": false, "why": "restates the book's own analysis checklist" },
+    { "id": "page_notion_164f794f84768057ba37ed2ee785814d", "book": "Atomic Habits", "title": "Building Habit Awareness with the Habits Scorecard", "bridge": false, "why": "restates the book's own habit advice" },
+    { "id": "page_notion_389f794f84768164a7f7d7f3412cef83", "book": "Neuroscience (Purves et al., 3rd Ed)", "title": "Introduction to Neuroscience: Levels of Analysis, Neural Structure", "bridge": true, "why": "educational neuroscience and reading neuroimaging studies" },
+    { "id": "page_notion_85ab93eeb4a84cda8404920629226cdb", "book": "The Origins of Political Order", "title": "The Partisan Sort: Ideological Sorting and Party Realignment", "bridge": false, "why": "no practice section" },
+    { "id": "page_hub_712f3d2c6ce74483866e0e35f99f81dc", "book": "The Origins of Political Order", "title": "Hardt and Negri on Economic Injustice and Its Solutions", "bridge": false, "why": "no practice section" },
+    { "id": "page_hub_91cec05a17d2489fa504b2784835f669", "book": "The Origins of Political Order", "title": "The Rule of Law Through an Economist's Lens", "bridge": false, "why": "no practice section" },
+    { "id": "page_notion_39bf794f847681278aecd19542e43ad0", "book": "Clinical Neuroanatomy", "title": "The Hypothalamus: Anatomy, Connections, and Clinical Correlations", "bridge": false, "why": "clinical" },
+    { "id": "page_notion_39bf794f847681fe80d6db3374ec06d9", "book": "Ancient Philosophy: A Very Short Introduction", "title": "Why Do We Read Plato's Republic?", "bridge": false, "why": "no practice section" },
+    { "id": "page_notion_33cf794f847680bbb140c8e0e442d41f", "book": "Problem Solver", "title": "Gap Analysis: A Framework for Identifying and Bridging Performance Shortfalls", "bridge": false, "why": "no practice section" }
+  ]
+}

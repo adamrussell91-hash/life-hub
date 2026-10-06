@@ -1,10 +1,9 @@
 /**
- * Settle the Show All tags graph and write an SVG so the connected mass can be
+ * Lay out the Show All tags graph and write an SVG so the connected mass can be
  * checked without a browser. Usage: npx tsx scripts/show-all-preview.ts [manifest] [outFile]
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { buildShowAllGraph } from "../src/archive/showAllGraph";
-import { createShowAllSimulation, lockShowAllNodes, SHOW_ALL_SETTLE_TICKS } from "../src/archive/showAllSimulation";
 import { graphMetrics, formatGraphMetrics } from "../src/archive/graphMetrics";
 import type { PageManifestEntry } from "../src/domain/page";
 
@@ -28,11 +27,7 @@ const model = buildShowAllGraph(entries, "tags");
 const metrics = graphMetrics(model.nodes, model.links);
 console.log(`build ${Date.now() - builtAt}ms · ${formatGraphMetrics(metrics)}`);
 
-const simAt = Date.now();
-const simulation = createShowAllSimulation(model.nodes, model.links).stop();
-simulation.tick(SHOW_ALL_SETTLE_TICKS);
-lockShowAllNodes(model.nodes);
-console.log(`settle ${Date.now() - simAt}ms · ${SHOW_ALL_SETTLE_TICKS} ticks`);
+// buildShowAllGraph already lays the map out (no physics), so positions are final here.
 
 const xs = model.nodes.map(node => node.x ?? 0);
 const ys = model.nodes.map(node => node.y ?? 0);

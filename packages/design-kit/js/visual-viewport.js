@@ -1,9 +1,9 @@
 /** Shared hub chat keyboard / visual-viewport contract.
  *
  * Sets `html.vv-keyboard-open` and `--vv-offset-top` / `--vv-height` / `--vv-offset-bottom`
- * only while a chat composer is focused, geometry says the keyboard is open, or
- * `.chat-view.is-busy`. Closed keyboard leaves the vars unset so shells sit on
- * `100dvh` without URL-bar flicker.
+ * only while a chat composer or Knowledge `.compose` note form is focused, geometry
+ * says the keyboard is open, or `.chat-view.is-busy`. Closed keyboard leaves the
+ * vars unset so shells sit on `100dvh` without URL-bar flicker.
  *
  * Pair with `hub-chat-viewport.css`. Shells still pin their own chat host height
  * (Life `.page-frame`, Tasks `.hub-layout[data-hub-view='clare']`, overlay panels).
@@ -134,7 +134,8 @@ function syncVisualViewportSoon() {
 function isComposerTarget(target) {
   return Boolean(
     target?.closest?.(
-      '.chat-form, #chat-form, .chat__composer, .hub-ai-bar--thread'
+      // Chat composers + Knowledge .compose (New/Edit note).
+      '.chat-form, #chat-form, .chat__composer, .hub-ai-bar--thread, .compose'
     )
   );
 }

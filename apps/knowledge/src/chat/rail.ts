@@ -521,64 +521,72 @@ function pendingConfirmsTrayHtml(canSave: boolean) {
   </aside>`;
 }
 
+const WORKING_BUTTON_LABEL = "thinking";
+
+function composerWorking() {
+  return busy || Boolean(researchSessionId) || Boolean(writeSessionId);
+}
+
 function noteComposerHtml(fileNote: boolean, placeholder: string, label: string, submitLabel = "Send") {
-  const buttonLabel = busy || researchSessionId || writeSessionId
-    ? escapeHtml(waitLine)
-    : escapeHtml(submitLabel);
+  const working = composerWorking();
   return `<form class="coach__form hub-ai-bar hub-ai-bar--thread ${fileNote ? "chat__note-form" : "chat__composer"}" novalidate>
     <label class="sr-only" for="chat-input">${escapeHtml(label)}</label>
     <div class="hub-ai-bar__field">
-      <textarea id="chat-input" class="hub-ai-bar__input" rows="${fileNote ? 4 : 3}" placeholder="${escapeHtml(placeholder)}" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
+      <textarea id="chat-input" class="hub-ai-bar__input" rows="${fileNote ? 4 : 3}" placeholder="${escapeHtml(placeholder)}" ${working ? "disabled" : ""}>${escapeHtml(input)}</textarea>
     </div>
     <div class="hub-ai-bar__aside">
+      ${working ? `<p class="chat__status" aria-live="polite">${escapeHtml(waitLine)}</p>` : ""}
       <div class="hub-ai-bar__tools alchemist__actions">
-        <button class="btn btn--primary" type="submit" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>${buttonLabel}</button>
+        <button class="btn btn--primary" type="submit" ${working ? "disabled" : ""}>${working ? WORKING_BUTTON_LABEL : escapeHtml(submitLabel)}</button>
       </div>
     </div>
     ${error ? `<p class="alchemist__error">${escapeHtml(error)}</p>` : ""}
-    ${busy || researchSessionId || writeSessionId ? `<p class="chat__status" aria-live="polite">${escapeHtml(waitLine)}</p>` : ""}
-    ${busy || researchSessionId || writeSessionId ? thinkingHistoryHtml(ticks, thinkingOpen) : ""}
+    ${working ? thinkingHistoryHtml(ticks, thinkingOpen) : ""}
   </form>`;
 }
 
-/** Update wait line / status / ticker / submit / error without remounting the shell. */
+/** Keep status in the aside (same row as the button); thinking history after the aside. */
 function paintWorkingChrome(host: ChatRailHost) {
-  const root = host.app;
-  const form = root.querySelector("form");
+  const form = host.app.querySelector("form");
   if (!form) {
     host.render();
     return;
   }
-  const working = busy || Boolean(researchSessionId) || Boolean(writeSessionId);
+  const working = composerWorking();
   const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
   const inputEl = form.querySelector<HTMLTextAreaElement>("#chat-input");
+  const aside = form.querySelector(".hub-ai-bar__aside");
   if (submit) {
-    if (working) submit.textContent = waitLine;
+    if (working) submit.textContent = WORKING_BUTTON_LABEL;
     submit.disabled = working;
   }
   if (inputEl) inputEl.disabled = working;
 
   let status = form.querySelector<HTMLElement>(".chat__status");
-  if (working) {
-    if (!status) {
-      form.insertAdjacentHTML("beforeend", `<p class="chat__status" aria-live="polite"></p>`);
-      status = form.querySelector(".chat__status");
-    }
-    if (status) status.textContent = waitLine;
-  } else {
+  if (!working) {
     status?.remove();
+  } else {
+    if (!status) {
+      status = document.createElement("p");
+      status.className = "chat__status";
+      status.setAttribute("aria-live", "polite");
+      if (aside) aside.prepend(status);
+      else form.append(status);
+    } else if (aside && status.parentElement !== aside) {
+      aside.prepend(status);
+    }
+    status.textContent = waitLine;
   }
 
   let thinking = form.querySelector<HTMLDetailsElement>("[data-thinking-history]");
   if (working && ticks.length) {
     if (!thinking) {
-      (status ?? form).insertAdjacentHTML(status ? "afterend" : "beforeend", thinkingHistoryHtml(ticks, thinkingOpen));
+      (aside ?? form).insertAdjacentHTML(
+        aside ? "afterend" : "beforeend",
+        thinkingHistoryHtml(ticks, thinkingOpen),
+      );
       thinking = form.querySelector("[data-thinking-history]");
-      if (thinking) {
-        thinking.ontoggle = () => {
-          thinkingOpen = thinking!.open;
-        };
-      }
+      if (thinking) thinking.ontoggle = () => { thinkingOpen = thinking!.open; };
     } else {
       const list = thinking.querySelector(".chat__ticker");
       if (list) list.innerHTML = ticks.map(line => `<li>${escapeHtml(line)}</li>`).join("");
@@ -590,8 +598,7 @@ function paintWorkingChrome(host: ChatRailHost) {
   let errEl = form.querySelector<HTMLElement>(".alchemist__error");
   if (error) {
     if (!errEl) {
-      const actions = form.querySelector(".alchemist__actions");
-      actions?.insertAdjacentHTML("afterend", `<p class="alchemist__error"></p>`);
+      form.querySelector(".alchemist__actions")?.insertAdjacentHTML("afterend", `<p class="alchemist__error"></p>`);
       errEl = form.querySelector(".alchemist__error");
     }
     if (errEl) errEl.textContent = error;
@@ -679,7 +686,7 @@ export function renderChatRail(host: ChatRailHost) {
     ${host.pageHeader(
       CLEMENTINE.shortName,
       fromBook ? "From a book" : makeNote ? "Ask Clementine" : "Chat",
-      `<button class="btn btn--ghost" data-new-chat type="button" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>New chat</button>`,
+      `<button class="btn btn--ghost chat-new-button" data-new-chat type="button" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>New chat</button>`,
       { portraitSrc: CLEMENTINE.avatarSrc, portraitAlt: CLEMENTINE.name },
     )}
     <section class="coach chat${fileNote ? " chat--from-book" : ""}">

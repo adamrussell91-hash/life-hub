@@ -6,7 +6,8 @@ import { listLessonTemplates, useLessonTemplate } from '@/teacher/template-api';
 function labeledSelect(
   name: string,
   labelText: string,
-  options: ReadonlyArray<{ value: string; label: string }>
+  options: ReadonlyArray<{ value: string; label: string }>,
+  preselect?: string
 ): HTMLLabelElement {
   const field = document.createElement('label');
   field.className = 'create-modal__field';
@@ -33,6 +34,8 @@ function labeledSelect(
 
   if (options.length === 1) {
     select.value = options[0]!.value;
+  } else if (preselect && options.some((opt) => opt.value === preselect)) {
+    select.value = preselect;
   }
 
   field.append(span, select);
@@ -146,7 +149,8 @@ function openFromTemplateMessage(message: string): Promise<Lesson | null> {
 
 function openFromTemplatePicker(
   templates: LessonTemplateSummary[],
-  units: Unit[]
+  units: Unit[],
+  preselectTemplateId?: string
 ): Promise<Lesson | null> {
   const fields = document.createElement('div');
   fields.className = 'create-modal__fields';
@@ -154,7 +158,8 @@ function openFromTemplatePicker(
     labeledSelect(
       'template_id',
       'Template',
-      templates.map((row) => ({ value: row.id, label: row.title }))
+      templates.map((row) => ({ value: row.id, label: row.title })),
+      preselectTemplateId
     ),
     labeledSelect(
       'unit_id',
@@ -184,7 +189,8 @@ function openFromTemplatePicker(
 }
 
 export async function promptLessonFromTemplate(
-  curriculum: CurriculumResponse
+  curriculum: CurriculumResponse,
+  preselectTemplateId?: string
 ): Promise<Lesson | null> {
   const units = curriculum.units.filter((unit) => unit.status === 'active');
   if (units.length === 0) {
@@ -198,7 +204,7 @@ export async function promptLessonFromTemplate(
         'No lesson templates yet. Save one from a lesson editor.'
       );
     }
-    return openFromTemplatePicker(templates, units);
+    return openFromTemplatePicker(templates, units, preselectTemplateId);
   } catch {
     return openFromTemplateMessage('Unable to create from template.');
   }

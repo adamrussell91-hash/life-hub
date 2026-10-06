@@ -61,6 +61,8 @@ import {
 } from './_shared/load-hub-protocols.mjs';
 import { activationForTurn, classifyIntent } from './_shared/capabilities/activation-policy.mjs';
 import { runSurfaceAgentTurn } from './_shared/agent-surface.mjs';
+import { insightTurn, insightsFor } from './_shared/readiness-insight-turn.mjs';
+import { INSIGHTS_KEY, INSIGHT_STATE_KEY, insightsEnabled } from './readiness-insights.mjs';
 import { proposeAction } from './_shared/agent-kernel.mjs';
 import {
   AGENT_TURNS_PATH,
@@ -89,6 +91,7 @@ import {
   selectNutritionEntries,
   selectSkincareHistoryEntries
 } from './_shared/domain-retrieval.mjs';
+import { executeSpecialistRead } from './_shared/domain-analysis.mjs';
 import { listKnowledgePages } from './_shared/knowledge-data.mjs';
 import {
   buildUserContent,
@@ -129,9 +132,6 @@ import {
   emptyNutritionChallenges,
   parseNutritionChallenges,
   serializeNutritionChallenges,
-  upsertNutritionChallengeSchema,
-  markNutritionChallengeDaySchema,
-  listNutritionChallengesSchema,
   validateUpsertNutritionChallengeInput,
   validateMarkNutritionChallengeDayInput,
   upsertNutritionChallenge,
@@ -256,7 +256,8 @@ import {
   TASK_PREFIX,
   defaultGetTasksStore,
   listJSON as listTasksJSON,
-  getJSON as getTasksJSON
+  getJSON as getTasksJSON,
+  setJSON as setTasksJSON
 } from './_shared/tasks-blobs.mjs';
 import {
   CLASS_PREFIX,
@@ -458,21 +459,51 @@ async function loadTurnCalendarMerge({
   return loadAgentCalendarMerge({ from, to, ...loaders });
 }
 
-/** null = free; otherwise a tool-error payload. */
-function slotConflictOrUnavailable(merge, { date, start, end }) {
+/**
+ * Clashes never block: Adam wants the thing scheduled anyway and told about it.
+ * null = clear; otherwise a note the agent must relay alongside the proposal.
+ */
+export function slotClashNote(merge, { date, start, end, excludePaths = [] }) {
   if (!merge) {
-    return {
-      ok: false,
-      error: 'calendar_sources_unavailable',
-      message: 'Calendar could not be loaded. Refusing to treat the slot as free.'
-    };
+    return { warning: 'calendar_unchecked', message: 'Calendar could not be loaded, so clashes were not checked.' };
+  }
+  const notes = [];
+  const conflicts = findSlotConflicts(merge.slots, { date, start, end, excludePaths });
+  if (conflicts.length) {
+    const { message, conflicts: formatted } = conflictToolError(conflicts);
+    notes.push({ warning: 'calendar_conflict', message: `Scheduled anyway. ${message}`, conflicts: formatted });
   }
   if (mergeHasUnavailableSources(merge.sourceStatus)) {
-    return unavailableCalendarToolError(merge.sourceStatus);
+    notes.push({ warning: 'calendar_unchecked', message: unavailableCalendarToolError(merge.sourceStatus).message });
   }
-  const conflicts = findSlotConflicts(merge.slots, { date, start, end });
-  if (conflicts.length) return conflictToolError(conflicts, { sourceStatus: merge.sourceStatus });
-  return null;
+  if (!notes.length) return null;
+  return {
+    warning: notes[0].warning,
+    message: notes.map((n) => n.message).join(' '),
+    ...(conflicts.length ? { conflicts: notes[0].conflicts } : {})
+  };
+}
+
+async function clashNoteFor(loadMerge, slot) {
+  try {
+    return slotClashNote(await loadMerge(), slot);
+  } catch {
+    return slotClashNote(null, slot);
+  }
+}
+
+/** Attach a clash note to a tool result so the agent tells Adam. */
+export function withClashNote(result, note) {
+  if (!note) return typeof result === 'string' ? result : JSON.stringify(result);
+  let parsed = result;
+  if (typeof result === 'string') {
+    try { parsed = JSON.parse(result); } catch { return result; }
+  }
+  if (!parsed || typeof parsed !== 'object' || parsed.ok === false) return JSON.stringify(parsed);
+  return JSON.stringify({
+    ...parsed,
+    clash_note: { ...note, tell_adam: 'Mention this clash to Adam in one line. It does not block the proposal.' }
+  });
 }
 
 export const config = { path: '/api/chat' };
@@ -736,6 +767,18 @@ export function createChatHandler({
         let hubLessons = [];
         let hubUnits = [];
         let hubLoadErrors = {};
+        // Agents that skip the hub preload still get search_tasks / get_task: load tasks on first use.
+        let hubTasksLoaded = needsHubRetrieval;
+        const ensureHubTasks = async () => {
+          if (hubTasksLoaded) return;
+          hubTasksLoaded = true;
+          try {
+            const tasksStore = await getTasksStore(env);
+            hubTasks = withoutDeleted(await listTasksJSON(tasksStore, TASK_PREFIX));
+          } catch (err) {
+            hubLoadErrors.tasks = err?.code || 'load_failed';
+          }
+        };
         let knowledgePages = [];
         let knowledgeLoadError = null;
         let sourceMeta = {};
@@ -1539,13 +1582,6 @@ export function createChatHandler({
             attachments: parsed.attachments,
             keepFullDomainTools: visualCtx.keepFullDomainTools
           }),
-          ...(needsNutritionChallenges
-            ? [
-                listNutritionChallengesSchema(),
-                upsertNutritionChallengeSchema(),
-                markNutritionChallengeDaySchema()
-              ]
-            : []),
           ...buildPromotedShortcutToolSchemas(promotedShortcutDrafts),
           ...(needsVisualEvidenceTool ? [recordVisualEvidenceToolSchema()] : [])
         ];
@@ -1679,6 +1715,27 @@ export function createChatHandler({
           flag: parsed.agentKernel
         });
         const evidencePack = surfaceTurn.pack;
+        // Readiness insights: offered first, revealed only after Adam says yes.
+        let insightBlock = '';
+        try {
+          const insightStore = await getTasksStore(env);
+          const insightDoc = await getTasksJSON(insightStore, INSIGHTS_KEY).catch(() => null);
+          if (insightsFor(slug, insightDoc?.insights).length) {
+            const insightState = (await getTasksJSON(insightStore, INSIGHT_STATE_KEY).catch(() => null)) ?? {};
+            const turn = insightTurn({
+              slug,
+              message: parsed.message,
+              insights: insightDoc.insights,
+              state: insightState,
+              now: nowInstant,
+              enabled: await insightsEnabled(insightStore)
+            });
+            insightBlock = turn.promptBlock;
+            if (turn.event) await setTasksJSON(insightStore, INSIGHT_STATE_KEY, turn.state);
+          }
+        } catch {
+          insightBlock = '';
+        }
         if (surfaceTurn.enabled && surfaceTurn.kernel?.plan?.workflow !== 'none') {
           tools = surfaceTurn.tools;
         }
@@ -1778,7 +1835,7 @@ export function createChatHandler({
           activationDirective: activation.activationBlock,
           visualIntelligenceBlock: sharedVisualIntelligenceBlock(),
           agentVisualCueBlock: agentVisualCueBlock(slug),
-          evidencePackBlock: surfaceTurn.promptBlock,
+          evidencePackBlock: [surfaceTurn.promptBlock, insightBlock].filter(Boolean).join('\n\n'),
           kernelBlock: surfaceTurn.interpretationBlock || ''
         });
 
@@ -2236,36 +2293,28 @@ export function createChatHandler({
                 else if (event.name === 'propose_future') built = buildFutureProposal(event.input ?? {});
                 else built = buildTieDecisionProposal(event.input ?? {});
                 if (!built.ok) return respondConfirmProposal(built);
-                // Timed meetings/events: conflict-check against full multi-hub merge before queueing.
+                // Timed meetings/events: clash-check against the full multi-hub merge.
+                // A clash is a note to Adam, never a reason to refuse.
+                let clashNote = null;
                 if (built.ghostInput?.date && built.ghostInput?.start && built.ghostInput?.end) {
-                  try {
-                    const merge = await loadTurnCalendarMerge({
-                      from: built.ghostInput.date,
-                      to: built.ghostInput.date,
-                      client,
-                      repoTree,
-                      env,
-                      fetchImpl,
-                      hubLessons,
-                      hubClasses,
-                      hubTasks,
-                      hubWorkBlocks,
-                      getLifeEvents,
-                      getTasksStore
-                    });
-                    const blocked = slotConflictOrUnavailable(merge, {
-                      date: built.ghostInput.date,
-                      start: built.ghostInput.start,
-                      end: built.ghostInput.end
-                    });
-                    if (blocked) return JSON.stringify(blocked);
-                  } catch {
-                    return JSON.stringify({
-                      ok: false,
-                      error: 'calendar_sources_unavailable',
-                      message: 'Calendar could not be loaded. Refusing to treat the slot as free.'
-                    });
-                  }
+                  clashNote = await clashNoteFor(() => loadTurnCalendarMerge({
+                    from: built.ghostInput.date,
+                    to: built.ghostInput.date,
+                    client,
+                    repoTree,
+                    env,
+                    fetchImpl,
+                    hubLessons,
+                    hubClasses,
+                    hubTasks,
+                    hubWorkBlocks,
+                    getLifeEvents,
+                    getTasksStore
+                  }), {
+                    date: built.ghostInput.date,
+                    start: built.ghostInput.start,
+                    end: built.ghostInput.end
+                  });
                 }
                 // Timed meetings/events: Confirm + calendar ghost. Multi-day / overnight
                 // spans that fail validateGhost fall back to Confirm-only professional write.
@@ -2275,19 +2324,19 @@ export function createChatHandler({
                       agent: slug,
                       nowIso: getSydneyTimestamp(nowInstant)
                     });
-                    return JSON.stringify(await queueCalendarGhostDualPath({
+                    return withClashNote(await queueCalendarGhostDualPath({
                       client,
                       entry,
                       agentSlug: slug,
                       proposeOsAction,
                       send,
                       validateProposeActionInput
-                    }));
+                    }), clashNote);
                   } catch {
-                    return respondConfirmProposal(built);
+                    return withClashNote(await respondConfirmProposal(built), clashNote);
                   }
                 }
-                return respondConfirmProposal(built);
+                return withClashNote(await respondConfirmProposal(built), clashNote);
               }
               if (event.name === 'propose_goal' || event.name === 'propose_goal_checkin') {
                 return respondConfirmProposal(
@@ -2356,6 +2405,7 @@ export function createChatHandler({
               }
               if (event.name === 'search_tasks') {
                 send({ type: 'status', text: 'Searching tasks…' });
+                await ensureHubTasks();
                 if (hubLoadErrors.tasks) {
                   return JSON.stringify({ ok: false, error: 'tasks_unavailable', store: 'tasks_hub' });
                 }
@@ -2363,6 +2413,10 @@ export function createChatHandler({
               }
               if (event.name === 'get_task') {
                 send({ type: 'status', text: 'Reading task…' });
+                await ensureHubTasks();
+                if (hubLoadErrors.tasks) {
+                  return JSON.stringify({ ok: false, error: 'tasks_unavailable', store: 'tasks_hub' });
+                }
                 return JSON.stringify(getTask(hubTasks, event.input ?? {}));
               }
               if (event.name === 'search_teaching') {
@@ -2407,6 +2461,33 @@ export function createChatHandler({
                   hammondDigest,
                   now: nowInstant
                 }));
+              }
+              {
+                const specialist = executeSpecialistRead(event.name, {
+                  today,
+                  now: nowInstant,
+                  message: parsed.message,
+                  input: event.input ?? {},
+                  nutritionRecords,
+                  nutritionChallenges,
+                  medicalEvents,
+                  compositionRecords,
+                  measurementRecords,
+                  mindEvents,
+                  skincareHistoryRecords,
+                  hubTasks,
+                  hubProjects,
+                  hubClasses,
+                  hubLessons,
+                  hubUnits,
+                  knowledgePages,
+                  workoutRecords,
+                  hubLoadErrors
+                });
+                if (specialist != null) {
+                  send({ type: 'status', text: 'Reading domain evidence…' });
+                  return JSON.stringify(specialist);
+                }
               }
               if (event.name === 'get_week_review') {
                 send({ type: 'status', text: 'Reading the week…' });
@@ -2969,6 +3050,16 @@ export function createChatHandler({
                   });
                 }
                 const risk = classifyCentralNodePatchRisk(patch);
+                // Dry-run against the live Central Node before queuing: a patch that
+                // cannot apply must go back to the agent now, not become a Confirm
+                // card that fails every time Adam taps it.
+                if (risk === 'confirm' && centralNodeMarkdown && !applyCentralNodePatch(centralNodeMarkdown, patch)) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: 'apply_failed',
+                    detail: 'This patch cannot apply to the current Central Node (section heading missing or payload empty). Re-propose it, e.g. append_line or replace_section.'
+                  });
+                }
                 if (risk === 'confirm') {
                   // Anthropic client swallows tool_call when executeTools returns
                   // non-null — emit Confirm SSE here (same as central_node_patched).
@@ -3079,36 +3170,29 @@ export function createChatHandler({
                     detail: error instanceof Error ? error.message : 'invalid input'
                   });
                 }
-                // Timed ghosts: block stacking over occupied multi-hub slots.
+                // Timed ghosts: clashes are a note to Adam, never a refusal.
+                let clashNote = null;
                 if (entry?.date && entry?.start && entry?.end && event.name === 'propose_calendar_ghost') {
-                  try {
-                    const merge = await loadTurnCalendarMerge({
-                      from: entry.date,
-                      to: entry.date,
-                      client,
-                      repoTree,
-                      env,
-                      fetchImpl,
-                      hubLessons,
-                      hubClasses,
-                      hubTasks,
-                      hubWorkBlocks,
-                      getLifeEvents,
-                      getTasksStore
-                    });
-                    const blocked = slotConflictOrUnavailable(merge, {
-                      date: entry.date,
-                      start: entry.start,
-                      end: entry.end
-                    });
-                    if (blocked) return JSON.stringify(blocked);
-                  } catch {
-                    return JSON.stringify({
-                      ok: false,
-                      error: 'calendar_sources_unavailable',
-                      message: 'Calendar could not be loaded. Refusing to treat the slot as free.'
-                    });
-                  }
+                  clashNote = await clashNoteFor(() => loadTurnCalendarMerge({
+                    from: entry.date,
+                    to: entry.date,
+                    client,
+                    repoTree,
+                    env,
+                    fetchImpl,
+                    hubLessons,
+                    hubClasses,
+                    hubTasks,
+                    hubWorkBlocks,
+                    getLifeEvents,
+                    getTasksStore
+                  }), {
+                    date: entry.date,
+                    start: entry.start,
+                    end: entry.end,
+                    // Moving a block must not report a clash with its own current slot.
+                    excludePaths: entry.kind === 'reschedule_block' ? [entry.path] : []
+                  });
                 }
                 try {
                   const queued = await queueCalendarGhostDualPath({
@@ -3119,7 +3203,7 @@ export function createChatHandler({
                     send,
                     validateProposeActionInput
                   });
-                  return JSON.stringify(queued);
+                  return withClashNote(queued, clashNote);
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }
@@ -3578,18 +3662,21 @@ async function persistOrProposeLogEntry({ client, slug, today, validation, send,
     exerciseLibraryEntries,
     today
   );
-  if (restrictionWarnings.length > 0) {
-    send({ type: 'record_rejected', errors: restrictionWarnings });
-    return { ok: false, status: 'rejected', error: 'shelved_exercise', errors: restrictionWarnings };
-  }
+  // Shelved exercises are a warning on the card, never a refusal: Adam asked for it.
   send({
     type: 'record_proposal',
     record: proposal.record,
     notes: proposal.notes,
     path,
-    warnings: lintWorkoutProposal(proposal.record)
+    warnings: [...restrictionWarnings, ...lintWorkoutProposal(proposal.record)]
   });
-  return { ok: true, status: 'awaiting_confirm' };
+  return {
+    ok: true,
+    status: 'awaiting_confirm',
+    ...(restrictionWarnings.length
+      ? { warnings: restrictionWarnings, tell_adam: 'Mention the shelved warning in one line. It does not block the proposal.' }
+      : {})
+  };
 }
 
 async function parseRequest(request) {

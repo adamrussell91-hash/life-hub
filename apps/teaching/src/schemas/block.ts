@@ -43,7 +43,7 @@ export const BlockTypeSchema = z.enum([
 export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33', 'custom']);
 export const SpacerSizeSchema = z.enum(['small', 'medium', 'large']);
 
-export const VideoProviderSchema = z.enum(['youtube', 'vimeo']);
+export const VideoProviderSchema = z.enum(['youtube', 'vimeo', 'file']);
 export const EmbedProviderSchema = z.enum([
   'google_maps',
   'google_slides',
@@ -190,6 +190,7 @@ export const VideoBlockSchema = z.object({
     provider: VideoProviderSchema,
     external_id: z.string(),
     url: z.string().optional(),
+    start_seconds: z.number().int().positive().optional(),
     title: z.string().optional(),
     caption: z.string().optional()
   }),
@@ -535,6 +536,9 @@ export const GraphNodeSchema = z.object({
   y: z.number().optional()
 });
 
+/** How the block is built: a written outline laid out automatically, or a free canvas. */
+export const GraphBuildModeSchema = z.enum(['outline', 'canvas']);
+
 export const GraphEdgeSchema = z.object({
   id: z.string().min(1),
   from: z.string().min(1),
@@ -551,7 +555,8 @@ export const MindMapBlockSchema = z.object({
   content: z.object({
     title: z.string().optional(),
     nodes: z.array(GraphNodeSchema).min(1).max(24),
-    edges: z.array(GraphEdgeSchema).max(40)
+    edges: z.array(GraphEdgeSchema).max(40),
+    mode: GraphBuildModeSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -566,7 +571,8 @@ export const ConceptMapBlockSchema = z.object({
   content: z.object({
     title: z.string().optional(),
     nodes: z.array(GraphNodeSchema).min(1).max(24),
-    edges: z.array(GraphEdgeSchema).max(40)
+    edges: z.array(GraphEdgeSchema).max(40),
+    mode: GraphBuildModeSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps

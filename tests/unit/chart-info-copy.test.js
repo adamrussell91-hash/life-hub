@@ -4,7 +4,8 @@ import {
   BODY_CHART_INFO,
   bodyChartInfo,
   healthThreadsInfo,
-  repMixInfo
+  repMixInfo,
+  stimulusGateInfo
 } from '../../apps/life/js/app/chart-info-copy.js';
 
 test('body metaphor charts each have what/how copy', () => {
@@ -17,6 +18,12 @@ test('body metaphor charts each have what/how copy', () => {
     assert.ok(spec.how.length > 20);
   }
   assert.equal(bodyChartInfo('missing'), null);
+});
+
+test('stimulus gate copy colours recent pace by up or down, not by the gate', () => {
+  const copy = stimulusGateInfo(28);
+  assert.match(copy.how, /green when that pace is up on the average, red when it is down/);
+  assert.doesNotMatch(copy.how, /green clears the gate/);
 });
 
 test('health threads and rep mix info cover the gap charts', () => {

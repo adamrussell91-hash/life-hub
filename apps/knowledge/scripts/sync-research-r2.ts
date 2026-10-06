@@ -2,8 +2,14 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Page } from "../src/domain/page";
+import {
+  CATALOGUE_DELTA_KEY,
+  CATALOGUE_DELTA_META_KEY,
+  CATALOGUE_STATE_KEY,
+  catalogueRow,
+} from "../src/research/catalogue";
 import { packVectorIndex } from "../src/research/vectorPack";
-import { createDataRepo } from "../netlify/functions/_lib/dataRepo";
+import { listDataRepoPages } from "./dataRepoPages";
 import type { IndexEntry } from "./build-index";
 import { loadDotEnv, loadLocalStagedPages } from "./loadLocalPages";
 
@@ -20,16 +26,19 @@ async function envValue(name: string) {
 }
 
 export function researchManifestFromPages(pages: Page[]) {
-  return pages.map(page => ({
-    id: page.id,
-    title: page.title,
-    area: page.area,
-    tags: page.tags,
-    excerpt: page.body.replace(/^#.*$/gm, "").replace(/\s+/g, " ").trim().slice(0, 157),
-    path: `pages/${page.id}.json`,
-    ...(page.origins?.length ? { origins: page.origins } : {}),
-  }));
+  return pages.map(catalogueRow);
 }
+
+/**
+ * A full rebuild replaces the base at the legacy keys, so the hourly delta
+ * and any folded base it points at are superseded: reset both, and make the
+ * next sync reconcile against the live manifest from scratch.
+ */
+export const catalogueResetObjects = () => [
+  { key: CATALOGUE_DELTA_KEY, body: JSON.stringify({ rows: [], removed: [] }), contentType: "application/json" },
+  { key: CATALOGUE_DELTA_META_KEY, body: "[]", contentType: "application/json" },
+  { key: CATALOGUE_STATE_KEY, body: JSON.stringify({ pending: [] }), contentType: "application/json" },
+];
 
 export function slimIndex(index: IndexEntry[]) {
   return index.map(entry => ({ pageId: entry.pageId, title: entry.title, vector: entry.vector }));
@@ -60,7 +69,7 @@ async function main() {
     pages =
       (await loadLocalStagedPages((done, total) => {
         console.log(`Loaded ${done}/${total} local pages`);
-      })) ?? (await createDataRepo().listPages());
+      })) ?? (await listDataRepoPages());
     objects.push({
       key: researchObjectKeys.manifest,
       body: JSON.stringify(researchManifestFromPages(pages)),
@@ -74,6 +83,8 @@ async function main() {
       })),
     );
   }
+  // Last, so the reader switches back to the legacy base only once it's written.
+  objects.push(...catalogueResetObjects());
   if (!execute) {
     console.log(
       JSON.stringify(

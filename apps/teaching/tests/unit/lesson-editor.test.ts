@@ -619,8 +619,6 @@ describe('mountLessonEditor', () => {
       updated_at: ISO,
       schema_version: 1
     });
-    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Do Now pack');
-
     mount();
     await tick();
 
@@ -630,12 +628,19 @@ describe('mountLessonEditor', () => {
     refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__save-composition')!.click();
     await tick();
 
-    expect(promptSpy).toHaveBeenCalled();
+    // Named in the kit text card, not window.prompt (blocked in some browsers).
+    const card = document.querySelector<HTMLFormElement>('.confirm-card-overlay form.confirm-card');
+    expect(card).not.toBeNull();
+    const input = card!.querySelector<HTMLInputElement>('input')!;
+    input.value = 'Do Now pack';
+    input.dispatchEvent(new Event('input'));
+    card!.requestSubmit();
+    await tick();
+
     expect(apiPostMock).toHaveBeenCalledWith(
       '/api/compositions',
       expect.objectContaining({ title: 'Do Now pack', root: expect.objectContaining({ id: section.id }) })
     );
-    promptSpy.mockRestore();
   });
 
   it('inserts a composition as an independent section copy', async () => {

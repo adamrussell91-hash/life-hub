@@ -90,11 +90,20 @@
   padding: var(--space-8) var(--space-6) var(--space-10);
 }
 
-.canvas:has(> .compose),
 .canvas:has(> .reader) {
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
+}
+
+/* New note / Edit note: header + scroll fields + docked Save (not sticky). */
+.canvas:has(> .compose) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
 }
 
 .canvas:has(> .protocols-root .protocol-intake),
@@ -156,6 +165,54 @@
   justify-content: flex-end;
 }
 
+/* Note titles use the whole canvas. Labelled actions sit under the title
+   in .reader__actions; only refresh stays on the eyebrow row. */
+.canvas:has(> .reader) > .page-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.canvas:has(> .reader) > .page-header .page-header__copy {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.canvas:has(> .reader) > .page-header .page-header__actions {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  align-self: start;
+  width: auto;
+  max-width: 100%;
+  margin-left: 0;
+  z-index: 1;
+}
+
+.canvas:has(> .reader) > .page-header .page-header__eyebrow {
+  min-height: var(--space-8);
+  padding-right: calc(var(--space-8) + var(--space-3));
+}
+
+.canvas:has(> .reader) > .page-header .page-header__title-row,
+.canvas:has(> .reader) > .page-header .page-header__title {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  .canvas:has(> .reader) > .page-header .page-header__eyebrow {
+    /* Matches .hub-icon-btn at this breakpoint so the title starts below it. */
+    min-height: 2.75rem;
+    padding-right: calc(2.75rem + var(--space-2));
+  }
+}
+
 .new-note {
   position: relative;
   display: inline-flex;
@@ -190,7 +247,11 @@
   line-height: var(--leading-snug);
 }
 
-.page-header__title,
+.page-header__title {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
 .reader__title {
   overflow-wrap: anywhere;
 }
@@ -866,6 +927,16 @@
   font-size: var(--text-sm);
 }
 
+/* Status + static "thinking" button share one aside row. */
+.hub-ai-bar__aside > .chat__status {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
 .chat__fold {
   min-width: 0;
   border: 1px solid var(--line);
@@ -1233,6 +1304,12 @@
     var(--depth);
 }
 
+/* Show All is a neural map: light adds up on a black field. */
+.graph-wrap.is-neural {
+  background: #03050a;
+}
+
+.graph-wrap.is-neural .graph-toolbar__meta,
 .graph-wrap.is-universe-dark .graph-toolbar__meta,
 .graph-wrap.is-universe-dark .graph-speed__label,
 .graph-wrap.is-universe-dark .graph-speed__value {
@@ -1852,6 +1929,58 @@ body.is-universe-fullscreen .local-banner {
   font-size: var(--text-sm);
 }
 
+.wiki-card,
+.wiki-card__pair button {
+  min-width: 0;
+}
+
+.wiki-card__pair button {
+  min-height: 2.75rem;
+  padding: var(--space-2) 0;
+}
+
+.wiki-card__relation,
+.wiki-card__pair strong,
+.wiki-card__book,
+.wiki-card__why {
+  overflow-wrap: anywhere;
+}
+
+.wiki-card__book {
+  font-style: normal;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.wiki-card__tag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0.125rem var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--glass);
+  vertical-align: middle;
+}
+
+.wiki .btn {
+  min-height: 2.75rem;
+}
+
+.wiki-auto {
+  margin-top: var(--space-6);
+}
+
+.wiki-auto summary {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  cursor: pointer;
+  font-weight: var(--weight-semibold);
+}
+
 .wiki-links {
   margin-top: var(--space-6);
 }
@@ -1987,11 +2116,26 @@ body.is-universe-fullscreen .local-banner {
 
   .topbar,
   .page-header {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: flex-start;
     gap: var(--space-2);
     margin-bottom: var(--space-4);
     min-width: 0;
+    max-width: 100%;
+  }
+
+  .page-header__copy {
+    flex: 1 1 12rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .page-header__actions:has(> :not(.hub-utilities)) {
+    flex: 1 0 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    margin-left: 0;
+    width: 100%;
     max-width: 100%;
   }
 
@@ -2002,7 +2146,7 @@ body.is-universe-fullscreen .local-banner {
     margin-bottom: var(--space-1);
   }
 
-  .page-header__actions {
+  .page-header__actions:not(:has(> :not(.hub-utilities))) {
     justify-content: flex-end;
     width: auto;
     min-width: 0;
@@ -2069,6 +2213,39 @@ body.is-universe-fullscreen .local-banner {
     overflow-x: clip;
     padding: var(--space-4);
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Room above the tab bar; keyboard mode pins to --vv-height and hides nav. */
+  .canvas:has(> .compose) {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  html.vv-keyboard-open .canvas:has(> .compose),
+  body:has(.compose:focus-within) .canvas:has(> .compose) {
+    padding-bottom: var(--space-4);
+  }
+
+  html.vv-keyboard-open .canvas:has(> .compose) {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: var(--vv-offset-top, 0px);
+    height: var(--vv-height, 100dvh);
+    max-height: var(--vv-height, 100dvh);
+    z-index: 40;
+  }
+
+  body:has(.compose) .floating-chat-button {
+    display: none;
+  }
+
+  .compose__savebar {
+    padding: var(--space-3) 0 calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .compose__scroll :is(input, select, textarea, .compose__tiptap-surface, .option-picker) {
+    scroll-margin-top: 1rem;
+    scroll-margin-bottom: 5rem;
   }
 
   .file {
@@ -2291,6 +2468,7 @@ body.is-universe-fullscreen .local-banner {
   .compose input,
   .compose select,
   .compose textarea,
+  .compose__tiptap-surface,
   .chat-overlay .chat-form textarea,
   .chat-overlay .chat-form input,
   .chat-overlay__book input {
@@ -2305,14 +2483,14 @@ body.is-universe-fullscreen .local-banner {
   .coach.chat .alchemist__actions .btn,
   .coach.chat.chat--from-book .chat__note-form .btn,
   .compose__capture .btn,
-  .compose__save,
+  .reader__actions .btn,
   .origin-add .btn,
   .origin-add select,
   .origin-add input {
     min-height: 44px;
   }
 
-  .page-header__actions {
+  .page-header__actions:not(:has(> :not(.hub-utilities))) {
     flex-wrap: nowrap;
     width: auto;
   }
@@ -2739,6 +2917,20 @@ body.is-universe-fullscreen .local-banner {
   min-height: 0;
   width: 100%;
   max-width: none;
+  overflow: hidden;
+}
+
+.compose > .page-header,
+.compose > .local-banner {
+  flex: 0 0 auto;
+}
+
+.compose__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .compose label {
@@ -3006,7 +3198,7 @@ body.is-universe-fullscreen .local-banner {
 }
 
 .compose__field--body {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -3037,13 +3229,30 @@ body.is-universe-fullscreen .local-banner {
   border-bottom: 1px solid var(--line);
 }
 
+/* Docked outside .compose__scroll — never sticky (R4). Do not pad with
+ * --vv-offset-bottom; keyboard inset is the canvas --vv-height pin. */
 .compose__savebar {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  margin-top: auto;
-  padding: var(--space-3) 0 max(var(--space-3), calc(env(safe-area-inset-bottom, 0px) + var(--vv-offset-bottom, 0px)));
-  background: linear-gradient(180deg, transparent, var(--paper) 1.25rem);
+  flex: 0 0 auto;
+  position: static;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) 0 max(var(--space-3), env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.compose__save {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 2.75rem;
+  justify-content: center;
+}
+
+/* After base 2.75rem so phone wins the cascade (R4 ≥44px → 3rem). */
+@media (max-width: 720px) {
+  .compose__save {
+    min-height: 3rem;
+  }
 }
 
 .compose__save[disabled] {
@@ -3053,13 +3262,12 @@ body.is-universe-fullscreen .local-banner {
 
 .reader__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-5);
-}
-
-.reader__actions .hub-utilities {
-  margin-left: auto;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 var(--space-5);
 }
 
 .reader__tidy {
@@ -3941,10 +4149,12 @@ body.is-universe-fullscreen .local-banner {
 .compose__body-host,
 .compose__tiptap {
   min-height: 16rem;
+  min-width: 0;
 }
 
 .compose__tiptap-surface {
   min-height: 16rem;
+  min-width: 0;
   padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -3952,6 +4162,8 @@ body.is-universe-fullscreen .local-banner {
   color: var(--ink);
   font: inherit;
   line-height: 1.5;
+  /* Avoid iOS zoom on focus — inherit alone can land under 16px. */
+  font-size: max(1rem, 16px);
 }
 
 .compose__tiptap-surface:focus {
@@ -5058,4 +5270,412 @@ body.is-stars-fullscreen .stars-sky-wrap {
 /* Tag-anything on a note (shared design-kit entity tagger). */
 .reader__tags {
   margin-top: var(--space-4, 1.5rem);
+}
+
+/* ---------- Universe effects (lens, chimes, comets, Big Bang) ---------- */
+
+.universe-key__swatch--comet {
+  --swatch: #f4f1ff;
+}
+
+.universe-key__swatch--comet .universe-key__dot {
+  position: relative;
+  width: 0.38rem;
+  height: 0.38rem;
+  background: var(--navy);
+  transform: translate(0.32rem, -0.2rem);
+}
+
+.universe-key__swatch--comet .universe-key__dot::after {
+  content: "";
+  position: absolute;
+  right: 0.24rem;
+  top: 0.08rem;
+  width: 0.95rem;
+  height: 0.2rem;
+  border-radius: 999px;
+  transform: rotate(-28deg);
+  transform-origin: right center;
+  background: linear-gradient(90deg, transparent, #d9a3c4 45%, #7eb0d5);
+}
+
+.universe-key__swatch--bridge .universe-key__dot {
+  width: 1.3rem;
+  height: 0.3rem;
+  border-radius: 0;
+  background: radial-gradient(circle, var(--navy) 0 0.07rem, transparent 0.08rem) 0 50% / 0.26rem 0.3rem repeat-x;
+}
+
+.universe-effect-tools label.universe-ambient {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.25rem 0.4rem 0.25rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--navy);
+  font-size: var(--text-xs);
+}
+
+.universe-effect-tools label.universe-ambient[hidden] {
+  display: none;
+}
+
+.universe-ambient select {
+  border: 0;
+  background: transparent;
+  color: var(--navy);
+  font: inherit;
+  font-weight: var(--weight-semibold);
+}
+
+@media (hover: none) {
+  [data-universe-lens] {
+    display: none;
+  }
+}
+
+.universe-replay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--space-4);
+  margin-inline: auto;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  width: min(32rem, calc(100% - 9rem));
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-radius: 999px;
+}
+
+.universe-replay__title {
+  color: var(--navy);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.universe-replay__scrub {
+  flex: 1 1 6rem;
+  min-width: 4rem;
+  accent-color: var(--navy);
+}
+
+.universe-replay__label {
+  min-width: 9rem;
+  color: var(--navy);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.universe-replay .btn {
+  min-height: 2rem;
+  padding: 0.25rem 0.75rem;
+  font-size: var(--text-xs);
+}
+
+.universe-replay .btn[hidden] {
+  display: none;
+}
+
+/* The note preview owns the bottom edge while it is open. */
+.graph-wrap:has(.graph-preview:not([hidden])) .universe-replay {
+  visibility: hidden;
+}
+
+body.is-universe-saver .graph-chrome,
+body.is-universe-saver .graph-preview,
+body.is-universe-saver .universe-replay,
+body.is-universe-saver .universe-exit,
+body.is-universe-saver .universe-zoom,
+body.is-universe-saver .graph-tip {
+  display: none !important;
+}
+
+body.is-universe-saver .graph-canvas {
+  cursor: none;
+}
+
+@media (max-width: 720px) {
+  .universe-replay {
+    left: var(--space-2);
+    right: var(--space-2);
+    bottom: calc(5.2rem + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    border-radius: var(--radius-md);
+    padding: var(--space-2);
+  }
+
+  .universe-replay__title {
+    display: none;
+  }
+
+  .universe-replay__scrub {
+    flex-basis: 100%;
+  }
+
+  .universe-replay__label {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+}
+
+/* Neural map tools: one short word per tool, one small panel at a time. */
+.neural-dock {
+  position: absolute;
+  right: var(--space-3);
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  max-width: min(460px, calc(100% - 2 * var(--space-3)));
+  pointer-events: none;
+}
+
+.neural-dock__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.neural-dock__row button,
+.neural-dock__panel button {
+  font: 600 12px/1 Inter, ui-sans-serif, sans-serif;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(251, 248, 242, 0.88);
+  color: var(--ink, #13233a);
+  cursor: pointer;
+  min-height: 30px;
+}
+
+.neural-dock__row button.is-active,
+.neural-dock__segments button.is-active {
+  background: #13233a;
+  border-color: #13233a;
+  color: #fbf8f2;
+}
+
+.neural-dock__panel {
+  pointer-events: auto;
+  width: min(320px, 100%);
+  max-height: min(52vh, 420px);
+  overflow: auto;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(251, 248, 242, 0.92);
+  backdrop-filter: blur(8px);
+  color: #13233a;
+  font-size: 13px;
+}
+
+.neural-dock__panel[hidden] {
+  display: none;
+}
+
+.neural-dock__note,
+.neural-dock__head {
+  margin: 4px 0;
+}
+
+.neural-dock__head {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  margin-top: var(--space-2);
+}
+
+.neural-dock__steps {
+  margin: 4px 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: 2px;
+}
+
+.neural-dock__steps button {
+  all: unset;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+}
+
+.neural-dock__steps button:hover,
+.neural-dock__steps button:focus-visible {
+  text-decoration: underline;
+}
+
+.neural-dock__saved {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.neural-dock__panel .neural-dock__quiet {
+  border-color: transparent;
+  background: transparent;
+  min-height: 0;
+  padding: 4px 8px;
+}
+
+.neural-dock__grow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.neural-dock__grow input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.neural-dock__when {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 6.5em;
+  text-align: right;
+}
+
+.neural-dock__segments {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.neural-dock__grow + .neural-dock__segments {
+  margin-top: var(--space-2);
+}
+
+.neural-dock__steps button {
+  display: block;
+}
+
+.neural-dock__steps button small {
+  display: block;
+  font-size: 11px;
+  opacity: 0.65;
+}
+
+.neural-dock__steps button.is-forgotten small {
+  color: #c25a14;
+  opacity: 1;
+}
+
+.neural-dock__spark {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.neural-dock__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 500 13px/1.2 Inter, ui-sans-serif, sans-serif;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.9);
+  color: #13233a;
+}
+
+.neural-dock__walking {
+  margin: 2px 0 var(--space-2);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.35;
+  min-height: 1.35em;
+  overflow-wrap: break-word;
+}
+
+.graph-wrap.is-neural .neural-dock__input {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #f4efe6;
+}
+
+.graph-wrap.is-neural .neural-dock__steps button.is-forgotten small {
+  color: #ffb070;
+}
+
+.neural-dock__modes {
+  display: flex;
+  gap: 4px;
+  margin-top: var(--space-2);
+}
+
+.neural-dock__panel .neural-dock__toggle.is-active {
+  background: #13233a;
+  border-color: #13233a;
+  color: #fbf8f2;
+}
+
+.neural-dock__pairs {
+  padding-left: 0;
+  list-style: none;
+  gap: var(--space-2);
+}
+
+.neural-dock__pair small {
+  display: inline;
+  margin: 0 0.35em;
+}
+
+.neural-dock__differ {
+  margin: 2px 0 0;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.graph-wrap.is-neural .neural-dock__panel .neural-dock__toggle.is-active {
+  background: #f4efe6;
+  border-color: #f4efe6;
+  color: #03050a;
+}
+
+.graph-wrap.is-neural .neural-dock__row button,
+.graph-wrap.is-neural .neural-dock__panel button:not(.neural-dock__quiet) {
+  background: rgba(20, 26, 40, 0.82);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f4efe6;
+}
+
+.graph-wrap.is-neural .neural-dock__row button.is-active,
+.graph-wrap.is-neural .neural-dock__segments button.is-active {
+  background: #f4efe6;
+  border-color: #f4efe6;
+  color: #03050a;
+}
+
+.graph-wrap.is-neural .neural-dock__panel {
+  background: rgba(10, 14, 24, 0.88);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f4efe6;
+}
+
+.graph-wrap.is-neural .neural-dock__panel .neural-dock__steps button,
+.graph-wrap.is-neural .neural-dock__panel .neural-dock__quiet {
+  color: #f4efe6;
+  background: transparent;
+}
+
+@media (max-width: 720px) {
+  .neural-dock {
+    right: var(--space-2);
+    max-width: calc(100% - 2 * var(--space-2));
+  }
+
+  .neural-dock__row button {
+    padding: 6px 9px;
+  }
 }

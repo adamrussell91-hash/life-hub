@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mountForceGraph } from "./forceGraph";
-import { SHOW_ALL_STRAND_WIDTH, resetShowAllTuning } from "./forceGraphBehavior";
+import { resetShowAllTuning } from "./forceGraphBehavior";
 import type { ArchiveGraphModel, GraphLinkDatum, GraphNodeDatum } from "./keywordGraph";
 import { TOPIC_VOCABULARY } from "../tidy/vocabulary";
 import { buildArchiveGraph } from "./keywordGraph";
@@ -48,6 +48,16 @@ function recordingContext() {
         lineCap: ctx.lineCap,
         strokeStyle: String(ctx.strokeStyle),
       });
+    },
+    measureText(text: string) {
+      return { width: text.length * 7 } as TextMetrics;
+    },
+    strokeText() {},
+    drawImage() {},
+    fillRect() {},
+    globalCompositeOperation: "source-over",
+    createLinearGradient() {
+      return { addColorStop() {} };
     },
     fillText(text: string) {
       texts.push(text);
@@ -123,7 +133,7 @@ describe("Show All strand drawing", () => {
     vi.unstubAllGlobals();
   });
 
-  it("batches Show All strands into one solid rounded stroke", () => {
+  it("draws note-to-note links as solid, rounded, curved fibres, with no hub spokes", () => {
     stubFrame();
     const recorded = installCanvas();
     const host = document.createElement("div");
@@ -131,21 +141,18 @@ describe("Show All strand drawing", () => {
     document.body.appendChild(host);
 
     const stop = mountForceGraph(host, model(), {}, { variant: "showAll", search: "", excerptFor: () => "" });
-    const viewK = 0.16;
-    const expected = SHOW_ALL_STRAND_WIDTH / viewK;
-    const strands = recorded.strokes.filter(stroke => stroke.strokeStyle !== "#fff");
-
+    const strands = recorded.strokes;
     expect(strands.length).toBeGreaterThanOrEqual(1);
-    expect(strands.every(stroke => Math.abs(stroke.lineWidth - expected) < 0.01)).toBe(true);
     expect(strands.every(stroke => stroke.dash.length === 0)).toBe(true);
     expect(strands.every(stroke => stroke.lineCap === "round")).toBe(true);
-    expect(recorded.paths.filter(path => path === "line").length).toBe(3);
-    expect(recorded.paths).not.toContain("curve");
+    // Two note-to-note links, each one gently curved fibre; the three hub spokes are never drawn.
+    expect(recorded.paths.filter(path => path === "curve").length).toBe(2);
+    expect(recorded.paths).not.toContain("line");
 
     stop();
   });
 
-  it("draws the 20-tag hubs and spokes, but never paints note titles", () => {
+  it("keeps words off the overview: no topic names and no note titles until you zoom or hover", () => {
     stubFrame();
     const recorded = installCanvas();
     const host = document.createElement("div");
@@ -164,14 +171,14 @@ describe("Show All strand drawing", () => {
     const graph = buildShowAllGraph(pages, "tags");
     const hubs = graph.nodes.filter(node => node.kind === "major");
     expect(hubs).toHaveLength(3);
-    expect(graph.links.some(link => link.kind === "spoke")).toBe(true);
+    expect(graph.links.some(link => link.kind === "spoke")).toBe(false);
     expect(graph.links.filter(link => link.kind === "overlap" || link.kind === "backbone").length).toBeGreaterThan(0);
 
     const stop = mountForceGraph(host, graph, {}, { variant: "showAll", search: "", excerptFor: () => "" });
     expect(recorded.paths.length).toBeGreaterThan(0);
-    expect(recorded.paths.every(path => path === "line")).toBe(true);
-    expect(hubs.every(hub => recorded.texts.some(text => hub.label.startsWith(text.replace(/…$/, ""))))).toBe(
-      true,
+    expect(recorded.paths.every(path => path === "curve")).toBe(true);
+    expect(hubs.some(hub => recorded.texts.some(text => text && hub.label.startsWith(text.replace(/…$/, ""))))).toBe(
+      false,
     );
     const leafTitles = new Set(graph.nodes.filter(node => node.kind === "leaf").map(node => node.label));
     expect(recorded.texts.some(text => leafTitles.has(text))).toBe(false);

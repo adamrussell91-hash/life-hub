@@ -1,5 +1,6 @@
-import { curatorAction, listCuratorPending, WIKI_NEEDS_NETLIFY, USE_LOCAL_DATA } from "../api/wikiClient";
-import type { PendingProposal } from "../curator/schema";
+import { curatorAction, listCuratorReview, WIKI_NEEDS_NETLIFY, USE_LOCAL_DATA } from "../api/wikiClient";
+import { isCrossBookPair } from "../curator/crossBook";
+import { confidencePercent, pairKey, type AutoApproved, type PendingProposal } from "../curator/schema";
 import { escapeHtml } from "../lib/dom";
 import { hubUtilitiesActionsHtml, titleRowHtml } from "../lib/hubChrome";
 
@@ -11,10 +12,12 @@ export type WikiRailHost = {
 };
 
 let pending: PendingProposal[] = [];
+let autoApproved: AutoApproved[] = [];
 let busy = false;
 let wikiError = "";
 let needQueue = true;
 let queueLoading = false;
+let queueLoaded = false;
 let mounted = false;
 
 export function enterWikiRail() {
@@ -43,22 +46,29 @@ function ensureQueue(host: WikiRailHost) {
   queueLoading = true;
   busy = true;
   wikiError = "";
-  void listCuratorPending()
-    .then(rows => {
-      pending = rows;
+  void listCuratorReview()
+    .then(review => {
+      pending = review.pending;
+      autoApproved = review.autoApproved;
     })
     .catch((error: unknown) => {
       if (!wikiError) wikiError = failMessage(error);
       pending = [];
+      autoApproved = [];
     })
     .finally(() => {
       queueLoading = false;
+      queueLoaded = true;
       busy = false;
       if (wikiVisible()) host.render();
     });
 }
 
-async function runAction(host: WikiRailHost, action: "approve" | "dismiss" | "approve-all" | "dismiss-all" | "run", id?: string) {
+async function runAction(
+  host: WikiRailHost,
+  action: "approve" | "dismiss" | "approve-all" | "dismiss-all" | "unlink" | "run",
+  id?: string,
+) {
   if (busy) return;
   busy = true;
   wikiError = "";
@@ -69,8 +79,11 @@ async function runAction(host: WikiRailHost, action: "approve" | "dismiss" | "ap
       wikiError = "Curator queued. Proposals appear after the Action finishes.";
     } else if (result.pending) {
       pending = result.pending;
+      if (result.autoApproved) autoApproved = result.autoApproved;
     } else {
-      pending = await listCuratorPending();
+      const review = await listCuratorReview();
+      pending = review.pending;
+      autoApproved = review.autoApproved;
     }
   } catch (error) {
     wikiError = failMessage(error);
@@ -80,33 +93,78 @@ async function runAction(host: WikiRailHost, action: "approve" | "dismiss" | "ap
   }
 }
 
+function byConfidence(items: PendingProposal[]) {
+  return [...items].sort((left, right) => {
+    const leftScore = typeof left.confidence === "number" ? left.confidence : -1;
+    const rightScore = typeof right.confidence === "number" ? right.confidence : -1;
+    return rightScore - leftScore;
+  });
+}
+
+function relationLine(item: PendingProposal) {
+  const percent = confidencePercent(item.confidence);
+  const cross = isCrossBookPair(item.bookA, item.bookB);
+  return `<p class="wiki-card__relation">${escapeHtml(item.relation)}${percent ? ` · ${percent}` : ""}${
+    cross ? `<span class="wiki-card__tag">Cross-book</span>` : ""
+  }</p>`;
+}
+
+function noteButton(id: string, title: string, excerpt: string, book?: string) {
+  return `<button type="button" data-open-page="${escapeHtml(id)}">
+            <strong>${escapeHtml(title)}</strong>
+            ${book ? `<em class="wiki-card__book">${escapeHtml(book)}</em>` : ""}
+            ${excerpt ? `<span>${escapeHtml(excerpt)}</span>` : ""}
+          </button>`;
+}
+
 function cardsHtml() {
   if (busy && !pending.length) return `<p class="empty">Loading proposals…</p>`;
   if (!busy && !pending.length) {
     return `<p class="empty">No pending links. Run now after you capture, or wait for the nightly pass.</p>`;
   }
-  return pending
-    .map(
-      item => `<article class="glass-panel wiki-card">
-                  <p class="wiki-card__relation">${escapeHtml(item.relation)}</p>
+  return byConfidence(pending)
+    .map(item => {
+      const cross = isCrossBookPair(item.bookA, item.bookB);
+      return `<article class="glass-panel wiki-card">
+                  ${relationLine(item)}
                   <div class="wiki-card__pair">
-                    <button type="button" data-open-page="${escapeHtml(item.noteA)}">
-                      <strong>${escapeHtml(item.titleA)}</strong>
-                      <span>${escapeHtml(item.excerptA)}</span>
-                    </button>
-                    <button type="button" data-open-page="${escapeHtml(item.noteB)}">
-                      <strong>${escapeHtml(item.titleB)}</strong>
-                      <span>${escapeHtml(item.excerptB)}</span>
-                    </button>
+                    ${noteButton(item.noteA, item.titleA, item.excerptA, cross ? item.bookA : undefined)}
+                    ${noteButton(item.noteB, item.titleB, item.excerptB, cross ? item.bookB : undefined)}
                   </div>
                   <p class="wiki-card__why">${escapeHtml(item.rationale)}</p>
                   <div class="alchemist__actions">
-                    <button type="button" data-wiki-approve="${escapeHtml(item.id)}" ${busy ? "disabled" : ""}>Approve</button>
-                    <button type="button" data-wiki-dismiss="${escapeHtml(item.id)}" ${busy ? "disabled" : ""}>Dismiss</button>
+                    <button type="button" class="btn btn--primary" data-wiki-approve="${escapeHtml(item.id)}" ${busy ? "disabled" : ""}>Approve</button>
+                    <button type="button" class="btn btn--ghost" data-wiki-dismiss="${escapeHtml(item.id)}" ${busy ? "disabled" : ""}>Dismiss</button>
                   </div>
-                </article>`,
-    )
+                </article>`;
+    })
     .join("");
+}
+
+function autoHtml() {
+  const rows = [...autoApproved].slice(-50).reverse();
+  const body = rows.length
+    ? rows
+        .map(row => {
+          const percent = confidencePercent(row.confidence);
+          const cross = isCrossBookPair(row.bookA, row.bookB);
+          return `<article class="glass-panel wiki-card">
+                    <p class="wiki-card__relation">${escapeHtml(row.relation)}${percent ? ` · ${percent}` : ""}${
+                      cross ? `<span class="wiki-card__tag">Cross-book</span>` : ""
+                    }</p>
+                    <div class="wiki-card__pair">
+                      ${noteButton(row.noteA, row.titleA, "", row.bookA)}
+                      ${noteButton(row.noteB, row.titleB, "", row.bookB)}
+                    </div>
+                    <p class="wiki-card__why">${escapeHtml(row.rationale)}</p>
+                    <div class="alchemist__actions">
+                      <button type="button" class="btn btn--secondary" data-wiki-unlink="${escapeHtml(pairKey(row.noteA, row.noteB))}" ${busy ? "disabled" : ""}>Unlink</button>
+                    </div>
+                  </article>`;
+        })
+        .join("")
+    : `<p class="empty">Nothing auto-approved yet.</p>`;
+  return `<details class="wiki-auto"><summary>Auto-approved</summary>${body}</details>`;
 }
 
 function bind(host: WikiRailHost) {
@@ -124,6 +182,9 @@ function bind(host: WikiRailHost) {
   });
   host.app.querySelectorAll<HTMLButtonElement>("[data-wiki-dismiss]").forEach(button => {
     button.onclick = () => void runAction(host, "dismiss", button.dataset.wikiDismiss);
+  });
+  host.app.querySelectorAll<HTMLButtonElement>("[data-wiki-unlink]").forEach(button => {
+    button.onclick = () => void runAction(host, "unlink", button.dataset.wikiUnlink);
   });
   host.app.querySelectorAll<HTMLButtonElement>("[data-open-page]").forEach(button => {
     button.onclick = () => host.onOpenPage?.(button.dataset.openPage!);
@@ -144,16 +205,17 @@ export function renderWikiRail(host: WikiRailHost) {
     </header>
     <section class="alchemist wiki">
       <div class="alchemist__actions">
-        <button type="button" data-wiki-run ${busy ? "disabled" : ""}>Run now</button>
+        <button type="button" class="btn btn--primary" data-wiki-run ${busy ? "disabled" : ""}>Run now</button>
         ${
           pending.length
-            ? `<button type="button" data-wiki-approve-all ${busy ? "disabled" : ""}>Approve all</button>
-               <button type="button" data-wiki-dismiss-all ${busy ? "disabled" : ""}>Dismiss all</button>`
+            ? `<button type="button" class="btn btn--secondary" data-wiki-approve-all ${busy ? "disabled" : ""}>Approve all</button>
+               <button type="button" class="btn btn--ghost" data-wiki-dismiss-all ${busy ? "disabled" : ""}>Dismiss all</button>`
             : ""
         }
       </div>
       ${wikiError ? `<p class="alchemist__error">${escapeHtml(wikiError)}</p>` : ""}
       ${cardsHtml()}
+      ${queueLoaded ? autoHtml() : ""}
     </section>
   `);
   bind(host);

@@ -175,3 +175,25 @@ export function termContainingDate(
     return ymd >= span.start && ymd <= span.end;
   });
 }
+
+/**
+ * Scopes created before the API wrote `title` / `term_number` stored terms as
+ * `{ label: 'Term 1' }`, which painted "TERM undefined". Fill both in from the
+ * label or the term's position so old records read like new ones.
+ */
+export function normalizeScopeTerms<T extends { id: string; start_week: number }>(
+  terms: ReadonlyArray<T & { title?: string; term_number?: number; label?: string }>
+): Array<T & { title: string; term_number: number }> {
+  const ordered = [...terms].sort((a, b) => a.start_week - b.start_week);
+  return ordered.map((term, index) => {
+    const fromLabel = Number(String(term.title ?? term.label ?? '').match(/\d+/)?.[0]);
+    const term_number =
+      typeof term.term_number === 'number' && term.term_number > 0
+        ? term.term_number
+        : Number.isInteger(fromLabel) && fromLabel > 0
+          ? fromLabel
+          : index + 1;
+    const title = term.title?.trim() || term.label?.trim() || `Term ${term_number}`;
+    return { ...term, title, term_number };
+  });
+}

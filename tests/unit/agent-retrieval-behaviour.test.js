@@ -16,6 +16,7 @@ import {
   getSkincareAdherence,
   getTasksFocus,
   searchTasks,
+  getTask,
   searchTeaching,
   getTeachingContext,
   searchKnowledge,
@@ -33,6 +34,7 @@ test('activation: Chadwick training overview requires fitness retrieval tools', 
   assert.equal(act.intentClass, 'training_overview');
   assert.ok(act.requiredTools.includes('get_fitness_snapshot'));
   assert.ok(act.requiredTools.includes('compare_workout_windows'));
+  assert.ok(act.requiredTools.includes('analyse_training_evidence'));
   assert.equal(act.forceToolChoice, true);
   assert.match(act.activationBlock, /MUST call these retrieval tools/i);
   assert.match(act.catalogueBlock, /get_fitness_snapshot/);
@@ -55,7 +57,7 @@ test('activation: Clare focus today requires tasks focus', () => {
     message: 'What should I focus on today?'
   });
   assert.equal(act.intentClass, 'focus_today');
-  assert.deepEqual(act.requiredTools, ['get_tasks_focus']);
+  assert.deepEqual(act.requiredTools, ['get_tasks_focus', 'get_tasks_open_loops']);
 });
 
 test('activation: irrelevant small talk does not force tools', () => {
@@ -190,6 +192,51 @@ test('domain tools: trashed (dead) tasks are not reported as open to Clare', () 
   assert.deepEqual(focus.overdue.map(t => t.id), ['task_live']);
 });
 
+test('domain tools: done tasks are hidden by default, flagged, and found with include_done', () => {
+  const tasks = [
+    { id: 'task_live', title: 'Book venue', status: 'open', domain: 'wedding', priority: 'high', tags: ['venue'] },
+    { id: 'task_done', title: 'Book photographer', status: 'done', completed_at: '2026-09-20T01:00:00Z', domain: 'wedding', notes: 'Deposit paid' },
+    { id: 'task_stamped', title: 'Book florist', status: 'open', completed_at: '2026-09-21T01:00:00Z', domain: 'wedding' },
+    { id: 'task_dead', title: 'Book photographer backup', status: 'dead', bucket: 'trash', domain: 'wedding' }
+  ];
+
+  const hidden = searchTasks(tasks, { query: 'photographer' });
+  assert.equal(hidden.count, 0);
+  assert.equal(hidden.done_matches_hidden, 1);
+  assert.match(hidden.next_step, /include_done: true/);
+
+  const found = searchTasks(tasks, { query: 'book', include_done: true });
+  assert.deepEqual(found.results.map(t => t.id), ['task_live', 'task_done', 'task_stamped']);
+  const done = found.results.find(t => t.id === 'task_done');
+  assert.equal(done.status, 'done');
+  assert.equal(done.is_done, true);
+  assert.equal(done.completed_at, '2026-09-20T01:00:00Z');
+  assert.equal(done.notes, 'Deposit paid');
+  const live = found.results.find(t => t.id === 'task_live');
+  assert.equal(live.is_done, false);
+  assert.deepEqual(live.tags, ['venue']);
+
+  const openOnly = searchTasks(tasks, { query: 'book' });
+  assert.deepEqual(openOnly.results.map(t => t.id), ['task_live']);
+  assert.equal(openOnly.done_matches_hidden, undefined);
+
+  const byId = getTask(tasks, { task_id: 'task_done' });
+  assert.equal(byId.found, true);
+  assert.equal(byId.task.is_done, true);
+  assert.equal(byId.task.notes, 'Deposit paid');
+});
+
+test('domain tools: every agent can search and read tasks', () => {
+  for (const slug of ['clare', 'hammond', 'ann', 'brisket', 'sara', 'penelope', 'vera', 'hyaluronica', 'clementine', 'chadwick']) {
+    const names = domainRetrievalSchemasFor(slug).map(t => t.name);
+    assert.ok(names.includes('search_tasks'), `${slug} search_tasks`);
+    assert.ok(names.includes('get_task'), `${slug} get_task`);
+  }
+  const schema = domainRetrievalSchemasFor('hammond').find(t => t.name === 'search_tasks');
+  assert.equal(schema.input_schema.properties.include_done.type, 'boolean');
+  assert.match(schema.description, /marked done/);
+});
+
 test('domain tools: knowledge search distinguishes corpus hits', () => {
   const pages = [
     { id: 'page_hub_1', title: 'Cognitive load theory', tags: ['clt'], excerpt: 'Working memory limits' },
@@ -234,10 +281,12 @@ test('buildAgentTools attaches domain retrieval for parity agents', () => {
 
   const ann = buildAgentTools({ slug: 'ann' }).map(t => t.name);
   assert.ok(ann.includes('search_teaching'));
-  assert.ok(ann.includes('get_teaching_context'));
+  assert.ok(ann.includes('get_teaching_diagnosis'));
 
   const clementine = buildAgentTools({ slug: 'clementine' }).map(t => t.name);
   assert.ok(clementine.includes('search_knowledge'));
+  assert.ok(clementine.includes('get_knowledge_synthesis'));
+  assert.ok(clementine.includes('search_teaching'));
 
   const brisket = buildAgentTools({
     slug: 'brisket',
@@ -309,10 +358,10 @@ test('classifyIntent weekly_planning requires get_week_review', () => {
 test('classifyIntent history_search maps per agent', () => {
   assert.deepEqual(
     classifyIntent('clementine', 'Have I mentioned cognitive load before?').requiredTools,
-    ['search_knowledge']
+    ['search_knowledge', 'get_knowledge_synthesis']
   );
   assert.deepEqual(
     classifyIntent('penelope', 'Have I mentioned this feeling before?').requiredTools,
-    ['search_diary_records']
+    ['search_diary_records', 'analyse_diary_evidence']
   );
 });

@@ -1024,8 +1024,14 @@ export function createChatController({
 
   function actionConfirmErrorMessage(error) {
     const code = error?.code || '';
+    const message = typeof error?.message === 'string' ? error.message.trim() : '';
     if (code === 'stale_write') {
       return 'Something changed since this proposal. Discard this card and ask again.';
+    }
+    if (code === 'stale_schedule_collision') {
+      return message && message !== 'Confirm request failed'
+        ? message
+        : 'That time collides with the current calendar. Discard this card and pick another slot.';
     }
     if (code === 'pending_action_execution_in_progress') {
       return 'That Confirm is still finishing or stuck mid-save. Wait a moment, or Discard if it stays.';
@@ -1036,7 +1042,6 @@ export function createChatController({
     if (code === 'pending_action_not_found') {
       return 'That Confirm is gone on the server. Refresh chat if it still shows.';
     }
-    const message = typeof error?.message === 'string' ? error.message.trim() : '';
     if (message && message !== 'Confirm request failed') return message;
     return 'Saving that action failed. You can try again, or Discard the card.';
   }
@@ -1106,10 +1111,13 @@ export function createChatController({
       });
       moveConfirmReceiptToTranscript(root, proposal.card);
       onRecordWritten?.(result);
-    } catch {
+    } catch (error) {
       proposal.confirm.disabled = false;
       proposal.confirm.textContent = previousLabel;
-      showChatError(root, 'Saving that Central Node change failed. You can try again.');
+      const message = error?.message && error.message !== 'Confirm request failed'
+        ? `Saving that Central Node change failed: ${error.message}`
+        : 'Saving that Central Node change failed. You can try again.';
+      showChatError(root, message);
     }
   }
 

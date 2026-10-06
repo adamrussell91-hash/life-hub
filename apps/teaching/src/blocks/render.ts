@@ -2,7 +2,7 @@ import { FAILURE } from '@/app/failure';
 import katex from 'katex';
 import { getApiBaseUrl } from '@/api/config';
 import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
-import { mountGraphMaker } from '@/blocks/graph-maker/mount';
+import { renderGraphView } from '../../../../packages/graph-blocks';
 import { mountHubWhiteboard } from '@/blocks/whiteboard-runtime';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildHtmlAppSrcdoc } from '@/blocks/html-app-srcdoc';
@@ -10,7 +10,7 @@ import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { embedFrameSrc, embedUsesIframe } from '@/blocks/embed-url';
-import { videoEmbedSrc } from '@/blocks/video-url';
+import { resolveVideoContent, videoEmbedSrc } from '@/blocks/video-url';
 import {
   loadActivityState,
   parseClozeText,
@@ -105,6 +105,7 @@ function videoWatchUrl(
   if (provider === 'youtube') {
     return `https://www.youtube.com/watch?v=${encodeURIComponent(externalId)}`;
   }
+  if (provider === 'file') return externalId;
   return `https://vimeo.com/${encodeURIComponent(externalId)}`;
 }
 
@@ -209,10 +210,10 @@ export function renderVideoBlock(
   const wrap = document.createElement('div');
   wrap.className = `block-video block-video--${block.variant}`;
 
+  const video = resolveVideoContent(block.content);
+
   if (mode === 'print') {
-    const watchUrl = block.content.external_id.trim()
-      ? videoWatchUrl(block.content.provider, block.content.external_id)
-      : undefined;
+    const watchUrl = video ? videoWatchUrl(video.provider, video.external_id) : undefined;
     wrap.append(
       renderPrintFallback({
         label: 'Video',
@@ -236,15 +237,24 @@ export function renderVideoBlock(
     wrap.append(title);
   }
 
-  if (!block.content.external_id.trim()) {
+  if (!video) {
     const unavailable = document.createElement('p');
     unavailable.className = 'block-video__unavailable';
     unavailable.textContent = FAILURE.videoUnavailable;
     wrap.append(unavailable);
+  } else if (video.provider === 'file') {
+    const player = document.createElement('video');
+    player.className = 'block-video__frame block-video__file';
+    player.src = video.external_id;
+    player.controls = true;
+    player.preload = 'metadata';
+    player.playsInline = true;
+    player.setAttribute('aria-label', block.content.title || 'Video');
+    wrap.append(player);
   } else {
     const iframe = document.createElement('iframe');
     iframe.className = 'block-video__frame';
-    iframe.src = videoEmbedSrc(block.content.provider, block.content.external_id);
+    iframe.src = videoEmbedSrc(video.provider, video.external_id, video.start_seconds);
     iframe.setAttribute('loading', 'lazy');
     iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
     iframe.setAttribute('allowfullscreen', 'true');
@@ -2030,12 +2040,8 @@ export function renderMindMapBlock(
   }
 
   const wrap = document.createElement('div');
-  wrap.className = 'block-mind-map__canvas';
-  mountGraphMaker(wrap, {
-    mode: 'mindmap',
-    content: block.content,
-    readOnly: true
-  });
+  wrap.className = 'block-mind-map__map';
+  renderGraphView(wrap, 'mind', block.content);
   root.append(wrap);
 
   return wrapBlock(root, block, mode);
@@ -2056,12 +2062,8 @@ export function renderConceptMapBlock(
   }
 
   const wrap = document.createElement('div');
-  wrap.className = 'block-concept-map__canvas';
-  mountGraphMaker(wrap, {
-    mode: 'conceptmap',
-    content: block.content,
-    readOnly: true
-  });
+  wrap.className = 'block-concept-map__map';
+  renderGraphView(wrap, 'concept', block.content);
   root.append(wrap);
 
   return wrapBlock(root, block, mode);

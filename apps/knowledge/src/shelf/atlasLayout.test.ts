@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { PageManifestEntry } from "../domain/page";
-import { buildAtlas, groupChapters, noteThemes } from "./atlasLayout";
+import { buildAtlas, groupChapters, noteThemes, type AtlasContext } from "./atlasLayout";
+import { terrainField } from "./atlasTerrain";
+import { SEA_LEVEL, islandShape } from "./islandShape";
 import { buildShelf } from "./model";
 
 const label = "Make It Stick";
@@ -14,7 +16,7 @@ describe("buildAtlas", () => {
   const data = {
     books: [{ label, pages: 250, chapters }],
     placements: [
-      { pageId: "a", page: 5, stance: "complicates" as const, gaps: ["Novices?"] },
+      { pageId: "a", page: 5, kind: "debate" as const, gaps: ["Novices?"] },
       { pageId: "b", page: 40 },
       { pageId: "c", page: 45, lastOpened: "2025-01-01T00:00:00.000Z" },
     ],
@@ -22,11 +24,49 @@ describe("buildAtlas", () => {
   const book = buildShelf(entries, data).find(b => b.label === label)!;
   const atlas = buildAtlas(book, Date.parse("2026-10-03T00:00:00.000Z"));
 
-  it("makes a province per chapter in reading order, fogging the unwritten ones", () => {
+  it("makes a region per chapter round the island in reading order, fogging the unwritten ones", () => {
     expect(atlas.source).toBe("chapters");
     expect(atlas.provinces.map(p => p.explored)).toEqual([true, true, false, false, false, false, false, false]);
-    const xs = atlas.provinces.map(p => p.x);
-    expect([...xs].sort((a, b) => a - b)).toEqual(xs);
+    // Clockwise from the north-west: bearings increase once unwrapped from the start.
+    const { x, y } = atlas.island!;
+    const start = -0.75 * Math.PI;
+    const turns = atlas.provinces.map(p => ((Math.atan2(p.y - y, p.x - x) - start) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI));
+    expect([...turns].sort((a, b) => a - b)).toEqual(turns);
+  });
+
+  it("draws the book as the same island it is on the Archipelago, scaled up, its shape not claiming colour", () => {
+    const shape = [...islandShape(book.key).base, ...islandShape(book.key).islets];
+    const own = atlas.land!.filter(l => l.province === book.key);
+    expect(own).toHaveLength(shape.length);
+    const r = own[0]!.sigma / shape[0]!.sigma;
+    expect(r).toBeCloseTo(atlas.island!.r);
+    own.forEach((l, i) => {
+      expect(l.x).toBeCloseTo(atlas.island!.x + shape[i]!.x * r);
+      expect(l.vote).toBe(false);
+    });
+  });
+
+  it("keeps every placed town on land and loose notes on an islet offshore", () => {
+    const field = terrainField(atlas);
+    const { x, y, r } = atlas.island!;
+    for (const t of atlas.towns) {
+      if (t.province === "loose") expect(Math.hypot(t.x - x, t.y - y)).toBeGreaterThan(r);
+      expect(field(t.x, t.y).e).toBeGreaterThan(SEA_LEVEL);
+    }
+  });
+
+  it("shows a joined neighbour at the edge with a road over the border, instead of a sea route", () => {
+    const context: AtlasContext = {
+      island: { x: 500, y: 500, r: 100 },
+      neighbours: [{ key: "peak", label: "Peak", kind: "joined", count: 3, x: 720, y: 500, r: 110, colour: 5, a: { x: 590, y: 500 }, b: { x: 610, y: 500 } }],
+    };
+    const joined = buildAtlas(book, Date.parse("2026-10-03T00:00:00.000Z"), context);
+    expect(joined.provinces.find(p => p.id === "peak")).toMatchObject({ neighbour: true });
+    expect(joined.crossings).toEqual([expect.objectContaining({ key: "peak", kind: "joined", count: 3, fromId: "d" })]);
+    expect(joined.routes).toEqual([]);
+    const { x, y, r } = joined.island!;
+    const k = r / (100 * 0.86);
+    expect(terrainField(joined)(x + 100 * k, y).e).toBeGreaterThan(SEA_LEVEL);
   });
 
   it("settles every note: placed ones in their chapter, loose ones offshore", () => {

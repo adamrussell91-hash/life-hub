@@ -8,6 +8,7 @@ import { tasksEventsFromTasks, tasksEventsFromWorkBlocks, tasksEventsFromWorkSes
 import { professionalEventsFromProjections } from '../shell/professional-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
 import { resolveSchoolTerms } from '../../../../packages/design-kit/js/calendar/school-terms.js';
+import { openHomeCheckin, renderHomeCheckin } from '../../../../packages/design-kit/js/calendar/home-checkin.js';
 import {
   calendarFeedRange,
   eventsFromCalendarFeeds,
@@ -327,11 +328,16 @@ export function createAppController(dependencies) {
     const tasks = event?.detail;
     if (!Array.isArray(tasks) || !tasks.length) return;
     const incoming = tasksEventsFromTasks(tasks);
-    const ids = new Set(incoming.map(item => item.record?.id).filter(Boolean));
+    // Every task in the event, not just the ones still drawn: a task ticked off or
+    // undated must drop its old open copy.
+    const ids = new Set(tasks.map(task => task?.id).filter(Boolean));
     tasksEvents = [
       ...tasksEvents.filter(item => (item.record?.type !== 'task' && item.record?.type !== 'task_context') || !ids.has(item.record.id)),
       ...incoming
     ];
+    // Memory alone leaves Day Dial / Tideline on the last paint — Week remount looked
+    // fresh after a Clare dump while Dial stayed empty until something else re-rendered.
+    if (currentSection === 'calendar') renderCalendarSection();
   });
   bind(windowTarget, 'hashchange', () => {
     if (!authenticated) return;
@@ -505,6 +511,7 @@ export function createAppController(dependencies) {
         if (syncQuiet) settleMetricRings(root);
         const model = buildHomeModel({ ...result, date });
         renderHome(root, model, { quiet: syncQuiet, onOpenSection: showSection });
+        showHomeCheckin();
         void renderHomeSprints(root, {
           api: createHomeSprintsApi(apiFetch),
           onOpenChat: (href) => {
@@ -597,6 +604,8 @@ export function createAppController(dependencies) {
         return;
       }
       if (painted) {
+        latestResult.history = { ...latestResult.history, loading: false, error: true };
+        if (currentSection === 'nutrition') renderNutritionSection();
         setStatus('Earlier history unavailable');
         return;
       }
@@ -620,6 +629,7 @@ export function createAppController(dependencies) {
       latestResult = { ...result, date };
       const model = buildHomeModel({ ...result, date });
       renderHome(root, model, { onOpenSection: showSection });
+      showHomeCheckin();
       void renderHomeSprints(root, {
         api: createHomeSprintsApi(apiFetch),
         onOpenChat: (href) => {
@@ -857,7 +867,10 @@ export function createAppController(dependencies) {
       void loadFutureMapTrips?.(root, { fetchImpl: apiFetch });
     }
     if (name === 'hub-map') void hubMap?.open();
-    if (name === 'home') void loadHubPulse();
+    if (name === 'home') {
+      void loadHubPulse();
+      showHomeCheckin();
+    }
     const lifeDomain = name !== 'home' && name !== 'chat' && name !== 'calendar';
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       if (button.matches?.('.hub-label, .hub-toggle')) continue;
@@ -937,7 +950,79 @@ export function createAppController(dependencies) {
       loadKnowledgeCalendar(),
       loadTasksCalendar(),
       loadProfessionalCalendar()
-    ]);
+    ]).finally(() => {
+      // Classes, meetings and work sessions feed today's forecast on Home too.
+      if (currentSection === 'home') renderHomeCheckinSection();
+    });
+  }
+
+  /** Home's morning check-in card (the bubbles). Created if a stale shell lacks the host. */
+  function homeCheckinHost() {
+    const existing = root.querySelector?.('[data-home-checkin]');
+    if (existing) return existing;
+    const anchor = root.querySelector?.('[data-value="hammond-line"]');
+    if (!anchor?.after || typeof root.createElement !== 'function') return null;
+    const host = root.createElement('div');
+    host.id = 'home-checkin';
+    host.setAttribute('data-home-checkin', '');
+    anchor.after(host);
+    return host;
+  }
+
+  function renderHomeCheckinSection() {
+    if (!latestResult?.date) return null;
+    const host = homeCheckinHost();
+    if (!host) return null;
+    try {
+      const terms = resolveSchoolTerms({
+        hubPrefs: calendarHubPrefs,
+        planningProfile: calendarPlanningProfile,
+        visual: latestResult.calendarVisual
+      });
+      return renderHomeCheckin(root, host, {
+        // Same merged list as the calendar, so Home and the Day dial share one forecast.
+        events: mergeLifeCalendarEvents({
+          lifeEvents: latestResult.events,
+          teachingEvents,
+          knowledgeEvents,
+          tasksEvents,
+          professionalEvents,
+          feedEvents
+        }),
+        visual: latestResult.calendarVisual ?? null,
+        today: latestResult.date,
+        now: now(),
+        dayProfile: calendarPlanningProfile?.day_profile ?? null,
+        terms: terms.length ? terms : null,
+        apiFetch,
+        onRepaint: () => {
+          if (currentSection === 'home') renderHomeCheckinSection();
+        }
+      });
+    } catch {
+      // The card must never take Home down with it.
+      host.hidden = true;
+      return null;
+    }
+  }
+
+  /** #/home?checkin=1 (the 7 am push): open the bubbles and bring them into view. */
+  function showHomeCheckin() {
+    const hash = String(windowTarget.location?.hash ?? '');
+    const wantsCheckin = /[?&]checkin=1\b/.test(hash);
+    if (wantsCheckin && latestResult?.date) {
+      openHomeCheckin(latestResult.date);
+      try {
+        windowTarget.history?.replaceState?.(null, '', '#/home');
+      } catch {
+        /* not fatal */
+      }
+    }
+    const card = renderHomeCheckinSection();
+    if (wantsCheckin && card) {
+      card.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+      card.querySelector?.('.rf-bubble')?.focus?.({ preventScroll: true });
+    }
   }
 
   function loadTeachingCalendar() {
@@ -2190,6 +2275,8 @@ function paintedViewKey(result) {
     result.events?.length ?? 0,
     result.commitSha ?? '',
     result.freshness ?? '',
-    result.warnings?.length ?? 0
+    result.warnings?.length ?? 0,
+    result.history?.from ?? '',
+    result.history?.loading ?? false
   ].join('\0');
 }

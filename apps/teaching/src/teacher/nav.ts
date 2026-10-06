@@ -1,3 +1,4 @@
+import { normalizeScopeTerms } from '@/scope/timeline-dates';
 import { apiGet } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { PedagogicalMode } from '@/curriculum/pedagogical-mode';
@@ -39,8 +40,15 @@ export interface CurriculumResponse {
   schedule_anchor_date: string; // YYYY-MM-DD — demo override (tests / VITE_SCHEDULE_ANCHOR_DATE)
 }
 
-export function fetchCurriculum(): Promise<CurriculumResponse> {
-  return apiGet<CurriculumResponse>('/api/curriculum');
+export async function fetchCurriculum(): Promise<CurriculumResponse> {
+  const curriculum = await apiGet<CurriculumResponse>('/api/curriculum');
+  return {
+    ...curriculum,
+    scope_sequences: (curriculum.scope_sequences ?? []).map((scope) => ({
+      ...scope,
+      terms: normalizeScopeTerms(scope.terms ?? [])
+    }))
+  };
 }
 
 const NAV_STORAGE_KEY = 'teaching-hub.nav';

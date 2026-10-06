@@ -78,6 +78,7 @@ import {
   type GraphMount,
 } from "./archive/forceGraphBehavior";
 import { buildShowAllGraph } from "./archive/showAllGraph";
+import { readShowAllTheme, writeShowAllTheme, type ShowAllTheme } from "./archive/showAllDraw";
 import {
   SHOW_ALL_GROUPINGS,
   showAllGroupingLabel,
@@ -85,17 +86,22 @@ import {
   type ShowAllGrouping,
 } from "./archive/showAllScope";
 import { buildSolarModel, type SolarModel } from "./archive/solarModel";
-import { UNIVERSE_BUILD, mountSolarView, resolveSearchHits } from "./archive/solarView";
+import { UNIVERSE_BUILD, mountSolarView, resolveSearchHits, type SolarMount } from "./archive/solarView";
+import { readSoundPrefs, universeChimes, writeSoundPrefs, type AmbientLevel } from "./archive/universeChimes";
 import {
   applyUniverseViewState,
+  bindUniverseEffects,
   bindUniverseView,
   graphFullscreenToolsHtml,
   readUniverseDark,
+  readUniverseLens,
   shouldExitUniverseFullscreen,
+  universeEffectToolsHtml,
   universeExitHtml,
   universeViewToolsHtml,
   universeWrapClass,
   writeUniverseDark,
+  writeUniverseLens,
 } from "./archive/universeChrome";
 import { bindUniverseKey, universeKeyHtml } from "./archive/universeKey";
 import { enterPodcastRail, leavePodcastRail, renderPodcastRail } from "./podcast/rail";
@@ -136,6 +142,7 @@ import { duePageReviews, seedPageReview, upsertPageReview } from "./quiz/pageRev
 import { duePagesHtml, pageReviewActionsHtml } from "./quiz/pageReviewView";
 import { type PageReview, type QuizRating, type QuizStore } from "./quiz/schema";
 import { mountStarsView } from "./stars/view";
+import { listSavedConstellations } from "./stars/client";
 
 type View =
   | "list"
@@ -262,10 +269,13 @@ let graphTeardown: (() => void) | null = null;
 let graphMount: GraphMount | null = null;
 let graphMode: GraphMode = "constellation";
 let showAllGrouping: ShowAllGrouping = "tags";
+let showAllTheme: ShowAllTheme = readShowAllTheme();
 let graphSearch = "";
 let orbitSpeed = 0.5;
 let universeKeyOpen = false;
 let universeDark = readUniverseDark(typeof localStorage === "undefined" ? null : localStorage);
+let universeLens = readUniverseLens(typeof localStorage === "undefined" ? null : localStorage);
+let universeSound = readSoundPrefs(typeof localStorage === "undefined" ? null : localStorage);
 let graphFullscreen = false;
 let solarModelCache: { source: PageManifestEntry[]; model: SolarModel } | null = null;
 let showAllModelCache: { source: PageManifestEntry[]; grouping: ShowAllGrouping; model: ReturnType<typeof buildShowAllGraph> } | null = null;
@@ -1062,11 +1072,9 @@ function showAllMetaText() {
   if (showAllGrouping !== "tags") return showAllGroupingMeta(showAllGrouping);
   const model = showAllModel();
   const notes = model.nodes.filter(node => node.kind === "leaf").length;
-  const hubs = model.nodes.filter(node => node.kind === "major").length;
-  const noteLinks = model.links.filter(link => link.kind === "overlap" || link.kind === "backbone").length;
   const hidden = Math.max(0, entries.length - notes);
-  const line = `${hubs} topics · ${notes} notes · ${noteLinks} links waiting on a click · at most 3 per note`;
-  return hidden ? `${line} · ${hidden} still untagged` : line;
+  const line = `${notes.toLocaleString()} notes`;
+  return hidden ? `${line} · ${hidden.toLocaleString()} untagged` : line;
 }
 
 function graphMetaText() {
@@ -1261,13 +1269,19 @@ function renderGraph() {
           <input class="graph-search" type="search" placeholder="Search keywords and notes" value="${escapeHtml(graphSearch)}" />
           ${graphMode === "showAll" ? showAllTuningHtml() : ""}
           ${
+            graphMode === "showAll"
+              ? `<div class="graph-modes" role="group" aria-label="Show All background"><button type="button" data-show-all-theme aria-pressed="${showAllTheme === "light"}">${showAllTheme === "dark" ? "Light" : "Dark"}</button></div>`
+              : ""
+          }
+          ${
             graphMode === "universe"
               ? `<label class="graph-speed">
                   <span class="graph-speed__label">Orbit speed</span>
                   <input type="range" min="0" max="1" step="0.05" value="${orbitSpeed}" data-orbit-speed />
                   <output class="graph-speed__value" data-orbit-speed-value>${orbitSpeedLabel(orbitSpeed)}</output>
                 </label>
-                ${universeViewToolsHtml(universeDark, graphFullscreen)}`
+                ${universeViewToolsHtml(universeDark, graphFullscreen)}
+                ${universeEffectToolsHtml({ lens: universeLens, sound: universeSound.on, ambient: universeSound.ambient })}`
               : graphFullscreenToolsHtml(graphFullscreen)
           }
           <p class="graph-toolbar__meta">${escapeHtml(graphMetaText())}</p>
@@ -1311,6 +1325,12 @@ function renderGraph() {
     graphMount?.setSearch(graphSearch);
     writeGraphChrome();
   };
+  search.onkeydown = event => {
+    if (event.key !== "Enter" || graphMode !== "universe" || !solarMount) return;
+    event.preventDefault();
+    event.stopPropagation();
+    solarMount.flyToNearestHit();
+  };
 
   app.querySelectorAll<HTMLInputElement>("[data-show-all-tune]").forEach(input => {
     input.oninput = () => {
@@ -1327,6 +1347,16 @@ function renderGraph() {
   const wrap = app.querySelector<HTMLElement>(".graph-wrap")!;
   const stage = app.querySelector<HTMLElement>(".graph-stage")!;
   applyUniverseViewState(wrap, document.body, graphMode === "universe" && universeDark, graphFullscreen);
+  wrap.classList.toggle("is-neural", graphMode === "showAll" && showAllTheme === "dark");
+  app.querySelector<HTMLButtonElement>("[data-show-all-theme]")?.addEventListener("click", event => {
+    showAllTheme = showAllTheme === "dark" ? "light" : "dark";
+    writeShowAllTheme(showAllTheme);
+    const button = event.currentTarget as HTMLButtonElement;
+    button.textContent = showAllTheme === "dark" ? "Light" : "Dark";
+    button.setAttribute("aria-pressed", String(showAllTheme === "light"));
+    wrap.classList.toggle("is-neural", showAllTheme === "dark");
+    graphMount?.setTheme(showAllTheme);
+  });
   if (graphMode === "universe") {
     bindUniverseKey(app, open => {
       universeKeyOpen = open;
@@ -1370,6 +1400,7 @@ function renderGraph() {
   };
 
   let mounted: GraphMount;
+  let solarMount: SolarMount | null = null;
   if (graphMode === "universe") {
     const clock = { speed: orbitSpeed };
     const slider = app.querySelector<HTMLInputElement>("[data-orbit-speed]");
@@ -1381,11 +1412,53 @@ function renderGraph() {
         if (readout) readout.textContent = orbitSpeedLabel(orbitSpeed);
       };
     }
-    mounted = mountSolarView(stage, getSolarModel(), {
+    const storage = typeof localStorage === "undefined" ? null : localStorage;
+    const solar = mountSolarView(stage, getSolarModel(), {
       search: graphSearch,
       onNoteSelect,
       clock,
+      entries,
+      lens: universeLens,
+      ambient: universeSound.ambient as AmbientLevel,
     });
+    solarMount = solar;
+    mounted = solar;
+    // Audio can only start from a gesture: a saved "Chimes on" wakes on the first touch of the sky.
+    const wakeChimes = () => {
+      if (universeSound.on && universeChimes.start()) universeChimes.enabled = true;
+    };
+    wrap.addEventListener("pointerdown", wakeChimes, { once: true });
+    bindUniverseEffects(app, {
+      getPrefs: () => ({ lens: universeLens, sound: universeSound.on, ambient: universeSound.ambient }),
+      setLens: on => {
+        universeLens = on;
+        writeUniverseLens(on, storage);
+        solar.setLens(on);
+      },
+      setSound: on => {
+        universeSound = { ...universeSound, on };
+        writeSoundPrefs(universeSound, storage);
+        universeChimes.enabled = on && universeChimes.start();
+      },
+      setAmbient: level => {
+        universeSound = { ...universeSound, ambient: level as AmbientLevel };
+        writeSoundPrefs(universeSound, storage);
+        solar.setAmbient(level as AmbientLevel);
+      },
+      followComet: () => solar.followNextComet(),
+      screensaver: () => {
+        graphFullscreen = true;
+        applyUniverseViewState(wrap, document.body, universeDark, true);
+        solar.startScreensaver();
+      },
+    });
+    listSavedConstellations()
+      .then(saved => {
+        if (graphMount === solar) solar.setConstellations(saved);
+      })
+      .catch(() => {
+        /* the sky simply has no constellations */
+      });
   } else {
     mounted = mountForceGraph(
       stage,
@@ -1503,20 +1576,19 @@ function renderPage(page: LivePage) {
   };
 
   shell(`
-    ${pageHeader(
-      topics[0] ? escapeHtml(topics[0]) : "Note",
-      escapeHtml(page.title),
-      `        <button class="btn btn--ghost reader__back" data-back type="button">← ${pageReturnView === "notebooks" ? "Notebooks" : pageReturnView === "bookshelf" ? "Bookshelf" : "Archive"}</button>
-        <button class="btn btn--ghost" data-pin-note type="button">${isPinned(page.id) ? "Unpin" : "Pin"}</button>
-        <button class="btn btn--ghost" data-edit type="button">Edit</button>
-        <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyReviewJob ? "disabled" : ""}>${tidyBusy ? intakeBusyLabel(tidyReviewJob?.phase) : "Clean up"}</button>
-        <button class="btn btn--ghost" data-open-chat type="button">Chat</button>
-        ${
-          resolvedOrigins(page).find(origin => origin.kind === "book")
-            ? `<button class="btn btn--ghost" data-from-book type="button">Note from this book</button>`
-            : ""
-        }`,
-    )}
+    ${pageHeader(topics[0] ? escapeHtml(topics[0]) : "Note", escapeHtml(page.title))}
+    <div class="reader__actions">
+      <button class="btn btn--ghost reader__back" data-back type="button">← ${pageReturnView === "notebooks" ? "Notebooks" : pageReturnView === "bookshelf" ? "Bookshelf" : "Archive"}</button>
+      <button class="btn btn--ghost" data-pin-note type="button">${isPinned(page.id) ? "Unpin" : "Pin"}</button>
+      <button class="btn btn--ghost" data-edit type="button">Edit</button>
+      <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyReviewJob ? "disabled" : ""}>${tidyBusy ? intakeBusyLabel(tidyReviewJob?.phase) : "Clean up"}</button>
+      <button class="btn btn--ghost" data-open-chat type="button">Chat</button>
+      ${
+        resolvedOrigins(page).find(origin => origin.kind === "book")
+          ? `<button class="btn btn--ghost" data-from-book type="button">Note from this book</button>`
+          : ""
+      }
+    </div>
     <article class="reader" data-hub-morph-page>
       ${
         tidyReviewJob
@@ -1723,42 +1795,44 @@ function renderCompose(state: ComposeState) {
         `<button class="btn btn--ghost reader__back" data-compose-cancel type="button">← Cancel</button>`,
       )}
       ${USE_LOCAL_DATA ? `<p class="local-banner">Saving and capture need the live API (npx netlify dev).</p>` : ""}
-      <div class="compose__field">
-        <label for="compose-title">Title</label>
-        <input id="compose-title" value="${escapeHtml(state.title)}" />
-        ${state.titleError ? `<p class="compose__error">${escapeHtml(state.titleError)}</p>` : ""}
-      </div>
-      <div class="compose__field">
-        <label id="compose-tags-label">Tags</label>
-        <p class="compose__hint">Up to 3.</p>
-        <div role="group" aria-labelledby="compose-tags-label">
-          ${topicTagPickerHtml(state.tags, composeTagQuery, composeTagOpen)}
+      <div class="compose__scroll">
+        <div class="compose__field">
+          <label for="compose-title">Title</label>
+          <input id="compose-title" value="${escapeHtml(state.title)}" />
+          ${state.titleError ? `<p class="compose__error">${escapeHtml(state.titleError)}</p>` : ""}
         </div>
+        <div class="compose__field">
+          <label id="compose-tags-label">Tags</label>
+          <p class="compose__hint">Up to 3.</p>
+          <div role="group" aria-labelledby="compose-tags-label">
+            ${topicTagPickerHtml(state.tags, composeTagQuery, composeTagOpen)}
+          </div>
+        </div>
+        ${originComposeFieldHtml(
+          state.origins,
+          composeOriginDraft,
+          originLabelsForKind(entries, composeOriginDraft?.kind ?? composeOriginKind).map(item => item.label),
+          composeOriginKind,
+        )}
+        ${composeBookPageHtml(state)}
+        <div class="compose__field compose__field--body">
+          <label id="compose-body-label">Body (markdown)</label>
+          <div id="compose-body-host" class="compose__body-host" aria-labelledby="compose-body-label"></div>
+        </div>
+        ${captureFieldHtml({
+          busy: state.busy,
+          captureBusy: state.captureBusy,
+          recording: state.recording,
+          localData: USE_LOCAL_DATA,
+        })}
+        <div class="compose__field">
+          <label>Attachments</label>
+          <ul class="compose__files">${files || "<li>None</li>"}</ul>
+          <input id="compose-files" type="file" multiple />
+        </div>
+        <div id="compose-relationships-host"></div>
       </div>
-      ${originComposeFieldHtml(
-        state.origins,
-        composeOriginDraft,
-        originLabelsForKind(entries, composeOriginDraft?.kind ?? composeOriginKind).map(item => item.label),
-        composeOriginKind,
-      )}
-      ${composeBookPageHtml(state)}
-      <div class="compose__field compose__field--body">
-        <label id="compose-body-label">Body (markdown)</label>
-        <div id="compose-body-host" class="compose__body-host" aria-labelledby="compose-body-label"></div>
-      </div>
-      ${captureFieldHtml({
-        busy: state.busy,
-        captureBusy: state.captureBusy,
-        recording: state.recording,
-        localData: USE_LOCAL_DATA,
-      })}
-      <div class="compose__field">
-        <label>Attachments</label>
-        <ul class="compose__files">${files || "<li>None</li>"}</ul>
-        <input id="compose-files" type="file" multiple />
-      </div>
-      <div id="compose-relationships-host"></div>
-      <div class="compose__savebar">
+      <div class="compose__savebar" data-part="form-actions">
         <button class="btn btn--primary compose__save" data-compose-save type="button" ${
           USE_LOCAL_DATA || state.busy || captureBusy ? "disabled" : ""
         }>${state.busy ? "Saving…" : "Save"}</button>

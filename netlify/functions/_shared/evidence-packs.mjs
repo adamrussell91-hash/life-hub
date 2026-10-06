@@ -13,7 +13,8 @@ import {
   getSessionComparisons,
   getLoadStatus,
   getPainTrainingSummary,
-  getBodyState
+  getBodyState,
+  analyseTrainingEvidence
 } from './fitness-tools.mjs';
 import { compareWorkoutWindows, searchWorkoutRecords } from './workout-history.mjs';
 import {
@@ -187,6 +188,14 @@ export function assembleEvidencePack({
         'record'
       );
     }
+    push(
+      sections,
+      toolsExecuted,
+      'analyse_training_evidence',
+      'Training evidence analysis',
+      analyseTrainingEvidence(workouts, today, { query: message }),
+      'calculation'
+    );
   }
 
   if (slug === 'brisket') {

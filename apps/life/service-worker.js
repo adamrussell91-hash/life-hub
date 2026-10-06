@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v196';
+const CACHE_NAME = 'life-hub-shell-v202';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -35,6 +35,7 @@ const SHELL_FILES = [
   'packages/design-kit/calendar-tideline.css',
   'packages/design-kit/calendar-almanac.css',
   'packages/design-kit/calendar-day-dial.css',
+  'packages/design-kit/calendar-readiness.css',
   'packages/design-kit/calendar-term-river.css',
   'packages/design-kit/calendar-zoom-bar.css',
   'packages/design-kit/js/hub-motion-engine.js',
@@ -44,6 +45,7 @@ const SHELL_FILES = [
   'packages/design-kit/js/dial-geometry.js',
   'packages/design-kit/js/time-grid.js',
   'js/app/main.js',
+  'js/app/heal-shell-styles.js',
   'js/app/api-session.js',
   'js/app/app-controller.js',
   'js/app/agent-avatars.js',
@@ -92,6 +94,7 @@ const SHELL_FILES = [
   'js/app/chart-kit/animate.js',
   'js/app/chart-kit/scene.js',
   'js/app/chart-kit/gate-rings.js',
+  'js/app/chart-kit/bullseye-rings.js',
   'js/app/chart-kit/region-rose.js',
   'js/app/chart-kit/glide-slope.js',
   'js/app/chart-kit/twin-clocks.js',
@@ -106,6 +109,10 @@ const SHELL_FILES = [
   'js/app/chart-kit/columns.js',
   'js/app/chart-kit/heatmap.js',
   'js/app/chart-kit/pie.js',
+  'js/app/chart-kit/nested-rings.js',
+  'js/app/chart-kit/protein-climb.js',
+  'js/app/chart-kit/week-grid.js',
+  'js/app/chart-kit/consistency-strip.js',
   'js/app/chart-kit/ring.js',
   'js/app/chart-kit/stream.js',
   'js/app/chart-kit/sankey-flow.js',
@@ -158,6 +165,7 @@ const SHELL_FILES = [
   'js/app/mind-model.js',
   'js/app/muscle-maps.js',
   'js/app/nutrition-charts.js',
+  'js/app/render-nutrition-today.js',
   'js/app/nutrition-model.js',
   'js/app/render-agent-picker.js',
   'js/app/render-protocol-pills.js',
@@ -202,8 +210,16 @@ const SHELL_FILES = [
   'packages/design-kit/js/calendar/rescue-sheet.js',
   'packages/design-kit/js/calendar/rescue-morph.js',
   'packages/design-kit/js/calendar/day-review-sheet.js',
+  'packages/design-kit/js/calendar/readiness-model.js',
+  'packages/design-kit/js/calendar/morning-bubbles.js',
+  'packages/design-kit/js/calendar/readiness-panel.js',
+  'packages/design-kit/js/calendar/home-checkin.js',
+  'packages/design-kit/js/calendar/readiness-checkins.js',
+  'packages/design-kit/js/calendar/weather-icons.js',
   'packages/design-kit/js/push-client.js',
   'packages/design-kit/js/calendar/render-day-dial.js',
+  'packages/design-kit/js/calendar/dial-faces.js',
+  'packages/design-kit/js/calendar/dial-complications.js',
   'packages/design-kit/js/calendar/render-almanac.js',
   'packages/design-kit/js/calendar/render-term-river.js',
   'packages/design-kit/js/calendar/calendar-sources.js',
@@ -322,7 +338,9 @@ const INDEX_PATH = SCOPE_PATH + 'index.html';
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE_URLS))
+      // One file at a time: a single 404 (capture-inbox.html, 2–6 Oct) failed addAll,
+      // so no new worker ever installed and phones kept a stale shell.
+      .then(cache => Promise.allSettled(PRECACHE_URLS.map(url => cache.add(url))))
       .then(() => self.skipWaiting())
   );
 });

@@ -295,19 +295,28 @@ test('validateProposeActionInput accepts allowlisted writes and builds diffs', (
   assert.ok(result.proposal.writes[0].diff);
 });
 
-test('validateProposeActionInput rejects out-of-allowlist writes before Confirm', () => {
+test('validateProposeActionInput hands off another lane, refuses paths no agent owns', () => {
   resetCapabilityCaches();
-  const result = validateProposeActionInput({
-    intent: 'rewrite medical constraints',
-    writes: [{
-      path: 'central-node.md',
-      mode: 'overwrite',
-      content: '# hacked'
-    }]
+  const handedOff = validateProposeActionInput({
+    intent: 'update Central Node',
+    writes: [{ path: 'central-node.md', mode: 'overwrite', content: '# CN' }]
   }, { agentSlug: 'brisket' });
+  assert.equal(handedOff.ok, true, handedOff.error);
+  assert.equal(handedOff.proposal.writes[0].on_behalf_of, 'hammond');
 
-  assert.equal(result.ok, false);
-  assert.ok(result.error);
+  const fitness = validateProposeActionInput({
+    intent: 'log a workout for Adam',
+    writes: [{ path: 'data/fitness/2026-10-05-run.md', mode: 'create', content: '---\ntype: workout\n---' }]
+  }, { agentSlug: 'brisket' });
+  assert.equal(fitness.ok, true, fitness.error);
+  assert.equal(fitness.proposal.writes[0].on_behalf_of, 'chadwick');
+
+  const nobody = validateProposeActionInput({
+    intent: 'rewrite server code',
+    writes: [{ path: 'netlify/functions/chat.mjs', mode: 'overwrite', content: '// x' }]
+  }, { agentSlug: 'brisket' });
+  assert.equal(nobody.ok, false);
+  assert.equal(nobody.error, 'write_path_denied');
 });
 
 test('executeProposeActionWrites creates then appends files', async () => {
@@ -519,12 +528,12 @@ test('create_task: two genuine tasks for one student both survive (flagged, not 
   assert.equal(result.skipped_duplicates, undefined);
 });
 
-test('Sara create_task is health-domain only; other agents are not', async () => {
+test('Sara create_task files under health instead of refusing; other agents keep their domain', async () => {
   resetCapabilityCaches();
   const sara = mockCtx('sara');
-  const denied = await executeShortcut('create_task', { title: 'Mark essays', domain: 'teaching' }, sara.ctx);
-  assert.equal(denied.kind, 'error');
-  assert.match(denied.error, /health/);
+  const coerced = await executeShortcut('create_task', { title: 'Mark essays', domain: 'teaching' }, sara.ctx);
+  assert.equal(coerced.kind, 'propose');
+  assert.equal(JSON.parse(coerced.proposal.writes[0].content).domain, 'health');
   const ok = await executeShortcut('create_task', { title: 'Book bloods', domain: 'health' }, sara.ctx);
   assert.equal(ok.kind, 'propose');
   assert.equal(JSON.parse(ok.proposal.writes[0].content).domain, 'health');
@@ -1043,8 +1052,11 @@ test('agents with tasks:task allowlist may propose task writes; unknown typed ta
     intent: 'rewrite a project',
     writes: [{ path: 'tasks:project:proj_x', mode: 'overwrite', content: '{}' }]
   }, { agentSlug: 'brisket' });
-  assert.equal(brisketProject.ok, false);
-  assert.equal(brisketProject.error, 'write_path_denied');
+  // Option A: outside Brisket's lane is handed off to the owner, not refused.
+  assert.equal(brisketProject.ok, true);
+  assert.equal(brisketProject.proposal.writes[0].on_behalf_of, 'hammond');
+  assert.deepEqual(brisketProject.proposal.handed_off_to, ['hammond']);
+  assert.match(brisketProject.proposal.writes[0].diff, /handed off to Hammond/);
 
   const unknown = validateProposeActionInput({
     intent: 'rewrite a mystery row',

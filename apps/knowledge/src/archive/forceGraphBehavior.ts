@@ -6,10 +6,10 @@ import {
   type GraphLinkKind,
   type GraphNodeDatum,
 } from "./keywordGraph";
-import { SHOW_ALL_SETTLE_TICKS, showAllLabelVisible } from "./showAllDraw";
-import { showAllClusterRadius } from "./showAllGraph";
+import { showAllLabelVisible } from "./showAllDraw";
+import type { ShowAllShape } from "./showAllGraph";
 
-export { SHOW_ALL_SETTLE_TICKS, showAllLabelVisible };
+export { showAllLabelVisible };
 
 export type ForceGraphVariant = "constellation" | "showAll";
 
@@ -23,7 +23,7 @@ export type ShowAllTuning = {
 export const SHOW_ALL_TUNING_DEFAULTS: ShowAllTuning = {
   leafCharge: -180,
   overlapLinkStrength: 0.28,
-  overlapLinkAlpha: 0.14,
+  overlapLinkAlpha: 0.32,
   lineWidthScale: 1,
 };
 
@@ -44,7 +44,7 @@ export type ShowAllTuningControl = {
 export const SHOW_ALL_TUNING_CONTROLS: readonly ShowAllTuningControl[] = [
   {
     key: "leafCharge",
-    label: "Repulsion",
+    label: "Spread",
     min: 20,
     max: 400,
     step: 10,
@@ -82,10 +82,10 @@ export const SHOW_ALL_TUNING_CONTROLS: readonly ShowAllTuningControl[] = [
   },
 ];
 
-export const SHOW_ALL_SPOKE_ALPHA = 0.28;
-export const SHOW_ALL_RETUNE_MS = 90;
-/** CSS-pixel width. Thick enough that diagonals do not hairline into dots. */
-export const SHOW_ALL_STRAND_WIDTH = 2;
+export const SHOW_ALL_SPOKE_ALPHA = 0.16;
+export const SHOW_ALL_RETUNE_MS = 60;
+/** CSS-pixel width. Every link is drawn, so keep it fine; still solid enough not to hairline into dots. */
+export const SHOW_ALL_STRAND_WIDTH = 1.2;
 const SHOW_ALL_STRAND_ACTIVE_BOOST = 0.6;
 
 export type ShowAllStrandStroke = {
@@ -181,6 +181,7 @@ export type GraphMount = (() => void) & {
   setSearch: (query: string) => void;
   setModel: (model: ArchiveGraphModel) => void;
   setTuning: (partial: Partial<ShowAllTuning>) => void;
+  setTheme: (theme: "dark" | "light") => void;
 };
 
 export function attachGraphSearch(
@@ -188,11 +189,13 @@ export function attachGraphSearch(
   setSearch: (query: string) => void,
   setModel: (model: ArchiveGraphModel) => void = () => {},
   setTuning: (partial: Partial<ShowAllTuning>) => void = () => {},
+  setTheme: (theme: "dark" | "light") => void = () => {},
 ): GraphMount {
   const stop = teardown as GraphMount;
   stop.setSearch = setSearch;
   stop.setModel = setModel;
   stop.setTuning = setTuning;
+  stop.setTheme = setTheme;
   return stop;
 }
 
@@ -239,50 +242,15 @@ export function constellationTargetStrength(node: GraphNodeDatum) {
   return 0.02;
 }
 
-export function showAllLinkDistance(linkOrKind: GraphLinkKind | GraphLinkDatum) {
-  const kind = typeof linkOrKind === "string" ? linkOrKind : linkOrKind.kind;
-  if (kind === "spoke" && typeof linkOrKind !== "string") {
-    const source = typeof linkOrKind.source === "string" ? null : linkOrKind.source;
-    const target = typeof linkOrKind.target === "string" ? null : linkOrKind.target;
-    const hub = source?.kind === "major" ? source : target?.kind === "major" ? target : null;
-    if (hub) return showAllClusterRadius(hub.count) * 0.5;
-  }
-  if (kind === "spoke") return 220;
-  if (kind === "overlap" || kind === "backbone") {
-    const weight = typeof linkOrKind === "string" ? 1 : linkOrKind.weight;
-    return 58 + 70 / (1 + Math.max(weight, 0.05));
-  }
-  if (kind === "orbit") return 200;
-  return 700;
-}
-
-export function showAllLinkStrength(kind: GraphLinkKind) {
-  if (kind === "spoke") return 0.32;
-  if (kind === "overlap" || kind === "backbone") return showAllTuning.overlapLinkStrength;
-  if (kind === "orbit") return 0.02;
-  return 0.01;
-}
-
-export function showAllNodeCharge(node: GraphNodeDatum) {
-  if (node.kind === "major") return -900;
-  if (node.kind === "minor") return -300;
-  return showAllTuning.leafCharge;
-}
-
-export function showAllCollisionRadius(node: GraphNodeDatum) {
-  if (node.kind === "major") return Math.max(22, node.r + 12);
-  if (node.kind === "minor") return Math.max(18, node.r + 10);
-  return Math.max(14, node.r + 8);
-}
-
-export function showAllTargetStrength(node: GraphNodeDatum) {
-  if (node.kind === "major") return 0;
-  if (node.kind === "minor") return 0.02;
-  return 0.05;
-}
-
-export function shouldLockShowAll(tickCount: number) {
-  return tickCount >= SHOW_ALL_SETTLE_TICKS;
+/**
+ * Show All has no physics. The two layout sliders keep their stored keys but now shape the
+ * deterministic layout: Spread spaces notes out, Pull leans multi-topic notes toward their
+ * other topics.
+ */
+export function showAllShape(tuning: ShowAllTuning = showAllTuning): ShowAllShape {
+  const spread = 0.6 + ((Math.abs(tuning.leafCharge) - 20) / 380) * 1.0;
+  const lean = Math.min(1.2, Math.max(0, (tuning.overlapLinkStrength / 0.28) * 0.6));
+  return { spread, lean };
 }
 
 export function showAllLinkShouldDraw(
@@ -445,6 +413,21 @@ export function initialForceView(
     x: width / 2 - anchor.x * k,
     y: height / 2 - anchor.y * k,
   };
+}
+
+/** Fits nodes into the part of the stage below a floating toolbar of height `top`. */
+export function fitViewBelowInset(
+  nodes: Array<{ x?: number; y?: number; r?: number }>,
+  width: number,
+  height: number,
+  top: number,
+  padding = 48,
+  minK = 0.04,
+): ViewState | null {
+  const usable = Math.max(120, height - top);
+  const fitted = fitViewToNodes(nodes, width, usable, padding, minK);
+  if (!fitted) return null;
+  return { ...fitted, y: fitted.y + (height - usable) };
 }
 
 export function fitViewToNodes(

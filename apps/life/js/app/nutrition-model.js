@@ -55,11 +55,50 @@ function dailyNutrition(events, date, targetsConfig) {
   };
 }
 
+// Where a meal sits on the clock. Logged HH:MM wins; otherwise the meal type's usual
+// slot, flagged so the chart can show it is an estimate rather than a logged time.
+const DEFAULT_MEAL_MINUTES = { breakfast: 480, lunch: 750, snack: 930, dinner: 1140, dessert: 1230 };
+export function mealMinutes(meal) {
+  const match = /^(\d{1,2}):(\d{2})/.exec(String(meal?.time ?? ''));
+  if (match) {
+    const minutes = Number(match[1]) * 60 + Number(match[2]);
+    if (minutes >= 0 && minutes < 1440) return { minutes, timeKnown: true };
+  }
+  return { minutes: DEFAULT_MEAL_MINUTES[meal?.meal] ?? 720, timeKnown: false };
+}
+
+const USUAL_DAYS = 7;
+const USUAL_MIN_DAYS = 3;
+const USUAL_LOOKBACK = 28;
+const USUAL_STEP = 30;
+
+// Average running protein total at each half hour across recent logged days.
+function buildUsualClimb(mealDays, date) {
+  const earliest = addCalendarDays(date, -USUAL_LOOKBACK);
+  const recent = [...mealDays.keys()]
+    .filter(day => day < date && day >= earliest)
+    .sort()
+    .slice(-USUAL_DAYS);
+  if (recent.length < USUAL_MIN_DAYS) return null;
+  const timed = recent.map(day => mealDays.get(day).map(meal => ({
+    minutes: mealMinutes(meal).minutes,
+    protein_g: Number(meal.protein_g) || 0
+  })));
+  const points = [];
+  for (let minutes = 360; minutes <= 1380; minutes += USUAL_STEP) {
+    const sum = timed.reduce((total, meals) => total + meals
+      .filter(meal => meal.minutes <= minutes)
+      .reduce((dayTotal, meal) => dayTotal + meal.protein_g, 0), 0);
+    points.push({ minutes, protein_g: Math.round((sum / timed.length) * 10) / 10 });
+  }
+  return { days: recent.length, points };
+}
+
 const averageProtein = days => (
   days.length === 0 ? 0 : days.reduce((sum, day) => sum + day.protein_g, 0) / days.length
 );
 
-export function buildNutritionModel({ events, targetsConfig, date, nutritionChallenges = null }) {
+export function buildNutritionModel({ events, targetsConfig, date, nutritionChallenges = null, history = null, freshness = null }) {
   if (!date) throw new RangeError('Nutrition display date is unavailable');
 
   const nutrition = aggregateNutrition(events, date);
@@ -76,6 +115,38 @@ export function buildNutritionModel({ events, targetsConfig, date, nutritionChal
     addCalendarDays(date, -WEEK_DAYS)
   ).map(day => dailyNutrition(events, day, targetsConfig));
 
+  const mealDays = new Map();
+  for (const event of events) {
+    const record = event?.record;
+    if (record?.type !== 'meal' || record.date > date) continue;
+    const meals = mealDays.get(record.date) ?? [];
+    const body = String(event.body ?? '').trim();
+    const notes = typeof record.notes === 'string' ? record.notes.trim() : '';
+    meals.push({
+      ...record,
+      id: record.id || event.path || `${record.date}-${meals.length}`,
+      body,
+      notes,
+      summary: body.split('\n').find(Boolean) || notes || `${record.meal} logged`
+    });
+    mealDays.set(record.date, meals);
+  }
+  const dayTargets = day => {
+    if (!targetsConfig) return { protein_g: 0, fat_ceiling_g: 0, calories: 0 };
+    const set = getDayTargets(targetsConfig, day, resolveDayType(events, day), hasRecoveryBonus(events, day));
+    return { protein_g: set.protein_g, fat_ceiling_g: set.fat_ceiling_g, calories: set.calories };
+  };
+  const mealHistory = {
+    ...history,
+    days: [...mealDays].sort(([a], [b]) => a.localeCompare(b)).map(([day, meals]) => ({
+      date: day,
+      meals: meals.sort((a, b) => String(a.time ?? '24:00').localeCompare(String(b.time ?? '24:00'))),
+      totals: aggregateNutrition(meals, day),
+      targets: dayTargets(day),
+      carbsKnown: meals.every(meal => Number.isFinite(meal.carbs_g))
+    }))
+  };
+
   const mealsToday = events
     .filter(event => event?.record?.type === 'meal' && event.record.date === date)
     .slice()
@@ -87,9 +158,11 @@ export function buildNutritionModel({ events, targetsConfig, date, nutritionChal
       return {
         meal: record.meal,
         time: record.time ?? null,
+        ...mealMinutes(record),
         calories: record.calories ?? 0,
         protein_g: record.protein_g ?? 0,
         fat_g: record.fat_g ?? 0,
+        carbs_g: record.carbs_g ?? null,
         notes,
         summary: bodyLine || notes || `${record.meal} logged`
       };
@@ -142,6 +215,9 @@ export function buildNutritionModel({ events, targetsConfig, date, nutritionChal
     overFatCeiling: targets.fat_ceiling_g > 0 && nutrition.fat_g > targets.fat_ceiling_g,
     polyphenolVsAim: polyphenolVsAim(nutrition.polyphenol_score, targets.polyphenol_daily_aim),
     mealsToday,
+    mealHistory,
+    usualClimb: buildUsualClimb(mealDays, date),
+    freshness,
     advice,
     challenges,
     macroSplit: {

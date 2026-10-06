@@ -69,7 +69,7 @@ import {
 } from '../cn-patch-queue.mjs';
 import { applyIntuitionEdit } from './intuition.mjs';
 import { executeProposeActionWrites, validateProposeActionInput } from './propose-action.mjs';
-import { listJSON as listTasksJSON, newTaskId, TASK_PREFIX } from '../tasks-blobs.mjs';
+import { listJSON as listTasksJSON, getJSON as getTasksJSON, newTaskId, TASK_PREFIX, taskKey } from '../tasks-blobs.mjs';
 import { isOpenTask } from '../task-liveness.mjs';
 import { findTaskTwin } from '../task-duplicates.mjs';
 import {
@@ -83,6 +83,7 @@ import {
 } from '../agent-memory.mjs';
 import { findMealDeletePaths, isMealSlot } from '../delete-meal.mjs';
 import { explodeCompoundDumpTitle } from '../clare-dump.mjs';
+import { DUE_TIME_FIELD, taskBlockWrite, TIME_BLOCK_FIELDS } from '../task-block-write.mjs';
 
 const CN_OPS = ['upsert_field', 'append_line', 'replace_section', 'delete_lines', 'condense'];
 
@@ -142,7 +143,10 @@ function buildProposal({ agentSlug, intent, writes, surfaces = ['governance_log'
       path: write.path,
       mode: write.mode || 'create',
       content: write.content,
-      diff: write.diff || `${write.mode || 'create'} ${write.path}`
+      diff: write.diff || `${write.mode || 'create'} ${write.path}`,
+      ...(typeof write.title === 'string' && write.title.trim()
+        ? { title: write.title.trim() }
+        : {})
     })),
     surfaces
   };
@@ -534,7 +538,7 @@ export function shortcutSchemas() {
     create_task: {
       name: 'create_task',
       description:
-        `Create one or more Tasks Hub rows immediately. Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (at most ${CREATE_TASK_MAX_ITEMS}; call again for more). Omit due_date only when the work is not for today — otherwise it lands on Today. NEVER merge distinct actions into one title — use items[] for related rows on one Confirm. Never mention this limit or the tool name in chat.`,
+        `Create one or more Tasks Hub rows immediately. Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (at most ${CREATE_TASK_MAX_ITEMS}; call again for more). Omit due_date only when the work is not for today — otherwise it lands on Today. due_time is a deadline only ("due by 5pm"). When Adam time-blocks ("3–4pm", "at 3 for 15 min"), pass start_time + end_time instead: the task gets a linked block on the calendar. NEVER merge distinct actions into one title — use items[] for related rows on one Confirm. Never mention this limit or the tool name in chat.`,
       input_schema: {
         type: 'object',
         properties: {
@@ -543,7 +547,8 @@ export function shortcutSchemas() {
           domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
           priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
           due_date: { type: 'string', description: 'YYYY-MM-DD' },
-          due_time: { type: 'string' },
+          due_time: DUE_TIME_FIELD,
+          ...TIME_BLOCK_FIELDS,
           parent_project_id: { type: 'string' },
           parent_task_id: { type: 'string' },
           estimated_duration: { type: 'number' },
@@ -577,7 +582,8 @@ export function shortcutSchemas() {
                 domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
                 priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
                 due_date: { type: 'string' },
-                due_time: { type: 'string' },
+                due_time: DUE_TIME_FIELD,
+          ...TIME_BLOCK_FIELDS,
                 parent_project_id: { type: 'string' },
                 parent_task_id: { type: 'string' },
                 estimated_duration: { type: 'number' },
@@ -603,7 +609,7 @@ export function shortcutSchemas() {
     update_task: {
       name: 'update_task',
       description:
-        'Patch an existing Tasks Hub row (Confirm). Call get_task first when appending so you know the current shape. Use append_description to add notes without replacing the rest of the task. To move several timed tasks in one Confirm, pass items[{task_id, due_date, due_time, ...}] — do not fire one update_task per row.',
+        'Patch an existing Tasks Hub row (Confirm). Call get_task first when appending so you know the current shape. Use append_description to add notes without replacing the rest of the task. due_time is a deadline only; to time-block a task pass start_time + end_time (adds a linked calendar block). To move or block several tasks in one Confirm, pass items[{task_id, due_date, due_time, start_time, end_time, ...}] — do not fire one update_task per row.',
       input_schema: {
         type: 'object',
         properties: {
@@ -615,7 +621,8 @@ export function shortcutSchemas() {
           priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
           domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
           due_date: { type: 'string' },
-          due_time: { type: 'string' },
+          due_time: DUE_TIME_FIELD,
+          ...TIME_BLOCK_FIELDS,
           target_date: { type: 'string' },
           review_at: { type: 'string' },
           parent_project_id: { type: 'string' },
@@ -641,7 +648,8 @@ export function shortcutSchemas() {
                 priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
                 domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
                 due_date: { type: 'string' },
-                due_time: { type: 'string' },
+                due_time: DUE_TIME_FIELD,
+          ...TIME_BLOCK_FIELDS,
                 target_date: { type: 'string' },
                 estimated_duration: { type: 'number' },
                 tags: { type: 'array', items: { type: 'string' } }
@@ -1330,7 +1338,7 @@ async function handleCoordinateRequestCnWrite(ctx, input) {
   }
   const patch = validateCentralNodePatchInput({ section: input.section, op: input.op, payload });
   if (!patch) {
-    return deny('Invalid patch: append_line needs text; upsert_field needs field and text (Today\'s Status only); delete_lines needs match; replace_section and condense need text.');
+    return deny('Invalid patch: append_line needs text; upsert_field needs field and text; delete_lines needs match; replace_section and condense need text.');
   }
   const contentError = centralNodePatchContentError(patch);
   if (contentError) {
@@ -1347,6 +1355,10 @@ async function handleCoordinateRequestCnWrite(ctx, input) {
   const tree = await currentTree(ctx);
   const centralNode = await readTextFile(ctx, tree, CENTRAL_NODE_PATH);
   if (centralNode.text == null) return deny('Central Node is not available.');
+
+  if (!auto && !applyCentralNodePatch(centralNode.text, patch)) {
+    return deny('This change could not be applied to Central Node. Re-propose it, e.g. append_line or replace_section.');
+  }
 
   if (auto) {
     const next = applyCentralNodePatch(centralNode.text, patch);
@@ -1818,6 +1830,9 @@ function normalizeTaskItem(raw) {
     priority,
     due_date: asOptionalString(raw.due_date),
     due_time: asOptionalString(raw.due_time),
+    start_time: asOptionalString(raw.start_time),
+    end_time: asOptionalString(raw.end_time),
+    block_date: asOptionalString(raw.block_date),
     parent_project_id: asOptionalString(raw.parent_project_id),
     parent_task_id: asOptionalString(raw.parent_task_id),
     estimated_duration: estimated,
@@ -1856,7 +1871,11 @@ function collectCreateTaskItems(input) {
         title: part.title,
         domain: part.domain || item.domain,
         priority: part.priority || item.priority,
-        due_date: part.due_date || item.due_date
+        due_date: part.due_date || item.due_date,
+        // One slot cannot hold several split-out tasks: they go on the day unblocked.
+        start_time: null,
+        end_time: null,
+        block_date: null
       });
     }
   }
@@ -1913,10 +1932,8 @@ async function handleCreateTask(ctx, input) {
   if (items.length > CREATE_TASK_MAX_ITEMS) {
     return deny(`at most ${CREATE_TASK_MAX_ITEMS} tasks per create_task call`);
   }
-  // Sara may only create health-domain tasks (Medical Overview ↔ Tasks).
+  // Sara's tasks land in the health domain (Medical Overview ↔ Tasks).
   if (ctx.agentSlug === 'sara') {
-    const bad = items.find(item => (item.domain || 'other') !== 'health');
-    if (bad) return deny('Sara create_task is restricted to domain: health');
     for (const item of items) item.domain = 'health';
   }
   // Twins guard: the same work captured twice (a second dump, a re-run turn, re-worded
@@ -1953,18 +1970,24 @@ async function handleCreateTask(ctx, input) {
 
   const now = new Date().toISOString();
   const today = typeof ctx.today === 'string' && ctx.today.trim() ? ctx.today.trim() : null;
-  const writes = kept.map(item => {
+  const blockWrites = [];
+  const taskWrites = kept.map(item => {
     const id = newTaskId();
     const twin = flagged.get(item);
+    const record = buildTaskRecord(item, { id, now, today });
+    const block = taskBlockWrite(record, item, now, { today });
+    if (block) blockWrites.push(block);
     return {
       path: `tasks:task:${id}`,
       mode: 'create',
-      content: serializeJson(buildTaskRecord(item, { id, now, today })),
+      content: serializeJson(record),
       diff: twin
         ? `new task: ${item.title} (possible duplicate of open task “${twin.title}”)`
         : `new task: ${item.title}`
     };
   });
+  // Task rows first: results[i] lines up with taskWrites[i] below.
+  const writes = [...taskWrites, ...blockWrites];
   const proposal = buildProposal({
     agentSlug: ctx.agentSlug,
     intent: kept.length === 1 ? `Create task: ${kept[0].title}` : `Create ${kept.length} tasks`,
@@ -1979,7 +2002,7 @@ async function handleCreateTask(ctx, input) {
       blobStores: { tasks: ctx.tasksStore }
     });
     if (!applied.ok) return deny(applied.error || 'create_failed');
-    const tasks = writes.map((write, index) => {
+    const tasks = taskWrites.map((write, index) => {
       const record = JSON.parse(write.content);
       const stamp = applied.results[index]?.updated_at;
       if (stamp) {
@@ -2026,7 +2049,44 @@ function buildUpdateTaskPatch(input) {
   return patch;
 }
 
-function handleUpdateTask(ctx, input) {
+/** A linked work block for update_task's start_time + end_time (the deadline is untouched). */
+async function resolveKnownTask(ctx, taskId) {
+  const listed = Array.isArray(ctx.openTasks) ? ctx.openTasks.find(task => task?.id === taskId) : null;
+  if (listed) return listed;
+  if (!ctx.tasksStore || !taskId) return null;
+  try {
+    const record = await getTasksJSON(ctx.tasksStore, taskKey(taskId));
+    return record && typeof record === 'object' ? record : null;
+  } catch {
+    return null;
+  }
+}
+
+function updateBlockWrite(ctx, taskId, item, patch, known) {
+  const task = {
+    id: taskId,
+    title: patch.title || known?.title || 'Planned work',
+    due_date: patch.due_date || known?.due_date || null,
+    parent_project_id: known?.parent_project_id ?? null,
+    depth: patch.depth || known?.depth || null
+  };
+  const today = typeof ctx.today === 'string' && ctx.today.trim() ? ctx.today.trim() : null;
+  return taskBlockWrite(task, item, new Date().toISOString(), { today });
+}
+
+function updateTaskIntent(writes) {
+  const taskWrites = writes.filter((write) => /^tasks:task:/.test(String(write?.path || '')));
+  if (!taskWrites.length) {
+    return writes.length === 1 ? 'Block time on the calendar' : `Block ${writes.length} calendar slots`;
+  }
+  if (taskWrites.length === 1) {
+    const title = typeof taskWrites[0].title === 'string' ? taskWrites[0].title.trim() : '';
+    return title ? `Update ${title}` : `Update task ${taskWrites[0].path.replace('tasks:task:', '')}`;
+  }
+  return `Update ${taskWrites.length} tasks`;
+}
+
+async function handleUpdateTask(ctx, input) {
   const batchItems = Array.isArray(input?.items)
     ? input.items.slice(0, CREATE_TASK_MAX_ITEMS)
     : null;
@@ -2036,21 +2096,25 @@ function handleUpdateTask(ctx, input) {
       const taskId = asOptionalString(item?.task_id);
       if (!taskId) continue;
       const patch = buildUpdateTaskPatch(item);
-      if (!Object.keys(patch).length) continue;
-      writes.push({
-        path: `tasks:task:${taskId}`,
-        mode: 'append',
-        content: serializeJson(patch),
-        diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`
-      });
+      const known = await resolveKnownTask(ctx, taskId);
+      const block = updateBlockWrite(ctx, taskId, item, patch, known);
+      if (!Object.keys(patch).length && !block) continue;
+      if (Object.keys(patch).length) {
+        writes.push({
+          path: `tasks:task:${taskId}`,
+          mode: 'append',
+          content: serializeJson(patch),
+          diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`,
+          ...(known?.title ? { title: known.title } : {})
+        });
+      }
+      if (block) writes.push(block);
     }
     if (!writes.length) return deny('update_task items[] need task_id and at least one field');
     return propose(
       buildProposal({
         agentSlug: ctx.agentSlug,
-        intent: writes.length === 1
-          ? `Update task ${writes[0].path.replace('tasks:task:', '')}`
-          : `Update ${writes.length} tasks`,
+        intent: updateTaskIntent(writes),
         surfaces: ['confirm_card', 'governance_log'],
         writes
       })
@@ -2059,18 +2123,25 @@ function handleUpdateTask(ctx, input) {
   const taskId = asOptionalString(input?.task_id);
   if (!taskId) return deny('task_id is required');
   const patch = buildUpdateTaskPatch(input);
-  if (!Object.keys(patch).length) return deny('update_task needs at least one field to change');
+  const known = await resolveKnownTask(ctx, taskId);
+  const block = updateBlockWrite(ctx, taskId, input, patch, known);
+  if (!Object.keys(patch).length && !block) return deny('update_task needs at least one field to change');
+  const writes = [
+    ...(Object.keys(patch).length ? [{
+      path: `tasks:task:${taskId}`,
+      mode: 'append',
+      content: serializeJson(patch),
+      diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`,
+      ...(known?.title ? { title: known.title } : {})
+    }] : []),
+    ...(block ? [block] : [])
+  ];
   return propose(
     buildProposal({
       agentSlug: ctx.agentSlug,
-      intent: `Update task ${taskId}`,
+      intent: updateTaskIntent(writes),
       surfaces: ['confirm_card', 'governance_log'],
-      writes: [{
-        path: `tasks:task:${taskId}`,
-        mode: 'append',
-        content: serializeJson(patch),
-        diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`
-      }]
+      writes
     })
   );
 }

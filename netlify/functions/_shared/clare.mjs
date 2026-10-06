@@ -208,6 +208,13 @@ export function backlogTitles(tasks) {
     .filter(Boolean);
 }
 
+function blockSpan(start, end) {
+  const hhmm = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  if (!hhmm.test(String(start ?? '')) || !hhmm.test(String(end ?? ''))) return 0;
+  const mins = value => Number(value.slice(0, 2)) * 60 + Number(value.slice(3));
+  return Math.max(0, mins(end) - mins(start));
+}
+
 function proposalFromDumpItem(item, frameworks, calibration, protocolId) {
   const proposal = buildProposal(
     {
@@ -221,8 +228,17 @@ function proposalFromDumpItem(item, frameworks, calibration, protocolId) {
     frameworks,
     calibration
   );
+  // A dumped slot ("3–3:15pm") is planned time: its length is the estimate, and
+  // accepting the proposal adds a block linked to the task.
+  const span = blockSpan(item.start_time, item.end_time);
   return {
     ...proposal,
+    ...(span ? {
+      start_time: item.start_time,
+      end_time: item.end_time,
+      proposed_minutes: span,
+      suggested_accepted_minutes: span
+    } : {}),
     dump_kind: item.kind,
     question: item.question
   };

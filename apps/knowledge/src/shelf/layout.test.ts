@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import type { PageManifestEntry } from "../domain/page";
 import { buildShelf } from "./model";
-import { COVER_GAP, COVER_SET_GAP, packCovers } from "./layout";
+import { parseShelfData } from "./schema";
+import { COVER_GAP, COVER_SET_GAP, EXIT_BAR, EXIT_OPEN, layoutDescent, packCovers } from "./layout";
 
 const notebooks = ["A", "A", "A", "B", "B", "C"];
 const books = buildShelf([], {
@@ -19,6 +21,37 @@ describe("packCovers", () => {
       expect(used).toBeLessThanOrEqual(shelf);
     }
     expect(rows[0]!.sets.map(s => s.books.length)).toEqual([3, 1]);
+  });
+
+  it("keeps unselected leads as bars beside their note and opens only the selected note", () => {
+    const entry = (id: string, title: string, book: string, extra: Partial<PageManifestEntry> = {}): PageManifestEntry =>
+      ({ id, title, area: "notes", tags: [], excerpt: "", origins: [{ kind: "book", label: book }], ...extra });
+    const alpha = buildShelf([
+      entry("a", "Memory boards", "The Knowledge Gene", { connected: ["c", "d"] }),
+      entry("b", "A later chapter", "The Knowledge Gene", { connected: ["e"] }),
+      entry("c", "Basal ganglia", "The Neural Mind"),
+      entry("d", "Sleep", "Purves"),
+      entry("e", "Cortex", "Clinical Neuroanatomy"),
+    ], parseShelfData({
+      books: [{ label: "The Knowledge Gene", pages: 120 }],
+      placements: [
+        { pageId: "a", page: 12 },
+        { pageId: "b", page: 70 },
+        { pageId: "c", page: 4 },
+        { pageId: "e", page: 9 },
+      ],
+    })).find(book => book.label === "The Knowledge Gene")!;
+    const closed = layoutDescent(alpha, 800);
+    expect(closed.exits.map(exit => exit.height)).toEqual([EXIT_BAR, EXIT_BAR, EXIT_BAR]);
+    const bCard = closed.cards.find(card => card.note.id === "b")!;
+    const bExit = closed.exits.find(exit => exit.fromId === "b")!;
+    expect(Math.abs(bExit.top - (bCard.top + 8))).toBeLessThan(30);
+    const open = layoutDescent(alpha, 800, "a");
+    expect(open.exits.filter(exit => exit.fromId === "a").every(exit => exit.open && exit.height === EXIT_OPEN)).toBe(true);
+    const openB = open.cards.find(card => card.note.id === "b")!;
+    const openBExit = open.exits.find(exit => exit.fromId === "b")!;
+    expect(openBExit.height).toBe(EXIT_BAR);
+    expect(Math.abs(openBExit.top - openB.top)).toBeLessThan(40);
   });
 
   it("stands each cover at a stable height near 3:2", () => {

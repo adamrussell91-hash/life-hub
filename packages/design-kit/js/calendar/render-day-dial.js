@@ -17,6 +17,7 @@ import { buildZoomPills, settleZoomPills } from './zoom-pills.js';
 import { clock12, holidayRun, lightsOutFor, tomorrow as tomorrowBrief, tonight as tonightBrief } from './day-brief.js';
 import { acceptPlan, GHOST_AGENTS } from './ghost-writes.js';
 import { buildTidelineModel, isSchoolHoliday, toHour } from './tideline-model.js';
+import { weekLabel } from '../school-time.js';
 import { getSydneyMinutesOfDay } from '../sydney-clock.js';
 import {
   countByFilterKey,
@@ -26,7 +27,8 @@ import {
   readFilterState
 } from './calendar-filter.js';
 import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
-import { saveCalendarItem } from './calendar-item-actions.js';
+import { canTickItem, isItemDone, saveCalendarItem, toggleItemDone } from './calendar-item-actions.js';
+import { offerTimedUndo } from '../hub-feedback.js';
 import { presetBand } from './render-tideline.js';
 import { clock as medClock, doseCandidate, MEDICATION, toHHMM } from './medication-model.js';
 import { bookmarkMoment, tonightFit, trackedHours } from './day-sense.js';
@@ -36,6 +38,14 @@ import { openRescueSheet } from './rescue-sheet.js';
 import { morphPairs, playArcs } from './rescue-morph.js';
 import { openDayReview } from './day-review-sheet.js';
 import { disablePush, enablePush, pushState } from '../push-client.js';
+import { chartSvg, mountReadinessPanel, openCheckin, todayForecast } from './readiness-panel.js';
+import { WEATHER_STATES } from './readiness-model.js';
+import {
+  agentsReworking, bezelDoses, bigEvent, COMPLICATIONS, duration, faceById, FACES, hourIn, moonFill,
+  readFaceChoice, resolveFace, stepFace, taskTally, tripOn, writeFaceChoice
+} from './dial-faces.js';
+import { drawBezel, drawCorey, drawDress, drawGmtHand, drawMoon, drawRetro, drawTourbillon, drawWeatherRing } from './dial-complications.js';
+import { onCheckinsChange, withCheckins } from './readiness-checkins.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -91,6 +101,17 @@ let doc = null;
 let host = null;
 let input = null;
 let model = null;
+/** input.events plus shared check-ins, for this paint. */
+let events = [];
+let unsubCheckins = null;
+/** Watch faces: the viewer's choice ('auto' or a face id), the face drawn now, the caseback. */
+let faceChoice = null;
+let face = { id: 'tool', auto: true };
+let flipped = false;
+/** Travel trips for Pilot GMT: { status: 'idle'|'loading'|'ready'|'error', list: Trip[] }. */
+const trips = { status: 'idle', list: [] };
+let swipe = null;
+let swallowClick = false;
 let engine = null;
 let root = null;
 let svg = null;
@@ -513,8 +534,10 @@ const sleepWall = bands => ({ id: 'sleep', h1: bands[bands.length - 1].to, h2: b
 
 function buildModel() {
   nowHour = Number.isFinite(input.nowHour) ? input.nowHour : getSydneyMinutesOfDay(input.now ?? new Date()) / 60;
+  // Check-ins ride along as events so the gauge, week and panel share one number.
+  events = withCheckins(input.events ?? [], { apiFetch: input?.apiFetch, today: input.today });
   model = buildTidelineModel({
-    events: input.events ?? [],
+    events,
     visual: input.visual ?? null,
     ghosts: ghostsNow().filter(ghost => ghost.status !== 'dismissed'),
     week: input.week,
@@ -523,6 +546,30 @@ function buildModel() {
     dayProfile: input.dayProfile ?? null,
     terms: input.terms ?? null
   });
+}
+
+/** Today's gauge and caseback show the readiness forecast on every hub; check-ins load from whichever API the hub has. */
+function readinessCtx() {
+  const today = dayAt(input.today);
+  if (!today) return null;
+  const hhmm = value => {
+    const m = /^(\d{2}):(\d{2})$/.exec(String(value ?? ''));
+    return m ? Number(m[1]) + Number(m[2]) / 60 : null;
+  };
+  const sleepAt = hhmm(input.dayProfile?.sleep);
+  return {
+    doc,
+    date: input.today,
+    nowHour,
+    now: input.now ?? new Date(),
+    events,
+    cap: today.cap,
+    items: (today.chips ?? []).filter(chip => !chip.ambient && !chip.ghost).map(chip => ({ start: chip.start, end: chip.end, kind: chip.kind, isClass: chip.isClass, protected: chip.protected, title: chip.title })),
+    apiFetch: input?.apiFetch,
+    wake: hhmm(input.dayProfile?.wake) ?? 6.5,
+    lightsOut: sleepAt != null ? Math.min(23.5, Math.max(20, sleepAt + 0.5)) : 22.5,
+    onRepaint: () => { if (mountedFor) repaintAfter(0); }
+  };
 }
 
 /** "Thursday 24/09/26 · T3 W10" and, for today, "6:05 pm · second-last school day of term". */
@@ -536,6 +583,170 @@ function periodCopy() {
   const nextTag = next ? dayAt(next)?.tag?.text ?? '' : '';
   const note = /^Last day T/.test(nextTag) ? 'second-last school day of term' : tag;
   return { title, note: note ? `${clock12(nowHour)} · ${note}` : clock12(nowHour) };
+}
+
+/* ======================================================================== 2b. Watch faces */
+
+/** Today's running work session (a deep-work block you started), if any. */
+function runningSession(date) {
+  if (date !== input.today) return null;
+  return (dayAt(date)?.actual ?? []).find(span => span.open && span.kind !== 'workout') ?? null;
+}
+
+function faceContext(date) {
+  const day = dayAt(date);
+  return {
+    date,
+    today: input.today,
+    nowHour,
+    weekday: weekday(date),
+    holiday: isHoliday(date),
+    chips: day?.chips ?? [],
+    trips: trips.list,
+    working: Boolean(runningSession(date))
+  };
+}
+
+function currentFace() {
+  if (faceChoice == null) faceChoice = readFaceChoice(input?.hub || 'life', doc?.defaultView?.localStorage);
+  return resolveFace(faceChoice, faceContext(state.day));
+}
+
+function chooseFace(choice) {
+  faceChoice = choice;
+  writeFaceChoice(input?.hub || 'life', choice, doc?.defaultView?.localStorage);
+  flipped = false;
+  mount({ entrance: false });
+  announce(`${faceById(face.id).title}${face.auto ? ', picked for this day' : ''}`);
+}
+
+/** Pilot GMT needs Travel's trips (with each city's time zone). Every hub; fetched once a session. */
+function loadTrips() {
+  if (trips.status !== 'idle' || typeof input?.apiFetch !== 'function') return;
+  trips.status = 'loading';
+  const fetchJson = async url => {
+    const response = await input.apiFetch(url);
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || payload?.ok === false) throw new Error(`travel ${response.status}`);
+    return payload?.data ?? payload;
+  };
+  void (async () => {
+    try {
+      const { trips: summaries = [] } = await fetchJson('/api/travel-trips');
+      const horizon = addDays(input.today, 60);
+      const wanted = summaries.filter(t => t?.id && t.end_date >= addDays(input.today, -7) && t.start_date <= horizon).slice(0, 4);
+      const full = await Promise.all(wanted.map(t => fetchJson(`/api/travel-trip?id=${encodeURIComponent(t.id)}`).then(d => d?.trip ?? null).catch(() => null)));
+      trips.list = full.filter(Boolean);
+      trips.status = 'ready';
+    } catch {
+      trips.status = 'error';
+    }
+    if (mountedFor && trips.list.length) repaintAfter(0);
+  })();
+}
+
+function addDays(date, n) {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The GMT hand's "other place": the trip on this day, else the next trip within 60 days. */
+function gmtTarget(date) {
+  const on = tripOn(date, trips.list);
+  if (on?.city) return { ...on, during: true };
+  const next = [...trips.list].filter(t => t.start_date > date).sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
+  const city = next?.cities?.find(c => c?.tz) ?? null;
+  return city ? { trip: next, city: { name: city.name, tz: city.tz }, homeTz: next.home_tz || 'Australia/Sydney', during: false } : null;
+}
+
+function faceSubtitle(date) {
+  const def = faceById(face.id);
+  if (!face.auto) return 'Chosen by you';
+  if (face.id === 'grand') return `Auto · ${bigEvent(date, dayAt(date)?.chips ?? [])?.title ?? 'a big day'}`;
+  if (face.id === 'pilot') return `Auto · ${tripOn(date, trips.list)?.city?.name ?? 'travelling'}`;
+  if (face.id === 'focus') return `Auto · ${runningSession(date)?.title ?? 'deep work'}`;
+  if (face.id === 'dress') return `Auto · ${weekday(date) ? 'holidays' : 'weekend'}`;
+  return `Auto · ${def.when.replace(/^Auto on /, '')}`;
+}
+
+function mountFaceBar(cell) {
+  const def = faceById(face.id);
+  const bar = el('div', 'dd-face', undefined, cell, { 'data-part': 'face-bar' });
+  el('button', 'dd__round dd-face__step', ICON.prev, bar, { type: 'button', 'aria-label': 'Previous face', 'data-face-step': '-1' });
+  el('div', 'dd-face__name', `<b>${escapeHtml(def.title)}</b><span>${escapeHtml(faceSubtitle(state.day))}</span>`, bar, { 'data-part': 'face-name', 'aria-live': 'polite' });
+  el('button', 'dd__round dd-face__step', ICON.next, bar, { type: 'button', 'aria-label': 'Next face', 'data-face-step': '1' });
+  el('button', 'dd-face__auto', face.auto ? 'Auto' : 'Auto off', bar, {
+    type: 'button',
+    'aria-pressed': String(face.auto),
+    'data-face-auto': '',
+    title: face.auto ? 'The face is picked for each day' : 'Tap to let each day pick its face again'
+  });
+}
+
+function mountFaceFooter(cell) {
+  const def = faceById(face.id);
+  const date = state.day;
+  const event = face.id === 'grand' ? bigEvent(date, dayAt(date)?.chips ?? []) : null;
+  if (def.comps.includes('countdown')) {
+    let text = event ? `${event.title} today` : 'Nothing big today';
+    if (event?.start != null && date === input.today) {
+      text = nowHour < event.start ? `${event.title} in ${duration(event.start - nowHour)}` : `${event.title} · under way`;
+    }
+    el('p', 'dd-face__plaque', escapeHtml(text), cell, { 'data-part': 'countdown' });
+  }
+  const dots = el('div', 'dd-face__dots', undefined, cell, { role: 'group', 'aria-label': 'Watch faces', 'data-part': 'face-dots' });
+  for (const f of FACES) {
+    el('button', '', '', dots, { type: 'button', 'aria-label': f.title, 'aria-current': String(f.id === face.id), 'data-face-pick': f.id });
+  }
+  el('p', 'dd-face__hint', 'Swipe the dial to change face · tap the centre to turn it over', cell);
+  const about = el('details', 'dd-face__about', undefined, cell, { 'data-part': 'face-about' });
+  el('summary', '', `About ${escapeHtml(def.title)}`, about);
+  const list = el('ul', '', undefined, about);
+  for (const id of def.comps) {
+    const c = COMPLICATIONS[id];
+    const note = complicationNote(id);
+    el('li', '', `<b>${escapeHtml(c.name)}</b> <span>· ${escapeHtml(c.watch)}</span><p>${escapeHtml(c.text)}${note ? ` <em>${escapeHtml(note)}</em>` : ''}</p>`, list);
+  }
+  if (!def.comps.length) {
+    el('li', '', '<b>No complications</b> <span>· dress watch</span><p>Black lacquer and gold. Readiness is the fine gold arc; classes are filled diamonds, tasks and meetings outlined ones, Corey time champagne. Your evening is a whisper of champagne at the rim; the night is the darker crescent. Everything is still listed beside the dial.</p>', list);
+  }
+  el('p', 'dd-face__when', escapeHtml(FACES.map(f => `${f.title}: ${f.when.replace(/^Auto /, '')}`).join(' · ')), about);
+}
+
+/** What a complication is waiting on, when it can't show anything yet. */
+function complicationNote(id) {
+  const date = state.day;
+  const isToday = date === input.today;
+  if (id === 'weather' && !isToday) return 'Shown for today only.';
+  if (id === 'weather' && !readinessCtx()) return 'Needs the Life readiness forecast.';
+  if ((id === 'gmt' || id === 'corey') && !gmtTarget(date)) return trips.status === 'loading' ? 'Loading trips…' : 'Shows when a trip is in Travel.';
+  if ((id === 'gmt' || id === 'corey') && !isToday) return 'Shown for today only.';
+  if (id === 'bezel' && !bezelDoses(dayAt(date)?.med, nowHour, isToday).length) return 'No dose logged this day.';
+  return '';
+}
+
+/** The caseback: today's outlook (or the day's number and note on another day). */
+function mountCaseback(back) {
+  const date = state.day;
+  const cap = dayAt(date)?.cap ?? { pct: 0, note: '' };
+  const inner = el('div', 'dd-cb', undefined, back);
+  el('p', 'dd-h', date === input.today ? 'Caseback · today’s outlook' : `Caseback · ${escapeHtml(dayLabel(date))}`, inner);
+  const ctx = date === input.today ? readinessCtx() : null;
+  if (ctx) {
+    const { view } = todayForecast(ctx);
+    el('div', 'dd-cb__big', `${view.readiness.score}<small>/100 · ${escapeHtml(WEATHER_STATES[view.state]?.name ?? '')}</small>`, inner);
+    el('p', 'dd-cb__why', escapeHtml(view.explanation), inner);
+    inner.append(chartSvg(doc, view.projection, { nowHour, width: 300, height: 120 }));
+    const cards = el('div', 'dd-cb__cards', undefined, inner);
+    for (const seg of view.projection.segments) {
+      el('div', 'dd-cb__card', `<span>${escapeHtml(clock12(seg.from).replace(':00', ''))}</span><b>${seg.score}</b><i>${escapeHtml(WEATHER_STATES[seg.state]?.name ?? '')}</i>`, cards);
+    }
+  } else {
+    el('div', 'dd-cb__big', `${cap.pct}<small>${cap.forecast ? ' · forecast' : ''}</small>`, inner);
+    if (cap.note) el('p', 'dd-cb__why', escapeHtml(cap.note), inner);
+  }
+  el('button', 'btn btn--secondary', 'Back to the dial', inner, { type: 'button', 'data-flip': '' });
 }
 
 /* ======================================================================== 3. Mount */
@@ -597,9 +808,11 @@ function mount({ entrance = false } = {}) {
   buildModel();
   profileSleep = model.bands[model.bands.length - 1]?.to ?? 22;
   lightsOut = lightsOutFor(state.day, ghostsNow(), profileSleep);
+  loadTrips();
+  face = currentFace();
 
   host.replaceChildren();
-  root = el('section', 'dd', undefined, host, { 'data-part': 'day-dial', 'aria-label': 'Day' });
+  root = el('section', `dd dd--face-${face.id}`, undefined, host, { 'data-part': 'day-dial', 'aria-label': 'Day', 'data-face': face.id });
 
   const period = periodCopy();
   const nav = el('header', 'dd__nav', undefined, root, { 'data-part': 'nav' });
@@ -649,10 +862,18 @@ function mount({ entrance = false } = {}) {
   svg.setAttribute('height', String(rings.height));
   svg.setAttribute('role', 'img');
   svg.setAttribute('data-part', 'dial');
-  svg.setAttribute('aria-label', `${dayLabel(state.day)}: a 24-hour dial with noon at the top`);
-  attach(cell, svg);
+  svg.setAttribute('aria-label', `${dayLabel(state.day)}: ${faceById(face.id).title}, a 24-hour dial with noon at the top`);
+  mountFaceBar(cell);
+  const watch = el('div', `dd-watch${flipped ? ' is-back' : ''}`, undefined, cell, { 'data-part': 'watch', 'data-face': face.id });
+  watch.style.width = `${size}px`;
+  watch.style.height = `${rings.height}px`;
+  const front = el('div', 'dd-watch__front', undefined, watch, { 'aria-hidden': String(flipped) });
+  attach(front, svg);
+  const back = el('div', 'dd-watch__back', undefined, watch, { 'data-part': 'caseback', 'aria-hidden': String(!flipped) });
   ensureHatch(svg);
   mountDial(size);
+  mountCaseback(back);
+  mountFaceFooter(cell);
   mountSide(side);
   mountPushControl(side);
   handleDeepLink(view, side);
@@ -717,11 +938,14 @@ function mountDial(size) {
   const isToday = date === input.today;
   const day = dayAt(date);
   const cap = day?.cap ?? { pct: 0, note: '', factors: [], forecast: true };
-  s('circle', { class: 'dd-disc', cx, cy, r: R + 8 }, svg);
+  const comps = new Set(faceById(face.id).comps);
+  const g = { s, cx, cy, R, rings };
+  if (face.id === 'dress') return mountDress(g, date, isToday, cap);
+  s('circle', { class: `dd-disc${face.id === 'grand' ? ' is-gold' : ''}`, cx, cy, r: R + 8 }, svg);
 
   // Context ring: the day's bands, plus the sleep wall.
   const bands = bandsFor(date);
-  const ctx = s('g', { 'data-part': 'context-ring' }, svg);
+  const ctx = s('g', { 'data-part': 'context-ring', class: face.id === 'focus' ? 'is-dimmed' : '' }, svg);
   const [c1, c2] = rings.context;
   const segs = [sleepWall(bands), ...bands.map(band => ({ id: band.id, h1: band.from, h2: band.to }))];
   for (const seg of segs) {
@@ -757,6 +981,8 @@ function mountDial(size) {
     const r2 = R * 0.696;
     const medRing = s('g', { 'data-part': 'med-ring' }, svg);
     for (const dose of med.doses) {
+      // On a dive-bezel face the logged dose moves out to the bezel; gaps stay here.
+      if (dose.status === 'taken' && comps.has('bezel')) continue;
       if (dose.status === 'taken') {
         const band = s('path', { class: `dd-med${dose.late ? ' is-late' : ''}`, d: arcPath(cx, cy, r1, r2, dose.window[0], Math.min(24, dose.window[1])) }, medRing);
         s('title', {}, band, `${MEDICATION.short} ${dose.slot === 'am' ? 'morning' : 'afternoon'} dose at ${medClock(dose.time)}${dose.late ? ' (later than usual)' : ''} · drawn as about ${MEDICATION.effectHours} h`);
@@ -787,11 +1013,17 @@ function mountDial(size) {
   const ev = s('g', { 'data-part': 'event-ring' }, svg);
   const ghosts = ghostsNow();
   const chips = chipsFor(date);
+  // Focus: everything but the block you're working in steps back.
+  const running = face.id === 'focus' ? runningSession(date) : null;
+  const inFocus = chip => !running
+    ? chip.start <= nowHour && chip.end > nowHour
+    : String(chip.title ?? '').includes(running.title) || String(running.title ?? '').includes(String(chip.title ?? '-'));
   for (const chip of chips) {
     const proposal = ghosts.find(ghost => ghost.overItem === chip.id && ghost.status === 'pending');
     const inset = chip.isClass ? 4 : 2;
     const texture = chip.texture && !['fixed', 'focus', 'protected'].includes(chip.texture) ? `tx-${chip.texture}` : '';
-    const cls = ['dd-arc', `k-${chip.kind}`, chip.isClass ? 'is-class' : '', proposal ? 'is-proposal' : '', chip.skipped ? 'is-skipped' : '', texture, chip.regained ? 'is-regained' : ''].filter(Boolean).join(' ');
+    const dim = face.id === 'focus' && isToday && !inFocus(chip);
+    const cls = ['dd-arc', `k-${chip.kind}`, chip.isClass ? 'is-class' : '', proposal ? 'is-proposal' : '', chip.skipped ? 'is-skipped' : '', chip.done ? 'is-done' : '', texture, chip.regained ? 'is-regained' : '', dim ? 'is-dimmed' : '', face.id === 'focus' && isToday && !dim ? 'is-focus' : ''].filter(Boolean).join(' ');
     nodes.set(`arc:${chip.id}`, s('path', {
       class: cls,
       tabindex: 0,
@@ -900,6 +1132,8 @@ function mountDial(size) {
     s('title', {}, circle, `${title} · ${clock12(dot.h)}`);
   }
 
+  if (comps.has('bezel')) drawBezel(g, svg, bezelDoses(day?.med, nowHour, isToday));
+
   // Hour ticks and labels
   for (let hour = 0; hour < 24; hour++) {
     const a = point(cx, cy, R - 2, hour);
@@ -975,8 +1209,26 @@ function mountDial(size) {
     }
   }
 
-  // Centre: capacity gauge
-  const gauge = s('g', { 'data-part': 'gauge', 'data-pct': cap.pct }, svg);
+  // Weather ring (today, Life): the hourly readiness line, coloured by condition.
+  if (comps.has('weather') && isToday) {
+    const ctxR = readinessCtx();
+    if (ctxR) {
+      const { view } = todayForecast(ctxR);
+      const families = Object.fromEntries(Object.entries(WEATHER_STATES).map(([id, st]) => [id, st.family]));
+      drawWeatherRing(g, svg, { points: view.projection.points, segments: view.projection.segments, families, nowHour });
+    }
+  }
+
+  // Centre: capacity gauge. Tap it to turn the watch over.
+  const gauge = s('g', {
+    'data-part': 'gauge',
+    'data-pct': cap.pct,
+    class: 'dd-gauge-btn',
+    role: 'button',
+    tabindex: 0,
+    'aria-label': `${cap.pct}%. Turn the watch over for the day’s outlook.`
+  }, svg);
+  s('circle', { class: 'dd-gauge-hit', cx, cy, r: rings.gauge + rings.gaugeWidth / 2 }, gauge);
   s('circle', { class: 'dd-gauge-track', cx, cy, r: rings.gauge, 'stroke-width': rings.gaugeWidth }, gauge);
   nodes.set('gauge', s('circle', {
     class: 'dd-gauge',
@@ -986,16 +1238,30 @@ function mountDial(size) {
     stroke: capColour(cap.pct),
     transform: `rotate(-90 ${cx} ${cy})`
   }, gauge));
-  const big = Math.max(28, Math.min(48, rings.gauge * 0.42));
-  // Text boxes (what a reader's eye and the spec measure) reach 1em above the baseline and ~0.25em below.
-  // So the caps line's baseline sits big + 6px above the % baseline: the two boxes never touch.
-  s('text', { class: 'dd-t-caps', x: cx, y: (cy + big * 0.35 - big - 6).toFixed(1) }, gauge, cap.forecast ? 'FORECAST' : 'CAPACITY');
-  nodes.set('pct', s('text', { class: 'dd-t-pct', x: cx, y: (cy + big * 0.35).toFixed(1), 'font-size': big, fill: capColour(cap.pct) }, gauge, `${cap.pct}%`));
-  const noteRoom = rings.gauge * 1.6; // inside the gauge ring, with air
-  s('text', { class: 'dd-t-note', x: cx, y: cy + big * 0.38 + 22 }, gauge, fitText(cap.note, noteRoom, NOTE_FONT));
-  const streak = cap.factors?.find(factor => factor.id === 'streak');
-  if (streak && !rings.compact) {
-    s('text', { class: 'dd-t-note', x: cx, y: cy + big * 0.38 + 38 }, gauge, fitText(streak.label, noteRoom, NOTE_FONT));
+  const centre = comps.has('tourbillon') ? 'grand' : comps.has('moon') ? 'moon' : comps.has('retro') ? 'retro' : null;
+  if (centre) {
+    mountCentre(g, gauge, centre, { cap, date, isToday, day, ghosts });
+  } else {
+    const big = Math.max(28, Math.min(48, rings.gauge * 0.42));
+    // Text boxes (what a reader's eye and the spec measure) reach 1em above the baseline and ~0.25em below.
+    // So the caps line's baseline sits big + 6px above the % baseline: the two boxes never touch.
+    s('text', { class: 'dd-t-caps', x: cx, y: (cy + big * 0.35 - big - 6).toFixed(1) }, gauge, cap.forecast ? 'FORECAST' : 'CAPACITY');
+    nodes.set('pct', s('text', { class: 'dd-t-pct', x: cx, y: (cy + big * 0.35).toFixed(1), 'font-size': big, fill: capColour(cap.pct) }, gauge, `${cap.pct}%`));
+    const noteRoom = rings.gauge * 1.6; // inside the gauge ring, with air
+    s('text', { class: 'dd-t-note', x: cx, y: cy + big * 0.38 + 22 }, gauge, fitText(cap.note, noteRoom, NOTE_FONT));
+    // The old model's low-day streak does not apply to the readiness forecast.
+    const streak = cap.readiness ? null : cap.factors?.find(factor => factor.id === 'streak');
+    if (streak && !rings.compact) {
+      s('text', { class: 'dd-t-note', x: cx, y: cy + big * 0.38 + 38 }, gauge, fitText(streak.label, noteRoom, NOTE_FONT));
+    }
+  }
+
+  // Second time zones (today only: they show the time now somewhere else).
+  if (isToday && (comps.has('gmt') || comps.has('corey'))) {
+    const target = gmtTarget(date);
+    const now = input.now ?? new Date();
+    if (target?.city && comps.has('gmt')) drawGmtHand(g, svg, { hour: hourIn(target.city.tz, now), label: target.city.name });
+    if (target?.during && comps.has('corey')) drawCorey(g, svg, { hour: hourIn(target.homeTz, now) });
   }
 
   // Now hand (today only)
@@ -1005,6 +1271,69 @@ function mountDial(size) {
     // On a compact dial the time is in the Tonight heading; no label outside the ring.
     if (!rings.compact) nodes.set('hand-label', s('text', { class: 'dd-t-now' }, svg, `now ${clock12(nowHour).replace(' pm', '').replace(' am', '')}`));
   }
+}
+
+/** How full the shown week is, for the moon: committed hours across its days. */
+function weekFill() {
+  let hours = 0;
+  for (const day of model?.days ?? []) {
+    for (const chip of day.chips ?? []) {
+      if (chip.ambient || chip.ghost || chip.kind === 'corey' || chip.kind === 'log') continue;
+      if (Number.isFinite(chip.start) && Number.isFinite(chip.end) && chip.end > chip.start) hours += chip.end - chip.start;
+    }
+  }
+  return moonFill(hours);
+}
+
+/** The gauge's centre when a face wears a complication there. Nothing shares space. */
+function mountCentre(g, gauge, centre, { cap, date, day, ghosts }) {
+  const { cx, cy } = rings;
+  const gr = rings.gauge;
+  const big = Math.max(20, Math.min(34, gr * 0.36));
+  const pct = y => ({ class: 'dd-t-pct', x: cx, y: y.toFixed(1), 'font-size': big.toFixed(1), fill: capColour(cap.pct) });
+  if (centre === 'grand') {
+    // Grand: the moon above the number, the tourbillon in its own window below.
+    nodes.set('pct', s('text', pct(cy + big * 0.35), gauge, `${cap.pct}%`));
+    drawMoon(g, gauge, { cx, cy: cy - gr * 0.56, r: gr * 0.13, fill: weekFill() });
+    drawTourbillon(g, gauge, { cx, cy: cy + gr * 0.56, r: gr * 0.2, spinning: agentsReworking(ghosts, date) });
+    return;
+  }
+  const baseline = cy + big * 0.1;
+  s('text', { class: 'dd-t-caps', x: cx, y: (baseline - big - 4).toFixed(1) }, gauge, cap.forecast ? 'FORECAST' : 'CAPACITY');
+  nodes.set('pct', s('text', pct(baseline), gauge, `${cap.pct}%`));
+  if (centre === 'moon') {
+    drawMoon(g, gauge, { cx, cy: cy + gr * 0.46, r: gr * 0.15, fill: weekFill(), label: rings.compact ? '' : (weekLabel(date, model?.terms ?? []) ?? '') });
+    return;
+  }
+  const items = [
+    ...(day?.chips ?? []).filter(chip => chip.kind === 'task'),
+    ...(day?.due ?? []).filter(item => item.kind !== 'allday' && item.kind !== 'promise').map(item => ({ ...item, kind: 'task' }))
+  ];
+  drawRetro(g, gauge, { cx, cy: cy + gr * 0.5, r: gr * 0.26, ...taskTally(items) });
+}
+
+/** Dress watch: the whole face is the drawing. Arcs aren't tappable here; the side list has everything. */
+function mountDress(g, date, isToday, cap) {
+  const bands = bandsFor(date);
+  const yours = bands.find(band => band.id === 'yours');
+  const wall = sleepWall(bands);
+  const items = chipsFor(date).filter(chip => !chip.ambient && Number.isFinite(chip.start) && Number.isFinite(chip.end) && chip.end > chip.start);
+  drawDress(g, svg, {
+    items,
+    pct: cap.pct,
+    nowHour: isToday ? nowHour : null,
+    evening: yours ? [yours.from, yours.to] : [17.5, 22.5],
+    sleep: [wall.h1, wall.h2]
+  });
+  const gauge = s('g', {
+    'data-part': 'gauge',
+    'data-pct': cap.pct,
+    class: 'dd-gauge-btn',
+    role: 'button',
+    tabindex: 0,
+    'aria-label': `Readiness ${cap.pct}. Turn the watch over for the day’s outlook.`
+  }, svg);
+  s('circle', { class: 'dd-gauge-hit', cx: g.cx, cy: g.cy, r: g.R * 0.4 }, gauge);
 }
 
 /** Which dose "Taken now" means: morning until well before the usual afternoon dose. */
@@ -1178,7 +1507,16 @@ function handleDeepLink(view, side) {
       /* not fatal */
     }
   };
-  if (query.get('review') === '1') {
+  if (query.get('checkin') === '1') {
+    // The bubbles live on Life Home now; older pushes still point here.
+    clean();
+    openCheckin(input.today);
+    try {
+      if (view?.location) view.location.hash = '#/home';
+    } catch {
+      /* not fatal */
+    }
+  } else if (query.get('review') === '1') {
     clean();
     queueMicrotask(() => openReview());
   } else if (query.get('bookmark')) {
@@ -1227,14 +1565,29 @@ async function togglePush(button) {
 function mountSide(side) {
   const date = state.day;
   const ghosts = ghostsNow();
+  if (date === input.today) {
+    const ctx = readinessCtx();
+    if (ctx) mountReadinessPanel({ ...ctx, side });
+  }
   mountBookmarkPrompt(side, date);
-  mountTransport(side, date);
-  mountMio(side, date);
   mountReviewEntry(side, date);
-  mountMedication(side, date);
+  // Agenda before Dexy / offers: on phone the side stacks under the dial, and Due
+  // tasks from a Clare dump must not sit below the medication panel.
+  const dayDue = (dayAt(date)?.due ?? [])
+    .filter(item => item.kind !== 'allday' && item.kind !== 'promise' && !item.onGrid)
+    .map(item => ({ id: item.id, title: item.title, time: item.time, meta: item.meta, kind: item.kind, done: item.done === true }));
   if (date === input.today) {
     const plannedDinnerAt = dayAt(date)?.med?.evening?.rows?.find(row => row.at === MEDICATION.dinnerAt)?.at ?? null;
-    const brief = tonightBrief({ date, now: nowHour, chips: chipsFor(date), ghosts, logs: logsFor(date), profileSleep, plannedDinnerAt });
+    const brief = tonightBrief({
+      date,
+      now: nowHour,
+      chips: chipsFor(date),
+      due: dayDue,
+      ghosts,
+      logs: logsFor(date),
+      profileSleep,
+      plannedDinnerAt
+    });
     const section = el('section', '', undefined, side, { 'data-part': 'tonight' });
     el('h4', 'dd-h', 'Tonight', section);
     const by = brief.timeLeft.by ? ` (${escapeHtml(brief.timeLeft.by)})` : '';
@@ -1249,7 +1602,25 @@ function mountSide(side) {
         section, { 'data-part': 'overflow-note' });
     }
     renderRows(el('div', 'dd-rows', undefined, section), brief.rows, ghosts);
+  } else if (dayDue.length) {
+    // Browsing another day: timed work is on the ring; Due still needs a list (Week has one).
+    const section = el('section', '', undefined, side, { 'data-part': 'due' });
+    el('h4', 'dd-h', 'Due', section);
+    renderRows(el('div', 'dd-rows', undefined, section), dayDue.map(d => ({
+      at: 99,
+      time: 'Due',
+      title: d.title,
+      kind: 'task',
+      itemId: d.id,
+      note: d.meta || 'Tasks · open',
+      struck: d.done,
+      ghostId: null,
+      suggestion: null
+    })), ghosts);
   }
+  mountTransport(side, date);
+  mountMio(side, date);
+  mountMedication(side, date);
   const next = model.week[model.week.indexOf(date) + 1];
   if (!next) return;
   const nextDay = dayAt(next);
@@ -1279,7 +1650,10 @@ function renderRows(wrap, rows, ghosts) {
     });
     el('div', 'dd-row__t', row.time, node);
     const mark = row.kind === 'corey' ? '<span class="dd-mark"></span>' : '';
-    const words = el('div', 'dd-row__w', `<b>${mark}${escapeHtml(row.title)}</b><span>${escapeHtml(row.note)}</span>`, node);
+    // Tasks and work blocks tick off right here, the same gesture as the Tasks board.
+    const item = row.itemId ? findDialItem(row.itemId) : null;
+    const tick = item && canTickItem(item) ? tickHtml(item) : '';
+    const words = el('div', 'dd-row__w', `<b>${tick}${mark}${escapeHtml(row.title)}</b><span>${escapeHtml(row.note)}</span>`, node);
     if (!row.ghostId) continue;
     const ghost = ghosts.find(item => item.id === row.ghostId);
     if (!ghost) continue;
@@ -1441,6 +1815,45 @@ function writePreview(ghost) {
 }
 
 /** A chip or Due row on any day of the week, or a log dot on the dial. */
+function tickHtml(item) {
+  const done = isItemDone(item);
+  const label = done ? `Mark ${item.title} not done` : `Mark ${item.title} done`;
+  return `<button type="button" class="cal-tick${done ? ' is-done' : ''}" data-tick="${escapeHtml(item.id)}" aria-pressed="${done}" aria-label="${escapeHtml(label)}" title="${done ? 'Done · tap to reopen' : 'Mark done'}"></button>`;
+}
+
+/** Optimistic tick from a Tonight / Due / Tomorrow row: flips, saves, offers Undo. */
+async function tickItem(id, button) {
+  const item = chipsFor(state.day).find(chip => chip.id === id) ?? findDialItem(id);
+  if (!item || !canTickItem(item) || button.disabled) return;
+  const done = !isItemDone(item);
+  const row = button.closest?.('.dd-row');
+  const flip = on => {
+    row?.classList?.toggle?.('is-struck', on);
+    button.classList?.toggle?.('is-done', on);
+    button.setAttribute('aria-pressed', String(on));
+    nodes.get(`arc:${id}`)?.classList?.toggle?.('is-done', on);
+  };
+  flip(done);
+  button.disabled = true;
+  try {
+    const undo = await toggleItemDone(input?.apiFetch, item);
+    void input?.onSourcesChanged?.();
+    offerTimedUndo({
+      root: doc,
+      message: done ? `Done: ${item.title}` : `Reopened: ${item.title}`,
+      onUndo: () => {
+        void undo().then(() => input?.onSourcesChanged?.())
+          .catch(() => showToast('<b>Not undone.</b> Try again.'));
+      }
+    });
+  } catch (error) {
+    flip(!done);
+    showToast(`<b>Not saved.</b> ${escapeHtml(error?.message || 'Could not reach the server.')}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function findDialItem(id) {
   for (const day of model?.days ?? []) {
     const chip = day.chips.find(entry => entry.id === id);
@@ -1603,9 +2016,48 @@ function step(delta) {
   setDay(model.week[model.week.indexOf(state.day) + delta]);
 }
 
+function setFlipped(next) {
+  flipped = next;
+  const watch = root?.querySelector?.('[data-part="watch"]');
+  if (!watch) return;
+  watch.classList.toggle('is-back', flipped);
+  watch.querySelector('.dd-watch__front')?.setAttribute('aria-hidden', String(flipped));
+  watch.querySelector('.dd-watch__back')?.setAttribute('aria-hidden', String(!flipped));
+  const focusTarget = flipped ? watch.querySelector('[data-flip]') : watch.querySelector('[data-part="gauge"]');
+  focusTarget?.focus?.({ preventScroll: true });
+}
+
 function wire(section) {
+  // Swipe the watch sideways to change face (a tap still opens arcs and the caseback).
+  section.addEventListener('pointerdown', event => {
+    if (!event.target?.closest?.('[data-part="watch"]') || flipped) return;
+    swipe = { x: event.clientX, y: event.clientY };
+  });
+  section.addEventListener('pointerup', event => {
+    if (!swipe) return;
+    const dx = event.clientX - swipe.x;
+    const dy = event.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    swallowClick = true;
+    setTimeout(() => { swallowClick = false; }, 0);
+    chooseFace(stepFace(face.id, dx < 0 ? 1 : -1));
+  });
+  section.addEventListener('pointercancel', () => { swipe = null; });
   section.addEventListener('click', event => {
+    if (swallowClick) {
+      swallowClick = false;
+      event.preventDefault();
+      return;
+    }
     const target = event.target;
+    const faceStep = target.closest?.('[data-face-step]');
+    if (faceStep) return chooseFace(stepFace(face.id, Number(faceStep.getAttribute('data-face-step'))));
+    const facePick = target.closest?.('[data-face-pick]');
+    if (facePick) return chooseFace(facePick.getAttribute('data-face-pick'));
+    if (target.closest?.('[data-face-auto]')) return chooseFace(face.auto ? face.id : 'auto');
+    if (target.closest?.('[data-flip]')) return setFlipped(false);
+    if (target.closest?.('[data-part="gauge"]')) return setFlipped(!flipped);
     const medButton = target.closest?.('[data-med-act]');
     if (medButton) return void saveDose(medButton);
     const accept = target.closest?.('[data-accept]');
@@ -1673,6 +2125,12 @@ function wire(section) {
       }
       return;
     }
+    const tickButton = target.closest?.('[data-tick]');
+    if (tickButton) {
+      event.stopPropagation?.();
+      closePop();
+      return void tickItem(tickButton.getAttribute('data-tick'), tickButton);
+    }
     const arc = target.closest?.('.dd-arc[data-id]');
     if (arc) {
       const id = arc.getAttribute('data-id');
@@ -1702,6 +2160,12 @@ function wire(section) {
   section.addEventListener('keydown', event => {
     const target = event.target;
     if (event.key === 'Escape') closePop();
+    if (event.key === 'Escape' && flipped) setFlipped(false);
+    if ((event.key === 'Enter' || event.key === ' ') && target?.getAttribute?.('data-part') === 'gauge') {
+      event.preventDefault();
+      setFlipped(!flipped);
+      return;
+    }
     if ((event.key === 'Enter' || event.key === ' ') && target?.classList?.contains?.('is-zoomable')) {
       zoomToBand(target.getAttribute('data-band-id'));
       event.preventDefault();
@@ -1801,6 +2265,8 @@ export function renderDayDial(nextDoc, dialHost, nextInput) {
     observer = null;
     mountedFor = dialHost;
     observe();
+    unsubCheckins?.();
+    unsubCheckins = onCheckinsChange(() => { if (mountedFor) repaintAfter(0); });
   }
   const entrance = !playedEntrance;
   if (!entrance && perfNow() < entranceGuardUntil) {
@@ -1819,6 +2285,12 @@ export function unmountDayDial() {
   repaintTimer = 0;
   observer?.disconnect();
   observer = null;
+  unsubCheckins?.();
+  unsubCheckins = null;
+  events = [];
+  faceChoice = null;
+  flipped = false;
+  swipe = null;
   engine?.dispose();
   engine = null;
   nodes.clear();

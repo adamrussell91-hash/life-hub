@@ -11,6 +11,7 @@ import { topicKeywords } from "../archive/keywordGraph";
 import { formatDisplayDate } from "../../design-kit/js/format-display-date.js";
 import { escapeHtml } from "../lib/dom";
 import { hubUtilitiesActionsHtml, titleRowHtml } from "../lib/hubChrome";
+import type { CatalogueHealth } from "../research/catalogue";
 import type { ResearchScope } from "../research/scope";
 import { bindPlayer, episodeName, playerHtml, resetPlayer } from "./playerView";
 import {
@@ -72,7 +73,10 @@ let busy = false;
 let statusNote = "";
 let podcastError = "";
 let current: PodcastEpisode | null = null;
-let library: { episodes: PodcastEpisode[]; series: PodcastSeries[] } = { episodes: [], series: [] };
+let library: { episodes: PodcastEpisode[]; series: PodcastSeries[]; catalogue?: CatalogueHealth } = {
+  episodes: [],
+  series: [],
+};
 let needLibrary = true;
 let libraryLoading = false;
 let pollTimer: number | null = null;
@@ -168,6 +172,14 @@ function runningNote(_episode: PodcastEpisode) {
 
 function formatDate(iso: string) {
   return formatDisplayDate(iso) || iso;
+}
+
+/** Says so when the Worker's searchable copy of the archive has fallen behind. */
+export function catalogueNoticeHtml(health: CatalogueHealth | undefined) {
+  if (!health?.stale) return "";
+  const since = health.caughtUpAt ? `last up to date ${escapeHtml(formatDate(health.caughtUpAt))}` : "not synced yet";
+  const queue = health.pending ? ` · ${health.pending} notes waiting` : "";
+  return `<p class="local-banner podcast-catalogue" role="status">The podcast catalogue is behind (${since}${queue}), so recent notes may be missing from episodes. Book broadcasts on the Wireless still read their notes directly.</p>`;
 }
 
 function canNext(series: PodcastSeries) {
@@ -508,6 +520,7 @@ async function generate(host: PodcastRailHost) {
       });
       current = started.episode;
       library = {
+        ...library,
         series: [started.series, ...library.series.filter(item => item.id !== started.series.id)],
         episodes: [started.episode, ...library.episodes.filter(item => item.id !== started.episode.id)],
       };
@@ -597,6 +610,7 @@ export function renderPodcastRail(host: PodcastRailHost) {
         ${podcastError ? `<p class="alchemist__error">${escapeHtml(podcastError)}</p>` : ""}
       </form>
       <div class="alchemist__results" aria-live="polite">
+        ${catalogueNoticeHtml(library.catalogue)}
         ${currentHtml()}
         <section class="podcast-library" aria-label="Library">
           ${libraryHtml()}

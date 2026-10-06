@@ -1,7 +1,13 @@
 import { z } from "zod";
 
-export const ShelfStanceSchema = z.enum(["supports", "complicates", "extends"]);
-export type ShelfStance = z.infer<typeof ShelfStanceSchema>;
+export const ShelfKindSchema = z.enum(["person", "idea", "case", "debate", "bridge"]);
+export type ShelfKind = z.infer<typeof ShelfKindSchema>;
+/** Fluid kinds need a quoted sentence; crystallised kinds do not. */
+export const FLUID_KINDS = ["debate", "bridge"] as const satisfies readonly ShelfKind[];
+/** When two kinds fit: first wins. `idea` is last — the lazy default. */
+export const KIND_PRECEDENCE = ["debate", "bridge", "case", "person", "idea"] as const satisfies readonly ShelfKind[];
+export const KindBySchema = z.enum(["adam", "clementine", "claude"]);
+export type KindBy = z.infer<typeof KindBySchema>;
 
 export const ChapterSchema = z.object({
   title: z.string(),
@@ -28,7 +34,11 @@ export const PlacementSchema = z.object({
   pageId: z.string(),
   page: z.number().int().positive().optional(),
   guessed: z.boolean().optional(),
-  stance: ShelfStanceSchema.optional(),
+  kind: ShelfKindSchema.optional(),
+  kindGuessed: z.boolean().optional(),
+  kindBy: KindBySchema.optional(),
+  kindReason: z.string().max(300).optional(),
+  kindAt: z.string().optional(),
   gaps: z.array(z.string()).optional(),
   themes: z.array(z.string()).optional(),
   lastOpened: z.string().optional(),
@@ -49,7 +59,21 @@ export const FactsJobSchema = z.object({
 });
 export type FactsJob = z.infer<typeof FactsJobSchema>;
 
-export type ShelfData = { books: ShelfBook[]; placements: Placement[]; factsJob?: FactsJob };
+export const KindsJobSchema = z.object({
+  status: z.enum(["none", "running", "done"]),
+  total: z.number().optional(),
+  finished: z.number().optional(),
+  applied: z.number().optional(),
+  byKind: z.record(z.number()).optional(),
+  guessed: z.number().optional(),
+  downgraded: z.number().optional(),
+  unreadable: z.number().optional(),
+  started_at: z.string().optional(),
+  finished_at: z.string().optional(),
+});
+export type KindsJob = z.infer<typeof KindsJobSchema>;
+
+export type ShelfData = { books: ShelfBook[]; placements: Placement[]; factsJob?: FactsJob; kindsJob?: KindsJob };
 
 /** Drops malformed rows instead of failing the whole shelf. */
 export function parseShelfData(raw: unknown): ShelfData {
@@ -60,10 +84,12 @@ export function parseShelfData(raw: unknown): ShelfData {
       return parsed.success ? [parsed.data] : [];
     });
   const job = FactsJobSchema.safeParse((value as { factsJob?: unknown }).factsJob);
+  const kindsJob = KindsJobSchema.safeParse((value as { kindsJob?: unknown }).kindsJob);
   return {
     books: rows(value.books, ShelfBookSchema),
     placements: rows(value.placements, PlacementSchema),
     ...(job.success ? { factsJob: job.data } : {}),
+    ...(kindsJob.success ? { kindsJob: kindsJob.data } : {}),
   };
 }
 
@@ -81,7 +107,11 @@ export type PlacementInput = {
   pageId: string;
   page?: number | null;
   guessed?: boolean | null;
-  stance?: ShelfStance | null;
+  kind?: ShelfKind | null;
+  kindGuessed?: boolean | null;
+  kindBy?: KindBy | null;
+  kindReason?: string | null;
+  kindAt?: string | null;
   gaps?: string[] | null;
   themes?: string[] | null;
   lastOpened?: string | null;

@@ -17,7 +17,7 @@ function owner(env) { return env.COGNITIVE_OWNER_ID || 'operator'; }
 export function parseListPaging(url) {
   const lim = Number(url.searchParams.get('limit'));
   const off = Number(url.searchParams.get('offset'));
-  const limit = Number.isFinite(lim) ? Math.min(200, Math.max(1, Math.floor(lim))) : 100;
+  const limit = Number.isFinite(lim) && lim > 0 ? Math.min(200, Math.floor(lim)) : 100;
   const offset = Number.isFinite(off) ? Math.max(0, Math.floor(off)) : 0;
   return { limit, offset };
 }
@@ -168,10 +168,11 @@ export function createKnowledgeProtocolsHandler(deps = {}) {
       if (!url.searchParams.has('sessionId') && !url.searchParams.has('list')) return withCors(okResponse(200, { catalog }), request, env);
       try {
         const service = await serviceFor(env, deps);
-        const data = url.searchParams.has('list')
-          ? { sessions: await service.list(owner(env), parseListPaging(url)) }
-          : { session: await service.get(owner(env), url.searchParams.get('sessionId') ?? '') };
-        return withCors(okResponse(200, data), request, env);
+        if (url.searchParams.has('list')) {
+          await service.purgeIncompleteOnce(owner(env));
+          return withCors(okResponse(200, { sessions: await service.list(owner(env), parseListPaging(url)) }), request, env);
+        }
+        return withCors(okResponse(200, { session: await service.get(owner(env), url.searchParams.get('sessionId') ?? '') }), request, env);
       } catch (error) { return withCors(errorResponse(error.status ?? 502, error.code ?? 'protocol_failed', error.message, error.status >= 500), request, env); }
     }
     if (request.method !== 'POST') return withCors(methodNotAllowed('GET, POST, OPTIONS'), request, env);

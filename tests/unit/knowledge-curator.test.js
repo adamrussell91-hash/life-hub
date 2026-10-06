@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { approveProposal, dismissProposal, pairKey } from '../../netlify/functions/_shared/knowledge-curator.mjs';
+import {
+  annotatePendingBooks,
+  approveProposal,
+  dismissProposal,
+  pairKey,
+  parsePendingProposal
+} from '../../netlify/functions/_shared/knowledge-curator.mjs';
 
 const pending = [{
   id: 'a||b',
@@ -37,6 +43,21 @@ test('approveProposal links both notes and drops the proposal', () => {
   assert.deepEqual(result.pageA.connected, ['b']);
   assert.deepEqual(result.pageB.connected, ['c', 'a']);
   assert.equal(pairKey('b', 'a'), 'a||b');
+});
+
+test('parsePendingProposal keeps confidence and does not invent one', () => {
+  const scored = parsePendingProposal({ ...pending[0], confidence: 0.72, bookA: 'The Neural Mind', bookB: 'Atomic Habits' });
+  assert.equal(scored.confidence, 0.72);
+  assert.equal(scored.bookA, 'The Neural Mind');
+  const unscored = parsePendingProposal(pending[0]);
+  assert.equal(Object.hasOwn(unscored, 'confidence'), false);
+  const annotated = annotatePendingBooks([unscored], JSON.stringify([
+    { id: 'a', origins: [{ kind: 'book', label: 'The Neural Mind' }] },
+    { id: 'b', origins: [{ kind: 'book', label: 'Atomic Habits' }] }
+  ]));
+  assert.equal(annotated[0].bookA, 'The Neural Mind');
+  assert.equal(annotated[0].bookB, 'Atomic Habits');
+  assert.equal(Object.hasOwn(annotated[0], 'confidence'), false);
 });
 
 test('dismissProposal records the pair once', () => {

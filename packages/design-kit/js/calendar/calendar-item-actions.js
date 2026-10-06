@@ -81,6 +81,98 @@ export function canMoveItem(item) {
   return type === 'task' || type === 'work_block' || type === 'scheduled_lesson';
 }
 
+/** Statuses the calendar may set, in display order (same columns as the Tasks board). */
+export const STATUS_CHOICES = Object.freeze({
+  task: Object.freeze([['open', 'To do'], ['in_progress', 'Doing'], ['done', 'Done']]),
+  work_block: Object.freeze([['confirmed', 'Planned'], ['in_progress', 'Doing'], ['done', 'Done']])
+});
+
+/** Tasks and work blocks can be ticked off from any calendar view. */
+export function canTickItem(item) {
+  const row = item && typeof item === 'object' ? /** @type {Record<string, any>} */ (item) : {};
+  if (row.ghost || itemRecord(item).ghost) return false;
+  const type = itemType(item);
+  return (type === 'task' || type === 'work_block') && Boolean(itemId(item));
+}
+
+/** @param {unknown} item */
+export function isItemDone(item) {
+  const row = item && typeof item === 'object' ? /** @type {Record<string, any>} */ (item) : {};
+  return row.done === true || itemRecord(item).status === 'done';
+}
+
+/**
+ * The status writes for one change, each with the value to restore on undo.
+ * Ticking off a task's last open work block ticks the task too; reopening a block of
+ * a done task reopens the task. A task with other open blocks stays open.
+ * @param {unknown} item
+ * @param {string} status
+ * @returns {Array<{ path: string, method: 'PATCH', body: { status: string }, before: { status: string } }>}
+ */
+export function statusRequests(item, status) {
+  const row = item && typeof item === 'object' ? /** @type {Record<string, any>} */ (item) : {};
+  const record = itemRecord(item);
+  const type = itemType(item);
+  const id = itemId(item);
+  const allowed = STATUS_CHOICES[type];
+  if (!id || !allowed || !allowed.some(([value]) => value === status)) return [];
+  const own = type === 'task'
+    ? `/api/tasks?id=${encodeURIComponent(id)}`
+    : `/api/work-blocks?id=${encodeURIComponent(id)}`;
+  const before = typeof record.status === 'string' && record.status ? record.status : allowed[0][0];
+  const out = [{ path: own, method: /** @type {const} */ ('PATCH'), body: { status }, before: { status: before } }];
+  const taskId = type === 'work_block' && typeof record.task_id === 'string' ? record.task_id : '';
+  if (taskId) {
+    const taskBefore = typeof row.taskStatus === 'string' ? row.taskStatus : 'open';
+    const ownOpen = before !== 'done' && before !== 'cancelled' ? 1 : 0;
+    const othersOpen = Math.max(0, (Number(row.taskOpenBlocks) || 0) - ownOpen);
+    const path = `/api/tasks?id=${encodeURIComponent(taskId)}`;
+    if (status === 'done' && taskBefore !== 'done' && othersOpen === 0) {
+      out.push({ path, method: 'PATCH', body: { status: 'done' }, before: { status: taskBefore } });
+    } else if (status !== 'done' && taskBefore === 'done') {
+      out.push({ path, method: 'PATCH', body: { status: 'open' }, before: { status: 'done' } });
+    }
+  }
+  return out;
+}
+
+async function sendJson(apiFetch, request, body) {
+  const fetcher = typeof apiFetch === 'function' ? apiFetch : globalThis.fetch;
+  const response = await fetcher(request.path, {
+    method: request.method,
+    credentials: 'include',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || payload?.ok === false) {
+    const message = payload?.error?.message;
+    throw new Error(typeof message === 'string' && message ? message : `Save failed (${response.status}).`);
+  }
+  return payload?.data ?? payload;
+}
+
+/**
+ * Set a task or work block's status. Resolves to an undo function that restores
+ * what was there before.
+ * @param {(path: string, init?: RequestInit) => Promise<Response>} apiFetch
+ */
+export async function setItemStatus(apiFetch, item, status) {
+  const requests = statusRequests(item, status);
+  if (!requests.length) throw new Error('This item cannot be ticked off from the calendar.');
+  for (const request of requests) await sendJson(apiFetch, request, request.body);
+  return async () => {
+    for (const request of [...requests].reverse()) await sendJson(apiFetch, request, request.before);
+  };
+}
+
+/** One-tap tick: done ↔ back open. Resolves to undo. */
+export function toggleItemDone(apiFetch, item) {
+  const type = itemType(item);
+  const reopen = type === 'work_block' ? 'confirmed' : 'open';
+  return setItemStatus(apiFetch, item, isItemDone(item) ? reopen : 'done');
+}
+
 /** Items whose start and end can be dragged. Lessons run a fixed period; tasks have no end. */
 export function canResizeItem(item) {
   return canMoveItem(item) && itemType(item) === 'work_block';
@@ -191,10 +283,35 @@ export function itemPatchRequest(item, patch) {
   const time = patch.start_time === null ? null
     : typeof patch.start_time === 'string' && TIME_KEY.test(patch.start_time) ? patch.start_time : undefined;
   const title = typeof patch.title === 'string' ? patch.title.trim() : undefined;
+  if (type === 'task' && patch.block && typeof patch.block === 'object') {
+    // Plan time for the task: a work block linked to it. The due date and time stay the deadline.
+    const block = patch.block;
+    const start = TIME_KEY.test(block.start_time ?? '') ? block.start_time : null;
+    const end = TIME_KEY.test(block.end_time ?? '') ? block.end_time : null;
+    const day = DATE_KEY.test(block.date ?? '') ? block.date : null;
+    if (!start || !end || !day) return null;
+    const minutes = (Number(end.slice(0, 2)) * 60 + Number(end.slice(3))) - (Number(start.slice(0, 2)) * 60 + Number(start.slice(3)));
+    if (!(minutes > 0)) return null;
+    const record = itemRecord(item);
+    return {
+      path: '/api/work-blocks',
+      method: 'POST',
+      body: {
+        title: String(record.title || 'Planned work'),
+        date: day,
+        start_time: start,
+        duration_minutes: minutes,
+        task_id: id,
+        status: 'confirmed',
+        source: 'manual'
+      }
+    };
+  }
   if (type === 'task') {
     if (date) body.due_date = date;
     if (time !== undefined) body.due_time = time;
     if (title) body.title = title;
+    if (STATUS_CHOICES.task.some(([value]) => value === patch.status)) body.status = patch.status;
     if (typeof patch.notes === 'string') body.description = patch.notes;
     if (typeof patch.bookmark === 'string') {
       const note = patch.bookmark.replace(/\s+/g, ' ').trim().slice(0, 280);
@@ -216,6 +333,7 @@ export function itemPatchRequest(item, patch) {
     if (time) body.start_time = time;
     if (Number.isFinite(patch.duration_min) && patch.duration_min > 0) body.duration_minutes = Math.round(patch.duration_min);
     if (title) body.title = title;
+    if (STATUS_CHOICES.work_block.some(([value]) => value === patch.status)) body.status = patch.status;
     if (!Object.keys(body).length) return null;
     return { path: `/api/work-blocks?id=${encodeURIComponent(id)}`, method: 'PATCH', body };
   }
@@ -233,6 +351,9 @@ export function itemPatchRequest(item, patch) {
  * @param {(path: string, init?: RequestInit) => Promise<Response>} apiFetch
  */
 export async function saveCalendarItem(apiFetch, item, patch) {
+  if (patch && Object.keys(patch).length === 1 && typeof patch.status === 'string') {
+    return setItemStatus(apiFetch, item, patch.status);
+  }
   const request = itemPatchRequest(item, patch);
   if (!request) throw new Error('This item cannot be changed from the calendar.');
   const fetcher = typeof apiFetch === 'function' ? apiFetch : globalThis.fetch;

@@ -118,6 +118,19 @@ test('full merge puts three Sydney 2026-10-01 meetings on the day and Meetings 3
   );
 });
 
+test('source: tasks-hub:tasks-changed repaints calendar so Day Dial is not left stale', () => {
+  const src = readFileSync(join(rootDir, 'apps/life/js/app/app-controller.js'), 'utf8');
+  const start = src.indexOf("tasks-hub:tasks-changed");
+  assert.ok(start >= 0);
+  const handler = src.slice(start, src.indexOf('bind(windowTarget, \'hashchange\'', start));
+  assert.match(handler, /tasksEventsFromTasks/);
+  assert.match(
+    handler,
+    /if \(currentSection === 'calendar'\) renderCalendarSection\(\)/,
+    'Clare dump / board edits must remount Day Dial and Week from the merged tasks'
+  );
+});
+
 test('source: Life renderCalendarSection feeds Tideline the merged hub list', () => {
   const src = readFileSync(join(rootDir, 'apps/life/js/app/app-controller.js'), 'utf8');
   assert.match(src, /mergeLifeCalendarEvents/);

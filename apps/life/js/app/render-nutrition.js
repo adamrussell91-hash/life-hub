@@ -1,15 +1,9 @@
-import { animateAreaReveal, animateRingFill } from './chart-kit/animate.js';
-import { buildAreaLine } from './chart-kit/area-line.js';
-import { applyRingTarget } from './chart-kit/apply-ring.js';
-import { buildMealProteinPie } from './chart-kit/pie.js';
-import { buildRingTarget } from './chart-kit/ring.js';
+import { countUp, playCardMotion } from './chart-kit/animate.js';
+import { buildConsistencyStrip } from './chart-kit/consistency-strip.js';
+import { renderMealHistory } from './render-meal-history.js';
+import { renderNutritionToday } from './render-nutrition-today.js';
 import { formatGrams } from '../core/aggregate.js';
-import { formatDisplayDate } from '../core/time.js';
-
-const setText = (root, selector, value) => {
-  const element = root.querySelector(selector);
-  if (element) element.textContent = String(value);
-};
+import { formatDisplayDate, formatWeekday } from '../core/time.js';
 
 const weekdayLetter = date => new Intl.DateTimeFormat('en-AU', {
   weekday: 'narrow'
@@ -17,275 +11,67 @@ const weekdayLetter = date => new Intl.DateTimeFormat('en-AU', {
 
 export function renderNutrition(root, model, options = {}) {
   const quiet = options.quiet === true;
-  setText(root, '[data-nutrition="sodium"]', `${model.nutrition.sodium_mg} mg`);
-  setText(root, '[data-target="nutrition-sodium"]', `/ ${model.targets.sodium_ceiling_mg} mg`);
-  setText(root, '[data-nutrition="calcium"]', `${model.nutrition.calcium_mg} mg`);
-  setText(root, '[data-target="nutrition-calcium"]', `/ ${model.targets.calcium_target_mg} mg`);
-  setText(root, '[data-nutrition="polyphenol"]', model.nutrition.polyphenol_score);
-  const pill = root.querySelector('[data-nutrition="polyphenol-pill"]');
-  if (pill && model.polyphenolVsAim) {
-    pill.textContent = model.polyphenolVsAim.label;
-    if (pill.dataset) pill.dataset.colour = model.polyphenolVsAim.colour;
-  }
-
-  renderMealProteinPie(root, model.nutrition.meals);
-
-  renderMacroSplit(root, model);
-  renderMealsToday(root, model.mealsToday);
+  renderNutritionToday(root, model, { quiet, now: options.now });
+  renderMealHistory(root, model);
   renderChallengeTrackers(root, model.challenges);
-  renderMacroRings(root, model, { quiet });
-  const proteinGuide = model.week.find(day => day.proteinTarget > 0)?.proteinTarget ?? model.targets.protein_g;
-  const fatGuide = model.week.find(day => day.fatCeiling > 0)?.fatCeiling ?? model.targets.fat_ceiling_g;
-  renderNamedAreaChart(root, '#nutrition-protein-chart', model.week, 'protein_g', {
-    rollingAverage: 3,
-    guideValue: proteinGuide,
-    valueLabels: true,
-    guideLabel: 'goal',
-    rollingLabel: 'avg',
-    quiet
-  });
-  renderNamedAreaChart(root, '#nutrition-calories-chart', model.week, 'calories', {
-    valueLabels: true,
-    quiet
-  });
-  renderNamedAreaChart(root, '#nutrition-fat-chart', model.week, 'fat_g', {
-    markOverage: true,
-    guideValue: fatGuide,
-    valueLabels: true,
-    guideLabel: 'ceiling',
-    quiet
-  });
-  renderNamedAreaChart(root, '#nutrition-carbs-chart', model.week, 'carbs_g', {
-    valueLabels: true,
-    quiet
-  });
-  renderHeatmap(root, model.month);
-  renderProteinTrend(root, model.proteinTrend);
+  renderConsistencyStrip(root, model.month, { quiet });
 
-  const fatOver = Boolean(model.overFatCeiling);
-  root.querySelector('#nutrition-dashboard')
-    ?.classList?.toggle?.('nutrition--fat-over', fatOver);
-
-  root.querySelector('#nutrition-dashboard')?.removeAttribute('hidden');
-}
-
-function renderMacroRings(root, model, options = {}) {
-  const quiet = options.quiet === true;
-  const rings = {
-    sodium: { value: model.nutrition.sodium_mg, target: model.targets.sodium_ceiling_mg },
-    calcium: { value: model.nutrition.calcium_mg, target: model.targets.calcium_target_mg }
-  };
-  for (const [name, config] of Object.entries(rings)) {
-    applyRingTarget(root.querySelector(`[data-nutrition-ring="${name}"]`), config, {
-      size: 56,
-      strokeWidth: 6,
-      quiet
-    });
+  const dashboard = root.querySelector('#nutrition-dashboard');
+  dashboard?.removeAttribute('hidden');
+  for (const selector of ['#nutrition-today', '.week-grid-card', '#nutrition-consistency']) {
+    playCardMotion(root.querySelector(selector), { quiet });
   }
 }
 
-function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
-  const {
-    rollingAverage = 0,
-    markOverage = false,
-    guideValue = null,
-    valueLabels = false,
-    guideLabel = null,
-    rollingLabel = null,
-    quiet = false
-  } = options;
-  const svg = root.querySelector(selector);
-  if (!svg) return;
-  const normalized = series.map(day => ({ date: day.date, value: day[valueKey] }));
-  const chart = buildAreaLine(normalized, {
-    rollingAverage,
-    width: 320,
-    height: 72,
-    padding: 10,
-    paddingBottom: 16,
-    guideValue
+export function renderConsistencyStrip(root, month, options = {}) {
+  const host = root.querySelector('#nutrition-consistency-strip');
+  if (!host) return;
+  const doc = host.ownerDocument ?? root;
+  const strip = buildConsistencyStrip(month);
+  const plot = doc.createElement('div');
+  plot.className = 'consistency-strip__plot';
+  const week = doc.createElement('span');
+  week.className = 'consistency-strip__week';
+  week.setAttribute('aria-hidden', 'true');
+  week.textContent = 'this week';
+  plot.append(week);
+  const labels = doc.createElement('div');
+  labels.className = 'consistency-strip__labels';
+  labels.setAttribute('aria-hidden', 'true');
+  strip.bars.forEach((bar, index) => {
+    const node = doc.createElement('span');
+    node.className = 'consistency-strip__bar';
+    node.dataset.state = bar.state;
+    node.dataset.date = bar.date;
+    node.style.setProperty('--pct', `${bar.state === 'none' ? 0 : bar.pct}%`);
+    node.style.setProperty('--d', `${index * 22}ms`);
+    node.style.gridColumn = String(index + 1);
+    node.title = `${formatWeekday(bar.date).slice(0, 3)} ${formatDisplayDate(bar.date)}: ${bar.state === 'none'
+      ? 'no meals logged'
+      : `${formatGrams(bar.protein_g)} g / ${formatGrams(bar.target)} g`}`;
+    plot.append(node);
+    if (bar.label) {
+      const label = doc.createElement('span');
+      label.style.gridColumn = String(index + 1);
+      label.textContent = formatDisplayDate(bar.date).slice(0, 5);
+      labels.append(label);
+    }
   });
-  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
-  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-
-  const line = svg.querySelector('[data-role="line"]');
-  const area = svg.querySelector('[data-role="area"]');
-  if (line) {
-    if (line.tagName.toLowerCase() === 'path') line.setAttribute('d', chart.linePath);
-    else line.setAttribute('points', chart.linePoints);
+  if (strip.goalPct != null) {
+    const goal = doc.createElement('span');
+    goal.className = 'consistency-strip__goal';
+    goal.style.setProperty('--pct', `${strip.goalPct}%`);
+    goal.setAttribute('aria-hidden', 'true');
+    plot.append(goal);
   }
-  if (area) {
-    if (area.tagName.toLowerCase() === 'path') area.setAttribute('d', chart.areaPath);
-    else area.setAttribute('points', chart.areaPoints);
-  }
+  host.replaceChildren(plot, labels);
+  host.setAttribute('aria-label', `Protein target hit on ${strip.hits} of ${strip.days} days; best run ${strip.bestRun} days`);
 
-  const rolling = svg.querySelector('[data-role="rolling"]');
-  if (rolling) {
-    const rollingPath = chart.rollingLinePath || chart.rollingLinePoints;
-    if (rollingPath) {
-      if (rolling.tagName.toLowerCase() === 'path') rolling.setAttribute('d', chart.rollingLinePath);
-      else rolling.setAttribute('points', chart.rollingLinePoints);
-      rolling.removeAttribute('hidden');
-    } else {
-      rolling.setAttribute('hidden', '');
-    }
-  }
-
-  const guide = svg.querySelector('[data-role="guide"]');
-  if (guide) {
-    if (chart.guideY != null) {
-      guide.setAttribute('x1', String(chart.points[0]?.x ?? 10));
-      guide.setAttribute('x2', String(chart.points.at(-1)?.x ?? 310));
-      guide.setAttribute('y1', String(chart.guideY));
-      guide.setAttribute('y2', String(chart.guideY));
-      guide.removeAttribute('hidden');
-    } else {
-      guide.setAttribute('hidden', '');
-    }
-  }
-
-  const guideLabels = svg.querySelector('[data-role="guide-labels"]');
-  if (guideLabels) {
-    guideLabels.replaceChildren();
-    const lastPoint = chart.points.at(-1);
-    if (chart.guideY != null && guideLabel && lastPoint) {
-      const text = root.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('x', String(lastPoint.x));
-      text.setAttribute('y', String(Math.max(9, chart.guideY - 4)));
-      text.setAttribute('text-anchor', 'end');
-      text.setAttribute('class', 'chart-guide-label');
-      text.textContent = guideLabel;
-      guideLabels.append(text);
-    }
-    if (rollingLabel && chart.rollingLinePath && lastPoint) {
-      let rollingLabelY = Math.max(10, lastPoint.y - 12);
-      if (chart.guideY != null && Math.abs(rollingLabelY - chart.guideY) < 6) {
-        rollingLabelY = Math.max(10, chart.guideY - 8);
-      }
-      const text = root.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('x', String(lastPoint.x));
-      text.setAttribute('y', String(rollingLabelY));
-      text.setAttribute('text-anchor', 'end');
-      text.setAttribute('class', 'chart-guide-label chart-guide-label--avg');
-      text.textContent = rollingLabel;
-      guideLabels.append(text);
-    }
-  }
-
-  const labels = svg.querySelector('[data-role="day-labels"]');
-  if (labels) {
-    labels.replaceChildren();
-    for (const day of chart.dayLabels) {
-      const text = root.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('x', day.x);
-      text.setAttribute('y', chart.height - 2);
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('class', 'chart-day-label');
-      text.textContent = weekdayLetter(day.date);
-      labels.append(text);
-    }
-  }
-
-  const valueLabelGroup = svg.querySelector('[data-role="value-labels"]');
-  if (valueLabelGroup) {
-    valueLabelGroup.replaceChildren();
-    if (valueLabels) {
-      for (const point of chart.points) {
-        if (!point.value) continue;
-        const text = root.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', point.x);
-        text.setAttribute('y', Math.max(9, point.y - 5));
-        text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('class', 'chart-value-label');
-        text.textContent = String(Math.round(point.value));
-        valueLabelGroup.append(text);
-      }
-    }
-  }
-
-  const markers = svg.querySelector('[data-role="overage-markers"]');
-  if (markers) {
-    markers.replaceChildren();
-    if (markOverage) {
-      for (let i = 0; i < series.length; i++) {
-        if (!series[i].overFatCeiling) continue;
-        const point = chart.points[i];
-        if (!point) continue;
-        const dot = root.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        dot.setAttribute('cx', String(point.x));
-        dot.setAttribute('cy', String(point.y));
-        dot.setAttribute('r', '3');
-        dot.setAttribute('class', 'chart-overage-dot');
-        markers.append(dot);
-      }
-    }
-  }
-
-  animateAreaReveal(svg, { quiet });
-}
-
-export function renderMealProteinPie(root, meals) {
-  const svg = root.querySelector('#nutrition-meal-protein-pie');
-  const slices = svg?.querySelector('[data-role="slices"]');
-  const empty = root.querySelector('[data-meal-protein-empty]');
-  const legend = root.querySelector('[data-role="meal-protein-legend"]');
-  const pie = buildMealProteinPie(meals);
-
-  slices?.replaceChildren();
-  legend?.replaceChildren();
-  if (pie.empty) {
-    svg?.setAttribute('hidden', '');
-    empty?.removeAttribute('hidden');
-    return;
-  }
-
-  svg?.removeAttribute('hidden');
-  empty?.setAttribute('hidden', '');
-  const sliceNodes = pie.slices.map(slice => {
-    const path = root.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', slice.path);
-    path.setAttribute('fill', slice.colour);
-    path.setAttribute('data-meal', slice.meal);
-    return path;
-  });
-  slices?.replaceChildren(...sliceNodes);
-
-  const legendItems = pie.slices.map(slice => {
-    const item = root.createElement('li');
-    const swatch = root.createElement('span');
-    swatch.className = 'meal-protein-legend__swatch';
-    swatch.style.background = slice.colour;
-    const label = root.createElement('span');
-    label.textContent = `${slice.label} · ${slice.value} g`;
-    item.append(swatch, label);
-    return item;
-  });
-  legend?.replaceChildren(...legendItems);
-}
-
-function renderMealsToday(root, mealsToday) {
-  const list = root.querySelector('#nutrition-meal-log');
-  const empty = root.querySelector('[data-nutrition="meal-log-empty"]');
-  if (!list) return;
-  list.replaceChildren();
-  if (!mealsToday?.length) {
-    empty?.removeAttribute('hidden');
-    return;
-  }
-  empty?.setAttribute('hidden', '');
-  for (const meal of mealsToday) {
-    const item = root.createElement('li');
-    item.className = 'meal-log__item';
-    const title = root.createElement('strong');
-    const mealLabel = meal.meal ? meal.meal[0].toUpperCase() + meal.meal.slice(1) : 'Meal';
-    title.textContent = meal.time ? `${mealLabel} · ${meal.time}` : mealLabel;
-    const detail = root.createElement('p');
-    detail.textContent = meal.summary;
-    const macros = root.createElement('p');
-    macros.className = 'meal-log__macros';
-    macros.textContent = `${meal.calories} kcal · ${formatGrams(meal.protein_g)} g protein · ${formatGrams(meal.fat_g)} g fat`;
-    item.append(title, detail, macros);
-    list.append(item);
+  const summary = root.querySelector('[data-nutrition="consistency-summary"]');
+  if (summary) {
+    const count = doc.createElement('strong');
+    summary.replaceChildren(count, ` of ${strip.days} days hit · best run ${strip.bestRun} day${strip.bestRun === 1 ? '' : 's'}`);
+    countUp(count, strip.hits, { quiet: options.quiet });
   }
 }
 
@@ -339,99 +125,5 @@ function renderChallengeTrackers(root, challenges) {
 
     card.append(heading, rule, days);
     list.append(card);
-  }
-}
-
-function renderHeatmap(root, month) {
-  const grid = root.querySelector('#nutrition-heatmap');
-  if (!grid) return;
-  grid.replaceChildren();
-  for (const day of month) {
-    const tile = root.createElement('span');
-    tile.className = 'heatmap-tile heatmap-tile--protein';
-    const pct = Math.max(0, Math.min(100, day.proteinPct ?? 0));
-    tile.dataset.pct = String(pct);
-    tile.dataset.hit = String(day.hitProtein);
-    tile.style?.setProperty?.('--protein-pct', String(pct));
-    tile.title = `${formatDisplayDate(day.date)}: ${formatGrams(day.protein_g)}g / ${formatGrams(day.proteinTarget)}g`;
-    tile.textContent = day.protein_g > 0 ? String(Math.round(day.protein_g)) : '';
-    grid.append(tile);
-  }
-}
-
-function renderProteinTrend(root, trend) {
-  const badge = root.querySelector('[data-value="protein-trend"]');
-  if (!badge) return;
-  badge.textContent = trend.label;
-  badge.dataset.colour = trend.colour;
-}
-
-function renderMacroSplit(root, model) {
-  const svg = root.querySelector('#nutrition-macro-split');
-  if (!svg) return;
-
-  const split = model.macroSplit ?? {
-    protein_g: model.nutrition.protein_g,
-    proteinTarget: model.targets.protein_g,
-    fat_g: model.nutrition.fat_g,
-    fatCeiling: model.targets.fat_ceiling_g,
-    calories: model.nutrition.calories,
-    caloriesTarget: model.targets.calories,
-    proteinPct: 0,
-    fatPct: 0,
-    energyPct: 0
-  };
-
-  setText(root, '[data-split="protein"]', `${formatGrams(split.protein_g)} g / ${formatGrams(split.proteinTarget)} g`);
-  setText(root, '[data-split="protein-pct"]', `${split.proteinPct}% of protein target`);
-  setText(root, '[data-split="fat"]', `${formatGrams(split.fat_g)} g / ${formatGrams(split.fatCeiling)} g`);
-  setText(root, '[data-split="fat-pct"]', `${split.fatPct}% of fat ceiling`);
-  setText(root, '[data-split="energy"]', `${split.calories.toLocaleString('en-AU')} / ${split.caloriesTarget.toLocaleString('en-AU')} kcal`);
-  setText(root, '[data-split="energy-pct"]', `${split.energyPct}% of energy target`);
-
-  const advice = root.querySelector('[data-nutrition="advice"]');
-  if (advice) {
-    const text = String(model.advice ?? '').trim();
-    advice.textContent = text || 'Log a meal with Brisket and his notes show up here.';
-    advice.classList?.toggle?.('is-empty', !text);
-  }
-
-  const protein = buildRingTarget(
-    { value: split.protein_g, target: split.proteinTarget },
-    { size: 96, strokeWidth: 8 }
-  );
-  const fat = buildRingTarget(
-    { value: split.fat_g, target: split.fatCeiling },
-    { size: 96, strokeWidth: 8 }
-  );
-  const fatRadius = protein.radius * 0.72;
-
-  const proteinTrack = svg.querySelector('[data-role="protein-track"]');
-  const proteinFill = svg.querySelector('[data-role="protein-fill"]');
-  const fatTrack = svg.querySelector('[data-role="fat-track"]');
-  const fatFill = svg.querySelector('[data-role="fat-fill"]');
-
-  for (const circle of [proteinTrack, proteinFill]) {
-    if (!circle) continue;
-    circle.setAttribute('cx', protein.center);
-    circle.setAttribute('cy', protein.center);
-    circle.setAttribute('r', protein.radius);
-    circle.setAttribute('stroke-width', protein.strokeWidth);
-  }
-  for (const circle of [fatTrack, fatFill]) {
-    if (!circle) continue;
-    circle.setAttribute('cx', fat.center);
-    circle.setAttribute('cy', fat.center);
-    circle.setAttribute('r', fatRadius);
-    circle.setAttribute('stroke-width', 7);
-  }
-
-  const fatCircumference = 2 * Math.PI * fatRadius;
-  if (proteinFill) animateRingFill(proteinFill, protein);
-  if (fatFill) {
-    animateRingFill(fatFill, {
-      circumference: fatCircumference,
-      dashoffset: fatCircumference * (1 - fat.fraction)
-    });
   }
 }

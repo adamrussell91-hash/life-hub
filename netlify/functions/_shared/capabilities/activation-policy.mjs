@@ -9,7 +9,7 @@ const INTENT_RULES = [
   {
     id: 'training_overview',
     agents: ['chadwick'],
-    requiredTools: ['get_fitness_snapshot', 'compare_workout_windows'],
+    requiredTools: ['get_fitness_snapshot', 'compare_workout_windows', 'analyse_training_evidence'],
     patterns: [
       /how(?:'s| is| has)? (?:my |the )?train/i,
       /training (?:been |going|lately|this (?:week|month))/i,
@@ -21,7 +21,7 @@ const INTENT_RULES = [
   {
     id: 'training_decline',
     agents: ['chadwick'],
-    requiredTools: ['get_load_status', 'get_pain_training_summary', 'get_fitness_snapshot', 'get_body_state'],
+    requiredTools: ['get_load_status', 'get_pain_training_summary', 'get_fitness_snapshot', 'get_body_state', 'analyse_training_evidence'],
     patterns: [
       /declin/i,
       /weaker|stall(?:ed|ing)?|plateau/i,
@@ -33,7 +33,7 @@ const INTENT_RULES = [
   {
     id: 'nutrition_overview',
     agents: ['brisket'],
-    requiredTools: ['get_nutrition_snapshot', 'get_nutrition_adherence'],
+    requiredTools: ['get_nutrition_snapshot', 'get_nutrition_adherence', 'get_nutrition_day_remaining', 'analyse_nutrition_evidence'],
     patterns: [
       /how(?:'s| is| has)? (?:my )?(?:eating|nutrition|diet|macros)/i,
       /adherence/i,
@@ -44,7 +44,7 @@ const INTENT_RULES = [
   {
     id: 'focus_today',
     agents: ['clare'],
-    requiredTools: ['get_tasks_focus'],
+    requiredTools: ['get_tasks_focus', 'get_tasks_open_loops'],
     patterns: [
       /what should i (?:focus on|do) today/i,
       /priorit(?:y|ise|ize)/i,
@@ -87,7 +87,7 @@ const INTENT_RULES = [
   {
     id: 'improve_lesson',
     agents: ['ann'],
-    requiredTools: ['search_teaching', 'get_teaching_context'],
+    requiredTools: ['search_teaching', 'get_teaching_context', 'get_teaching_diagnosis'],
     patterns: [
       /improve (?:tomorrow(?:'s)? |today(?:'s)? |(?:the |my )?)?(?:year \d+ )?lesson/i,
       /help (?:me )?(?:with |fix )?tomorrow(?:'s)?/i,
@@ -99,7 +99,7 @@ const INTENT_RULES = [
   {
     id: 'knowledge_lookup',
     agents: ['clementine'],
-    requiredTools: ['search_knowledge'],
+    requiredTools: ['search_knowledge', 'get_knowledge_synthesis'],
     patterns: [
       /what do i (?:already )?have (?:about|on)/i,
       /what (?:do i |have i )?know about/i,
@@ -122,7 +122,7 @@ const INTENT_RULES = [
   {
     id: 'diary_pattern',
     agents: ['penelope'],
-    requiredTools: ['search_diary_records'],
+    requiredTools: ['search_diary_records', 'analyse_diary_evidence'],
     patterns: [
       /have i (?:been )?feeling (?:like )?this/i,
       /often(?:\?|$)/i,
@@ -134,7 +134,7 @@ const INTENT_RULES = [
   {
     id: 'mind_pattern',
     agents: ['vera'],
-    requiredTools: ['search_mind_records'],
+    requiredTools: ['search_mind_records', 'compare_mind_sessions', 'analyse_mind_evidence'],
     patterns: [
       /pattern (?:have you |across |in )?/i,
       /across (?:our )?recent sessions/i,
@@ -145,7 +145,7 @@ const INTENT_RULES = [
   {
     id: 'routine_helping',
     agents: ['hyaluronica'],
-    requiredTools: ['get_skincare_adherence', 'list_skincare_routines', 'search_skincare_records'],
+    requiredTools: ['get_skincare_adherence', 'list_skincare_routines', 'search_skincare_records', 'get_skincare_response_evidence', 'analyse_skincare_evidence'],
     patterns: [
       /is (?:this |my )?routine\b.{0,40}\bhelp/i,
       /routine\b.{0,40}\b(?:working|helping|adherence)/i,
@@ -158,7 +158,7 @@ const INTENT_RULES = [
   {
     id: 'life_slipping',
     agents: ['hammond'],
-    requiredTools: ['inspect_hub_signals'],
+    requiredTools: ['inspect_hub_signals', 'get_hammond_attention_pack'],
     patterns: [
       /what is slipping/i,
       /slipping across/i,
@@ -187,15 +187,15 @@ const INTENT_RULES = [
     id: 'history_search',
     agents: ['chadwick', 'brisket', 'sara', 'penelope', 'vera', 'hyaluronica', 'clare', 'ann', 'clementine'],
     requiredToolsByAgent: {
-      chadwick: ['search_workout_records'],
-      brisket: ['search_nutrition_records'],
-      sara: ['search_medical_records', 'get_weight_trend'],
-      penelope: ['search_diary_records'],
-      vera: ['search_mind_records'],
-      hyaluronica: ['search_skincare_records'],
-      clare: ['search_tasks'],
-      ann: ['search_teaching'],
-      clementine: ['search_knowledge']
+      chadwick: ['search_workout_records', 'analyse_training_evidence'],
+      brisket: ['search_nutrition_records', 'analyse_nutrition_evidence'],
+      sara: ['search_medical_records', 'get_weight_trend', 'analyse_medical_evidence'],
+      penelope: ['search_diary_records', 'analyse_diary_evidence'],
+      vera: ['search_mind_records', 'compare_mind_sessions', 'analyse_mind_evidence'],
+      hyaluronica: ['search_skincare_records', 'get_skincare_response_evidence', 'analyse_skincare_evidence'],
+      clare: ['search_tasks', 'get_tasks_open_loops'],
+      ann: ['search_teaching', 'get_teaching_context', 'get_teaching_diagnosis'],
+      clementine: ['search_knowledge', 'get_knowledge_synthesis']
     },
     patterns: [
       /have i mentioned/i,
@@ -208,56 +208,56 @@ const INTENT_RULES = [
 
 const CATALOGUES = {
   chadwick: [
-    'Fitness sessions (data/fitness) — get_fitness_snapshot, get_last_workout, search_workout_records, compare_workout_windows, get_training_volume, get_working_weights, get_long_term_fitness, get_session_comparisons, get_exercise_history, get_exercise_progress, get_load_status, get_pain_training_summary, get_region_strength, get_workout_template',
+    'Fitness sessions (data/fitness) — get_fitness_snapshot, get_last_workout, search_workout_records, compare_workout_windows, get_training_volume, get_working_weights, get_long_term_fitness, get_session_comparisons, get_exercise_history, get_exercise_progress, get_load_status, get_pain_training_summary, get_region_strength, get_workout_template, analyse_training_evidence',
     'Body composition/tape (data/body) — get_body_state',
     'Exercise library — search_exercise_library, save_exercise_library_entry (single or batch of learned moves)',
     'Prompt may include a bounded Recent sessions list; that is metadata, not a substitute for calling tools when Adam asks how training is going, about decline, load, pain, volume, or comparisons.'
   ],
   brisket: [
-    'Nutrition logs (data/nutrition) — get_nutrition_snapshot, get_nutrition_adherence, search_nutrition_records, get_nutrition_targets',
+    'Nutrition logs (data/nutrition) — get_nutrition_snapshot, get_nutrition_adherence, get_nutrition_day_remaining, compare_nutrition_periods, search_nutrition_records, get_nutrition_targets, analyse_nutrition_evidence',
     'Meal writes — log_entry (Confirm) to add a meal (meal+time path; same type+time overwrites); delete_meal (Confirm) to remove a meal from the day',
-    'Challenge trackers — list_nutrition_challenges / mark tools',
+    'Challenge trackers — list_nutrition_challenges, upsert_nutrition_challenge, mark_nutrition_challenge_day',
     'Food library — check before web_search; save_food_library_entry for verified AU figures',
     'Body state may be preloaded — still call nutrition tools for week/month adherence questions.'
   ],
   sara: [
     'Body composition/weight/tape — get_body_state, get_weight_trend',
-    'Medical Overview — search_medical_records, brief_medical_appointment',
+    'Medical Overview — search_medical_records, brief_medical_appointment, analyse_medical_evidence',
     'Records — list_medical_visits (ids, duplicates), get_medical_visit, update_medical_visit (notes_append/status/time/duration save at once; date/type/title/replace need Confirm), delete_medical_visit, merge_medical_visits (Confirm)',
     'Analyst — get_marker_trend (any blood marker or group over time), compare_bloods, get_treatment_timeline (Stelara cycle), get_symptom_timeline (episodes vs cycle day), get_cross_signals (food/training/mood/weight around events), get_open_loops, build_appointment_brief (questions to ask)',
     'Never answer personalised body/medical questions from generic knowledge when these tools can retrieve Adam\'s records.'
   ],
   penelope: [
-    'Diary records (data/mind diary) — search_diary_records, get_diary_range',
+    'Diary records (data/mind diary) — search_diary_records, get_diary_range, compare_diary_periods, extract_diary_themes, analyse_diary_evidence',
     'Mind digest / on-this-day may be preloaded — still search when Adam refers to patterns, recurrence, or earlier events.',
     'Do not ask him to paste prior entries that tools can retrieve.'
   ],
   vera: [
-    'Mind sessions + diary metadata — get_mind_session, search_mind_records',
+    'Mind sessions + diary metadata — get_mind_session, search_mind_records, compare_mind_sessions, analyse_mind_evidence; search_diary_records is read-only context',
     'Ground every claimed pattern in retrieved session evidence. Cross-session comparison requires search_mind_records first.'
   ],
   hyaluronica: [
     'Routines + product library — list_skincare_routines, search_skincare_library',
-    'Routine/treatment history — get_skincare_adherence, search_skincare_records',
+    'Routine/treatment history — get_skincare_adherence, get_skincare_response_evidence, search_skincare_records, analyse_skincare_evidence',
     'Treatment state / nutrition→skin week may be preloaded — still retrieve history when asking if a routine is helping.'
   ],
   clare: [
-    'Tasks store — get_tasks_focus (open tasks, deadlines, capacity, stress), search_tasks, get_task',
+    'Tasks store — get_tasks_focus (open tasks, deadlines, capacity, stress), get_tasks_open_loops, search_tasks, get_task',
     'Write ordinary new rows with create_task (lands immediately). Use update_task for edits (Confirm). Do not invent GitHub paths or dump work into Central Node. Never merge distinct actions into one create_task title — one row per distinct piece of work.',
     'Workbench (40 jobs): fetch_url, research_topic, lookup_au_dates, lookup_place, compare_options, clare_mutate, inspect_board, plan_work, run_desk_protocol, draft_comms, check_calendars, check_clock, parse_dump, read_protocol, update_protocol. web_search finds pages; fetch_url opens a specific URL. Prefer create_task / update_task for capture and edits; clare_mutate for complete, split, trash, move, batch, research notes, and the rest.',
     'Inspect Tasks data before suggesting what Adam should do next. Do not invent rows. create_task writes one task immediately; dumps (2+ tasks), possible duplicates and other writes wait for Confirm.'
   ],
   ann: [
-    'Teaching store — search_teaching, get_teaching_context (class/unit/lesson/calendar window)',
+    'Teaching store — search_teaching, get_teaching_context, get_teaching_diagnosis (class/unit/lesson/calendar window)',
     'Inspect existing material before recommending or changing teaching work.'
   ],
   clementine: [
-    'Knowledge Hub archive (not Notion) — search_knowledge (notes, tags, connected sources, claims)',
-    'Search stored Knowledge Hub notes before synthesising. Distinguish retrieved notes from new synthesis. Never call archive pages Notion pages.',
+    'Knowledge Hub archive (not Notion) — search_knowledge, get_knowledge_synthesis (notes, tags, connected sources, claims)',
+    'Search stored Knowledge Hub notes before synthesising. Distinguish retrieved notes from new synthesis. Never call archive pages Notion pages. Classroom bridges use search_teaching.',
     'Teaching-hub protocol path is intentional for school workplace turns; Knowledge prompts remain the research spine.'
   ],
   hammond: [
-    'Cross-hub signals — inspect_hub_signals (Tasks/Teaching/Life digests available this turn)',
+    'Cross-hub signals — inspect_hub_signals, get_hammond_attention_pack (Tasks/Teaching/Life digests available this turn)',
     'Week inventory — get_week_review (last-week recap + next-week forward plan). A Week pack may be preloaded; still call the tool if the pack is missing/unavailable or he asks to refresh.',
     'Full Central Node + governance tail may be preloaded — still call inspect_hub_signals when asking what is slipping across life.',
     'State which hubs lacked usable evidence. Do not invent rows.'

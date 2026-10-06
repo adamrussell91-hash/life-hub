@@ -16,3 +16,13 @@ When a change touches HTML, CSS, rendering JS, SVG or a layout:
 4. If you hit a failure that isn't in the register, add an entry in the same PR.
 
 A plausible screenshot is not evidence. The failure register's checks are.
+
+## R4 every time (sheets / forms / dialogs)
+
+If the surface has Save, Add, Cancel, Confirm, Remove, or any other primary/secondary action at the bottom of a sheet, dialog, modal, or long form: **R4 is mandatory**. Do not claim done until you have measured at **390**:
+
+- each action button height ≥ 44px
+- action row `bottom` ≤ `innerHeight` (clear of the home indicator / bottom chrome)
+- actions stay docked after scrolling the fields (not lost under the fold)
+
+Tiny pills, sticky-in-scroll footers, or actions flush to the screen edge are a **ship blocker**. This class of bug has already wasted Adam's data entry twice — treat it as a hard gate, not an optional polish check.

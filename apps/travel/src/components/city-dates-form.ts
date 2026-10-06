@@ -33,6 +33,9 @@ export function renderCityDatesForm(host: HTMLElement, options: CityDatesFormOpt
 
   const form = document.createElement('form');
   form.noValidate = true;
+  form.className = 'addform__form';
+  const scroll = document.createElement('div');
+  scroll.className = 'addform__scroll';
   const grid = document.createElement('div');
   grid.className = 'fgrid';
 
@@ -51,12 +54,13 @@ export function renderCityDatesForm(host: HTMLElement, options: CityDatesFormOpt
   hint.className = 'hint full';
   hint.textContent = `Trip runs ${trip.start_date} → ${trip.end_date}. Inclusive dates.`;
   grid.append(hint);
-  form.append(grid);
+  scroll.append(grid);
 
   const errorNote = document.createElement('p');
   errorNote.className = 'hint';
   errorNote.hidden = true;
-  form.append(errorNote);
+  scroll.append(errorNote);
+  form.append(scroll);
 
   function close(): void {
     host.replaceChildren();
@@ -69,7 +73,8 @@ export function renderCityDatesForm(host: HTMLElement, options: CityDatesFormOpt
   }
 
   const actions = document.createElement('div');
-  actions.className = 'row';
+  actions.className = 'addform__actions';
+  actions.setAttribute('data-part', 'form-actions');
   const saveBtn = document.createElement('button');
   saveBtn.type = 'submit';
   saveBtn.className = 'btn';

@@ -1,0 +1,192 @@
+/* Capacity forecast panel (Day view): readiness weather, morning bubbles, reasons.
+   JS: js/calendar/readiness-panel.js. Icons: icons/capacity-weather (condition-coloured).
+   Colour reinforces the state name and icon shape; it is never the only signal. */
+
+.rf {
+  --rf-clear: #d9801c;
+  --rf-steady: #3f9460;
+  --rf-wind: #1c8f9d;
+  --rf-cloud: #6e8199;
+  --rf-fog: #8178ab;
+  --rf-rain: #3b7dd8;
+  --rf-storm: #5b4c9c;
+  --rf-recovery: #2e9c7a;
+  --rf-evening: #5a63b5;
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.rf-fam--clear { --rf-c: var(--rf-clear); }
+.rf-fam--steady { --rf-c: var(--rf-steady); }
+.rf-fam--wind { --rf-c: var(--rf-wind); }
+.rf-fam--cloud { --rf-c: var(--rf-cloud); }
+.rf-fam--fog { --rf-c: var(--rf-fog); }
+.rf-fam--rain { --rf-c: var(--rf-rain); }
+.rf-fam--storm { --rf-c: var(--rf-storm); }
+.rf-fam--recovery { --rf-c: var(--rf-recovery); }
+.rf-fam--evening { --rf-c: var(--rf-evening); }
+
+.rf-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--rf-c, var(--rf-cloud)) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--rf-c, var(--rf-cloud)) 28%, transparent);
+}
+.rf-icon { flex: none; width: 56px; height: 56px; display: grid; place-items: center; }
+.rf-icon svg { display: block; width: 56px; height: 56px; }
+.rf-words { min-width: 0; }
+.rf-score {
+  font-size: 2rem;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  color: var(--navy);
+  letter-spacing: var(--tracking-tight, -0.01em);
+  font-variant-numeric: tabular-nums;
+}
+.rf-score small { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--muted); margin-left: 2px; }
+.rf-state {
+  margin-top: 4px;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: color-mix(in srgb, var(--rf-c, var(--navy)) 70%, var(--ink));
+  overflow-wrap: anywhere;
+}
+.rf-range { display: inline-block; font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--muted); }
+.rf-why { margin: 0; font-size: var(--text-sm); line-height: 1.45; color: var(--ink); }
+
+.rf-chart-wrap { min-width: 0; }
+.rf-chart { display: block; width: 100%; height: auto; max-height: 160px; overflow: visible; }
+.rf-grid { stroke: color-mix(in srgb, var(--navy) 8%, transparent); stroke-width: 1; }
+.rf-band { fill: color-mix(in srgb, var(--wave) 12%, transparent); stroke: none; }
+.rf-line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.rf-line--clear { stroke: var(--rf-clear); }
+.rf-line--steady { stroke: var(--rf-steady); }
+.rf-line--wind { stroke: var(--rf-wind); stroke-dasharray: 6 3; }
+.rf-line--cloud { stroke: var(--rf-cloud); }
+.rf-line--fog { stroke: var(--rf-fog); stroke-dasharray: 2 3; }
+.rf-line--rain { stroke: var(--rf-rain); }
+.rf-line--storm { stroke: var(--rf-storm); stroke-width: 3.5; }
+.rf-line--recovery { stroke: var(--rf-recovery); }
+.rf-line--evening { stroke: var(--rf-evening); }
+.rf-now { stroke: var(--high-sea); stroke-width: 1.5; stroke-dasharray: 3 2; }
+.rf-axis { font: 500 10px var(--font-ui); fill: var(--muted); }
+
+.rf-windows { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.rf-window {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--rf-c) 35%, transparent);
+  background: color-mix(in srgb, var(--rf-c) 8%, #fff);
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  max-width: 100%;
+}
+.rf-window svg { flex: none; width: 28px; height: 28px; }
+.rf-window span { display: grid; line-height: 1.2; min-width: 0; }
+.rf-window b { font-weight: var(--weight-semibold); color: var(--muted); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--tracking-caps, 0.06em); }
+.rf-window[aria-expanded="true"] { background: color-mix(in srgb, var(--rf-c) 18%, #fff); border-color: var(--rf-c); }
+.rf-window:focus-visible, .rf-bubble:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+.rf-detail {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--navy) 4%, #fff);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.rf-details summary { cursor: pointer; font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--navy); min-height: 32px; display: flex; align-items: center; }
+.rf-contrib { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: var(--text-xs); }
+.rf-contrib li { display: grid; grid-template-columns: 1fr auto auto; gap: var(--space-2); align-items: baseline; padding: 2px 0; border-bottom: 1px solid var(--line); }
+.rf-contrib b { font-variant-numeric: tabular-nums; min-width: 2.5ch; text-align: right; }
+.rf-src { color: var(--muted); font-size: var(--text-2xs); }
+.rf-foot, .rf-note { margin: 0; font-size: var(--text-xs); color: var(--muted); line-height: 1.45; }
+
+.rf-done { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; font-size: var(--text-xs); color: var(--muted); min-height: 32px; }
+.rf-done .dd-link { min-height: 32px; display: inline-flex; align-items: center; }
+
+.rf-checkin {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--pastel-blue) 40%, #fff);
+  border: 1px solid color-mix(in srgb, var(--wave) 30%, transparent);
+  min-width: 0;
+}
+.rf-opening { margin: 0; font-size: var(--text-md); font-weight: var(--weight-bold); color: var(--navy); }
+.rf-q { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 6px; }
+.rf-q legend { padding: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--ink); margin-bottom: 6px; }
+.rf-bubbles { display: flex; flex-wrap: wrap; gap: 6px; }
+.rf-bubble {
+  min-height: 44px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--navy) 22%, transparent);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.rf-bubble[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; font-weight: var(--weight-semibold); }
+.rf-bubble[aria-pressed="true"]::before { content: "✓ "; }
+.rf-bubble--other { border-style: dashed; color: var(--muted); }
+.rf-other {
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--navy) 22%, transparent);
+  font: inherit;
+  font-size: var(--text-sm);
+  width: 100%;
+  box-sizing: border-box;
+}
+.rf-other[hidden] { display: none; }
+.rf-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.rf-actions .btn { min-height: 44px; }
+.rf-status { margin: 0; font-size: var(--text-xs); color: var(--danger); min-height: 1em; }
+.rf-status:empty { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .rf-bubble, .rf-window { transition: background-color 120ms ease, border-color 120ms ease; }
+}
+
+/* Life Home: the morning check-in card. The bubbles live here, not in the Day view. */
+.rf--home {
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--hub-glass-fill, #fff);
+  border: 1px solid var(--line);
+  box-shadow: var(--hub-elev-card, none);
+  margin-bottom: var(--space-4);
+}
+.rf-home-head { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.rf-home-head .rf-icon, .rf-home-head .rf-icon svg { width: 40px; height: 40px; }
+.rf-home-head .rf-words { flex: 1; }
+.rf-kicker {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rf-home-score { margin: 2px 0 0; font-size: var(--text-base); color: var(--ink); overflow-wrap: anywhere; }
+.rf-home-score b { font-size: var(--text-lg, 1.25rem); color: var(--navy); font-variant-numeric: tabular-nums; }
+.rf-home-score small { color: var(--muted); }
+.rf-home-open { flex: none; align-self: flex-start; font-size: var(--text-sm); }
+.rf--home .rf-checkin { margin-top: var(--space-2); }

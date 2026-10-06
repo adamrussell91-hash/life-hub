@@ -1,3 +1,4 @@
+import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
 import {
   PEDAGOGICAL_MODES,
@@ -388,8 +389,14 @@ export function renderLessonsLibrary(
 
   function paintRail(): void {
     rail.replaceChildren();
+    // Recents live in local storage and outlast the lesson; only show ones still in the library.
+    const liveIds = new Set(
+      curriculum.lessons
+        .filter((lesson) => isActiveLibraryStatus(lesson.status))
+        .map((lesson) => lesson.id)
+    );
     const recent = readRecent()
-      .filter((item) => item.type === 'lesson')
+      .filter((item) => item.type === 'lesson' && liveIds.has(item.id))
       .slice(0, 8);
     if (recent.length === 0) return;
     const heading = el('p', 'lessons-lib__rail-label', 'Recently opened');
@@ -485,7 +492,10 @@ export function renderLessonsLibrary(
         })();
       });
       option(move, '', 'Move to unit…', true);
-      for (const unit of curriculum.units) option(move, unit.id, unit.title, false);
+      for (const unit of curriculum.units) {
+        if (unit.status === 'trashed') continue;
+        option(move, unit.id, unit.title, false);
+      }
       bulk.append(move);
     }
     const tagInput = document.createElement('input');
@@ -494,13 +504,20 @@ export function renderLessonsLibrary(
     tagInput.placeholder = 'Add tag…';
     tagInput.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter') return;
-      const tag = tagInput.value.trim();
-      if (!tag) return;
+      // "forces, practical" is two tags, not one tag with a comma in it.
+      const added = tagInput.value
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+      if (added.length === 0) return;
+      tagInput.value = '';
       void (async () => {
         for (const id of selected) {
           const row = curriculum.lessons.find((lesson) => lesson.id === id);
-          const tags = [...new Set([...(row?.tags ?? []), tag])];
-          await patchLessonLibrary(id, { tags });
+          const tags = [...new Set([...(row?.tags ?? []), ...added])];
+          const saved = await patchLessonLibrary(id, { tags });
+          // Write back now: a second add before the list refreshes must build on this one.
+          if (row) row.tags = saved?.tags ?? tags;
         }
         selected = new Set();
         await options.onMutated?.();
@@ -892,7 +909,10 @@ export function renderLessonsLibrary(
     const saveBtn = el('button', 'btn btn--secondary', 'Save current filters');
     saveBtn.type = 'button';
     saveBtn.addEventListener('click', () => {
-      const name = window.prompt('Name this view');
+      void saveCurrentView();
+    });
+    async function saveCurrentView(): Promise<void> {
+      const name = await askTextCard({ title: 'Name this view', confirmLabel: 'Save view' });
       if (!name?.trim()) return;
       const view: SavedLessonView = {
         id: `view_${Date.now().toString(36)}`,
@@ -914,7 +934,7 @@ export function renderLessonsLibrary(
       };
       writeSavedViews([...saved, view]);
       paint();
-    });
+    }
     panel.append(saveBtn);
     for (const view of saved) {
       const row = el('div', 'lessons-mine__saved');

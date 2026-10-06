@@ -23,6 +23,7 @@ describe("loadPromptFile", () => {
   it("loads the from-a-book protocol from prompts/", () => {
     expect(loadPromptFile("clementine-book-note.md")).toContain("From a book protocol");
     expect(loadPromptFile("clementine-book-note.md")).toContain("How this bears on the book");
+    expect(loadPromptFile("clementine-book-note.md")).toContain("Kind: <one of the five>");
   });
 
   it("loads the make-a-note protocol from prompts/", () => {

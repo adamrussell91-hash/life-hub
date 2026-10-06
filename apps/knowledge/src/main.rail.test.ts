@@ -116,7 +116,20 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain("intakeReviewHtml");
     expect(css).toContain("align-items: flex-end");
     expect(css).toContain(".page-header__actions");
+    expect(main).toContain('class="reader__actions"');
+    expect(css).toMatch(/\.canvas:has\(> \.reader\) > \.page-header \.page-header__title\s*\{[^}]*width:\s*100%/);
+    expect(css).toMatch(/\.reader__actions\s*\{[^}]*flex-wrap:\s*wrap/);
     expect(css).not.toMatch(/\.reader__tidy\s*\{[^}]*font-size:/);
+  });
+
+  it("keeps Archive as one word on the phone header (T2)", () => {
+    expect(css).not.toMatch(/\.page-header__title,\s*\.reader__title\s*\{[^}]*overflow-wrap:\s*anywhere/);
+    expect(css).toMatch(/\.page-header__title\s*\{[^}]*overflow-wrap:\s*break-word/);
+    expect(css).toMatch(/\.page-header__title\s*\{[^}]*word-break:\s*normal/);
+    expect(css).toMatch(
+      /\.page-header__actions:has\(>\s*:not\(\.hub-utilities\)\)\s*\{[^}]*flex:\s*1 0 100%/,
+    );
+    expect(css).toMatch(/\.topbar,\s*\.page-header\s*\{[^}]*flex-wrap:\s*wrap/);
   });
 
   it("puts Ask Clementine, From a book, and Write it yourself under one New note menu", () => {
@@ -134,6 +147,8 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain("function openCompose");
     expect(main).toContain('hat: "makeNote"');
     expect(main).toContain("compose__savebar");
+    expect(main).toContain("compose__scroll");
+    expect(main).toContain('data-part="form-actions"');
     expect(main).toContain("compose-relationships-host");
     expect(main).toContain("replacePageRelationships");
     expect(main).toContain("mountPageRelationshipsEditor");
@@ -192,8 +207,10 @@ describe("Knowledge Hub rail", () => {
     expect(css).toMatch(/\.chat-overlay\s*\{[^}]*z-index:\s*50/);
     expect(css).toContain("--vv-height");
     expect(css).toContain("body:has(.chat-overlay) .hub-mobile-nav");
-    expect(css).toMatch(/\.coach\.chat \.chat__composer\s*\{[^}]*position:\s*fixed/);
-    expect(css).toMatch(/\.coach\.chat \.chat__composer\s*\{[^}]*bottom:\s*calc\(5\.5rem/);
+    // Since #636 the Confirm tray and composer share one fixed .chat-floor.
+    expect(css).toMatch(/\.coach\.chat > \.chat-floor\s*\{[^}]*position:\s*fixed/);
+    expect(css).toMatch(/\.coach\.chat > \.chat-floor\s*\{[^}]*bottom:\s*calc\(5\.5rem/);
+    expect(css).toMatch(/\.coach\.chat > \.chat-floor > \.chat__composer\s*\{[^}]*position:\s*static/);
     expect(css).toMatch(/\.graph-stage\s*\{[^}]*min-height:\s*560px/);
     expect(css).toContain(".universe-zoom");
     expect(css).toContain(".graph-wrap.is-universe-dark");

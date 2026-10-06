@@ -14,6 +14,7 @@ import {
   SCHEDULED_LESSON_PREFIX,
   unitKey
 } from './_shared/teaching-blobs.mjs';
+import { isDeletedRecord, withoutDeleted } from './_shared/record-liveness.mjs';
 import { buildPublishedClass } from './_shared/teaching-student.mjs';
 import {
   containsWhiteboardBlocks,
@@ -42,20 +43,20 @@ export function createPublishedClassHandler(deps = {}) {
 
     const { blobs: scheduledBlobs } = await store.list({ prefix: SCHEDULED_LESSON_PREFIX });
     const scheduledRows = await Promise.all(scheduledBlobs.map(blob => getJSON(store, blob.key)));
-    const scheduled = scheduledRows.filter(row => row && row.class_id === id);
+    const classRows = withoutDeleted(scheduledRows).filter(row => row.class_id === id);
 
     const unitIds = new Set(rawClass.active_unit_ids ?? []);
-    for (const row of scheduled) unitIds.add(row.unit_id);
+    for (const row of classRows) unitIds.add(row.unit_id);
     if (rawClass.current_unit_id) unitIds.add(rawClass.current_unit_id);
 
     const units = [];
     for (const unitId of unitIds) {
       const rawUnit = await getJSON(store, unitKey(unitId));
-      if (rawUnit?.id && rawUnit.title) units.push(rawUnit);
+      if (rawUnit?.id && rawUnit.title && !isDeletedRecord(rawUnit)) units.push(rawUnit);
     }
 
     const lessonIds = new Set();
-    for (const row of scheduled) lessonIds.add(row.lesson_id);
+    for (const row of classRows) lessonIds.add(row.lesson_id);
     if (rawClass.current_unit_id) {
       const currentUnit = units.find(unit => unit.id === rawClass.current_unit_id);
       for (const lessonId of currentUnit?.lesson_ids ?? []) lessonIds.add(lessonId);
@@ -64,16 +65,24 @@ export function createPublishedClassHandler(deps = {}) {
     const lessons = [];
     for (const lessonId of lessonIds) {
       const rawLesson = await getJSON(store, draftLessonKey(lessonId));
-      if (rawLesson && typeof rawLesson.title === 'string' && rawLesson.title) {
+      if (
+        rawLesson &&
+        !isDeletedRecord(rawLesson) &&
+        typeof rawLesson.title === 'string' &&
+        rawLesson.title
+      ) {
         lessons.push({ id: lessonId, title: rawLesson.title });
       }
     }
+    // Schedule rows pointing at a trashed or deleted lesson would surface as a raw-id orphan.
+    const liveLessonIds = new Set(lessons.map(lesson => lesson.id));
+    const scheduled = classRows.filter(row => liveLessonIds.has(row.lesson_id));
 
     const { blobs: publishedBlobs } = await store.list({ prefix: PUBLISHED_LESSON_PREFIX });
     const publishedLessonIds = new Set();
     for (const blob of publishedBlobs) {
       const lessonId = blob.key.slice(PUBLISHED_LESSON_PREFIX.length);
-      if (lessonId) publishedLessonIds.add(lessonId);
+      if (lessonId && liveLessonIds.has(lessonId)) publishedLessonIds.add(lessonId);
     }
 
     let publicClass = rawClass;

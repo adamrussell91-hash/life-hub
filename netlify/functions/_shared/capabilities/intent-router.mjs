@@ -19,7 +19,12 @@ const KEYWORD_HINTS = [
   },
   {
     ids: ['remember.note-context', 'coordinate.request-cn-write'],
-    patterns: [/loan (?:a )?capacity/i, /borrow (?:from|capacity)/i, /ask (?:chadwick|brisket|hammond|sara) to/i]
+    patterns: [
+      /loan (?:a )?capacity/i,
+      /borrow (?:from|capacity)/i,
+      /ask (?:chadwick|brisket|hammond|sara|clare|ann|vera|hyaluronica|penelope|clementine) to/i,
+      /tell (?:chadwick|brisket|hammond|sara|clare|ann|vera|hyaluronica|penelope|clementine)\b/i
+    ]
   },
   {
     ids: ['lookup.save-food-library', 'lookup.food-brand-au'],
@@ -39,7 +44,15 @@ const KEYWORD_HINTS = [
   },
   {
     ids: ['coordinate.request-cn-write'],
-    patterns: [/central node/i, /\bcn\b/i, /tell hammond/i, /cross[- ]agent/i]
+    patterns: [
+      /central node/i,
+      /\bcn\b/i,
+      /tell hammond/i,
+      /cross[- ]agent/i,
+      /(?:send|make|write|leave|pass)\b.{0,48}\b(?:note|flag|message)\b.{0,24}\b(?:brisket|chadwick|hammond|sara|clare|ann|vera|hyaluronica|penelope|clementine)/i,
+      /(?:note|flag|message)\b.{0,24}\b(?:for|to)\b.{0,16}\b(?:brisket|chadwick|hammond|sara|clare|ann|vera|hyaluronica|penelope|clementine)/i,
+      /calcium note/i
+    ]
   },
   {
     ids: ['plan.week-meals'],
@@ -105,7 +118,13 @@ const KEYWORD_HINTS = [
 ];
 
 /** Domain write shortcuts that stay attached whenever the agent owns them. */
-const PINNED_CAPABILITY_IDS = ['tasks.create', 'tasks.update', 'log.delete-meal'];
+const PINNED_CAPABILITY_IDS = [
+  'tasks.create',
+  'tasks.update',
+  'log.delete-meal',
+  'coordinate.request-cn-write',
+  'remember.write-memory'
+];
 
 /** Soft image presence — never inspect base64 contents. */
 function hasVisualAttachmentSignal(attachments) {
@@ -162,7 +181,7 @@ export function selectCapabilityIdsForTurn({
   const restKeep = ordered.filter(id => keep.has(id) && id !== 'os.propose-action');
   const restOther = ordered
     .filter(id => id !== 'os.propose-action' && !keep.has(id))
-    .slice(0, Math.max(0, maxShortcuts - restKeep.length));
+    .slice(0, maxShortcuts);
   return [...propose, ...restKeep, ...restOther];
 }
 

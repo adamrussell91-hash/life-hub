@@ -2,7 +2,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Page } from "../src/domain/page";
 import { embedTexts } from "../src/lib/embed";
-import { createDataRepo } from "../netlify/functions/_lib/dataRepo";
+import { embeddingText, indexExcerpt } from "../src/research/catalogue";
+import { listDataRepoPages } from "./dataRepoPages";
 import { loadDotEnv, loadLocalStagedPages } from "./loadLocalPages";
 
 export type EmbedFn = (texts: string[]) => Promise<number[][]>;
@@ -24,15 +25,14 @@ export interface LexicalCorpusEntry {
 
 const BATCH = 4;
 
-export function excerptFromBody(body: string) {
-  return body.replace(/^#.*$/gm, "").replace(/\s+/g, " ").trim().slice(0, 300);
-}
+/** Shared with the hourly catalogue sync so both embed notes the same way. */
+export const excerptFromBody = indexExcerpt;
 
 export async function buildIndex(pages: Page[], embed: EmbedFn): Promise<IndexEntry[]> {
   const vectors: number[][] = [];
   for (let offset = 0; offset < pages.length; offset += BATCH) {
     const chunk = pages.slice(offset, offset + BATCH);
-    const embedded = await embed(chunk.map(page => `${page.title}\n\n${excerptFromBody(page.body)}`));
+    const embedded = await embed(chunk.map(embeddingText));
     vectors.push(...embedded);
   }
   return pages.map((page, index) => ({
@@ -67,7 +67,7 @@ async function main() {
   const local = await loadLocalStagedPages((done, total) => {
     console.log(`Loaded ${done}/${total} local pages`);
   });
-  const pages = local ?? (await createDataRepo().listPages());
+  const pages = local ?? (await listDataRepoPages());
   const source = local ? "migrated/data-repo" : "data repo / fixtures";
   console.log(`Using ${pages.length} pages from ${source}`);
   const lexicalPath = path.join(outputDir, "lexical-corpus.json");

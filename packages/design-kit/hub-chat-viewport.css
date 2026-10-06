@@ -98,7 +98,9 @@
   body:has(.chat-view:not([hidden]) .hub-ai-bar--thread:focus-within) .hub-mobile-nav,
   body:has(.chat-overlay:not([hidden]) .chat-form:focus-within) .hub-mobile-nav,
   body:has(.coach.chat .chat__composer:focus-within) .hub-mobile-nav,
-  body:has(.coach.chat .chat-floor:focus-within) .hub-mobile-nav {
+  body:has(.coach.chat .chat-floor:focus-within) .hub-mobile-nav,
+  html.vv-keyboard-open:has(.compose) .hub-mobile-nav,
+  body:has(.compose:focus-within) .hub-mobile-nav {
     display: none;
   }
 
@@ -181,7 +183,15 @@
   gap: var(--space-3);
   margin-bottom: var(--space-2);
   padding-block: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
   box-shadow: inset 0 -1px 0 var(--line);
+}
+
+/* Title copy yields to New chat / Tools — never push them past the canvas edge. */
+.page-header.is-chat-rail .page-header__copy {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .page-header.is-chat-rail .page-header__copy > .page-header__eyebrow,
@@ -214,6 +224,13 @@
   flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-2);
+  /* Phone chrome parks labelled actions at flex: 1 0 100% so they wrap under
+     the title. The chat rail stays one row — that 100% basis overflows the
+     canvas and clips New chat. Keep actions intrinsic on the rail. */
+  flex: 0 0 auto;
+  width: auto;
+  max-width: none;
+  margin-left: auto;
 }
 
 .page-header.is-chat-rail .date-chip,
@@ -326,6 +343,7 @@
   }
 
   .page-header.is-chat-rail .chat-new-button,
+  .page-header.is-chat-rail [data-new-chat],
   .chat-view:not([data-panel-mode]) > .chat-view__toolbar .btn {
     min-height: 2.75rem;
   }

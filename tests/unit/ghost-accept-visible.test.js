@@ -255,8 +255,20 @@ test('B4: identical re-propose binds; accepted then re-propose errors', async ()
   const third = await queueCalendarGhostDualPath({
     client, entry, agentSlug: 'clare', proposeOsAction, validateProposeActionInput
   });
-  assert.equal(third.ok, false);
-  assert.equal(third.error, 'ghost_already_decided');
+  assert.equal(third.ok, true);
+  assert.equal(third.ghost_status, 'already_accepted');
+
+  // Dismissed, then Adam asks again: reopened as pending, not refused.
+  const dismissed = parsePendingCalendarGhosts(files.get('pending-calendar-ghosts.json'))
+    .map(g => (g.id === entry.id ? { ...g, status: 'dismissed' } : g));
+  files.set('pending-calendar-ghosts.json', JSON.stringify(dismissed));
+  const fourth = await queueCalendarGhostDualPath({
+    client, entry, agentSlug: 'clare', proposeOsAction, validateProposeActionInput
+  });
+  assert.equal(fourth.ok, true);
+  assert.equal(fourth.ghost_status, 'already_queued');
+  const after = parsePendingCalendarGhosts(files.get('pending-calendar-ghosts.json')).find(g => g.id === entry.id);
+  assert.equal(after.status, 'pending');
 });
 
 test('already_queued re-emits action_proposal for the live pending Confirm (no twin / no silent card)', async () => {

@@ -140,6 +140,7 @@ function chipFromEvent(event) {
   if (!record.time || LOG_TYPES.has(record.type) || record.type === 'knowledge_page') return null;
   if (record.type === 'calendar_block' && (record.kind === 'wall' || record.kind === 'protected')) return null;
   if (record.type === 'calendar_block' && record.status === 'cancelled') return null;
+  // A task's due time is a deadline (Due row). Planned time is a work block.
   if (record.type === 'task' && !record.end_time) return null;
   const workout = workoutOnGrid(record);
   if (workout === 'omit') return null;
@@ -150,6 +151,8 @@ function chipFromEvent(event) {
     : record.end_time
       ? toHour(record.end_time)
       : start + (Number(record.duration_min) || 60) / 60;
+  // A finished block keeps its place on the day, struck through, and stops loading it.
+  const done = (record.type === 'work_block' || record.type === 'task') && record.status === 'done';
   const kind = eventKind(record);
   const isClass = record.type === 'scheduled_lesson' || record.isClass === true;
   const filterKey = kind === 'teaching' || isClass
@@ -182,7 +185,7 @@ function chipFromEvent(event) {
     kind,
     // Prefer lesson title for class chips; class name stays in meta.
     title: isClass ? (record.title || record.class_title || 'Class') : (record.title || kind),
-    meta: workout?.meta ?? feedMeta ?? peopleMeta ?? classMeta,
+    meta: workout?.meta ?? feedMeta ?? peopleMeta ?? (done ? `Done · ${classMeta}` : classMeta),
     isClass,
     protected: record.protected === true || kind === 'corey',
     provider: record.provider || record.clinician || '',
@@ -193,7 +196,8 @@ function chipFromEvent(event) {
     class_id: typeof record.class_id === 'string' ? record.class_id : undefined,
     record,
     ...(record.feed ? { feed: record.feed } : {}),
-    ...(record.ambient ? { ambient: true } : {}),
+    ...(record.ambient || done ? { ambient: true } : {}),
+    ...(done ? { done: true } : {}),
     ...(record.location ? { location: record.location } : {}),
     ...(workout?.skipped ? { skipped: true } : {})
   };
@@ -347,8 +351,42 @@ function dueFor(visual, events, date, useVisual) {
   return [...allDay, ...dueForHubs(visual, events, date, useVisual)];
 }
 
+function taskDueRow(event, date) {
+  const done = event.record.status === 'done';
+  return {
+    ...(done ? { done: true } : {}),
+    id: event.record.id || event.path,
+    date,
+    title: event.record.title || 'Task',
+    kind: 'task',
+    filterKey: 'tasks',
+    source: 'task',
+    time: event.record.time || undefined,
+    meta: [done ? 'Done' : '', event.record.time ? `due ${clockMeta(toHour(event.record.time))}` : ''].filter(Boolean).join(' · '),
+    record: event.record
+  };
+}
+
+function liveTaskDues(events, date) {
+  // Untimed tasks, and timed tasks with no end (a due time is a deadline, not a block).
+  // Done tasks stay, struck through, after the open ones. A task already on the grid
+  // that day (a linked work block) with no deadline time is marked onGrid: planners
+  // still see it here, views do not list it twice.
+  const blocked = new Set((events ?? [])
+    .filter(event => event.record?.type === 'work_block' && event.record.date === date && event.record.task_id && !event.record.ghost && event.record.status !== 'cancelled')
+    .map(event => event.record.task_id));
+  return (events ?? [])
+    .filter(event => event.record?.type === 'task' && event.record.date === date && !(event.record.time && event.record.end_time))
+    .map(event => {
+      const row = taskDueRow(event, date);
+      return !event.record.time && blocked.has(event.record.id) ? { ...row, onGrid: true } : row;
+    })
+    .sort((a, b) => Number(Boolean(a.done)) - Number(Boolean(b.done)) || String(a.time ?? '').localeCompare(String(b.time ?? '')));
+}
+
 function dueForHubs(visual, events, date, useVisual) {
   const promises = promiseDuesFromEvents(events, date);
+  const live = liveTaskDues(events, date);
   if (useVisual) {
     const visualDue = (visual.DUE ?? []).filter(item => item.date === date).map(item => {
       const task = (events ?? []).find(event => event.record?.type === 'task' && event.record.id === item.id);
@@ -357,24 +395,11 @@ function dueForHubs(visual, events, date, useVisual) {
       if (typeof actual === 'string' && actual !== item.date) return { ...withRecord, moved: true, movedTo: actual };
       return withRecord;
     });
-    return [...visualDue, ...promises.filter(item => !visualDue.some(due => due.id === item.id))];
+    // Same contract as chipsFromVisual overlays: a covering visual must not hide live Tasks Due.
+    const extras = live.filter(row => !visualDue.some(due => due.id === row.id));
+    return [...visualDue, ...extras, ...promises.filter(item => !visualDue.some(due => due.id === item.id))];
   }
-  // Untimed tasks, and timed tasks with no end (a due time is a deadline, not a block).
-  const tasks = (events ?? [])
-    .filter(event => event.record?.type === 'task' && event.record.date === date && !(event.record.time && event.record.end_time))
-    .map(event => ({
-      id: event.record.id || event.path,
-      date,
-      title: event.record.title || 'Task',
-      kind: 'task',
-      filterKey: 'tasks',
-      source: 'task',
-      time: event.record.time || undefined,
-      meta: event.record.time ? `due ${clockMeta(toHour(event.record.time))}` : '',
-      record: event.record
-    }))
-    .sort((a, b) => String(a.time ?? '').localeCompare(String(b.time ?? '')));
-  return [...tasks, ...promises];
+  return [...live, ...promises];
 }
 
 function wallsFor(visual, events, date, useVisual) {
@@ -440,8 +465,8 @@ function sleepLabel(date, week, events, today, terms) {
 function sourceCounts(days) {
   const counts = Object.fromEntries(SOURCE_ORDER.map(id => [id, 0]));
   for (const day of days) {
-    for (const chip of day.chips) counts[chip.kind] = (counts[chip.kind] ?? 0) + 1;
-    for (const due of day.due) if (due.kind !== 'promise' && due.kind !== 'allday') counts.task += 1;
+    for (const chip of day.chips) if (!chip.done) counts[chip.kind] = (counts[chip.kind] ?? 0) + 1;
+    for (const due of day.due) if (due.kind !== 'promise' && due.kind !== 'allday' && !due.done) counts.task += 1;
   }
   return SOURCE_ORDER
     .filter(id => counts[id] > 0)
@@ -488,7 +513,7 @@ export function buildTidelineModel({
   const useVisual = visualCovers(visual, week);
   const ghostList = Array.isArray(ghosts) ? ghosts : (useVisual ? (visual?.GHOSTS ?? []) : []);
   const holiday = date => isSchoolHoliday(date, schoolTerms);
-  const capacity = capacityForDates(events, week, { isHoliday: holiday });
+  const capacity = capacityForDates(events, week, { isHoliday: holiday, today });
   // A failed or in-flight Life fetch has no diaries yet. "no logs" would
   // claim Adam didn't write them. Keep a real diary day's note when one arrived.
   if (lifeLogStatus !== 'live') {
@@ -499,12 +524,35 @@ export function buildTidelineModel({
       }
     }
   }
+  // A block for a task that is ticked off reads as done too. The tick on a block also
+  // needs to know whether other open blocks remain for its task (calendar-item-actions).
+  const taskStatus = new Map();
+  const openBlocks = new Map();
+  for (const event of events ?? []) {
+    const record = event?.record;
+    if (record?.type === 'task' && record.id) taskStatus.set(record.id, record.status ?? 'open');
+    if (record?.type === 'work_block' && record.task_id && !record.ghost && record.status !== 'done' && record.status !== 'cancelled') {
+      openBlocks.set(record.task_id, (openBlocks.get(record.task_id) ?? 0) + 1);
+    }
+  }
+  const markLinked = chip => {
+    const taskId = chip.record?.type === 'work_block' ? chip.record.task_id : null;
+    if (!taskId) return chip;
+    chip.taskStatus = taskStatus.get(taskId);
+    chip.taskOpenBlocks = openBlocks.get(taskId) ?? 0;
+    if (chip.taskStatus === 'done' && !chip.done) {
+      chip.done = true;
+      chip.ambient = true;
+      chip.meta = `Done · ${chip.meta ?? ''}`.replace(/ · $/, '');
+    }
+    return chip;
+  };
   const medLogs = medicationLogs(events);
   const usualDoses = usualDoseTimes(medLogs, today);
   const days = week.map(date => {
     const chips = appendGhostChips(useVisual ? chipsFromVisual(visual, date, events) : mergeMedical(
       (events ?? []).map(chipFromEvent).filter(chip => chip && chip.date === date)
-    ), ghostList, date);
+    ), ghostList, date).map(markLinked);
     const cap = capacity.get(date);
     const load = dayLoadHours(chips.filter(chip => !chip.ambient).map(chip => ({
       start: chip.start,
