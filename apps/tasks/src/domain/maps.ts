@@ -1,6 +1,6 @@
 import type { MapStation, Point, TickAttach, TransitMap } from '@/schemas/map';
 import type { SchoolYearTerms } from '@/domain/hub-prefs';
-import { layoutMap, MAP_LEFT, normalizeLineColors, wrapEventLines } from '@/domain/maps-layout';
+import { layoutMap, MAP_CAP_LABEL_GAP, MAP_CAP_PILL_H, MAP_LEFT, normalizeLineColors, wrapEventLines } from '@/domain/maps-layout';
 import { swatch } from '@/domain/maps-colors';
 import { mindWorks2026Map } from '@/domain/maps-seed';
 
@@ -142,15 +142,22 @@ function renderExportSvg(map: TransitMap, years?: readonly SchoolYearTerms[] | n
           `<line x1="${track.x}" y1="${cut.y0}" x2="${track.x}" y2="${cut.y1}" stroke="${tone.stroke}" stroke-width="8" stroke-linecap="round"/>`
         );
       }
-      const labelY = track.disc.cy - track.disc.r - 36;
-      const pillW = Math.max(56, track.label.length * 9 + 20);
-      const pillH = 24;
-      parts.push(
-        `<rect x="${track.disc.cx - pillW / 2}" y="${labelY - pillH / 2}" width="${pillW}" height="${pillH}" rx="${pillH / 2}" fill="#fbf8f2" stroke="${tone.stroke}" stroke-width="2"/>`,
-        `<text x="${track.disc.cx}" y="${labelY + 5}" text-anchor="middle" font-size="15" fill="${tone.stroke}" font-weight="600">${escapeHtml(track.label)}</text>`,
-        `<circle cx="${track.disc.cx}" cy="${track.disc.cy}" r="${track.disc.r}" fill="${tone.disc}"/>`,
-        `<text x="${track.disc.cx}" y="${track.disc.cy + 5}" text-anchor="middle" font-size="16" fill="${tone.letter}" font-weight="700">${escapeHtml(line.letter)}</text>`
-      );
+      for (const cap of [
+        { disc: track.disc, place: 'above' as const },
+        { disc: track.end, place: 'below' as const }
+      ]) {
+        const labelY =
+          cap.place === 'above'
+            ? cap.disc.cy - cap.disc.r - MAP_CAP_LABEL_GAP
+            : cap.disc.cy + cap.disc.r + MAP_CAP_LABEL_GAP;
+        const pillW = Math.max(56, track.label.length * 9 + 20);
+        parts.push(
+          `<rect x="${cap.disc.cx - pillW / 2}" y="${labelY - MAP_CAP_PILL_H / 2}" width="${pillW}" height="${MAP_CAP_PILL_H}" rx="${MAP_CAP_PILL_H / 2}" fill="#fbf8f2" stroke="${tone.stroke}" stroke-width="2"/>`,
+          `<text x="${cap.disc.cx}" y="${labelY + 5}" text-anchor="middle" font-size="15" fill="${tone.stroke}" font-weight="600">${escapeHtml(track.label)}</text>`,
+          `<circle cx="${cap.disc.cx}" cy="${cap.disc.cy}" r="${cap.disc.r}" fill="${tone.disc}"/>`,
+          `<text x="${cap.disc.cx}" y="${cap.disc.cy + 5}" text-anchor="middle" font-size="16" fill="${tone.letter}" font-weight="700">${escapeHtml(line.letter)}</text>`
+        );
+      }
     }
   }
   for (const connector of layout.connectors) {

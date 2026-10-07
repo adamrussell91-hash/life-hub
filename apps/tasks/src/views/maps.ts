@@ -23,6 +23,8 @@ import {
   dateToY,
   layoutMap,
   lineTrackDefs,
+  MAP_CAP_LABEL_GAP,
+  MAP_CAP_PILL_H,
   LINE_COLORS,
   lineColorsNeedWriteback,
   missingStandardYearTracks,
@@ -344,6 +346,56 @@ function discFill(color: MapColorToken): string {
   return discCss(color);
 }
 
+function appendTrackCap(
+  parent: SVGElement,
+  disc: { cx: number; cy: number; r: number },
+  name: string,
+  stroke: string,
+  color: MapColorToken,
+  letter: string,
+  place: 'above' | 'below'
+): void {
+  const labelY = place === 'above' ? disc.cy - disc.r - MAP_CAP_LABEL_GAP : disc.cy + disc.r + MAP_CAP_LABEL_GAP;
+  const pillW = Math.max(56, name.length * 9 + 20);
+  parent.append(
+    svgEl('rect', {
+      x: String(disc.cx - pillW / 2),
+      y: String(labelY - MAP_CAP_PILL_H / 2),
+      width: String(pillW),
+      height: String(MAP_CAP_PILL_H),
+      rx: String(MAP_CAP_PILL_H / 2),
+      class: 'map-track-label__pill',
+      fill: 'var(--paper)',
+      stroke,
+      'stroke-width': '2'
+    })
+  );
+  const label = svgEl('text', {
+    x: String(disc.cx),
+    y: String(labelY + 5),
+    'text-anchor': 'middle',
+    class: 'map-track-label',
+    fill: stroke
+  });
+  label.textContent = name;
+  const mark = svgEl('circle', {
+    cx: String(disc.cx),
+    cy: String(disc.cy),
+    r: String(disc.r),
+    fill: discFill(color),
+    class: 'map-line-disc'
+  });
+  const glyph = svgEl('text', {
+    x: String(disc.cx),
+    y: String(disc.cy + 6),
+    'text-anchor': 'middle',
+    class: 'map-line-letter',
+    fill: letterFill(color)
+  });
+  glyph.textContent = letter;
+  parent.append(label, mark, glyph);
+}
+
 function renderMapSvg(
   host: SVGSVGElement,
   layout: MapCanvasLayout,
@@ -407,46 +459,8 @@ function renderMapSvg(
           })
         );
       }
-      const labelY = item.disc.cy - item.disc.r - 36;
-      const pillW = Math.max(56, item.label.length * 9 + 20);
-      const pillH = 24;
-      track.append(
-        svgEl('rect', {
-          x: String(item.disc.cx - pillW / 2),
-          y: String(labelY - pillH / 2),
-          width: String(pillW),
-          height: String(pillH),
-          rx: String(pillH / 2),
-          class: 'map-track-label__pill',
-          fill: 'var(--paper)',
-          stroke: color,
-          'stroke-width': '2'
-        })
-      );
-      const label = svgEl('text', {
-        x: String(item.disc.cx),
-        y: String(labelY + 5),
-        'text-anchor': 'middle',
-        class: 'map-track-label',
-        fill: color
-      });
-      label.textContent = item.label;
-      const disc = svgEl('circle', {
-        cx: String(item.disc.cx),
-        cy: String(item.disc.cy),
-        r: String(item.disc.r),
-        fill: discFill(line.color),
-        class: 'map-line-disc'
-      });
-      const letter = svgEl('text', {
-        x: String(item.disc.cx),
-        y: String(item.disc.cy + 6),
-        'text-anchor': 'middle',
-        class: 'map-line-letter',
-        fill: letterFill(line.color)
-      });
-      letter.textContent = line.letter;
-      track.append(label, disc, letter);
+      appendTrackCap(track, item.disc, item.label, color, line.color, line.letter, 'above');
+      appendTrackCap(track, item.end, item.label, color, line.color, line.letter, 'below');
     }
     root.append(track);
   }
@@ -645,7 +659,13 @@ function hitMap(
     }
   }
   for (const line of layout.lines) {
-    if (line.tracks.some((track) => Math.hypot(x - track.disc.cx, y - track.disc.cy) <= track.disc.r + 6)) {
+    if (
+      line.tracks.some(
+        (track) =>
+          Math.hypot(x - track.disc.cx, y - track.disc.cy) <= track.disc.r + 6 ||
+          Math.hypot(x - track.end.cx, y - track.end.cy) <= track.end.r + 6
+      )
+    ) {
       return { kind: 'line', id: line.id };
     }
     if (
