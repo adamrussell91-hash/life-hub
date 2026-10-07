@@ -51,4 +51,18 @@ describe('add form docked actions (R4)', () => {
     expect(css).toMatch(/\.addform__actions \.btn[\s\S]*?min-height:\s*2\.75rem/);
     expect(css).toMatch(/@media \(max-width: 719px\)[\s\S]*?\.addform__actions \.btn[\s\S]*?min-height:\s*3rem/);
   });
+
+  it('offers Post home as a stop type', () => {
+    const host = document.createElement('div');
+    renderAddForm(host, {
+      trip,
+      tripId: trip.id,
+      version: 'sha-v1',
+      onSaved: vi.fn(),
+      onClose: vi.fn()
+    });
+    const typeSeg = host.querySelector('.seg[aria-label="Type"]');
+    const labels = [...(typeSeg?.querySelectorAll('button') ?? [])].map((b) => b.textContent);
+    expect(labels).toEqual(['Thing to do', 'Food', 'Post home', 'Stay', 'Flight', 'Train']);
+  });
 });

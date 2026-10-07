@@ -1,7 +1,7 @@
 import { Map as MapLibreMap, Marker, NavigationControl, LngLatBounds } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { City, Item } from '@/types';
-import { itemPlace, numberStops } from '@/model/day';
+import type { City, IsoDate, Item } from '@/types';
+import { itemPlace, numberStops, orderDayItems } from '@/model/day';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 
@@ -14,6 +14,8 @@ export interface DayMapHandle {
 
 function markerElement(item: Item, number: number | undefined, accent: string): HTMLDivElement {
   const el = document.createElement('div');
+  el.dataset.itemId = item.id;
+  if (number != null) el.dataset.stopNumber = String(number);
   if (item.kind === 'stay') {
     el.className = 'pin pin--stay';
     el.style.background = '#17375e';
@@ -46,7 +48,7 @@ export function renderDayMap(
   host: HTMLElement,
   city: City,
   items: Item[],
-  options: { cooperativeGestures?: boolean } = {}
+  options: { cooperativeGestures?: boolean; viewDate?: IsoDate } = {}
 ): DayMapHandle {
   host.replaceChildren();
   const map = new MapLibreMap({
@@ -60,11 +62,13 @@ export function renderDayMap(
   map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
   (host as HTMLElement & { _travelMap?: MapLibreMap })._travelMap = map;
 
-  const numbers = numberStops(items);
+  // Same order as the day list — otherwise pin numbers disagree with plan items.
+  const ordered = orderDayItems(items, options.viewDate);
+  const numbers = numberStops(ordered);
   const markers = new Map<string, Marker>();
   let onSelectCb: ((itemId: string) => void) | null = null;
 
-  const pinned = items.filter((item) => itemPlace(item));
+  const pinned = ordered.filter((item) => itemPlace(item));
   const withinRange = pinned.filter((item) => haversineRough(city.center, itemPlace(item)!) <= 60);
 
   map.on('load', () => {

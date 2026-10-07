@@ -59,6 +59,21 @@ test('normalizeItem keeps locationless itinerary tasks valid', () => {
   assert.equal(remoteTask.title, 'Apply for an ETA');
 });
 
+test('normalizeItem accepts post (post home) kind', () => {
+  const item = normalizeItem({
+    kind: 'post',
+    title: 'Post parcels home',
+    city_id: 'lis',
+    date: '2027-03-04',
+    time: '11:00',
+    note: 'Send winter clothes',
+    status: 'planned',
+    place: { name: 'CTT Correios', lat: 38.71, lon: -9.14 }
+  });
+  assert.equal(item.kind, 'post');
+  assert.equal(item.place.name, 'CTT Correios');
+});
+
 const ticketBase = {
   title: 'ScotRail',
   city_id: 'lis',
