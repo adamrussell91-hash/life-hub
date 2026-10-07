@@ -3,6 +3,15 @@
 **Status:** For Adam to fill in. Not a build brief.
 **Used by:** Track B and Slice 2a in [life-city-build-plan.md](life-city-build-plan.md). The layout engine treats everything here as fixed ground that records build around.
 
+## Interim ground (until Adam fills this in)
+
+Adam's call on 7 October 2026, so the layout engine has ground to build around. It is a placeholder, not the final design. Replace it before the big build.
+
+- **Harbour along the south edge.** This is the public edge: no route or life wall may close it.
+- **A river along the east edge,** running north into the harbour.
+- Everything else is open land. Districts grow north and west, away from the water.
+- The corner and all names are still open.
+
 Answer as loosely as you like: dot points, a sketch photo, or "like this place". Leave anything blank that you have no view on yet.
 
 ## The public edge
@@ -50,3 +59,4 @@ Each hub becomes a district. Do any of them have a place in mind?
 ## History
 
 - **2026-10-07:** Created as a blank brief for Adam.
+- **2026-10-07:** Interim ground added: harbour to the south, river to the east.
