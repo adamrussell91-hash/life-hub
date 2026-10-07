@@ -75,7 +75,7 @@ interface ItemBase {
 }
 
 export interface PlaceItem extends ItemBase {
-  kind: 'do' | 'food' | 'transit' | 'med';
+  kind: 'do' | 'food' | 'transit' | 'med' | 'post';
   place?: Place;
   off_map_label?: string;
 }

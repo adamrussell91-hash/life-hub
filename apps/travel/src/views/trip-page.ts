@@ -315,11 +315,14 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       });
       dayMapHandle?.destroy();
       dayMapHandle = null;
-      const dayItems = itemsForCityDay(trip, city.id, selectedDate);
+      const dayItems = orderDayItems(itemsForCityDay(trip, city.id, selectedDate), selectedDate);
       const render = ++dayMapRender;
       void import('@/components/day-map').then(({ renderDayMap }) => {
         if (render !== dayMapRender || !mapInner.isConnected) return;
-        dayMapHandle = renderDayMap(mapInner, city, dayItems, { cooperativeGestures: window.innerWidth < 720 });
+        dayMapHandle = renderDayMap(mapInner, city, dayItems, {
+          cooperativeGestures: window.innerWidth < 720,
+          viewDate: selectedDate
+        });
         dayMapHandle.onSelect((itemId) => {
           listCol.querySelectorAll('.stop').forEach((el) => el.classList.remove('is-on'));
           listCol.querySelector(`[data-item-id="${itemId}"]`)?.classList.add('is-on');

@@ -7,13 +7,13 @@ import { makeId, normalizeItem, validateTrip } from './travel-schema.mjs';
 import { clean, makeProposal } from './agent-propose-helpers.mjs';
 
 const TRIP_ID_RE = /^[a-z0-9_]{4,64}$/i;
-const KINDS = new Set(['do', 'food', 'transit', 'med', 'stay', 'flight', 'train', 'checkin_slot']);
+const KINDS = new Set(['do', 'food', 'transit', 'med', 'post', 'stay', 'flight', 'train', 'checkin_slot']);
 
 export function proposeTravelItemSchema() {
   return {
     name: 'propose_travel_item',
     description:
-      'Propose adding an itinerary item to a Travel trip (do/food/transit/stay/flight/train/…). Nothing is saved until Adam taps Confirm. Requires trip_id and the current if_version from the trip (load the trip first when unsure). Physical do, food and transit stops require a place with name, latitude and longitude; use a clear off_map_label only when the stop genuinely has no fixed location.',
+      'Propose adding an itinerary item to a Travel trip (do/food/transit/post/stay/flight/train/…). Nothing is saved until Adam taps Confirm. Requires trip_id and the current if_version from the trip (load the trip first when unsure). Physical do, food, transit and post stops require a place with name, latitude and longitude; use a clear off_map_label only when the stop genuinely has no fixed location.',
     input_schema: {
       type: 'object',
       properties: {
@@ -108,7 +108,7 @@ export async function buildTravelItemProposal(input, { loadTrip } = {}) {
   }
 
   const requiresPinnedPlace =
-    ['do', 'food', 'transit'].includes(normalized.kind) &&
+    ['do', 'food', 'transit', 'post'].includes(normalized.kind) &&
     !normalized.place &&
     !clean(normalized.off_map_label, 160);
   if (requiresPinnedPlace) {

@@ -3,11 +3,12 @@ import { addItem, editItem, getTrip, parseEmail, removeItem, searchPlaces } from
 import { ApiClientError } from '@/api/client';
 import { daysForCity } from '@/model/day';
 
-type FormKind = 'do' | 'food' | 'stay' | 'flight' | 'train';
+type FormKind = 'do' | 'food' | 'post' | 'stay' | 'flight' | 'train';
 
 const KIND_LABELS: Record<FormKind, string> = {
   do: 'Thing to do',
   food: 'Food',
+  post: 'Post home',
   stay: 'Stay',
   flight: 'Flight',
   train: 'Train'
@@ -74,7 +75,9 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
       ? editing.kind
       : editing?.kind === 'food'
         ? 'food'
-        : 'do';
+        : editing?.kind === 'post'
+          ? 'post'
+          : 'do';
   let kind: FormKind = initialKind;
 
   const seg = document.createElement('div');
@@ -583,7 +586,7 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
   /** Checks the server would reject, caught here so the message names the field. */
   function checkBeforeSave(): { message: string; el: HTMLElement } | null {
     if (!titleInput.value.trim()) return { message: 'Add a title.', el: titleInput };
-    if ((kind === 'do' || kind === 'food') && !placeDraft) {
+    if ((kind === 'do' || kind === 'food' || kind === 'post') && !placeDraft) {
       return { message: 'Choose a place from the search results or Pick on map before saving this stop.', el: placeSearch };
     }
     if (kind === 'flight' || kind === 'train') {

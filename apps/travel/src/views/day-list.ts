@@ -33,6 +33,7 @@ function tagFor(item: Item): { cls: string; label: string } | null {
   if (item.status === 'booked') return { cls: 'booked', label: 'Booked' };
   if (item.status === 'idea') return { cls: 'idea', label: 'Idea' };
   if (item.kind === 'med') return { cls: 'med', label: 'Private' };
+  if (item.kind === 'post') return { cls: 'post', label: 'Post home' };
   return null;
 }
 
@@ -51,6 +52,7 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
   if (item.kind === 'flight') dot.innerHTML = I.planeR;
   else if (item.kind === 'train') dot.innerHTML = I.trainR;
   else if (item.kind === 'stay') dot.innerHTML = I.bed;
+  else if (item.kind === 'post' && !number) dot.innerHTML = I.post;
   else dot.textContent = number ? String(number) : '';
   const line = document.createElement('div');
   line.className = 'line';
