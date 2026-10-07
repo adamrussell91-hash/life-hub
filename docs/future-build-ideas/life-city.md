@@ -143,16 +143,115 @@ Life City needs a tiny fraction of OpenTTD: no money, no crashes, no freight eco
 
 A rough chat prototype (code-drawn SVG, not Kenney art) proved the feel: an isometric grid with glass towers around a central interchange, a park and fountain, a harbour with bridge and ferry, and a bus, tram and car moving along roads. An earlier flat transit-map version showed a "drop a life wall" button rerouting a bus around a closure. Neither is production code.
 
-## 7. Open questions
+## 7. What if rounds
+
+Adam is running iterative "what if" rounds between Claude Code, Cursor and ChatGPT Codex. Each round a contributor plays two idea cards (Extend, Substitute, Combine, Adapt, Magnify, Put to another use) and may edit any part of this file. Nothing here is a decision until Adam names a slice to build.
+
+### Round 1 · Claude Code · Extend + Adapt
+
+> **Author note:** This round was written by Claude Code (Claude Opus 5.5) on 7 October 2026. Cards played: **Extend** and **Adapt**. Everything below is a proposal for the other contributors to build on, challenge or replace.
+
+#### Extend: Harbour City, a city that could only be Adam's
+
+The base doc describes a friendly toy city. The risk is that it ends up generic, a city anyone could have. This extension makes it unmistakably Adam's by borrowing the shape of Sydney and the cast of Life Hub, without ever becoming a literal map.
+
+**1. Sydney's bones, toy-sized.**
+The harbour is the spine of the map, with water running through the middle rather than sitting at the edge. The bridge is the one crossing that everything funnels across. Ferries already exist in the base doc as cross-hub links; in Harbour City they become the most important vehicles on the map rather than a side feature.
+
+- **North shore: work.** The Teaching district sits at the north foot of the bridge, the way Adam's school sits beside the real one. Professional sits beside it.
+- **South side: life.** Body, Mind, Fitness, Nutrition, Skincare, Travel and Knowledge spread along the southern shore.
+- **The bridge is the commute between them.** In heavy school weeks the bridge is jammed northbound in the morning. In holidays it is nearly empty. A glance at the bridge tells Adam how much of his week school is taking.
+- **The CBD is Tasks.** Clare's interchange, where most lines meet, is the city centre.
+
+The geography is a suggestion of Sydney (harbour, bridge, ferries, headlands), not a copy of it. It should be readable to anyone but feel like home to Adam.
+
+**2. Every named agent gets a vehicle, a depot and a uniform.**
+This answers the open question "Which agents become which services?" with a first draft. Each agent's service matches what the agent actually does in Life Hub (`config/agents.yml`).
+
+| Agent | Domain | City service | Depot | What it tells Adam |
+|-------|--------|--------------|-------|--------------------|
+| Clare DeMind | Tasks | The network signal box and the big departures board in the CBD | Central interchange | What is next, what is late, what is blocked |
+| General Hammond | Life coaching | Harbour control tower | Headland tower | Rerouting around life walls; he is the one who "reroutes the city" when a plan changes |
+| Ann O'Tation | Teaching | School buses | North shore depot | Teaching load; more buses in marking weeks |
+| Professor Clementine Haig | Knowledge | The library tram, with a book cart | Library on the main square | Reading and notes in motion; the tram stops at the library when a note is added |
+| Brisket Lasso | Nutrition | The food truck (already in the base doc) | Market hall | A meal or macros due; drives off once logged |
+| Chadwick Flexington | Fitness | Stadium shuttle and the running track around the park | Stadium | Training sessions; the park greys out if they are skipped |
+| Dr Sara Tonin | Body | The ambulance (already in the base doc) | Hospital | Medical appointments and bloods coming up |
+| Dr Vera Lenz | Psychology | The weather station and lighthouse on the headland | Lighthouse | Mind check-ins drive the city's weather; the lighthouse beam sweeps when a check-in is due |
+| Hyaluronica St. Claire | Skincare | A street sweeper doing a morning and evening round | Day spa | AM and PM routines; streets look freshly washed once done |
+| Penelope Rose Quillian | Diary | The night mail train that collects the day | Post office | The evening diary prompt; the train leaves once the entry is written |
+
+Uniforms are the agent's line colour applied to Kenney's vehicles (CC0, so recolouring is allowed). Tapping any service opens that agent.
+
+**3. Driverless metro for work that runs without Adam.**
+Sydney Metro is a fully driverless network ([Rail Journal](https://www.railjournal.com/rolling-stock/first-driverless-trains-for-sydney-city-and-southwest-line-enter-service/); [TK Elevator overview](https://www.tkelevator.com/global-en/newsroom/blog/exploring-sydney-metro-an-all-new-driverless-metro-network/)). Life City can borrow that as a meaning, not just a look:
+
+- **Driverless trains** are lines whose next steps an agent can complete on its own (scheduled automations, imports, reminders).
+- **Staffed trains**, with a visible driver, are lines that need Adam's hand or confirmation.
+- A staffed train waiting at a platform with its doors open is the same as "agent awaiting confirmation" in the base doc, but now it reads instantly: something is waiting for *you*.
+
+Over time Adam can literally watch more of the network go driverless as he trusts more automations.
+
+**4. Personal landmarks, chosen by Adam.**
+The base doc says finished projects become landmarks. Extend that: big life milestones get bespoke landmarks that Adam names and places himself, and they never move. Examples from the repo itself include the 2026 wedding (already in the gap map as an archive) and major professional milestones such as accreditation or finishing a degree. A small plaque on each records the date. The city slowly becomes a memoir.
+
+**5. Vacant lots for districts that do not exist yet.**
+The Notion → GitHub gap map lists areas with no home in Life Hub (house records, renovations, car records, watches, writing projects, tax and insurance). Each becomes a **fenced vacant lot with a development application sign** on the edge of the map: "DA lodged: Watch Collection". When Adam names a slice to build, a crane arrives. When it ships, a new district opens with the `district.opened` event.
+
+This turns the migration backlog into something Adam can see and enjoy clearing. Day-to-day finances are not coming over from Notion, so they get no lot.
+
+#### Adapt: GTFS as the city's internal language
+
+**The problem.** The base doc's city events contract is a good start, but three tools (Claude Code, Cursor, Codex) are going to name things differently unless the vocabulary is fixed. Inventing a vocabulary invites drift.
+
+**The adaptation.** Public transport already has a shared language: the General Transit Feed Specification (GTFS). Transit agencies worldwide publish their networks in it, including Transport for NSW, and it is what trip planners and map apps read. It has a **static** part (the network: routes, stops, timetables, shapes) and a **realtime** part (trip updates, vehicle positions and service alerts) ([GTFS.org](https://gtfs.org/getting_started/features/base_add-ons); [OpenStreetMap wiki](https://wiki.openstreetmap.org/wiki/General_Transit_Feed_Specification)).
+
+Life City could keep its data in a GTFS-shaped form internally. It would not be a real feed published anywhere, just the same shapes and names.
+
+| GTFS file or entity | Life City meaning |
+|---------------------|-------------------|
+| `agency` | A hub (district) |
+| `routes` with `route_type` | Dreams (rail), goals (metro), projects (bus), routines (tram), cross-hub links (ferry). These are all real GTFS route types |
+| `route_color` | The Life Hub line colour for that goal or project |
+| `stops` | Tasks |
+| `trips` + `stop_times` | The planned order of tasks along a project and their due dates |
+| `transfers` | Interchanges, where one task is shared by several goals or projects |
+| `frequencies` | Recurring routines (bloods, macros, Mind check-ins) |
+| `calendar` / `calendar_dates` | Term rhythm. GTFS already models "school weeks run one timetable, holidays run another" |
+| `shapes` | The drawn path the layout engine gives each route, so it stays put between visits |
+| Realtime: trip updates | Overdue tasks, shown as delays |
+| Realtime: vehicle positions | Agent activity, shown as moving vehicles |
+| Realtime: service alerts | Blockers and life walls |
+
+**How it fits the existing contract.** The city events in section 5 become the realtime layer. A GTFS-shaped snapshot becomes the static layer the renderer loads first. Renderer and back end both build to one published vocabulary that none of the three tools invented, which is exactly what the "Who builds what" split needs.
+
+**What it unlocks.**
+
+- **A trip planner for life.** "How do I get to [goal]?" returns the remaining stops, the interchanges on the way and an expected arrival date, the way a transit app plans a journey. Clare could answer in the same language: "Two stops and one change to the end of this project. Expected arrival 24 October."
+- **A departures board.** The CBD board lists today's next services in plain transit language: "Next: Year 10 marking · Platform 2 · 4:30 pm · On time". On a phone this may be more useful than the city itself: a glanceable list that still belongs to the metaphor.
+- **Free validation and tooling ideas.** There are open validators and trip planning engines for GTFS. As with OpenTTD, borrow ideas and test against them; check each licence before any code comes near Life Hub.
+
+**A second, smaller adaptation: Mini Metro's pressure rings.**
+In the game Mini Metro, a crowded station shows a ring that slowly fills before the line fails. That is a better overdue signal than a red badge. A task stop that is getting stale grows a ring around it, filling day by day, so Adam sees trouble coming before it arrives. As with OpenTTD, this borrows the mechanic only; Mini Metro is a commercial game and none of its art or code comes near Life Hub.
+
+#### New open questions from round 1
+
+- Is the Sydney geography too personal to share in a screenshot, or exactly the point?
+- Should the departures board be the phone default, with the full city as the desktop view?
+- Who decides when a line becomes driverless: Adam, or the agent after a run of confirmed successes?
+- Which milestones earn a bespoke landmark, and can Adam move or rename them later?
+
+## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load?
 - How many vehicles before it gets noisy on a phone at 390px?
 - Is Life City a hub page of its own, or a mode of the Tasks Hub Lines view?
 - Tap interactions: does tapping a bus open the project, a stop open the task?
-- Which agents become which services, and do they get uniforms?
+- Which agents become which services, and do they get uniforms? (First draft in round 1)
 - How are archived or deleted items handled? (Repo rule: deleted means gone; archived could become landmarks)
 - Sound? (Off by default, presumably)
 
-## 8. Contributions log
+## 9. Contributions log
 
 - **2026-10-07, Claude:** Created this doc from the chat thought experiment with Adam.
+- **2026-10-07, Claude Code:** Round 1 of the what if game (Extend + Adapt). Added section 7 with Harbour City, agent services, driverless lines, landmarks, vacant lots, the GTFS-shaped vocabulary and pressure rings. Renumbered Open questions to 8 and this log to 9.
