@@ -40,7 +40,7 @@ The plan picked **PixiJS (2D sprites)** because it expected 2D isometric tiles. 
 1. **Keep PixiJS.** Render every 3D model into 2D sprites through a Blender rig, at four angles each. That is the Track A rig, run by Codex on Adam's Mac. Sprites must be re-rendered whenever a model is added.
 2. **Switch to Three.js with a fixed orthographic camera** and load the GLB models directly. The isometric look is the same, rotation and zoom come free (a Cities: Skylines feel), there is no Blender rig and nothing to re-render, and new models drop straight in. The catalogue already lists Three.js (MIT). The costs: picking and occlusion work differently from 2D, Three.js is a bigger download than Pixi (it still lazy-loads on the city page only, W4), and the Home tile still needs a pre-rendered image.
 
-**Recommendation: route 2.** The assets that arrived are 3D, Adam wants a Skylines-style visit, and it removes the Blender rig from the critical path. Adam's call, because it changes the Stack section of the build plan.
+**Decided: route 2 (Three.js).** Adam's call, 7 October 2026. The build plan's Stack section now says so.
 
 ## Gaps to fill
 
@@ -50,7 +50,7 @@ The plan picked **PixiJS (2D sprites)** because it expected 2D isometric tiles. 
 
 ## Repo size
 
-268 MB of mostly unused models now sit in the public repo's history and slow every fresh clone. Removing them later does not shrink history. Before the big build, consider keeping only the packs Life City uses and moving the rest out of the repo.
+268 MB of mostly unused models now sit in the public repo's history and slow every fresh clone. Removing them later does not shrink history. Adam's call: delete the unused packs once the build is complete and it is clear which are used.
 
 ## History
 
