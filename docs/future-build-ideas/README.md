@@ -15,3 +15,4 @@ A parking lot for big ideas that are not scheduled yet. Nothing in this folder i
 | Idea | Status | File |
 |------|--------|------|
 | Life City: Life Hub as a living transit city | Thought experiment | [life-city.md](life-city.md) |
+| Notion → GitHub gap map | Future build inventory | [notion-github-gap-map.md](notion-github-gap-map.md) |
