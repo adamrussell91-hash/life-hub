@@ -18,14 +18,11 @@ import { createMapToolbar } from '@/views/map-chrome';
 import {
   applyDateSpanToStation,
   applyDateToTickAttach,
-  addExtraYearTrack,
-  addStandardYearTrack,
   dateToY,
   layoutMap,
   lineTrackDefs,
   LINE_COLORS,
   lineColorsNeedWriteback,
-  missingStandardYearTracks,
   moveLine,
   nextLineLetter,
   nextLineX,
@@ -38,8 +35,17 @@ import {
   type MapCanvasLayout
 } from '@/domain/maps-layout';
 import { discCss, fillCss, letterCss, strokeCss } from '@/domain/maps-colors';
-import { createHubField } from '@/views/hub-kit';
+import { createHubField, createHubFilter } from '@/views/hub-kit';
+import { mapItemKindLabel } from '@/domain/maps-planning';
+import {
+  buildLineEditor,
+  createMapInspector,
+  inspectorButton,
+  inspectorField,
+  inspectorText
+} from '@/views/map-inspector';
 import { showViewLoading } from '@/views/feedback';
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 
 export { mapsOrSeed };
 
@@ -155,6 +161,28 @@ function focusCameraOnY(layout: MapCanvasLayout, targetY: number, zoom: number):
   return Math.max(0, Math.min(layout.height - viewH, targetY - viewH / 3));
 }
 
+/** The canvas is 3–4k units wide, so a narrow stage needs well past 2× to read. */
+const MAP_MAX_ZOOM = 5;
+
+/** On-screen px per map unit we aim for on load, so 18-unit labels read at ~13px. */
+const READABLE_SCALE = 0.75;
+
+/**
+ * Starting zoom: the whole-year canvas is ~3–4k units wide, so fitting it to the
+ * stage drew every label at 5–7px. Zoom in until text is readable; − still shows it all.
+ */
+function stageFit(svg: SVGSVGElement, layout: MapCanvasLayout): number {
+  const rect = svg.getBoundingClientRect();
+  if (!rect.width || !rect.height) return 0;
+  return Math.max(rect.width / layout.width, rect.height / layout.height);
+}
+
+function readableZoom(svg: SVGSVGElement, layout: MapCanvasLayout): number {
+  const fit = stageFit(svg, layout);
+  if (!fit) return 1;
+  return Math.min(MAP_MAX_ZOOM, Math.max(1, READABLE_SCALE / fit));
+}
+
 function attachSelectValue(tick: MapTick): string {
   if (tick.attach.kind === 'station') return `station:${tick.attach.station_id}`;
   if (tick.attach.kind === 'event') return `event:${tick.attach.event_id}`;
@@ -239,7 +267,7 @@ function horizontalText(
     text.textContent = lines[0]!;
     return text;
   }
-  const lineH = 16;
+  const lineH = MAP_TICK_LINE_H;
   const start = y - ((lines.length - 1) * lineH) / 2;
   for (const [index, line] of lines.entries()) {
     const tspan = svgEl('tspan', {
@@ -252,6 +280,9 @@ function horizontalText(
   void boxH;
   return text;
 }
+
+/** Map units per wrapped competition line; keep in step with `.map-tick__label` font-size. */
+const MAP_TICK_LINE_H = 22;
 
 function portDot(x: number, y: number, id: string, color: string): SVGCircleElement {
   return svgEl('circle', {
@@ -370,7 +401,7 @@ function renderMapSvg(
       svgEl('circle', {
         cx: '36',
         cy: String(term.y),
-        r: '15',
+        r: '17',
         class: 'map-term__disc'
       })
     );
@@ -389,7 +420,7 @@ function renderMapSvg(
   for (const line of layout.lines) {
     const color = strokeOf(line.color);
     const track = svgEl('g', {
-      class: 'map-line-group map-line-group--track',
+      class: `map-line-group map-line-group--track${selectedId === line.id ? ' is-selected' : ''}`,
       'data-line': line.id
     });
     for (const item of line.tracks) {
@@ -407,9 +438,9 @@ function renderMapSvg(
           })
         );
       }
-      const labelY = item.disc.cy - item.disc.r - 36;
-      const pillW = Math.max(56, item.label.length * 9 + 20);
-      const pillH = 24;
+      const labelY = item.disc.cy - item.disc.r - 32;
+      const pillW = Math.max(72, item.label.length * 11 + 28);
+      const pillH = 32;
       track.append(
         svgEl('rect', {
           x: String(item.disc.cx - pillW / 2),
@@ -425,7 +456,7 @@ function renderMapSvg(
       );
       const label = svgEl('text', {
         x: String(item.disc.cx),
-        y: String(labelY + 5),
+        y: String(labelY + 6),
         'text-anchor': 'middle',
         class: 'map-track-label',
         fill: color
@@ -440,7 +471,7 @@ function renderMapSvg(
       });
       const letter = svgEl('text', {
         x: String(item.disc.cx),
-        y: String(item.disc.cy + 6),
+        y: String(item.disc.cy + 8),
         'text-anchor': 'middle',
         class: 'map-line-letter',
         fill: letterFill(line.color)
@@ -738,16 +769,6 @@ function downloadHtml(map: TransitMap, years: readonly SchoolYearTerms[] | null)
   URL.revokeObjectURL(url);
 }
 
-function field(label: string, control: HTMLElement): HTMLElement {
-  const wrap = el('label', 'map-field');
-  wrap.append(el('span', 'map-field__label', label), control);
-  return wrap;
-}
-
-function textInput(value: string, aria: string): { el: HTMLLabelElement; input: HTMLInputElement } {
-  return createHubField({ ariaLabel: aria, value });
-}
-
 function dateInput(value: string, aria: string): { el: HTMLLabelElement; input: HTMLInputElement } {
   return createHubField({ type: 'date', ariaLabel: aria, value });
 }
@@ -810,6 +831,11 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
   let toast = '';
   let indexQuery = '';
   let indexOpen = false;
+  /** Map id whose starting zoom has been set; a new map gets a fresh readable zoom. */
+  let zoomReadyFor: string | null = null;
+  /** Stage px per map unit at zoom 1 on the last paint. */
+  let lastFit = 0;
+  let lastInspected: string | null = null;
 
   const activeTouches = new Map<number, { x: number; y: number }>();
   let pinchStartDist = 0;
@@ -870,7 +896,6 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
       mode,
       fullscreen,
       joining,
-      lines: current.lines,
       handlers: {
         onSelectMap: (value) => {
           const next = maps.find((m) => m.id === value);
@@ -883,7 +908,13 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         onMode: (next) => {
           mode = next;
           if (next === 'view') joining = false;
+          if (next === 'view' && selectedId && current.lines.some((line) => line.id === selectedId)) selectedId = null;
+          toast = '';
           paint();
+        },
+        onRenameMap: (title) => {
+          current.title = title;
+          void persist().then(() => paint());
         },
         onExport: () => downloadHtml(current, termYears),
         onNewMap: () => {
@@ -903,28 +934,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         onAddCompetition: () => addEventNow(),
         onJoin: () => {
           joining = !joining;
-          toast = joining ? 'Drag from one element to another to join. Ports show only in this mode.' : '';
+          toast = joining ? 'Drag from one item to another to join them. Ports show only in this mode.' : '';
           paint();
-        },
-        onMove: (id, delta) => {
-          current.lines = moveLine(current.lines, id, delta);
-          paint();
-          void persist();
-        },
-        onAddYearLine: (line) => {
-          const missing = missingStandardYearTracks(line);
-          if (missing.length) {
-            current.lines = current.lines.map((entry) =>
-              entry.id === line.id ? addStandardYearTrack(entry) : entry
-            );
-          } else {
-            const label = window.prompt('Name for the extra year line on this strand:', 'Middle');
-            if (!label?.trim()) return;
-            current.lines = current.lines.map((entry) =>
-              entry.id === line.id ? addExtraYearTrack(entry, label) : entry
-            );
-          }
-          void persist().then(() => paint());
         }
       }
     });
@@ -942,6 +953,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     applyCamera(svg, layout);
 
     const zoomBar = el('div', 'map-zoom');
+    zoomBar.setAttribute('role', 'group');
+    zoomBar.setAttribute('aria-label', 'Zoom');
     const out = el('button', 'hub-icon-btn', '−');
     const reset = el('button', 'btn btn--ghost', 'Reset');
     const inn = el('button', 'hub-icon-btn', '+');
@@ -952,7 +965,7 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     inn.setAttribute('aria-label', 'Zoom in');
     const setZoomAt = (next: number, anchor?: { x: number; y: number }) => {
       const old = zoom;
-      const nextZoom = Math.min(2.2, Math.max(0.5, next));
+      const nextZoom = Math.min(MAP_MAX_ZOOM, Math.max(0.5, next));
       if (nextZoom === old) return;
       const vw0 = layout.width / old;
       const vh0 = layout.height / old;
@@ -968,14 +981,16 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     };
     out.addEventListener('click', () => setZoomAt(zoom - 0.15));
     inn.addEventListener('click', () => setZoomAt(zoom + 0.15));
+    reset.title = 'Back to the readable starting view';
     reset.addEventListener('click', () => {
-      zoom = 1;
+      zoom = readableZoom(svg, layout);
       camX = 0;
       camY = 0;
       applyCamera(svg, layout);
     });
     zoomBar.append(out, reset, inn);
-    stage.append(svg, zoomBar);
+    toolbar.insertBefore(zoomBar, toolbar.querySelector('.map-editbar'));
+    stage.append(svg);
 
     const indexItems = buildMapIndexItems(current, layout);
     const cardModels = buildCardModels(current, projects);
@@ -991,16 +1006,14 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         onExpand: () => {
           selectedId = model.id;
           const jump = indexItems.find((item) => item.id === model.id);
-          if (jump) {
-            camY = focusCameraOnY(layout, jump.y, zoom);
-            applyCamera(svg, layout);
-          }
+          if (jump) camY = focusCameraOnY(layout, jump.y, zoom);
+          paint();
         },
         onCollapse: () => {
           if (selectedId === model.id) selectedId = null;
         }
       }),
-      (model) => (mode === 'edit' ? buildItemEditor(model.id, year, terms) : null),
+      () => null,
       {
         query: indexQuery,
         open: indexOpen,
@@ -1014,6 +1027,9 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     );
     stage.append(index);
     body.append(stage);
+    const inspector = buildInspector(year, terms);
+    if (inspector) body.append(inspector);
+    body.classList.toggle('has-inspector', Boolean(inspector));
     if (selectedId) {
       index
         .querySelector<HTMLElement>(`.map-card-slot[data-map-item-id="${selectedId}"]`)
@@ -1196,7 +1212,7 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         const dx = (lastX - originX) * unitX;
         const dy = (lastY - originY) * unitY;
         if (!moved) {
-          selectedId = hit && hit.kind !== 'line' && hit.kind !== 'station-resize' ? hit.id : null;
+          selectedId = hit && (hit.kind !== 'line' || mode === 'edit') ? hit.id : null;
           paint();
           return;
         }
@@ -1273,7 +1289,28 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     }
 
     canvas.append(body);
-    if (toast) canvas.append(el('p', 'canvas-status', toast));
+    const fit = stageFit(svg, layout);
+    if (zoomReadyFor !== current.id) {
+      zoomReadyFor = current.id;
+      zoom = readableZoom(svg, layout);
+      camX = 0;
+      camY = 0;
+    } else if (fit && lastFit && fit !== lastFit) {
+      // The stage changed width (side panel opened or closed): keep text the same size on screen.
+      zoom = Math.min(MAP_MAX_ZOOM, Math.max(0.5, (zoom * lastFit) / fit));
+    }
+    if (fit) lastFit = fit;
+    applyCamera(svg, layout);
+    if (inspector && selectedId !== lastInspected && window.matchMedia?.('(max-width: 720px)').matches) {
+      inspector.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+    lastInspected = inspector ? selectedId : null;
+    const hint =
+      toast ||
+      (mode === 'edit' && !selectedId
+        ? 'Click a line, program or competition to edit it. Drag to move; drag a program’s top or bottom edge to change its dates.'
+        : '');
+    if (hint) canvas.insertBefore(el('p', 'canvas-status map-hint', hint), body);
   };
 
   function buildCardModels(map: TransitMap, projectList: Project[]): MapCardModel[] {
@@ -1315,96 +1352,265 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     return models;
   }
 
-  function buildItemEditor(id: string, year: number, terms: ReturnType<typeof schoolTerms>): HTMLElement | null {
-    const selectedStation = current.stations.find((item) => item.id === id);
-    const selectedTick = current.ticks.find((item) => item.id === id);
-    const item = selectedStation ?? selectedTick;
-    if (!item) return null;
-    const form = el('div', 'map-card__editor');
-    const name = textInput(item.label, 'Name');
-    name.input.addEventListener('change', () => {
-      item.label = name.input.value.trim() || item.label;
-      void persist().then(() => paint());
+  function liveItem(id: string): { station: MapStation | null; tick: MapTick | null } {
+    return {
+      station: current.stations.find((item) => item.id === id) ?? null,
+      tick: current.ticks.find((item) => item.id === id) ?? null
+    };
+  }
+
+  function closeInspector(): void {
+    selectedId = null;
+    paint();
+  }
+
+  function buildInspector(year: number, terms: ReturnType<typeof schoolTerms>): HTMLElement | null {
+    if (!selectedId) return null;
+    const line = current.lines.find((item) => item.id === selectedId);
+    if (line) return mode === 'edit' ? buildLineInspector(line) : null;
+    const { station, tick } = liveItem(selectedId);
+    if (!station && !tick) return null;
+    return mode === 'edit' ? buildItemInspector(selectedId, year, terms) : buildItemSummary(selectedId);
+  }
+
+  function buildLineInspector(line: MapLine): HTMLElement {
+    const id = line.id;
+    const index = current.lines.findIndex((item) => item.id === id);
+    const itemCount =
+      current.stations.filter((item) => item.line_id === id).length +
+      current.ticks.filter((tick) => lineForTick(current, tick)?.id === id).length;
+    return createMapInspector({
+      eyebrow: 'Line',
+      title: `${line.letter} · ${line.name}`,
+      onClose: closeInspector,
+      body: buildLineEditor(
+        line,
+        { index, count: current.lines.length, itemCount },
+        {
+          onChange: (next, settled) => {
+            current.lines = current.lines.map((item) => (item.id === id ? { ...item, ...next, id } : item));
+            if (settled) void persist().then(() => paint());
+            else schedulePersist();
+          },
+          onMove: (delta) => {
+            current.lines = moveLine(current.lines, id, delta);
+            void persist().then(() => paint());
+          },
+          onDelete: () => {
+            current.lines = current.lines.filter((item) => item.id !== id);
+            selectedId = null;
+            void persist().then(() => paint());
+          }
+        }
+      )
     });
-    const start = dateInput(item.starts_on ?? terms.t1, selectedStation ? 'Starts' : 'Date');
-    const end = dateInput(item.ends_on ?? item.starts_on ?? terms.e, 'Ends');
+  }
+
+  function buildItemSummary(id: string): HTMLElement | null {
+    const { station, tick } = liveItem(id);
+    const item = station ?? tick;
+    if (!item) return null;
+    const kind = station ? 'station' : 'event';
+    const line = station ? findLine(current, station.line_id) : lineForTick(current, tick ?? undefined);
+    const facts = el('dl', 'map-inspector__facts');
+    const fact = (label: string, value: string | null | undefined) => {
+      if (!value) return;
+      facts.append(el('dt', '', label), el('dd', '', value));
+    };
+    fact('Line', line ? `${line.letter} · ${line.name}` : null);
+    fact(station ? 'Starts' : 'Date', item.starts_on ? formatDisplayDate(item.starts_on) : null);
+    if (station) fact('Ends', item.ends_on ? formatDisplayDate(item.ends_on) : null);
+    fact('Status', planningOf(item) === 'active' ? 'Active' : 'Planned');
+    const actions = el('div', 'map-inspector__actions');
+    actions.append(
+      inspectorButton('Edit', 'btn--primary', () => {
+        mode = 'edit';
+        paint();
+      }),
+      inspectorButton('Full page', 'btn--ghost', () => {
+        location.hash = mapItemPageHash(current.id, kind, id);
+      })
+    );
+    return createMapInspector({
+      eyebrow: mapItemKindLabel(kind),
+      title: item.label,
+      onClose: closeInspector,
+      body: [facts, actions]
+    });
+  }
+
+  function buildItemInspector(id: string, year: number, terms: ReturnType<typeof schoolTerms>): HTMLElement | null {
+    const initial = liveItem(id);
+    const initialItem = initial.station ?? initial.tick;
+    if (!initialItem) return null;
+    const isStation = Boolean(initial.station);
+    const kind = isStation ? 'station' : 'event';
+    const body: HTMLElement[] = [];
+
+    const name = inspectorText({
+      value: initialItem.label,
+      ariaLabel: 'Name',
+      onDraft: (value) => {
+        const { station, tick } = liveItem(id);
+        const item = station ?? tick;
+        if (!item) return;
+        item.label = value;
+        svgLabelFor(id, value);
+        schedulePersist();
+      },
+      onCommit: (value) => {
+        const { station, tick } = liveItem(id);
+        const item = station ?? tick;
+        if (!item) return;
+        item.label = value;
+        void persist().then(() => paint());
+      }
+    });
+    body.push(inspectorField('Name', name));
+
+    if (initial.station) {
+      const lineFilter = createHubFilter({
+        key: 'Line',
+        label: 'Line',
+        defaultValue: initial.station.line_id,
+        options: current.lines.map((entry) => ({ value: entry.id, label: `${entry.letter} · ${entry.name}` })),
+        value: initial.station.line_id,
+        onChange: (value) => {
+          const station = liveItem(id).station;
+          if (!station || !value) return;
+          station.line_id = value;
+          const nextLine = findLine(current, value);
+          if (nextLine) {
+            const allowed = new Set(lineTrackDefs(nextLine).map((track) => track.id));
+            const kept = station.tracks.filter((track) => allowed.has(track));
+            station.tracks = kept.length ? kept : [lineTrackDefs(nextLine)[0]?.id ?? 'junior'];
+          }
+          void persist().then(() => paint());
+        }
+      });
+      body.push(inspectorField('Line', lineFilter.el));
+    }
+
+    const start = dateInput(initialItem.starts_on ?? terms.t1, isStation ? 'Starts' : 'Date');
+    const end = dateInput(initialItem.ends_on ?? initialItem.starts_on ?? terms.e, 'Ends');
     const applyDates = () => {
+      const { station, tick } = liveItem(id);
+      const item = station ?? tick;
+      if (!item) return;
       item.starts_on = start.input.value || null;
-      item.ends_on = selectedStation ? end.input.value || null : end.input.value || start.input.value || null;
-      if (selectedStation) {
-        const next = applyDateSpanToStation(selectedStation, year);
-        selectedStation.starts_on = next.starts_on;
-        selectedStation.ends_on = next.ends_on;
-        selectedStation.y = next.y;
-        selectedStation.height = next.height;
-      } else if (selectedTick) {
-        const next = applyDateToTickAttach(selectedTick, year);
-        selectedTick.attach = next.attach;
+      item.ends_on = station ? end.input.value || null : end.input.value || start.input.value || null;
+      if (station) {
+        const next = applyDateSpanToStation(station, year);
+        station.starts_on = next.starts_on;
+        station.ends_on = next.ends_on;
+        station.y = next.y;
+        station.height = next.height;
+      } else if (tick) {
+        tick.attach = applyDateToTickAttach(tick, year).attach;
       }
       void persist().then(() => paint());
     };
     start.input.addEventListener('change', applyDates);
     end.input.addEventListener('change', applyDates);
-    const stationLine = selectedStation ? findLine(current, selectedStation.line_id) : null;
-    const tracks = selectedStation
-      ? trackPicker(selectedStation.tracks, stationLine ? lineTrackDefs(stationLine) : lineTrackDefs(current.lines[0]!))
-      : null;
-    tracks?.root.addEventListener('change', () => {
-      selectedStation!.tracks = tracks.value();
-      void persist().then(() => paint());
-    });
-    const attachPicker = selectedTick
-      ? createFilteredPicker(targetPickerGroups(current, selectedTick.id), attachSelectValue(selectedTick), {
-          ariaLabel: 'Attach to',
-          placeholder: 'Search lines, stations…'
-        })
-      : null;
-    const alsoPicker = selectedTick
-      ? createFilteredPicker(
-          targetPickerGroups(current, selectedTick.id),
-          connectSelectValue(current, selectedTick.connects_to),
-          {
-            ariaLabel: 'Also connect to',
-            blankLabel: 'No extra connection',
-            placeholder: 'Search connections…'
-          }
-        )
-      : null;
-    const applyAttach = () => {
-      if (!selectedTick || !attachPicker || !alsoPicker) return;
-      selectedTick.attach = parseAttachValue(
-        attachPicker.getValue(),
-        current.lines[0]?.id ?? '',
-        selectedTick.attach.kind === 'line' ? selectedTick.attach.y : 200
-      );
-      selectedTick.connects_to = parseConnectValue(alsoPicker.getValue(), current);
-      const next = applyDateToTickAttach(selectedTick, year);
-      selectedTick.attach = next.attach;
-      void persist().then(() => paint());
-    };
-    attachPicker?.root.addEventListener('click', applyAttach);
-    alsoPicker?.root.addEventListener('click', applyAttach);
-    form.append(name.el);
-    form.append(selectedStation ? field('Starts', start.el) : field('Date', start.el));
-    if (selectedStation) {
-      form.append(field('Ends', end.el));
-      if (tracks) form.append(field('Year lines', tracks.root));
-    }
-    if (selectedTick && attachPicker && alsoPicker) {
-      form.append(field('Attach to', attachPicker.root), field('Also connect to', alsoPicker.root));
-    }
-    if (planningOf(item) === 'active' && item.link) {
-      const linked = projects.find((project) => project.id === item.link!.id);
-      if (linked) {
-        const open = el('button', 'btn btn--secondary', `Open ${linked.title}`);
-        open.type = 'button';
-        open.addEventListener('click', () => {
-          location.hash = projectPageHash(linked.id);
+    const dates = el('div', 'map-inspector__row');
+    dates.append(inspectorField(isStation ? 'Starts' : 'Date', start.el));
+    if (isStation) dates.append(inspectorField('Ends', end.el));
+    body.push(dates);
+
+    if (initial.station) {
+      const stationLine = findLine(current, initial.station.line_id) ?? current.lines[0];
+      if (stationLine) {
+        const tracks = trackPicker(initial.station.tracks, lineTrackDefs(stationLine));
+        tracks.root.addEventListener('change', () => {
+          const station = liveItem(id).station;
+          if (!station) return;
+          station.tracks = tracks.value();
+          void persist().then(() => paint());
         });
-        form.append(open);
+        body.push(inspectorField('Year lines', tracks.root, 'Which year lines this program runs on.'));
       }
     }
-    return form;
+
+    if (initial.tick) {
+      const attachPicker = createFilteredPicker(
+        targetPickerGroups(current, id),
+        attachSelectValue(initial.tick),
+        { ariaLabel: 'Attach to', placeholder: 'Search lines, programs…' }
+      );
+      const alsoPicker = createFilteredPicker(
+        targetPickerGroups(current, id),
+        connectSelectValue(current, initial.tick.connects_to),
+        { ariaLabel: 'Also connect to', blankLabel: 'No extra connection', placeholder: 'Search connections…' }
+      );
+      let lastAttach = attachPicker.getValue();
+      let lastAlso = alsoPicker.getValue();
+      const applyAttach = () => {
+        const tick = liveItem(id).tick;
+        if (!tick) return;
+        const attachValue = attachPicker.getValue();
+        const alsoValue = alsoPicker.getValue();
+        if (attachValue === lastAttach && alsoValue === lastAlso) return;
+        lastAttach = attachValue;
+        lastAlso = alsoValue;
+        tick.attach = parseAttachValue(
+          attachValue,
+          current.lines[0]?.id ?? '',
+          tick.attach.kind === 'line' ? tick.attach.y : 200
+        );
+        tick.connects_to = parseConnectValue(alsoValue, current);
+        tick.attach = applyDateToTickAttach(tick, year).attach;
+        void persist().then(() => paint());
+      };
+      attachPicker.root.addEventListener('click', applyAttach);
+      alsoPicker.root.addEventListener('click', applyAttach);
+      body.push(inspectorField('Attach to', attachPicker.root), inspectorField('Also connect to', alsoPicker.root));
+    }
+
+    const actions = el('div', 'map-inspector__actions');
+    actions.append(
+      inspectorButton(planningOf(initialItem) === 'active' ? 'Make planned' : 'Make active', 'btn--ghost', () => {
+        void togglePlanningNow(id);
+      }),
+      inspectorButton('Full page', 'btn--ghost', () => {
+        location.hash = mapItemPageHash(current.id, kind, id);
+      })
+    );
+    if (planningOf(initialItem) === 'active' && initialItem.link) {
+      const linked = projects.find((project) => project.id === initialItem.link!.id);
+      if (linked) {
+        actions.append(
+          inspectorButton(`Open ${linked.title}`, 'btn--ghost', () => {
+            location.hash = projectPageHash(linked.id);
+          })
+        );
+      }
+    }
+    body.push(actions);
+
+    const danger = el('div', 'map-inspector__actions map-inspector__actions--end');
+    danger.append(
+      inspectorButton(`Delete ${mapItemKindLabel(kind).toLowerCase()}`, 'btn--ghost map-inspector__danger', () => {
+        void deleteItemNow(id);
+      })
+    );
+    body.push(danger);
+
+    return createMapInspector({
+      eyebrow: mapItemKindLabel(kind),
+      title: initialItem.label,
+      onClose: closeInspector,
+      body
+    });
+  }
+
+  /** Live-update the drawn label while typing so the map follows the name field. */
+  function svgLabelFor(id: string, label: string): void {
+    const group = canvas.querySelector(`.map-svg [data-id="${CSS.escape(id)}"]`);
+    group?.querySelectorAll('.map-station__label').forEach((node) => {
+      node.textContent = label;
+    });
+    const title = canvas.querySelector('.map-inspector__title');
+    if (title) title.textContent = label;
   }
 
   function addLineNow(): void {
@@ -1515,18 +1721,35 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     }
   }
 
-  async function persist(): Promise<void> {
+  let saveChain: Promise<void> = Promise.resolve();
+  let saveTimer: number | undefined;
+
+  /** Quiet save while typing: no redraw, so the field keeps focus. */
+  function schedulePersist(): void {
+    window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(() => void persist(), 500);
+  }
+
+  /** Saves run one at a time so an older reply never lands over a newer edit. */
+  function persist(): Promise<void> {
+    window.clearTimeout(saveTimer);
+    saveChain = saveChain.then(saveNow);
+    return saveChain;
+  }
+
+  async function saveNow(): Promise<void> {
+    const target = current;
     try {
-      const saved = await tasksApi.updateMap(current.id, {
-        title: current.title,
-        year: current.year,
-        lines: current.lines,
-        stations: current.stations,
-        ticks: current.ticks
+      const saved = await tasksApi.updateMap(target.id, {
+        title: target.title,
+        year: target.year,
+        lines: target.lines,
+        stations: target.stations,
+        ticks: target.ticks
       });
       const idx = maps.findIndex((m) => m.id === saved.id);
       if (idx >= 0) maps[idx] = saved;
-      current = saved;
+      if (current.id === saved.id) current = saved;
       toast = '';
     } catch {
       toast = 'Could not save — last good map is still on screen.';

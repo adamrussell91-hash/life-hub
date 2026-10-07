@@ -1,22 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { MapLine } from '@/schemas/map';
 import { closeCardMenu } from '@/views/card-menu';
 import { createMapIndexSearch, createMapIndexShell, createMapToolbar } from '@/views/map-chrome';
-
-function line(partial: Partial<MapLine> = {}): MapLine {
-  return {
-    id: 'line_justice',
-    name: 'Justice',
-    letter: 'J',
-    color: 'blue',
-    points: [
-      { x: 80, y: 0 },
-      { x: 80, y: 400 }
-    ],
-    extra_tracks: [],
-    ...partial
-  };
-}
 
 function openMenu(root: ParentNode, label: string): HTMLElement {
   root.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click();
@@ -68,45 +52,7 @@ describe('map chrome', () => {
     expect(handlers.onMode).toHaveBeenCalledWith('edit');
   });
 
-  it('adds edit actions to the same menu once editing', () => {
-    const toolbar = createMapToolbar({
-      maps: [{ id: 'map_a', title: 'MindWorks 2026' }],
-      currentId: 'map_a',
-      mode: 'edit',
-      fullscreen: true,
-      joining: true,
-      handlers: {
-        onSelectMap: vi.fn(),
-        onMode: vi.fn(),
-        onExport: vi.fn(),
-        onNewMap: vi.fn(),
-        onFullscreen: vi.fn(),
-        onAddLine: vi.fn(),
-        onAddProgram: vi.fn(),
-        onAddCompetition: vi.fn(),
-        onJoin: vi.fn()
-      }
-    });
-    expect(menuLabels(openMenu(toolbar, 'Map menu'))).toEqual([
-      'View',
-      'Editing',
-      'Export',
-      'New map',
-      'Exit full screen',
-      'Add line',
-      'Add program',
-      'Add competition',
-      'Stop joining'
-    ]);
-  });
-
-  it('hides line chrome in view and parks line edits in the toolbar menu', () => {
-    const onMove = vi.fn();
-    const onAddYearLine = vi.fn();
-    const lines = [
-      line(),
-      line({ id: 'line_innovation', name: 'Innovation', letter: 'I', color: 'yellow' })
-    ];
+  it('shows labelled edit buttons and a map name field once editing, not a second menu', () => {
     const handlers = {
       onSelectMap: vi.fn(),
       onMode: vi.fn(),
@@ -117,40 +63,49 @@ describe('map chrome', () => {
       onAddProgram: vi.fn(),
       onAddCompetition: vi.fn(),
       onJoin: vi.fn(),
-      onMove,
-      onAddYearLine
+      onRenameMap: vi.fn()
     };
-    const viewing = createMapToolbar({
-      maps: [{ id: 'map_a', title: 'MindWorks 2026' }],
-      currentId: 'map_a',
-      mode: 'view',
-      fullscreen: false,
-      joining: false,
-      lines,
-      handlers
-    });
-    expect(viewing.querySelector('[aria-label="Lines menu"]')).toBeNull();
-    expect(viewing.textContent).not.toContain('Justice Line');
-    expect(viewing.textContent).not.toContain('Junior · Rozelle · Senior');
-
-    const editing = createMapToolbar({
+    const toolbar = createMapToolbar({
       maps: [{ id: 'map_a', title: 'MindWorks 2026' }],
       currentId: 'map_a',
       mode: 'edit',
-      fullscreen: false,
-      joining: false,
-      lines,
+      fullscreen: true,
+      joining: true,
       handlers
     });
-    const menu = openMenu(editing, 'Lines menu');
-    expect(menuLabels(menu)).toEqual([
-      'Move Justice right',
-      'Add extra year line to Justice',
-      'Move Innovation left',
-      'Add extra year line to Innovation'
+    expect(menuLabels(openMenu(toolbar, 'Map menu'))).toEqual([
+      'View',
+      'Editing',
+      'Export',
+      'New map',
+      'Exit full screen'
     ]);
-    menu.querySelector<HTMLButtonElement>('[data-card-menu-item="right-line_justice"]')?.click();
-    expect(onMove).toHaveBeenCalledWith('line_justice', 1);
+    closeCardMenu();
+    expect(toolbar.querySelector('[aria-label="Lines menu"]')).toBeNull();
+
+    const buttons = [...toolbar.querySelectorAll<HTMLButtonElement>('.map-editbar .btn')];
+    expect(buttons.map((btn) => btn.textContent)).toEqual([
+      '+ Line',
+      '+ Program',
+      '+ Competition',
+      'Stop joining',
+      'Done'
+    ]);
+    expect(buttons[3]?.getAttribute('aria-pressed')).toBe('true');
+    buttons[1]!.click();
+    expect(handlers.onAddProgram).toHaveBeenCalled();
+    buttons[4]!.click();
+    expect(handlers.onMode).toHaveBeenCalledWith('view');
+
+    const name = toolbar.querySelector<HTMLInputElement>('input[aria-label="Map name"]')!;
+    expect(name.value).toBe('MindWorks 2026');
+    name.value = '  ';
+    name.dispatchEvent(new Event('change'));
+    expect(handlers.onRenameMap).not.toHaveBeenCalled();
+    expect(name.value).toBe('MindWorks 2026');
+    name.value = 'MindWorks 2027';
+    name.dispatchEvent(new Event('change'));
+    expect(handlers.onRenameMap).toHaveBeenCalledWith('MindWorks 2027');
   });
 
   it('starts the map index as an icon and expands the panel on click', () => {
