@@ -1485,6 +1485,189 @@ One golden day for this round: do not open the city for seven fictional days in 
 | Magnify | 1 | 1 |
 | Put to another use | 2 | 0 |
 
+### Round 4 · ChatGPT Codex · Extend + Combine
+
+> **Author note:** Written by ChatGPT Codex on 7 October 2026. Cards played: **Extend** and **Combine**, each used for the second and final time. Adam's feedback was direct: my earlier rounds were too boring. This round changes direction toward an expressive, explorable personal world. It follows Claude Code's glance view and Cursor's collection and bundle rituals, while challenging the proposal to prohibit decorative motion everywhere. Everything below is a proposal.
+
+#### First: the city deserves a reason to visit when nothing needs doing
+
+My earlier rounds supplied desks, records, source cards and review steps. Those belong behind the doors. They do not supply enough reason to open the city on a free Sunday.
+
+Give Harbour City two experiences.
+
+**Glance** is the calm display Claude proposed. The existing meanings, stable geography and one decision signal do their work.
+
+**Explore** is an explicitly chosen visit. The camera moves through the city, illustrated interiors unfold, destination worlds open and chosen objects become architecture. Decorative animation is permitted here. Its purpose is pleasure, rather than a claim about workload.
+
+Neither experience earns points. Neither requires a task to be completed first. Returning after six months opens the same loved places.
+
+#### Extend: the harbour contains foldout worlds
+
+**The central image.** The harbour has a long pier with several closed miniature travel trunks. Each represents a saved destination. Select one and the trunk unfolds into an island: the lid becomes the backdrop, its sides become streets, and the interior becomes a small place to explore.
+
+The island is a scene within the Travel room, reached from the pier. Its illustrated backdrop extends beyond the harbour without moving the established city. Closing the trunk returns to the same quay.
+
+A trunk is available for a destination Adam saves, including a future trip. Its label distinguishes planned, visited and imagined. Visited status requires the relevant Travel record or Adam's confirmation. A booking date alone never claims he went.
+
+**1. The December journey becomes a chain of little worlds.**
+
+The proposed art direction below follows the destinations already discussed for the trip. Exact details are creative options for Adam to select.
+
+| Destination world | A first scene | Personal detail which gives the scene purpose |
+|-------------------|---------------|-----------------------------------------------|
+| Kuala Lumpur | A miniature city at dusk, with a market lane opening behind the skyline | The selected Malaysian fragrance interests occupy a small shop window |
+| Istanbul | A vaulted courtyard with a domed pavilion and narrow lanes | Watch designs and fragrance research sit in cabinets reached through the courtyard |
+| Scotland | A stone lane leading to a conservatory on a headland | Selected local fragrance interests appear as labelled objects in the conservatory |
+| London | A covered arcade whose centrepiece is a watchmaker's bench | Saved vintage watch interests live in the bench drawers |
+| Rome | A small square surrounded by layered façades | Saved cultural and historical notes open from selected buildings |
+| Seoul | A ceramic studio beside a small urban courtyard | Tattoo ideas, chosen artwork and confirmed keepsakes have a place to return to |
+
+These scenes are personal illustrations, rather than maps or factual reconstructions. Travel retains the actual bookings, locations and routes.
+
+From the main quay, selecting "Follow my trip" opens the trunks in itinerary order. A train ticket folds into the transition between scenes. The transition names the real origin and destination from Travel. A missing leg leaves a labelled break rather than an invented connection.
+
+**2. A visit has details worth finding.**
+
+The London arcade has a watchmaker's drawer. Open the drawer and a saved watch appears as a large inspection object, with the research available beside it.
+
+The Istanbul courtyard has several cabinets. One holds selected watch designs, another fragrance interests, another a saved historical note. Their arrangement is curated, rather than an automatic claim about which shop sells which item.
+
+The Seoul studio has a blue ceramic tile on a drafting table. Selecting the tile opens the chosen tattoo concept. Adam decides which revision occupies the table. Unchosen drafts remain accessible through their source records.
+
+These are illustrations with direct interaction. The readable source record opens when requested, rather than covering the whole scene immediately.
+
+**3. Bring one chosen thing back to the harbour.**
+
+A visited destination offers a small display plinth on its quay. Adam chooses a keepsake: a photograph, a confirmed collection item, a favourite saved passage or a custom illustration representing the visit.
+
+The keepsake changes a permanent part of Harbour City. A selected ceramic becomes a fountain detail. A selected watch becomes a clock above the Travel terminal. A photograph becomes a framed view inside the concourse.
+
+The source remains linked. Changing the display moves the illustration, rather than changing a collection's ownership or a trip's history. A wanted watch remains wanted even if Adam uses its design as inspiration.
+
+The result is a city which gradually acquires his taste. Two people with identical task graphs would still have different harbours.
+
+**4. Future destinations have their own pleasure.**
+
+An imagined destination opens as a paper stage with unfinished edges. Adam adds references, chooses a backdrop and places a few objects.
+
+This is available before any booking or project. Planning remains optional. A place on the paper stage does not acquire a deadline.
+
+Claude's lifecycle fits the distinction. A future stage belongs to Plans or Explore. A booked journey belongs to the real Travel network. The trunk's interior is always accessible as a saved personal scene, with its status visible at the entrance.
+
+#### Combine: personal objects become the city's architecture
+
+**The combination.** Watches, fragrances, books, travel keepsakes and selected personal symbols already belong in different parts of Life Hub. Combine their visual forms with buildings and interiors. These collections become a design language for Harbour City.
+
+This is more than a gallery displaying records. A chosen object helps create a place.
+
+**1. A watch becomes a building with an interior mechanism.**
+
+The central station clock is inspired by a watch Adam selects. Its face retains readable city time. The selected watch contributes the bezel, hands, case shape and dial texture.
+
+In Explore, selecting the clock opens its case. Inside sits a tiny station built between gears. Platforms occupy bridges across the mechanism. An active tracked session drives a designated indicator using the same source as the Day dial. Other moving gears are clearly part of the illustrated mechanism.
+
+A pocket watch design produces a station beneath a hinged lid. A field watch produces a compact signal tower. A dress watch produces a small pavilion with a polished dial above the doorway. These are candidate visual treatments, chosen by Adam.
+
+The watch is not consumed, ranked or awarded. The design is a preference attached to the building. Changing the source watch changes the treatment without relocating the station or changing its operational signals.
+
+**2. A fragrance bottle becomes a conservatory.**
+
+The collection arcade opens onto a garden of oversized glass bottles. Each chosen fragrance has a small conservatory inside its bottle.
+
+Inside, saved fragrance notes determine optional illustrated elements. A recorded citrus note suggests a citrus tree. A recorded woody note suggests carved timber. A recorded rose note suggests roses. Where the profile is absent, Adam chooses a visual treatment without the city inventing a scent.
+
+The bottle's shape forms the roof and walls. Selecting a note opens the collection record's own description. No fragrance is represented as a real ingredient formula, and no projection or longevity claim is generated by the garden.
+
+A shelf switches between Owned, Wanted and Research. Wanted bottles have paper display stands with that label. Their beautiful interiors remain available. Possession is not a requirement for enjoying the scene.
+
+When the arcade closes, the harbour keeps one low glass conservatory selected by Adam. Its plants do not wither because he stopped logging purchases.
+
+**3. A future book opens into a physical little world.**
+
+The writing studio contains large books on angled stands. Open one and the pages rise into a stage.
+
+An early idea has a title page and a few paper objects chosen from its premise. A developed outline adds labelled chapter doors. A draft fragment appears on a lectern. The contents come from the writing record, with the stage itself treated as personal layout.
+
+For an educational book, the stage might be a small classroom, library and debating room. For a fiction idea, Adam chooses the scene. The city does not infer a genre from a filename.
+
+Turning a chapter page changes the stage. The research constellation for that chapter appears on the ceiling where an explicit saved relationship exists. The selected passage remains readable through the writing editor behind the lectern.
+
+An unfinished book is still an attractive place. There is no crumbling stage, empty theatre penalty or publishing countdown.
+
+**4. Delft becomes a chosen material, rather than a generic city filter.**
+
+Give Adam a blue and white ceramic set for selected interiors and keepsakes. A fountain bowl, station plaque, courtyard floor and collection cabinet receive coordinated Delft inspired treatments.
+
+This set belongs to the objects he selects. It does not recolour operational lines, capacity weather icons or the whole city.
+
+The main city retains its clean isometric style. Ceramic details use simplified patterns at street distance. Close inspection reveals the denser artwork.
+
+The Seoul studio is a natural first home for this set because the tattoo project already exists in Adam's interests. If he chooses to represent a personal milestone elsewhere, the same materials give the city a consistent signature.
+
+**5. A private garden holds chosen personal symbols.**
+
+A small gated garden is available as a personal scene. Adam names each planting and supplies or selects its meaning.
+
+If he chooses to bring the pet flower project into Harbour City, the confirmed flower choices become individual planting beds. Unresolved choices stay unresolved. The city does not select a flower for a pet or invent a memory.
+
+Selecting a bed opens the chosen photograph or written memory. Nothing is scored. Nothing needs watering. The gate stays where Adam placed it, and the garden is excluded from ordinary catch-up summaries unless he chooses otherwise.
+
+The garden is available independently of the project retirement ferry. A loved animal is never treated as an archived task.
+
+**6. The ordinary city stays familiar while the interiors become impossible.**
+
+These places fit through the existing doors. A conservatory looks like one modest building from the street. Inside, a bottle becomes a garden. The station has one clock from the street. Inside, a watch mechanism contains platforms. The writing studio has a stable footprint. Inside, a book unfolds into a theatre.
+
+This gives the city richness without adding twenty new districts. The main harbour stays readable. The expressive scale changes happen during an intentional visit.
+
+#### One proposed visit, with no work required
+
+Adam opens Explore on a Sunday.
+
+He enters the station clock, opens its case and looks across the tiny platforms between gears. The selected watch design is his choice, rather than a default asset.
+
+Back at the quay, he opens the Istanbul trunk. Its courtyard unfolds. He visits the watch cabinet and examines a saved design. He selects a ceramic detail to try on the Travel fountain. The preview stays a visual preference until saved.
+
+He returns to the collection arcade and opens a fragrance bottle. The glass roof lifts, revealing the selected scent's garden. He opens its source notes, then closes them to look around.
+
+Finally, he opens a book in the writing studio. A chapter stage rises from the pages. He adds one fragment if he wants, or leaves without changing anything.
+
+No task was required. No productivity score moved. The visit was worthwhile because the city contains places and objects he enjoys.
+
+#### A direct challenge to the current motion proposal
+
+Claude's calm display is useful. The assertion that every movement must mean work would rule out the pleasures proposed here.
+
+Retain the channel budget for Glance. In Explore, use two clearly separated kinds of motion:
+
+- Operational motion retains the existing meaning and visual emphasis.
+- Atmospheric motion lives inside the selected scene, such as the opening trunk, mechanical gears or conservatory roof. It never generates a stop completion, workload claim or agent action.
+
+The scene entrance names Explore. Returning to Glance ends atmospheric animation. Reduced motion replaces these transitions with static open and closed states.
+
+This is a proposal to revise the scope of the decorative motion validator, rather than pretend the current rule already allows these scenes. Adam has not adopted the rule, and the what if scope remains open.
+
+#### Open questions from ChatGPT Codex Round 4
+
+1. Which first impossible interior deserves a visual prototype: the watch station, fragrance conservatory or book theatre?
+2. Should the travel trunks sit on the main quay, or inside one large atlas in the Travel terminal?
+3. Does the blue ceramic set belong mainly to the Seoul studio, or selected details throughout the city?
+4. Which personal objects should inspire buildings first, including objects wanted but not owned?
+5. Should Explore have a free walking character, or stay a camera with selected doors?
+6. Does Adam want a private garden in the city, or should personal memories stay within their existing home?
+
+#### ChatGPT Codex card ledger after Round 4
+
+| Card | Uses by ChatGPT Codex | Uses left |
+|------|----------------------|-----------|
+| Extend | 2 | 0 |
+| Substitute | 1 | 1 |
+| Combine | 2 | 0 |
+| Adapt | 1 | 1 |
+| Magnify | 1 | 1 |
+| Put to another use | 1 | 1 |
+
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load? (Claude round 4: expands at its edges, never reflows its centre)
@@ -1509,3 +1692,4 @@ One golden day for this round: do not open the city for seven fictional days in 
 - **2026-10-07, ChatGPT Codex:** Round 3 (Adapt + Magnify). Added guided walks through linked records and an Idea Exchange for source grounded teaching and writing proposals, small experiments and curated outcome exhibitions. Preserved all earlier contributions and updated the Codex card ledger, with each card now used once.
 - **2026-10-07, Claude Code:** Round 4 (Substitute + Magnify). Proposed the glance test (street versus room). Substituted the visit model with calm technology (Home tile, station clock, idle default) and a perceptual channel budget, including an audit of colour overload across all rounds. Magnified change over state: a "Since you were last here" replay grounded in change blindness research, and a never-reflow layout grounded in mental map research. Added three validator rules and a smallest testable slice.
 - **2026-10-07, Cursor:** Round 4 (Put to another use + Adapt). Brought in simulation-game rituals that keep a life (Spiritfarer's farewell, Stardew's bundles, Animal Crossing's museum, Mini Motorways' pin) and refused the ones that punish absence (Frostpunk's meters, worn-away grass, the Motorways timer, Stardew's gold vault). Adapted Skylines info views, RCT thought summaries and Dorfromantik's no-penalty quests so they obey the glance test and the channel budget.
+- **2026-10-07, ChatGPT Codex:** Round 4 (Extend + Combine), responding to Adam's request for more creative ideas. Added foldout destination worlds and architecture inspired by chosen watches, fragrances, books, travel keepsakes and ceramic artwork. Proposed distinct Glance and Explore experiences, with impossible interiors and atmospheric motion during intentional exploration. Preserved all earlier contributions. Extend and Combine are now exhausted.
