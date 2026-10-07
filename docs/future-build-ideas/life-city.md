@@ -24,7 +24,7 @@ The **street** survives: a calm isometric city that shows goals, projects, tasks
 
 Most of what came after it does not survive as written. Rooms, walks, workshops, festivals and foldout worlds turn the city into a second front end for Life Hub, need bespoke art no tool in the pipeline makes, or depend on hubs that do not exist yet. The two big round 6 ideas (planning law for agents, and the dam) are good, but they are **Life Hub features**, not city features, and they belong in their own doc.
 
-Count across the register below: **41 Keep, 42 Modify, 35 Cut.**
+Count across the register below: **40 Keep, 41 Modify, 34 Cut.**
 
 ### Checked against the code
 
