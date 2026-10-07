@@ -29,6 +29,7 @@ Adam's complaint with a glance-only city: "a train is moving, and I need to clic
 - **A legend** that is always one tap away, listing every vehicle and shape and what it means.
 - **Glance stays.** The default view is still the calm street with the channel budget, and the Home tile is still the glance surface. Visit is what happens when Adam leans in.
 - **Not included:** zoning, money, building placement for records, or any simulation that invents activity. Records place themselves. Adam places only his own landmarks, keepsakes and the ground (Track B).
+- **The city grows on its own.** Adam's call: he does not want to place districts or routes. He wants to see how the city and its surrounds grow from his life. The one condition is that routes are long enough to show real movement and make sense (Slice 2a).
 
 ## 1. Where the code lives
 
@@ -86,6 +87,15 @@ Each slice has one builder, end to end (F9). Each code slice is its own PR throu
 Track A runs beside Slice 1, because neither needs the other.
 
 ### Slice 1 · City snapshot and golden days (no picture)
+
+**Status:** Built in PR #730 (draft). As built:
+- 13 rules, adding `vehicle_without_momentum` (motion is momentum only).
+- Barriers and late rings are flags on each stop, not separate lists.
+- Vacant lots move to Slice 5 with the gap-map data file.
+- Interchanges are stops that depend on a task in another project (`depends_on`, as Tasks Lines already draws them). `linked_project_ids` and `linked_goal_ids` turned out to be Someday promotion links, not shared tasks.
+- Tasks inside a removed project count as deleted.
+- The timestamp catch-up (`cityCatchUp`) is in this slice, since it is pure data.
+- Live adapters for appointments, meals, decisions and the sky are Slice 3. The snapshot takes them as typed inputs.
 
 **Builder:** Claude Code. **Size:** one PR.
 
@@ -148,6 +158,7 @@ Adam has ideas for the physical space. They go in [life-city-ground.md](life-cit
 - Never reflow: adding a record only fills a free slot or grows the map at its edge.
 - The Tiled ground map is an input: its scenery lots, corner and public edge are fixed obstacles that no slot may use.
 - Pins store tile and footprint only.
+- **Routes long enough to move along.** A route has a minimum length in tiles, even with one or two stops, with stops spaced so a bus visibly travels between them. A short project gets a longer, quieter route, not a stub.
 - Tests: `layout_reflow` (add a project; every other position is unchanged), `pin_moved_by_layout`, `public_edge_closed`, and determinism (same input gives the same output twice, and in shuffled input order).
 
 **2b · Prototype: glance and inspect (Cursor)**
@@ -257,3 +268,4 @@ Rewind and Forecast scrubbers (after a term of log), term replay, Ask the statio
 - **2026-10-07:** Draft written from the critical review and a check of `main`.
 - **2026-10-07:** Resource catalogue folded in. Added the Stack section, licence rules for a public repo, Track A (art rig), the IsoCity spike, an accessibility requirement and the Slice 5 asset sources. The Kenney pack list now names the Isometric Tiles family. Tiled is limited to the fixed ground.
 - **2026-10-07:** Adam's answers: visit in the SimCity and Cities: Skylines sense (free camera, hover and click to inspect, info views, legend), the event log approved, governance split out, glance test approved with an inspection half. Added §1a, Track B (the ground) and the ground brief. Codex runs Blender and Tiled on Adam's Mac.
+- **2026-10-07:** Adam: no hand placement of districts or routes; the city grows on its own, with routes long enough for real movement. Slice 1 built (PR #730) with the deviations noted under Slice 1.

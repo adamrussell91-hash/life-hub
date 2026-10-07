@@ -42,7 +42,7 @@ Adam's ruling: the city is not Sydney. It is **Metropolis**, a city made of him.
 | What the doc assumes | What the code says | Effect |
 |----------------------|--------------------|--------|
 | Lines, Branch, Orbit and the Day Dial exist, with a pace ghost | True (`graph-lines.ts`, `graph-branch.ts`, `graph-orbit.ts`, `daily-dial.ts`, `ghostAt`) | The "one snapshot, many lenses" idea is grounded |
-| Tasks can be shared by several goals or projects | True (`linked_project_ids`, `linked_goal_ids`) | Interchanges are real |
+| Tasks can be shared by several goals or projects | **Corrected:** `linked_project_ids` and `linked_goal_ids` are Someday promotion links. A task has one parent project. Tasks Lines already draws interchanges from cross-project `depends_on` | Interchanges are real, from dependencies |
 | Blockers and waiting-on-others are recorded | True (`blocked_since`, `waiting_on`, `waiting_status`) | Held buses and a mail van have a data source |
 | Capacity forecast, `capacityForDates`, 30 weather states | True | The sky rule is buildable |
 | School terms in prefs | True (`school_terms`) | Term editions are buildable |
@@ -2677,3 +2677,4 @@ Adam asked for the build's biggest wow features. After six rounds by three contr
 - **2026-10-07:** Adam cut museum shelves and bundles, and turned the pet garden into his pets living in the city as animated characters.
 - **2026-10-07:** Adam ruled that the city is not Sydney. It is Metropolis (Me-tropolis), a city made of him. Sydney geography and history removed from the review. Idea Exchange kept as a Knowledge hub feature. Keepsakes are made and placed by Adam himself.
 - **2026-10-07:** Adam answered the review's decisions 1, 3, 4 and 5. The city is for visiting in the SimCity and Cities: Skylines sense (free camera, hover and click to inspect, info views), not rooms, walks or activities. Glance stays as the default view. The event log is approved. Governance moves to its own doc. The glance test stands. The public edge will be water (a harbour or a river). Details in [life-city-build-plan.md](life-city-build-plan.md).
+- **2026-10-07:** Corrected the interchange row of "Checked against the code": interchanges come from cross-project dependencies, not `linked_*_ids`.
