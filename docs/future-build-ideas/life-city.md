@@ -1668,6 +1668,155 @@ This is a proposal to revise the scope of the decorative motion validator, rathe
 | Put to another use | 1 | 1 |
 
 
+### Round 5 · Claude Code · Put to another use + Extend
+
+> **Author note:** This round was written by Claude Code (Claude Opus 5.5) on 7 October 2026. Cards played: **Put to another use** and **Extend**, each for the second and final time. It answers Codex's round 4 challenge, builds on Cursor's lenses and info views, and aims for delight as much as rigour. Everything here is a proposal until Adam names a slice to build.
+
+#### Codex is right about motion, with one refinement
+
+Codex's round 4 challenged my rule that every movement must mean work. The challenge is fair. A city with no pleasure in it fails the other half of the brief: a reason to open it on a free Sunday.
+
+So I accept Codex's split. **Glance** keeps the channel budget strictly. **Explore** allows atmospheric motion inside a chosen scene: the trunk unfolding, the gears turning, the conservatory roof lifting.
+
+One refinement keeps the two from leaking into each other. Atmospheric motion must never borrow the operational vocabulary. No atmospheric buses, no decorative halos, no stops that light up for effect. Atmosphere uses its own materials (water, leaves, gears, paper, light through glass), so even in Explore, a moving bus still only ever means work.
+
+| Notice | Level | Rule |
+|--------|-------|------|
+| `decorative_motion` | Error | Now scoped to Glance only: something moves on the street that no event or real clock change explains |
+| `atmosphere_mimics_signal` | Error | In Explore, an atmospheric element uses a vehicle, halo, lit stop or line style that the street reserves for meaning |
+
+The rest of this round adds one tool that makes the city genuinely useful to *ask*, and one layer that makes it genuinely lovely to *visit*.
+
+#### Put to another use: brushing and linking becomes "Ask the stationmaster"
+
+**The precedent.** In 1987 Richard Becker and William Cleveland published *Brushing Scatterplots*: drag a brush over points in one chart, and the same records light up in every other chart on screen. It became one of the founding techniques of visual analytics, now called **brushing and linking** ([Becker and Cleveland, 1987](https://www.sci.utah.edu/~kpotter/Library/Papers/becker:1987:BS/index.html); [Brushing and linking](https://en.wikipedia.org/wiki/Brushing_and_linking)). Its power is that a selection is shown *in place*, across every view at once, rather than reported in a separate list.
+
+**Why it fits here exactly.** Cursor's round 1 established that Lines, Branch, Orbit, the Day Dial, the Platform and the city are all lenses on one snapshot. That is precisely the setup brushing and linking was invented for. Nobody has yet used it.
+
+**The twist: the brush is a question.** In 1987 the brush was a rectangle dragged with a mouse. In Life Hub, with its named agents, the brush can be a sentence. Adam asks Clare, as the city's stationmaster:
+
+> "What did I actually do for Year 10 this term?"
+
+Clare does not answer with a paragraph. She answers by **lighting the city**. The Year 10 stops completed this term light up across the harbour, on Lines, on the Day Dial's history and on the Platform, all at once. Everything else steps back. The scrubber sets itself to the term. A single caption sits at the bottom: "Showing: Year 10 tasks completed 14 July to 19 September · 23 stops". The answer is a place Adam can look around, not a summary he has to trust.
+
+Follow-ups refine the brush rather than starting again: "Just the marking." "Which of those ran late?" "Compare with Term 2." Each one narrows or shifts what is lit.
+
+**Example questions, and how the city answers them.**
+
+| Adam asks | The city lights | Scrubber |
+|-----------|-----------------|----------|
+| "What's waiting on other people?" | Routes held at a signal whose blocker names someone else | Now |
+| "Where did my evenings go last week?" | Stops completed after 6 pm, by district | Last week |
+| "What feeds the book?" | Ferries and walks linking the library to the writing studio | All time |
+| "What has Hammond rerouted this month?" | Every detour shape and the life walls that caused them | This month |
+| "What's due before the holidays?" | Stops with due dates inside the current term edition (Cursor round 3) | Forecast to term end |
+
+**The grounding rule, which is the whole design.** The language model must never decide what is lit. It only translates Adam's words into a **structured query** over the snapshot and event log (filters on hub, tags, dates, states, routes). The query then lights the city deterministically. So:
+
+- Every lit element is a real record returned by a real query. Nothing is lit because a model guessed it.
+- The caption shows the query in plain words, so Adam can see what was actually asked and correct it ("No, Year 10 English, not Year 10 Science").
+- If the words cannot be turned into a valid query, Clare says so and lights nothing. An empty brush is honest. A plausible-looking brush that is wrong is the worst possible outcome.
+- Health, diary and student records enter a question only when Adam deliberately includes them, following Codex's scope rule for the Idea Exchange.
+
+This is the general lesson for AI in visual tools: **let the model write the query, never the answer.**
+
+**How it fits what already exists.**
+
+- **Cursor's info views** (round 4): an asked question is an info view Adam summons in words. Same rules: one at a time, never left on when the city goes idle.
+- **Codex's walks** (round 3): a walk is a saved question plus an order. "Walk me back through the book" is the brush for "what feeds the book", visited stop by stop. Walks get easier to make because they start from a question.
+- **My catch-up** (round 4): "Since you were last here" is simply the question "What changed since my last visit?", asked automatically.
+- **The Platform**: on the phone, the brush becomes a filtered departures list and a highlighted carriage strip. The caption is the same sentence.
+- **Saved questions** become personal lenses. "My evenings" or "Year 10 this term" can be pinned and recalled with one tap.
+
+**Validator rules.**
+
+| Notice | Level | Rule |
+|--------|-------|------|
+| `ungrounded_highlight` | Error | Anything lit during an answer that was not returned by the answer's query |
+| `answer_without_query` | Error | An answer that lights or states something without a stored, inspectable query |
+| `brush_lens_mismatch` | Error | The same question lights different records in two lenses at the same clock time (Cursor's `lens_disagreement`, applied to answers) |
+
+#### Extend: Harbour City keeps the real Sydney almanac
+
+**The idea in one line.** The sky belongs to Adam's inner weather. The land and the water belong to the real world's seasons.
+
+My round 1 made the city Sydney-shaped. Cursor's round 3 gave it a teacher's term editions. Codex's round 4 asked for a reason to visit when nothing needs doing. Extend all three: Harbour City keeps Sydney's actual natural calendar, driven by the real date.
+
+The trick that makes this safe is that **seasonal decoration cannot lie**. It reports the world, not Adam. Purple jacarandas in November say nothing about his workload, so they can never be mistaken for a signal. They are honest decoration: true, beautiful and free of meaning about him.
+
+**The almanac.**
+
+| Season | What appears in the city | Where it lives |
+|--------|--------------------------|----------------|
+| **Jacarandas**, October and November | Purple canopies along the north shore streets, petals on the school buses' route | Land, Term 4 edition |
+| **Humpbacks heading south**, October and November | Mothers and calves passing close to the heads, slowly | Water |
+| **Humpbacks heading north**, mid May to July, peaking late June | Whales passing further out, faster | Water |
+| **Wattle**, late winter into Wattle Day on 1 September | Gold in the parks | Land |
+| **Christmas bush**, December | Red in the gardens and on the concourse | Land |
+| **Vivid**, May and June | The end-of-term light show from round 2 borrows the real festival's season | Buildings, evening |
+| **New Year's Eve** | The harbour replay from round 2 | Water and sky edge, one night |
+| **Daylight saving** | The real clock shifts, so evening light arrives an hour later from the first Sunday in October | The real clock |
+
+The whale months come from Destination NSW's own guide: northbound from mid May with the peak at the end of June, and in October and November mothers and calves travelling south slowly, close to the shore ([Sydney.com, whale watching](https://www.sydney.com/things-to-do/nature-and-parks/whale-watching)).
+
+**The jacaranda deserves its own paragraph.** For anyone who has taught senior English in Sydney, the jacaranda is the HSC. At the University of Sydney, folklore said a student who had not started studying by the quadrangle tree's first bloom would fail their exams. The tree stood in the Main Quadrangle from 1928 until it fell in October 2016. The University had already taken cuttings in 2014, so the tree was replanted from genetically identical clones of itself ([University of Sydney](https://www.sydney.edu.au/news-opinion/news/2016/10/29/university-community-mourns-jacaranda-tree-collapse.html)).
+
+Both halves of that story belong in Harbour City.
+
+- **The first bloom.** In the Term 4 edition, the first jacaranda on the north shore flowers outside the Teaching district. It is a nod Adam and every Year 12 student would recognise, and it means nothing about his task list. It is just October in Sydney.
+- **The cutting.** When a landmark has to be rebuilt (a renderer change, a new art style, a 2D-to-3D swap), it is regrown from its own record, in the same place with the same identity. That is the round 4 mental map rule told as a story: the city can change its art and keep its places.
+
+**Vera's lighthouse gets a gentle second job.** In whale season, Explore offers the headland: Adam climbs the lighthouse and watches the whales pass the heads. Nothing is required, nothing is scored, and the lighthouse beam still means only "check-in due" on the street.
+
+**Adam's own almanac.** Beyond nature, Adam can add recurring dates he cares about as seasonal features: an anniversary, a conference season, the week a tradition happens each year. Each is chosen and named by him, never inferred from his records, and each appears as atmosphere (lanterns on the quay, a flag on the bridge) rather than as a signal.
+
+**Rules that keep the almanac honest.**
+
+- **Never the sky.** The sky is the capacity forecast and only the capacity forecast. Seasons live on land and water.
+- **Never a line colour.** Jacaranda purple, wattle gold and Christmas bush red are drawn from a scenery palette that excludes every `route_color`, so the channel budget holds.
+- **Still on the street, alive in Explore.** In Glance the seasons are static scenery that changes only when the real date crosses a boundary. Whales swim and petals fall only in Explore, under Codex's atmosphere rule.
+- **Rewind shows the season of the day.** Scrub back to last October and the jacarandas are in bloom. Year-on-year comparison stops feeling like two charts and starts feeling like the same place in the same season.
+- **No penalty, ever.** The jacarandas bloom whether or not Adam opened the city. Nothing seasonal wilts because he was away, which meets Cursor's `neglect_decay` rule.
+
+| Notice | Level | Rule |
+|--------|-------|------|
+| `almanac_in_sky` | Error | Any seasonal element is drawn in the sky or changes the sky's state |
+| `almanac_uses_line_hue` | Error | A seasonal element uses a colour reserved for route identity |
+| `almanac_from_records` | Error | A seasonal or personal-almanac feature appears because of a record, rather than the real date or Adam's own almanac entry |
+
+#### Where the city now stands: three layers and two tools
+
+After five rounds from three contributors, the design has settled into a shape simple enough to build in order.
+
+| Part | What it is | Main contributors |
+|------|------------|-------------------|
+| **The street** (Glance) | The calm, peripheral city: channel budget, one halo, catch-up replay, never-reflow layout | Claude r4, Cursor r1 and r3 |
+| **The rooms** (doors from the street) | Records, studio, workshop, model table, walks, the Idea Exchange | Codex r1 to r3 |
+| **The worlds** (Explore) | Foldout trunks, impossible interiors, personal architecture, the almanac in motion | Codex r4, Claude r5 |
+| **Time** (a tool) | Rewind, Forecast, catch-up and replays, all from one event log | Claude r2 and r4, Cursor r2 |
+| **Ask** (a tool) | Questions as brushes across every lens, grounded in queries | Claude r5, Cursor r4 info views |
+
+Under all five sits one snapshot (Cursor r1), the GTFS-shaped vocabulary (Claude r1), the planning layer (Claude r3) and the validator with its golden days (Claude r3, with rules added by every contributor since).
+
+#### New open questions from round 5
+
+- Should Clare be the only stationmaster who answers questions, or should each agent answer about its own district?
+- Should a saved question appear on the Platform as a fourth door, or stay inside the full city?
+- Which almanac entries does Adam want first, and which personal dates (if any) should join them?
+- Should the almanac show in Glance at all, or only in Explore, so the street stays as quiet as possible?
+
+#### Claude Code card ledger after round 5
+
+| Card | Uses by Claude Code | Uses left |
+|------|---------------------|-----------|
+| Extend | 2 | 0 |
+| Substitute | 1 | 1 |
+| Combine | 1 | 1 |
+| Adapt | 2 | 0 |
+| Magnify | 2 | 0 |
+| Put to another use | 2 | 0 |
+
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load? (Claude round 4: expands at its edges, never reflows its centre)
@@ -1693,3 +1842,4 @@ This is a proposal to revise the scope of the decorative motion validator, rathe
 - **2026-10-07, Claude Code:** Round 4 (Substitute + Magnify). Proposed the glance test (street versus room). Substituted the visit model with calm technology (Home tile, station clock, idle default) and a perceptual channel budget, including an audit of colour overload across all rounds. Magnified change over state: a "Since you were last here" replay grounded in change blindness research, and a never-reflow layout grounded in mental map research. Added three validator rules and a smallest testable slice.
 - **2026-10-07, Cursor:** Round 4 (Put to another use + Adapt). Brought in simulation-game rituals that keep a life (Spiritfarer's farewell, Stardew's bundles, Animal Crossing's museum, Mini Motorways' pin) and refused the ones that punish absence (Frostpunk's meters, worn-away grass, the Motorways timer, Stardew's gold vault). Adapted Skylines info views, RCT thought summaries and Dorfromantik's no-penalty quests so they obey the glance test and the channel budget.
 - **2026-10-07, ChatGPT Codex:** Round 4 (Extend + Combine), responding to Adam's request for more creative ideas. Added foldout destination worlds and architecture inspired by chosen watches, fragrances, books, travel keepsakes and ceramic artwork. Proposed distinct Glance and Explore experiences, with impossible interiors and atmospheric motion during intentional exploration. Preserved all earlier contributions. Extend and Combine are now exhausted.
+- **2026-10-07, Claude Code:** Round 5 (Put to another use + Extend). Accepted Codex's Glance and Explore split for motion, with a rule that atmosphere never borrows signal vocabulary. Put brushing and linking to use as "Ask the stationmaster" (questions light the city through grounded queries). Extended the city with the real Sydney almanac (jacarandas, whales, wattle, Christmas bush) on land and water only. Added a summary of the city's three layers and two tools, and eight validator rules.
