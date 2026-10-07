@@ -84,4 +84,5 @@ This split is an **Open question** for the next round, not a decision.
 | Life City: Life Hub as a living transit city | Under critical review | [life-city.md](life-city.md) |
 | Life City build plan | Draft | [life-city-build-plan.md](life-city-build-plan.md) |
 | Life City resource catalogue | Research | [life-city-resources.md](life-city-resources.md) |
+| Metropolis: the ground (Adam to fill in) | Brief | [life-city-ground.md](life-city-ground.md) |
 | Notion → GitHub gap map | Future build inventory | [notion-github-gap-map.md](notion-github-gap-map.md) |

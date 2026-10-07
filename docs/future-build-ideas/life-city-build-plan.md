@@ -9,15 +9,26 @@
 
 ## 0. Assumptions
 
-These are the review's five open decisions, answered with the review's own lean. Adam can overrule any of them. Each one changes a named slice.
+These are the review's five open decisions. Adam answered four of them on 7 October 2026; D2 still stands on the review's lean.
 
 | # | Decision | Assumed | If Adam says otherwise |
 |---|----------|---------|------------------------|
-| D1 | Glance or visit? | Glance first. Explore is a free camera over the same city | Slice 3 grows. Slice 2's test becomes a visit test |
+| D1 | Glance or visit? | **Adam: visit, in the SimCity and Cities: Skylines sense.** Not rooms, walks or activities. A city you move around, zoom into and inspect. Glance still matters, but a moving train must explain itself without guesswork | See §1a. Slice 2b gains inspection. Info views move up to Slice 3 |
 | D2 | Phone | Wide-screen city plus a Home tile. No new phone board | A board must name the Tasks view it replaces (F8) and becomes its own slice |
-| D3 | Event log | Approved in principle, built in Slice 4, not before | The catch-up stays on timestamps forever, and Time tools are cut |
-| D4 | Split out governance | Yes, to its own doc. Not in this plan | — |
-| D5 | Glance test | Adam sits it at the end of Slice 2 | Without it, Slice 3 does not start |
+| D3 | Event log | **Adam: yes.** Built in Slice 4 | — |
+| D4 | Split out governance | **Adam: yes.** Its own doc, which still needs thinking through. Not in this plan | — |
+| D5 | Glance test | **Adam: yes.** Sat at the end of Slice 2, now with an inspection half (see Slice 2) | Without it, Slice 3 does not start |
+
+## 1a. What "visit" means here
+
+Adam's complaint with a glance-only city: "a train is moving, and I need to click on it to figure out what it means." The Cities: Skylines answer is that everything on screen explains itself the moment you ask, and the city has map modes for each question. That fits the review: it is the "info views only on request" Keep (P11) moved earlier, not a return of the cut rooms.
+
+- **Free camera.** Pan and zoom. Rotating between the four isometric views only if Track A finds four-direction sprites for every building; otherwise one fixed angle, as in SimCity 2000. Zooming in brings up labels: line names, route names, district names.
+- **Hover to know, click to inspect.** Every vehicle, stop, building, barrier and service has a hover card in plain words ("Year 10 marking: 3 of 7 stops done, moving this week") and a click panel: what it is, why it is there (the record and the rule that put it there), and a button that opens the owning hub page. No editing in the panel (F4).
+- **Info views** (Skylines' map modes): a toolbar that recolours the city for one question at a time, such as Capacity, Blocked and waiting, Due dates, Teaching load and Momentum. While an info view is on, the channel budget is suspended for that question and a legend explains the colours. Turning it off returns the calm street.
+- **A legend** that is always one tap away, listing every vehicle and shape and what it means.
+- **Glance stays.** The default view is still the calm street with the channel budget, and the Home tile is still the glance surface. Visit is what happens when Adam leans in.
+- **Not included:** zoning, money, building placement for records, or any simulation that invents activity. Records place themselves. Adam places only his own landmarks, keepsakes and the ground (Track B).
 
 ## 1. Where the code lives
 
@@ -51,7 +62,7 @@ The catalogue's recommendation is adopted with the changes marked **Changed**. V
 | Particles | PixiJS `ParticleContainer` | Slice 5 only. No third-party particle library until a festival needs one |
 | Pet paths | EasyStar.js | Slice 5 only. Never used for routes: a suspension is dates, not a detour |
 | Asset pipeline | PixiJS AssetPack | Three bundles: `core`, `pets`, `festival`. The Home tile loads a pre-rendered image, not a bundle |
-| Map composition | Tiled | **Changed.** Tiled holds the fixed ground only: terrain, the named corner, the public edge and scenery lots. Routes, stops and buildings tied to records come from the layout engine. Hand-editing a Tiled map for every new project would break never-reflow and turn Adam into the map's maintainer |
+| Map composition | Tiled, driven by Codex on Adam's Mac if Adam wants to shape it by hand | **Changed.** Tiled holds the fixed ground only: terrain, the named corner, the public edge and scenery lots (Track B). Routes, stops and buildings tied to records come from the layout engine. Hand-editing a Tiled map for every new project would break never-reflow and turn Adam into the map's maintainer |
 | Sprite rig | Blender, orthographic camera | Renders the 3D Kenney kits, Cube Pets and the balloon into the 2D style |
 | Scenery variation | seedrandom | Scenery variants only. Record placements are stored slots, never seeds |
 | Whole-city reference | IsoCity (MIT) | A time-boxed spike in Slice 2 compares its depth sorting and route follower with writing our own. Retain its MIT notice if any code is lifted |
@@ -111,13 +122,22 @@ This is the catalogue's §7 point: the packs remove drawing work, but not mismat
 
 - **Base family:** Kenney Isometric Tiles (City, Buildings, Landscape, Vehicles). It sets the angle, tile size, outline and light direction for everything else.
 - **Sprite spec** (`apps/tasks/public/city/SPRITE-SPEC.md`): tile footprint in px, ground anchor, light direction, palette, direction names, frame size, and frame counts for vehicles and pets. Keepsakes use the same spec.
-- **Blender rig:** one `.blend` with the locked orthographic camera and lighting, matched to the 2D family. Used for Train Kit, Watercraft Kit, the City Kits, Cube Pets and the balloon. The `.blend` lives outside the repo if any source model is not CC0.
+- **Blender rig** (run by ChatGPT Codex on Adam's Mac, from a script Claude Code writes): one `.blend` with the locked orthographic camera and lighting, matched to the 2D family. Used for Train Kit, Watercraft Kit, the City Kits, Cube Pets and the balloon. The `.blend` lives outside the repo if any source model is not CC0.
 - **Proof sheet:** one Kenney street tile beside one rendered Train Kit tram, one Cube Pet idle frame and one balloon. If they don't sit together, adjust the rig before going further.
 - **Vehicle audit:** open the Vehicles archive and confirm what really exists: ambulance, school bus, a food-truck stand-in, a van, a crane, and how many directions each has. Gaps go to Blender (the City Kits) or Asset Forge.
 - **Sky:** decide how the 30 capacity weather states show over the city. The catalogue does not cover this. Suggested: a sky gradient plus the existing weather icon in a corner badge, with no new art for each state.
 - **Credits and `assets.json`** started, per the licence rules above.
 
 **Done when** the proof sheet looks like one city to Adam.
+
+### Track B · The ground (Adam, beside Slice 1)
+
+Adam has ideas for the physical space. They go in [life-city-ground.md](life-city-ground.md) before the layout engine is written, because the ground decides where the slots can go.
+
+- The public edge is water: a harbour or a river. No route or life wall may close it.
+- The corner is one named public place that belongs to no hub.
+- Water, hills and parks exist because Adam wants them, not to copy a real city (Metropolis ruling).
+- Output: a ground map (Tiled JSON, or generated in code from the brief) that Slice 2a reads as fixed obstacles.
 
 ### Slice 2 · Layout engine and the glance prototype
 
@@ -130,12 +150,13 @@ This is the catalogue's §7 point: the packs remove drawing work, but not mismat
 - Pins store tile and footprint only.
 - Tests: `layout_reflow` (add a project; every other position is unchanged), `pin_moved_by_layout`, `public_edge_closed`, and determinism (same input gives the same output twice, and in shuffled input order).
 
-**2b · Glance prototype (Cursor)**
+**2b · Prototype: glance and inspect (Cursor)**
 - One page at `/tasks/city?golden=<day>` rendering each golden day snapshot as a static isometric street from the Track A atlas.
 - **IsoCity spike first, time-boxed to one session:** try its depth sorting and route follower against our snapshot. Adopt the module if it fits in a day, keeping its MIT notice; otherwise write our own small versions. Record the result in the PR.
 - Channel budget enforced (P10): hue is identity only, motion is momentum only, light is open or finished, sky is the capacity forecast, line style is the lifecycle, shape is the exceptions (barrier, halo, late ring).
 - "Since you were last here" built from timestamps only (created, completed, trashed). Quiet days say "Quiet since …" and play nothing. One tap skips. Reduced motion jumps straight to Now.
 - Building fade only when a barrier, halo or service vehicle sits behind it (plan the layout first, fade second).
+- Hover cards, click panels, zoom labels and the legend from §1a, on the golden days. Info views wait for Slice 3.
 - No live data and no Home tile yet.
 - UI failure register: **W4** (Pixi out of the entry bundle; check the built entry chunk size is unchanged), **C2** (no decorative band or motion standing in for data; check that every moving sprite maps to a snapshot vehicle id), **C9** (no settle then snap; check that the first frame is the final layout), **V7** (a repaint keeps the camera; check that the camera holds after a data refresh), **D3** (screenshots on golden days are labelled as fixtures), **P5** (a prototype is not the city).
 - **Measure:** first load and frame rate on desktop and on Adam's iPhone (catalogue §6.2).
@@ -143,6 +164,7 @@ This is the catalogue's §7 point: the packs remove drawing work, but not mismat
 
 **The glance test (Adam).** Four golden days, plus two Adam has not seen. Each is shown for three seconds as a catch-up replay. Adam then says what changed and what needs him.
 **Pass:** he names the main change and the decision correctly on at least five of six, without reading a label.
+**Inspect half:** on the same days, Adam picks any five moving or marked things and says what each means after one hover. **Pass:** five of five, with no guessing.
 **Fail:** stop. Record the result in the concept doc's History. Do not start Slice 3.
 
 ### Slice 3 · Live city and Home tile
@@ -152,6 +174,7 @@ This is the catalogue's §7 point: the packs remove drawing work, but not mismat
 - Feed `citySnapshot` from the live Tasks store and the capacity and term data. Desktop and tablet only.
 - Real clock day and night, idle by default, dims at night.
 - Every door opens the owning hub page (F4). No editors in the city.
+- **Info views** from §1a, each with its own legend and a test that the overlay colours come from the snapshot, not from new logic.
 - Home tile: a new approved surface widget template showing a pre-rendered image of the city with the sky. It opens `/tasks/city`. No Pixi on Home.
 - Station clock mode: full screen, dimmed, no controls until touched.
 - Tap a bus to open the project and a stop to open the task (concept §8 open question, answered).
@@ -201,11 +224,11 @@ Rewind and Forecast scrubbers (after a term of log), term replay, Ask the statio
 | A1 | Confirm or overrule D1 to D5 | Before Slice 1 | One line each |
 | A2 | **Kenney Isometric Tiles packs**: City, Buildings, Landscape, Vehicles | Track A | The cloud sandbox cannot reach kenney.nl (blocked by the network allowlist). Download the four zips and commit the unzipped folders, licence file included, to `apps/tasks/public/city/kenney/` on a branch, or put them in Drive. Trimming to the used sprites happens in Track A |
 | A3 | **3D kits for the rig**: Train Kit, Watercraft Kit, Cube Pets, and City Kit Roads, Commercial and Suburban | Track A | Same as A2, kept outside `public/` until rendered |
-| A4 | Install **Blender** and **Tiled** on the Mac | Track A | Both free |
+| A4 | Let Codex install and drive **Blender** (and Tiled, if wanted) on the Mac | Track A | Claude Code writes the script and the prompt. Adam does not need to learn either tool |
 | A5 | Line colour per goal domain, or "reuse the Lines colours" | Slice 2b | Default: reuse `lineColour` from Lines |
 | A6 | Approve the proof sheet | End of Track A | Look at four sprites side by side |
 | A7 | Sit the glance test, with the iPhone to hand | End of Slice 2 | About ten minutes |
-| A8 | Name the corner and the public edge | Slice 2a | Two names |
+| A8 | **Ground brief**: the physical space, the corner and the public edge (harbour or river) | Slice 2a | Fill in [life-city-ground.md](life-city-ground.md) |
 | A9 | Pets: names, a few photos each, and a resting spot | Slice 5 | Later |
 | A10 | Almanac entries, including whale months, and a whale silhouette | Slice 5 | Later |
 | A11 | Keepsake pieces made to the sprite spec | Slice 5 | Later, at Adam's pace |
@@ -233,3 +256,4 @@ Rewind and Forecast scrubbers (after a term of log), term replay, Ask the statio
 
 - **2026-10-07:** Draft written from the critical review and a check of `main`.
 - **2026-10-07:** Resource catalogue folded in. Added the Stack section, licence rules for a public repo, Track A (art rig), the IsoCity spike, an accessibility requirement and the Slice 5 asset sources. The Kenney pack list now names the Isometric Tiles family. Tiled is limited to the fixed ground.
+- **2026-10-07:** Adam's answers: visit in the SimCity and Cities: Skylines sense (free camera, hover and click to inspect, info views, legend), the event log approved, governance split out, glance test approved with an inspection half. Added §1a, Track B (the ground) and the ground brief. Codex runs Blender and Tiled on Adam's Mac.
