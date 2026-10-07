@@ -131,6 +131,7 @@ Life City needs a tiny fraction of OpenTTD: no money, no crashes, no freight eco
   - `routine.completed` / `routine.missed`
   - `city.weather` (Mind), `city.clock` (real time, term rhythm)
 - **Layout engine:** deterministic placement, so a project's route stays in the same place between visits
+- **One graph, four lenses:** Tasks Lines, Branch, Orbit and Harbour City read one snapshot of that graph. The city does not keep a second copy of what is done, blocked or due. Proposal in Cursor's round 1 below.
 - **Renderer:** PixiJS (2D) first
 
 ### Who builds what
@@ -241,17 +242,87 @@ In the game Mini Metro, a crowded station shows a ring that slowly fills before 
 - Who decides when a line becomes driverless: Adam, or the agent after a run of confirmed successes?
 - Which milestones earn a bespoke landmark, and can Adam move or rename them later?
 
+### Round 1 · Cursor · Combine + Put to another use
+
+> **Author note:** This round was written by Cursor on 7 October 2026. Cards played: **Combine** and **Put to another use**. It builds on Claude Code's Round 1 (Harbour City, the agent fleet, driverless lines, and the GTFS-shaped vocabulary). It is a proposal for the other contributors to build on, challenge or replace. Nothing here is a decision until Adam names a slice to build.
+
+#### Combine: one graph, four lenses
+
+**The problem.** Life Hub already draws Adam's work three ways on the Tasks graph, and the calendar draws it again. Lines is a transit map (`transit-lines`): a travelled track and an ahead track, a breathing "you are here" ring, a ghost marker at a fractional `ghostAt` ("pace says be here by today"), a blocked bar through the track, and a Clare alert on the line. Branch is the same tasks as flowchart lanes. Orbit is the same tasks as what is circling now. The Day Dial places today's work blocks on a clock and ticks them off with the same gesture as the board. Claude Code's round then adds a fourth picture, Harbour City, plus a departures board and a GTFS-shaped feed.
+
+Four pictures of one life will drift. The city will show a bus at a stop Lines has already filled. The board will announce a task the dial has already struck. Clare will say "on time" while the ghost says the pace has slipped. Each picture can be internally correct and still be a lie about the others.
+
+**The combination.** Lines, Branch, Orbit, the Day Dial's work blocks, Clare's departures board and Harbour City are lenses on one snapshot. Claude's GTFS-shaped files are that snapshot, not a new database. The Tasks graph is the source. The layout engine may curve a route along the harbour. It may not reorder stops, invent a stop, or decide that a task is done.
+
+| Already in the product | Same fact in the city |
+|------------------------|------------------------|
+| A Lines route, in its line colour from Properties | A GTFS `route` plus the `shape` the layout engine stored |
+| A station, in order | A `stop`, in that same order |
+| Travelled track versus ahead track | Which stops are completed, and `shape_dist_traveled` for the vehicle |
+| The breathing "you are here" ring | The `VehiclePosition` of the service Adam is actually in |
+| The ghost at `ghostAt` | A second, ghost vehicle where the pace says he should be. It is not a second bus doing work |
+| The blocked bar | A GTFS Realtime service alert. A life wall is a detour: the shape bends, the stop order stays |
+| Clare's alert card | The same words on the departures board. The city does not paraphrase her |
+| A Branch child under `parent_task_id` | The side street Lines already drops off that station |
+| Orbit's "now" | The set of vehicles currently in service |
+| A Day Dial work block (`task_id`, start, length) | The vehicle dwells at that stop for that span. Ticking the block completes the stop |
+| A deleted or trashed task | Gone from every lens in the same refresh. An archived project can still become a landmark. A deleted one cannot |
+
+**How a vehicle is allowed to stand.** GTFS Realtime practice is that a vehicle position sits on the trip's shape, within about 200 metres of it, unless a detour alert is in effect ([GTFS Realtime best practices](https://gtfs.org/documentation/realtime/realtime-best-practices/)). In the toy city that rule becomes absolute: the sprite's anchor is a point on the polyline. If the snapshot cannot place it on the shape, the vehicle is absent and the board says the position is unknown. A bus does not hover in the harbour because the layout failed. Two trips that share a shape are told apart by time, the way a real feed tells the 16:14 from the 16:44 apart. The Day Dial is that clock. Sydney time, the same clock the dial already uses.
+
+Driverless and staffed, from Claude's round, are a property of the vehicle, not a second position system. A driverless tram still snaps to the shape. A staffed train with its doors open is the same "you are here" ring, waiting.
+
+**One Sunday afternoon, so the contract is obvious.** It is 16:30 in Sydney. Year 10 marking is the current station on a Teaching route. Lines shows the breathing ring on that station and a ghost a little ahead. The Day Dial has a work block on that task from 16:00. The departures board reads "Year 10 marking · you are here · on time". The city shows one staffed bus on the shape at that station, and a ghost bus at the pace marker. Adam ticks the block on the dial. The station fills, the bus moves to the next stop, the board advances, and the dial strikes the block. Those four changes are one fact. A city that still shows the bus at the old stop is the broken lens.
+
+A life wall closes that route. Lines draws the blocked bar. The snapshot emits a detour alert and a new shape around the closure. The bus follows the new shape. Lines' ahead track keeps the same stop order. The city does not cut a tunnel the graph does not have.
+
+**Phone and desktop are lenses too.** This is a proposal for two open questions in section 8, not a decision. On a wide screen the lens is the isometric city. At 390px the lens is Claude's departures board, which is the same "what is next" query, stacked the way Lines already goes vertical on a narrow canvas. The phone does not shrink the whole fleet until the buses are specks. The noise question is answered by showing fewer lenses, not by deleting vehicles from the snapshot.
+
+**What this asks of the three of us.** One function builds the snapshot. Lines, Branch, Orbit, the dial and the city all read it. A second progress calculator, even a well-meaning one inside the renderer, is the bug. Codex draws Kenney sprites on the polyline and runs the smart building-fade off that same point, so a tower fades when the vehicle really is behind it. Cursor's side of "who builds what" is the snapshot and the proof that the four lenses agree. Claude's GTFS names stay the vocabulary.
+
+Day-to-day finances stay out of the snapshot. A fare, a balance or a tap-on cost is not a stop time.
+
+#### Put to another use: the concourse ceiling is the Knowledge sky
+
+**The precedent.** Grand Central's main concourse was meant to have a skylight. What it got, in 1913, is a painted sky of constellations over the departures hall. Within weeks a commuter saw that the heavens were reversed, and the backwards sky was kept anyway ([Untapped New York](https://www.untappedcities.com/the-hidden-history-of-grand-central-terminals-celestial-ceiling/); [New York Times, 23 March 1913](https://www.nytimes.com/1913/03/23/archives/constellations-reversed-new-grand-central-ceiling-has-the-heavens.html)). The useful part is the ceiling over the hall. The warning is the mirror: a decorative sky that does not match the real one is noticeable forever.
+
+**The element to reuse.** Knowledge already has that sky, and it is not decoration.
+
+- Saved constellations are Adam's. Each figure is laid out from its notes, then placed with the sky position, scale and rotation he saved (`universeSky.ts`). Those points are notes. Tapping a point opens that note.
+- The scattered star field is a seeded backdrop (`buildSkyLayers`, seed 9173). Those stars are not notes. They are not tappable, and they are not a second archive.
+- The twenty topic planets are a different instrument. Each topic has one seeded look so the planet matches in the universe, the orrery and its own system (`universePlanets.ts`). They already have a home.
+
+**How it sits in Harbour City.** Clare's CBD interchange, the big departures hall from Claude's round, has a vaulted ceiling. The ceiling is the Knowledge sky: the same seeded star field and the same saved constellations, in the same arrangement as the Universe view. Looking up in the hall and opening Universe are two readings of one painting. A constellation is never mirrored to suit the architecture. Grand Central's mistake is the test: if a figure is flipped on the ceiling and correct in Knowledge, the ceiling is wrong.
+
+By day, outdoors, the sky stays the weather Vera's lighthouse already drives. The ceiling mural is still there in the hall, the way Grand Central's is visible in daylight, so notes are reachable without waiting for night. At night, `city.clock` brings the same star field up over the open city as well. Weather and stars take turns outdoors. They do not paint over each other.
+
+Topic planets stay in the Universe. Pasting a solar system onto the suburbs would make a second map of topics the districts already cover. A district does not become a planet, and a planet does not become a building.
+
+**What changes when knowledge changes.** Adding a note to a saved constellation adds a point on the ceiling, in the same place the Universe adds it. Deleting a note removes that point everywhere. A deleted note does not remain as a dim star. A constellation Adam has not saved does not appear just because a topic exists. The city sky grows when he saves figures, not when the renderer feels like drawing more.
+
+**Sound.** The open question "Sound?" gets this proposal: the city does not grow its own soundtrack. Knowledge already has universe chimes and a saved preference. If sound is ever on, it is that preference, and the base assumption stands that it ships off. A second mixer for bus horns and lighthouse bells is a different product.
+
+**On the phone.** The departures board can keep a thin strip of the ceiling, enough to show that a constellation has a new point, not a second panorama beside the list. The full vault is part of the wide city lens.
+
+#### New open questions from Cursor's round 1
+
+- When the city and Lines disagree, the proposal is that the city is the broken lens, because the graph is the source. Is that the rule Adam wants, including on a day when the city is the view he is looking at?
+- Is the Knowledge sky the concourse vault only, with a plain outdoor sky at night, or does the whole city look up at it after dark?
+- A booked trip in Travel is the obvious intercity departure, but this round does not fold it in. The travel map has already been wrong by treating an arrival city as both ends of a leg. Should a later round put real trip legs to use as intercity trains, with Sydney as the start, or do dreams stay the only intercity service?
+- Does a life-wall detour have to repaint Lines and the city in the same frame, or may the schematic keep a straight track while the city bends?
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load?
-- How many vehicles before it gets noisy on a phone at 390px?
-- Is Life City a hub page of its own, or a mode of the Tasks Hub Lines view?
+- How many vehicles before it gets noisy on a phone at 390px? (Cursor round 1: the phone lens is the departures board, so the fleet stays on the wide view)
+- Is Life City a hub page of its own, or a mode of the Tasks Hub Lines view? (Cursor round 1: a lens on the same graph as Lines, Branch and Orbit)
 - Tap interactions: does tapping a bus open the project, a stop open the task?
 - Which agents become which services, and do they get uniforms? (First draft in round 1)
 - How are archived or deleted items handled? (Repo rule: deleted means gone; archived could become landmarks)
-- Sound? (Off by default, presumably)
+- Sound? (Off by default. Cursor round 1: if it is ever on, it uses the Knowledge universe chimes preference, not a new city soundtrack)
 
 ## 9. Contributions log
 
 - **2026-10-07, Claude:** Created this doc from the chat thought experiment with Adam.
 - **2026-10-07, Claude Code:** Round 1 of the what if game (Extend + Adapt). Added section 7 with Harbour City, agent services, driverless lines, landmarks, vacant lots, the GTFS-shaped vocabulary and pressure rings. Renumbered Open questions to 8 and this log to 9.
+- **2026-10-07, Cursor:** Round 1 of the what if game (Combine + Put to another use). Added one-graph-four-lenses (Lines, Branch, Orbit, the Day Dial and Harbour City share a GTFS-shaped snapshot) and the Knowledge sky as the concourse ceiling. Noted both in the architecture sketch and on three open questions.
