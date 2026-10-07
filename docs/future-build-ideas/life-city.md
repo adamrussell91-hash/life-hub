@@ -2456,6 +2456,175 @@ The Platform at 390 does not grow a map of seams. The departures board stays the
 
 All twelve card uses are now spent. A further Cursor round would need a new allowance or a new rule from Adam.
 
+### Round 6 · Claude Code · Substitute + Combine
+
+> **Author note:** This round was written by Claude Code (Claude Opus 5.5) on 7 October 2026. Cards played: **Substitute** and **Combine**, each for the second and final time. Adam's question for this round: *what do real cities have that this city does not, which could become the build's biggest wow features for Life Hub and its future builds?* I read Codex's and Cursor's round 6 first. Codex has given the city its institutions (works department, repair arcade, council, press, receiving dock, night programme, Old City). Cursor has given it its form (Lynch's five elements, Alexander's overlap, Jacobs's short blocks, Gehl's edges, the buried creek and the public foreshore). This round takes what neither covered. Everything here is a proposal until Adam names a slice to build.
+
+#### What real cities still have that Harbour City does not
+
+After six rounds the city has transit, weather, seasons, landmarks, festivals, streets, institutions, archives and a public edge. Three civic systems are still missing, and they happen to be the three that would change **Life Hub itself**, not only the picture of it.
+
+| A real city has | What it does | Still missing here |
+|-----------------|--------------|--------------------|
+| **Planning law** | Decides, calmly and in advance, what may be built where, what needs no permission, what needs a quick check and what needs a full hearing | Agents' capabilities are simply `auto` or `confirm` (76 of each in `capabilities/`). Life walls are one-off. There is no standing plan |
+| **A water supply with a drought plan** | Tracks a slow reserve (the dams), not just today's weather, and triggers pre-agreed restrictions when the reserve falls | The capacity forecast is daily weather. Nothing shows the slow stock beneath it, and nothing says in advance what gives way when it runs low |
+| **A heritage register** | Lists places that cannot be demolished, whatever the pressure | Nothing in the design is protected from being squeezed out in a heavy week |
+
+Smaller things real cities have, worth a line each for a later round: a **census** (a periodic statistical portrait, such as a population pyramid of open commitments by age), **street addresses** (a memorable, permanent address for any record, which Life Hub's universal links could supply) and **time capsules** (a letter sealed at the start of term and opened at its end).
+
+The two cards below take the three big ones.
+
+#### Substitute: replace "auto or confirm" with a Life Environmental Plan
+
+**What is being replaced.** Today every agent capability is one of two kinds: it runs on its own, or Adam confirms a diff. My round 1 copied that into the city as driverless and staffed trains. Life walls sit beside it as a separate idea. Codex's council debates individual plans. None of these is a **standing plan** that says, in advance, what kind of change is welcome where and when.
+
+Real cities solved this a long time ago. In NSW the solution has three lanes, scaled to impact ([Singleton Council, types of development](https://www.singleton.nsw.gov.au/Development/Planning-Information-and-Advice/Understanding-types-of-developments-and-applications)):
+
+- **Exempt development** needs no consent at all, provided it meets published criteria (a small deck, a carport).
+- **Complying development** is checked against fixed, pre-determined standards and certified fast, generally within ten business days, because nobody has to exercise judgement.
+- **A development application (DA)** is everything else. It gets a merit assessment by a person.
+
+Above all three sits the **Local Environmental Plan**: zones that say what each piece of land is for, and numerical standards (height, floor space) that every proposal is measured against. When a proposal breaks a standard, the applicant must lodge a written **clause 4.6 variation request**, arguing why compliance is unreasonable in this case ([an example request on the NSW Planning Portal](https://www.planningportal.nsw.gov.au/sites/default/files/documents/2022/Clause%204.6%20Height%20Variation%20Request.pdf)).
+
+**The substitution.** Life Hub gets its own LEP: a **Life Environmental Plan**, written by Adam once, when he is calm, and amended whenever he likes.
+
+**1. Zones on the week.** The week is the land. Adam zones it.
+
+| Zone (illustrative) | Covers | Permitted without consent | Prohibited |
+|---------------------|--------|---------------------------|------------|
+| **Work core** | School days, roughly 7:30 to 17:00 | Teaching and professional work | Nothing in particular |
+| **Residential** | Weekday evenings | Light admin, reading, time at home, diary | New work blocks |
+| **Public recreation** | Sundays | Anything Adam chooses to do | Any agent-proposed work |
+| **Conservation** | The sleep window | Nothing | Everything |
+| **Special purpose** | Marking weeks and report periods, set per term | Extra work blocks up to a standard | Work in the conservation zone, still |
+
+Zones replace most life walls. A recurring wall becomes a zone. A one-off wall becomes a **temporary closure order** with an end date. In the city, zoning is not painted on the street (the channel budget from round 4 still holds). It is one of Cursor's info views: ask to see it and the week's land use appears; close it and it is gone.
+
+**2. Development standards.** Numbers Adam sets for each zone: the most work hours allowed in a residential evening (perhaps zero), the most of a week that may be committed in advance, the latest a meeting may end. These are the height limits and floor space ratios of a life.
+
+**3. Three lanes for every agent proposal.**
+
+| Lane | What it means for an agent | What Adam sees | Today's equivalent |
+|------|----------------------------|----------------|--------------------|
+| **Exempt** | The action meets published criteria (log a reading, file an import, refresh a forecast). It runs and is logged | Nothing, unless he opens the Governance Log | Most `auto` capabilities, now with written criteria |
+| **Complying** | The action is checked automatically against every zone and standard. If it passes, it is **certified**: labelled "complies with your plan" | A light, grouped confirmation: several certified proposals approved in one tap, each still showing its real diff | Many `confirm` capabilities, made faster |
+| **DA** | Anything the plan does not cover, or anything that changes a person, a commitment or a record outside its own hub | The full confirmation card with the agent's reasons | The rest of `confirm` |
+
+Life Hub's rule that Adam always sees the real diff before a durable write stays intact. Complying only changes how quickly and in what batch he sees it.
+
+**4. Variations: agents must argue.** If Clare wants to put a work block into a Tuesday evening, the proposal breaks the residential standard. She cannot simply ask. She must lodge a **variation** with two parts, the way clause 4.6 requires:
+
+- why compliance is unreasonable in this case ("the reports close at 9 am Wednesday and Tuesday afternoon is full of classes")
+- what makes this case different from the ordinary rule ("this is the only report week this term")
+
+Adam approves or refuses. Both are logged.
+
+**5. The best part: variations reveal a bad plan.** Real councils notice when the same standard is varied again and again, and they amend the plan rather than keep granting exceptions. Life Hub can do exactly that. If Adam has approved four evening variations in a term, the Governance Log raises a **planning proposal**: "Your residential standard has been varied 4 times this term. Amend the plan, or keep refusing?" The rules Adam lives by learn from the exceptions he actually grants, but only with his say-so.
+
+**6. In the city.** My round 1 put DA signs on vacant lots as a joke. They become real. A building cannot start construction without consent, so the planning layer from round 3 now has a legal backbone: dashed (proposed), DA lodged (sign on the hoarding), consent granted (crane arrives), open. An exempt change simply happens. A variation awaiting Adam is Cursor's single halo, with the variation's reasons as the first line of its action card.
+
+**Why this is a wow for future builds, not only the city.** Every new agent, connector and hub that Life Hub adds will need to answer "what may this do without asking?". The LEP answers it once, in one place, in a language Adam already understands from living in NSW. It also makes the agent system explainable: any action can be traced to the zone, standard and lane that allowed it.
+
+| Notice | Level | Rule |
+|--------|-------|------|
+| `build_without_consent` | Error | A record change reaches the city (a route opened, a building started) that was neither exempt, certified complying, nor approved as a DA |
+| `variation_without_reasons` | Error | A proposal breaches a zone or standard and lacks either of the two written reasons |
+| `exempt_criteria_unpublished` | Error | A capability runs as exempt without written criteria Adam can read |
+
+#### Combine: the dam, the drought plan and the heritage register
+
+**The missing quantity.** Round 2 made the sky the capacity forecast: today's weather. Weather is a flow. Real cities also watch a **stock**: the water held in their dams. One wet day does not fill a dam, and one good night's sleep does not undo a hard term. A teacher's year is shaped like a reservoir: it drains across a term and refills in the holidays. Nothing in the design shows that.
+
+**The Sydney precedent.** Sydney lived through this in 2019. Greater Sydney's storage was at 53.4 per cent when Level 1 water restrictions began on 1 June 2019, and at 46.1 per cent when Level 2 began on 10 December 2019. The rules had been set years earlier: the desalination plant switches on at 60 per cent, restrictions start at 50 per cent ([Water restrictions in Australia](https://en.wikipedia.org/wiki/Water_restrictions_in_Australia)). In February 2020 heavy rain almost doubled storage in ten days, and restrictions eased to Level 1 on 1 March 2020 ([Bureau of Meteorology, National Water Account 2020](https://www.bom.gov.au/water/nwa/2020/sydney/supportinginformation/statementdetails.shtml)).
+
+The important part is not the dam. It is that **every decision was made before the drought**, in calm, as a set of triggers. When storage fell, nobody had to decide anything under pressure. The plan decided.
+
+Psychology has a name for that move. **Implementation intentions** are if-then plans made in advance ("if X happens, I will do Y"). Gollwitzer and Sheeran's meta-analysis of 94 tests found a medium-to-large effect on actually reaching goals (d = 0.65) ([Gollwitzer and Sheeran, 2006](https://kops.uni-konstanz.de/entities/publication/2e749bfb-8533-437c-8203-7e788c910c5f)). A drought plan is an implementation intention for a whole life.
+
+**The combination.** Three real city systems become one feature.
+
+**1. The dam.** On the hills at the edge of the map sits a reservoir. Its level is the **average of the last four weeks of daily readiness**, computed from the one capacity function (`capacityForDates`) over days it has already scored. It is not a new model. It is the same numbers, seen as a stock instead of a flow, and labelled honestly as "four week average readiness". Days with no evidence are left out of the average rather than counted as empty, and if there are too few scored days the gauge reads **offline**, never zero.
+
+Level uses a channel the round 4 budget has not yet spent: **fill**, the height of water against the dam wall. It is read at a glance and means only one thing. Over a term Adam sees the water line creep down. In the first week of holidays he sees it rise, the way Sydney's dams did in February 2020.
+
+**2. The drought plan.** When the dam is high (a good moment is the first week of holidays), Adam writes his plan as if-then triggers. The city offers a template; he writes the contents.
+
+| Level | Trigger (Adam sets) | What changes automatically (Adam writes) | In the city |
+|-------|---------------------|------------------------------------------|-------------|
+| **Supplementary supply** | Dam below his first line | A pre-chosen recovery source switches on, such as a protected rest block he already designed or a lighter version of a weekly routine | The desalination plant on the coast starts running |
+| **Level 1** | Below his second line | No new optional commitments; residential zone standards tighten; Clare defers anything without a hard deadline | A restrictions sign at the dam; park sprinklers off |
+| **Level 2** | Below his third line | A named list of things that pause until the dam recovers (an extra committee, a second gym session, new PD invitations) | A second sign; fountains off |
+| **Recovery** | Back above a line | Restrictions lift in reverse order | Signs come down; the fountain runs again |
+
+This is where the two cards meet. A restriction level is simply a **temporary amendment to the Life Environmental Plan**: tighter standards, fewer exempt actions, more variations needed. Agents read it automatically because it is part of the plan they are already checked against. Nobody has to persuade Adam to slow down in the middle of a bad week, because he already decided how, weeks ago, when the water was high.
+
+Nothing triggers that Adam did not write. The city never invents a restriction, and a level never pauses something he did not list.
+
+**3. The heritage register.** Some things must survive Level 2. In NSW the State Heritage Register protects places that matter so much they cannot be demolished whatever the development pressure. Adam lists his own: time with the people he loves, a weekly ritual, a particular routine, one creative project. Whatever he chooses.
+
+Heritage items carry a small blue plaque in the city. They are exempt from every restriction level. An agent may never propose cancelling, shrinking or moving a heritage item, under any lane. A variation cannot touch one. Only Adam can delist it.
+
+This is the safeguard a drought plan needs. Without it, restrictions cut whatever is easiest to cut, which is usually the thing that refills the dam.
+
+**4. What it is not.**
+
+- Not a health or clinical measure. It is an average of the existing readiness numbers, with the existing forecast's own caveats.
+- Not a score. The dam is never "good" or "bad", and there is no streak for keeping it high.
+- Not a penalty for absence. A month without opening the city changes nothing except what the real readiness record says.
+- Not money. Water here is time and energy, never dollars.
+
+| Notice | Level | Rule |
+|--------|-------|------|
+| `dam_from_second_model` | Error | The dam level comes from anything other than an average of `capacityForDates` results |
+| `dam_unknown_as_empty` | Error | Days without evidence lower the dam, or too little evidence is shown as a low level instead of offline |
+| `restriction_not_in_plan` | Error | A restriction level pauses or changes anything Adam did not write into the drought plan |
+| `heritage_item_touched` | Error | Any proposal, restriction or variation cancels, shrinks or moves a heritage-listed item |
+
+#### The biggest wow features across all six rounds
+
+Adam asked for the build's biggest wow features. After six rounds by three contributors, this is my honest shortlist, ranked by how much each changes the experience for how little it costs to build.
+
+| Rank | Feature | Why it wows | Cost | From |
+|------|---------|-------------|------|------|
+| 1 | **"Since you were last here"** catch-up | Every visit opens with the changes happening in front of Adam. Nearly free once the event log exists | Low | Claude r4, built on Cursor r2 |
+| 2 | **Ask the stationmaster** | A question lights the whole city and every lens at once, grounded in a real query | Medium | Claude r5 |
+| 3 | **The Life Environmental Plan** | Zones, three approval lanes and variations make every current and future agent explainable. Changes Life Hub, not only the city | Medium | Claude r6 |
+| 4 | **The dam, drought plan and heritage register** | The first view of the slow stock beneath the daily weather, with pre-agreed restrictions and protected essentials | Medium | Claude r6 |
+| 5 | **The term replay and New Year's Eve fireworks** | A teacher's year told as an event, from real history | Medium | Claude r2, Cursor r2 |
+| 6 | **Foldout worlds and the Balloon Gathering** | Pure delight on a free Sunday; the city as a place worth visiting | High | Codex r4 and r5 |
+| 7 | **Fig Corner and the public foreshore** | The city becomes a place, not a diagram, and its edge belongs to no task | Medium | Cursor r5 and r6 |
+| 8 | **The Exchange Station and Repair Arcade** | Trust made visible: where every fact came from, and what is broken | Medium | Codex r6 |
+
+**A suggested build order** that keeps each step testable with round 3's validator and golden days:
+
+1. The snapshot, event log and validator, with no picture at all.
+2. The calm street with the channel budget and the catch-up replay, tested with Adam's three second glance (round 4).
+3. The Platform for the phone.
+4. The Life Environmental Plan, which improves Life Hub's agents even before the city is finished.
+5. Ask the stationmaster, then the time scrubber, then the dam and drought plan.
+6. Explore: rooms, worlds, festivals, Fig Corner.
+
+#### New open questions from round 6
+
+- Would Adam want to write a Life Environmental Plan, or should the first version be drafted from his existing life walls and calendar for him to edit?
+- Which capabilities should be exempt, complying or DA on day one?
+- Is four weeks the right window for the dam, or should it follow the school term?
+- What would go on Adam's heritage register first?
+
+#### Claude Code card ledger after round 6
+
+| Card | Uses by Claude Code | Uses left |
+|------|---------------------|-----------|
+| Extend | 2 | 0 |
+| Substitute | 2 | 0 |
+| Combine | 2 | 0 |
+| Adapt | 2 | 0 |
+| Magnify | 2 | 0 |
+| Put to another use | 2 | 0 |
+
+All twelve of Claude Code's card uses are now spent.
+
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load? (Claude round 4: expands at its edges, never reflows its centre)
@@ -2486,3 +2655,4 @@ All twelve card uses are now spent. A further Cursor round would need a new allo
 - **2026-10-07, ChatGPT Codex:** Round 5 (Adapt + Magnify). Researched official Balloon Fiesta, Nintendo and Historic Environment Scotland references. Added a balloon gathering for chosen futures, balloon sightseeing and workshop landings, a whole city snowstorm festival using Cursor's ordinary streets, winter keepsakes, thaw, spring unfinished idea stalls, a summer exchange, a solstice inspired reflection chamber and term end paper theatres. Proposed explicit festival scene exceptions to operational sky and motion rules. Adapt and Magnify are now exhausted. Earlier contributions preserved.
 - **2026-10-07, ChatGPT Codex:** Round 6 (Substitute + Put to another use). Compared sixteen real city functions with the concept. Proposed an underground Exchange Station, Repair Arcade and Old City, plus a receiving dock, council chamber, source linked newspaper, curated relationship pavilions and a distinct night programme. Linked municipal research from NYC DEP, City of Sydney Archives and London City Hall. Preserved earlier contributions. All Codex card uses are now exhausted.
 - **2026-10-07, Cursor:** Round 6 (Substitute + Combine). Answered the same question with the form of a city rather than its institutions: a seam where necessary, optional and social life share Fig Corner, a foreshore path a life wall cannot close, and ground older than the records (sandstone, a drowned valley, a buried kink, a plate no agent may write). All Cursor card uses are now exhausted.
+- **2026-10-07, Claude Code:** Round 6 (Substitute + Combine). Listed the civic systems still missing after Codex's and Cursor's round 6. Substituted auto-or-confirm with a Life Environmental Plan (zones, standards, exempt, complying and DA lanes, written variations, planning proposals). Combined the dam, a drought plan grounded in Sydney's 2019 restrictions and implementation intentions research, and a heritage register. Added a ranked wow shortlist across all rounds and a build order. All Claude Code cards now spent.
