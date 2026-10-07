@@ -157,6 +157,10 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       return renderPropertiesView(canvas);
     case 'term-dates':
       return renderTermDatesView(canvas);
+    case 'city': {
+      const { renderCityView } = await import('@/views/city/view');
+      return renderCityView(canvas);
+    }
   }
 }
 

@@ -1,0 +1,186 @@
+[
+  {
+    "file": "ambulance.glb",
+    "sourcePack": "Kenney Car Kit",
+    "sourceFile": "ambulance.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. Copied unchanged."
+  },
+  {
+    "file": "commercial-a.glb",
+    "sourcePack": "Kenney City Kit Commercial",
+    "sourceFile": "building-a.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "Renamed so commercial, suburban and industrial files can share one folder."
+  },
+  {
+    "file": "commercial-b.glb",
+    "sourcePack": "Kenney City Kit Commercial",
+    "sourceFile": "building-b.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "Renamed so commercial, suburban and industrial files can share one folder."
+  },
+  {
+    "file": "commercial-skyscraper-a.glb",
+    "sourcePack": "Kenney City Kit Commercial",
+    "sourceFile": "building-skyscraper-a.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "Renamed so commercial, suburban and industrial files can share one folder."
+  },
+  {
+    "file": "construction-fence.glb",
+    "sourcePack": "Kenney City Kit Roads",
+    "sourceFile": "construction-fence.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. Copied unchanged. Stands in for a crane."
+  },
+  {
+    "file": "delivery.glb",
+    "sourcePack": "Kenney Car Kit",
+    "sourceFile": "delivery.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. Copied unchanged. Stands in for a food truck."
+  },
+  {
+    "file": "industrial-a.glb",
+    "sourcePack": "Kenney City Kit Industrial",
+    "sourceFile": "building-a.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "Renamed so commercial, suburban and industrial files can share one folder."
+  },
+  {
+    "file": "industrial-b.glb",
+    "sourcePack": "Kenney City Kit Industrial",
+    "sourceFile": "building-b.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "Renamed so commercial, suburban and industrial files can share one folder."
+  },
+  {
+    "file": "road-bend.glb",
+    "sourcePack": "Kenney City Kit Roads",
+    "sourceFile": "road-bend.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. Copied unchanged."
+  },
+  {
+    "file": "road-crossroad.glb",
+    "sourcePack": "Kenney City Kit Roads",
+    "sourceFile": "road-crossroad.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. Copied unchanged."
+  },
+  {
+    "file": "road-end.glb",
+    "sourcePack": "Kenney City Kit Roads",
+    "sourceFile": "road-end.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. Copied unchanged."
+  },
+  {
+    "file": "road-intersection.glb",
+    "sourcePack": "Kenney City Kit Roads",
+    "sourceFile": "road-intersection.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. Copied unchanged."
+  },
+  {
+    "file": "road-straight.glb",
+    "sourcePack": "Kenney City Kit Roads",
+    "sourceFile": "road-straight.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. Copied unchanged."
+  },
+  {
+    "file": "suburban-a.glb",
+    "sourcePack": "Kenney City Kit Suburban",
+    "sourceFile": "building-type-a.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "Renamed so commercial, suburban and industrial files can share one folder."
+  },
+  {
+    "file": "suburban-b.glb",
+    "sourcePack": "Kenney City Kit Suburban",
+    "sourceFile": "building-type-b.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "Renamed so commercial, suburban and industrial files can share one folder."
+  },
+  {
+    "file": "train-tram-modern.glb",
+    "sourcePack": "Kenney Train Kit",
+    "sourceFile": "train-tram-modern.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. Copied unchanged."
+  },
+  {
+    "file": "van.glb",
+    "sourcePack": "Kenney Car Kit",
+    "sourceFile": "van.glb",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. Copied unchanged. Stands in for the bus, the mail van and the school bus."
+  },
+  {
+    "file": "textures/car/Textures/colormap.png",
+    "sourcePack": "Kenney Car Kit",
+    "sourceFile": "Textures/colormap.png",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. The car models reference this file as Textures/colormap.png."
+  },
+  {
+    "file": "textures/train/Textures/colormap.png",
+    "sourcePack": "Kenney Train Kit",
+    "sourceFile": "Textures/colormap.png",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. The tram references this file as Textures/colormap.png."
+  },
+  {
+    "file": "textures/commercial/Textures/colormap.png",
+    "sourcePack": "Kenney City Kit Commercial",
+    "sourceFile": "Textures/colormap.png",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. The commercial buildings reference this file as Textures/colormap.png."
+  },
+  {
+    "file": "textures/suburban/Textures/colormap.png",
+    "sourcePack": "Kenney City Kit Suburban",
+    "sourceFile": "Textures/colormap.png",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. The suburban buildings reference this file as Textures/colormap.png."
+  },
+  {
+    "file": "textures/industrial/Textures/colormap.png",
+    "sourcePack": "Kenney City Kit Industrial",
+    "sourceFile": "Textures/colormap.png",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. The industrial buildings reference this file as Textures/colormap.png."
+  },
+  {
+    "file": "textures/roads/Textures/colormap.png",
+    "sourcePack": "Kenney City Kit Roads",
+    "sourceFile": "Textures/colormap.png",
+    "licence": "CC0",
+    "date": "2026-08-18",
+    "modifications": "None. The road pieces and fence reference this file as Textures/colormap.png."
+  }
+]
