@@ -133,6 +133,7 @@ Life City needs a tiny fraction of OpenTTD: no money, no crashes, no freight eco
 - **Layout engine:** deterministic placement, so a project's route stays in the same place between visits. A building Adam has placed keeps that place. Proposal in Cursor's round 2.
 - **One graph, four lenses:** Tasks Lines, Branch, Orbit and Harbour City read one snapshot of that graph. The city does not keep a second copy of what is done, blocked or due. Proposal in Cursor's round 1 below.
 - **History is the event log:** Rewind replays these events up to a day. It does not keep a second archive of the city. Proposal in Cursor's round 2.
+- **Term edition:** which Teaching services are in the snapshot comes from hub prefs `school_terms`. Proposal in Cursor's round 3.
 - **Renderer:** PixiJS (2D) first
 
 ### Who builds what
@@ -991,6 +992,73 @@ In development builds, the validator can also run live as a **city inspector**: 
 | Put to another use | 1 | 1 |
 
 
+### Round 3 · Cursor · Extend + Magnify
+
+> **Author note:** This round was written by Cursor on 7 October 2026. Cards played: **Extend** and **Magnify**. It follows Codex's Round 2 (one decision at a time, the two-layer train, the model table) and Claude Code's Round 3 (one planning layer, the Platform, the validator and the golden days). It uses the school terms already stored in hub prefs. Everything here is a proposal until Adam names a slice to build.
+
+#### Extend: the city publishes a term edition, and a trip is not a dream
+
+The city is already a harbour, a fleet and a plan. It is not yet a teacher's year. The pieces are scattered: school buses in heavy weeks, a quiet depot in the holidays, the bridge as the commute, end-of-term lights, a term calendar inside the GTFS sketch, and Codex's book plan that wants the street the buses leave behind. Extend those into one edition of the same city. Nothing new is stored. The edition is which services the snapshot includes on this date.
+
+**Where the dates come from.** Hub prefs already hold `school_terms`: a year, a term number from 1 to 4, and `starts_on` / `ends_on`. Goals and the calendar already read that list. The almanac ignores a terms list that is not that shape. Clare can look up NSW and QLD dates, and Adam confirms them into prefs. The city reads the confirmed list. It does not keep a second copy of the NSW calendar, and it does not guess a state when the list is empty.
+
+The calendar ghosts already treat a date as a holiday when terms exist and the date sits in none of them. The snapshot uses that same test.
+
+| Edition | When | What the snapshot includes |
+|---------|------|----------------------------|
+| **Term** | The date falls inside a confirmed term | Teaching services run. School buses leave the north-shore depot. The bridge can carry them. A dashed writing plan, with Plans on, is drawn against those services so a clash is a shared street |
+| **Holidays** | Terms exist, and the date falls in none of them | Teaching services stay in the depot. The bridge is clear of them because they are not in the snapshot, not because the picture was told to look empty. A saved book plan can occupy the corridor they left. Holiday tasks Adam actually has still run |
+| **No terms saved** | `school_terms` is missing or empty | No edition. Teaching services follow their tasks like any other route. The city does not invent a holiday |
+
+Congestion inside a term still comes from the tasks and the capacity forecast. Term time alone does not jam the bridge. A quiet teaching week in term looks quiet. Marking congestion appears when the marking work is in the graph, which is the base doc's "marking shadows", not a mood painted on because the word marking is nearby. `marking_default_minutes_per_script` stays a Tasks preference. The city does not turn it into traffic.
+
+The Platform sign gains the edition beside the weather icon: "Term 3" or "Holidays", from the same prefs row, or nothing when no terms are saved. Rewind and Forecast use the edition for the day under the scrubber. Last year's Term 3 is last year's dates, not this year's dates slid backwards.
+
+**A booked trip and a dream stay different lines.** Codex already asked for a distinct departure label. Extend that into the edition so the planning layer cannot blur them.
+
+| Service | What it is | How it is drawn |
+|---------|------------|-----------------|
+| Dream | An intercity aspiration, off the edge of the map | Dashed only while it is still a proposal. Solid once it is a real goal or project, and then it is in the event log |
+| Booked travel | A Travel leg with its real origin, destination and dates | A solid intercity service on those dates, in whichever edition those dates fall in. It leaves from the travel terminal. It does not use a dream's route id, and it does not become a dream because the holiday edition is quiet |
+
+A December flight during the holidays is a train that is really scheduled. A dream of a book is not that train. If a leg's two ends are the same city, the service is absent and the board says the journey is unknown, which is the travel-map failure already fixed once: an arrival city is not both ends of a trip.
+
+The New Year's Eve replay can light the bridge for a dream that moved, as Claude had it, and it can send the booked train out of the terminal for a trip that was taken. Those are two different bursts. Deleting either record removes only that burst.
+
+#### Magnify: one open door, and the rest of the city waits
+
+Codex was right that a chorus of ambulances, vans, rings and held buses is another list. Claude then gave the phone one Platform. Magnify the single decision those two ideas already imply, until it is the thing you see first, and keep every other signal quiet on purpose.
+
+**What counts as the door.** A decision is one of: an agent proposal waiting for confirmation, a recorded blocker on a route, or the next recorded deadline that already has a time. It has an owner, a reason and a destination, as Codex required. An icon is not a priority. Sara's vehicle does not jump a confirmation that has been waiting longer, unless the appointment's recorded time is sooner. A missing time stays untimed and stays off this door. It can still be opened from the Decisions list. It does not get the loud treatment.
+
+**What loud means.** In Now, exactly one vehicle is drawn with its doors open. It wears the Lines "you are here" ring, at city scale, and the wide view's first camera position is that vehicle when Adam has asked "What needs a decision?". On the Platform it takes the top of the Next train zone: one row, the action card, then the carriage strip, then the three doors, then the list. It does not become a second screen. The carriage strip and the ceiling strip stay. The door is heavier than they are, and the page is still one station read from the top.
+
+Every other waiting decision is a count on Clare's board: "3 at the depot". They are not also drawn as a fleet around the harbour. Opening the count shows the queue, ordered by recorded time. Defer sends the open vehicle to the depot and brings the next. Defer does not delete, does not complete, and does not write an event that says the work was done. Dismissing a real proposal still happens in the owning confirmation, not by closing the picture.
+
+**During a session.** This is a proposal for the question Codex left open, about what may interrupt a focused room. While a session is running, the open door waits at the depot with the others, except when a life wall covers the session or a medical appointment's recorded time falls inside it. Those two may take the door. A marking deadline, a mail van and a food truck wait until the session ends, and the departures board still lists them under the room so they are not hidden. Medical icons do not get a special siren. The exception is the appointment's time, not the ambulance's paint.
+
+**Sound stays off.** Louder is size, order and the ring. If the universe chimes are ever on, they do not gain a city horn for this door.
+
+**One rule for Claude's validator.** `decision_queue_split` is an error when Now draws more than one vehicle with its doors open. A golden day sits beside Sunday 16:30: three proposals waiting, the earliest one's doors open, the other two counted at the depot, and ticking nothing until Adam confirms. Defer swaps which doors are open and writes no `stop.completed`.
+
+#### New open questions from Cursor's round 3
+
+- When a public holiday falls inside a term, should that day use the holiday edition, or stay a term day because `school_terms` still covers it? The calendar's holiday test only treats dates outside every term as holidays.
+- If Adam confirms terms for both NSW and QLD in one prefs list, which row is his school's edition?
+- Is "life wall or an appointment inside the session" the right pair to interrupt, or should nothing interrupt and the board be enough?
+- Should the open door on the wide city move the camera, or only take the Platform's first row, so the harbour stays where he left it?
+
+#### Cursor card ledger after round 3
+
+| Card | Uses by Cursor | Uses left |
+|------|----------------|-----------|
+| Extend | 1 | 1 |
+| Substitute | 1 | 1 |
+| Combine | 1 | 1 |
+| Adapt | 1 | 1 |
+| Magnify | 1 | 1 |
+| Put to another use | 1 | 1 |
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load?
@@ -1011,3 +1079,4 @@ In development builds, the validator can also run live as a **city inspector**: 
 - **2026-10-07, Cursor:** Round 2 (Substitute + Adapt). Substituted daily city snapshots with a replay of the section 5 event log, so Rewind does not keep a second archive. Adapted Knowledge constellation placement for buildings Adam pins, and adapted the capacity forecast's uncertainty band so future haze is not Dense fog. Noted both on the architecture sketch.
 - **2026-10-07, ChatGPT Codex:** Round 2 (Substitute + Put to another use). Added decision and focus views, refined the occupancy train against the capacity handoff, proposed preserving valued quiet places, and added a model table for comparing possible futures before promotion. Preserved all earlier contributions. Updated the Codex card ledger.
 - **2026-10-07, Claude Code:** Round 3 (Combine + Adapt). Adopted Cursor's event-log Rewind and Codex's two-layer train. Combined five ideas into one planning layer (vacant lot, proposed, under construction, open, retired) and five phone ideas into the Platform screen. Adapted MobilityData's GTFS validator and the capacity forecast's one-number test into a Life City validator with traced rules and golden-day fixtures.
+- **2026-10-07, Cursor:** Round 3 (Extend + Magnify). Extended the school-term prefs into a term edition of the same city, and kept a booked trip distinct from a dream. Magnified a single open door for the next decision, with the rest counted at the depot. Noted the edition on the architecture sketch.
