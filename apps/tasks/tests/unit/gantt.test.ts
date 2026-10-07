@@ -1,7 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import type { SeedData } from '@/services/types';
 import type { Task } from '@/schemas/task';
 import {
   buildProjectGanttRows,
@@ -18,8 +15,9 @@ import {
   requiredStartIdx,
   wouldCreateCycle
 } from '@/domain/gantt';
+import { loadSeed } from './seed-fixture';
 
-const seed = JSON.parse(readFileSync(resolve(process.cwd(), 'fixtures/seed.json'), 'utf8')) as SeedData;
+const seed = loadSeed();
 
 function task(partial: Partial<Task> & Pick<Task, 'id' | 'title' | 'due_date'>): Task {
   return {

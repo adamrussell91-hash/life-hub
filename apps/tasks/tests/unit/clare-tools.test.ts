@@ -12,13 +12,9 @@ import {
 } from '@/domain/clare-tools';
 import { applyProtocolUpdate } from '@/domain/agent-protocol';
 import { resolveTimeZoneInput } from '@/domain/hub-prefs';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import type { SeedData } from '@/services/types';
+import { loadSeed } from './seed-fixture';
 
-const seed = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'fixtures/seed.json'), 'utf8')
-) as SeedData;
+const seed = loadSeed();
 
 describe('resolveTimeZoneInput', () => {
   it('maps Sydney shorthand and IANA ids', () => {

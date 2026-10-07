@@ -1,7 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import type { SeedData } from '@/services/types';
 import {
   briefingToMarkdown,
   buildAppointmentPrep,
@@ -18,10 +15,9 @@ import {
   buildWeeklyReset,
   findHighStakesTasks
 } from '@/domain/clare-desk';
+import { loadSeed } from './seed-fixture';
 
-const seed = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'fixtures/seed.json'), 'utf8')
-) as SeedData;
+const seed = loadSeed();
 
 const now = new Date(2026, 7, 25, 9, 0, 0);
 

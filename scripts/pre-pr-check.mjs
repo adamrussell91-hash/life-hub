@@ -16,7 +16,8 @@
  *
  * This script is the source of truth for which commands agents must run.
  * Keep steps aligned with `.github/workflows/pages.yml`:
- *   - Pages runs `npm test` with pipefail, then `npm run build`
+ *   - Pages runs `npm test` with pipefail, then the Tasks Hub vitest suite
+ *     (`cd apps/tasks && npx vitest run`), then `npm run build`
  *   - `build:professional` runs `npm run typecheck` (`tsc --noEmit`) first
  *
  * Agent checklist (Project store): docs/mandatory-pre-pr-check.md
@@ -24,7 +25,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -39,7 +40,8 @@ Mandatory before any life-hub PR. Exit 0 required.
 Steps:
   1. Static guards (rail IDs, registry count parity, Contents mock sha)
   2. npm test          (same as Pages)
-  3. Professional typecheck  (same as build:professional; skipped with --docs-only)
+  3. Tasks Hub vitest  (same as Pages; installs apps/tasks deps if missing)
+  4. Professional typecheck  (same as build:professional; skipped with --docs-only)
 `);
   process.exit(0);
 }
@@ -193,6 +195,22 @@ if (failures.length) {
 const testOk = run('npm test (Pages)', 'npm', ['test']);
 if (!testOk) {
   console.error('\npre-pr-check FAILED at npm test');
+  process.exit(1);
+}
+
+const tasksDir = join(root, 'apps', 'tasks');
+if (!existsSync(join(tasksDir, 'node_modules'))) {
+  const installOk = run('Install Tasks Hub dependencies', 'npm', ['ci', '--ignore-scripts'], {
+    cwd: tasksDir
+  });
+  if (!installOk) {
+    console.error('\npre-pr-check FAILED installing Tasks Hub dependencies');
+    process.exit(1);
+  }
+}
+const tasksOk = run('Tasks Hub vitest (Pages)', 'npx', ['vitest', 'run'], { cwd: tasksDir });
+if (!tasksOk) {
+  console.error('\npre-pr-check FAILED at Tasks Hub vitest');
   process.exit(1);
 }
 

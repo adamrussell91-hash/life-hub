@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
-import type { SeedData } from '@/services/types';
 import { findStallCandidates } from '@/domain/stall';
 import {
   classifyProjectLifecycle,
@@ -16,10 +13,9 @@ import {
   runningProjectCount,
   buildProjectPulseCard
 } from '@/domain/projects-pulse';
+import { loadSeed } from './seed-fixture';
 
-const seed = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'fixtures/seed.json'), 'utf8')
-) as SeedData;
+const seed = loadSeed();
 
 const now = new Date('2026-08-26T12:00:00');
 

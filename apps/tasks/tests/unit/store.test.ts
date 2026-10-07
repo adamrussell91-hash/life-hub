@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import * as keys from '@/storage/keys';
 import { createTasksStore, seedIfEmpty, type KvAdapter } from '@/services/store';
-import type { SeedData } from '@/services/types';
 import {
   adaptiveTodayTasks,
   backlogTasks,
@@ -17,6 +14,7 @@ import { createBlock } from '@/blocks/create-block';
 import { PageBlockSchema } from '@/schemas/page-block';
 import { DEFAULT_TASK_PROPERTY_CONFIG } from '@/domain/task-properties-defaults';
 import * as taskProperties from '@/services/task-properties';
+import { loadSeed } from './seed-fixture';
 
 function memoryKv(): KvAdapter {
   const map = new Map<string, unknown>();
@@ -33,9 +31,7 @@ function memoryKv(): KvAdapter {
   };
 }
 
-const seed = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'fixtures/seed.json'), 'utf8')
-) as SeedData;
+const seed = loadSeed();
 
 describe('tasks store', () => {
   it('seeds and supports CRUD through the shared service', async () => {

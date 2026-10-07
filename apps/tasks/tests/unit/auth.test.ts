@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiClientError, apiPost, parseApiResponse, readPlatformError } from '../../src/api/client';
@@ -8,18 +9,15 @@ import {
   normalizePassphrase,
   renderSignIn
 } from '../../src/auth/gate';
+// Tasks signs in through the umbrella Functions at the repo root (remount
+// 4f0c54a83); there is no Tasks-local netlify/ folder.
 import {
   createPassphraseHash,
-  createSha256PassphraseHash,
-  normalizeStoredPassphraseHash,
   serializeSessionCookie,
   verifyPassphrase
-} from '../../netlify/functions/_shared/auth-security.mts';
-import {
-  corsHeadersForOrigin,
-  originIsAllowed,
-  parseAllowedOrigins
-} from '../../netlify/functions/_shared/http.mts';
+} from '../../../../netlify/functions/_shared/auth-security.mjs';
+import { corsHeaders } from '../../../../netlify/functions/_shared/http.mjs';
+import { isAllowedRequestOrigin } from '../../../../netlify/functions/_shared/umbrella-origins.mjs';
 
 describe('passphrase verify', () => {
   it('does not commit a literal SHA-256 passphrase hash in the test source', async () => {
@@ -27,13 +25,10 @@ describe('passphrase verify', () => {
     expect(source).not.toMatch(/toBe\(['"][a-f0-9]{64}['"]\)/i);
   });
 
-  it('accepts Knowledge-style SHA-256 hex (Netlify bootstrap)', async () => {
-    const hash = createSha256PassphraseHash('tasks-hub-local');
-    expect(hash).toMatch(/^[a-f0-9]{64}$/i);
-    expect(await verifyPassphrase('tasks-hub-local', hash)).toBe(true);
-    expect(await verifyPassphrase('wrong', hash)).toBe(false);
-    expect(await verifyPassphrase('tasks-hub-local', `"${hash}"`)).toBe(true);
-    expect(normalizeStoredPassphraseHash(` sha256:${hash} `)).toBe(hash);
+  it('rejects bare SHA-256 hex — the umbrella login is scrypt-only', async () => {
+    const hash = createHash('sha256').update('tasks-hub-local').digest('hex');
+    expect(await verifyPassphrase('tasks-hub-local', hash)).toBe(false);
+    expect(await verifyPassphrase('tasks-hub-local', `sha256:${hash}`)).toBe(false);
   });
 
   it('accepts Teaching-style scrypt$v1 hashes', async () => {
@@ -183,20 +178,24 @@ describe('API base URL', () => {
 });
 
 describe('allowed origins', () => {
-  it('always allows Pages and the Functions host', () => {
-    const allowed = parseAllowedOrigins({});
-    expect(allowed).toContain('https://tasks-hub.adam-russell.com');
-    expect(allowed).toContain('https://tasks-api.adam-russell.com');
+  function requestFrom(origin: string) {
+    return { headers: new Headers({ origin }) } as unknown as Request;
+  }
+
+  it('allows the Life umbrella and Tasks Pages origins', () => {
+    expect(isAllowedRequestOrigin('https://life-hub.adam-russell.com', {})).toBe(true);
+    expect(isAllowedRequestOrigin('https://tasks-hub.adam-russell.com', {})).toBe(true);
   });
 
   it('accepts a Pages Origin and echoes it in CORS', () => {
-    const origin = 'https://tasks-hub.adam-russell.com';
-    expect(originIsAllowed(origin, {})).toBe(true);
-    expect(corsHeadersForOrigin(origin, {})['access-control-allow-origin']).toBe(origin);
+    const origin = 'https://life-hub.adam-russell.com';
+    const headers = corsHeaders(requestFrom(origin), {}) as Record<string, string>;
+    expect(headers['access-control-allow-origin']).toBe(origin);
+    expect(headers['access-control-allow-credentials']).toBe('true');
   });
 
   it('rejects an unknown Origin', () => {
-    expect(originIsAllowed('https://evil.example', {})).toBe(false);
-    expect(corsHeadersForOrigin('https://evil.example', {})).toEqual({});
+    expect(isAllowedRequestOrigin('https://evil.example', {})).toBe(false);
+    expect(corsHeaders(requestFrom('https://evil.example'), {})).toEqual({});
   });
 });

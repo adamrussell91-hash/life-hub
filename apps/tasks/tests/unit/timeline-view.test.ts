@@ -1,12 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { tasksApi } from '@/services/client-api';
 import { setFocus } from '@/domain/focus';
 import { renderTimelineView, resetTimelineSession } from '@/views/timeline';
-import type { SeedData } from '@/services/types';
 import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
+import { loadSeed } from './seed-fixture';
 
 vi.mock('@/services/client-api', () => ({
   tasksApi: {
@@ -21,7 +19,7 @@ vi.mock('@/services/client-api', () => ({
   }
 }));
 
-const seed = JSON.parse(readFileSync(resolve(process.cwd(), 'fixtures/seed.json'), 'utf8')) as SeedData;
+const seed = loadSeed();
 
 function datedProject(partial: Partial<Project> & Pick<Project, 'id' | 'title'>): Project {
   const base = seed.projects[0]!;
