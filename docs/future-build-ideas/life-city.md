@@ -1222,9 +1222,162 @@ The validator needs separate checks for explanation and suggestion. A proposed i
 | Put to another use | 1 | 1 |
 
 
+### Round 4 · Claude Code · Substitute + Magnify
+
+> **Author note:** This round was written by Claude Code (Claude Opus 5.5) on 7 October 2026. Cards played: **Substitute** and **Magnify**. It responds to all three of round 3, and it leans on research from perception science, visualisation and graph drawing. Everything here is a proposal until Adam names a slice to build.
+
+#### Stepping back: is the city still doing its one job?
+
+Section 1 of this document makes one promise: Adam should **feel** the state of his life *without reading anything*. An ambulance, a gridlocked street, a skyline grown over months.
+
+Read the rounds since, in order, and count what has been added: rooms with records, a writing studio, a records office, a model table, saved activities, an action card for every signal, guided walks with annotated stops, an Idea Exchange with three columns, curated exhibitions. Every one of those is a good idea. Nearly every one of them is something to **read**. Taken together, the city is quietly turning into a second front end for Life Hub, with a harbour painted around it.
+
+That matters because Life Hub already has excellent places to read. The hubs are those places. What no hub can do, and what the city is uniquely placed to do, is tell Adam something in the two seconds before he decides whether to read at all.
+
+So this round proposes a test for everything already in this document and everything still to come:
+
+> **The glance test.** Does this tell Adam something true in a two second glance, without a tap? If yes, it belongs on the **street**. If no, it belongs in a **room** or a hub, and the street holds only the door.
+
+This is not a call to delete anyone's ideas. Codex's rooms, walks and Exchange stay, behind doors. Cursor's single open door is already the purest street idea in the document. The test simply says which layer each idea lives in, so the street stays glanceable as the rooms grow.
+
+The two cards below are about making the street pass that test.
+
+#### Substitute: replace "a place Adam visits" with "a place that sits beside him"
+
+**What is being replaced.** Every round so far has assumed the same model: Adam opens Life City, looks at it, does something and leaves. That model makes the city one more screen competing for attention. Substitute it with a different model from the history of computing.
+
+**The precedent.** In 1995 Mark Weiser and John Seely Brown at Xerox PARC described **calm technology**: technology that lives mostly in the periphery of attention and moves into the centre only when it needs to, then back out again. Their example was the **Dangling String** by the artist Natalie Jeremijenko: a long plastic string hanging from a small motor in a hallway corner, wired to the office network. Every packet made the motor twitch. A busy network made it whirl; a quiet one made it barely move. Nobody had to look at it. Everyone knew when the network was struggling ([Weiser and Brown, Designing Calm Technology](https://calmtech.com/papers/designing-calm-technology)).
+
+The Dangling String works because of one discipline: **the only motion is the data**. It never moves for decoration. That is precisely the discipline Life City has not yet set itself.
+
+**1. Where the city lives.** If the city is peripheral, it needs places to sit where Adam already looks, rather than a page he must open.
+
+| Surface | What it shows | Notes |
+|---------|---------------|-------|
+| **Life Hub Home widget** | A small live tile of the city, sky included | Home already has a widget system (`tests/browser/home-widgets.spec.mjs`). The city earns a tile, it does not need a new page to be useful |
+| **Station clock mode** | Full-screen city on a spare tablet or second monitor, dimming with the real clock | The Dangling String in Adam's study. No controls visible until touched |
+| **The Platform** | The phone lens from round 3 | Unchanged; the reading surface for when the glance says "look closer" |
+| **Full city page** | The wide interactive lens | Where rooms, walks, Plans and the scrubber live |
+
+Native lock screen or watch surfaces would need a native app, which Life Hub is not, so they stay out of scope.
+
+**2. Each signal gets one perceptual channel, and no channel carries two meanings.**
+
+This is the most important idea in this round, and it comes from perception research. Anne Treisman's experiments showed that a target differing from everything around it in **one** basic feature (a red dot among blue ones) is found almost instantly, however many distractors there are. A target defined by a **combination** of features (a red *bus* among red trams and blue buses) has to be searched for item by item, and the search slows with every extra item on screen ([EagerEyes on Treisman](https://eagereyes.org/blog/2015/treisman-preattentive-processing); [Healey and Enns, Attention and Visual Memory in Visualization](https://www.csc2.ncsu.edu/faculty/healey/download/tvcg.11.pdf)). In plain terms: the moment a signal needs two features to be read, it can no longer be glanced. It has to be read.
+
+Now audit the current document against that. Colour is carrying at least eight meanings already:
+
+| Colour currently means… | Introduced in |
+|-------------------------|---------------|
+| Which goal or project a line belongs to (`route_color`) | Base doc, round 1 |
+| Which agent a vehicle belongs to (uniforms) | Round 1 (mine) |
+| Routine done (green) or missed (grey) | Base doc |
+| Blocked (red signal) | Base doc |
+| Late (amber terminus) | Round 2 (mine) |
+| Proposal alternatives (paper tints) | Round 3 (mine) |
+| Weather condition families | Capacity forecast |
+| Carriage occupancy | Round 2 (mine), now on hold |
+
+Several of those are mine, so this is self-criticism first. "Is that a red-signal bus on the Teaching line?" is a conjunction search. Adam would have to read it.
+
+Motion is just as overloaded: momentum, decorative ferries, weather animation, the lighthouse beam, filling pressure rings, fireworks.
+
+**The substitution: a channel budget.** Each peripheral meaning owns exactly one channel. A channel never carries a second meaning on the street.
+
+| Channel | Owns, and only owns | Gives up |
+|---------|---------------------|----------|
+| **Hue** | Identity: which line, district or agent something belongs to | All status. Nothing is ever "red for blocked" or "amber for late" |
+| **Motion** | Momentum: something moving is being worked on | All decoration. No idle ferries, no ambient traffic, no beam sweeping for effect |
+| **Light** (lit or dark) | Open or finished: lit windows and stops are still open | Nothing else lights up for emphasis |
+| **Sky** | Capacity weather, from the one forecast function | Nothing else tints the whole scene |
+| **Line style** (solid, hatched, dashed) | The planning lifecycle from round 3 | Nothing else uses dashes |
+| **Shape** | Exceptions: a barrier for blocked, a halo for Cursor's single open door, a widening ring for late | Shapes are few and each is unique |
+
+Read with this budget, the city answers its questions without any reading. Is anything moving on the Teaching line? Motion. Is that line blocked? A barrier shape. Is the day heavy? The sky. Is there a decision? One halo, exactly as Cursor proposed. Each answer is a single-feature search.
+
+This also tightens Cursor's single door. A halo is the one shape that means "decide", so it pops out pre-attentively no matter how busy the harbour is.
+
+Two new validator rules follow directly:
+
+| Notice | Level | Rule |
+|--------|-------|------|
+| `channel_overloaded` | Error | A street signal encodes status with hue, or any channel carries a meaning outside its budget |
+| `decorative_motion` | Error | Something moves on the street that no event, vehicle trip or real clock change explains |
+
+**3. Idle is the default state.** When nobody has touched the city for a few minutes, it settles: the camera stops, labels fade, only real events move. At night it dims with the real clock, so a station clock tablet is not a light source in a dark study. The city's resting state is calm, and change is what stands out against it.
+
+#### Magnify: make *change* the loudest thing in the city
+
+**The problem nobody has named yet.** Every round has designed how the city shows **state**. None has designed how it shows **change**, and perception research says those are completely different problems.
+
+In 1997 Ronald Rensink, Kevin O'Regan and James Clark showed that when a brief blank interrupts a scene, people fail to notice even large changes to it, sometimes for twenty seconds of looking, even when told to search for them. They notice a change only if their attention is on the item while the change is happening ([Rensink, O'Regan and Clark, To See or Not to See](https://www2.psych.ubc.ca/~rensink/publications/abs.96.2.html)). This is **change blindness**.
+
+Adam's visits to the city are separated by hours or days. That is the longest blank imaginable. If the city simply redraws itself to the current state each time he opens it, he will see "my city" and miss what changed: the route that opened, the stop that went dark, the wall that went up. And what changed is usually the most important thing on the screen.
+
+So Magnify this one thing until it cannot be missed.
+
+**1. "Since you were last here": a three second catch-up.**
+
+When the city comes into view, it does not open on Now. It opens on the state at Adam's last real visit, then plays the event log forward to Now in about three seconds. Every change *happens in front of him*: the stop lights up, the bus moves on, the barrier drops, the crane rises. Then the city settles into calm.
+
+This costs almost nothing to build, because Cursor's round 2 already made Rewind a replay of the event log. "Since you were last here" is that same replay with the start time set to the last visit instead of a date on the scrubber. It inherits every rule already agreed: deleted records never replay, nothing is copied, nothing is written.
+
+Details that make it work:
+
+- **A real visit is time in view, not a page load.** The last visit is the last time the city was visible on screen for more than a few seconds (the browser's page visibility API reports this), so a quick accidental open does not reset the catch-up.
+- **Big gaps compress by district.** After a long break, the replay plays district by district rather than event by event, with a small count over each district ("Teaching: 14 stops done").
+- **Always skippable.** One tap anywhere jumps to Now. Holding the replay pauses it.
+- **On the Platform** it becomes one line at the top: "Since Tuesday: 6 stops done, 1 route opened, 1 wall placed", with "Show me" to play the replay.
+- **Quiet is said plainly.** If nothing changed, the city says "Quiet since yesterday" and plays nothing. It never invents motion to look alive. This fits Codex's point that silence is not failure.
+
+**2. Magnify by stillness: the layout must never reflow.**
+
+A change can only stand out if everything around it stays still. If adding one new project nudges five other routes, Adam's eye catches six changes and cannot tell which one is real. The layout engine therefore has a prime directive, above beauty: **once drawn, a thing never moves unless its own event moves it.**
+
+This is a known problem in graph drawing called preserving the **mental map**. Misue, Eades, Lai and Sugiyama defined it in 1995, and Purchase, Hoggan and Görg later found experimentally that preserving it does help people follow a changing graph, at least for some tasks ([Purchase, Hoggan and Görg, How Important Is the Mental Map?](https://eprints.gla.ac.uk/35828)).
+
+It also changes how the layout engine should be built. The best published metro map methods, such as Nöllenburg and Wolff's mixed-integer programming approach, lay out a whole network from scratch for the most beautiful result ([KIT metro maps project](https://algo.iti.kit.edu/en/projects/geovis/metro)). Life City needs the incremental version: every existing route and building is **fixed** as a constraint, and the solver places only the new element in the space that is left. Harry Beck's original 1933 Underground diagram gives the grammar for that space: lines at horizontal, vertical or 45 degree angles only. That keeps new routes legible without moving old ones.
+
+This answers the base doc's first open question, "Fixed map or does it expand?": **the map expands at its edges and never reflows its centre.** When there is no free corridor for a new route, the harbour gains new land at the edge, the way real cities reclaim it. The centre Adam knows stays exactly where he left it.
+
+One more validator rule:
+
+| Notice | Level | Rule |
+|--------|-------|------|
+| `layout_reflow` | Error | Any existing shape, stop or building changes position without an event for that element. Adam's pins (Cursor round 2) are fixed constraints too |
+
+**3. The smallest slice that tests the whole idea.**
+
+Rounds 1 to 3 have produced a rich design and no way to know whether its central promise works. Before anyone builds rooms, walks or exchanges, test the promise directly.
+
+- **Build:** a static city from one golden day (round 3), with only the channel budget above (hue, motion, light, sky, one halo) and the "Since you were last here" replay. No rooms, no Plans, no scrubber.
+- **Test:** give Adam a three second glance at a catch-up replay he has not seen, then ask him what changed and what needs him. Repeat with several golden days.
+- **Pass:** he names the main change and the decision correctly most of the time, without reading a label.
+
+If it passes, every later layer (rooms, walks, Plans, the scrubber, fireworks) is building on a street that works. If it fails, no number of rooms will fix it, and it is far better to learn that from one small prototype than after building the whole city.
+
+#### New open questions from round 4
+
+- Does Adam want the city to sit in his periphery at all (a Home tile, a station clock), or is it a place he chooses to visit?
+- Which meanings should move off colour first, if the channel budget is accepted: blocked, late or routine status?
+- How long is the ideal catch-up: three seconds, five, or "as long as it takes, but skippable"?
+- Should the glance test be written into the folder README as a rule for every future round?
+
+#### Claude Code card ledger after round 4
+
+| Card | Uses by Claude Code | Uses left |
+|------|---------------------|-----------|
+| Extend | 1 | 1 |
+| Substitute | 1 | 1 |
+| Combine | 1 | 1 |
+| Adapt | 2 | 0 |
+| Magnify | 2 | 0 |
+| Put to another use | 1 | 1 |
+
+
 ## 8. Open questions
 
-- Fixed map or does it expand as districts are added? How is the map laid out on first load?
+- Fixed map or does it expand as districts are added? How is the map laid out on first load? (Claude round 4: expands at its edges, never reflows its centre)
 - How many vehicles before it gets noisy on a phone at 390px? (Cursor round 1: the phone lens is the departures board, so the fleet stays on the wide view)
 - Is Life City a hub page of its own, or a mode of the Tasks Hub Lines view? (Cursor round 1: a lens on the same graph as Lines, Branch and Orbit)
 - Tap interactions: does tapping a bus open the project, a stop open the task?
@@ -1244,3 +1397,4 @@ The validator needs separate checks for explanation and suggestion. A proposed i
 - **2026-10-07, Claude Code:** Round 3 (Combine + Adapt). Adopted Cursor's event-log Rewind and Codex's two-layer train. Combined five ideas into one planning layer (vacant lot, proposed, under construction, open, retired) and five phone ideas into the Platform screen. Adapted MobilityData's GTFS validator and the capacity forecast's one-number test into a Life City validator with traced rules and golden-day fixtures.
 - **2026-10-07, Cursor:** Round 3 (Extend + Magnify). Extended the school-term prefs into a term edition of the same city, and kept a booked trip distinct from a dream. Magnified a single open door for the next decision, with the rest counted at the depot. Noted the edition on the architecture sketch.
 - **2026-10-07, ChatGPT Codex:** Round 3 (Adapt + Magnify). Added guided walks through linked records and an Idea Exchange for source grounded teaching and writing proposals, small experiments and curated outcome exhibitions. Preserved all earlier contributions and updated the Codex card ledger, with each card now used once.
+- **2026-10-07, Claude Code:** Round 4 (Substitute + Magnify). Proposed the glance test (street versus room). Substituted the visit model with calm technology (Home tile, station clock, idle default) and a perceptual channel budget, including an audit of colour overload across all rounds. Magnified change over state: a "Since you were last here" replay grounded in change blindness research, and a never-reflow layout grounded in mental map research. Added three validator rules and a smallest testable slice.
