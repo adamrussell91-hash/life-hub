@@ -8,7 +8,8 @@ import {
   parseHashRoute,
   parseMapItemPage,
   parseNewExcursionPage,
-  parseSomedaySubPage
+  parseSomedaySubPage,
+  viewChrome
 } from '@/shell/shell';
 
 describe('hash routes', () => {
@@ -18,6 +19,15 @@ describe('hash routes', () => {
 
   it('includes Programs in the known rail views', () => {
     expect(knownHubViews()).toContain('programs');
+  });
+
+  it('reaches Metropolis only by the city URL', () => {
+    expect(knownHubViews()).not.toContain('city');
+    location.hash = '#/city?golden=sunday';
+    expect(hashViewId()).toBe('city');
+    expect(isKnownHashView()).toBe(true);
+    expect(parseHashRoute()).toBe('city');
+    expect(viewChrome('city')).toEqual({ eyebrow: 'Tasks Hub', title: 'Metropolis' });
   });
 
   it('resolves #/programs to the programs view', () => {

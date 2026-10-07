@@ -7,8 +7,8 @@ import {
   noCheckInMorning,
   suspendedService,
   sundayAfternoon
-} from '../fixtures/city/golden-days';
-import { UNSEEN_DAYS, unseenOne, unseenTwo } from '../fixtures/city/unseen-days';
+} from '@/domain/city/fixtures/golden-days';
+import { UNSEEN_DAYS, unseenOne, unseenTwo } from '@/domain/city/fixtures/unseen-days';
 import { layoutCity, validateLayout } from '@/domain/city/layout';
 
 function idsEverywhere(snapshot: ReturnType<typeof citySnapshot>): string[] {
