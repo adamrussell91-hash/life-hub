@@ -2,6 +2,7 @@
 
 **Status:** Under critical review. Not scheduled and not a build brief. The review below decides what survives
 **Started:** 7 October 2026, as a chat thought experiment
+**The city's name:** Metropolis. Me-tropolis: the city is Adam, not Sydney.
 **One line:** An isometric, Transport Tycoon style city that shows the live state of Adam's whole life at a glance, driven entirely by Life Hub data.
 
 ---
@@ -24,7 +25,17 @@ The **street** survives: a calm isometric city that shows goals, projects, tasks
 
 Most of what came after it does not survive as written. Rooms, walks, workshops and foldout worlds turn the city into a second front end for Life Hub, need bespoke art no tool in the pipeline makes, or depend on hubs that do not exist yet. The two big round 6 ideas (planning law for agents, and the dam) are good, but they are **Life Hub features**, not city features, and they belong in their own doc.
 
-Count across the register below: **42 Keep, 45 Modify, 28 Cut.** The delight features (festivals, Adam's pets, keepsakes and whale watching) came back in on Adam's call, rebuilt so they are cheap to draw. Museum shelves and bundles stay cut, also on his call.
+Count across the register below: **42 Keep, 43 Modify, 30 Cut.** The delight features (festivals, Adam's pets, keepsakes and whale watching) came back in on Adam's call, rebuilt so they are cheap to draw. Museum shelves and bundles stay cut, also on his call.
+
+### Metropolis: the city is Adam
+
+Adam's ruling: the city is not Sydney. It is **Metropolis**, a city made of him. Every place in it exists because of something in his life, not because of a real map.
+
+- **Geography comes from his life.** Districts are his hubs, landmarks are his milestones, the skyline is his work, and his keepsakes and pets live in it. Water, a bridge or a headland appear only if they serve that, not to echo Sydney Harbour.
+- **No real city is copied.** The north shore and south side, Sydney's buried creek, sandstone, the jacaranda story and the plate about the land's older name all come out.
+- **Seasons are his seasons.** The almanac follows the real date where he lives, but its entries are the ones he chooses. The whales stay because he wants them.
+- **Real-world research stays as research.** Sydney Metro's driverless trains, the Waratah occupancy screens, the 2019 dam levels and NSW planning law are still the precedents behind the ideas. They explain why a mechanic works; they do not put Sydney on the map.
+- **Section 7 keeps the old name.** Proposals P1 to P18 say "Harbour City" and use Sydney throughout. They are left as written, as a record. Read "Metropolis" wherever they say "Harbour City".
 
 ### Checked against the code
 
@@ -106,8 +117,8 @@ Count across the register below: **42 Keep, 45 Modify, 28 Cut.** The delight fea
 | Fireworks for a completed goal | Base | **Keep** | Small, one burst |
 | Skyline height grows with hub busyness | Base | **Cut** | Reflows the layout, hides roads and gives height a second meaning |
 | Grey empty park for skipped exercise | Base | **Cut** | Already reversed by P6 and P11. It is a neglect meter |
-| Sydney geography: work on the north shore, life on the south side, the bridge as the commute | P1 | **Keep** | — |
-| Bridge jam as the share of the week school takes | P1 | **Modify** | Define it from scheduled teaching hours against all scheduled hours that week |
+| Sydney geography: work on the north shore, life on the south side, the bridge as the commute | P1 | **Cut** | Adam's ruling: the city is Metropolis, not Sydney. Districts are laid out around his hubs. A link between work and the rest of life can still exist, but it is not the Harbour Bridge |
+| Work-to-life link jam as the share of the week work takes | P1 | **Modify** | Define it from scheduled teaching hours against all scheduled hours that week. Drawn on whatever link joins the work district to the rest of the city |
 | Trip planner with an expected arrival date | P1 | **Modify** | Only from the existing pace model. With no pace, no arrival date is shown |
 
 #### Services and signals
@@ -187,7 +198,7 @@ Count across the register below: **42 Keep, 45 Modify, 28 Cut.** The delight fea
 | Museum shelves | P11 | **Cut** | Adam's call: he does not like them |
 | Focus sessions inside rooms, and interrupt rules | P6, P8 | **Cut** | Work sessions already exist in Tasks |
 | Guided walks and the accreditation walk | P9 | **Cut** | Reading-heavy and authored. The Professional hub is the place, if anywhere |
-| Idea Exchange and unexpected pairings | P9 | **Modify** | Build it inside Knowledge, where the notes and the existing chat already are. The city's library is the door. Pairings only on request, with the recorded, proposed and to-examine columns kept separate. Exhibitions move to the museum shelves |
+| Idea Exchange and unexpected pairings | P9 | **Keep** | Adam's call: a good idea, built in the Knowledge hub as a Knowledge feature. It is out of Life City's scope |
 | Exchange Station: where a fact came from, and how fresh it is | P16 | **Modify** | A real need. Build it as a plain data-status list in Life Hub, not an underground city |
 | Repair Arcade for broken links and failed imports | P16 | **Modify** | Same: a plain list with repair actions |
 | Receiving dock for imports | P16 | **Modify** | A Notion migration status page, outside the city |
@@ -204,15 +215,15 @@ Count across the register below: **42 Keep, 45 Modify, 28 Cut.** The delight fea
 | Atmosphere never borrows the signal vocabulary | P13 | **Keep** | — |
 | Foldout travel trunks and destination worlds | P12 | **Cut** | F5 |
 | Watch station, fragrance conservatories, book theatres, Delft set | P12 | **Cut** | F5, and no collection hubs exist |
-| Keepsakes that reshape the city | P12 | **Modify** | A fixed set of slots drawn once: the station clock face, the fountain, a plaque and a framed view in the concourse. Each takes a photo Adam chooses or a motif from a small set. No new illustration per keepsake |
-| Adam's pets, alive in the city | P12, revised by Adam | **Keep** | Adam's pets come back as small animated characters who live in Harbour City. Each is drawn once from his photos in the locked city style, as one hero piece per pet with a short walk cycle. In Glance they rest in a spot he chooses (the front step, under the fig, the seawall), so their stillness never reads as a signal. In Explore they wander the footpaths, the park and the foreshore. Tap one to see a photo or memory he chose. They are never scored, never in the catch-up, never linked to a task, and no agent can change them. The garden stays as somewhere they return to |
-| Sydney almanac on land and water | P13 | **Keep** | Date-driven palette and sprite swaps, static in Glance. Cheap delight |
+| Keepsakes that reshape the city | P12 | **Keep** | Adam makes each keepsake himself, styled and animated to suit the city, and places it personally. The city needs only a sprite spec (isometric angle, tile size, frame count) and a way to import and pin his piece. No agent or tool generates keepsakes |
+| Adam's pets, alive in the city | P12, revised by Adam | **Keep** | Adam's pets come back as small animated characters who live in Metropolis. Each is drawn once from his photos in the locked city style, as one hero piece per pet with a short walk cycle. In Glance they rest in a spot he chooses (the front step, under the fig, the seawall), so their stillness never reads as a signal. In Explore they wander the footpaths, the park and the foreshore. Tap one to see a photo or memory he chose. They are never scored, never in the catch-up, never linked to a task, and no agent can change them. The garden stays as somewhere they return to |
+| Adam's almanac on land and water | P13 | **Modify** | Driven by the real date where he lives, with entries he chooses rather than Sydney's (whales stay because he wants them). Palette and sprite swaps, static in Glance. Cheap delight |
 | Personal almanac dates | P13 | **Keep** | Later |
-| Whale watching from the lighthouse | P13 | **Keep** | Later. The whales are already in the almanac, so this is just a camera position at the lighthouse in whale months |
+| Whale watching | P13 | **Keep** | Later. Whales are in Adam's almanac because he chose them, so this is a camera position over the water in whale months |
 | Census of ordinary places | P14 | **Modify** | A handful of static scenery buildings with time-of-day states (shutters up or down). No walking figures, no per-figure timetables, no enterable cutaways |
 | Crowd at the school gate | P14 | **Modify** | Gate open or shut only. No figures, which is safer and cheaper |
-| Fig Corner, sandstone and the foreshore path no route may use | P17 | **Modify** | Fine as layout and art direction at no extra cost. Drop the validator rules about it |
-| The plate about the land's older name | P17 | **Modify** | Ships blank. If Adam wants an acknowledgement, he writes it. No generated or placeholder wording |
+| Fig Corner, sandstone and the foreshore path no route may use | P17 | **Modify** | Keep the form: one named corner and one public edge that no route or life wall may close. Adam names the corner. The Sydney material (sandstone, the buried creek, the drowned valley) comes out. Drop the validator rules about it |
+| The plate about the land's older name | P17 | **Cut** | It belonged to the Sydney setting. Metropolis is not a real place |
 | Festivals: Balloon Gathering, winter snow dome, thaw, spring and summer festivals, solstice chamber, term-end paper theatres | P15 | **Modify** | They give the city life. Start with one festival, built mostly from lighting, particles and recolours rather than new illustration. Snowfall and dusk glow are cheap; bespoke scenes are not. The Balloon Gathering fits best, because the dreams jar is real Someday data: each balloon is a dream Adam chooses, with the "Do you still want this?" ribbon. Explore only, clearly labelled, with the forecast still in its panel |
 | Revising the sky rule for festivals | P15 | **Modify** | Accept P15's own version: a labelled festival scene in Explore can have its own sky. The Glance sky never changes and fictional weather never picks a capacity icon |
 | Ask the stationmaster | P13 | **Modify** | A later phase, on the city lens only at first. Define the query schema before any language model is involved. The health, diary and student scope rule stays |
@@ -230,7 +241,7 @@ Count across the register below: **42 Keep, 45 Modify, 28 Cut.** The delight fea
 
 ### What Life City is now
 
-A calm isometric street, wide screen first, with a Home tile. It shows goals, projects and tasks as lines, routes and stops. Blockers are barriers. Walls are suspended services. The sky is the capacity forecast. Ambulance, school bus, food truck and tram vehicles appear only when real records call for them. There is one halo for the one decision that matters, a depot count for the rest, the Sydney almanac as scenery, and a short "since you were last here" catch-up when it opens. Everything else is a door into the hub that owns it.
+**Metropolis**: a calm isometric street, wide screen first, with a Home tile. It shows goals, projects and tasks as lines, routes and stops. Blockers are barriers. Walls are suspended services. The sky is the capacity forecast. Ambulance, school bus, food truck and tram vehicles appear only when real records call for them. There is one halo for the one decision that matters, a depot count for the rest, the Sydney almanac as scenery, and a short "since you were last here" catch-up when it opens. Everything else is a door into the hub that owns it.
 
 ### Revised build order
 
@@ -2664,3 +2675,4 @@ Adam asked for the build's biggest wow features. After six rounds by three contr
 - **2026-10-07:** Critical review added at the top. It sorts every concept into Keep, Modify or Cut and replaces the round 6 build order.
 - **2026-10-07:** Festivals, keepsakes, the pet garden, whale watching, museum shelves, bundles and the Idea Exchange moved from Cut to Keep or Modify at Adam's request, each with a cheaper way to build it.
 - **2026-10-07:** Adam cut museum shelves and bundles, and turned the pet garden into his pets living in the city as animated characters.
+- **2026-10-07:** Adam ruled that the city is not Sydney. It is Metropolis (Me-tropolis), a city made of him. Sydney geography and history removed from the review. Idea Exchange kept as a Knowledge hub feature. Keepsakes are made and placed by Adam himself.
