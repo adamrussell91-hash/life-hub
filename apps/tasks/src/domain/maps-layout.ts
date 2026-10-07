@@ -313,7 +313,7 @@ export function applyDateSpanToStation(station: MapStation, year: number): MapSt
   const end = station.ends_on || station.starts_on || `${year}-12-31`;
   const y = dateToY(start, year);
   const endY = dateToY(end, year);
-  const minH = estimateVerticalLabel(station.label).h + 28;
+  const minH = estimateVerticalLabel(station.label, MAP_STATION_FONT).h + 28;
   return {
     ...station,
     starts_on: station.starts_on || start,
@@ -575,7 +575,7 @@ function labelForSide(
   tick: { id: string; cx: number; cy: number; label: string },
   side: PortSide
 ): LabelBox {
-  const size = estimateHorizontalLabel(tick.label, 12);
+  const size = estimateHorizontalLabel(tick.label, MAP_TICK_FONT);
   const w = size.w + MAP_CHIP_PAD * 2;
   const h = size.h + MAP_CHIP_PAD * 2;
   const gap = 22;
@@ -1143,7 +1143,7 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
     const line = lines.find((item) => item.id === dated.line_id);
     const x = line?.x ?? MAP_FIRST_LINE_X;
     const y = dated.starts_on ? dated.y : remapLegacyY(dated.y);
-    const minH = estimateVerticalLabel(dated.label).h + 28;
+    const minH = estimateVerticalLabel(dated.label, MAP_STATION_FONT).h + 28;
     const h = dated.starts_on
       ? Math.max(minH, dated.height)
       : Math.max(minH, remapLegacyY(dated.y + dated.height) - y);

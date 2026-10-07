@@ -172,7 +172,7 @@ function renderExportSvg(map: TransitMap, years?: readonly SchoolYearTerms[] | n
     for (const body of station.bodies) {
       parts.push(
         `<rect x="${body.x - body.w / 2}" y="${body.y}" width="${body.w}" height="${body.h}" rx="${body.w / 2}" fill="${tone.fill}" stroke="${tone.stroke}" stroke-width="3.5"/>`,
-        `<text transform="rotate(-90 ${body.x} ${body.y + body.h / 2})" x="${body.x}" y="${body.y + body.h / 2}" text-anchor="middle" dominant-baseline="middle" font-size="12" fill="${tone.stroke}" font-weight="600">${escapeHtml(station.label)}</text>`
+        `<text transform="rotate(-90 ${body.x} ${body.y + body.h / 2})" x="${body.x}" y="${body.y + body.h / 2}" text-anchor="middle" dominant-baseline="middle" font-size="18" fill="${tone.stroke}" font-weight="600">${escapeHtml(station.label)}</text>`
       );
     }
   }
@@ -181,9 +181,9 @@ function renderExportSvg(map: TransitMap, years?: readonly SchoolYearTerms[] | n
     parts.push(
       `<circle cx="${tick.cx}" cy="${tick.cy}" r="14" fill="#fbf8f2" stroke="${color}" stroke-width="3.5"/>`,
       `<rect x="${tick.labelBox.x}" y="${tick.labelBox.y}" width="${tick.labelBox.w}" height="${tick.labelBox.h}" rx="8" fill="#fbf8f2"/>`,
-      `<text x="${tick.labelBox.x + tick.labelBox.w / 2}" y="${tick.labelBox.y + tick.labelBox.h / 2}" text-anchor="middle" dominant-baseline="middle" font-size="12" fill="${color}" font-weight="600">${wrapEventLines(tick.label)
+      `<text x="${tick.labelBox.x + tick.labelBox.w / 2}" y="${tick.labelBox.y + tick.labelBox.h / 2}" text-anchor="middle" dominant-baseline="middle" font-size="16" fill="${color}" font-weight="600">${wrapEventLines(tick.label)
         .map((line, index, all) => {
-          const y = tick.labelBox.y + tick.labelBox.h / 2 - ((all.length - 1) * 16) / 2 + index * 16;
+          const y = tick.labelBox.y + tick.labelBox.h / 2 - ((all.length - 1) * 22) / 2 + index * 22;
           return `<tspan x="${tick.labelBox.x + tick.labelBox.w / 2}" y="${y}">${escapeHtml(line)}</tspan>`;
         })
         .join('')}</text>`

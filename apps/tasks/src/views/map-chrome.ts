@@ -1,5 +1,3 @@
-import type { MapLine } from '@/schemas/map';
-import { missingStandardYearTracks } from '@/domain/maps-layout';
 import { createOutlineIcon, RAIL_ICON_PATHS } from '@/shell/icons';
 import { renderCardMenu, type CardMenuItem } from '@/views/card-menu';
 import { createHubFilter, createHubToolbar, el } from '@/views/hub-kit';
@@ -93,9 +91,65 @@ export type MapToolbarHandlers = {
   onAddProgram: () => void;
   onAddCompetition: () => void;
   onJoin: () => void;
-  onMove?: (id: string, delta: -1 | 1) => void;
-  onAddYearLine?: (line: MapLine) => void;
+  onRenameMap?: (title: string) => void;
 };
+
+function toolbarButton(label: string, className: string, onClick: () => void): HTMLButtonElement {
+  const button = el('button', className, label) as HTMLButtonElement;
+  button.type = 'button';
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+/** Visible edit controls: map name, add buttons, join toggle and Done. */
+function createMapEditBar(options: {
+  title: string;
+  joining: boolean;
+  handlers: MapToolbarHandlers;
+}): HTMLElement {
+  const bar = el('div', 'map-editbar');
+  bar.setAttribute('role', 'group');
+  bar.setAttribute('aria-label', 'Edit map');
+
+  if (options.handlers.onRenameMap) {
+    const name = el('label', 'map-editbar__name');
+    name.append(el('span', 'map-editbar__name-label', 'Map name'));
+    const input = el('input', 'map-editbar__name-input') as HTMLInputElement;
+    input.type = 'text';
+    input.value = options.title;
+    input.setAttribute('aria-label', 'Map name');
+    input.addEventListener('change', () => {
+      const next = input.value.trim();
+      if (!next) {
+        input.value = options.title;
+        return;
+      }
+      if (next !== options.title) options.handlers.onRenameMap?.(next);
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') input.blur();
+    });
+    name.append(input);
+    bar.append(name);
+  }
+
+  const join = toolbarButton(
+    options.joining ? 'Stop joining' : 'Join',
+    `btn btn--ghost map-editbar__join${options.joining ? ' is-on' : ''}`,
+    options.handlers.onJoin
+  );
+  join.setAttribute('aria-pressed', options.joining ? 'true' : 'false');
+  join.title = 'Drag from one item to another to connect them';
+
+  bar.append(
+    toolbarButton('+ Line', 'btn btn--ghost', options.handlers.onAddLine),
+    toolbarButton('+ Program', 'btn btn--ghost', options.handlers.onAddProgram),
+    toolbarButton('+ Competition', 'btn btn--ghost', options.handlers.onAddCompetition),
+    join,
+    toolbarButton('Done', 'btn btn--primary map-editbar__done', () => options.handlers.onMode('view'))
+  );
+  return bar;
+}
 
 export function createMapToolbar(options: {
   maps: Array<{ id: string; title: string }>;
@@ -103,7 +157,6 @@ export function createMapToolbar(options: {
   mode: MapMode;
   fullscreen: boolean;
   joining: boolean;
-  lines?: MapLine[];
   handlers: MapToolbarHandlers;
 }): HTMLElement {
   const toolbar = createHubToolbar('map-toolbar');
@@ -135,48 +188,12 @@ export function createMapToolbar(options: {
       onSelect: options.handlers.onFullscreen
     }
   ];
-  if (options.mode === 'edit') {
-    items.push(
-      { id: 'add-line', label: 'Add line', onSelect: options.handlers.onAddLine },
-      { id: 'add-program', label: 'Add program', onSelect: options.handlers.onAddProgram },
-      { id: 'add-competition', label: 'Add competition', onSelect: options.handlers.onAddCompetition },
-      {
-        id: 'join',
-        label: options.joining ? 'Stop joining' : 'Join',
-        onSelect: options.handlers.onJoin
-      }
-    );
-  }
 
   toolbar.append(select.el, renderCardMenu('Map menu', items, { heading: 'Map', inline: true }));
 
-  const lines = options.lines ?? [];
-  if (options.mode === 'edit' && lines.length && options.handlers.onMove && options.handlers.onAddYearLine) {
-    const lineItems: CardMenuItem[] = [];
-    for (const [index, line] of lines.entries()) {
-      if (index > 0) {
-        lineItems.push({
-          id: `left-${line.id}`,
-          label: `Move ${line.name} left`,
-          onSelect: () => options.handlers.onMove?.(line.id, -1)
-        });
-      }
-      if (index < lines.length - 1) {
-        lineItems.push({
-          id: `right-${line.id}`,
-          label: `Move ${line.name} right`,
-          onSelect: () => options.handlers.onMove?.(line.id, 1)
-        });
-      }
-      lineItems.push({
-        id: `year-${line.id}`,
-        label: missingStandardYearTracks(line).length
-          ? `Add year line to ${line.name}`
-          : `Add extra year line to ${line.name}`,
-        onSelect: () => options.handlers.onAddYearLine?.(line)
-      });
-    }
-    toolbar.append(renderCardMenu('Lines menu', lineItems, { heading: 'Lines', inline: true }));
+  if (options.mode === 'edit') {
+    const title = options.maps.find((map) => map.id === options.currentId)?.title ?? '';
+    toolbar.append(createMapEditBar({ title, joining: options.joining, handlers: options.handlers }));
   }
 
   return toolbar;
