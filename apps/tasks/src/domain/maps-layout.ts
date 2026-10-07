@@ -16,6 +16,9 @@ export const MAP_STATION_W = 48;
 export const MAP_TICK_R = 14;
 export const MAP_LABEL_PAD = 16;
 export const MAP_PORT_GAP = 36;
+/** SVG label sizes in map units. Keep in step with .map-station__label and .map-tick__label in views.css. */
+export const MAP_STATION_FONT = 18;
+export const MAP_TICK_FONT = 16;
 export const MAP_LANE_MIN = 640;
 export const MAP_LANE_GUTTER = 140;
 export const MAP_EVENT_STEM = 64;
