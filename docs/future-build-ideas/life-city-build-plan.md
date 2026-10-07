@@ -152,6 +152,9 @@ Adam has ideas for the physical space. They go in [life-city-ground.md](life-cit
 **Builder:** Claude Code builds the layout engine. Cursor builds the static street, because it needs live preview. Two PRs, in strict order, each one whole. 2b needs Track A done.
 
 **2a · Layout engine (Claude Code)**
+
+**Status:** Built in PR #732 (draft, stacked on #730). Pins wait for keepsakes in Slice 5, since Adam does not place records by hand. A full district spreads into the nearest free block. Metro lines hop between stations in L-shapes and may cross other districts.
+
 - A grid of reserved slots per district. Lines at 0, 45 and 90 degrees (Beck). Fixed slot order keyed by record id.
 - Never reflow: adding a record only fills a free slot or grows the map at its edge.
 - The Tiled ground map is an input: its scenery lots, corner and public edge are fixed obstacles that no slot may use.
@@ -268,3 +271,4 @@ Rewind and Forecast scrubbers (after a term of log), term replay, Ask the statio
 - **2026-10-07:** Adam's answers: visit in the SimCity and Cities: Skylines sense (free camera, hover and click to inspect, info views, legend), the event log approved, governance split out, glance test approved with an inspection half. Added §1a, Track B (the ground) and the ground brief. Codex runs Blender and Tiled on Adam's Mac.
 - **2026-10-07:** Adam: no hand placement of districts or routes; the city grows on its own, with routes long enough for real movement. Slice 1 built (PR #730) with the deviations noted under Slice 1.
 - **2026-10-07:** Renderer switched to Three.js after the Kenney upload turned out to be 3D models. No sprite conversion, rotation for free, Blender and Tiled no longer needed. Unused packs are deleted once the build is complete and we know which are used.
+- **2026-10-07:** Slice 2a (layout engine) built in PR #732.
