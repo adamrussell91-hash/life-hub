@@ -311,6 +311,149 @@ Topic planets stay in the Universe. Pasting a solar system onto the suburbs woul
 - A booked trip in Travel is the obvious intercity departure, but this round does not fold it in. The travel map has already been wrong by treating an arrival city as both ends of a leg. Should a later round put real trip legs to use as intercity trains, with Sydney as the start, or do dreams stay the only intercity service?
 - Does a life-wall detour have to repaint Lines and the city in the same frame, or may the schematic keep a straight track while the city bends?
 
+### Round 1 · ChatGPT Codex · Extend + Combine
+
+> **Author note:** Written by ChatGPT Codex on 7 October 2026. Cards played: **Extend** and **Combine**. This contribution builds on Claude Code's Harbour City and vacant lots, and Cursor's shared snapshot and Knowledge ceiling. All additions are proposals for the next contributor to develop or challenge.
+
+#### Extend: a city with places to use, beyond the transport network
+
+**The next step.** The current city shows movement, workload and progress. The gap map also contains possessions, documents, ideas and records whose value has little connection to completed tasks. A house contract needs a reliable home even during a quiet year. A book idea deserves a place before a writing schedule exists.
+
+Give Harbour City usable interiors. The outside shows the overall state. Entering a building opens the relevant records and actions. The city becomes another way to use Life Hub, with the existing hubs still providing the underlying functions.
+
+**1. Three distances, one place.**
+
+| Distance | What you see | What you do |
+|----------|--------------|-------------|
+| Harbour | Districts, routes, services and a few selected signals | Choose an area or open today's departures |
+| Street | Named buildings and their current purpose | Select the writing studio, records office, collection gallery or kitchen |
+| Room | A focused workspace using the relevant hub records | Find a document, develop a book idea, compare collection items or choose a recipe |
+
+A tap on a building opens a room sheet on a phone. On a larger screen, the camera approaches the building and opens the workspace alongside the city. Closing the room returns to the same position and zoom. Direct links also open the room without requiring a walk through the map.
+
+The room uses normal readable controls. Shelves, desks and cabinets establish the setting, while labelled lists and editors handle the work. A tiny illustrated drawer should never be the only route to an important document.
+
+**2. Give the missing areas distinct homes.**
+
+These are proposed destinations from the gap map, rather than claims about features already built.
+
+| Gap or extension | Place in Harbour City | First useful room |
+|------------------|-----------------------|-------------------|
+| House records and important documents | Records office beside the residential district | Searchable property, contract and certificate records, with linked originals |
+| Insurance and car records | Service centre | Policy documents, renewal dates, service history and associated actions |
+| Renovations | Design workshop | Plans, decisions, before and after records, and linked projects |
+| Future book ideas | Writing studio beside the Knowledge library | Idea notebook, research shelf, outline and draft workspace |
+| Watches and fragrances | Collection arcade | Owned items, wish list, provenance, condition and personal notes |
+| Recipes and dinner database | Market kitchen beside Brisket's depot | Saved recipes, dietary tags and links to food records |
+| Hair and aesthetic procedure history | Treatment rooms beside the Body and Skincare districts | Dated records, photographs and linked appointments |
+| Tax evidence | Records office archive room | Evidence organised by financial year, with links to source documents |
+
+House records and insurance enter as records and responsibilities. The city has no daily spending ledger, banking feed, fare economy or income dashboard. The gap map's broad Finance proposal does not automatically enter Life City.
+
+Room placement expresses a useful relationship. The writing studio sits beside the library because research supports writing. The collection arcade sits near Travel because saved shopping interests support a trip. Personal placement overrides remain an open design choice.
+
+**3. Book ideas become objects worth returning to.**
+
+Inside the studio, each book idea has a dedicated desk. Early ideas have a title, premise, intended reader and a few saved fragments. A developing idea gains an outline board, linked research and draft material. Publication or deliberate completion earns a book on the studio shelf.
+
+These states come from the writing record, with Adam choosing the stage. Word count does not decide whether an idea is good. The city does not create a project or deadline merely because a desk exists.
+
+For an educational book, the desk brings together a research note, a teaching example and a developing chapter. Source details travel with the research. Private classroom material stays within its existing access rules. The writing view never silently copies student records into a manuscript.
+
+A quiet desk keeps its name and position. Returning after months opens the last saved fragment and an optional next action. Dormant ideas do not become abandoned buildings.
+
+**4. Migration changes a lot in two separate steps.**
+
+Claude's vacant lots are a useful start. Give each lot two independent facts: whether a suitable product home exists, and whether the relevant records have arrived.
+
+Teaching already has a home, even with lessons still awaiting import. House records currently lack a home in the gap map. Those are different conditions.
+
+An opened building with a labelled empty shelf means the structure exists and import is pending. A fenced lot means a product home still needs development. Missing records never produce invented collection items, placeholder policy dates or false activity. An import fills existing shelves rather than building a second district.
+
+#### Combine: saved activities spanning several districts
+
+**The combination.** Claude's ferries connect districts. Cursor keeps the existing task views aligned. Add a way to gather relevant places around one purpose, without turning every record into a task.
+
+A saved activity selects records from several hubs and opens them together. Adam chooses the purpose and confirms the associations. Harbour City highlights the participating buildings and offers one workspace for the activity. Closing the activity restores the normal city.
+
+The buildings stay in their usual positions. Relationships and selections change. The city does not rearrange itself every time Adam switches focus.
+
+**1. A travel activity connects the things needed for a specific trip.**
+
+Opening a saved December trip activity brings the Travel terminal into focus. Around the terminal are the linked itinerary, selected documents, saved fragrance and watch interests, and travel tasks.
+
+| Existing or future record | Contribution to the activity |
+|---------------------------|------------------------------|
+| Travel leg | Actual origin, destination, dates and booking reference from Travel |
+| Accommodation record | Stay details associated with the relevant city |
+| Document record | A selected passport or travel document, through its authorised viewer |
+| Saved shopping interest | Research relevant to a destination |
+| Collection item | Owned or wanted state where Adam recorded the distinction |
+| Task | A preparation action with its existing status and due date |
+| Knowledge note | Cultural, historical or practical research linked to the trip |
+
+Travel legs use their real endpoints. They get a distinct departure label from dream routes. A real flight and a long term aspiration should never share an ambiguous arrival prediction.
+
+Before departure, Adam opens the activity and sees unresolved preparation tasks beside the supporting records. During travel, opening the Istanbul stop brings up the relevant booking and saved interests. After travel, a confirmed purchase links to an owned collection item, with provenance retained. A saved shop or browsing session never counts as a purchase.
+
+This connects planning, experience and later recall. Day to day expenditure stays outside the activity.
+
+**2. A writing activity connects research to the work receiving the benefit.**
+
+Opening a book desk highlights the Knowledge library, Writing studio and any explicitly linked teaching resources. The room shows the outline beside selected research and examples.
+
+Adam links a neuroscience note to a chapter, adds a teaching example and writes a paragraph. Each record stays in its owning hub. The chapter records the relationship and a source reference. Later corrections to the research are visible when the chapter is reopened. A quoted or adapted passage keeps the version used, so a changing source never silently rewrites an existing draft.
+
+The ferry between library and studio represents a saved relationship. A decorative ferry trip does not mean a draft was written. Only a recorded writing action changes the desk's activity state.
+
+**3. A home activity joins evidence and action.**
+
+Opening a repairs activity brings together the property record, selected photographs, relevant communications, the associated task and any linked policy document.
+
+The room answers practical questions: Which property is involved? What evidence exists? What has already been requested? What is the next recorded action?
+
+Finding a policy document opens the original. Selecting a communication shows the saved record. Completing the repair task changes the existing Tasks record. The city never treats viewing evidence as completing a repair, and opening the room never sends a message.
+
+This is the difference between storing a document somewhere and having the evidence ready when needed.
+
+**4. Useful combinations stay optional and explicit.**
+
+An activity begins with a named purpose and selected records. Suggestions appear as candidates with a reason, such as a shared trip identifier or an existing research link. A shared word alone does not establish a relationship.
+
+Adam confirms a suggested link, removes a selection or opens the source. Saving the activity stores the selection and presentation state. The underlying records remain authoritative.
+
+On a phone, the activity becomes a short list of useful doors, followed by the selected room. For example, itinerary, documents, saved interests and preparation tasks. The departure board stays available. Switching between related records should take fewer taps than opening several separate hub pages.
+
+**5. Fit this around the shared snapshot.**
+
+Cursor's rule still holds for task progress. Every task view reads the same status and ordering. Extend the city snapshot with references to other domain records and their explicit relationships. Each domain owns its facts.
+
+The transit vocabulary describes routes and services. A policy is a document reference, a watch is a collection reference, and a manuscript is a writing reference. None becomes a GTFS stop unless a genuine task links to the record.
+
+The renderer owns camera position, room selection and visual emphasis. A city action calls the owning hub and then refreshes the shared snapshot. A failed save leaves the underlying record unchanged and the room reports the failure.
+
+Deleted records disappear from rooms, activity selections and city signals through the existing liveness rules. Archived records remain available through explicit archive views. The city does not preserve a private duplicate to keep a shelf looking full.
+
+#### Questions for the next round
+
+1. Should rooms open inside Harbour City, or move directly into the owning hub with a clear return route?
+2. Does Adam want to place buildings himself, choose from suggested neighbourhoods, or keep a fixed layout?
+3. Should saved activities live in Tasks as project workspaces, or support purposes with no task or project?
+4. Which first room would make the city useful beyond its appearance: Writing, House records or Collections?
+5. How should the wider city show a quiet but valued area without interpreting silence as failure?
+
+#### ChatGPT Codex card ledger after Round 1
+
+| Card | Uses by ChatGPT Codex | Uses left |
+|------|----------------------|-----------|
+| Extend | 1 | 1 |
+| Substitute | 0 | 2 |
+| Combine | 1 | 1 |
+| Adapt | 0 | 2 |
+| Magnify | 0 | 2 |
+| Put to another use | 0 | 2 |
+
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load?
@@ -326,3 +469,4 @@ Topic planets stay in the Universe. Pasting a solar system onto the suburbs woul
 - **2026-10-07, Claude:** Created this doc from the chat thought experiment with Adam.
 - **2026-10-07, Claude Code:** Round 1 of the what if game (Extend + Adapt). Added section 7 with Harbour City, agent services, driverless lines, landmarks, vacant lots, the GTFS-shaped vocabulary and pressure rings. Renumbered Open questions to 8 and this log to 9.
 - **2026-10-07, Cursor:** Round 1 of the what if game (Combine + Put to another use). Added one-graph-four-lenses (Lines, Branch, Orbit, the Day Dial and Harbour City share a GTFS-shaped snapshot) and the Knowledge sky as the concourse ceiling. Noted both in the architecture sketch and on three open questions.
+- **2026-10-07, ChatGPT Codex:** Round 1 (Extend + Combine). Added usable interiors for current and future domains, separate product home and import states, and saved activities linking Travel, Writing and House records. Preserved both earlier rounds and the main concept. Recorded Codex card usage within the round.
