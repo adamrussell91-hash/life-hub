@@ -129,9 +129,10 @@ Life City needs a tiny fraction of OpenTTD: no money, no crashes, no freight eco
   - `vehicle.dispatched` / `vehicle.paused` (agent activity, awaiting confirmation)
   - `service.dispatched` (ambulance, food truck, mail van) with a `reason`
   - `routine.completed` / `routine.missed`
-  - `city.weather` (Mind), `city.clock` (real time, term rhythm)
-- **Layout engine:** deterministic placement, so a project's route stays in the same place between visits
+  - `city.weather` (the capacity forecast's weather state for that hour), `city.clock` (real time, term rhythm)
+- **Layout engine:** deterministic placement, so a project's route stays in the same place between visits. A building Adam has placed keeps that place. Proposal in Cursor's round 2.
 - **One graph, four lenses:** Tasks Lines, Branch, Orbit and Harbour City read one snapshot of that graph. The city does not keep a second copy of what is done, blocked or due. Proposal in Cursor's round 1 below.
+- **History is the event log:** Rewind replays these events up to a day. It does not keep a second archive of the city. Proposal in Cursor's round 2.
 - **Renderer:** PixiJS (2D) first
 
 ### Who builds what
@@ -591,6 +592,110 @@ Cursor proposed that the phone lens is the departures board. The occupancy train
 | Put to another use | 1 | 1 |
 
 
+### Round 2 · Cursor · Substitute + Adapt
+
+> **Author note:** This round was written by Cursor on 7 October 2026. Cards played: **Substitute** and **Adapt**. It follows Codex's Round 1 (rooms, two-step migration, saved activities) and Claude Code's Round 2 (the time scrubber, the occupancy train, and the correction that city weather is the capacity forecast). It also uses `docs/capacity-forecast-handoff/weather-states.md` and `docs/capacity-forecast-handoff/BUILD.md`, which Claude's round points at, and the Knowledge constellation placement already in the repo. Everything here is a proposal until Adam names a slice to build.
+
+#### Substitute: Rewind replays the event log, instead of keeping a daily copy of the city
+
+**The problem.** Claude's Round 2 makes time something you can drag. That is the right magnification. The storage she suggests for it is a daily snapshot, with each day keeping the differences from the day before, and a past room opening "as it was".
+
+That second archive fights the rule this game has already agreed. Cursor's Round 1 said the city does not keep a second copy of what is done, blocked or due. One function builds the snapshot, and every lens reads it. A pile of daily copies is another function, and it will drift. Codex's shelves made the same point about import: missing records never produce invented items. A snapshot that freezes a document's text will, on a later day, show a copy Adam has since corrected or deleted.
+
+Claude already saw half of this. She said a stored day holds record ids and states, not copies of the records, and that a task deleted today vanishes from every past day because the renderer checks liveness (`withoutDeleted`, `isOpenTask`). Archive stays readable. That rule is right. It also means the room cannot honestly claim "as it was" for the body of a contract, a chapter or a policy. The id is the same. The text is today's, unless the owning hub itself remembers an older version. The capacity forecast keeps immutable snapshots so its scores stay honest. The city must not borrow that pattern, or Rewind becomes a private copy of things Adam removed. Claude said that too. The daily diff archive is how it would happen anyway.
+
+**The substitute.** Section 5 already lists the events. They are the history. Rewind does not open a photo of the city. It asks the same snapshot function for a clock time in the past, and that function replays the log up to the end of the chosen day.
+
+The log is allowed to store:
+
+- the event name from section 5 (`route.opened`, `stop.completed`, `wall.placed`, `district.opened`, and the rest of that list)
+- the record id it refers to
+- when it happened
+- the small fields the picture needs and the live record does not keep, such as a route's shape id at the time the layout engine assigned it
+
+The log is not allowed to store the body of a note, the text of a contract, a photograph, a collection item's notes, or a copy of a task title "just in case". Those stay in the hub that owns them.
+
+Replay then does four things, in order:
+
+1. Take the events up to the end of the chosen day.
+2. Drop any event whose record is deleted today. Archived records stay, on the days they were active.
+3. Build the routes, stops and services from what survived. The layout engine places them. Stop order still comes from the graph, as in Round 1.
+4. Apply the weather for that day from the capacity forecast's own record of that day, if it has one. If it does not, the sky is the unknown state, not a guessed icon.
+
+Letting go of the scrubber still springs back to Now, and Now is the same function with the clock set to the present. Forecast, dragging the other way, is the same function fed by due dates, the term calendar and the forecast. It does not write pretend events for days that have not happened. There is nothing in the future to copy.
+
+**What a past room is allowed to say.** Codex's rooms still open in Rewind. They open with a banner, and the banner tells the truth about that record:
+
+| The record | What the past room shows |
+|------------|--------------------------|
+| A diary entry, a check-in, a completed task, a booked travel leg, anything whose date is the record | That day's record, because the date is on it |
+| A document, a book draft, a policy, a collection note, with no version stored by its hub | The record as it is now, and the banner says so |
+| A record the hub really versions | The version that was current on the chosen day, read from that hub, not from the city log |
+| A deleted record | The room does not open. The building or the stop is gone from that day as well |
+
+Viewing a past room still changes nothing. A repair viewed in March does not complete the task. Codex's rule holds in both directions of the scrubber.
+
+**The fireworks read the same log.** Claude's New Year's Eve show and the end-of-term lights are a replay of `goal completed`, `route.retired` and dream events in that year, in the order the log has them. They are not a saved video with its own copy of the year. A goal deleted before the replay does not launch a burst. "Save this" can still export a render of that replay. The export is a file Adam asked for. It is not a second history the city consults later.
+
+**On the phone.** The tide line belongs on the wide lens. At 390 the departures board gains a date: "As at 12 March", with Now as the way back. The board is still the phone lens from Round 1. Rewind does not ask a thumb to drag a hairline across a harbour.
+
+#### Adapt: place buildings the way Knowledge places constellations, and let the forecast keep its own fog
+
+Two existing mechanisms already solve questions this game is about to invent new controls for.
+
+**1. Adam places a building the way he places a constellation.**
+
+Codex asked whether buildings are fixed, suggested, or put down by hand. Knowledge already has the interaction. A saved constellation stores a normal position, not a picture: `sky.x` and `sky.y` as fractions of the sky, plus `rotation` and `scale`, and the figure is rebuilt from its notes every time (`SavedConstellation` in `apps/knowledge/src/stars/schema.ts`). Stars he has not saved do not appear just because a topic exists. Topic planets are seeded and stay put without anyone dragging them.
+
+Harbour City can use that same save, for buildings only.
+
+| What | Who places it | What is stored |
+|------|----------------|----------------|
+| Districts, routes, stops, the bridge, the harbour | The layout engine, deterministic, as the base doc says | The shape id on the route. Adam does not drag a metro line |
+| A building he cares about: the writing studio, the records office, the collection arcade, a milestone landmark | Adam, once. A suggestion can offer a lot. Saving it pins the building | The same four numbers: x, y, rotation, scale, plus the building's record id |
+| A vacant lot or a new building he has not touched | A seeded lot on the edge, stable between visits, the way an unsaved sky position is stable | Nothing, until he saves it |
+
+The suggestion can still follow Codex's relationships: the studio offered beside the library, the kitchen beside Brisket's depot. Saving accepts the offer or moves it. After that, the layout engine does not "improve" the spot on the next visit. Personal placement wins, which is the override Codex left open.
+
+This is also how a quiet place stays valued. The grey empty park means exercise skipped. That grey does not spread to a records office that has had a quiet year. A pinned building with records on its shelf is lit. A fenced lot still means no product home. An opened building with an empty shelf still means the home exists and the import has not arrived. Silence is not failure, and it is not an empty park.
+
+The ceiling from Round 1 and these pins are one habit, not two systems. Both are "Adam put this here, and the generated city works around it." A constellation is never a building, and a building is never drawn on the ceiling.
+
+Rewind uses the pins as they are now, so last October is still his city and not a reshuffle. Whether moving a building should itself be an event, so Rewind can show the old lot, is an open question. The default proposal is no: placement is a preference, like the constellation's sky position, not a fact about the past.
+
+**2. Distance into the future uses the forecast's band, not a new kind of fog.**
+
+Claude's Forecast paints sea fog as the view gets less certain, until the city is only an outline. The instinct is right, and the paint collides with a weather language Adam has already fixed.
+
+`docs/capacity-forecast-handoff/weather-states.md` gives thirty states, and they describe conditions, not score brackets and not uncertainty. Dense fog, icon 20, means mental clarity is substantially reduced. Morning mist, patchy fog and fog lifting are cognition too. The same document says the shaded band is the prediction uncertainty, and it must not be described as a calibrated fact. It also says not to swap his icons for a generated set. `BUILD.md` is the forecast's own rule that every view calls the one capacity function.
+
+So the city, on a future day, shows two different things with two different drawings:
+
+- **The sky's icon** is the capacity weather for that hour, from that one function, using his icon. A thunderstorm means overload. It does not mean "this date is far away".
+- **The uncertainty** is the forecast's shaded band, laid over the city as a fade: tomorrow crisp, further out lighter and wider, past the last day with evidence or a due date a labelled absence. The label is the same idea as the occupancy train's "no data available". It is not icon 20, and it is not a new sea-fog asset.
+
+A carriage diagram for a hazy future day, in Claude's week board, fades with that same band. The carriage's word (many seats, standing room, no data) still comes from the forecast function. The fade does not change the word.
+
+Vera's lighthouse stays the check-in reminder Claude reduced it to. It does not get the sky back.
+
+#### New open questions from Cursor's round 2
+
+- Which hubs actually keep an older version of a record, and which past rooms must say "as it is now" until they do?
+- If Adam moves the records office, should Rewind show the old lot, or is placement a preference that always shows where it stands today?
+- The event log stores shape ids so a retired route can be redrawn. If the layout engine's rules change later, old shapes and new rules will disagree. Do stored shapes win for past days, so Rewind stays recognisable?
+- Is a date on the phone departures board enough for Rewind, or does the phone need the tide line too?
+
+#### Cursor card ledger after round 2
+
+| Card | Uses by Cursor | Uses left |
+|------|----------------|-----------|
+| Extend | 0 | 2 |
+| Substitute | 1 | 1 |
+| Combine | 1 | 1 |
+| Adapt | 1 | 1 |
+| Magnify | 0 | 2 |
+| Put to another use | 1 | 1 |
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load?
@@ -608,3 +713,4 @@ Cursor proposed that the phone lens is the departures board. The occupancy train
 - **2026-10-07, Cursor:** Round 1 of the what if game (Combine + Put to another use). Added one-graph-four-lenses (Lines, Branch, Orbit, the Day Dial and Harbour City share a GTFS-shaped snapshot) and the Knowledge sky as the concourse ceiling. Noted both in the architecture sketch and on three open questions.
 - **2026-10-07, ChatGPT Codex:** Round 1 (Extend + Combine). Added usable interiors for current and future domains, separate product home and import states, and saved activities linking Travel, Writing and House records. Preserved both earlier rounds and the main concept. Recorded Codex card usage within the round.
 - **2026-10-07, Claude Code:** Round 2 (Magnify + Put to another use). Corrected the city's weather to come from the capacity forecast (base table and round 1 table updated). Added the time scrubber (Rewind, Forecast with honest fog, the New Year's Eve and end-of-term replays) and the per-carriage occupancy train as a capacity display. Added a card ledger.
+- **2026-10-07, Cursor:** Round 2 (Substitute + Adapt). Substituted daily city snapshots with a replay of the section 5 event log, so Rewind does not keep a second archive. Adapted Knowledge constellation placement for buildings Adam pins, and adapted the capacity forecast's uncertainty band so future haze is not Dense fog. Noted both on the architecture sketch.
