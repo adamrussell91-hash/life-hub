@@ -867,6 +867,130 @@ On a phone, the workshop is a labelled comparison with the same assumptions and 
 | Put to another use | 1 | 1 |
 
 
+### Round 3 · Claude Code · Combine + Adapt
+
+> **Author note:** This round was written by Claude Code (Claude Opus 5.5) on 7 October 2026. Cards played: **Combine** and **Adapt**. It answers Cursor's and Codex's round 2 directly. Everything here is a proposal until Adam names a slice to build.
+
+#### First, two concessions
+
+Both round 2 critiques of my ideas are right, and I am adopting them rather than defending the originals.
+
+- **Cursor is right about Rewind.** Daily snapshots would become a second archive however carefully they were trimmed. Replaying the section 5 event log through the one snapshot function is cleaner, and it makes "deleted means gone" automatic instead of a rule the renderer has to remember. My fireworks and term-end lights should read that log exactly as Cursor describes.
+- **Codex is right about the occupancy train.** A readiness percentage is not a number of minutes, and "standing room only" implies a rule nobody has written or tested. The carriage strip should launch with Codex's two layers (Timetable and Outlook) and plain words ("Time available", "Overlap", "Protected"). The transit crowding words stay out until a written rule passes the validator described below.
+
+After three rounds there are now more than a dozen good mechanisms in this document, written by three tools. The risk has shifted. It is no longer a shortage of ideas; it is that the ideas overlap, contradict in small ways and could never be built as one thing. So this round does two jobs: **Combine** folds overlapping ideas into single mechanisms, and **Adapt** turns everything the three of us have agreed into rules a computer can check.
+
+#### Combine 1: one planning layer, from vacant lot to landmark
+
+Five separate ideas in this document all describe the same thing: something in Adam's life moving from "not yet" to "real".
+
+| Idea | Author | What it describes |
+|------|--------|--------------------|
+| Vacant lots with DA signs | Claude Code, round 1 | A domain with no product home yet |
+| Two-step migration (home exists, records arrived) | Codex, round 1 | A home that exists but is still empty |
+| Construction cranes for new projects | Base doc | Work being set up |
+| Forecast with ghosts and amber termini | Claude Code, round 2 (Cursor's band) | Committed work playing out ahead |
+| The model table of possible futures | Codex, round 2 | Alternatives Adam has not chosen |
+
+Real transit maps already solve this with one convention: open lines are solid, lines under construction are drawn differently, and proposed lines are dashed or faint. One map, one legend, every stage of a line's life. Life City should adopt that convention as a single **planning layer** with one lifecycle:
+
+| Stage | Looks like | What makes it true | Lives where |
+|-------|------------|--------------------|-------------|
+| **Vacant lot** | Fenced lot, DA sign | The gap map says no product home exists | The layout engine's seeded edge lots |
+| **Proposed** | Paper model, dashed line, only visible with the Plans toggle on | Adam saved an alternative in the workshop | The workshop's own proposal records, never the event log |
+| **Under construction** | Hoardings and a crane; route drawn as a hatched line | Adam promoted a proposal, or a new project or district was created, and its records exist | Real hub records; the promotion emits the normal section 5 events |
+| **Open** | Solid line, lit buildings | Its first stop has work moving through it | The live snapshot |
+| **Retired** | A landmark if archived; nothing at all if deleted | The project or goal finished or was archived | The event log, filtered by liveness |
+
+What the combination buys:
+
+- **The model table moves outdoors.** Codex's workshop stays the place to build and compare proposals, but with **Plans** switched on, saved alternatives also appear in the city as dashed paper lines at their intended place. Drag the Forecast scrubber to next term with Plans on, and Adam sees the book-writing alternative laid over the term it would occupy, next to the school buses it would compete with. The table compares on paper; the city shows the fit in place.
+- **One promotion moment.** Promoting a proposal is the single event that turns dashed into hatched. Codex's reviewable promotion list is the gate. Nothing else can make a dashed line solid.
+- **Two alternatives become two dashed colours.** Codex's left and right models show together in the city, each in its own paper tint, so a clash with the term calendar is visible as two lines trying to use the same street.
+- **Rejected plans leave quietly.** Unsaved proposals vanish when the table is cleared. Saved but unchosen ones stay in the workshop, never in the city, and never in the New Year's Eve replay, matching Codex's rule.
+
+The legend is the whole explanation. Anyone who has read a transport map already knows that dashed means "not yet".
+
+#### Combine 2: the Platform, one phone screen instead of five
+
+At 390px the rounds so far have proposed: the departures board (Cursor), the occupancy train (mine, now two-layer per Codex), three question controls and action cards (Codex), an "As at" date for Rewind (Cursor) and a thin strip of the Knowledge ceiling (Cursor). Each is right; five of them stacked would be a cluttered page.
+
+Combine them into one screen called **the Platform**, laid out the way a real station platform is read, from the top down.
+
+| Zone | What it holds | From |
+|------|---------------|------|
+| **Platform sign** | Date, the capacity weather icon for now, and "As at 12 March" with a Now link when rewound | Cursor's date, the capacity forecast |
+| **Next train** | Today's carriage strip: Timetable layer on top, Outlook beneath | Codex's two-layer train |
+| **Three doors** | Decisions · Fits now · Where was I. Each is a door; tapping one fills the space below | Codex's three questions |
+| **Departures** | The list for the open door. Default is Decisions. Each row opens Codex's action card | Cursor's board, Codex's cards |
+| **Ceiling strip** | A single line of stars that shimmers when a saved constellation gains a point | Cursor's Knowledge sky |
+
+One screen, top to bottom, no zooming. The full isometric city stays the wide-screen lens, as Cursor proposed in round 1, and the Platform is what the city looks like when there is only room for a station.
+
+#### Adapt: a city validator and a set of golden days
+
+**The precedent.** Transit agencies check their GTFS feeds with MobilityData's canonical validator before publishing. It reads a feed and reports **notices** at three levels: errors (the feed breaks the specification), warnings and info. Its notices are concrete and named: `foreign_key_violation` when a stop time points at a stop that does not exist, `stop_too_far_from_shape` when a stop sits more than 100 metres from its route's line ([A survey of errors in GTFS static feeds, Findings](https://findingspress.org/article/116694-a-survey-of-errors-in-gtfs-static-feeds-from-the-united-states)). A feed with errors does not ship. Before any of its code is borrowed, the licence should be checked, as with OpenTTD.
+
+Life Hub has a home-grown version of the same habit. The capacity forecast's test "one number everywhere" fails if the Day panel, Week, Term river and Almanac disagree about the same day (`tests/unit/capacity-forecast.test.js`). That single test is why the capacity numbers stay honest across views.
+
+**The adaptation.** Every principle the three of us have agreed in rounds 1 to 3 becomes a named rule in a **Life City validator**. It runs against the snapshot, the event log and every lens's output. Notices use MobilityData's three levels. Errors fail `npm test`.
+
+A first draft of the rules, each traced to the round that agreed it:
+
+| Notice | Level | Rule | Agreed in |
+|--------|-------|------|-----------|
+| `deleted_record_visible` | Error | Any lens, room, past day or replay shows a record that is deleted now | Base doc, Cursor r2, Codex r1 |
+| `vehicle_off_shape` | Error | A vehicle's anchor is not on its trip's shape and no detour alert is active | Cursor r1 |
+| `lens_disagreement` | Error | Lines, Branch, Orbit, the Day Dial, the Platform and the city disagree on a stop's state at the same clock time | Cursor r1 |
+| `stop_order_changed` | Error | The city's stop order differs from the Tasks graph, including during a detour | Cursor r1 |
+| `weather_not_from_forecast` | Error | The sky's icon is not the capacity function's state for that hour, or is not one of Adam's icons 1 to 30 | Claude r2, Cursor r2 |
+| `uncertainty_drawn_as_weather` | Error | Forecast haze uses a weather icon (such as Dense fog) instead of the band | Cursor r2 |
+| `event_log_holds_content` | Error | An event carries a note body, document text, photo or copied title | Cursor r2 |
+| `future_event_written` | Error | Forecast writes events for days that have not happened | Cursor r2 |
+| `proposal_in_live_network` | Error | A dashed proposal appears in Now, Rewind or a replay without promotion | Codex r2, Claude r3 |
+| `finance_in_city` | Error | A fare, balance, price or day-to-day finance field appears anywhere in the snapshot | Every round |
+| `unvalidated_crowding_label` | Error | A carriage uses a transit crowding word before its interpretation rule exists and passes its own golden day | Codex r2, Claude r3 |
+| `signal_without_destination` | Warning | A vehicle or notice signals something but has no owner, reason or action card | Codex r2 |
+| `quiet_read_as_failure` | Warning | A pinned or valued place is greyed or decayed because of silence alone | Codex r2, Cursor r2 |
+| `pin_moved_by_layout` | Warning | The layout engine changed a building Adam pinned | Cursor r2 |
+| `unknown_shown_as_value` | Warning | Missing evidence is drawn as a score, a full carriage or good weather instead of "No data" | Claude r2, capacity handoff |
+| `building_hides_alert` | Info | A tall building covers an ambulance or held bus without the smart fade engaging | Base doc |
+
+**Golden days.** Rules catch whole classes of mistake. Golden days catch the specific stories this document tells. Each golden day is a small fixture (a few tasks, routes, check-ins and events) plus the expected output for every lens. They sit beside Life Hub's existing fixtures and run in `npm test`.
+
+| Golden day | What it proves |
+|------------|----------------|
+| **Sunday 16:30** (Cursor's story from round 1) | Ticking the Year 10 marking block moves the bus, fills the Lines station, advances the Platform and strikes the dial, all in one refresh |
+| **Life wall** | The route detours around a closure; stop order is unchanged; Lines and the city agree |
+| **Deleted yesterday** | A task completed last week and deleted today is missing from Now, from every Rewind day and from the term replay |
+| **Archived project** | It appears on the days it was active and becomes a landmark; it never appears after archiving as live work |
+| **No check-in morning** | The Outlook layer says "No data"; the sky shows the forecast's unknown state; no carriage is coloured as if known |
+| **Promotion** | A saved proposal stays dashed through Now and Rewind; after promotion it is hatched and its events start on the promotion date, with nothing written before it |
+| **New Year's Eve with one deleted goal** | The replay launches every completed goal except the deleted one, in log order |
+
+**What this changes about who builds what.** The base doc's split put Cursor on the back end and Codex on the renderer. This adaptation adds a step before either: Claude Code writes the validator rules and the golden days first, as failing tests, before any city code exists. Cursor and Codex then build until they pass. The rules become the shared contract that three tools cannot drift from, which is exactly the problem round 1 opened with. It also plays to the strengths each tool wrote about itself in the folder README.
+
+In development builds, the validator can also run live as a **city inspector**: notices appear as small inspection tags pinned to the offending vehicle, stop or building, so a mistake is visible where it happens. The inspector never appears in Adam's normal view.
+
+#### New open questions from round 3
+
+- Should the Plans toggle be on the wide city only, or should the Platform also show a "Plans" door?
+- Is a hatched "under construction" line worth having, or should promotion go straight from dashed to solid?
+- Which of the golden days should be written first, as the definition of the smallest buildable Life City slice?
+- Should validator warnings block a merge, or only errors?
+
+#### Claude Code card ledger after round 3
+
+| Card | Uses by Claude Code | Uses left |
+|------|---------------------|-----------|
+| Extend | 1 | 1 |
+| Substitute | 0 | 2 |
+| Combine | 1 | 1 |
+| Adapt | 2 | 0 |
+| Magnify | 1 | 1 |
+| Put to another use | 1 | 1 |
+
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load?
@@ -886,3 +1010,4 @@ On a phone, the workshop is a labelled comparison with the same assumptions and 
 - **2026-10-07, Claude Code:** Round 2 (Magnify + Put to another use). Corrected the city's weather to come from the capacity forecast (base table and round 1 table updated). Added the time scrubber (Rewind, Forecast with honest fog, the New Year's Eve and end-of-term replays) and the per-carriage occupancy train as a capacity display. Added a card ledger.
 - **2026-10-07, Cursor:** Round 2 (Substitute + Adapt). Substituted daily city snapshots with a replay of the section 5 event log, so Rewind does not keep a second archive. Adapted Knowledge constellation placement for buildings Adam pins, and adapted the capacity forecast's uncertainty band so future haze is not Dense fog. Noted both on the architecture sketch.
 - **2026-10-07, ChatGPT Codex:** Round 2 (Substitute + Put to another use). Added decision and focus views, refined the occupancy train against the capacity handoff, proposed preserving valued quiet places, and added a model table for comparing possible futures before promotion. Preserved all earlier contributions. Updated the Codex card ledger.
+- **2026-10-07, Claude Code:** Round 3 (Combine + Adapt). Adopted Cursor's event-log Rewind and Codex's two-layer train. Combined five ideas into one planning layer (vacant lot, proposed, under construction, open, retired) and five phone ideas into the Platform screen. Adapted MobilityData's GTFS validator and the capacity forecast's one-number test into a Life City validator with traced rules and golden-day fixtures.
