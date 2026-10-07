@@ -63,15 +63,18 @@ export function tripLegs(trip: Trip): Leg[] {
         )
       : undefined;
     if (t) {
-      const head = `${formatWeekdayDate(t.date)} · ${t.from_code} → ${t.to_code}.`;
+      const overnight = t.arrive_date !== t.date;
+      const head = overnight
+        ? `${formatWeekdayDate(t.date)} – ${formatWeekdayDate(t.arrive_date)} · ${t.from_code} → ${t.to_code}.`
+        : `${formatWeekdayDate(t.date)} · ${t.from_code} → ${t.to_code}.`;
       legs.push({
         fromCity: a,
         toCity: b,
         booked: t.status === 'booked',
         rail: t.kind === 'train',
-        statusHtml: `<b>${escapeHtml(head)}</b> ${escapeHtml(`${t.carrier} ${t.number}`)}. ${
-          t.status === 'booked' ? 'Booked.' : 'Not booked yet.'
-        }`
+        statusHtml: `<b>${escapeHtml(head)}</b> ${escapeHtml(`${t.carrier} ${t.number}`)}.${
+          overnight ? ' Overnight.' : ''
+        } ${t.status === 'booked' ? 'Booked.' : 'Not booked yet.'}`
       });
     } else {
       legs.push({

@@ -1,4 +1,4 @@
-import type { City, IsoDate, Item, Place, StayItem, Trip } from '@/types';
+import type { City, IsoDate, Item, Place, StayItem, TicketItem, Trip } from '@/types';
 
 /** Only PlaceItem and StayItem carry a `place`; tickets and check-ins never do. */
 export function itemPlace(item: Item): Place | undefined {
@@ -12,8 +12,36 @@ export function itemPlace(item: Item): Place | undefined {
   }
 }
 
+export function isTicketItem(item: Item): item is TicketItem {
+  return item.kind === 'flight' || item.kind === 'train';
+}
+
+/** True when a ticket's local arrive calendar day differs from its depart day. */
+export function isOvernightTicket(item: Item): item is TicketItem {
+  return isTicketItem(item) && item.arrive_date !== item.date;
+}
+
+function ticketLandCityId(item: TicketItem): string {
+  return item.arrive_city_id ?? item.city_id;
+}
+
+/** Ticket appears on its depart city/day, and again on the land city/day when overnight. */
+export function ticketShowsOnDay(item: TicketItem, cityId: string, date: IsoDate): boolean {
+  if (item.city_id === cityId && item.date === date) return true;
+  if (!isOvernightTicket(item) || item.arrive_date !== date) return false;
+  return ticketLandCityId(item) === cityId;
+}
+
+/** Items for one city day list — includes overnight tickets landing that morning. */
+export function itemsForCityDay(trip: Trip, cityId: string, date: IsoDate): Item[] {
+  return trip.items.filter((item) =>
+    isTicketItem(item) ? ticketShowsOnDay(item, cityId, date) : item.city_id === cityId && item.date === date
+  );
+}
+
 /** §3 rule 1 — every date from start to end for a city, plus any date with
- * an item for that city (travel days can appear in two cities). */
+ * an item for that city (travel days can appear in two cities). Overnight
+ * landings also open the arrive day in the land city. */
 export function daysForCity(trip: Trip, cityId: string): IsoDate[] {
   const city = trip.cities.find((c) => c.id === cityId);
   const dates = new Set<IsoDate>();
@@ -26,6 +54,7 @@ export function daysForCity(trip: Trip, cityId: string): IsoDate[] {
   }
   for (const item of trip.items) {
     if (item.city_id === cityId) dates.add(item.date);
+    if (isTicketItem(item) && ticketLandCityId(item) === cityId) dates.add(item.arrive_date);
   }
   return [...dates].sort();
 }
@@ -33,7 +62,10 @@ export function daysForCity(trip: Trip, cityId: string): IsoDate[] {
 /** True when the city's range or an item tags this date (travel days can hit two cities). */
 function cityCoversDate(trip: Trip, city: City, date: IsoDate): boolean {
   if (city.start_date <= date && date <= city.end_date) return true;
-  return trip.items.some((item) => item.city_id === city.id && item.date === date);
+  return trip.items.some((item) => {
+    if (item.city_id === city.id && item.date === date) return true;
+    return isTicketItem(item) && ticketShowsOnDay(item, city.id, date);
+  });
 }
 
 /** Cities whose day list includes this date (range or item). Travel days land in two. */
@@ -46,18 +78,53 @@ export function otherCitiesSharingDate(trip: Trip, cityId: string, date: IsoDate
 }
 
 /**
- * Short daybar label when this date is shared with another city.
+ * Short daybar label when this date is shared with another city, or when an
+ * overnight ticket spans this city into/out of another.
  * Prefer → toward a city that starts today, ← from a city that ends today.
  */
 export function travelDayCue(trip: Trip, cityId: string, date: IsoDate): string | null {
   const others = otherCitiesSharingDate(trip, cityId, date);
-  if (!others.length) return null;
-  const names = (cities: City[]) => cities.map((city) => city.name).join(', ');
-  const outbound = others.filter((city) => city.start_date === date);
-  if (outbound.length) return `→ ${names(outbound)}`;
-  const inbound = others.filter((city) => city.end_date === date);
-  if (inbound.length) return `← ${names(inbound)}`;
-  return `also ${names(others)}`;
+  if (others.length) {
+    const names = (cities: City[]) => cities.map((city) => city.name).join(', ');
+    const outbound = others.filter((city) => city.start_date === date);
+    if (outbound.length) return `→ ${names(outbound)}`;
+    const inbound = others.filter((city) => city.end_date === date);
+    if (inbound.length) return `← ${names(inbound)}`;
+    return `also ${names(others)}`;
+  }
+
+  const leaveNight = trip.items.find(
+    (item): item is TicketItem =>
+      isOvernightTicket(item) &&
+      item.city_id === cityId &&
+      item.date === date &&
+      ticketLandCityId(item) !== cityId
+  );
+  if (leaveNight) {
+    const dest = trip.cities.find((c) => c.id === ticketLandCityId(leaveNight));
+    return dest ? `→ ${dest.name} · overnight` : 'Overnight';
+  }
+
+  const landNight = trip.items.find(
+    (item): item is TicketItem =>
+      isOvernightTicket(item) &&
+      item.arrive_date === date &&
+      ticketLandCityId(item) === cityId &&
+      item.city_id !== cityId
+  );
+  if (landNight) {
+    const from = trip.cities.find((c) => c.id === landNight.city_id);
+    return from ? `← ${from.name} · overnight` : 'Overnight';
+  }
+
+  const sameCityNight = trip.items.some(
+    (item) =>
+      isOvernightTicket(item) &&
+      ticketLandCityId(item) === cityId &&
+      item.city_id === cityId &&
+      (item.date === date || item.arrive_date === date)
+  );
+  return sameCityNight ? 'Overnight' : null;
 }
 
 function toIsoUtc(d: Date): IsoDate {
@@ -69,13 +136,14 @@ function addDaysUtc(d: Date, n: number): Date {
 }
 
 /** §3 rule 2 — time ascending, `time: null` first, ties keep insertion order.
- * Tickets sort by `depart_time`. */
-export function orderDayItems(items: Item[]): Item[] {
+ * Tickets sort by `depart_time`, or by `arrive_time` when the view is their
+ * overnight landing day. */
+export function orderDayItems(items: Item[], viewDate?: IsoDate): Item[] {
   return items
     .map((item, index) => ({ item, index }))
     .sort((a, b) => {
-      const ta = sortTime(a.item);
-      const tb = sortTime(b.item);
+      const ta = sortTime(a.item, viewDate);
+      const tb = sortTime(b.item, viewDate);
       if (ta === null && tb === null) return a.index - b.index;
       if (ta === null) return -1;
       if (tb === null) return 1;
@@ -85,8 +153,11 @@ export function orderDayItems(items: Item[]): Item[] {
     .map((entry) => entry.item);
 }
 
-function sortTime(item: Item): string | null {
-  if (item.kind === 'flight' || item.kind === 'train') return item.depart_time;
+function sortTime(item: Item, viewDate?: IsoDate): string | null {
+  if (item.kind === 'flight' || item.kind === 'train') {
+    if (viewDate && item.arrive_date === viewDate && item.date !== viewDate) return item.arrive_time;
+    return item.depart_time;
+  }
   return item.time;
 }
 

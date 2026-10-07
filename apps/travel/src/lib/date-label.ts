@@ -9,6 +9,18 @@ export function formatWeekdayDate(date: IsoDate): string {
   return `${weekday} ${d.getUTCDate()} ${month}`;
 }
 
+/**
+ * Ticket depart/arrive line. Same-day keeps "Fri 09:35"; overnight uses the
+ * full calendar day so a span reads as "Tue 1 Dec 22:15" → "Wed 2 Dec 04:10".
+ */
+export function formatTicketMoment(date: IsoDate, time: string | undefined, overnight: boolean): string {
+  if (!time) return 'Time to set';
+  if (overnight) return `${formatWeekdayDate(date)} ${time}`;
+  const d = new Date(date + 'T00:00:00Z');
+  const weekday = d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
+  return `${weekday} ${time}`;
+}
+
 function parts(date: IsoDate): { day: number; month: string; year: number } {
   const d = new Date(date + 'T00:00:00Z');
   return {
