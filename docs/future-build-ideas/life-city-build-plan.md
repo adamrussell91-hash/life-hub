@@ -3,7 +3,7 @@
 **Status:** Draft plan. Not a build brief. Nothing builds until Adam names a slice.
 **Written:** 7 October 2026
 **Governs from:** the critical review at the top of [life-city.md](life-city.md). Where this plan and a verdict there disagree, the verdict wins.
-**Missing input:** the resources doc (`life-city-resources.md`) has not reached the repo yet. Each slice below has a **Resources** line saying what it expects that doc to supply. Once the doc lands, those lines get filled in and the plan is revised.
+**Inputs:** the critical review, a check of `main`, and the resource catalogue in [life-city-resources.md](life-city-resources.md).
 
 ---
 
@@ -37,9 +37,42 @@ Checked against `main`, 7 October 2026.
 
 New code sits in one folder: `apps/tasks/src/domain/city/` for logic and `apps/tasks/src/views/city/` for drawing. The city is a lens of the Tasks hub (open question in §8 of the concept doc, answered by P2).
 
-## 2. Slices
+## 2. Stack, taken from the resource catalogue
 
-Each slice has one builder, end to end (F9). Each slice is its own PR through `npm run pre-pr-check`. Code slices are not idea docs, so they never go straight to `main`.
+The catalogue's recommendation is adopted with the changes marked **Changed**. Versions are the npm `latest` on 7 October 2026. Each is pinned when it is first installed.
+
+| Use | Choice | Notes |
+|-----|--------|-------|
+| Renderer | `pixi.js` 8 (8.22) | Lazy-loaded on `/tasks/city` only (W4). The Home tile must not pull it into Home's bundle |
+| Camera | `pixi-viewport` 6 | Glance: camera locked. Explore: drag and pinch |
+| Ground and road tiles | `@pixi/tilemap` 5 | Ground only. Buildings and vehicles go in separate depth-sorted layers |
+| Halo and night | `pixi-filters` 6 | One glow filter for the halo. Night is a colour filter plus window masks |
+| Movement | Tween.js | Driven by the city clock, not wall time, so a replay gives the same frames |
+| Particles | PixiJS `ParticleContainer` | Slice 5 only. No third-party particle library until a festival needs one |
+| Pet paths | EasyStar.js | Slice 5 only. Never used for routes: a suspension is dates, not a detour |
+| Asset pipeline | PixiJS AssetPack | Three bundles: `core`, `pets`, `festival`. The Home tile loads a pre-rendered image, not a bundle |
+| Map composition | Tiled | **Changed.** Tiled holds the fixed ground only: terrain, the named corner, the public edge and scenery lots. Routes, stops and buildings tied to records come from the layout engine. Hand-editing a Tiled map for every new project would break never-reflow and turn Adam into the map's maintainer |
+| Sprite rig | Blender, orthographic camera | Renders the 3D Kenney kits, Cube Pets and the balloon into the 2D style |
+| Scenery variation | seedrandom | Scenery variants only. Record placements are stored slots, never seeds |
+| Whole-city reference | IsoCity (MIT) | A time-boxed spike in Slice 2 compares its depth sorting and route follower with writing our own. Retain its MIT notice if any code is lifted |
+
+**Not adopted:** Phaser, Excalibur, Godot, Three.js (for now), Pogicity art (its README limits the art to prototyping), Buggy Studio and Tibayan assets (no clear reuse licence), Howler.js (the existing chimes preference covers sound), the legacy particle emitter, TexturePacker and Aseprite. **Asset Forge** (about AUD 29) stays an optional purchase once a missing building or vehicle is needed. No purchase is needed for Slices 1 to 3.
+
+### Licences: the repo is public
+
+`adamrussell91-hash/life-hub` is a public repository. Every asset committed to it is redistributed. That makes three rules:
+
+1. **CC0 only in the repo by default.** Kenney, Screaming Brain Studios, Kenney Particle Pack and Kenney audio qualify.
+2. **CC BY (the Poly Pizza balloons)** may be committed with creator, licence, source URL and a note of modifications in `apps/tasks/public/city/CREDITS.md`, shown on an in-app credits line.
+3. **Quaternius (QAL) source files must not be committed.** QAL prohibits standalone redistribution, including modified assets. If a Quaternius animal is used, only the rendered sprite sheet inside the built product ships, and the source stays on Adam's machine. If in doubt, use Kenney Cube Pets instead.
+
+Every asset gets a line in `apps/tasks/public/city/assets.json`: file, source pack, URL, licence, date fetched and modifications. A test fails if a file in the city asset folder has no line there.
+
+## 3. Slices
+
+Each slice has one builder, end to end (F9). Each code slice is its own PR through `npm run pre-pr-check`. Code slices are not idea docs, so they never go straight to `main`.
+
+Track A runs beside Slice 1, because neither needs the other.
 
 ### Slice 1 · City snapshot and golden days (no picture)
 
@@ -72,32 +105,45 @@ A pure function `citySnapshot(input, now) → CitySnapshot` and the tests that p
 
 **Files:** `apps/tasks/src/domain/city/{types,snapshot,rules,momentum}.ts`, `apps/tasks/tests/unit/city-*.test.ts`, `apps/tasks/tests/fixtures/city/*.json`.
 
-**Resources:** the doc's mapping of life to city, if it differs from the review. Any extra service or vehicle types.
+### Track A · Art rig (Adam and Chat, beside Slice 1)
+
+This is the catalogue's §7 point: the packs remove drawing work, but not mismatched angles, shading and anchors. Fix those once, before any city code draws a sprite.
+
+- **Base family:** Kenney Isometric Tiles (City, Buildings, Landscape, Vehicles). It sets the angle, tile size, outline and light direction for everything else.
+- **Sprite spec** (`apps/tasks/public/city/SPRITE-SPEC.md`): tile footprint in px, ground anchor, light direction, palette, direction names, frame size, and frame counts for vehicles and pets. Keepsakes use the same spec.
+- **Blender rig:** one `.blend` with the locked orthographic camera and lighting, matched to the 2D family. Used for Train Kit, Watercraft Kit, the City Kits, Cube Pets and the balloon. The `.blend` lives outside the repo if any source model is not CC0.
+- **Proof sheet:** one Kenney street tile beside one rendered Train Kit tram, one Cube Pet idle frame and one balloon. If they don't sit together, adjust the rig before going further.
+- **Vehicle audit:** open the Vehicles archive and confirm what really exists: ambulance, school bus, a food-truck stand-in, a van, a crane, and how many directions each has. Gaps go to Blender (the City Kits) or Asset Forge.
+- **Sky:** decide how the 30 capacity weather states show over the city. The catalogue does not cover this. Suggested: a sky gradient plus the existing weather icon in a corner badge, with no new art for each state.
+- **Credits and `assets.json`** started, per the licence rules above.
+
+**Done when** the proof sheet looks like one city to Adam.
 
 ### Slice 2 · Layout engine and the glance prototype
 
-**Builder:** Claude Code builds the layout engine. Cursor builds the static street, because it needs live preview. This is two PRs in strict order, each one whole.
+**Builder:** Claude Code builds the layout engine. Cursor builds the static street, because it needs live preview. Two PRs, in strict order, each one whole. 2b needs Track A done.
 
 **2a · Layout engine (Claude Code)**
 - A grid of reserved slots per district. Lines at 0, 45 and 90 degrees (Beck). Fixed slot order keyed by record id.
 - Never reflow: adding a record only fills a free slot or grows the map at its edge.
+- The Tiled ground map is an input: its scenery lots, corner and public edge are fixed obstacles that no slot may use.
 - Pins store tile and footprint only.
-- Tests: `layout_reflow` (add a project; every other position is unchanged), `pin_moved_by_layout`, determinism (same input gives the same output twice).
+- Tests: `layout_reflow` (add a project; every other position is unchanged), `pin_moved_by_layout`, `public_edge_closed`, and determinism (same input gives the same output twice, and in shuffled input order).
 
 **2b · Glance prototype (Cursor)**
-- One page at `/tasks/city?golden=<day>` rendering each golden day snapshot as a static isometric street using Kenney sprites.
+- One page at `/tasks/city?golden=<day>` rendering each golden day snapshot as a static isometric street from the Track A atlas.
+- **IsoCity spike first, time-boxed to one session:** try its depth sorting and route follower against our snapshot. Adopt the module if it fits in a day, keeping its MIT notice; otherwise write our own small versions. Record the result in the PR.
 - Channel budget enforced (P10): hue is identity only, motion is momentum only, light is open or finished, sky is the capacity forecast, line style is the lifecycle, shape is the exceptions (barrier, halo, late ring).
-- "Since you were last here" built from timestamps only (created, completed, trashed). Quiet days say "Quiet since …" and play nothing. One tap skips.
+- "Since you were last here" built from timestamps only (created, completed, trashed). Quiet days say "Quiet since …" and play nothing. One tap skips. Reduced motion jumps straight to Now.
+- Building fade only when a barrier, halo or service vehicle sits behind it (plan the layout first, fade second).
 - No live data and no Home tile yet.
-- Renderer: PixiJS 2D, lazy-loaded on the city route only (W4).
 - UI failure register: **W4** (Pixi out of the entry bundle; check the built entry chunk size is unchanged), **C2** (no decorative band or motion standing in for data; check that every moving sprite maps to a snapshot vehicle id), **C9** (no settle then snap; check that the first frame is the final layout), **V7** (a repaint keeps the camera; check that the camera holds after a data refresh), **D3** (screenshots on golden days are labelled as fixtures), **P5** (a prototype is not the city).
+- **Measure:** first load and frame rate on desktop and on Adam's iPhone (catalogue §6.2).
 - Review checklist (the picture rules from F7 that cannot be unit tested): building hides alert, scenery read as signal, quiet read as failure. Claude Code reviews against it.
 
 **The glance test (Adam).** Four golden days, plus two Adam has not seen. Each is shown for three seconds as a catch-up replay. Adam then says what changed and what needs him.
 **Pass:** he names the main change and the decision correctly on at least five of six, without reading a label.
 **Fail:** stop. Record the result in the concept doc's History. Do not start Slice 3.
-
-**Resources:** the Kenney pack list, the sprite spec (tile size, angle, frame counts), the style reference and the palette mapping of line colours to hub domains.
 
 ### Slice 3 · Live city and Home tile
 
@@ -106,9 +152,10 @@ A pure function `citySnapshot(input, now) → CitySnapshot` and the tests that p
 - Feed `citySnapshot` from the live Tasks store and the capacity and term data. Desktop and tablet only.
 - Real clock day and night, idle by default, dims at night.
 - Every door opens the owning hub page (F4). No editors in the city.
-- Home tile: a new approved surface widget template showing a small live tile with the sky. It opens `/tasks/city`.
+- Home tile: a new approved surface widget template showing a pre-rendered image of the city with the sky. It opens `/tasks/city`. No Pixi on Home.
 - Station clock mode: full screen, dimmed, no controls until touched.
 - Tap a bus to open the project and a stop to open the task (concept §8 open question, answered).
+- **Accessibility:** the halo, barriers and depot count have keyboard focus and a plain-text equivalent through the PixiJS accessibility layer. The canvas alone is not the control.
 - UI failure register: **W1** (umbrella-relative fetches), **W2** (proven on the deployed umbrella, not only in tests), **R2** and **R3** (the Home tile at 390 with no horizontal scroll), **V4** (the city and Lines agree on the same stop; Slice 1's `lens_disagreement` covers the data), **I3** (empty city: a clear first-run state, not a blank canvas).
 
 **Verify:** the stress test walk of `/tasks/city` and Home at desktop and 390.
@@ -126,47 +173,63 @@ A pure function `citySnapshot(input, now) → CitySnapshot` and the tests that p
 
 **Builder:** Cursor, with Adam's art.
 
-In order: Adam's pets, the almanac, vacant lots (a small data file in the repo), personal landmarks, keepsake slots, then the Balloon Gathering, then whale watching. Each is its own small PR.
+In order, each its own small PR:
 
-**Resources:** pet sprites, the almanac entries, the vacant lot list.
+1. **Adam's pets.** Cube Pets rendered through the Track A rig as the movement base, then each pet's own look from his photos. EasyStar on footpaths in Explore. A fixed resting spot in Glance.
+2. **Almanac.** Palette and sprite swaps from Adam's chosen dates.
+3. **Vacant lots, personal landmarks, keepsake slots.** Keepsakes import against the sprite spec and are listed in `assets.json`.
+4. **Balloon Gathering.** One CC BY Poly Pizza balloon, credited, rendered once and recoloured per dream. Explore only, labelled.
+5. **Winter snow** (catalogue §6.6). `ParticleContainer`, density cap, reduced motion, stops when the tab is hidden, torn down when leaving the city.
+6. **Whale watching.** No whale art exists in the catalogue. Needs a custom silhouette, which Adam draws or commissions.
 
 ### Later, not planned here
 
 Rewind and Forecast scrubbers (after a term of log), term replay, Ask the stationmaster. Governance, the dam and the heritage register go in their own doc.
 
-## 3. What is needed, and from whom
+### Where this plan departs from the catalogue's first evaluation (§6)
+
+- §6.1 composes a whole street in Tiled. Here Tiled composes the ground only, and the layout engine places everything tied to a record (see Stack).
+- §6.5 tests the golden days in the renderer. Here they are written first, as data tests in Slice 1, before any renderer exists.
+- §6.6 adds snow in the first evaluation. Here it waits for Slice 5. The glance test decides whether there is a city to snow on.
+
+## 4. What is needed, and from whom
 
 ### From Adam
 
 | # | What | Needed by | How |
 |---|------|-----------|-----|
-| A1 | **The resources doc** | Now | Commit it to `docs/future-build-ideas/life-city-resources.md`, or paste it into chat |
-| A2 | Confirm or overrule D1 to D5 | Before Slice 1 | One line each |
-| A3 | **Kenney packs.** Isometric City, Isometric Buildings, Isometric Vehicles #1, Isometric Landscape and Isometric Roads, or whatever the resources doc lists | Slice 2b | The cloud sandbox cannot reach kenney.nl (blocked by the network allowlist). Download the zips and either commit only the sprites used under `apps/tasks/public/city/kenney/` with the CC0 licence file, or put the zips in Drive for Cursor |
-| A4 | Line colour per goal domain, or "reuse the Lines colours" | Slice 2b | Default: reuse `lineColour` from Lines |
-| A5 | Sit the glance test | End of Slice 2 | About ten minutes |
-| A6 | Name the corner and the public edge | Slice 3 | Two names |
-| A7 | Pets: names, a few photos each, and a resting spot | Slice 5 | Later |
-| A8 | Almanac entries, including whale months | Slice 5 | Later |
-| A9 | Keepsake pieces made to the sprite spec | Slice 5 | Later, at Adam's pace |
+| A1 | Confirm or overrule D1 to D5 | Before Slice 1 | One line each |
+| A2 | **Kenney Isometric Tiles packs**: City, Buildings, Landscape, Vehicles | Track A | The cloud sandbox cannot reach kenney.nl (blocked by the network allowlist). Download the four zips and commit the unzipped folders, licence file included, to `apps/tasks/public/city/kenney/` on a branch, or put them in Drive. Trimming to the used sprites happens in Track A |
+| A3 | **3D kits for the rig**: Train Kit, Watercraft Kit, Cube Pets, and City Kit Roads, Commercial and Suburban | Track A | Same as A2, kept outside `public/` until rendered |
+| A4 | Install **Blender** and **Tiled** on the Mac | Track A | Both free |
+| A5 | Line colour per goal domain, or "reuse the Lines colours" | Slice 2b | Default: reuse `lineColour` from Lines |
+| A6 | Approve the proof sheet | End of Track A | Look at four sprites side by side |
+| A7 | Sit the glance test, with the iPhone to hand | End of Slice 2 | About ten minutes |
+| A8 | Name the corner and the public edge | Slice 2a | Two names |
+| A9 | Pets: names, a few photos each, and a resting spot | Slice 5 | Later |
+| A10 | Almanac entries, including whale months, and a whale silhouette | Slice 5 | Later |
+| A11 | Keepsake pieces made to the sprite spec | Slice 5 | Later, at Adam's pace |
+| A12 | Asset Forge (about AUD 29), only if Track A's vehicle audit finds a gap | When asked | Optional |
 
 ### From Chat
 
 | # | What |
 |---|------|
-| C1 | Check the resources doc against the critical review: Metropolis not Sydney, cut items left out, no Notion |
-| C2 | The **sprite spec**: isometric angle, tile size in px, anchor point, frame counts for vehicles and pets |
-| C3 | One **locked style reference** for any AI-assisted hero piece: angle, palette and outline weight |
-| C4 | A palette check: line hues must not clash with the 30 sky states or with the barrier, halo and late ring shapes |
+| C1 | Write the **sprite spec** from the downloaded Kenney Isometric Tiles family: tile size, anchor, light direction, frame sizes and direction names |
+| C2 | One **locked style reference** for any AI-assisted hero piece and for the pet likenesses |
+| C3 | A palette check: line hues must not clash with the sky gradients, or with the barrier, halo and late ring shapes |
+| C4 | The **sky** treatment for the 30 capacity states (Track A suggests a gradient plus the existing icon) |
+| C5 | Correct the catalogue's licence note: the repo is public, so Quaternius source files cannot be committed |
 
 ### From Cursor
 
 | # | What |
 |---|------|
-| K1 | Confirm that a new approved surface widget template is the right route for the Home tile, or name a better one |
-| K2 | Confirm that PixiJS can lazy-load on one route in the Tasks Vite build without touching the entry chunk |
-| K3 | Build Slice 2b and Slice 3 to the briefs above, once Slice 1 merges |
+| K1 | Confirm that a new approved surface widget template showing a pre-rendered image is the right route for the Home tile |
+| K2 | Confirm that PixiJS can lazy-load on `/tasks/city` in the Tasks Vite build without touching the entry chunk |
+| K3 | Run the IsoCity spike and build Slices 2b and 3 to the briefs above, once Slice 1 and Track A are done |
 
-## 4. History
+## 5. History
 
-- **2026-10-07:** Draft written from the critical review and a check of `main`. The resources doc is pending.
+- **2026-10-07:** Draft written from the critical review and a check of `main`.
+- **2026-10-07:** Resource catalogue folded in. Added the Stack section, licence rules for a public repo, Track A (art rig), the IsoCity spike, an accessibility requirement and the Slice 5 asset sources. The Kenney pack list now names the Isometric Tiles family. Tiled is limited to the fixed ground.
