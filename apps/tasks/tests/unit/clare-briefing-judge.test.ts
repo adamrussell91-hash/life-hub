@@ -6,13 +6,9 @@ import {
 import { buildMorningSweep } from '@/domain/clare-desk';
 import { createTasksStore, seedIfEmpty, type KvAdapter } from '@/services/store';
 import * as keys from '@/storage/keys';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import type { SeedData } from '@/services/types';
+import { loadSeed } from './seed-fixture';
 
-const seed = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'fixtures/seed.json'), 'utf8')
-) as SeedData;
+const seed = loadSeed();
 
 function memoryKv(): KvAdapter {
   const map = new Map<string, unknown>();

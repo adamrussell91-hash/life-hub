@@ -73,6 +73,10 @@ describe('Sunday check-in via tasksApi', () => {
   });
 
   it('Hammond strip loads check-in via tasksApi.getGoalCheckins', async () => {
+    // The strip line shows until the Saturday after the check-in (2026-10-03),
+    // so pin "today" to the Tuesday after the mocked 2026-09-27 check-in.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-29T00:00:00Z'));
     const host = document.createElement('div');
     const g = goal({ id: 'g1', title: 'HA evidence' });
     renderHammondStrip(
@@ -93,9 +97,13 @@ describe('Sunday check-in via tasksApi', () => {
       [g],
       () => undefined
     );
-    await vi.waitFor(() => {
-      expect(tasksApi.getGoalCheckins).toHaveBeenCalled();
-    });
-    expect(host.querySelector('.hammond-strip__checkin')?.textContent).toMatch(/Checked in/);
+    try {
+      await vi.waitFor(() => {
+        expect(tasksApi.getGoalCheckins).toHaveBeenCalled();
+        expect(host.querySelector('.hammond-strip__checkin')?.textContent).toMatch(/Checked in/);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

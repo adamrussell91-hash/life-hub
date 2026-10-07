@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import * as keys from '@/storage/keys';
 import { createTasksStore, seedIfEmpty, type KvAdapter } from '@/services/store';
-import type { SeedData } from '@/services/types';
 import { ProgramSchema } from '@/schemas/program';
 import { catalogPrograms } from '@/domain/programs-seed';
 import { queryPrograms, searchPrograms } from '@/domain/programs';
+import { loadSeed } from './seed-fixture';
 
 function memoryKv(): KvAdapter {
   const map = new Map<string, unknown>();
@@ -23,7 +21,7 @@ function memoryKv(): KvAdapter {
   };
 }
 
-const seed = JSON.parse(readFileSync(resolve(process.cwd(), 'fixtures/seed.json'), 'utf8')) as SeedData;
+const seed = loadSeed();
 seed.programs = catalogPrograms();
 
 describe('program schema', () => {

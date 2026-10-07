@@ -1,10 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { tasksApi } from '@/services/client-api';
 import { renderGanttView, resetGanttSession } from '@/views/gantt';
-import type { SeedData } from '@/services/types';
 import type { Task } from '@/schemas/task';
+import { loadSeed } from './seed-fixture';
 
 vi.mock('@/services/client-api', () => ({
   tasksApi: {
@@ -16,7 +14,7 @@ vi.mock('@/services/client-api', () => ({
   }
 }));
 
-const seed = JSON.parse(readFileSync(resolve(process.cwd(), 'fixtures/seed.json'), 'utf8')) as SeedData;
+const seed = loadSeed();
 
 function createdTask(overrides: Partial<Task> = {}): Task {
   const base = seed.tasks.find((entry) => entry.id === 'task_demo_lesson_pack')!;

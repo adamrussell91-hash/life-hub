@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import * as keys from '@/storage/keys';
 import { createTasksStore, seedIfEmpty, type KvAdapter } from '@/services/store';
-import type { SeedData } from '@/services/types';
 import {
   adminTaskKind,
   buildExcursionPlan,
@@ -20,6 +17,7 @@ import {
 import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import type { ExcursionTemplate } from '@/schemas/templates';
+import { loadSeed } from './seed-fixture';
 
 function memoryKv(): KvAdapter {
   const map = new Map<string, unknown>();
@@ -36,9 +34,7 @@ function memoryKv(): KvAdapter {
   };
 }
 
-const seed = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'fixtures/seed.json'), 'utf8')
-) as SeedData;
+const seed = loadSeed();
 
 describe('excursion plan', () => {
   it('schedules admin tasks from the single excursion template lead times', () => {

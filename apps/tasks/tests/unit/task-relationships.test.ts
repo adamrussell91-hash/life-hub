@@ -202,11 +202,15 @@ describe('Task editor Relationships section', () => {
     await renderTaskEditor(host, baseTask, [], async () => undefined);
     await vi.waitFor(() => expect(host.textContent).toMatch(/Seth Example/));
 
-    const remove = [...host.querySelectorAll('button')].find((btn) => btn.textContent === 'Remove');
+    // Saved chips render Remove as an × icon button named by its aria-label.
+    const remove = host.querySelector<HTMLButtonElement>('button[aria-label="Remove Seth Example"]');
     expect(remove).toBeTruthy();
-    expect([...host.querySelectorAll('button')].some((btn) => btn.textContent === 'End')).toBe(
-      false
-    );
+    expect(remove!.classList.contains('entity-chip__action--remove')).toBe(true);
+    expect(
+      [...host.querySelectorAll('button')].some(
+        (btn) => btn.textContent === 'End' || /^End relationship/.test(btn.getAttribute('aria-label') ?? '')
+      )
+    ).toBe(false);
     remove!.click();
     await vi.waitFor(() => expect(suppressUniversalLink).toHaveBeenCalled());
     expect(vi.mocked(suppressUniversalLink).mock.calls[0]![0]).toBe('ul_saved_contact');
