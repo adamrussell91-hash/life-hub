@@ -231,6 +231,7 @@ export function citySnapshot(input: CityInput, now: Date = new Date()): CitySnap
     routes.push({
       id: project.id,
       title: project.title,
+      createdAt: project.created_at,
       lineId,
       district,
       lifecycle,
@@ -273,6 +274,7 @@ export function citySnapshot(input: CityInput, now: Date = new Date()): CitySnap
     lines.push({
       id: goal.id,
       title: goal.title,
+      createdAt: goal.created_at,
       district,
       routeIds,
       landmark: goal.status === 'achieved',
