@@ -9,7 +9,7 @@ import {
   suspendedService,
   sundayAfternoon,
   task
-} from '../fixtures/city/golden-days';
+} from '@/domain/city/fixtures/golden-days';
 
 /** Build a valid snapshot, break it on purpose, and expect exactly this rule to fire. */
 function breaks(

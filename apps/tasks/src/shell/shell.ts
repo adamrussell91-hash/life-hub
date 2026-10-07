@@ -60,7 +60,8 @@ export type HubViewId =
   | 'archive'
   | 'programs'
   | 'properties'
-  | 'term-dates';
+  | 'term-dates'
+  | 'city';
 
 type NavItem = { id: HubViewId; label: string; href: string };
 
@@ -194,6 +195,7 @@ export function viewChrome(view: HubViewId): { eyebrow: string; title: string } 
   }
   const stretch = NAV.find((item) => item.id === view);
   if (stretch) return { eyebrow: 'Tasks Hub', title: stretch.label };
+  if (view === 'city') return { eyebrow: 'Tasks Hub', title: 'Metropolis' };
   return { eyebrow: 'Tasks Hub', title: 'Dashboard' };
 }
 
@@ -805,6 +807,7 @@ export function isKnownHashView(hash = location.hash): boolean {
   if (id === 'backlog') return true;
   // Month is not a rail stop — still a known deep link; parseHashRoute redirects to week.
   if (id === 'month') return true;
+  if (id === 'city') return true;
   if (parseEntityPage(hash)) return true;
   if (parseGoalPage(hash)) return true;
   if (parseNewExcursionPage(hash)) return true;
@@ -818,6 +821,7 @@ export function parseHashRoute(): HubViewId {
   if (id === 'constellation' || id === 'orbit' || id === 'branch' || id === 'universe') return 'graph';
   if (id === 'gantt') return 'timeline';
   if (id === 'backlog') return 'list';
+  if (id === 'city') return 'city';
   // Month is not a locked zoom stop — land on Week (preserve ?date= via hash as-is for week).
   if (id === 'month') {
     if (typeof location !== 'undefined' && location.hash.startsWith('#/month')) {

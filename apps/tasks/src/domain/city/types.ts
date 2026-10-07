@@ -92,6 +92,7 @@ export type CityDistrict = {
 export type CityLine = {
   id: string;
   title: string;
+  createdAt: string;
   district: string;
   routeIds: string[];
   /** Achieved goals stand as landmarks. */
@@ -113,6 +114,8 @@ export type CityMomentum = {
 export type CityRoute = {
   id: string;
   title: string;
+  /** Creation time: the layout places routes in this order, so older routes never move. */
+  createdAt: string;
   lineId: string | null;
   district: string;
   lifecycle: CityRouteLifecycle;

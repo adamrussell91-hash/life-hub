@@ -7,7 +7,9 @@ import {
   noCheckInMorning,
   suspendedService,
   sundayAfternoon
-} from '../fixtures/city/golden-days';
+} from '@/domain/city/fixtures/golden-days';
+import { UNSEEN_DAYS, unseenOne, unseenTwo } from '@/domain/city/fixtures/unseen-days';
+import { layoutCity, validateLayout } from '@/domain/city/layout';
 
 function idsEverywhere(snapshot: ReturnType<typeof citySnapshot>): string[] {
   return [
@@ -133,5 +135,34 @@ describe('golden day: no check-in morning', () => {
       changes: [],
       byDistrict: {}
     });
+  });
+});
+
+describe('unseen days are valid and carry their story', () => {
+  for (const build of UNSEEN_DAYS) {
+    const unseen = build();
+    it(`${unseen.name} passes every city and layout rule`, () => {
+      const snapshot = citySnapshot(unseen.input, unseen.now);
+      expect(validateCity(unseen.input, snapshot, unseen.now)).toEqual([]);
+      expect(validateLayout(snapshot, layoutCity(snapshot))).toEqual([]);
+      expect(cityCatchUp(unseen.input, unseen.lastVisitAt, unseen.now).quiet).toBe(false);
+    });
+  }
+
+  it('unseen 1 has its signals', () => {
+    const day = unseenOne();
+    const snapshot = citySnapshot(day.input, day.now);
+    expect(snapshot.clock.isNight).toBe(true);
+    expect(snapshot.halo?.id).toBe('u1_d1');
+    expect(snapshot.services.map((s) => s.kind).sort()).toEqual(['ambulance', 'crane', 'school_bus']);
+  });
+
+  it('unseen 2 has its signals', () => {
+    const day = unseenTwo();
+    const snapshot = citySnapshot(day.input, day.now);
+    expect(snapshot.clock.inTerm).toBe(false);
+    expect(snapshot.halo).toBeNull();
+    expect(snapshot.stops.find((s) => s.id === 'u2_k3')?.late).toBe(true);
+    expect(snapshot.services.map((s) => s.kind)).toEqual(['mail_van']);
   });
 });
