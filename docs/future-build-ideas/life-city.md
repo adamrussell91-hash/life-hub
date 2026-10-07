@@ -136,6 +136,7 @@ Life City needs a tiny fraction of OpenTTD: no money, no crashes, no freight eco
 - **Term edition:** which Teaching services are in the snapshot comes from hub prefs `school_terms`. Proposal in Cursor's round 3.
 - **No neglect meter:** the street does not decay, score, or end because time passed. Accumulation rituals are a proposal in Cursor's round 4.
 - **The blocks are inhabited:** between the routes, ordinary places follow the real clock and the term edition. They are scenery. They are not records and they are not signals. Proposal in Cursor's round 5.
+- **The public realm is a seam:** hub records stay owned by their hubs. The ground, the foreshore and the overlap between districts belong to no hub, and they are there before the first record. Proposal in Cursor's round 6.
 - **Renderer:** PixiJS (2D) first
 
 ### Who builds what
@@ -2351,6 +2352,110 @@ The city has received something, repaired something, considered something and pr
 
 All twelve card uses are now spent. A further Codex round would need a new allowance or a new rule from Adam.
 
+### Round 6 · Cursor · Substitute + Combine
+
+> **Author note:** This round was written by Cursor on 7 October 2026. Cards played: **Substitute** and **Combine**, each for the second and final time. Adam asked what real cities have that this one does not, and how that translates. Codex has already answered with the institutions a city runs: a works department under the square, a council, a press, a receiving dock, a night programme, and an old city made of Adam's own archives. This round does not add another institution. It answers the other half of the question. A real city is also a form: ground, overlap, and a public edge you can stand on when nothing is due. Everything here is a proposal until Adam names a slice to build.
+
+This is about the concept, not a built product. The concept already has a network, rooms, seasons, festivals, and, since round 5, a street of ordinary things. It is still organised as a tree. Teaching is a district. The library belongs to Knowledge. History belongs to Adam. The pavement between those facts is scenery the layout is allowed to have, not a place the city is required to be.
+
+#### What is actually missing
+
+Four things. Not sixteen more attractions.
+
+| A real city has | This concept has had | The translation |
+|-----------------|----------------------|-----------------|
+| **Life between buildings.** The footpath, the corner, the edge of the water. Necessary trips, optional staying, and the social fact of other people, in the same outdoor room | Routes, interiors, and round 5's objects placed along a walk | One seam, where those three lives share an edge |
+| **Overlap.** A corner sits in more than one life at once. It is not filed under a single owner | Districts as zones, with ferries as the permitted exception | The seam belongs to the commute and the stool and the water, and to no hub |
+| **Ground older than the person on it.** Stone, a drowned valley, a creek the streets still obey, and a name for the land that is not the resident's to invent | An event log, and Codex's Old City of archived chapters | Sandstone, a kink in the paving, a grate, and a plate no agent may write |
+| **A place you can tell someone to meet you** | Districts, pins, and directories of records | A named corner, readable from the street |
+
+Kevin Lynch, in *The Image of the City* (1960), found that people carry a city as five kinds of thing: paths, edges, districts, nodes and landmarks. We have districts and landmarks. The bridge is a path. What we have not had is an edge that is the city's rather than a route's, or a node ordinary enough to meet at.
+
+#### Substitute: a tree of zones becomes a seam on older ground
+
+**The overlap.** Christopher Alexander, in "A City is Not a Tree" (*Architectural Forum*, April and May 1965), draws the difference as a rule about sets. A tree: any two sets are either nested or completely apart. A semilattice: sets may overlap, and the overlap is itself a real unit. His example is a drugstore newsrack and a traffic light on a Berkeley corner. People waiting for the light read the headlines. The newsrack belongs to the shop and to the act of waiting. Design it as only a shop, or only a kerb, and the unit disappears ([the essay](https://www.patternlanguage.com/archive/cityisnotatree.html)).
+
+Life City's records should stay a tree. A task has one state. A hub owns its facts. Cursor's round 1 depends on that. The geography copied the tree anyway: north shore is work, south side is life, and a building is in one district or it is decoration. Ferries were the one allowed overlap, and they only run when a saved link exists. That is a railway diagram with a harbour painted on it.
+
+Substitute the hard boundary with a **seam**. A seam is Alexander's overlap, drawn as a block. It is not a new hub and it emits no city event. The school stays Teaching. The library's notes stay Knowledge. The first block south of the bridge, the one round 5 already walks, becomes the overlap: it is on the way home, it is where the reader sits, and it is where the water is met. The common part is the corner. That corner is the unit.
+
+Jane Jacobs's four conditions for a living street, in *The Death and Life of Great American Cities* (1961), say what the seam has to contain. Mixed primary uses, so the same pavement has a different reason to be there at 8, at noon and after dark. Short blocks, so paths actually meet. Buildings of different ages, so the street is not all one vintage. Enough people to animate it. We take the first three and refuse the fourth as a crowd. Round 5 already refused Kamurocho's faceless crush. A few figures on a short block are the ballet. A packed pavement is a picture of busyness, and busyness is already spoken for by the bridge.
+
+The short block is a physical change to round 5's walk. Between the market lane and the library steps, one cross-lane. Call the meeting of the two, until Adam renames it, **Fig Corner**. The fig is already in the park's edge. The corner is small enough that from it you see the awning, the steps, and a slice of water. Lynch's node is that: a place you can name without opening a record. A street plate on the fig's side, scenery pigment, not a route colour. Renaming it is a pin, the same kind of pin as a building. The layout engine does not "improve" the name.
+
+**The ground.** Codex's Old City, under the inspection plate, is the right place for Adam's archived chapters. It is not this. A real city's oldest layer is not the resident's archive.
+
+The Sydney estuary is a drowned river valley, cut into Hawkesbury Sandstone. Gavin Birch's account of the estuary describes that drowning: the valley was eroded into the sandstone, and the sea filled it ([Birch, on the Sydney estuary](https://ses.library.usyd.edu.au/bitstream/handle/2123/2102/WaterWindCh7Birch.pdf)). The harbour in this concept is not a feature we added for the metaphor. On this coast, water is what a valley becomes. The headlands are the valley walls. They are there if the account has no tasks at all.
+
+Under the real city's grid, a freshwater stream once ran from the swamp near Hyde Park to Sydney Cove. It was the reason the colony sat there. It was pooled, polluted, made a sewer, and from the 1850s buried. It is still a stormwater drain ([Sydney Water, Tank Stream fact sheet](https://www.sydneywater.com.au/content/dam/sydneywater/documents/tank-streamheritage-fact-sheet.pdf)). Sydney Water's account of the culvert at Circular Quay names that fresh water as **Warrane**, and names the Gadigal people who made and used nawi there ([Sydney Water, Tank Stream works](https://www.sydneywater.com.au/water-the-environment/what-we-are-doing/projects-in-your-area/circular-quay-pump-station-and-tank-stream-work.html)). The City of Sydney marked the course in the pavement for the 2000 sculpture walk, because the streets above it do not follow it. Watkin Tench had already noticed the stream dividing the country ([Tankstream, City of Sydney](https://www.cityofsydney.nsw.gov.au/installations/tankstream-into-the-head-of-the-cove)).
+
+Translate the form, not the cadastral map. This harbour is a suggestion of Sydney, not a copy, so it does not collect real clan boundaries and it does not paste Warrane onto a fictional cove.
+
+- A line of narrower, darker pavers crosses the seam and ends at the seawall. The lanes kink one tile where they cross it. In Explore, if the Knowledge sound preference is on, a grate at the kink carries water underneath. The grate does not open. Codex's brass plate in the square remains the door to sources, repairs and the Old City. This grate is a creek. It shows no record, no freshness timestamp and no import.
+- The sandstone is the material of the seawall and of Fig Corner's kerb. New buildings, when a project opens, are crisp and set one tile back from that kerb. Jacobs's aged building, without the rent: you can see three ages at once. The ground, which has no date. The milk bar, which was in round 5's census and looks worn. The new room, which looks new. Nothing decays because Adam was away. Age here is authorship, not a score. The ground has no author. The new room has an event.
+- An archived project may leave a painted name on the side wall of the seam, in scenery pigment, faded, not tappable as a live route. Asking the stationmaster can still find the archive, because that is a query over records. The paint is only the glance. A deleted record leaves no paint and no scar. Deleted means gone, including from the wall. The Old City downstairs does not get to keep it either.
+- Set into the sandstone at the end of the pavers, one plate. On an empty account it reads only: "This ground has a name older than this city." Nothing else. Adam may replace that sentence. An agent may not. Clare may not answer it from the event log, because it is not in the log. A model may not draft an acknowledgement, a nation, a clan or a motif and call it the city's. The real harbour's names are for Aboriginal people and for sources Adam trusts, not for a layout engine. If he never writes the plate, it stays as that one sentence, and the sandstone is still there. The city does not remind him.
+
+**The foreshore.** The 2005 Sydney Harbour Catchment regional plan treated the harbour as a public resource, and it said public access to and along the foreshore should be maintained and improved, with the public good taking precedence over the private good when the edge changes ([Sydney Regional Environmental Plan (Sydney Harbour Catchment) 2005](https://legislation.nsw.gov.au/view/whole/html/inforce/2020-11-04/epi-2005-0590)). That is the civic fact this map has been missing. We have a ferry, a skiff and a quay. We have not had a path the buildings are forbidden to swallow.
+
+The seawall path runs from the baths, past the skiff, under the bridge, and out to the headland. It is not a GTFS shape. It has no stops. Buses do not use it. The ferry pontoon touches it, and the ferry still runs only for a real cross-hub link. A life wall closes a route. It does not close the seawall. Workload can reroute a bus. It cannot privatise the edge.
+
+Jan Gehl's edge effect is why the path is low and the benches face the water. People stay at edges, beside a facade, a corner, a column, where the back is covered and the view is open ([Gehl, Kaefer and Reigstad, "Close encounters with buildings"](https://www.urbaplan.ch/wp-content/uploads/2015/02/jangehl_urbandesign_article-1.pdf)). The school gate stays a hard edge on purpose. There is still no classroom behind it. The hospital garden stays turned away from the ambulance bay. Soft edges belong on the seam: the milk bar's doorway, the library step, the seawall's coping. A hard edge everywhere is a campus. A soft edge on the school would be a lie about what that building contains.
+
+Hyaluronica's sweeper still means an AM or PM routine was done, and a washed street still means that. The grate is not a second reason for wet pavement. Water stays under the plate.
+
+| Notice | Level | Rule |
+|--------|-------|------|
+| `life_wall_closes_foreshore` | Error | A life wall, a route or a building footprint blocks the seawall path |
+| `ground_from_records` | Error | The kink, the plate's words, or a painted name was generated from records or written by an agent; or a painted name exists for a deleted record |
+
+#### Combine: necessary, optional and social life on the one corner
+
+Gehl, in *Life Between Buildings* (1971), splits outdoor life into three. Necessary activities happen almost regardless of the place: going to work, to school, waiting. Optional activities happen when the place makes staying attractive: sitting, strolling, looking. Social activities are mostly resultant. They appear because people are already there, and the smallest of them is simply seeing and hearing someone else ([Urban Design Group, on Gehl's three activities](https://www.udg.org.uk/publications/udlibrary/life-between-buildings-using-public-space)).
+
+The concept has been almost entirely the first kind, drawn as vehicles. Round 5 added the second, as a walk. Codex's guest pavilions add chosen relationships, which are real and which stay his: a person Adam linked to an occasion, indoors, curated. What the street still lacked is Gehl's third kind in public, where the other person is not a guest and not a task.
+
+Combine the bridge (necessary), round 5's clock and stool (optional), and the anonymous figures (social, and only social) onto Fig Corner. Ray Oldenburg's third place, in *The Great Good Place* (1989), is the indoor half of that combine. It is not home and not work. Neutral ground, no host's duty, regulars, a low profile, conversation possible and not required. The milk bar doorway is that. Codex's pavilion is for someone you invited. The stool is for nobody in particular. Opening it still does not open a ledger, a price or a meal. Brisket's truck remains the only meal signal. Alexander's newsrack sold papers. Ours does not. The unit is the waiting and the looking. The blank sheets stay blank.
+
+The terrace row shows the gradient in four steps, so privacy and the public realm are visible at once. Hallway, which round 5 already opens, private. Front step, where he can sit without entering the records office. Footpath. Fig Corner, then the seawall, the most public thing in the city. The step is his. The seawall is not.
+
+**Tuesday in term, at the fig.**
+
+Just after eight, the necessary life is facing south. People come off the bridge on the footpath. They are not buses, and they are not the jam. The jam, if the week is heavy, is still the roadway. Shutters are coming up. The grate is only a grate. The plate says whatever it said yesterday. Nobody stops, because necessary life does not have to. The corner holds them for the length of a crossing.
+
+Late morning, the optional life arrives. The awning is up. The reader is on the library step, in sight of the fig, because the block is now short enough for that. One person has taken the stool in the milk bar door. From the stool you see the corner. From the corner you see the stool. That mutual sight is the whole social activity. It logs nothing. It is not a relationship, not a pavilion guest, and not a student. If it is Friday, the reader leaves the step for the library glass after midday, as round 5 already has, and the stool stays.
+
+Mid-afternoon the gate's crowd crosses and comes apart. They are anonymous, they have no work in their hands, and they do not remain as a group on the seam. A crowd that stayed would become a class. A class on the street is the thing the gate was built to refuse.
+
+At dusk the necessary life thins. Shutters drop. House amber comes on in the terraces, still the scenery amber from round 5, still not the lamp for work left open. The stool keeps one extra hour and then the doorway is just a doorway. In Glance, night is the dim the city already uses. No new street meaning for light. In Explore, a short run of small lamps along the seawall puts light on stone and on water only. Not on a window, not on a stop, not in a halo. When he leaves Explore, the lamps are gone and the dim remains.
+
+**Sunday, late morning, nothing due.**
+
+The open door stays shut. The halo stays absent. The roadway is quiet, because a jam with no teaching load would be a lie. Necessary life is missing, and that absence is the test. Optional life is still there: the morning market, the reader, someone on the seawall facing the water, the skiff still tied. Social life is the thin kind, seeing those people from the fig. Gehl's claim, translated without the sermon, is that a place which only works when a task is due is not a public realm. It is a corridor that happens to be outdoors. Sunday at Fig Corner is how you tell the difference.
+
+The festivals Codex built can use this ground. Snow, if that scene is open, sits on the seawall coping and on the fig, and then it lifts, as he already said, without becoming the weather. The balloons do not launch from the foreshore path. The path stays walkable underneath the visit. A festival that closes the seawall has made the public edge private for a show.
+
+The Platform at 390 does not grow a map of seams. The departures board stays the phone lens. The corner is a wide-city pleasure. On the phone, Explore can pan to the fig, and the three doors stay what they are.
+
+#### New open questions from round 6
+
+- Does Fig Corner keep that name until he renames it, or does he already know the corner's name?
+- The plate cannot be written by an agent. Does he want the doc to point at sources he trusts for the real harbour, or should the sentence stay untouched until he raises it?
+- One seam, south of the bridge, is the whole proposal. If it works, the next seam would be the hospital garden's edge, not a new system. Is one enough to learn from?
+
+#### Cursor card ledger after round 6
+
+| Card | Uses by Cursor | Uses left |
+|------|----------------|-----------|
+| Extend | 2 | 0 |
+| Substitute | 2 | 0 |
+| Combine | 2 | 0 |
+| Adapt | 2 | 0 |
+| Magnify | 2 | 0 |
+| Put to another use | 2 | 0 |
+
+All twelve card uses are now spent. A further Cursor round would need a new allowance or a new rule from Adam.
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load? (Claude round 4: expands at its edges, never reflows its centre)
@@ -2380,3 +2485,4 @@ All twelve card uses are now spent. A further Codex round would need a new allow
 - **2026-10-07, Cursor:** Round 5 (Extend + Magnify). Filled the ordinary blocks: school gate, market row, library steps, hospital garden, park, house row, wharf kiosk and a skiff that never casts off. Figures follow the real clock and the term edition, and they are scenery rather than signals. Magnified one walk from the gate to the skiff, on a term Tuesday and on a free Sunday.
 - **2026-10-07, ChatGPT Codex:** Round 5 (Adapt + Magnify). Researched official Balloon Fiesta, Nintendo and Historic Environment Scotland references. Added a balloon gathering for chosen futures, balloon sightseeing and workshop landings, a whole city snowstorm festival using Cursor's ordinary streets, winter keepsakes, thaw, spring unfinished idea stalls, a summer exchange, a solstice inspired reflection chamber and term end paper theatres. Proposed explicit festival scene exceptions to operational sky and motion rules. Adapt and Magnify are now exhausted. Earlier contributions preserved.
 - **2026-10-07, ChatGPT Codex:** Round 6 (Substitute + Put to another use). Compared sixteen real city functions with the concept. Proposed an underground Exchange Station, Repair Arcade and Old City, plus a receiving dock, council chamber, source linked newspaper, curated relationship pavilions and a distinct night programme. Linked municipal research from NYC DEP, City of Sydney Archives and London City Hall. Preserved earlier contributions. All Codex card uses are now exhausted.
+- **2026-10-07, Cursor:** Round 6 (Substitute + Combine). Answered the same question with the form of a city rather than its institutions: a seam where necessary, optional and social life share Fig Corner, a foreshore path a life wall cannot close, and ground older than the records (sandstone, a drowned valley, a buried kink, a plate no agent may write). All Cursor card uses are now exhausted.
