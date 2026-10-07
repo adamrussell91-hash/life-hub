@@ -22,9 +22,9 @@ Proposals are referred to as P1 to P18, as numbered in section 7.
 
 The **street** survives: a calm isometric city that shows goals, projects, tasks, blockers, the capacity weather and one decision at a time, with a "since you were last here" catch-up. That is the part only a city can do, and it is worth testing.
 
-Most of what came after it does not survive as written. Rooms, walks, workshops, festivals and foldout worlds turn the city into a second front end for Life Hub, need bespoke art no tool in the pipeline makes, or depend on hubs that do not exist yet. The two big round 6 ideas (planning law for agents, and the dam) are good, but they are **Life Hub features**, not city features, and they belong in their own doc.
+Most of what came after it does not survive as written. Rooms, walks, workshops and foldout worlds turn the city into a second front end for Life Hub, need bespoke art no tool in the pipeline makes, or depend on hubs that do not exist yet. The two big round 6 ideas (planning law for agents, and the dam) are good, but they are **Life Hub features**, not city features, and they belong in their own doc.
 
-Count across the register below: **40 Keep, 41 Modify, 34 Cut.**
+Count across the register below: **42 Keep, 47 Modify, 26 Cut.** The delight features (festivals, keepsakes, the pet garden, whale watching, museum shelves and bundles) came back in on Adam's call, rebuilt so they are cheap to draw.
 
 ### Checked against the code
 
@@ -54,7 +54,7 @@ Count across the register below: **40 Keep, 41 Modify, 34 Cut.**
 
 **F4. The city keeps becoming a second front end.** P3, P6, P9, P12, P15 and P16 build rooms with editors, desks, tables and workspaces that redo what hubs do. Fix: **every door opens the owning hub page.** The city never hosts an editor. A domain with no hub needs a hub first. That is a Life Hub build, not a Life City build.
 
-**F5. Art cost.** Kenney covers the street. Foldout trunks, watch-mechanism stations, fragrance-bottle gardens, book theatres, balloons and snow domes each need bespoke illustration in one consistent style. The folder README says plainly that none of the build tools can do that. Fix: cut the bespoke worlds. At most, add one AI-assisted hero piece later, under a locked style reference.
+**F5. Art cost.** Kenney covers the street. Foldout trunks, watch-mechanism stations, fragrance-bottle gardens and book theatres each need bespoke illustration in one consistent style, and the folder README says plainly that none of the build tools can do that. Fix: cut the bespoke worlds. Delight comes from what is cheap to draw well: lighting, particles, recolours, the almanac, photo slots and one AI-assisted hero piece at a time under a locked style reference. Festivals, keepsakes and the pet garden are rebuilt on that basis.
 
 **F6. The central promise is unproven.** "Feel the state of your life without reading" is a hypothesis. Fix: P10's glance test comes before anything else is built, and the project stops if it fails.
 
@@ -183,11 +183,11 @@ Count across the register below: **40 Keep, 41 Modify, 34 Cut.**
 | Records office, service centre, design workshop, writing studio, collection arcade, market kitchen, treatment rooms | P3 | **Cut** | These are hub gaps. Build hubs first, then the city gets a door |
 | Book idea desks | P3 | **Cut** | There is no Writing hub |
 | Saved activities across hubs | P3 | **Cut** | A cross-hub collections feature. It belongs in Life Hub, if anywhere |
-| Stardew-style bundles | P11 | **Cut** | Depends on saved activities |
-| Museum shelves | P11 | **Cut** | Depends on collection hubs |
+| Stardew-style bundles | P11 | **Modify** | Later phase. A bundle is a named set of slots that point at records already in any hub ("passport", "booking", "insurance"). A slot fills when the record exists and Adam confirms it. Finishing a bundle lifts the hoarding off one wing, as one change in the catch-up. Only for things that are not tasks, because Tasks already does checklists |
+| Museum shelves | P11 | **Modify** | Start with what existing hubs already hold: finished lessons, completed goals, visited trips, saved constellations. Adam places each item himself and nothing nags him to. Watches, fragrances and books join when their hubs exist. Exhibitions live here too, as a shelf item with Adam's note |
 | Focus sessions inside rooms, and interrupt rules | P6, P8 | **Cut** | Work sessions already exist in Tasks |
 | Guided walks and the accreditation walk | P9 | **Cut** | Reading-heavy and authored. The Professional hub is the place, if anywhere |
-| Idea Exchange, unexpected pairings, exhibitions | P9 | **Cut** | A Knowledge feature, not a city one |
+| Idea Exchange and unexpected pairings | P9 | **Modify** | Build it inside Knowledge, where the notes and the existing chat already are. The city's library is the door. Pairings only on request, with the recorded, proposed and to-examine columns kept separate. Exhibitions move to the museum shelves |
 | Exchange Station: where a fact came from, and how fresh it is | P16 | **Modify** | A real need. Build it as a plain data-status list in Life Hub, not an underground city |
 | Repair Arcade for broken links and failed imports | P16 | **Modify** | Same: a plain list with repair actions |
 | Receiving dock for imports | P16 | **Modify** | A Notion migration status page, outside the city |
@@ -204,17 +204,17 @@ Count across the register below: **40 Keep, 41 Modify, 34 Cut.**
 | Atmosphere never borrows the signal vocabulary | P13 | **Keep** | — |
 | Foldout travel trunks and destination worlds | P12 | **Cut** | F5 |
 | Watch station, fragrance conservatories, book theatres, Delft set | P12 | **Cut** | F5, and no collection hubs exist |
-| Keepsakes that reshape the city | P12 | **Cut** | Depends on the above |
-| Private garden for pets | P12 | **Cut** | Memories of a loved animal belong in their own home, not a productivity map |
+| Keepsakes that reshape the city | P12 | **Modify** | A fixed set of slots drawn once: the station clock face, the fountain, a plaque and a framed view in the concourse. Each takes a photo Adam chooses or a motif from a small set. No new illustration per keepsake |
+| Private garden for pets | P12 | **Keep** | As P12 wrote it. Adam names every bed and chooses every photo or memory. Nothing is scored or watered, it never appears in the catch-up, and no agent can read or change it. It is a gate only he opens |
 | Sydney almanac on land and water | P13 | **Keep** | Date-driven palette and sprite swaps, static in Glance. Cheap delight |
 | Personal almanac dates | P13 | **Keep** | Later |
-| Whale watching from the lighthouse | P13 | **Cut** | Explore content with nothing to support it |
+| Whale watching from the lighthouse | P13 | **Keep** | Later. The whales are already in the almanac, so this is just a camera position at the lighthouse in whale months |
 | Census of ordinary places | P14 | **Modify** | A handful of static scenery buildings with time-of-day states (shutters up or down). No walking figures, no per-figure timetables, no enterable cutaways |
 | Crowd at the school gate | P14 | **Modify** | Gate open or shut only. No figures, which is safer and cheaper |
 | Fig Corner, sandstone and the foreshore path no route may use | P17 | **Modify** | Fine as layout and art direction at no extra cost. Drop the validator rules about it |
 | The plate about the land's older name | P17 | **Modify** | Ships blank. If Adam wants an acknowledgement, he writes it. No generated or placeholder wording |
-| Balloon Gathering, winter snow dome, thaw, spring and summer festivals, solstice chamber, term-end paper theatres | P15 | **Cut** | F5. The snowstorm also needed the sky rule broken, which shows the mismatch |
-| Revising the sky rule for festivals | P15 | **Cut** | Not needed once the festivals are cut |
+| Festivals: Balloon Gathering, winter snow dome, thaw, spring and summer festivals, solstice chamber, term-end paper theatres | P15 | **Modify** | They give the city life. Start with one festival, built mostly from lighting, particles and recolours rather than new illustration. Snowfall and dusk glow are cheap; bespoke scenes are not. The Balloon Gathering fits best, because the dreams jar is real Someday data: each balloon is a dream Adam chooses, with the "Do you still want this?" ribbon. Explore only, clearly labelled, with the forecast still in its panel |
+| Revising the sky rule for festivals | P15 | **Modify** | Accept P15's own version: a labelled festival scene in Explore can have its own sky. The Glance sky never changes and fictional weather never picks a capacity icon |
 | Ask the stationmaster | P13 | **Modify** | A later phase, on the city lens only at first. Define the query schema before any language model is involved. The health, diary and student scope rule stays |
 
 #### Agent governance (P18), moving to its own doc
@@ -238,7 +238,7 @@ A calm isometric street, wide screen first, with a Home tile. It shows goals, pr
 2. **Glance prototype.** A static Kenney street for those golden days, following the channel budget, with one halo and a catch-up built from timestamps. Run P10's three-second glance test with Adam. **If it fails, stop here.**
 3. **Home tile and the wide city page on live data.** Desktop only.
 4. **Event log.** Append-only and ids only, at the Tasks write path. This unlocks the full catch-up.
-5. **Cheap delight.** The almanac, vacant lots and personal landmarks.
+5. **Delight.** The almanac, vacant lots, personal landmarks, keepsake slots and the pet garden. Then the first festival (the Balloon Gathering), the museum shelves and whale watching. Bundles follow once there are records worth gathering.
 6. **Time tools.** Rewind and Forecast once there is a term of log, then the term replay.
 7. **Ask the stationmaster,** city lens first.
 
@@ -2662,3 +2662,4 @@ Adam asked for the build's biggest wow features. After six rounds by three contr
 - **2026-10-07:** Created from a chat thought experiment with Adam. Six rounds of "what if" proposals (P1 to P18) followed the same day. Each one is preserved in section 7.
 - **2026-10-07:** Contributor names removed from the whole doc at Adam's request. Proposals are now identified only by number; authorship lives in git history. Card ledgers and author notes deleted.
 - **2026-10-07:** Critical review added at the top. It sorts every concept into Keep, Modify or Cut and replaces the round 6 build order.
+- **2026-10-07:** Festivals, keepsakes, the pet garden, whale watching, museum shelves, bundles and the Idea Exchange moved from Cut to Keep or Modify at Adam's request, each with a cheaper way to build it.
