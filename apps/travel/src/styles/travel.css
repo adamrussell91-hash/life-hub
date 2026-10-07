@@ -189,6 +189,7 @@ details.tobook[open] summary::after { content: "Hide"; }
 .tag.todo { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
 .tag.idea { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
 .tag.med { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.tag.post { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
 .price { font-weight: 600; }
 .price small { color: var(--muted); font-weight: 500; }
 .go { display: flex; align-items: center; gap: 8px; font-size: .75rem; color: var(--muted); padding: 6px 0 2px; }

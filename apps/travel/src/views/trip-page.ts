@@ -306,7 +306,9 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       });
       dayMapHandle?.destroy();
       dayMapHandle = null;
-      const dayItems = trip.items.filter((item) => item.city_id === city.id && item.date === selectedDate);
+      const dayItems = orderDayItems(
+        trip.items.filter((item) => item.city_id === city.id && item.date === selectedDate)
+      );
       const render = ++dayMapRender;
       void import('@/components/day-map').then(({ renderDayMap }) => {
         if (render !== dayMapRender || !mapInner.isConnected) return;

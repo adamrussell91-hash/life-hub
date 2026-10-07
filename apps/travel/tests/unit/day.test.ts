@@ -102,6 +102,22 @@ describe('numberStops (§3 rule 3)', () => {
     expect(numbers.get('itm_testfood01')).toBe(2);
   });
 
+  it('map and list share the same numbers when trip.items order differs from time order', () => {
+    const day = trip.items.filter((item) => item.city_id === 'lis' && item.date === '2027-03-04');
+    // Reverse insertion order so unordered numbering would flip 1 and 2.
+    const shuffled = [...day].reverse();
+    const listNumbers = numberStops(orderDayItems(day));
+    const mapNumbers = numberStops(orderDayItems(shuffled));
+    expect(mapNumbers.get('itm_testtodo01')).toBe(listNumbers.get('itm_testtodo01'));
+    expect(mapNumbers.get('itm_testfood01')).toBe(listNumbers.get('itm_testfood01'));
+    expect(mapNumbers.get('itm_testtodo01')).toBe(1);
+    expect(mapNumbers.get('itm_testfood01')).toBe(2);
+    // Guard: numbering without orderDayItems disagrees with the list.
+    const buggy = numberStops(shuffled);
+    expect(buggy.get('itm_testfood01')).toBe(1);
+    expect(buggy.get('itm_testtodo01')).toBe(2);
+  });
+
   it('skips stays, tickets and items without a place', () => {
     const day = trip.items.filter((item) => item.city_id === 'lis' && item.date === '2027-03-03');
     const numbers = numberStops(orderDayItems(day));
@@ -111,6 +127,40 @@ describe('numberStops (§3 rule 3)', () => {
     const opoNumbers = numberStops(orderDayItems(opoDay3));
     expect(opoNumbers.has('itm_testnoplace01')).toBe(false); // no place
     expect(opoNumbers.has('itm_testcheckin01')).toBe(false); // checkin slot
+  });
+
+  it('numbers post (post home) stops like other place-bearing kinds', () => {
+    const items: Item[] = [
+      {
+        id: 'a',
+        kind: 'post',
+        city_id: 'x',
+        date: '2027-01-01',
+        time: '10:00',
+        title: 'Post parcels home',
+        note: '',
+        status: 'planned',
+        place: { name: 'Post office', lat: 38.7, lon: -9.14 },
+        created_at: '',
+        updated_at: ''
+      },
+      {
+        id: 'b',
+        kind: 'do',
+        city_id: 'x',
+        date: '2027-01-01',
+        time: '11:00',
+        title: 'Museum',
+        note: '',
+        status: 'planned',
+        place: { name: 'Museum', lat: 38.71, lon: -9.13 },
+        created_at: '',
+        updated_at: ''
+      }
+    ];
+    const numbers = numberStops(orderDayItems(items));
+    expect(numbers.get('a')).toBe(1);
+    expect(numbers.get('b')).toBe(2);
   });
 });
 
