@@ -16,9 +16,10 @@ Exit 0 required. Do not open/update the PR if the gate is red.
 - Script (command source of truth): `scripts/pre-pr-check.mjs`
 - Agent checklist + failure inventory: Project store `docs/mandatory-pre-pr-check.md`
 - User workflow: Project user store `workflows/life-hub-pre-pr-gate.md`
-- Principle: never weaken Pages / skip `npm test` / delete rail features to hide failures
+- The gate runs root `npm test` and the Tasks Hub vitest suite (`cd apps/tasks && npx vitest run`); Pages runs both too
+- Principle: never weaken Pages / skip `npm test` or the Tasks vitest suite / delete rail features to hide failures
 
-Docs-only PRs with zero runtime/test/type impact may use `node scripts/pre-pr-check.mjs --docs-only` (still runs `npm test` + static guards).
+Docs-only PRs with zero runtime/test/type impact may use `node scripts/pre-pr-check.mjs --docs-only` (still runs `npm test`, the Tasks Hub vitest suite and static guards).
 
 **Exception: idea docs.** Edits that only touch `docs/future-build-ideas/` skip this gate and may be committed straight to `main` with no PR. These are concept docs for the what if rounds between Claude Code, Cursor and Codex; nothing builds from them. Pull `main` first, commit, push. If a change touches any file outside that folder, the gate applies as normal.
 

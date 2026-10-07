@@ -21,6 +21,17 @@ vi.mock('@/services/client-api', () => ({
   }
 }));
 
+// The task editor's Relationships section reads Universal Links on open; keep
+// it off the network (no API server runs under vitest).
+vi.mock('@/api/universal-links', () => ({
+  taskEntityRef: (id: string) => `tasks:task:${id}`,
+  listUniversalLinksForEntity: vi.fn(async () => ({ outgoing: [], incoming: [] })),
+  createUniversalLink: vi.fn(),
+  endUniversalLink: vi.fn(),
+  suppressUniversalLink: vi.fn(),
+  searchEntities: vi.fn(async () => ({ groups: {} }))
+}));
+
 function task(): Task {
   return {
     schema_version: 1,
@@ -508,7 +519,7 @@ describe('page editor', () => {
           source: 'auto_generated_from_excursion'
         })
       );
-      expect(canvas.querySelector('.task-editor [aria-label="Due date"]')).not.toBeNull();
+      expect(canvas.querySelector('.task-editor [aria-label="Deadline"]')).not.toBeNull();
     });
   });
 
@@ -548,7 +559,7 @@ describe('page editor', () => {
     trigger!.click();
     document.querySelector<HTMLButtonElement>('[data-card-menu-item="edit"]')!.click();
     await vi.waitFor(() => {
-      expect(canvas.querySelector('.task-editor [aria-label="Due date"]')).not.toBeNull();
+      expect(canvas.querySelector('.task-editor [aria-label="Deadline"]')).not.toBeNull();
     });
   });
 
@@ -612,9 +623,9 @@ describe('page editor', () => {
     eventSlot!.querySelector<HTMLButtonElement>('.card-menu')!.click();
     document.querySelector<HTMLButtonElement>('[data-card-menu-item="edit"]')!.click();
     await vi.waitFor(() => {
-      expect(canvas.querySelector('.task-editor [aria-label="Due date"]')).not.toBeNull();
+      expect(canvas.querySelector('.task-editor [aria-label="Deadline"]')).not.toBeNull();
     });
-    const due = canvas.querySelector<HTMLInputElement>('.task-editor [aria-label="Due date"]')!;
+    const due = canvas.querySelector<HTMLInputElement>('.task-editor [aria-label="Deadline"]')!;
     due.value = '2026-10-17';
     due.dispatchEvent(new Event('input', { bubbles: true }));
     canvas.querySelector<HTMLButtonElement>('.task-editor .btn--primary')!.click();
