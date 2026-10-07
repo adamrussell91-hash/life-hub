@@ -61,7 +61,7 @@ If buses equalled tasks, a 40-task project would gridlock the street. Instead:
 | School buses | Teaching load; more in heavy weeks, quiet depot in holidays |
 | Mail van | Messages waiting on a reply |
 | Construction cranes | New projects being set up |
-| Weather | Mind check-ins, sunny to overcast |
+| Weather | The capacity forecast's weather state (Adam's 30 icons, `docs/capacity-forecast-handoff/weather-states.md`). Corrected in round 2 |
 | Day and night | Real time; lit windows show what is still open tonight |
 | Grey, empty park | Exercise or downtime skipped for a while |
 
@@ -178,7 +178,7 @@ This answers the open question "Which agents become which services?" with a firs
 | Brisket Lasso | Nutrition | The food truck (already in the base doc) | Market hall | A meal or macros due; drives off once logged |
 | Chadwick Flexington | Fitness | Stadium shuttle and the running track around the park | Stadium | Training sessions; the park greys out if they are skipped |
 | Dr Sara Tonin | Body | The ambulance (already in the base doc) | Hospital | Medical appointments and bloods coming up |
-| Dr Vera Lenz | Psychology | The weather station and lighthouse on the headland | Lighthouse | Mind check-ins drive the city's weather; the lighthouse beam sweeps when a check-in is due |
+| Dr Vera Lenz | Psychology | The weather station and lighthouse on the headland | Lighthouse | The lighthouse beam sweeps when a check-in is due. The weather itself comes from the capacity forecast (see round 2) |
 | Hyaluronica St. Claire | Skincare | A street sweeper doing a morning and evening round | Day spa | AM and PM routines; streets look freshly washed once done |
 | Penelope Rose Quillian | Diary | The night mail train that collects the day | Post office | The evening diary prompt; the train leaves once the entry is written |
 
@@ -454,6 +454,143 @@ Deleted records disappear from rooms, activity selections and city signals throu
 | Put to another use | 0 | 2 |
 
 
+### Round 2 · Claude Code · Magnify + Put to another use
+
+> **Author note:** This round was written by Claude Code (Claude Opus 5.5) on 7 October 2026. Cards played: **Magnify** and **Put to another use**. It builds on Cursor's one snapshot with many lenses and Codex's rooms and saved activities. It also corrects one thing from my own round 1. Everything here is a proposal until Adam names a slice to build.
+
+#### A correction first: the city's weather already exists
+
+In round 1 I gave the city's weather to Vera's lighthouse and Mind check-ins. That was wrong. Life Hub already has a weather system: the capacity forecast, built on 5 October, with Adam's own 30 weather icons, an hourly readiness line and an uncertainty band (`docs/capacity-forecast-handoff/BUILD.md`, `weather-states.md`). Its rule is "one number everywhere": every view that shows capacity calls the same function, and a test fails if two views disagree.
+
+Life City should obey that rule exactly as Cursor's lenses obey the Tasks graph. The sky over Harbour City is the capacity weather state for the current hour, drawn from the same function and the same icon numbers. Fog over the city means "Dense fog" in the forecast, never a separate guess. Vera's lighthouse keeps a smaller job: its beam sweeps when the morning check-in is due. I have updated the base table and my round 1 table to say so.
+
+This matters for the two ideas below, because both lean on the forecast.
+
+#### Magnify: make time bigger
+
+Every round so far shows the city **now**. The base doc says the city becomes "a visual record of everything built", but nothing yet lets Adam actually travel through that record or look ahead. Magnify the time axis: the same city, scrubbed backwards and forwards, at whatever speed he likes.
+
+**1. One control, three directions.**
+
+A single time scrubber sits along the bottom of the wide city lens (a thin harbour tide line, so it fits the place).
+
+| Direction | What the city shows | Where the truth comes from |
+|-----------|---------------------|----------------------------|
+| **Now** (default) | The live city, as every earlier round describes | Cursor's snapshot, refreshed |
+| **Rewind** | The city as it stood on any earlier day. Drag left and routes retract, cranes return, landmarks sink back into empty plazas | A stored daily snapshot for each past day |
+| **Forecast** | The city as currently planned for any future day: buses on the stops due that week, school buses following next term's timetable, the sky in that day's forecast weather | Due dates, the term calendar and the capacity forecast |
+
+Letting go of the scrubber springs back to Now. Nothing in Rewind or Forecast can edit a record. Tapping a building in the past opens its room in a read-only "as it was" state with a clear banner and a "Go to now" button.
+
+**2. Rewind: the city as a diary you can walk through.**
+
+Cursor's snapshot is already the contract between data and renderer, so history is simply keeping one snapshot per day. The layout engine is deterministic, so a past day redraws in exactly the place it stood. Storage is small: each day only needs the differences from the day before.
+
+What Rewind makes possible:
+
+- **The term timelapse.** Press play on Term 3 and watch ten weeks go by in thirty seconds: the bridge clogging in marking weeks, routes opening and retiring, the skyline rising, the weather rolling through. It is the "how much did I actually do" answer that a list of completed tasks never quite gives.
+- **"What did my city look like when…"** Jump to a date (the week of a big deadline, the first week back after a holiday) and see the whole life at that moment, not just the task that was due.
+- **Year on year.** Put this October beside last October, side by side, same camera. A teacher's year repeats on a term rhythm, so like-for-like comparison is unusually meaningful here.
+
+The one hard rule: **deleted means gone, including from the past.** A stored snapshot holds record ids and states, not copies of the records. When the renderer replays a day, it resolves each id against the live liveness rules (`withoutDeleted`, `isOpenTask`). A task deleted today vanishes from every past day too. An archived project still appears in the days it was active, because archive is readable. The capacity forecast keeps immutable snapshots for a good reason (honest scoring), but the city's history must not, or it becomes a private copy of things Adam chose to remove. Codex made the same point about shelves. The same rule applies to time.
+
+**3. Forecast: honest fog toward the horizon.**
+
+Dragging right shows the planned future, and the planned future gets less certain the further out it goes. The capacity forecast already says so: its band widens with distance and its estimate drifts back toward the baseline. Life City should show that uncertainty as weather, not hide it.
+
+- Tomorrow is crisp.
+- Next week is lightly hazed.
+- Three weeks out, sea fog rolls in over the harbour and the city fades to outlines.
+- Past the last day with any real evidence or due date, the fog is total. The city does not invent a future it has no data for.
+
+This is the "ghost" from Cursor's round, magnified. On Lines the ghost shows where the pace says Adam should be today. In Forecast, every route gets a ghost of where it is expected to be on the day he has dragged to. If a ghost has not reached the end of its route by the route's due date, that route's terminus glows amber on the horizon. Adam sees a future late arrival without opening a single list.
+
+**4. Louder: the year's fireworks.**
+
+The base doc already fires fireworks over the harbour when a goal is completed. Magnify that into the city's one big annual event.
+
+At midnight on New Year's Eve (or whenever Adam presses "Replay the year"), the harbour stages a show built only from that year's real history:
+
+- Each completed goal launches a burst in its line colour, from its own district, in the order the goals were finished.
+- Each completed project is a smaller burst along its old route.
+- A dream that moved forward lights the bridge.
+- The show lasts about a minute, then the city settles into the new year with the year's landmarks lit up.
+
+A smaller version runs at the end of each school term, closer to Vivid Sydney than to New Year's Eve: the term's finished work is projected in light onto the buildings where it happened, for one evening. This suits a teacher's year, where terms are the real chapters.
+
+Both are replays of the stored history, so they obey the same deleted-means-gone rule. Sound follows Cursor's proposal (the Knowledge chimes preference, off by default). A "Save this" button exports the replay as a short video, the one Life City artefact that might be worth sharing.
+
+#### Put to another use: platform occupancy screens become a capacity display
+
+**The precedent.** On Sydney's Waratah trains, sensors under each carriage measure weight, and platform screens show each carriage of the arriving train as having seats available, standing room only or being full. The same data has appeared in the Trip Planner and apps such as TripView ([IoT Hub](https://www.iothub.com.au/news/sydney-trains-bring-real-time-occupancy-data-to-stations-525456); [Transport for NSW occupancy data guide](https://opendata.transport.nsw.gov.au/data/dataset/28e08a94-fbbb-44d6-a074-d69ad63e760d/resource/3e01b4b6-0b23-43fa-9480-182122467827/download/train-occupancy-data-guide-v2_0.pdf)). The point of the screen is simple: before the train arrives, you know which carriage to walk to.
+
+GTFS Realtime even has the vocabulary built in. Its `OccupancyStatus` runs from `EMPTY` through `MANY_SEATS_AVAILABLE`, `FEW_SEATS_AVAILABLE`, `STANDING_ROOM_ONLY`, `CRUSHED_STANDING_ROOM_ONLY` and `FULL` to `NOT_ACCEPTING_PASSENGERS`, with `NO_DATA_AVAILABLE` for the unknown case, and an experimental per-carriage breakdown ([GTFS Realtime reference](https://gtfs.org/documentation/realtime/reference/)). That slots straight into the GTFS-shaped vocabulary from round 1.
+
+**The element to reuse.** The per-carriage occupancy screen, put to work showing how full Adam's day is against how much he has in him.
+
+**1. Each day is a train, each part of the day is a carriage.**
+
+Today arrives at the platform as one train. Its carriages are the parts of the day, in order. A first draft would be early morning, morning classes, middle of the day, afternoon and evening, though the real split should follow the Day Dial's blocks.
+
+Each carriage's occupancy compares two numbers Life Hub already has:
+
+- **Demand:** what is planned in that part of the day (classes, meetings, tracked work and Day Dial blocks), counted the way the capacity forecast already counts them, with meetings at 0.65 of a class hour.
+- **Capacity:** the readiness model's hourly line for the same span.
+
+| Occupancy | Meaning for that part of the day |
+|-----------|----------------------------------|
+| Many seats available | Plenty of room left; a good place to put something demanding |
+| Few seats available | Comfortably used |
+| Standing room only | Tight; planned demand is close to what the forecast says Adam will have |
+| Crushed standing room only | Overbooked; something should move |
+| Not accepting passengers | Protected time Adam has closed (a life wall). Nothing can be added |
+| No data available | No check-in or evidence for that span. Shown as unknown, never guessed |
+
+The last row follows the capacity forecast's own rule: missing answers are unknown, not zero and not assumed fine.
+
+**2. Why a carriage diagram beats a number.**
+
+The capacity forecast gives one percentage for the day. That is honest, but it hides *where* the day is tight. A train with five carriages answers the question Adam actually has at 7 am: "Which part of today can take the extra thing?" If carriage 4 (the afternoon) is crushed and carriage 2 has seats, that is the whole insight at a glance.
+
+**3. Moving passengers.**
+
+A task with a time block is a passenger. Long-press a passenger in a crushed carriage and drag it to a carriage with seats. That is a reschedule, and following Codex's rule, the city calls the owning hub: Tasks moves the Day Dial block, then the snapshot refreshes and every lens updates together, as Cursor requires. If the move fails, the passenger stays where it was and the screen says so.
+
+Clare can **reserve a seat**: a proposed placement shown as a hatched seat with her name on it, which stays a proposal until Adam confirms. This uses the same staffed-versus-driverless logic from round 1: a reservation is a staffed train with its doors open, waiting for Adam.
+
+**4. The week as a departures board.**
+
+Combined with the Forecast scrubber above, the departures board can list the next seven days as seven trains, each with its carriage diagram. Monday's train is crushed in the afternoon, Wednesday has seats all day, Friday's evening carriage is closed. That is a week's load in one glance, and it uses the real forecast, including its widening uncertainty (later trains show their carriages with lighter, hazier fills).
+
+**5. Built for the phone.**
+
+Cursor proposed that the phone lens is the departures board. The occupancy train is the best thing on that board at 390px: one train, five carriages in a row, each a colour and a word. It needs no city and no zoom, and it is still part of the metaphor.
+
+**6. What it is not.**
+
+- Not a new calculator. Demand and capacity both come from the existing one-number function. The train only presents them by carriage.
+- Not a judgement. A crushed carriage is information, not a failure. The wording stays the transit wording, which is neutral by nature.
+- Not money. There is no fare, no ticket price and no Opal balance. Day-to-day finances stay out of the city, as every round has agreed.
+
+#### New open questions from round 2
+
+- How should a day be split into carriages: fixed parts of the day, the Day Dial's blocks or the school timetable's periods on teaching days?
+- How far back should Rewind go: one year, or the whole history since Life Hub began?
+- Should the New Year's Eve replay play itself at midnight, or only when Adam asks?
+- Is drag-a-passenger rescheduling welcome in the city, or should the city stay look-only with a "move this" button that opens the Day Dial?
+
+#### Claude Code card ledger after round 2
+
+| Card | Uses by Claude Code | Uses left |
+|------|---------------------|-----------|
+| Extend | 1 | 1 |
+| Substitute | 0 | 2 |
+| Combine | 0 | 2 |
+| Adapt | 1 | 1 |
+| Magnify | 1 | 1 |
+| Put to another use | 1 | 1 |
+
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load?
@@ -470,3 +607,4 @@ Deleted records disappear from rooms, activity selections and city signals throu
 - **2026-10-07, Claude Code:** Round 1 of the what if game (Extend + Adapt). Added section 7 with Harbour City, agent services, driverless lines, landmarks, vacant lots, the GTFS-shaped vocabulary and pressure rings. Renumbered Open questions to 8 and this log to 9.
 - **2026-10-07, Cursor:** Round 1 of the what if game (Combine + Put to another use). Added one-graph-four-lenses (Lines, Branch, Orbit, the Day Dial and Harbour City share a GTFS-shaped snapshot) and the Knowledge sky as the concourse ceiling. Noted both in the architecture sketch and on three open questions.
 - **2026-10-07, ChatGPT Codex:** Round 1 (Extend + Combine). Added usable interiors for current and future domains, separate product home and import states, and saved activities linking Travel, Writing and House records. Preserved both earlier rounds and the main concept. Recorded Codex card usage within the round.
+- **2026-10-07, Claude Code:** Round 2 (Magnify + Put to another use). Corrected the city's weather to come from the capacity forecast (base table and round 1 table updated). Added the time scrubber (Rewind, Forecast with honest fog, the New Year's Eve and end-of-term replays) and the per-carriage occupancy train as a capacity display. Added a card ledger.
