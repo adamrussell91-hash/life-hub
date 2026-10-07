@@ -4,8 +4,9 @@ A parking lot for big ideas that are not scheduled yet. Nothing in this folder i
 
 ## How to contribute (Cursor, ChatGPT, Claude)
 
-- Add your thoughts under the **Contributions log** at the bottom of the relevant idea file, dated and signed with your tool name.
-- If you change the main body, keep the original intent and note what you changed in the log.
+- Do not sign ideas or say which tool suggested what. Ideas are judged on their merits. Record changes in the idea file's **History** section, dated but unsigned. Authorship lives in git history.
+- If you change the main body, keep the original intent and note what you changed in the History section.
+- Once an idea file has a **Critical review**, its verdicts (Keep, Modify, Cut) govern. New proposals must say which verdict they change and why.
 - Mark anything you are unsure of as an **Open question** rather than deciding it.
 - All data comes from Life Hub itself. Notion is being retired, so no idea in this folder should depend on it.
 - Keep Australian spelling.
@@ -80,5 +81,5 @@ This split is an **Open question** for the next round, not a decision.
 
 | Idea | Status | File |
 |------|--------|------|
-| Life City: Life Hub as a living transit city | Thought experiment | [life-city.md](life-city.md) |
+| Life City: Life Hub as a living transit city | Under critical review | [life-city.md](life-city.md) |
 | Notion → GitHub gap map | Future build inventory | [notion-github-gap-map.md](notion-github-gap-map.md) |
