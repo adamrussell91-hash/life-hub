@@ -14,6 +14,8 @@ export interface DayMapHandle {
 
 function markerElement(item: Item, number: number | undefined, accent: string): HTMLDivElement {
   const el = document.createElement('div');
+  el.dataset.itemId = item.id;
+  if (number != null) el.dataset.stopNumber = String(number);
   if (item.kind === 'stay') {
     el.className = 'pin pin--stay';
     el.style.background = '#17375e';
