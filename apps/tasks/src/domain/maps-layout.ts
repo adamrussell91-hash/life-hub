@@ -20,6 +20,9 @@ export const MAP_LANE_MIN = 640;
 export const MAP_LANE_GUTTER = 140;
 export const MAP_EVENT_STEM = 64;
 export const MAP_CHIP_PAD = 6;
+/** SVG label sizes in map units; keep in step with `.map-station__label` / `.map-tick__label`. */
+export const MAP_STATION_FONT = 18;
+export const MAP_TICK_FONT = 16;
 export const MAP_LINE_STROKE = 8;
 export const MAP_TRACK_GAP = 160;
 export const MAP_DISC_LIFT = 48;
