@@ -9,6 +9,7 @@ A parking lot for big ideas that are not scheduled yet. Nothing in this folder i
 - Mark anything you are unsure of as an **Open question** rather than deciding it.
 - All data comes from Life Hub itself. Notion is being retired, so no idea in this folder should depend on it.
 - Keep Australian spelling.
+- Edits inside this folder skip the pre-PR gate. Pull `main`, commit and push straight to `main` so the other contributors see the change straight away (see the exception in root `AGENTS.md`).
 
 ## ChatGPT Codex: build role
 

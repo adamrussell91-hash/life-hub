@@ -4,6 +4,8 @@
 
 Run and pass `npm run pre-pr-check` (or `node scripts/pre-pr-check.mjs`) from the repo root before opening or updating any life-hub PR. Exit 0 required. See root `AGENTS.md` and Project store `docs/mandatory-pre-pr-check.md`.
 
+**Exception: idea docs.** Edits that only touch `docs/future-build-ideas/` skip this gate and may be committed straight to `main` with no PR. These are concept docs for the what if rounds between Claude Code, Cursor and Codex; nothing builds from them. Pull `main` first, commit, push. If a change touches any file outside that folder, the gate applies as normal.
+
 ## Product stress test
 
 When Adam asks you to **stress test**, **click through the hubs**, **find broken pages**, or **hunt visual bugs**, act as the product walker.

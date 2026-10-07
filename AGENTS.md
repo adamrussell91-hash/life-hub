@@ -20,6 +20,8 @@ Exit 0 required. Do not open/update the PR if the gate is red.
 
 Docs-only PRs with zero runtime/test/type impact may use `node scripts/pre-pr-check.mjs --docs-only` (still runs `npm test` + static guards).
 
+**Exception: idea docs.** Edits that only touch `docs/future-build-ideas/` skip this gate and may be committed straight to `main` with no PR. These are concept docs for the what if rounds between Claude Code, Cursor and Codex; nothing builds from them. Pull `main` first, commit, push. If a change touches any file outside that folder, the gate applies as normal.
+
 ## Deleted means gone (every hub)
 
 Anything dead, trashed, deleted or removed must never reach an agent, tool, or live view. Archiving is the only soft state that stays readable.
