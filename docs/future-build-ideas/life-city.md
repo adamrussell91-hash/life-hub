@@ -1940,6 +1940,222 @@ He can spend the visit in the hallway, or on the kiosk stool, or walking the loo
 | Put to another use | 2 | 0 |
 
 
+### Round 5 · ChatGPT Codex · Adapt + Magnify
+
+> **Author note:** Written by ChatGPT Codex on 7 October 2026. Cards played: **Adapt** and **Magnify**, each for the second and final time. Adam explicitly asked for hot air balloons, seasonal events, snowstorms and creativity with meaning. I researched balloon gatherings, seasonal game scenery and a Scottish solstice monument. This round develops those references into original Life City events, with Cursor's newly added ordinary streets and scenery figures providing the places where festivals happen. All scenes and rituals below are proposals.
+
+#### Adapt: the Balloon Gathering, a festival for the futures Adam chooses to keep
+
+**The researched starting point.** Albuquerque's Balloon Fiesta describes evening balloon glows, including a moment when burners illuminate the balloons together. Its account traces the original glow to local pilots inflating balloons on Christmas Eve in 1979 as thanks to residents. The useful interaction is a gathering which becomes luminous without requiring departure. [Official Balloon Fiesta account](https://www.balloonfiesta.com/experience-the-fiesta/balloon-glows/).
+
+**The Life City version.** Once each chosen season, a field opens behind the harbour headland. Large hot air balloons lie across the grass. Their fabric unfolds, baskets settle upright and the balloons slowly rise on tethers.
+
+Each personal balloon holds a dream, book idea or saved future which Adam selected for this gathering. A few unlabelled festival balloons provide atmosphere. They do not represent records.
+
+This is a celebration of wanting something. The future does not need a schedule, a project or proof of progress to belong here.
+
+**1. Give each selected future its own enormous balloon.**
+
+The balloon designer uses a small vocabulary from Round 4:
+
+- A book idea receives an envelope with folded page panels and a tiny book resting inside the basket.
+- A travel dream receives a fabric globe, with destination illustrations chosen by Adam.
+- A research ambition receives a balloon patterned with a selected Knowledge constellation.
+- A home idea receives a balloon carrying a miniature paper house.
+- A personally chosen design receives blue and white ceramic inspired panels, a watch dial or another selected motif.
+
+These are stylised balloon illustrations, rather than physical engineering designs.
+
+All personal balloons have comparable scale. Importance is not inferred from task count, money, word count or how recently Adam touched the idea.
+
+**2. The night glow is about continuing to choose.**
+
+At dusk, the tethered balloons illuminate in a slow sequence. The harbour reflects their shapes. A final shared glow lights the field.
+
+Selecting a basket opens its saved future and one optional question: "Do you still want this?"
+
+Keeping the future places a small dated ribbon on its basket. Changing direction opens the existing idea or proposal. Removing the balloon from the gathering changes the curated scene, rather than deleting the source record.
+
+A balloon stays welcome if the answer is "Yes, but later". No launch deadline appears. No fabric sags because the idea has been quiet.
+
+The next seasonal gathering displays the same future with its previous ribbons, if Adam wants them. Its history is his recorded choice to keep the idea, rather than a manufactured measure of progress.
+
+**3. A balloon ride changes how the city is seen.**
+
+Adam selects "Take a flight". The basket rises above the harbour. Buildings become miniatures beneath it. The ride follows a slow scenic path, with pauses over selected districts.
+
+For a book balloon, the journey pauses above the library and writing studio. Existing saved links remain available through a telescope in the basket. For a travel balloon, the route passes the atlas quay and the relevant destination trunk.
+
+There is also a sightseeing flight with no linked future. Admiring the city does not need a planning justification.
+
+The flight is an Explore camera experience. A moving balloon does not represent work, an agent operating or a dream coming true. It belongs to the festival, with a distinct silhouette from the operational fleet.
+
+**4. The launch ritual moves a chosen idea into the workshop.**
+
+If Adam decides to explore a future seriously, he places one selected fragment in the basket: a premise, a research question, a destination or an existing proposal.
+
+The balloon lifts from its tether and drifts to a workshop landing terrace. There, its basket opens onto the paper model table.
+
+The actual change is explicit: save or open a proposal. No live project appears merely because the balloon launched. Promotion still uses the reviewable changes established earlier.
+
+The ceremony supplies a memorable moment for a real choice. The workshop supplies somewhere to develop the choice afterwards.
+
+#### Magnify: seasons become events which temporarily transform the whole city
+
+Claude's almanac changes plants and water. Magnify the reach of those changes. A seasonal event alters how the whole harbour is experienced for a chosen visit, with a purpose and an optional keepsake.
+
+The city keeps its actual Sydney calendar outside the event. These festivals are authored city traditions. Their weather, where fictional, is labelled as festival scenery.
+
+**1. Winter: the harbour becomes a snow globe, then the storm arrives.**
+
+Enter the Winter festival and the camera pulls back. A glass dome settles over the city. Fine snow begins above the rooftops. The bridge collects a white edge. Tram wires acquire frost. Snow builds along steps and fountain rims, while the operational roads and their states remain readable.
+
+The storm has a sequence:
+
+1. First flakes catch in the courtyard lights.
+2. Snow thickens and crosses the foreground at an angle.
+3. The far harbour becomes obscured by the scene's snowfall.
+4. The camera reaches a warm shelter selected by Adam.
+5. Through the window, the snow continues across the miniature city.
+6. The storm eases, revealing the harbour under its temporary winter covering.
+
+This is a snowstorm worth looking at. It changes depth, visibility, surfaces and the relationship between outdoors and indoors. It does not close projects or damage buildings.
+
+The initial setting is a fictional June winter celebration. A winter scene is also available inside the Scotland or Seoul travel trunk in December. Neither claims real snow at a destination or in Sydney.
+
+**Meaning: choose somewhere to stop.** The shelter is a place Adam selects: the writing studio, conservatory, library or watch station. The festival offers an optional protected interval through the existing calendar action. Choosing the interval records a boundary. Watching snowfall does not establish recovery or alter readiness.
+
+The shelter also opens without a calendar action. A winter visit is available for pleasure.
+
+**The ordinary street joins the storm.** Cursor's market awnings collect snow. The library reader carries a thermos into the building. Scenery neighbours leave prints on footpaths, shake snow from their coats and shelter under the kiosk roof. The school gate's crowd follows its existing timetable, dressed for this fictional event scene. These figures remain anonymous scenery. Their footsteps never log exercise or work.
+
+When the scene ends, snow lifts from the paving and the ordinary shutters return to the clock's current state. The city resumes the moment Adam left, with live record updates still present. The festival has used his familiar streets, rather than replacing them with an unrelated winter backdrop.
+
+**2. Frosted windows become a place for one chosen memory.**
+
+Inside the shelter, a window fills with frost. A swipe clears a small viewing circle. Beyond it sits the city, with one selected keepsake visible on the sill.
+
+Adam chooses a photograph, book fragment, ceramic detail or recorded memory to accompany this winter. The festival remembers that selection.
+
+A later winter opens last year's keepsake beside an empty position for this year's choice. These become personal editions of the same scene. Leaving the new position empty changes nothing else.
+
+The view is saved as a winter postcard if Adam requests an export. The source content remains governed by its owning hub. The postcard is a chosen output, rather than a hidden archive.
+
+**3. Thaw makes the return visible.**
+
+Nintendo's official Animal Crossing spring preview describes snow melting and greener grass arriving. The useful lesson is a transition expressed through the ground and scenery, rather than a calendar heading. [Nintendo's seasonal preview](https://play.nintendo.com/media/videos/animal-crossing-new-horizons-exploring-march/).
+
+In Life City, snow retreats from the fountain outward. Meltwater briefly collects in the paving. The conservatory roof opens. The first plants appear around the dome's edge.
+
+One selected paper future returns to the workshop table. This is an invitation to reopen something Adam already chose, rather than a new task from the city. He chooses which future, or leaves the table empty.
+
+Winter offered a place to pause. Thaw offers a place to return. Neither declares how he feels.
+
+**4. Spring: the Festival of Unfinished Things.**
+
+The market square fills with stalls displaying unfinished book ideas, saved plans and selected research questions.
+
+Each stall contains one object with a clear identity: a folded chapter stage, a paper house, a miniature telescope or a destination trunk still packed.
+
+The event is curated. The city does not parade every overdue task through the square.
+
+Selecting a stall reveals a single small starting point chosen by Adam, such as the last saved paragraph or an unanswered research question. An optional action sends the object to its existing room. No complete project plan is required.
+
+At evening, the stalls close into travelling cabinets and return to the workshop. Unchosen ideas remain available. The event celebrates things worth keeping before they are finished.
+
+**5. Summer: the Harbour Exchange.**
+
+The quays become an evening promenade. The recipe kitchen places chosen dishes in illustrated displays. The fragrance conservatory opens its bottle roofs. The collection arcade presents selected watches on rotating exhibition stands inside the scene.
+
+At the centre sits one shared table from the Idea Exchange. Adam chooses two source objects and asks a question. Their associated scenes briefly appear on opposite sides of the harbour, with the selected connection visible between them.
+
+For example, a research note and a literary passage appear as a library pavilion and a book stage. Saving a proposed connection returns to the existing Exchange record flow.
+
+The festival provides a more expressive setting for the same question. Suggested connections retain their proposed status. The illustration never establishes an argument's truth.
+
+**6. Autumn: the Chamber of Returning Light.**
+
+Historic Environment Scotland describes Maeshowe's passage admitting the setting sun around the winter solstice, illuminating the chamber's rear wall. The source concerns a specific Scottish monument. Life City's chamber below is an original design inspired by the interaction of architecture, time and light. [Maeshowe history](https://www.historicenvironment.scot/visit/all/maeshowe-chambered-cairn/history-and-stories/).
+
+A low stone pavilion sits on the headland. During the selected annual reflection event, a narrow beam enters its passage and slowly reaches a ceramic panel inside.
+
+The panel holds one artefact Adam chooses to bring forward from the previous year: a paragraph, an image, a finished resource, a travel keepsake or a named personal memory.
+
+The beam reveals the chosen artefact without projecting a whole productivity report. Adam chooses what deserves attention. A quiet year is allowed a quiet chamber.
+
+This scene is a personal ritual, rather than a reproduction of Scottish religious practice or a claim about the monument's original meaning. Its event date is chosen explicitly. A Sydney event does not silently use Scotland's seasonal calendar.
+
+**7. Term end: classrooms release their paper worlds.**
+
+When a confirmed term ends, the Teaching district offers an evening scene. Selected lesson resources become small paper theatres in school windows. A chosen class text becomes a book stage. A selected teaching reflection occupies the station's exhibition cabinet.
+
+The existing term replay still shows recorded changes. This festival supplies the curated objects worth returning to.
+
+After the event, the theatre folds into the Teaching archive room. Archiving follows the owning hub. The festival does not archive anything on its own.
+
+This gives a teacher's year a series of visual chapters without claiming every completed task improved student learning.
+
+#### How a festival becomes personal without becoming another obligation
+
+Each event has three parts:
+
+| Part | What changes | Meaning |
+|------|--------------|---------|
+| Scene | The city temporarily transforms | A distinct experience of the season |
+| Optional ritual | Adam chooses one future, boundary, question or artefact | A deliberate personal action |
+| Keepsake | A selected scene and object become an annual edition | Something specific worth revisiting |
+
+The whole scene opens without completing the ritual. Missed events remain available through the festival calendar. Their title states the event and year. There are no attendance streaks, expiring objects or penalties for coming late.
+
+A snow globe, balloon ribbon or chamber panel is a personal selection, rather than a trophy awarded by task count.
+
+#### A necessary revision to the sky rule
+
+The capacity forecast owns capacity conditions, icons and explanations. It should not prevent an explicitly labelled Explore festival from having balloons overhead or theatrical snowfall.
+
+In Glance, the current capacity sky retains its established meaning. In a festival, the forecast remains available in the station's outlook panel, with the same data and original icons. The scene is labelled "Winter festival" or "Balloon Gathering". Fictional snow never selects Dense fog, Thunderstorm or another capacity state.
+
+This proposes narrowing the almanac sky restriction to operational Glance and unlabelled weather effects. It also proposes allowing atmospheric balloon silhouettes in Explore, rather than treating every moving vehicle shape as an agent signal.
+
+The operational buses, stops, halos and lines retain their meanings. Festival balloons and scene snowfall have their own visual language.
+
+#### One evening across these ideas
+
+The Balloon Gathering opens on the headland. Adam selects the book idea he still wants. Its envelope unfolds with paper page panels. He takes a slow flight above the library and sees the harbour from a new height.
+
+He keeps the idea and adds this season's ribbon. A chosen fragment travels to the workshop terrace, where the paper model is ready to open later.
+
+Then he enters the Winter festival for a different kind of visit. Snow thickens around the glass dome. The bridge becomes a distant silhouette. He reaches the watch station and opens the shelter window.
+
+On the sill sits the keepsake he selected for this winter. Beyond it, the city is almost lost in snow. The storm eventually clears, leaving the same harbour, temporarily changed and still recognisably his.
+
+The balloons meant a future he chose to keep. The snow scene offered a place to pause. The object on the sill made the visit specific to his life.
+
+#### Open questions from ChatGPT Codex Round 5
+
+1. Should the Balloon Gathering recur each season, once a year or whenever Adam opens it?
+2. Is the winter dome a whole city scene, or an island reached through the Travel quay?
+3. Which shelter should appear first: the watch station, library or fragrance conservatory?
+4. Should festivals follow Sydney seasons by default, with destination scenes retaining their own explicitly labelled calendars?
+5. Does Adam want one keepsake per event, several selected objects or no saved editions?
+6. Which scene deserves the first prototype: night balloon glow, heavy snowfall or the solstice inspired chamber?
+
+#### Research and design distinction
+
+The balloon glow, Nintendo's seasonal transition and Maeshowe's illumination are researched references linked above. The Balloon Gathering, snow dome, personal rituals and festival sequence are original Life City proposals. No source is presented as evidence these features improve wellbeing or productivity.
+
+#### ChatGPT Codex card ledger after Round 5
+
+| Card | Uses by ChatGPT Codex | Uses left |
+|------|----------------------|-----------|
+| Extend | 2 | 0 |
+| Substitute | 1 | 1 |
+| Combine | 2 | 0 |
+| Adapt | 2 | 0 |
+| Magnify | 2 | 0 |
+| Put to another use | 1 | 1 |
+
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load? (Claude round 4: expands at its edges, never reflows its centre)
@@ -1967,3 +2183,4 @@ He can spend the visit in the hallway, or on the kiosk stool, or walking the loo
 - **2026-10-07, ChatGPT Codex:** Round 4 (Extend + Combine), responding to Adam's request for more creative ideas. Added foldout destination worlds and architecture inspired by chosen watches, fragrances, books, travel keepsakes and ceramic artwork. Proposed distinct Glance and Explore experiences, with impossible interiors and atmospheric motion during intentional exploration. Preserved all earlier contributions. Extend and Combine are now exhausted.
 - **2026-10-07, Claude Code:** Round 5 (Put to another use + Extend). Accepted Codex's Glance and Explore split for motion, with a rule that atmosphere never borrows signal vocabulary. Put brushing and linking to use as "Ask the stationmaster" (questions light the city through grounded queries). Extended the city with the real Sydney almanac (jacarandas, whales, wattle, Christmas bush) on land and water only. Added a summary of the city's three layers and two tools, seven new validator rules and one rescoped rule.
 - **2026-10-07, Cursor:** Round 5 (Extend + Magnify). Filled the ordinary blocks: school gate, market row, library steps, hospital garden, park, house row, wharf kiosk and a skiff that never casts off. Figures follow the real clock and the term edition, and they are scenery rather than signals. Magnified one walk from the gate to the skiff, on a term Tuesday and on a free Sunday.
+- **2026-10-07, ChatGPT Codex:** Round 5 (Adapt + Magnify). Researched official Balloon Fiesta, Nintendo and Historic Environment Scotland references. Added a balloon gathering for chosen futures, balloon sightseeing and workshop landings, a whole city snowstorm festival using Cursor's ordinary streets, winter keepsakes, thaw, spring unfinished idea stalls, a summer exchange, a solstice inspired reflection chamber and term end paper theatres. Proposed explicit festival scene exceptions to operational sky and motion rules. Adapt and Magnify are now exhausted. Earlier contributions preserved.
