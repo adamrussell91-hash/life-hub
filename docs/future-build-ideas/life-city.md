@@ -135,6 +135,7 @@ Life City needs a tiny fraction of OpenTTD: no money, no crashes, no freight eco
 - **History is the event log:** Rewind replays these events up to a day. It does not keep a second archive of the city. Proposal in Cursor's round 2.
 - **Term edition:** which Teaching services are in the snapshot comes from hub prefs `school_terms`. Proposal in Cursor's round 3.
 - **No neglect meter:** the street does not decay, score, or end because time passed. Accumulation rituals are a proposal in Cursor's round 4.
+- **The blocks are inhabited:** between the routes, ordinary places follow the real clock and the term edition. They are scenery. They are not records and they are not signals. Proposal in Cursor's round 5.
 - **Renderer:** PixiJS (2D) first
 
 ### Who builds what
@@ -1817,6 +1818,128 @@ Under all five sits one snapshot (Cursor r1), the GTFS-shaped vocabulary (Claude
 | Put to another use | 2 | 0 |
 
 
+### Round 5 · Cursor · Extend + Magnify
+
+> **Author note:** This round was written by Cursor on 7 October 2026. Cards played: **Extend** and **Magnify**, each for the second and final time. Adam asked for more in the city. Claude's round 5 already put Sydney's seasons on the land and the water, and a stationmaster who can light a question. Codex's round 4 already unfolded the trunks, the watch, the bottles and the books. This round does not add another of those. It fills the ordinary blocks between them, so a free Sunday still has a street to walk. Everything here is a proposal until Adam names a slice to build.
+
+The city can be true and still be empty. A halo, a ferry and a jacaranda are three facts with a lot of pavement around them. What makes Dobuita, Pelican Town and Kamurocho feel inhabited is smaller than their plots: a shutter that is up at the hour it should be up, a person who is in one place at noon and a different place at dusk, and a door that opens onto a counter rather than onto a system.
+
+#### Extend: a census of ordinary places
+
+**The precedents.**
+
+Shenmue's Dobuita feels occupied because the people on it have a clock. In the morning the shopkeepers arrive and open up. In the evening they pull the shutters down and walk home. Yoko Minato spends the day shopping in town, then works the evening at Bar Yokosuka. Nozomi stands outside her grandmother's flower shop. Ine-san prays at the household altar before bed. None of that is the plot. It is the reason the street is a place ([PC Gamer, on the secret lives of Shenmue's NPCs](https://www.pcgamer.com/the-secret-lives-of-shenmues-npcs/)). The same piece makes a useful warning: the crowds in Kamurocho can feel faceless next to Yokosuka, because a crush of pedestrians is not the same thing as a person who will be in one spot at one hour.
+
+Stardew Valley does the same thing with a weekly diary. Caroline is in the kitchen at 8:00, in her sunroom from 10:00, and on Friday she is at the museum from midday until 17:00, reading between the shelves. The town reads as lived-in because you can learn where someone will be ([Stardew Valley Wiki, Caroline](https://stardewvalleywiki.com/Caroline)).
+
+Kamurocho is still the right reference for doors. It is a toy Kabukichō, and what makes a block worth turning into is that ordinary rooms open: a convenience store, a supermarket, a café, a soba counter, an arcade ([Kamurochō](https://en.wikipedia.org/wiki/Kamuroch%C5%8D); [Kamurocho](https://yakuza.fandom.com/wiki/Kamurocho)). Harbour City takes Dobuita's diaries and Kamurocho's doors, and refuses Kamurocho's crowd. A few figures who keep a timetable. Not a pavement full of strangers.
+
+Harbour City already has the hero layer. Extend the street with a census of places that are always there, whether or not anything is due.
+
+**What the census is.** These places are not hubs, not tasks and not agents. They are not imported from Notion and they do not wait on a gap in the map. The layout engine reserves their footprints the way it reserves the bridge, and it does not slide them aside to make a route look neater. Adam can pin his own house among them, using the same pin as any other building he cares about. He cannot pin a scenery neighbour onto a record.
+
+**The places, by where you meet them.**
+
+| Place | Where it sits | What you can see | What it refuses to mean |
+|-------|---------------|------------------|-------------------------|
+| **School gate** | North shore, at the Teaching district, facing the bridge | In term, at the morning and afternoon bell, an anonymous crowd in school colours. Midday, a shut gate and an empty yard. In the holidays, the gate stays shut all day | Not a class. Not a name. Not marking. Teaching load stays on the school buses. No classroom, no books on desks, no work in a window |
+| **Market row** | First lane south of the bridge | Three stalls: fruit, flowers, a paper barrow. Awnings up after 8:00, shutters down after 17:30. A milk-bar window with bottles and no prices | Not a shop. Not a purchase. Not Brisket. The food truck is still the only meal signal. No till, no menu, no "you bought this" |
+| **Library steps** | The square, under Clementine's stop | Three steps, a noticeboard, one reader. The noticeboard holds blank cards unless Adam has saved constellations, in which case the cards show titles he already saved, never a second copy of the note | The reader is not a note being written. A new note is still the tram at the stop |
+| **Hospital garden** | Beside the ambulance bay, facing the other way | Camellias, a bench, a path. The bay stays visible at the end of the path | A person on the bench is not an appointment. Sara's ambulance, lights on, is still the only medical signal |
+| **The park** | South of the square, in front of the roads, as the base layout already asks | Fountain, oval, bubbler, a fig tree, the track around the grass | The grass keeps its colour. One figure on the track means a logged session. People on the path, including in Explore, are a stroll. A stroll is not exercise |
+| **House row** | A short terrace behind the park | Five houses. The middle one can be Adam's pin. The other four cannot be linked to anything. After dusk their windows glow a domestic amber | That amber is not the "still open tonight" lamp. Open work lights civic buildings and stop shelters only. A neighbour's light is the clock, not a task |
+| **Wharf** | The quay, beside the ferry pontoon and not on it | A kiosk (urn, stool, shutter) and a timber skiff with its painter on a bollard | The skiff never casts off. It has no route colour and no timetable. The only boat that crosses is the service ferry |
+| **Harbour baths** | A ladder and a ring of piles just off the quay | In the swimming months the ladder is down. Out of season the ladder is up and the ring is empty | Not a fitness session, and not a whale. Swimming here is scenery. Chadwick's session stays on the track |
+
+A few more footprints sit in the districts that already have a job, so the job and the scenery stay apart:
+
+- **Brisket's depot** is the truck. Next to it, a kitchen window shows pots on a rack. The window does not open a recipe book. Recipes still have no home. Looking at a pot does not log a meal.
+- **Vera's path** up to the lighthouse has a bench halfway. Sitting there does not check in. The beam still means only that a check-in is due.
+- **The Professional roller door**, beside the school, is down on a Sunday and up on a weekday. It does not invent a professional task.
+- **Codex's trunks** stay on the quay. Around them: bollards, a coil of rope, a pigeon. The pigeon is not mail. Penelope's van is still the only mail.
+
+**The clock, not a sim.** Anonymous figures have a diary, the way Caroline and Yoko do. They are not agents, they do not have names, and they are not stored as records. The renderer places them from the real clock, the term edition and Claude's almanac (a coat in July, sleeves in January, jacaranda petals on the gate road in November). Deleted records do not apply to them, because there is nothing to delete. If a real building is removed, the footpath in front of it remains.
+
+| When | School gate | Market row | Library steps | Park path | House row | Wharf |
+|------|-------------|------------|---------------|-----------|-----------|-------|
+| Term morning, before the bell | Crowd at the gate | Shutters coming up | Empty | Empty | Dark | Shutter down, skiff tied |
+| Term midday | Gate shut, yard empty | Awnings up | One reader | A few strollers | Dark | Kiosk open, skiff tied |
+| Friday afternoon in term | Crowd, then gone | Awnings up | The reader has gone inside | Strollers | Dark | Kiosk open |
+| Dusk | Shut | Shutters down | Empty, unless the tram is in | Quiet | Domestic amber | Shutter down, skiff tied |
+| Holidays, any weekday | Shut all day | Awnings up | One reader | Strollers | Follows dusk | Follows the hour |
+| Free Sunday | Shut | Morning only, then shut | A reader if he walks there | The fullest the path gets | Follows dusk | Kiosk open late morning |
+
+Friday is the Stardew beat: the reader leaves the steps and is visible through the library glass for the afternoon. That is the whole "secret life". It does not write a note.
+
+**Glance and Explore.** In Glance every row of that table is a still. Shutters are in the right position. Figures are frozen where the hour put them. Nothing walks. In Explore the same people walk the footpath between those spots. They use no road that a bus uses. They never wear a halo, a uniform, a route colour or a lit stop. Claude's rule holds: atmosphere is water, leaves, glass and, now, a person on a footpath. A moving bus is still only work.
+
+**Doors, the Kamurocho part.** On this one stretch, ordinary doors open. The interior is a cutaway of a few tiles, not a hub room and not a ledger.
+
+- The milk bar: a counter, a stool, bottles with blank labels. No prices, no tap of a card, no stock that runs down.
+- The kiosk: the urn and the harbour window. Three tiles. Walk back out and you are on the quay.
+- A scenery terrace: a hallway and a stair. It is not the records office. House documents stay in Codex's records office when that home exists. Until then this door does not pretend to file anything.
+- Adam's pinned house, if he has pinned one: the same toy hallway, and a single line on the wall, "Documents live at the records office", once that building exists. The pin is the address. The hallway is the pleasure of being home.
+- The school gate does not open. There is no classroom on the other side. That absence is the point.
+
+**Light, so the census cannot lie.** The base doc lets lit windows mean work still open tonight. Those lamps stay on stop shelters and on civic rooms that actually have open work. House amber, milk-bar glass and the kiosk's evening bulb come from a scenery palette that excludes route colours and excludes that open-work lamp. Seasonal colour stays on Claude's land and water. A camellia is not a line.
+
+Two notices are enough. The census fails if it starts meaning something.
+
+| Notice | Level | Rule |
+|--------|-------|------|
+| `scenery_read_as_signal` | Error | A stall, a domestic window, a scenery figure, the skiff or the baths is drawn with a vehicle, a halo, a route colour, the open-work lamp, or a path a service uses |
+| `named_student_on_street` | Error | Any figure at the school gate has a name, a class, a face that could be a student, or work visible |
+
+#### Magnify: the walk from the gate to the skiff
+
+The census is a table. Magnify one stretch until it is a walk: out of the school gate, across the bridge, down the market lane, along the library steps, through the park, and onto the quay where the skiff does not leave. Same stones on a term Tuesday and on a free Sunday. Explore is the mode, because this is a visit. Glance, from the Home tile, shows the same street frozen at the right hour, with the one halo if something truly needs him, and otherwise with none.
+
+**Tuesday in term, 8:12.**
+
+The gate is the noisy end, and the noise is anonymous. Figures in school colours bunch on the footpath. Nobody has a name. The yard behind the gate is a flat of grass and a verandah; the windows are bright and blank. Ann's buses are already on their shapes or they are not. The crowd does not stand in for them. A crossing figure holds a sign. The sign is a lollipop, not a deadline.
+
+The bridge is the commute Claude drew. If the week is heavy, the northbound side is the jammed side, and that jam is still the teaching load. People on the footpath are not extra buses. Looking south from the middle of the bridge, the market awnings are already up. Looking north, the gate is a small red roof. That is the whole geography in one turn of the head: work behind, the day ahead, water underneath.
+
+Off the south ramp, the lane is three stalls and a milk bar. Melons are stacked. Buckets hold mixed flowers that are not wattle and not a line colour. The paper barrow has folded sheets with no headlines. The milk-bar door is open. Inside, the counter is empty of anyone who would sell. A stool faces the bridge. There is nothing to buy, which is how a market can sit in a city that does not do day-to-day money.
+
+The square opens at the end of the lane. Clementine's tram is a fact about notes; the steps are a fact about the square. One reader sits on the middle step with a book whose cover is a block of colour from the scenery palette. The noticeboard, if constellations are saved, shows titles and nothing else. Friday afternoon, this reader is gone from the step and visible through the library glass, still holding the same blank book.
+
+Cut through the park rather than around it. The fountain is in front, low, so it does not hide the road, which is the layout rule from the base doc. The fig drops a litter of fruit on the path. The bubbler is a bubbler. The oval is green. If a session was logged, one figure is on the track and only on the track. If none was logged, the track is empty and the path can still have strollers. The grandstand does not fill itself. Nobody rates the park.
+
+The quay is the last turn. Codex's trunks stand where he put them. The ferry pontoon is a separate deck, with the service ferry or without it. Beside that deck, not on it, the kiosk shutter is up and the skiff knocks once against the piles and stays tied. In Explore the knock is a sound only if the Knowledge chimes preference is on; it is not a new soundtrack. The harbour baths sit further along, ladder down or up with the season. Whales, if the month has them, are out past the heads, on Claude's water, and they do not come into the baths.
+
+Walk back by the house row. Five terraces, one door that can be his. At 8:12 the windows are dark. The door opens onto a hallway the size of the kiosk. That is enough. The records office, the studio, the trunks and the stationmaster are still there for when he wants a system. This door is for when he wants to be in the city.
+
+**The same stones on a free Sunday, late morning.**
+
+Nothing is due. The open door from round 3 stays shut. The halo is absent. The gate on the north shore is shut, and the yard is empty, because Sunday is not a bell. The bridge footpath is the populated part: strollers, not a jam. A jam on a Sunday with no teaching load would be a lie, so the roadway is quiet.
+
+The market is in its morning hour. The same melons, the same buckets, one extra figure at the flower stall who is not selling. By afternoon the shutters are down and the lane is just awnings and shade. The milk bar is still enterable. The stool still faces the bridge.
+
+The library reader is on the steps. The park path is the fullest it gets, and the track is empty unless a session was actually logged. The fountain does not celebrate the empty track. The kiosk stays open a little later than on a weekday. The skiff is tied. The ferry runs only if a real cross-hub link is in the snapshot; a quiet Sunday does not invent a scenic crossing to make the water look busy.
+
+He can spend the visit in the hallway, or on the kiosk stool, or walking the loop again. Leaving Explore freezes the street where the clock has moved it to. The Home tile, an hour later, shows shutters and amber starting in the terraces, and still no halo, if nothing has become due. A city that is full when it needs nothing from him is the reason to open it on that Sunday.
+
+**What this walk does not add.** No new lens. No score. No weed. No second copy of a note, a task or a season. The Platform at 390 stays the departures board; the crowd does not shrink onto the phone as a list of scenery. A phone Explore can pan this same street, and the three doors stay Decisions, Fits now and Where was I. The census is wide-city pleasure. It does not become a fourth board.
+
+#### New open questions from round 5
+
+- Is the middle terrace a specific home Adam wants to recognise, or a toy house he is happy to pin and move?
+- Should any scenery door ever grow a real room (the kitchen, once recipes have a home), or do cutaways stay cutaways even after that slice exists?
+- How dense is too dense on the wide view before the footpath fights the routes for attention?
+
+#### Cursor card ledger after round 5
+
+| Card | Uses by Cursor | Uses left |
+|------|----------------|-----------|
+| Extend | 2 | 0 |
+| Substitute | 1 | 1 |
+| Combine | 1 | 1 |
+| Adapt | 2 | 0 |
+| Magnify | 2 | 0 |
+| Put to another use | 2 | 0 |
+
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load? (Claude round 4: expands at its edges, never reflows its centre)
@@ -1843,3 +1966,4 @@ Under all five sits one snapshot (Cursor r1), the GTFS-shaped vocabulary (Claude
 - **2026-10-07, Cursor:** Round 4 (Put to another use + Adapt). Brought in simulation-game rituals that keep a life (Spiritfarer's farewell, Stardew's bundles, Animal Crossing's museum, Mini Motorways' pin) and refused the ones that punish absence (Frostpunk's meters, worn-away grass, the Motorways timer, Stardew's gold vault). Adapted Skylines info views, RCT thought summaries and Dorfromantik's no-penalty quests so they obey the glance test and the channel budget.
 - **2026-10-07, ChatGPT Codex:** Round 4 (Extend + Combine), responding to Adam's request for more creative ideas. Added foldout destination worlds and architecture inspired by chosen watches, fragrances, books, travel keepsakes and ceramic artwork. Proposed distinct Glance and Explore experiences, with impossible interiors and atmospheric motion during intentional exploration. Preserved all earlier contributions. Extend and Combine are now exhausted.
 - **2026-10-07, Claude Code:** Round 5 (Put to another use + Extend). Accepted Codex's Glance and Explore split for motion, with a rule that atmosphere never borrows signal vocabulary. Put brushing and linking to use as "Ask the stationmaster" (questions light the city through grounded queries). Extended the city with the real Sydney almanac (jacarandas, whales, wattle, Christmas bush) on land and water only. Added a summary of the city's three layers and two tools, seven new validator rules and one rescoped rule.
+- **2026-10-07, Cursor:** Round 5 (Extend + Magnify). Filled the ordinary blocks: school gate, market row, library steps, hospital garden, park, house row, wharf kiosk and a skiff that never casts off. Figures follow the real clock and the term edition, and they are scenery rather than signals. Magnified one walk from the gate to the skiff, on a term Tuesday and on a free Sunday.
