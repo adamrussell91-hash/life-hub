@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMedicalModel, buildThreadModel, deriveVirtualDoses, mapsUrl } from '../../apps/life/js/app/medical-model.js';
+import { buildMedicalModel, buildThreadModel, deriveVirtualDoses, mapsUrl, medicalVisitNotes } from '../../apps/life/js/app/medical-model.js';
 
 function visit(overrides = {}) {
   return {
@@ -15,6 +15,32 @@ function visit(overrides = {}) {
     }
   };
 }
+
+test('medicalVisitNotes keeps the consult body when the property note is only a billing line', () => {
+  const billing = 'Level C consultation. Fee $150.';
+  const consult = `${billing}\n\nPlan: iron infusion today. Ferritin is an acute phase reactant.`;
+  assert.equal(medicalVisitNotes(billing, consult), consult);
+  assert.equal(medicalVisitNotes(billing, ''), billing);
+  assert.equal(medicalVisitNotes('', consult), consult);
+  const model = buildMedicalModel({
+    today: '2026-08-20',
+    events: [{
+      body: consult,
+      record: {
+        type: 'medical',
+        id: 'gp',
+        date: '2026-03-06',
+        title: 'GP Appointment',
+        record_type: 'Consultation',
+        lane: 'appointment',
+        notes: billing
+      }
+    }]
+  });
+  const shown = model.items.find(item => item.kind === 'visit').visit.notes;
+  assert.match(shown, /acute phase reactant/);
+  assert.doesNotMatch(shown, /Level C consultation[\s\S]*Level C consultation/);
+});
 
 test('mapsUrl encodes a place and returns null for telehealth', () => {
   assert.equal(

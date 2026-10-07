@@ -234,10 +234,21 @@ function collectThreadMarkers(thread, bloods) {
   return points.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** Property notes are the short import line. The page body holds the consult write-up. */
+export function medicalVisitNotes(notes, body) {
+  const short = typeof notes === 'string' ? notes.trim() : '';
+  const long = typeof body === 'string' ? body.trim() : '';
+  if (!long || long === short) return short;
+  if (!short || long.includes(short)) return long;
+  if (short.includes(long)) return short;
+  return long.length > short.length ? `${short}\n\n${long}` : short;
+}
+
 function decorateVisit(record, event, bloods, today) {
+  const notes = medicalVisitNotes(record.notes, event?.body);
   const weight = record.weight && ['major', 'routine', 'minor'].includes(record.weight)
     ? record.weight
-    : inferWeight({ ...record, lab: bloods, notes: record.notes || event?.body });
+    : inferWeight({ ...record, lab: bloods, notes });
   const visit = {
     id: record.id,
     date: record.date,
@@ -255,7 +266,7 @@ function decorateVisit(record, event, bloods, today) {
     provider: record.provider ?? null,
     location: record.location ?? null,
     location_kind: record.location_kind ?? (record.location ? 'place' : 'unknown'),
-    notes: record.notes || event?.body || '',
+    notes,
     follow_up_date: record.follow_up_date ?? null,
     cost_aud: record.cost_aud ?? null,
     insurance_status: record.insurance_status ?? null,
