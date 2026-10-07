@@ -1,7 +1,16 @@
 import type { Hop, Item, Trip } from '@/types';
 import { formatAud } from '@/lib/money';
+import { formatShortRange, formatTicketMoment } from '@/lib/date-label';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
-import { hopFallback, itemPlace, numberStops, orderDayItems, showArrivalGuide } from '@/model/day';
+import {
+  hopFallback,
+  isOvernightTicket,
+  itemPlace,
+  itemsForCityDay,
+  numberStops,
+  orderDayItems,
+  showArrivalGuide
+} from '@/model/day';
 import { I } from '@/lib/icons';
 
 export interface DayListOptions {
@@ -83,20 +92,25 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
     body.append(from, flight, to);
     const perf = document.createElement('div');
     perf.className = 'perf';
+    const overnight = isOvernightTicket(item);
     const departLabel = document.createElement('span');
     departLabel.className = 'hm';
-    const weekday = (d: string) =>
-      new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
     const departB = document.createElement('b');
-    departB.textContent = item.depart_time ? `${weekday(item.date)} ${item.depart_time}` : 'Time to set';
+    departB.textContent = formatTicketMoment(item.date, item.depart_time, overnight);
     departLabel.append('Departs', departB);
     const arriveLabel = document.createElement('span');
     arriveLabel.className = 'hm r';
     const arriveB = document.createElement('b');
-    arriveB.textContent = `${weekday(item.arrive_date || item.date)} ${item.arrive_time}`;
+    arriveB.textContent = formatTicketMoment(item.arrive_date || item.date, item.arrive_time, overnight);
     arriveLabel.append('Arrives', arriveB);
     const tagsWrap = document.createElement('div');
     tagsWrap.className = 'meta';
+    if (overnight) {
+      const span = document.createElement('span');
+      span.className = 'ticket-span';
+      span.textContent = `${formatShortRange(item.date, item.arrive_date)} · overnight`;
+      tagsWrap.append(span);
+    }
     const tag = tagFor(item);
     if (tag) {
       const tagEl = document.createElement('span');
@@ -242,8 +256,8 @@ export function renderDayList(
   container.replaceChildren();
   const city = trip.cities.find((c) => c.id === cityId);
   const listOptions: DayListOptions = { ...options, directionsApp: options.directionsApp ?? city?.directions_app };
-  const dayItems = trip.items.filter((item) => item.city_id === cityId && item.date === date);
-  const ordered = orderDayItems(dayItems);
+  const dayItems = itemsForCityDay(trip, cityId, date);
+  const ordered = orderDayItems(dayItems, date);
   const numbers = numberStops(ordered);
   const pinnedOrder = ordered.filter((item) => numbers.has(item.id));
 

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import fixtureTrip from '../../fixtures/test-trip.json';
-import type { Item, PlaceItem, Trip } from '@/types';
+import type { Item, PlaceItem, TicketItem, Trip } from '@/types';
 import {
   daysForCity,
   haversineKm,
   homeBaseForNight,
   hopFallback,
+  isOvernightTicket,
+  itemsForCityDay,
   numberStops,
   orderDayItems,
   otherCitiesSharingDate,
@@ -14,6 +16,28 @@ import {
 } from '@/model/day';
 
 const trip = fixtureTrip as unknown as Trip;
+
+function overnightFlight(
+  partial: Partial<TicketItem> & Pick<TicketItem, 'id' | 'city_id' | 'date' | 'arrive_date'>
+): TicketItem {
+  return {
+    kind: 'flight',
+    time: '22:15',
+    title: 'Overnight test',
+    note: '',
+    status: 'booked',
+    carrier: 'Test Air',
+    number: 'TA999',
+    from_code: 'AAA',
+    to_code: 'BBB',
+    depart_time: '22:15',
+    arrive_time: '04:10',
+    arrive_city_id: partial.arrive_city_id ?? partial.city_id,
+    created_at: '',
+    updated_at: '',
+    ...partial
+  };
+}
 
 describe('daysForCity (§3 rule 1)', () => {
   it('lists every date in the city range, ascending', () => {
@@ -37,7 +61,139 @@ describe('travelDayCue (§3 travel days)', () => {
   });
 
   it('returns null on ordinary single-city days', () => {
-    expect(travelDayCue(trip, 'lis', '2027-03-04')).toBeNull();
+    expect(travelDayCue(trip, 'opo', '2027-03-06')).toBeNull();
+  });
+
+  it('marks the fixture overnight inbound on leave and land days', () => {
+    expect(travelDayCue(trip, 'lis', '2027-03-03')).toBe('Overnight');
+    expect(travelDayCue(trip, 'lis', '2027-03-04')).toBe('Overnight');
+  });
+
+  it('marks same-city overnight leave and land days', () => {
+    const withNight: Trip = {
+      ...trip,
+      items: [
+        ...trip.items,
+        overnightFlight({
+          id: 'itm_night_same',
+          city_id: 'lis',
+          date: '2027-03-03',
+          arrive_date: '2027-03-04',
+          arrive_city_id: 'lis'
+        })
+      ]
+    };
+    expect(travelDayCue(withNight, 'lis', '2027-03-03')).toBe('Overnight');
+    expect(travelDayCue(withNight, 'lis', '2027-03-04')).toBe('Overnight');
+  });
+
+  it('marks cross-city overnight leave and land when cities do not share a date', () => {
+    const withNight: Trip = {
+      ...trip,
+      cities: trip.cities.map((c) =>
+        c.id === 'lis'
+          ? { ...c, end_date: '2027-03-04' }
+          : c.id === 'opo'
+            ? { ...c, start_date: '2027-03-05' }
+            : c
+      ),
+      items: [
+        overnightFlight({
+          id: 'itm_night_cross',
+          city_id: 'lis',
+          date: '2027-03-04',
+          arrive_date: '2027-03-05',
+          arrive_city_id: 'opo',
+          from_code: 'LIS',
+          to_code: 'OPO'
+        })
+      ]
+    };
+    expect(travelDayCue(withNight, 'lis', '2027-03-04')).toBe('→ Porto · overnight');
+    expect(travelDayCue(withNight, 'opo', '2027-03-05')).toBe('← Lisbon · overnight');
+  });
+});
+
+describe('overnight tickets on both days', () => {
+  it('detects overnight when arrive_date differs', () => {
+    expect(
+      isOvernightTicket(
+        overnightFlight({
+          id: 'n',
+          city_id: 'lis',
+          date: '2027-03-03',
+          arrive_date: '2027-03-04'
+        })
+      )
+    ).toBe(true);
+    expect(isOvernightTicket(trip.items.find((i) => i.id === 'itm_testflight01')!)).toBe(true);
+    expect(isOvernightTicket(trip.items.find((i) => i.id === 'itm_testtrain01')!)).toBe(false);
+  });
+
+  it('lists an overnight ticket on the depart day and again on the land day', () => {
+    const withNight: Trip = {
+      ...trip,
+      items: [
+        ...trip.items,
+        overnightFlight({
+          id: 'itm_night_same',
+          city_id: 'lis',
+          date: '2027-03-03',
+          arrive_date: '2027-03-04',
+          arrive_city_id: 'lis'
+        })
+      ]
+    };
+    expect(itemsForCityDay(withNight, 'lis', '2027-03-03').map((i) => i.id)).toContain('itm_night_same');
+    expect(itemsForCityDay(withNight, 'lis', '2027-03-04').map((i) => i.id)).toContain('itm_night_same');
+  });
+
+  it('opens the land city day for a cross-city overnight arrival', () => {
+    const withNight: Trip = {
+      ...trip,
+      cities: trip.cities.map((c) =>
+        c.id === 'opo' ? { ...c, start_date: '2027-03-06' } : c
+      ),
+      items: [
+        overnightFlight({
+          id: 'itm_night_cross',
+          city_id: 'lis',
+          date: '2027-03-05',
+          arrive_date: '2027-03-06',
+          arrive_city_id: 'opo'
+        })
+      ]
+    };
+    expect(daysForCity(withNight, 'opo')).toContain('2027-03-06');
+    expect(itemsForCityDay(withNight, 'opo', '2027-03-06').map((i) => i.id)).toEqual(['itm_night_cross']);
+  });
+
+  it('sorts an overnight landing by arrive_time on the land day', () => {
+    const night = overnightFlight({
+      id: 'itm_night_land',
+      city_id: 'lis',
+      date: '2027-03-03',
+      arrive_date: '2027-03-04',
+      arrive_city_id: 'lis',
+      arrive_time: '04:10'
+    });
+    const later: Item = {
+      id: 'itm_later',
+      kind: 'do',
+      city_id: 'lis',
+      date: '2027-03-04',
+      time: '09:00',
+      title: 'Later',
+      note: '',
+      status: 'planned',
+      place: { name: 'X', lat: 1, lon: 1 },
+      created_at: '',
+      updated_at: ''
+    };
+    expect(orderDayItems([later, night], '2027-03-04').map((i) => i.id)).toEqual([
+      'itm_night_land',
+      'itm_later'
+    ]);
   });
 });
 
@@ -187,7 +343,7 @@ describe('showArrivalGuide (§3 rule 5)', () => {
   });
 
   it('is false on other days', () => {
-    expect(showArrivalGuide(trip, 'lis', '2027-03-04')).toBe(false);
+    expect(showArrivalGuide(trip, 'opo', '2027-03-06')).toBe(false);
   });
 });
 

@@ -216,6 +216,7 @@ details.tobook[open] summary::after { content: "Hide"; }
 .ticket .perf::before, .ticket .perf::after { content: ""; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%; background: var(--cotton); }
 .ticket .perf::before { left: -20px; } .ticket .perf::after { right: -20px; }
 .ticket .meta { padding: 8px 14px 10px; margin: 0; }
+.ticket .ticket-span { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spacing: .02em; }
 @keyframes fly { 0% { left: -10%; } 100% { left: 100%; } }
 
 /* special cards */

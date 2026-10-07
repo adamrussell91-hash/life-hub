@@ -1,6 +1,6 @@
 import { Map as MapLibreMap, Marker, NavigationControl, LngLatBounds } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { City, Item } from '@/types';
+import type { City, IsoDate, Item } from '@/types';
 import { itemPlace, numberStops, orderDayItems } from '@/model/day';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
@@ -48,7 +48,7 @@ export function renderDayMap(
   host: HTMLElement,
   city: City,
   items: Item[],
-  options: { cooperativeGestures?: boolean } = {}
+  options: { cooperativeGestures?: boolean; viewDate?: IsoDate } = {}
 ): DayMapHandle {
   host.replaceChildren();
   const map = new MapLibreMap({
@@ -63,7 +63,7 @@ export function renderDayMap(
   (host as HTMLElement & { _travelMap?: MapLibreMap })._travelMap = map;
 
   // Same order as the day list — otherwise pin numbers disagree with plan items.
-  const ordered = orderDayItems(items);
+  const ordered = orderDayItems(items, options.viewDate);
   const numbers = numberStops(ordered);
   const markers = new Map<string, Marker>();
   let onSelectCb: ((itemId: string) => void) | null = null;
