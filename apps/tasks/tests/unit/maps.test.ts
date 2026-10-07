@@ -473,7 +473,11 @@ describe('year layout', () => {
       expect(line.y0).toBe(line.disc.cy);
       for (const track of line.tracks) {
         expect(track.disc.cy).toBe(line.y0);
+        expect(track.end.cx).toBe(track.x);
+        expect(track.end.cy).toBe(line.y1);
+        expect(track.end.cy).toBeGreaterThan(layout.yearBottom);
         expect(track.cuts[0]?.y0).toBe(track.disc.cy);
+        expect(track.cuts.at(-1)?.y1).toBe(track.end.cy);
         const stations = layout.stations.filter(
           (station) => station.line_id === line.id && station.tracks.includes(track.id)
         );
@@ -486,6 +490,8 @@ describe('year layout', () => {
         }
       }
     }
+    const foot = layout.lines[0]!.tracks[0]!.end;
+    expect(layout.height).toBeGreaterThan(foot.cy + foot.r);
   });
 });
 
@@ -546,9 +552,10 @@ describe('export', () => {
     expect(html).toContain('#f0c400');
     expect(html).toContain('#009a3a');
     expect(html).toContain('#6b2d8e');
-    expect(html).toContain('Junior');
-    expect(html).toContain('Rozelle');
-    expect(html).toContain('Senior');
+    expect(html.match(/Junior/g)?.length).toBe(8);
+    expect(html.match(/Rozelle/g)?.length).toBe(8);
+    expect(html.match(/Senior/g)?.length).toBe(8);
+    expect(html.match(/r="26"/g)?.length).toBe(24);
     expect(html).not.toContain('r="4"');
     expect(html).toMatch(/<circle cx="[\d.]+" cy="[\d.]+" r="14"/);
   });

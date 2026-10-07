@@ -23,9 +23,9 @@ export const MAP_CHIP_PAD = 6;
 export const MAP_LINE_STROKE = 8;
 export const MAP_TRACK_GAP = 160;
 export const MAP_DISC_LIFT = 48;
-/** Map-unit font sizes for labels; keep in step with `.map-station__label` / `.map-tick__label`. */
-export const MAP_STATION_FONT = 18;
-export const MAP_TICK_FONT = 16;
+/** Pill centre sits this far outside the disc edge, at both caps. */
+export const MAP_CAP_LABEL_GAP = 36;
+export const MAP_CAP_PILL_H = 24;
 
 export const YEAR_TRACKS: YearTrack[] = ['junior', 'rozelle', 'senior'];
 export const YEAR_TRACK_LABELS: Record<YearTrack, string> = {
@@ -77,7 +77,10 @@ export type LaidTrack = {
   id: string;
   label: string;
   x: number;
+  /** Cap at the top of the year line. */
   disc: { cx: number; cy: number; r: number };
+  /** Cap at the bottom of the year line. */
+  end: { cx: number; cy: number; r: number };
   cuts: Array<{ y0: number; y1: number }>;
 };
 
@@ -476,13 +479,14 @@ export function lineStrokeBox(line: LaidLine): LabelBox {
   return { id: `line-${line.id}`, x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
-export function trackLabelBox(line: LaidLine, track: LaidTrack): LabelBox {
+export function trackLabelBox(line: LaidLine, track: LaidTrack, at: 'head' | 'foot' = 'head'): LabelBox {
+  const anchor = at === 'foot' ? track.end : track.disc;
   const w = 62;
   const h = 16;
   return {
-    id: `track-${line.id}-${track.id}`,
-    x: track.disc.cx - w / 2,
-    y: track.disc.cy - track.disc.r - 38,
+    id: `track-${line.id}-${track.id}${at === 'foot' ? '-end' : ''}`,
+    x: anchor.cx - w / 2,
+    y: at === 'foot' ? anchor.cy + anchor.r + 22 : anchor.cy - anchor.r - 38,
     w,
     h
   };
@@ -599,6 +603,7 @@ function shiftX(
   for (const track of line.tracks) {
     track.x += dx;
     track.disc.cx += dx;
+    track.end.cx += dx;
   }
   for (const station of stations) {
     if (station.line_id !== line.id) continue;
@@ -628,14 +633,24 @@ function exclusiveBoxes(
   }
   for (const line of lines) {
     for (const track of line.tracks) {
-      boxes.push({
-        id: `disc-${line.id}-${track.id}`,
-        x: track.disc.cx - track.disc.r,
-        y: track.disc.cy - track.disc.r,
-        w: track.disc.r * 2,
-        h: track.disc.r * 2
-      });
-      boxes.push(trackLabelBox(line, track));
+      boxes.push(
+        {
+          id: `disc-${line.id}-${track.id}`,
+          x: track.disc.cx - track.disc.r,
+          y: track.disc.cy - track.disc.r,
+          w: track.disc.r * 2,
+          h: track.disc.r * 2
+        },
+        {
+          id: `disc-${line.id}-${track.id}-end`,
+          x: track.end.cx - track.end.r,
+          y: track.end.cy - track.end.r,
+          w: track.end.r * 2,
+          h: track.end.r * 2
+        },
+        trackLabelBox(line, track),
+        trackLabelBox(line, track, 'foot')
+      );
     }
   }
   for (const station of stations) {
@@ -668,14 +683,24 @@ export function lineContentBox(
 ): LabelBox {
   const parts: LabelBox[] = [lineStrokeBox(line)];
   for (const track of line.tracks) {
-    parts.push({
-      id: `disc-${line.id}-${track.id}`,
-      x: track.disc.cx - track.disc.r,
-      y: track.disc.cy - track.disc.r - 24,
-      w: track.disc.r * 2 + 8,
-      h: track.disc.r * 2 + 32
-    });
-    parts.push(trackLabelBox(line, track));
+    parts.push(
+      {
+        id: `disc-${line.id}-${track.id}`,
+        x: track.disc.cx - track.disc.r,
+        y: track.disc.cy - track.disc.r - 24,
+        w: track.disc.r * 2 + 8,
+        h: track.disc.r * 2 + 32
+      },
+      {
+        id: `disc-${line.id}-${track.id}-end`,
+        x: track.end.cx - track.end.r,
+        y: track.end.cy - track.end.r - 8,
+        w: track.end.r * 2 + 8,
+        h: track.end.r * 2 + 32
+      },
+      trackLabelBox(line, track),
+      trackLabelBox(line, track, 'foot')
+    );
   }
   for (const station of stations.filter((item) => item.line_id === line.id)) {
     for (const body of station.bodies) {
@@ -1085,6 +1110,7 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
   const lines: LaidLine[] = map.lines.map((line, index) => {
     const baseX = MAP_FIRST_LINE_X + index * MAP_LINE_GAP;
     const discY = yearTop - MAP_DISC_LIFT;
+    const endY = yearBottom + MAP_DISC_LIFT;
     const trackDefs = lineTrackDefs(line);
     const count = trackDefs.length;
     const tracks: LaidTrack[] = trackDefs.map((def, trackIndex) => {
@@ -1094,7 +1120,8 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
         label: def.label,
         x: tx,
         disc: { cx: tx, cy: discY, r: MAP_DISC_R },
-        cuts: [{ y0: discY, y1: yearBottom }]
+        end: { cx: tx, cy: endY, r: MAP_DISC_R },
+        cuts: [{ y0: discY, y1: endY }]
       };
     });
     const center = tracks[Math.floor((count - 1) / 2)] ?? tracks[0]!;
@@ -1105,7 +1132,7 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
       color: line.color,
       x: center.x,
       y0: discY,
-      y1: yearBottom,
+      y1: endY,
       disc: { ...center.disc },
       tracks
     };
@@ -1177,7 +1204,10 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
   packLines(lines, stations, ticks);
 
   let width = Math.max(1600, ...lines.map((line) => line.x + 360));
-  const height = yearBottom + 80;
+  const footY = yearBottom + MAP_DISC_LIFT;
+  const footLabelBottom = footY + MAP_DISC_R + MAP_CAP_LABEL_GAP + MAP_CAP_PILL_H / 2;
+  const headMargin = yearTop - MAP_DISC_LIFT - MAP_DISC_R - MAP_CAP_LABEL_GAP - MAP_CAP_PILL_H / 2;
+  const height = footLabelBottom + headMargin;
   const canvas = { width, height };
   let extraGutter = 0;
 
