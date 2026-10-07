@@ -696,6 +696,177 @@ Vera's lighthouse stays the check-in reminder Claude reduced it to. It does not 
 | Magnify | 0 | 2 |
 | Put to another use | 1 | 1 |
 
+### Round 2 · ChatGPT Codex · Substitute + Put to another use
+
+> **Author note:** Written by ChatGPT Codex on 7 October 2026. Cards played: **Substitute** and **Put to another use**. Read before writing: the current README, gap map, both contributors' Round 2 additions, and the capacity forecast handoff's BUILD and weather states documents. This round develops the occupancy train, pinned buildings, rooms and saved activities. All additions remain proposals until Adam selects a build slice.
+
+#### Substitute: a city which helps choose, with fewer demands for attention
+
+**The replacement.** Replace the assumption of every outstanding responsibility asking for attention at once. Keep the whole city available, but give the default view one selected decision and a small number of relevant signals.
+
+An ambulance, mail van, food truck, pressure ring and blocked bus all asking for attention together would become another list to manage. The city should help Adam answer a concrete question: What needs my decision now, and where do I start?
+
+**1. A signal has an owner, a reason and a useful destination.**
+
+Each meaningful signal opens a small action card with the source record, timing and next available action. Decorative motion remains decorative. A passing ferry does not secretly mean another overdue responsibility.
+
+| Situation | Proposed signal | Useful destination |
+|-----------|-----------------|--------------------|
+| A medical preparation task has a recorded due date | Sara's service vehicle waits beside the hospital entrance | The task and linked appointment |
+| An agent needs a decision | A staffed vehicle waits with an open door | The exact pending proposal |
+| A project has a recorded blocker | A signal holds its route | The blocker and affected work |
+| A document has an approaching renewal date | The records office places one notice in its window | The policy record and renewal action |
+| A linked action was moved | A timetable notice appears briefly | The changed block, with its previous and current time |
+
+The ambulance is an appointment reminder, rather than a visual claim of a medical emergency. A policy notice needs an actual renewal date. A quiet hospital, empty meal log or unanswered check-in never establishes whether an action happened.
+
+Select an item and the camera reveals the relevant vehicle, stop and room. Other routes remain visible but step back. Closing the item restores the wider view. On a phone, the same action card opens above the departures list.
+
+**2. Adam chooses the question.**
+
+Offer three small controls beside the city rather than an automatic stream of advice.
+
+| Question | What receives emphasis |
+|----------|-------------------------|
+| What needs a decision? | Pending agent proposals, explicit blockers and recorded deadlines |
+| What fits this window? | Existing tasks with duration estimates, known commitments and relevant readiness evidence |
+| Where was I? | The last saved room, activity and unfinished fragment |
+
+The first question helps with responsibility. The second helps with placement. The third helps with returning to a book idea, research topic or administrative job after an interruption.
+
+An untimed task stays untimed. A missing estimate receives a label rather than a made up duration. Selecting a question changes the view, rather than creating work or changing priorities.
+
+**3. Starting a session changes the city deliberately.**
+
+Adam selects a writing activity and a 25 minute session. The studio opens at the last saved paragraph, with its selected research beside the draft. The associated route receives emphasis. Routine city motion slows, and unrelated notices collect at the interchange instead of crossing the workspace.
+
+The session uses the existing tracked work mechanism if a compatible writing integration is built. Until then, opening the room records navigation only. A timer alone never proves writing progress.
+
+When the session ends, the room offers to save the current fragment and a short return note. For example, "Next: check the source for the classroom example." Returning tomorrow opens the same fragment and note.
+
+A task requiring attention during the session stays visible through the underlying departures board. Which deadlines interrupt the session, and which wait until the session ends, is an **Open question** for Adam. Medical icons alone should not decide priority.
+
+**4. Refine the occupancy train using the handoff's actual distinctions.**
+
+The BUILD document makes a distinction Claude's proposed passenger display needs to retain. Tracked sessions are actual workload. Classes are scheduled workload. Meetings use the model's existing weighting. A task block alone does not count as workload in the readiness model.
+
+Also, a readiness percentage and a duration in minutes are different quantities. The existing percentage does not establish how many additional tasks a carriage accommodates.
+
+Keep Claude's carriage diagram, with two readable layers:
+
+| Layer | Meaning | Source |
+|-------|---------|--------|
+| Timetable | Occupied clock time, free intervals and overlaps | Calendar commitments and task blocks |
+| Outlook | Readiness trend, condition icon, explanation and uncertainty | The shared capacity forecast |
+
+A carriage with 40 free minutes shows an opportunity in the timetable. The outlook beside it describes the expected conditions. Neither claims 40 minutes of assured productive work.
+
+An estimated 20 minute task fits an available 40 minute interval by time. Whether the task suits the current conditions is a separate, labelled suggestion. Modelled readiness stays provisional, as BUILD states. Keep the forecast's explanation available in one tap.
+
+If literal seats or "standing room only" labels are retained, the rule connecting the two layers needs explicit design and validation. Until then, use wording such as "Time available", "Overlap" and "Protected", with the readiness outlook separately visible. This preserves the train's usefulness without introducing a second capacity calculator.
+
+**5. A valued place does not need activity to deserve space.**
+
+Replace the grey park as a general consequence of missed exercise or downtime. The park retains its colour. A routine stop shows "Not logged" when evidence is absent, and a planned session shows its actual status.
+
+An intentionally protected evening appears as a lit waterfront garden with its calendar boundary visible. The city acknowledges the boundary without claiming recovery occurred. Body and Mind still own evidence about recovery.
+
+The records office stays intact during a quiet year. A dormant book desk keeps its title. The collection arcade displays owned items whether or not anything new arrived. Pinned places, from Cursor's round, support continuity rather than a requirement to remain busy.
+
+#### Put to another use: the architectural model table becomes a room for possible futures
+
+**The element to repurpose.** A miniature model of a proposed building or neighbourhood lets someone inspect a design before construction. Put a model table inside Harbour City's design workshop. Here Adam rehearses possible commitments before bringing them into the live city.
+
+This adds a different activity from Claude's time scrubber. Forecast shows the future already planned. The model table holds alternatives Adam has not chosen.
+
+**1. A proposal starts with a question, rather than another project.**
+
+Examples:
+
+- What would developing a book across the next term involve?
+- Which commitments need to change before starting another qualification?
+- What would a renovation require beyond the finished room?
+- Which preparation steps belong before the December trip?
+- How would a weekly research session connect to a future writing project?
+
+Each proposal has a purpose, selected live records, candidate additions and named assumptions. A book proposal references the existing idea desk and research. A qualification proposal references current teaching commitments and the information Adam saved about the course.
+
+Nothing becomes an active task merely because Adam explores the question.
+
+**2. Hold two alternatives on the same table.**
+
+For a book idea, the left model proposes a weekly research session during term. The right model proposes outlining during term and drafting in the holidays.
+
+Both show the same harbour, calendar commitments and pinned buildings. The candidate studio extension looks like a paper model, clearly distinct from the built city. Proposed sessions appear on a separate planning strip. Buildings stay in their usual positions.
+
+The table shows differences with ordinary labels:
+
+| Comparison | Useful information |
+|------------|--------------------|
+| New commitment | Proposed sessions and their estimated duration |
+| Clash | Overlaps with existing commitments |
+| Prerequisite | Research, decisions or resources still needed |
+| Change to existing work | Blocks proposed for movement or cancellation |
+| Unknown | Missing estimates, undecided scope or unavailable evidence |
+| First useful result | The earliest proposed output, such as a chapter outline |
+
+A blank estimate stays blank. A model with fewer commitments is lighter in planned time, rather than automatically better for Adam.
+
+**3. Keep the weather faithful while exploring.**
+
+The sky above the table retains the existing readiness outlook and evidence explanation. Moving a candidate task block never makes the weather sunnier by itself.
+
+A proposal receives a recalculated readiness outlook only if the owning forecast supports the changed input through its existing model. For example, a proposed change to a recognised scheduled class or meeting would need a supported preview path. A hypothetical task block must not silently acquire a workload penalty absent from the live model.
+
+Without a supported forecast preview, the table still compares clock time, clashes and prerequisites. It labels the outlook as the current plan's forecast. This leaves the workshop useful without inventing a prediction.
+
+**4. Proposed roads show what needs to connect.**
+
+The paper neighbourhood reveals more than scheduled tasks. A proposed book desk connects to research, an intended reader and a candidate outline. A renovation connects to property records, plans and recorded approvals. A trip preparation plan connects to bookings and selected documents.
+
+A road with an unconnected end represents a named missing relationship, such as "Course workload not yet recorded". Selecting the end opens a place to add information or link an existing record.
+
+These roads belong to the proposal. They do not appear in the live transit network, and visiting them does not create a completion event. The model is an aid to choosing a future, rather than proof of progress toward one.
+
+**5. Promotion is a specific reviewable change.**
+
+When Adam chooses an alternative, the workshop lists the records to create or change. Each candidate item has a destination hub. An existing linked task receives an update instead of an accidental duplicate.
+
+Candidate decisions become real only through the owning hub's normal action. If a multi step promotion fails partway, completed writes are reported individually. Remaining changes stay pending. Reopening the proposal recognises previously created records.
+
+After successful promotion, the paper model gains a "Chosen" plaque and links to the live records. Claude's construction crew now has genuine work to represent. The city event log records actual creations and changes, with no retrospective events for earlier experiments.
+
+Rejected alternatives stay in the workshop only if Adam saves them. Their proposal notes explain the decision. They do not occupy vacant lots or appear as failed ambitions in a year replay.
+
+**6. The workshop supports a longer view of life.**
+
+Several saved models form a shelf of possible futures. A teaching book, a research qualification, a home project and a travel idea each have their own model and relationships.
+
+Adam chooses which model to return to. A proposed future never gains priority merely because an agent generated more tasks for it.
+
+On a phone, the workshop is a labelled comparison with the same assumptions and selected records. A small model preview provides context. The useful work remains readable without rotating or zooming a miniature city.
+
+#### Open questions from ChatGPT Codex Round 2
+
+1. Which recorded deadlines should interrupt a focused room, and which should wait at the interchange?
+2. Should a short return note attach to the activity, the underlying record or the tracked session?
+3. Does the occupancy train keep transit crowding labels after its interpretation rule is defined, or use timetable labels beside the readiness outlook?
+4. Should the model table support two alternatives initially, or several saved alternatives?
+5. Where should proposal records live when the idea has no active project yet?
+6. Is the shelf of possible futures part of the design workshop, or a separate view from the Dreams district?
+
+#### ChatGPT Codex card ledger after Round 2
+
+| Card | Uses by ChatGPT Codex | Uses left |
+|------|----------------------|-----------|
+| Extend | 1 | 1 |
+| Substitute | 1 | 1 |
+| Combine | 1 | 1 |
+| Adapt | 0 | 2 |
+| Magnify | 0 | 2 |
+| Put to another use | 1 | 1 |
+
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load?
@@ -714,3 +885,4 @@ Vera's lighthouse stays the check-in reminder Claude reduced it to. It does not 
 - **2026-10-07, ChatGPT Codex:** Round 1 (Extend + Combine). Added usable interiors for current and future domains, separate product home and import states, and saved activities linking Travel, Writing and House records. Preserved both earlier rounds and the main concept. Recorded Codex card usage within the round.
 - **2026-10-07, Claude Code:** Round 2 (Magnify + Put to another use). Corrected the city's weather to come from the capacity forecast (base table and round 1 table updated). Added the time scrubber (Rewind, Forecast with honest fog, the New Year's Eve and end-of-term replays) and the per-carriage occupancy train as a capacity display. Added a card ledger.
 - **2026-10-07, Cursor:** Round 2 (Substitute + Adapt). Substituted daily city snapshots with a replay of the section 5 event log, so Rewind does not keep a second archive. Adapted Knowledge constellation placement for buildings Adam pins, and adapted the capacity forecast's uncertainty band so future haze is not Dense fog. Noted both on the architecture sketch.
+- **2026-10-07, ChatGPT Codex:** Round 2 (Substitute + Put to another use). Added decision and focus views, refined the occupancy train against the capacity handoff, proposed preserving valued quiet places, and added a model table for comparing possible futures before promotion. Preserved all earlier contributions. Updated the Codex card ledger.
