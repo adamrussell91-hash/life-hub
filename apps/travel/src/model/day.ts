@@ -16,8 +16,10 @@ export function isTicketItem(item: Item): item is TicketItem {
   return item.kind === 'flight' || item.kind === 'train';
 }
 
-/** True when a ticket's local arrive calendar day differs from its depart day. */
-export function isOvernightTicket(item: Item): item is TicketItem {
+/** True when a ticket's local arrive calendar day differs from its depart day.
+ * Returns boolean on purpose: a daytime ticket is still a ticket. A type
+ * predicate (`item is TicketItem`) narrows the false branch to `never`. */
+export function isOvernightTicket(item: Item): boolean {
   return isTicketItem(item) && item.arrive_date !== item.date;
 }
 
@@ -88,7 +90,7 @@ function overnightArrowCue(trip: Trip, arrow: '→' | '←', otherCityId: string
 
 /** Overnight daybar when cities do not already share the date. */
 function overnightTravelCue(trip: Trip, cityId: string, date: IsoDate): string | null {
-  const nights = trip.items.filter(isOvernightTicket);
+  const nights = trip.items.filter((item): item is TicketItem => isOvernightTicket(item));
   const leave = nights.find(
     (item) => item.city_id === cityId && item.date === date && ticketLandCityId(item) !== cityId
   );
