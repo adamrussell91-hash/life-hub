@@ -1059,6 +1059,169 @@ Every other waiting decision is a count on Clare's board: "3 at the depot". They
 | Magnify | 1 | 1 |
 | Put to another use | 1 | 1 |
 
+### Round 3 · ChatGPT Codex · Adapt + Magnify
+
+> **Author note:** Written by ChatGPT Codex on 7 October 2026. Cards played: **Adapt** and **Magnify**. This round follows Claude Code's consolidated planning layer and Platform, and Cursor's term editions and single decision door. It develops the rooms, saved activities and workshop from my earlier rounds, together with Cursor's Knowledge ceiling. These are proposals, rather than implementation instructions or decisions made for Adam.
+
+#### Adapt: guided walks through the records which explain a piece of life
+
+**The interaction to adapt.** A guided tour selects places, gives their sequence a purpose and explains what to notice at each stop. Apply this interaction to existing Life Hub records. Harbour City gains walks which tell a specific story, alongside routes which show work.
+
+A walk is a saved, ordered selection of references with short annotations. It uses buildings and rooms already present. Its order is chosen for explanation, separate from the Tasks graph's operational stop order.
+
+**1. Return to a project through context, rather than a task list.**
+
+A writing activity offers a "Walk me back through this" action. The walk begins at the idea desk, opens the premise, visits selected research in the Knowledge library, then returns to the outline and last saved fragment.
+
+The first panel answers why the idea exists. The second answers what supports it. The final panel answers where Adam stopped.
+
+On desktop, a small guide marker follows the path while the camera reveals each building. On the Platform, the same walk is a sequence of readable cards with Next, Previous and Open source. No camera animation is needed to understand the sequence.
+
+A walk never moves a task stop or marks a record complete. Following the whole walk means Adam reviewed its context, rather than finished the underlying work.
+
+**2. Accreditation evidence becomes an explorable account of practice.**
+
+A professional walk brings selected records from Teaching, Knowledge and Professional into one account. For example, an identified learning need, a planned response, a resource, recorded evidence of student learning, and a professional reflection.
+
+| Stop | Question answered |
+|------|-------------------|
+| Starting point | What specific need was identified? |
+| Reasoning | Why was this response selected? |
+| Practice | What was done? |
+| Evidence | What recorded change followed? |
+| Reflection | What was learned, and what needs further examination? |
+
+These are proposed narrative roles. They do not replace any accreditation framework or assert sufficient evidence for a standard.
+
+Each claim has a saved annotation and a source reference. Missing evidence appears as a named gap. A teaching resource alone does not establish impact. An annotation such as "Students improved" needs the linked evidence or stays an unsupported draft claim.
+
+The walk provides a way to inspect an account before writing a submission or discussing practice with a colleague. Sharing remains a separate, explicit action. The city's harbour view does not display private classroom evidence in building windows.
+
+**3. Travel research becomes a walk with a purpose.**
+
+A saved Istanbul research walk visits selected historical notes, a saved attraction and related fragrance or watch research. Its description states the organising question, such as the relationship between local design and the objects Adam wants to examine.
+
+This is a research walk within Life Hub. An outdoor itinerary remains a Travel itinerary. A virtual path through the library and collection arcade never establishes walking distance, opening hours or a safe physical route.
+
+When the research supports an actual trip, selected stops link to their Travel records. The terminal uses real origins and destinations as Cursor requires. The guide opens the relevant research without changing a booking or claiming an attraction was visited.
+
+**4. A walk explains relationships which a diagram alone leaves unclear.**
+
+A ferry shows a saved connection between two districts. Selecting "Explain this connection" opens the associated annotation or walk.
+
+For example, the library connects to a book desk because selected notes support a chapter. The walk names which notes, what role each serves and where uncertainty persists. Merely sharing a topic does not establish support.
+
+Adam chooses whether the city draws this explanatory path. A selected walk receives emphasis. Other walks stay stored rather than adding another network of moving vehicles.
+
+This fits Cursor's single decision door. A guide is a navigation marker, separate from a waiting decision vehicle. Opening a walk does not produce another prominent agent proposal.
+
+**5. Walks use references and survive ordinary change honestly.**
+
+The owning hub supplies each record when a stop opens. A versioned draft uses the version selected in the walk where the hub supports this. An unversioned record shows its current contents, with the same distinction Cursor established for past rooms.
+
+Deleted records are absent through the shared liveness rules. An authorised walk editor identifies a missing source so Adam has a chance to repair the account. A normal walk omits the deleted material and marks the account incomplete without revealing its old title or contents.
+
+Archived material is available through the existing archive rules. A saved walk is never an exemption from access controls.
+
+A proposed new walk is reviewed in the workshop. Saving the walk stores references, order and Adam's annotations. It does not create tasks unless Adam separately chooses an action.
+
+#### Magnify: the Knowledge ceiling opens into an Idea Exchange
+
+**What becomes bigger.** Cursor's ceiling makes saved constellations visible in the station. Magnify the usefulness of those connections. Give the concourse a room where Adam explores how selected ideas apply to teaching, writing or another explicitly chosen purpose.
+
+The Idea Exchange opens from a constellation or selected notes. Its purpose is to produce a question, a tentative connection or a small experiment worth considering.
+
+**1. A connection becomes a conversation with the sources present.**
+
+Adam selects two notes and a purpose. The room places their source cards on opposite sides of a shared table. Between them appears a question Adam enters, or a suggestion he requests.
+
+For an English teaching example, the selected material might concern concept distinctions and examples of students confusing comparison with juxtaposition. The question is practical: Which examples would help students distinguish the two concepts?
+
+The room keeps three columns:
+
+| Column | Contents |
+|--------|----------|
+| Recorded | What the selected sources and teaching records explicitly say |
+| Proposed | A tentative connection, interpretation or lesson idea |
+| To examine | Missing evidence, a competing explanation or a question for further research |
+
+An educational application stays a proposal until examined. A neuroscience source does not automatically prove a classroom method works. The room keeps the claim, the source and the proposed application visibly separate.
+
+**2. Expand one idea across several useful forms.**
+
+A selected idea has destinations suited to Adam's work:
+
+| Destination | Candidate output |
+|-------------|------------------|
+| Teaching | A contrasting example set, explanation or diagnostic question |
+| Writing | A chapter question, argument fragment or example |
+| Knowledge | A new research question or note needing sources |
+| Professional | A reflection question or discussion prompt |
+| Workshop | A proposed small experiment with assumptions and an evaluation plan |
+
+The Exchange offers candidate outputs when requested. Saving one records its tentative status and links to the originating notes. Publishing, teaching or sending anything remains a separate action.
+
+This makes the Knowledge ceiling a route into practical work. The stars retain their saved positions. A new proposal does not redraw a constellation or become a saved note before Adam accepts it.
+
+**3. Ask for a surprising connection without pretending a connection exists.**
+
+An optional control says "Offer an unexpected pairing". Adam first selects the scope, such as teaching and writing. The Exchange offers a pair from eligible records with a short explanation of the proposed connection.
+
+A pair might place a note about competing explanations beside a literary interpretation task. The suggestion asks whether testing alternative interpretations would help the lesson. It does not state an established relationship between the records.
+
+Existing explicit relationships receive their own label. New suggested relationships receive a proposal label. Accepting a question and accepting a relationship are separate choices.
+
+This uses source retrieval and suggestions, rather than another daily agent job. Opening the city does not run an automatic search through the whole life archive. The selected scope determines which records enter the exchange. Health, diary and student records require deliberate inclusion through their normal access rules.
+
+**4. A small experiment goes to the model table.**
+
+Adam selects a proposed teaching idea and opens "Try a small version". The workshop asks for the change, the relevant class or context, a suitable observation and the point at which Adam will review the result.
+
+For example, the proposal uses a short set of paired examples and checks whether students distinguish the concepts in an unseen example. The observation is recorded as an observation. A class response alone does not establish a general causal finding.
+
+The paper model shows the proposed resource, session and review. Existing teaching commitments remain solid. Promotion uses the reviewable record changes from Round 2 and the lifecycle Claude consolidated.
+
+After the review, Adam chooses whether to revise, retain or stop the experiment. The Exchange links to the recorded result without automatically declaring success or building a landmark.
+
+**5. Outcomes become exhibitions which explain value.**
+
+A retained lesson resource, a developed chapter or a completed research account is eligible for a small exhibition in its owning building. Adam selects what the exhibition says and which sources it opens.
+
+The exhibition contains a title, an artefact, a short account of its purpose and selected evidence. A quiet district gains something useful to revisit, independent of its current task count.
+
+Claude's term replay provides the evening event. Selecting a projected building opens its curated exhibition, where one exists. An uncurated milestone opens the ordinary source record. The replay never generates an impact story merely because a task finished.
+
+These exhibitions serve the later walk. A professional account visits the lesson exhibition and its evidence. A writing walk visits a finished chapter. Harbour City gradually records work which has meaning beyond the number of completed stops.
+
+**6. Keep the Exchange inside the established city.**
+
+The Platform gains the Exchange as a room reached through the ceiling strip or a selected activity. It does not add a fourth permanent door beside Decisions, Fits now and Where was I.
+
+The wide city uses the existing concourse and library. New connections appear only while an Exchange or walk is selected. Normal city traffic retains its existing meanings.
+
+The validator needs separate checks for explanation and suggestion. A proposed interpretation must not appear as a recorded fact. A guide marker must not trigger the decision queue rule. A saved experiment must not emit completion or impact events merely because its proposal was accepted.
+
+#### Open questions from ChatGPT Codex Round 3
+
+1. Which first walk would be most useful: returning to a book idea, reviewing professional evidence or connecting travel research?
+2. Should walk annotations stay in the saved activity, or become individually linked Knowledge notes?
+3. Should the Exchange open with Adam's question, selected notes or a choice of purpose?
+4. Is unexpected pairing useful only on request, or as a single optional suggestion when opening the room?
+5. Which completed outputs deserve curated exhibitions, and should any appear without Adam choosing them?
+6. Should the guide marker be a person, a small route highlight or only a sequence of room cards?
+
+#### ChatGPT Codex card ledger after Round 3
+
+| Card | Uses by ChatGPT Codex | Uses left |
+|------|----------------------|-----------|
+| Extend | 1 | 1 |
+| Substitute | 1 | 1 |
+| Combine | 1 | 1 |
+| Adapt | 1 | 1 |
+| Magnify | 1 | 1 |
+| Put to another use | 1 | 1 |
+
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load?
@@ -1080,3 +1243,4 @@ Every other waiting decision is a count on Clare's board: "3 at the depot". They
 - **2026-10-07, ChatGPT Codex:** Round 2 (Substitute + Put to another use). Added decision and focus views, refined the occupancy train against the capacity handoff, proposed preserving valued quiet places, and added a model table for comparing possible futures before promotion. Preserved all earlier contributions. Updated the Codex card ledger.
 - **2026-10-07, Claude Code:** Round 3 (Combine + Adapt). Adopted Cursor's event-log Rewind and Codex's two-layer train. Combined five ideas into one planning layer (vacant lot, proposed, under construction, open, retired) and five phone ideas into the Platform screen. Adapted MobilityData's GTFS validator and the capacity forecast's one-number test into a Life City validator with traced rules and golden-day fixtures.
 - **2026-10-07, Cursor:** Round 3 (Extend + Magnify). Extended the school-term prefs into a term edition of the same city, and kept a booked trip distinct from a dream. Magnified a single open door for the next decision, with the rest counted at the depot. Noted the edition on the architecture sketch.
+- **2026-10-07, ChatGPT Codex:** Round 3 (Adapt + Magnify). Added guided walks through linked records and an Idea Exchange for source grounded teaching and writing proposals, small experiments and curated outcome exhibitions. Preserved all earlier contributions and updated the Codex card ledger, with each card now used once.
