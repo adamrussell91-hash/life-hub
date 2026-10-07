@@ -28,15 +28,18 @@ function ticketLandCityId(item: TicketItem): string {
 /** Ticket appears on its depart city/day, and again on the land city/day when overnight. */
 export function ticketShowsOnDay(item: TicketItem, cityId: string, date: IsoDate): boolean {
   if (item.city_id === cityId && item.date === date) return true;
-  if (!isOvernightTicket(item) || item.arrive_date !== date) return false;
-  return ticketLandCityId(item) === cityId;
+  return isOvernightTicket(item) && item.arrive_date === date && ticketLandCityId(item) === cityId;
+}
+
+function itemOnCityDay(item: Item, cityId: string, date: IsoDate): boolean {
+  return isTicketItem(item)
+    ? ticketShowsOnDay(item, cityId, date)
+    : item.city_id === cityId && item.date === date;
 }
 
 /** Items for one city day list — includes overnight tickets landing that morning. */
 export function itemsForCityDay(trip: Trip, cityId: string, date: IsoDate): Item[] {
-  return trip.items.filter((item) =>
-    isTicketItem(item) ? ticketShowsOnDay(item, cityId, date) : item.city_id === cityId && item.date === date
-  );
+  return trip.items.filter((item) => itemOnCityDay(item, cityId, date));
 }
 
 /** §3 rule 1 — every date from start to end for a city, plus any date with
@@ -62,10 +65,7 @@ export function daysForCity(trip: Trip, cityId: string): IsoDate[] {
 /** True when the city's range or an item tags this date (travel days can hit two cities). */
 function cityCoversDate(trip: Trip, city: City, date: IsoDate): boolean {
   if (city.start_date <= date && date <= city.end_date) return true;
-  return trip.items.some((item) => {
-    if (item.city_id === city.id && item.date === date) return true;
-    return isTicketItem(item) && ticketShowsOnDay(item, city.id, date);
-  });
+  return trip.items.some((item) => itemOnCityDay(item, city.id, date));
 }
 
 /** Cities whose day list includes this date (range or item). Travel days land in two. */
@@ -77,6 +77,37 @@ export function otherCitiesSharingDate(trip: Trip, cityId: string, date: IsoDate
   return citiesSharingDate(trip, date).filter((city) => city.id !== cityId);
 }
 
+function cityNames(cities: City[]): string {
+  return cities.map((city) => city.name).join(', ');
+}
+
+function overnightArrowCue(trip: Trip, arrow: '→' | '←', otherCityId: string): string {
+  const name = trip.cities.find((c) => c.id === otherCityId)?.name;
+  return name ? `${arrow} ${name} · overnight` : 'Overnight';
+}
+
+/** Overnight daybar when cities do not already share the date. */
+function overnightTravelCue(trip: Trip, cityId: string, date: IsoDate): string | null {
+  const nights = trip.items.filter(isOvernightTicket);
+  const leave = nights.find(
+    (item) => item.city_id === cityId && item.date === date && ticketLandCityId(item) !== cityId
+  );
+  if (leave) return overnightArrowCue(trip, '→', ticketLandCityId(leave));
+
+  const land = nights.find(
+    (item) => item.arrive_date === date && ticketLandCityId(item) === cityId && item.city_id !== cityId
+  );
+  if (land) return overnightArrowCue(trip, '←', land.city_id);
+
+  const sameCity = nights.some(
+    (item) =>
+      item.city_id === cityId &&
+      ticketLandCityId(item) === cityId &&
+      (item.date === date || item.arrive_date === date)
+  );
+  return sameCity ? 'Overnight' : null;
+}
+
 /**
  * Short daybar label when this date is shared with another city, or when an
  * overnight ticket spans this city into/out of another.
@@ -85,46 +116,13 @@ export function otherCitiesSharingDate(trip: Trip, cityId: string, date: IsoDate
 export function travelDayCue(trip: Trip, cityId: string, date: IsoDate): string | null {
   const others = otherCitiesSharingDate(trip, cityId, date);
   if (others.length) {
-    const names = (cities: City[]) => cities.map((city) => city.name).join(', ');
     const outbound = others.filter((city) => city.start_date === date);
-    if (outbound.length) return `→ ${names(outbound)}`;
+    if (outbound.length) return `→ ${cityNames(outbound)}`;
     const inbound = others.filter((city) => city.end_date === date);
-    if (inbound.length) return `← ${names(inbound)}`;
-    return `also ${names(others)}`;
+    if (inbound.length) return `← ${cityNames(inbound)}`;
+    return `also ${cityNames(others)}`;
   }
-
-  const leaveNight = trip.items.find(
-    (item): item is TicketItem =>
-      isOvernightTicket(item) &&
-      item.city_id === cityId &&
-      item.date === date &&
-      ticketLandCityId(item) !== cityId
-  );
-  if (leaveNight) {
-    const dest = trip.cities.find((c) => c.id === ticketLandCityId(leaveNight));
-    return dest ? `→ ${dest.name} · overnight` : 'Overnight';
-  }
-
-  const landNight = trip.items.find(
-    (item): item is TicketItem =>
-      isOvernightTicket(item) &&
-      item.arrive_date === date &&
-      ticketLandCityId(item) === cityId &&
-      item.city_id !== cityId
-  );
-  if (landNight) {
-    const from = trip.cities.find((c) => c.id === landNight.city_id);
-    return from ? `← ${from.name} · overnight` : 'Overnight';
-  }
-
-  const sameCityNight = trip.items.some(
-    (item) =>
-      isOvernightTicket(item) &&
-      ticketLandCityId(item) === cityId &&
-      item.city_id === cityId &&
-      (item.date === date || item.arrive_date === date)
-  );
-  return sameCityNight ? 'Overnight' : null;
+  return overnightTravelCue(trip, cityId, date);
 }
 
 function toIsoUtc(d: Date): IsoDate {
@@ -154,11 +152,10 @@ export function orderDayItems(items: Item[], viewDate?: IsoDate): Item[] {
 }
 
 function sortTime(item: Item, viewDate?: IsoDate): string | null {
-  if (item.kind === 'flight' || item.kind === 'train') {
-    if (viewDate && item.arrive_date === viewDate && item.date !== viewDate) return item.arrive_time;
-    return item.depart_time;
-  }
-  return item.time;
+  if (!isTicketItem(item)) return item.time;
+  // On the overnight land day, order by arrival so the ticket sits in the morning.
+  if (viewDate && item.arrive_date === viewDate && item.date !== viewDate) return item.arrive_time;
+  return item.depart_time;
 }
 
 /** §3 rule 3 — numbered pins go to items with a `place` that aren't stays,

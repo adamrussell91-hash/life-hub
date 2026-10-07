@@ -1,12 +1,18 @@
 import type { IsoDate } from '@/types';
 
+function weekdayShort(date: IsoDate): string {
+  return new Date(date + 'T00:00:00Z').toLocaleDateString('en-GB', {
+    weekday: 'short',
+    timeZone: 'UTC'
+  });
+}
+
 /** "Fri 4 Dec" style label used by the world map status chip and check-ins. */
 export function formatWeekdayDate(date: IsoDate): string {
   // Built by hand: en-GB inserts a comma ("Fri, 4 Dec") in some engines.
   const d = new Date(date + 'T00:00:00Z');
-  const weekday = d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
   const month = d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' });
-  return `${weekday} ${d.getUTCDate()} ${month}`;
+  return `${weekdayShort(date)} ${d.getUTCDate()} ${month}`;
 }
 
 /**
@@ -15,10 +21,7 @@ export function formatWeekdayDate(date: IsoDate): string {
  */
 export function formatTicketMoment(date: IsoDate, time: string | undefined, overnight: boolean): string {
   if (!time) return 'Time to set';
-  if (overnight) return `${formatWeekdayDate(date)} ${time}`;
-  const d = new Date(date + 'T00:00:00Z');
-  const weekday = d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
-  return `${weekday} ${time}`;
+  return overnight ? `${formatWeekdayDate(date)} ${time}` : `${weekdayShort(date)} ${time}`;
 }
 
 function parts(date: IsoDate): { day: number; month: string; year: number } {

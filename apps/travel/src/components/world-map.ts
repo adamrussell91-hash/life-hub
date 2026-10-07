@@ -5,6 +5,7 @@ import type { Trip, TicketItem } from '@/types';
 import { I } from '@/lib/icons';
 import { zoomable } from '@/lib/zoomable';
 import { formatWeekdayDate } from '@/lib/date-label';
+import { isOvernightTicket } from '@/model/day';
 
 const VIEW_W = 1000;
 const VIEW_H = 540;
@@ -63,10 +64,12 @@ export function tripLegs(trip: Trip): Leg[] {
         )
       : undefined;
     if (t) {
-      const overnight = t.arrive_date !== t.date;
-      const head = overnight
-        ? `${formatWeekdayDate(t.date)} – ${formatWeekdayDate(t.arrive_date)} · ${t.from_code} → ${t.to_code}.`
-        : `${formatWeekdayDate(t.date)} · ${t.from_code} → ${t.to_code}.`;
+      const overnight = isOvernightTicket(t);
+      const when = overnight
+        ? `${formatWeekdayDate(t.date)} – ${formatWeekdayDate(t.arrive_date)}`
+        : formatWeekdayDate(t.date);
+      const head = `${when} · ${t.from_code} → ${t.to_code}.`;
+      const bookedLabel = t.status === 'booked' ? 'Booked.' : 'Not booked yet.';
       legs.push({
         fromCity: a,
         toCity: b,
@@ -74,7 +77,7 @@ export function tripLegs(trip: Trip): Leg[] {
         rail: t.kind === 'train',
         statusHtml: `<b>${escapeHtml(head)}</b> ${escapeHtml(`${t.carrier} ${t.number}`)}.${
           overnight ? ' Overnight.' : ''
-        } ${t.status === 'booked' ? 'Booked.' : 'Not booked yet.'}`
+        } ${bookedLabel}`
       });
     } else {
       legs.push({
