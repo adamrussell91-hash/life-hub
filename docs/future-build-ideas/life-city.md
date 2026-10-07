@@ -24,7 +24,7 @@ The **street** survives: a calm isometric city that shows goals, projects, tasks
 
 Most of what came after it does not survive as written. Rooms, walks, workshops and foldout worlds turn the city into a second front end for Life Hub, need bespoke art no tool in the pipeline makes, or depend on hubs that do not exist yet. The two big round 6 ideas (planning law for agents, and the dam) are good, but they are **Life Hub features**, not city features, and they belong in their own doc.
 
-Count across the register below: **42 Keep, 47 Modify, 26 Cut.** The delight features (festivals, keepsakes, the pet garden, whale watching, museum shelves and bundles) came back in on Adam's call, rebuilt so they are cheap to draw.
+Count across the register below: **42 Keep, 45 Modify, 28 Cut.** The delight features (festivals, Adam's pets, keepsakes and whale watching) came back in on Adam's call, rebuilt so they are cheap to draw. Museum shelves and bundles stay cut, also on his call.
 
 ### Checked against the code
 
@@ -54,7 +54,7 @@ Count across the register below: **42 Keep, 47 Modify, 26 Cut.** The delight fea
 
 **F4. The city keeps becoming a second front end.** P3, P6, P9, P12, P15 and P16 build rooms with editors, desks, tables and workspaces that redo what hubs do. Fix: **every door opens the owning hub page.** The city never hosts an editor. A domain with no hub needs a hub first. That is a Life Hub build, not a Life City build.
 
-**F5. Art cost.** Kenney covers the street. Foldout trunks, watch-mechanism stations, fragrance-bottle gardens and book theatres each need bespoke illustration in one consistent style, and the folder README says plainly that none of the build tools can do that. Fix: cut the bespoke worlds. Delight comes from what is cheap to draw well: lighting, particles, recolours, the almanac, photo slots and one AI-assisted hero piece at a time under a locked style reference. Festivals, keepsakes and the pet garden are rebuilt on that basis.
+**F5. Art cost.** Kenney covers the street. Foldout trunks, watch-mechanism stations, fragrance-bottle gardens and book theatres each need bespoke illustration in one consistent style, and the folder README says plainly that none of the build tools can do that. Fix: cut the bespoke worlds. Delight comes from what is cheap to draw well: lighting, particles, recolours, the almanac, photo slots and one AI-assisted hero piece at a time under a locked style reference. Festivals, keepsakes and Adam's pets are built on that basis.
 
 **F6. The central promise is unproven.** "Feel the state of your life without reading" is a hypothesis. Fix: P10's glance test comes before anything else is built, and the project stops if it fails.
 
@@ -183,8 +183,8 @@ Count across the register below: **42 Keep, 47 Modify, 26 Cut.** The delight fea
 | Records office, service centre, design workshop, writing studio, collection arcade, market kitchen, treatment rooms | P3 | **Cut** | These are hub gaps. Build hubs first, then the city gets a door |
 | Book idea desks | P3 | **Cut** | There is no Writing hub |
 | Saved activities across hubs | P3 | **Cut** | A cross-hub collections feature. It belongs in Life Hub, if anywhere |
-| Stardew-style bundles | P11 | **Modify** | Later phase. A bundle is a named set of slots that point at records already in any hub ("passport", "booking", "insurance"). A slot fills when the record exists and Adam confirms it. Finishing a bundle lifts the hoarding off one wing, as one change in the catch-up. Only for things that are not tasks, because Tasks already does checklists |
-| Museum shelves | P11 | **Modify** | Start with what existing hubs already hold: finished lessons, completed goals, visited trips, saved constellations. Adam places each item himself and nothing nags him to. Watches, fragrances and books join when their hubs exist. Exhibitions live here too, as a shelf item with Adam's note |
+| Stardew-style bundles | P11 | **Cut** | Adam's call: not for him. Tasks already handles checklists |
+| Museum shelves | P11 | **Cut** | Adam's call: he does not like them |
 | Focus sessions inside rooms, and interrupt rules | P6, P8 | **Cut** | Work sessions already exist in Tasks |
 | Guided walks and the accreditation walk | P9 | **Cut** | Reading-heavy and authored. The Professional hub is the place, if anywhere |
 | Idea Exchange and unexpected pairings | P9 | **Modify** | Build it inside Knowledge, where the notes and the existing chat already are. The city's library is the door. Pairings only on request, with the recorded, proposed and to-examine columns kept separate. Exhibitions move to the museum shelves |
@@ -205,7 +205,7 @@ Count across the register below: **42 Keep, 47 Modify, 26 Cut.** The delight fea
 | Foldout travel trunks and destination worlds | P12 | **Cut** | F5 |
 | Watch station, fragrance conservatories, book theatres, Delft set | P12 | **Cut** | F5, and no collection hubs exist |
 | Keepsakes that reshape the city | P12 | **Modify** | A fixed set of slots drawn once: the station clock face, the fountain, a plaque and a framed view in the concourse. Each takes a photo Adam chooses or a motif from a small set. No new illustration per keepsake |
-| Private garden for pets | P12 | **Keep** | As P12 wrote it. Adam names every bed and chooses every photo or memory. Nothing is scored or watered, it never appears in the catch-up, and no agent can read or change it. It is a gate only he opens |
+| Adam's pets, alive in the city | P12, revised by Adam | **Keep** | Adam's pets come back as small animated characters who live in Harbour City. Each is drawn once from his photos in the locked city style, as one hero piece per pet with a short walk cycle. In Glance they rest in a spot he chooses (the front step, under the fig, the seawall), so their stillness never reads as a signal. In Explore they wander the footpaths, the park and the foreshore. Tap one to see a photo or memory he chose. They are never scored, never in the catch-up, never linked to a task, and no agent can change them. The garden stays as somewhere they return to |
 | Sydney almanac on land and water | P13 | **Keep** | Date-driven palette and sprite swaps, static in Glance. Cheap delight |
 | Personal almanac dates | P13 | **Keep** | Later |
 | Whale watching from the lighthouse | P13 | **Keep** | Later. The whales are already in the almanac, so this is just a camera position at the lighthouse in whale months |
@@ -238,7 +238,7 @@ A calm isometric street, wide screen first, with a Home tile. It shows goals, pr
 2. **Glance prototype.** A static Kenney street for those golden days, following the channel budget, with one halo and a catch-up built from timestamps. Run P10's three-second glance test with Adam. **If it fails, stop here.**
 3. **Home tile and the wide city page on live data.** Desktop only.
 4. **Event log.** Append-only and ids only, at the Tasks write path. This unlocks the full catch-up.
-5. **Delight.** The almanac, vacant lots, personal landmarks, keepsake slots and the pet garden. Then the first festival (the Balloon Gathering), the museum shelves and whale watching. Bundles follow once there are records worth gathering.
+5. **Delight.** Adam's pets first, then the almanac, vacant lots, personal landmarks and keepsake slots. Then the first festival (the Balloon Gathering) and whale watching.
 6. **Time tools.** Rewind and Forecast once there is a term of log, then the term replay.
 7. **Ask the stationmaster,** city lens first.
 
@@ -2663,3 +2663,4 @@ Adam asked for the build's biggest wow features. After six rounds by three contr
 - **2026-10-07:** Contributor names removed from the whole doc at Adam's request. Proposals are now identified only by number; authorship lives in git history. Card ledgers and author notes deleted.
 - **2026-10-07:** Critical review added at the top. It sorts every concept into Keep, Modify or Cut and replaces the round 6 build order.
 - **2026-10-07:** Festivals, keepsakes, the pet garden, whale watching, museum shelves, bundles and the Idea Exchange moved from Cut to Keep or Modify at Adam's request, each with a cheaper way to build it.
+- **2026-10-07:** Adam cut museum shelves and bundles, and turned the pet garden into his pets living in the city as animated characters.
