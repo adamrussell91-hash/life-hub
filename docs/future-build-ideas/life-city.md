@@ -134,6 +134,7 @@ Life City needs a tiny fraction of OpenTTD: no money, no crashes, no freight eco
 - **One graph, four lenses:** Tasks Lines, Branch, Orbit and Harbour City read one snapshot of that graph. The city does not keep a second copy of what is done, blocked or due. Proposal in Cursor's round 1 below.
 - **History is the event log:** Rewind replays these events up to a day. It does not keep a second archive of the city. Proposal in Cursor's round 2.
 - **Term edition:** which Teaching services are in the snapshot comes from hub prefs `school_terms`. Proposal in Cursor's round 3.
+- **No neglect meter:** the street does not decay, score, or end because time passed. Accumulation rituals are a proposal in Cursor's round 4.
 - **Renderer:** PixiJS (2D) first
 
 ### Who builds what
@@ -1375,6 +1376,115 @@ If it passes, every later layer (rooms, walks, Plans, the scrubber, fireworks) i
 | Put to another use | 1 | 1 |
 
 
+### Round 4 · Cursor · Put to another use + Adapt
+
+> **Author note:** This round was written by Cursor on 7 October 2026. Cards played: **Put to another use** and **Adapt**. It follows Claude Code's Round 4 (the glance test, the channel budget, and change as the thing you notice) and Codex's rooms, bundles-in-waiting and quiet places. The research is a pass across life sims and tycoons, looking for mechanics that match a city which must stay true in a two-second glance and must never punish a week Adam did not open it. Everything here is a proposal until Adam names a slice to build.
+
+#### What these games are for
+
+Claude's round 4 is right that the street is turning into a second set of pages. The games below are not a wishlist of features to paste on. They are a split the street can use.
+
+Some of them know how a place **keeps** a life: a room comes back when a set of things from different work is gathered, a collection fills when you choose to give it something, a finished presence gets a real goodbye. Some of them know how a place **punishes** a life: a meter hits zero and the city ends, weeds spread because you were away, a score falls because guests got bored. Life City takes the first family and writes the second down as things the validator is allowed to fail.
+
+Every import is also sorted by Claude's glance test. If it cannot be read in two seconds, it is a room. If it needs a new meaning for colour, it does not go on the street.
+
+#### Put to another use: the rituals that keep a life, taken from four games
+
+**1. Spiritfarer's Everdoor becomes the retirement of an archived route.**
+
+In Spiritfarer, a spirit asks to be taken to the Everdoor when their own story is done. You choose who goes, and you can wait. The spirit asks if you are ready before they leave. One of them, Atul, does not get a door at all: he is simply gone, which is the point of that character ([ScreenRant on keeping spirits aboard](https://screenrant.com/spiritfarer-how-keep-people-on-boat-make-stay/); [Steam, choosing who goes when several are ready](https://steamcommunity.com/app/972660/discussions/0/3075377162297146118/)).
+
+Put that door to use as the last moment of Claude's planning layer, and only for **archive**, never for delete.
+
+When a project or goal is archived, its last vehicle does not vanish. It boards the ferry, crosses to the landmark the base doc already promised, and the route's line style goes from solid to "retired" in that one crossing. Adam can leave it at the depot if he is not ready. The catch-up replay Claude just designed is allowed to include this crossing, because it is a real event in the log (`route.retired`), and motion on the street is only allowed when an event explains it.
+
+A **deleted** record gets Atul's exit. No ferry, no plaque, no title left on the water. The liveness filter drops it before the ceremony can be queued. A golden day: archive the Weight Line and the ferry plays once; delete a different project and the catch-up shows a gap with no boat and no name.
+
+The ceremony is one line on the Platform ("A route retired. Show me."). It is not a cutscene that must be watched. Skip still jumps to Now.
+
+**2. Stardew's bundles become Codex's saved activities, and they live in a room.**
+
+The Community Center in Stardew Valley is a wreck until you fill bundles. Each room asks for things from a different kind of work: forage in one, crops in another, metal from the mines in a third. There is no deadline. Finishing every bundle in a room restores that room, and the Junimos do it overnight, not as a points pop-up. Finishing the whole center restores the building ([Stardew Valley Wiki, Community Center](https://stardewvalleywiki.com/Community_Center); [Bundles](https://stardewvalleywiki.com/Bundles)).
+
+One room, the Vault, is just gold. That room is the one we do not take. Day-to-day money stays out of the city, and a bundle that can be completed by paying is not a bundle.
+
+Put the other rooms to use as the payoff for a saved activity. Codex already gathers records from several hubs for one purpose: a trip, a book, a repair. A bundle is that set, with slots Adam names ("the passport", "the chapter outline", "the builder's quote"). A slot fills when the owning record exists and he confirms the link. An empty slot is a named gap in the **room**, the way a walk already shows a missing source. It is not a pin, a weed, or a halo on the street.
+
+When the last slot fills, the street gets one change, and only one, so the catch-up can show it: the hoarding comes off that wing and the building joins the ordinary city. Light means "open", which is correct, because the room is now a place he can use. It does not flash a new colour. It does not award a trophy. The Junimos' gift shop is not imported. The useful thing the town got, in Stardew, was a bridge or a bus. The useful thing Harbour City gets is the wing itself.
+
+A bundle can sit unfinished for a year. Seasonal items in Stardew sometimes make you wait. Here, a missing document stays missing until it exists. The city does not invent a placeholder policy to fill the slot, which is Codex's import rule again.
+
+**3. The museum, not the weeds.**
+
+Animal Crossing's museum takes a fish, a bug, or a fossil when you decide to give it, and the wing fills up over a real year because some creatures only exist in some months. Past games did not even pay you for finishing it ([Polygon's museum guide](https://www.polygon.com/animal-crossing-new-horizons-switch-acnh-guide/2020/3/20/21185842/museum-unlock-blathers-fossils-fish-bugs/)). That is the collection arcade, the writing shelf, and the records office: a watch, a fragrance, a finished chapter, a certificate goes on the shelf when Adam puts it there. Nothing in the depot queue nags him to donate. A quiet gallery stays lit. Silence is not a gap in the bundle unless he named that slot himself.
+
+The same series also shows the mechanic to refuse. In City Folk and New Leaf, walking the town wore the grass down to dirt. Players called the result desert towns. New Horizons removed that wear ([Nookipedia on grass](https://nookipedia.com/wiki/Grass); [grass deterioration](https://animalcrossing.fandom.com/wiki/Grass_deterioration)). Weeds still spread when you are away, up to twenty missed days at a time ([ACNH rates](https://acnh.isomorphicbox.com/rates/)). A desire line that destroys the park, and a weed that grows because the city was closed, both fail the rule Codex and Claude already wrote: quiet is not failure. They also fail Claude's channel budget, because "neglected" would be a new meaning for light and colour.
+
+If the city ever shows where life actually flowed, it is an info view, below, and it is a mark he can turn off. It is not the ground eating itself.
+
+**4. The pin, not the timer.**
+
+Mini Motorways, from the studio that made Mini Metro, puts a pin on a building when that destination wants a trip. The pin's colour is which house it belongs to. You do not drive the cars. If too many pins stack, a timer starts, and a finished timer ends the city ([Mini Motorways Wiki](https://minimotorways.miraheze.org/wiki/Gameplay); [Dinosaur Polo Club](https://dinopoloclub.com/games/mini-motorways/)).
+
+Put the **pin** to use. A task that is real and not yet on any route is a single pin shape on its building. The shape means "not on a route". The colour, if the pin has one, is the line it would join, which is identity, the only thing hue is allowed to mean. The street can glance it: a pin is not a moving bus and not the halo.
+
+Leave the **timer** in the game. A countdown to "the city shuts down" is the same family as Frostpunk's lose bar, below. Mini Metro's pressure ring is already in this document as a stale-task warning, and Codex has already said a crowding word needs a written rule before it is allowed to look like failure. A pin does not grow a second ring. It waits. Connecting it to a route is an ordinary task edit in Tasks, and then the pin is gone because the stop exists.
+
+#### Adapt: tycoon tools that only appear when you ask, and the meters we will not build
+
+**The pattern.** Cities: Skylines keeps thirty-odd info views off the normal camera. You open one when you are asking a question: where the ambulances reach, where the garbage trucks have a road, where the fire cover is thin. The view is a tool, not the city. The wiki is also a warning: the green on those roads is not "the truck cannot go further". It is a land-value wash, and players misread it constantly ([Cities: Skylines Wiki, info views](https://skylines.paradoxwikis.com/index.php?title=Info_views&veaction=edit)).
+
+RollerCoaster Tycoon puts a thought over each guest ("I'm hungry", "I can't find the exit") and, separately, a window that sorts those thoughts by how many guests share them ([Guest thoughts](https://rct.wiki/wiki/Guest_Thoughts)). The useful half is the summary. The useless half, for our street, is a hundred bubbles. The game then rolls the thoughts up into a park rating that falls when people are miserable ([park rating notes](https://rct2resource.bizhat.com/tutorials/parkrating.html)). That rating is the part to leave behind.
+
+Dorfromantik is the control case for quests. You place tiles, a windmill asks to touch six fields, a locomotive asks for ten tracks. Failing a quest has no penalty. The video game's peaceful mode takes the score away entirely ([Steam](https://store.steampowered.com/app/1455840/Dorfromantik/); [Rock Paper Shotgun](https://www.rockpapershotgun.com/dorfromantik-review-early-access)). The stack of tiles does run out in a normal game. Life City does not import an ending. It imports the permission to abandon a quest.
+
+**What the city adapts.**
+
+| Tool | On the street by default | When Adam asks |
+|------|--------------------------|----------------|
+| Skylines info view | Nothing. The channel budget stands | One overlay at a time. Coverage of a real service: which stops Chadwick's logged sessions have touched this week, which routes a life wall has cut. Drawn as a stipple, not a new hue, so it cannot be misread as "green means healthy". Closes when he leaves it |
+| RCT thought summary | The one halo, and the depot count | The action card's first line is the thought, in words, from the record ("blocked on the quote", not a hungry-face icon). No bubble on every bus |
+| Dorfromantik quest | A bundle or a plan he has saved | He can abandon it. Abandoning writes no failure event, greys nothing, and does not appear in the New Year's Eve replay |
+| Motorways pin | One pin shape on a building with a task and no route | Gone once the stop is on a route. No countdown |
+
+The info view is how a desire line is allowed to exist after the Animal Crossing warning. "Where I actually went" can be a stipple on the routes whose stops were completed, using the event log, for the week he asks about. It does not wear the park down. It does not spread overnight. Turn it off and the street is the street.
+
+**What we looked at and will not build.**
+
+Frostpunk puts Hope and Discontent on the screen. If Hope stays at nothing, or Discontent stays full, the city gives an ultimatum and then the game ends: the captain is banished ([gamepressure](https://www.gamepressure.com/frostpunk/what-happens-when-discontent-or-hope-reach-critical-values/zfad7c); [Frostpunk Wiki, Hope](https://frostpunk.fandom.com/wiki/Hope)). That is a life sim aimed at a different feeling. Harbour City does not get a hope bar, a discontent bar, a park rating, or a "you were away, so the skyline shrank". The capacity forecast stays the sky, and it is a condition with an explanation, not a lose state. A week of not opening the city changes nothing except the catch-up, which plays what actually happened.
+
+RCT's park value and Stardew's Vault are money. They stay out with the rest of day-to-day finances.
+
+**Validator, added to Claude's list rather than replacing it.**
+
+| Notice | Level | Rule |
+|--------|-------|------|
+| `neglect_decay` | Error | Any street element changes because time-since-visit passed, with no event and no forecast update. Weeds, worn-away parks, a fallen rating, a shrunk skyline |
+| `score_on_street` | Error | A total, a rating, hope, discontent, or a points count is drawn on the street or the Platform |
+| `ceremony_for_deleted` | Error | A farewell ferry, plaque, or replay beat names or shows a record that is deleted now |
+| `pin_countdown` | Error | An unrouted task grows a timer, a failing ring, or a game-over state |
+| `overlay_left_on` | Warning | An info view is still drawn after the city returns to idle |
+
+One golden day for this round: do not open the city for seven fictional days in which a project was archived, a task was deleted, and a session was logged. The catch-up plays the ferry and the session. It does not name the deleted task. The park is the same colour as on day one. No meter has moved.
+
+#### New open questions from Cursor's round 4
+
+- Should the farewell wait until Adam is at the city, or is it enough that the catch-up plays it the next time he looks?
+- A bundle slot he named but never filled: after a year, does the room keep showing the gap, or does he have to abandon it himself for the gap to leave?
+- Is "where I actually went" a stipple he would ever turn on, or is the travelled track on Lines already that view?
+- The museum takes things he chooses to give. Should a finished chapter land on the studio shelf by itself, or only when he puts it there?
+
+#### Cursor card ledger after round 4
+
+| Card | Uses by Cursor | Uses left |
+|------|----------------|-----------|
+| Extend | 1 | 1 |
+| Substitute | 1 | 1 |
+| Combine | 1 | 1 |
+| Adapt | 2 | 0 |
+| Magnify | 1 | 1 |
+| Put to another use | 2 | 0 |
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load? (Claude round 4: expands at its edges, never reflows its centre)
@@ -1398,3 +1508,4 @@ If it passes, every later layer (rooms, walks, Plans, the scrubber, fireworks) i
 - **2026-10-07, Cursor:** Round 3 (Extend + Magnify). Extended the school-term prefs into a term edition of the same city, and kept a booked trip distinct from a dream. Magnified a single open door for the next decision, with the rest counted at the depot. Noted the edition on the architecture sketch.
 - **2026-10-07, ChatGPT Codex:** Round 3 (Adapt + Magnify). Added guided walks through linked records and an Idea Exchange for source grounded teaching and writing proposals, small experiments and curated outcome exhibitions. Preserved all earlier contributions and updated the Codex card ledger, with each card now used once.
 - **2026-10-07, Claude Code:** Round 4 (Substitute + Magnify). Proposed the glance test (street versus room). Substituted the visit model with calm technology (Home tile, station clock, idle default) and a perceptual channel budget, including an audit of colour overload across all rounds. Magnified change over state: a "Since you were last here" replay grounded in change blindness research, and a never-reflow layout grounded in mental map research. Added three validator rules and a smallest testable slice.
+- **2026-10-07, Cursor:** Round 4 (Put to another use + Adapt). Brought in simulation-game rituals that keep a life (Spiritfarer's farewell, Stardew's bundles, Animal Crossing's museum, Mini Motorways' pin) and refused the ones that punish absence (Frostpunk's meters, worn-away grass, the Motorways timer, Stardew's gold vault). Adapted Skylines info views, RCT thought summaries and Dorfromantik's no-penalty quests so they obey the glance test and the channel budget.
