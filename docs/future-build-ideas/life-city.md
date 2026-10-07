@@ -2156,6 +2156,201 @@ The balloon glow, Nintendo's seasonal transition and Maeshowe's illumination are
 | Put to another use | 1 | 1 |
 
 
+### Round 6 · ChatGPT Codex · Substitute + Put to another use
+
+> **Author note:** Written by ChatGPT Codex on 7 October 2026. Cards played: **Substitute** and **Put to another use**, each for the second and final time. Adam asked what real cities have which the current city concept lacks, and how those differences translate into Life City. I read the latest document and researched municipal water infrastructure, city archives and planning for urban night life. All additions below are proposals.
+
+#### The comparison: we have attractions and transport, but only part of a city
+
+This comparison concerns the concept document. Its proposed features are not all implemented product features.
+
+| Real city feature | Present in the concept | Missing opportunity for Life City |
+|-------------------|------------------------|----------------------------------|
+| Utilities beneath the streets | Transit and a data contract | A visible account of which sources supply each view, and when they last arrived |
+| Receiving docks and distribution | Travel terminal and migration lots | A place where new material arrives, waits for a destination and enters its owning hub |
+| Repair and maintenance services | Renovation records, blockers and construction | A way to inspect broken connections, missing sources and repairs without making the whole city look ruined |
+| Civic government and public debate | Agents, proposals and a validator | A chamber where competing plans receive distinct, inspectable arguments before Adam chooses |
+| Personal relationships | Named agents and anonymous scenery figures | Chosen people represented through actual shared occasions and links, without friendship scores |
+| A local newspaper | Catch-up replay and filtered questions | A curated edition explaining selected changes through linked artefacts |
+| Historical layers | Rewind, archives and landmark retirement | An explorable old city beneath the current streets, built from authorised history |
+| A night city | Dimming, diary train and evening scenery | Night places with distinct purposes, rather than the day city with lower brightness |
+| Accessibility and connected public space | Phone controls, direct room links and stable placement | An alternative continuous route through the whole experience, without spatial navigation requirements |
+| Urban ecology | Plants, whales and seasonal scenes | Living scenery relationships, such as a conservatory changing with its chosen plants and season |
+| Public workshops and rehearsal spaces | Writing studio and model table | A place to try a small idea without committing to a full project |
+| Sporting occasions | Stadium depot and logged training signals | Personal training milestones staged as optional events, with recorded results rather than invented opponents |
+| Addresses and directories | Pinned buildings and named districts | A memorable address for an idea, document or collection, alongside reliable search |
+| Service access and opening hours | Timetabled scenery doors | Real differences between a room being available, a source being reachable and an action awaiting confirmation |
+| Community rituals | Festivals and chosen keepsakes | Shared occasions selected from real records, with an explicit choice about which people appear |
+| Public art with local identity | Delft details, personal architecture and exhibitions | Commissioned city pieces drawn from chosen writing, images and memories |
+
+Adding every feature as another attraction would produce a crowded map. The next two cards add depth and distinct city functions.
+
+#### Substitute: replace the single city surface with a city above and a city below
+
+**The change.** The harbour is the place Adam sees. Underneath sits the infrastructure which supplies and remembers it.
+
+Select a brass inspection plate in the square. The street lifts like the lid of a model. The camera descends into an underground cross section. Roads remain visible above, while the library, workshop and records office have lower floors below.
+
+There are three chambers. Each answers a different question.
+
+**1. The Exchange Station: where a fact came from.**
+
+A record enters through its owning hub's labelled conduit. A transparent carrier takes its reference to the city view which uses it.
+
+Select the Year 10 route. Its path leads back to Tasks. Select the capacity outlook. Its path leads back to the shared forecast, with the actual evidence explanation available. Select a collection display. Its source shelf is the collection record, rather than the illustration itself.
+
+The Exchange Station shows source, last successful retrieval and known pending changes where those facts exist. It never turns a quiet source into an outage.
+
+A source which is unreachable shows a disconnected coupling and a timestamped last known state. The above ground city stays visible, with a clear freshness notice. A disconnected library feed does not mean Adam forgot his knowledge or lost capacity.
+
+Opening a coupling reveals the actual problem. A missing record, permission issue and failed save receive different labels. This is an inspection view, rather than a city wide disaster animation.
+
+**Meaning:** trust becomes inspectable in the same place as the picture. Adam sees why a scene changed, or why a change has not arrived.
+
+**2. The Repair Arcade: useful things with a missing connection.**
+
+The second chamber contains workbenches. Each holds an existing object which needs a recorded repair: a source link which no longer resolves, an imported item without a destination, or a proposed record change which failed.
+
+A book stage with a missing source sits on one bench. A document reference without its original sits on another. Selecting a bench opens the existing repair action or a proposed action requiring confirmation.
+
+The object is not represented as worthless. Its established contents remain available through their source rules. The missing part is named.
+
+When the owning action succeeds, the reference returns to its place. A small mechanical lift carries the repaired object upstairs. The animation follows the successful change. Merely watching the lift never fixes anything.
+
+The arcade stays behind a door. Missing links do not become cracks spreading across the city.
+
+**3. The Old City: walk through previous chapters.**
+
+City of Sydney maintains historic photographs, maps, plans and other records. Its catalogue includes building and development material as well as historical maps. This supports a useful distinction: a city has both a present layout and evidence about its former places. [City of Sydney Archives](https://www.cityofsydney.nsw.gov.au/history-archive-collections/archives).
+
+Life City's lower level contains an Old City assembled from eligible archived records and the existing event replay.
+
+An archived project occupies an old platform. A chosen former teaching unit becomes a paper façade. An earlier version of a book appears only where its owning hub preserves that version.
+
+Select a date and the appropriate platforms appear. The stair back to Now always remains visible. The current harbour does not rearrange.
+
+Cursor's history distinction still governs the contents. Historical state comes from recorded events. Historical text comes from an actual source version. Current unversioned material is labelled current. Deleted content never becomes an archaeological exhibit.
+
+**Meaning:** finished work has somewhere to belong beyond the main skyline. The city gains depth without confusing archived work with current commitments.
+
+#### Put to another use: municipal systems become functions for a whole life
+
+**1. Stormwater capture becomes a harbour receiving system.**
+
+New York City's rain gardens receive street runoff. Water enters through an inlet, is absorbed through the garden's layers, and excess flow has an outlet. The useful design pattern is arrival, temporary holding, processing and a clear route onward. [NYC Department of Environmental Protection](https://www.nyc.gov/site/dep/water/green-infrastructure-streets-sidewalks.page).
+
+Apply the pattern to material Adam deliberately captures or imports.
+
+A receiving dock sits behind the Travel terminal. A captured note, uploaded document or imported collection item arrives as a labelled parcel. Its label identifies the intended destination where known.
+
+The warehouse has three areas: destination confirmed, destination needed and action required. A quoted contract and a saved fragrance interest enter different owning systems. The dock does not quietly turn everything into a task.
+
+After a successful write, a small carrier takes the parcel to its destination. A selected import batch appears as a short procession in Explore. Importing a lesson collection visibly fills the school's existing shelves, rather than building a second school.
+
+An item awaiting a destination remains in the warehouse. Nothing is discarded to make the dock look clean. Duplicate handling requires the owning hub's actual comparison and review rules.
+
+The illustrated water system also gives Round 5's snowfall a consequence inside the festival scene. Meltwater runs into planted basins along the square. This is scenery, separate from the parcel flow and capacity forecast.
+
+**Meaning:** bringing the remaining material over from Notion becomes a legible arrival process. The city shows whether the problem is a missing home, an unfinished import or a decision about where something belongs.
+
+**2. City Hall becomes a chamber of competing futures.**
+
+The workshop produces alternatives. City Hall gives those alternatives different perspectives.
+
+Place the two book plans from Round 2 on a long council table. The room contains selected seats for relevant existing agents. Clare's panel addresses schedule clashes. The Knowledge panel addresses research still needed. The writing record addresses the intended output. Adam chooses which perspectives enter the discussion.
+
+Each panel contains an inspectable argument and its source references. Where an agent has not produced advice, the seat remains empty or holds a labelled draft question. Decorative councillors never invent expert advice.
+
+The chamber makes disagreements explicit. A lighter timetable does not automatically win over a better supported writing sequence. Different criteria remain visible.
+
+Adam selects a plan or records a reason to leave the question open. The decision plaque links to the proposal. Moving a wooden marker to a plan is a selection, rather than permission for every proposed write. The established promotion review follows when requested.
+
+**Meaning:** agents stop appearing only as service vehicles. They also help Adam examine competing priorities, with disagreement retained instead of averaged into a false consensus.
+
+**3. The city newspaper becomes an edition worth keeping.**
+
+A printing works sits beside the post office. On request, a selected period becomes a newspaper spread.
+
+Its front page contains one chosen change. The inside pages contain selected finished artefacts, opened routes, archived projects and recorded occasions. Every factual item links to its source or event query.
+
+A chapter fragment becomes a typeset inset. A selected trip photograph becomes the picture section. An archived project's farewell occupies a short article. A correction appears as a correction, rather than silently rewriting a saved edition.
+
+This newspaper extends Claude's catch-up, rather than replacing it. Catch-up says what changed. The newspaper lets Adam choose what deserves an account.
+
+The edition is composed from eligible live references at viewing time. Exporting a fixed edition is an explicit file action. Private material is included only within the selected scope.
+
+The printing press operates when a real edition is requested. It does not invent midnight news to keep the city busy.
+
+**Meaning:** a month becomes a small account of a life, rather than a completion count. The print shop gives the city a way to speak in objects Adam chose.
+
+**4. Neighbourhood life becomes a place for actual shared occasions.**
+
+The city currently has assistants and scenery neighbours. Give chosen relationships a different home: small guest pavilions reached from a shared square.
+
+Adam selects a person and links an existing occasion or shared project. The pavilion opens a curated view of those selected records. A shared trip appears as two chosen travel markers at the terminal. A collaboration has its own table in the Professional district.
+
+Presence reflects a selected occasion, rather than an inferred location. A partner travelling abroad does not cause an empty home or a relationship warning. A long gap between meetings does not lower a friendship score.
+
+The pavilion is available even without an upcoming occasion. A photograph or memory selected by Adam provides a personal interior.
+
+Anonymous scenery neighbours remain anonymous. Real people never become background pedestrians generated from the people database.
+
+**Meaning:** the city represents who shares parts of Adam's life, rather than only the work which requires him.
+
+**5. The night city gets its own purpose.**
+
+London's 2016 night time planning decision treated the city at night as a subject requiring dedicated coordination across culture, transport, residents and other interests. The useful idea is a distinct programme for night, rather than merely dimming daytime scenes. [London City Hall decision](https://www.london.gov.uk/decisions/md2044-24-hour-london-chair-night-time-commission).
+
+Harbour City's night places are selected, quiet and accessible:
+
+- The observatory opens the saved Knowledge sky through a large telescope.
+- The print shop opens a requested edition.
+- The diary post office holds a chosen entry or the existing prompt.
+- The winter shelter offers its window and keepsake.
+- A small rehearsal theatre opens a chapter stage or lesson idea for inspection.
+
+An existing session or saved action remains truthful about timing. No agent begins working simply because its window lights up.
+
+Adam selects which places belong to his evening. A protected evening closes operational invitations while leaving the observatory and winter scene available. No relationship between visiting these places and improved sleep or recovery is asserted.
+
+**Meaning:** night supports reflection, curiosity and enjoyment alongside unfinished work.
+
+#### One route through the city which now exists
+
+A collection of lesson records arrives at the receiving dock. The destination is Teaching, where the building already exists. A successful import fills its shelves.
+
+One imported research reference fails to resolve. The Repair Arcade opens a bench for the actual problem. The rest of the lesson collection remains available.
+
+Adam descends through the square's inspection plate. The Exchange Station shows the source supplying the school and the broken reference. He opens the repair action and supplies the correct source. After the successful save, the lift carries the repaired reference back upstairs.
+
+He visits City Hall to compare a writing proposal with his existing term commitments. The arguments disagree, so he records the reason for postponing promotion.
+
+At night, he opens the printing works. The month's edition contains a chosen lesson artefact, one travel photograph and a brief account of the decision he kept open.
+
+The city has received something, repaired something, considered something and preserved something. Those are city functions with a direct place in Life Hub.
+
+#### Open questions from ChatGPT Codex Round 6
+
+1. Which missing city function deserves the first prototype: underground inspection, receiving dock, council chamber or newspaper?
+2. Should the Old City be a physical lower level, or a separate historical island reached from the harbour?
+3. Which source freshness facts already exist, and which would need explicit recording before the Exchange Station is truthful?
+4. Should City Hall display previously saved agent advice first, or request a new discussion only when Adam asks?
+5. Does the newspaper default to a month, a school term or a selected occasion?
+6. Which relationships belong in curated guest pavilions, and should those places be hidden from the wider harbour view?
+
+#### ChatGPT Codex card ledger after Round 6
+
+| Card | Uses by ChatGPT Codex | Uses left |
+|------|----------------------|-----------|
+| Extend | 2 | 0 |
+| Substitute | 2 | 0 |
+| Combine | 2 | 0 |
+| Adapt | 2 | 0 |
+| Magnify | 2 | 0 |
+| Put to another use | 2 | 0 |
+
+All twelve card uses are now spent. A further Codex round would need a new allowance or a new rule from Adam.
+
 ## 8. Open questions
 
 - Fixed map or does it expand as districts are added? How is the map laid out on first load? (Claude round 4: expands at its edges, never reflows its centre)
@@ -2184,3 +2379,4 @@ The balloon glow, Nintendo's seasonal transition and Maeshowe's illumination are
 - **2026-10-07, Claude Code:** Round 5 (Put to another use + Extend). Accepted Codex's Glance and Explore split for motion, with a rule that atmosphere never borrows signal vocabulary. Put brushing and linking to use as "Ask the stationmaster" (questions light the city through grounded queries). Extended the city with the real Sydney almanac (jacarandas, whales, wattle, Christmas bush) on land and water only. Added a summary of the city's three layers and two tools, seven new validator rules and one rescoped rule.
 - **2026-10-07, Cursor:** Round 5 (Extend + Magnify). Filled the ordinary blocks: school gate, market row, library steps, hospital garden, park, house row, wharf kiosk and a skiff that never casts off. Figures follow the real clock and the term edition, and they are scenery rather than signals. Magnified one walk from the gate to the skiff, on a term Tuesday and on a free Sunday.
 - **2026-10-07, ChatGPT Codex:** Round 5 (Adapt + Magnify). Researched official Balloon Fiesta, Nintendo and Historic Environment Scotland references. Added a balloon gathering for chosen futures, balloon sightseeing and workshop landings, a whole city snowstorm festival using Cursor's ordinary streets, winter keepsakes, thaw, spring unfinished idea stalls, a summer exchange, a solstice inspired reflection chamber and term end paper theatres. Proposed explicit festival scene exceptions to operational sky and motion rules. Adapt and Magnify are now exhausted. Earlier contributions preserved.
+- **2026-10-07, ChatGPT Codex:** Round 6 (Substitute + Put to another use). Compared sixteen real city functions with the concept. Proposed an underground Exchange Station, Repair Arcade and Old City, plus a receiving dock, council chamber, source linked newspaper, curated relationship pavilions and a distinct night programme. Linked municipal research from NYC DEP, City of Sydney Archives and London City Hall. Preserved earlier contributions. All Codex card uses are now exhausted.
