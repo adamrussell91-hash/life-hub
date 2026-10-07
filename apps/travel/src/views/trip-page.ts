@@ -1,6 +1,15 @@
 import type { City, Trip } from '@/types';
 import { getTrip } from '@/api/travel';
-import { buildTodo, daysForCity, homeBaseForNight, itemPlace, orderDayItems, otherCitiesSharingDate, travelDayCue } from '@/model/day';
+import {
+  buildTodo,
+  daysForCity,
+  homeBaseForNight,
+  itemPlace,
+  itemsForCityDay,
+  orderDayItems,
+  otherCitiesSharingDate,
+  travelDayCue
+} from '@/model/day';
 import { renderScene } from '@/scenes';
 import { renderWorldMap } from '@/components/world-map';
 import type { DayMapHandle } from '@/components/day-map';
@@ -24,7 +33,7 @@ const PENELOPE_KEY = 'lifehub.travel.penelope';
 
 function writePenelopeHandoff(trip: Trip, cityId: string, date: string, prompt: string): void {
   const city = trip.cities.find((c) => c.id === cityId);
-  const dayItems = trip.items.filter((item) => item.city_id === cityId && item.date === date && !item.private);
+  const dayItems = itemsForCityDay(trip, cityId, date).filter((item) => !item.private);
   const checkinLines = trip.checkins
     .filter((c) => c.city_id === cityId)
     .map((c) => `Checked in: ${c.label}`);
@@ -306,7 +315,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       });
       dayMapHandle?.destroy();
       dayMapHandle = null;
-      const dayItems = trip.items.filter((item) => item.city_id === city.id && item.date === selectedDate);
+      const dayItems = itemsForCityDay(trip, city.id, selectedDate);
       const render = ++dayMapRender;
       void import('@/components/day-map').then(({ renderDayMap }) => {
         if (render !== dayMapRender || !mapInner.isConnected) return;
@@ -429,9 +438,7 @@ async function startWhereAmI(
   note.textContent = 'Finding you…';
   mapBox.append(note);
 
-  const dayItems = orderDayItems(
-    trip.items.filter((item) => item.city_id === city.id && item.date === date)
-  );
+  const dayItems = orderDayItems(itemsForCityDay(trip, city.id, date), date);
   const now = new Date();
   const next = dayItems.find((item) => {
     if (!item.time || !itemPlace(item)) return false;

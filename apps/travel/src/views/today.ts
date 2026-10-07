@@ -1,6 +1,6 @@
 import type { Trip } from '@/types';
 import { listTrips, getTrip } from '@/api/travel';
-import { orderDayItems } from '@/model/day';
+import { itemsForCityDay, orderDayItems } from '@/model/day';
 import { renderScene } from '@/scenes';
 import { renderDayList } from '@/views/day-list';
 import { formatInZone } from '@/lib/time';
@@ -68,7 +68,7 @@ export async function renderTodayView(canvas: HTMLElement, options: TodayOptions
   scene.append(titleDiv);
   wrap.append(scene);
 
-  const dayItems = orderDayItems(trip.items.filter((item) => item.city_id === city.id && item.date === date));
+  const dayItems = orderDayItems(itemsForCityDay(trip, city.id, date), date);
   const nowTime = formatInZone(new Date(), city.tz);
   const next = dayItems.find((item) => item.kind !== 'stay' && (item.time ?? '00:00') >= nowTime);
   const nowCard = document.createElement('div');

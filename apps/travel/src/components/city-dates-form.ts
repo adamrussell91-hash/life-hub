@@ -28,7 +28,7 @@ export function renderCityDatesForm(host: HTMLElement, options: CityDatesFormOpt
   title.textContent = `Dates in ${city.name}`;
   const blurb = document.createElement('p');
   blurb.textContent =
-    'Travel days (leave one city, land in the next) should sit in both cities — set the leaving city’s end date to that day, and the arriving city’s start date to the same day.';
+    'Same-day travel sits in both cities: leaving city’s end date and arriving city’s start date on that day. Overnight flights keep the leaving city through the depart date and start the arriving city on the land date — the ticket itself spans both days.';
   sheet.append(title, blurb);
 
   const form = document.createElement('form');
