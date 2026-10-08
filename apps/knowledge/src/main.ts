@@ -138,6 +138,7 @@ import { notebookCards, notebookCatalog, notesForNotebook } from "./notebooks/ca
 import { mountBookshelf, parseBookshelfHash } from "./shelf/view";
 import { recordComposedPage } from "./shelf/record";
 import { bindNotebooksGrid, notebooksGridHtml } from "./notebooks/view";
+import { mountStudio } from "./studio/view";
 import { getQuizSchedule, saveQuiz } from "./api/quizClient";
 import { applyRating } from "./quiz/review";
 import { duePageReviews, seedPageReview, upsertPageReview } from "./quiz/pageReview";
@@ -152,6 +153,7 @@ type View =
   | "timeline"
   | "notebooks"
   | "bookshelf"
+  | "studio"
   | "page"
   | "compose"
   | "chat"
@@ -392,6 +394,7 @@ const icons = {
   notebooks: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h11a2 2 0 0 1 2 2v14H8a2 2 0 0 0-2 2V4z"/><path d="M8 20a2 2 0 0 1 2-2h9"/><path d="M10 8h6M10 12h6"/></svg>`,
   bookshelf: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M5 20V6h3v14M9 20V4h3v16"/><path d="m14 7 3-1 3 13-3 1z"/></svg>`,
   protocols: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`,
+  studio: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l5 5-7.5 12L4 21l1-5.5z"/><path d="M12 3l-2 6 3 3 6-2"/><circle cx="11.5" cy="12.5" r="1.2"/></svg>`,
 };
 
 function kindBadge(attachment: Attachment) {
@@ -674,6 +677,7 @@ function shell(main: string) {
         <p class="hub-rail__section">Library</p>
         <button class="rail__btn hub-rail__link ${view === "bookshelf" ? "is-current" : ""}" data-nav="bookshelf" type="button">${icons.bookshelf}<span>Bookshelf</span></button>
         <button class="rail__btn hub-rail__link ${view === "notebooks" ? "is-current" : ""}" data-nav="notebooks" type="button">${icons.notebooks}<span>Notebooks</span></button>
+        <button class="rail__btn hub-rail__link ${view === "studio" ? "is-current" : ""}" data-nav="studio" type="button">${icons.studio}<span>Studio</span></button>
         <button class="rail__btn hub-rail__link ${view === "graph" ? "is-current" : ""}" data-nav="graph" type="button">${icons.graph}<span>Graph</span></button>
         <button class="rail__btn hub-rail__link ${view === "timeline" ? "is-current" : ""}" data-nav="timeline" type="button">${icons.timeline}<span>Timeline</span></button>
         <button class="rail__btn hub-rail__link ${view === "protocols" ? "is-current" : ""}" data-nav="protocols" type="button">${icons.protocols}<span>Thinking</span></button>
@@ -694,6 +698,7 @@ function shell(main: string) {
       const special: Record<string, View> = {
         notebooks: "notebooks",
         bookshelf: "bookshelf",
+        studio: "studio",
         graph: "graph",
         timeline: "timeline",
         chat: "chat",
@@ -819,6 +824,13 @@ function shell(main: string) {
     goProtocols: () => {
       leaveSpecialRails();
       view = "protocols";
+      activePage = null;
+      clearPageHash();
+      render();
+    },
+    goStudio: () => {
+      leaveSpecialRails();
+      view = "studio";
       activePage = null;
       clearPageHash();
       render();
@@ -1174,6 +1186,27 @@ function renderBookshelf() {
   };
 }
 
+function isReturnView(next: View): next is "notebooks" | "bookshelf" | "studio" {
+  return next === "notebooks" || next === "bookshelf" || next === "studio";
+}
+
+function renderStudio() {
+  shell(`${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · Studio changes stay in this browser</p>` : ""}<div data-studio></div>`);
+  const host = app.querySelector<HTMLElement>("[data-studio]");
+  if (!host) return;
+  const unmount = mountStudio(host, {
+    entries,
+    header: (supporting, actions) => pageHeader("Writing", "Studio", actions, { supportingHtml: supporting }),
+    openPage: id => void openPage(id),
+    getPage,
+    savePage,
+    onSaved: async () => {
+      entries = await listPages();
+    },
+  });
+  graphTeardown = unmount;
+}
+
 /** #bookshelf, #bookshelf/<book>, #bookshelf/<book>/<note> */
 function applyBookshelfHash(): boolean {
   if (!parseBookshelfHash(location.hash)) return false;
@@ -1492,7 +1525,7 @@ function archiveNotes() {
 
 async function openPage(id: string, title?: string) {
   if (view !== "page") {
-    pageReturnView = view === "notebooks" || view === "bookshelf" ? view : "list";
+    pageReturnView = isReturnView(view) ? view : "list";
     if (view === "bookshelf" && parseBookshelfHash(location.hash)) bookshelfReturnHash = location.hash;
   }
   const resolved = resolveArchivePageId(id, title, archiveNotes());
@@ -1588,7 +1621,7 @@ function renderPage(page: LivePage) {
   shell(`
     ${pageHeader(topics[0] ? escapeHtml(topics[0]) : "Note", escapeHtml(page.title))}
     <div class="reader__actions">
-      <button class="btn btn--ghost reader__back" data-back type="button">← ${pageReturnView === "notebooks" ? "Notebooks" : pageReturnView === "bookshelf" ? "Bookshelf" : "Archive"}</button>
+      <button class="btn btn--ghost reader__back" data-back type="button">← ${pageReturnView === "notebooks" ? "Notebooks" : pageReturnView === "bookshelf" ? "Bookshelf" : pageReturnView === "studio" ? "Studio" : "Archive"}</button>
       <button class="btn btn--ghost" data-pin-note type="button">${isPinned(page.id) ? "Unpin" : "Pin"}</button>
       <button class="btn btn--ghost" data-edit type="button">Edit</button>
       <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyReviewJob ? "disabled" : ""}>${tidyBusy ? intakeBusyLabel(tidyReviewJob?.phase) : "Clean up"}</button>
@@ -1633,7 +1666,7 @@ function renderPage(page: LivePage) {
   });
   app.querySelector<HTMLButtonElement>("[data-back]")!.onclick = () => {
     activePage = null;
-    view = pageReturnView === "notebooks" || pageReturnView === "bookshelf" ? pageReturnView : "list";
+    view = isReturnView(pageReturnView) ? pageReturnView : "list";
     if (view === "bookshelf") history.replaceState(null, "", bookshelfReturnHash);
     render();
   };
@@ -2268,6 +2301,7 @@ function render() {
   else if (view === "graph") renderGraph();
   else if (view === "notebooks") renderNotebooks();
   else if (view === "bookshelf") renderBookshelf();
+  else if (view === "studio") renderStudio();
   else if (view === "timeline") renderTimeline();
   else if (view === "chat") {
     renderChatRail({
@@ -2383,7 +2417,8 @@ function renderLoadError() {
     goTimeline: () => void boot({ signedIn: true }),
     goPodcast: () => void boot({ signedIn: true }),
     goQuiz: () => void boot({ signedIn: true }),
-    goProtocols: () => void boot({ signedIn: true })
+    goProtocols: () => void boot({ signedIn: true }),
+    goStudio: () => void boot({ signedIn: true })
   });
 }
 
@@ -2446,7 +2481,7 @@ async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean 
           if (applyProtocolsHash()) return;
           if (applyBookshelfHash()) return;
           if (view === "page") {
-            view = pageReturnView === "notebooks" || pageReturnView === "bookshelf" ? pageReturnView : "list";
+            view = isReturnView(pageReturnView) ? pageReturnView : "list";
             activePage = null;
             render();
           }
@@ -2486,6 +2521,7 @@ document.addEventListener("keydown", event => {
         { id: "all", label: "Archive", hint: "Notes", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=all]")?.click() },
         { id: "bookshelf", label: "Bookshelf", hint: "Books", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=bookshelf]")?.click() },
         { id: "notebooks", label: "Notebooks", hint: "Covers", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=notebooks]")?.click() },
+        { id: "studio", label: "Studio", hint: "Book ideas", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=studio]")?.click() },
         { id: "graph", label: "Graph", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=graph]")?.click() },
         { id: "timeline", label: "Timeline", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=timeline]")?.click() },
         { id: "chat", label: "Chat", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=chat]")?.click() },
