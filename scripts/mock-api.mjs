@@ -752,6 +752,25 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       return true;
     }
 
+    if (url.pathname === '/api/watch-radar') {
+      if (!readSession(request)) return unauthenticated(response);
+      const targets = taskData.get('meta/watch_radar_targets') ?? {};
+      if (request.method === 'GET') {
+        // Local dev has no shop checks: the page shows each watch at its Notion price.
+        json(response, 200, { ok: true, data: { readings: {}, lastRun: null, targets } }, PRIVATE_HEADERS);
+        return true;
+      }
+      if (request.method === 'PUT') {
+        const body = await readJson(request);
+        const next = { ...targets };
+        if (typeof body?.key === 'string' && typeof body?.target === 'number' && body.target > 0) next[body.key] = Math.round(body.target);
+        else if (typeof body?.key === 'string' && body?.target === null) delete next[body.key];
+        taskData.set('meta/watch_radar_targets', next);
+        json(response, 200, { ok: true, data: { targets: next } }, PRIVATE_HEADERS);
+        return true;
+      }
+    }
+
     if (url.pathname === '/api/hub-prefs') {
       if (!readSession(request)) return unauthenticated(response);
       if (request.method === 'GET') {
