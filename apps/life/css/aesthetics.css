@@ -204,6 +204,24 @@
 .aes-shelf__bottle small { font-size: 0.68rem; color: var(--muted); text-align: center; }
 .aes-shelf__plank { height: 8px; margin: 0 var(--space-1); border-radius: 4px; background: linear-gradient(var(--shallow), var(--shore)); }
 
+/* Complete source references */
+.aes-reference { grid-column: 1 / -1; min-width: 0; }
+.aes-records { display: grid; gap: var(--space-2); min-width: 0; }
+.aes-record { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.aes-record > summary { min-height: 2.75rem; padding: var(--space-3); cursor: pointer; overflow-wrap: anywhere; }
+.aes-record > summary .aes-meta { display: block; margin-top: var(--space-1); }
+.aes-record > summary:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+.aes-record__body { padding: 0 var(--space-3) var(--space-3); min-width: 0; overflow-wrap: anywhere; }
+.aes-record__fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--space-2) var(--space-3); font-size: var(--text-sm); }
+.aes-record__fields dt { color: var(--muted); }
+.aes-record__fields dd { margin: 0; min-width: 0; }
+.aes-source-prose { font-size: var(--text-sm); line-height: 1.6; }
+.aes-source-prose p { margin: var(--space-2) 0; }
+.aes-source-prose ul { padding-left: var(--space-5); }
+.aes-source-prose li { margin: var(--space-2) 0; }
+.aes-source-prose a, .aes-record__body a { color: var(--marine); overflow-wrap: anywhere; }
+.aes-source-prose a { margin-right: var(--space-1); }
+
 /* ---------- Dress ---------- */
 .aes-dress { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; }
 .aes-snap { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-4); align-items: center; margin-top: var(--space-2); padding: var(--space-4); border: 2px dashed var(--line); border-radius: var(--radius-md); cursor: pointer; }

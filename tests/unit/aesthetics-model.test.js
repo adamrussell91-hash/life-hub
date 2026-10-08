@@ -31,7 +31,7 @@ test('fragrance library mirrors the Notion tracker', () => {
   assert.deepEqual([count('Owned'), count('Sampling'), count('Wishlist'), count('Retired')], [12, 10, 28, 2]);
   assert.equal(new Set(FRAGRANCES.map(f => f.name)).size, 52, 'names are unique');
   for (const f of FRAGRANCES) {
-    assert.ok(f.notes.length > 0, `${f.name} has notes`);
+    assert.deepEqual(f.notes, ['Top Notes', 'Heart Notes', 'Base Notes'].flatMap(key => f.source.properties[key] ?? []), `${f.name} keeps recorded notes without inventing unset tiers`);
     assert.equal(f.tiers.reduce((a, b) => a + b, 0), f.notes.length, `${f.name} tiers add up to its notes`);
     assert.ok(['fresh', 'floral', 'gourmand', 'amber', 'woody'].includes(f.family), f.name);
   }

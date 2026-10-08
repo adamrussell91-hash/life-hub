@@ -52,7 +52,7 @@ export const LOOKS = [
   look('intentional', 'Gray + blue + red → intentional', ['grey', 'overshirt'], ['blue', 'oxford shirt'], ['charcoal', 'trousers'], ['white', 'sneakers'], ['red', 'cap'], 'flannel', 'Aether'),
   look('rich', 'White + cream + cognac → expensive', ['cream', 'linen shirt'], ['white', 'tee'], ['cream', 'trousers'], ['cognac', 'loafers'], ['chocolate', 'belt'], 'linen', 'Milk Orchid'),
   look('refined', 'Powder blue + white + merlot → luxurious', ['merlot', 'cardigan'], ['powder blue', 'shirt'], ['white', 'trousers'], ['cognac', 'loafers'], ['merlot', 'belt'], 'knit', 'Liaisons Dangereuses'),
-  look('artistic', 'Terracotta orange + Tiffany blue → artistic', ['terracotta', 'chore jacket'], ['Tiffany blue', 'tee'], ['cream', 'trousers'], ['chocolate', 'loafers'], ['navy', 'cap'], 'canvas', 'Asad Zanzibar'),
+  look('artistic', 'Terracotta orange + Tiffany blue → artistic', ['terracotta', 'chore jacket'], ['Tiffany blue', 'tee'], ['cream', 'trousers'], ['chocolate', 'loafers'], ['navy', 'cap'], 'canvas', 'Asad Zanzibar Limited Edition'),
   look('richer', 'Pistachio green + chocolate brown → richer', ['tan', 'overshirt'], ['pistachio', 'knit polo'], ['chocolate', 'trousers'], ['white', 'sneakers'], ['chocolate', 'belt'], 'knit', 'Asad Bourbon'),
   look('striking', 'Mustard yellow + fuchsia pink → striking', ['mustard', 'overshirt'], ['fuchsia', 'tee'], ['navy', 'jeans'], ['white', 'sneakers'], ['black', 'watch strap'], 'corduroy', 'Velvet Underground')
 ];
