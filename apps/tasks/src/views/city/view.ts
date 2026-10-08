@@ -4,7 +4,7 @@ import { hashQuery } from '@/shell/shell';
 import type { GoldenDay } from '@/domain/city/fixtures/golden-days';
 import './city.css';
 import { legendRows, quietSinceLabel } from './copy';
-import { cityNeedsWideScreen, goldenRequest, KNOWN_GOLDEN_DAYS, type GoldenKey } from './days';
+import { cityNeedsWideScreen, goldenRequest, isTestMode, KNOWN_GOLDEN_DAYS, testLetter, type GoldenKey } from './days';
 import { planCity, type CityPlan } from './plan';
 import type { CitySceneHandle } from './scene';
 
@@ -33,9 +33,11 @@ export async function renderCityView(canvas: HTMLElement): Promise<void> {
     return;
   }
 
+  const testMode = isTestMode(hashQuery());
   const page = document.createElement('div');
   page.className = 'city-page';
   page.dataset.golden = request.key;
+  page.dataset.test = testMode ? 'true' : 'false';
   canvas.append(page);
 
   const narrow = document.createElement('p');
@@ -55,7 +57,8 @@ export async function renderCityView(canvas: HTMLElement): Promise<void> {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const plan = planCity(snapshot, layout, catchUp, 1, reducedMotion);
   const inspect = indexPlan(plan);
-  const hud = renderHud(page, day, plan, catchUp.quiet ? quietSinceLabel(catchUp) : null, inspect);
+  const caption = testMode ? `Day ${testLetter(request.key)}` : day.name;
+  const hud = renderHud(page, caption, plan, catchUp.quiet ? quietSinceLabel(catchUp) : null, inspect, testMode);
   page.append(hud.root);
 
   async function sync(): Promise<void> {
@@ -152,10 +155,11 @@ function renderUnknown(value: string): HTMLElement {
 
 function renderHud(
   page: HTMLElement,
-  day: GoldenDay,
+  captionText: string,
   plan: CityPlan,
   quiet: string | null,
-  inspect: Map<string, Inspect>
+  inspect: Map<string, Inspect>,
+  testMode: boolean
 ): { root: HTMLElement; card: HTMLElement; panel: HTMLElement; banner: HTMLElement } {
   const root = document.createElement('div');
   root.className = 'city-hud';
@@ -171,12 +175,19 @@ function renderHud(
   const sky = document.createElement('button');
   sky.type = 'button';
   sky.className = 'city-sky';
-  sky.textContent = plan.skyLabel;
+  if (testMode) {
+    // Test mode: the sky badge is a swatch, never the weather in words (V10).
+    sky.classList.add('city-sky--swatch');
+    sky.dataset.family = plan.skyKnown ? plan.skyFamily : 'unknown';
+    sky.setAttribute('aria-label', 'Sky');
+  } else {
+    sky.textContent = plan.skyLabel;
+  }
   sky.addEventListener('click', () => openPanel(panel, inspect, 'sky'));
 
   const caption = document.createElement('p');
   caption.className = 'city-day';
-  caption.textContent = day.name;
+  caption.textContent = captionText;
 
   const banner = document.createElement('p');
   banner.className = 'city-banner';
@@ -247,7 +258,7 @@ function renderHud(
   for (const item of focusItems(plan)) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = item.text;
+    button.textContent = testMode ? item.label : item.text;
     button.addEventListener('click', () => openPanel(panel, inspect, item.id));
     a11y.append(button);
   }
@@ -268,11 +279,12 @@ function renderHud(
   return { root, card, panel, banner };
 }
 
-function focusItems(plan: CityPlan): { id: string; text: string }[] {
-  const items: { id: string; text: string }[] = [];
-  if (plan.halo) items.push({ id: plan.halo.id, text: plan.halo.text });
-  for (const barrier of plan.barriers) items.push({ id: barrier.id, text: barrier.text });
-  items.push({ id: plan.depot.id, text: plan.depot.text });
+/** Keyboard mirror of the marks. In test mode it carries neutral labels until opened. */
+function focusItems(plan: CityPlan): { id: string; text: string; label: string }[] {
+  const items: { id: string; text: string; label: string }[] = [];
+  if (plan.halo) items.push({ id: plan.halo.id, text: plan.halo.text, label: 'Mark' });
+  for (const barrier of plan.barriers) items.push({ id: barrier.id, text: barrier.text, label: 'Mark' });
+  items.push({ id: plan.depot.id, text: plan.depot.text, label: 'Depot' });
   return items;
 }
 

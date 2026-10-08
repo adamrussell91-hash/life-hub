@@ -76,7 +76,7 @@ describe('golden day: Sunday 16:30', () => {
 
 describe('golden day: suspended service', () => {
   it('suspends only the route with a stop inside the wall, before the wall starts', () => {
-    const day = suspendedService();
+    const day = suspendedService(new Date('2026-10-13T01:00:00.000Z'));
     const snapshot = citySnapshot(day.input, day.now);
     expect(snapshot.suspensions).toEqual([
       { id: 'task:wedding', startsOn: '2026-10-14', endsOn: '2026-10-16', label: 'Wedding', active: false, affectedRouteIds: ['p_report'] }
@@ -84,7 +84,7 @@ describe('golden day: suspended service', () => {
   });
 
   it('marks the suspension active during the wall and never changes stop order', () => {
-    const before = suspendedService();
+    const before = suspendedService(new Date('2026-10-13T01:00:00.000Z'));
     const during = suspendedService(new Date('2026-10-15T01:00:00.000Z'));
     const a = citySnapshot(before.input, before.now);
     const b = citySnapshot(during.input, during.now);

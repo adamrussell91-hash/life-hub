@@ -43,6 +43,11 @@ import {
 const ELEV = Math.atan(1 / Math.sqrt(2));
 const DIST = 96;
 const FRUSTUM = 16;
+/** Signals are drawn larger than life so they beat the scenery at a glance (C10). */
+const SIGNAL = 2.5;
+/** Room kept clear at the top of the stage for the HUD, and the margin around the fitted city (C9). */
+const HUD_PX = 76;
+const FIT_MARGIN = 0.06;
 
 /** Classic isometric sits on the corner. Q and E step a quarter turn from there. */
 function cameraYaw(quarter: number): number {
@@ -59,7 +64,13 @@ const TOKEN = {
   ink: 0x13233a,
   orca: 0x424860,
   gold: 0xf1e2b6,
-  lilac: 0xe8e0f1
+  lilac: 0xe8e0f1,
+  /** Figure and ground keep their own value bands, day and night (C11). */
+  land: 0xd8d0b8,
+  water: 0x4f86b3,
+  waterNight: 0x5a8fbb,
+  plinth: 0x6b5a48,
+  halo: 0xffc94a
 } as const;
 
 const SKY: Record<string, number> = {
@@ -125,7 +136,8 @@ export async function mountCityScene(
 
   const scene = new Scene();
   scene.background = new Color(SKY[finalPlan.skyFamily] ?? SKY.unknown);
-  scene.add(new AmbientLight(0xffffff, 0.72));
+  const ambient = new AmbientLight(0xffffff, 0.72);
+  scene.add(ambient);
   const sun = new DirectionalLight(0xffffff, 1.15);
   sun.position.set(40, 70, 30);
   scene.add(sun);
@@ -136,13 +148,11 @@ export async function mountCityScene(
   host.append(renderer.domElement);
 
   const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 500);
-  const center = cityCenter(finalPlan);
-  const span = activitySpan(finalPlan);
-  if (!cityCameraState().touched) {
-    updateCityCamera({ zoom: Math.min(3.2, (FRUSTUM * 2) / Math.max(span, 6)) });
-  }
+  const corners = fitCorners(finalPlan);
+  const center = cornersCenter(corners);
+  if (!cityCameraState().touched) updateCityCamera({ zoom: 1 });
   if (import.meta.env.DEV) {
-    console.info('[city] span', span, 'zoom', cityCameraState().zoom, 'roads', finalPlan.roads.length, 'scenery', finalPlan.scenery.length);
+    console.info('[city] roads', finalPlan.roads.length, 'scenery', finalPlan.scenery.length);
   }
 
   const loader = new GLTFLoader();
@@ -161,34 +171,35 @@ export async function mountCityScene(
   await paintScenery(scene, finalPlan, template);
 
   const pickables: Object3D[] = [];
+  const signs: Object3D[] = [];
   const stopMeshes = new Map<string, Mesh>();
   const hideable = new Map<string, Object3D>();
   const vehicles: { mesh: Object3D; path: Point[]; index: number; count: number; parked: boolean; at: Point }[] = [];
   const trams: { mesh: Object3D; loop: Point[] }[] = [];
-  const signs: Object3D[] = [];
 
   for (const stop of finalPlan.stops) {
-    const mesh = new Mesh(
-      new BoxGeometry(0.18, 0.42, 0.18),
-      new MeshStandardMaterial({ color: TOKEN.paper, roughness: 0.6 })
-    );
-    place(mesh, stop.at, 0.24);
+    // Base sits on the street so a finished stop can shrink in place.
+    const geometry = new BoxGeometry(0.18 * SIGNAL, 0.42 * SIGNAL, 0.18 * SIGNAL);
+    geometry.translate(0, 0.21 * SIGNAL, 0);
+    const mesh = new Mesh(geometry, new MeshStandardMaterial({ color: TOKEN.paper, roughness: 0.6 }));
+    place(mesh, stop.at, 0.02);
     tag(mesh, stop.id, pickables);
     scene.add(mesh);
     stopMeshes.set(stop.id, mesh);
   }
   for (const barrier of finalPlan.barriers) {
     const mesh = new Mesh(
-      new BoxGeometry(0.72, 0.28, 0.16),
+      new BoxGeometry(0.12 * SIGNAL, 0.24 * SIGNAL, 0.72 * SIGNAL),
       new MeshStandardMaterial({ color: TOKEN.ink, roughness: 0.8 })
     );
-    place(mesh, barrier.at, 0.2);
+    // Lanes run east-west, so the long side spans the road north-south.
+    place(mesh, barrier.at, 0.12 * SIGNAL);
     tag(mesh, barrier.id, pickables);
     scene.add(mesh);
   }
   for (const ring of finalPlan.rings) {
     const mesh = new Mesh(
-      new RingGeometry(0.34, 0.48, 28),
+      new RingGeometry(0.34 * SIGNAL, 0.48 * SIGNAL, 28),
       new MeshStandardMaterial({ color: TOKEN.wave, roughness: 0.5, side: DoubleSide })
     );
     mesh.rotation.x = -Math.PI / 2;
@@ -198,68 +209,89 @@ export async function mountCityScene(
   }
   if (finalPlan.halo) {
     const mesh = new Mesh(
-      new RingGeometry(0.85, 1.05, 32),
+      new RingGeometry(0.85 * SIGNAL, 1.1 * SIGNAL, 40),
       new MeshStandardMaterial({
-        color: TOKEN.lilac,
-        emissive: TOKEN.gold,
-        emissiveIntensity: 0.35,
+        color: TOKEN.halo,
+        emissive: TOKEN.halo,
+        emissiveIntensity: 1,
         side: DoubleSide
       })
     );
-    place(mesh, finalPlan.halo.at, 1.7);
+    // The single most salient shape on screen. It faces the camera and never moves.
+    place(mesh, finalPlan.halo.at, 1.3 * SIGNAL);
     tag(mesh, finalPlan.halo.id, pickables);
     scene.add(mesh);
+    signs.push(mesh);
   }
   for (const station of finalPlan.stations) {
     const mesh = new Mesh(
-      new BoxGeometry(0.28, 0.16, 0.28),
+      new BoxGeometry(0.28 * SIGNAL, 0.16 * SIGNAL, 0.28 * SIGNAL),
       new MeshStandardMaterial({ color: LINE_HUE[hashId(station.id) % LINE_HUE.length] })
     );
-    place(mesh, station.at, 0.45);
+    place(mesh, station.at, 0.5);
     tag(mesh, station.id, pickables);
     scene.add(mesh);
   }
   for (const line of finalPlan.lines) {
     const group = new Group();
     const colour = LINE_HUE[hashId(line.id) % LINE_HUE.length];
-    for (let i = 1; i < line.path.length; i += 1) group.add(segmentMesh(line.path[i - 1], line.path[i], colour, 0.42));
+    for (let i = 1; i < line.path.length; i += 1) group.add(segmentMesh(line.path[i - 1], line.path[i], colour, 0.5));
     hideable.set(line.id, group);
     scene.add(group);
   }
   for (const mark of finalPlan.landmarks) {
-    const mesh = fittedClone(await template('commercial-skyscraper-a.glb'), 1.15);
+    const mesh = fittedClone(await template('commercial-skyscraper-a.glb'), 0.95 * SIGNAL);
     place(mesh, mark.at, 0);
     tag(mesh, mark.id, pickables);
     scene.add(mesh);
   }
   for (const service of finalPlan.services) {
-    const mesh = fittedClone(await template(service.file), service.kind === 'crane' ? 0.95 : 0.7);
+    const mesh = fittedClone(await template(service.file), (service.kind === 'crane' ? 0.95 : 0.7) * SIGNAL);
     place(mesh, service.at, 0);
     tag(mesh, service.id, pickables);
     hideable.set(service.id, mesh);
     scene.add(mesh);
   }
   for (const vehicle of finalPlan.vehicles) {
-    const mesh = fittedClone(await template('van.glb'), 0.62);
+    const mesh = fittedClone(await template('van.glb'), 0.62 * SIGNAL);
     place(mesh, vehicle.at, 0);
     tag(mesh, vehicle.id, pickables);
     scene.add(mesh);
     vehicles.push({ mesh, path: vehicle.path, index: vehicle.index, count: vehicle.count, parked: vehicle.parked, at: vehicle.at });
   }
   for (const tram of finalPlan.trams) {
-    const mesh = fittedClone(await template('train-tram-modern.glb'), 0.7);
+    const mesh = fittedClone(await template('train-tram-modern.glb'), 0.7 * SIGNAL);
     place(mesh, tram.loop[0] ?? { x: 0, y: 0 }, 0);
     tag(mesh, tram.id, pickables);
     scene.add(mesh);
     trams.push({ mesh, loop: tram.loop });
   }
   for (const sign of finalPlan.signs) {
-    const mesh = signMesh('Not running');
-    place(mesh, sign.at, 1.1);
+    // A striped gate, not a word: the shape says "not running", the legend names it (V10).
+    const mesh = signMesh();
+    mesh.scale.setScalar(SIGNAL * 1.2);
+    place(mesh, sign.at, 0.9 * SIGNAL);
     tag(mesh, sign.id, pickables);
     scene.add(mesh);
     signs.push(mesh);
   }
+
+  // One pulse per catch-up change, played in turn at the place it happens.
+  const pulses = finalPlan.changeMarks.map((mark) => {
+    const material = new MeshStandardMaterial({
+      color: TOKEN.halo,
+      emissive: TOKEN.halo,
+      emissiveIntensity: 1,
+      transparent: true,
+      side: DoubleSide
+    });
+    const mesh = new Mesh(new RingGeometry(0.5, 0.75, 40), material);
+    mesh.rotation.x = -Math.PI / 2;
+    place(mesh, mark.at, 0.15);
+    mesh.visible = false;
+    scene.add(mesh);
+    return { mesh, material, index: mark.index, count: mark.count };
+  });
 
   let disposed = false;
   let skipped = settled;
@@ -279,7 +311,23 @@ export async function mountCityScene(
     return replayProgress(now, replayStart, skipped);
   }
 
+  function applyReplay(t: number): void {
+    const replaying = t < 1;
+    // Everything not changing dims during the replay; emissive changes and pulses stay bright.
+    ambient.intensity = replaying ? 0.4 : 0.72;
+    sun.intensity = replaying ? 0.6 : 1.15;
+    for (const pulse of pulses) {
+      const local = t * pulse.count - pulse.index;
+      const on = replaying && local >= 0 && local <= 1;
+      pulse.mesh.visible = on;
+      if (!on) continue;
+      pulse.mesh.scale.setScalar(1 + local * 4);
+      pulse.material.opacity = 1 - local * 0.75;
+    }
+  }
+
   function applyMask(t: number): void {
+    applyReplay(t);
     const mask = replayMask(input.catchUp, t);
     const lit = litStopIds(input.snapshot, mask);
     for (const [id, mesh] of stopMeshes) {
@@ -289,6 +337,8 @@ export async function mountCityScene(
       material.emissive.set(on ? TOKEN.gold : 0x000000);
       material.emissiveIntensity = on ? 0.85 : 0;
       material.color.set(on ? TOKEN.paper : TOKEN.orca);
+      // Light is open or finished; a finished stop also drops to a low stub so it never reads as a barrier.
+      mesh.scale.y = on ? 1 : 0.3;
     }
     for (const [id, object] of hideable) {
       object.visible = !mask.hiddenServiceIds.has(id) && !mask.hiddenLineIds.has(id);
@@ -298,6 +348,47 @@ export async function mountCityScene(
   let viewW = 0;
   let viewH = 0;
 
+  const fitCache = new Map<string, { left: number; right: number; top: number; bottom: number }>();
+
+  function aim(target: typeof camera, yaw: number, lookX: number, lookZ: number): void {
+    target.position.set(
+      lookX + DIST * Math.cos(ELEV) * Math.sin(yaw),
+      DIST * Math.sin(ELEV),
+      lookZ + DIST * Math.cos(ELEV) * Math.cos(yaw)
+    );
+    target.up.set(0, 1, 0);
+    target.lookAt(lookX, 0, lookZ);
+    target.updateMatrixWorld(true);
+  }
+
+  /** Frustum that holds the whole city and its water below the HUD, per turn and stage size (C9). */
+  function fittedFrustum(quarter: number, width: number, height: number) {
+    const key = `${quarter}:${width}x${height}`;
+    const cached = fitCache.get(key);
+    if (cached) return cached;
+    const probe = new OrthographicCamera(-1, 1, 1, -1, 0.1, 500);
+    aim(probe, cameraYaw(quarter), center.x, center.z);
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const corner of corners) {
+      const v = new Vector3(corner.x, corner.y, corner.z).applyMatrix4(probe.matrixWorldInverse);
+      minX = Math.min(minX, v.x);
+      maxX = Math.max(maxX, v.x);
+      minY = Math.min(minY, v.y);
+      maxY = Math.max(maxY, v.y);
+    }
+    const usable = Math.max(height - HUD_PX, height * 0.5);
+    const perPx = Math.max(((maxX - minX) * (1 + 2 * FIT_MARGIN)) / width, ((maxY - minY) * (1 + 2 * FIT_MARGIN)) / usable);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const bottom = cy - (usable / 2) * perPx;
+    const fit = { left: cx - (width / 2) * perPx, right: cx + (width / 2) * perPx, bottom, top: bottom + height * perPx };
+    fitCache.set(key, fit);
+    return fit;
+  }
+
   function placeCamera(): void {
     const width = host.clientWidth || 1;
     const height = host.clientHeight || 1;
@@ -306,25 +397,15 @@ export async function mountCityScene(
       viewH = height;
       renderer.setSize(width, height, false);
     }
-    const aspect = width / height;
     const cam = cityCameraState();
-    const yaw = cameraYaw(cam.quarter);
-    const lookX = center.x + cam.panX;
-    const lookZ = center.z + cam.panZ;
-    camera.position.set(
-      lookX + DIST * Math.cos(ELEV) * Math.sin(yaw),
-      DIST * Math.sin(ELEV),
-      lookZ + DIST * Math.cos(ELEV) * Math.cos(yaw)
-    );
-    camera.up.set(0, 1, 0);
-    camera.lookAt(lookX, 0, lookZ);
+    aim(camera, cameraYaw(cam.quarter), center.x + cam.panX, center.z + cam.panZ);
+    const fit = fittedFrustum(cam.quarter, width, height);
     camera.zoom = cam.zoom;
-    camera.left = -FRUSTUM * aspect;
-    camera.right = FRUSTUM * aspect;
-    camera.top = FRUSTUM;
-    camera.bottom = -FRUSTUM;
+    camera.left = fit.left;
+    camera.right = fit.right;
+    camera.top = fit.top;
+    camera.bottom = fit.bottom;
     camera.updateProjectionMatrix();
-    camera.updateMatrixWorld(true);
     for (const sign of signs) sign.lookAt(camera.position);
   }
 
@@ -403,7 +484,7 @@ export async function mountCityScene(
       lastY = event.clientY;
       const cam = cityCameraState();
       const yaw = cameraYaw(cam.quarter);
-      const scale = 0.03 / cam.zoom;
+      const scale = (camera.right - camera.left) / Math.max(viewW, 1) / cam.zoom;
       updateCityCamera({
         panX: cam.panX - (dx * Math.cos(yaw) + dy * Math.sin(yaw)) * scale,
         panZ: cam.panZ - (dx * -Math.sin(yaw) + dy * Math.cos(yaw)) * scale,
@@ -493,26 +574,19 @@ function fittedClone(source: Object3D, longest: number): Group {
   return holder;
 }
 
-function activityPoints(plan: CityPlan): Point[] {
-  const points = [plan.depot.at, ...plan.roads.map((road) => road.at), ...plan.stops.map((stop) => stop.at)];
-  for (const vehicle of plan.vehicles) points.push(vehicle.at);
-  for (const service of plan.services) points.push(service.at);
-  if (plan.halo) points.push(plan.halo.at);
-  return points;
+/** World corners of the ground and its water, at street and roof height. */
+function fitCorners(plan: CityPlan): { x: number; y: number; z: number }[] {
+  const lo = tileWorld({ x: GROUND_EXTENT.river.fromX - 1, y: GROUND_EXTENT.harbour.fromY - 1 });
+  const hi = tileWorld({ x: plan.bounds.maxX + 1, y: plan.bounds.maxY + 1 });
+  const out: { x: number; y: number; z: number }[] = [];
+  for (const x of [lo.x, hi.x]) for (const z of [lo.z, hi.z]) for (const y of [-1, 2]) out.push({ x, y, z });
+  return out;
 }
 
-function activitySpan(plan: CityPlan): number {
-  const points = activityPoints(plan);
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) + 4;
-}
-
-function cityCenter(plan: CityPlan): { x: number; z: number } {
-  const points = activityPoints(plan);
-  const midX = (Math.min(...points.map((point) => point.x)) + Math.max(...points.map((point) => point.x))) / 2;
-  const midY = (Math.min(...points.map((point) => point.y)) + Math.max(...points.map((point) => point.y))) / 2;
-  return tileWorld({ x: midX, y: midY });
+function cornersCenter(corners: { x: number; z: number }[]): { x: number; z: number } {
+  const xs = corners.map((c) => c.x);
+  const zs = corners.map((c) => c.z);
+  return { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2 };
 }
 
 function paintGround(scene: Scene, plan: CityPlan): void {
@@ -520,13 +594,39 @@ function paintGround(scene: Scene, plan: CityPlan): void {
   const y0 = GROUND_EXTENT.harbour.fromY;
   const x1 = plan.bounds.maxX;
   const y1 = plan.bounds.maxY;
-  scene.add(rect(x0, y0, x1, y1, TOKEN.shore, 0));
-  scene.add(rect(x0, GROUND_EXTENT.harbour.fromY, x1, GROUND_EXTENT.harbour.toY, TOKEN.navy, 0.004));
-  scene.add(rect(GROUND_EXTENT.river.fromX, y0, GROUND_EXTENT.river.toX, y1, TOKEN.navy, 0.005));
+  const water = plan.isNight ? TOKEN.waterNight : TOKEN.water;
+  // A diorama base: the city sits on a slab with dark sides, so it never floats on the sky (C11).
+  // Top sits just under the land so the two never fight for the same depth.
+  const slab = rect(x0, y0, x1, y1, TOKEN.plinth, -0.62);
+  slab.geometry.dispose();
+  slab.geometry = new BoxGeometry(Math.abs(x1 - x0) + 1, 1.2, Math.abs(y1 - y0) + 1);
+  scene.add(slab);
+  scene.add(rect(x0, y0, x1, y1, TOKEN.land, 0));
+  // A dark rim round the board. Sky colour follows the forecast across the whole value range,
+  // so no single land colour contrasts with every sky; the rim separates them in all of them (C11).
+  const lo = tileWorld({ x: Math.min(x0, x1), y: Math.min(y0, y1) });
+  const hi = tileWorld({ x: Math.max(x0, x1), y: Math.max(y0, y1) });
+  const w = Math.abs(hi.x - lo.x) + 1;
+  const d = Math.abs(hi.z - lo.z) + 1;
+  const cx = (lo.x + hi.x) / 2;
+  const cz = (lo.z + hi.z) / 2;
+  const rim = new MeshStandardMaterial({ color: TOKEN.plinth, roughness: 1 });
+  for (const [sx, sz, px, pz] of [
+    [w + 0.6, 0.3, cx, cz - d / 2],
+    [w + 0.6, 0.3, cx, cz + d / 2],
+    [0.3, d + 0.6, cx - w / 2, cz],
+    [0.3, d + 0.6, cx + w / 2, cz]
+  ]) {
+    const edge = new Mesh(new BoxGeometry(sx, 0.25, sz), rim);
+    edge.position.set(px, 0.1, pz);
+    scene.add(edge);
+  }
+  scene.add(rect(x0, GROUND_EXTENT.harbour.fromY, x1, GROUND_EXTENT.harbour.toY, water, 0.004));
+  scene.add(rect(GROUND_EXTENT.river.fromX, y0, GROUND_EXTENT.river.toX, y1, water, 0.005));
   scene.add(rect(x0, GROUND_EXTENT.promenade.y, x1, GROUND_EXTENT.promenade.y, TOKEN.sand, 0.008));
   scene.add(rect(GROUND_EXTENT.promenade.x, y0, GROUND_EXTENT.promenade.x, y1, TOKEN.sand, 0.009));
   for (const tint of plan.tints) {
-    scene.add(rect(tint.x0, tint.y0, tint.x1, tint.y1, DISTRICT_TINT[hashId(tint.id) % DISTRICT_TINT.length], 0.012, 0.45));
+    scene.add(rect(tint.x0, tint.y0, tint.x1, tint.y1, DISTRICT_TINT[hashId(tint.id) % DISTRICT_TINT.length], 0.03, 0.45));
   }
 }
 
@@ -593,11 +693,10 @@ async function paintScenery(
   for (const [file, tiles] of groups) {
     const fitted = fittedClone(await template(file), 0.82);
     for (const part of meshParts(fitted)) {
-      const material = part.material as MeshStandardMaterial;
-      if (plan.isNight && material.emissive) {
-        material.emissive.set(TOKEN.gold);
-        material.emissiveIntensity = 0.22;
-      }
+      // Scenery is background: washed lighter and lower in contrast than any signal (C10).
+      const material = (part.material as MeshStandardMaterial).clone();
+      material.emissive.set(plan.isNight ? TOKEN.gold : 0xffffff);
+      material.emissiveIntensity = plan.isNight ? 0.22 : 0.32;
       const mesh = new InstancedMesh(part.geometry, material, tiles.length);
       const dummy = new Object3D();
       tiles.forEach((tile, index) => {
@@ -633,13 +732,13 @@ function segmentMesh(from: Point, to: Point, color: number, y: number): Mesh {
   const dx = b.x - a.x;
   const dz = b.z - a.z;
   const length = Math.max(Math.hypot(dx, dz), 0.001);
-  const mesh = new Mesh(new BoxGeometry(0.12, 0.08, length), new MeshStandardMaterial({ color }));
+  const mesh = new Mesh(new BoxGeometry(0.3, 0.1, length), new MeshStandardMaterial({ color }));
   mesh.position.set((a.x + b.x) / 2, y, (a.z + b.z) / 2);
   mesh.rotation.y = Math.atan2(dx, dz);
   return mesh;
 }
 
-function signMesh(label: string): Mesh {
+function signMesh(): Mesh {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 64;
@@ -647,14 +746,19 @@ function signMesh(label: string): Mesh {
   if (context) {
     context.fillStyle = '#fbf8f2';
     context.fillRect(0, 0, 256, 64);
+    context.fillStyle = '#13233a';
+    for (let x = -64; x < 256; x += 48) {
+      context.beginPath();
+      context.moveTo(x, 64);
+      context.lineTo(x + 24, 64);
+      context.lineTo(x + 88, 0);
+      context.lineTo(x + 64, 0);
+      context.closePath();
+      context.fill();
+    }
     context.strokeStyle = '#13233a';
     context.lineWidth = 6;
-    context.strokeRect(4, 4, 248, 56);
-    context.fillStyle = '#13233a';
-    context.font = '600 28px Inter, sans-serif';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillText(label, 128, 34);
+    context.strokeRect(3, 3, 250, 58);
   }
-  return new Mesh(new PlaneGeometry(1.4, 0.35), new MeshStandardMaterial({ map: new CanvasTexture(canvas), roughness: 1 }));
+  return new Mesh(new PlaneGeometry(1.4, 0.35), new MeshStandardMaterial({ map: new CanvasTexture(canvas), roughness: 1, side: DoubleSide }));
 }
