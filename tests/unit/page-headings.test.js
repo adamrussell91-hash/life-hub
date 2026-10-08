@@ -15,7 +15,8 @@ test('section dashboards do not repeat the page name as a kicker under the topba
     'mind-dashboard',
     'central-node-dashboard',
     'future-map-dashboard',
-    'property-dashboard'
+    'property-dashboard',
+    'garage-home-dashboard'
   ];
   assert.equal(html.includes('id="shortcuts-dashboard"'), false);
   assert.doesNotMatch(html, /data-section="shortcuts"/);

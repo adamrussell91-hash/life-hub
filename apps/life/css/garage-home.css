@@ -1,0 +1,231 @@
+/* Life → Garage & Home. Kit tokens only (tokens.css + life overlay).
+   Pastel roles: gold = car, sage = home we rent, lilac = investment. */
+
+#garage-home-dashboard { display: block; }
+#garage-home-dashboard [hidden] { display: none !important; }
+#garage-home-dashboard[data-state="loading"] [data-gh="body"] { opacity: 0.6; transition: opacity 0.2s; }
+#garage-home-dashboard dd, #garage-home-dashboard time, .gh-stat__value, .gh-odo { font-variant-numeric: tabular-nums; }
+
+.gh-tile { min-width: 0; padding: var(--space-5); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--glass); box-shadow: var(--elev-1); color: var(--ink); text-align: left; }
+button.gh-tile { width: 100%; font: inherit; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+button.gh-tile:hover { box-shadow: var(--elev-2); transform: translateY(-1px); }
+.gh-kicker { margin: 0 0 var(--space-2); font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); }
+.gh-kicker--on-dark { color: var(--on-dark-muted); }
+.gh-h { margin: 0; font-size: var(--text-lg); line-height: var(--leading-snug); letter-spacing: var(--tracking-tight); color: var(--depth); text-wrap: balance; }
+.gh-h--big { font-size: var(--text-xl); }
+.gh-sub { display: block; margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--muted); }
+.gh-muted { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.gh-on-dark-muted { color: var(--on-dark-muted); }
+.gh-danger { color: var(--danger); }
+
+/* Bar */
+.gh-bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-4); padding: var(--space-2) 0; background: linear-gradient(180deg, var(--warm-white) 70%, transparent); }
+.gh-bar__actions { display: flex; gap: var(--space-2); margin-left: auto; }
+.gh-bar .btn, .gh-inline-actions .btn, .gh-section-head .btn { min-height: 2.75rem; }
+.gh-seg { display: inline-flex; flex-wrap: wrap; padding: 3px; border: 1px solid var(--line); border-radius: var(--radius-full); background: var(--glass); box-shadow: var(--elev-1); }
+.gh-seg button { min-height: 2.75rem; padding: 0 var(--space-4); border: 0; border-radius: var(--radius-full); background: transparent; font: inherit; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--muted); cursor: pointer; }
+.gh-seg button[aria-selected="true"], .gh-seg button[aria-pressed="true"] { background: var(--navy); color: var(--on-dark); }
+.gh-seg--small button { min-height: 2.5rem; padding: 0 var(--space-3); }
+.gh-count { display: inline-grid; place-items: center; min-width: 1.4em; height: 1.4em; margin-left: 4px; padding: 0 5px; border-radius: var(--radius-full); background: var(--pastel-gold); color: var(--pastel-gold-ink); font-size: var(--text-2xs); font-weight: var(--weight-bold); }
+.gh-status-line { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--glass); font-size: var(--text-sm); color: var(--orca); }
+.gh-status-line[data-tone="warn"] { background: var(--pastel-gold); color: var(--pastel-gold-ink); border-color: transparent; }
+.gh-status-line[data-tone="error"] { background: var(--danger-surface); color: var(--danger); border-color: transparent; }
+
+.gh-section-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-3); margin: var(--space-8) 0 var(--space-3); }
+.gh-section-head--tight { margin-top: 0; align-items: center; }
+.gh-section-head h2 { margin: 0; font-size: var(--text-lg); color: var(--depth); letter-spacing: var(--tracking-tight); }
+.gh-section-head p { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.gh-inline-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-4); }
+
+/* Chips and pills */
+.gh-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.gh-chip, .gh-kind, .gh-status { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-full); font-size: var(--text-2xs); font-weight: var(--weight-semibold); white-space: nowrap; }
+.gh-chip--gold { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.gh-chip--sage { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.gh-chip--lilac { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.gh-chip--none, .gh-kind { background: var(--glass); border: 1px solid var(--line); color: var(--muted); }
+.gh-status--waiting { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.gh-status--filed { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.gh-status--ignored { background: var(--glass); color: var(--muted); border: 1px solid var(--line); }
+.gh-pick { min-height: 2.75rem; padding: 0 var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-full); background: var(--glass); font: inherit; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--orca); cursor: pointer; }
+.gh-pick[aria-pressed="true"] { background: var(--navy); border-color: transparent; color: var(--on-dark); }
+.gh-pick--gold { background: var(--pastel-gold); color: var(--pastel-gold-ink); border-color: transparent; }
+.gh-pick--sage { background: var(--pastel-sage); color: var(--pastel-sage-ink); border-color: transparent; }
+.gh-pick--lilac { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); border-color: transparent; }
+
+/* Driveway */
+.gh-banner { display: grid; gap: var(--space-1); padding: var(--space-6); background: linear-gradient(160deg, var(--depth) 0%, var(--marine) 100%); color: var(--on-dark); border-color: transparent; }
+.gh-banner .gh-kicker, .gh-banner .gh-sub { color: var(--on-dark-muted); }
+.gh-banner__line { font-size: var(--text-xl); font-weight: var(--weight-bold); letter-spacing: -0.02em; line-height: var(--leading-tight); }
+.gh-banner__line em { font-style: normal; color: var(--high-sea); }
+.gh-needs { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: var(--hub-tile-gap, var(--space-3)); }
+.gh-need { display: grid; gap: var(--space-1); border-left-width: 1px; }
+.gh-need__title { font-size: var(--text-md, 1rem); font-weight: var(--weight-semibold); color: var(--depth); }
+.gh-need--act { background: var(--pastel-peach); border-color: transparent; }
+.gh-need--act .gh-sub, .gh-need--act .gh-need__title { color: var(--pastel-peach-ink); }
+.gh-need--soon { background: var(--pastel-sage); border-color: transparent; }
+.gh-need--soon .gh-sub, .gh-need--soon .gh-need__title { color: var(--pastel-sage-ink); }
+.gh-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: var(--hub-tile-gap, var(--space-3)); }
+.gh-card { display: flex; flex-direction: column; gap: var(--space-2); min-height: 12rem; }
+.gh-card__title { font-size: var(--text-lg); font-weight: var(--weight-bold); color: var(--depth); letter-spacing: var(--tracking-tight); }
+.gh-card__stats { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: var(--text-sm); color: var(--orca); }
+.gh-card__stats b { font-size: var(--text-lg); color: var(--depth); }
+.gh-card .gh-sub { margin-top: auto; }
+.gh-card--car { box-shadow: inset 0 3px 0 var(--pastel-gold), var(--elev-1); }
+.gh-card--home { box-shadow: inset 0 3px 0 var(--pastel-sage), var(--elev-1); }
+.gh-card--inv { box-shadow: inset 0 3px 0 var(--pastel-lilac), var(--elev-1); }
+.gh-card.is-retired { opacity: 0.75; }
+
+/* Odometer */
+.gh-odo { display: flex; align-items: flex-end; gap: 3px; margin: var(--space-1) 0; }
+.gh-odo span { display: inline-grid; place-items: center; min-width: 1.6rem; height: 2.25rem; border-radius: 6px; background: var(--depth); color: var(--on-dark); font-size: 1.35rem; font-weight: var(--weight-bold); }
+.gh-odo span.is-ghost { color: var(--on-dark-muted); }
+.gh-odo small { margin-left: var(--space-2); font-size: var(--text-xs); color: var(--muted); }
+
+/* Mailroom */
+.gh-mailroom { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: flex-start; }
+.gh-mail-list { flex: 1 1 22rem; min-width: 0; display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.gh-mail-empty { flex: 1 1 22rem; padding: var(--space-6); border: 1px dashed var(--line); border-radius: var(--radius-md); text-align: center; }
+.gh-mail { display: grid; gap: var(--space-1); width: 100%; min-height: 2.75rem; padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--glass); font: inherit; text-align: left; color: var(--ink); cursor: pointer; }
+.gh-mail.is-on { border-color: var(--navy); box-shadow: 0 0 0 1px var(--navy); }
+.gh-mail__top { display: flex; justify-content: space-between; gap: var(--space-2); font-size: var(--text-xs); color: var(--orca); }
+.gh-mail__top time { color: var(--muted); }
+.gh-mail__subject { font-weight: var(--weight-semibold); color: var(--depth); }
+.gh-mail__chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.gh-detail { flex: 999 1 26rem; min-width: 0; display: grid; gap: var(--space-3); align-content: start; }
+.gh-read { padding: var(--space-4); border-radius: var(--radius-sm); background: var(--depth); color: var(--on-dark); }
+.gh-read__snippet { margin: 0 0 var(--space-3); line-height: var(--leading-normal, 1.5); }
+.gh-facts { display: grid; margin: 0; }
+.gh-facts > div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--on-dark-line); }
+.gh-facts dt { font-size: var(--text-xs); color: var(--on-dark-muted); }
+.gh-facts dd { margin: 0; font-weight: var(--weight-semibold); }
+.gh-facts--light > div { border-top-color: var(--line); }
+.gh-facts--light dt { color: var(--muted); }
+.gh-done { justify-content: space-between; padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); }
+.gh-done--filed { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.gh-done--ignored { background: var(--glass); border: 1px solid var(--line); color: var(--muted); }
+.gh-move { display: grid; gap: var(--space-2); }
+.gh-check { display: flex; align-items: center; gap: var(--space-2); min-height: 2.75rem; font-size: var(--text-sm); color: var(--ink); cursor: pointer; }
+.gh-check input { width: 1.125rem; height: 1.125rem; accent-color: var(--wave); }
+
+/* Garage */
+.gh-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--hub-tile-gap, var(--space-3)); }
+.gh-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--hub-tile-gap, var(--space-3)); }
+.gh-stat__value { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-bold); color: var(--depth); letter-spacing: var(--tracking-tight); }
+.gh-stat__value small { font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--muted); }
+.gh-road-tile { margin-top: var(--hub-tile-gap, var(--space-3)); }
+.gh-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.gh-scroll > svg { display: block; width: 100%; min-width: 640px; height: auto; overflow: visible; }
+#garage-home-dashboard svg text { font-family: var(--font-ui); font-variant-numeric: tabular-nums; }
+.gh-road { fill: var(--depth); }
+.gh-road__centre { stroke: var(--on-dark-muted); stroke-width: 2; stroke-dasharray: 10 10; }
+.gh-tick { fill: var(--muted); font-size: 12px; }
+.gh-marker { cursor: pointer; outline: none; }
+.gh-marker__stem { stroke: var(--line); stroke-width: 2; }
+.gh-marker__dot { fill: var(--warm-white); stroke: var(--wave); stroke-width: 3; transition: r 0.2s; }
+.gh-marker.is-on .gh-marker__dot, .gh-marker:focus-visible .gh-marker__dot { fill: var(--wave); }
+.gh-marker__label { fill: var(--orca); font-size: 12px; font-weight: 600; }
+.gh-marker.is-on .gh-marker__label { fill: var(--depth); }
+.gh-ghost line { stroke: var(--high-sea); stroke-width: 3; stroke-dasharray: 4 6; }
+.gh-ghost rect { fill: none; stroke: var(--high-sea); stroke-width: 2; stroke-dasharray: 4 3; }
+.gh-ghost text { fill: var(--muted); font-size: 12px; }
+.gh-visit-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: var(--space-4); align-items: start; margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--line); }
+.gh-visit-detail p { margin: 0; }
+.gh-timeline { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.gh-timeline__row { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; width: 100%; min-height: 2.75rem; padding: var(--space-2) var(--space-3); border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font: inherit; text-align: left; color: var(--ink); }
+button.gh-timeline__row { cursor: pointer; }
+button.gh-timeline__row:hover, .gh-timeline__row.is-on { background: var(--glass); border-color: var(--line); }
+.gh-timeline__row time { font-size: var(--text-xs); color: var(--muted); }
+.gh-timeline__row span { display: grid; min-width: 0; }
+.gh-timeline__row small { color: var(--muted); font-size: var(--text-xs); }
+.gh-timeline__amt { display: flex !important; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold); }
+
+/* Homes */
+.gh-place-section + .gh-place-section { margin-top: var(--space-10); padding-top: var(--space-6); border-top: 1px solid var(--line); }
+.gh-grid--home { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+.gh-stack { display: grid; gap: var(--hub-tile-gap, var(--space-3)); align-content: start; }
+.gh-inspection__head, .gh-pack__head { display: flex; justify-content: space-between; gap: var(--space-4); align-items: flex-start; }
+.gh-ring { display: grid; place-items: center; flex-shrink: 0; width: 5.5rem; height: 5.5rem; margin: 0; border-radius: 50%; background: var(--depth); color: var(--on-dark); line-height: 1; }
+.gh-ring b { font-size: var(--text-xl); }
+.gh-ring small { font-size: var(--text-2xs); color: var(--on-dark-muted); margin-top: -1.2rem; }
+.gh-ring--light { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.gh-ring--light small { color: var(--pastel-lilac-ink); }
+.gh-progress { height: 8px; margin: var(--space-4) 0; border-radius: var(--radius-full); background: var(--line); overflow: hidden; }
+.gh-progress span { display: block; height: 100%; border-radius: inherit; background: var(--wave); transition: width 0.4s; }
+.gh-checklist { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.gh-check-row { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 2.75rem; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--glass); font: inherit; font-size: var(--text-sm); text-align: left; color: var(--ink); cursor: pointer; }
+.gh-check-row i { flex-shrink: 0; width: 1.4rem; height: 1.4rem; border: 2px solid var(--wave); border-radius: 6px; }
+.gh-check-row[aria-checked="true"] { background: var(--pastel-sage); border-color: transparent; color: var(--pastel-sage-ink); text-decoration: line-through; }
+.gh-check-row[aria-checked="true"] i { background: var(--wave); box-shadow: inset 0 0 0 3px var(--pastel-sage); }
+.gh-receipts { display: flex; gap: var(--space-2); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.gh-receipts li { flex: 1; display: grid; gap: var(--space-1); justify-items: center; min-width: 0; }
+.gh-receipts span { width: 100%; height: 2rem; border-radius: 6px; background: var(--pastel-sage); }
+.gh-receipts small { font-size: var(--text-2xs); color: var(--muted); white-space: nowrap; }
+.gh-repair { margin-bottom: var(--space-3); }
+.gh-steps { display: grid; gap: var(--space-3); margin: var(--space-3) 0 0; padding: 0; list-style: none; border-left: 2px solid var(--line); }
+.gh-steps li { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: var(--space-3); padding-left: var(--space-3); font-size: var(--text-sm); }
+.gh-steps time { color: var(--muted); font-size: var(--text-xs); }
+.gh-steps b { display: block; color: var(--depth); }
+.gh-pack__group { margin-top: var(--space-4); }
+.gh-pack__group ul { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.gh-pack__group li { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; gap: var(--space-3); font-size: var(--text-sm); }
+.gh-pack__group time { color: var(--muted); font-size: var(--text-xs); }
+.gh-needed { background: linear-gradient(170deg, var(--depth) 0%, var(--marine) 100%); color: var(--on-dark); border-color: transparent; }
+.gh-checklist--dark .gh-check-row { background: var(--on-dark-hover); border-color: var(--on-dark-line); color: var(--on-dark); }
+.gh-checklist--dark .gh-check-row i { border-color: var(--high-sea); }
+.gh-checklist--dark .gh-check-row[aria-checked="true"] { background: transparent; color: var(--on-dark-muted); }
+.gh-checklist--dark .gh-check-row[aria-checked="true"] i { background: var(--high-sea); box-shadow: none; }
+.gh-empty { display: grid; gap: var(--space-2); padding: var(--space-8); }
+
+/* Sheets (R4: docked actions, 44px buttons, clear of the home indicator) */
+.gh-sheet { padding: 0; border: 0; background: transparent; max-width: none; max-height: none; width: 100%; height: 100%; color: var(--ink); }
+.gh-sheet::backdrop { background: rgba(10, 21, 54, 0.35); backdrop-filter: blur(6px); }
+.gh-sheet__panel { position: fixed; inset: auto 0 0; margin: 0 auto; width: min(40rem, 100%); max-height: min(90dvh, 52rem); display: flex; flex-direction: column; border-radius: var(--radius-xl) var(--radius-xl) 0 0; background: var(--warm-white); box-shadow: var(--elev-4); }
+.gh-sheet__head { padding: var(--space-5) var(--space-5) var(--space-3); border-bottom: 1px solid var(--line); }
+.gh-sheet__head h2 { margin: 0; font-size: var(--text-lg); color: var(--depth); }
+.gh-sheet__head p { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--muted); }
+.gh-sheet__body { flex: 1; overflow-y: auto; padding: var(--space-4) var(--space-5); display: grid; gap: var(--space-5); align-content: start; }
+.gh-sheet__section h3 { margin: 0 0 var(--space-2); font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); }
+.gh-sheet__foot { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-5) calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: var(--warm-white); }
+.gh-sheet__foot .btn { min-height: 2.75rem; min-width: 6rem; }
+.gh-sheet__error { margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-xs); background: var(--danger-surface); color: var(--danger); font-size: var(--text-sm); }
+.gh-fields, .gh-fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: 0; padding: 0; border: 0; }
+.gh-fieldset legend { padding: 0 0 var(--space-2); font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); }
+.gh-field { display: grid; gap: var(--space-1); min-width: 0; align-content: start; }
+.gh-field--wide { grid-column: 1 / -1; }
+.gh-field label { font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--muted); }
+.gh-field input, .gh-field select, .gh-field textarea { width: 100%; min-height: 2.75rem; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--glass); font: inherit; color: var(--ink); box-sizing: border-box; }
+.gh-field textarea { resize: vertical; }
+.gh-place-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.gh-place-list li { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--line); }
+.gh-place-list small { display: block; margin-top: 2px; color: var(--muted); font-size: var(--text-xs); }
+.gh-switches { display: grid; gap: var(--space-2); }
+.gh-switch { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); width: 100%; min-height: 2.75rem; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--glass); font: inherit; text-align: left; color: var(--ink); cursor: pointer; }
+.gh-switch span { display: grid; }
+.gh-switch small { color: var(--muted); font-size: var(--text-xs); }
+.gh-switch i { flex-shrink: 0; position: relative; width: 2.75rem; height: 1.6rem; border-radius: var(--radius-full); background: var(--line); transition: background 0.2s; }
+.gh-switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: calc(1.6rem - 6px); height: calc(1.6rem - 6px); border-radius: 50%; background: var(--warm-white); box-shadow: var(--elev-1); transition: transform 0.2s; }
+.gh-switch[aria-checked="true"] i { background: var(--wave); }
+.gh-switch[aria-checked="true"] i::after { transform: translateX(1.15rem); }
+
+@media (max-width: 1100px) {
+  .gh-grid, .gh-grid--home { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .gh-bar__actions { width: 100%; margin-left: 0; }
+  .gh-bar__actions .btn { flex: 1; }
+  .gh-seg { width: 100%; }
+  .gh-seg button { flex: 1; padding: 0 var(--space-2); }
+  .gh-banner { padding: var(--space-5); }
+  .gh-banner__line { font-size: var(--text-lg); }
+  .gh-stats { grid-template-columns: minmax(0, 1fr); }
+  .gh-facts > div { grid-template-columns: 7rem minmax(0, 1fr); }
+  .gh-visit-detail { grid-template-columns: minmax(0, 1fr); }
+  .gh-timeline__row, .gh-steps li, .gh-pack__group li { grid-template-columns: 4.75rem minmax(0, 1fr) auto; }
+  .gh-steps li { grid-template-columns: 4.75rem minmax(0, 1fr); }
+  .gh-fields, .gh-fieldset { grid-template-columns: minmax(0, 1fr); }
+  .gh-sheet__panel { max-height: 92dvh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  button.gh-tile, .gh-progress span, .gh-switch i, .gh-switch i::after, .gh-marker__dot { transition: none; }
+}
