@@ -1,6 +1,7 @@
 # Brief 2b-fix · Make the glance prototype readable (Cursor)
 
 **Follows:** [brief-2b-glance-prototype.md](brief-2b-glance-prototype.md) and PR #740.
+**Status:** Built by Claude Code in PR #741 (8 October 2026), at Adam's request, using a live browser loop. See "As built" at the end.
 **Why:** Claude Code reviewed #740 on 8 October 2026 by loading `#/city` in a real browser on every golden day. The plumbing is right: the snapshot, layout, legend, text overlay, catch-up data and model loading all work, with no console errors. But the picture does not communicate. **If Adam sat the glance test now, it would fail because of how the city is drawn, not because the idea is wrong.** Fix that before the test.
 
 ## What the review found
@@ -60,3 +61,14 @@ Claude Code has already fixed one of its own problems in this PR: the "Suspended
 ## Files
 
 `apps/tasks/src/views/city/plan.ts` (scenery corridor and fill), `scene.ts` (scale, colours, catch-up dimming, barrier), `view.ts` and `city.css` (test mode, camera fit, labels), and `camera.ts`.
+
+## As built (PR #741)
+
+- **Scenery:** a 2-tile corridor around every road, stop, station, landmark, tram loop, service, gate and the depot. 35 % fill, low buildings first, washed lighter. Unit tests cover the corridor and the cap.
+- **Signals at 2.5×.** The halo is a large gold ring facing the camera. Finished stops drop to a low dark stub, so they never read as a barrier.
+- **Camera:** fits the board and its water below the HUD, per turn and stage size, with no snap.
+- **Board:** a diorama slab with a dark rim, plus mid-blue water by day and night. Measured lightness (L\*): day sky, land and water are 91, 68 and 41; night sky, land and water are 18, 67 and 44. Every pair of land, water and sky differs by at least 21 in the measured day and night views. On cloud-sky days, land and sky are within 3 of each other, and the rim separates them.
+- **Catch-up:** the lights dim to about 55 % during the replay, and a gold pulse ring plays at each change in turn.
+- **Test mode:** `&test=1` is full screen, labelled "Day A" to "Day F" from a fixed shuffle, with a swatch sky, a hidden keyboard mirror with neutral labels, and no hint. A Chromium check of `document.body.innerText` on all six days found none of the banned words.
+- **The life wall:** a striped gate (no words) across the start of the closed route. The legend calls it "Striped gate".
+- **Not done:** a frame rate on real hardware (the cloud browser uses software rendering), and the C10 greyscale-blur pair was judged by eye, not measured.

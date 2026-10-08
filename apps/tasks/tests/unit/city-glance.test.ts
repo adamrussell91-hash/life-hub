@@ -6,10 +6,11 @@ import { cityCatchUp, citySnapshot } from '@/domain/city/snapshot';
 import { layoutCity } from '@/domain/city/layout';
 import { deletedYesterday, noCheckInMorning, sundayAfternoon, suspendedService } from '@/domain/city/fixtures/golden-days';
 import { cityCameraState, resetCityCameraForTests, updateCityCamera } from '@/views/city/camera';
-import { cityNeedsWideScreen, goldenRequest, KNOWN_GOLDEN_DAYS } from '@/views/city/days';
+import { cityNeedsWideScreen, goldenRequest, isTestMode, KNOWN_GOLDEN_DAYS, testLetter } from '@/views/city/days';
 import { cityModelUrl } from '@/views/city/model-url';
 import { vehicleText } from '@/views/city/copy';
-import { movingIds, parkedRouteIds, planCity, replayMask, replayProgress, roadPiece } from '@/views/city/plan';
+import { movingIds, parkedRouteIds, planCity, replayMask, replayProgress, roadPiece, SCENERY_CORRIDOR, SCENERY_FILL_PCT } from '@/views/city/plan';
+import { BLOCK } from '@/domain/city/layout';
 
 const viewDir = join(dirname(fileURLToPath(import.meta.url)), '../../src/views/city');
 
@@ -145,5 +146,47 @@ describe('glance roads and URL', () => {
       if (source.includes("'/city/") || source.includes('"/city/')) hits.push(file);
     }
     expect(hits).toEqual([]);
+  });
+});
+
+describe('glance readability (review of #740)', () => {
+  function planFor(day: ReturnType<typeof sundayAfternoon>) {
+    const snapshot = citySnapshot(day.input, day.now);
+    const layout = layoutCity(snapshot);
+    const catchUp = cityCatchUp(day.input, day.lastVisitAt, day.now);
+    return { layout, plan: planCity(snapshot, layout, catchUp, 1, false) };
+  }
+
+  it('keeps scenery out of a corridor around every road, stop, service and the depot (C10)', () => {
+    for (const build of [sundayAfternoon, suspendedService, deletedYesterday, noCheckInMorning]) {
+      const { plan } = planFor(build());
+      const marks = [...plan.roads.map((r) => r.at), ...plan.stops.map((s) => s.at), ...plan.services.map((s) => s.at), plan.depot.at];
+      for (const tile of plan.scenery) {
+        for (const mark of marks) {
+          const near = Math.abs(tile.at.x - mark.x) <= SCENERY_CORRIDOR && Math.abs(tile.at.y - mark.y) <= SCENERY_CORRIDOR;
+          expect(near, `scenery at ${tile.at.x},${tile.at.y} beside ${mark.x},${mark.y}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('fills at most about a third of district ground with scenery (C10)', () => {
+    const { layout, plan } = planFor(sundayAfternoon());
+    const districtTiles = layout.districts.reduce((sum, d) => sum + d.blocks.length * BLOCK * BLOCK, 0);
+    expect(plan.scenery.length / districtTiles).toBeLessThanOrEqual(SCENERY_FILL_PCT / 100);
+  });
+
+  it('marks where Sunday’s one change happens, so the replay can show it', () => {
+    const { layout, plan } = planFor(sundayAfternoon());
+    const m2 = layout.stops.find((stop) => stop.id === 'm2');
+    expect(plan.changeMarks).toEqual([{ index: 0, count: 1, at: m2?.at }]);
+  });
+
+  it('gives each day its own neutral test letter (V10)', () => {
+    const letters = (['sunday', 'suspended', 'deleted', 'no-checkin', 'unseen-1', 'unseen-2'] as const).map(testLetter);
+    expect(new Set(letters).size).toBe(6);
+    expect(letters.every((letter) => /^[A-F]$/.test(letter))).toBe(true);
+    expect(isTestMode(new URLSearchParams('golden=sunday&test=1'))).toBe(true);
+    expect(isTestMode(new URLSearchParams('golden=sunday'))).toBe(false);
   });
 });

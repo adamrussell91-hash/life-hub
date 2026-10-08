@@ -67,7 +67,7 @@ export function legendRows(): LegendRow[] {
     { term: 'Mail van', means: 'A follow-up is due.' },
     { term: 'Food truck', means: 'A meal window is open and not logged.' },
     { term: 'School bus', means: 'Teaching tasks due in the next seven days.' },
-    { term: 'Not running', means: 'A life wall has suspended that route. Its buses wait at the depot.' },
+    { term: 'Striped gate', means: 'Not running. A life wall has suspended that route. Its buses wait at the depot.' },
     { term: 'Sky', means: 'Capacity. No data means there is no check-in.' },
     { term: 'Landmark', means: 'A goal that has been achieved.' }
   ];
