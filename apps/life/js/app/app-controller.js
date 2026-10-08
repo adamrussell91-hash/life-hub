@@ -44,7 +44,8 @@ const MORE_SECTIONS = new Set([
   'mind',
   'skincare',
   'central-node',
-  'future-map'
+  'future-map',
+  'property'
 ]);
 
 const HASH_SECTIONS = new Set([
@@ -60,6 +61,7 @@ const HASH_SECTIONS = new Set([
   'mind',
   'central-node',
   'future-map',
+  'property',
   'hub-map'
 ]);
 
@@ -121,6 +123,7 @@ export function createAppController(dependencies) {
     scheduleApi,
     renderFutureMap,
     loadFutureMapTrips,
+    propertyView,
     skincareController,
     skincareRoutines,
     getCurrentRoutineKey,
@@ -240,7 +243,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'future-map' || target === 'more') continue;
+    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'future-map' || target === 'property' || target === 'more') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
@@ -275,6 +278,9 @@ export function createAppController(dependencies) {
   }
   for (const button of root.querySelectorAll?.('[data-section="future-map"]') ?? []) {
     bind(button, 'click', () => showSection('future-map'));
+  }
+  for (const button of root.querySelectorAll?.('[data-section="property"]') ?? []) {
+    bind(button, 'click', () => showSection('property'));
   }
   bind(root.querySelector('#central-node-map-button'), 'click', () => showSection('hub-map'));
   bindHubAccordion(root.querySelector('[data-hub-accordion]'));
@@ -723,6 +729,7 @@ export function createAppController(dependencies) {
     mind: { eyebrow: 'Life Hub', title: 'Mind' },
     'central-node': { eyebrow: 'Life Hub', title: 'Central Node' },
     'future-map': { eyebrow: 'Life Hub', title: 'Future map' },
+    property: { eyebrow: 'Life Hub · Property', title: 'Property' },
     'hub-map': { eyebrow: 'Life Hub', title: 'Hub map' }
   };
 
@@ -781,6 +788,8 @@ export function createAppController(dependencies) {
     const centralNode = root.querySelector('#central-node-dashboard');
     const futureMap = root.querySelector('#future-map-dashboard');
     const hubMapSection = root.querySelector('#hub-map-dashboard');
+    const property = root.querySelector('#property-dashboard');
+    if (property) property.hidden = name !== 'property';
     if (home) home.hidden = name !== 'home';
     if (nutrition) nutrition.hidden = name !== 'nutrition';
     if (fitness) fitness.hidden = name !== 'fitness';
@@ -862,6 +871,7 @@ export function createAppController(dependencies) {
       consumeTravelPenelopeHandoff();
     }
     if (name === 'central-node') renderCentralNodeSection();
+    if (name === 'property') propertyView?.show?.();
     if (name === 'future-map') {
       void loadFutureMap();
       void loadFutureMapTrips?.(root, { fetchImpl: apiFetch });

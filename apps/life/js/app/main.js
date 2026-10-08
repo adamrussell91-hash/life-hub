@@ -50,6 +50,8 @@ import { createKnowledgeApi } from './knowledge-api.js';
 import { createTasksApi } from './tasks-api.js';
 import { createScheduleApi } from './schedule-api.js';
 import { renderFutureMap, loadFutureMapTrips } from './render-future-map.js';
+import { createPropertyApi } from './property-api.js';
+import { createPropertyView } from './render-property.js';
 import { createHubMapApi } from './hub-map-api.js';
 import { createHubMapController } from './hub-map-controller.js';
 import { createTeachingApi } from './teaching-api.js';
@@ -108,6 +110,14 @@ const loadCached = async ({ date }) => loadLiveEvents({
 const chatPanel = createChatPanelController({ root: document });
 const chatApi = createChatApi(fetchImpl);
 const skincareApi = createSkincareApi(fetchImpl);
+const propertyView = createPropertyView({
+  root: document,
+  api: createPropertyApi(fetchImpl),
+  setTitle: title => {
+    const heading = document.querySelector('#page-title');
+    if (heading && document.querySelector('#property-dashboard')?.hidden === false) heading.textContent = title;
+  }
+});
 const teachingApi = createTeachingApi(fetchImpl);
 const knowledgeApi = createKnowledgeApi(fetchImpl);
 const tasksApi = createTasksApi(fetchImpl);
@@ -199,6 +209,7 @@ controller = createAppController({
   scheduleApi,
   renderFutureMap,
   loadFutureMapTrips,
+  propertyView,
   skincareController,
   skincareRoutines: SKINCARE_ROUTINES,
   getCurrentRoutineKey: currentRoutineKey,
