@@ -52,6 +52,8 @@ import { createScheduleApi } from './schedule-api.js';
 import { renderFutureMap, loadFutureMapTrips } from './render-future-map.js';
 import { createPropertyApi } from './property-api.js';
 import { createPropertyView } from './render-property.js';
+import { createGarageHomeApi } from './garage-home-api.js';
+import { createGarageHomeView } from './render-garage-home.js';
 import { createHubMapApi } from './hub-map-api.js';
 import { createHubMapController } from './hub-map-controller.js';
 import { createTeachingApi } from './teaching-api.js';
@@ -118,6 +120,17 @@ const propertyView = createPropertyView({
   setTitle: title => {
     const heading = document.querySelector('#page-title');
     if (heading && document.querySelector('#property-dashboard')?.hidden === false) heading.textContent = title;
+  }
+});
+const garageHomeView = createGarageHomeView({
+  root: document,
+  api: createGarageHomeApi(fetchImpl),
+  // Investments hand off to the Property page through the rail button, so the
+  // controller's own section switch (title, hash, visibility) runs as usual.
+  openSection: name => document.querySelector(`.hub-nav-item[data-section="${name}"]`)?.click(),
+  setTitle: title => {
+    const heading = document.querySelector('#page-title');
+    if (heading && document.querySelector('#garage-home-dashboard')?.hidden === false) heading.textContent = title;
   }
 });
 const teachingApi = createTeachingApi(fetchImpl);
@@ -212,6 +225,7 @@ controller = createAppController({
   renderFutureMap,
   loadFutureMapTrips,
   propertyView,
+  garageHomeView,
   skincareController,
   skincareRoutines: SKINCARE_ROUTINES,
   getCurrentRoutineKey: currentRoutineKey,
