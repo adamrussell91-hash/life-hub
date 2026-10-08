@@ -4,7 +4,8 @@ import { hashQuery } from '@/shell/shell';
 import type { GoldenDay } from '@/domain/city/fixtures/golden-days';
 import './city.css';
 import { legendRows, quietSinceLabel } from './copy';
-import { cityNeedsWideScreen, goldenRequest, isTestMode, KNOWN_GOLDEN_DAYS, testLetter, type GoldenKey } from './days';
+import { cityNeedsWideScreen, goldenRequest, isTestMode, KNOWN_GOLDEN_DAYS, TEST_DAYS, testLetter, type GoldenKey } from './days';
+import { cityCameraState, updateCityCamera } from './camera';
 import { planCity, type CityPlan } from './plan';
 import type { CitySceneHandle } from './scene';
 
@@ -25,7 +26,7 @@ export async function renderCityView(canvas: HTMLElement): Promise<void> {
 
   const request = goldenRequest(hashQuery());
   if (request.kind === 'list') {
-    canvas.append(renderDayList());
+    canvas.append(isTestMode(hashQuery()) ? renderTestList() : renderDayList());
     return;
   }
   if (request.kind === 'unknown') {
@@ -141,6 +142,27 @@ function renderDayList(): HTMLElement {
   return section;
 }
 
+/** The tester's start page: six neutral buttons, so nobody has to type a test address. */
+function renderTestList(): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'city-picker city-picker--test';
+  const lede = document.createElement('p');
+  lede.className = 'view-lede';
+  lede.textContent = 'Glance test. Open each day in the order you choose. Each opens full screen; use Days to come back.';
+  const list = document.createElement('ul');
+  for (const day of TEST_DAYS) {
+    const item = document.createElement('li');
+    const link = document.createElement('a');
+    link.className = 'btn btn--secondary';
+    link.href = `#/city?golden=${day.key}&test=1`;
+    link.textContent = `Day ${day.letter}`;
+    item.append(link);
+    list.append(item);
+  }
+  section.append(lede, list);
+  return section;
+}
+
 function renderUnknown(value: string): HTMLElement {
   const section = document.createElement('section');
   section.className = 'city-unknown';
@@ -170,7 +192,26 @@ function renderHud(
   legendButton.type = 'button';
   legendButton.className = 'btn btn--secondary';
   legendButton.textContent = 'Legend';
-  tools.append(legendButton);
+  const zoomOut = document.createElement('button');
+  zoomOut.type = 'button';
+  zoomOut.className = 'btn btn--secondary';
+  zoomOut.textContent = '−';
+  zoomOut.setAttribute('aria-label', 'Zoom out');
+  zoomOut.addEventListener('click', () => updateCityCamera({ zoom: cityCameraState().zoom / 1.25, touched: true }));
+  const zoomIn = document.createElement('button');
+  zoomIn.type = 'button';
+  zoomIn.className = 'btn btn--secondary';
+  zoomIn.textContent = '+';
+  zoomIn.setAttribute('aria-label', 'Zoom in');
+  zoomIn.addEventListener('click', () => updateCityCamera({ zoom: cityCameraState().zoom * 1.25, touched: true }));
+  tools.append(legendButton, zoomOut, zoomIn);
+  if (testMode) {
+    const back = document.createElement('a');
+    back.className = 'btn btn--secondary';
+    back.href = '#/city?test=1';
+    back.textContent = 'Days';
+    tools.append(back);
+  }
 
   const sky = document.createElement('button');
   sky.type = 'button';
@@ -265,7 +306,7 @@ function renderHud(
 
   const hint = document.createElement('p');
   hint.className = 'city-hint';
-  hint.textContent = 'Drag to move · scroll to zoom · Q and E to turn';
+  hint.textContent = 'Drag to move · pinch, Ctrl + scroll or + − to zoom · Q and E to turn';
 
   root.append(tools, sky, caption, banner, card, panel, legend, a11y, hint);
   page.addEventListener('keydown', (event) => {

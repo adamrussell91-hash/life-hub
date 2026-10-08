@@ -499,10 +499,26 @@ export async function mountCityScene(
     dragging = false;
     if (!dragMoved) input.onPick(pick(event));
   }
+  /**
+   * A plain scroll belongs to the page, so scrolling past the city never zooms it.
+   * Trackpad pinch in Chrome and Firefox arrives as wheel + ctrlKey; Ctrl/Cmd + scroll works too (C4).
+   */
   function onWheel(event: WheelEvent): void {
+    if (!event.ctrlKey && !event.metaKey) return;
     event.preventDefault();
     const cam = cityCameraState();
     updateCityCamera({ zoom: cam.zoom * (event.deltaY > 0 ? 0.92 : 1.08), touched: true });
+  }
+  // Safari macOS reports trackpad pinch as gesture events, not wheel (C4).
+  let gestureZoom = 1;
+  function onGestureStart(event: Event): void {
+    event.preventDefault();
+    gestureZoom = cityCameraState().zoom;
+  }
+  function onGestureChange(event: Event): void {
+    event.preventDefault();
+    const scale = (event as Event & { scale?: number }).scale ?? 1;
+    updateCityCamera({ zoom: gestureZoom * scale, touched: true });
   }
   function onKey(event: KeyboardEvent): void {
     const target = event.target as HTMLElement | null;
@@ -520,6 +536,8 @@ export async function mountCityScene(
   renderer.domElement.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
   renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
+  renderer.domElement.addEventListener('gesturestart', onGestureStart);
+  renderer.domElement.addEventListener('gesturechange', onGestureChange);
   window.addEventListener('keydown', onKey);
   frameId = requestAnimationFrame(frame);
 
@@ -536,6 +554,8 @@ export async function mountCityScene(
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('wheel', onWheel);
+      renderer.domElement.removeEventListener('gesturestart', onGestureStart);
+      renderer.domElement.removeEventListener('gesturechange', onGestureChange);
       window.removeEventListener('keydown', onKey);
       renderer.dispose();
       renderer.domElement.remove();

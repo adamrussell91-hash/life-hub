@@ -6,7 +6,7 @@ import { cityCatchUp, citySnapshot } from '@/domain/city/snapshot';
 import { layoutCity } from '@/domain/city/layout';
 import { deletedYesterday, noCheckInMorning, sundayAfternoon, suspendedService } from '@/domain/city/fixtures/golden-days';
 import { cityCameraState, resetCityCameraForTests, updateCityCamera } from '@/views/city/camera';
-import { cityNeedsWideScreen, goldenRequest, isTestMode, KNOWN_GOLDEN_DAYS, testLetter } from '@/views/city/days';
+import { cityNeedsWideScreen, goldenRequest, isTestMode, KNOWN_GOLDEN_DAYS, TEST_DAYS, testLetter } from '@/views/city/days';
 import { cityModelUrl } from '@/views/city/model-url';
 import { vehicleText } from '@/views/city/copy';
 import { movingIds, parkedRouteIds, planCity, replayMask, replayProgress, roadPiece, SCENERY_CORRIDOR, SCENERY_FILL_PCT } from '@/views/city/plan';
@@ -188,5 +188,17 @@ describe('glance readability (review of #740)', () => {
     expect(letters.every((letter) => /^[A-F]$/.test(letter))).toBe(true);
     expect(isTestMode(new URLSearchParams('golden=sunday&test=1'))).toBe(true);
     expect(isTestMode(new URLSearchParams('golden=sunday'))).toBe(false);
+  });
+});
+
+describe('glance test entry', () => {
+  it('lists six days as Day A to Day F, in letter order, all opening in test mode', () => {
+    expect(TEST_DAYS.map((day) => day.letter)).toEqual(['A', 'B', 'C', 'D', 'E', 'F']);
+    expect(new Set(TEST_DAYS.map((day) => day.key)).size).toBe(6);
+  });
+
+  it('never lets a plain scroll zoom the city', () => {
+    const source = readFileSync(join(viewDir, 'scene.ts'), 'utf8');
+    expect(source).toMatch(/if \(!event\.ctrlKey && !event\.metaKey\) return;/);
   });
 });
