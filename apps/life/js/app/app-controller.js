@@ -14,7 +14,7 @@ import {
   eventsFromCalendarFeeds,
   summarizeIcalFeedStatuses
 } from '../../../../packages/design-kit/js/calendar/ical-calendar.js';
-import { mergeLifeCalendarEvents, shiftYearMonth } from './calendar-model.js';
+import { eventsForDate, mergeLifeCalendarEvents, shiftYearMonth } from './calendar-model.js';
 import { deriveRiverZooms } from './term-river.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
@@ -127,6 +127,7 @@ export function createAppController(dependencies) {
     skincareController,
     skincareRoutines,
     getCurrentRoutineKey,
+    aesthetics,
     buildCalendarModel,
     renderCalendar,
     chatApi,
@@ -721,7 +722,7 @@ export function createAppController(dependencies) {
     chat: { eyebrow: 'Life Hub', title: 'Chat' },
     nutrition: { eyebrow: 'Life Hub', title: 'Nutrition' },
     fitness: { eyebrow: 'Life Hub', title: 'Fitness' },
-    skincare: { eyebrow: 'Life Hub', title: 'Skincare' },
+    skincare: { eyebrow: 'Life Hub', title: 'Aesthetics' },
     calendar: { eyebrow: 'Life Hub', title: 'Calendar' },
     body: { eyebrow: 'Life Hub', title: 'Body' },
     'body-bloods': { eyebrow: 'Life Hub', title: 'Bloods' },
@@ -1538,6 +1539,21 @@ export function createAppController(dependencies) {
     });
     const button = root.querySelector('#skincare-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, SKINCARE_AGENT_SLUG));
+    renderAestheticsSection();
+  }
+
+  // Today / Scent / Dress tabs. Today's calendar (all hubs) drives the scent ribbon.
+  function renderAestheticsSection() {
+    if (!aesthetics || !latestResult?.date) return;
+    const merged = mergeLifeCalendarEvents({
+      lifeEvents: latestResult.events,
+      teachingEvents,
+      knowledgeEvents,
+      tasksEvents,
+      professionalEvents,
+      feedEvents
+    });
+    aesthetics.render({ date: latestResult.date, events: eventsForDate(merged, latestResult.date) });
   }
 
   async function refreshSkincareShelf() {

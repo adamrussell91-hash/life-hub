@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v204';
+const CACHE_NAME = 'life-hub-shell-v206';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -14,6 +14,7 @@ const SHELL_FILES = [
   'js/app/capture-inbox.js',
   'capture-inbox.html',
   'css/app.css',
+  'css/aesthetics.css',
   'packages/design-kit/tokens.css',
   'packages/design-kit/overlays.css',
   'packages/design-kit/actions.css',
@@ -248,6 +249,12 @@ const SHELL_FILES = [
   'js/app/render-nutrition.js',
   'js/app/render-future-map.js',
   'js/app/render-skincare.js',
+  'js/app/aesthetics/aesthetics-model.js',
+  'js/app/aesthetics/dress-looks.js',
+  'js/app/aesthetics/fragrance-library.js',
+  'js/app/aesthetics/notion-aesthetics-source.js',
+  'js/app/aesthetics/render-aesthetics.js',
+  'js/app/aesthetics/render-source-reference.js',
   'js/app/skincare-api.js',
   'js/app/skincare-controller.js',
   'js/app/skincare-model.js',

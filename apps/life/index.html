@@ -8,7 +8,7 @@
   <title>Life Hub · Home</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,600;1,6..96,400;1,6..96,600&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="packages/design-kit/tokens.css">
   <link rel="stylesheet" href="packages/design-kit/overlays.css">
@@ -35,6 +35,7 @@
   <link rel="stylesheet" href="packages/design-kit/calendar-term-river.css">
   <link rel="stylesheet" href="packages/design-kit/calendar-zoom-bar.css">
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/aesthetics.css">
   <link rel="stylesheet" href="css/property.css">
 </head>
 <body>
@@ -101,7 +102,7 @@
               <button class="hub-nav-item" type="button" data-section="fitness"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8v8M18 8v8M6 12h12M4 10v4M20 10v4"/></svg></span><span>Fitness</span></button>
               <button class="hub-nav-item" type="button" data-section="body"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3"/><path d="M6 20v-1a6 6 0 0 1 12 0v1"/></svg></span><span>Body</span></button>
               <button class="hub-nav-item" type="button" data-section="mind"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.2 6.2l2.5 2.5M15.3 15.3l2.5 2.5M17.8 6.2l-2.5 2.5M8.7 15.3l-2.5 2.5"/></svg></span><span>Mind</span></button>
-              <button class="hub-nav-item" type="button" data-section="skincare"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 7.2 6 11a6 6 0 0 1-12 0c0-3.8 6-11 6-11Z"/></svg></span><span>Skincare</span></button>
+              <button class="hub-nav-item" type="button" data-section="skincare"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 7.2 6 11a6 6 0 0 1-12 0c0-3.8 6-11 6-11Z"/></svg></span><span>Aesthetics</span></button>
               <button class="hub-nav-item" type="button" data-section="property"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><circle cx="12" cy="14" r="2"/><path d="M12 16v2.5"/></svg></span><span>Property</span></button>
               <button class="hub-nav-item" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3M6.6 6.6l2.1 2.1M15.3 15.3l2.1 2.1M17.4 6.6l-2.1 2.1M8.7 15.3l-2.1 2.1"/></svg></span><span>Central Node</span></button>
               <button class="hub-nav-item" type="button" data-section="future-map"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="m14.6 9.4-1.7 4.5-4.5 1.7 1.7-4.5z"/></svg></span><span>Future map</span></button>
@@ -772,7 +773,116 @@
           <button id="fitness-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Chadwick">💬</button>
         </section>
 
-        <section id="skincare-dashboard" class="dashboard" aria-label="Skincare" hidden>
+        <section id="skincare-dashboard" class="dashboard aesthetics" aria-label="Aesthetics" hidden>
+          <div id="aes-tabs" class="hub-pills aes-tabs" role="tablist" aria-label="Aesthetics">
+            <button type="button" class="hub-pills__btn" role="tab" data-aes-tab="today" aria-controls="aes-today" aria-selected="true">Today</button>
+            <button type="button" class="hub-pills__btn" role="tab" data-aes-tab="scent" aria-controls="aes-scent" aria-selected="false">Scent</button>
+            <button type="button" class="hub-pills__btn" role="tab" data-aes-tab="dress" aria-controls="aes-dress" aria-selected="false">Dress</button>
+            <button type="button" class="hub-pills__btn" role="tab" data-aes-tab="skin" aria-controls="aes-skin" aria-selected="false">Skin</button>
+          </div>
+
+          <div id="aes-today" class="aes-panel" role="tabpanel" aria-label="Today">
+            <div id="aes-stage" class="aes-stage">
+              <div class="aes-stage__grid">
+                <div class="aes-stage__copy">
+                  <p class="aes-eyebrow">Your look for today</p>
+                  <p id="aes-today-date" class="aes-stage__date"></p>
+                  <div class="aes-wear">
+                    <div id="aes-today-bottle" class="aes-wear__bottle" role="button" tabindex="0" aria-label="Spray"><canvas id="aes-mist" class="aes-mist" width="400" height="340" aria-hidden="true"></canvas></div>
+                    <div class="aes-wear__text">
+                      <p class="aes-eyebrow">Wear</p>
+                      <p id="aes-today-name" class="aes-display aes-wear__name"></p>
+                      <p id="aes-today-by" class="aes-wear__by"></p>
+                    </div>
+                  </div>
+                  <p id="aes-today-line" class="aes-wear__line"></p>
+                  <div class="aes-actions">
+                    <button type="button" id="aes-spray" class="aes-btn aes-btn--primary">Spray it</button>
+                    <button type="button" id="aes-reroll" class="aes-btn">Not feeling it</button>
+                    <button type="button" id="aes-noticed" class="aes-btn">Someone noticed ✦</button>
+                  </div>
+                  <p id="aes-today-worn" class="aes-stage__worn" aria-live="polite"></p>
+                </div>
+                <div id="aes-today-flat" class="aes-flatlay aes-flatlay--stage"></div>
+              </div>
+              <div class="aes-ribbon">
+                <p class="aes-eyebrow">Your scent through the day</p>
+                <p id="aes-ribbon-empty" class="aes-stage__worn" hidden>Nothing timed on your calendar today.</p>
+                <div id="aes-ribbon" class="aes-ribbon__track"></div>
+                <div id="aes-ribbon-notes" class="aes-ribbon__notes"></div>
+              </div>
+              <div id="aes-toast" class="aes-toast" role="status" hidden></div>
+            </div>
+          </div>
+
+          <div id="aes-scent" class="aes-panel aes-scent" role="tabpanel" aria-label="Scent" hidden>
+            <article class="metric-card aes-card">
+              <p class="aes-eyebrow">Your scent map</p>
+              <h2 class="aes-display aes-h2">All 52 fragrances you've met, plotted by how they smell</h2>
+              <p class="aes-meta">Map positions and colour families are estimates from recorded notes.</p>
+              <div id="aes-map-filter" class="hub-pills hub-pills--loose aes-chips" aria-label="Show on map"></div>
+              <div id="aes-map" class="aes-map"></div>
+              <div id="aes-mapcard" class="aes-mapcard"></div>
+              <p id="aes-insight" class="aes-insight"></p>
+            </article>
+            <div class="aes-scent__side">
+              <article class="metric-card aes-card">
+                <p class="aes-eyebrow">Would I like it?</p>
+                <h2 class="aes-display aes-h2">Ask before you buy</h2>
+                <p class="aes-lede">Name a fragrance or type its notes. Hyaluronica scores it against everything you've loved and hated.</p>
+                <label class="visually-hidden" for="aes-ask">Fragrance or notes</label>
+                <input id="aes-ask" class="aes-input" list="aes-ask-list" autocomplete="off" placeholder="Baccarat Rouge 540, or: vanilla, cardamom, incense">
+                <datalist id="aes-ask-list"></datalist>
+                <div id="aes-ask-presets" class="hub-pills hub-pills--loose aes-chips"></div>
+                <div id="aes-verdict" class="aes-verdict" aria-live="polite"></div>
+              </article>
+              <article class="metric-card aes-card">
+                <p class="aes-eyebrow">On the shelf</p>
+                <h2 class="aes-display aes-h2">Your twelve bottles</h2>
+                <div id="aes-shelf" class="aes-shelf"></div>
+                <div class="aes-shelf__plank" aria-hidden="true"></div>
+                <p class="aes-meta">Tap a bottle to find it on the map.</p>
+              </article>
+            </div>
+            <article class="metric-card aes-card aes-reference">
+              <h2 class="aes-display aes-h2">Complete fragrance library</h2>
+              <p class="aes-meta">All 52 records, with full reviews, recorded note pyramids, prices, dates and page notes. Unset fields show “Not recorded”.</p>
+              <div id="aes-library" class="aes-records"></div>
+            </article>
+          </div>
+
+          <div id="aes-dress" class="aes-panel aes-dress" role="tabpanel" aria-label="Dress" hidden>
+            <article class="metric-card aes-card">
+              <p class="aes-eyebrow">Snap a piece</p>
+              <h2 class="aes-display aes-h2">What goes with this?</h2>
+              <p class="aes-lede">Photograph something in your wardrobe or in a shop. Hyaluronica reads its colour and styles a whole look around it.</p>
+              <label class="aes-snap" for="aes-snap-file">
+                <span id="aes-snap-img" class="aes-snap__img"><span id="aes-snap-plus" aria-hidden="true">+</span><span id="aes-snap-swatch" class="aes-snap__swatch" hidden></span></span>
+                <span><b>Add a photo</b><br><span class="aes-meta">From your camera or camera roll. It stays on this device.</span></span>
+              </label>
+              <input id="aes-snap-file" class="visually-hidden" type="file" accept="image/*">
+              <div class="aes-snap__samples"><span class="aes-meta">Or try</span><div id="aes-snap-samples" class="hub-pills hub-pills--loose aes-chips"></div></div>
+              <div id="aes-snapres" class="aes-snapres" aria-live="polite"></div>
+            </article>
+            <article class="metric-card aes-card">
+              <p class="aes-eyebrow">Pick a vibe</p>
+              <h2 class="aes-display aes-h2">How do you want to come across?</h2>
+              <div id="aes-vibes" class="hub-pills hub-pills--loose aes-chips"></div>
+              <div id="aes-dress-flat" class="aes-flatlay"></div>
+              <div class="aes-lookfoot">
+                <div id="aes-dress-scent" class="aes-pairscent"></div>
+                <button type="button" id="aes-spin" class="aes-btn aes-btn--ink">Surprise me</button>
+              </div>
+              <p id="aes-dress-quote" class="aes-quote"></p>
+            </article>
+            <article class="metric-card aes-card aes-reference">
+              <h2 class="aes-display aes-h2">Men's Style &amp; Color Theory Tips</h2>
+              <p class="aes-meta">Complete original summary and transcript. The styled looks above are interpretations of these notes.</p>
+              <div id="aes-style-notes" class="aes-records"></div>
+            </article>
+          </div>
+
+          <div id="aes-skin" class="aes-panel aes-skin" role="tabpanel" aria-label="Skin" hidden>
           <p class="metric-caption" data-skincare="date">—</p>
           <p id="skincare-status" class="metric-caption" aria-live="polite"></p>
           <article class="metric-card skincare-consistency-card">
@@ -809,6 +919,7 @@
             <p class="metric-label">Today’s procedures</p>
             <div id="skincare-procedure-log"></div>
           </article>
+          </div>
           <button id="skincare-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Hyaluronica">💬</button>
         </section>
 
@@ -1339,7 +1450,7 @@
           <button type="button" data-section="fitness"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8v8M18 8v8M6 12h12M4 10v4M20 10v4"/></svg></span>Fitness</button>
           <button type="button" data-section="body"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3"/><path d="M6 20v-1a6 6 0 0 1 12 0v1"/></svg></span>Body</button>
           <button type="button" data-section="mind"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.2 6.2l2.5 2.5M15.3 15.3l2.5 2.5M17.8 6.2l-2.5 2.5M8.7 15.3l-2.5 2.5"/></svg></span>Mind</button>
-          <button type="button" data-section="skincare"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 7.2 6 11a6 6 0 0 1-12 0c0-3.8 6-11 6-11Z"/></svg></span>Skincare</button>
+          <button type="button" data-section="skincare"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 7.2 6 11a6 6 0 0 1-12 0c0-3.8 6-11 6-11Z"/></svg></span>Aesthetics</button>
           <button type="button" data-section="property"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><circle cx="12" cy="14" r="2"/><path d="M12 16v2.5"/></svg></span>Property</button>
           <button type="button" data-section="central-node"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3M6.6 6.6l2.1 2.1M15.3 15.3l2.1 2.1M17.4 6.6l-2.1 2.1M8.7 15.3l-2.1 2.1"/></svg></span>Central Node</button>
           <button type="button" data-section="future-map"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="m14.6 9.4-1.7 4.5-4.5 1.7 1.7-4.5z"/></svg></span>Future map</button>

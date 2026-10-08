@@ -59,6 +59,7 @@ import { createSkincareController } from './skincare-controller.js';
 import { buildSkincareModel } from './skincare-model.js';
 import { SKINCARE_ROUTINES, currentRoutineKey } from './skincare-routines-data.js';
 import { renderSkincare } from './render-skincare.js';
+import { createAesthetics } from './aesthetics/render-aesthetics.js';
 import { buildCalendarModel } from './calendar-model.js';
 import { renderCalendar } from './render-calendar.js';
 import { syncRepository } from './sync-repository.js';
@@ -213,6 +214,7 @@ controller = createAppController({
   skincareController,
   skincareRoutines: SKINCARE_ROUTINES,
   getCurrentRoutineKey: currentRoutineKey,
+  aesthetics: createAesthetics(document),
   buildCalendarModel,
   renderCalendar,
   chatApi,

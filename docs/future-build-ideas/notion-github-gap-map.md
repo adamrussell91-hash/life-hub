@@ -28,7 +28,7 @@
 | Skincare | Aesthetic Health | Life Hub Skincare | ✅ Migrated structure |
 | Mental health and diary | Mental Health | Life Hub Mind | ✅ Migrated structure |
 | Goals | Life Hub and Tasks | Life Hub and Tasks Hub | ✅ Place exists |
-| Future book ideas | Book Ideas database | No dedicated writing project structure | ❌ No place |
+| Future book ideas | Book Ideas database | Writing Projects | ✅ Migrated structure |
 | House records | House | No equivalent area | ❌ No place |
 | Home documents | Certificates, contracts, council records, valuations | No document vault | ❌ No place |
 | Renovations | Renovation Tracker | No equivalent | ❌ No place |
@@ -36,10 +36,10 @@
 | Bills, income and expenses | Finance databases | Tasks only handles actions | ❌ No proper place |
 | Tax records | Tax Return pages and evidence | No equivalent | ❌ No place |
 | Insurance policies | Car, contents, landlord, health, property | No general insurance store | ❌ No place |
-| Investment property | Property details, costs, documents | No proper property area | ❌ No place |
+| Investment property | Property details, costs, documents | Life Hub property records | ✅ Migrated structure |
 | Car records | Car Maintenance Tracker | No vehicle area | ❌ No place |
 | Watch collection | Watch Tracker | Nothing equivalent | ❌ No place |
-| Fragrance collection | Fragrance Tracker | Fragrance data type exists, no proper collection interface | 🟠 Partial |
+| Fragrance collection | Fragrance Tracker | Life Hub fragrance collection | ✅ Migrated structure |
 | Hair tracking | Hair Process Tracker | Only incidental references | 🟠 Partial |
 | Body aesthetic procedures | Aesthetic Health | Medical and Body overlap, no dedicated record structure | 🟠 Partial |
 | Recipes | Dinner Database and Recipe Collection | Nutrition has food logging, not a recipe collection | 🟠 Partial |
@@ -51,9 +51,8 @@ The clearest architecture gaps are:
 
 - **Personal Admin and Documents** — house records, important documents, contracts, certificates and renovation records.
 - **Finance** — bills, income, expenses, tax, insurance, property finances and wealth tracking.
-- **Writing Projects** — future book ideas developed as actual writing projects, linked to Knowledge research where useful.
-- **Assets** — vehicles and property records that need more than a task list.
-- **Collections** — watches and fragrances as persistent personal collections.
+- **Assets** — vehicle records that need more than a task list.
+- **Collections** — watches as a persistent personal collection.
 - **Nutrition extension** — recipe collection and dinner database.
 - **Aesthetic tracking extension** — hair process and body aesthetic procedure history.
 
@@ -66,3 +65,4 @@ A Notion area is not considered missing merely because its records have not yet 
 ## Contributions log
 
 - **7 October 2026 — ChatGPT:** Created the initial cross comparison from the Notion and GitHub audit. No implementation decisions made.
+- **8 October 2026 — Adam:** Marked future book ideas, investment property and fragrance collection as migrated into Life Hub.
