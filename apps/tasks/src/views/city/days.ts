@@ -42,3 +42,8 @@ const TEST_LETTERS: Record<GoldenKey, string> = {
 export function testLetter(key: GoldenKey): string {
   return TEST_LETTERS[key];
 }
+
+/** The tester's list, in letter order, so the order says nothing about the days. */
+export const TEST_DAYS: { key: GoldenKey; letter: string }[] = (Object.entries(TEST_LETTERS) as [GoldenKey, string][])
+  .map(([key, letter]) => ({ key, letter }))
+  .sort((a, b) => a.letter.localeCompare(b.letter));
