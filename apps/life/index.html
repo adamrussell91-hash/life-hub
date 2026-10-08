@@ -852,6 +852,11 @@
           </div>
 
           <div id="aes-dress" class="aes-panel aes-dress" role="tabpanel" aria-label="Dress" hidden>
+            <div id="aes-dress-views" class="hub-pills hub-pills--loose aes-chips aes-dress__views" role="tablist" aria-label="Dress">
+              <button type="button" class="hub-pills__btn" role="tab" data-aes-dress-view="looks" aria-controls="aes-looks" aria-selected="true">Looks</button>
+              <button type="button" class="hub-pills__btn" role="tab" data-aes-dress-view="watches" aria-controls="aes-watches" aria-selected="false">Watches</button>
+            </div>
+            <div id="aes-looks" class="aes-dress__looks" role="tabpanel" aria-label="Looks">
             <article class="metric-card aes-card">
               <p class="aes-eyebrow">Snap a piece</p>
               <h2 class="aes-display aes-h2">What goes with this?</h2>
@@ -880,6 +885,96 @@
               <p class="aes-meta">Complete original summary and transcript. The styled looks above are interpretations of these notes.</p>
               <div id="aes-style-notes" class="aes-records"></div>
             </article>
+            </div>
+
+            <div id="aes-watches" class="aes-watches" role="tabpanel" aria-label="Watches" hidden>
+              <section class="aes-stage aes-wrist" aria-label="On the wrist today">
+                <div class="aes-wrist__copy">
+                  <p class="aes-eyebrow">On the wrist today</p>
+                  <p id="aes-wrist-name" class="aes-display aes-wrist__name"></p>
+                  <p id="aes-wrist-line" class="aes-wear__line"></p>
+                  <div id="aes-wrist-look" class="aes-wrist__look" aria-label="Today's look"></div>
+                  <div class="aes-actions">
+                    <button type="button" id="aes-wrist-wear" class="aes-btn aes-btn--primary">Wearing it</button>
+                    <button type="button" id="aes-wrist-next" class="aes-btn">Another from the box</button>
+                  </div>
+                  <p id="aes-wrist-worn" class="aes-stage__worn" aria-live="polite"></p>
+                </div>
+                <div id="aes-wrist-art" class="aes-wrist__art"></div>
+              </section>
+
+              <article class="metric-card aes-card aes-radar">
+                <p class="aes-eyebrow">Price radar</p>
+                <h2 class="aes-display aes-h2">Every watch you want, closing in on your price</h2>
+                <p class="aes-lede">Every Sunday the radar checks the shop page of each wishlist watch and plots it by how far it sits above the price you'd happily pay. The closer to the centre, the closer to buying. A watch that reaches your price sends you a notification.</p>
+                <p id="aes-radar-status" class="aes-meta" aria-live="polite"></p>
+                <div class="aes-radar__grid">
+                  <div class="aes-radar__dialwrap">
+                    <div id="aes-radar-dial" class="aes-radar__dial"></div>
+                    <p class="aes-meta aes-radar__legend">Centre: at or under your price. Rings: within 10%, within 25%, further out. Hollow on the rim: no shop page to check.</p>
+                  </div>
+                  <div class="aes-radar__side">
+                    <div id="aes-radar-card" class="aes-radar__card" aria-live="polite"></div>
+                    <div>
+                      <p class="aes-eyebrow">Price drops</p>
+                      <ul id="aes-radar-pings" class="aes-pings"></ul>
+                    </div>
+                    <div class="aes-cover">
+                      <p class="aes-eyebrow">What the radar can see</p>
+                      <div id="aes-radar-cover-bar" class="aes-cover__bar" aria-hidden="true"></div>
+                      <p id="aes-radar-cover" class="aes-meta"></p>
+                    </div>
+                  </div>
+                </div>
+              </article>
+
+              <div class="aes-watches__pair">
+                <article class="metric-card aes-card">
+                  <p class="aes-eyebrow">The box</p>
+                  <h2 class="aes-display aes-h2">Your watches, drawn to scale</h2>
+                  <div id="aes-box" class="aes-box"></div>
+                  <div id="aes-box-detail"></div>
+                </article>
+                <article class="metric-card aes-card">
+                  <p class="aes-eyebrow">What the box says</p>
+                  <h2 class="aes-display aes-h2">A dress collection on big cases</h2>
+                  <ul id="aes-box-facts" class="aes-facts"></ul>
+                </article>
+              </div>
+
+              <article class="metric-card aes-card">
+                <p class="aes-eyebrow">Wishlist</p>
+                <h2 id="aes-wish-title" class="aes-display aes-h2"></h2>
+                <p class="aes-lede">Green tags mark what nothing in the box does yet. Colourways of one model share a card.</p>
+                <div id="aes-wish-filter" class="hub-pills hub-pills--loose aes-chips" aria-label="Filter the wishlist"></div>
+                <div id="aes-wish" class="aes-wishes"></div>
+              </article>
+
+              <article class="metric-card aes-card">
+                <p class="aes-eyebrow">London and Scotland, December</p>
+                <h2 class="aes-display aes-h2">The vintage British watch hunt</h2>
+                <div class="aes-hunt">
+                  <div class="aes-hunt__col">
+                    <p class="aes-lede">A classic British looking watch with real history, character and value. Smiths first.</p>
+                    <div id="aes-hunt-brief" class="aes-hunt__brief"></div>
+                    <div id="aes-hunt-sizes" class="aes-hunt__sizes"></div>
+                    <p id="aes-hunt-size-note" class="aes-meta"></p>
+                    <ul id="aes-hunt-targets" class="aes-hunt__targets"></ul>
+                  </div>
+                  <div class="aes-hunt__col">
+                    <p class="aes-eyebrow">At the counter</p>
+                    <ol id="aes-hunt-checks" class="aes-hunt__checks"></ol>
+                    <p id="aes-hunt-rule" class="aes-quote"></p>
+                  </div>
+                </div>
+              </article>
+
+              <article class="metric-card aes-card aes-reference">
+                <h2 class="aes-display aes-h2">Complete watch records</h2>
+                <p class="aes-meta">All 27 entries with every tracker property. Unset fields show “Not recorded”. Source: <span id="aes-watch-source"></span></p>
+                <div id="aes-watch-records" class="aes-records"></div>
+              </article>
+            </div>
           </div>
 
           <div id="aes-skin" class="aes-panel aes-skin" role="tabpanel" aria-label="Skin" hidden>

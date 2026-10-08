@@ -1,5 +1,5 @@
 /**
- * Aesthetics section (route stays `skincare`): Today · Scent · Dress · Skin.
+ * Aesthetics section (route stays `skincare`): Today · Scent · Dress (Looks, Watches) · Skin.
  * The Skin tab is the existing Skincare dashboard, untouched.
  *
  * createAesthetics(doc, { storage }) → { render({ date, events }) }
@@ -8,6 +8,7 @@
 import { FAMILY_LABELS, FRAGRANCES, REFERENCE_FRAGRANCES } from './fragrance-library.js';
 import { GARMENT_COLOURS, LOOKS, SNAP_SAMPLES } from './dress-looks.js';
 import { renderSourceReference } from './render-source-reference.js';
+import { createWatches } from './render-watches.js';
 import {
   dominantColour,
   formatHour,
@@ -31,6 +32,8 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const SVG_TAGS = new Set(['svg', 'g', 'path', 'circle', 'rect', 'ellipse', 'text', 'defs', 'radialGradient', 'linearGradient', 'stop', 'line']);
 const TABS = ['today', 'scent', 'dress', 'skin'];
 const TAB_KEY = 'life-aesthetics-tab';
+const DRESS_VIEW_KEY = 'life-aesthetics-dress-view';
+const DRESS_VIEWS = ['looks', 'watches'];
 const WEAR_KEY = 'life-aesthetics-wear';
 const PRAISE_KEY = 'life-aesthetics-compliments';
 
@@ -43,10 +46,11 @@ function writeJson(storage, key, value) {
   try { storage?.setItem(key, JSON.stringify(value)); } catch { /* private mode: keep going */ }
 }
 
-export function createAesthetics(doc, { storage = globalThis.localStorage, matchMedia = globalThis.matchMedia?.bind(globalThis) } = {}) {
+export function createAesthetics(doc, { storage = globalThis.localStorage, matchMedia = globalThis.matchMedia?.bind(globalThis), watchRadarApi = null } = {}) {
   const $ = sel => doc.querySelector(sel);
   const reduceMotion = () => matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
   const affinity = noteAffinity(FRAGRANCES);
+  const watches = createWatches(doc, { storage, matchMedia, radarApi: watchRadarApi });
 
   /** Tiny element helper; SVG tags get the SVG namespace, CSS-var paints go through style. */
   function el(tag, attrs = {}, ...kids) {
@@ -66,6 +70,7 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
 
   const state = {
     tab: (() => { try { const t = storage?.getItem?.(TAB_KEY); return TABS.includes(t) ? t : 'today'; } catch { return 'today'; } })(),
+    dressView: (() => { try { const v = storage?.getItem?.(DRESS_VIEW_KEY); return DRESS_VIEWS.includes(v) ? v : 'looks'; } catch { return 'looks'; } })(),
     dayIndex: 0,
     mapSel: 'Neon',
     mapShow: { Owned: true, Sampling: true, Wishlist: true, Retired: true },
@@ -138,6 +143,15 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
     try { storage?.setItem(TAB_KEY, tab); } catch { /* ignore */ }
     for (const b of doc.querySelectorAll('#aes-tabs [data-aes-tab]')) b.setAttribute('aria-selected', String(b.dataset.aesTab === tab));
     for (const t of TABS) { const p = $(`#aes-${t}`); if (p) p.hidden = t !== tab; }
+  }
+
+  function showDressView(view) {
+    state.dressView = view;
+    try { storage?.setItem(DRESS_VIEW_KEY, view); } catch { /* ignore */ }
+    for (const b of doc.querySelectorAll('#aes-dress-views [data-aes-dress-view]')) b.setAttribute('aria-selected', String(b.dataset.aesDressView === view));
+    const looks = $('#aes-looks'), wrist = $('#aes-watches');
+    if (looks) looks.hidden = view !== 'looks';
+    if (wrist) wrist.hidden = view !== 'watches';
   }
 
   // ---------------- TODAY ----------------
@@ -405,6 +419,7 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
     if (state.wired) return;
     state.wired = true;
     for (const b of doc.querySelectorAll('#aes-tabs [data-aes-tab]')) b.addEventListener('click', () => showTab(b.dataset.aesTab));
+    for (const b of doc.querySelectorAll('#aes-dress-views [data-aes-dress-view]')) b.addEventListener('click', () => showDressView(b.dataset.aesDressView));
     $('#aes-spray').addEventListener('click', spray);
     $('#aes-today-bottle').addEventListener('click', spray);
     $('#aes-today-bottle').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); spray(); } });
@@ -438,7 +453,9 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
       state.date = date;
       state.events = events;
       showTab(state.tab);
+      showDressView(state.dressView);
       renderToday();
+      watches.render({ date, look: lookForScent(plan.day.name) });
       renderMap();
       renderOracle();
       renderVibe();
