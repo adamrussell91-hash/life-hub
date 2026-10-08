@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v206';
+const CACHE_NAME = 'life-hub-shell-v207';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -255,6 +255,13 @@ const SHELL_FILES = [
   'js/app/aesthetics/notion-aesthetics-source.js',
   'js/app/aesthetics/render-aesthetics.js',
   'js/app/aesthetics/render-source-reference.js',
+  'js/app/aesthetics/notion-watch-source.js',
+  'js/app/aesthetics/render-watches.js',
+  'js/app/aesthetics/watch-face.js',
+  'js/app/aesthetics/watch-hunt.js',
+  'js/app/aesthetics/watch-model.js',
+  'js/app/aesthetics/watch-photos.js',
+  'js/app/watch-radar-api.js',
   'js/app/skincare-api.js',
   'js/app/skincare-controller.js',
   'js/app/skincare-model.js',
