@@ -257,3 +257,47 @@
   color: var(--ink);
   font-size: var(--text-sm);
 }
+
+/* Glance test mode (V10): full screen over the hub shell, no words that name the answer. */
+.city-page[data-test='true'] {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  height: auto;
+  border-radius: 0;
+}
+
+.city-page[data-test='true'] .city-hint {
+  display: none;
+}
+
+.city-page[data-test='true'] .city-a11y {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.city-page[data-test='true'] .city-a11y:focus-within {
+  width: auto;
+  height: auto;
+  overflow: auto;
+  clip-path: none;
+}
+
+.city-sky--swatch {
+  width: 2.75rem;
+  padding: 0;
+}
+
+.city-sky--swatch[data-family='clear'] { background: #dceafa; }
+.city-sky--swatch[data-family='steady'] { background: #dfe9e1; }
+.city-sky--swatch[data-family='wind'],
+.city-sky--swatch[data-family='cloud'] { background: #a7abb9; }
+.city-sky--swatch[data-family='fog'],
+.city-sky--swatch[data-family='unknown'] { background: #eae7da; }
+.city-sky--swatch[data-family='rain'] { background: #244f7c; }
+.city-sky--swatch[data-family='storm'] { background: #142b51; }
+.city-sky--swatch[data-family='recovery'] { background: #f1e2b6; }
+.city-sky--swatch[data-family='evening'] { background: #17375e; }

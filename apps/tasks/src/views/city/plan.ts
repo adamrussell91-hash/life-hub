@@ -172,14 +172,22 @@ function pathLengthOf(path: Point[]): number {
   return total;
 }
 
+/** Low buildings first: scenery is background, never a wall between the camera and a route (C10). */
 const BUILDINGS = [
-  'commercial-a.glb',
-  'commercial-b.glb',
   'suburban-a.glb',
   'suburban-b.glb',
+  'suburban-a.glb',
+  'suburban-b.glb',
+  'commercial-a.glb',
+  'commercial-b.glb',
   'industrial-a.glb',
   'industrial-b.glb'
 ] as const;
+
+/** Tiles kept clear around everything that carries data. */
+export const SCENERY_CORRIDOR = 2;
+/** Share of the remaining district tiles that get a building, in percent. */
+export const SCENERY_FILL_PCT = 35;
 
 function tileHash(x: number, y: number): number {
   let hash = (Math.imul(x, 374761393) + Math.imul(y, 668265263)) >>> 0;
@@ -189,13 +197,17 @@ function tileHash(x: number, y: number): number {
 
 export type SceneryTile = { at: Point; file: (typeof BUILDINGS)[number]; quarter: number };
 
-export function sceneryTiles(layout: CityLayout, roads: RoadPiece[]): SceneryTile[] {
+export function sceneryTiles(layout: CityLayout, roads: RoadPiece[], extra: Point[] = []): SceneryTile[] {
+  const marks: Point[] = [...roads.map((road) => road.at), ...layout.stops.map((stop) => stop.at), ...extra];
+  for (const line of layout.lines) for (const station of line.stations) marks.push(station.at);
+  for (const mark of layout.landmarks) marks.push(mark.at);
+  for (const tram of layout.trams) marks.push(...tilesAlong(tram.loop));
   const blocked = new Set<string>();
-  for (const road of roads) blocked.add(`${road.at.x},${road.at.y}`);
-  for (const stop of layout.stops) blocked.add(`${stop.at.x},${stop.at.y}`);
-  for (const line of layout.lines) for (const station of line.stations) blocked.add(`${station.at.x},${station.at.y}`);
-  for (const mark of layout.landmarks) blocked.add(`${mark.at.x},${mark.at.y}`);
-  for (const tram of layout.trams) for (const tile of tilesAlong(tram.loop)) blocked.add(`${tile.x},${tile.y}`);
+  for (const mark of marks) {
+    for (let dy = -SCENERY_CORRIDOR; dy <= SCENERY_CORRIDOR; dy += 1) {
+      for (let dx = -SCENERY_CORRIDOR; dx <= SCENERY_CORRIDOR; dx += 1) blocked.add(`${mark.x + dx},${mark.y + dy}`);
+    }
+  }
 
   const tiles: SceneryTile[] = [];
   for (const district of layout.districts) {
@@ -206,10 +218,11 @@ export function sceneryTiles(layout: CityLayout, roads: RoadPiece[]): SceneryTil
           if (x < 1 || y < 1) continue;
           if (blocked.has(`${x},${y}`)) continue;
           const hash = tileHash(x, y);
+          if (hash % 100 >= SCENERY_FILL_PCT) continue;
           tiles.push({
             at: { x, y },
-            file: BUILDINGS[hash % BUILDINGS.length],
-            quarter: hash % 4
+            file: BUILDINGS[(hash >>> 8) % BUILDINGS.length],
+            quarter: (hash >>> 4) % 4
           });
         }
       }
@@ -297,6 +310,8 @@ export type CityPlan = {
   depot: Marker;
   lines: { id: string; path: Point[]; text: string; href: string }[];
   tints: DistrictTint[];
+  /** Where each catch-up change happens, in replay order, so the scene can show it happening. */
+  changeMarks: { index: number; count: number; at: Point }[];
   bounds: { maxX: number; maxY: number };
   movingIds: string[];
   skyLabel: string;
@@ -361,7 +376,8 @@ export function planCity(
     .filter((wall) => wall.active)
     .map((wall, index) => ({
       id: `sign:${wall.id}`,
-      at: { x: DEPOT.x, y: DEPOT.y + 1 + index },
+      // The gate stands across the start of the closed route, so it marks the route itself.
+      at: gateAt(wall.affectedRouteIds, layoutRoute) ?? { x: DEPOT.x, y: DEPOT.y + 1 + index },
       text: `${wall.label} · not running · ${formatRoutes(wall.affectedRouteIds, routeById)}`
     }));
 
@@ -403,10 +419,24 @@ export function planCity(
     ? { id: `halo:${snapshot.halo.id}`, at: DEPOT, text: haloText(snapshot) ?? '', href: snapshot.halo.href }
     : null;
 
+  const changes = catchUp.quiet ? [] : catchUp.changes;
+  const stopAt = new Map(layout.stops.map((stop) => [stop.id, stop.at]));
+  const changeMarks = changes.flatMap((change, index) => {
+    let at: Point | undefined;
+    if (change.kind === 'stop_added' || change.kind === 'stop_done') at = stopAt.get(change.id);
+    if (change.kind === 'route_opened') at = layoutRoute.get(change.id)?.path[0];
+    if (change.kind === 'line_opened') at = layout.lines.find((line) => line.id === change.id)?.stations[0]?.at;
+    return at ? [{ index, count: changes.length, at }] : [];
+  });
+
+  const allServices = placeServices(snapshot, layout);
+  const clearOf = [DEPOT, ...allServices.map((service) => service.at), ...signs.map((sign) => sign.at)];
+  for (const vehicle of vehicles) if (vehicle.parked) clearOf.push(vehicle.at);
+
   return {
     roads,
-    scenery: sceneryTiles(layout, roads),
-    services: placeServices(snapshot, layout).filter((service) => !mask.hiddenServiceIds.has(service.id)),
+    scenery: sceneryTiles(layout, roads, clearOf),
+    services: allServices.filter((service) => !mask.hiddenServiceIds.has(service.id)),
     stops,
     barriers,
     rings,
@@ -419,6 +449,7 @@ export function planCity(
     depot: { id: 'depot', at: DEPOT, text: depotText(snapshot), href: null },
     lines,
     tints: districtTints(layout),
+    changeMarks,
     bounds: layout.bounds,
     movingIds: movingIds(snapshot, layout, reducedMotion),
     skyLabel: skyText(snapshot),
@@ -426,6 +457,11 @@ export function planCity(
     skyKnown: snapshot.sky.known,
     isNight: snapshot.clock.isNight
   };
+}
+
+function gateAt(routeIds: string[], routes: Map<string, { path: Point[] }>): Point | null {
+  const start = routeIds.map((id) => routes.get(id)?.path[0]).find((point): point is Point => Boolean(point));
+  return start ? { x: start.x, y: start.y + 1 } : null;
 }
 
 function formatRoutes(ids: string[], routes: Map<string, { title: string }>): string {

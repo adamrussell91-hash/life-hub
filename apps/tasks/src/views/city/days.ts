@@ -23,3 +23,22 @@ export function goldenRequest(params: URLSearchParams): GoldenRequest {
 export function cityNeedsWideScreen(width: number): boolean {
   return width < 768;
 }
+
+/** `&test=1`: the glance test screen, with neutral labels and no hub chrome (V10). */
+export function isTestMode(params: URLSearchParams): boolean {
+  return params.get('test') === '1';
+}
+
+/** Fixed shuffle, so the letter says nothing about the day or its place in the list. */
+const TEST_LETTERS: Record<GoldenKey, string> = {
+  'no-checkin': 'A',
+  'unseen-2': 'B',
+  sunday: 'C',
+  'unseen-1': 'D',
+  deleted: 'E',
+  suspended: 'F'
+};
+
+export function testLetter(key: GoldenKey): string {
+  return TEST_LETTERS[key];
+}
