@@ -38,7 +38,7 @@ export function buildHubMapSeed() {
   add('life-chat', 'Chat', 'life', 'page', 'hub-life', { route: '#chat', features: ['Agent picker', 'Chat composer'] });
   add('life-nutrition', 'Nutrition', 'life', 'page', 'hub-life', { route: '#nutrition' });
   add('life-fitness', 'Fitness', 'life', 'page', 'hub-life', { route: '#fitness' });
-  add('life-skincare', 'Skincare', 'life', 'page', 'hub-life', { route: '#skincare' });
+  add('life-skincare', 'Aesthetics', 'life', 'page', 'hub-life', { route: '#skincare' });
   add('life-calendar', 'Calendar', 'life', 'page', 'hub-life', { route: '#calendar' });
   add('life-body', 'Body', 'life', 'page', 'hub-life', { route: '#body' });
   add('life-body-bloods', 'Bloods', 'life', 'section', 'life-body', { route: '#body-bloods' });
