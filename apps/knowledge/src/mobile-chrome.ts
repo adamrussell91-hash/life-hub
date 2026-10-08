@@ -6,6 +6,7 @@ export type KnowledgeMobileView =
   | "timeline"
   | "notebooks"
   | "bookshelf"
+  | "studio"
   | "chat"
   | "podcast"
   | "quiz"
@@ -43,6 +44,7 @@ const NOTEBOOKS = [
 ];
 const BOOKSHELF = ["M3 20h18", "M5 20V6h3v14", "M9 20V4h3v16", "m14 7 3-1 3 13-3 1z"];
 const PROTOCOLS = ["M5 4h14v16H5z", "M8 8h8", "M8 12h8", "M8 16h5"];
+const STUDIO = ["M12 3l5 5-7.5 12L4 21l1-5.5z", "M12 3l-2 6 3 3 6-2"];
 
 export type KnowledgeMobileNav = {
   goArchive: () => void;
@@ -54,6 +56,7 @@ export type KnowledgeMobileNav = {
   goPodcast: () => void;
   goQuiz: () => void;
   goProtocols: () => void;
+  goStudio: () => void;
 };
 
 /** Locked phone chrome — same bottom bar + More sheet as every other hub. */
@@ -99,6 +102,12 @@ export function syncKnowledgeMobileChrome(
         label: "Notebooks",
         paths: NOTEBOOKS,
         onSelect: nav.goNotebooks
+      },
+      {
+        id: "studio",
+        label: "Studio",
+        paths: STUDIO,
+        onSelect: nav.goStudio
       },
       {
         id: "timeline",
