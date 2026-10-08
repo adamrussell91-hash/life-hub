@@ -214,7 +214,7 @@ test('the Life Hub tile is deleted from favicon, sign-in, and every page title',
       ['fitness', 'Fitness'],
       ['body', 'Body'],
       ['mind', 'Mind'],
-      ['skincare', 'Skincare'],
+      ['skincare', 'Aesthetics'],
       ['calendar', 'Calendar'],
       ['central-node', 'Central Node']
     ];
