@@ -108,10 +108,10 @@ export function sundayAfternoon(): GoldenDay {
  * route has a stop due inside it, so that route does not run on those days. The Garden
  * route does not, so it runs as normal. Stop order never changes.
  */
-export function suspendedService(now = new Date('2026-10-13T01:00:00.000Z')): GoldenDay {
+export function suspendedService(now = new Date('2026-10-15T01:00:00.000Z')): GoldenDay {
   return {
     name: 'Suspended service',
-    now, // default Tue 13 Oct, 12:00
+    now, // default Thu 15 Oct, 12:00, inside the wall so the suspension shows
     lastVisitAt: null,
     input: {
       ...emptyInput(),
