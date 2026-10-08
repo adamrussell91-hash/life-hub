@@ -1128,6 +1128,7 @@ test('sectionFromHash maps #central-node onto the Central Node section', () => {
   assert.equal(sectionFromHash('#central-node-dashboard'), 'central-node');
   assert.equal(sectionFromHash('#home'), 'home');
   assert.equal(sectionFromHash('#future-map'), 'future-map');
+  assert.equal(sectionFromHash('#property'), 'property');
   assert.equal(sectionFromHash('#/calendar'), 'calendar');
   assert.equal(sectionFromHash('#shortcuts'), 'home');
   assert.equal(sectionFromHash('#unknown'), null);

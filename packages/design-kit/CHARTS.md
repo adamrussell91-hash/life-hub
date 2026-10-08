@@ -99,6 +99,9 @@ Use only when the data matches the type. Do not pick these for a generic count i
 | `watchlist-heat` | Watchlist intensity. | `buildWatchlistHeat(series)`, `WATCHLIST_SLOTS`, `watchlistDelta` | `watchlist-heat.js` |
 | `stream` | Stacked theme flow over weeks. | `buildStreamPaths(weekly, { width, height, padding })`, `buildThemeTopography(weekly)` | `stream.js` |
 | `sankey` | Transition flows. | `buildSankeyFlow(transitions, { width, height })` | `sankey-flow.js` |
+| `money-flow` | Two-column money Sankey with a fixed node order (sources fill targets top to bottom, ribbons never cross). | `buildMoneyFlow(sources, targets, { height, xLeft, xRight, gap })`, `spaceLabels(nodes, { minGap })` | `money-flow.js` |
+| `diverging-bars` | Signed values either side of zero, with a dashed ghost for what moved a bar. | `buildDivergingBars(rows, { width, left, right })` | `diverging-bars.js` |
+| `equity-wedge` | Rising value over a falling loan; the gap filled as equity, with milestone pins and a year cursor. | `buildEquityWedge(series, { width, height, padLeft, sample })`, `yearAtX(wedge, x)` | `equity-wedge.js` |
 | `chord` | Co-occurrence. | `buildChordLayout(cooccurrence)` | `chord-layout.js` |
 | `bump` | Rank over time. | `buildBumpChart(…)` / `buildBumpLines(ranks, themes, { width, height })` | `bump.js` |
 | `horizon` | Compact multi-metric bands / strip / grouped bars. | `buildHorizonBands`, `buildMetricStrip`, `buildGroupedMetricBars`, `moodLevelFromScore` | `horizon.js` |
@@ -236,6 +239,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-10-08 | `money-flow`, `diverging-bars`, `equity-wedge` | New for Life → Property. Money flow is a fixed-order Sankey (the d3 `sankey` reorders nodes). Diverging bars show the tax result as recorded vs corrected. Equity wedge is the Time machine chart. Classes `prop-*` in `apps/life/css/property.css`, tokens only. |
 | 2026-10-05 | `gate-rings` | Recent-pace arrows and arcs colour by whether recent is up or down on the average (green up, red down). Met / Short stays on the key pills and still means the average vs the gate. |
 | 2026-10-04 | `bullseye-rings` | Promoted from `future-charts/`. Scene builder `chart-kit/bullseye-rings.js`, `bandDistance` shared with Bloods `allowanceUsed`. Used on Bloods Glucose/Diabetes (HbA1c, fasting glucose) and Lipid Studies (LDL) via `buildBloodsBullseyes`; HbA1c and LDL count the upper limit only. Classes `hc-bull-*`, `bloods-bullseye*` in `app.css`, tokens only. |
 | 2026-10-01 | `gate-rings`, `hub-chart-info` | Stimulus gate rings gain a thin recent-pace arc (last 7 training days, last 4 complete protein days). Protein ring ink moves to `--pastel-gold-ink`. `hub-chart-info` is the shared "i"; Home macro rings and forecast cards mount it. |
