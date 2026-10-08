@@ -8,6 +8,7 @@ import { TYPE_DOMAINS } from '../apps/life/js/core/records.js';
 import { listNamedShortcuts } from '../netlify/functions/_shared/capabilities/registry.mjs';
 import { buildHubMapSeed } from '../apps/life/js/app/hub-map-seed.js';
 import { validateMap } from '../apps/life/js/app/hub-map-model.js';
+import { createGarageHomeMock } from './garage-home-demo.mjs';
 
 import { SESSION_MS } from '../netlify/functions/_shared/auth-security.mjs';
 import { getSydneyDateKey, getSydneyTimestamp } from '../apps/life/js/core/time.js';
@@ -129,6 +130,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
   const taskData = new Map();
   let nextSessionId = 0;
   const hubMap = { map: null, version: 0 };
+  const garageHome = createGarageHomeMock({ now: () => clock.now() });
   const taskStore = {
     async get(key, options) {
       const value = taskData.get(key);
@@ -275,6 +277,15 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
           files: files.map(({ path, sha, content }) => ({ path, sha, content }))
         }
       });
+      return true;
+    }
+
+    if (url.pathname === '/api/garage-home') {
+      if (request.method !== 'GET' && request.method !== 'POST') return methodNotAllowed(response, 'GET, POST');
+      if (!readSession(request)) return unauthenticated(response);
+      const result = garageHome(request.method === 'POST' ? await readJson(request) : null);
+      if (result.error) error(response, result.status, result.error[0], result.error[1], false);
+      else json(response, 200, { ok: true, data: result.data });
       return true;
     }
 
