@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v207';
+const CACHE_NAME = 'life-hub-shell-v208';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -15,6 +15,7 @@ const SHELL_FILES = [
   'capture-inbox.html',
   'css/app.css',
   'css/aesthetics.css',
+  'js/app/aesthetics/fragrance-photos.js',
   'packages/design-kit/tokens.css',
   'packages/design-kit/overlays.css',
   'packages/design-kit/actions.css',
