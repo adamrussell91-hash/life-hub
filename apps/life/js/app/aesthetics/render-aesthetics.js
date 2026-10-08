@@ -7,6 +7,7 @@
  */
 import { FAMILY_LABELS, FRAGRANCES, REFERENCE_FRAGRANCES } from './fragrance-library.js';
 import { GARMENT_COLOURS, LOOKS, SNAP_SAMPLES } from './dress-looks.js';
+import { renderSourceReference } from './render-source-reference.js';
 import {
   dominantColour,
   formatHour,
@@ -140,8 +141,16 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
   }
 
   // ---------------- TODAY ----------------
-  const wearLog = () => readJson(storage, WEAR_KEY, {});
-  const praise = () => readJson(storage, PRAISE_KEY, {});
+  const canonicalName = name => name === 'Asad Zanzibar' ? 'Asad Zanzibar Limited Edition' : name;
+  const wearLog = () => Object.fromEntries(Object.entries(readJson(storage, WEAR_KEY, {})).map(([date, name]) => [date, canonicalName(name)]));
+  const praise = () => {
+    const counts = {};
+    for (const [name, value] of Object.entries(readJson(storage, PRAISE_KEY, {}))) {
+      const key = canonicalName(name);
+      counts[key] = (counts[key] ?? 0) + value;
+    }
+    return counts;
+  };
   function lastWorn() {
     const log = wearLog();
     const before = Object.keys(log).filter(d => d < state.date).sort().at(-1);
@@ -282,13 +291,17 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
       }),
       el('text', { x: labelRight ? X(sel.x) + 14 : X(sel.x) - 14, y: Y(sel.y) + 5, 'text-anchor': labelRight ? 'start' : 'end', class: 'aes-map__sel', text: sel.f.name })));
     const f = sel.f;
-    const count = praise()[f.name] ?? 0;
+    const count = (f.source.properties.Compliments ?? 0) + (praise()[f.name] ?? 0);
     const meta = [f.brand, f.status, f.rating ? `${f.rating}/10` : null, f.loved ? 'loved' : null, f.hated ? 'not for you' : null, count ? `${count} compliment${count === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ');
     $('#aes-mapcard').replaceChildren(bottle(f, 54), el('div', { class: 'aes-mapcard__body' },
       el('div', { class: 'aes-display aes-mapcard__name', text: f.name }),
       el('div', { class: 'aes-meta', text: meta }),
       f.quote ? el('p', { class: 'aes-quote', text: `“${f.quote}”` }) : el('p', { class: 'aes-meta', text: listOf(f.notes.slice(0, 6)) }),
-      f.tryAt && f.status === 'Wishlist' ? el('p', { class: 'aes-meta', text: `Try it at: ${f.tryAt}` }) : null));
+      f.tryAt && f.status === 'Wishlist' ? el('p', { class: 'aes-meta', text: `Try it at: ${f.tryAt}` }) : null,
+      el('button', { type: 'button', class: 'aes-btn', onclick: () => {
+        const record = doc.querySelector(`#aes-library [data-fragrance-id="${f.id}"]`);
+        if (record) { record.open = true; record.scrollIntoView?.({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' }); record.querySelector('summary')?.focus(); }
+      } }, 'Full record')));
   }
 
   function renderOracle() {
@@ -296,6 +309,10 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
     const host = $('#aes-verdict');
     if (!resolved) {
       host.replaceChildren(el('p', { class: 'aes-meta', text: state.query.trim() ? 'Not one I know. Type its notes instead, separated by commas.' : 'Type a name, or notes like: vanilla, cardamom, incense.' }));
+      return;
+    }
+    if (!resolved.notes.length) {
+      host.replaceChildren(el('p', { class: 'aes-meta', text: `${resolved.name} has no recorded note pyramid. Read its full review below, or enter notes to compare.` }));
       return;
     }
     const v = judgeNotes(resolved.notes, affinity);
@@ -410,6 +427,7 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
     } }, el('i', { class: 'aes-dot', style: `background:${GARMENT_COLOURS[s.colour]}` }), s.label)));
     $('#aes-insight').textContent = mapInsight(FRAGRANCES);
     renderShelf();
+    renderSourceReference(doc);
   }
 
   return {
