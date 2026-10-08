@@ -51,9 +51,8 @@ The clearest architecture gaps are:
 
 - **Personal Admin and Documents** — house records, important documents, contracts, certificates and renovation records.
 - **Finance** — bills, income, expenses, tax, insurance, property finances and wealth tracking.
-- **Writing Projects** — future book ideas developed as actual writing projects, linked to Knowledge research where useful.
-- **Assets** — vehicles and property records that need more than a task list.
-- **Collections** — watches and fragrances as persistent personal collections.
+- **Assets** — vehicle records that need more than a task list.
+- **Collections** — watches as a persistent personal collection.
 - **Nutrition extension** — recipe collection and dinner database.
 - **Aesthetic tracking extension** — hair process and body aesthetic procedure history.
 
