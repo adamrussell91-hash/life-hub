@@ -6,6 +6,7 @@
  * `events` are today's calendar items ({ time: 'HH:MM', title, type }).
  */
 import { FAMILY_LABELS, FRAGRANCES, REFERENCE_FRAGRANCES } from './fragrance-library.js';
+import { createFragrancePhoto, fragrancePhotoUrl } from './fragrance-photos.js';
 import { GARMENT_COLOURS, LOOKS, SNAP_SAMPLES } from './dress-looks.js';
 import { renderSourceReference } from './render-source-reference.js';
 import { createWatches } from './render-watches.js';
@@ -29,7 +30,7 @@ import {
 } from './aesthetics-model.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const SVG_TAGS = new Set(['svg', 'g', 'path', 'circle', 'rect', 'ellipse', 'text', 'defs', 'radialGradient', 'linearGradient', 'stop', 'line']);
+const SVG_TAGS = new Set(['svg', 'g', 'path', 'circle', 'rect', 'ellipse', 'text', 'defs', 'radialGradient', 'linearGradient', 'stop', 'line', 'foreignObject']);
 const TABS = ['today', 'scent', 'dress', 'skin'];
 const TAB_KEY = 'life-aesthetics-tab';
 const DRESS_VIEW_KEY = 'life-aesthetics-dress-view';
@@ -82,27 +83,7 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
     wired: false
   };
 
-  // ---------------- glass bottle ----------------
-  let gradientId = 0;
-  function bottle(f, width = 120) {
-    const id = `aes-glass-${gradientId++}`;
-    const glass = 'M30 48 Q30 40 40 40 H80 Q90 40 90 48 L104 70 Q108 76 108 86 V160 Q108 176 92 176 H28 Q12 176 12 160 V86 Q12 76 16 70 Z';
-    const level = f.status === 'Owned' ? 92 : f.status === 'Sampling' ? 150 : null;
-    const label = f.name.length > 18 ? `${f.name.slice(0, 17)}…` : f.name;
-    return el('svg', { class: 'aes-bottle', viewBox: '0 0 120 180', width, height: width * 1.5, 'aria-hidden': 'true', 'data-status': f.status },
-      el('defs', {}, el('linearGradient', { id, x1: 0, x2: 1 },
-        el('stop', { offset: 0, 'stop-color': '#fff', 'stop-opacity': 0.4 }),
-        el('stop', { offset: 0.22, 'stop-color': '#fff', 'stop-opacity': 0 }),
-        el('stop', { offset: 0.85, 'stop-color': '#000', 'stop-opacity': 0 }),
-        el('stop', { offset: 1, 'stop-color': '#000', 'stop-opacity': 0.25 }))),
-      el('rect', { x: 44, y: 2, width: 32, height: 30, rx: 5, class: 'aes-bottle__cap' }),
-      el('rect', { x: 50, y: 30, width: 20, height: 10, class: 'aes-bottle__collar' }),
-      el('path', { d: glass, fill: famVar(f), 'fill-opacity': 0.2, stroke: famVar(f), 'stroke-width': 2, 'stroke-dasharray': f.status === 'Wishlist' ? '5 4' : null }),
-      level ? el('path', { d: `M14 ${level} H106 V160 Q106 174 92 174 H28 Q14 174 14 160 Z`, fill: famVar(f), 'fill-opacity': 0.88 }) : null,
-      el('path', { d: glass, fill: `url(#${id})` }),
-      el('rect', { x: 28, y: 108, width: 64, height: 34, rx: 3, class: 'aes-bottle__label' }),
-      el('text', { x: 60, y: 129, 'text-anchor': 'middle', class: 'aes-bottle__name', 'font-size': label.length > 12 ? 8 : label.length > 8 ? 10 : 13, text: label }));
-  }
+  const bottle = (f, width = 120, eager = false) => createFragrancePhoto(doc, f.name, { width, eager });
 
   // ---------------- flat-lay ----------------
   function flatlay(look, onStage) {
@@ -112,9 +93,7 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
     const seam = d => el('path', { d, class: 'aes-seam' });
     const tip = p => el('title', { svg: 1, text: `${p[0]} ${p[1]}` });
     const f = FRAGRANCES.find(x => x.name === look.scent);
-    const b = bottle(f, 48);
-    b.setAttribute('x', '312');
-    b.setAttribute('y', '190');
+    const b = el('foreignObject', { x: 300, y: 200, width: 64, height: 64 }, bottle(f, 64));
     return el('svg', { class: 'aes-flatlay__art', viewBox: '0 0 380 330', role: 'img', 'aria-label': `${lookPieces(look).map(p => `${p[0]} ${p[1]}`).join(', ')}, with ${look.scent}` },
       el('g', { transform: 'rotate(-6 110 100)' }, piece('M62 28 L104 18 L118 30 L132 18 L174 28 L206 80 L184 94 L170 72 L170 186 L66 186 L66 72 L52 94 L30 80 Z', look.outer[0]), seam('M104 18 L118 60 L132 18 M118 60 L118 186'), tip(look.outer)),
       el('g', { transform: 'rotate(5 290 80)' }, piece('M236 26 L266 18 Q282 34 298 18 L328 26 L356 58 L338 72 L326 60 L326 146 L240 146 L240 60 L228 72 L210 58 Z', look.top[0]), seam('M266 18 Q282 34 298 18'), tip(look.top)),
@@ -179,8 +158,8 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
     const dateLabel = new Date(`${state.date}T12:00:00`).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
     $('#aes-today-date').textContent = `${dateLabel} · Sydney ${seasonName(plan.season)}`;
     const wrap = $('#aes-today-bottle');
-    wrap.querySelector('svg')?.remove();
-    wrap.prepend(bottle(f));
+    wrap.querySelector('.aes-photo')?.remove();
+    wrap.prepend(bottle(f, 120, true));
     wrap.setAttribute('aria-label', `Spray ${f.name}`);
     $('#aes-today-name').textContent = f.name;
     $('#aes-today-by').textContent = `${f.brand} · ${FAMILY_LABELS[f.family]}`;
@@ -332,11 +311,13 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
     const v = judgeNotes(resolved.notes, affinity);
     const circ = 2 * Math.PI * 40;
     host.replaceChildren(
+      el('div', { class: 'aes-verdict__visual' },
+        fragrancePhotoUrl(resolved.name) ? createFragrancePhoto(doc, resolved.name, { width: 88 }) : null,
       el('div', { class: 'aes-dial', 'data-band': v.score >= 6 ? 'good' : v.score >= 4 ? 'maybe' : 'bad' },
         el('svg', { viewBox: '0 0 92 92', 'aria-hidden': 'true' },
           el('circle', { cx: 46, cy: 46, r: 40, class: 'aes-dial__track' }),
           el('circle', { cx: 46, cy: 46, r: 40, class: 'aes-dial__value', 'stroke-dasharray': `${(v.score / 10) * circ} ${circ}` })),
-        el('b', { text: String(v.score) })),
+        el('b', { text: String(v.score) }))),
       el('div', { class: 'aes-verdict__body' },
         el('div', { class: 'aes-display aes-verdict__word', text: resolved.name ? `${v.verdict}: ${resolved.name}` : v.verdict }),
         el('p', { class: 'aes-why' },
@@ -347,7 +328,7 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
   function renderShelf() {
     $('#aes-shelf').replaceChildren(...FRAGRANCES.filter(f => f.status === 'Owned').map(f =>
       el('button', { type: 'button', class: 'aes-shelf__bottle', onclick: () => { state.mapSel = f.name; renderMap(); $('#aes-map')?.scrollIntoView?.({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'center' }); } },
-        bottle(f, 50), el('span', { text: f.name }), el('small', { text: f.brand }))));
+        bottle(f, 72), el('span', { text: f.name }), el('small', { text: f.brand }))));
   }
 
   // ---------------- DRESS ----------------
