@@ -195,6 +195,46 @@ test('Day Dial: blocks are arcs (done ones is-done); Tonight rows carry a tick t
   win.close();
 });
 
+test('Day Dial: a data remount keeps page scroll (tick → onSourcesChanged must not jump to top)', async () => {
+  const { events } = todayModel();
+  const { apiFetch } = fakeApi();
+  const win = new Window({ url: 'https://life-hub.adam-russell.com/#/calendar/day' });
+  // Synchronous rAF so restore-after-settle runs inside this test.
+  win.requestAnimationFrame = (cb) => {
+    cb(0);
+    return 0;
+  };
+  win.localStorage.setItem('hub-calendar:dial-face:life', 'tool');
+  const host = win.document.createElement('div');
+  // Tall spacer so the page can scroll past the dial (the wipe would otherwise clamp to 0).
+  const spacer = win.document.createElement('div');
+  spacer.style.height = '2400px';
+  win.document.body.append(spacer, host);
+  const input = {
+    hub: 'life', events, ghosts: [], week: WEEK, today: TODAY, selectedDate: TODAY, nowHour: 14.5,
+    now: new Date('2026-10-04T03:30:00Z'), apiFetch,
+    onSourcesChanged: () => {}, onSwitchView: () => {}, onSelectDate: () => {}
+  };
+  renderDayDial(win.document, host, input);
+  await new Promise((r) => setTimeout(r, 40));
+  const scroller = win.document.scrollingElement || win.document.documentElement;
+  scroller.scrollTop = 640;
+  win.scrollTo(0, 640);
+  // Simulate the post-tick remount (same path as onSourcesChanged → renderCalendarSection).
+  renderDayDial(win.document, host, {
+    ...input,
+    events: events.map((item) =>
+      item.record?.id === 'b-fergus'
+        ? { ...item, record: { ...item.record, status: 'done' }, done: true }
+        : item
+    )
+  });
+  assert.equal(scroller.scrollTop, 640, 'scrollingElement stays put across a Day Dial remount');
+  assert.equal(win.scrollY, 640, 'window scroll stays put across a Day Dial remount');
+  unmountDayDial();
+  win.close();
+});
+
 test('Week grid: ticks on blocks and Due rows, deadlines stay Due, hour lines drawn', async () => {
   const { events } = todayModel();
   const { calls, apiFetch } = fakeApi();
