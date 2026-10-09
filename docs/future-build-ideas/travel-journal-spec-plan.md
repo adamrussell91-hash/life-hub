@@ -45,7 +45,7 @@ Read packages/design-kit/AGENTS.md, MOBILE.md, RAIL.md, ICONS.md, tokens.css, ov
 
 Inter weights 400, 500, 600 and 700 only. Warm white and navy with Wave focus and High Sea decisive accents. Orange fills use dark text. Use kit spacing, radii, shadows, pills, buttons and icons. No new palette or decorative font.
 
-Desktop retains the locked 15rem rail. Below 720px retain the shared four slot bottom navigation and More sheet. Reuse current Travel navigation configuration. Add is a content control, never a fifth navigation slot.
+Desktop retains the locked 15rem rail. At the shared phone breakpoint retain the warm translucent white four slot bottom navigation and More sheet. Reuse current Travel navigation configuration. Add is a content control, never a fifth navigation slot.
 
 Refresh is a faint icon at the title row's top right. No hub marks. All displayed dates use the shared dd/mm/yy formatter.
 
@@ -178,3 +178,223 @@ Reuse only where needed. Verify the licence for the exact pinned version, preser
 12. No remote font or CDN dependency is required for basic journal access.
 
 Before any implementation PR run the root pre PR gate and relevant meaningful tests. This idea document uses the repository's docs/future-build-ideas exception and needs no runtime changes or deployment.
+
+
+## Binding UI and interaction contract, revision 2
+
+This section overrides vague visual guidance above. Values tied to kit classes come from actual checked in CSS. Generated images are reference mood only. No implementation is accepted from screenshot resemblance alone.
+
+### Authority and explicit corrections
+
+Use the current shared CSS unchanged. The actual mobile.css bar is warm translucent white with muted icons and a pale blue selected surface. It is NOT navy. Its glyphs are 20px, not the desktop rail's 18px. Preserve its four destinations as currently configured by Travel. Never copy the mockup's navy bar or white plus on orange.
+
+Kit chrome has a 42px desktop title, 32px phone title, 13px desktop eyebrow and 11px phone eyebrow. Use those rules. Refresh-only utilities remain on the title row.
+
+A product component may use responsive aspect ratios, grid tracks, measured offsets and layout constraints below. These are layout geometry, not permission to introduce a new token palette or type scale. Reuse kit tokens for padding, gaps, radii and elevation. Do not change shared kit files to make the journal look different.
+
+### Route and reading structure
+
+Use the existing app router and shell. Proposed journal route: existing trip route plus a journal view, with an optional moment identifier. Confirm final route names from source before implementation. Browser Back closes an opened overlay before leaving the journal. Opening an overlay must not add repeated duplicate history entries.
+
+DOM order: page header, trip toolbar, leg section, day section, moment articles, optional connection fragment, next moment, leg transition, next leg. Headers use a logical heading hierarchy. Do not create a second app shell.
+
+There is one main reading scroll. No scroll container around each leg, day, map preview or photo group. Editors and media viewers have their own internal scroll only while open. Keep stable IDs and restore the nearest visible moment with its relative offset after mutations or new imports.
+
+Persist the last viewed moment per trip locally. First visit during travel goes to the leg and day matching the trip timezone and available itinerary evidence. If today has no entry, show a short empty day with Add moment, followed by earlier memories. Never fabricate a moment. Outside travel, open the first chapter on first visit. A saved deep link overrides these defaults.
+
+### Geometry and sizing matrix
+
+| Element | Phone, viewport below 720px | Desktop, viewport above 720px |
+| --- | --- | --- |
+| Shell | Existing shared mobile shell | Existing locked 15rem rail |
+| Canvas inset | space-4, 16px on each side | Shared canvas space-8 top, space-6 sides |
+| Story column | Available width, no minimum forcing overflow | Centred in remaining canvas, maximum 48rem |
+| At 390px | Canvas content 358px | Not applicable |
+| Timeline gutter | 16px, followed by 8px gap | 24px, followed by 16px gap |
+| Moment content at 390px | 334px after gutter and gap | Remaining story width |
+| Leg title | text-lg, 21px, weight 700 | text-xl, 32px, weight 700 |
+| Day date | text-sm, 13px, weight 600 | Same |
+| Moment metadata | text-sm, 13px, leading-normal | Same |
+| Reflection | text-md, 17px, leading-normal | Same, measure capped at 68ch |
+| Moment separation | space-6, 24px | space-8, 32px |
+| Gap within moment | space-2, 8px | space-2, 8px |
+| Photo frame radius | radius-xs, 6px | Same |
+| Leg header spacing | space-8 above, space-4 below | space-12 above, space-6 below |
+| Audio control row | Minimum 48px | Minimum 48px |
+| Map preview | Content width, 96px tall | Content width, 128px tall |
+| Transition | Auto height, minimum 96px | Auto height, minimum 128px |
+
+The timeline is a 2px Wave line centred within its gutter. Each moment has an 8px node aligned with the first metadata baseline. Use decorative SVG, pointer-events none, aria-hidden true. The thread must never cross photographs, text or buttons. Day gaps retain continuity. Leg transitions introduce a mode glyph node. Do not claim the visual thread represents measured movement.
+
+All measurements are CSS logical pixels. At increased text size, fixed minima expand. Do not set fixed article height. Test 320px, 390px, 430px, 768px and 1440px with no horizontal page overflow. The exact 720px boundary follows current kit media queries.
+
+### Header, toolbar and capture placement
+
+The page header scrolls naturally and is not collapsed or hidden by journal code. Refresh stays available on return to top. Use the shared header markup.
+
+Below it, place the trip title at left and a Chapter button at right. This toolbar has a minimum 48px height, 8px gap and wraps into two rows when labels no longer fit. No text truncation hides the chosen trip. Chapter opens a searchable list of legs and days with 48px rows. Selecting one closes the list, scrolls to the section and moves focus to its heading.
+
+One Add moment button belongs to the toolbar. On small widths it goes into a second toolbar row, not a floating navigation slot. Each day heading also has a shared icon button labelled Add moment to this day, with a 44px touch box. Do not render an orange plus beside every photo or repeat capture actions in every article.
+
+More actions includes Import photos, Search journal, Pattern appearance, Export and Trash. Keep these reachable in no more than two taps from the journal. Never replace global More destinations with journal actions.
+
+### Moment arrangement and media layouts
+
+Reading order within a moment: media group, metadata row, optional writing, optional audio, optional attached object. Metadata includes local time and place. Ellipsis sits at the trailing edge with a 44px hit box. On text-only moments, metadata comes first.
+
+Long place names wrap. Metadata grid uses minmax(0,1fr) and a fixed action hit box. Dates remain dd/mm/yy. Times use 24 hour HH:mm. Unknown time is omitted, not replaced with midnight. Unknown place reads Location not added only in the editor. Reading view omits the missing field.
+
+One photo uses the full moment width, aspect ratio 3:2 in the story. Default object-fit cover with stored crop position. Portrait photos use a 4:5 contain frame when the crop would discard most of the original. The editor lets the user choose Fit or Fill and reposition the crop. Never distort an image.
+
+Two photos use equal columns separated by space-2. Each tile is square. At 390px, 334px content yields two 163px tiles. At 320px or increased text scale, tiles remain images; labels live below, not squeezed inside. Three photos use a full width lead plus two squares. Four or more show one lead and two squares with a labelled View all N photos control. Do not download hidden originals.
+
+Do not overlap, rotate or tear photographs. No Polaroid simulation, sticker shadows or floating decorative caption strips in the default journal. A caption is readable text below its image in the viewer; the story shows the moment's reflection once, not repeated per photograph.
+
+Story text initially shows up to six lines using a labelled Read more disclosure. Expansion stays in place without moving the reader to another screen. Expanded content is never truncated in export or editing. Links open safely with a clear destination. Rendering user text must not execute HTML.
+
+Photo tap opens a viewer using the shared morph primitive. Viewer shows the entire image using contain, never the story crop only. Next and Previous have explicit buttons. Swiping is optional, not the only method. Captions and media controls have opaque surfaces. Pinch zoom is confined to the viewer. Closing restores focus and exact reading position.
+
+### Pattern artwork placement
+
+Patterns are background assets associated with the leg, not a wallpaper on body, header, navigation or dialogs. Two consecutive legs use separate clipped decorative layers. Kuala Lumpur ends at its transition. Istanbul begins at its section.
+
+At phone size use a single sparse motif cluster in the leg header's trailing 40 percent and narrow motifs along the outer margin. At desktop allow motifs outside the story column within the canvas. Never paint inside photographs, waveform controls, map previews or form fields.
+
+Use Wave, sand and muted kit tokens through SVG currentColor or CSS colour mapping. Initial artwork opacity is 0.06 to 0.10, with a hard maximum of 0.12. If contrast fails, lower artwork opacity or mask it, rather than darkening all text.
+
+Place a solid paper backing beneath text clusters, with a soft mask beyond the backing, so motifs disappear under glyphs. No enormous flowers above the app title. No texture downloads from a remote service. Pattern off is saved as a journal preference and leaves all spacing unchanged.
+
+At a transition the old pattern ends, whitespace separates the chapters, then the new pattern starts. No full page crossfade driven by scroll. A manual Pattern preview affects only the targeted leg. Store pattern version so a future asset replacement does not silently redesign old journals.
+
+### Connection fragments and leg transitions
+
+Render at most one map preview per day by default, after the first located moment or before a meaningful change to another cluster. Additional connections remain visible in expanded map view. Zero located moments means no map. One located moment means one labelled stop, no connection.
+
+Preview uses a saved lightweight static map or a simple schematic. Do not mount a separate WebGL map for every moment. One expanded interactive map instance is created on demand and destroyed or reused on close. Attribution remains visible and readable when map data requires it.
+
+The full preview is an accessible button with label Open photo stops for this day. Keyboard Enter opens it. Expanded map defaults to cooperative gestures, so scrolling the page does not become map zoom. Full screen map explicitly enables map interaction.
+
+Transition contains date, transport mode, departure label, straight connector and arrival label. Labels wrap rather than collide. Airport codes appear only if verified in linked itinerary data; otherwise use destination names. A transition appears once. Do not show both a world map connection and an identical ticket graphic stacked together. Price, booking code and baggage stay behind View journey details.
+
+A corrected transition label is a journal override, not an itinerary mutation. Editing a booking requires entering the existing itinerary workflow.
+
+### Motion contract
+
+Use motion.css and shared helpers. No new animation framework. No autonomous looping aircraft, moving wallpaper, floating photos, ambient particle effects, scroll hijacking or autoplay audio.
+
+| Trigger | Behaviour | Exact constraint |
+| --- | --- | --- |
+| First visible content load | Reveal newly mounted section heading and first moment | Shared 420ms duration, 8px lift, shared ease |
+| Small imported group appears | Stagger the first four new visible moments | 45ms stagger, no delay beyond 135ms |
+| Ordinary scrolling | Content stays visible | No repeated entrance animation |
+| Chapter jump | Native smooth scroll only on explicit selection | Reduced motion uses immediate scroll; user input interrupts |
+| Open editor or photo | Shared spring FLIP | Stiffness 200, damping 24, mass 1; shared maximum 900ms |
+| Close overlay | Return toward trigger if trigger still exists | Missing trigger closes cleanly without travel across page |
+| Note or field popover | Shared morphing popover | Existing 250ms ease-out behaviour |
+| Saved map coordinate changes | Recompute line immediately, reveal updated preview | Shared 420ms opacity, no spinning or camera flight |
+| Delete accepted | Remove article and preserve reading anchor | Shared in-place morph where feasible; no theatrical collapse |
+| Undo accepted | Restore at original order | One shared reveal; restore focus |
+| Upload progress | Update actual progress | No decorative fake progress or number count up |
+| Leg transition enters viewport | Reveal its mode icon and labels once | Shared reveal, no motion across route |
+| Audio playing | Playhead follows actual currentTime | No waveform movement when paused |
+
+On reduced motion all nonessential transforms, fades, smooth scrolling and spring effects are disabled. Content appears immediately. Audio progress remains factual. Do not initially hide content unless motion JS is confirmed active. A failed script must leave the entire journal visible.
+
+Only animate opacity and transforms for entry effects. Do not animate layout height across dozens of photos. Remove will-change after completion. Route geometry and media processing run outside the animation frame critical path. No animation delays a Save or changes a persisted value.
+
+### Capture sheet and realistic phone use
+
+Add opens an opaque shared dialog with title Add moment, three choices Photos, Voice and Text, each at least 48px tall. Context shows target leg and day and allows changing them.
+
+Text opens a labelled textarea with date, optional time and optional place. Do not require title, coordinates or a recording before save. Save becomes enabled after nonempty text or an accepted attachment. Cancel retains a recoverable local draft after an explicit Keep draft choice.
+
+Voice requests microphone permission only after Record. Denial shows Record unavailable and keeps Photos and Text working. Recording view shows elapsed time, Stop and Cancel. Stop opens playback, Retake and Attach. Attachment is not final server backup. A phone lock or interruption preserves successfully captured chunks where possible and labels an incomplete recording. No promise of background recording.
+
+Photo selection is user initiated. Do not request access to the entire phone library or claim passive photo synchronisation. Import offers originals from the system picker. Metadata missing from a selected file is a normal case.
+
+Editor phone layout is header, independently scrolling body, docked Cancel and Save footer. Use the shared visual viewport inset helper. The journal dialog covers the app navigation while open; do not stack its footer atop a live global nav. Restore nav on close. Keep actions within the visible viewport above the keyboard, with safe area padding. No doubled keyboard inset.
+
+Each button minimum 48px height using space-12, 8px gap and equal columns. Footer opaque paper, 16px inset, top divider. At 390px the two buttons fit without clipping. Desktop uses the shared dialog width cap of 32rem and internal footer. Dialog max height follows shared CSS and the visual viewport.
+
+Focus the editor heading on open, not the textarea, unless Text was explicitly selected. Escape, close, backdrop and browser Back funnel through the same dirty check. Dirty dialog offers Keep editing and Discard changes. Do not silently save on backdrop dismissal. Save validation focuses the first invalid field with a specific message. Failed save leaves the entered content intact.
+
+### Edit, reorder, split and merge screens
+
+Moment ellipsis opens Edit moment, Reorder, Split, Merge, Move and Delete. Disable unavailable actions with a short explanation. Split requires at least two attachments or explicit selection of divisible text blocks. Do not split arbitrary prose automatically.
+
+Edit body: photo selection and order, writing, audio attachments, date and time, leg and day, place, then advanced crop and metadata details. Basic editing never exposes storage keys or provenance JSON. Place offers Search, Choose on map and Remove location.
+
+Pin editor has an interactive map, 44px zoom controls, a fixed centre crosshair and Use this location. Dragging the map previews coordinates. Commit happens only on Use this location then Save. Cancel returns to the prior coordinates. Provide numeric latitude and longitude under an advanced disclosure with valid bounds and finite number checks.
+
+Reorder opens an ordered list with thumbnail, time and short place. Provide Move up and Move down buttons as well as pointer drag handles. Save shows changed order. A manual order badge is quiet and optional; Reset to time order is explicit and preserves original times.
+
+Split opens selectable attachment rows. User names or accepts two resulting moments and confirms time and place for each. Preserve every attachment exactly once. Empty resulting moments are forbidden.
+
+Merge opens candidates from the same day by default. Cross day selection explicitly previews the resulting day. Show combined attachment order, writing paragraphs, recordings and location choice before Merge. Preserve distinct recordings. Never overwrite one reflection with another.
+
+Move requires leg then day selection. Default timezone handling preserves the actual instant when known and recomputes displayed local time, with a preview. If only wall time is known, ask whether to keep that time or enter a corrected one. Do not invent an instant.
+
+Delete moment gives timed undo for 10 seconds and permanent access via Trash. Deleting a day, leg or trip requires an explicit impact summary confirmation. Toast does not cover Save, navigation or captions and uses the shared feedback helper. Restore is idempotent. Permanent deletion requires a separate action in Trash.
+
+### Import review state machine
+
+States: selected, inspecting, proposed, uploading, partially complete, complete, cancelled and failed. Each file has its own state. Do not represent a partially successful batch as wholly failed or wholly saved.
+
+Inspection operates with two files concurrently by default. Network upload uses two concurrent originals. Release decoded bitmap memory after derivative production. Large batches render rows progressively.
+
+Review header states photo count and proposed moment count. A compact disclosure lists duplicates and files needing date, leg or location review. Default location gaps do not block import. Missing date requires a date choice or the current selected day explicitly marked Assigned by you.
+
+Users edit grouping before upload through Split group and Merge groups. Save the reviewed proposal locally so app reload does not require reselecting files still available in local storage. If original blobs were not retained, ask to reselect the missing files and match by checksum.
+
+Include maximum supported file size and batch size in the implementation configuration and display them in the picker help. Initial target is 100 files per batch and 50MB per image, subject to verified infrastructure limits. Larger selections are split into batches rather than crashing or discarding the selection. Do not advertise those limits until upload signing and storage actually accept them.
+
+Orientation, timezone offsets, photos spanning midnight, zero coordinate values, missing capture dates and EXIF removed by sharing are mandatory fixtures. Local metadata parsing works without a geocoding service. Place lookup failure retains coordinates and an editable label.
+
+### Audio, media failures and empty states
+
+Only one recording plays at once. Starting another pauses the first. Leaving the trip pauses playback. Open map or editor pauses playback unless the editor is specifically editing that recording. Never autoplay after import or chapter jump.
+
+Audio row contains 48px play button, flexible waveform or plain progress slider and 13px tabular duration. Waveform missing does not prevent playback. Error presents Retry and Download recording when authorised. Transcripts are editable derived text, separate from original audio.
+
+Missing image retains its known aspect ratio, filename or caption and Retry, avoiding layout jumps. Failed original processing keeps original downloadable and offers Replace display image. Unsupported HEIC shows a clear conversion action or export guidance; never a blank successful photo tile.
+
+Empty trip: title and Add photos plus Add moment, no invented travel media. Empty leg: destination heading and Add to this leg. Text only: normal story typography, no empty image rectangle. Offline: quiet status row with pending count, not a blocking modal. Search with no results retains query and offers clear search.
+
+### Performance and persistence boundaries
+
+Store image width and height with derivatives so layout is reserved before download. Use responsive srcset sizes appropriate to 390px screens and high density displays. Thumbnail targets 320px long edge, story derivatives 960px and 1600px, originals unchanged. Select actual derivative based on rendered width and device pixel ratio.
+
+Lazy load below viewport, prefetch the next two moments, and never fetch all originals on page open. Use native image loading and decoding. Mount no more than one live WebGL map. Paginate moments in groups of 30 with stable anchors, a Load earlier or Load more fallback and no inaccessible endless trap.
+
+Target a cached journal shell visible within one second on a contemporary phone. Target interactive reading before images complete. Measure actual import responsiveness, layout shift and memory on iPhone Safari. Do not call a performance target passed without measurement. Metadata work must not block tap response.
+
+Drafts persist locally after 500ms idle and on input blur. UI reports Draft saved on this device only after successful IndexedDB write. Server backed up status follows acknowledgement plus media verification. A crash between media upload and record commit creates a retryable attachment, not an invisible orphan forever. Cleanup never removes assets belonging to pending valid uploads.
+
+Refresh does not discard drafts, rerecord audio, move scroll to top or replace the whole app with a spinner. It reconciles current records and pending operations, with conflicts surfaced.
+
+### Concrete walkthroughs and acceptance evidence
+
+Scenario A: Adam takes 18 photos across three Istanbul stops. Import proposes three moments. Two images lack GPS and remain in their time group without invented pins. Adam changes one place and adds a recording. Reload preserves corrections. The day displays integrated photos and writing, one small route preview and one editable continuous sequence.
+
+Scenario B: 65 Kuala Lumpur photos include a duplicate and a portrait. Duplicate is skipped with explanation. Portrait shows without distortion. Two failed uploads remain retryable. Adam closes and reopens the app. Uploaded media stays committed and pending files are clearly identified.
+
+Scenario C: Adam scrolls from final Kuala Lumpur moment to flight transition and first Istanbul moment. Background artwork changes only at chapter boundary. There is one transition. Header and navigation remain kit components. No date, booking or route is invented.
+
+Scenario D: Adam edits a long reflection on a 390px iPhone with keyboard open. Save and Cancel remain visible. Back prompts about unsaved changes. After Save, the journal returns to the same moment without resetting scroll. Larger text does not cause horizontal scrolling.
+
+Scenario E: Adam deletes a middle stop, then undoes. Routes recalculate twice. No deleted copy appears in search or shared pages. Restore does not revive an attachment deleted before the parent.
+
+Implementation PR evidence must include actual rendered screenshots at 390x844 and 1440x900, keyboard open editing, both leg patterns, long place name, text only moment, portrait media, import partial failure and reduced motion. Include a short screen recording of chapter jump, editor morph, deletion and undo. Generated images do not satisfy this requirement.
+
+Pass criteria include no clipped controls, no screenshot only custom navbar, no hidden content from disabled animation JS, no repeated reveals during ordinary scroll, no autonomous sound, no external network requirement for exported basic reading and no alteration of unrelated itinerary records.
+
+## Revised execution checklist
+
+1. Extract kit tokens and actual current Travel shell before UI coding. Record reused component paths and current API/storage adapters in implementation notes.
+2. Build renderer and chapter artwork using fixture records. Validate the sizing matrix and realistic phone viewport before attaching storage.
+3. Implement metadata, review, media and draft state machines with meaningful failure tests.
+4. Implement editing, split, merge, movement, liveness and version conflict behaviour.
+5. Add shared motion only after the static interface works. Verify reduced motion and animation JS failure.
+6. Implement map preview, transition links, search, offline reconciliation and complete export.
+7. Complete the scenario walkthroughs with real browser evidence, then required repository checks.
+8. Optional enhancements must meet this same contract. No feature is finished solely because its happy path renders.
