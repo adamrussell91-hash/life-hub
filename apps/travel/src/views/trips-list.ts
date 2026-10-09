@@ -1,11 +1,33 @@
 import { createTrip, listTrips } from '@/api/travel';
 import { ApiClientError } from '@/api/client';
 import { tripRoute } from '@/app/router';
+import { renderPassportMap, type PassportMapHandle } from '@/components/passport-map';
+import {
+  matchAtlasCountry,
+  tripsForAtlasCountry,
+  visitedAtlasCountries
+} from '@/lib/visited-countries';
+import type { TripSummary } from '@/types';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { feature } from 'topojson-client';
+import countriesAtlas from 'world-atlas/countries-110m.json';
 
 export interface TripsListOptions {
   isCurrent: () => boolean;
 }
+
+const atlasNames: string[] = (() => {
+  const topology = countriesAtlas as unknown as { objects: Record<string, unknown> };
+  const collection = feature(topology as never, topology.objects.countries as never) as unknown as {
+    features: { properties?: { name?: string } }[];
+  };
+  const names: string[] = [];
+  for (const f of collection.features) {
+    const name = f.properties?.name;
+    if (name) names.push(name);
+  }
+  return names;
+})();
 
 function daysUntil(date: string): number {
   const today = new Date().toISOString().slice(0, 10);
@@ -21,12 +43,59 @@ function statusLabel(start: string, end: string): string {
   return `Leaves in ${n} day${n === 1 ? '' : 's'}`;
 }
 
-/** Trips list (`#/`, TR-60): cards with title, dates, city chips and status.
- * New trip opens as a docked sheet so phone actions stay tappable (R4). */
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function sortByStartDateDesc(trips: TripSummary[]): TripSummary[] {
+  return [...trips].sort((a, b) => (a.start_date < b.start_date ? 1 : a.start_date > b.start_date ? -1 : 0));
+}
+
+function applyMapHighlight(
+  list: HTMLElement,
+  trips: TripSummary[],
+  atlasCountry: string | null,
+  map: PassportMapHandle
+): void {
+  const cards = list.querySelectorAll<HTMLElement>('.trips-list__card');
+  if (!atlasCountry) {
+    for (const card of cards) {
+      card.classList.remove('is-map-hit', 'is-dimmed');
+      card.removeAttribute('data-active-country');
+    }
+    map.setSelected(null);
+    return;
+  }
+
+  const selected = matchAtlasCountry(atlasCountry, atlasNames) ?? atlasCountry;
+  const matchingIds = new Set(
+    tripsForAtlasCountry(trips, selected, atlasNames).map((t) => t.id)
+  );
+  let firstHit: HTMLElement | null = null;
+  for (const card of cards) {
+    const id = card.getAttribute('data-trip-id') ?? '';
+    const hit = matchingIds.has(id);
+    card.classList.toggle('is-map-hit', hit);
+    card.classList.toggle('is-dimmed', !hit);
+    if (hit) {
+      card.setAttribute('data-active-country', selected);
+      if (!firstHit) firstHit = card;
+    } else {
+      card.removeAttribute('data-active-country');
+    }
+  }
+  firstHit?.scrollIntoView({ block: 'nearest' });
+  map.setSelected(selected);
+}
+
+/** Passport homepage (`#/`): visited-countries map, trip timeline, New trip sheet (R4). */
 export async function renderTripsList(canvas: HTMLElement, options: TripsListOptions): Promise<void> {
   canvas.replaceChildren();
-  const { trips } = await listTrips();
+  const { trips: rawTrips } = await listTrips();
   if (!options.isCurrent()) return;
+
+  const trips = sortByStartDateDesc(rawTrips);
+  const visited = visitedAtlasCountries(trips, atlasNames, todayIso());
 
   const wrap = document.createElement('div');
   wrap.className = 'wrap trips-list';
@@ -38,10 +107,13 @@ export async function renderTripsList(canvas: HTMLElement, options: TripsListOpt
   h1.textContent = 'Trips';
   const sub = document.createElement('p');
   sub.className = 'sub';
-  sub.textContent =
-    trips.length === 0
-      ? 'Plan the next holiday from here.'
-      : `${trips.length} trip${trips.length === 1 ? '' : 's'} · open one, or plan another.`;
+  if (trips.length === 0) {
+    sub.textContent = 'Your passport starts empty — plan the next holiday from here.';
+  } else {
+    const n = trips.length;
+    const k = visited.size;
+    sub.textContent = `${n} trip${n === 1 ? '' : 's'} · ${k} ${k === 1 ? 'country' : 'countries'} visited`;
+  }
   titleBlock.append(h1, sub);
   const acts = document.createElement('div');
   acts.className = 'acts';
@@ -54,42 +126,61 @@ export async function renderTripsList(canvas: HTMLElement, options: TripsListOpt
   top.append(titleBlock, acts);
   wrap.append(top);
 
+  const mapHost = document.createElement('div');
+  mapHost.className = 'trips-list__map';
+  wrap.append(mapHost);
+
+  const list = document.createElement('div');
+  list.className = 'trips-list__cards';
+
+  const map = renderPassportMap(mapHost, {
+    visited,
+    onSelect: (atlasCountry) => applyMapHighlight(list, trips, atlasCountry, map)
+  });
+
   if (trips.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'empty-state';
     empty.textContent = 'No trips yet.';
     wrap.append(empty);
-  }
+  } else {
+    for (const trip of trips) {
+      const card = document.createElement('a');
+      card.className = 'card trips-list__card';
+      card.href = tripRoute(trip.id);
+      card.setAttribute('data-trip-id', trip.id);
 
-  const list = document.createElement('div');
-  list.className = 'trips-list__cards';
-  for (const trip of trips) {
-    const card = document.createElement('a');
-    card.className = 'card trips-list__card';
-    card.href = tripRoute(trip.id);
-    const h3 = document.createElement('h3');
-    h3.textContent = trip.title;
-    const p = document.createElement('p');
-    p.textContent = `${formatDisplayDate(trip.start_date)} – ${formatDisplayDate(trip.end_date)} · ${statusLabel(trip.start_date, trip.end_date)}`;
-    const chips = document.createElement('div');
-    chips.className = 'chips';
-    if (trip.cities.length === 0) {
-      const chip = document.createElement('span');
-      chip.className = 'chip';
-      chip.textContent = 'No cities yet';
-      chips.append(chip);
-    } else {
-      for (const cityName of trip.cities) {
+      const finished = todayIso() > trip.end_date;
+      if (finished) card.classList.add('is-finished');
+
+      const h3 = document.createElement('h3');
+      h3.textContent = trip.title;
+      const meta = document.createElement('p');
+      meta.className = 'trips-list__meta';
+      const status = statusLabel(trip.start_date, trip.end_date);
+      meta.textContent = `${formatDisplayDate(trip.start_date)} – ${formatDisplayDate(trip.end_date)} · ${status}`;
+      if (finished) meta.classList.add('is-quiet');
+
+      const chips = document.createElement('div');
+      chips.className = 'chips';
+      if (trip.cities.length === 0) {
         const chip = document.createElement('span');
         chip.className = 'chip';
-        chip.textContent = cityName;
+        chip.textContent = 'No cities yet';
         chips.append(chip);
+      } else {
+        for (const cityName of trip.cities) {
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          chip.textContent = cityName;
+          chips.append(chip);
+        }
       }
+      card.append(h3, meta, chips);
+      list.append(card);
     }
-    card.append(h3, p, chips);
-    list.append(card);
+    wrap.append(list);
   }
-  if (trips.length) wrap.append(list);
 
   canvas.append(wrap);
 
