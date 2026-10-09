@@ -11,7 +11,9 @@ import { GARMENT_COLOURS, LOOKS, SNAP_SAMPLES } from './dress-looks.js';
 import { renderSourceReference } from './render-source-reference.js';
 import { createWatches } from './render-watches.js';
 import {
+  combosFor,
   dominantColour,
+  familyWheelDistance,
   formatHour,
   judgeNotes,
   listOf,
@@ -23,22 +25,36 @@ import {
   nearestGarmentColour,
   noteAffinity,
   placeOnMap,
+  placeOnWheel,
   planScentDay,
   proseNote,
   resolveQuery,
-  seasonName
+  seasonName,
+  topCombos,
+  WHEEL_FAMILIES
 } from './aesthetics-model.js';
+import { loadSydneyWeather } from './sydney-weather.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const SVG_TAGS = new Set(['svg', 'g', 'path', 'circle', 'rect', 'ellipse', 'text', 'defs', 'radialGradient', 'linearGradient', 'stop', 'line', 'foreignObject']);
+const SVG_TAGS = new Set(['svg', 'g', 'path', 'circle', 'rect', 'ellipse', 'text', 'defs', 'radialGradient', 'linearGradient', 'stop', 'line', 'foreignObject', 'animateTransform']);
 const TABS = ['today', 'scent', 'dress', 'skin'];
 const TAB_KEY = 'life-aesthetics-tab';
 const DRESS_VIEW_KEY = 'life-aesthetics-dress-view';
 const DRESS_VIEWS = ['looks', 'watches'];
 const WEAR_KEY = 'life-aesthetics-wear';
 const PRAISE_KEY = 'life-aesthetics-compliments';
+const FAMILY_WHEEL_LABEL = { fresh: 'Fresh', floral: 'Floral', gourmand: 'Gourmand', amber: 'Amber', woody: 'Woody' };
 
 const famVar = f => `var(--aes-${f.family})`;
+const polar = (cx, cy, r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+function donutSlice(cx, cy, r0, r1, a0, a1) {
+  const large = a1 - a0 > Math.PI ? 1 : 0;
+  const [x0, y0] = polar(cx, cy, r1, a0);
+  const [x1, y1] = polar(cx, cy, r1, a1);
+  const [x2, y2] = polar(cx, cy, r0, a1);
+  const [x3, y3] = polar(cx, cy, r0, a0);
+  return `M${x0} ${y0} A${r1} ${r1} 0 ${large} 1 ${x1} ${y1} L${x2} ${y2} A${r0} ${r0} 0 ${large} 0 ${x3} ${y3} Z`;
+}
 
 function readJson(storage, key, fallback) {
   try { return JSON.parse(storage?.getItem(key) ?? 'null') ?? fallback; } catch { return fallback; }
@@ -47,7 +63,13 @@ function writeJson(storage, key, value) {
   try { storage?.setItem(key, JSON.stringify(value)); } catch { /* private mode: keep going */ }
 }
 
-export function createAesthetics(doc, { storage = globalThis.localStorage, matchMedia = globalThis.matchMedia?.bind(globalThis), watchRadarApi = null } = {}) {
+export function createAesthetics(doc, {
+  storage = globalThis.localStorage,
+  matchMedia = globalThis.matchMedia?.bind(globalThis),
+  watchRadarApi = null,
+  weatherApi = loadSydneyWeather,
+  sessionStorage = globalThis.sessionStorage
+} = {}) {
   const $ = sel => doc.querySelector(sel);
   const reduceMotion = () => matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
   const affinity = noteAffinity(FRAGRANCES);
@@ -75,11 +97,15 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
     dayIndex: 0,
     mapSel: 'Neon',
     mapShow: { Owned: true, Sampling: true, Wishlist: true, Retired: true },
+    wheelSel: 'Neon',
+    comboPartner: null,
     query: 'Tom Ford Tobacco Vanille',
     vibe: 0,
     snap: null,
     date: null,
     events: [],
+    weather: null,
+    weatherStatus: 'pending',
     wired: false
   };
 
@@ -151,19 +177,41 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
   }
   let plan = null;
   function renderToday() {
-    plan = planScentDay({ date: state.date, events: state.events, index: state.dayIndex, lastWorn: lastWorn() });
+    plan = planScentDay({
+      date: state.date,
+      events: state.events,
+      index: state.dayIndex,
+      lastWorn: lastWorn(),
+      weather: state.weather
+    });
     const f = plan.day;
     const stage = $('#aes-stage');
     stage.style.setProperty('--aes-glow', famVar(f));
     const dateLabel = new Date(`${state.date}T12:00:00`).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
     $('#aes-today-date').textContent = `${dateLabel} · Sydney ${seasonName(plan.season)}`;
+    const weatherEl = $('#aes-today-weather');
+    if (weatherEl) {
+      if (state.weather?.label) {
+        weatherEl.textContent = `Weather pick · ${state.weather.label}`;
+        weatherEl.hidden = false;
+      } else if (state.weatherStatus === 'unavailable') {
+        weatherEl.textContent = 'Weather unavailable · ranking by season and calendar';
+        weatherEl.hidden = false;
+      } else if (state.weatherStatus === 'pending') {
+        weatherEl.textContent = 'Reading Sydney weather…';
+        weatherEl.hidden = false;
+      } else {
+        weatherEl.textContent = '';
+        weatherEl.hidden = true;
+      }
+    }
     const wrap = $('#aes-today-bottle');
     wrap.querySelector('.aes-photo')?.remove();
     wrap.prepend(bottle(f, 120, true));
     wrap.setAttribute('aria-label', `Spray ${f.name}`);
     $('#aes-today-name').textContent = f.name;
     $('#aes-today-by').textContent = `${f.brand} · ${FAMILY_LABELS[f.family]}`;
-    $('#aes-today-line').textContent = plan.line;
+    $('#aes-today-line').textContent = plan.weatherLine ? `${plan.line} ${plan.weatherLine}` : plan.line;
     const worn = wearLog()[state.date];
     $('#aes-today-worn').textContent = worn ? `Logged: ${worn} today` : '';
     renderFlat($('#aes-today-flat'), lookForScent(f.name), true);
@@ -331,6 +379,136 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
         bottle(f, 72), el('span', { text: f.name }), el('small', { text: f.brand }))));
   }
 
+  // ---------------- Combo wheel ----------------
+  function selectWheel(name, partnerName = null) {
+    state.wheelSel = name;
+    state.comboPartner = partnerName;
+    renderWheel();
+  }
+
+  function renderComboCard(base, picks) {
+    const host = $('#aes-combo');
+    if (!host) return;
+    const active = picks.find(p => p.partner.name === state.comboPartner) ?? picks[0];
+    if (!active) {
+      host.replaceChildren(el('p', { class: 'aes-meta', text: 'Pick a bottle on the wheel to see layering partners.' }));
+      return;
+    }
+    if (!state.comboPartner) state.comboPartner = active.partner.name;
+    const [first, second] = [active.base, active.accent];
+    host.replaceChildren(
+      el('div', { class: 'aes-combo__pair' },
+        el('div', { class: 'aes-combo__bottle' }, bottle(first, 72), el('span', { class: 'aes-combo__step', text: '1 · base' }), el('b', { text: first.name })),
+        el('div', { class: 'aes-combo__join', 'aria-hidden': 'true' }, el('span', { class: 'aes-combo__pulse' }), el('span', { text: '+' })),
+        el('div', { class: 'aes-combo__bottle' }, bottle(second, 72), el('span', { class: 'aes-combo__step', text: '2 · accent' }), el('b', { text: second.name }))),
+      el('p', { class: 'aes-display aes-combo__verdict', text: active.verdict }),
+      el('p', { class: 'aes-combo__why', text: active.why }),
+      active.shared.length
+        ? el('p', { class: 'aes-meta' }, 'Bridge notes: ', el('b', { text: listOf(active.shared.map(proseNote)) }))
+        : el('p', { class: 'aes-meta', text: 'No shared notes — the wheel adjacency is doing the work.' }),
+      el('div', { class: 'hub-pills hub-pills--loose aes-chips', 'aria-label': 'Partner picks' },
+        picks.map(p => el('button', {
+          type: 'button',
+          class: 'hub-pills__btn',
+          'aria-pressed': String(p.partner.name === active.partner.name),
+          onclick: () => selectWheel(base.name, p.partner.name)
+        }, p.partner.name))));
+  }
+
+  function renderWheel() {
+    const host = $('#aes-wheel');
+    if (!host) return;
+    const owned = FRAGRANCES.filter(f => f.status === 'Owned');
+    const base = owned.find(f => f.name === state.wheelSel) ?? owned[0];
+    if (!base) return;
+    state.wheelSel = base.name;
+    const picks = combosFor(base, { limit: 3 });
+    if (!picks.some(p => p.partner.name === state.comboPartner)) state.comboPartner = picks[0]?.partner.name ?? null;
+    const partner = picks.find(p => p.partner.name === state.comboPartner)?.partner ?? null;
+
+    const size = 420, cx = size / 2, cy = size / 2;
+    const rOuter = 168, rInner = 108, rLabel = 188;
+    const wedge = (Math.PI * 2) / WHEEL_FAMILIES.length;
+    const familyPaths = WHEEL_FAMILIES.map((family, i) => {
+      const a0 = -Math.PI / 2 + i * wedge + 0.02;
+      const a1 = -Math.PI / 2 + (i + 1) * wedge - 0.02;
+      const [lx, ly] = polar(cx, cy, rLabel, a0 + wedge / 2);
+      return el('g', { class: 'aes-wheel__family', 'data-family': family },
+        el('path', { d: donutSlice(cx, cy, rInner, rOuter, a0, a1), class: 'aes-wheel__wedge', fill: `var(--aes-${family})` }),
+        el('text', { x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'middle', class: 'aes-wheel__flabel', text: FAMILY_WHEEL_LABEL[family] }));
+    });
+
+    const dots = owned.map(f => {
+      const { angle, radius } = placeOnWheel(f);
+      const r = rInner + radius * (rOuter - rInner);
+      const [x, y] = polar(cx, cy, r, angle);
+      const on = f.name === base.name;
+      const linked = partner && f.name === partner.name;
+      return el('g', {
+        class: 'aes-wheel__dot',
+        tabindex: 0,
+        role: 'button',
+        'aria-label': `${f.name}, ${FAMILY_LABELS[f.family]}`,
+        'aria-pressed': String(on),
+        transform: `translate(${x} ${y})`,
+        onclick: () => selectWheel(f.name),
+        onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectWheel(f.name); } }
+      },
+        el('circle', { r: on || linked ? 11 : 7.5, class: on ? 'aes-wheel__orb aes-wheel__orb--on' : linked ? 'aes-wheel__orb aes-wheel__orb--link' : 'aes-wheel__orb', fill: famVar(f) }),
+        on || linked ? el('circle', { r: 16, class: 'aes-wheel__halo', fill: 'none', stroke: famVar(f) }) : null);
+    });
+
+    let link = null;
+    if (partner) {
+      const a = placeOnWheel(base);
+      const b = placeOnWheel(partner);
+      const [x1, y1] = polar(cx, cy, rInner + a.radius * (rOuter - rInner), a.angle);
+      const [x2, y2] = polar(cx, cy, rInner + b.radius * (rOuter - rInner), b.angle);
+      const dist = familyWheelDistance(base.family, partner.family);
+      link = el('path', {
+        class: 'aes-wheel__arc',
+        d: `M${x1} ${y1} Q${cx} ${cy} ${x2} ${y2}`,
+        fill: 'none',
+        stroke: famVar(partner),
+        'data-span': String(dist)
+      });
+    }
+
+    const rimSpin = !reduceMotion()
+      ? el('animateTransform', { attributeName: 'transform', type: 'rotate', from: `0 ${cx} ${cy}`, to: `360 ${cx} ${cy}`, dur: '64s', repeatCount: 'indefinite' })
+      : null;
+
+    const highlights = topCombos({ limit: 4 });
+    host.replaceChildren(el('svg', { class: 'aes-wheel__svg', viewBox: `0 0 ${size} ${size}`, role: 'img', 'aria-label': `Layering wheel centred on ${base.name}` },
+      el('defs', {},
+        el('radialGradient', { id: 'aes-wheel-core' },
+          el('stop', { offset: '0%', 'stop-color': 'var(--paper)', 'stop-opacity': 1 }),
+          el('stop', { offset: '100%', 'stop-color': 'var(--cotton)', 'stop-opacity': 1 }))),
+      el('circle', { cx, cy, r: rOuter + 18, class: 'aes-wheel__disc' }),
+      el('g', { class: 'aes-wheel__rim' },
+        rimSpin,
+        el('circle', { cx, cy, r: rOuter + 10, class: 'aes-wheel__rim-ring', fill: 'none' })),
+      ...familyPaths,
+      link,
+      el('circle', { cx, cy, r: rInner - 6, fill: 'url(#aes-wheel-core)', class: 'aes-wheel__hub' }),
+      el('text', { x: cx, y: cy - 8, 'text-anchor': 'middle', class: 'aes-wheel__hub-label', text: 'Layer' }),
+      el('text', { x: cx, y: cy + 14, 'text-anchor': 'middle', class: 'aes-wheel__hub-name', text: base.name.length > 14 ? `${base.name.slice(0, 13)}…` : base.name }),
+      ...dots));
+
+    renderComboCard(base, picks);
+    const comboHost = $('#aes-combo');
+    if (comboHost && highlights.length) {
+      comboHost.append(el('div', { class: 'aes-combo__tops' },
+        el('p', { class: 'aes-eyebrow', text: 'Shelf favourites' }),
+        el('div', { class: 'aes-combo__top-row' }, highlights.slice(0, 3).map(h =>
+          el('button', {
+            type: 'button',
+            class: 'aes-combo__top',
+            onclick: () => selectWheel(h.a.name, h.b.name)
+          }, el('b', { text: h.a.name }), el('span', { text: '+' }), el('b', { text: h.b.name }), el('small', { text: h.verdict }))))));
+    }
+  }
+
   // ---------------- DRESS ----------------
   function renderVibe() {
     const look = LOOKS[state.vibe];
@@ -423,14 +601,29 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
     } }, el('i', { class: 'aes-dot', style: `background:${GARMENT_COLOURS[s.colour]}` }), s.label)));
     $('#aes-insight').textContent = mapInsight(FRAGRANCES);
     renderShelf();
+    renderWheel();
     renderSourceReference(doc);
+  }
+
+  async function refreshWeather() {
+    state.weatherStatus = 'pending';
+    renderToday();
+    const result = await weatherApi({ storage: sessionStorage });
+    state.weather = result?.weather ?? null;
+    state.weatherStatus = result?.status === 'unavailable' || !state.weather ? 'unavailable' : result.status;
+    if (state.date) renderToday();
   }
 
   return {
     render({ date, events = [] } = {}) {
       if (!$('#aes-stage') || !date) return;
       wire();
-      if (state.date !== date) state.dayIndex = 0;
+      if (state.date !== date) {
+        state.dayIndex = 0;
+        state.weather = null;
+        state.weatherStatus = 'pending';
+        void refreshWeather();
+      }
       state.date = date;
       state.events = events;
       showTab(state.tab);
@@ -438,6 +631,7 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
       renderToday();
       watches.render({ date, look: lookForScent(plan.day.name) });
       renderMap();
+      renderWheel();
       renderOracle();
       renderVibe();
       renderSnap();

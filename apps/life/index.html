@@ -789,6 +789,7 @@
                 <div class="aes-stage__copy">
                   <p class="aes-eyebrow">Your look for today</p>
                   <p id="aes-today-date" class="aes-stage__date"></p>
+                  <p id="aes-today-weather" class="aes-stage__weather" aria-live="polite"></p>
                   <div class="aes-wear">
                     <div id="aes-today-bottle" class="aes-wear__bottle" role="button" tabindex="0" aria-label="Spray"><canvas id="aes-mist" class="aes-mist" width="400" height="340" aria-hidden="true"></canvas></div>
                     <div class="aes-wear__text">
@@ -818,6 +819,15 @@
           </div>
 
           <div id="aes-scent" class="aes-panel aes-scent" role="tabpanel" aria-label="Scent" hidden>
+            <article class="metric-card aes-card aes-wheel-card">
+              <p class="aes-eyebrow">Layering wheel</p>
+              <h2 class="aes-display aes-h2">Combos that work, from scent science</h2>
+              <p class="aes-lede">Families sit on a compact fragrance wheel. Adjacent families layer cleanly; shared bridge notes stitch the rest. Tap a bottle to see its best partners and spray order.</p>
+              <div class="aes-wheel-layout">
+                <div id="aes-wheel" class="aes-wheel" aria-label="Fragrance layering wheel"></div>
+                <div id="aes-combo" class="aes-combo" aria-live="polite"></div>
+              </div>
+            </article>
             <article class="metric-card aes-card">
               <p class="aes-eyebrow">Your scent map</p>
               <h2 class="aes-display aes-h2">All 52 fragrances you've met, plotted by how they smell</h2>

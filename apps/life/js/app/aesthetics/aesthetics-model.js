@@ -34,8 +34,9 @@ export function formatHour(hour) {
 const hoursFor = f => LONGEVITY[f.longevity ?? 2].hours;
 const owned = list => list.filter(f => f.status === 'Owned');
 
-/** Owned bottles ranked for a season, time of day ('D' | 'N') and occasion. */
-export function rankScents({ fragrances = FRAGRANCES, season, time, occasion = 'Casual', exclude = [], lastWorn = null } = {}) {
+/** Owned bottles ranked for a season, time of day ('D' | 'N') and occasion.
+ * Optional `weather` (from classifyWeather) nudges scores for heat, humidity and rain. */
+export function rankScents({ fragrances = FRAGRANCES, season, time, occasion = 'Casual', exclude = [], lastWorn = null, weather = null } = {}) {
   return owned(fragrances)
     .filter(f => !exclude.includes(f.name))
     .map(f => {
@@ -47,10 +48,118 @@ export function rankScents({ fragrances = FRAGRANCES, season, time, occasion = '
       score += (f.rating ?? 0) / 10;
       score += (f.longevity ?? 2) / 20;
       if (lastWorn && f.name === lastWorn) score -= 1.5; // gentle rotation
+      if (weather) score += weatherAffinity(f, weather);
       return { fragrance: f, score };
     })
     .sort((a, b) => b.score - a.score)
     .map(r => r.fragrance);
+}
+
+// ---------------- Weather × scent ----------------
+// Heat speeds evaporation (loud then short); humidity + warm skin makes sweets cloying.
+// Cold mutes projection, so denser amber / gourmand / woody bases earn their keep.
+const HEAT_BANDS = new Set(['humid-heat', 'dry-heat', 'warm-humid']);
+const COLD_BANDS = new Set(['cool', 'cold', 'wet-cool']);
+const SWEET_NOTES = new Set(['Vanilla', 'Tonka Bean', 'Praline', 'Cocoa', 'Honey', 'Coconut']);
+const FRESH_NOTES = new Set(['Bergamot', 'Lemon', 'Citron', 'Grapefruit', 'Mandarin', 'Marine', 'Sea Notes', 'Mint', 'Aldehydes', 'Petitgrain', 'Apple', 'Pear']);
+const HEAVY_NOTES = new Set(['Oud', 'Leather', 'Labdanum', 'Tobacco', 'Incense', 'Myrrh', 'Benzoin', 'Amber']);
+
+/** Classify a Sydney reading into a band the ranker understands. */
+export function classifyWeather({ tempC, humidity, precipMm = 0, weatherCode = 0 } = {}) {
+  if (tempC == null || Number.isNaN(Number(tempC))) return null;
+  const t = Number(tempC);
+  const h = Number(humidity ?? 50);
+  const rain = Number(precipMm) >= 0.2 || Number(weatherCode) >= 51;
+  let band;
+  if (t >= 28) band = h >= 65 ? 'humid-heat' : 'dry-heat';
+  else if (t >= 22) band = h >= 70 ? 'warm-humid' : 'mild-warm';
+  else if (t >= 15) band = 'mild';
+  else if (t >= 8) band = rain ? 'wet-cool' : 'cool';
+  else band = rain ? 'wet-cool' : 'cold';
+  if (rain && (band === 'mild' || band === 'mild-warm')) band = 'wet-cool';
+  const label = weatherLabel({ band, tempC: t, humidity: h, rain });
+  return { band, tempC: t, humidity: h, precipMm: Number(precipMm) || 0, weatherCode: Number(weatherCode) || 0, rain, label };
+}
+
+function weatherLabel({ band, tempC, humidity, rain }) {
+  const deg = `${Math.round(tempC)}°`;
+  const wet = rain ? ' · rain' : '';
+  switch (band) {
+    case 'humid-heat': return `${deg} · muggy heat${wet}`;
+    case 'dry-heat': return `${deg} · dry heat${wet}`;
+    case 'warm-humid': return `${deg} · warm and sticky${wet}`;
+    case 'mild-warm': return `${deg} · warm${wet}`;
+    case 'mild': return `${deg} · mild${wet}`;
+    case 'cool': return `${deg} · cool${wet}`;
+    case 'cold': return `${deg} · cold${wet}`;
+    case 'wet-cool': return `${deg} · cool and wet`;
+    default: return `${deg}${humidity != null ? ` · ${Math.round(humidity)}% humidity` : ''}${wet}`;
+  }
+}
+
+/** Score delta for a bottle under a classified weather reading. */
+export function weatherAffinity(fragrance, weather) {
+  if (!weather?.band) return 0;
+  const { band } = weather;
+  const family = fragrance.family;
+  const longevity = fragrance.longevity ?? 2;
+  const notes = fragrance.notes ?? [];
+  const sweet = notes.filter(n => SWEET_NOTES.has(n)).length;
+  const fresh = notes.filter(n => FRESH_NOTES.has(n)).length;
+  const heavy = notes.filter(n => HEAVY_NOTES.has(n)).length;
+  let score = 0;
+
+  if (HEAT_BANDS.has(band)) {
+    if (family === 'fresh') score += 3;
+    else if (family === 'floral') score += 1.5;
+    else if (family === 'woody') score += band === 'dry-heat' ? 0.5 : -0.5;
+    else if (family === 'amber') score += -2;
+    else if (family === 'gourmand') score += band === 'humid-heat' || band === 'warm-humid' ? -3.5 : -2.5;
+    score += Math.min(2, fresh) * 0.6;
+    score -= Math.min(2, sweet) * (band === 'humid-heat' || band === 'warm-humid' ? 1.2 : 0.7);
+    score -= Math.min(2, heavy) * 0.8;
+    if (longevity >= 4) score -= 1.2; // heat already projects; skip eternal skins
+    if (longevity <= 2) score += 0.6;
+  } else if (COLD_BANDS.has(band)) {
+    if (family === 'gourmand') score += 2.5;
+    else if (family === 'amber') score += 2.2;
+    else if (family === 'woody') score += 1.5;
+    else if (family === 'floral') score += band === 'wet-cool' ? 0.3 : -0.5;
+    else if (family === 'fresh') score += -2;
+    score += Math.min(2, sweet + heavy) * 0.5;
+    score -= Math.min(2, fresh) * 0.4;
+    if (longevity >= 3) score += 0.8;
+    if (longevity <= 1) score -= 0.8;
+    if (band === 'wet-cool' && (family === 'woody' || family === 'amber')) score += 0.6;
+  } else if (band === 'mild' || band === 'mild-warm') {
+    // Mild days keep season + occasion in charge; only soft nudges.
+    if (family === 'fresh' || family === 'floral') score += 0.4;
+    if (sweet >= 2 && band === 'mild-warm') score -= 0.4;
+  }
+  return score;
+}
+
+/** One plain-English why-this-bottle line for the weather reading. */
+export function weatherReason(fragrance, weather) {
+  if (!weather?.band || !fragrance) return '';
+  const { band, label } = weather;
+  if (HEAT_BANDS.has(band)) {
+    if (fragrance.family === 'fresh' || fragrance.family === 'floral') {
+      return `${label}: keeps it airy so heat does not turn the drydown syrupy.`;
+    }
+    if (fragrance.family === 'gourmand' || fragrance.family === 'amber') {
+      return `${label}: this one runs rich — go light on sprays, or pick something fresher.`;
+    }
+  }
+  if (COLD_BANDS.has(band)) {
+    if (fragrance.family === 'gourmand' || fragrance.family === 'amber' || fragrance.family === 'woody') {
+      return `${label}: cooler air wants a denser base so the trail still reads.`;
+    }
+    if (fragrance.family === 'fresh') {
+      return `${label}: a fresh one can vanish in the cold — consider something warmer.`;
+    }
+  }
+  return `${label}: season and calendar still lead; weather is a soft nudge.`;
 }
 
 const GYM = /\b(gym|workout|training|run|swim|pilates|yoga|boxing|lift)\b/i;
@@ -93,17 +202,18 @@ export function dayAnchors(events = []) {
 /**
  * Today's scent plan: what to spray, when it fades, and whether to change for the evening.
  * `index` steps through alternatives ("Not feeling it").
+ * Optional `weather` (classifyWeather result) tilts day/night ranking for the climate.
  */
-export function planScentDay({ date, events = [], fragrances = FRAGRANCES, index = 0, lastWorn = null } = {}) {
+export function planScentDay({ date, events = [], fragrances = FRAGRANCES, index = 0, lastWorn = null, weather = null } = {}) {
   const season = sydneySeason(date);
   const anchors = dayAnchors(events);
   const gym = anchors.find(a => a.kind === 'gym');
   const evening = anchors.find(a => a.kind === 'evening');
   const firstDay = anchors.find(a => a.kind !== 'evening');
 
-  const dayRank = rankScents({ fragrances, season, time: 'D', occasion: 'Casual', lastWorn });
+  const dayRank = rankScents({ fragrances, season, time: 'D', occasion: 'Casual', lastWorn, weather });
   const eveningOccasion = evening ? (FORMAL.test(evening.title) ? 'Formal' : DATE.test(evening.title) ? 'Date Night' : 'Casual') : 'Date Night';
-  const nightRankAll = rankScents({ fragrances, season, time: 'N', occasion: eveningOccasion });
+  const nightRankAll = rankScents({ fragrances, season, time: 'N', occasion: eveningOccasion, weather });
   // Keep the evening scent for the evening: the day list skips whichever bottle the evening would pick.
   const nightDefault = evening ? nightRankAll[0] : null;
   const dayChoices = dayRank.filter(f => f !== nightDefault);
@@ -132,14 +242,26 @@ export function planScentDay({ date, events = [], fragrances = FRAGRANCES, index
         ? { title: `Fades around ${formatHour(fadeAt)}`, body: 'One more spray at lunch carries it to the end of the day.' }
         : { title: `Lasts to ${formatHour(Math.min(fadeAt, 22))}`, body: 'One spray covers the whole day.' }
   ];
+  if (weather?.label) {
+    notes.splice(1, 0, { title: `Sydney · ${weather.label}`, body: weatherReason(day, weather) });
+  }
   if (evening && night) {
     notes.push({ title: `${formatHour(swapAt)} · change for ${evening.title}`, body: `${night.name} tonight.${night.quote ? ` ${night.quote}` : ''}` });
   } else {
     notes.push({ title: 'Free evening', body: 'Nothing on tonight, so nothing to change.' });
   }
 
+  const line = gym && fadeAt <= gym.hour
+    ? `About ${hours} hours on skin, so it's worn off before ${proseNote(gym.title)}.`
+    : fadeAt >= 15
+    ? `Lasts about ${hours} hours, so one spray at ${formatHour(sprayAt)} carries you through the working day.`
+    : hours >= 5
+      ? `About ${hours} hours on skin. A top-up at lunch takes it to the end of the day.`
+      : `A lighter one: about ${hours} hours. Keep it in your bag for a lunchtime top-up.`;
+
   return {
     season,
+    weather,
     day,
     night,
     dayChoiceCount: dayChoices.length,
@@ -149,13 +271,8 @@ export function planScentDay({ date, events = [], fragrances = FRAGRANCES, index
     hours,
     anchors,
     notes,
-    line: gym && fadeAt <= gym.hour
-      ? `About ${hours} hours on skin, so it's worn off before ${proseNote(gym.title)}.`
-      : fadeAt >= 15
-      ? `Lasts about ${hours} hours, so one spray at ${formatHour(sprayAt)} carries you through the working day.`
-      : hours >= 5
-        ? `About ${hours} hours on skin. A top-up at lunch takes it to the end of the day.`
-        : `A lighter one: about ${hours} hours. Keep it in your bag for a lunchtime top-up.`
+    line,
+    weatherLine: weather ? weatherReason(day, weather) : ''
   };
 }
 
@@ -319,4 +436,140 @@ export function looksForColour(colour) {
   const target = luminance(GARMENT_COLOURS[colour]);
   const near = [...LOOKS].sort((a, b) => Math.abs(luminance(GARMENT_COLOURS[a.top[0]]) - target) - Math.abs(luminance(GARMENT_COLOURS[b.top[0]]) - target)).slice(0, 3);
   return { exact: false, looks: near };
+}
+
+// ---------------- Combo wheel (scent science) ----------------
+// Compact Edwards-style wheel using the five families already on the shelf.
+// Adjacent families share bridge molecules; opposites clash unless notes bridge them.
+// Layering: denser/longer base first, lighter accent second (volatility order).
+export const WHEEL_FAMILIES = ['fresh', 'floral', 'gourmand', 'amber', 'woody'];
+
+const BRIDGE_NOTES = new Set([
+  'Vanilla', 'Musk', 'Ambroxan', 'ISO E Super', 'Sandalwood', 'Cedarwood', 'Cashmeran',
+  'Bergamot', 'Rose', 'Jasmine', 'Amber', 'Tonka Bean', 'Patchouli', 'Iris', 'Cardamom'
+]);
+const CLASH_PAIRS = [
+  ['Oud', 'Lemon'], ['Oud', 'Marine'], ['Oud', 'Sea Notes'],
+  ['Praline', 'Marine'], ['Cocoa', 'Marine'], ['Leather', 'Coconut']
+];
+
+export function familyWheelDistance(a, b) {
+  const i = WHEEL_FAMILIES.indexOf(a);
+  const j = WHEEL_FAMILIES.indexOf(b);
+  if (i < 0 || j < 0) return 2;
+  const d = Math.abs(i - j);
+  return Math.min(d, WHEEL_FAMILIES.length - d);
+}
+
+function sharedNotes(a, b) {
+  const set = new Set(a.notes.map(n => n.toLowerCase()));
+  return b.notes.filter(n => set.has(n.toLowerCase()));
+}
+
+function hasClash(a, b) {
+  const notes = new Set([...a.notes, ...b.notes]);
+  return CLASH_PAIRS.some(([x, y]) => notes.has(x) && notes.has(y));
+}
+
+/** How well two bottles layer: higher is better. Same bottle scores −Infinity. */
+export function comboScore(a, b) {
+  if (!a || !b || a.name === b.name) return -Infinity;
+  const dist = familyWheelDistance(a.family, b.family);
+  const shared = sharedNotes(a, b);
+  const bridges = shared.filter(n => BRIDGE_NOTES.has(n));
+  const weightGap = Math.abs((a.longevity ?? 2) - (b.longevity ?? 2));
+  let score = 0;
+  if (dist === 0) score += 1.4; // same family: safe, a little flat
+  else if (dist === 1) score += 4.4; // adjacent on the wheel — primary rule
+  else if (dist === 2) score += bridges.length ? 1.2 : -0.4;
+  // Bridges help most when families already sit near each other.
+  score += Math.min(3, bridges.length) * (dist <= 1 ? 0.9 : 0.45);
+  score += Math.min(2, shared.length - bridges.length) * 0.25;
+  if (weightGap >= 1 && weightGap <= 3) score += 1.1; // base + accent contrast
+  if (weightGap === 0 && dist === 0) score -= 0.8; // twin weight + family = muddy
+  if (hasClash(a, b)) score -= 4;
+  // Two dense sweets stack into candy fog.
+  const bothSweet = [a, b].every(f => f.family === 'gourmand' || (f.notes.filter(n => SWEET_NOTES.has(n)).length >= 2 && (f.longevity ?? 2) >= 3));
+  if (bothSweet) score -= 2.2;
+  // Fresh + heavy gourmand is a long reach unless the wheel already called it adjacent.
+  if (dist >= 2 && [a.family, b.family].includes('fresh') && [a.family, b.family].includes('gourmand')) score -= 1.4;
+  // Adam's hard pass.
+  if ([...a.notes, ...b.notes].some(n => n.toLowerCase() === 'oud')) score -= 1.5;
+  score += ((a.rating ?? 0) + (b.rating ?? 0)) / 40;
+  return score;
+}
+
+/** Spray order: denser / longer first, lighter accent second. */
+export function layerOrder(a, b) {
+  const wa = (a.longevity ?? 2) + (a.notes.filter(n => HEAVY_NOTES.has(n)).length) * 0.4;
+  const wb = (b.longevity ?? 2) + (b.notes.filter(n => HEAVY_NOTES.has(n)).length) * 0.4;
+  return wa >= wb ? [a, b] : [b, a];
+}
+
+function comboWhy(a, b, score) {
+  const [base, accent] = layerOrder(a, b);
+  const dist = familyWheelDistance(a.family, b.family);
+  const shared = sharedNotes(a, b);
+  const bridges = shared.filter(n => BRIDGE_NOTES.has(n));
+  const parts = [];
+  if (dist === 1) parts.push(`${FAMILY_LABEL_SHORT[a.family]} sits next to ${FAMILY_LABEL_SHORT[b.family]} on the wheel`);
+  else if (dist === 0) parts.push(`both ${FAMILY_LABEL_SHORT[a.family]}, so they speak the same language`);
+  else if (bridges.length) parts.push(`${listOf(bridges.slice(0, 2).map(proseNote))} bridges the gap`);
+  else parts.push('a longer reach across the wheel');
+  if (bridges.length && dist === 1) parts.push(`shared ${proseNote(bridges[0])} keeps the join clean`);
+  parts.push(`spray ${base.name} first, then ${accent.name}`);
+  const verdict = score >= 5 ? 'Strong layer' : score >= 3.2 ? 'Worth a try' : score >= 1.5 ? 'Soft match' : 'Risky';
+  return { base, accent, shared: shared.slice(0, 4), bridges: bridges.slice(0, 3), verdict, why: parts.join(' · ') };
+}
+
+const FAMILY_LABEL_SHORT = {
+  fresh: 'fresh',
+  floral: 'floral',
+  gourmand: 'gourmand',
+  amber: 'amber',
+  woody: 'woody'
+};
+
+/** Best partners for one bottle from the owned shelf. */
+export function combosFor(base, { fragrances = FRAGRANCES, limit = 3 } = {}) {
+  return owned(fragrances)
+    .filter(f => f.name !== base.name)
+    .map(partner => {
+      const score = comboScore(base, partner);
+      return { partner, score, ...comboWhy(base, partner, score) };
+    })
+    .filter(c => Number.isFinite(c.score))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+}
+
+/** Top shelf pairings overall (unique unordered pairs). */
+export function topCombos({ fragrances = FRAGRANCES, limit = 6 } = {}) {
+  const bottles = owned(fragrances);
+  const seen = new Set();
+  const pairs = [];
+  for (let i = 0; i < bottles.length; i++) {
+    for (let j = i + 1; j < bottles.length; j++) {
+      const a = bottles[i], b = bottles[j];
+      const score = comboScore(a, b);
+      if (score < 2.5) continue;
+      const key = [a.name, b.name].sort().join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pairs.push({ a, b, score, ...comboWhy(a, b, score) });
+    }
+  }
+  return pairs.sort((x, y) => y.score - x.score).slice(0, limit);
+}
+
+/** Polar placement on the family wheel: angle by family wedge, radius by warmth. */
+export function placeOnWheel(fragrance) {
+  const i = Math.max(0, WHEEL_FAMILIES.indexOf(fragrance.family));
+  const wedge = (Math.PI * 2) / WHEEL_FAMILIES.length;
+  const h = hash(fragrance.name);
+  const jitter = ((h % 100) / 100 - 0.5) * wedge * 0.55;
+  const angle = -Math.PI / 2 + i * wedge + wedge / 2 + jitter;
+  const warmth = Math.max(-2, Math.min(2, axis(fragrance.notes, WARMTH)));
+  const radius = 0.42 + ((warmth + 2) / 4) * 0.38 + (((h >> 8) % 100) / 100) * 0.08;
+  return { angle, radius, familyIndex: i };
 }

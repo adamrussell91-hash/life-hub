@@ -3,20 +3,28 @@ import assert from 'node:assert/strict';
 import { FRAGRANCES, REFERENCE_FRAGRANCES } from '../../apps/life/js/app/aesthetics/fragrance-library.js';
 import { GARMENT_COLOURS, LOOKS, SNAP_SAMPLES } from '../../apps/life/js/app/aesthetics/dress-looks.js';
 import {
+  classifyWeather,
+  comboScore,
+  combosFor,
   dayAnchors,
   dominantColour,
+  familyWheelDistance,
   formatHour,
   judgeNotes,
+  layerOrder,
   lookForScent,
   lookRules,
   looksForColour,
   mapInsight,
   nearestGarmentColour,
   placeOnMap,
+  placeOnWheel,
   planScentDay,
   rankScents,
   resolveQuery,
-  sydneySeason
+  sydneySeason,
+  topCombos,
+  weatherAffinity
 } from '../../apps/life/js/app/aesthetics/aesthetics-model.js';
 
 const SAMPLE_DAY = [
@@ -145,4 +153,44 @@ test('snap: colour sampling names the garment and finds looks', () => {
   assert.equal(looksForColour('burgundy').exact, true);
   assert.equal(looksForColour('burgundy').looks.length, 2);
   assert.equal(looksForColour('tan').exact, true);
+});
+
+test('weather bands prefer fresh in muggy heat and dense bases in the cold', () => {
+  const heat = classifyWeather({ tempC: 31, humidity: 78, precipMm: 0, weatherCode: 1 });
+  assert.equal(heat.band, 'humid-heat');
+  const cold = classifyWeather({ tempC: 9, humidity: 60, precipMm: 1.2, weatherCode: 61 });
+  assert.equal(cold.band, 'wet-cool');
+  const neon = FRAGRANCES.find(f => f.name === 'Neon');
+  const khamrah = FRAGRANCES.find(f => f.name === 'Khamrah');
+  assert.ok(weatherAffinity(neon, heat) > weatherAffinity(khamrah, heat));
+  assert.ok(weatherAffinity(khamrah, cold) > weatherAffinity(neon, cold));
+  const hotRank = rankScents({ season: 'Su', time: 'D', weather: heat });
+  assert.ok(hotRank.slice(0, 4).every(f => f.family === 'fresh' || f.family === 'floral'));
+  const hotPlan = planScentDay({ date: '2026-01-15', events: [], weather: heat });
+  assert.ok(['fresh', 'floral'].includes(hotPlan.day.family));
+  assert.match(hotPlan.weatherLine, /muggy heat|airy|heat/i);
+  assert.ok(hotPlan.notes.some(n => /Sydney/.test(n.title)));
+});
+
+test('combo wheel scores adjacent families and orders denser bottles first', () => {
+  assert.equal(familyWheelDistance('fresh', 'woody'), 1);
+  assert.equal(familyWheelDistance('fresh', 'floral'), 1);
+  assert.equal(familyWheelDistance('fresh', 'amber'), 2);
+  const neon = FRAGRANCES.find(f => f.name === 'Neon');
+  const liaisons = FRAGRANCES.find(f => f.name === 'Liaisons Dangereuses');
+  const irish = FRAGRANCES.find(f => f.name === 'Irish Creme');
+  const asad = FRAGRANCES.find(f => f.name === 'Asad');
+  assert.ok(comboScore(neon, liaisons) > comboScore(neon, irish), 'adjacent floral beats distant gourmand for Neon');
+  const [base, accent] = layerOrder(irish, neon);
+  assert.equal(base.name, 'Irish Creme');
+  assert.equal(accent.name, 'Neon');
+  const picks = combosFor(neon, { limit: 3 });
+  assert.equal(picks.length, 3);
+  assert.ok(picks.every(p => p.partner.name !== 'Neon'));
+  assert.ok(picks[0].score >= picks.at(-1).score);
+  assert.match(picks[0].why, /spray .+ first/i);
+  const tops = topCombos({ limit: 4 });
+  assert.ok(tops.length >= 3);
+  assert.ok(placeOnWheel(asad).radius > 0.4);
+  assert.ok(Number.isFinite(placeOnWheel(neon).angle));
 });
