@@ -30,7 +30,11 @@ describe('renderDayList marked safe', () => {
       ...trip,
       items: trip.items.map((i) =>
         i.id === item.id
-          ? ({ ...i, safe_at: '2027-03-04T15:30:00.000Z', safe_photo_id: 'tph_abc' } as Item)
+          ? ({
+              ...i,
+              safe_at: '2027-03-04T15:30:00.000Z',
+              safe_photo_id: 'tph_abc'
+            } as Item & { safe_at: string; safe_photo_id: string })
           : i
       )
     };
