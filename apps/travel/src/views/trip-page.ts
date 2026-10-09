@@ -1,5 +1,5 @@
-import type { City, Trip } from '@/types';
-import { getTrip } from '@/api/travel';
+import type { City, Item, Trip } from '@/types';
+import { addCheckin, getTrip, uploadTravelPhoto } from '@/api/travel';
 import {
   buildTodo,
   daysForCity,
@@ -17,6 +17,7 @@ import { renderDayList } from '@/views/day-list';
 import { renderAddForm } from '@/components/add-form';
 import { renderCityDatesForm } from '@/components/city-dates-form';
 import { renderCityForm } from '@/components/city-form';
+import { renderSafePhotoSheet } from '@/components/safe-photo-sheet';
 import { renderTakeMeHome } from '@/components/take-me-home';
 import { renderShareSheet } from '@/components/share-sheet';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
@@ -345,7 +346,8 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
         onSelect: (itemId) => dayMapHandle?.selectStop(itemId),
         onEdit: (item) => openForm(item),
         onAddAt: (cityId, date) => openForm(undefined, cityId, date),
-        onTellPenelope: (prompt) => writePenelopeHandoff(trip, city.id, selectedDate, prompt)
+        onTellPenelope: (prompt) => writePenelopeHandoff(trip, city.id, selectedDate, prompt),
+        onMarkSafe: (item, mode) => openSafeMark(item, mode)
       });
       dayMapHandle?.destroy();
       dayMapHandle = null;
@@ -452,6 +454,40 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
         const city = _updated.cities.find((c) => c.id === cityId);
         const date = city?.start_date ?? trip.start_date;
         location.hash = `#/trip/${encodeURIComponent(tripId)}/${encodeURIComponent(cityId)}/${date}`;
+      }
+    });
+  }
+
+  async function markItemSafe(item: Item, photoId?: string): Promise<void> {
+    const saved = await addCheckin(tripId, {
+      city_id: item.city_id,
+      label: photoId ? `Photo · ${item.title}` : `Safe · ${item.title}`,
+      item_id: item.id,
+      photo_id: photoId,
+      if_version: version
+    });
+    trip = saved.trip;
+    version = saved.version;
+    renderCityScene();
+  }
+
+  function openSafeMark(item: Item, mode: 'mark' | 'photo'): void {
+    // One-tap mark safe; photo opens the sheet.
+    if (mode === 'mark') {
+      void markItemSafe(item).catch((err) => {
+        window.alert(err instanceof Error ? err.message : 'Could not mark safe.');
+      });
+      return;
+    }
+    const formHost = document.createElement('div');
+    document.body.append(formHost);
+    renderSafePhotoSheet(formHost, {
+      item,
+      onClose: () => formHost.remove(),
+      onConfirm: async (file) => {
+        const uploaded = await uploadTravelPhoto(tripId, file);
+        await markItemSafe(item, uploaded.photo_id);
+        formHost.remove();
       }
     });
   }

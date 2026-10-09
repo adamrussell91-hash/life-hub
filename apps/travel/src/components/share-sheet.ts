@@ -19,7 +19,8 @@ export function renderShareSheet(host: HTMLElement, options: ShareSheetOptions):
   const title = document.createElement('h3');
   title.textContent = 'Public link';
   const info = document.createElement('p');
-  info.textContent = 'They see: titles, times, places and check-ins. Hidden: prices, booking references, links and private items.';
+  info.textContent =
+    'They see: titles, times, places, safe ticks (with the time you marked them) and any place photos you share. Hidden: prices, booking references, links and private items.';
   sheet.append(title, info);
 
   const linkBox = document.createElement('div');

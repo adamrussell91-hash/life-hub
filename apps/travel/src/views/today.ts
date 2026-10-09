@@ -105,7 +105,7 @@ export async function renderTodayView(canvas: HTMLElement, options: TodayOptions
   safeBtn.addEventListener('click', async () => {
     try {
       const { addCheckin } = await import('@/api/travel');
-      await addCheckin(trip.id, city.id, 'Safe check-in');
+      await addCheckin(trip.id, { city_id: city.id, label: 'Safe check-in' });
       const nowLocal = formatInZone(new Date(), city.tz);
       const nowHome = formatInZone(new Date(), trip.home_tz);
       safeStatus.textContent = `Checked in ${nowLocal} ${city.name} · ${nowHome} Sydney`;

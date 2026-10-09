@@ -1,4 +1,5 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from '@/api/client';
+import { ApiClientError, apiDelete, apiGet, apiPatch, apiPost, parseApiResponse } from '@/api/client';
+import { getApiBaseUrl } from '@/api/config';
 import type { Checkin, Item, ItemDraft, Place, Trip, TripSummary } from '@/types';
 
 export interface TripEnvelope {
@@ -62,8 +63,35 @@ export function removeItem(tripId: string, itemId: string, ifVersion: string): P
   );
 }
 
-export function addCheckin(tripId: string, cityId: string, label: string): Promise<TripEnvelope> {
-  return apiPost(`/api/travel-checkins?trip=${encodeURIComponent(tripId)}`, { city_id: cityId, label });
+export function addCheckin(
+  tripId: string,
+  body: { city_id: string; label: string; item_id?: string; photo_id?: string; if_version?: string }
+): Promise<TripEnvelope> {
+  return apiPost(`/api/travel-checkins?trip=${encodeURIComponent(tripId)}`, body);
+}
+
+export async function uploadTravelPhoto(tripId: string, file: File): Promise<{ photo_id: string }> {
+  const form = new FormData();
+  form.append('file', file);
+  const response = await fetch(`${getApiBaseUrl()}/api/travel-photo?trip=${encodeURIComponent(tripId)}`, {
+    method: 'POST',
+    body: form,
+    credentials: 'include'
+  });
+  const result = await parseApiResponse<{ photo_id: string }>(response);
+  if (!result.ok) {
+    throw new ApiClientError(result.error, response.status, result.data);
+  }
+  if (!result.data?.photo_id) {
+    throw new ApiClientError({ code: 'invalid_response', message: 'Photo upload failed.' }, response.status);
+  }
+  return { photo_id: result.data.photo_id };
+}
+
+export function travelPhotoUrl(photoId: string, shareToken?: string | null): string {
+  const params = new URLSearchParams({ id: photoId });
+  if (shareToken) params.set('token', shareToken);
+  return `${getApiBaseUrl()}/api/travel-photo?${params.toString()}`;
 }
 
 export function createShareLink(tripId: string): Promise<{ url: string }> {
@@ -76,8 +104,11 @@ export function revokeShareLink(tripId: string): Promise<{ enabled: false }> {
 
 export interface PublicTrip {
   trip: Omit<Trip, 'items' | 'checkins' | 'share'> & {
-    items: Item[];
-    last_checkin: (Pick<Checkin, 'at'> & { city_name: string; label: string }) | null;
+    items: Array<Item & { safe_at?: string; safe_photo_id?: string }>;
+    last_checkin: (Pick<Checkin, 'at' | 'item_id' | 'photo_id'> & {
+      city_name: string;
+      label: string;
+    }) | null;
   };
 }
 

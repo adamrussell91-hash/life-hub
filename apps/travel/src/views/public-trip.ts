@@ -79,11 +79,15 @@ export async function renderPublicTrip(root: HTMLElement, token: string): Promis
       btn.type = 'button';
       btn.className = 'daybtn';
       btn.textContent = date.slice(8, 10);
-      btn.addEventListener('click', () => renderDayList(dayHost, trip as never, city.id, date, { isPublic: true }));
+      btn.addEventListener('click', () =>
+        renderDayList(dayHost, trip as never, city.id, date, { isPublic: true, shareToken: token })
+      );
       dayBar.append(btn);
     }
     citySection.append(dayBar, dayHost);
-    if (dates[0]) renderDayList(dayHost, trip as never, city.id, dates[0], { isPublic: true });
+    if (dates[0]) {
+      renderDayList(dayHost, trip as never, city.id, dates[0], { isPublic: true, shareToken: token });
+    }
   }
 
   worldMap.onSelect(showCity);
