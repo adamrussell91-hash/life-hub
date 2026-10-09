@@ -4,6 +4,7 @@ import { itemsForCityDay, orderDayItems } from '@/model/day';
 import { renderScene } from '@/scenes';
 import { renderDayList } from '@/views/day-list';
 import { formatInZone } from '@/lib/time';
+import { pickPrimaryTrip } from '@/lib/pick-trip';
 
 export interface TodayOptions {
   isCurrent: () => boolean;
@@ -26,7 +27,7 @@ export async function renderTodayView(canvas: HTMLElement, options: TodayOptions
     canvas.append(empty);
     return;
   }
-  const summary = trips[0]!;
+  const summary = pickPrimaryTrip(trips)!;
   const { trip } = await getTrip(summary.id);
   if (!options.isCurrent()) return;
 
