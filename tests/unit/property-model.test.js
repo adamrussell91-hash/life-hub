@@ -8,15 +8,18 @@ import {
   financialYear,
   focusFinancialYear,
   guessFromText,
+  interestBearing,
   markLodged,
   normalizeEntry,
   parsePropertyRecord,
   payoff,
   removeEntry,
   simulateFuture,
+  stepLoanWeek,
   taxYearSummary,
   updateSettings,
-  weeklyFlow
+  weeklyFlow,
+  weeklyInterestOn
 } from '../../apps/life/js/app/property-model.js';
 
 // Synthetic property: tenanted from 10/01/26, statements on the 12th and 28th.
@@ -93,11 +96,14 @@ test('updateSettings patches known fields only and clears yearly costs', () => {
 });
 
 test('weeklyFlow splits the repayment into interest and money that goes into the house', () => {
-  const flow = weeklyFlow(fixture(), '2026-10-08');
+  const record = fixture();
+  const flow = weeklyFlow(record, '2026-10-08');
+  const model = buildPropertyModel(record, { today: '2026-10-08' });
+  const expectedInterest = weeklyInterestOn(model.loan.position.today, { rate: 5.5, offset: null });
   assert.equal(flow.rent, 500);
   assert.equal(Math.round(flow.agent * 100) / 100, 40);
   assert.equal(Math.round(flow.rates * 100) / 100, 60);
-  assert.equal(Math.round(flow.interest * 100) / 100, Math.round(((2400 * 12) / 52) * 100) / 100);
+  assert.equal(Math.round(flow.interest * 100) / 100, Math.round(expectedInterest * 100) / 100);
   assert.equal(Math.round((flow.interest + flow.principal) * 100) / 100, 800);
   assert.equal(Math.round(flow.pocket * 100) / 100, Math.round((flow.outflow - 500) * 100) / 100);
   assert.ok(Math.abs(flow.real - flow.holding * 0.7) < 1e-9);
@@ -105,6 +111,27 @@ test('weeklyFlow splits the repayment into interest and money that goes into the
   const extra = weeklyFlow(fixture(), '2026-10-08', { extra: 100, rent: 550 });
   assert.equal(Math.round((extra.principal - flow.principal) * 100) / 100, 100);
   assert.equal(extra.rent, 550);
+});
+
+test('offset capacity reduces interest to the rate on (loan − offset)', () => {
+  assert.equal(interestBearing(600_000, 100_000), 500_000);
+  assert.equal(interestBearing(80_000, 100_000), 0);
+  assert.ok(Math.abs(weeklyInterestOn(520_000, { rate: 5.2, offset: 20_000 }) - (500_000 * 0.052) / 52) < 1e-9);
+  assert.equal(stepLoanWeek(100_000, { rate: 5.2, offset: 100_000, repayment: 100_000 }), 0);
+  assert.equal(stepLoanWeek(100_000, { rate: 5.2, offset: 100_000, repayment: 200 }), 99_800);
+
+  const record = updateSettings(fixture(), { loan: { offset: 100_000 } }).record;
+  const without = weeklyFlow(fixture(), '2026-10-08');
+  const withOffset = weeklyFlow(record, '2026-10-08');
+  assert.ok(withOffset.interest < without.interest);
+  assert.ok(withOffset.offsetSaving > 0);
+  assert.equal(withOffset.offset, 100_000);
+  assert.equal(withOffset.bearing, interestBearing(buildPropertyModel(record, { today: '2026-10-08' }).loan.position.today, 100_000));
+
+  const base = payoff({ balance: 400_000, weeklyRepayment: 800, rate: 5.2, offset: 0 });
+  const faster = payoff({ balance: 400_000, weeklyRepayment: 800, rate: 5.2, offset: 80_000 });
+  assert.ok(faster.weeks < base.weeks);
+  assert.ok(faster.interest < base.interest);
 });
 
 test('financial years and the focus year follow lodging', () => {
@@ -120,13 +147,15 @@ test('financial years and the focus year follow lodging', () => {
 });
 
 test('taxYearSummary estimates unrecorded interest and spots the swing', () => {
-  const summary = taxYearSummary(fixture(), '2026-10-08');
+  const record = fixture();
+  const summary = taxYearSummary(record, '2026-10-08');
   assert.equal(summary.fy.label, '2025-26');
   assert.equal(summary.income, 12000);
   assert.equal(summary.agentCosts, 960);
   assert.deepEqual(summary.missingMonths, ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06']);
-  // January is part-rented (from the 10th), so it counts as ~70% of a month.
-  assert.ok(summary.interestEstimate > 2400 * 5.6 && summary.interestEstimate < 2400 * 5.8);
+  // Missing months use rate × (loan − offset). January is part-rented (~70% of a month).
+  const monthly = weeklyInterestOn(buildPropertyModel(record, { today: '2026-10-08' }).loan.position.today, { rate: 5.5 }) * 52 / 12;
+  assert.ok(summary.interestEstimate > monthly * 5.5 && summary.interestEstimate < monthly * 5.9);
   assert.equal(summary.interestRecorded, 0, 'pre-tenancy interest is not deductible');
   assert.equal(summary.recordedResult, 11040);
   assert.ok(summary.correctedResult < 0);
@@ -180,6 +209,7 @@ test('payoff gets shorter and cheaper with an extra repayment', () => {
   assert.ok(faster.interest < base.interest);
   assert.deepEqual(payoff({ balance: 400000, weeklyRepayment: 300, effWeekly: 0.001 }), { weeks: Infinity, interest: Infinity });
   assert.equal(payoff({ balance: null, weeklyRepayment: 800, effWeekly: 0.001 }), null);
+  assert.equal(payoff({ balance: 400000, weeklyRepayment: 800 }), null);
 });
 
 test('time machine grows value, runs the loan down and orders the milestones', () => {

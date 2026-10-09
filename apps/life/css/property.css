@@ -151,7 +151,7 @@
 .prop-tm .btn--ghost { color: var(--on-dark); background: transparent; border-color: var(--on-dark-line); }
 
 /* KPIs */
-.prop-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--hub-tile-gap, var(--space-3)); margin: var(--hub-tile-gap, var(--space-3)) 0 0; }
+.prop-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--hub-tile-gap, var(--space-3)); margin: var(--hub-tile-gap, var(--space-3)) 0 0; }
 .prop-kpi { padding: var(--space-4); }
 .prop-kpi dt { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: var(--text-xs); color: var(--muted); }
 .prop-kpi dd { margin: var(--space-2) 0 0; font-size: var(--text-lg); font-weight: var(--weight-bold); color: var(--depth); letter-spacing: var(--tracking-tight); }
@@ -311,7 +311,6 @@
   .prop-truth { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
   .prop-truth > div { padding: 0; border-left: 0; }
   .prop-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .prop-kpis > :last-child { grid-column: span 2; }
   .prop-tm { padding: var(--space-5); }
   .prop-tm__top { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
   .prop-tm__title { display: none; }

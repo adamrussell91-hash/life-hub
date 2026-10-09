@@ -17,6 +17,7 @@ import {
   guessFromText,
   pointAtYear,
   simulateFuture,
+  stepLoanWeek,
   sydneyDateKey,
   toTime,
   yearFraction
@@ -258,10 +259,10 @@ const SHELL = `
 `;
 
 const CHART_INFO = {
-  flow: { id: 'property-flow', title: 'Where the money goes', what: 'Each week, the rent plus what you top up, and where every dollar lands: interest, loan repayment, agent fees, rates and insurance. Hover a ribbon to trace it.', how: 'Interest is the average of your last three loan interest charges. Repayment is the rest of the weekly repayment and goes into the house. The real cost is interest plus running costs less rent, after tax back at your tax rate.' },
-  tax: { id: 'property-tax', title: 'Rental result', what: 'The rental result on your return: right of zero is taxable profit, left is a loss that lowers your other tax.', how: 'As recorded uses only what is on file. Corrected adds an estimate for each month of loan interest not yet recorded, plus yearly estimates for rates, insurance and depreciation where you have set them.' },
+  flow: { id: 'property-flow', title: 'Where the money goes', what: 'Each week, the rent plus what you top up, and where every dollar lands: interest, loan repayment, agent fees, rates and insurance. Hover a ribbon to trace it.', how: 'Interest is the stated rate on the loan balance less cash in the offset accounts. Without an offset figure, it falls back to the average of your last three loan interest charges. Repayment is the rest of the weekly repayment and goes into the house. The real cost is interest plus running costs less rent, after tax back at your tax rate.' },
+  tax: { id: 'property-tax', title: 'Rental result', what: 'The rental result on your return: right of zero is taxable profit, left is a loss that lowers your other tax.', how: 'As recorded uses only what is on file. Corrected adds an estimate for each month of loan interest not yet recorded (rate on the loan less offset when set), plus yearly estimates for rates, insurance and depreciation where you have set them.' },
   ledger: { id: 'property-ledger', title: 'Agent statements', what: 'Each bar is one agent statement: what reached you, and what the agent kept. Dashed bars are statements your usual cadence says should exist but are not recorded. Tap a bar for detail.', how: 'Expected dates come from the days of the month your last six statements arrived on.' },
-  loan: { id: 'property-loan', title: 'Balance and rate', what: 'Solid line: loan balances from your statements. Dashed: projected from your weekly repayment since the last recorded balance. The strip shows each rate.', how: 'The projection uses the interest you have actually been charged, so the offset accounts are already counted.' }
+  loan: { id: 'property-loan', title: 'Balance and rate', what: 'Solid line: loan balances from your statements. Dashed: projected from your weekly repayment since the last recorded balance. The strip shows each rate.', how: 'Interest each week is charged only on the loan less the cash in your offset accounts. Add the current offset total in Details so projections and the weekly money flow use it.' }
 };
 
 const SETTINGS_FIELDS = [
@@ -275,7 +276,8 @@ const SETTINGS_FIELDS = [
   ]],
   ['Loan', [
     ['loan.lender', 'Lender', 'text'], ['loan.reference', 'Loan reference', 'text'], ['loan.original', 'Original loan', 'money'],
-    ['loan.weeklyRepayment', 'Weekly repayment', 'money'], ['loan.rate', 'Interest rate (%)', 'number']
+    ['loan.weeklyRepayment', 'Weekly repayment', 'money'], ['loan.rate', 'Interest rate (%)', 'number'],
+    ['loan.offset', 'Offset accounts total', 'money']
   ]],
   ['Yearly costs', [
     ['annualCosts.council', 'Council rates', 'cost'], ['annualCosts.water', 'Water rates', 'cost'], ['annualCosts.insurance', 'Landlord and building insurance', 'cost'],
@@ -695,9 +697,12 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
     q('hero-line').innerHTML = pays
       ? `${escapeHtml(name)} pays you about <em>${money(-flow.real * k)}</em> ${period.word}`
       : `${escapeHtml(name)} costs you about <em>${money(flow.real * k)}</em> ${period.word}`;
+    const offsetLine = flow.offsetSaving > 0
+      ? ` Offset capacity of <b>${money(flow.offset)}</b> saves about <b>${money(flow.offsetSaving * k)}</b> ${period.word} in interest.`
+      : '';
     q('hero-why').innerHTML = flow.pocket > 0
-      ? `You put in <b>${money(flow.pocket * k)}</b> ${period.word} on top of the rent, but <b>${money(flow.principal * k)}</b> of that pays down the loan. That's savings, not cost. What's left is <b>${money(flow.holding * k)}</b>, and tax back at ${Math.round(flow.taxRate * 100)}% brings it to <b>${money(flow.real * k)}</b>.`
-      : `The rent covers every cost with <b>${money(-flow.pocket * k)}</b> ${period.word} to spare.`;
+      ? `You put in <b>${money(flow.pocket * k)}</b> ${period.word} on top of the rent, but <b>${money(flow.principal * k)}</b> of that pays down the loan. That's savings, not cost. What's left is <b>${money(flow.holding * k)}</b>, and tax back at ${Math.round(flow.taxRate * 100)}% brings it to <b>${money(flow.real * k)}</b>.${offsetLine}`
+      : `The rent covers every cost with <b>${money(-flow.pocket * k)}</b> ${period.word} to spare.${offsetLine}`;
     q('t-pocket').innerHTML = `${money(Math.max(flow.pocket, 0) * k)}<small>${period.suffix}</small>`;
     q('t-equity').innerHTML = `${money(flow.principal * k)}<small>${period.suffix}</small>`;
     q('t-real').innerHTML = `${money(flow.real * k)}<small>${period.suffix}</small>`;
@@ -776,8 +781,11 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
     const rent = currentRent(state.record, model.today);
     const last = model.lastStatement;
     const original = state.record.loan.original;
+    const offset = model.loan.offset;
+    const bearing = model.loan.bearing;
     const items = [
       { label: 'Loan today', pill: position.estimated ? 'est.' : '', value: position.today === null ? '—' : money(roundTo(position.today, 100)), note: position.known ? `Last statement ${formatDisplayDate(position.known.date)}: ${money(position.known.balance)}` : 'Record a loan statement' },
+      { label: 'Offset capacity', value: offset === null ? '—' : money(roundTo(offset, 100)), note: offset === null ? 'Add the total in your Bankwest offset accounts in Details' : bearing !== null ? `<span class="is-good">${money(roundTo(bearing, 100))}</span> still earning interest` : 'Linked offset accounts reduce interest' },
       { label: 'Paid off so far', pill: position.estimated ? 'est.' : '', value: position.paidOff === null ? '—' : money(roundTo(position.paidOff, 100)), note: original && position.paidOff !== null ? `<span class="is-good">${((position.paidOff / original) * 100).toFixed(1)}%</span> of the original loan` : 'Add the original loan in Details' },
       { label: 'Interest rate', value: model.loan.rate === null ? '—' : `${model.loan.rate.toFixed(2)}%`, note: model.loan.rateChange ? `<span class="${model.loan.rateChange < 0 ? 'is-good' : 'is-bad'}">${model.loan.rateChange > 0 ? '+' : '−'}${Math.abs(model.loan.rateChange).toFixed(2)} pts</span> since ${formatDisplayDate(model.loan.rateSince)}` : 'Record rate changes as they happen' },
       { label: 'Rent', value: rent === null ? '—' : `${money(rent * periodOf().mul)}${periodOf().suffix}`, pill: last?.periodTo && daysSince(last.periodTo) > 21 ? 'stale' : '', note: last?.periodTo ? `Paid to ${formatDisplayDate(last.periodTo)}` : 'Record an agent statement' },
@@ -955,11 +963,16 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
 
   function paintLoan() {
     const loan = state.record.loan;
-    q('loan-sub').textContent = [loan.lender && `${loan.lender} home loan`, loan.reference, loan.weeklyRepayment && `${money(loan.weeklyRepayment, 2)} a week`].filter(Boolean).join(' · ') || 'Add the loan in Details';
+    q('loan-sub').textContent = [
+      loan.lender && `${loan.lender} home loan`,
+      loan.reference,
+      loan.weeklyRepayment && `${money(loan.weeklyRepayment, 2)} a week`,
+      loan.offset !== null && `${money(loan.offset)} in offset`
+    ].filter(Boolean).join(' · ') || 'Add the loan in Details';
     const position = model.loan.position;
     const cuts = model.loan.rates.filter((rate, index, list) => index > 0 && rate.rate < list[index - 1].rate).length;
     q('loan-h').textContent = position.paidOff !== null && state.record.property.settledOn
-      ? `Down ${money(roundTo(position.paidOff, 100))} since ${formatDisplayDate(state.record.property.settledOn)}${cuts ? `, and ${cuts} rate cut${cuts === 1 ? '' : 's'}` : ''}`
+      ? `Down ${money(roundTo(position.paidOff, 100))} since ${formatDisplayDate(state.record.property.settledOn)}${cuts ? `, and ${cuts} rate cut${cuts === 1 ? '' : 's'}` : ''}${loan.offset ? `, with ${money(roundTo(loan.offset, 100))} offsetting interest` : ''}`
       : 'Record loan statements to draw the balance';
     const svg = q('glide');
     svg.replaceChildren();
@@ -978,13 +991,20 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
     const t1 = toTime(endKey);
     const sx = key => padL + ((toTime(key) - t0) / (t1 - t0)) * (width - padL - padR);
     const projection = [];
-    const eff = position.effWeekly ?? 0;
+    const rate = model.loan.rate;
+    const offset = loan.offset;
+    const eff = position.effWeekly;
     let balance = position.known?.balance ?? series.at(-1).balance;
     let cursor = position.known?.date ?? series.at(-1).date;
     while (cursor <= endKey) {
       projection.push({ date: cursor, balance });
       const extra = cursor >= model.today ? state.extra : 0;
-      balance = Math.max(0, balance * (1 + eff) - (state.record.loan.weeklyRepayment ?? 0) - extra);
+      balance = stepLoanWeek(balance, {
+        rate,
+        offset,
+        repayment: (state.record.loan.weeklyRepayment ?? 0) + extra,
+        effWeekly: eff
+      });
       cursor = addDays(cursor, 7);
     }
     const all = [...series.map(point => point.balance), ...projection.map(point => point.balance)];

@@ -114,7 +114,7 @@ export function emptyPropertyRecord() {
     version: PROPERTY_SCHEMA_VERSION,
     property: { name: 'Investment property', address: '', owners: [], settledOn: null, purchasePrice: null },
     tenancy: { tenant: '', startedOn: null, weeklyRent: null, agent: '', agentRate: null },
-    loan: { lender: '', reference: '', original: null, weeklyRepayment: null, rate: null },
+    loan: { lender: '', reference: '', original: null, weeklyRepayment: null, rate: null, offset: null },
     annualCosts: {},
     assumptions: { priceGrowth: 0.05, rentGrowth: 0.03, costGrowth: 0.03, taxRate: 0.32, depositTarget: 160_000 },
     lodgedYears: [],
@@ -177,7 +177,9 @@ export function parsePropertyRecord(raw) {
       reference: text(loan.reference, 80),
       original: num(loan.original),
       weeklyRepayment: num(loan.weeklyRepayment),
-      rate: num(loan.rate)
+      rate: num(loan.rate),
+      // Cash in linked offset accounts: interest is charged on max(0, balance − offset).
+      offset: num(loan.offset) === null ? null : Math.max(0, round2(num(loan.offset)))
     },
     annualCosts,
     assumptions: {
@@ -350,12 +352,51 @@ function interestProfile(record) {
   return { monthly, anchor, count: charges.length };
 }
 
-/** Effective weekly interest per dollar owed, from recent charges (captures the offset accounts). */
-function effectiveWeeklyRate(record, today) {
+/** Loan dollars that still earn interest after offset cash is applied. */
+export function interestBearing(balance, offset) {
+  if (balance === null || balance === undefined || !Number.isFinite(balance)) return null;
+  const parked = offset === null || offset === undefined || !Number.isFinite(offset) ? 0 : Math.max(0, offset);
+  return Math.max(0, balance - parked);
+}
+
+/**
+ * Weekly interest on a balance. Prefers the stated rate on (balance − offset).
+ * Falls back to recent charges only when there is no rate to apply.
+ */
+export function weeklyInterestOn(balance, { rate, offset = null, effWeekly = null } = {}) {
+  if (balance === null || balance === undefined || !Number.isFinite(balance) || balance <= 0) return 0;
+  if (rate !== null && rate !== undefined && Number.isFinite(rate) && rate > 0) {
+    return interestBearing(balance, offset) * (rate / 100) / WEEKS_PER_YEAR;
+  }
+  if (effWeekly !== null && Number.isFinite(effWeekly)) return balance * effWeekly;
+  return 0;
+}
+
+/** One week of loan run-down: interest (offset-aware) then repayment. */
+export function stepLoanWeek(balance, { rate, offset = null, repayment = 0, effWeekly = null } = {}) {
+  if (!balance || balance <= 0) return 0;
+  const interest = weeklyInterestOn(balance, { rate, offset, effWeekly });
+  return Math.max(0, balance + interest - (repayment || 0));
+}
+
+/** Fallback weekly rate from recent charges when the stated rate is missing. */
+function chargedWeeklyRate(record) {
   const { monthly, anchor } = interestProfile(record);
   if (monthly !== null && anchor?.balance) return (monthly * 12) / WEEKS_PER_YEAR / anchor.balance;
+  return null;
+}
+
+/** Effective weekly interest per dollar of the full loan (for UI notes; projections use stepLoanWeek). */
+function effectiveWeeklyRate(record, today) {
   const rate = currentRate(record, today);
-  return rate ? rate / 100 / WEEKS_PER_YEAR : null;
+  const offset = record.loan.offset;
+  const { anchor } = interestProfile(record);
+  const balance = anchor?.balance ?? record.loan.original;
+  if (rate && balance) {
+    const bearing = interestBearing(balance, offset);
+    return bearing > 0 ? (bearing / balance) * (rate / 100) / WEEKS_PER_YEAR : 0;
+  }
+  return chargedWeeklyRate(record) ?? (rate ? rate / 100 / WEEKS_PER_YEAR : null);
 }
 
 /** Last known loan balance and a projection to today. */
@@ -365,20 +406,41 @@ export function loanPosition(record, today) {
   const startDate = record.property.settledOn;
   const known = anchor ? { date: anchor.date, balance: anchor.balance } : original && startDate ? { date: startDate, balance: original } : null;
   const repayment = record.loan.weeklyRepayment;
+  const rate = currentRate(record, today);
+  const offset = record.loan.offset;
   const eff = effectiveWeeklyRate(record, today);
-  if (!known) return { known: null, today: null, estimated: false, paidOff: null, effWeekly: eff };
+  const charged = chargedWeeklyRate(record);
+  if (!known) {
+    return {
+      known: null,
+      today: null,
+      estimated: false,
+      paidOff: null,
+      effWeekly: eff,
+      offset,
+      bearing: null,
+      offsetFromCharges: false
+    };
+  }
   let balance = known.balance;
   const weeks = Math.max(0, Math.floor(daysBetween(known.date, today) / 7));
-  if (repayment && eff !== null) {
-    for (let i = 0; i < weeks && balance > 0; i++) balance = balance * (1 + eff) - repayment;
+  if (repayment && (rate || charged !== null)) {
+    for (let i = 0; i < weeks && balance > 0; i++) {
+      balance = stepLoanWeek(balance, { rate, offset, repayment, effWeekly: charged });
+    }
   }
   balance = Math.max(0, balance);
+  const bearing = interestBearing(balance, offset);
   return {
     known,
     today: round2(balance),
     estimated: weeks >= 5,
     paidOff: original ? round2(original - balance) : null,
-    effWeekly: eff
+    effWeekly: eff,
+    offset,
+    bearing: bearing === null ? null : round2(bearing),
+    // True when interest is inferred from old charges because no rate is set.
+    offsetFromCharges: !(rate > 0)
   };
 }
 
@@ -401,15 +463,18 @@ export function loanSeries(record) {
 }
 
 /** Weeks and interest to clear the loan from a balance, with optional extra weekly repayment. */
-export function payoff({ balance, weeklyRepayment, effWeekly, extra = 0 }) {
-  if (!balance || !weeklyRepayment || effWeekly === null || effWeekly === undefined) return null;
+export function payoff({ balance, weeklyRepayment, effWeekly, extra = 0, rate = null, offset = null }) {
+  if (!balance || !weeklyRepayment) return null;
+  const canCharge = (rate !== null && rate > 0) || (effWeekly !== null && effWeekly !== undefined);
+  if (!canCharge) return null;
   const pay = weeklyRepayment + extra;
-  if (balance * effWeekly >= pay) return { weeks: Infinity, interest: Infinity };
+  const firstCharge = weeklyInterestOn(balance, { rate, offset, effWeekly });
+  if (firstCharge >= pay) return { weeks: Infinity, interest: Infinity };
   let left = balance;
   let weeks = 0;
   let interest = 0;
   while (left > 0 && weeks < 5200) {
-    const charge = left * effWeekly;
+    const charge = weeklyInterestOn(left, { rate, offset, effWeekly });
     interest += charge;
     left = left + charge - pay;
     weeks++;
@@ -431,10 +496,18 @@ export function weeklyFlow(record, today, { extra = 0, rent: rentOverride } = {}
   const position = loanPosition(record, today);
   const { monthly } = interestProfile(record);
   const repayment = record.loan.weeklyRepayment ?? 0;
-  const interest = monthly !== null
-    ? (monthly * 12) / WEEKS_PER_YEAR
-    : position.today && position.effWeekly ? position.today * position.effWeekly : 0;
+  const rate = currentRate(record, today);
+  const offset = record.loan.offset;
+  // Prefer rate × (loan − offset). Historical charges only fill in when there is no rate.
+  const interest = rate && position.today !== null
+    ? weeklyInterestOn(position.today, { rate, offset })
+    : monthly !== null
+      ? (monthly * 12) / WEEKS_PER_YEAR
+      : position.today && position.effWeekly ? position.today * position.effWeekly : 0;
   const principal = Math.max(0, repayment - interest) + extra;
+  const offsetSaving = rate && position.today !== null && offset
+    ? weeklyInterestOn(position.today, { rate, offset: 0 }) - interest
+    : 0;
   const outflow = interest + principal + agent + rates + insuranceWeekly;
   const pocket = outflow - rent;
   const holding = interest + agent + rates + insuranceWeekly - rent;
@@ -453,8 +526,11 @@ export function weeklyFlow(record, today, { extra = 0, rent: rentOverride } = {}
     taxBack,
     real: holding - taxBack,
     taxRate,
+    offset,
+    offsetSaving: round2(offsetSaving),
+    bearing: position.bearing,
     gaps: {
-      interestEstimated: monthly === null,
+      interestEstimated: !(rate > 0) && monthly === null,
       councilEstimated: council.estimate || council.amount === null,
       waterEstimated: water.estimate || water.amount === null,
       insuranceMissing: insurance.amount === null
@@ -514,8 +590,16 @@ export function taxYearSummary(record, today, fy = focusFinancialYear(record, to
   const firstMonthShare = tenancy && missingMonths[0] === tenancy.slice(0, 7)
     ? Math.max(0, 1 - (Number(tenancy.slice(8, 10)) - 1) / MONTH_DAYS)
     : 1;
-  const interestEstimate = monthly !== null && missingMonths.length
-    ? round2(monthly * (missingMonths.length - 1 + firstMonthShare))
+  const rate = currentRate(record, today);
+  const offset = record.loan.offset;
+  const position = loanPosition(record, today);
+  // Missing months: rate × (loan − offset) when we know them; else average of recorded charges.
+  const monthlyFromOffset = rate && position.today !== null
+    ? weeklyInterestOn(position.today, { rate, offset }) * WEEKS_PER_YEAR / 12
+    : null;
+  const monthlyForEstimate = monthlyFromOffset ?? monthly;
+  const interestEstimate = monthlyForEstimate !== null && missingMonths.length
+    ? round2(monthlyForEstimate * (missingMonths.length - 1 + firstMonthShare))
     : 0;
 
   const expenses = ofKind(record, 'expense').filter(entry => inRange(entry.date, fy.start, fy.end) && entry.deductible && !entry.inStatement);
@@ -700,7 +784,9 @@ export function simulateFuture(record, today, { extra = 0, rent, value, priceGro
   const flow = weeklyFlow(record, today, { rent });
   const position = loanPosition(record, today);
   const repayment = (record.loan.weeklyRepayment ?? 0) + extra;
-  const eff = position.effWeekly ?? 0;
+  const rate = currentRate(record, today);
+  const offset = record.loan.offset;
+  const charged = chargedWeeklyRate(record);
   const runningCosts = flow.rates + flow.insurance;
   const startYear = yearFraction(today);
   const valueYears = (toTime(today) - toTime(valuation.date)) / (365.25 * DAY_MS);
@@ -713,7 +799,7 @@ export function simulateFuture(record, today, { extra = 0, rent, value, priceGro
     const worth = valueToday * Math.pow(1 + growth, years);
     const weeklyRent = flow.rent * Math.pow(1 + rentG, years);
     const net = weeklyRent * (1 - (record.tenancy.agentRate ?? 0)) - runningCosts * Math.pow(1 + costG, years);
-    const interest = loan > 0 ? loan * eff : 0;
+    const interest = weeklyInterestOn(loan, { rate, offset, effWeekly: charged });
     const pay = loan > 0 ? Math.min(repayment, loan + interest) : 0;
     series.push({ year: startYear + years, worth, loan: Math.max(0, loan), equity: worth - Math.max(0, loan), profit: net - interest, cash: net - pay });
     loan = loan + interest - pay;
@@ -772,11 +858,14 @@ export function buildPropertyModel(record, { today, extra = 0, rent } = {}) {
   const summary = taxYearSummary(record, today);
   const ledger = rentLedger(record, today);
   const position = loanPosition(record, today);
-  const repaymentPlan = payoff({ balance: position.today, weeklyRepayment: record.loan.weeklyRepayment, effWeekly: position.effWeekly, extra });
-  const basePlan = payoff({ balance: position.today, weeklyRepayment: record.loan.weeklyRepayment, effWeekly: position.effWeekly });
+  const rate = currentRate(record, today);
+  const offset = record.loan.offset;
+  const charged = chargedWeeklyRate(record);
+  const payoffOpts = { balance: position.today, weeklyRepayment: record.loan.weeklyRepayment, rate, offset, effWeekly: charged };
+  const repaymentPlan = payoff({ ...payoffOpts, extra });
+  const basePlan = payoff(payoffOpts);
   const rates = rateHistory(record);
   const firstRate = rates[0]?.rate ?? null;
-  const rate = currentRate(record, today);
   return {
     today,
     record,
@@ -789,6 +878,8 @@ export function buildPropertyModel(record, { today, extra = 0, rent } = {}) {
       series: loanSeries(record),
       rates,
       rate,
+      offset,
+      bearing: position.bearing,
       rateChange: firstRate !== null && rate !== null ? round2(rate - firstRate) : null,
       rateSince: rates[0]?.date ?? null,
       plan: repaymentPlan,
