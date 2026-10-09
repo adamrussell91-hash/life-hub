@@ -67,6 +67,44 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .world { position: relative; background: #cfe6f1; border-radius: var(--radius-lg); overflow: hidden; }
 .world > svg { display: block; width: 100%; height: auto; }
 .world .land { fill: #f7efdf; stroke: #e2d5bd; stroke-width: .6; }
+
+/* ---------- Passport countries map (homepage) ---------- */
+.passport {
+  position: relative;
+  background: var(--map-water);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  height: min(52vh, 420px);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.passport > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: pan-y;
+  cursor: grab;
+}
+.passport > svg:active { cursor: grabbing; }
+.passport.is-zoomed > svg { touch-action: none; }
+.passport-ocean { fill: var(--map-water); }
+.passport-country {
+  fill: var(--map-land);
+  stroke: var(--line);
+  stroke-width: 0.6;
+  cursor: default;
+}
+.passport-country.is-visited {
+  fill: var(--pastel-sage);
+  stroke: var(--success);
+  stroke-width: 0.9;
+  cursor: pointer;
+}
+.passport-country.is-visited:hover,
+.passport-country.is-visited.is-on {
+  fill: var(--pastel-sage-ink);
+  stroke: var(--navy);
+}
+.passport .zoom-ctl { top: 12px; bottom: auto; right: 12px; }
 .world .grat { fill: none; stroke: rgba(255,255,255,.55); stroke-width: .6; }
 .world .leg { fill: none; stroke: var(--navy); stroke-width: 2.4; stroke-linecap: round; }
 .world .leg.todo { stroke-dasharray: 2 7; stroke: #5d6f8a; }
@@ -475,4 +513,5 @@ body.map-open { overflow: hidden; }
   .status-chip { font-size: .75rem; }
   .world-foot { position: static; padding: 10px; }
   .ticket .iata { font-size: 1.5rem; }
+  .passport { height: min(42vh, 280px); }
 }
