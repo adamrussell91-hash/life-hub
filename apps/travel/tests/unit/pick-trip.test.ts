@@ -6,6 +6,7 @@ function trip(partial: Partial<TripSummary> & Pick<TripSummary, 'id' | 'start_da
   return {
     title: partial.title ?? partial.id,
     cities: partial.cities ?? [],
+    countries: partial.countries ?? [],
     ...partial
   };
 }

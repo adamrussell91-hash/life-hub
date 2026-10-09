@@ -199,12 +199,21 @@ export function makeId(prefix) {
 }
 
 export function tripSummary(trip) {
+  const countries = [];
+  const seen = new Set();
+  for (const city of trip.cities || []) {
+    const country = typeof city.country === 'string' ? city.country.trim() : '';
+    if (!country || seen.has(country)) continue;
+    seen.add(country);
+    countries.push(country);
+  }
   return {
     id: trip.id,
     title: trip.title,
     start_date: trip.start_date,
     end_date: trip.end_date,
-    cities: trip.cities.map((c) => c.name)
+    cities: (trip.cities || []).map((c) => c.name),
+    countries
   };
 }
 

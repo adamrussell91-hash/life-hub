@@ -80,13 +80,24 @@ export function createMockApi() {
     }
 
     if (path === '/api/travel-trips' && method === 'GET') {
-      const summaries = [...trips.values()].map((trip) => ({
-        id: trip.id,
-        title: trip.title,
-        start_date: trip.start_date,
-        end_date: trip.end_date,
-        cities: trip.cities.map((c) => c.name)
-      }));
+      const summaries = [...trips.values()].map((trip) => {
+        const countries: string[] = [];
+        const seen = new Set<string>();
+        for (const city of trip.cities || []) {
+          const country = typeof city.country === 'string' ? city.country.trim() : '';
+          if (!country || seen.has(country)) continue;
+          seen.add(country);
+          countries.push(country);
+        }
+        return {
+          id: trip.id,
+          title: trip.title,
+          start_date: trip.start_date,
+          end_date: trip.end_date,
+          cities: (trip.cities || []).map((c) => c.name),
+          countries
+        };
+      });
       return json(200, { ok: true, data: { trips: summaries } });
     }
     if (path === '/api/travel-trips' && method === 'POST') {

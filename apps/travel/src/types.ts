@@ -158,6 +158,7 @@ export interface TripSummary {
   start_date: IsoDate;
   end_date: IsoDate;
   cities: string[];
+  countries: string[];
 }
 
 export type MoneyDraft = { amount: number; currency: Currency };
