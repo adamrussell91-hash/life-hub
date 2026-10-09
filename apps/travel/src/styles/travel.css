@@ -92,6 +92,22 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .chip.is-on { background: var(--city); color: #fff; box-shadow: none; }
 .chip.is-on span { color: rgba(255,255,255,.85); }
 .chip .todo-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--high-sea); margin-left: 6px; vertical-align: 1px; }
+.chip--add { box-shadow: inset 0 0 0 1.5px dashed rgba(23,55,94,.28); background: transparent; }
+.chip--add b { color: var(--navy); }
+
+/* Trips list — multi-holiday home */
+.trips-list__cards { display: grid; gap: 10px; margin-top: 4px; }
+.trips-list__card { display: block; text-decoration: none; margin-top: 0; cursor: pointer; }
+.trips-list__card .chips { padding-top: 8px; overflow: visible; flex-wrap: wrap; }
+.trips-list__card .chip { cursor: inherit; min-width: 0; }
+.trips-list__new { margin-top: 18px; padding: 16px 16px 0; }
+.trips-list__form { display: flex; flex-direction: column; gap: 0; }
+.trips-list__form .addform__scroll { overflow: visible; }
+.trips-list__form .addform__actions { margin-top: 4px; }
+.trip-empty-cities { margin-top: 12px; padding: 18px 16px; cursor: default; }
+.trip-empty-cities .btn { margin-top: 12px; min-height: 2.75rem; }
+.place-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.place-suggestions .btn { font-size: .8125rem; min-height: 2.5rem; }
 
 /* To book */
 details.tobook { margin-top: 10px; background: var(--paper); border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--line); }

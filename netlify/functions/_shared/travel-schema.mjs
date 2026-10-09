@@ -143,7 +143,8 @@ export function validateTrip(trip) {
   requireDate(trip, 'end_date', 'end_date');
   requireString(trip, 'home_tz', 'home_tz');
   requireString(trip, 'followers_label', 'followers_label');
-  if (!Array.isArray(trip.cities) || trip.cities.length === 0) throw fail('cities', 'cities required');
+  // Empty cities allowed so a fresh trip can be created (title + dates) before cities are added.
+  if (!Array.isArray(trip.cities)) throw fail('cities', 'cities must be an array');
   if (!Array.isArray(trip.items)) throw fail('items', 'items must be an array');
   if (!Array.isArray(trip.days)) throw fail('days', 'days must be an array');
   if (!Array.isArray(trip.checkins)) throw fail('checkins', 'checkins must be an array');
