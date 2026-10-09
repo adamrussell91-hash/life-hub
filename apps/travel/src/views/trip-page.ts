@@ -105,6 +105,8 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
   addCityBtn.type = 'button';
   addCityBtn.className = 'btn ghost';
   addCityBtn.innerHTML = `${I.plus}Add city`;
+  // Empty trip: card CTA is the only Add city control (V3). Header appears once cities exist.
+  addCityBtn.hidden = trip.cities.length === 0;
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'btn';
@@ -169,12 +171,16 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       chip.addEventListener('click', () => selectCity(city.id));
       chips.append(chip);
     }
-    const addChip = document.createElement('button');
-    addChip.type = 'button';
-    addChip.className = 'chip chip--add';
-    addChip.innerHTML = `<b>Add city</b><span>Next stop</span>`;
-    addChip.addEventListener('click', () => openAddCity());
-    chips.append(addChip);
+    // When cities exist, the chip is the in-flow "next stop" affordance.
+    // Empty trips use the card CTA only (one Add city path — V3).
+    if (trip.cities.length > 0) {
+      const addChip = document.createElement('button');
+      addChip.type = 'button';
+      addChip.className = 'chip chip--add';
+      addChip.innerHTML = `<b>Add city</b><span>Next stop</span>`;
+      addChip.addEventListener('click', () => openAddCity());
+      chips.append(addChip);
+    }
   }
 
   function renderCityScene(): void {

@@ -113,7 +113,8 @@ export function renderWorldMap(host: HTMLElement, trip: Trip): WorldMapHandle {
 
   const projection = geoNaturalEarth1().rotate([-70, 0]);
   const stops = routeStops(trip);
-  if (stops.length > 0) {
+  // LineString fitExtent needs ≥2 points; a lone home stop (empty cities) NaNs.
+  if (stops.length >= 2) {
     const box = {
       type: 'Feature',
       geometry: {
@@ -132,7 +133,13 @@ export function renderWorldMap(host: HTMLElement, trip: Trip): WorldMapHandle {
       box as never
     );
   } else {
-    projection.fitSize([VIEW_W, VIEW_H], { type: 'Sphere' } as never);
+    projection.fitExtent(
+      [
+        [40, 50],
+        [VIEW_W - 90, VIEW_H - 90]
+      ],
+      { type: 'Sphere' } as never
+    );
   }
   const path = geoPath(projection);
 

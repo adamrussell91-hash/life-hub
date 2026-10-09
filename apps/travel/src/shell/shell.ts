@@ -156,20 +156,22 @@ function buildNavLink(item: NavItem, highlight: RailHighlight): HTMLAnchorElemen
 }
 
 function syncMobileChrome(shellRoot: HTMLElement, active: RailHighlight, tripHref: string, onAdd?: () => void | Promise<void>): void {
+  // Trip · Today · Trips on the bar so the list is reachable with one holiday;
+  // Add + Public live in More (multi-trip home needs Trips as a first-class dest).
   mountMobileChrome(shellRoot, {
     currentHub: 'life',
     primary: [
       { id: 'trip', label: 'Trip', paths: RAIL_ICON_PATHS.trip, href: tripHref, current: active === 'trip' },
       { id: 'today', label: 'Today', paths: RAIL_ICON_PATHS.today, href: '#/today', current: active === 'today' },
+      { id: 'trips', label: 'Trips', paths: RAIL_ICON_PATHS.trips, href: '#/', current: active === 'trips' }
+    ],
+    more: [
       {
         id: 'add',
         label: 'Add',
         paths: RAIL_ICON_PATHS.add,
         onSelect: () => onAdd?.()
-      }
-    ],
-    more: [
-      { id: 'trips', label: 'Trips', paths: RAIL_ICON_PATHS.trips, href: '#/' },
+      },
       { id: 'public', label: 'Public link', paths: RAIL_ICON_PATHS.trips, href: tripHref }
     ]
   });
