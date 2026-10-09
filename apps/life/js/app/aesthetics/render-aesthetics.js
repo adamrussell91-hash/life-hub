@@ -11,7 +11,9 @@ import { GARMENT_COLOURS, LOOKS, SNAP_SAMPLES } from './dress-looks.js';
 import { renderSourceReference } from './render-source-reference.js';
 import { createWatches } from './render-watches.js';
 import {
+  combosFor,
   dominantColour,
+  familyWheelDistance,
   formatHour,
   judgeNotes,
   listOf,
@@ -23,22 +25,53 @@ import {
   nearestGarmentColour,
   noteAffinity,
   placeOnMap,
+  placeOnWheel,
   planScentDay,
   proseNote,
   resolveQuery,
-  seasonName
+  seasonName,
+  topCombos,
+  wheelArcPath,
+  WHEEL_FAMILIES
 } from './aesthetics-model.js';
+import { loadSydneyWeather } from './sydney-weather.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const SVG_TAGS = new Set(['svg', 'g', 'path', 'circle', 'rect', 'ellipse', 'text', 'defs', 'radialGradient', 'linearGradient', 'stop', 'line', 'foreignObject']);
+const SVG_TAGS = new Set(['svg', 'g', 'path', 'circle', 'rect', 'ellipse', 'text', 'defs', 'radialGradient', 'linearGradient', 'stop', 'line', 'foreignObject', 'animate', 'filter', 'feGaussianBlur', 'feMerge', 'feMergeNode']);
 const TABS = ['today', 'scent', 'dress', 'skin'];
 const TAB_KEY = 'life-aesthetics-tab';
 const DRESS_VIEW_KEY = 'life-aesthetics-dress-view';
 const DRESS_VIEWS = ['looks', 'watches'];
 const WEAR_KEY = 'life-aesthetics-wear';
 const PRAISE_KEY = 'life-aesthetics-compliments';
-
+const WHEEL_SIZE = 440;
+const WHEEL_CX = WHEEL_SIZE / 2;
+const WHEEL_CY = WHEEL_SIZE / 2;
+const WHEEL_OUTER = 158;
+const WHEEL_INNER = 102;
+const WHEEL_LABEL = 196;
 const famVar = f => `var(--aes-${f.family})`;
+const titleCase = s => s.charAt(0).toUpperCase() + s.slice(1);
+const polar = (cx, cy, r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+function donutSlice(cx, cy, r0, r1, a0, a1) {
+  const large = a1 - a0 > Math.PI ? 1 : 0;
+  const [x0, y0] = polar(cx, cy, r1, a0);
+  const [x1, y1] = polar(cx, cy, r1, a1);
+  const [x2, y2] = polar(cx, cy, r0, a1);
+  const [x3, y3] = polar(cx, cy, r0, a0);
+  return `M${x0} ${y0} A${r1} ${r1} 0 ${large} 1 ${x1} ${y1} L${x2} ${y2} A${r0} ${r0} 0 ${large} 0 ${x3} ${y3} Z`;
+}
+function wheelPoint(f, cx, cy, rInner, rOuter, slot = {}) {
+  const { angle, radius } = placeOnWheel(f, slot);
+  return polar(cx, cy, rInner + radius * (rOuter - rInner), angle);
+}
+function wrapHubName(name, max = 12) {
+  if (name.length <= max) return [name];
+  const parts = name.split(/\s+/);
+  if (parts.length < 2) return [name.slice(0, max - 1) + '…'];
+  const mid = Math.ceil(parts.length / 2);
+  return [parts.slice(0, mid).join(' '), parts.slice(mid).join(' ')];
+}
 
 function readJson(storage, key, fallback) {
   try { return JSON.parse(storage?.getItem(key) ?? 'null') ?? fallback; } catch { return fallback; }
@@ -47,7 +80,13 @@ function writeJson(storage, key, value) {
   try { storage?.setItem(key, JSON.stringify(value)); } catch { /* private mode: keep going */ }
 }
 
-export function createAesthetics(doc, { storage = globalThis.localStorage, matchMedia = globalThis.matchMedia?.bind(globalThis), watchRadarApi = null } = {}) {
+export function createAesthetics(doc, {
+  storage = globalThis.localStorage,
+  matchMedia = globalThis.matchMedia?.bind(globalThis),
+  watchRadarApi = null,
+  weatherApi = loadSydneyWeather,
+  sessionStorage = globalThis.sessionStorage
+} = {}) {
   const $ = sel => doc.querySelector(sel);
   const reduceMotion = () => matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
   const affinity = noteAffinity(FRAGRANCES);
@@ -75,11 +114,17 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
     dayIndex: 0,
     mapSel: 'Neon',
     mapShow: { Owned: true, Sampling: true, Wishlist: true, Retired: true },
+    wheelSel: 'Neon',
+    comboPartner: null,
+    wheelBuilt: false,
+    wheelArcRaf: 0,
     query: 'Tom Ford Tobacco Vanille',
     vibe: 0,
     snap: null,
     date: null,
     events: [],
+    weather: null,
+    weatherStatus: 'pending',
     wired: false
   };
 
@@ -151,19 +196,34 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
   }
   let plan = null;
   function renderToday() {
-    plan = planScentDay({ date: state.date, events: state.events, index: state.dayIndex, lastWorn: lastWorn() });
+    plan = planScentDay({
+      date: state.date,
+      events: state.events,
+      index: state.dayIndex,
+      lastWorn: lastWorn(),
+      weather: state.weather
+    });
     const f = plan.day;
     const stage = $('#aes-stage');
     stage.style.setProperty('--aes-glow', famVar(f));
     const dateLabel = new Date(`${state.date}T12:00:00`).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
     $('#aes-today-date').textContent = `${dateLabel} · Sydney ${seasonName(plan.season)}`;
+    const weatherEl = $('#aes-today-weather');
+    if (weatherEl) {
+      let caption = '';
+      if (state.weather?.label) caption = `Weather pick · ${state.weather.label}`;
+      else if (state.weatherStatus === 'unavailable') caption = 'Weather unavailable · ranking by season and calendar';
+      else if (state.weatherStatus === 'pending') caption = 'Reading Sydney weather…';
+      weatherEl.textContent = caption;
+      weatherEl.hidden = !caption;
+    }
     const wrap = $('#aes-today-bottle');
     wrap.querySelector('.aes-photo')?.remove();
     wrap.prepend(bottle(f, 120, true));
     wrap.setAttribute('aria-label', `Spray ${f.name}`);
     $('#aes-today-name').textContent = f.name;
     $('#aes-today-by').textContent = `${f.brand} · ${FAMILY_LABELS[f.family]}`;
-    $('#aes-today-line').textContent = plan.line;
+    $('#aes-today-line').textContent = plan.weatherLine ? `${plan.line} ${plan.weatherLine}` : plan.line;
     const worn = wearLog()[state.date];
     $('#aes-today-worn').textContent = worn ? `Logged: ${worn} today` : '';
     renderFlat($('#aes-today-flat'), lookForScent(f.name), true);
@@ -331,6 +391,277 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
         bottle(f, 72), el('span', { text: f.name }), el('small', { text: f.brand }))));
   }
 
+  // ---------------- Combo wheel ----------------
+  function selectWheel(name, partnerName = null) {
+    state.wheelSel = name;
+    state.comboPartner = partnerName;
+    renderWheel({ animate: !reduceMotion() });
+  }
+
+  function comboBottle(f, step) {
+    return el('div', { class: 'aes-combo__bottle' },
+      bottle(f, 72),
+      el('span', { class: 'aes-combo__step', text: step }),
+      el('b', { text: f.name }));
+  }
+
+  function ownedSlots(owned) {
+    const byFamily = Object.fromEntries(WHEEL_FAMILIES.map(f => [f, []]));
+    for (const f of owned) (byFamily[f.family] ?? (byFamily[f.family] = [])).push(f);
+    const slots = new Map();
+    for (const family of WHEEL_FAMILIES) {
+      const list = byFamily[family] ?? [];
+      list.forEach((f, index) => slots.set(f.name, { index, count: list.length }));
+    }
+    return slots;
+  }
+
+  function drawArc(pathEl, d, animate) {
+    if (!pathEl) return;
+    if (state.wheelArcRaf) {
+      globalThis.cancelAnimationFrame?.(state.wheelArcRaf);
+      state.wheelArcRaf = 0;
+    }
+    pathEl.setAttribute('d', d);
+    pathEl.setAttribute('opacity', '1');
+    const len = typeof pathEl.getTotalLength === 'function' ? pathEl.getTotalLength() : 180;
+    pathEl.style.strokeDasharray = String(len);
+    if (!animate || reduceMotion()) {
+      pathEl.style.strokeDashoffset = '0';
+      pathEl.classList.remove('is-drawing');
+      return;
+    }
+    pathEl.classList.add('is-drawing');
+    pathEl.style.strokeDashoffset = String(len);
+    const start = performance.now();
+    const dur = 620;
+    const tick = now => {
+      if (!pathEl.isConnected) return;
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - (1 - t) ** 3;
+      pathEl.style.strokeDashoffset = String(len * (1 - eased));
+      if (t < 1) state.wheelArcRaf = globalThis.requestAnimationFrame(tick);
+      else {
+        pathEl.classList.remove('is-drawing');
+        state.wheelArcRaf = 0;
+      }
+    };
+    state.wheelArcRaf = globalThis.requestAnimationFrame(tick);
+  }
+
+  function renderComboCard(base, picks, { animate = false } = {}) {
+    const host = $('#aes-combo');
+    if (!host) return;
+    const active = picks.find(p => p.partner.name === state.comboPartner) ?? picks[0];
+    const paint = () => {
+      if (!active) {
+        host.replaceChildren(el('p', { class: 'aes-meta', text: 'Pick a bottle on the wheel to see layering partners.' }));
+        return;
+      }
+      if (!state.comboPartner) state.comboPartner = active.partner.name;
+      const highlights = topCombos({ limit: 4 }).slice(0, 3);
+      host.replaceChildren(
+        el('div', { class: 'aes-combo__pair' },
+          comboBottle(active.base, '1 · base'),
+          el('div', { class: 'aes-combo__join', 'aria-hidden': 'true' },
+            el('span', { class: 'aes-combo__join-ring' }),
+            el('span', { class: 'aes-combo__join-mark', text: '→' })),
+          comboBottle(active.accent, '2 · accent')),
+        el('p', { class: 'aes-display aes-combo__verdict', text: active.verdict }),
+        el('p', { class: 'aes-combo__why', text: active.why }),
+        active.shared.length
+          ? el('p', { class: 'aes-meta' }, 'Bridge notes: ', el('b', { text: listOf(active.shared.map(proseNote)) }))
+          : el('p', { class: 'aes-meta', text: 'No shared notes — the wheel adjacency is doing the work.' }),
+        el('div', { class: 'hub-pills hub-pills--loose aes-chips', 'aria-label': 'Partner picks' },
+          picks.map(p => el('button', {
+            type: 'button',
+            class: 'hub-pills__btn',
+            'aria-pressed': String(p.partner.name === active.partner.name),
+            onclick: () => selectWheel(base.name, p.partner.name)
+          }, p.partner.name))),
+        highlights.length
+          ? el('div', { class: 'aes-combo__tops' },
+            el('p', { class: 'aes-eyebrow', text: 'Shelf favourites' }),
+            el('div', { class: 'aes-combo__top-row' }, highlights.map(h =>
+              el('button', {
+                type: 'button',
+                class: 'aes-combo__top',
+                onclick: () => selectWheel(h.a.name, h.b.name)
+              }, el('b', { text: h.a.name }), el('span', { text: '+' }), el('b', { text: h.b.name }), el('small', { text: h.verdict })))))
+          : null);
+    };
+    if (animate && !reduceMotion()) {
+      host.classList.remove('is-in');
+      host.classList.add('is-swap');
+      paint();
+      requestAnimationFrame(() => {
+        host.classList.remove('is-swap');
+        host.classList.add('is-in');
+      });
+    } else {
+      paint();
+      host.classList.add('is-in');
+    }
+  }
+
+  function ensureWheel() {
+    const host = $('#aes-wheel');
+    if (!host || state.wheelBuilt) return host?.querySelector('.aes-wheel__svg');
+    const owned = FRAGRANCES.filter(f => f.status === 'Owned');
+    const slots = ownedSlots(owned);
+    const wedge = (Math.PI * 2) / WHEEL_FAMILIES.length;
+    const cx = WHEEL_CX, cy = WHEEL_CY;
+
+    const familyPaths = WHEEL_FAMILIES.map((family, i) => {
+      const a0 = -Math.PI / 2 + i * wedge + 0.018;
+      const a1 = -Math.PI / 2 + (i + 1) * wedge - 0.018;
+      const [lx, ly] = polar(cx, cy, WHEEL_LABEL, a0 + wedge / 2);
+      return el('g', { class: 'aes-wheel__family', 'data-family': family, style: `--aes-enter:${i * 45}ms` },
+        el('path', { d: donutSlice(cx, cy, WHEEL_INNER, WHEEL_OUTER, a0, a1), class: 'aes-wheel__wedge', fill: `var(--aes-${family})` }),
+        el('text', { x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'middle', class: 'aes-wheel__flabel', text: titleCase(family) }));
+    });
+
+    const dots = owned.map((f, i) => {
+      const [x, y] = wheelPoint(f, cx, cy, WHEEL_INNER, WHEEL_OUTER, slots.get(f.name));
+      return el('g', {
+        class: 'aes-wheel__dot',
+        'data-name': f.name,
+        'data-family': f.family,
+        tabindex: 0,
+        role: 'button',
+        'aria-label': `${f.name}, ${FAMILY_LABELS[f.family]}`,
+        'aria-pressed': 'false',
+        transform: `translate(${x} ${y})`,
+        style: `--aes-enter:${120 + i * 28}ms`,
+        onclick: () => selectWheel(f.name),
+        onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectWheel(f.name); } }
+      },
+        el('circle', { r: 18, class: 'aes-wheel__hit', fill: 'transparent' }),
+        el('circle', { r: 7.5, class: 'aes-wheel__orb', fill: famVar(f) }),
+        el('circle', { r: 14, class: 'aes-wheel__halo', fill: 'none', stroke: famVar(f), opacity: 0 },
+          reduceMotion() ? null : el('animate', {
+            attributeName: 'r', values: '13;18;13', dur: '2.4s', begin: 'indefinite', repeatCount: '2'
+          }),
+          reduceMotion() ? null : el('animate', {
+            attributeName: 'opacity', values: '0.55;0.15;0.55', dur: '2.4s', begin: 'indefinite', repeatCount: '2'
+          })));
+    });
+
+    const svg = el('svg', {
+      class: 'aes-wheel__svg',
+      viewBox: `0 0 ${WHEEL_SIZE} ${WHEEL_SIZE}`,
+      role: 'img',
+      'aria-label': 'Fragrance layering wheel'
+    },
+      el('defs', {},
+        el('radialGradient', { id: 'aes-wheel-core' },
+          el('stop', { offset: '0%', 'stop-color': 'var(--paper)', 'stop-opacity': 1 }),
+          el('stop', { offset: '100%', 'stop-color': 'var(--cotton)', 'stop-opacity': 1 })),
+        el('filter', { id: 'aes-wheel-glow', x: '-40%', y: '-40%', width: '180%', height: '180%' },
+          el('feGaussianBlur', { stdDeviation: '2.2', result: 'b' }),
+          el('feMerge', {}, el('feMergeNode', { in: 'b' }), el('feMergeNode', { in: 'SourceGraphic' })))),
+      el('circle', { cx, cy, r: WHEEL_OUTER + 22, class: 'aes-wheel__disc' }),
+      el('circle', { cx, cy, r: WHEEL_OUTER + 12, class: 'aes-wheel__rim-ring', fill: 'none' }),
+      el('g', { class: 'aes-wheel__families' }, ...familyPaths),
+      el('path', { class: 'aes-wheel__arc', d: '', fill: 'none', opacity: 0 }),
+      el('circle', { cx, cy, r: WHEEL_INNER - 8, fill: 'url(#aes-wheel-core)', class: 'aes-wheel__hub' }),
+      el('text', { x: cx, y: cy - 16, 'text-anchor': 'middle', class: 'aes-wheel__hub-label', text: 'Layer' }),
+      el('text', { x: cx, y: cy + 6, 'text-anchor': 'middle', class: 'aes-wheel__hub-name', 'data-line': '1', text: '' }),
+      el('text', { x: cx, y: cy + 24, 'text-anchor': 'middle', class: 'aes-wheel__hub-name', 'data-line': '2', text: '' }),
+      el('g', { class: 'aes-wheel__dots' }, ...dots));
+
+    host.replaceChildren(svg);
+    state.wheelBuilt = true;
+    if (!reduceMotion()) {
+      requestAnimationFrame(() => svg.classList.add('is-ready'));
+    } else {
+      svg.classList.add('is-ready');
+    }
+    return svg;
+  }
+
+  function renderWheel({ animate = false } = {}) {
+    const host = $('#aes-wheel');
+    if (!host) return;
+    const owned = FRAGRANCES.filter(f => f.status === 'Owned');
+    const base = owned.find(f => f.name === state.wheelSel) ?? owned[0];
+    if (!base) return;
+    state.wheelSel = base.name;
+    const picks = combosFor(base, { limit: 3 });
+    if (!picks.some(p => p.partner.name === state.comboPartner)) {
+      state.comboPartner = picks[0]?.partner.name ?? null;
+    }
+    const partner = picks.find(p => p.partner.name === state.comboPartner)?.partner ?? null;
+    const slots = ownedSlots(owned);
+    const svg = ensureWheel();
+    if (!svg) return;
+
+    svg.setAttribute('aria-label', `Layering wheel centred on ${base.name}`);
+    for (const wedge of svg.querySelectorAll('.aes-wheel__family')) {
+      const on = wedge.getAttribute('data-family') === base.family
+        || (partner && wedge.getAttribute('data-family') === partner.family);
+      wedge.classList.toggle('is-lit', on);
+      wedge.classList.toggle('is-focus', wedge.getAttribute('data-family') === base.family);
+    }
+
+    for (const f of owned) {
+      const g = [...svg.querySelectorAll('.aes-wheel__dot')].find(n => n.getAttribute('data-name') === f.name);
+      if (!g) continue;
+      const [x, y] = wheelPoint(f, WHEEL_CX, WHEEL_CY, WHEEL_INNER, WHEEL_OUTER, slots.get(f.name));
+      g.setAttribute('transform', `translate(${x} ${y})`);
+      const on = f.name === base.name;
+      const linked = partner && f.name === partner.name;
+      g.setAttribute('aria-pressed', String(on));
+      g.classList.toggle('is-on', on);
+      g.classList.toggle('is-link', Boolean(linked));
+      const orb = g.querySelector('.aes-wheel__orb');
+      const halo = g.querySelector('.aes-wheel__halo');
+      if (orb) {
+        orb.setAttribute('r', on ? '11.5' : linked ? '10' : '7.5');
+        orb.classList.toggle('aes-wheel__orb--on', on);
+        orb.classList.toggle('aes-wheel__orb--link', Boolean(linked && !on));
+      }
+      if (halo) {
+        halo.setAttribute('opacity', on || linked ? '0.5' : '0');
+        if ((on || linked) && animate && !reduceMotion()) {
+          for (const anim of halo.querySelectorAll('animate')) {
+            try { anim.beginElement(); } catch { /* SMIL optional */ }
+          }
+        }
+      }
+    }
+
+    const arc = svg.querySelector('.aes-wheel__arc');
+    if (partner && arc) {
+      const [x1, y1] = wheelPoint(base, WHEEL_CX, WHEEL_CY, WHEEL_INNER, WHEEL_OUTER, slots.get(base.name));
+      const [x2, y2] = wheelPoint(partner, WHEEL_CX, WHEEL_CY, WHEEL_INNER, WHEEL_OUTER, slots.get(partner.name));
+      const d = wheelArcPath(x1, y1, x2, y2, WHEEL_CX, WHEEL_CY);
+      arc.style.setProperty('--aes-arc', `var(--aes-${partner.family})`);
+      arc.setAttribute('data-span', String(familyWheelDistance(base.family, partner.family)));
+      const firstTune = svg.dataset.tuned !== '1';
+      drawArc(arc, d, animate || firstTune);
+      svg.dataset.tuned = '1';
+    } else if (arc) {
+      arc.setAttribute('opacity', '0');
+      arc.setAttribute('d', '');
+      arc.style.strokeDasharray = '';
+      arc.style.strokeDashoffset = '';
+    }
+
+    const lines = wrapHubName(base.name);
+    const line1 = svg.querySelector('.aes-wheel__hub-name[data-line="1"]');
+    const line2 = svg.querySelector('.aes-wheel__hub-name[data-line="2"]');
+    if (line1) line1.textContent = lines[0] ?? '';
+    if (line2) {
+      line2.textContent = lines[1] ?? '';
+      line2.setAttribute('opacity', lines[1] ? '1' : '0');
+    }
+    if (line1 && !lines[1]) line1.setAttribute('y', String(WHEEL_CY + 8));
+    else if (line1) line1.setAttribute('y', String(WHEEL_CY + 4));
+
+    renderComboCard(base, picks, { animate });
+  }
+
   // ---------------- DRESS ----------------
   function renderVibe() {
     const look = LOOKS[state.vibe];
@@ -423,14 +754,29 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
     } }, el('i', { class: 'aes-dot', style: `background:${GARMENT_COLOURS[s.colour]}` }), s.label)));
     $('#aes-insight').textContent = mapInsight(FRAGRANCES);
     renderShelf();
+    renderWheel();
     renderSourceReference(doc);
+  }
+
+  async function refreshWeather() {
+    state.weatherStatus = 'pending';
+    renderToday();
+    const result = await weatherApi({ storage: sessionStorage });
+    state.weather = result?.weather ?? null;
+    state.weatherStatus = state.weather ? (result.status ?? 'ok') : 'unavailable';
+    if (state.date) renderToday();
   }
 
   return {
     render({ date, events = [] } = {}) {
       if (!$('#aes-stage') || !date) return;
       wire();
-      if (state.date !== date) state.dayIndex = 0;
+      if (state.date !== date) {
+        state.dayIndex = 0;
+        state.weather = null;
+        state.weatherStatus = 'pending';
+        void refreshWeather();
+      }
       state.date = date;
       state.events = events;
       showTab(state.tab);
@@ -438,6 +784,7 @@ export function createAesthetics(doc, { storage = globalThis.localStorage, match
       renderToday();
       watches.render({ date, look: lookForScent(plan.day.name) });
       renderMap();
+      renderWheel();
       renderOracle();
       renderVibe();
       renderSnap();

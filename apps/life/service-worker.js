@@ -253,6 +253,7 @@ const SHELL_FILES = [
   'js/app/aesthetics/aesthetics-model.js',
   'js/app/aesthetics/dress-looks.js',
   'js/app/aesthetics/fragrance-library.js',
+  'js/app/aesthetics/sydney-weather.js',
   'js/app/aesthetics/notion-aesthetics-source.js',
   'js/app/aesthetics/render-aesthetics.js',
   'js/app/aesthetics/render-source-reference.js',
