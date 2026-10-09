@@ -116,7 +116,17 @@ export interface Checkin {
   at: string;
   city_id: string;
   label: string;
+  /** When set, this is a stop-level "marked safe" on an itinerary item. */
+  item_id?: string;
+  /** Optional place photo (Netlify Blobs id, served via /api/travel-photo). */
+  photo_id?: string;
 }
+
+/** Public/redacted item fields for follower-visible safe ticks. */
+export type PublicSafeFields = {
+  safe_at?: string;
+  safe_photo_id?: string;
+};
 
 export interface DayMeta {
   city_id: string;

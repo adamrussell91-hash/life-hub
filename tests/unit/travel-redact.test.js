@@ -48,3 +48,25 @@ test('redactTrip drops private fields and their values never appear in JSON', ()
   assert.equal(publicTrip.share, undefined);
   assert.equal(publicTrip.days[0].penelope_prompt, undefined);
 });
+
+test('redactTrip attaches safe_at and photo id onto the matching public stop', () => {
+  const trip = structuredClone(fixture);
+  const stopId = trip.items.find((i) => i.kind === 'do' && !i.private)?.id;
+  assert.ok(stopId);
+  trip.checkins = [
+    {
+      id: 'chk_stop1',
+      at: '2027-03-04T15:30:00.000Z',
+      city_id: 'lis',
+      label: 'Safe · Belém',
+      item_id: stopId,
+      photo_id: 'tph_testphoto01'
+    }
+  ];
+  const publicTrip = redactTrip(trip);
+  const stop = publicTrip.items.find((i) => i.id === stopId);
+  assert.equal(stop?.safe_at, '2027-03-04T15:30:00.000Z');
+  assert.equal(stop?.safe_photo_id, 'tph_testphoto01');
+  assert.equal(publicTrip.last_checkin?.photo_id, 'tph_testphoto01');
+  assert.equal(publicTrip.last_checkin?.item_id, stopId);
+});
