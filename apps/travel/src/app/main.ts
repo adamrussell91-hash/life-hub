@@ -24,6 +24,7 @@ import { renderTripPage } from '@/views/trip-page';
 import { renderTodayView } from '@/views/today';
 import { renderPublicTrip } from '@/views/public-trip';
 import { listTrips } from '@/api/travel';
+import { pickPrimaryTrip } from '@/lib/pick-trip';
 import { registerServiceWorker, mountOfflineBanner } from '@/lib/offline';
 
 function publicToken(): string | null {
@@ -84,24 +85,8 @@ async function bootApp(root: HTMLElement): Promise<void> {
 
     try {
       if (route.name === 'trips') {
-        const { trips } = await listTrips();
-        if (generation !== routeGeneration) return;
-        // One trip → paint it in this turn (V3). Do not `location.hash =` and
-        // return with an empty canvas while waiting on hashchange.
-        if (trips.length === 1) {
-          const tripId = trips[0]!.id;
-          const tripHash = `#/trip/${encodeURIComponent(tripId)}`;
-          if (location.hash !== tripHash) {
-            history.replaceState(null, '', tripHash);
-          }
-          currentTripId = tripId;
-          renderHighlight('trip');
-          renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: '' });
-          await renderTripPage(shell.canvas, tripId, {
-            isCurrent: () => generation === routeGeneration
-          });
-          return;
-        }
+        // Always show the list at #/ so New trip stays reachable with one holiday.
+        // Bare /travel/ (empty hash) opens the primary trip in bootApp instead.
         renderHighlight('trips');
         renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: 'Trips' });
         await renderTripsList(shell.canvas, { isCurrent: () => generation === routeGeneration });
@@ -150,9 +135,21 @@ async function bootApp(root: HTMLElement): Promise<void> {
     void paint();
   });
 
-  // V3: default hash via replaceState — never location.hash= when hashchange also paints.
-  if (!location.hash || location.hash === '#/') {
-    history.replaceState(null, '', '#/');
+  // Empty hash (landing on /travel/) → primary trip when one exists. Explicit #/
+  // is the Trips list (create another holiday). Never location.hash= here (V3).
+  if (!location.hash || location.hash === '#') {
+    try {
+      const { trips } = await listTrips();
+      const primary = pickPrimaryTrip(trips);
+      history.replaceState(
+        null,
+        '',
+        primary ? `#/trip/${encodeURIComponent(primary.id)}` : '#/'
+      );
+      if (primary) currentTripId = primary.id;
+    } catch {
+      history.replaceState(null, '', '#/');
+    }
   }
   await paint();
 }

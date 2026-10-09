@@ -18,6 +18,18 @@ test('fixture trip validates', () => {
   assert.equal(validateTrip(fixture).id, 'trp_testlisbon01');
 });
 
+test('validateTrip accepts a fresh trip with no cities yet', () => {
+  const empty = {
+    ...fixture,
+    id: 'trp_emptycities01',
+    cities: [],
+    items: [],
+    days: [],
+    checkins: []
+  };
+  assert.equal(validateTrip(empty).cities.length, 0);
+});
+
 const cases = [
   ['unknown kind', { kind: 'spaceship', title: 'x', city_id: 'lis', date: '2027-03-03', time: null, note: '', status: 'planned' }, 'item.kind'],
   ['bad date', { kind: 'do', title: 'x', city_id: 'lis', date: '03-03-2027', time: null, note: '', status: 'planned' }, 'item.date'],

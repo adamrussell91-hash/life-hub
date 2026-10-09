@@ -16,6 +16,7 @@ import type { DayMapHandle } from '@/components/day-map';
 import { renderDayList } from '@/views/day-list';
 import { renderAddForm } from '@/components/add-form';
 import { renderCityDatesForm } from '@/components/city-dates-form';
+import { renderCityForm } from '@/components/city-form';
 import { renderTakeMeHome } from '@/components/take-me-home';
 import { renderShareSheet } from '@/components/share-sheet';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
@@ -100,15 +101,21 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
   titleBlock.append(crumb, h1, sub);
   const acts = document.createElement('div');
   acts.className = 'acts';
+  const addCityBtn = document.createElement('button');
+  addCityBtn.type = 'button';
+  addCityBtn.className = 'btn ghost';
+  addCityBtn.innerHTML = `${I.plus}Add city`;
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'btn';
   addBtn.innerHTML = `${I.plus}Add`;
+  addBtn.disabled = trip.cities.length === 0;
+  addBtn.title = trip.cities.length === 0 ? 'Add a city first' : 'Add to the trip';
   const publicBtn = document.createElement('button');
   publicBtn.type = 'button';
   publicBtn.className = 'btn ghost';
   publicBtn.innerHTML = `${I.link}Public link`;
-  acts.append(addBtn, publicBtn);
+  acts.append(addCityBtn, addBtn, publicBtn);
   top.append(titleBlock, acts);
   wrap.append(top);
 
@@ -162,13 +169,34 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       chip.addEventListener('click', () => selectCity(city.id));
       chips.append(chip);
     }
+    const addChip = document.createElement('button');
+    addChip.type = 'button';
+    addChip.className = 'chip chip--add';
+    addChip.innerHTML = `<b>Add city</b><span>Next stop</span>`;
+    addChip.addEventListener('click', () => openAddCity());
+    chips.append(addChip);
   }
 
   function renderCityScene(): void {
     citySection.replaceChildren();
     citySection.style.setProperty('--city', '');
     const cityOrNull = trip.cities.find((c) => c.id === selectedCityId);
-    if (!cityOrNull) return;
+    if (!cityOrNull) {
+      const empty = document.createElement('div');
+      empty.className = 'card trip-empty-cities';
+      const h3 = document.createElement('h3');
+      h3.textContent = 'No cities yet';
+      const p = document.createElement('p');
+      p.textContent = 'Add the first city to start the map, days, and itinerary.';
+      const cta = document.createElement('button');
+      cta.type = 'button';
+      cta.className = 'btn';
+      cta.textContent = 'Add a city';
+      cta.addEventListener('click', () => openAddCity());
+      empty.append(h3, p, cta);
+      citySection.append(empty);
+      return;
+    }
     const city = cityOrNull;
     citySection.style.setProperty('--city', city.accent.color);
     citySection.style.setProperty('--city-soft', city.accent.soft);
@@ -404,7 +432,32 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       ...sheetHandlers(formHost)
     });
   }
-  addBtn.addEventListener('click', () => openForm());
+
+  function openAddCity(): void {
+    const formHost = document.createElement('div');
+    document.body.append(formHost);
+    renderCityForm(formHost, {
+      trip,
+      tripId,
+      version,
+      onClose: () => formHost.remove(),
+      onSaved: (_updated, _nextVersion, cityId) => {
+        formHost.remove();
+        const city = _updated.cities.find((c) => c.id === cityId);
+        const date = city?.start_date ?? trip.start_date;
+        location.hash = `#/trip/${encodeURIComponent(tripId)}/${encodeURIComponent(cityId)}/${date}`;
+      }
+    });
+  }
+
+  addCityBtn.addEventListener('click', () => openAddCity());
+  addBtn.addEventListener('click', () => {
+    if (trip.cities.length === 0) {
+      openAddCity();
+      return;
+    }
+    openForm();
+  });
 
   publicBtn.addEventListener('click', () => {
     const host = document.createElement('div');

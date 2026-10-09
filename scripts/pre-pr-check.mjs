@@ -17,7 +17,7 @@
  * This script is the source of truth for which commands agents must run.
  * Keep steps aligned with `.github/workflows/pages.yml`:
  *   - Pages runs `npm test` with pipefail, then the Tasks Hub vitest suite
- *     (`cd apps/tasks && npx vitest run`), then `npm run build`
+ *     (`cd apps/tasks && ./node_modules/.bin/vitest run`), then `npm run build`
  *   - `build:professional` runs `npm run typecheck` (`tsc --noEmit`) first
  *
  * Agent checklist (Project store): docs/mandatory-pre-pr-check.md
@@ -71,13 +71,13 @@ function listTestFiles(dir, out = []) {
   return out;
 }
 
-function run(label, command, commandArgs, { cwd = root } = {}) {
+function run(label, command, commandArgs, { cwd = root, env = process.env } = {}) {
   console.log(`\n==> ${label}`);
   console.log(`$ ${command} ${commandArgs.join(' ')}`);
   const result = spawnSync(command, commandArgs, {
     cwd,
     stdio: 'inherit',
-    env: process.env,
+    env,
     shell: false
   });
   if (result.error) {
@@ -208,7 +208,16 @@ if (!existsSync(join(tasksDir, 'node_modules'))) {
     process.exit(1);
   }
 }
-const tasksOk = run('Tasks Hub vitest (Pages)', 'npx', ['vitest', 'run'], { cwd: tasksDir });
+// Prefer the local binary: cloud agent `npx` can be a broken /exec-daemon shim.
+// Unset ANTHROPIC_API_KEY so Clare unit tests stay on the heuristic path (live
+// key would call api.anthropic.com and CORS-fail under happy-dom).
+const tasksEnv = { ...process.env };
+delete tasksEnv.ANTHROPIC_API_KEY;
+const tasksVitest = join(tasksDir, 'node_modules', '.bin', 'vitest');
+const tasksOk = run('Tasks Hub vitest (Pages)', tasksVitest, ['run'], {
+  cwd: tasksDir,
+  env: tasksEnv
+});
 if (!tasksOk) {
   console.error('\npre-pr-check FAILED at Tasks Hub vitest');
   process.exit(1);
