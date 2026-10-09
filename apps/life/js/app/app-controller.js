@@ -350,7 +350,8 @@ export function createAppController(dependencies) {
     ];
     // Memory alone leaves Day Dial / Tideline on the last paint — Week remount looked
     // fresh after a Clare dump while Dial stayed empty until something else re-rendered.
-    if (currentSection === 'calendar') renderCalendarSection();
+    // keepScroll: a tick remount must not throw the page back to the top.
+    if (currentSection === 'calendar') keepScroll(() => renderCalendarSection());
   });
   bind(windowTarget, 'hashchange', () => {
     if (!authenticated) return;
@@ -1776,8 +1777,9 @@ export function createAppController(dependencies) {
       calendarGhosts,
       apiFetch,
       // Calendar writes (accept, drag, item card) reload sources, then paint the saved state in place.
+      // keepScroll: Day Dial / Tideline remount after a tick must stay where the user was reading.
       onSourcesChanged: () => refreshGhostSources().then(() => {
-        if (currentSection === 'calendar') renderCalendarSection();
+        if (currentSection === 'calendar') keepScroll(() => renderCalendarSection());
       }),
       planningProfile: calendarPlanningProfile,
       onTogglePlanningLens: () => {
