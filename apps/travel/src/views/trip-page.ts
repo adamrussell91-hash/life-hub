@@ -2,6 +2,7 @@ import type { City, Trip } from '@/types';
 import { getTrip } from '@/api/travel';
 import {
   buildTodo,
+  dayBarCaption,
   daysForCity,
   homeBaseForNight,
   itemPlace,
@@ -17,6 +18,8 @@ import { renderDayList } from '@/views/day-list';
 import { renderAddForm } from '@/components/add-form';
 import { renderCityDatesForm } from '@/components/city-dates-form';
 import { renderCityForm } from '@/components/city-form';
+import { renderDayLabelSheet } from '@/components/day-label-sheet';
+import { renderArrivalGuideSheet } from '@/components/arrival-guide-sheet';
 import { renderTakeMeHome } from '@/components/take-me-home';
 import { renderShareSheet } from '@/components/share-sheet';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
@@ -241,25 +244,35 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       btn.className = 'daybtn';
       if (date === selectedDate) btn.classList.add('is-on');
       const cue = travelDayCue(trip, city.id, date);
-      if (cue) btn.classList.add('is-travel');
-      // "Tue 1 Dec" over the day's subtitle ("Leave Sydney"), as in the mockup.
+      const custom = trip.days.find((d) => d.city_id === city.id && d.date === date)?.subtitle?.trim();
+      if (cue && !custom) btn.classList.add('is-travel');
+      // "Tue 1 Dec" over the day's caption ("Leave Sydney"), as in the mockup.
       btn.textContent = formatWeekdayDate(date);
-      const subtitle = trip.days.find((d) => d.city_id === city.id && d.date === date)?.subtitle;
-      const smallText = [subtitle, cue].filter(Boolean).join(' · ');
+      const smallText = dayBarCaption(trip, city.id, date);
       if (smallText) {
         const small = document.createElement('small');
         small.textContent = smallText;
         btn.append(small);
       }
       btn.addEventListener('click', () => {
+        if (selectedDate === date) {
+          openDayLabel(city.id, date);
+          return;
+        }
         selectedDate = date;
         renderDay();
       });
       dayBar.append(btn);
     }
+    const dayLabelEdit = document.createElement('button');
+    dayLabelEdit.type = 'button';
+    dayLabelEdit.className = 'mini day-label-edit';
+    dayLabelEdit.textContent = 'Edit day label';
+    dayLabelEdit.title = 'Change the short caption under this day';
+    dayLabelEdit.addEventListener('click', () => openDayLabel(city.id, selectedDate));
     // Day bar sits under the scene (its CSS rounds the bottom corners); inside
     // the fixed-height scene it overprinted the city title.
-    citySection.append(scene, dayBar);
+    citySection.append(scene, dayBar, dayLabelEdit);
 
     const day = document.createElement('div');
     day.className = 'day';
@@ -339,7 +352,8 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
         onSelect: (itemId) => dayMapHandle?.selectStop(itemId),
         onEdit: (item) => openForm(item),
         onAddAt: (cityId, date) => openForm(undefined, cityId, date),
-        onTellPenelope: (prompt) => writePenelopeHandoff(trip, city.id, selectedDate, prompt)
+        onTellPenelope: (prompt) => writePenelopeHandoff(trip, city.id, selectedDate, prompt),
+        onEditArrivalGuide: () => openArrivalGuide(city)
       });
       dayMapHandle?.destroy();
       dayMapHandle = null;
@@ -425,6 +439,32 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     const formHost = document.createElement('div');
     document.body.append(formHost);
     renderCityDatesForm(formHost, {
+      trip,
+      tripId,
+      version,
+      city,
+      ...sheetHandlers(formHost)
+    });
+  }
+
+  function openDayLabel(cityId: string, date: string): void {
+    if (!date) return;
+    const formHost = document.createElement('div');
+    document.body.append(formHost);
+    renderDayLabelSheet(formHost, {
+      trip,
+      tripId,
+      version,
+      cityId,
+      date,
+      ...sheetHandlers(formHost)
+    });
+  }
+
+  function openArrivalGuide(city: City): void {
+    const formHost = document.createElement('div');
+    document.body.append(formHost);
+    renderArrivalGuideSheet(formHost, {
       trip,
       tripId,
       version,
