@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
 import { createAesthetics } from '../../apps/life/js/app/aesthetics/render-aesthetics.js';
-import { FRAGRANCES } from '../../apps/life/js/app/aesthetics/fragrance-library.js';
+import { fragrancePhotoUrl } from '../../apps/life/js/app/aesthetics/fragrance-photos.js';
+import { FRAGRANCES, REFERENCE_FRAGRANCES } from '../../apps/life/js/app/aesthetics/fragrance-library.js';
 
 test('recommendations use exact source names, perfumers and recorded note tiers', () => {
   assert.ok(FRAGRANCES.some(f => f.name === 'Asad Zanzibar Limited Edition'));
@@ -54,4 +55,53 @@ test('Dress exposes all seven summary sections and the complete transcript with 
   assert.match(text, /shirt's collar should be proportionate to the size of your face/);
   assert.match(text, /Intentional pieces will help make your outfit look intentional and dynamic instead of uninspired and boring/);
   assert.ok(doc.querySelector('#aes-style-notes a[href*="392f794f8476802ea9f9d06c30e34694"]'));
+});
+
+
+test('photos appear in the shelf, full records, selected scent and Today without losing interactions', () => {
+  const doc = render();
+  assert.equal(doc.querySelectorAll('#aes-shelf img').length, FRAGRANCES.filter(f => f.status === 'Owned' && f.name !== 'Tea Soirée').length);
+  assert.equal(doc.querySelectorAll('#aes-library summary img').length, 51);
+  assert.match(doc.querySelector('#aes-mapcard img').src, /criminal-elements-neon\.webp$/);
+  assert.equal(doc.querySelectorAll('#aes-today-bottle img').length, 1);
+  doc.querySelector('#aes-reroll').click();
+  assert.equal(doc.querySelectorAll('#aes-today-bottle .aes-photo').length, 1);
+  doc.querySelector('#aes-today-bottle').click();
+  assert.match(doc.querySelector('#aes-today-worn').textContent, /Logged:/);
+  assert.ok(doc.querySelector('#aes-dress-flat foreignObject img'));
+});
+
+test('the oracle shows reference photos and removes them for free-form notes', () => {
+  const doc = render();
+  assert.match(doc.querySelector('#aes-verdict img').src, /tom-ford-tobacco-vanille\.webp$/);
+  const ask = doc.querySelector('#aes-ask');
+  ask.value = 'vanilla, cardamom, incense';
+  ask.dispatchEvent(new doc.defaultView.Event('input'));
+  assert.equal(doc.querySelector('#aes-verdict img'), null);
+  assert.ok(doc.querySelector('#aes-verdict .aes-dial'));
+});
+
+test('missing and failed photos keep a reserved frame with no broken image', () => {
+  const doc = render();
+  const tea = [...doc.querySelectorAll('#aes-library details')].find(el => el.querySelector('summary')?.textContent.includes('Tea Soirée'));
+  assert.ok(tea.querySelector('summary .aes-photo--fallback'));
+  assert.equal(tea.querySelector('summary img'), null);
+  const frame = doc.querySelector('#aes-mapcard .aes-photo');
+  frame.querySelector('img').dispatchEvent(new doc.defaultView.Event('error'));
+  assert.equal(frame.querySelector('img'), null);
+  assert.ok(frame.classList.contains('aes-photo--fallback'));
+});
+
+
+test('every collection and reference photo resolves to a compact bundled WebP except Tea Soirée', () => {
+  for (const name of [...FRAGRANCES.map(f => f.name), ...Object.keys(REFERENCE_FRAGRANCES)]) {
+    const url = fragrancePhotoUrl(name);
+    if (name === 'Tea Soirée') { assert.equal(url, null); continue; }
+    assert.ok(url, name);
+    const bytes = readFileSync(new URL(url));
+    assert.equal(bytes.toString('ascii', 8, 12), 'WEBP', name);
+    assert.ok(bytes.length < 100_000, name);
+  }
+  assert.equal(fragrancePhotoUrl('vanilla, cardamom'), null);
+  assert.equal(fragrancePhotoUrl('constructor'), null);
 });

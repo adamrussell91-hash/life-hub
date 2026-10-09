@@ -1,3 +1,4 @@
+import { createFragrancePhoto, FRAGRANCE_PHOTOS } from './fragrance-photos.js';
 import { SOURCE_FRAGRANCES, STYLE_NOTE } from './notion-aesthetics-source.js';
 import { formatDisplayDate } from '../../../../../packages/design-kit/js/format-display-date.js';
 
@@ -106,11 +107,18 @@ export function renderSourceReference(doc) {
       const details = el('details', null, 'aes-record');
       details.dataset.fragranceId = record.id;
       const summary = el('summary');
-      summary.append(el('strong', p.Fragrance), el('span', `${p.Brand.replace(/\\([\[\]])/g, '$1')} · ${p.Status}`, 'aes-meta'));
+      summary.className = 'aes-record__summary';
+      const label = el('span', null, 'aes-record__label');
+      label.append(el('strong', p.Fragrance), el('span', `${p.Brand.replace(/\\([\[\]])/g, '$1')} · ${p.Status}`, 'aes-meta'));
+      summary.append(createFragrancePhoto(doc, p.Fragrance, { width: 48 }), label);
       const body = el('div', null, 'aes-record__body');
       const fields = el('dl', null, 'aes-record__fields');
       for (const [key, label] of FIELDS) fields.append(el('dt', label), fieldValue(record, key));
-      body.append(fields, el('h4', 'Full review'));
+      const photo = el('div', null, 'aes-record__photo');
+      photo.append(createFragrancePhoto(doc, p.Fragrance, { width: 160 }));
+      const source = Object.hasOwn(FRAGRANCE_PHOTOS, p.Fragrance) && FRAGRANCE_PHOTOS[p.Fragrance].source;
+      if (source) photo.append(link('Photo source', source));
+      body.append(photo, fields, el('h4', 'Full review'));
       const review = el('div', null, 'aes-source-prose');
       review.dataset.sourceField = 'Review';
       markdown(review, p.Review || 'Not recorded');
