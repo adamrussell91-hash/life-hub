@@ -191,6 +191,9 @@ test('combo wheel scores adjacent families and orders denser bottles first', () 
   assert.match(picks[0].why, /spray .+ first/i);
   const tops = topCombos({ limit: 4 });
   assert.ok(tops.length >= 3);
-  assert.ok(placeOnWheel(asad).radius > 0.4);
+  assert.ok(placeOnWheel(asad).radius > 0.35);
   assert.ok(Number.isFinite(placeOnWheel(neon).angle));
+  const a0 = placeOnWheel(neon, { index: 0, count: 4 }).angle;
+  const a1 = placeOnWheel(neon, { index: 3, count: 4 }).angle;
+  assert.ok(a1 > a0, 'siblings fan across the family wedge');
 });

@@ -591,15 +591,36 @@ export function topCombos({ fragrances = FRAGRANCES, limit = 6 } = {}) {
 }
 
 /** Polar placement on the family wheel: angle by family wedge, radius by warmth. */
-export function placeOnWheel(fragrance) {
+/** Polar placement. Pass `{ index, count }` to fan bottles evenly inside their family wedge. */
+export function placeOnWheel(fragrance, { index = null, count = null } = {}) {
   const i = Math.max(0, WHEEL_FAMILIES.indexOf(fragrance.family));
   const wedge = (Math.PI * 2) / WHEEL_FAMILIES.length;
   const h = hash(fragrance.name);
-  const jitter = ((h % 100) / 100 - 0.5) * wedge * 0.55;
   const warmth = Math.max(-2, Math.min(2, axis(fragrance.notes, WARMTH)));
+  let angle;
+  if (index != null && count > 0) {
+    const slot = (index + 0.5) / count;
+    angle = -Math.PI / 2 + i * wedge + slot * wedge * 0.82 + wedge * 0.09;
+  } else {
+    const jitter = ((h % 100) / 100 - 0.5) * wedge * 0.55;
+    angle = -Math.PI / 2 + i * wedge + wedge / 2 + jitter;
+  }
   return {
-    angle: -Math.PI / 2 + i * wedge + wedge / 2 + jitter,
-    radius: 0.42 + ((warmth + 2) / 4) * 0.38 + (((h >> 8) % 100) / 100) * 0.08,
+    angle,
+    radius: 0.38 + ((warmth + 2) / 4) * 0.42 + (((h >> 8) % 100) / 100) * 0.06,
     familyIndex: i
   };
+}
+
+/** Outward-bulging quadratic between two wheel points (avoids cutting the hub). */
+export function wheelArcPath(x1, y1, x2, y2, cx, cy) {
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  const dx = mx - cx;
+  const dy = my - cy;
+  const len = Math.hypot(dx, dy) || 1;
+  const lift = Math.min(52, 28 + Math.hypot(x2 - x1, y2 - y1) * 0.18);
+  const qx = mx + (dx / len) * lift;
+  const qy = my + (dy / len) * lift;
+  return `M${x1} ${y1} Q${qx} ${qy} ${x2} ${y2}`;
 }
