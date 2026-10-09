@@ -1,4 +1,5 @@
-import type { Hop, Item, Trip } from '@/types';
+import type { Checkin, Hop, Item, Trip } from '@/types';
+import { travelPhotoUrl } from '@/api/travel';
 import { formatAud } from '@/lib/money';
 import { formatShortRange, formatTicketMoment } from '@/lib/date-label';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
@@ -11,19 +12,27 @@ import {
   orderDayItems,
   showArrivalGuide
 } from '@/model/day';
+import { canMarkSafe, formatSafeTime, safeByItemId } from '@/lib/safe-mark';
 import { I } from '@/lib/icons';
 
 export interface DayListOptions {
   isPublic?: boolean;
+  /** Share-link token so public photo URLs authenticate. */
+  shareToken?: string | null;
   selectedId?: string | null;
   directionsApp?: 'google' | 'naver';
+  cityTz?: string;
   onSelect?: (itemId: string) => void;
   onEdit?: (item: Item) => void;
   onAddAt?: (cityId: string, date: string) => void;
   onTellPenelope?: (prompt: string) => void;
   /** Owner: edit Soft Landing tips for this city. */
   onEditArrivalGuide?: () => void;
+  /** Owner: open mark-safe / add-photo sheet for this stop. */
+  onMarkSafe?: (item: Item, mode: 'mark' | 'photo') => void;
 }
+
+type PublicSafeFields = { safe_at?: string; safe_photo_id?: string };
 
 function guideIconHtml(icon: string): string {
   const map: Record<string, string> = { phone: I.phone, transport: I.train, money: I.money, weather: I.temp, paperwork: I.doc };
@@ -39,7 +48,77 @@ function tagFor(item: Item): { cls: string; label: string } | null {
   return null;
 }
 
-function renderCard(item: Item, number: number | undefined, options: DayListOptions, hop?: Hop): HTMLElement {
+function resolveSafe(
+  item: Item,
+  byItem: Map<string, Checkin>
+): { at: string; photoId?: string } | null {
+  const publicItem = item as Item & PublicSafeFields;
+  if (publicItem.safe_at) {
+    return { at: publicItem.safe_at, photoId: publicItem.safe_photo_id };
+  }
+  const live = byItem.get(item.id);
+  return live ? { at: live.at, photoId: live.photo_id } : null;
+}
+
+function appendSafeMark(
+  meta: HTMLElement,
+  item: Item,
+  options: DayListOptions,
+  byItem: Map<string, Checkin>
+): void {
+  if (!canMarkSafe(item)) return;
+  const safe = resolveSafe(item, byItem);
+  const tz = options.cityTz || 'UTC';
+
+  if (safe) {
+    const badge = document.createElement('span');
+    badge.className = 'safe-mark is-safe';
+    badge.innerHTML = `${I.check}<span>Safe · ${formatSafeTime(safe.at, tz)}</span>`;
+    badge.title = `Marked safe at ${safe.at}`;
+    meta.append(badge);
+
+    if (safe.photoId) {
+      const img = document.createElement('img');
+      img.className = 'safe-mark__photo';
+      img.alt = `Photo from ${item.title}`;
+      img.src = travelPhotoUrl(safe.photoId, options.shareToken);
+      img.loading = 'lazy';
+      meta.append(img);
+    } else if (!options.isPublic && options.onMarkSafe) {
+      const addPhoto = document.createElement('button');
+      addPhoto.type = 'button';
+      addPhoto.className = 'mini safe-mark__photo-btn';
+      addPhoto.innerHTML = `${I.camera}Photo`;
+      addPhoto.addEventListener('click', (e) => {
+        e.stopPropagation();
+        options.onMarkSafe?.(item, 'photo');
+      });
+      meta.append(addPhoto);
+    }
+    return;
+  }
+
+  if (options.isPublic || !options.onMarkSafe) return;
+
+  const tick = document.createElement('button');
+  tick.type = 'button';
+  tick.className = 'safe-mark safe-mark__btn';
+  tick.innerHTML = `${I.check}<span>Mark safe</span>`;
+  tick.title = 'Mark safe for people following along';
+  tick.addEventListener('click', (e) => {
+    e.stopPropagation();
+    options.onMarkSafe?.(item, 'mark');
+  });
+  meta.append(tick);
+}
+
+function renderCard(
+  item: Item,
+  number: number | undefined,
+  options: DayListOptions,
+  hop: Hop | undefined,
+  byItem: Map<string, Checkin>
+): HTMLElement {
   const stop = document.createElement('div');
   stop.className = 'stop';
   if (options.selectedId === item.id) stop.classList.add('is-on');
@@ -141,6 +220,7 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
       openLink.textContent = 'Open ticket';
       tagsWrap.append(openLink);
     }
+    // Tickets are not location stops — no mark-safe control.
     // Row 2 of the .body grid (mockup): Departs | spacer | Arrives. Appended to
     // the unpadded card instead, they ran flush to its edges.
     body.append(departLabel, document.createElement('span'), arriveLabel);
@@ -197,6 +277,7 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
       mapsLink.textContent = useNaver ? 'Naver Map ↗' : 'Directions in Google Maps ↗';
       meta.append(mapsLink);
     }
+    appendSafeMark(meta, item, options, byItem);
   }
 
   if (!options.isPublic && options.onEdit) {
@@ -257,7 +338,11 @@ export function renderDayList(
 ): void {
   container.replaceChildren();
   const city = trip.cities.find((c) => c.id === cityId);
-  const listOptions: DayListOptions = { ...options, directionsApp: options.directionsApp ?? city?.directions_app };
+  const listOptions: DayListOptions = {
+    ...options,
+    directionsApp: options.directionsApp ?? city?.directions_app,
+    cityTz: options.cityTz ?? city?.tz
+  };
   const dayItems = itemsForCityDay(trip, cityId, date);
   const ordered = orderDayItems(dayItems, date);
   const numbers = numberStops(ordered);
@@ -310,6 +395,7 @@ export function renderDayList(
     list.append(empty);
   }
 
+  const safeByItem = safeByItemId(trip.checkins);
   for (const item of ordered) {
     if (item.kind === 'checkin_slot') {
       const row = document.createElement('div');
@@ -359,7 +445,7 @@ export function renderDayList(
       const fallback = hopFallback(item, next);
       if (fallback) hop = { mode: 'walk', minutes: fallback.minutes };
     }
-    list.append(renderCard(item, numbers.get(item.id), listOptions, hop));
+    list.append(renderCard(item, numbers.get(item.id), listOptions, hop, safeByItem));
   }
 
   if (!options.isPublic) {

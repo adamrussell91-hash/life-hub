@@ -23,6 +23,7 @@ function nowIso(): string {
 export function createMockApi() {
   const trips = new Map<string, Trip>([[fixtureTrip.id, clone(fixtureTrip) as Trip]]);
   const shareTokens = new Map<string, { tripId: string; createdAt: string }>();
+  const photoBytes = new Map<string, { tripId: string; mime: string }>();
   let authenticated = false;
 
   function version(trip: Trip): string {
@@ -70,7 +71,11 @@ export function createMockApi() {
       return json(200, { ok: true, data: { loggedOut: true } });
     }
 
-    if (!authenticated && path !== '/api/travel-public') {
+    if (
+      !authenticated &&
+      path !== '/api/travel-public' &&
+      !(path === '/api/travel-photo' && method === 'GET')
+    ) {
       return json(401, { ok: false, error: { code: 'unauthenticated', message: 'Please sign in to continue.' } });
     }
 
@@ -203,15 +208,58 @@ export function createMockApi() {
       const tripId = url.searchParams.get('trip') ?? '';
       const trip = tripOr404(tripId);
       if (!trip) return json(404, { ok: false, error: { code: 'not_found', message: 'Trip not found.' } });
-      const payload = body as { city_id?: string; label?: string };
+      const payload = body as {
+        city_id?: string;
+        label?: string;
+        item_id?: string;
+        photo_id?: string;
+      };
+      let cityId = payload.city_id ?? '';
+      if (payload.item_id) {
+        const item = trip.items.find((i) => i.id === payload.item_id);
+        if (item) cityId = item.city_id;
+      }
       trip.checkins.push({
         id: `chk_${randomUUID().replace(/-/g, '').slice(0, 10)}`,
         at: nowIso(),
-        city_id: payload.city_id ?? '',
-        label: payload.label ?? 'Check-in'
+        city_id: cityId,
+        label: payload.label ?? 'Check-in',
+        ...(payload.item_id ? { item_id: payload.item_id } : {}),
+        ...(payload.photo_id ? { photo_id: payload.photo_id } : {})
       });
       trip.updated_at = nowIso();
       return json(200, { ok: true, data: { trip, version: version(trip) } });
+    }
+
+    if (path === '/api/travel-photo' && method === 'POST') {
+      const tripId = url.searchParams.get('trip') ?? '';
+      if (!tripOr404(tripId)) {
+        return json(404, { ok: false, error: { code: 'not_found', message: 'Trip not found.' } });
+      }
+      const photoId = `tph_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+      // Local mock: accept any multipart upload and return an id; GET serves a 1×1 png.
+      photoBytes.set(photoId, { tripId, mime: 'image/png' });
+      return json(201, { ok: true, data: { photo_id: photoId } });
+    }
+    if (path === '/api/travel-photo' && method === 'GET') {
+      const photoId = url.searchParams.get('id') ?? '';
+      const token = url.searchParams.get('token');
+      const entry = photoBytes.get(photoId);
+      if (!entry) return json(404, { ok: false, error: { code: 'not_found', message: 'Photo not found.' } });
+      if (token) {
+        const share = shareTokens.get(token);
+        if (!share || share.tripId !== entry.tripId) {
+          return json(404, { ok: false, error: { code: 'not_found', message: 'Photo not found.' } });
+        }
+      } else if (!authenticated) {
+        return json(401, { ok: false, error: { code: 'unauthenticated', message: 'Please sign in to continue.' } });
+      }
+      // Tiny transparent PNG — binary responses use `raw` for the Vite plugin.
+      const png = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        'base64'
+      );
+      return { status: 200, body: null, raw: { contentType: entry.mime, buffer: png } };
     }
 
     if (path === '/api/travel-share' && method === 'POST') {
@@ -274,7 +322,7 @@ export function createMockApi() {
   return {
     handle,
     async handleNodeRequest(
-      req: { method?: string; url?: string; on: Function },
+      req: { method?: string; url?: string; headers?: Record<string, string | string[] | undefined>; on: Function },
       res: { statusCode: number; setHeader: Function; end: Function }
     ) {
       const chunks: Buffer[] = [];
@@ -283,25 +331,43 @@ export function createMockApi() {
         req.on('end', () => resolve());
       });
       let requestBody: unknown;
-      const raw = Buffer.concat(chunks).toString('utf8');
-      if (raw) {
+      const rawBuf = Buffer.concat(chunks);
+      const contentType = String(req.headers?.['content-type'] ?? '');
+      if (contentType.includes('multipart/form-data')) {
+        requestBody = { multipart: true };
+      } else if (rawBuf.length) {
         try {
-          requestBody = JSON.parse(raw);
+          requestBody = JSON.parse(rawBuf.toString('utf8'));
         } catch {
           requestBody = undefined;
         }
       }
-      const result = await handle(req.method ?? 'GET', req.url ?? '/', requestBody);
+      const result = (await handle(req.method ?? 'GET', req.url ?? '/', requestBody)) as {
+        status: number;
+        body: unknown;
+        raw?: { contentType: string; buffer: Buffer };
+      };
       res.statusCode = result.status;
+      if (result.raw) {
+        res.setHeader('Content-Type', result.raw.contentType);
+        res.end(result.raw.buffer);
+        return;
+      }
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(result.body));
     }
   };
 }
 
-/** §4 redaction (mirrors the eventual netlify-side `travel-redact.mjs`). */
+/** §4 redaction (mirrors netlify `travel-redact.mjs` for local public links). */
 function redactTrip(trip: Trip) {
-  const lastCheckin = trip.checkins[trip.checkins.length - 1];
+  const safeByItem = new Map<string, (typeof trip.checkins)[number]>();
+  for (const c of trip.checkins) {
+    if (!c.item_id) continue;
+    const prev = safeByItem.get(c.item_id);
+    if (!prev || c.at > prev.at) safeByItem.set(c.item_id, c);
+  }
+  const lastCheckin = [...trip.checkins].sort((a, b) => b.at.localeCompare(a.at))[0];
   return {
     ...trip,
     items: trip.items
@@ -313,7 +379,12 @@ function redactTrip(trip: Trip) {
         void link;
         void note;
         const withoutSource = 'source' in rest ? (({ source, ...r }) => r)(rest as { source?: string }) : rest;
-        return { ...withoutSource, note: '' };
+        const safe = safeByItem.get(item.id);
+        return {
+          ...withoutSource,
+          note: '',
+          ...(safe ? { safe_at: safe.at, ...(safe.photo_id ? { safe_photo_id: safe.photo_id } : {}) } : {})
+        };
       }),
     days: trip.days.map(({ penelope_prompt, ...rest }) => {
       void penelope_prompt;
@@ -325,7 +396,9 @@ function redactTrip(trip: Trip) {
       ? {
           at: lastCheckin.at,
           city_name: trip.cities.find((c) => c.id === lastCheckin.city_id)?.name ?? lastCheckin.city_id,
-          label: lastCheckin.label
+          label: lastCheckin.label,
+          ...(lastCheckin.item_id ? { item_id: lastCheckin.item_id } : {}),
+          ...(lastCheckin.photo_id ? { photo_id: lastCheckin.photo_id } : {})
         }
       : null
   };

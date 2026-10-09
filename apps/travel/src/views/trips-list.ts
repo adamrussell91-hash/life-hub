@@ -21,8 +21,8 @@ function statusLabel(start: string, end: string): string {
   return `Leaves in ${n} day${n === 1 ? '' : 's'}`;
 }
 
-/** Trips list (`#/`, TR-60): cards with title, dates, city chips and status,
- * plus a New trip form that stays reachable even when only one holiday exists. */
+/** Trips list (`#/`, TR-60): cards with title, dates, city chips and status.
+ * New trip opens as a docked sheet so phone actions stay tappable (R4). */
 export async function renderTripsList(canvas: HTMLElement, options: TripsListOptions): Promise<void> {
   canvas.replaceChildren();
   const { trips } = await listTrips();
@@ -43,7 +43,15 @@ export async function renderTripsList(canvas: HTMLElement, options: TripsListOpt
       ? 'Plan the next holiday from here.'
       : `${trips.length} trip${trips.length === 1 ? '' : 's'} · open one, or plan another.`;
   titleBlock.append(h1, sub);
-  top.append(titleBlock);
+  const acts = document.createElement('div');
+  acts.className = 'acts';
+  const newBtn = document.createElement('button');
+  newBtn.type = 'button';
+  newBtn.className = 'btn';
+  newBtn.textContent = trips.length === 0 ? 'Plan a trip' : 'New trip';
+  newBtn.addEventListener('click', () => openNewTripSheet(document.body, trips.length === 0));
+  acts.append(newBtn);
+  top.append(titleBlock, acts);
   wrap.append(top);
 
   if (trips.length === 0) {
@@ -83,17 +91,31 @@ export async function renderTripsList(canvas: HTMLElement, options: TripsListOpt
   }
   if (trips.length) wrap.append(list);
 
-  const newTripCard = document.createElement('section');
-  newTripCard.className = 'card trips-list__new';
-  newTripCard.setAttribute('aria-labelledby', 'new-trip-heading');
+  canvas.append(wrap);
 
-  const newTripForm = document.createElement('form');
-  newTripForm.className = 'addform trips-list__form';
-  newTripForm.noValidate = true;
+  if (trips.length === 0) {
+    openNewTripSheet(document.body, true);
+  }
+}
+
+function openNewTripSheet(hostParent: HTMLElement, emptyList: boolean): void {
+  const host = document.createElement('div');
+  hostParent.append(host);
+
+  const back = document.createElement('div');
+  back.className = 'sheet-back';
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet addform';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
 
   const heading = document.createElement('h3');
-  heading.id = 'new-trip-heading';
-  heading.textContent = trips.length === 0 ? 'Plan a trip' : 'New trip';
+  heading.textContent = emptyList ? 'Plan a trip' : 'New trip';
+  sheet.append(heading);
+
+  const form = document.createElement('form');
+  form.className = 'addform__form';
+  form.noValidate = true;
 
   const scroll = document.createElement('div');
   scroll.className = 'addform__scroll';
@@ -132,8 +154,17 @@ export async function renderTripsList(canvas: HTMLElement, options: TripsListOpt
   formError.className = 'hint';
   formError.hidden = true;
   formError.setAttribute('role', 'alert');
-
   scroll.append(grid, formError);
+  form.append(scroll);
+
+  function close(): void {
+    host.remove();
+  }
+
+  function showError(message: string): void {
+    formError.hidden = false;
+    formError.textContent = message;
+  }
 
   const actions = document.createElement('div');
   actions.className = 'addform__actions';
@@ -142,18 +173,15 @@ export async function renderTripsList(canvas: HTMLElement, options: TripsListOpt
   submit.type = 'submit';
   submit.className = 'btn';
   submit.textContent = 'Create trip';
-  actions.append(submit);
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'btn ghost';
+  cancel.textContent = 'Cancel';
+  cancel.addEventListener('click', close);
+  actions.append(submit, cancel);
+  form.append(actions);
 
-  newTripForm.append(heading, scroll, actions);
-  newTripCard.append(newTripForm);
-  wrap.append(newTripCard);
-
-  function showError(message: string): void {
-    formError.hidden = false;
-    formError.textContent = message;
-  }
-
-  newTripForm.addEventListener('submit', async (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     formError.hidden = true;
     const title = titleInput.value.trim();
@@ -172,6 +200,7 @@ export async function renderTripsList(canvas: HTMLElement, options: TripsListOpt
         start_date: startInput.value,
         end_date: endInput.value
       });
+      host.remove();
       location.hash = tripRoute(trip.id);
     } catch (err) {
       submit.disabled = false;
@@ -187,6 +216,7 @@ export async function renderTripsList(canvas: HTMLElement, options: TripsListOpt
       const text = await file.text();
       const parsed = JSON.parse(text);
       const { trip } = await createTrip({ import: parsed });
+      host.remove();
       location.hash = tripRoute(trip.id);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Could not import that file.');
@@ -194,7 +224,13 @@ export async function renderTripsList(canvas: HTMLElement, options: TripsListOpt
     }
   });
 
-  canvas.append(wrap);
+  sheet.append(form);
+  back.append(sheet);
+  back.addEventListener('click', (e) => {
+    if (e.target === back) close();
+  });
+  host.append(back);
+  titleInput.focus();
 }
 
 function labelled(labelText: string, control: HTMLElement, full = false): HTMLElement {

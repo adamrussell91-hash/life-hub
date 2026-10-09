@@ -27,6 +27,15 @@ export function redactTrip(trip) {
 
   const cityName = Object.fromEntries(cities.map((c) => [c.id, c.name]));
 
+  // Latest stop-level safe mark per itinerary item (for green ticks on the public day list).
+  const checkins = trip.checkins || [];
+  const safeByItem = new Map();
+  for (const c of checkins) {
+    if (!c?.item_id) continue;
+    const prev = safeByItem.get(c.item_id);
+    if (!prev || String(c.at) > String(prev.at)) safeByItem.set(c.item_id, c);
+  }
+
   const items = (trip.items || [])
     .filter((item) => !item.private && item.kind !== 'med')
     .map((item) => {
@@ -68,6 +77,11 @@ export function redactTrip(trip) {
         base.arrive_date = item.arrive_date;
         base.arrive_city_id = item.arrive_city_id;
       }
+      const safe = safeByItem.get(item.id);
+      if (safe) {
+        base.safe_at = safe.at;
+        if (safe.photo_id) base.safe_photo_id = safe.photo_id;
+      }
       return base;
     });
 
@@ -77,12 +91,14 @@ export function redactTrip(trip) {
     subtitle: d.subtitle
   }));
 
-  const latest = [...(trip.checkins || [])].sort((a, b) => b.at.localeCompare(a.at))[0];
+  const latest = [...checkins].sort((a, b) => b.at.localeCompare(a.at))[0];
   const checkin = latest
     ? {
         at: latest.at,
         city_name: cityName[latest.city_id] || latest.city_id,
-        label: latest.label
+        label: latest.label,
+        ...(latest.item_id ? { item_id: latest.item_id } : {}),
+        ...(latest.photo_id ? { photo_id: latest.photo_id } : {})
       }
     : null;
 

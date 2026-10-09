@@ -100,10 +100,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .trips-list__card { display: block; text-decoration: none; margin-top: 0; cursor: pointer; }
 .trips-list__card .chips { padding-top: 8px; overflow: visible; flex-wrap: wrap; }
 .trips-list__card .chip { cursor: inherit; min-width: 0; }
-.trips-list__new { margin-top: 18px; padding: 16px 16px 0; }
-.trips-list__form { display: flex; flex-direction: column; gap: 0; }
-.trips-list__form .addform__scroll { overflow: visible; }
-.trips-list__form .addform__actions { margin-top: 4px; }
+.trips-list .top .acts .btn { min-height: 2.75rem; }
 .trip-empty-cities { margin-top: 12px; padding: 18px 16px; cursor: default; }
 .trip-empty-cities .btn { margin-top: 12px; min-height: 2.75rem; }
 .place-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
@@ -234,6 +231,33 @@ details.tobook[open] summary::after { content: "Hide"; }
 .tag.idea { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
 .tag.med { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
 .tag.post { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
+
+/* Marked safe on itinerary stops (owner + public link) */
+.safe-mark {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .75rem; font-weight: 600; border-radius: 999px;
+  padding: 4px 10px 4px 8px; border: 0; background: var(--pastel-sage); color: var(--pastel-sage-ink);
+}
+.safe-mark svg { width: 14px; height: 14px; flex: none; }
+.safe-mark.is-safe { background: #d7eddf; color: var(--success); }
+.safe-mark__btn {
+  cursor: pointer; background: var(--paper); color: var(--success);
+  box-shadow: inset 0 0 0 1.5px rgba(47,122,79,.45);
+  min-height: 2rem;
+}
+.safe-mark__btn:hover { background: #d7eddf; }
+.safe-mark__photo-btn { display: inline-flex; align-items: center; gap: 4px; min-height: 2rem; }
+.safe-mark__photo-btn svg { width: 14px; height: 14px; }
+.safe-mark__photo {
+  display: block; width: 100%; max-width: 280px; max-height: 180px; object-fit: cover;
+  border-radius: var(--radius-sm); margin-top: 8px; flex: 1 1 100%;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.safe-photo-preview {
+  display: block; width: 100%; max-height: 200px; object-fit: cover;
+  border-radius: var(--radius-sm); margin-top: 8px;
+}
+.card .meta:has(.safe-mark__photo) { align-items: flex-start; }
 .price { font-weight: 600; }
 .price small { color: var(--muted); font-weight: 500; }
 .go { display: flex; align-items: center; gap: 8px; font-size: .75rem; color: var(--muted); padding: 6px 0 2px; }
