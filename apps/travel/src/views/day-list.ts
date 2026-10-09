@@ -26,6 +26,8 @@ export interface DayListOptions {
   onEdit?: (item: Item) => void;
   onAddAt?: (cityId: string, date: string) => void;
   onTellPenelope?: (prompt: string) => void;
+  /** Owner: edit Soft Landing tips for this city. */
+  onEditArrivalGuide?: () => void;
   /** Owner: open mark-safe / add-photo sheet for this stop. */
   onMarkSafe?: (item: Item, mode: 'mark' | 'photo') => void;
 }
@@ -349,7 +351,7 @@ export function renderDayList(
   const list = document.createElement('div');
   list.className = 'list';
 
-  if (showArrivalGuide(trip, cityId, date) && city?.arrival_guide) {
+  if (showArrivalGuide(trip, cityId, date) && (city?.arrival_guide || options.onEditArrivalGuide)) {
     const guide = document.createElement('details');
     guide.className = 'card landing';
     guide.open = true;
@@ -360,10 +362,10 @@ export function renderDayList(
     const k = document.createElement('span');
     k.className = 'k';
     k.textContent = 'Soft landing';
-    heading.append(k, city.arrival_guide.title);
+    heading.append(k, city?.arrival_guide?.title || `Landing in ${city?.name ?? 'city'}`);
     summary.append(heading);
     const dl = document.createElement('dl');
-    for (const row of city.arrival_guide.rows) {
+    for (const row of city?.arrival_guide?.rows || []) {
       const dt = document.createElement('dt');
       dt.innerHTML = guideIconHtml(row.icon);
       const dd = document.createElement('dd');
@@ -371,6 +373,18 @@ export function renderDayList(
       dl.append(dt, dd);
     }
     guide.append(summary, dl);
+    if (!options.isPublic && options.onEditArrivalGuide) {
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'mini landing-edit';
+      edit.textContent = 'Edit tips';
+      edit.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        options.onEditArrivalGuide?.();
+      });
+      guide.append(edit);
+    }
     list.append(guide);
   }
 

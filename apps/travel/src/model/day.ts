@@ -127,6 +127,16 @@ export function travelDayCue(trip: Trip, cityId: string, date: IsoDate): string 
   return overnightTravelCue(trip, cityId, date);
 }
 
+/**
+ * Caption under a day chip. A custom `days[].subtitle` wins alone (does not
+ * append the auto travel cue) so wrong auto labels can be replaced cleanly.
+ */
+export function dayBarCaption(trip: Trip, cityId: string, date: IsoDate): string | null {
+  const subtitle = trip.days.find((d) => d.city_id === cityId && d.date === date)?.subtitle?.trim();
+  if (subtitle) return subtitle;
+  return travelDayCue(trip, cityId, date);
+}
+
 function toIsoUtc(d: Date): IsoDate {
   return d.toISOString().slice(0, 10);
 }
