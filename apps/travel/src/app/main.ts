@@ -88,7 +88,8 @@ async function bootApp(root: HTMLElement): Promise<void> {
         // Always show the list at #/ so New trip stays reachable with one holiday.
         // Bare /travel/ (empty hash) opens the primary trip in bootApp instead.
         renderHighlight('trips');
-        renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: 'Trips' });
+        // Title lives in the list canvas (same pattern as the trip page), not a second h1.
+        renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: '' });
         await renderTripsList(shell.canvas, { isCurrent: () => generation === routeGeneration });
         return;
       }
