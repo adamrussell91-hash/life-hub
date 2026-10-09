@@ -56,7 +56,7 @@ describe('latestSafeForItem / safeByItemId', () => {
   });
 
   it('maps each stop to its latest mark', () => {
-    const map = safeByItemId({ checkins });
+    const map = safeByItemId(checkins);
     expect(map.get('itm_a')?.id).toBe('2');
     expect(map.size).toBe(1);
   });

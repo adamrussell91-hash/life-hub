@@ -5,6 +5,7 @@ import {
   readJson,
   PRIVATE_CACHE
 } from './_shared/travel-http.mjs';
+import { isPhotoId } from './_shared/travel-blobs.mjs';
 import { makeId, validateTrip } from './_shared/travel-schema.mjs';
 
 export const config = { path: '/api/travel-checkins' };
@@ -14,8 +15,7 @@ export function createTravelCheckinsHandler(deps = {}) {
     if (request.method !== 'POST') {
       return errorResponse(405, 'method_not_allowed', 'Use POST.', false, PRIVATE_CACHE);
     }
-    const url = new URL(request.url);
-    const tripId = url.searchParams.get('trip');
+    const tripId = new URL(request.url).searchParams.get('trip');
     const body = await readJson(request);
     if (!tripId || !body?.city_id || !body?.label) {
       return errorResponse(
@@ -30,7 +30,7 @@ export function createTravelCheckinsHandler(deps = {}) {
     const ifVersion = body.if_version || version;
 
     let cityId = String(body.city_id);
-    let itemId = typeof body.item_id === 'string' && body.item_id.trim() ? body.item_id.trim() : undefined;
+    const itemId = typeof body.item_id === 'string' && body.item_id.trim() ? body.item_id.trim() : undefined;
     if (itemId) {
       const item = (trip.items || []).find((i) => i.id === itemId);
       if (!item) {
@@ -42,8 +42,8 @@ export function createTravelCheckinsHandler(deps = {}) {
       return errorResponse(400, 'validation_error', 'city_id is not on this trip.', false, PRIVATE_CACHE);
     }
 
-    let photoId = typeof body.photo_id === 'string' && body.photo_id.trim() ? body.photo_id.trim() : undefined;
-    if (photoId && !/^tph_[a-z0-9]+$/i.test(photoId)) {
+    const photoId = typeof body.photo_id === 'string' && body.photo_id.trim() ? body.photo_id.trim() : undefined;
+    if (photoId && !isPhotoId(photoId)) {
       return errorResponse(400, 'validation_error', 'photo_id is invalid.', false, PRIVATE_CACHE);
     }
 

@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from '@/api/client';
+import { ApiClientError, apiDelete, apiGet, apiPatch, apiPost, parseApiResponse } from '@/api/client';
 import { getApiBaseUrl } from '@/api/config';
 import type { Checkin, Item, ItemDraft, Place, Trip, TripSummary } from '@/types';
 
@@ -78,18 +78,14 @@ export async function uploadTravelPhoto(tripId: string, file: File): Promise<{ p
     body: form,
     credentials: 'include'
   });
-  const text = await response.text();
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new Error(`Photo upload failed (HTTP ${response.status})`);
+  const result = await parseApiResponse<{ photo_id: string }>(response);
+  if (!result.ok) {
+    throw new ApiClientError(result.error, response.status, result.data);
   }
-  const body = parsed as { ok?: boolean; data?: { photo_id?: string }; error?: { message?: string } };
-  if (!body.ok || !body.data?.photo_id) {
-    throw new Error(body.error?.message || 'Photo upload failed.');
+  if (!result.data?.photo_id) {
+    throw new ApiClientError({ code: 'invalid_response', message: 'Photo upload failed.' }, response.status);
   }
-  return { photo_id: body.data.photo_id };
+  return { photo_id: result.data.photo_id };
 }
 
 export function travelPhotoUrl(photoId: string, shareToken?: string | null): string {

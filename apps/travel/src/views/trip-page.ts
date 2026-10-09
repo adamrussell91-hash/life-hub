@@ -477,10 +477,8 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     document.body.append(formHost);
     renderSafePhotoSheet(formHost, {
       item,
-      mode: 'photo',
       onClose: () => formHost.remove(),
       onConfirm: async (file) => {
-        if (!file) throw new Error('Choose a photo to share.');
         const uploaded = await uploadTravelPhoto(tripId, file);
         await markItemSafe(item, uploaded.photo_id);
         formHost.remove();

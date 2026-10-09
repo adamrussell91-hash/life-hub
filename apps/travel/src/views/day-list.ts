@@ -12,7 +12,7 @@ import {
   orderDayItems,
   showArrivalGuide
 } from '@/model/day';
-import { canMarkSafe, formatSafeTime, latestSafeForItem } from '@/lib/safe-mark';
+import { canMarkSafe, formatSafeTime, safeByItemId } from '@/lib/safe-mark';
 import { I } from '@/lib/icons';
 
 export interface DayListOptions {
@@ -30,6 +30,8 @@ export interface DayListOptions {
   onMarkSafe?: (item: Item, mode: 'mark' | 'photo') => void;
 }
 
+type PublicSafeFields = { safe_at?: string; safe_photo_id?: string };
+
 function guideIconHtml(icon: string): string {
   const map: Record<string, string> = { phone: I.phone, transport: I.train, money: I.money, weather: I.temp, paperwork: I.doc };
   return map[icon] ?? I.doc;
@@ -46,14 +48,13 @@ function tagFor(item: Item): { cls: string; label: string } | null {
 
 function resolveSafe(
   item: Item,
-  options: DayListOptions,
-  checkins: Checkin[] | undefined
+  byItem: Map<string, Checkin>
 ): { at: string; photoId?: string } | null {
-  const publicItem = item as Item & { safe_at?: string; safe_photo_id?: string };
+  const publicItem = item as Item & PublicSafeFields;
   if (publicItem.safe_at) {
     return { at: publicItem.safe_at, photoId: publicItem.safe_photo_id };
   }
-  const live = latestSafeForItem(checkins, item.id);
+  const live = byItem.get(item.id);
   return live ? { at: live.at, photoId: live.photo_id } : null;
 }
 
@@ -61,10 +62,10 @@ function appendSafeMark(
   meta: HTMLElement,
   item: Item,
   options: DayListOptions,
-  checkins: Checkin[] | undefined
+  byItem: Map<string, Checkin>
 ): void {
   if (!canMarkSafe(item)) return;
-  const safe = resolveSafe(item, options, checkins);
+  const safe = resolveSafe(item, byItem);
   const tz = options.cityTz || 'UTC';
 
   if (safe) {
@@ -113,8 +114,8 @@ function renderCard(
   item: Item,
   number: number | undefined,
   options: DayListOptions,
-  hop?: Hop,
-  checkins?: Checkin[]
+  hop: Hop | undefined,
+  byItem: Map<string, Checkin>
 ): HTMLElement {
   const stop = document.createElement('div');
   stop.className = 'stop';
@@ -274,7 +275,7 @@ function renderCard(
       mapsLink.textContent = useNaver ? 'Naver Map ↗' : 'Directions in Google Maps ↗';
       meta.append(mapsLink);
     }
-    appendSafeMark(meta, item, options, checkins);
+    appendSafeMark(meta, item, options, byItem);
   }
 
   if (!options.isPublic && options.onEdit) {
@@ -380,6 +381,7 @@ export function renderDayList(
     list.append(empty);
   }
 
+  const safeByItem = safeByItemId(trip.checkins);
   for (const item of ordered) {
     if (item.kind === 'checkin_slot') {
       const row = document.createElement('div');
@@ -429,7 +431,7 @@ export function renderDayList(
       const fallback = hopFallback(item, next);
       if (fallback) hop = { mode: 'walk', minutes: fallback.minutes };
     }
-    list.append(renderCard(item, numbers.get(item.id), listOptions, hop, trip.checkins));
+    list.append(renderCard(item, numbers.get(item.id), listOptions, hop, safeByItem));
   }
 
   if (!options.isPublic) {

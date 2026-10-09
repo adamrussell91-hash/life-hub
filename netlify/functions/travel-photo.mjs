@@ -9,6 +9,7 @@ import {
 } from './_shared/travel-http.mjs';
 import {
   defaultGetTravelStore,
+  isPhotoId,
   newPhotoId,
   photoBytesKey,
   photoMetaKey
@@ -85,21 +86,18 @@ export function createTravelPhotoUploadHandler(deps = {}) {
   }, deps);
 }
 
-async function loadPhotoResponse(store, photoId, expectedTripId) {
-  let metaRaw;
+async function readPhotoMeta(store, photoId) {
   try {
-    metaRaw = await store.get(photoMetaKey(photoId), { type: 'text' });
-  } catch {
-    metaRaw = null;
-  }
-  if (!metaRaw) return null;
-  let meta;
-  try {
-    meta = JSON.parse(metaRaw);
+    const raw = await store.get(photoMetaKey(photoId), { type: 'text' });
+    return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
-  if (expectedTripId && meta.trip_id !== expectedTripId) return null;
+}
+
+async function loadPhotoResponse(store, photoId, expectedTripId) {
+  const meta = await readPhotoMeta(store, photoId);
+  if (!meta || (expectedTripId && meta.trip_id !== expectedTripId)) return null;
   const result = await store.getWithMetadata(photoBytesKey(photoId), { type: 'arrayBuffer' });
   if (!result?.data) return null;
   const contentType =
@@ -141,7 +139,7 @@ export function createTravelPhotoGetHandler(deps = {}) {
     const url = new URL(request.url);
     const photoId = url.searchParams.get('id');
     const token = url.searchParams.get('token');
-    if (!photoId || !/^tph_[a-z0-9]+$/i.test(photoId)) {
+    if (!isPhotoId(photoId)) {
       return httpError(404, 'not_found', 'Photo not found.', false, { 'cache-control': 'no-store' });
     }
 

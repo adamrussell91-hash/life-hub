@@ -1,6 +1,7 @@
 /** Netlify Blobs store for Travel place photos on safe check-ins. */
 
 export const TRAVEL_CONTENT_STORE = 'life-hub-travel';
+export const PHOTO_ID_RE = /^tph_[a-z0-9]+$/i;
 
 export function photoMetaKey(id) {
   return `photos/${id}.json`;
@@ -8,6 +9,10 @@ export function photoMetaKey(id) {
 
 export function photoBytesKey(id) {
   return `photos/${id}.bin`;
+}
+
+export function isPhotoId(id) {
+  return typeof id === 'string' && PHOTO_ID_RE.test(id);
 }
 
 export async function defaultGetTravelStore(env = process.env) {

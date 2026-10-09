@@ -3,12 +3,11 @@ import { I } from '@/lib/icons';
 
 export interface SafePhotoSheetOptions {
   item: Item;
-  mode: 'mark' | 'photo';
-  onConfirm: (file: File | null) => void | Promise<void>;
+  onConfirm: (file: File) => void | Promise<void>;
   onClose: () => void;
 }
 
-/** Sheet to mark a stop safe, optionally with a place photo for followers (R4). */
+/** Sheet to attach a place photo for followers after a stop is marked safe (R4). */
 export function renderSafePhotoSheet(host: HTMLElement, options: SafePhotoSheetOptions): void {
   host.replaceChildren();
 
@@ -20,12 +19,9 @@ export function renderSafePhotoSheet(host: HTMLElement, options: SafePhotoSheetO
   sheet.setAttribute('aria-modal', 'true');
 
   const heading = document.createElement('h3');
-  heading.textContent = options.mode === 'photo' ? 'Add a photo' : 'Mark safe';
+  heading.textContent = 'Add a photo';
   const blurb = document.createElement('p');
-  blurb.textContent =
-    options.mode === 'photo'
-      ? `Share a photo of ${options.item.title} with people on the public link.`
-      : `Tick ${options.item.title} as safe. Followers on the public link see the time you marked it — add a photo if you want.`;
+  blurb.textContent = `Share a photo of ${options.item.title} with people on the public link.`;
   sheet.append(heading, blurb);
 
   const form = document.createElement('form');
@@ -41,7 +37,7 @@ export function renderSafePhotoSheet(host: HTMLElement, options: SafePhotoSheetO
   fileLabel.className = 'full';
   const flabel = document.createElement('span');
   flabel.className = 'flabel';
-  flabel.textContent = options.mode === 'photo' ? 'Photo' : 'Photo (optional)';
+  flabel.textContent = 'Photo';
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
   fileInput.accept = 'image/jpeg,image/png,image/webp,image/gif';
@@ -83,7 +79,7 @@ export function renderSafePhotoSheet(host: HTMLElement, options: SafePhotoSheetO
   const saveBtn = document.createElement('button');
   saveBtn.type = 'submit';
   saveBtn.className = 'btn';
-  saveBtn.innerHTML = `${I.check}${options.mode === 'photo' ? 'Save photo' : 'Mark safe'}`;
+  saveBtn.innerHTML = `${I.check}Save photo`;
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.className = 'btn ghost';
@@ -95,8 +91,8 @@ export function renderSafePhotoSheet(host: HTMLElement, options: SafePhotoSheetO
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     errorNote.hidden = true;
-    const file = fileInput.files?.[0] ?? null;
-    if (options.mode === 'photo' && !file) {
+    const file = fileInput.files?.[0];
+    if (!file) {
       errorNote.hidden = false;
       errorNote.textContent = 'Choose a photo to share.';
       return;
