@@ -188,4 +188,45 @@ describe('Today view mutations', () => {
     expect(canvas.querySelector('.canvas-status')).toBeNull();
     expect(canvas.textContent).toContain('Nothing due today');
   });
+
+  it('keeps window scroll when ticking Done remounts Today', async () => {
+    const open = task({ id: 'task_tick', title: 'Tick me', due_time: '09:00' });
+    const done = task({
+      id: 'task_tick',
+      title: 'Tick me',
+      due_time: '09:00',
+      status: 'done',
+      completed_at: new Date().toISOString()
+    });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
+    vi.mocked(tasksApi.updateTask).mockResolvedValue(done);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'hub-canvas';
+    const canvas = document.createElement('div');
+    canvas.className = 'hub-canvas__body';
+    wrap.append(canvas);
+    document.body.append(wrap);
+    await renderDayView(canvas);
+
+    // Refetch after Done returns the completed task (drops off the Today plate).
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([done]);
+
+    window.scrollTo(0, 520);
+    wrap.scrollTop = 180;
+    canvas.scrollTop = 40;
+
+    canvas.querySelector<HTMLButtonElement>('.card-menu')?.click();
+    document.querySelector<HTMLButtonElement>('[data-card-menu-item="toggle"]')?.click();
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(tasksApi.updateTask)).toHaveBeenCalledWith('task_tick', { status: 'done' });
+    });
+    await vi.waitFor(() => {
+      expect(canvas.textContent).toContain('Nothing due today');
+    });
+    expect(window.scrollY).toBe(520);
+    expect(wrap.scrollTop).toBe(180);
+    expect(canvas.scrollTop).toBe(40);
+  });
 });

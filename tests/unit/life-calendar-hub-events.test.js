@@ -124,9 +124,10 @@ test('source: tasks-hub:tasks-changed repaints calendar so Day Dial is not left 
   assert.ok(start >= 0);
   const handler = src.slice(start, src.indexOf('bind(windowTarget, \'hashchange\'', start));
   assert.match(handler, /tasksEventsFromTasks/);
+  // keepScroll wraps the remount so a tick does not throw the page to the top (I12).
   assert.match(
     handler,
-    /if \(currentSection === 'calendar'\) renderCalendarSection\(\)/,
+    /if \(currentSection === 'calendar'\) keepScroll\(\(\) => renderCalendarSection\(\)\)/,
     'Clare dump / board edits must remount Day Dial and Week from the merged tasks'
   );
 });

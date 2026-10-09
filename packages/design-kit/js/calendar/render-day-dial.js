@@ -795,10 +795,34 @@ function ensureHatch(target) {
   s('circle', { cx: 3.5, cy: 3.5, r: 1, fill: 'color-mix(in srgb, var(--navy) 28%, transparent)' }, speckle);
 }
 
+/** Capture page scroll before a remount wipe — replaceChildren collapses height and drops it. */
+function capturePageScroll(documentRef, view) {
+  const se = documentRef?.scrollingElement || documentRef?.documentElement;
+  const main = documentRef?.querySelector?.('main');
+  return {
+    se,
+    seTop: Number(se?.scrollTop ?? 0),
+    main,
+    mainTop: Number(main?.scrollTop ?? 0),
+    winX: Number(view?.scrollX ?? 0),
+    winY: Number(view?.scrollY ?? 0),
+    view
+  };
+}
+
+function restorePageScroll(saved) {
+  if (!saved) return;
+  if (saved.se) saved.se.scrollTop = saved.seTop;
+  if (saved.main) saved.main.scrollTop = saved.mainTop;
+  saved.view?.scrollTo?.(saved.winX, saved.winY);
+}
+
 function mount({ entrance = false } = {}) {
   const view = doc.defaultView;
   // Focus lives on the chosen day across a re-layout; read it before the DOM goes.
   const keepFocus = Boolean(root && doc.activeElement && root.contains?.(doc.activeElement) && doc.activeElement.closest?.('[data-day]'));
+  // Tick / source refresh remounts the dial in place. Keep the page where the user was.
+  const savedScroll = entrance ? null : capturePageScroll(doc, view);
   engine?.dispose();
   engine = null;
   clearTimeout(toastTimer);
@@ -926,13 +950,21 @@ function mount({ entrance = false } = {}) {
     lastHostW = Math.round(host.getBoundingClientRect?.().width || lastHostW);
     settleZoomPills(zoom);
     applyHubPillsThumb(viewPills);
+    // Height may still be settling after the wipe; restore again so the page does not stay at top.
+    restorePageScroll(savedScroll);
   };
-  if (typeof view?.requestAnimationFrame === 'function') view.requestAnimationFrame(settle);
-  else settle();
+  restorePageScroll(savedScroll);
+  if (typeof view?.requestAnimationFrame === 'function') {
+    view.requestAnimationFrame(() => {
+      restorePageScroll(savedScroll);
+      settle();
+    });
+  } else settle();
   if (keepFocus) nodes.get(`wd:${state.day}`)?.focus?.({ preventScroll: true });
   wire(root);
   publish(view);
   if (state.toast && Date.now() < state.toast.until) showToast(state.toast.html, { resume: true });
+  restorePageScroll(savedScroll);
 }
 
 function mountDial(size) {

@@ -161,7 +161,15 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
       return true;
     });
     const prefs = preferredDomains(today);
-    const scrollTop = canvas.scrollTop;
+    // Today remounts the dial + list on every tick. Preserve the real scroll hosts
+    // (window and .hub-canvas wrap) — canvas.scrollTop alone is often 0.
+    const scrollHost = canvas.closest('.hub-canvas');
+    const saved = {
+      canvasTop: canvas.scrollTop,
+      hostTop: scrollHost instanceof HTMLElement ? scrollHost.scrollTop : 0,
+      windowX: window.scrollX,
+      windowY: window.scrollY
+    };
 
     canvas.replaceChildren();
     canvas.append(
@@ -295,11 +303,17 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
 
     remountDial();
 
+    function restoreTodayScroll(): void {
+      canvas.scrollTop = saved.canvasTop;
+      if (scrollHost instanceof HTMLElement) scrollHost.scrollTop = saved.hostTop;
+      window.scrollTo(saved.windowX, saved.windowY);
+    }
+
     if (!list.length) {
       canvas.append(
         el('p', 'empty-state', 'Nothing due today in the preferred domains. Check Backlog or Week.')
       );
-      canvas.scrollTop = scrollTop;
+      restoreTodayScroll();
       return;
     }
     const stack = el('div', 'task-stack');
@@ -320,7 +334,7 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
       );
     }
     canvas.append(stack);
-    canvas.scrollTop = scrollTop;
+    restoreTodayScroll();
   }
 
   paint();
