@@ -187,7 +187,7 @@
   margin-top: var(--space-3);
 }
 .aes-wheel { min-width: 0; }
-.aes-wheel__svg { display: block; width: min(100%, 26rem); height: auto; margin-inline: auto; }
+.aes-wheel__svg { display: block; width: min(100%, 27rem); height: auto; margin-inline: auto; overflow: visible; }
 .aes-wheel__disc { fill: var(--cotton); }
 .aes-wheel__wedge { fill-opacity: 0.22; stroke: var(--paper); stroke-width: 2; }
 .aes-wheel__flabel,

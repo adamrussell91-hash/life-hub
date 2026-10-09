@@ -430,12 +430,12 @@ export function createAesthetics(doc, {
     }
     const partner = picks.find(p => p.partner.name === state.comboPartner)?.partner ?? null;
 
-    const size = 420;
+    const size = 440;
     const cx = size / 2;
     const cy = size / 2;
-    const rOuter = 168;
-    const rInner = 108;
-    const rLabel = 188;
+    const rOuter = 162;
+    const rInner = 104;
+    const rLabel = 198;
     const wedge = (Math.PI * 2) / WHEEL_FAMILIES.length;
     const familyPaths = WHEEL_FAMILIES.map((family, i) => {
       const a0 = -Math.PI / 2 + i * wedge + 0.02;
