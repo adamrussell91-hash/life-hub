@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { emptyJournalDocument } from '@/api/journal';
 import { renderJournal } from '@/journal/render-journal';
 import { klIstanbulFixture } from '@/journal/fixtures/kl-istanbul';
 
@@ -84,6 +85,17 @@ describe('renderJournal', () => {
     await flushAnimationFrames();
     expect(scrollIntoView).toHaveBeenCalled();
     expect(scrollIntoView.mock.calls[0]?.[0]).toMatchObject({ behavior: 'auto' });
+  });
+
+  it('shows empty trip actions without invented media', () => {
+    const root = document.createElement('div');
+    const empty = emptyJournalDocument('trp_empty');
+    renderJournal(root, { fixture: empty, displayTitle: 'Summer break' });
+    expect(root.querySelector('[data-journal-empty]')).toBeTruthy();
+    expect(root.querySelector('.journal-empty__photos')?.textContent).toBe('Add photos');
+    expect(root.querySelector('.journal-empty__moment')?.textContent).toBe('Add moment');
+    expect(root.querySelector('[data-journal-moment]')).toBeNull();
+    expect(root.querySelector('.journal-toolbar__title')?.textContent).toBe('Summer break');
   });
 
   it('uses toolbar h1 for trip title and enables Add moment', () => {

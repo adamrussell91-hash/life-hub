@@ -5,6 +5,7 @@ import { getPattern } from '@/journal/patterns/registry';
 import { shouldShowDayMapPreview } from '@/journal/layout';
 import { openChapterJump } from '@/journal/chapter-jump';
 import { journalImportChecksums } from '@/journal/import-review';
+import { isJournalStoryEmpty, resolveCaptureContext } from '@/journal/capture-context';
 import { openCaptureSheet } from '@/journal/capture-sheet';
 import { openImportSheet } from '@/journal/import-sheet';
 import { renderToolbar } from '@/journal/render-toolbar';
@@ -18,6 +19,8 @@ export interface RenderJournalOptions {
   momentId?: string;
   patternOff?: boolean;
   journalVersion?: string;
+  /** Trip title when journal.title is still empty (live API journal). */
+  displayTitle?: string;
   onChapterJump?: (id: string) => void;
 }
 
@@ -142,23 +145,6 @@ function scrollToChapter(
   onChapterJump?.(id);
 }
 
-function resolveCaptureContext(
-  fixture: JournalFixture,
-  dayId?: string,
-): { legId: string; localDate: string } | null {
-  if (dayId) {
-    const day = fixture.days.find((d) => d.id === dayId);
-    if (day) return { legId: day.leg_id, localDate: day.local_date };
-  }
-  const empty = fixture.days.find((d) => d.empty_marker);
-  if (empty) return { legId: empty.leg_id, localDate: empty.local_date };
-  const firstDay = [...fixture.days].sort((a, b) => a.local_date.localeCompare(b.local_date))[0];
-  if (firstDay) return { legId: firstDay.leg_id, localDate: firstDay.local_date };
-  const firstLeg = [...fixture.legs].sort((a, b) => a.order - b.order)[0];
-  if (firstLeg?.start_date) return { legId: firstLeg.id, localDate: firstLeg.start_date };
-  return null;
-}
-
 function persistLastView(tripId: string, momentId: string): void {
   try {
     localStorage.setItem(LAST_VIEW_KEY(tripId), momentId);
@@ -183,6 +169,8 @@ export function renderJournal(
   let captureOverlay: { destroy(): void } | null = null;
 
   const journalDoc = opts.fixture as JournalDocument;
+  const toolbarTitle =
+    opts.displayTitle?.trim() || opts.fixture.title.trim() || 'Your trip';
 
   function openImport(initialFiles?: File[]): void {
     importOverlay?.destroy();
@@ -210,6 +198,7 @@ export function renderJournal(
       legId: ctx.legId,
       localDate: ctx.localDate,
       journal: journalDoc,
+      tripTitle: toolbarTitle,
       version: opts.journalVersion ?? 'fixture',
       anchor: root,
       onImportPhotos: (files) => openImport(files),
@@ -224,7 +213,7 @@ export function renderJournal(
   }
 
   const toolbar = renderToolbar({
-    title: opts.fixture.title,
+    title: toolbarTitle,
     onAddMoment: () => openCapture(),
     onImportPhotos: () => {
       openImport();
@@ -251,6 +240,37 @@ export function renderJournal(
 
   const story = document.createElement('div');
   story.className = 'journal__story';
+
+  const storyEmpty = isJournalStoryEmpty(opts.fixture);
+
+  if (storyEmpty) {
+    const empty = document.createElement('div');
+    empty.className = 'journal-empty';
+    empty.setAttribute('data-journal-empty', '');
+
+    const lead = document.createElement('p');
+    lead.className = 'journal-empty__lead';
+    lead.textContent = 'Your story starts here — add photos or capture a moment.';
+
+    const actions = document.createElement('div');
+    actions.className = 'journal-empty__actions';
+
+    const photosBtn = document.createElement('button');
+    photosBtn.type = 'button';
+    photosBtn.className = 'btn btn--secondary journal-empty__photos';
+    photosBtn.textContent = 'Add photos';
+    photosBtn.addEventListener('click', () => openImport());
+
+    const momentBtn = document.createElement('button');
+    momentBtn.type = 'button';
+    momentBtn.className = 'btn btn--primary journal-empty__moment';
+    momentBtn.textContent = 'Add moment';
+    momentBtn.addEventListener('click', () => openCapture());
+
+    actions.append(photosBtn, momentBtn);
+    empty.append(lead, actions);
+    story.append(empty);
+  }
 
   const legs = [...opts.fixture.legs].sort((a, b) => a.order - b.order);
 

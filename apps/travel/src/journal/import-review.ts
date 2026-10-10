@@ -33,6 +33,8 @@ export interface ImportFileEntry {
   skipReason?: string;
   error?: string;
   inspected?: InspectedPhoto;
+  /** Stable R2 media id for this import row — reused on retry / IDB restore. */
+  mediaId?: string;
 }
 
 export interface ImportBatchSummary {
@@ -87,6 +89,23 @@ export function importFileNeedsBlob(entry: ImportFileEntry, blobs: Map<string, B
 
 export function stableOperationId(tripId: string, checksum: string): string {
   return `op_imp_${tripId}_${checksum.slice(0, 24)}`;
+}
+
+export function resolveImportMediaId(
+  entry: ImportFileEntry,
+  allocate: () => string,
+): ImportFileEntry {
+  if (entry.mediaId) return entry;
+  return { ...entry, mediaId: allocate() };
+}
+
+/** Import rows that still need an upload attempt (excludes duplicates and finished rows). */
+export function importFilesPendingUpload(files: ImportFileEntry[]): ImportFileEntry[] {
+  return files.filter(
+    (f) =>
+      !f.skipReason &&
+      (f.state === 'proposed' || f.state === 'failed' || f.state === 'partially_complete'),
+  );
 }
 
 export function createImportFile(tripId: string, checksum: string, name: string): ImportFileEntry {

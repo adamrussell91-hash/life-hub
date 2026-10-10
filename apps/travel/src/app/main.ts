@@ -28,7 +28,7 @@ import { renderTripsList } from '@/views/trips-list';
 import { renderTripPage } from '@/views/trip-page';
 import { renderTodayView } from '@/views/today';
 import { renderPublicTrip } from '@/views/public-trip';
-import { listTrips } from '@/api/travel';
+import { getTrip, listTrips } from '@/api/travel';
 import { pickPrimaryTrip } from '@/lib/pick-trip';
 import { registerServiceWorker, mountOfflineBanner } from '@/lib/offline';
 
@@ -123,16 +123,26 @@ async function bootApp(root: HTMLElement): Promise<void> {
         journalHandle?.destroy();
         let fixture: JournalFixture;
         let journalVersion: string | undefined;
+        let displayTitle: string | undefined;
         if (journalUseFixture()) {
           fixture = klIstanbulFixture();
         } else {
           const envelope = await ensureJournal(route.tripId);
           fixture = envelope.journal;
           journalVersion = envelope.version;
+          if (!fixture.title.trim()) {
+            try {
+              const { trip } = await getTrip(route.tripId);
+              displayTitle = trip.title;
+            } catch {
+              /* title stays blank until trip load works */
+            }
+          }
         }
         journalHandle = renderJournal(shell.canvas, {
           fixture,
           journalVersion,
+          displayTitle,
           momentId: route.momentId,
           patternOff: journalPatternOff()
         });

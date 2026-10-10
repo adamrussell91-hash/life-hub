@@ -9,8 +9,10 @@ import {
   deriveBatchSummary,
   duplicateSkipReason,
   importFileNeedsBlob,
+  importFilesPendingUpload,
   loadImportProposal,
   mergeMomentGroups,
+  resolveImportMediaId,
   saveImportProposal,
   splitMomentGroup,
   stableOperationId,
@@ -296,6 +298,8 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
 
   async function runUpload(): Promise<void> {
     if (files.some((f) => importFileNeedsBlob(f, blobs))) return;
+    files = files.map((f) => resolveImportMediaId(f, makeMediaId));
+    await persist();
     const queue = new UploadQueue({
       concurrency: 2,
       upload: async (task) => {
@@ -347,22 +351,27 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
       },
     });
 
-    const tasks = files
-      .filter(
-        (f) =>
-          !f.skipReason &&
-          (f.state === 'proposed' || f.state === 'failed' || f.state === 'partially_complete')
-      )
-      .map((f) => {
+    for (const f of files) {
+      if (f.state === 'complete' && !f.skipReason) {
+        queue.markComplete(f.operationId);
+      }
+    }
+
+    const tasks = importFilesPendingUpload(files).map((f) => {
         const blob = blobs.get(f.checksum);
         if (!blob) throw new Error(`Missing blob for ${f.name}`);
+        const withMedia = resolveImportMediaId(f, makeMediaId);
+        if (withMedia.mediaId !== f.mediaId) {
+          const idx = files.findIndex((row) => row.localId === f.localId);
+          if (idx >= 0) files[idx] = withMedia;
+        }
         return {
-          operationId: f.operationId,
-          checksum: f.checksum,
+          operationId: withMedia.operationId,
+          checksum: withMedia.checksum,
           file: blob,
           tripId,
-          mediaId: makeMediaId(),
-          contentType: f.inspected?.mime ?? blob.type ?? 'image/jpeg',
+          mediaId: withMedia.mediaId!,
+          contentType: withMedia.inspected?.mime ?? blob.type ?? 'image/jpeg',
           byteSize: blob.size,
         };
       });

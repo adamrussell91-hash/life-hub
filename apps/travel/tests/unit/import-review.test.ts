@@ -9,6 +9,8 @@ import {
   mergeMomentGroups,
   splitMomentGroup,
   stableOperationId,
+  importFilesPendingUpload,
+  resolveImportMediaId,
   transitionImportFile,
   type ImportFileEntry,
 } from '@/journal/import-review';
@@ -112,6 +114,41 @@ describe('transitionImportFile', () => {
     f = transitionImportFile(f, { type: 'retry_upload' });
     expect(f.state).toBe('uploading');
     expect(f.operationId).toBe(stableOperationId('trp_test', 'c'.repeat(64)));
+  });
+});
+
+describe('Codex check 1 — mixed import batch', () => {
+  it('reports partial when some files complete and one fails', () => {
+    const files = [
+      file({ checksum: '1'.repeat(64), state: 'complete' }),
+      file({ checksum: '2'.repeat(64), state: 'complete' }),
+      file({ checksum: '3'.repeat(64), state: 'failed', error: 'network' }),
+    ];
+    const summary = deriveBatchSummary(files);
+    expect(deriveBatchOutcome(summary)).toBe('partial');
+    expect(summary.complete).toBe(2);
+    expect(summary.failed).toBe(1);
+  });
+});
+
+describe('Codex check 5 — reload failed upload', () => {
+  it('reuses stable mediaId on retry after a failed row', () => {
+    const failed = file({ checksum: 'e'.repeat(64), state: 'failed', mediaId: 'med_persist_1' });
+    const again = resolveImportMediaId(failed, () => 'med_new_should_not_run');
+    expect(again.mediaId).toBe('med_persist_1');
+    expect(importFilesPendingUpload([failed, file({ checksum: 'f'.repeat(64), state: 'complete' })])).toHaveLength(
+      1,
+    );
+  });
+});
+
+describe('resolveImportMediaId', () => {
+  it('allocates once then keeps the same id', () => {
+    const row = file({ checksum: '9'.repeat(64), state: 'proposed' });
+    const first = resolveImportMediaId(row, () => 'med_alloc_a');
+    const second = resolveImportMediaId(first, () => 'med_alloc_b');
+    expect(first.mediaId).toBe('med_alloc_a');
+    expect(second.mediaId).toBe('med_alloc_a');
   });
 });
 

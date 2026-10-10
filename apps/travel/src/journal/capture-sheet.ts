@@ -7,6 +7,7 @@ import {
   createDraftAutosave,
   loadCaptureDraft,
 } from '@/journal/drafts';
+import { bootstrapJournalForFirstMoment } from '@/journal/capture-context';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
 
 export type CaptureMode = CaptureDraftMode;
@@ -17,6 +18,7 @@ export interface OpenCaptureSheetOptions {
   localDate: string;
   journal: JournalDocument;
   version: string;
+  tripTitle?: string;
   anchor: HTMLElement;
   onSaved?: (envelope: { journal: JournalDocument; version: string }) => void;
   onClose?: () => void;
@@ -463,11 +465,17 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
     const legMoments = options.journal.moments.filter((m) => m.leg_id === options.legId);
     const display_order =
       legMoments.reduce((max, m) => Math.max(max, m.display_order), 0) + 1;
+    const baseJournal = bootstrapJournalForFirstMoment(
+      options.journal,
+      options.legId,
+      localDate,
+      options.tripTitle?.trim() || 'Trip',
+    );
     const nextJournal: JournalDocument = {
-      ...options.journal,
-      revision: options.journal.revision + 1,
+      ...baseJournal,
+      revision: baseJournal.revision + 1,
       moments: [
-        ...options.journal.moments,
+        ...baseJournal.moments,
         {
           id: momentId,
           leg_id: options.legId,
