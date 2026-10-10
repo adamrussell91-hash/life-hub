@@ -1051,6 +1051,13 @@ function mountChip(body, chip) {
     ...(chip.lesson_id ? { 'data-lesson-id': chip.lesson_id } : {}),
     ...(chip.class_id ? { 'data-class-id': chip.class_id } : {})
   });
+  // Chips sharing time sit side by side (lanes from the model), never stacked on top of each other.
+  if (chip.lanes > 1 && node.style?.setProperty) {
+    node.dataset.lanes = String(chip.lanes);
+    node.style.setProperty('--lane', String(chip.lane ?? 0));
+    node.style.setProperty('--lanes', String(chip.lanes));
+    node.style.setProperty('--span', String(chip.laneSpan ?? 1));
+  }
   if (chipIsMovable(chip)) {
     node.dataset.movable = '1';
     if (canResizeItem(chip) && typeof node.insertAdjacentHTML === 'function') {

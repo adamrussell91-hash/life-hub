@@ -600,6 +600,7 @@ export function buildTidelineModel({
       actual: date <= today ? actualSpans(events, date) : []
     };
   });
+  for (const day of days) assignLanes(day.chips);
   for (const day of days) day.cost = dayCost(day, days, today);
   // Where Adam left each task (bookmark) and its count progress, on its Due row and on
   // any work block linked to it.
@@ -661,6 +662,48 @@ export function buildTidelineModel({
     terms: schoolTerms,
     visual: useVisual ? visual : null
   };
+}
+
+/**
+ * Side-by-side lanes for chips that share time, so two blocks at 11 am sit next to
+ * each other instead of on top of each other. Each overlapping cluster gets as many
+ * lanes as it needs at its busiest moment; chips that overlap nothing keep the full width.
+ * A chip widens into lanes to its right that are free for its whole time (`laneSpan`).
+ * Sets `lane` (0-based), `lanes` and `laneSpan` on every chip; nothing else.
+ */
+export function assignLanes(chips) {
+  const sorted = [...(chips ?? [])]
+    .filter(chip => Number.isFinite(chip?.start) && Number.isFinite(chip?.end))
+    .sort((a, b) => a.start - b.start || b.end - a.end);
+  let cluster = [];
+  let clusterEnd = -Infinity;
+  let laneEnds = [];
+  const close = () => {
+    for (const chip of cluster) chip.lanes = laneEnds.length;
+    // Widen into lanes to the right that stay free for this chip's whole time.
+    for (const chip of cluster) {
+      let span = 1;
+      while (chip.lane + span < chip.lanes && !cluster.some(other => other !== chip
+        && other.lane === chip.lane + span && other.start < chip.end - 1e-6 && other.end > chip.start + 1e-6)) span += 1;
+      chip.laneSpan = span;
+    }
+    cluster = [];
+    laneEnds = [];
+  };
+  for (const chip of sorted) {
+    const end = Math.max(chip.end, chip.start + 1 / 60);
+    if (cluster.length && chip.start >= clusterEnd - 1e-6) close();
+    let lane = laneEnds.findIndex(laneEnd => laneEnd <= chip.start + 1e-6);
+    if (lane < 0) {
+      lane = laneEnds.length;
+      laneEnds.push(end);
+    } else laneEnds[lane] = end;
+    chip.lane = lane;
+    cluster.push(chip);
+    clusterEnd = cluster.length === 1 ? end : Math.max(clusterEnd, end);
+  }
+  close();
+  return chips;
 }
 
 function trayFor(ghosts) {

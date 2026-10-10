@@ -501,3 +501,6 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-deadline{position:absolute;left:6px;right:6px;z-index:4;gap:1px;padding:3px 8px 4px;border-radius:0 0 8px 8px;border-top:2px solid var(--cal-sage-stripe);box-shadow:0 1px 2px color-mix(in srgb,var(--navy) 6%,transparent)}
 .cal-deadline .cal-due__text{-webkit-line-clamp:1}
 .cal-body.is-past .cal-deadline{opacity:.72}
+/* Overlapping chips share the column in lanes (tideline-model assignLanes). */
+.cal-chip[data-lanes]{left:calc(6px + (100% - 12px) * var(--lane,0) / var(--lanes,1));right:auto;width:calc((100% - 12px) * var(--span,1) / var(--lanes,1) - 3px)}
+.cal-chip[data-lanes] .cal-chip__meta{text-overflow:clip}
