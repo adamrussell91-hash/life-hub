@@ -1,0 +1,728 @@
+{
+  "retrieved": "2026-10-10",
+  "purpose": "Selected Grove reference source, unmodified; not runtime dependencies",
+  "sources": [
+    {
+      "repository": "https://github.com/mrdoob/three.js",
+      "commit": "5d8e8a89347650ee210e120cdd70f9e9288f0abc",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "three.js/LICENSE.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/LICENSE",
+          "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc"
+        },
+        {
+          "upstreamPath": "examples/jsm/controls/OrbitControls.js",
+          "localPath": "three.js/examples__jsm__controls__OrbitControls.js.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/jsm/controls/OrbitControls.js",
+          "sha256": "ed1c2b84dd80f8ef447cf35d724d867832290700886a7df5fcf06581ce8e4188"
+        },
+        {
+          "upstreamPath": "examples/jsm/generators/TreeGenerator.js",
+          "localPath": "three.js/examples__jsm__generators__TreeGenerator.js.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/jsm/generators/TreeGenerator.js",
+          "sha256": "489e54ec07b870e3902c922e603e153298c85c7d178ac52bb25cc9417c5d7b52"
+        },
+        {
+          "upstreamPath": "examples/jsm/loaders/GLTFLoader.js",
+          "localPath": "three.js/examples__jsm__loaders__GLTFLoader.js.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/jsm/loaders/GLTFLoader.js",
+          "sha256": "eb6315711545ecbf58a7d1b113d5799229d6aa49889a2690c64c79e53a36c206"
+        },
+        {
+          "upstreamPath": "examples/jsm/math/ImprovedNoise.js",
+          "localPath": "three.js/examples__jsm__math__ImprovedNoise.js.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/jsm/math/ImprovedNoise.js",
+          "sha256": "d3821241e25bf0c8bfc13cec941924573bbaaf8f599a4fa07d60664b97832b39"
+        },
+        {
+          "upstreamPath": "examples/jsm/objects/Water.js",
+          "localPath": "three.js/examples__jsm__objects__Water.js.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/jsm/objects/Water.js",
+          "sha256": "3386670ba86003a32f5efe449041bd108d4cf1e0661849caa814741a2aaf395b"
+        },
+        {
+          "upstreamPath": "examples/jsm/objects/Water2.js",
+          "localPath": "three.js/examples__jsm__objects__Water2.js.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/jsm/objects/Water2.js",
+          "sha256": "80180ce0b031169883e14a79374e2c4d899b7726a1af4897dd7a9efc9d9240f7"
+        },
+        {
+          "upstreamPath": "examples/jsm/utils/BufferGeometryUtils.js",
+          "localPath": "three.js/examples__jsm__utils__BufferGeometryUtils.js.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/jsm/utils/BufferGeometryUtils.js",
+          "sha256": "e9b626dcd6c2029650a37e2ac987d3d939db7876c93eeea5aa3e307efb960b11"
+        },
+        {
+          "upstreamPath": "examples/jsm/utils/SkeletonUtils.js",
+          "localPath": "three.js/examples__jsm__utils__SkeletonUtils.js.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/jsm/utils/SkeletonUtils.js",
+          "sha256": "b1632a703206c3d830de9fcbe515696770d04b71a15ee6b50afa6d2c3298c86f"
+        },
+        {
+          "upstreamPath": "examples/webgl_animation_multiple.html",
+          "localPath": "three.js/examples__webgl_animation_multiple.html.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/webgl_animation_multiple.html",
+          "sha256": "3cdb9eab9ff00e70a511e8e6b89cb38415e00eca384ddaaa99f83dba1c1167e8"
+        },
+        {
+          "upstreamPath": "examples/webgl_animation_skinning_blending.html",
+          "localPath": "three.js/examples__webgl_animation_skinning_blending.html.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/webgl_animation_skinning_blending.html",
+          "sha256": "f258936939ce2940dad1f8f21e6a9fba70edea5dd4a7327a51e93c77b113d8f8"
+        },
+        {
+          "upstreamPath": "examples/webgl_camera.html",
+          "localPath": "three.js/examples__webgl_camera.html.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/webgl_camera.html",
+          "sha256": "a97d4efbc7b530844793187301eca9e68572d78e01c3723704b2624d010b8b87"
+        },
+        {
+          "upstreamPath": "examples/webgl_geometry_terrain.html",
+          "localPath": "three.js/examples__webgl_geometry_terrain.html.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/webgl_geometry_terrain.html",
+          "sha256": "3ae22ea15f1cb7042872ad07fadd9d691558165edea6cd1f8a692ff6f79b6b8f"
+        },
+        {
+          "upstreamPath": "examples/webgl_instancing_dynamic.html",
+          "localPath": "three.js/examples__webgl_instancing_dynamic.html.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/webgl_instancing_dynamic.html",
+          "sha256": "1bb7cdf50e4d63065ec00435aa3f912fbc6329ffdfa104118ca557cf91593d92"
+        },
+        {
+          "upstreamPath": "examples/webgl_instancing_raycast.html",
+          "localPath": "three.js/examples__webgl_instancing_raycast.html.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/webgl_instancing_raycast.html",
+          "sha256": "9f5488f1c20afcb93a09c8ab6e4440ab681ce706c8ce904e46b2c51a40cad3cd"
+        },
+        {
+          "upstreamPath": "examples/webgl_lod.html",
+          "localPath": "three.js/examples__webgl_lod.html.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/webgl_lod.html",
+          "sha256": "c00873378be832a6742e120ccdc785abfdd542996094d0a0934af9470855e1c3"
+        },
+        {
+          "upstreamPath": "examples/webgl_shadowmap_performance.html",
+          "localPath": "three.js/examples__webgl_shadowmap_performance.html.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/webgl_shadowmap_performance.html",
+          "sha256": "168ab0dd650044a904b9cef35f8c1e2561b38a0972bb81d0a9623f9a3e53e5e5"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "three.js/package.json.txt",
+          "url": "https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/package.json",
+          "sha256": "50e651ded364f9b1d0325bec5af816e2fd83679b9122ba58b4f009862bd4cd0c"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/kchapelier/poisson-disk-sampling",
+      "commit": "9536e50c682c8e1d5a5add44a729b7414a276c61",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "poisson-disk-sampling/LICENSE.txt",
+          "url": "https://github.com/kchapelier/poisson-disk-sampling/blob/9536e50c682c8e1d5a5add44a729b7414a276c61/LICENSE",
+          "sha256": "85d7c629c37bf2496b5fcf30a08567478eae40d43a5237f180b93ddaa7f18d42"
+        },
+        {
+          "upstreamPath": "README.md",
+          "localPath": "poisson-disk-sampling/README.md.txt",
+          "url": "https://github.com/kchapelier/poisson-disk-sampling/blob/9536e50c682c8e1d5a5add44a729b7414a276c61/README.md",
+          "sha256": "aa5353e0243174dc7a7e9c070d379c0dbb78f982f93f1803a7e27e5f697c94ef"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "poisson-disk-sampling/package.json.txt",
+          "url": "https://github.com/kchapelier/poisson-disk-sampling/blob/9536e50c682c8e1d5a5add44a729b7414a276c61/package.json",
+          "sha256": "cd7bb577c789957259dbb93d81ad2be040e9b0847ed72702fc578702a6c1d02b"
+        },
+        {
+          "upstreamPath": "src/implementations/fixed-density.js",
+          "localPath": "poisson-disk-sampling/src__implementations__fixed-density.js.txt",
+          "url": "https://github.com/kchapelier/poisson-disk-sampling/blob/9536e50c682c8e1d5a5add44a729b7414a276c61/src/implementations/fixed-density.js",
+          "sha256": "b5d70f337f0129953708205ed0410f3df6bece8d27a14249535096d095a0b24d"
+        },
+        {
+          "upstreamPath": "src/implementations/variable-density.js",
+          "localPath": "poisson-disk-sampling/src__implementations__variable-density.js.txt",
+          "url": "https://github.com/kchapelier/poisson-disk-sampling/blob/9536e50c682c8e1d5a5add44a729b7414a276c61/src/implementations/variable-density.js",
+          "sha256": "0c30e9b7b81dd06038fa647f8d191ba5a9388a8f09e920b41028b9fc9769f723"
+        },
+        {
+          "upstreamPath": "src/neighbourhood.js",
+          "localPath": "poisson-disk-sampling/src__neighbourhood.js.txt",
+          "url": "https://github.com/kchapelier/poisson-disk-sampling/blob/9536e50c682c8e1d5a5add44a729b7414a276c61/src/neighbourhood.js",
+          "sha256": "219950e18a4d144731c295d6eed705bd9be44b960688f8ccefecf0bb609cee3b"
+        },
+        {
+          "upstreamPath": "src/poisson-disk-sampling.js",
+          "localPath": "poisson-disk-sampling/src__poisson-disk-sampling.js.txt",
+          "url": "https://github.com/kchapelier/poisson-disk-sampling/blob/9536e50c682c8e1d5a5add44a729b7414a276c61/src/poisson-disk-sampling.js",
+          "sha256": "d33b4f7565a4cd09500910b33ee24c0f5bb8ec0054a9e08ffc95996093953fe1"
+        },
+        {
+          "upstreamPath": "src/sphere-random.js",
+          "localPath": "poisson-disk-sampling/src__sphere-random.js.txt",
+          "url": "https://github.com/kchapelier/poisson-disk-sampling/blob/9536e50c682c8e1d5a5add44a729b7414a276c61/src/sphere-random.js",
+          "sha256": "28f95d01bf0c3409683f1d4fe725c6851b360c3a7af64cdf5ef0d42102cc7ce0"
+        },
+        {
+          "upstreamPath": "src/tiny-ndarray.js",
+          "localPath": "poisson-disk-sampling/src__tiny-ndarray.js.txt",
+          "url": "https://github.com/kchapelier/poisson-disk-sampling/blob/9536e50c682c8e1d5a5add44a729b7414a276c61/src/tiny-ndarray.js",
+          "sha256": "d0e2243a4d611d7dd916eade5d1c62c94f8db4d717c563da5bea1f1728d6fea4"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/mapbox/delaunator",
+      "commit": "c2bd4edf7ed167a821eb6f922f3456006c56fa39",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "delaunator/LICENSE.txt",
+          "url": "https://github.com/mapbox/delaunator/blob/c2bd4edf7ed167a821eb6f922f3456006c56fa39/LICENSE",
+          "sha256": "0b348fff56384b43dbb37593906904e56d0f9deb51eae590d4dc6d427fbf1808"
+        },
+        {
+          "upstreamPath": "README.md",
+          "localPath": "delaunator/README.md.txt",
+          "url": "https://github.com/mapbox/delaunator/blob/c2bd4edf7ed167a821eb6f922f3456006c56fa39/README.md",
+          "sha256": "9433f4fc6ec738ec7b373e6e38d31d8d1b1034f8183d7bccbf5c89591b000e4e"
+        },
+        {
+          "upstreamPath": "index.js",
+          "localPath": "delaunator/index.js.txt",
+          "url": "https://github.com/mapbox/delaunator/blob/c2bd4edf7ed167a821eb6f922f3456006c56fa39/index.js",
+          "sha256": "1a941d291859ebe1f6755dfbc2024686103c5ab2f31659177c01088ab88c2ca3"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "delaunator/package.json.txt",
+          "url": "https://github.com/mapbox/delaunator/blob/c2bd4edf7ed167a821eb6f922f3456006c56fa39/package.json",
+          "sha256": "5b934aa3dc1e415e5e4f7cd60bc223b0782253e46fb42eff32cab8570c2e8bb5"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/mourner/flatqueue",
+      "commit": "eee96a6df7705e57f8dbb3702aa3efc40bb6e4b5",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "flatqueue/LICENSE.txt",
+          "url": "https://github.com/mourner/flatqueue/blob/eee96a6df7705e57f8dbb3702aa3efc40bb6e4b5/LICENSE",
+          "sha256": "dda6815257c8b5dd1c557507e0f49b592001a515fe4e9f152a2e7683f9d3a3b5"
+        },
+        {
+          "upstreamPath": "README.md",
+          "localPath": "flatqueue/README.md.txt",
+          "url": "https://github.com/mourner/flatqueue/blob/eee96a6df7705e57f8dbb3702aa3efc40bb6e4b5/README.md",
+          "sha256": "7aa2be7be4165f86be2deba58a953e5f51f6bef92df9e4c430aac265bf7fce9b"
+        },
+        {
+          "upstreamPath": "index.js",
+          "localPath": "flatqueue/index.js.txt",
+          "url": "https://github.com/mourner/flatqueue/blob/eee96a6df7705e57f8dbb3702aa3efc40bb6e4b5/index.js",
+          "sha256": "f621295eb3bdebcd3e0189fb18004b8c43af9707bdc7f6caa5d913ecdbcf149e"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "flatqueue/package.json.txt",
+          "url": "https://github.com/mourner/flatqueue/blob/eee96a6df7705e57f8dbb3702aa3efc40bb6e4b5/package.json",
+          "sha256": "1b9a1af82b63e6bd903b4340a0d001deb98dc8fcb585ce39571974e719381588"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/davidbau/seedrandom",
+      "commit": "4460ad325a0a15273a211e509f03ae0beb99511a",
+      "files": [
+        {
+          "upstreamPath": "README.md",
+          "localPath": "seedrandom/README.md.txt",
+          "url": "https://github.com/davidbau/seedrandom/blob/4460ad325a0a15273a211e509f03ae0beb99511a/README.md",
+          "sha256": "4f42a296eee4f5ae3a8dadba94c2b0b5fb57662b96b8749f4d5288d4629b6240"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "seedrandom/package.json.txt",
+          "url": "https://github.com/davidbau/seedrandom/blob/4460ad325a0a15273a211e509f03ae0beb99511a/package.json",
+          "sha256": "f93348642af783cca495e5a31a22df5613ccf24ca167c9c4347416627a015a09"
+        },
+        {
+          "upstreamPath": "seedrandom.js",
+          "localPath": "seedrandom/seedrandom.js.txt",
+          "url": "https://github.com/davidbau/seedrandom/blob/4460ad325a0a15273a211e509f03ae0beb99511a/seedrandom.js",
+          "sha256": "df5431fa9ba4b311f182a046e60cdd36ae37a1a80f515d6e9b1f568528735047"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/prettymuchbryce/easystarjs",
+      "commit": "10615147add3af46f76a5d86ee7b7e7bebf83ac5",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "easystarjs/LICENSE.txt",
+          "url": "https://github.com/prettymuchbryce/easystarjs/blob/10615147add3af46f76a5d86ee7b7e7bebf83ac5/LICENSE",
+          "sha256": "dbb23ecd59fbe6d317945837e986daa8a4c9bdf2f228d01c1834db7f109a5f6d"
+        },
+        {
+          "upstreamPath": "README.md",
+          "localPath": "easystarjs/README.md.txt",
+          "url": "https://github.com/prettymuchbryce/easystarjs/blob/10615147add3af46f76a5d86ee7b7e7bebf83ac5/README.md",
+          "sha256": "66d7b16c5f4cdfc0be2552d6da8e0e881f9416dda21ce578c352bf16223c651b"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "easystarjs/package.json.txt",
+          "url": "https://github.com/prettymuchbryce/easystarjs/blob/10615147add3af46f76a5d86ee7b7e7bebf83ac5/package.json",
+          "sha256": "bd5fc0b2c9f28f093de73143c8e1a8aca95c408eb8b66be9d24e7fd0d9dc1d1d"
+        },
+        {
+          "upstreamPath": "src/easystar.js",
+          "localPath": "easystarjs/src__easystar.js.txt",
+          "url": "https://github.com/prettymuchbryce/easystarjs/blob/10615147add3af46f76a5d86ee7b7e7bebf83ac5/src/easystar.js",
+          "sha256": "3e0d27f27018708602adc334fb0b7033a2c460d4c2c2b75505e65d9547d175dd"
+        },
+        {
+          "upstreamPath": "src/instance.js",
+          "localPath": "easystarjs/src__instance.js.txt",
+          "url": "https://github.com/prettymuchbryce/easystarjs/blob/10615147add3af46f76a5d86ee7b7e7bebf83ac5/src/instance.js",
+          "sha256": "cebf458b74d6bae4706bc784babfdaa8527a6d9e1d883ad4be2915932eb69169"
+        },
+        {
+          "upstreamPath": "src/node.js",
+          "localPath": "easystarjs/src__node.js.txt",
+          "url": "https://github.com/prettymuchbryce/easystarjs/blob/10615147add3af46f76a5d86ee7b7e7bebf83ac5/src/node.js",
+          "sha256": "f7c604c4b1913e4306384e609b017f6ab19c42c2f545109f42a0573bdae3d46e"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/donmccurdy/three-pathfinding",
+      "commit": "b55cd7e825c5bd01965083f2543b13048a7d4127",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "three-pathfinding/LICENSE.txt",
+          "url": "https://github.com/donmccurdy/three-pathfinding/blob/b55cd7e825c5bd01965083f2543b13048a7d4127/LICENSE",
+          "sha256": "fc62c5b6d81351781b537402cd2fa70b4be9fe8a95e7ee0f51adbb1481b8431c"
+        },
+        {
+          "upstreamPath": "README.md",
+          "localPath": "three-pathfinding/README.md.txt",
+          "url": "https://github.com/donmccurdy/three-pathfinding/blob/b55cd7e825c5bd01965083f2543b13048a7d4127/README.md",
+          "sha256": "ee82fc35a8c0d8059f66ebc4c3cf4cc5933ad4838ebeef37905b5bdbbf76671e"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "three-pathfinding/package.json.txt",
+          "url": "https://github.com/donmccurdy/three-pathfinding/blob/b55cd7e825c5bd01965083f2543b13048a7d4127/package.json",
+          "sha256": "e952fb49fb71955f8dbf331e9d5faadaf55c174cafe64edf02dc7be54709524a"
+        },
+        {
+          "upstreamPath": "src/AStar.js",
+          "localPath": "three-pathfinding/src__AStar.js.txt",
+          "url": "https://github.com/donmccurdy/three-pathfinding/blob/b55cd7e825c5bd01965083f2543b13048a7d4127/src/AStar.js",
+          "sha256": "e41279372d4598cb3d046316801b8652769dbdede763f1014b03d02d1fa89968"
+        },
+        {
+          "upstreamPath": "src/BinaryHeap.js",
+          "localPath": "three-pathfinding/src__BinaryHeap.js.txt",
+          "url": "https://github.com/donmccurdy/three-pathfinding/blob/b55cd7e825c5bd01965083f2543b13048a7d4127/src/BinaryHeap.js",
+          "sha256": "f1c958371f8e83e07a98715e7d73aef43aa1d75f97a05b3161c90564f95c967e"
+        },
+        {
+          "upstreamPath": "src/Builder.js",
+          "localPath": "three-pathfinding/src__Builder.js.txt",
+          "url": "https://github.com/donmccurdy/three-pathfinding/blob/b55cd7e825c5bd01965083f2543b13048a7d4127/src/Builder.js",
+          "sha256": "9eea7a1617502f0201095952da0ee0387b8802ed06a13579b0b2766c1e6910d7"
+        },
+        {
+          "upstreamPath": "src/Channel.js",
+          "localPath": "three-pathfinding/src__Channel.js.txt",
+          "url": "https://github.com/donmccurdy/three-pathfinding/blob/b55cd7e825c5bd01965083f2543b13048a7d4127/src/Channel.js",
+          "sha256": "26219d245d209ab47e36b6cf605f0a2296060ea77ac0478112a25937b13995f8"
+        },
+        {
+          "upstreamPath": "src/Pathfinding.js",
+          "localPath": "three-pathfinding/src__Pathfinding.js.txt",
+          "url": "https://github.com/donmccurdy/three-pathfinding/blob/b55cd7e825c5bd01965083f2543b13048a7d4127/src/Pathfinding.js",
+          "sha256": "2f220c9bd4b21752f913b4391350bda3255e65336d2863dd790a98fad0230eec"
+        },
+        {
+          "upstreamPath": "src/PathfindingHelper.js",
+          "localPath": "three-pathfinding/src__PathfindingHelper.js.txt",
+          "url": "https://github.com/donmccurdy/three-pathfinding/blob/b55cd7e825c5bd01965083f2543b13048a7d4127/src/PathfindingHelper.js",
+          "sha256": "952a9c5100389f526c57a40ef7dd51bc7ce502f0de18a05bb5782759177318ab"
+        },
+        {
+          "upstreamPath": "src/Utils.js",
+          "localPath": "three-pathfinding/src__Utils.js.txt",
+          "url": "https://github.com/donmccurdy/three-pathfinding/blob/b55cd7e825c5bd01965083f2543b13048a7d4127/src/Utils.js",
+          "sha256": "8a92f304b5ca71c6eac9de1f47e7a3e8cf4383e9f02a5ad0a538c4f530d67c73"
+        },
+        {
+          "upstreamPath": "src/index.js",
+          "localPath": "three-pathfinding/src__index.js.txt",
+          "url": "https://github.com/donmccurdy/three-pathfinding/blob/b55cd7e825c5bd01965083f2543b13048a7d4127/src/index.js",
+          "sha256": "d6caa1638be94dd77731dc3fe9cd1d8098153dba163c4d2cbaaa54aefd0cc195"
+        },
+        {
+          "upstreamPath": "src/three-pathfinding.d.ts",
+          "localPath": "three-pathfinding/src__three-pathfinding.d.ts.txt",
+          "url": "https://github.com/donmccurdy/three-pathfinding/blob/b55cd7e825c5bd01965083f2543b13048a7d4127/src/three-pathfinding.d.ts",
+          "sha256": "f7873ab55fdcb6a99cff215b9b2e4b2218ed204fc7fe006d09385f0d140e4491"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/dgreenheck/ez-tree",
+      "commit": "dcf309bd86bd521083d9c70f01f2de45fdc7c457",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "ez-tree/LICENSE.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/LICENSE",
+          "sha256": "20e4afadfb10c67952b3d73cd2982d21d165ab4ae82b0dd9e4d6f2166ee349b6"
+        },
+        {
+          "upstreamPath": "README.md",
+          "localPath": "ez-tree/README.md.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/README.md",
+          "sha256": "1c758991522e87610b7459ea0a8fbfb0a22ec4bd90903459ff974d78e6be5282"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "ez-tree/package.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/package.json",
+          "sha256": "48f5ddc8af8ee19b1ee6d2ff7047a3a42575aa13e5f721bd871506e161a90131"
+        },
+        {
+          "upstreamPath": "src/lib/branch.js",
+          "localPath": "ez-tree/src__lib__branch.js.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/branch.js",
+          "sha256": "f71a5e0df6b74ae521942f1722e5a0dd17707add05f12691da96231fdeff8571"
+        },
+        {
+          "upstreamPath": "src/lib/enums.js",
+          "localPath": "ez-tree/src__lib__enums.js.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/enums.js",
+          "sha256": "d83df789447a421baaecfd18cc8187bf3f80f6cf6e7ba7866812ed527f104092"
+        },
+        {
+          "upstreamPath": "src/lib/index.js",
+          "localPath": "ez-tree/src__lib__index.js.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/index.js",
+          "sha256": "a0a92be6d68505522f9d218710f7fd8bff197c77a188999757a9fdb802459546"
+        },
+        {
+          "upstreamPath": "src/lib/options.js",
+          "localPath": "ez-tree/src__lib__options.js.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/options.js",
+          "sha256": "092e20ee9073d7402e2fa04d570c17ff150276b5f8c941b3da629edf4ecfe0b9"
+        },
+        {
+          "upstreamPath": "src/lib/presets/ash_large.json",
+          "localPath": "ez-tree/src__lib__presets__ash_large.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/ash_large.json",
+          "sha256": "fb630c9f4ae0e344c884f0380d23b35bd93af8924dc0244190b83811634d4f50"
+        },
+        {
+          "upstreamPath": "src/lib/presets/ash_medium.json",
+          "localPath": "ez-tree/src__lib__presets__ash_medium.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/ash_medium.json",
+          "sha256": "4fbda008f54a1421c67bdff3022d64aba1d497253bc45dc7f186e3a4f78a9edd"
+        },
+        {
+          "upstreamPath": "src/lib/presets/ash_small.json",
+          "localPath": "ez-tree/src__lib__presets__ash_small.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/ash_small.json",
+          "sha256": "aa912b8789d348e751aea05c8bf7fd3e91919f7d2429a43150d0b171a57c7a1d"
+        },
+        {
+          "upstreamPath": "src/lib/presets/aspen_large.json",
+          "localPath": "ez-tree/src__lib__presets__aspen_large.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/aspen_large.json",
+          "sha256": "91d66898f9a2edb0ac29482c137c295e8fefd2f39b9c328f690c4656e3edbf89"
+        },
+        {
+          "upstreamPath": "src/lib/presets/aspen_medium.json",
+          "localPath": "ez-tree/src__lib__presets__aspen_medium.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/aspen_medium.json",
+          "sha256": "0ccedf06c8777fc7e21f04852f43a52fbe454d71521f2abeaa1cbb5af656ed3f"
+        },
+        {
+          "upstreamPath": "src/lib/presets/aspen_small.json",
+          "localPath": "ez-tree/src__lib__presets__aspen_small.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/aspen_small.json",
+          "sha256": "342fd45bf5243c927c56e499d1083e6d527ec875366b6d763a529069e7255473"
+        },
+        {
+          "upstreamPath": "src/lib/presets/bush_1.json",
+          "localPath": "ez-tree/src__lib__presets__bush_1.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/bush_1.json",
+          "sha256": "c15a079777169edbc8e7d99ddfde1f70b332049a1ca4b2469fb2987dfc195a4b"
+        },
+        {
+          "upstreamPath": "src/lib/presets/bush_2.json",
+          "localPath": "ez-tree/src__lib__presets__bush_2.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/bush_2.json",
+          "sha256": "fee591915db8ee450151d30330c22ec9a980eaffe93bf58977d1113b749685ec"
+        },
+        {
+          "upstreamPath": "src/lib/presets/bush_3.json",
+          "localPath": "ez-tree/src__lib__presets__bush_3.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/bush_3.json",
+          "sha256": "7b5fdf2bd190f8f61b792b32ac3a0eade9e09db6471bf422c6936c5855399926"
+        },
+        {
+          "upstreamPath": "src/lib/presets/index.js",
+          "localPath": "ez-tree/src__lib__presets__index.js.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/index.js",
+          "sha256": "66f5c90aa49e18467bad26c21158a184fb33a6c019d9cc0efd403b514fb7dc5f"
+        },
+        {
+          "upstreamPath": "src/lib/presets/oak_large.json",
+          "localPath": "ez-tree/src__lib__presets__oak_large.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/oak_large.json",
+          "sha256": "da60d7104796e5dc099effe778f22e055a8365549e2eb6cfa6fb0bb6a8190d6b"
+        },
+        {
+          "upstreamPath": "src/lib/presets/oak_medium.json",
+          "localPath": "ez-tree/src__lib__presets__oak_medium.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/oak_medium.json",
+          "sha256": "b71da9eeebbe88e7e216af549427f4ec368c4939bf4d4e47d5325f79364fc1ea"
+        },
+        {
+          "upstreamPath": "src/lib/presets/oak_small.json",
+          "localPath": "ez-tree/src__lib__presets__oak_small.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/oak_small.json",
+          "sha256": "56351f70c8d9432db4c2e80ad9e4f9a08cfb02cb511b5005bb451ddd76a384b4"
+        },
+        {
+          "upstreamPath": "src/lib/presets/pine_large.json",
+          "localPath": "ez-tree/src__lib__presets__pine_large.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/pine_large.json",
+          "sha256": "80d3e4b0c8d283d995e9af515c54e1622750b620959fbfab06fb4fcf7de29189"
+        },
+        {
+          "upstreamPath": "src/lib/presets/pine_medium.json",
+          "localPath": "ez-tree/src__lib__presets__pine_medium.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/pine_medium.json",
+          "sha256": "001254eff844a6d41aff3c409b78effe2a2995c8dd7a21ae301b1e7fb9da0118"
+        },
+        {
+          "upstreamPath": "src/lib/presets/pine_small.json",
+          "localPath": "ez-tree/src__lib__presets__pine_small.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/pine_small.json",
+          "sha256": "3e389bbcec2fb8965a6a77c014409394aa8e8b81f32b6d3b4d9de86eb02f0c17"
+        },
+        {
+          "upstreamPath": "src/lib/presets/trellis.json",
+          "localPath": "ez-tree/src__lib__presets__trellis.json.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/presets/trellis.json",
+          "sha256": "015e40156baa5f7778d5fb9f9a5e601001e632d40e6fdd34644db4f47d1abc1c"
+        },
+        {
+          "upstreamPath": "src/lib/rng.js",
+          "localPath": "ez-tree/src__lib__rng.js.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/rng.js",
+          "sha256": "e4f2bfff79a0a6af3f909f106876e9208be1bb88cc7f7d1541a6858cbaa0c3c8"
+        },
+        {
+          "upstreamPath": "src/lib/tree.js",
+          "localPath": "ez-tree/src__lib__tree.js.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/tree.js",
+          "sha256": "a1b7bd933cb2078e9373c9c853c620be8a3edc84a9edda6a4073c8ad2a31f934"
+        },
+        {
+          "upstreamPath": "src/lib/trellis.js",
+          "localPath": "ez-tree/src__lib__trellis.js.txt",
+          "url": "https://github.com/dgreenheck/ez-tree/blob/dcf309bd86bd521083d9c70f01f2de45fdc7c457/src/lib/trellis.js",
+          "sha256": "ca623b4fbbee1a11aa14be213f5132928ecbe37f91db7424081fe9d681fc765b"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/pajama-studio/lowpoly-tree-generator",
+      "commit": "4377dd602717e04705e73943cd8f0ed8d21bba91",
+      "files": [
+        {
+          "upstreamPath": "CREDITS.md",
+          "localPath": "lowpoly-tree-generator/CREDITS.md.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/CREDITS.md",
+          "sha256": "ba7e005c3cfa7232a666328cd051abf871fd26698c654c407c6072a1dcfefceb"
+        },
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "lowpoly-tree-generator/LICENSE.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/LICENSE",
+          "sha256": "113ca778e1689cd12270a412d9ac4872d7fc12a7990f7afab5712f0d75c278ef"
+        },
+        {
+          "upstreamPath": "README.md",
+          "localPath": "lowpoly-tree-generator/README.md.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/README.md",
+          "sha256": "c48d6553fc46ce416e28321b8567c699ba9732816ea0cf7ccd3d694f0737b0c3"
+        },
+        {
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "localPath": "lowpoly-tree-generator/THIRD_PARTY_NOTICES.md.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/THIRD_PARTY_NOTICES.md",
+          "sha256": "b61927e869dd75125728be388f62e029cd005d89241c85541b3f4e6dcb12c55a"
+        },
+        {
+          "upstreamPath": "examples/basic.js",
+          "localPath": "lowpoly-tree-generator/examples__basic.js.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/examples/basic.js",
+          "sha256": "4e6521103bc5dc46e86db2eeb916ea334d3e52d91f6d15900472fb43aef1242e"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "lowpoly-tree-generator/package.json.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/package.json",
+          "sha256": "703be1ad2e254ed5fe8182f26a5c66acf01a5a98b489db86e02bc0a1a91923ad"
+        },
+        {
+          "upstreamPath": "src/animation.js",
+          "localPath": "lowpoly-tree-generator/src__animation.js.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/src/animation.js",
+          "sha256": "bf24140e7599271844ad2e5889a18e2819474942a3ee4aaac6d446fb1a83dbb3"
+        },
+        {
+          "upstreamPath": "src/archetypes.js",
+          "localPath": "lowpoly-tree-generator/src__archetypes.js.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/src/archetypes.js",
+          "sha256": "aa8204b863a21ad21b194700323f56b7e060da8d8affd14f2da78eae9c338d36"
+        },
+        {
+          "upstreamPath": "src/controller.js",
+          "localPath": "lowpoly-tree-generator/src__controller.js.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/src/controller.js",
+          "sha256": "0de94c8abdf0534164f3bdab7635f6406c9b3ff15248615afc56263697f33291"
+        },
+        {
+          "upstreamPath": "src/index.js",
+          "localPath": "lowpoly-tree-generator/src__index.js.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/src/index.js",
+          "sha256": "541282fb7d8022de3d39baace85dccfb300805c2a3da7b247475f0bb4bff8223"
+        },
+        {
+          "upstreamPath": "src/profile.js",
+          "localPath": "lowpoly-tree-generator/src__profile.js.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/src/profile.js",
+          "sha256": "05f46601b5b3d4ba7f9b3e6562fe2dd741baea2f340de032c3f404c62b54d2fb"
+        },
+        {
+          "upstreamPath": "src/rig.js",
+          "localPath": "lowpoly-tree-generator/src__rig.js.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/src/rig.js",
+          "sha256": "5f7309da8cb21f43222ca7a3874b8cd7201fb340fe50c1c1e92eb9a7377452b4"
+        },
+        {
+          "upstreamPath": "src/vines.js",
+          "localPath": "lowpoly-tree-generator/src__vines.js.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/src/vines.js",
+          "sha256": "2880fd0af961cf7ae355b4979b0f8d34e07faae42e7a287b76681d8145aad621"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/Mugen87/yuka",
+      "commit": "10591304811222d6856020d5de129b39ef43b58d",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "yuka/LICENSE.txt",
+          "url": "https://github.com/Mugen87/yuka/blob/10591304811222d6856020d5de129b39ef43b58d/LICENSE",
+          "sha256": "2b75427a84abb4a68e331d02d14f61ba7405c0e0bbab2aea8d6afe3803580d83"
+        },
+        {
+          "upstreamPath": "README.md",
+          "localPath": "yuka/README.md.txt",
+          "url": "https://github.com/Mugen87/yuka/blob/10591304811222d6856020d5de129b39ef43b58d/README.md",
+          "sha256": "2ecb063afd665b7d07fbe0b8dc9f5d260a878f6ff815b626efbff721440f84e2"
+        },
+        {
+          "upstreamPath": "examples/steering/wander/index.html",
+          "localPath": "yuka/examples__steering__wander__index.html.txt",
+          "url": "https://github.com/Mugen87/yuka/blob/10591304811222d6856020d5de129b39ef43b58d/examples/steering/wander/index.html",
+          "sha256": "2b3bd1ee9fc3066f2d82fd092597cd6b1c1a98f0e6c5efebdbf02dbff2d07824"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "yuka/package.json.txt",
+          "url": "https://github.com/Mugen87/yuka/blob/10591304811222d6856020d5de129b39ef43b58d/package.json",
+          "sha256": "787f606f5dd273f3017239e450d9f20306eab3eec91752aec2a04d41e605600a"
+        },
+        {
+          "upstreamPath": "src/fsm/State.js",
+          "localPath": "yuka/src__fsm__State.js.txt",
+          "url": "https://github.com/Mugen87/yuka/blob/10591304811222d6856020d5de129b39ef43b58d/src/fsm/State.js",
+          "sha256": "0789d44be7eddfe6e87f3aa9a8cf08a74714fedb03786c6691d33bafdacd16c3"
+        },
+        {
+          "upstreamPath": "src/fsm/StateMachine.js",
+          "localPath": "yuka/src__fsm__StateMachine.js.txt",
+          "url": "https://github.com/Mugen87/yuka/blob/10591304811222d6856020d5de129b39ef43b58d/src/fsm/StateMachine.js",
+          "sha256": "ca6fe68605f845551579153a9ec67bad5e99fba427d43757781f7f732abb0645"
+        },
+        {
+          "upstreamPath": "src/steering/Vehicle.js",
+          "localPath": "yuka/src__steering__Vehicle.js.txt",
+          "url": "https://github.com/Mugen87/yuka/blob/10591304811222d6856020d5de129b39ef43b58d/src/steering/Vehicle.js",
+          "sha256": "d6300be887cc7d20ce247ee4448d82e9caa02584350159dc63c5d35d104b1e28"
+        },
+        {
+          "upstreamPath": "src/steering/behaviors/ArriveBehavior.js",
+          "localPath": "yuka/src__steering__behaviors__ArriveBehavior.js.txt",
+          "url": "https://github.com/Mugen87/yuka/blob/10591304811222d6856020d5de129b39ef43b58d/src/steering/behaviors/ArriveBehavior.js",
+          "sha256": "c3b687534ba7f8a17f3d2991317deb419322e14a091ac77bab2b0f38aab4b31f"
+        },
+        {
+          "upstreamPath": "src/steering/behaviors/FollowPathBehavior.js",
+          "localPath": "yuka/src__steering__behaviors__FollowPathBehavior.js.txt",
+          "url": "https://github.com/Mugen87/yuka/blob/10591304811222d6856020d5de129b39ef43b58d/src/steering/behaviors/FollowPathBehavior.js",
+          "sha256": "4a9624bb8e8eace7e89247bfff814787f87b4547293513b4a7ce5a7080bc0757"
+        },
+        {
+          "upstreamPath": "src/steering/behaviors/SeparationBehavior.js",
+          "localPath": "yuka/src__steering__behaviors__SeparationBehavior.js.txt",
+          "url": "https://github.com/Mugen87/yuka/blob/10591304811222d6856020d5de129b39ef43b58d/src/steering/behaviors/SeparationBehavior.js",
+          "sha256": "3bef63b70cbad2363c7a9004bf3dfeae48e35ff7c1f60b45e9a503c8c1a15c92"
+        },
+        {
+          "upstreamPath": "src/steering/behaviors/WanderBehavior.js",
+          "localPath": "yuka/src__steering__behaviors__WanderBehavior.js.txt",
+          "url": "https://github.com/Mugen87/yuka/blob/10591304811222d6856020d5de129b39ef43b58d/src/steering/behaviors/WanderBehavior.js",
+          "sha256": "820137f2e4df6339c4fe305f9daa5f4c8aefb9989922010f8a4c392843b7b81d"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/r-barnes/richdem",
+      "commit": "9a1c97bb2529e386451a7dd54768b8b74bb4d620",
+      "use": "Priority-Flood algorithm study; GPLv3 reference, not selected browser runtime",
+      "files": [
+        {
+          "upstreamPath": "LICENSE.txt",
+          "localPath": "richdem/LICENSE.txt.txt",
+          "url": "https://github.com/r-barnes/richdem/blob/9a1c97bb2529e386451a7dd54768b8b74bb4d620/LICENSE.txt",
+          "sha256": "c53a65c2fd561c87eaabf1072ef5dcab8653042bc15308465f52413585eb6271"
+        },
+        {
+          "upstreamPath": "include/richdem/depressions/Barnes2014.hpp",
+          "localPath": "richdem/include__richdem__depressions__Barnes2014.hpp.txt",
+          "url": "https://github.com/r-barnes/richdem/blob/9a1c97bb2529e386451a7dd54768b8b74bb4d620/include/richdem/depressions/Barnes2014.hpp",
+          "sha256": "ca28db4eb746acc2bafd70d9c830fa06868caaa6c57acc17ef601356938af592"
+        }
+      ]
+    }
+  ],
+  "fetchFailures": []
+}

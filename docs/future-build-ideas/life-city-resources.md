@@ -4,7 +4,7 @@ Research date: 7 October 2026.
 Author: ChatGPT.
 Purpose: public repositories, free assets and inexpensive tools for Metropolis.
 
-**Terrain and growing trees update, 10 October 2026:** See [the focused code research pack](life-city-terrain-growth.md) for noise hills, terrain-following streams, basin-filling lakes and sapling growth with an arrival wobble. It includes commit-pinned upstream source snapshots, demos and adaptation notes for Adam's Forest Island-style visual reference.
+**Related Grove research, 10 October 2026:** Adam's forest concept is separate from Life City and uses Three.js. See [Grove](grove.md), [the raw ingredient collection](grove-ingredients/README.md) and [terrain/growth notes](grove-resources.md). The shared terrain algorithms may also be useful here.
 
 ## Recommendation
 
@@ -146,3 +146,5 @@ The essential custom work is the Life Hub to city mapping, stable geography, sig
 
 - **2026-10-10:** Linked the terrain/water/tree-growth research and source snapshots. The original catalogue and its renderer recommendation remain intact.
 
+
+- **2026-10-10:** Corrected the Forest Island-style research association to Grove and linked its broader ingredient collection.

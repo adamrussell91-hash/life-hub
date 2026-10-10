@@ -1,0 +1,260 @@
+{
+  "retrieved": "2026-10-10",
+  "purpose": "Reference-only code snapshots, not installed engines",
+  "sources": [
+    {
+      "repository": "https://github.com/norio/three-stylized-water",
+      "commit": "47cc9020e3926e648cef247687209f16736d078b",
+      "license": "MIT",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "three-stylized-water/LICENSE.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/LICENSE",
+          "sha256": "a5e4c48e866ae8261d313d88734e7b1984cec049f69eaeafc7d108b6f84f6b44"
+        },
+        {
+          "upstreamPath": "README.md",
+          "localPath": "three-stylized-water/README.md.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/README.md",
+          "sha256": "8f1e9e5ad5273bdf7dd20f1df9d2590d33817e6d76376083b02ab4114509a69b"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "three-stylized-water/package.json.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/package.json",
+          "sha256": "7cdbe9dafe90dc9d2d5835a8096be2613c8eba1f33cbc9f3c5f88baec724d012"
+        },
+        {
+          "upstreamPath": "src/water/WaterMaterial.ts",
+          "localPath": "three-stylized-water/src__water__WaterMaterial.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/WaterMaterial.ts",
+          "sha256": "44420240d6fbf38597bb20b4cbcd211a33c5c2b8d35d8263df6c67b4539a841a"
+        },
+        {
+          "upstreamPath": "src/water/uniforms.ts",
+          "localPath": "three-stylized-water/src__water__uniforms.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/uniforms.ts",
+          "sha256": "5af5697e98370f597922b49e0bbb9469594b60c86f006e271575a93d0ebe24c9"
+        },
+        {
+          "upstreamPath": "src/water/presets.json",
+          "localPath": "three-stylized-water/src__water__presets.json.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/presets.json",
+          "sha256": "8625fac7794fc65cebd98c18a507d4818e56f804fdafa16294c00a54fa4e0d38"
+        },
+        {
+          "upstreamPath": "src/water/presets.ts",
+          "localPath": "three-stylized-water/src__water__presets.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/presets.ts",
+          "sha256": "e8b91716d53d537dd236c3c3b347cc57ee0b4f245b68a4c46413ce7dd713967f"
+        },
+        {
+          "upstreamPath": "src/water/nodes/normals.ts",
+          "localPath": "three-stylized-water/src__water__nodes__normals.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/normals.ts",
+          "sha256": "24620d0574b58fffb3a87499b42e120ee980b7d598f120fd93d107461bd74b2e"
+        },
+        {
+          "upstreamPath": "src/water/nodes/surfaceFoam.ts",
+          "localPath": "three-stylized-water/src__water__nodes__surfaceFoam.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/surfaceFoam.ts",
+          "sha256": "2b38d4db85addcfa626c4b2df7804b08846442cc7f398bfbb6f81f7a3cc95da2"
+        },
+        {
+          "upstreamPath": "src/water/nodes/intersection.ts",
+          "localPath": "three-stylized-water/src__water__nodes__intersection.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/intersection.ts",
+          "sha256": "bd6b8f9e26a5180206ba75e801b229bb59e2b257ed4d3ab700cb7743a74c36a7"
+        },
+        {
+          "upstreamPath": "src/water/nodes/waves.ts",
+          "localPath": "three-stylized-water/src__water__nodes__waves.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/waves.ts",
+          "sha256": "009eda293bee47fc88b0fcd0f8cd8a95feedcf7beef605c02ff4e9b7a503c9dd"
+        },
+        {
+          "upstreamPath": "src/water/nodes/refraction.ts",
+          "localPath": "three-stylized-water/src__water__nodes__refraction.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/refraction.ts",
+          "sha256": "5518a329f90d00a6ee2c31f4d6cdf2b4398dc50492e1362b9b6a05906a85acba"
+        },
+        {
+          "upstreamPath": "src/water/nodes/baseColor.ts",
+          "localPath": "three-stylized-water/src__water__nodes__baseColor.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/baseColor.ts",
+          "sha256": "1c450319b8911d56b461f723d729052d670edfb4e790b3578120369f694fcddb"
+        },
+        {
+          "upstreamPath": "src/water/nodes/depth.ts",
+          "localPath": "three-stylized-water/src__water__nodes__depth.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/depth.ts",
+          "sha256": "ac1d1c8780661f03e28a7f85073ee3c08e31921b4bc3f821ea07a5af43fb723f"
+        },
+        {
+          "upstreamPath": "src/water/nodes/utils.ts",
+          "localPath": "three-stylized-water/src__water__nodes__utils.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/utils.ts",
+          "sha256": "f18636a3970bfd599e5a11cc47b979df34034abf2de83f29c3f77b924f915e49"
+        },
+        {
+          "upstreamPath": "src/water/nodes/types.ts",
+          "localPath": "three-stylized-water/src__water__nodes__types.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/types.ts",
+          "sha256": "9efd683f61507412bd23a7ceddb05cd7aa8e590e671feb5f40c9c629977fcf51"
+        },
+        {
+          "upstreamPath": "src/water/nodes/shoreline.ts",
+          "localPath": "three-stylized-water/src__water__nodes__shoreline.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/shoreline.ts",
+          "sha256": "599074c8db5e2665f9dc5670ccae6f0ab1d8fd583a217fc99eb12ce6fb3dbeed"
+        },
+        {
+          "upstreamPath": "src/water/nodes/specular.ts",
+          "localPath": "three-stylized-water/src__water__nodes__specular.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/specular.ts",
+          "sha256": "d93c8a13a62de19c424d40318c627fde50316978fffc33216c0cce01913b62dd"
+        },
+        {
+          "upstreamPath": "src/water/nodes/reflection.ts",
+          "localPath": "three-stylized-water/src__water__nodes__reflection.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/reflection.ts",
+          "sha256": "61d6cba87fedc84c79ae44b43554d91e939e81f7dc9bf146a715530fcd5e221e"
+        },
+        {
+          "upstreamPath": "src/water/nodes/caustics.ts",
+          "localPath": "three-stylized-water/src__water__nodes__caustics.ts.txt",
+          "url": "https://github.com/norio/three-stylized-water/blob/47cc9020e3926e648cef247687209f16736d078b/src/water/nodes/caustics.ts",
+          "sha256": "d57a7a925b98cd3586dd6e13ecd5bd99f69f13db1beab5b3d40926ee181f83b4"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/IceCreamYou/THREE.Terrain",
+      "commit": "27b4c726b98a4e162f441d0603cc1f28c545d811",
+      "license": "MIT",
+      "files": [
+        {
+          "upstreamPath": "LICENSE.txt",
+          "localPath": "THREE.Terrain/LICENSE.txt.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/LICENSE.txt",
+          "sha256": "8a15ff970a854e22d3a3d5b72147abc019774255f4271f0a5a690c603fc05130"
+        },
+        {
+          "upstreamPath": "README.md",
+          "localPath": "THREE.Terrain/README.md.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/README.md",
+          "sha256": "88faeb691af5846887b8c1c94cb6fda87cc0382df8d335b89763fe61190a8cbc"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "THREE.Terrain/package.json.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/package.json",
+          "sha256": "a8db60e1aaa25cf74a6ec1f3f4fb05605d4cd7adc32efa363d4c90b8f2a0e327"
+        },
+        {
+          "upstreamPath": "src/materials.js",
+          "localPath": "THREE.Terrain/src__materials.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/materials.js",
+          "sha256": "e162734a807cfecc87443518f403feec355f68e002d278cdc1a9df8ee76f92a0"
+        },
+        {
+          "upstreamPath": "src/influences.js",
+          "localPath": "THREE.Terrain/src__influences.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/influences.js",
+          "sha256": "7e3d9addf80096e63c66adace359b2475308e5068f3191f9f51964244681404f"
+        },
+        {
+          "upstreamPath": "src/random.js",
+          "localPath": "THREE.Terrain/src__random.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/random.js",
+          "sha256": "204396b92c99120c263c1627b75d9d54a0c204563542e14697850fe30bcb3d7d"
+        },
+        {
+          "upstreamPath": "src/core.js",
+          "localPath": "THREE.Terrain/src__core.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/core.js",
+          "sha256": "528776d4c1356db3824c9d6c856a64529f5a2701e2e8e385e512e742bed39ea2"
+        },
+        {
+          "upstreamPath": "src/worley.js",
+          "localPath": "THREE.Terrain/src__worley.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/worley.js",
+          "sha256": "bd907edfc3f73140d148183e682b396c163a3f799e2d9187e7af1d27d9c5e931"
+        },
+        {
+          "upstreamPath": "src/index.js",
+          "localPath": "THREE.Terrain/src__index.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/index.js",
+          "sha256": "8c2d66e39d2db6ae6fd11d23eff7f7a083c256bd932ab9b50850afe85700402e"
+        },
+        {
+          "upstreamPath": "src/analysis.js",
+          "localPath": "THREE.Terrain/src__analysis.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/analysis.js",
+          "sha256": "33e64ed48b0151ff594937968d69639b44e9b7ed12663c349c7232dcffc396cc"
+        },
+        {
+          "upstreamPath": "src/weightedBoxBlurGaussian.js",
+          "localPath": "THREE.Terrain/src__weightedBoxBlurGaussian.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/weightedBoxBlurGaussian.js",
+          "sha256": "9e3ae75c3cddc5a2eea45accf3c900667b15fce85aeeac193d4307f3f4d4337c"
+        },
+        {
+          "upstreamPath": "src/filters.js",
+          "localPath": "THREE.Terrain/src__filters.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/filters.js",
+          "sha256": "9f3dc4efa1f752af3f8ecb161b49040022ee8a5efbd9b4e786e802aae86a01d3"
+        },
+        {
+          "upstreamPath": "src/gaussian.js",
+          "localPath": "THREE.Terrain/src__gaussian.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/gaussian.js",
+          "sha256": "ce895730e78b0f015396ec6c923ef0b4dfb2d1487be40c089587a037d29298a2"
+        },
+        {
+          "upstreamPath": "src/generators.js",
+          "localPath": "THREE.Terrain/src__generators.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/generators.js",
+          "sha256": "481a96211053b739f5babc1c1c00e98de12cc5e53046465570770b61dbfa5bb1"
+        },
+        {
+          "upstreamPath": "src/brownian.js",
+          "localPath": "THREE.Terrain/src__brownian.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/brownian.js",
+          "sha256": "19378eac74eda765a82d1b630f304ab37bfc0bdbb8f3559e062d7ff68c6d9951"
+        },
+        {
+          "upstreamPath": "src/tint.js",
+          "localPath": "THREE.Terrain/src__tint.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/tint.js",
+          "sha256": "8219b94a02ecc21f21e0c00676e7d55db589bd9ad4ef5938835c5a1d4177982e"
+        },
+        {
+          "upstreamPath": "src/grass.js",
+          "localPath": "THREE.Terrain/src__grass.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/grass.js",
+          "sha256": "7a5c1b702288876556485baecd8810a78cbc15c33ccd2837512e35e3f06f598b"
+        },
+        {
+          "upstreamPath": "src/noise.js",
+          "localPath": "THREE.Terrain/src__noise.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/noise.js",
+          "sha256": "082ccea476e40698cce62c060d240204f78b4043ceb472922b7a863fa364f7bc"
+        },
+        {
+          "upstreamPath": "src/images.js",
+          "localPath": "THREE.Terrain/src__images.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/images.js",
+          "sha256": "c1bd9267804d89f592eabc46528aa9c9488f98b77926128e35f85dbc399f0333"
+        },
+        {
+          "upstreamPath": "src/scatter.js",
+          "localPath": "THREE.Terrain/src__scatter.js.txt",
+          "url": "https://github.com/IceCreamYou/THREE.Terrain/blob/27b4c726b98a4e162f441d0603cc1f28c545d811/src/scatter.js",
+          "sha256": "371cc066045d38ff7351cbe887b8cb70e62522a5d2bb898a683743a9e5ca5114"
+        }
+      ]
+    }
+  ]
+}

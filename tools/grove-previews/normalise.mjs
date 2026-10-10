@@ -18,13 +18,15 @@ const io = new NodeIO().registerExtensions(ALL_EXTENSIONS)
 await Promise.all([MeshoptDecoder.ready, MeshoptEncoder.ready]);
 const selection = JSON.parse(await fs.readFile(path.join(here, 'selection.json')));
 const only = process.env.GROVE_ONLY_KIND;
-const assets = only ? JSON.parse(await fs.readFile(path.join(out,'manifest.json'))).assets.filter(a=>a.kind!==only) : [];
-for (const item of selection.filter(a=>!only || a.kind===only)) {
+const onlyIds = process.env.GROVE_ONLY_IDS?.split(',');
+const selected = a => (!only || a.kind===only) && (!onlyIds || onlyIds.includes(a.id));
+const assets = only || onlyIds ? JSON.parse(await fs.readFile(path.join(out,'manifest.json'))).assets.filter(a=>!selected(a)) : [];
+for (const item of selection.filter(selected)) {
   const [family, ...parts] = item.input.split('/');
   const original = parts.join('/');
   const input = family === 'kenney'
     ? path.join(repo, 'assets/kenney/kenney_nature-kit/Models/GLTF format', original)
-    : path.join(sourceRoot, family === 'nature' ? 'nature-sources' : 'animal-sources', original);
+    : path.join(sourceRoot, item.source_folder || (family === 'nature' ? 'nature-sources' : 'animal-sources'), original);
   const doc = await io.read(input);
   const root = doc.getRoot();
   for (const camera of root.listCameras()) camera.dispose();
@@ -51,11 +53,11 @@ for (const item of selection.filter(a=>!only || a.kind===only)) {
       const texture = mat.getBaseColorTexture();
       if (texture?.getImage()) {
         const clone = texture.clone();
-        // Retain the mask, recolour RGB for the wedding stand-in.
+        // Retain the alpha mask while choosing Grove's pink blossom palette.
         const {data, info} = await sharp(texture.getImage()).ensureAlpha().raw().toBuffer({resolveWithObject:true});
         for(let p=0;p<data.length;p+=4){data[p]=242;data[p+1]=145;data[p+2]=180;}
         clone.setImage(await sharp(data,{raw:info}).png().toBuffer()).setMimeType('image/png');
-        mat.setBaseColorTexture(clone);
+        mat.setBaseColorTexture(clone).setBaseColorFactor([1,1,1,1]);
       }
     }
   }
@@ -68,7 +70,7 @@ for (const item of selection.filter(a=>!only || a.kind===only)) {
   for (const child of [...scene.listChildren()]) { scene.removeChild(child); wrapper.addChild(child); }
   wrapper.setTranslation([-(bounds.min[0]+bounds.max[0])*scale/2,-bounds.min[1]*scale,-(bounds.min[2]+bounds.max[2])*scale/2]);
   scene.addChild(wrapper);
-  await doc.transform(dedup(), prune(), textureCompress({encoder:sharp,targetFormat:'webp',resize:[512,512]}));
+  await doc.transform(dedup(), prune(), textureCompress({encoder:sharp,targetFormat:'webp',resize:[item.texture_size || 512,item.texture_size || 512]}));
   const kindFolder = item.kind === 'tree' ? 'trees' : item.kind === 'animal' ? 'animals' : 'ground';
   const file = `models/${kindFolder}/${item.id}.glb`;
   const dest = path.join(out, file);
@@ -84,8 +86,8 @@ for (const item of selection.filter(a=>!only || a.kind===only)) {
     const n = (p.getIndices() || p.getAttribute('POSITION')).getCount();
     triangles += p.getMode()===4 ? n/3 : p.getMode()===5 || p.getMode()===6 ? Math.max(0,n-2) : 0;
   }
-  const pack = family === 'nature' ? 'Stylized Nature MegaKit (Standard)' : family === 'animals' ? 'Ultimate Animated Animal Pack' : 'Nature Kit';
-  assets.push({id:item.id,slot:item.slot,kind:item.kind,variant:item.variant,stage:item.stage,file,preview:`previews/${item.id}.png`,bytes:(await fs.stat(dest)).size,triangles,height_m: +(measured.max[1]-measured.min[1]).toFixed(4),animations:final.getRoot().listAnimations().map(a=>a.getName()),animation_source_names:animationSourceNames,source:{pack,author:family==='kenney'?'Kenney':'Quaternius',page_url:family==='nature'?'https://quaternius.com/packs/stylizednaturemegakit.html':family==='animals'?'https://quaternius.com/packs/ultimateanimatedanimals.html':'https://kenney.nl/assets/nature-kit',original_file:original,downloaded_at:'2026-10-10'},license:{id:'CC0-1.0',url:'https://creativecommons.org/publicdomain/zero/1.0/',attribution:null},notes:item.notes});
+  const pack = item.source?.pack || (family === 'nature' ? 'Stylized Nature MegaKit (Source)' : family === 'animals' ? 'Ultimate Animated Animal Pack' : 'Nature Kit');
+  assets.push({id:item.id,slot:item.slot,kind:item.kind,variant:item.variant,stage:item.stage,file,preview:`previews/${item.id}.png`,bytes:(await fs.stat(dest)).size,triangles,height_m: +(measured.max[1]-measured.min[1]).toFixed(4),animations:final.getRoot().listAnimations().map(a=>a.getName()),animation_source_names:animationSourceNames,source:{pack,author:item.source?.author || (family==='kenney'?'Kenney':'Quaternius'),page_url:item.source?.page_url || (family==='nature'?'https://quaternius.com/packs/stylizednaturemegakit.html':family==='animals'?'https://quaternius.com/packs/ultimateanimatedanimals.html':'https://kenney.nl/assets/nature-kit'),original_file:item.source?.original_file || original,downloaded_at:'2026-10-10'},license:{id:'CC0-1.0',url:'https://creativecommons.org/publicdomain/zero/1.0/',attribution:null},notes:item.notes});
   console.log(item.id, assets.at(-1).bytes);
 }
 assets.sort((a,b)=>selection.findIndex(s=>s.id===a.id)-selection.findIndex(s=>s.id===b.id));
