@@ -5,6 +5,7 @@ export interface RenderToolbarOptions {
   onSearchJournal?: () => void;
   onSouvenirs?: () => void;
   onExportJournal?: () => void;
+  onPrintJournal?: () => void;
   onShareJournal?: () => void;
   onAddMoment?: () => void;
   onTrash?: () => void;
@@ -52,6 +53,7 @@ export function renderToolbar(options: RenderToolbarOptions): HTMLElement {
     { label: 'Search journal', action: options.onSearchJournal, disabled: !options.onSearchJournal },
     { label: 'Souvenirs', action: options.onSouvenirs, disabled: !options.onSouvenirs },
     { label: 'Pattern appearance', disabled: true },
+    { label: 'Print', action: options.onPrintJournal, disabled: !options.onPrintJournal },
     { label: 'Export', action: options.onExportJournal, disabled: !options.onExportJournal },
     { label: 'Share', action: options.onShareJournal, disabled: !options.onShareJournal },
     { label: 'Trash', action: options.onTrash, disabled: !options.onTrash },

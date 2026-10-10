@@ -27,6 +27,7 @@ import {
   writeCoreyPerspectiveVisible,
 } from '@/journal/corey-perspective';
 import { downloadJournalExportBundle, stripJournalForExport } from '@/journal/export-bundle';
+import { openJournalPrintEdition } from '@/journal/print-edition';
 import {
   JOURNAL_MOMENT_PAGE_SIZE,
   attachMomentPrefetchObserver,
@@ -284,6 +285,13 @@ export function renderJournal(
     },
     onExportJournal: () => {
       void downloadJournalExportBundle(stripJournalForExport(journalDoc()));
+    },
+    onPrintJournal: () => {
+      openJournalPrintEdition(stripJournalForExport(journalDoc()), {
+        tripId: liveFixture.trip_id,
+        title: toolbarTitle(),
+        showCoreyPerspective,
+      });
     },
     onShareJournal: () => {
       shareOverlay?.destroy();
