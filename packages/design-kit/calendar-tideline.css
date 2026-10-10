@@ -487,3 +487,20 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-rescue.is-docked{background:transparent;place-items:end end;pointer-events:none}
 .cal-rescue.is-docked .cal-rescue__panel{pointer-events:auto;width:min(380px,100%);max-height:min(70vh,560px)}
 @media (max-width:719px){.cal-rescue.is-docked{place-items:end stretch}.cal-rescue.is-docked .cal-rescue__panel{width:auto;max-height:45vh}}
+
+/* ---------- tick column + timed deadlines (10/10/26) ---------- */
+/* The tick sits top-left of every task card, level with the first title line; the text wraps beside it, never under it. */
+.cal-chip.has-tick .cal-chip__title,.cal-due.has-tick > b{display:grid;grid-template-columns:14px minmax(0,1fr);column-gap:6px;align-items:start;-webkit-line-clamp:none}
+.cal-chip__text,.cal-due__text{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;min-width:0}
+.cal-chip__text{-webkit-line-clamp:var(--lines,2)}
+.cal-due__text{-webkit-line-clamp:2}
+.cal-chip.has-tick .cal-tick,.cal-due.has-tick .cal-tick{margin:1px 0 0;margin-top:calc((1lh - 14px) / 2)}
+.cal-chip.has-tick > :is(.cal-chip__meta,.cal-chip__bm,.cal-chip__proposal),
+.cal-due.has-tick > :not(b){margin-left:20px}
+/* A task due at a set time: a marker at that hour (its top edge is the time), not a block and not the all-day row. */
+.cal-deadline{position:absolute;left:6px;right:6px;z-index:4;gap:1px;padding:3px 8px 4px;border-radius:0 0 8px 8px;border-top:2px solid var(--cal-sage-stripe);box-shadow:0 1px 2px color-mix(in srgb,var(--navy) 6%,transparent)}
+.cal-deadline .cal-due__text{-webkit-line-clamp:1}
+.cal-body.is-past .cal-deadline{opacity:.72}
+/* Overlapping chips share the column in lanes (tideline-model assignLanes). */
+.cal-chip[data-lanes]{left:calc(6px + (100% - 12px) * var(--lane,0) / var(--lanes,1));right:auto;width:calc((100% - 12px) * var(--span,1) / var(--lanes,1) - 3px)}
+.cal-chip[data-lanes] .cal-chip__meta{text-overflow:clip}
