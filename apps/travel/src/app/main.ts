@@ -20,7 +20,9 @@ import {
 import { ApiClientError } from '@/api/client';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, type HubShellRefs, type RailHighlight } from '@/shell/shell';
 import { journalPatternOff, parseRoute } from '@/app/router';
+import { ensureJournal } from '@/api/journal';
 import { klIstanbulFixture } from '@/journal/fixtures/kl-istanbul';
+import type { JournalFixture } from '@/journal/types';
 import { renderJournal } from '@/journal/render-journal';
 import { renderTripsList } from '@/views/trips-list';
 import { renderTripPage } from '@/views/trip-page';
@@ -29,6 +31,10 @@ import { renderPublicTrip } from '@/views/public-trip';
 import { listTrips } from '@/api/travel';
 import { pickPrimaryTrip } from '@/lib/pick-trip';
 import { registerServiceWorker, mountOfflineBanner } from '@/lib/offline';
+
+function journalUseFixture(): boolean {
+  return new URLSearchParams(location.search).get('fixture') === '1';
+}
 
 function publicToken(): string | null {
   const match = /\/travel\/t\/([^/]+)\/?$/.exec(location.pathname) ?? /^\/t\/([^/]+)\/?$/.exec(location.pathname);
@@ -113,9 +119,15 @@ async function bootApp(root: HTMLElement): Promise<void> {
       if (route.name === 'journal') {
         currentTripId = route.tripId;
         renderHighlight('trip');
-        const fixture = klIstanbulFixture();
         renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: '' });
         journalHandle?.destroy();
+        let fixture: JournalFixture;
+        if (journalUseFixture()) {
+          fixture = klIstanbulFixture();
+        } else {
+          const { journal } = await ensureJournal(route.tripId);
+          fixture = journal;
+        }
         journalHandle = renderJournal(shell.canvas, {
           fixture,
           momentId: route.momentId,
