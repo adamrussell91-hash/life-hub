@@ -170,6 +170,11 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
 
   // ── Events ────────────────────────────────────────────────────────────────
 
+  function toggleVisit(id) {
+    state.selectedVisit = state.selectedVisit === id ? null : id;
+    update();
+  }
+
   function wire(el) {
     el.addEventListener('click', event => {
       const t = event.target;
@@ -200,11 +205,7 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
         return update();
       }
       const visit = t.closest('[data-gh-visit]');
-      if (visit) {
-        const id = visit.dataset.ghVisit;
-        state.selectedVisit = state.selectedVisit === id ? null : id;
-        return update();
-      }
+      if (visit) return toggleVisit(visit.dataset.ghVisit);
       const open = t.closest('[data-gh-open]');
       if (open) return open.dataset.ghOpen === 'visit' ? openVisit() : openPlaces();
       const close = t.closest('[data-gh-close]');
@@ -227,9 +228,7 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
       const marker = event.target.closest?.('g[data-gh-visit]');
       if (!marker) return;
       event.preventDefault();
-      const id = marker.dataset.ghVisit;
-      state.selectedVisit = state.selectedVisit === id ? null : id;
-      update();
+      toggleVisit(marker.dataset.ghVisit);
     });
     el.addEventListener('change', event => {
       if (event.target.matches?.('[data-gh="remember"]')) state.remember = event.target.checked;
@@ -523,9 +522,7 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
   }
 
   function wireRoadLabels() {
-    const root = host();
-    if (!root) return;
-    for (const marker of root.querySelectorAll('g.gh-marker')) {
+    for (const marker of host()?.querySelectorAll('g.gh-marker') ?? []) {
       const viewport = marker.querySelector('.gh-marker__title');
       const text = marker.querySelector('.gh-marker__title-text');
       if (!viewport || !text) continue;
@@ -738,8 +735,9 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
     const ROAD_BOT = ROAD_Y + ROAD_H;
     const STEM = 28;
     const DOT = 8;
-    const UP_CY = ROAD_Y - STEM - DOT; // 44
-    const DOWN_CY = ROAD_BOT + (ROAD_Y - UP_CY); // 164 — mirror of above
+    // Same gap above and below the road: stem length + dot radius.
+    const UP_CY = ROAD_Y - STEM - DOT;
+    const DOWN_CY = ROAD_BOT + STEM + DOT;
     const LABEL_W = 120;
     const LABEL_H = 18;
     const x = value => 30 + (value / maxKm) * (W - 60);
