@@ -127,6 +127,29 @@ export function isNotionMeetingMethod(method) {
   return NOTION_MEETING_METHODS.has(method);
 }
 
+/** Deterministic hub id (`communication_` / `meeting_` + UUID-shaped hex) from a Notion row id. */
+function notionDerivedHubId(kind, notionId) {
+  const digest = createHash('sha256').update(`${kind}:${notionId}`).digest('hex').slice(0, 32);
+  const grouped = [
+    digest.slice(0, 8),
+    digest.slice(8, 12),
+    digest.slice(12, 16),
+    digest.slice(16, 20),
+    digest.slice(20, 32)
+  ];
+  return `${kind}_${grouped.join('-')}`;
+}
+
+/** Deterministic hub Communication id from a Notion communications.json row id. */
+export function notionCommunicationId(notionId) {
+  return notionDerivedHubId('communication', notionId);
+}
+
+/** Deterministic hub Meeting id from a Notion communications.json meeting-method row. */
+export function notionMeetingId(notionId) {
+  return notionDerivedHubId('meeting', notionId);
+}
+
 /** True for missing / Unix-epoch placeholders that must never render as a calendar day. */
 export function isMissingScheduleInstant(value) {
   if (value == null || value === '') return true;
