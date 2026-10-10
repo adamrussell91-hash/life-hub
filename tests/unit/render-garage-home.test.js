@@ -111,6 +111,67 @@ test('Garage draws Odometer Road with a ghost estimate and opens a visit on tap'
   assert.match(host.querySelector('.gh-odo').getAttribute('aria-label'), /estimated/);
 });
 
+test('Garage marker tap toggles selection off; below stems mirror above spacing', async () => {
+  const { view, host, click } = setup();
+  await view.show();
+  click('[data-gh-tab="garage"]');
+  const markers = [...host.querySelectorAll('g.gh-marker')];
+  assert.ok(markers.length >= 2);
+  const road = host.querySelector('rect.gh-road');
+  const roadTop = Number(road.getAttribute('y'));
+  const roadBot = roadTop + Number(road.getAttribute('height'));
+  const above = markers[0];
+  const below = markers[1];
+  const aboveStem = above.querySelector('line.gh-marker__stem');
+  const belowStem = below.querySelector('line.gh-marker__stem');
+  assert.equal(Number(aboveStem.getAttribute('y2')), roadTop);
+  assert.equal(Number(belowStem.getAttribute('y1')), roadBot);
+  const aboveGap = roadTop - Number(above.querySelector('circle').getAttribute('cy'));
+  const belowGap = Number(below.querySelector('circle').getAttribute('cy')) - roadBot;
+  assert.equal(aboveGap, belowGap);
+  assert.ok(above.querySelector('.gh-marker__title-text')?.textContent.length > 0, 'full title in scroll viewport');
+  click('g.gh-marker');
+  assert.ok(host.querySelector('.gh-visit-detail'));
+  const onId = host.querySelector('g.gh-marker.is-on')?.dataset.ghVisit;
+  assert.ok(onId);
+  click(`g.gh-marker[data-gh-visit="${onId}"]`);
+  assert.equal(host.querySelector('.gh-visit-detail'), null);
+  assert.equal(host.querySelector('g.gh-marker.is-on'), null);
+});
+
+test('Garage long marker titles scroll on focus using measured overflow', async () => {
+  const { view, host, click } = setup();
+  await view.show();
+  click('[data-gh-tab="garage"]');
+  const marker = host.querySelector('g.gh-marker');
+  const viewport = marker.querySelector('.gh-marker__title');
+  const text = marker.querySelector('.gh-marker__title-text');
+  Object.defineProperty(viewport, 'clientWidth', { value: 100, configurable: true });
+  Object.defineProperty(text, 'scrollWidth', { value: 340, configurable: true });
+  marker.dispatchEvent(new host.ownerDocument.defaultView.FocusEvent('focus', { bubbles: true }));
+  assert.equal(marker.classList.contains('is-reading-title'), true);
+  assert.equal(marker.style.getPropertyValue('--gh-title-shift'), '-240px');
+  marker.dispatchEvent(new host.ownerDocument.defaultView.FocusEvent('blur', { bubbles: true }));
+  assert.equal(marker.classList.contains('is-reading-title'), false);
+});
+
+test('Garage can retire and unretire the selected car', async () => {
+  const { view, host, click, settle, calls } = setup();
+  await view.show();
+  click('[data-gh-tab="garage"]');
+  assert.match(host.querySelector('[data-gh-act="retire-car"]').textContent, /No longer ours/);
+  click('[data-gh-act="retire-car"]');
+  await settle();
+  const saved = calls.find(c => c?.action === 'place');
+  assert.equal(saved?.place?.details?.retired, true);
+  assert.match(host.textContent, /no longer ours/i);
+  assert.match(host.querySelector('[data-gh-act="retire-car"]').textContent, /Mark as ours again/);
+  click('[data-gh-act="retire-car"]');
+  await settle();
+  const again = calls.filter(c => c?.action === 'place').at(-1);
+  assert.equal(again?.place?.details?.retired, false);
+});
+
 test('Check mail without Gmail explains how to connect instead of failing silently', async () => {
   const { view, host, click, settle } = setup();
   await view.show();
