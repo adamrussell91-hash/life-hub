@@ -71,7 +71,7 @@ export function filterKeyForItem(item) {
   if (!item || typeof item !== 'object') return null;
   if (item.filterKey && ALL_IDS.includes(item.filterKey)) return item.filterKey;
   const kind = item.kind || item.chip?.kind;
-  const source = item.source || item.type || item.record?.type || item.chip?.source;
+  const source = item.record?.type || item.type || item.source || item.chip?.source;
   const isClass = item.isClass === true || item.chip?.isClass === true || source === 'scheduled_lesson';
   if (kind === 'teaching' || source === 'scheduled_lesson' || isClass) {
     return isClass || source === 'scheduled_lesson' ? 'classes' : 'events';
@@ -83,7 +83,7 @@ export function filterKeyForItem(item) {
     const eventType = item.event_type ?? item.record?.event_type ?? item.chip?.event_type ?? null;
     return eventType && eventType !== 'professional_development' ? 'events' : 'pd';
   }
-  if (kind === 'task' || source === 'task' || source === 'work_block' || source === 'deadline') return 'tasks';
+  if (kind === 'task' || source === 'task' || source === 'project' || source === 'work_block' || source === 'deadline') return 'tasks';
   if (kind === 'health' || source === 'medical') return 'health';
   if (kind === 'fitness' || source === 'workout') return 'fitness';
   if (kind === 'corey') return 'corey';
