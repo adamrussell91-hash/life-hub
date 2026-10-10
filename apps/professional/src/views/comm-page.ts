@@ -47,9 +47,8 @@ function personFrom(entry: UniversalLinkEntry): PersonOnPage {
 }
 
 async function loadPage(id: string): Promise<PageData> {
-  const { communication: record } = await getCommunication(id);
   const commRef = `professional:communication:${id}`;
-  const links = await listUniversalLinksForEntity(commRef);
+  const [{communication:record}, links] = await Promise.all([getCommunication(id), listUniversalLinksForEntity(commRef)]);
   const current = links.outgoing.filter((entry) => entry.link.status === 'current');
   const withPeople = current.filter((entry) => entry.link.relationship_type === 'recipient').map(personFrom);
   const alsoConcerned = current.filter((entry) => entry.link.relationship_type === 'about_person').map(personFrom);
@@ -105,11 +104,13 @@ export async function renderCommPage(
   id: string,
   options: { isCurrent: () => boolean; onTitleReady: (title: string) => void }
 ): Promise<void> {
+  if (!options.isCurrent()) return;
   showViewLoading(canvas, 'Loading…');
   let data: PageData;
   try {
     data = await loadPage(id);
   } catch (err) {
+    if (!options.isCurrent()) return;
     renderLoadError(canvas, err, () => void renderCommPage(canvas, id, options));
     return;
   }

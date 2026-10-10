@@ -10,6 +10,8 @@ import {
   listEvents,
   retryEventLinks,
   retryEventTaskLink,
+  linkEventTask,
+  isEventTaskLinkIncompleteError,
   updateEvent,
   type EventLinkInput
 } from '@/api/events';
@@ -22,9 +24,8 @@ import { renderScheduleDbPage } from '@/components/schedule-db-page';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { utcIsoToWallLocal, wallLocalToUtcIso, isValidTimeZone } from '@/lib/wall-time';
 import { isPriorityArea, PRIORITY_AREAS, priorityAreaName, splitEventLabels } from '@/domain/priority-area';
-import { loadEntityRelationships, mountKnowledgePagePicker } from '@/components/schedule-relationships';
+import { loadEntityRelationships, mountKnowledgePagePicker, mountTaskLinkPanel } from '@/components/schedule-relationships';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
-import { createAutoRetry } from '@/lib/auto-retry';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -916,36 +917,48 @@ export function buildPdFields(record: EventRecord, onSaved: (next: EventRecord) 
   return evidence;
 }
 
-export function buildEventConnections(record: EventRecord, reload: () => Promise<void>): HTMLElement {
+export function buildEventConnections(record: EventRecord, _reload: () => Promise<void>): HTMLElement {
   const host = el('section', 'card event-page__connections');
-  const operation = record.learning_operation;
-  const fallbackLabels: Record<string, string> = {};
-  if (operation?.task_id && operation.title && operation.title !== operation.task_id) fallbackLabels[`tasks:task:${operation.task_id}`] = operation.title;
-  mountTagAnythingSection(host, `professional:event:${record.id}`, {
-    includeRelationships: ['learning_for'], fallbackLabels
-  });
-  // Keep recovery of an already-created task link without exposing another
-  // task creation form or internal operation ids.
-  if (operation?.status === 'incomplete') {
-    const status = el('p', 'task-link-panel__state', 'Linking task…');
-    status.setAttribute('role', 'status');
-    const tryNow = el('button', 'btn btn--ghost', 'Try now');
-    tryNow.type = 'button';
-    tryNow.hidden = true;
-    const retry = createAutoRetry({
-      run: async () => {
-        if (!host.isConnected) { retry.stop(); return; }
-        await retryEventTaskLink(record.id, operation.operation_id);
-        await reload();
-      },
-      onState: (state) => {
-        status.textContent = state === 'linked' ? 'Task linked.' : state === 'stuck' ? 'Task link is still pending.' : 'Linking task…';
-        tryNow.hidden = state !== 'stuck';
-      }
-    });
-    tryNow.addEventListener('click', () => void retry.tryNow());
-    host.append(status, tryNow);
-  }
+  mountTagAnythingSection(host, `professional:event:${record.id}`);
+  return host;
+}
+
+export function buildEventTaskPanel(record: EventRecord, reload: () => Promise<void>): HTMLElement {
+  const host = el('section', 'card event-page__tasks');
+  const load = async () => {
+    const loading = el('p', 'muted', 'Loading linked tasks…');
+    loading.setAttribute('role', 'status');
+    host.replaceChildren(el('h3', undefined, 'Follow-up tasks'), loading);
+    try {
+      const entries = await loadEntityRelationships(`professional:event:${record.id}`);
+      if (!host.contains(loading)) return;
+      const linkedOperations = entries.filter(entry => entry.link.relationship_type === 'learning_for' && entry.endpoint?.kind === 'task').map(entry => {
+        const endpoint = entry.endpoint!;
+        const taskId = endpoint.ref.replace(/^tasks:task:/, '');
+        const label = endpoint.display_label?.trim();
+        return {operation_id: entry.link.id, status: 'committed', task_id: taskId,
+          title: label && label !== endpoint.ref && label !== taskId ? label : 'Linked task'};
+      });
+      host.replaceChildren();
+      mountTaskLinkPanel({
+        host, heading: 'Follow-up tasks', relationshipType: 'learning_for', linkedOperations,
+        incompleteOperationId: record.learning_operation?.status === 'incomplete' ? record.learning_operation.operation_id : null,
+        onSubmit: async input => {
+          try { await linkEventTask(record.id, {relationship_type: 'learning_for', ...input}); }
+          catch (error) { if (!isEventTaskLinkIncompleteError(error)) throw error; }
+          await reload();
+        },
+        onRetry: async operationId => { await retryEventTaskLink(record.id, operationId); await reload(); }
+      });
+    } catch {
+      if (!host.contains(loading)) return;
+      const retry = el('button', 'btn btn--secondary', 'Try again');
+      retry.type = 'button';
+      retry.addEventListener('click', () => void load());
+      host.replaceChildren(el('h3', undefined, 'Follow-up tasks'), el('p', 'muted', 'Could not load linked tasks.'), retry);
+    }
+  };
+  void load();
   return host;
 }
 

@@ -5,7 +5,7 @@ import { createUniversalLink, listUniversalLinksForEntity, endUniversalLink } fr
 import { createPdGroup, getPdGroup } from '@/api/pd-groups';
 import { createKnowledgeNote } from '@/api/knowledge-notes';
 import { mountBlockPage } from '@/components/block-page';
-import { buildEventConnections, buildPdFields, renderEventNewView } from '@/views/events';
+import { buildEventTaskPanel, buildEventConnections, buildPdFields, renderEventNewView } from '@/views/events';
 import { groupTotals, talkHoursNote } from '@/lib/pd-totals';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import type { EventRecord, EventTalk, PdGroupRecord } from '@/domain/types';
@@ -170,7 +170,9 @@ export async function renderEventPage(
     root.append(seriesHost);
   }
 
-  root.append(buildEventConnections(data.record, rerender));
+  const links = el('div', 'event-page__links');
+  links.append(buildEventTaskPanel(data.record, rerender), buildEventConnections(data.record, rerender));
+  root.append(links);
   const notes = el('section', 'card event-page__notes');
   notes.append(el('h3', undefined, isPd ? 'Reflection and notes' : 'Notes'));
   const body = el('div');

@@ -118,7 +118,7 @@ export async function resolveTask(id, accessContext, { getStore = defaultGetTask
   if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
   const store = await getStore();
   const record = await getTasksJSON(store, taskKey(id));
-  if (!record || typeof record !== 'object') throw endpointNotFoundError();
+  if (!record || typeof record !== 'object' || isDeletedRecord(record)) throw endpointNotFoundError();
   return {
     ref,
     kind: 'task',

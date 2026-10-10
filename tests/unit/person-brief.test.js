@@ -5,6 +5,7 @@ import {
   EMPTY_BRIEF_BODY,
   EMPTY_BRIEF_TITLE
 } from '../../netlify/functions/_shared/person-brief.mjs';
+import {taskKey} from '../../netlify/functions/_shared/tasks-blobs.mjs';
 import { createMeetingRepository } from '../../netlify/functions/_shared/meeting-repository.mjs';
 import {
   resolveEvent,
@@ -206,12 +207,15 @@ test('open_loops: includes only linked Tasks with status open or in_progress, ex
   const inProgressTask = await makeTask(tasksStore, { title: 'Introduce Vicky to James', status: 'in_progress' });
   const doneTask = await makeTask(tasksStore, { title: 'Already sent', status: 'done' });
   const deferredTask = await makeTask(tasksStore, { title: 'Someday', status: 'deferred' });
-  const deadTask = await makeTask(tasksStore, { title: 'Abandoned', status: 'dead' });
+  const deadTask = await makeTask(tasksStore, { title: 'Abandoned', status: 'open' });
 
   for (const task of [openTask, inProgressTask, doneTask, deferredTask, deadTask]) {
     // eslint-disable-next-line no-await-in-loop
     await makeLink(universalStore, { sourceRef: task.ref, targetRef: person.ref, relationshipType: 'collaborator', resolveEntity });
   }
+
+  // A task can be deleted after a valid link was created.
+  await tasksStore.setJSON(taskKey(deadTask.id), {...deadTask,status:'dead'});
 
   const brief = await assemblePersonBrief(person.id, { universalStore, professionalStore, resolveEntity, now: NOW });
 

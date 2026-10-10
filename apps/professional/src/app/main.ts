@@ -27,7 +27,7 @@ import '../styles/thread-page.css';
 import '../styles/meeting-page.css';
 import '../styles/event-page.css';
 
-import { clearEventReadCache } from '@/api/client';
+import { clearScheduleReadCache } from '@/api/client';
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, viewChrome, type HubShellRefs } from '@/shell/shell';
@@ -82,7 +82,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
       await logout();
       await boot(root);
     },
-    onRefresh: () => { clearEventReadCache(); void paint(); }
+    onRefresh: () => { clearScheduleReadCache(); void paint(); }
   });
 
   let routeGeneration = 0;

@@ -20,6 +20,7 @@ vi.mock('@/api/events', () => ({
 }));
 vi.mock('@/views/events', () => ({
   renderEventNewView: vi.fn(async () => {}),
+  buildEventTaskPanel: () => Object.assign(document.createElement('section'), { className: 'task-link-panel task-panel-stub' }),
   buildEventConnections: () => Object.assign(document.createElement('section'), { className: 'connections-stub' }),
   buildPdFields: () => Object.assign(document.createElement('section'), { className: 'pd-fields-stub' })
 }));
@@ -98,11 +99,12 @@ describe('event page', () => {
     expect(canvas.querySelector('.block-page-stub')).not.toBeNull();
   });
 
-  it('uses the shared Connections section and record cards without a task creation panel or native format select', async () => {
+  it('uses the shared Connections section and record cards with a Tasks panel beside it and no native format select', async () => {
     const canvas = await render();
     expect(canvas.querySelector('.connections-stub')).not.toBeNull();
     expect(canvas.querySelector('[data-part="shape"] select')).toBeNull();
-    expect(canvas.querySelector('.task-link-panel')).toBeNull();
+    expect(canvas.querySelector('.event-page__links .task-panel-stub')).not.toBeNull();
+    expect(canvas.querySelector('.event-page__links .connections-stub')).not.toBeNull();
     expect(canvas.querySelector('[data-part="talks"]')?.classList.contains('card')).toBe(true);
     expect(canvas.querySelector('.event-page__notes')?.classList.contains('card')).toBe(true);
   });
