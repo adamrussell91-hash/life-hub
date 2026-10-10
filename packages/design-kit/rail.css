@@ -225,6 +225,9 @@ button.hub-rail__section:focus-visible {
   align-items: center;
   width: 100%;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   border-radius: var(--radius-sm);
 }
 

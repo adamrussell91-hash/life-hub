@@ -52,19 +52,6 @@
   margin-top: var(--space-4);
 }
 
-/* Kit accordion rows. Cards.css .hub-row is a canvas tile — keep it off the rail. */
-.hub-rail .hub-row {
-  flex-direction: row;
-  align-items: center;
-  gap: 0;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
 .hub-rail__list {
   display: flex;
   flex-direction: column;
