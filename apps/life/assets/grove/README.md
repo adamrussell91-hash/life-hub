@@ -1,6 +1,6 @@
 # Grove
 
-**Status:** Canonical concept and asset brief, consolidated 10 October 2026. Grove runtime is not built.
+**Status:** Canonical concept and asset brief, consolidated 10 October 2026. Day and Week views are built (`/tasks/#/grove`, and Home's Grove panel); Term, Year, water and animals are next.
 **Ingredients:** [Model manifest](manifest.json), [contact sheet](previews/_sheet.png), [code references](references/README.md), [terrain and water notes](references/terrain-notes.md).
 
 Grove is a quiet Three.js forest drawn from completed-task history, viewed from above at an angle. It lives below Day and Tasks, separately from them. Home shows today's clearing; tapping it opens the wider forest.

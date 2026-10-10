@@ -61,7 +61,8 @@ export type HubViewId =
   | 'programs'
   | 'properties'
   | 'term-dates'
-  | 'city';
+  | 'city'
+  | 'grove';
 
 type NavItem = { id: HubViewId; label: string; href: string };
 
@@ -88,7 +89,8 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'almanac', label: 'Almanac', href: '#/almanac' },
       { id: 'list', label: 'Backlog', href: '#/list' },
       { id: 'graph', label: 'Graph', href: '#/graph' },
-      { id: 'timeline', label: 'Timeline', href: '#/timeline' }
+      { id: 'timeline', label: 'Timeline', href: '#/timeline' },
+      { id: 'grove', label: 'Grove', href: '#/grove' }
     ]
   },
   {

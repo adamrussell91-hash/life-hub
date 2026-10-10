@@ -99,6 +99,9 @@ function renderNotFound(canvas: HTMLElement, hash: string): void {
   canvas.append(lede, home);
 }
 
+/** Grove owns a WebGL context; release it when another view takes the canvas. */
+let groveUnmount: (() => void) | null = null;
+
 async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<void> {
   switch (view) {
     case 'board':
@@ -161,6 +164,11 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       const { renderCityView } = await import('@/views/city/view');
       return renderCityView(canvas);
     }
+    case 'grove': {
+      const grove = await import('@/views/grove/view');
+      groveUnmount = grove.unmountGroveView;
+      return grove.renderGroveView(canvas);
+    }
   }
 }
 
@@ -201,6 +209,8 @@ async function bootApp(root: HTMLElement): Promise<void> {
       if (canvasWrap instanceof HTMLElement) canvasWrap.scrollTop = 0;
       shell.canvas.scrollTop = 0;
       clare.park();
+      groveUnmount?.();
+      groveUnmount = null;
       // Leaving the kit calendar surface tears the mount down.
       if (nextView == null || viewSurface(nextView) !== 'kit-calendar') {
         unmountTasksCalendar();
