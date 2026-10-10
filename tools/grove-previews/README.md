@@ -84,3 +84,18 @@ family consistency and one successful CLI `inspect` per GLB. `--update-total`
 updates the manifest's whole-folder byte budget including itself and previews.
 Run it again without that flag for a read-only audit. Known shopping-list gaps
 are recorded above and in the draft PR, rather than hidden by the validator.
+
+## Local project-only candidates
+
+The canonical Grove README and `animal-audit.json` record the locally prepared
+robin and Spring hare/squirrel. Extra licences prohibit standalone public asset
+redistribution, so their files are outside the repo. Hare/squirrel have rigs,
+not authored locomotion clips. Bird has authored fly/idle/hop/eat.
+
+For a separately stored selection, `GROVE_SELECTION=/absolute/selection.json`
+chooses its input list and `GROVE_OUTPUT_DIR=/absolute/output` chooses its model
+folder for both normalisation and previews. Selection entries may specify
+`clip_map`, `source_folder`, source metadata and their actual `license`; a paid
+asset must never be recorded as CC0. Set `GROVE_RENDER_REPORT` to a local report
+path too, so previewing the local selection cannot replace the public report.
+Default invocation still prepares the repository's existing CC0 selection.

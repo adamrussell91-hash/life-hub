@@ -75,8 +75,8 @@
     },
     {
       "name": "Animated Low Poly Animals.unitypackage",
-      "creator": "Acorn Bringer (identified by internal package paths)",
-      "page_url": null,
+      "creator": "Acorn Bringer",
+      "page_url": "https://acornbringer.itch.io/assets-animated-low-poly-animals",
       "license_status": "pending exact download page and applicable licence",
       "archive": {
         "file": "Animated Low Poly Animals.unitypackage",
@@ -94,15 +94,15 @@
         "Assets/Acorn Bringer Assets/Animated Low Poly Animals/Meshes/Character_BumbleBee.fbx",
         "Assets/Acorn Bringer Assets/Animated Low Poly Animals/Meshes/Character_Fish.fbx"
       ],
-      "status": "archive inspected without importing Unity or running included code; animation clips and visual fit not yet validated",
+      "status": "Bird FBX import metadata includes authored flight and walking frame ranges. No converted model yet; applicable redistribution licence still pending.",
       "creator_reported_by_user": "SilverAnimations",
-      "creator_verification": "not independently confirmed"
+      "creator_verification": "public publisher page matches internal names and download; local download origin corroborates source"
     },
     {
       "name": "4 Rigged Spring Animals.blend",
-      "creator": "SilverAnimations (user reported)",
-      "page_url": null,
-      "license_status": "pending source confirmation",
+      "creator": "GameDev.tv and contributors",
+      "page_url": "https://gamedev.tv/assets/spring-assets",
+      "license_status": "GameDev.tv General Asset License 2.0 inspected; finished-project use allowed, standalone redistribution prohibited",
       "file": {
         "file": "4 Rigged Spring Animals.blend",
         "bytes": 1929431,
@@ -113,9 +113,16 @@
         "bytes": 2970,
         "sha256": "ebd54a24f6e2790308b73ee8e4a18fd76fb635b31224ac9127643b3231d6268c"
       },
-      "status": "files present; species, rigs, clips and art fit not inspected in Blender",
+      "status": "Blender 5.0.1 inspected rigs; all actions are frame 1 only, no NLA clips. Hare/squirrel exported locally, not ready animated slots.",
       "creator_reported_by_user": "SilverAnimations",
-      "creator_verification": "not independently confirmed"
+      "creator_verification": "publisher page, exact download names and matching local source"
+    },
+    {
+      "name": "LookToTheBirds_FreeSample_AmericanRobin_v1.0.zip",
+      "creator": "Soltorch Games Inc.",
+      "page_url": "https://soltorchgames.itch.io/animated-low-poly-bird-sample",
+      "license_status": "bundled licence inspected; project use allowed, standalone asset redistribution prohibited",
+      "status": "Normalised local GLB 160176 bytes; fly/hop/idle/eat clips verified to move; public Grove model manifest unchanged"
     }
   ]
 }

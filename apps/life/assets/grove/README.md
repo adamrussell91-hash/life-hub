@@ -7,26 +7,45 @@ Grove is a quiet Three.js forest drawn from completed-task history, viewed from 
 
 ## Download hand-off for Claude
 
-Adam has already downloaded the packs below. He identifies the three extra
-animal downloads as SilverAnimations. Creator/store pages still need to be
-verified; the Unity archive itself uses Acorn Bringer internal paths. Check the local Downloads folder
-before requesting another purchase or treating these ingredients as absent.
-This is a record of locally available sources, not approval to publish every
-source file or a claim that every model matches Grove.
+Adam has downloaded the packs below. Check the local files before asking for
+another purchase. Extra project-only files are prepared outside the public repo;
+this repo was still public when checked on 10 October 2026. Adam plans to make
+it private. The public model manifest still contains three animals; that does
+not mean the local project has no additional ingredients.
 
-| Local download | Verified contents / current status |
+| Local source | Inspected result |
 | --- | --- |
-| `~/Downloads/Stylized Nature MegaKit[Source]/` | Purchased Quaternius Source edition; 116 glTF models; bundled Source licence verified CC0. Selected trees/vegetation are already normalised here. Includes original engine projects outside the repository. |
-| `~/Downloads/low-poly-australian-animals/` | 10 FBX files: crocodile, dingo, emu, kangaroo, koala, kookaburra, magpie, platypus, Tasmanian devil and wombat. Creator/page/licence confirmation and rig/clip/visual checks pending. |
-| `~/Downloads/Animated Low Poly Animals.unitypackage` | Internal paths identify Acorn Bringer; nine FBX meshes: skipper, firefly, frog, turtle, finch, butterfly, bird, bumblebee and fish. Exact source/licence and usable clip checks pending. |
-| `~/Downloads/4 Rigged Spring Animals.blend` + `Animals Colour.png` | Both files present. Species, rig/clip contents, visual fit and source/licence checks pending. Filename alone does not establish which animals or animations are included. |
+| `~/Downloads/Stylized Nature MegaKit[Source]/` | Quaternius, purchased, 116 glTF models, verified CC0; selected vegetation already delivered. |
+| `~/Downloads/low-poly-australian-animals/` | 10 FBX files; source/licence and usable clips remain pending. |
+| `~/Downloads/Animated Low Poly Animals.unitypackage` | Verified public source: [Acorn Bringer](https://acornbringer.itch.io/assets-animated-low-poly-animals). Nine FBX creatures. Unity metadata defines authored bird flight and walking frame ranges; not yet converted or cleared for asset redistribution. |
+| `~/Downloads/4 Rigged Spring Animals.blend` + `Animals Colour.png` | [GameDev.tv Bloom & Burrow](https://gamedev.tv/assets/spring-assets): hare, squirrel, fox, stag. Blender 5.0.1 confirms rigs but no multi-frame actions or NLA clips. Hare and squirrel exported as local rigged GLBs; they still need idle/locomotion animation. |
+| `~/Downloads/LookToTheBirds_FreeSample_AmericanRobin_v1.0.zip` | [Soltorch American Robin](https://soltorchgames.itch.io/animated-low-poly-bird-sample): 20 authored clips. Prepared local GLB retains `idle`, `hop`, `fly`, `eat`; each passed browser motion checks. It hops rather than walks. |
 
-Detailed file hashes and package paths: [downloaded-candidates.json](../../../../tools/grove-previews/downloaded-candidates.json).
+The second Spring `.blend` and `Animals Colour (1).png` downloads are duplicates,
+not another species pack. The accompanying `GameDev.tv General Asset License
+2.0.txt` was found and inspected. Both that licence and the robin's bundled
+licence allow finished-project use but prohibit redistributing standalone
+assets, including modified versions. The local prepared files stay out of the
+public asset collection. Making the repo private addresses public sharing,
+but does not turn those licences into CC0.
+
+**Prepared local hand-off:** `outputs/grove-local-animals/` in the Codex task
+workspace, alongside `work/`, not inside the repository. It contains a manifest,
+three optimised GLBs, previews, original licence texts, measured bounds and
+SHA-256-linked browser reports. The exact absolute folder is recorded in
+[animal-audit.json](../../../../tools/grove-previews/animal-audit.json).
+
+- Bird: usable authored flight/idle/hop/eat clips, 160,176-byte GLB.
+- Hare and squirrel: usable meshes/rigs, 75,224 / 71,456-byte GLBs, **zero supplied
+  locomotion clips**. They do not yet complete the animated rabbit/squirrel slots.
+- Duck: still missing. Soltorch's [Wetlands pack](https://soltorchgames.itch.io/animated-low-poly-birds-wetlands)
+  lists a mallard with 17 clips; the public page does not verify a swim clip.
+
+Detailed download hashes: [downloaded-candidates.json](../../../../tools/grove-previews/downloaded-candidates.json).
 MegaKit inventory: [source-edition-inventory.json](../../../../tools/grove-previews/source-edition-inventory.json).
-Grove keeps MegaKit/Quaternius as its core. These extra animals are candidates
-for matching one-offs; pending downloads do not yet close the listed gaps.
-Raw files for those three candidate packs remain local while their licences
-and suitability are checked.
+Adam originally identified the extra packs as SilverAnimations. The confirmed
+Spring and Acorn sources above differ; the original report is retained in the
+inventory, alongside the verified publisher identities.
 
 ## Appearance and behaviour
 

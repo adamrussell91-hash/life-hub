@@ -1,0 +1,248 @@
+{
+  "inspected_at": "2026-10-10",
+  "local_delivery_path": "/Users/adamrussell/Documents/Codex/2026-10-10/ground-streams-lakes-generated-in-code/outputs/grove-local-animals",
+  "public_models_added": 0,
+  "public_repo_private_at_check": false,
+  "assets": [
+    {
+      "id": "animal-bird-robin",
+      "slot": "animal-bird",
+      "kind": "animal",
+      "variant": 1,
+      "stage": null,
+      "file": "models/animals/animal-bird-robin.glb",
+      "preview": "previews/animal-bird-robin.png",
+      "bytes": 160176,
+      "triangles": 1404,
+      "height_m": 0.1831,
+      "animations": [
+        "fly",
+        "hop",
+        "idle",
+        "eat"
+      ],
+      "animation_source_names": {
+        "fly": "A_Fly_01",
+        "hop": "A_Hop_01",
+        "idle": "A_Idle_01",
+        "eat": "A_PeckGround_01"
+      },
+      "source": {
+        "pack": "Look to the Birds \u2014 American Robin Sample",
+        "author": "Soltorch Games Inc.",
+        "page_url": "https://soltorchgames.itch.io/animated-low-poly-bird-sample",
+        "original_file": "American_Robin_Mesh.glb",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "Soltorch-Asset-License",
+        "url": "https://soltorchgames.itch.io/animated-low-poly-bird-sample",
+        "attribution": null
+      },
+      "notes": "Local project asset only. Authored clips preserved: idle, hop, fly, eat. Hop remains hop, not relabelled walk. Not CC0 and not published to public repo."
+    },
+    {
+      "id": "animal-rabbit-hare-rig",
+      "slot": "animal-rabbit",
+      "kind": "animal",
+      "variant": 1,
+      "stage": null,
+      "file": "models/animals/animal-rabbit-hare-rig.glb",
+      "preview": "previews/animal-rabbit-hare-rig.png",
+      "bytes": 75224,
+      "triangles": 496,
+      "height_m": 0.4136,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Bloom & Burrow: Spring Animal Asset Pack",
+        "author": "GameDev.tv and contributors",
+        "page_url": "https://gamedev.tv/assets/spring-assets",
+        "original_file": "4 Rigged Spring Animals.blend",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "GameDev.tv-General-Asset-License-2.0",
+        "url": "https://gamedev.tv/assets/spring-assets",
+        "attribution": null
+      },
+      "notes": "Rigged local candidate, not an animated must-have replacement. Source has no multi-frame actions or NLA clips. Export selected mesh plus deformation rig, omitted controls/cameras/lights, and preserved packed palette. GLTF limits joints to four influences per vertex. Needs authored idle and locomotion animation. Not CC0; do not publish to public repo."
+    },
+    {
+      "id": "animal-squirrel-rig",
+      "slot": "animal-squirrel",
+      "kind": "animal",
+      "variant": 1,
+      "stage": null,
+      "file": "models/animals/animal-squirrel-rig.glb",
+      "preview": "previews/animal-squirrel-rig.png",
+      "bytes": 71456,
+      "triangles": 477,
+      "height_m": 0.109,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Bloom & Burrow: Spring Animal Asset Pack",
+        "author": "GameDev.tv and contributors",
+        "page_url": "https://gamedev.tv/assets/spring-assets",
+        "original_file": "4 Rigged Spring Animals.blend",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "GameDev.tv-General-Asset-License-2.0",
+        "url": "https://gamedev.tv/assets/spring-assets",
+        "attribution": null
+      },
+      "notes": "Rigged local candidate, not an animated must-have replacement. Source has no multi-frame actions or NLA clips. Export selected mesh plus deformation rig, omitted controls/cameras/lights, and preserved packed palette. GLTF limits joints to four influences per vertex. Needs authored idle and locomotion animation. Not CC0; do not publish to public repo."
+    }
+  ],
+  "browser_reports": [
+    {
+      "file": "models/animals/animal-bird-robin.glb",
+      "height_m": 0.18307561601101238,
+      "bounds": {
+        "min": [
+          -0.036826448467082835,
+          -5.703661693896855e-06,
+          -0.10998952009791432
+        ],
+        "max": [
+          0.036826462386917114,
+          0.1830699123493185,
+          0.11000972217088566
+        ]
+      },
+      "animations": [
+        {
+          "name": "fly",
+          "duration": 0.6666666865348816,
+          "moves": true
+        },
+        {
+          "name": "hop",
+          "duration": 0.3333333432674408,
+          "moves": true
+        },
+        {
+          "name": "idle",
+          "duration": 5,
+          "moves": true
+        },
+        {
+          "name": "eat",
+          "duration": 5,
+          "moves": true
+        }
+      ],
+      "sha256": "935b630b85c929bb83417ad811ed3c3f5f6d65ef05cc6d38d3568d6ad90fa9d0"
+    },
+    {
+      "file": "models/animals/animal-rabbit-hare-rig.glb",
+      "height_m": 0.41360729464070967,
+      "bounds": {
+        "min": [
+          -0.02605333696073089,
+          4.514352138169499e-07,
+          -0.17499470482203372
+        ],
+        "max": [
+          0.0260533369607309,
+          0.4136077460759235,
+          0.17499468931857953
+        ]
+      },
+      "animations": [],
+      "sha256": "30030cd4c366e51b23f5d97324f2827ed864d3da31c46c7f6e74591b3b8b1af4"
+    },
+    {
+      "file": "models/animals/animal-squirrel-rig.glb",
+      "height_m": 0.10904489992419186,
+      "bounds": {
+        "min": [
+          -0.015398424666086345,
+          -4.819977716971846e-07,
+          -0.13999997608543838
+        ],
+        "max": [
+          0.015398419100015966,
+          0.10904441792642017,
+          0.13999999365863222
+        ]
+      },
+      "animations": [],
+      "sha256": "cd5afeea353183d1b34f1b251814a41b8c63c7ef6be355194e2240223a8dbd51"
+    }
+  ],
+  "spring_animation_audit": {
+    "blender": "5.0.1",
+    "actions": [
+      {
+        "name": "hare rigAction",
+        "frames": [
+          1.0,
+          1.0
+        ],
+        "slots": [
+          "OBhare rig"
+        ]
+      },
+      {
+        "name": "rig - squirellAction",
+        "frames": [
+          1.0,
+          1.0
+        ],
+        "slots": [
+          "OBrig - squirell"
+        ]
+      },
+      {
+        "name": "wolf rigAction",
+        "frames": [
+          1.0,
+          1.0
+        ],
+        "slots": [
+          "OBwolf rig"
+        ]
+      }
+    ],
+    "rigs": [
+      {
+        "name": "hare rig",
+        "bones": 805,
+        "nla_strips": 0
+      },
+      {
+        "name": "metarig - hair",
+        "bones": 186,
+        "nla_strips": 0
+      },
+      {
+        "name": "metarig - squirell",
+        "bones": 174,
+        "nla_strips": 0
+      },
+      {
+        "name": "metarig - wolf",
+        "bones": 190,
+        "nla_strips": 0
+      },
+      {
+        "name": "rig - squirell",
+        "bones": 760,
+        "nla_strips": 0
+      },
+      {
+        "name": "Stag Rig",
+        "bones": 359,
+        "nla_strips": 0
+      },
+      {
+        "name": "wolf rig",
+        "bones": 823,
+        "nla_strips": 0
+      }
+    ]
+  }
+}
