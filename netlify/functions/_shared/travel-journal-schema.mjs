@@ -118,6 +118,24 @@ function validateMedia(media, path) {
   if (media.original_key !== undefined) {
     requireString(media, 'original_key', `${path}.original_key`, { min: 1 });
   }
+  if (media.upload_state !== undefined) {
+    const states = new Set(['pending', 'uploading', 'backed_up', 'failed']);
+    if (!states.has(media.upload_state)) throw fail(`${path}.upload_state`, 'unknown upload_state');
+  }
+  if (media.checksum !== undefined) {
+    requireString(media, 'checksum', `${path}.checksum`, { min: 64 });
+  }
+  if (media.byte_size !== undefined) {
+    if (typeof media.byte_size !== 'number' || media.byte_size < 1) {
+      throw fail(`${path}.byte_size`, 'byte_size must be a positive number');
+    }
+  }
+  if (media.content_type !== undefined) {
+    requireString(media, 'content_type', `${path}.content_type`, { min: 1 });
+  }
+  if (media.derivative_keys !== undefined) {
+    if (!isObject(media.derivative_keys)) throw fail(`${path}.derivative_keys`, 'derivative_keys must be an object');
+  }
   if (media.width !== undefined && (typeof media.width !== 'number' || media.width < 1)) {
     throw fail(`${path}.width`, 'width must be a positive number');
   }
