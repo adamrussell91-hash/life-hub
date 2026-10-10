@@ -3031,6 +3031,9 @@ body.is-gym-mode { overflow: hidden; }
 .gym__stage {
   display: grid;
   align-content: start;
+  /* Rows take their content height so the stage scrolls. Without this the
+     overflow:hidden hero card shrinks to fit and clips the reps stepper. */
+  grid-auto-rows: max-content;
   gap: 0.85rem;
   min-height: 0;
   overflow-y: auto;
