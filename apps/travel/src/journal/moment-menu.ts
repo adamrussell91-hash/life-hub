@@ -24,8 +24,6 @@ function dayMoments(fixture: JournalFixture, moment: JournalMoment): JournalMome
   );
 }
 
-const LATER = 'Available in a later update.';
-
 export function buildMomentMenuItems(
   fixture: JournalFixture,
   moment: JournalMoment,
@@ -51,7 +49,7 @@ export function buildMomentMenuItems(
         ? 'Deleted moments cannot be reordered'
         : peerCount < 2
           ? 'Need at least two moments this day'
-          : LATER,
+          : 'Change the order moments appear this day',
     },
     {
       action: 'split',
@@ -61,7 +59,7 @@ export function buildMomentMenuItems(
         ? 'Deleted moments cannot be split'
         : mediaCount < 2
           ? 'Need at least two photos to split'
-          : LATER,
+          : 'Split photos into two moments',
     },
     {
       action: 'merge',
@@ -71,19 +69,19 @@ export function buildMomentMenuItems(
         ? 'Deleted moments cannot be merged'
         : mergeCandidates < 1
           ? 'No other moments this day to merge with'
-          : LATER,
+          : 'Combine with another moment this day',
     },
     {
       action: 'move',
       label: 'Move',
       disabled: !live,
-      title: live ? LATER : 'Deleted moments cannot be moved',
+      title: live ? 'Move to another leg or day' : 'Deleted moments cannot be moved',
     },
     {
       action: 'delete',
       label: 'Delete',
       disabled: !live,
-      title: live ? LATER : 'Already deleted',
+      title: live ? 'Delete this moment (coming in Task 5)' : 'Already deleted',
     },
   ];
 

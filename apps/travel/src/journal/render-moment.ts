@@ -3,6 +3,10 @@ import type { JournalFixture, JournalMedia, JournalMoment } from '@/journal/type
 import { photoLayout, reflectionLikelyOverflows } from '@/journal/layout';
 import { buildMomentMenuItems, type MomentMenuAction } from '@/journal/moment-menu';
 import { openEditMomentSheet } from '@/journal/edit-moment-sheet';
+import { openMergeSheet } from '@/journal/merge-sheet';
+import { openMoveSheet } from '@/journal/move-sheet';
+import { openReorderSheet } from '@/journal/reorder-sheet';
+import { openSplitSheet } from '@/journal/split-sheet';
 
 function mediaById(fixture: JournalFixture): Map<string, JournalMedia> {
   return new Map(fixture.media.map((m) => [m.id, m]));
@@ -35,7 +39,7 @@ function renderEllipsisMenu(
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
 
-  let editOverlay: { destroy(): void } | null = null;
+  let sheetOverlay: { destroy(): void } | null = null;
 
   const closeMenu = (): void => {
     menu.hidden = true;
@@ -60,7 +64,7 @@ function renderEllipsisMenu(
       closeMenu();
       if (button.disabled) return;
       handleMenuAction(item.action, moment, ctx, (handle) => {
-        editOverlay = handle;
+        sheetOverlay = handle;
       });
     });
     menu.append(button);
@@ -75,30 +79,50 @@ function renderEllipsisMenu(
 
   article.addEventListener('journal-moment-destroy', () => {
     document.removeEventListener('click', onDocClick);
-    editOverlay?.destroy();
+    sheetOverlay?.destroy();
   });
 
   wrap.append(btn, menu);
   article.append(wrap);
 }
 
+function sheetBase(ctx: RenderMomentContext, moment: JournalMoment) {
+  return {
+    tripId: ctx.tripId,
+    journal: ctx.journal,
+    version: ctx.version,
+    moment,
+    anchor: ctx.anchor,
+    onSaved: (envelope: { journal: JournalDocument; version: string }) =>
+      ctx.onJournalSaved?.(envelope),
+  };
+}
+
 function handleMenuAction(
   action: MomentMenuAction,
   moment: JournalMoment,
   ctx: RenderMomentContext,
-  setEditOverlay: (handle: { destroy(): void }) => void,
+  setSheetOverlay: (handle: { destroy(): void }) => void,
 ): void {
-  if (action === 'edit') {
-    setEditOverlay(
-      openEditMomentSheet({
-        tripId: ctx.tripId,
-        journal: ctx.journal,
-        version: ctx.version,
-        moment,
-        anchor: ctx.anchor,
-        onSaved: (envelope) => ctx.onJournalSaved?.(envelope),
-      }),
-    );
+  const base = sheetBase(ctx, moment);
+  switch (action) {
+    case 'edit':
+      setSheetOverlay(openEditMomentSheet(base));
+      break;
+    case 'reorder':
+      setSheetOverlay(openReorderSheet(base));
+      break;
+    case 'split':
+      setSheetOverlay(openSplitSheet(base));
+      break;
+    case 'merge':
+      setSheetOverlay(openMergeSheet(base));
+      break;
+    case 'move':
+      setSheetOverlay(openMoveSheet(base));
+      break;
+    default:
+      break;
   }
 }
 
