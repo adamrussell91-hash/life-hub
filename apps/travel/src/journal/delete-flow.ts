@@ -125,6 +125,7 @@ export function deleteImpactSummary(
         (t.from_leg_id === leg.id || t.to_leg_id === leg.id),
     );
     return {
+      ...empty,
       moments: moments.length,
       media: mediaIds.size,
       days: days.length,
@@ -136,6 +137,7 @@ export function deleteImpactSummary(
     const moments = journal.moments.filter((m) => m.lifecycle === 'live');
     const mediaIds = mediaIdsForMoments(moments);
     return {
+      ...empty,
       moments: moments.length,
       media: mediaIds.size,
       days: journal.days.filter((d) => d.lifecycle === 'live').length,
@@ -280,7 +282,7 @@ function reviveRow<T extends { lifecycle: JournalLifecycle; deleted_at?: string;
 ): T {
   if (row.lifecycle !== 'deleted') return row;
   const { deleted_at: _da, deleted_with: _dw, ...rest } = row;
-  return { ...rest, lifecycle: 'live' };
+  return { ...rest, lifecycle: 'live' } as T;
 }
 
 function reviveCascade<T extends { lifecycle: JournalLifecycle; deleted_with?: string }>(
