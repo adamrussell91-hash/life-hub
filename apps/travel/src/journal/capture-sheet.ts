@@ -1,5 +1,5 @@
 import type { JournalDocument } from '@/api/journal';
-import { saveJournal } from '@/api/journal';
+import { persistJournalPatch } from '@/journal/journal-sheet-save';
 import {
   type CaptureDraftMode,
   type JournalCaptureDraft,
@@ -490,7 +490,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
       ],
     };
     try {
-      const envelope = await saveJournal(options.tripId, options.version, nextJournal);
+      const envelope = await persistJournalPatch(options.tripId, options.version, nextJournal);
       await clearCaptureDraft(options.tripId, options.legId, options.localDate);
       options.onSaved?.(envelope);
       finishClose();

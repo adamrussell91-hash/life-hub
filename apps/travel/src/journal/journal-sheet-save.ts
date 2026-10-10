@@ -1,5 +1,9 @@
 import type { JournalDocument } from '@/api/journal';
 import { saveJournal } from '@/api/journal';
+import {
+  isJournalSaveConflict,
+  recoverJournalSaveConflict,
+} from '@/journal/conflict-resolve';
 
 export function isFixtureVersion(version: string): boolean {
   return version === 'fixture';
@@ -13,5 +17,10 @@ export async function persistJournalPatch(
   if (isFixtureVersion(version)) {
     return { journal, version };
   }
-  return saveJournal(tripId, version, journal);
+  try {
+    return await saveJournal(tripId, version, journal);
+  } catch (err) {
+    if (!isJournalSaveConflict(err)) throw err;
+    return recoverJournalSaveConflict(tripId, version, journal);
+  }
 }

@@ -1,5 +1,5 @@
 import type { JournalDocument } from '@/api/journal';
-import { saveJournal } from '@/api/journal';
+import { persistJournalPatch } from '@/journal/journal-sheet-save';
 import { searchPlaces } from '@/api/travel';
 import type { JournalCoordinates, JournalMoment, JournalPlace } from '@/journal/types';
 import { openPinEditor } from '@/journal/pin-editor';
@@ -323,7 +323,7 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
     }
 
     try {
-      const envelope = await saveJournal(options.tripId, options.version, nextJournal);
+      const envelope = await persistJournalPatch(options.tripId, options.version, nextJournal);
       options.onSaved?.(envelope);
       finishClose();
     } catch {
