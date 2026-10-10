@@ -266,3 +266,16 @@ test('prose that merely starts with "A" is not a lettered plan', () => {
   assert.equal(parseLetteredWorkoutChat('A solid week, mate. 3 rounds of rest is plenty.'), null);
   assert.equal(parseLetteredWorkoutChat('1. Bench — 10x30kg\n2. Row — 10x30kg\n3. Curl — 10x10kg'), null);
 });
+
+test('lettered AMRAP Cindy expands round-slots from the time cap, not one lonely set', () => {
+  const plan = parseLetteredWorkoutChat(`
+A  Bar Press — 30 kg × 10
+C  Cindy (circuit, AMRAP 3 min)
+C1 Push-ups — 5 reps · C2 Bench dips — 5 reps · C3 Russian twists — 5 reps · C4 Reverse crunch — 5 reps
+`);
+  const push = plan.exercises.find(item => /push/i.test(item.name));
+  assert.equal(push.superset_label, 'Cindy');
+  assert.deepEqual(push.block, { kind: 'circuit', format: 'amrap', time_cap_sec: 180 });
+  assert.equal(push.sets.length, 6, '3-minute Cindy plans 6 round slots');
+  assert.equal(plan.exercises.filter(item => item.superset_group === push.superset_group).every(item => item.sets.length === 6), true);
+});

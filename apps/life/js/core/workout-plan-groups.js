@@ -17,6 +17,70 @@ export const BLOCK_FORMATS = ['rounds', 'for_time', 'amrap'];
 /** Seconds of rest after a straight set / a finished round when nothing says otherwise. */
 export const DEFAULT_REST_SEC = 90;
 
+/**
+ * How many round-slots an AMRAP should plan for when Chadwick forgets.
+ * Gym mode has + Round for overflow and trims unplayed rounds on finish — under-
+ * provisioning (1 set) is the bug; over-provisioning is harmless.
+ */
+export const DEFAULT_AMRAP_ROUNDS = 8;
+export const MIN_AMRAP_ROUNDS = 5;
+export const MAX_AMRAP_ROUNDS = 12;
+
+/** Plausible round capacity for a time cap (~30s/round ceiling for a 4-move Cindy). */
+export function amrapRoundCapacity(timeCapSec, explicitRounds = null) {
+  const explicit = Number(explicitRounds);
+  if (Number.isFinite(explicit) && explicit >= 1) {
+    return Math.min(MAX_AMRAP_ROUNDS, Math.max(1, Math.round(explicit)));
+  }
+  const cap = Number(timeCapSec);
+  if (Number.isFinite(cap) && cap > 0) {
+    return Math.min(MAX_AMRAP_ROUNDS, Math.max(MIN_AMRAP_ROUNDS, Math.ceil(cap / 30)));
+  }
+  return DEFAULT_AMRAP_ROUNDS;
+}
+
+function cloneRoundTemplate(set) {
+  if (!set || typeof set !== 'object') {
+    return { reps: 0, weight_kg: 0, cable_type: 'none' };
+  }
+  const { done: _done, failed: _failed, note: _note, ...rest } = set;
+  return { ...rest };
+}
+
+/**
+ * Ensure every AMRAP circuit member has enough `sets` (one per possible round).
+ * Mutates and returns the same array. Safe to call on planned log_entry, chat
+ * parse, and gym-mode draft clone — the logger drops unplayed rounds on finish.
+ */
+export function provisionAmrapCircuitRounds(exercises = []) {
+  if (!Array.isArray(exercises) || !exercises.length) return exercises;
+  const groups = new Map();
+  for (const exercise of exercises) {
+    const group = exercise?.superset_group;
+    if (group == null) continue;
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(exercise);
+  }
+  for (const members of groups.values()) {
+    if (members.length < 2) continue;
+    // format: amrap is the signal — Chadwick sometimes omits kind: circuit.
+    const owner = members.find(exercise => exercise?.block?.format === 'amrap');
+    if (!owner) continue;
+    if (owner.block.kind == null) owner.block.kind = 'circuit';
+    const target = amrapRoundCapacity(owner.block?.time_cap_sec);
+    for (const exercise of members) {
+      const sets = Array.isArray(exercise.sets) ? exercise.sets : [];
+      if (sets.length >= target) continue;
+      const template = cloneRoundTemplate(sets[0]);
+      exercise.sets = [
+        ...sets.map(set => ({ ...set })),
+        ...Array.from({ length: target - sets.length }, () => ({ ...template }))
+      ];
+    }
+  }
+  return exercises;
+}
+
 function exerciseSets(exercise) {
   return Array.isArray(exercise?.sets) ? exercise.sets : [];
 }

@@ -3,6 +3,7 @@ import { validateRecord } from '../../../apps/life/js/core/validate.js';
 import { isCalendarDate } from '../../../apps/life/js/core/time.js';
 import { buildMedicalSlug } from '../../../apps/life/js/app/medical-model.js';
 import { coerceCalendarDate, normalizeMedicalFields, splitLongTitle } from '../../../apps/life/js/app/medical-normalize.js';
+import { provisionAmrapCircuitRounds } from '../../../apps/life/js/core/workout-plan-groups.js';
 import { collapseSetSplitExercises } from './workout-history.mjs';
 import { slugifyWorkoutTitle } from './workout-templates.mjs';
 
@@ -69,19 +70,19 @@ const DOMAIN_PROPERTIES = {
           },
           superset_label: {
             type: 'string',
-            description: 'Optional short name for the block shown on cards and in the logger, e.g. "Press + Curl" or "Cindy". Put it on the first member.'
+            description: 'Optional short name for the block shown on cards and in the logger. Put it on the first member. For Adam\'s AMRAP density finishers always reuse "Cindy" (not "Pump & Dump" / remix names) so Benchmark Wall and circuit ghosts stay continuous.'
           },
           block: {
             type: 'object',
-            description: 'Optional block settings, on the FIRST member of a superset_group only. Omit for a plain superset with default rest.',
+            description: 'Optional block settings, on the FIRST member of a superset_group only. Omit for a plain superset with default rest. A Cindy is scored as one circuit (block.result), not as per-move ghosts.',
             properties: {
-              kind: { type: 'string', enum: ['superset', 'circuit'], description: 'superset = 2 moves alternated set-for-set; circuit = 3+ moves done back-to-back as a round (e.g. a Cindy-style finisher).' },
-              format: { type: 'string', enum: ['rounds', 'for_time', 'amrap'], description: 'rounds = fixed rounds (= sets per member); for_time = fixed rounds as fast as possible, logger runs a stopwatch; amrap = as many rounds as possible inside time_cap_sec.' },
+              kind: { type: 'string', enum: ['superset', 'circuit'], description: 'superset = 2 moves alternated set-for-set; circuit = 3+ moves done back-to-back as a round (e.g. a Cindy finisher).' },
+              format: { type: 'string', enum: ['rounds', 'for_time', 'amrap'], description: 'rounds = fixed rounds (= sets per member); for_time = fixed rounds as fast as possible, logger runs a stopwatch; amrap = as many whole rounds as possible inside time_cap_sec (Cindy). For amrap, each member needs many identical sets as round slots — never only one set.' },
               rest_sec: { type: 'number', description: 'Rest after each full round (not between members).' },
-              time_cap_sec: { type: 'number', description: 'amrap / for_time window in seconds.' },
+              time_cap_sec: { type: 'number', description: 'amrap / for_time window in seconds (Cindy is often 180).' },
               result: {
                 type: 'object',
-                description: 'Completed sessions only: what the circuit scored.',
+                description: 'Completed sessions only: the whole-circuit score (rounds + optional extra_reps + time). This is what ghosts and Benchmark Wall race — not the individual member reps.',
                 properties: {
                   rounds: { type: 'number' },
                   extra_reps: { type: 'number', description: 'Reps into the unfinished round (AMRAP "5 + 8").' },
@@ -527,11 +528,22 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
   }
 
   const today = now.slice(0, 10);
-  const normalizedFields = type === 'medical'
+  let normalizedFields = type === 'medical'
     ? normalizeMedicalFields(fields, { notes, today })
     : type === 'workout' && Array.isArray(fields.exercises)
       ? { ...fields, exercises: collapseSetSplitExercises(fields.exercises, { keepGroups: true }) }
       : fields;
+  // Planned AMRAPs only — never re-pad a completed Cindy after gym trims unplayed rounds.
+  if (
+    type === 'workout'
+    && normalizedFields?.status === 'planned'
+    && Array.isArray(normalizedFields.exercises)
+  ) {
+    normalizedFields = {
+      ...normalizedFields,
+      exercises: provisionAmrapCircuitRounds(normalizedFields.exercises)
+    };
+  }
   const resolvedDate = type === 'medical'
     ? (coerceCalendarDate(date, { today }) ?? date)
     : date;

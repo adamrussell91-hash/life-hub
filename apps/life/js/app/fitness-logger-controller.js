@@ -76,6 +76,7 @@ export function createFitnessLoggerController({
   let rest = null; // { endsAt, cue }
   let restTimerId = null;
   let lastPerformance = null;
+  let lastCircuits = null;
   let motivation = { exerciseBests: null, buildBoard: null, lastSessionVolume: null, libraryByName: null };
   let sessionBests = {};
   let celebration = null; // { kind, title, detail }
@@ -284,6 +285,8 @@ export function createFitnessLoggerController({
       rounds: roundsDone,
       ...(timeSec > 0 ? { time_sec: timeSec } : {})
     };
+    // Layout blocks snapshot result at relayout — keep the live score/ghost in sync.
+    block.result = owner.block.result;
   }
 
   function toggleCircuitClock(block) {
@@ -345,6 +348,7 @@ export function createFitnessLoggerController({
     if (!owner) return;
     owner.block = { kind: 'circuit', ...(owner.block ?? {}) };
     owner.block.result = { ...(owner.block.result ?? {}), [field]: Math.max(0, Number(value) || 0) };
+    block.result = owner.block.result;
     touchDraft();
   }
 
@@ -976,6 +980,7 @@ export function createFitnessLoggerController({
       rest: restSnapshot(),
       circuits: circuitState,
       lastPerformance,
+      lastCircuits,
       celebration,
       targetFor,
       readinessOpen: readinessOpen && !draft.readiness?.adjusted && !layout.steps.some(stepDone),
@@ -1053,6 +1058,7 @@ export function createFitnessLoggerController({
       const result = await chatApi.confirm(payload);
       const report = buildPumpReport(draft, {
         lastPerformance,
+        lastCircuits,
         exerciseBests: motivation.exerciseBests,
         board: motivation.buildBoard,
         libraryByName: motivation.libraryByName,
@@ -1113,6 +1119,7 @@ export function createFitnessLoggerController({
 
   function mount(session, {
     lastPerformance: previous = null,
+    lastCircuits: previousCircuits = null,
     exerciseBests = null,
     buildBoard = null,
     lastSessionVolume = null,
@@ -1125,6 +1132,7 @@ export function createFitnessLoggerController({
       return;
     }
     if (previous) lastPerformance = previous;
+    if (previousCircuits) lastCircuits = previousCircuits;
     if (exerciseBests || buildBoard || weekStreak) {
       motivation = { exerciseBests, buildBoard, lastSessionVolume, libraryByName, weekStreak, lastPainFlags };
     }
@@ -1139,6 +1147,7 @@ export function createFitnessLoggerController({
 
     unmount({ keepVoice: true });
     if (previous) lastPerformance = previous;
+    if (previousCircuits) lastCircuits = previousCircuits;
     sessionBests = Object.fromEntries(Object.entries(motivation.exerciseBests ?? {}).map(([key, value]) => [key, { ...value }]));
     draft = nextDraft;
     mountedPath = draft.path;

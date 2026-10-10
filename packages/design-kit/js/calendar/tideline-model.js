@@ -106,9 +106,11 @@ function eventKind(record) {
     // plan (outing / meal_block) and rest → health chip
     return 'health';
   }
-  if (record.type === 'work_block' || record.type === 'task') return 'task';
+  if (record.type === 'work_block' || record.type === 'task' || record.type === 'deadline') return 'task';
   if (record.type === 'ical_event') return record.feed === 'social' || record.feed === 'family' ? record.feed : 'event';
-  return 'task';
+  // Anything else with a time is a log (creatine, a mind session, a new Life type):
+  // never a block. Defaulting to 'task' drew an untitled "task" arc at 7–8 pm.
+  return null;
 }
 
 function skippedBySara(record) {
@@ -142,6 +144,8 @@ export function chipFromEvent(event) {
   if (record.type === 'calendar_block' && record.status === 'cancelled') return null;
   // A task's due time is a deadline (Due row). Planned time is a work block.
   if (record.type === 'task' && !record.end_time) return null;
+  const kind = eventKind(record);
+  if (!kind) return null;
   const workout = workoutOnGrid(record);
   if (workout === 'omit') return null;
   const start = toHour(record.time);
@@ -153,7 +157,6 @@ export function chipFromEvent(event) {
       : start + (Number(record.duration_min) || 60) / 60;
   // A finished block keeps its place on the day, struck through, and stops loading it.
   const done = (record.type === 'work_block' || record.type === 'task') && record.status === 'done';
-  const kind = eventKind(record);
   const isClass = record.type === 'scheduled_lesson' || record.isClass === true;
   const filterKey = kind === 'teaching' || isClass
     ? (isClass || record.type === 'scheduled_lesson' ? 'classes' : 'events')
@@ -353,8 +356,12 @@ function dueFor(visual, events, date, useVisual) {
 
 function taskDueRow(event, date) {
   const done = event.record.status === 'done';
+  const at = event.record.time ? toHour(event.record.time) : null;
   return {
     ...(done ? { done: true } : {}),
+    // A due time is a moment, not a block: views draw it as a marker at that hour
+    // (Week / Linear grid, the Day Dial ring) instead of in the all-day Due row.
+    ...(Number.isFinite(at) ? { at } : {}),
     id: event.record.id || event.path,
     date,
     title: event.record.title || 'Task',
@@ -527,10 +534,14 @@ export function buildTidelineModel({
   // A block for a task that is ticked off reads as done too. The tick on a block also
   // needs to know whether other open blocks remain for its task (calendar-item-actions).
   const taskStatus = new Map();
+  const taskDue = new Map();
   const openBlocks = new Map();
   for (const event of events ?? []) {
     const record = event?.record;
-    if (record?.type === 'task' && record.id) taskStatus.set(record.id, record.status ?? 'open');
+    if (record?.type === 'task' && record.id) {
+      taskStatus.set(record.id, record.status ?? 'open');
+      if (record.time) taskDue.set(record.id, { date: record.date, time: record.time });
+    }
     if (record?.type === 'work_block' && record.task_id && !record.ghost && record.status !== 'done' && record.status !== 'cancelled') {
       openBlocks.set(record.task_id, (openBlocks.get(record.task_id) ?? 0) + 1);
     }
@@ -540,6 +551,11 @@ export function buildTidelineModel({
     if (!taskId) return chip;
     chip.taskStatus = taskStatus.get(taskId);
     chip.taskOpenBlocks = openBlocks.get(taskId) ?? 0;
+    // Planned time and the deadline are one task: the block names the deadline it serves.
+    const due = taskDue.get(taskId);
+    if (due && due.date === chip.date && chip.taskStatus !== 'done' && !String(chip.meta ?? '').includes('due ')) {
+      chip.meta = `${chip.meta ?? ''} · due ${clockMeta(toHour(due.time))}`.replace(/^ · /, '');
+    }
     if (chip.taskStatus === 'done' && !chip.done) {
       chip.done = true;
       chip.ambient = true;
@@ -584,6 +600,7 @@ export function buildTidelineModel({
       actual: date <= today ? actualSpans(events, date) : []
     };
   });
+  for (const day of days) assignLanes(day.chips);
   for (const day of days) day.cost = dayCost(day, days, today);
   // Where Adam left each task (bookmark) and its count progress, on its Due row and on
   // any work block linked to it.
@@ -645,6 +662,48 @@ export function buildTidelineModel({
     terms: schoolTerms,
     visual: useVisual ? visual : null
   };
+}
+
+/**
+ * Side-by-side lanes for chips that share time, so two blocks at 11 am sit next to
+ * each other instead of on top of each other. Each overlapping cluster gets as many
+ * lanes as it needs at its busiest moment; chips that overlap nothing keep the full width.
+ * A chip widens into lanes to its right that are free for its whole time (`laneSpan`).
+ * Sets `lane` (0-based), `lanes` and `laneSpan` on every chip; nothing else.
+ */
+export function assignLanes(chips) {
+  const sorted = [...(chips ?? [])]
+    .filter(chip => Number.isFinite(chip?.start) && Number.isFinite(chip?.end))
+    .sort((a, b) => a.start - b.start || b.end - a.end);
+  let cluster = [];
+  let clusterEnd = -Infinity;
+  let laneEnds = [];
+  const close = () => {
+    for (const chip of cluster) chip.lanes = laneEnds.length;
+    // Widen into lanes to the right that stay free for this chip's whole time.
+    for (const chip of cluster) {
+      let span = 1;
+      while (chip.lane + span < chip.lanes && !cluster.some(other => other !== chip
+        && other.lane === chip.lane + span && other.start < chip.end - 1e-6 && other.end > chip.start + 1e-6)) span += 1;
+      chip.laneSpan = span;
+    }
+    cluster = [];
+    laneEnds = [];
+  };
+  for (const chip of sorted) {
+    const end = Math.max(chip.end, chip.start + 1 / 60);
+    if (cluster.length && chip.start >= clusterEnd - 1e-6) close();
+    let lane = laneEnds.findIndex(laneEnd => laneEnd <= chip.start + 1e-6);
+    if (lane < 0) {
+      lane = laneEnds.length;
+      laneEnds.push(end);
+    } else laneEnds[lane] = end;
+    chip.lane = lane;
+    cluster.push(chip);
+    clusterEnd = cluster.length === 1 ? end : Math.max(clusterEnd, end);
+  }
+  close();
+  return chips;
 }
 
 function trayFor(ghosts) {

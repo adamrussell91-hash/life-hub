@@ -49,3 +49,21 @@ test('unrelated meals remain loggable after the single dose, and corrections are
  const correction={type:'meal',fields:{meal:'breakfast',creatine_g:0}};
  assert.deepEqual(preserveReportedCreatine(correction,'Correct the 5g creatine I took to zero'),correction);
 });
+
+
+test('a creatine dose mixed into protein water is logged inside the drink, including compact reports', () => {
+  const guard = createReportedCreatineGuard('Post-workout protein water with 10g creatine, 7pm');
+  const dose = {type:'creatine', fields:{grams:10, dose_key:'post-workout-7pm', product:'Muscle Nation Protein Water + Collagen'}, notes:'10g creatine with post-workout protein water, 7pm'};
+  assert.match(guard.prepare(dose).error, /meal.*creatine_g/i);
+  const meal = {type:'meal', fields:{meal:'snack',protein_g:23.6}, notes:'Protein water with 10g creatine'};
+  assert.equal(guard.prepare(meal).candidate.fields.creatine_g,10);
+  guard.accept(meal);
+  assert.match(guard.prepare(dose).error, /already/);
+});
+
+test('the carrier drink is not attributed as the creatine product', () => {
+  const result = preserveReportedCreatine({type:'meal',fields:{creatine_g:10,creatine_product:'Muscle Nation Protein Water + Collagen'},notes:'Protein water with creatine'},'I had protein water with 10g creatine');
+  assert.equal(result.fields.creatine_product,undefined);
+  const coles = preserveReportedCreatine({type:'meal',fields:{creatine_g:10,creatine_product:'Coles creatine'},notes:'Protein water with creatine'},'I had protein water with 10g creatine');
+  assert.equal(coles.fields.creatine_product,'Coles creatine');
+});
