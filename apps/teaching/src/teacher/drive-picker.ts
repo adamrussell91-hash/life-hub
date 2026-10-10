@@ -253,8 +253,19 @@ function showPicker(opts: {
   apiKey: string;
   appId?: string;
   imagesOnly?: boolean;
+  signal?: AbortSignal;
 }): Promise<PickerDoc | null> {
-  return new Promise((resolve) => {
+  opts.signal?.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const finish = (doc: PickerDoc | null) => {
+      opts.signal?.removeEventListener('abort', abort);
+      resolve(doc);
+    };
+    const abort = () => {
+      picker.setVisible(false);
+      opts.signal?.removeEventListener('abort', abort);
+      reject(opts.signal?.reason);
+    };
     const builder = new google.picker.PickerBuilder();
     if (opts.imagesOnly) {
       // Thumbnail grid of images, with folders so a "Cover images" folder is browsable.
@@ -275,12 +286,12 @@ function showPicker(opts: {
       .setDeveloperKey(opts.apiKey)
       .setCallback((data: PickerCallbackData) => {
         if (data.action === google.picker.Action.CANCEL) {
-          resolve(null);
+          finish(null);
           return;
         }
         if (data.action === google.picker.Action.PICKED) {
           const doc = data.docs?.[0];
-          resolve(doc ?? null);
+          finish(doc ?? null);
         }
       });
 
@@ -288,16 +299,19 @@ function showPicker(opts: {
       builder.setAppId(opts.appId);
     }
 
-    builder.build().setVisible(true);
+    const picker = builder.build();
+    opts.signal?.addEventListener('abort', abort, { once: true });
+    picker.setVisible(true);
   });
 }
 
-async function fetchDriveFileMeta(fileId: string, accessToken: string): Promise<DriveFileMeta> {
+async function fetchDriveFileMeta(fileId: string, accessToken: string, signal?: AbortSignal): Promise<DriveFileMeta> {
   const fields =
     'id,name,mimeType,webViewLink,webContentLink,thumbnailLink,capabilities,shared';
   const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=${encodeURIComponent(fields)}`;
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` }
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal
   });
   if (!response.ok) {
     throw new Error(`Could not read Drive file metadata (HTTP ${response.status})`);
@@ -313,11 +327,13 @@ async function downloadDriveFile(
   fileId: string,
   name: string,
   mimeType: string,
-  accessToken: string
+  accessToken: string,
+  signal?: AbortSignal
 ): Promise<File> {
   const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` }
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal
   });
   if (!response.ok) {
     throw new Error(`Could not download Drive file (HTTP ${response.status})`);
@@ -329,21 +345,28 @@ async function downloadDriveFile(
 export interface OpenDrivePickerOptions {
   /** Show only images (grid view, folders browsable) and reject non-image picks. */
   imagesOnly?: boolean;
+  signal?: AbortSignal;
 }
 
 export async function openDrivePicker(
   options: OpenDrivePickerOptions = {}
 ): Promise<DrivePickResult | null> {
+  options.signal?.throwIfAborted();
   const { clientId, apiKey, appId } = await resolveGooglePickerConfig({
     vite: viteGoogleEnv(),
     loadRemote: loadRemotePickerConfig
   });
+  options.signal?.throwIfAborted();
   await loadGoogleApis();
+  options.signal?.throwIfAborted();
   const accessToken = await requestAccessToken(clientId);
-  const picked = await showPicker({ accessToken, apiKey, appId, imagesOnly: options.imagesOnly });
+  options.signal?.throwIfAborted();
+  const picked = await showPicker({ accessToken, apiKey, appId, imagesOnly: options.imagesOnly, signal: options.signal });
+  options.signal?.throwIfAborted();
   if (!picked?.id) return null;
 
-  const meta = await fetchDriveFileMeta(picked.id, accessToken);
+  const meta = await fetchDriveFileMeta(picked.id, accessToken, options.signal);
+  options.signal?.throwIfAborted();
   if (options.imagesOnly && !meta.mimeType.startsWith('image/')) {
     throw new Error('That file is not an image. Choose a JPG, PNG, GIF or WebP.');
   }
@@ -367,7 +390,7 @@ export async function openDrivePicker(
     };
   }
 
-  const file = await downloadDriveFile(meta.id, meta.name, meta.mimeType, accessToken);
+  const file = await downloadDriveFile(meta.id, meta.name, meta.mimeType, accessToken, options.signal);
   return {
     kind: 'mirror',
     file,

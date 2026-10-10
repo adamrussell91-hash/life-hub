@@ -48,7 +48,8 @@ export function mountCoverPicker(
   options: CoverPickerOptions
 ): CoverPickerHandle {
   const editable = options.editable !== false;
-  const pickFromDrive = options.pickFromDrive ?? (() => openDrivePicker({ imagesOnly: true }));
+  const driveAbort = new AbortController();
+  const pickFromDrive = options.pickFromDrive ?? (() => openDrivePicker({ imagesOnly: true, signal: driveAbort.signal }));
   const uploadFile = options.uploadFile ?? uploadMediaFile;
   const onMediaCreated = options.onMediaCreated ?? ((media: Media) => void applyCreatedMedia(media));
   let current: Cover | null = options.cover ?? null;
@@ -93,7 +94,10 @@ export function mountCoverPicker(
   const driveBtn = document.createElement('button');
   driveBtn.type = 'button';
   driveBtn.className = 'btn btn--primary cover-picker__drive';
-  driveBtn.textContent = 'Choose from Google Drive';
+  driveBtn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="#0F9D58" d="M8 2h8L8 16H0z"/><path fill="#F4B400" d="M16 2l8 14h-8L8 2z"/><path fill="#4285F4" d="M0 16h24l-4 6H4z"/></svg>';
+  const driveLabel = document.createElement('span');
+  driveLabel.textContent = 'Choose from Google Drive';
+  driveBtn.append(driveLabel);
 
   const uploadBtn = document.createElement('button');
   uploadBtn.type = 'button';
@@ -166,6 +170,8 @@ export function mountCoverPicker(
     mediaList.filter((entry) => entry.media_type === 'image' && entry.status === 'active');
 
   const syncButtons = (): void => {
+    urlInput.disabled = busy;
+    altInput.disabled = busy;
     applyBtn.disabled = busy;
     driveBtn.disabled = busy;
     uploadBtn.disabled = busy;
@@ -210,12 +216,13 @@ export function mountCoverPicker(
 
   const save = async (next: Cover | null): Promise<void> => {
     await options.onSave(next);
+    if (disposed) return;
     current = next;
-    if (!disposed) renderPreview();
+    renderPreview();
   };
 
   const persist = async (next: Cover | null): Promise<void> => {
-    if (busy) return;
+    if (busy || disposed) return;
     busy = true;
     setError(null);
     syncButtons();
@@ -240,14 +247,14 @@ export function mountCoverPicker(
 
   /** Shared busy/status/error wrapper for the Drive and upload flows. */
   const runAdd = async (working: string, task: () => Promise<Media | null>): Promise<void> => {
-    if (busy) return;
+    if (busy || disposed) return;
     busy = true;
     setError(null);
     setStatus(working);
     syncButtons();
     try {
       const media = await task();
-      if (!media) return;
+      if (!media || disposed) return;
       mediaList = [media, ...mediaList.filter((entry) => entry.id !== media.id)];
       onMediaCreated(media);
       if (!disposed) renderLibrary();
@@ -314,10 +321,10 @@ export function mountCoverPicker(
       try {
         pick = await pickFromDrive();
       } finally {
-        options.onExternalPicker?.(false);
+        if (!disposed) options.onExternalPicker?.(false);
       }
-      if (!pick) return null;
-      if (pick.kind !== 'mirror') {
+      if (!pick || disposed) return null;
+      if (pick.kind !== 'mirror' || !pick.file.type.startsWith('image/')) {
         throw new Error('That file is not an image. Choose a JPG, PNG, GIF or WebP.');
       }
       setStatus(`Adding ${pick.title}…`);
@@ -375,6 +382,7 @@ export function mountCoverPicker(
     root,
     dispose: () => {
       disposed = true;
+      driveAbort.abort();
       host.replaceChildren();
     },
     getCover: () => current

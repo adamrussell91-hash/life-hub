@@ -228,6 +228,7 @@ export function renderEntityBanner(
         // A modal dialog makes the rest of the page inert, Google's picker
         // included, so hide it while Drive is open and bring it back after.
         if (dialogClosed || dialog !== next) return;
+        next.hidden = open;
         if (open) {
           dialogSuspended = true;
           if (next.open) next.close();

@@ -349,4 +349,50 @@ describe('mountCoverPicker adding images', () => {
     expect(uploadFile).not.toHaveBeenCalled();
     expect(host.querySelector('.cover-picker__error')!.textContent).toContain('not an image');
   });
+  it('provides a decorative Google Drive icon and aborts its default picker on disposal', async () => {
+    const driveModule = await import('@/teacher/drive-picker');
+    const pending = new Promise<null>(() => {});
+    const pick = vi.spyOn(driveModule, 'openDrivePicker').mockReturnValue(pending);
+    const handle = mountCoverPicker(host, { media: [], onSave: vi.fn() });
+    const button = findButton(host, 'Choose from Google Drive')!;
+    expect(button.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    button.click();
+    const signal = pick.mock.calls[0]?.[0]?.signal;
+    expect(signal?.aborted).toBe(false);
+    handle.dispose();
+    expect(signal?.aborted).toBe(true);
+    pick.mockRestore();
+  });
+
+  it('does not upload or reopen the modal when disposed during a Drive pick', async () => {
+    let finish!: (pick: import('@/teacher/drive-picker').DrivePickResult) => void;
+    const pickFromDrive = () => new Promise<import('@/teacher/drive-picker').DrivePickResult>((resolve) => { finish = resolve; });
+    const uploadFile = vi.fn();
+    const onSave = vi.fn();
+    const onExternalPicker = vi.fn();
+    const handle = mountCoverPicker(host, { media: [], onSave, uploadFile, pickFromDrive, onExternalPicker });
+    findButton(host, 'Choose from Google Drive')!.click();
+    handle.dispose();
+    finish({ kind: 'mirror', file: new File(['x'], 'cover.png', { type: 'image/png' }), title: 'cover.png', provider_file_id: 'drive_1' });
+    await flush();
+    expect(uploadFile).not.toHaveBeenCalled();
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onExternalPicker.mock.calls).toEqual([[true]]);
+  });
+
+  it('does not save a cover when its upload completes after disposal', async () => {
+    let finish!: (media: Media) => void;
+    const uploadFile = () => new Promise<Media>((resolve) => { finish = resolve; });
+    const onSave = vi.fn();
+    const onMediaCreated = vi.fn();
+    const handle = mountCoverPicker(host, { media: [], onSave, onMediaCreated, uploadFile, pickFromDrive: async () => ({ kind: 'mirror', file: new File(['x'], 'cover.png', { type: 'image/png' }), title: 'cover.png', provider_file_id: 'drive_1' }) });
+    findButton(host, 'Choose from Google Drive')!.click();
+    await flush();
+    handle.dispose();
+    finish(imageMedia('late'));
+    await flush();
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onMediaCreated).not.toHaveBeenCalled();
+  });
+
 });
