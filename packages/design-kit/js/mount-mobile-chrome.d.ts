@@ -9,7 +9,8 @@ export type MobileChromeItem = {
 };
 
 export type MountMobileChromeOptions = {
-  currentHub: 'life' | 'teaching' | 'knowledge' | 'tasks' | 'professional';
+  /** Umbrella hub id, or a section id (e.g. travel) that is not in the switcher so Life still appears. */
+  currentHub: 'life' | 'teaching' | 'knowledge' | 'tasks' | 'professional' | 'travel';
   primary: MobileChromeItem[];
   more?: MobileChromeItem[];
 };
