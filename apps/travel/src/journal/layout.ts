@@ -1,6 +1,4 @@
-export type PhotoLayoutKind = 'single' | 'pair' | 'lead-pair' | 'lead-pair-more';
-
-export function photoLayout(count: number): PhotoLayoutKind {
+export function photoLayout(count: number): 'single' | 'pair' | 'lead-pair' | 'lead-pair-more' {
   if (count <= 1) return 'single';
   if (count === 2) return 'pair';
   if (count === 3) return 'lead-pair';
