@@ -459,8 +459,7 @@ export function createEventRepository(deps = {}) {
     transitionState,
     rescheduleEvent,
     retryLinks,
-    // Used by scripts/migrate-professional-imports.mjs — same path listEvents
-    // uses when copying an imported PD row into Blobs.
+    // Migration / listEvents: materialise an imported PD row into Blobs.
     loadEditableEvent
   };
 }
