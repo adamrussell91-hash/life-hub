@@ -115,12 +115,11 @@ function relationshipEntry(link) {
 
 async function seedSelf(identityStore) {
   const repo = createIdentityRepository({ store: identityStore, now: () => NOW });
-  const self = personRecord(PERSON_SELF, { display_name: 'Adam', is_self: true });
+  // adopt refuses is_self; write the flag after so confirmSelfPerson can see it.
   await repo.adoptImportedIdentity({
     kind: 'person',
     record: personRecord(PERSON_SELF, { display_name: 'Adam', is_self: false })
   });
-  // adopt refuses is_self; write the self flag via setJSON for the confirmation path.
   const stored = await getJSON(identityStore, personKey(PERSON_SELF), { consistency: 'strong' });
   await identityStore.setJSON(personKey(PERSON_SELF), { ...stored, is_self: true });
   await identityStore.setJSON(SELF_POINTER_KEY, {
@@ -128,7 +127,6 @@ async function seedSelf(identityStore) {
     person_id: PERSON_SELF,
     operation_id: null
   });
-  return self;
 }
 
 function makeDeps({
