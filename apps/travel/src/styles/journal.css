@@ -516,7 +516,14 @@
   background: none;
   text-align: left;
   font-size: var(--text-sm);
+  color: var(--navy);
+  cursor: pointer;
+}
+
+.journal-moment__menu-item:disabled {
   color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.85;
 }
 
 .journal-connection {
@@ -803,4 +810,184 @@
 
 html.vv-keyboard-open .sheet.addform.journal-capture-sheet {
   max-height: min(100dvh, var(--vv-height, 100dvh));
+}
+
+/* Edit moment sheet */
+.journal-edit-moment-sheet {
+  background: var(--paper);
+}
+
+.journal-edit-moment__field {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.journal-edit-moment__text {
+  width: 100%;
+  min-height: 6rem;
+}
+
+.journal-edit-moment__section-hint {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.journal-edit-moment__place-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.journal-edit-moment__place-actions .btn {
+  min-height: 2.75rem;
+  flex: 1 1 auto;
+}
+
+.journal-edit-moment__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.journal-edit-moment__suggestion {
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.journal-edit-moment__place-summary {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.journal-edit-moment__status {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--high-sea-ink);
+}
+
+html.vv-keyboard-open .sheet.addform.journal-edit-moment-sheet {
+  max-height: min(100dvh, var(--vv-height, 100dvh));
+}
+
+/* Pin editor */
+.journal-pin-panel {
+  width: min(32rem, 100%);
+  max-height: min(92dvh, var(--vv-height, 92dvh));
+  margin: auto;
+  padding: var(--space-4);
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--paper);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.journal-pin-panel__title {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.journal-pin-panel__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.journal-pin-panel__map {
+  position: relative;
+  height: min(50vh, 320px);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.journal-pin-panel__map-host {
+  position: absolute;
+  inset: 0;
+}
+
+.journal-pin-panel__crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  pointer-events: none;
+  border: 2px solid var(--navy);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--paper) 80%, transparent);
+}
+
+.journal-pin-panel__crosshair::before,
+.journal-pin-panel__crosshair::after {
+  content: '';
+  position: absolute;
+  background: var(--navy);
+}
+
+.journal-pin-panel__crosshair::before {
+  left: 50%;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  margin-left: -1px;
+}
+
+.journal-pin-panel__crosshair::after {
+  top: 50%;
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  margin-top: -1px;
+}
+
+.journal-pin-panel__zoom.maplibregl-ctrl-group button {
+  width: 44px;
+  height: 44px;
+}
+
+.journal-pin-panel__field {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.journal-pin-panel__coords {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.journal-pin-panel__coord-error {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--high-sea-ink);
+}
+
+.journal-pin-panel__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.journal-pin-panel__actions .btn {
+  min-height: 3rem;
+}
+
+@media (min-width: 720px) {
+  .journal-pin-panel {
+    border-radius: var(--radius-lg);
+  }
 }

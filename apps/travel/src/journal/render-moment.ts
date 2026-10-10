@@ -1,11 +1,27 @@
+import type { JournalDocument } from '@/api/journal';
 import type { JournalFixture, JournalMedia, JournalMoment } from '@/journal/types';
 import { photoLayout, reflectionLikelyOverflows } from '@/journal/layout';
+import { buildMomentMenuItems, type MomentMenuAction } from '@/journal/moment-menu';
+import { openEditMomentSheet } from '@/journal/edit-moment-sheet';
 
 function mediaById(fixture: JournalFixture): Map<string, JournalMedia> {
   return new Map(fixture.media.map((m) => [m.id, m]));
 }
 
-function renderEllipsisMenu(article: HTMLElement): void {
+export interface RenderMomentContext {
+  fixture: JournalFixture;
+  journal: JournalDocument;
+  tripId: string;
+  version: string;
+  anchor: HTMLElement;
+  onJournalSaved?: (envelope: { journal: JournalDocument; version: string }) => void;
+}
+
+function renderEllipsisMenu(
+  article: HTMLElement,
+  moment: JournalMoment,
+  ctx: RenderMomentContext,
+): void {
   const wrap = document.createElement('div');
   wrap.className = 'journal-moment__menu-wrap';
   const btn = document.createElement('button');
@@ -18,20 +34,72 @@ function renderEllipsisMenu(article: HTMLElement): void {
   menu.className = 'journal-moment__menu';
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
-  for (const label of ['Edit moment', 'Move to day', 'Delete']) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'journal-moment__menu-item';
-    item.setAttribute('role', 'menuitem');
-    item.disabled = true;
-    item.textContent = `${label} — Coming in Phase 3`;
-    menu.append(item);
+
+  let editOverlay: { destroy(): void } | null = null;
+
+  const closeMenu = (): void => {
+    menu.hidden = true;
+  };
+
+  const onDocClick = (ev: MouseEvent) => {
+    if (!wrap.contains(ev.target as Node)) closeMenu();
+  };
+
+  for (const item of buildMomentMenuItems(ctx.fixture, moment)) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'journal-moment__menu-item';
+    button.setAttribute('role', 'menuitem');
+    button.disabled = item.disabled;
+    button.title = item.title;
+    button.textContent = item.label;
+    if (item.disabled && item.title) {
+      button.setAttribute('aria-description', item.title);
+    }
+    button.addEventListener('click', () => {
+      closeMenu();
+      if (button.disabled) return;
+      handleMenuAction(item.action, moment, ctx, (handle) => {
+        editOverlay = handle;
+      });
+    });
+    menu.append(button);
   }
-  btn.addEventListener('click', () => {
-    menu.hidden = !menu.hidden;
+
+  btn.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    const opening = menu.hidden;
+    menu.hidden = !opening;
+    if (opening) document.addEventListener('click', onDocClick, { once: true });
   });
+
+  article.addEventListener('journal-moment-destroy', () => {
+    document.removeEventListener('click', onDocClick);
+    editOverlay?.destroy();
+  });
+
   wrap.append(btn, menu);
   article.append(wrap);
+}
+
+function handleMenuAction(
+  action: MomentMenuAction,
+  moment: JournalMoment,
+  ctx: RenderMomentContext,
+  setEditOverlay: (handle: { destroy(): void }) => void,
+): void {
+  if (action === 'edit') {
+    setEditOverlay(
+      openEditMomentSheet({
+        tripId: ctx.tripId,
+        journal: ctx.journal,
+        version: ctx.version,
+        moment,
+        anchor: ctx.anchor,
+        onSaved: (envelope) => ctx.onJournalSaved?.(envelope),
+      }),
+    );
+  }
 }
 
 function renderPhotoGrid(
@@ -49,12 +117,12 @@ function renderPhotoGrid(
     .map((id) => mediaMap.get(id))
     .filter((m): m is JournalMedia => Boolean(m));
 
-  if (layout === 'single' && resolved[0]) {
+  if (layout === 'single') {
     const img = document.createElement('img');
-    img.src = resolved[0].url;
+    img.src = resolved[0]!.url;
     img.alt = '';
-    img.width = resolved[0].width;
-    img.height = resolved[0].height;
+    img.width = resolved[0]!.width;
+    img.height = resolved[0]!.height;
     img.loading = 'lazy';
     img.decoding = 'async';
     grid.append(img);
@@ -168,6 +236,7 @@ function renderAudioStub(host: HTMLElement): void {
 export function renderMomentArticle(
   fixture: JournalFixture,
   moment: JournalMoment,
+  ctx?: RenderMomentContext,
 ): HTMLElement {
   const article = document.createElement('article');
   article.className = 'journal-moment';
@@ -187,6 +256,6 @@ export function renderMomentArticle(
     renderAudioStub(article);
   }
 
-  renderEllipsisMenu(article);
+  if (ctx) renderEllipsisMenu(article, moment, ctx);
   return article;
 }

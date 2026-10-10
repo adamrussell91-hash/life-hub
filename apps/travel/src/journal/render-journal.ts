@@ -171,15 +171,34 @@ export function renderJournal(
   let captureOverlay: { destroy(): void } | null = null;
   let dayMapOverlay: { destroy(): void } | null = null;
 
-  const journalDoc = opts.fixture as JournalDocument;
-  const toolbarTitle =
-    opts.displayTitle?.trim() || opts.fixture.title.trim() || 'Your trip';
+  let liveFixture: JournalFixture = opts.fixture;
+  let liveVersion = opts.journalVersion ?? 'fixture';
+  const journalDoc = () => liveFixture as JournalDocument;
+  const toolbarTitle = () =>
+    opts.displayTitle?.trim() || liveFixture.title.trim() || 'Your trip';
+
+  function onJournalSaved(envelope: { journal: JournalDocument; version: string }): void {
+    liveFixture = envelope.journal;
+    liveVersion = envelope.version;
+    rebuildStory();
+  }
+
+  function momentCtx(): import('@/journal/render-moment').RenderMomentContext {
+    return {
+      fixture: liveFixture,
+      journal: journalDoc(),
+      tripId: liveFixture.trip_id,
+      version: liveVersion,
+      anchor: root,
+      onJournalSaved,
+    };
+  }
 
   function openImport(initialFiles?: File[]): void {
     importOverlay?.destroy();
-    const { knownChecksums, deletedChecksums } = journalImportChecksums(opts.fixture);
+    const { knownChecksums, deletedChecksums } = journalImportChecksums(liveFixture);
     importOverlay = openImportSheet({
-      fixture: opts.fixture,
+      fixture: liveFixture,
       knownChecksums,
       deletedChecksums,
       journalVersion: opts.journalVersion,
@@ -193,16 +212,16 @@ export function renderJournal(
   }
 
   function openCapture(dayId?: string): void {
-    const ctx = resolveCaptureContext(opts.fixture, dayId);
+    const ctx = resolveCaptureContext(liveFixture, dayId);
     if (!ctx) return;
     captureOverlay?.destroy();
     captureOverlay = openCaptureSheet({
-      tripId: opts.fixture.trip_id,
+      tripId: liveFixture.trip_id,
       legId: ctx.legId,
       localDate: ctx.localDate,
-      journal: journalDoc,
-      tripTitle: toolbarTitle,
-      version: opts.journalVersion ?? 'fixture',
+      journal: journalDoc(),
+      tripTitle: toolbarTitle(),
+      version: liveVersion,
       anchor: root,
       onImportPhotos: (files) => openImport(files),
       onClose: () => {
@@ -216,7 +235,7 @@ export function renderJournal(
   }
 
   const toolbar = renderToolbar({
-    title: toolbarTitle,
+    title: toolbarTitle(),
     onAddMoment: () => openCapture(),
     onImportPhotos: () => {
       openImport();
@@ -224,7 +243,7 @@ export function renderJournal(
     onChapter: () => {
       chapterOverlay?.destroy();
       chapterOverlay = openChapterJump({
-        fixture: opts.fixture,
+        fixture: liveFixture,
         anchor: root,
         onSelect: (id) => {
           scrollToChapter(id, root, opts.onChapterJump);
@@ -244,9 +263,31 @@ export function renderJournal(
   const story = document.createElement('div');
   story.className = 'journal__story';
 
-  const storyEmpty = isJournalStoryEmpty(opts.fixture);
+  const observer = new IntersectionObserver(
+    (entries) => {
+      const visible = entries
+        .filter((e) => e.isIntersecting)
+        .sort((a, b) => (b.intersectionRatio ?? 0) - (a.intersectionRatio ?? 0))[0];
+      if (!visible?.target.id) return;
+      if (visible.target.hasAttribute('data-journal-moment')) {
+        persistLastView(liveFixture.trip_id, visible.target.id);
+      }
+    },
+    { root: null, threshold: 0.4 },
+  );
 
-  if (storyEmpty) {
+  function rebuildStory(): void {
+    story.replaceChildren();
+    paintStoryInto(story);
+    for (const el of story.querySelectorAll('[data-journal-moment]')) {
+      observer.observe(el);
+    }
+  }
+
+  function paintStoryInto(host: HTMLElement): void {
+    const storyEmpty = isJournalStoryEmpty(liveFixture);
+
+    if (storyEmpty) {
     const empty = document.createElement('div');
     empty.className = 'journal-empty';
     empty.setAttribute('data-journal-empty', '');
@@ -272,10 +313,11 @@ export function renderJournal(
 
     actions.append(photosBtn, momentBtn);
     empty.append(lead, actions);
-    story.append(empty);
-  }
+      host.append(empty);
+      return;
+    }
 
-  const legs = [...opts.fixture.legs].sort((a, b) => a.order - b.order);
+    const legs = [...liveFixture.legs].sort((a, b) => a.order - b.order);
 
   for (const leg of legs) {
     const legSection = document.createElement('section');
@@ -291,7 +333,7 @@ export function renderJournal(
     title.textContent = leg.destination;
     legSection.append(title);
 
-    const days = opts.fixture.days
+    const days = liveFixture.days
       .filter((d) => d.leg_id === leg.id)
       .sort((a, b) => a.local_date.localeCompare(b.local_date));
 
@@ -306,7 +348,7 @@ export function renderJournal(
       dayHeading.textContent = formatDisplayDate(day.local_date);
       daySection.append(dayHeading);
 
-      const moments = opts.fixture.moments
+      const moments = liveFixture.moments
         .filter((m) => m.leg_id === leg.id && m.local_date === day.local_date)
         .sort((a, b) => a.display_order - b.display_order);
 
@@ -325,7 +367,7 @@ export function renderJournal(
 
       for (let i = 0; i < moments.length; i++) {
         const moment = moments[i]!;
-        daySection.append(renderMomentArticle(opts.fixture, moment));
+        daySection.append(renderMomentArticle(liveFixture, moment, momentCtx()));
 
         const prev = moments[i - 1];
         if (prev?.coordinates && moment.coordinates) {
@@ -358,11 +400,14 @@ export function renderJournal(
       legSection.append(daySection);
     }
 
-    story.append(legSection);
+      host.append(legSection);
 
-    const trn = opts.fixture.transitions.find((t) => t.from_leg_id === leg.id);
-    if (trn) story.append(renderTransition(trn));
+      const trn = liveFixture.transitions.find((t) => t.from_leg_id === leg.id);
+      if (trn) host.append(renderTransition(trn));
+    }
   }
+
+  paintStoryInto(story);
 
   timeline.append(story);
   root.append(toolbar, timeline);
@@ -377,7 +422,7 @@ export function renderJournal(
     opts.momentId ??
     (() => {
       try {
-        return localStorage.getItem(LAST_VIEW_KEY(opts.fixture.trip_id)) ?? undefined;
+        return localStorage.getItem(LAST_VIEW_KEY(liveFixture.trip_id)) ?? undefined;
       } catch {
         return undefined;
       }
@@ -388,28 +433,16 @@ export function renderJournal(
       scrollToChapter(scrollId, root);
       playJournalEntrance(root, scrollId);
     });
-    if (opts.fixture.moments.some((m) => m.id === scrollId)) {
-      persistLastView(opts.fixture.trip_id, scrollId);
+    if (liveFixture.moments.some((m) => m.id === scrollId)) {
+      persistLastView(liveFixture.trip_id, scrollId);
     }
   } else {
-    if (opts.fixture.moments[0]) {
-      persistLastView(opts.fixture.trip_id, opts.fixture.moments[0].id);
+    if (liveFixture.moments[0]) {
+      persistLastView(liveFixture.trip_id, liveFixture.moments[0].id);
     }
     requestAnimationFrame(() => playJournalEntrance(root));
   }
 
-  const observer = new IntersectionObserver(
-    (entries) => {
-      const visible = entries
-        .filter((e) => e.isIntersecting)
-        .sort((a, b) => (b.intersectionRatio ?? 0) - (a.intersectionRatio ?? 0))[0];
-      if (!visible?.target.id) return;
-      if (visible.target.hasAttribute('data-journal-moment')) {
-        persistLastView(opts.fixture.trip_id, visible.target.id);
-      }
-    },
-    { root: null, threshold: 0.4 },
-  );
   for (const el of root.querySelectorAll('[data-journal-moment]')) {
     observer.observe(el);
   }
