@@ -11,7 +11,15 @@ describe('journal reconcile on refresh', () => {
 
     const next = klIstanbulFixture();
     next.legs[0]!.destination = 'Reconciled leg label';
-    handle.reconcile({ journal: next, version: 'v2' });
+    handle.reconcile({
+      journal: {
+        ...next,
+        leg_ids: next.legs.map((l) => l.id),
+        preferences: {},
+        operations: [],
+      },
+      version: 'v2',
+    });
 
     expect(root.querySelector('.journal')).toBe(journalRoot);
     expect(root.textContent).toContain('Reconciled leg label');

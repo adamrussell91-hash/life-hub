@@ -34,6 +34,10 @@ export interface JournalMedia extends JournalDeletedMeta {
   /** SHA-256 hex of original bytes when known (live API journal). */
   checksum?: string;
   caption?: string;
+  /** Legacy inline transcript; live edits prefer preferences.audio_transcripts_v1. */
+  transcript?: string;
+  /** Optional object / detail notes indexed by search (Phase 5). */
+  object_notes?: string;
 }
 
 export interface JournalTransitionDisplayOverride {

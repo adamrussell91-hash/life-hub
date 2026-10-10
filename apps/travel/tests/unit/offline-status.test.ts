@@ -38,7 +38,7 @@ describe('mountJournalOfflineStatus', () => {
     const host = document.createElement('div');
     const cleanup = mountJournalOfflineStatus(host);
     await new Promise((r) => setTimeout(r, 0));
-    expect(host.querySelector('.journal-offline-status')?.hidden).toBe(true);
+    expect((host.querySelector('.journal-offline-status') as HTMLElement | null)?.hidden).toBe(true);
     cleanup();
   });
 
