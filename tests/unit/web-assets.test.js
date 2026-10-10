@@ -529,3 +529,9 @@ test('Life browser modules do not import netlify Functions (Pages does not publi
   }
   assert.deepEqual(hits, [], 'browser import of netlify/ breaks the main.js module graph on Pages');
 });
+
+
+test('the installed shell includes creatine readers, intake guard and card renderer for offline reloads', async () => {
+  const worker = await readFile(new URL('../../apps/life/service-worker.js', import.meta.url), 'utf8');
+  for (const path of ['js/core/creatine.js','js/core/creatine-intake.js','js/app/render-creatine.js']) assert.ok(worker.includes("'" + path + "'"), path);
+});

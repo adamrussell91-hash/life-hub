@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v208';
+const CACHE_NAME = 'life-hub-shell-v209';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -46,6 +46,10 @@ const SHELL_FILES = [
   'packages/design-kit/js/day-dial-geometry.js',
   'packages/design-kit/js/dial-geometry.js',
   'packages/design-kit/js/time-grid.js',
+  'js/core/creatine.js',
+  'js/core/creatine-intake.js',
+  'js/app/render-creatine.js',
+  'js/app/chart-kit/creatine-elastic.js',
   'js/app/main.js',
   'js/app/heal-shell-styles.js',
   'js/app/api-session.js',
