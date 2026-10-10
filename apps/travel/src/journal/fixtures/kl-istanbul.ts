@@ -117,12 +117,12 @@ function buildMoments(): JournalMoment[] {
     {
       id: 'mom_kul_text',
       leg_id: 'leg_kul',
-      local_date: '2026-03-02',
-      local_time: '08:30',
+      local_date: '2026-03-01',
+      local_time: '21:15',
       media_ids: [],
-      display_order: 1,
+      display_order: 6,
       lifecycle: 'live',
-      text: 'Quiet morning notes before packing — text-only moment.',
+      text: 'Quiet evening notes — text-only moment.',
     },
     {
       id: 'mom_ist_pair',
