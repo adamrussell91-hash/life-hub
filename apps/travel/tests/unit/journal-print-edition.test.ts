@@ -23,8 +23,12 @@ describe('journal print edition', () => {
   });
 
   it('uses derivative URLs for live API media', () => {
+    const fixture = klIstanbulFixture();
     const journal: JournalDocument = {
-      ...klIstanbulFixture(),
+      ...fixture,
+      leg_ids: fixture.legs.map((l) => l.id),
+      preferences: {},
+      operations: [],
       media: [
         {
           id: 'med_api',
