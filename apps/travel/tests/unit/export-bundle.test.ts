@@ -65,7 +65,7 @@ function miniJournal(overrides: Partial<JournalDocument> = {}): JournalDocument 
         checksum: 'b'.repeat(64),
         caption: 'Street',
         transcript: 'Birdsong',
-      },
+      } as JournalDocument['media'][number] & { transcript: string },
       {
         id: 'med_deleted',
         url: '/fixtures/x.jpg',
@@ -149,7 +149,7 @@ describe('restore stub', () => {
       journal: { ...miniJournal(), id: 'jrn_target', revision: 0, title: 'Existing' },
       version: 'ver_a',
     });
-    let saved: JournalDocument | null = null;
+    let saved: JournalDocument | undefined;
     const saveJournal = async (_trip: string, ifVersion: string, journal: JournalDocument) => {
       expect(ifVersion).toBe('ver_a');
       saved = journal;
