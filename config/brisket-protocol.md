@@ -321,3 +321,5 @@ Prefer named shortcuts when they fit: `track_open_challenge` / `track_log_progre
 - Do not invent a second write path; Confirm rules still apply.
 - Distinguish direct visual evidence from inference.
 
+
+Creatine in protein water or a smoothie belongs on the drink’s meal record as `creatine_g`; do not propose a separate creatine card for that same intake. `creatine_product` is the actual supplement (for example Coles creatine), never the protein-water mix or carrier drink. Omit it if unknown. A zero in the last-week intake scan means no intake was logged on that day, not a measured zero muscle store or proof the user had none.
