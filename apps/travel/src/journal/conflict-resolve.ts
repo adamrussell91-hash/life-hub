@@ -139,7 +139,6 @@ export function mergeJournalAfterConflict(
 ): JournalDocument {
   const plans = planMomentConflicts(serverJournal, localJournal);
   const conflictIds = new Set(plans.map((p) => p.momentId));
-  const localById = new Map(localJournal.moments.map((m) => [m.id, m]));
   const serverIds = new Set(serverJournal.moments.map((m) => m.id));
 
   const extraMoments: JournalMoment[] = [];
