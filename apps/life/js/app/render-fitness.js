@@ -82,6 +82,7 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
       libraryByName,
       motivation: {
         lastPerformance: model.lastPerformance,
+        lastCircuits: model.lastCircuits,
         exerciseBests: model.exerciseBests,
         buildBoard: model.buildBoard,
         lastSessionVolume: model.lastSessionVolume,

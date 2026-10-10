@@ -1,5 +1,5 @@
 import { resolveTrackingType } from '../core/exercise-tracking.js';
-import { copyExerciseStructure, copySetExtras } from '../core/workout-plan-groups.js';
+import { copyExerciseStructure, copySetExtras, provisionAmrapCircuitRounds } from '../core/workout-plan-groups.js';
 
 export const DEFAULT_CABLE_TYPE = 'constant_force';
 
@@ -78,8 +78,24 @@ function withoutDone(exercises) {
   }));
 }
 
-export function cloneLoggerDraft(session) {
+export function cloneLoggerDraft(session, { provisionAmrap = false } = {}) {
   const source = session ?? {};
+  const exercises = (source.exercises ?? []).map(exercise => {
+    const tracking = resolveTrackingType(exercise);
+    return {
+      name: exercise.name,
+      ...(exercise.tracking != null ? { tracking: exercise.tracking } : {}),
+      ...(exercise.equipment != null ? { equipment: exercise.equipment } : {}),
+      ...(exercise.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
+      ...(exercise.intensification != null ? { intensification: exercise.intensification } : {}),
+      ...(exercise.coach_cues != null ? { coach_cues: { ...exercise.coach_cues } } : {}),
+      ...copyExerciseStructure(exercise),
+      sets: (exercise.sets ?? []).map(set => cloneLoggerSet(set, tracking))
+    };
+  });
+  // Only when loading a planned session into gym mode — never on finish/clone of a
+  // trimmed AMRAP, or unplayed rounds get stuffed back onto the completed record.
+  if (provisionAmrap) provisionAmrapCircuitRounds(exercises);
   return {
     type: 'workout',
     date: source.date,
@@ -97,19 +113,7 @@ export function cloneLoggerDraft(session) {
     pain_flags: Array.isArray(source.pain_flags)
       ? source.pain_flags.map(flag => (typeof flag === 'object' ? { ...flag } : flag))
       : [],
-    exercises: (source.exercises ?? []).map(exercise => {
-      const tracking = resolveTrackingType(exercise);
-      return {
-        name: exercise.name,
-        ...(exercise.tracking != null ? { tracking: exercise.tracking } : {}),
-        ...(exercise.equipment != null ? { equipment: exercise.equipment } : {}),
-        ...(exercise.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
-        ...(exercise.intensification != null ? { intensification: exercise.intensification } : {}),
-        ...(exercise.coach_cues != null ? { coach_cues: { ...exercise.coach_cues } } : {}),
-        ...copyExerciseStructure(exercise),
-        sets: (exercise.sets ?? []).map(set => cloneLoggerSet(set, tracking))
-      };
-    }),
+    exercises,
     notes: typeof source.notes === 'string' ? source.notes : '',
     ...(isPlainObject(source.season) ? { season: { ...source.season } } : {}),
     ...(isPlainObject(source.readiness) ? { readiness: { ...source.readiness } } : {}),
@@ -156,7 +160,7 @@ export function clearDraft(storage, date, path) {
 
 export function resolveDraft(session, storage) {
   if (!session || session.status !== 'planned') return null;
-  const base = cloneLoggerDraft(session);
+  const base = cloneLoggerDraft(session, { provisionAmrap: true });
   const serverPlan = planFingerprint(session);
   base._planFingerprint = serverPlan;
   const stored = loadDraft(storage, base.date, base.path);
@@ -166,7 +170,10 @@ export function resolveDraft(session, storage) {
     // Confirmed plan changed under the draft — discard stale local exercise list.
     return base;
   }
-  return { ...stored, path: base.path ?? stored.path, _planFingerprint: serverPlan };
+  const resumed = { ...stored, path: base.path ?? stored.path, _planFingerprint: serverPlan };
+  // Local drafts saved before AMRAP provisioning still need round-slots.
+  if (Array.isArray(resumed.exercises)) provisionAmrapCircuitRounds(resumed.exercises);
+  return resumed;
 }
 
 export function toConfirmPayload(draft, { status = 'planned' } = {}) {
