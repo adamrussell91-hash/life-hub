@@ -704,8 +704,11 @@ export function createAppController(dependencies) {
     if (intervalId !== null || destroyed) return;
     intervalId = setIntervalImpl(() => {
       if (authenticated && !requireUnexpiredSession()) return;
-      if (documentTarget.visibilityState === 'visible' && authenticated && navigatorTarget.onLine) {
-        void refresh();
+      if (documentTarget.visibilityState === 'visible' && authenticated) {
+        // The intake estimate advances even when repository data is unchanged
+        // or offline. Reuse the existing ten-minute timer, without new motion.
+        if (currentSection === 'nutrition') renderNutritionSection({ quiet: true });
+        if (navigatorTarget.onLine) void refresh();
       }
     }, REFRESH_INTERVAL_MS);
   }
@@ -1471,9 +1474,10 @@ export function createAppController(dependencies) {
     }
   }
 
-  function renderNutritionSection() {
+  function renderNutritionSection({ quiet = syncQuiet } = {}) {
     if (!latestResult || !buildNutritionModel || !renderNutrition) return;
-    renderNutrition(root, buildNutritionModel(latestResult), { quiet: syncQuiet });
+    const clock = now();
+    renderNutrition(root, buildNutritionModel({ ...latestResult, now: clock }), { quiet, now: clock });
     renderNutritionSurfaceWidgets(root, surfaceWidgetLibrary?.getState?.() ?? { status: 'idle', widgets: [] });
     const button = root.querySelector('#nutrition-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, NUTRITION_AGENT_SLUG));

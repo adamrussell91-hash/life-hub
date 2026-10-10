@@ -185,6 +185,33 @@ function validateMeal(record, errors) {
   }
   finiteNumber(record, 'polyphenol_score', errors, { minimum: 0, maximum: 10 });
   enumeration(record, 'omega3', OMEGA3_LEVELS, errors);
+  finiteNumber(record, 'creatine_g', errors, { maximum: 100 });
+  optionalString(record, 'creatine_product', errors);
+  if (record.creatine_time != null && !isTime(record.creatine_time)) {
+    errors.push('creatine_time must be HH:MM');
+  }
+}
+
+function validateCreatine(record, errors) {
+  finiteNumber(record, 'grams', errors, { required: true, maximum: 100 });
+  optionalString(record, 'product', errors);
+  if (typeof record.dose_key !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(record.dose_key)) {
+    errors.push('dose_key must be a lowercase slug');
+  }
+}
+
+function validateCreatinePlan(record, errors) {
+  finiteNumber(record, 'daily_g', errors, { required: true, maximum: 30 });
+  finiteNumber(record, 'maintenance_g', errors, { required: true, minimum: 3, maximum: 5 });
+  enumeration(record, 'mode', ['loading', 'maintenance', 'paused'], errors, true);
+  finiteNumber(record, 'baseline', errors, { maximum: 1 });
+  if (record.baseline_date != null) {
+    if (!isCalendarDate(record.baseline_date)) {
+      errors.push('baseline_date must be a valid calendar date in YYYY-MM-DD form');
+    } else if (isCalendarDate(record.date) && record.baseline_date > record.date) {
+      errors.push('baseline_date must be on or before record date');
+    }
+  }
 }
 
 function validateWorkout(record, errors) {
@@ -604,6 +631,8 @@ function validateBloods(record, errors) {
 
 const VALIDATORS = {
   meal: validateMeal,
+  creatine: validateCreatine,
+  creatine_plan: validateCreatinePlan,
   workout: validateWorkout,
   diary: validateDiary,
   mind_session: validateMindSession,

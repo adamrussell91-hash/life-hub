@@ -167,13 +167,16 @@ test('creates central-node.md from the app seed when the private repo is missing
   assert.equal(payload.data.centralNodeUpdated, true);
 
   const putCalls = calls.filter(call => call.options?.method === 'PUT');
-  assert.equal(putCalls.length, 2, 'expected meal write plus central-node create');
+  assert.deepEqual(putCalls.map(call => new URL(call.url).pathname.split('/contents/')[1]).sort(), [
+    'central-node.md', 'data/nutrition/2026/08/2026-08-01-breakfast-1600.md', 'data/nutrition/creatine-index.json'
+  ]);
   const centralNodePut = putCalls.find(call => call.url.includes('central-node.md'));
   assert.ok(centralNodePut);
   assert.equal(JSON.parse(centralNodePut.options.body).sha, undefined, 'create must not send a sha');
 
   const writtenContent = Buffer.from(JSON.parse(centralNodePut.options.body).content, 'base64').toString('utf8');
   assert.match(writtenContent, /## ⚡ Today's Status/);
+  assert.match(writtenContent, /\*\*Creatine:\*\*.*0 g logged today/);
   assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F, 420mg Na, 210mg Ca, polyphenol 4\./);
   assert.match(writtenContent, /\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast/);
 });
@@ -216,13 +219,16 @@ test('appends a one-line entry to the central node running log after a successfu
   assert.equal(payload.data.centralNodeUpdated, true);
 
   const putCalls = calls.filter(call => call.options?.method === 'PUT');
-  assert.equal(putCalls.length, 2, 'expected one PUT for the record and one for the central node log');
+  assert.deepEqual(putCalls.map(call => new URL(call.url).pathname.split('/contents/')[1]).sort(), [
+    'central-node.md', 'data/nutrition/2026/08/2026-08-01-breakfast-1600.md', 'data/nutrition/creatine-index.json'
+  ]);
   const centralNodePut = putCalls.find(call => call.url.includes('central-node.md'));
   assert.ok(centralNodePut, 'expected a PUT to central-node.md');
   assert.equal(JSON.parse(centralNodePut.options.body).sha, centralNodeSha);
 
   const writtenContent = Buffer.from(JSON.parse(centralNodePut.options.body).content, 'base64').toString('utf8');
   assert.match(writtenContent, /\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast \(520 kcal, 38g protein, 12g fat\)\./);
+  assert.match(writtenContent, /\*\*Creatine:\*\*.*0 g logged today/);
   assert.match(writtenContent, /Chest and Curls session completed and logged/, 'must preserve the existing log rather than replacing it');
   assert.match(writtenContent, /## ⚡ Today's Status \([^)]*1 August 2026\)/);
   assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F, 420mg Na, 210mg Ca, polyphenol 4\./);
@@ -2835,4 +2841,54 @@ test('delete_log 404s when the medical file is not in the tree', async () => {
     id: 'stelara-2'
   }));
   assert.equal(response.status, 404);
+});
+
+
+test('confirmed creatine doses add to embedded meal intake and corrections replace only their stable dose key', async () => {
+  let revision = 0;
+  const files = new Map([['central-node.md', {
+    sha: 'f'.repeat(40),
+    content: "# Central Node\n\n## ⚡ Today's Status (Saturday 1 August 2026)\n**Health:** Stable.\n\n## 📝 Recent Agent Actions\n"
+  }]]);
+  const fetchImpl = async (url, options) => {
+    if (options?.method === 'PUT') {
+      const path = decodeURIComponent(new URL(url).pathname.split('/contents/')[1]);
+      const body = JSON.parse(options.body);
+      if (files.has(path) && body.sha !== files.get(path).sha) return Response.json({message: 'conflict'}, {status: 409});
+      const sha = (++revision).toString(16).padStart(40, '0');
+      files.set(path, {sha, content: Buffer.from(body.content, 'base64').toString('utf8')});
+      return Response.json({content: {sha}, commit: {sha}});
+    }
+    if (url.includes('/commits/')) return Response.json({sha: 'c'.repeat(40), commit: {tree: {sha: 'd'.repeat(40)}}});
+    if (url.includes('/git/trees/')) return Response.json({tree: [...files].map(([path, file]) => ({path, sha: file.sha, type: 'blob'}))});
+    if (url.includes('/git/blobs/')) {
+      const file = [...files.values()].find(file => file.sha === url.split('/').pop());
+      if (file) return Response.json({encoding: 'base64', content: Buffer.from(file.content).toString('base64')});
+    }
+    return Response.json({message: 'not found'}, {status: 404});
+  };
+  const handler = createChatConfirmHandler({env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T06:00:00Z')});
+  const dose = (dose_key, grams) => ({type: 'creatine', date: '2026-08-01', fields: {dose_key, grams, product: 'Coles'}});
+  const confirm = async (record, extra = {}) => {
+    const response = await handler(request({candidate: record, slug: 'brisket', ...extra}));
+    const result = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(result));
+    assert.equal(result.data.centralNodeUpdated, true);
+    return result.data.path;
+  };
+  const firstPath = await confirm(dose('morning', 5));
+  const secondPath = await confirm(dose('afternoon', 5));
+  assert.notEqual(firstPath, secondPath, 'two doses at the same log time must remain additive');
+  const mealPath = await confirm({...candidate, fields: {...candidate.fields, creatine_g: 7, creatine_product: 'Coles'}});
+  assert.match(files.get('central-node.md').content, /17 g logged today/);
+  assert.match(files.get(mealPath).content, /creatine_g: 7/);
+  assert.equal(await confirm(dose('morning', 3), {overwrite: true}), firstPath);
+  assert.match(files.get('central-node.md').content, /15 g logged today/);
+  assert.match(files.get('central-node.md').content, /Health:\*\* Stable/);
+  assert.equal((files.get('central-node.md').content.match(/\*\*Creatine:\*\*/g) || []).length, 1);
+  const index = JSON.parse(files.get('data/nutrition/creatine-index.json').content);
+  assert.equal(Object.keys(index.records).length, 3, 'two standalone sources and one meal, never a duplicate embedded-dose record');
+  assert.equal(index.records[firstPath].record.grams, 3);
+  assert.equal(index.records[secondPath].record.grams, 5);
+  assert.equal(index.records[mealPath].record.creatine_g, 7);
 });

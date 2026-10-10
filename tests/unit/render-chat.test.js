@@ -745,3 +745,10 @@ test('formatActionWriteDisplay shows people writes as plain sentences, not raw p
   assert.equal(link.useCode, false);
   assert.equal(link.label, 'Link Sam Lee → Jo Example: colleague');
 });
+test('creatine confirmations use human titles and keep dose identity out of editable fields',()=>{
+ const root=new FakeDocument();
+ const dose=appendRecordProposal(root,{path:'data/nutrition/2026/10/2026-10-10-creatine-dose-1.md',record:{type:'creatine',date:'2026-10-10',grams:7,dose_key:'dose-1',product:'Coles creatine'}});
+ assert.equal(dose.inputs.grams.value,'7');assert.equal(dose.inputs.dose_key,undefined);
+ const plan=appendRecordProposal(root,{path:'data/nutrition/2026/10/2026-10-10-creatine-plan.md',record:{type:'creatine_plan',date:'2026-10-10',daily_g:5,maintenance_g:5,mode:'loading'}});
+ assert.equal(findByClass(plan.card,'confirm-card__title').textContent,'Creatine routine');
+});

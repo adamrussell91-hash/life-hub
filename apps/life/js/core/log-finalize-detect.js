@@ -1,3 +1,4 @@
+import { reportedCreatineGrams } from './creatine-intake.js';
 /** Shared finalize / claim detection so Log / Confirm never dies as empty-turn. */
 
 import { claimedPlanLocked, isWorkoutLockIn } from './workout-plan-detect.js';
@@ -203,13 +204,18 @@ export function shouldForceAgentLog({
   if (!LOG_AGENTS.has(slug)) return false;
   if (slug === 'chadwick') return false;
   if (slug === 'sara' && missingSaraBodyLogTypes({ userMessage, loggedTypes }).length) return true;
+  if (slug === 'brisket' && reportedCreatineGrams(userMessage) !== null) {
+    const types = new Set(loggedTypes);
+    return !types.has('creatine_intake') && !types.has('creatine');
+  }
   if (sawLogEntry) return false;
   if (isLogFinalize(userMessage)) return true;
   if (slug === 'vera' && isVeraFlushMessage(userMessage)) return true;
   return claimedDomainSave(assistantText, slug);
 }
 
-export function forceLogNudgeFor(slug) {
+export function forceLogNudgeFor(slug, message) {
+  if (slug === 'brisket' && reportedCreatineGrams(message) !== null) return 'Call log_entry now for the reported creatine: type meal with creatine_g inside the described drink/meal; type creatine with grams and a stable new dose_key for a standalone intake. Never create both for the same intake. Do not invent macros for a standalone supplement. This prepares a Confirm card; do not claim it is saved yet.';
   return FORCE_NUDGE_BY_SLUG[slug] ?? PENELOPE_FORCE_DIARY_NUDGE;
 }
 
