@@ -15,7 +15,7 @@ const TAGGABLE_KINDS = 'person,organisation,task,application,program,page,unit,l
  * generic `tagged_with` relationship, so a pair nobody has declared a
  * specific relationship type for still works.
  */
-export function mountTagAnythingSection(host: HTMLElement, sourceRef: string) {
+export function mountTagAnythingSection(host: HTMLElement, sourceRef: string, options: { includeRelationships?: readonly string[]; fallbackLabels?: Record<string, string> } = {}) {
   return mountEntityTagger({
     host,
     sourceRef,
@@ -27,7 +27,15 @@ export function mountTagAnythingSection(host: HTMLElement, sourceRef: string) {
       const { outgoing, incoming } = await listUniversalLinksForEntity(ref);
       const withEndpoint = (entries: Awaited<ReturnType<typeof listUniversalLinksForEntity>>['outgoing']) =>
         entries
-          .map((entry) => (entry.endpoint ? { link: entry.link, endpoint: entry.endpoint } : null))
+          .map((entry) => (entry.endpoint ? {
+            // Present existing semantic links in the same chip list; preserve the
+            // stored relationship and link id for removal. New tags stay tagged_with.
+            link: options.includeRelationships?.includes(entry.link.relationship_type)
+              ? {...entry.link, relationship_type: 'tagged_with'} : entry.link,
+            endpoint: {...entry.endpoint, display_label: entry.endpoint.display_label?.trim() && entry.endpoint.display_label !== entry.endpoint.ref && entry.endpoint.display_label !== entry.endpoint.ref.split(':').pop()
+              ? entry.endpoint.display_label
+              : options.fallbackLabels?.[entry.endpoint.ref] || (options.includeRelationships && entry.endpoint.kind === 'task' ? 'Linked task' : entry.endpoint.display_label)}
+          } : null))
           .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
       return {
         outgoing: withEndpoint(outgoing),

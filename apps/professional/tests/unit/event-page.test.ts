@@ -20,7 +20,7 @@ vi.mock('@/api/events', () => ({
 }));
 vi.mock('@/views/events', () => ({
   renderEventNewView: vi.fn(async () => {}),
-  buildLearningTaskPanel: () => Object.assign(document.createElement('section'), { className: 'learning-stub' }),
+  buildEventConnections: () => Object.assign(document.createElement('section'), { className: 'connections-stub' }),
   buildPdFields: () => Object.assign(document.createElement('section'), { className: 'pd-fields-stub' })
 }));
 vi.mock('@/api/universal-links', () => ({
@@ -33,6 +33,7 @@ vi.mock('@/api/universal-links', () => ({
         { link: { id: 'g', source_ref: EVENT_REF, target_ref: `professional:pd_group:${GROUP_ID}`, relationship_type: 'in_pd_group', status: 'current' },
           endpoint: { ref: EVENT_REF, kind: 'event', display_label: 'Warlight 1', href: null }, direction: 'incoming' }
       ] }),
+  endUniversalLink: vi.fn(async () => ({})),
   createUniversalLink: vi.fn(async () => ({ link: { id: 'new' }, created: true }))
 }));
 vi.mock('@/api/pd-groups', () => ({
@@ -49,10 +50,11 @@ vi.mock('@/components/block-page', () => ({
 
 import { renderEventNewView } from '@/views/events';
 import { renderEventPage } from '@/views/event-page';
+import { createPdGroup } from '@/api/pd-groups';
 import { mountBlockPage } from '@/components/block-page';
 import { updateEvent, deleteEvent } from '@/api/events';
 import { createKnowledgeNote } from '@/api/knowledge-notes';
-import { createUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
+import { createUniversalLink, listUniversalLinksForEntity, endUniversalLink } from '@/api/universal-links';
 
 async function render() {
   const canvas = document.createElement('div');
@@ -88,12 +90,33 @@ describe('event page', () => {
   it('PD event shows the switch on, shape, series strip, talks and PD panels', async () => {
     const canvas = await render();
     expect(canvas.querySelector('[data-part="pd-switch"]')?.getAttribute('aria-checked')).toBe('true');
-    expect(canvas.querySelector<HTMLSelectElement>('[data-part="shape"] select.hub-select')?.value).toBe('series');
+    expect(canvas.querySelector<HTMLButtonElement>('[data-part="shape"] .morphing-popover__trigger')?.textContent).toBe('Series');
     expect(canvas.querySelector('[data-part="series"]')).not.toBeNull();
     expect(canvas.querySelector('[data-part="talks"]')?.textContent).toContain('Keynote · Reading against the grain');
     expect(canvas.querySelector('.pd-fields-stub')).not.toBeNull();
-    expect(canvas.querySelector('.learning-stub')).not.toBeNull();
+    expect(canvas.querySelector('.connections-stub')).not.toBeNull();
     expect(canvas.querySelector('.block-page-stub')).not.toBeNull();
+  });
+
+  it('uses the shared Connections section and record cards without a task creation panel or native format select', async () => {
+    const canvas = await render();
+    expect(canvas.querySelector('.connections-stub')).not.toBeNull();
+    expect(canvas.querySelector('[data-part="shape"] select')).toBeNull();
+    expect(canvas.querySelector('.task-link-panel')).toBeNull();
+    expect(canvas.querySelector('[data-part="talks"]')?.classList.contains('card')).toBe(true);
+    expect(canvas.querySelector('.event-page__notes')?.classList.contains('card')).toBe(true);
+  });
+
+  it('stages a format choice and writes only when Save is pressed', async () => {
+    const canvas = await render();
+    const writes = vi.mocked(createPdGroup).mock.calls.length;
+    canvas.querySelector<HTMLButtonElement>('[data-part="shape"] button')!.click();
+    document.querySelector<HTMLButtonElement>('[role="radio"][data-value="program"]')!.click();
+    expect(vi.mocked(createPdGroup).mock.calls.length).toBe(writes);
+    const save = [...document.querySelectorAll<HTMLButtonElement>('.morphing-popover__actions button')].find(button => button.textContent === 'Save')!;
+    save.click();
+    await vi.waitFor(() => expect(createPdGroup).toHaveBeenCalledWith({shape:'program', title:base.title}));
+    await vi.waitFor(() => expect(endUniversalLink).toHaveBeenCalledWith('g'));
   });
 
   it('turning PD off makes it a general event and hides the PD panels', async () => {

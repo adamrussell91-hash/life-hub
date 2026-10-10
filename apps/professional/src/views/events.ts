@@ -7,8 +7,6 @@ import {
   eventStateAction,
   getEvent,
   isEventIncompleteLinksError,
-  isEventTaskLinkIncompleteError,
-  linkEventTask,
   listEvents,
   retryEventLinks,
   retryEventTaskLink,
@@ -24,10 +22,9 @@ import { renderScheduleDbPage } from '@/components/schedule-db-page';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { utcIsoToWallLocal, wallLocalToUtcIso, isValidTimeZone } from '@/lib/wall-time';
 import { isPriorityArea, PRIORITY_AREAS, priorityAreaName, splitEventLabels } from '@/domain/priority-area';
-import { loadEntityRelationships, mountKnowledgePagePicker, mountTaskLinkPanel } from '@/components/schedule-relationships';
+import { loadEntityRelationships, mountKnowledgePagePicker } from '@/components/schedule-relationships';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
-import { clareTaskTitle } from '@/api/clare-comms';
-import { blockPlainText } from '@/lib/inline-promises';
+import { createAutoRetry } from '@/lib/auto-retry';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -919,36 +916,36 @@ export function buildPdFields(record: EventRecord, onSaved: (next: EventRecord) 
   return evidence;
 }
 
-export function buildLearningTaskPanel(record: EventRecord, reload: () => Promise<void>): HTMLElement {
-  const host = el('div', 'event-detail__task-host');
-  mountTaskLinkPanel({
-    host,
-    heading: 'Learning task',
-    relationshipType: 'learning_for',
-    incompleteOperationId:
-      record.learning_operation?.status === 'incomplete' ? record.learning_operation.operation_id : null,
-    statusMessage:
-      record.learning_operation?.status === 'committed'
-        ? `Learning Task ${record.learning_operation.task_id}`
-        : null,
-    suggestTitle: () => clareTaskTitle({ title: record.title, notes: blockPlainText(record.blocks ?? []) }).then((out) => out.title),
-    onSubmit: async (input) => {
-      try {
-        await linkEventTask(record.id, { relationship_type: 'learning_for', ...input });
-        await reload();
-      } catch (err) {
-        if (isEventTaskLinkIncompleteError(err)) {
-          await reload();
-          return;
-        }
-        throw err;
-      }
-    },
-    onRetry: async (operationId) => {
-      await retryEventTaskLink(record.id, operationId);
-      await reload();
-    }
+export function buildEventConnections(record: EventRecord, reload: () => Promise<void>): HTMLElement {
+  const host = el('section', 'card event-page__connections');
+  const operation = record.learning_operation;
+  const fallbackLabels: Record<string, string> = {};
+  if (operation?.task_id && operation.title && operation.title !== operation.task_id) fallbackLabels[`tasks:task:${operation.task_id}`] = operation.title;
+  mountTagAnythingSection(host, `professional:event:${record.id}`, {
+    includeRelationships: ['learning_for'], fallbackLabels
   });
+  // Keep recovery of an already-created task link without exposing another
+  // task creation form or internal operation ids.
+  if (operation?.status === 'incomplete') {
+    const status = el('p', 'task-link-panel__state', 'Linking task…');
+    status.setAttribute('role', 'status');
+    const tryNow = el('button', 'btn btn--ghost', 'Try now');
+    tryNow.type = 'button';
+    tryNow.hidden = true;
+    const retry = createAutoRetry({
+      run: async () => {
+        if (!host.isConnected) { retry.stop(); return; }
+        await retryEventTaskLink(record.id, operation.operation_id);
+        await reload();
+      },
+      onState: (state) => {
+        status.textContent = state === 'linked' ? 'Task linked.' : state === 'stuck' ? 'Task link is still pending.' : 'Linking task…';
+        tryNow.hidden = state !== 'stuck';
+      }
+    });
+    tryNow.addEventListener('click', () => void retry.tryNow());
+    host.append(status, tryNow);
+  }
   return host;
 }
 
@@ -1154,7 +1151,6 @@ export async function renderEventDetailView(
     const linkedHost = el('div', 'event-detail__linked-host');
     linkedHost.append(el('p', 'event-detail__kicker', 'Knowledge'), el('p', undefined, 'Loading…'));
     purposeCard.append(linkedHost);
-    purposeCard.append(buildLearningTaskPanel(record, load));
 
     const whoCard = el('section', 'event-detail__card');
     whoCard.append(el('h2', 'event-detail__section-title', 'Who'));
@@ -1165,8 +1161,7 @@ export async function renderEventDetailView(
     const columns = el('div', 'event-detail__columns');
     columns.append(purposeCard, whoCard);
 
-    const tagCard = el('section', 'event-detail__card');
-    mountTagAnythingSection(tagCard, `professional:event:${record.id}`);
+    const tagCard = buildEventConnections(record, load);
 
     root.append(actionStatus, session, columns, tagCard);
     canvas.append(root);
