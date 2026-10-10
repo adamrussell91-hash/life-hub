@@ -2,6 +2,7 @@ export interface RenderToolbarOptions {
   title: string;
   onChapter: () => void;
   onImportPhotos?: () => void;
+  onSearchJournal?: () => void;
   onAddMoment?: () => void;
   onTrash?: () => void;
 }
@@ -42,7 +43,7 @@ export function renderToolbar(options: RenderToolbarOptions): HTMLElement {
 
   const menuItems: { label: string; action?: () => void; disabled?: boolean }[] = [
     { label: 'Import photos', action: options.onImportPhotos, disabled: !options.onImportPhotos },
-    { label: 'Search journal', disabled: true },
+    { label: 'Search journal', action: options.onSearchJournal, disabled: !options.onSearchJournal },
     { label: 'Pattern appearance', disabled: true },
     { label: 'Export', disabled: true },
     { label: 'Trash', action: options.onTrash, disabled: !options.onTrash },

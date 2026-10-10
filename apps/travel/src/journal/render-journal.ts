@@ -16,6 +16,7 @@ import { renderMomentArticle } from '@/journal/render-moment';
 import { createDayMapPreview } from '@/journal/map-preview';
 import { getActiveJournalDayMap } from '@/journal/map-expanded';
 import { openTrashView } from '@/journal/trash-view';
+import { openJournalSearch } from '@/journal/search-sheet';
 
 const LAST_VIEW_KEY = (tripId: string) => `lifehub.travel.journal.lastView.${tripId}`;
 
@@ -133,6 +134,7 @@ export function renderJournal(
   let captureOverlay: { destroy(): void } | null = null;
   let dayMapOverlay: { destroy(): void } | null = null;
   let trashOverlay: { destroy(): void } | null = null;
+  let searchOverlay: { destroy(): void } | null = null;
 
   let liveFixture: JournalFixture = opts.fixture;
   let liveVersion = opts.journalVersion ?? 'fixture';
@@ -204,6 +206,20 @@ export function renderJournal(
     onAddMoment: () => openCapture(),
     onImportPhotos: () => {
       openImport();
+    },
+    onSearchJournal: () => {
+      searchOverlay?.destroy();
+      searchOverlay = openJournalSearch({
+        journal: journalDoc(),
+        anchor: root,
+        onSelect: (id) => {
+          scrollToChapter(id, root, opts.onChapterJump);
+        },
+        onClose: () => {
+          searchOverlay = null;
+        },
+      });
+      cleanups.push(() => searchOverlay?.destroy());
     },
     onTrash: () => {
       trashOverlay?.destroy();

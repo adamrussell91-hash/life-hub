@@ -667,6 +667,43 @@
   font-size: var(--text-sm);
 }
 
+.journal-search__head {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.journal-search__clear {
+  min-height: 44px;
+  flex-shrink: 0;
+}
+
+.journal-search__status {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.journal-search__row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  text-align: left;
+}
+
+.journal-search__kind {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.journal-search__label {
+  font-size: var(--text-base);
+  color: var(--ink);
+}
+
 .journal-toolbar__actions {
   display: flex;
   gap: var(--space-2);
