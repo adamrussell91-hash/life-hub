@@ -14,7 +14,7 @@ import { IDENTITY_SCHEMA_VERSION } from '../../netlify/functions/_shared/identit
 import { formatEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
 import { resolveEntity } from '../../netlify/functions/_shared/entity-resolvers.mjs';
 import { personKey, organisationKey, getJSON } from '../../netlify/functions/_shared/universal-link-blobs.mjs';
-import { eventKey, getJSON as getProfessionalJSON, setJSON } from '../../netlify/functions/_shared/professional-blobs.mjs';
+import { eventKey, getJSON as getProfessionalJSON } from '../../netlify/functions/_shared/professional-blobs.mjs';
 import { STUDENT_ORIGINAL_CATEGORY } from '../../netlify/functions/_shared/github-professional-data.mjs';
 import { projectNotionPdEvent } from '../../netlify/functions/_shared/notion-pd-events.mjs';
 import { createAccessContext } from '../../netlify/functions/_shared/entity-access.mjs';
