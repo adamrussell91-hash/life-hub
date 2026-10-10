@@ -1,9 +1,9 @@
-import { getEvent, updateEvent } from '@/api/events';
+import { getEvent, updateEvent, deleteEvent } from '@/api/events';
 import { createUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
 import { createPdGroup, getPdGroup } from '@/api/pd-groups';
 import { createKnowledgeNote } from '@/api/knowledge-notes';
 import { mountBlockPage } from '@/components/block-page';
-import { buildLearningTaskPanel, buildPdFields } from '@/views/events';
+import { buildLearningTaskPanel, buildPdFields, renderEventNewView } from '@/views/events';
 import { groupTotals, talkHoursNote } from '@/lib/pd-totals';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import type { EventRecord, EventTalk, PdGroupRecord } from '@/domain/types';
@@ -71,7 +71,6 @@ export async function renderEventPage(
 
   const root = el('div', 'event-page');
   const isPd = data.record.event_type === PD;
-  const imported = data.record.source === 'notion';
   root.dataset.pd = String(isPd);
 
   const toggleRow = el('div', 'pd-toggle');
@@ -81,27 +80,76 @@ export async function renderEventPage(
   toggle.setAttribute('aria-checked', String(isPd));
   toggle.setAttribute('aria-label', 'Counts as PD');
   toggle.dataset.part = 'pd-switch';
-  if (!imported) {
-    toggle.addEventListener('click', async () => {
+  toggle.addEventListener('click', async () => {
       toggle.disabled = true;
       await updateEvent(id, { event_type: isPd ? 'general' : PD });
       await rerender();
     });
-  } else {
-    toggle.disabled = true;
-  }
   toggleRow.append(toggle, el('b', undefined, 'Counts as PD'),
-    el('span', 'muted', imported
-      ? 'Brought across from your Notion PD list. Hours stay blank until you log them.'
-      : isPd ? 'Feeds the PD dashboard' : 'Off. No hours or evidence.'));
+    el('span', 'muted', isPd ? 'Feeds the PD dashboard' : 'Off. No hours or evidence.'));
   root.append(toggleRow);
+  const edit = el('button', 'btn btn--secondary', 'Edit event');
+  edit.type = 'button';
+  edit.dataset.part = 'edit-event';
+  edit.addEventListener('click', () => void renderEventNewView(canvas, {
+    draft: {
+      title: data.record.title, start: data.record.start, end: data.record.end,
+      timeZone: data.record.time_zone, allDay: data.record.all_day,
+      location: data.record.location_text, hours: data.record.hours,
+      accreditation: data.record.accreditation_category, priorityArea: data.record.priority_area,
+      certificate: data.record.certificate
+    },
+    onCancel: () => void rerender(),
+    onSave: async (payload) => {
+      await updateEvent(id, {
+        title: payload.title, location_text: payload.location, all_day: payload.allDay,
+        hours: payload.hours, accreditation_category: payload.accreditation,
+        priority_area: payload.priorityArea, certificate: payload.certificate,
+        start: payload.startIso, end: payload.endIso, time_zone: payload.timeZone
+      });
+      for (const link of payload.pendingLinks) await createUniversalLink({ source_ref: eventRef, ...link });
+      await rerender();
+    }
+  }));
+  root.append(edit);
+  const remove = el('button', 'btn btn--ghost', 'Delete event');
+  remove.type = 'button';
+  remove.dataset.part = 'delete-event';
+  const confirmation = el('section', 'confirm-card');
+  confirmation.hidden = true;
+  confirmation.style.display = 'none';
+  confirmation.setAttribute('aria-label', 'Delete event');
+  confirmation.append(el('h3', undefined, 'Delete this event?'),
+    el('p', undefined, 'This removes the event from Professional Hub and the calendar. Linked Knowledge notes stay in Knowledge.'));
+  const actions = el('div', 'confirm-card__actions');
+  const discard = el('button', 'btn btn--ghost', 'Keep event');
+  discard.type = 'button';
+  discard.addEventListener('click', () => { confirmation.hidden = true; confirmation.style.display = 'none'; remove.focus(); });
+  const confirm = el('button', 'btn btn--primary', 'Delete event');
+  confirm.type = 'button';
+  confirm.dataset.part = 'confirm-delete';
+  const status = el('p', 'event-form__status');
+  status.setAttribute('role', 'status');
+  confirm.addEventListener('click', async () => {
+    confirm.disabled = true;
+    status.textContent = '';
+    try {
+      await deleteEvent(id);
+      window.location.hash = '#/events';
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : 'Could not delete the event. Try again.';
+      confirm.disabled = false;
+    }
+  });
+  remove.addEventListener('click', () => { confirmation.hidden = false; confirmation.style.removeProperty('display'); discard.focus(); });
+  actions.append(discard, confirm);
+  confirmation.append(actions, status);
+  root.append(remove, confirmation);
 
   if (isPd) {
-    if (!imported) root.append(shapePicker());
+    root.append(shapePicker());
     root.append(talksCard());
-    if (!imported) {
-      root.append(buildPdFields(data.record, (next) => { data.record = next; }), buildLearningTaskPanel(data.record, rerender));
-    }
+    root.append(buildPdFields(data.record, (next) => { data.record = next; }), buildLearningTaskPanel(data.record, rerender));
     if (data.group) root.append(seriesStrip(data.group));
   }
 
@@ -112,7 +160,7 @@ export async function renderEventPage(
   root.append(notes);
   mountBlockPage(body, {
     blocks: (data.record.blocks ?? []) as never[],
-    editable: !imported,
+    editable: true,
     onSave: async (blocks) => {
       data.record = (await updateEvent(id, { blocks })).event;
     }
@@ -138,6 +186,7 @@ export async function renderEventPage(
       button.append(el('b', undefined, label), el('small', undefined, help));
       button.addEventListener('click', async () => {
         if (value === currentShape || value === 'one_off') return;
+        await updateEvent(id, { event_type: data.record.event_type });
         const { group: created } = await createPdGroup({ shape: value as 'series' | 'program', title: data.record.title });
         await createUniversalLink({ source_ref: eventRef, target_ref: `professional:pd_group:${created.id}`, relationship_type: 'in_pd_group' });
         await rerender();
@@ -204,7 +253,7 @@ export async function renderEventPage(
       data.record = (await updateEvent(id, { talks })).event;
       await rerender();
     });
-    if (!imported) card.append(form);
+    card.append(form);
     return card;
   }
 
@@ -217,12 +266,13 @@ export async function renderEventPage(
       const link = el('a', 'kn', '✓ Knowledge note') as HTMLAnchorElement;
       if (href) link.href = href;
       row.append(link);
-    } else if (!imported) {
+    } else {
       const make = el('button', 'kn is-draft', '＋ Make note') as HTMLButtonElement;
       make.type = 'button';
       make.dataset.talkNote = talk.id;
       make.addEventListener('click', async () => {
         make.disabled = true;
+        await updateEvent(id, { event_type: data.record.event_type });
         const page = await createKnowledgeNote({
           title: talk.title,
           body: [talk.presenter, data.record.title, data.record.location_text].filter(Boolean).join(' · '),

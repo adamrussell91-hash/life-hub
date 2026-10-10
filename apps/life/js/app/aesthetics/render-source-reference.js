@@ -130,7 +130,7 @@ export function renderSourceReference(doc) {
         body.append(notes);
       }
       const provenance = el('p', null, 'aes-meta');
-      provenance.append(link('Open original Notion record', p.url), ` · Last edited ${formatDisplayDate(record.lastEditedAt)}`);
+      provenance.textContent = `Last edited ${formatDisplayDate(record.lastEditedAt)}`;
       provenance.title = record.lastEditedAt;
       body.append(provenance);
       details.append(summary, body);
@@ -140,7 +140,7 @@ export function renderSourceReference(doc) {
   const style = doc.querySelector('#aes-style-notes');
   if (style) {
     const source = el('p', null, 'aes-meta');
-    source.append(`${formatDisplayDate(STYLE_NOTE.date)} · `, link('Open original style note', STYLE_NOTE.sourceUrl));
+    source.textContent = formatDisplayDate(STYLE_NOTE.date);
     style.replaceChildren(source);
     for (const section of STYLE_NOTE.summary.split(/(?=^### )/m).filter(s => s.trim())) {
       const [heading, ...lines] = section.split('\n');
