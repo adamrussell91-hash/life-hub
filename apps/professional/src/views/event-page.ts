@@ -1,10 +1,11 @@
+import { createMorphingClosedFieldPopover } from '../../design-kit/js/morphing-popover.js';
 import { eventOptions } from '@/components/event-options';
 import { getEvent, updateEvent, deleteEvent } from '@/api/events';
 import { createUniversalLink, listUniversalLinksForEntity, endUniversalLink } from '@/api/universal-links';
 import { createPdGroup, getPdGroup } from '@/api/pd-groups';
 import { createKnowledgeNote } from '@/api/knowledge-notes';
 import { mountBlockPage } from '@/components/block-page';
-import { buildLearningTaskPanel, buildPdFields, renderEventNewView } from '@/views/events';
+import { buildEventTaskPanel, buildEventConnections, buildPdFields, renderEventNewView } from '@/views/events';
 import { groupTotals, talkHoursNote } from '@/lib/pd-totals';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import type { EventRecord, EventTalk, PdGroupRecord } from '@/domain/types';
@@ -79,7 +80,8 @@ export async function renderEventPage(
   const isPd = data.record.event_type === PD;
   root.dataset.pd = String(isPd);
 
-  const toggleRow = el('div', 'pd-toggle');
+  const settings = el('div', 'event-page__settings');
+  const toggleRow = el('div', 'event-page__pd');
   const toggle = el('button', 'switch') as HTMLButtonElement;
   toggle.type = 'button';
   toggle.setAttribute('role', 'switch');
@@ -91,9 +93,9 @@ export async function renderEventPage(
       await updateEvent(id, { event_type: isPd ? 'general' : PD });
       await rerender();
     });
-  toggleRow.append(toggle, el('b', undefined, 'Counts as PD'),
-    el('span', 'muted', isPd ? 'Feeds the PD dashboard' : 'Off. No hours or evidence.'));
-  root.append(toggleRow);
+  toggleRow.append(toggle, el('span', undefined, 'Counts as PD'));
+  settings.append(toggleRow);
+  root.append(settings);
   const editEvent = () => {
     if (!options.isCurrent()) return;
     options.onActionsReady?.(el('div'));
@@ -153,19 +155,25 @@ export async function renderEventPage(
   root.append(confirmation);
 
   let relationsReady = false;
+  let formatPicker: ReturnType<typeof createMorphingClosedFieldPopover> | null = null;
   const shapeHost = el('div');
   const seriesHost = el('div');
   const relatedStatus = el('div', 'canvas-status', 'Loading linked records…');
   relatedStatus.setAttribute('role', 'status');
   if (isPd) {
     shapeHost.append(shapePicker());
-    root.append(shapeHost);
+    settings.append(shapeHost);
     root.append(talksCard());
-    root.append(buildPdFields(data.record, (next) => { data.record = next; }), buildLearningTaskPanel(data.record, rerender));
+    const evidence = el('section', 'card');
+    evidence.append(buildPdFields(data.record, (next) => { data.record = next; }));
+    root.append(evidence);
     root.append(seriesHost);
   }
 
-  const notes = el('section', 'event-page__notes');
+  const links = el('div', 'event-page__links');
+  links.append(buildEventTaskPanel(data.record, rerender), buildEventConnections(data.record, rerender));
+  root.append(links);
+  const notes = el('section', 'card event-page__notes');
   notes.append(el('h3', undefined, isPd ? 'Reflection and notes' : 'Notes'));
   const body = el('div');
   notes.append(body);
@@ -178,6 +186,12 @@ export async function renderEventPage(
     }
   });
   canvas.replaceChildren(root);
+  const removal = new MutationObserver(() => {
+    if (canvas.contains(root)) return;
+    formatPicker?.destroy();
+    removal.disconnect();
+  });
+  removal.observe(canvas, {childList:true});
   await enrich();
 
   async function enrich(): Promise<void> {
@@ -210,23 +224,25 @@ export async function renderEventPage(
   }
 
   function shapePicker(): HTMLElement {
-    const field = el('div', 'hub-field event-page__format');
+    const field = el('div', 'event-page__format');
     field.dataset.part = 'shape';
-    const label = el('label', 'hub-label', 'Event format');
-    const select = el('select', 'hub-select');
-    select.id = `event-format-${id}`; label.htmlFor = select.id;
-    select.disabled = !relationsReady;
     const currentShape = data.group?.shape ?? 'one_off';
-    for (const [value, name] of [['one_off', 'One-off'], ['series', 'Series'], ['program', 'Program']]) {
-      const option = el('option', undefined, name); option.value = value!; select.append(option);
-    }
-    select.value = currentShape;
     const error = el('p', 'hub-field__error');
     error.setAttribute('role', 'status');
-    select.addEventListener('change', async () => {
-      const value = select.value;
-      if (value === currentShape) return;
-      select.disabled = true;
+    formatPicker?.destroy();
+    const picker = createMorphingClosedFieldPopover({
+      root: document, title: 'Event format', supporting: '', value: currentShape, className: 'event-format-editor',
+      options: [{value:'one_off',label:'One-off'}, {value:'series',label:'Series'}, {value:'program',label:'Program'}],
+      onSave: (value) => { void saveFormat(value); }
+    });
+    picker.content.classList.add('event-format-editor');
+    formatPicker = picker;
+    const trigger = picker.trigger;
+    trigger.setAttribute('aria-label', 'Event format');
+    trigger.disabled = !relationsReady;
+    async function saveFormat(value: string): Promise<void> {
+      if (value === currentShape || !options.isCurrent()) return;
+      trigger.disabled = true;
       try {
         if (value !== 'one_off') {
           const {group} = await createPdGroup({shape:value as 'series' | 'program', title:data.record.title});
@@ -235,17 +251,18 @@ export async function renderEventPage(
         if (data.groupLinkId) await endUniversalLink(data.groupLinkId);
         await rerender();
       } catch (err) {
+        if (!options.isCurrent()) return;
         error.textContent = err instanceof Error ? err.message : 'Could not change the event format.';
-        select.value = currentShape; select.disabled = false;
+        picker.setValue(currentShape); trigger.disabled = false;
       }
-    });
-    field.append(label, select, error);
+    }
+    field.append(el('span', 'event-detail__kicker', 'Event format'), picker.el, error);
     return field;
   }
 
   function seriesStrip(group: PdGroupRecord): HTMLElement {
     const totals = groupTotals(data.members);
-    const card = el('section', 'hub-card');
+    const card = el('section', 'card');
     card.dataset.part = 'series';
     const title = el('h3', undefined, `${group.shape === 'series' ? 'The series' : 'The program'} · ${totals.hoursDone}/${totals.hoursTotal} h`);
     const open = el('a', 'btn btn--ghost', 'Open') as HTMLAnchorElement;
@@ -267,7 +284,7 @@ export async function renderEventPage(
   }
 
   function talksCard(): HTMLElement {
-    const card = el('section', 'hub-card');
+    const card = el('section', 'card');
     card.dataset.part = 'talks';
     card.append(el('h3', undefined, 'Talks and activities'));
     const list = el('div', 'prog');

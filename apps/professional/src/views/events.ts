@@ -7,11 +7,11 @@ import {
   eventStateAction,
   getEvent,
   isEventIncompleteLinksError,
-  isEventTaskLinkIncompleteError,
-  linkEventTask,
   listEvents,
   retryEventLinks,
   retryEventTaskLink,
+  linkEventTask,
+  isEventTaskLinkIncompleteError,
   updateEvent,
   type EventLinkInput
 } from '@/api/events';
@@ -26,8 +26,6 @@ import { utcIsoToWallLocal, wallLocalToUtcIso, isValidTimeZone } from '@/lib/wal
 import { isPriorityArea, PRIORITY_AREAS, priorityAreaName, splitEventLabels } from '@/domain/priority-area';
 import { loadEntityRelationships, mountKnowledgePagePicker, mountTaskLinkPanel } from '@/components/schedule-relationships';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
-import { clareTaskTitle } from '@/api/clare-comms';
-import { blockPlainText } from '@/lib/inline-promises';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -919,36 +917,48 @@ export function buildPdFields(record: EventRecord, onSaved: (next: EventRecord) 
   return evidence;
 }
 
-export function buildLearningTaskPanel(record: EventRecord, reload: () => Promise<void>): HTMLElement {
-  const host = el('div', 'event-detail__task-host');
-  mountTaskLinkPanel({
-    host,
-    heading: 'Learning task',
-    relationshipType: 'learning_for',
-    incompleteOperationId:
-      record.learning_operation?.status === 'incomplete' ? record.learning_operation.operation_id : null,
-    statusMessage:
-      record.learning_operation?.status === 'committed'
-        ? `Learning Task ${record.learning_operation.task_id}`
-        : null,
-    suggestTitle: () => clareTaskTitle({ title: record.title, notes: blockPlainText(record.blocks ?? []) }).then((out) => out.title),
-    onSubmit: async (input) => {
-      try {
-        await linkEventTask(record.id, { relationship_type: 'learning_for', ...input });
-        await reload();
-      } catch (err) {
-        if (isEventTaskLinkIncompleteError(err)) {
+export function buildEventConnections(record: EventRecord, _reload: () => Promise<void>): HTMLElement {
+  const host = el('section', 'card event-page__connections');
+  mountTagAnythingSection(host, `professional:event:${record.id}`);
+  return host;
+}
+
+export function buildEventTaskPanel(record: EventRecord, reload: () => Promise<void>): HTMLElement {
+  const host = el('section', 'card event-page__tasks');
+  const load = async () => {
+    const loading = el('p', 'muted', 'Loading linked tasks…');
+    loading.setAttribute('role', 'status');
+    host.replaceChildren(el('h3', undefined, 'Follow-up tasks'), loading);
+    try {
+      const entries = await loadEntityRelationships(`professional:event:${record.id}`);
+      if (!host.contains(loading)) return;
+      const linkedOperations = entries.filter(entry => entry.link.relationship_type === 'learning_for' && entry.endpoint?.kind === 'task').map(entry => {
+        const endpoint = entry.endpoint!;
+        const taskId = endpoint.ref.replace(/^tasks:task:/, '');
+        const label = endpoint.display_label?.trim();
+        return {operation_id: entry.link.id, status: 'committed', task_id: taskId,
+          title: label && label !== endpoint.ref && label !== taskId ? label : 'Linked task'};
+      });
+      host.replaceChildren();
+      mountTaskLinkPanel({
+        host, heading: 'Follow-up tasks', relationshipType: 'learning_for', linkedOperations,
+        incompleteOperationId: record.learning_operation?.status === 'incomplete' ? record.learning_operation.operation_id : null,
+        onSubmit: async input => {
+          try { await linkEventTask(record.id, {relationship_type: 'learning_for', ...input}); }
+          catch (error) { if (!isEventTaskLinkIncompleteError(error)) throw error; }
           await reload();
-          return;
-        }
-        throw err;
-      }
-    },
-    onRetry: async (operationId) => {
-      await retryEventTaskLink(record.id, operationId);
-      await reload();
+        },
+        onRetry: async operationId => { await retryEventTaskLink(record.id, operationId); await reload(); }
+      });
+    } catch {
+      if (!host.contains(loading)) return;
+      const retry = el('button', 'btn btn--secondary', 'Try again');
+      retry.type = 'button';
+      retry.addEventListener('click', () => void load());
+      host.replaceChildren(el('h3', undefined, 'Follow-up tasks'), el('p', 'muted', 'Could not load linked tasks.'), retry);
     }
-  });
+  };
+  void load();
   return host;
 }
 
@@ -1154,7 +1164,6 @@ export async function renderEventDetailView(
     const linkedHost = el('div', 'event-detail__linked-host');
     linkedHost.append(el('p', 'event-detail__kicker', 'Knowledge'), el('p', undefined, 'Loading…'));
     purposeCard.append(linkedHost);
-    purposeCard.append(buildLearningTaskPanel(record, load));
 
     const whoCard = el('section', 'event-detail__card');
     whoCard.append(el('h2', 'event-detail__section-title', 'Who'));
@@ -1165,8 +1174,7 @@ export async function renderEventDetailView(
     const columns = el('div', 'event-detail__columns');
     columns.append(purposeCard, whoCard);
 
-    const tagCard = el('section', 'event-detail__card');
-    mountTagAnythingSection(tagCard, `professional:event:${record.id}`);
+    const tagCard = buildEventConnections(record, load);
 
     root.append(actionStatus, session, columns, tagCard);
     canvas.append(root);

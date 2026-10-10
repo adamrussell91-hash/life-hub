@@ -1,5 +1,5 @@
-import { clearEventReadCache } from '@/api/client';
-beforeEach(() => clearEventReadCache());
+import { clearScheduleReadCache } from '@/api/client';
+beforeEach(() => clearScheduleReadCache());
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderMeetingsView, renderMeetingNewView } from '@/views/meetings';
 import { renderEventDetailView, renderEventNewView, renderEventsView } from '@/views/events';
@@ -739,7 +739,7 @@ describe('renderEventNewView', () => {
         data: { events: [{ accreditation_category: 'Course', priority_area: 'Literacy' }] }
       })
     );
-    clearEventReadCache();
+    clearScheduleReadCache();
     await renderEventNewView(added, {
       onSave: async (payload) => {
         addedSaved.push({ accreditation: payload.accreditation, priorityArea: payload.priorityArea });
