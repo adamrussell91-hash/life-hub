@@ -116,6 +116,14 @@ These support deriving Grove without a new game-state store. They do not establi
 - How does a completed book map into the owl milestone? A finished task is not necessarily a finished book.
 - Exact animal milestone definitions, maturation duration and default species mapping.
 
+## Build decisions (10 October 2026)
+
+- Grove's engine lives in Tasks (`#/grove`). The Life Hub dashboard shows today's clearing at the bottom of Home and links into it.
+- Reeds and lily pads are the one Kenney exception: Adam asked for them back for water edges. They are recoloured to Grove greens.
+- Health's birch keeps the MegaKit mesh with its autumn-orange leaves hue-shifted to a light spring green.
+- Bought (non-CC0) packs are allowed. Commit only optimised `.glb` files, never the original FBX/Blender/Unity sources.
+- The plan logic is `apps/tasks/src/domain/grove/plan.ts`; it uses the mature mesh for every stage and scales it.
+
 ## History
 
 - **2026-10-10:** Captured Adam's Grove concept and linked the collected raw ingredients. This is separate from Life City; its terrain does not inherit Life City's harbour, district or transit rules.
