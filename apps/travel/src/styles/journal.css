@@ -1073,3 +1073,35 @@ html.vv-keyboard-open .sheet.addform.journal-move-sheet {
     border-radius: var(--radius-lg);
   }
 }
+
+.journal-trash__list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.journal-trash__card {
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.journal-trash__title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.journal-trash__meta {
+  margin: var(--space-1) 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.journal-trash__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.journal-trash__actions .btn {
+  min-height: 2.75rem;
+}

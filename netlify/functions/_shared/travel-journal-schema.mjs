@@ -1,5 +1,6 @@
 import { DATE_RE, TIME_RE } from './travel-schema.mjs';
 import { isJournalMediaKey } from './travel-journal-r2.mjs';
+import { isDeletedRecord, withoutDeleted } from './record-liveness.mjs';
 
 const LOCATION_SOURCES = new Set(['exif', 'inferred', 'manual']);
 const LIFECYCLES = new Set(['live', 'deleted', 'archived']);
@@ -295,4 +296,18 @@ export function validateJournal(doc) {
   return doc;
 }
 
-export { LOCATION_SOURCES, LIFECYCLES };
+/** Normal client GET: drop deleted journal rows; archived and live remain. */
+export function stripDeletedFromJournal(journal) {
+  if (!journal || typeof journal !== 'object') return journal;
+  if (isDeletedRecord(journal)) return journal;
+  return {
+    ...journal,
+    legs: withoutDeleted(journal.legs),
+    days: withoutDeleted(journal.days),
+    moments: withoutDeleted(journal.moments),
+    media: withoutDeleted(journal.media),
+    transitions: withoutDeleted(journal.transitions)
+  };
+}
+
+export { LOCATION_SOURCES, LIFECYCLES, isDeletedRecord, withoutDeleted };

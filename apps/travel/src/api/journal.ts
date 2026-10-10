@@ -39,8 +39,9 @@ export function emptyJournalDocument(tripId: string): JournalDocument {
   };
 }
 
-export function getJournal(tripId: string): Promise<JournalEnvelope> {
-  return apiGet(`/api/travel-journal?trip=${encodeURIComponent(tripId)}`);
+export function getJournal(tripId: string, opts?: { trash?: boolean }): Promise<JournalEnvelope> {
+  const trash = opts?.trash ? '&trash=1' : '';
+  return apiGet(`/api/travel-journal?trip=${encodeURIComponent(tripId)}${trash}`);
 }
 
 export function saveJournal(

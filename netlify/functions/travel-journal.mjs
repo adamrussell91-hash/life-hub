@@ -6,7 +6,7 @@ import {
   PRIVATE_CACHE
 } from './_shared/travel-http.mjs';
 import { createTravelJournalRepository } from './_shared/travel-journal-repository.mjs';
-import { validateJournal } from './_shared/travel-journal-schema.mjs';
+import { stripDeletedFromJournal, validateJournal } from './_shared/travel-journal-schema.mjs';
 
 export const config = { path: '/api/travel-journal' };
 
@@ -28,7 +28,10 @@ export function createTravelJournalHandler(deps = {}) {
 
     if (request.method === 'GET') {
       const { journal, version } = await ctx.repo.getJournal(tripId);
-      return okResponse(200, { journal, version }, PRIVATE_CACHE);
+      const includeDeleted =
+        url.searchParams.get('trash') === '1' || url.searchParams.get('include_deleted') === '1';
+      const payload = includeDeleted ? journal : stripDeletedFromJournal(journal);
+      return okResponse(200, { journal: payload, version }, PRIVATE_CACHE);
     }
 
     if (request.method === 'PUT') {

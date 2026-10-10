@@ -81,7 +81,7 @@ export function buildMomentMenuItems(
       action: 'delete',
       label: 'Delete',
       disabled: !live,
-      title: live ? 'Delete this moment (coming in Task 5)' : 'Already deleted',
+      title: live ? 'Delete this moment' : 'Already deleted',
     },
   ];
 

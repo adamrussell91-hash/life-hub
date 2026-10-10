@@ -13,6 +13,7 @@ import type { JournalDocument } from '@/api/journal';
 import { renderMomentArticle } from '@/journal/render-moment';
 import { createDayMapPreview } from '@/journal/map-preview';
 import { getActiveJournalDayMap } from '@/journal/map-expanded';
+import { openTrashView } from '@/journal/trash-view';
 
 const LAST_VIEW_KEY = (tripId: string) => `lifehub.travel.journal.lastView.${tripId}`;
 
@@ -170,6 +171,7 @@ export function renderJournal(
   let importOverlay: { destroy(): void } | null = null;
   let captureOverlay: { destroy(): void } | null = null;
   let dayMapOverlay: { destroy(): void } | null = null;
+  let trashOverlay: { destroy(): void } | null = null;
 
   let liveFixture: JournalFixture = opts.fixture;
   let liveVersion = opts.journalVersion ?? 'fixture';
@@ -239,6 +241,20 @@ export function renderJournal(
     onAddMoment: () => openCapture(),
     onImportPhotos: () => {
       openImport();
+    },
+    onTrash: () => {
+      trashOverlay?.destroy();
+      trashOverlay = openTrashView({
+        tripId: liveFixture.trip_id,
+        journal: journalDoc(),
+        version: liveVersion,
+        anchor: root,
+        onSaved: onJournalSaved,
+        onClose: () => {
+          trashOverlay = null;
+        },
+      });
+      cleanups.push(() => trashOverlay?.destroy());
     },
     onChapter: () => {
       chapterOverlay?.destroy();
@@ -317,7 +333,9 @@ export function renderJournal(
       return;
     }
 
-    const legs = [...liveFixture.legs].sort((a, b) => a.order - b.order);
+    const legs = [...liveFixture.legs]
+      .filter((l) => l.lifecycle === 'live')
+      .sort((a, b) => a.order - b.order);
 
   for (const leg of legs) {
     const legSection = document.createElement('section');
@@ -334,7 +352,7 @@ export function renderJournal(
     legSection.append(title);
 
     const days = liveFixture.days
-      .filter((d) => d.leg_id === leg.id)
+      .filter((d) => d.leg_id === leg.id && d.lifecycle === 'live')
       .sort((a, b) => a.local_date.localeCompare(b.local_date));
 
     for (const day of days) {
@@ -349,7 +367,12 @@ export function renderJournal(
       daySection.append(dayHeading);
 
       const moments = liveFixture.moments
-        .filter((m) => m.leg_id === leg.id && m.local_date === day.local_date)
+        .filter(
+          (m) =>
+            m.lifecycle === 'live' &&
+            m.leg_id === leg.id &&
+            m.local_date === day.local_date,
+        )
         .sort((a, b) => a.display_order - b.display_order);
 
       if (day.empty_marker && moments.length === 0) {
@@ -402,7 +425,9 @@ export function renderJournal(
 
       host.append(legSection);
 
-      const trn = liveFixture.transitions.find((t) => t.from_leg_id === leg.id);
+      const trn = liveFixture.transitions.find(
+        (t) => t.lifecycle === 'live' && t.from_leg_id === leg.id,
+      );
       if (trn) host.append(renderTransition(trn));
     }
   }

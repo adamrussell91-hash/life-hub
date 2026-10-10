@@ -2,6 +2,12 @@
 
 export type JournalLifecycle = 'live' | 'deleted' | 'archived';
 
+/** Set when soft-deleted; cascade children reference the parent row id. */
+export type JournalDeletedMeta = {
+  deleted_at?: string;
+  deleted_with?: string;
+};
+
 export type JournalLocationSource = 'exif' | 'inferred' | 'manual';
 
 export type JournalTransitionMode = 'flight' | 'train' | 'car' | 'ferry' | 'other';
@@ -15,7 +21,7 @@ export interface JournalPlace {
   name: string;
 }
 
-export interface JournalMedia {
+export interface JournalMedia extends JournalDeletedMeta {
   id: string;
   /** Display URL for Phase 1 fixtures (local path or data URL). */
   url: string;
@@ -26,7 +32,7 @@ export interface JournalMedia {
   checksum?: string;
 }
 
-export interface JournalMoment {
+export interface JournalMoment extends JournalDeletedMeta {
   id: string;
   leg_id: string;
   local_date: string;
@@ -40,7 +46,7 @@ export interface JournalMoment {
   text?: string;
 }
 
-export interface JournalDay {
+export interface JournalDay extends JournalDeletedMeta {
   id: string;
   leg_id: string;
   local_date: string;
@@ -49,7 +55,7 @@ export interface JournalDay {
   empty_marker?: boolean;
 }
 
-export interface JournalLeg {
+export interface JournalLeg extends JournalDeletedMeta {
   id: string;
   trip_id: string;
   pattern_id: string;
@@ -62,7 +68,7 @@ export interface JournalLeg {
   end_date?: string;
 }
 
-export interface JournalTransition {
+export interface JournalTransition extends JournalDeletedMeta {
   id: string;
   from_leg_id: string;
   to_leg_id: string;
@@ -73,7 +79,7 @@ export interface JournalTransition {
   arrival_label?: string;
 }
 
-export interface JournalFixture {
+export interface JournalFixture extends JournalDeletedMeta {
   id: string;
   schema_version: 1;
   trip_id: string;

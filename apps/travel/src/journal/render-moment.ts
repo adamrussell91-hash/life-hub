@@ -7,6 +7,7 @@ import { openMergeSheet } from '@/journal/merge-sheet';
 import { openMoveSheet } from '@/journal/move-sheet';
 import { openReorderSheet } from '@/journal/reorder-sheet';
 import { openSplitSheet } from '@/journal/split-sheet';
+import { openDeleteConfirmSheet } from '@/journal/delete-confirm-sheet';
 
 function mediaById(fixture: JournalFixture): Map<string, JournalMedia> {
   return new Map(fixture.media.map((m) => [m.id, m]));
@@ -120,6 +121,16 @@ function handleMenuAction(
       break;
     case 'move':
       setSheetOverlay(openMoveSheet(base));
+      break;
+    case 'delete':
+      setSheetOverlay(
+        openDeleteConfirmSheet({
+          ...base,
+          target: { kind: 'moment', id: moment.id },
+          moment,
+          onClose: () => {},
+        }),
+      );
       break;
     default:
       break;
