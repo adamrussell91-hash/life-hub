@@ -6,6 +6,7 @@ import '../../design-kit/sign-in.css';
 import '../../design-kit/motion.css';
 import '../../design-kit/mobile.css';
 import '../styles/travel.css';
+import '../styles/journal.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
@@ -19,6 +20,8 @@ import {
 import { ApiClientError } from '@/api/client';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, type HubShellRefs, type RailHighlight } from '@/shell/shell';
 import { parseRoute } from '@/app/router';
+import { klIstanbulFixture } from '@/journal/fixtures/kl-istanbul';
+import { renderJournal } from '@/journal/render-journal';
 import { renderTripsList } from '@/views/trips-list';
 import { renderTripPage } from '@/views/trip-page';
 import { renderTodayView } from '@/views/today';
@@ -78,6 +81,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
 
   let routeGeneration = 0;
   let currentTripId: string | null = null;
+  let journalHandle: { destroy(): void } | null = null;
 
   async function paint(): Promise<void> {
     const route = parseRoute();
@@ -100,6 +104,23 @@ async function bootApp(root: HTMLElement): Promise<void> {
         await renderTodayView(shell.canvas, { isCurrent: () => generation === routeGeneration });
         return;
       }
+
+      if (route.name === 'journal') {
+        journalHandle?.destroy();
+        journalHandle = null;
+        currentTripId = route.tripId;
+        renderHighlight('trip');
+        const fixture = klIstanbulFixture();
+        renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: fixture.title });
+        journalHandle = renderJournal(shell.canvas, {
+          fixture,
+          momentId: route.momentId
+        });
+        return;
+      }
+
+      journalHandle?.destroy();
+      journalHandle = null;
 
       if (route.name === 'trip') {
         currentTripId = route.tripId;
