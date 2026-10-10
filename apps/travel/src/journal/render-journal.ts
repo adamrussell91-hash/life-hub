@@ -5,8 +5,10 @@ import { getPattern } from '@/journal/patterns/registry';
 import { shouldShowDayMapPreview } from '@/journal/layout';
 import { openChapterJump } from '@/journal/chapter-jump';
 import { journalImportChecksums } from '@/journal/import-review';
+import { openCaptureSheet } from '@/journal/capture-sheet';
 import { openImportSheet } from '@/journal/import-sheet';
 import { renderToolbar } from '@/journal/render-toolbar';
+import type { JournalDocument } from '@/api/journal';
 import { renderMomentArticle } from '@/journal/render-moment';
 
 const LAST_VIEW_KEY = (tripId: string) => `lifehub.travel.journal.lastView.${tripId}`;
@@ -140,6 +142,23 @@ function scrollToChapter(
   onChapterJump?.(id);
 }
 
+function resolveCaptureContext(
+  fixture: JournalFixture,
+  dayId?: string,
+): { legId: string; localDate: string } | null {
+  if (dayId) {
+    const day = fixture.days.find((d) => d.id === dayId);
+    if (day) return { legId: day.leg_id, localDate: day.local_date };
+  }
+  const empty = fixture.days.find((d) => d.empty_marker);
+  if (empty) return { legId: empty.leg_id, localDate: empty.local_date };
+  const firstDay = [...fixture.days].sort((a, b) => a.local_date.localeCompare(b.local_date))[0];
+  if (firstDay) return { legId: firstDay.leg_id, localDate: firstDay.local_date };
+  const firstLeg = [...fixture.legs].sort((a, b) => a.order - b.order)[0];
+  if (firstLeg?.start_date) return { legId: firstLeg.id, localDate: firstLeg.start_date };
+  return null;
+}
+
 function persistLastView(tripId: string, momentId: string): void {
   try {
     localStorage.setItem(LAST_VIEW_KEY(tripId), momentId);
@@ -161,23 +180,54 @@ export function renderJournal(
 
   let chapterOverlay: { destroy(): void } | null = null;
   let importOverlay: { destroy(): void } | null = null;
+  let captureOverlay: { destroy(): void } | null = null;
+
+  const journalDoc = opts.fixture as JournalDocument;
+
+  function openImport(initialFiles?: File[]): void {
+    importOverlay?.destroy();
+    const { knownChecksums, deletedChecksums } = journalImportChecksums(opts.fixture);
+    importOverlay = openImportSheet({
+      fixture: opts.fixture,
+      knownChecksums,
+      deletedChecksums,
+      journalVersion: opts.journalVersion,
+      anchor: root,
+      initialFiles,
+      onClose: () => {
+        importOverlay = null;
+      },
+    });
+    cleanups.push(() => importOverlay?.destroy());
+  }
+
+  function openCapture(dayId?: string): void {
+    const ctx = resolveCaptureContext(opts.fixture, dayId);
+    if (!ctx) return;
+    captureOverlay?.destroy();
+    captureOverlay = openCaptureSheet({
+      tripId: opts.fixture.trip_id,
+      legId: ctx.legId,
+      localDate: ctx.localDate,
+      journal: journalDoc,
+      version: opts.journalVersion ?? 'fixture',
+      anchor: root,
+      onImportPhotos: (files) => openImport(files),
+      onClose: () => {
+        captureOverlay = null;
+      },
+      onSaved: () => {
+        captureOverlay = null;
+      },
+    });
+    cleanups.push(() => captureOverlay?.destroy());
+  }
 
   const toolbar = renderToolbar({
     title: opts.fixture.title,
+    onAddMoment: () => openCapture(),
     onImportPhotos: () => {
-      importOverlay?.destroy();
-      const { knownChecksums, deletedChecksums } = journalImportChecksums(opts.fixture);
-      importOverlay = openImportSheet({
-        fixture: opts.fixture,
-        knownChecksums,
-        deletedChecksums,
-        journalVersion: opts.journalVersion,
-        anchor: root,
-        onClose: () => {
-          importOverlay = null;
-        },
-      });
-      cleanups.push(() => importOverlay?.destroy());
+      openImport();
     },
     onChapter: () => {
       chapterOverlay?.destroy();
@@ -245,9 +295,8 @@ export function renderJournal(
         add.type = 'button';
         add.className = 'btn btn--secondary journal-day__add';
         add.textContent = 'Add moment';
-        add.disabled = true;
-        add.title = 'Coming in Phase 2';
-        add.setAttribute('aria-label', 'Add moment — Coming in Phase 2');
+        add.setAttribute('aria-label', 'Add moment');
+        add.addEventListener('click', () => openCapture(day.id));
         daySection.append(empty, add);
       }
 
@@ -336,6 +385,7 @@ export function renderJournal(
       for (const fn of cleanups) fn();
       chapterOverlay?.destroy();
       importOverlay?.destroy();
+      captureOverlay?.destroy();
       canvas.replaceChildren();
     },
   };

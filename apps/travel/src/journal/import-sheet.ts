@@ -32,6 +32,8 @@ export interface OpenImportSheetOptions {
   anchor: HTMLElement;
   onClose?: () => void;
   onUploadComplete?: (summary: { complete: number; failed: number }) => void;
+  /** Pre-selected files (e.g. from capture sheet multi-photo handoff). */
+  initialFiles?: File[];
 }
 
 function makeMediaId(): string {
@@ -434,6 +436,10 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   options.anchor.append(back);
 
   void (async () => {
+    if (options.initialFiles?.length) {
+      await inspectBatch(options.initialFiles);
+      return;
+    }
     const restored = await loadImportProposal(tripId);
     if (!restored || destroyed) return;
     files = restored.snapshot.files;

@@ -86,14 +86,14 @@ describe('renderJournal', () => {
     expect(scrollIntoView.mock.calls[0]?.[0]).toMatchObject({ behavior: 'auto' });
   });
 
-  it('uses toolbar h1 for trip title and disables Add moment stub', () => {
+  it('uses toolbar h1 for trip title and enables Add moment', () => {
     const root = document.createElement('div');
     renderJournal(root, { fixture: klIstanbulFixture() });
     const title = root.querySelector('.journal-toolbar__title');
     expect(title?.tagName).toBe('H1');
     const addBtn = root.querySelector('.journal-toolbar__add') as HTMLButtonElement | null;
-    expect(addBtn?.disabled).toBe(true);
-    expect(addBtn?.getAttribute('aria-label')).toContain('Phase 2');
+    expect(addBtn?.disabled).toBe(false);
+    expect(addBtn?.getAttribute('aria-label')).toBe('Add moment');
   });
 
   it('adds journal--pattern-off when patternOff option is true', () => {
