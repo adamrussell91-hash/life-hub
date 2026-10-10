@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { clearEventReadCache } from '@/api/client';
+import { clearScheduleReadCache } from '@/api/client';
 import { renderEventNewView } from '@/views/events';
 
 describe('existing event edit draft', () => {
-  beforeEach(() => { clearEventReadCache(); vi.stubGlobal('fetch', vi.fn(async () => Response.json({ok: true, data: { preferences: {}, groups: {} }}))); });
+  beforeEach(() => { clearScheduleReadCache(); vi.stubGlobal('fetch', vi.fn(async () => Response.json({ok: true, data: { preferences: {}, groups: {} }}))); });
   afterEach(() => vi.unstubAllGlobals());
   it('shows the editor while optional priority areas are still loading', async () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));

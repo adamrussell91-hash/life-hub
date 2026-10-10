@@ -27,7 +27,10 @@ export function mountTagAnythingSection(host: HTMLElement, sourceRef: string) {
       const { outgoing, incoming } = await listUniversalLinksForEntity(ref);
       const withEndpoint = (entries: Awaited<ReturnType<typeof listUniversalLinksForEntity>>['outgoing']) =>
         entries
-          .map((entry) => (entry.endpoint ? { link: entry.link, endpoint: entry.endpoint } : null))
+          .map((entry) => (entry.endpoint ? {
+            link: entry.link,
+            endpoint: entry.endpoint
+          } : null))
           .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
       return {
         outgoing: withEndpoint(outgoing),

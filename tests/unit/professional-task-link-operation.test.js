@@ -27,7 +27,8 @@ const session = createSessionToken(
 function memoryStore() {
   const map = new Map();
   return {
-    async get(key, { type } = {}) {
+    async get(key, { type, consistency } = {}) {
+      if (key.startsWith('professional/task-link-operations/')) assert.equal(consistency, 'strong');
       if (!map.has(key)) return null;
       const raw = map.get(key);
       return type === 'json' ? structuredClone(raw) : raw;
@@ -86,6 +87,12 @@ function makeRepo({ professionalStore, tasksStore, getUniversalLinkStore, links 
     getTasksStore: async () => tasksStore,
     getUniversalLinkStore,
     createUniversalLinkRepository: () => ({
+      async getLink(id, _context, options) {
+        assert.equal(options.consistency, 'strong');
+        const link = links.find(link=>link.id===id && link.status==='current');
+        if (!link) throw Object.assign(new Error('not found'),{code:'endpoint_not_found'});
+        return link;
+      },
       async createLink(input) {
         const existing = links.find(
           (row) =>
@@ -476,6 +483,13 @@ test('preparation rejects an 11th distinct task with task_link_limit', async () 
       return true;
     }
   );
+  // Removing a link frees a slot even though its repair journal stays stored.
+  links[0].status = 'suppressed';
+  const replacement = await repo.linkTask({targetRef, relationshipType:'preparation', taskId:overflowId});
+  assert.equal(replacement.operation.status, 'committed');
+  assert.equal(links.filter(link=>link.status==='current').length, MAX_TASK_LINKS_PER_TARGET);
+  await assert.rejects(repo.linkTask({targetRef,relationshipType:'preparation',title:'One more'}),error=>error.code==='task_link_limit');
+
 });
 
 test('Meetings GET returns preparation_operations list', async () => {

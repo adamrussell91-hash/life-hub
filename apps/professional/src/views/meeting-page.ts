@@ -102,6 +102,7 @@ export async function renderMeetingPage(
   id: string,
   options: { isCurrent: () => boolean; onTitleReady: (title: string) => void }
 ): Promise<void> {
+  if (!options.isCurrent()) return;
   showViewLoading(canvas, 'Loading…');
   const meetingRef = `professional:meeting:${id}`;
   let record: MeetingRecord;
@@ -109,16 +110,18 @@ export async function renderMeetingPage(
   let directory: DirectoryPersonRow[];
   let ledger: LedgerItem[];
   try {
-    record = (await getMeeting(id)).meeting;
-    const [loadedAttendees, loadedDirectory, ledgerResult] = await Promise.all([
+    const [meetingResult, loadedAttendees, loadedDirectory, ledgerResult] = await Promise.all([
+      getMeeting(id),
       loadAttendees(meetingRef),
       loadDirectory(),
       listLedgerForSources([meetingRef])
     ]);
+    record = meetingResult.meeting;
     attendees = loadedAttendees;
     directory = loadedDirectory;
     ledger = ledgerResult.items;
   } catch (err) {
+    if (!options.isCurrent()) return;
     renderLoadError(canvas, err, () => void renderMeetingPage(canvas, id, options));
     return;
   }

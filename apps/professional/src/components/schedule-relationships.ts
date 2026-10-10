@@ -80,12 +80,11 @@ function taskIdFromRef(ref: string): string {
   return ref.replace(/^tasks:task:/, '');
 }
 
-function linkedTaskChips(linked: LinkedTaskOperation[], relationshipType: string) {
+function linkedTaskChips(linked: LinkedTaskOperation[]) {
   return linked.map((op) => ({
     id: op.operation_id,
     ref: op.task_id ? `tasks:task:${op.task_id}` : op.operation_id,
     label: op.title || op.task_id || 'Task',
-    relationshipType,
     state: op.status === 'incomplete' ? 'pending' : 'saved',
     readonly: true,
     href: op.task_id ? `/tasks/#/task/${encodeURIComponent(op.task_id)}` : null
@@ -127,13 +126,14 @@ export function mountTaskLinkPanel(options: {
   if (linked.length) {
     createEntityChipList({
       container: linkedHost,
-      chips: linkedTaskChips(linked, options.relationshipType)
+      chips: linkedTaskChips(linked)
     });
   }
   root.append(linkedHost);
 
   const title = document.createElement('input');
   title.type = 'text';
+  title.className = 'hub-input';
   title.placeholder = 'Task title';
   title.setAttribute('aria-label', `${options.heading} title`);
 
@@ -152,6 +152,7 @@ export function mountTaskLinkPanel(options: {
 
   const taskInput = document.createElement('input');
   taskInput.type = 'text';
+  taskInput.className = 'hub-input';
   taskInput.placeholder = 'Type @ to pick a Task';
   taskInput.setAttribute('aria-label', `${options.heading} task`);
   taskInput.hidden = true;

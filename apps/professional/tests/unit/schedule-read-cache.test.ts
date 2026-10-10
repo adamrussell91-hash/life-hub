@@ -1,15 +1,34 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {apiGet, apiPost, apiPatch, clearEventReadCache} from '@/api/client';
+import {apiGet, apiPost, apiPatch, clearScheduleReadCache} from '@/api/client';
 
 const response = (data: unknown) => new Response(JSON.stringify({ok:true, data}), {status:200});
-beforeEach(() => { clearEventReadCache(); vi.stubGlobal('fetch', vi.fn(async () => response({event:{id:'event_one', title:'Saved'}, events:[]}))); });
-afterEach(() => { clearEventReadCache(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+beforeEach(() => { clearScheduleReadCache(); vi.stubGlobal('fetch', vi.fn(async () => response({event:{id:'event_one', title:'Saved'}, events:[]}))); });
+afterEach(() => { clearScheduleReadCache(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
-describe('event navigation cache', () => {
+describe('schedule navigation cache', () => {
   it('reuses the list, event, links and group reads on repeat navigation', async () => {
     const paths = ['/api/events', '/api/events?id=event_one', '/api/universal-links?entity_ref=professional%3Aevent%3Aevent_one', '/api/pd-groups?id=group_one'];
     for (const path of paths) {await apiGet(path); await apiGet(path);}
     expect(fetch).toHaveBeenCalledTimes(paths.length);
+  });
+  it('reuses Comms, Meetings and their dependency reads', async () => {
+    const paths=['/api/communications','/api/communications?id=c1','/api/meetings','/api/meetings?id=m1','/api/threads','/api/threads?id=t1','/api/people/directory','/api/people/ledger?source_refs=professional%3Ameeting%3Am1','/api/universal-links?entity_ref=professional%3Acommunication%3Ac1','/api/universal-links?entity_ref=professional%3Ameeting%3Am1','/api/universal-links?entity_ref=professional%3Athread%3At1'];
+    for (const path of paths) {await apiGet(path); await apiGet(path);}
+    expect(fetch).toHaveBeenCalledTimes(paths.length);
+  });
+  it.each(['/api/communications?id=c1','/api/meetings?id=m1','/api/threads?id=t1','/api/people/ledger','/api/entities?ref=p1&action=update'])('invalidates cached schedule dependencies after %s',async path=>{
+    await apiGet('/api/communications'); await apiGet('/api/meetings'); await apiGet('/api/people/directory');
+    await apiGet('/api/communications'); await apiGet('/api/meetings'); await apiGet('/api/people/directory');
+    expect(fetch).toHaveBeenCalledTimes(3);
+    await apiPatch(path,{});
+    await apiGet('/api/communications'); await apiGet('/api/meetings'); await apiGet('/api/people/directory');
+    expect(fetch).toHaveBeenCalledTimes(7);
+  });
+  it('fresh directory reads bypass and clear the cache',async()=>{
+    await apiGet('/api/people/directory'); await apiGet('/api/people/directory');
+    await apiGet('/api/people/directory?fresh=1'); await apiGet('/api/people/directory?fresh=1');
+    await apiGet('/api/people/directory');
+    expect(fetch).toHaveBeenCalledTimes(4);
   });
   it('shares overlapping requests and gives each view its own copy', async () => {
     let finish!: (value:Response) => void;
@@ -26,7 +45,7 @@ describe('event navigation cache', () => {
     let now = 1000;
     vi.spyOn(Date, 'now').mockImplementation(() => now);
     await apiGet('/api/events'); now += 60001; await apiGet('/api/events');
-    clearEventReadCache(); await apiGet('/api/events');
+    clearScheduleReadCache(); await apiGet('/api/events');
     expect(fetch).toHaveBeenCalledTimes(3);
   });
   it.each(['/api/events?id=event_one&action=delete', '/api/universal-links', '/api/pd-groups', '/api/logout'])('invalidates all event dependencies after %s', async path => {

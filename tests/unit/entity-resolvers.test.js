@@ -339,3 +339,11 @@ test('resolvePerson still 404s when neither Blobs nor the GitHub import has the 
     error => error.status === 404 && error.code === 'endpoint_not_found'
   );
 });
+
+for (const state of [{status: 'dead'}, {bucket: 'trash'}, {deleted_at: '2026-10-10'}]) {
+  test(`resolveTask excludes deleted records: ${JSON.stringify(state)}`, async () => {
+    const store = createMemoryStore();
+    await store.setJSON(taskKey('task_deleted'), {id:'task_deleted',title:'Former task',...state});
+    await assert.rejects(resolveTask('task_deleted', tasksContext, {getStore:async()=>store}), error=>error.code==='endpoint_not_found');
+  });
+}

@@ -1,19 +1,21 @@
-// Memory only: never persist private event data across sessions.
+// Memory only: never persist private schedule data across sessions.
 const TTL_MS = 60_000;
 const MAX_ENTRIES = 200;
 type Entry = {promise: Promise<unknown>; expiresAt: number};
 const reads = new Map<string, Entry>();
 
-export function clearEventReadCache(): void { reads.clear(); }
+export function clearScheduleReadCache(): void { reads.clear(); }
 
-export function isEventRead(path: string): boolean {
+export function isScheduleRead(path: string): boolean {
   const url = new URL(path, 'https://hub.invalid');
-  if (['/api/events', '/api/pd-groups', '/api/schedule-projections'].includes(url.pathname)) return true;
-  return url.pathname === '/api/universal-links' && /^professional:(event|pd_group):/.test(url.searchParams.get('entity_ref') ?? '');
+  if (url.searchParams.get('fresh') === '1') return false;
+  if (['/api/events', '/api/pd-groups', '/api/schedule-projections', '/api/communications', '/api/meetings', '/api/threads', '/api/people/directory', '/api/people/ledger'].includes(url.pathname)) return true;
+  return url.pathname === '/api/universal-links' && /^professional:(event|pd_group|communication|meeting|thread):/.test(url.searchParams.get('entity_ref') ?? '');
 }
 
-export function changesEventReads(path: string): boolean {
-  return ['/api/events', '/api/pd-groups', '/api/universal-links', '/api/auth', '/api/logout'].includes(path.split('?')[0]!);
+export function changesScheduleReads(path: string): boolean {
+  const pathname = path.split('?')[0]!;
+  return ['/api/events', '/api/pd-groups', '/api/universal-links', '/api/auth', '/api/logout', '/api/communications', '/api/meetings', '/api/threads', '/api/entities', '/api/tasks'].includes(pathname) || pathname.startsWith('/api/people/') || pathname.startsWith('/api/organisations/');
 }
 
 function waitForRead<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
@@ -26,7 +28,7 @@ function waitForRead<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
   });
 }
 
-export function cachedEventRead<T>(key: string, load: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+export function cachedScheduleRead<T>(key: string, load: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
   let entry = reads.get(key);
   if (!entry || entry.expiresAt <= Date.now()) {

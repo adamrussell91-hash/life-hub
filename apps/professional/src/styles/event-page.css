@@ -9,16 +9,18 @@
   max-width: 72rem;
 }
 
-.pd-toggle {
+.event-page__pd {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--cotton);
-  border: 1px solid var(--line);
+  gap: var(--space-2);
   font-size: var(--text-sm);
+}
+
+.event-page__settings {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
+  gap: var(--space-4);
 }
 
 /* ── Series / program strip ── */
@@ -174,7 +176,7 @@
 .event-page__toolbar { display: flex; justify-content: flex-end; }
 .event-options-menu .hub-menu__opt { min-height: 2.75rem; }
 .event-options-menu [data-part="delete-event"] { color: var(--danger); }
-.event-page__format { max-width: 20rem; }
+.event-page__format { display: flex; align-items: center; gap: var(--space-2); }
 .event-page .confirm-card[hidden] { display: none; }
 @media (max-width: 719px) {
   .event-page .talk-add input { min-width: 0; font-size: var(--text-md); }
@@ -183,6 +185,27 @@
   .event-page .confirm-card__actions { padding-bottom: env(safe-area-inset-bottom); }
 }
 
-.event-page .hub-card h3 { margin: 0 0 var(--space-3); font-size: var(--text-md); color: var(--navy); }
 .event-page .canvas-status:empty, .event-page .hub-field__error:empty { display: none; }
-.event-page__format .hub-select { font-size: var(--text-md); }
+
+
+@media (max-width: 719px) {
+  .event-page .entity-tagger__picker { font-size: var(--text-md); min-height: 2.75rem; }
+  .event-page .morphing-popover__trigger { min-height: 2.75rem; }
+}
+
+@media (max-width: 719px) {
+  .event-format-editor .morphing-popover__actions .btn,
+  .event-format-editor .hub-pills__btn { min-height: 2.75rem; }
+  .event-page .entity-chip__action { min-width: 2.75rem; min-height: 2.75rem; }
+}
+
+.event-page__links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); align-items: start; }
+.event-page__links > * { min-width: 0; }
+.event-page__tasks .task-link-panel__row input { min-width: 0; flex: 1; }
+@media (max-width: 900px) {
+  .event-page__links { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 719px) {
+  .event-page__tasks input { font-size: var(--text-md); }
+  .event-page__tasks .btn { min-height: 2.75rem; }
+}

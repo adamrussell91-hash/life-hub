@@ -22,6 +22,7 @@ import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { equivalenceInput, generateLinkId } from './universal-link-schema.mjs';
 
 const PREFIX = 'professional/task-link-operations/';
+const STRONG = {consistency: 'strong'};
 /** Cap per (target, relationship_type). Prep and follow-up each get their own bucket. */
 export const MAX_TASK_LINKS_PER_TARGET = 10;
 
@@ -148,7 +149,7 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
   const getTasksStore = deps.getTasksStore ?? defaultGetTasksStore;
 
   async function loadJournal(operationId) {
-    return getJSON(professionalStore, operationKey(operationId));
+    return getJSON(professionalStore, operationKey(operationId), STRONG);
   }
 
   async function saveJournal(journal) {
@@ -186,7 +187,7 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
     await setJSON(professionalStore, operationKey(merged.operation_id), merged);
     const pointer = await getJSON(
       professionalStore,
-      pointerKey(merged.target_ref, merged.relationship_type)
+      pointerKey(merged.target_ref, merged.relationship_type), STRONG
     );
     const operationIds = readPointerOperationIds(pointer);
     if (!operationIds.includes(merged.operation_id)) operationIds.push(merged.operation_id);
@@ -201,7 +202,7 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
   }
 
   async function listForTarget(targetRef, relationshipType) {
-    const pointer = await getJSON(professionalStore, pointerKey(targetRef, relationshipType));
+    const pointer = await getJSON(professionalStore, pointerKey(targetRef, relationshipType), STRONG);
     const journals = await Promise.all(readPointerOperationIds(pointer).map(loadJournal));
     return journals.map(projectProfessionalTaskLinkOperation).filter(Boolean);
   }
@@ -313,7 +314,29 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
 
     let journal = await loadJournal(operationId);
     if (!journal) {
-      if (already.length >= MAX_TASK_LINKS_PER_TARGET) {
+      let count = already.length;
+      if (count >= MAX_TASK_LINKS_PER_TARGET) {
+        // Journals remain for repair, but ended/suppressed/deleted endpoints
+        // no longer occupy a slot. The read repository resolves live endpoints.
+        const linkRepo = await bindLinkRepo();
+        const taskRefs = new Set();
+        const linkIds = [...new Set(already.flatMap(op => op.completed_link_ids ?? []))];
+        await Promise.all(linkIds.map(async id => {
+          try {
+            const link = await linkRepo.getLink(id, accessContext, {consistency: 'strong'});
+            if (link.status === 'current' && link.relationship_type === relationshipType && link.target_ref === targetRef) taskRefs.add(link.source_ref);
+          } catch (error) {
+            // Missing/suppressed/deleted endpoints free the slot. Storage or
+            // resolver failures must propagate rather than undercount.
+            if (error?.code !== 'endpoint_not_found') throw error;
+          }
+        }));
+        for (const op of already.filter(op => op.status === 'incomplete')) {
+          if (op.task_id) taskRefs.add(`tasks:task:${op.task_id}`);
+        }
+        count = taskRefs.size;
+      }
+      if (count >= MAX_TASK_LINKS_PER_TARGET) {
         throw Object.assign(
           new Error(
             `This ${relationshipType.replace(/_/g, ' ')} list is full (${MAX_TASK_LINKS_PER_TARGET} tasks).`
@@ -322,7 +345,7 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
             status: 400,
             code: 'task_link_limit',
             limit: MAX_TASK_LINKS_PER_TARGET,
-            count: already.length
+            count
           }
         );
       }
