@@ -347,7 +347,17 @@ export function renderEmbedBlock(
   }
 
   const provider = block.content.provider ?? 'generic';
-  const frameSrc = embedFrameSrc(block.content);
+  // Uploaded PDFs use our file endpoint (which has no .pdf extension). Older
+  // blocks saved them as generic embeds. Only this trusted media route may use
+  // the native PDF viewer; external HTML embeds retain their sandbox.
+  const sourceUrl = new URL(safeUrl);
+  const apiOrigin = new URL(getApiBaseUrl() || location.origin, location.origin).origin;
+  const uploadedPdf =
+    (provider === 'pdf' || /\.pdf$/i.test(block.content.title?.trim() || '')) &&
+    (sourceUrl.origin === apiOrigin || sourceUrl.origin === location.origin ||
+      sourceUrl.origin === 'https://api.adam-russell.com') &&
+    /^\/api\/media\/[^/]+\/file$/.test(sourceUrl.pathname);
+  const frameSrc = uploadedPdf ? safeUrl : embedFrameSrc(block.content);
 
   if (embedUsesIframe(provider) && frameSrc) {
     const iframe = document.createElement('iframe');
@@ -355,7 +365,10 @@ export function renderEmbedBlock(
     iframe.src = frameSrc;
     iframe.setAttribute('loading', 'lazy');
     iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-forms');
+    // Sandboxed frames cannot instantiate the browser's native PDF viewer.
+    if (!uploadedPdf) {
+      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-forms');
+    }
     iframe.title = block.content.title || embedDefaultTitle(provider);
     wrap.append(iframe);
 
