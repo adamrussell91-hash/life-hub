@@ -11,7 +11,6 @@ import { unwrapApiPayload } from "../api/envelope";
  * The note's own "Connected" editor stays page-to-page (`related_to`);
  * people, organisations, tasks, meetings and events come through here.
  */
-const TAGGABLE_KINDS = "person,organisation,task,goal,project,application,program,unit,lesson,class,event,meeting";
 
 // Knowledge's API base is `<origin>/api/knowledge`; the shared entity and
 // Universal Link routes live one level up at `<origin>/api`.
@@ -68,8 +67,10 @@ export function mountNoteTagger(host: HTMLElement, pageId: string) {
     host,
     sourceRef: pageEntityRef(pageId),
     heading: "People & tags",
-    search: async (query: string, signal: AbortSignal) => {
-      const params = new URLSearchParams({ q: query, kinds: TAGGABLE_KINDS });
+    // Note-to-note links belong to the "Connected" editor (`related_to`).
+    excludeKinds: ["page"],
+    search: async (query: string, signal: AbortSignal, kinds: string[]) => {
+      const params = new URLSearchParams({ q: query, kinds: kinds.join(",") });
       const result = await sharedFetch<{ groups: Record<string, Suggestion[] | undefined> }>(
         `/entities/search?${params.toString()}`,
         { signal },

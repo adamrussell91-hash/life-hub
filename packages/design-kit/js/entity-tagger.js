@@ -10,6 +10,7 @@
  */
 import { createEntityPicker } from './entity-picker.js';
 import { createEntityChipList } from './entity-chips.js';
+import { KIND_FILTERS, TAGGABLE_KINDS, kindLabel } from './entity-kinds.js';
 
 /**
  * @typedef {{
@@ -29,13 +30,6 @@ import { createEntityChipList } from './entity-chips.js';
  * @typedef {{ link: TaggerLink, endpoint: { ref: string, kind: string, display_label: string, href?: string | null } }} TaggerLinkEntry
  */
 
-function kindLabel(kind) {
-  if (typeof kind !== 'string' || !kind) return null;
-  return kind
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
 function createdLinkFrom(result) {
   if (!result || typeof result !== 'object' || Array.isArray(result)) return null;
   const link = result.link;
@@ -51,12 +45,19 @@ function createdLinkFrom(result) {
  *   heading?: string,
  *   hint?: string,
  *   emptyText?: string,
- *   search: (query: string, signal: AbortSignal) => Promise<{ groups: Record<string, TaggerSuggestion[] | undefined> }>,
+ *   kinds?: readonly string[],
+ *   excludeKinds?: readonly string[],
+ *   search: (query: string, signal: AbortSignal, kinds: string[]) => Promise<{ groups: Record<string, TaggerSuggestion[] | undefined> }>,
  *   listLinks: (sourceRef: string) => Promise<{ outgoing: TaggerLinkEntry[], incoming: TaggerLinkEntry[] }>,
  *   createLink: (input: { source_ref: string, target_ref: string, relationship_type: string }) => Promise<unknown>,
  *   suppressLink: (linkId: string) => Promise<unknown>,
  *   onError?: (message: string) => void
  * }} options
+ *
+ * `kinds` is what this host can tag (default: every taggable kind, less
+ * any `excludeKinds`). The
+ * category buttons narrow it further, and `search` receives the narrowed
+ * list so it asks the server for only those kinds.
  */
 export function mountEntityTagger(options) {
   const relationshipType = options.relationshipType ?? 'tagged_with';
@@ -71,11 +72,46 @@ export function mountEntityTagger(options) {
   const field = document.createElement('div');
   field.className = 'entity-tagger__field';
 
+  const excluded = new Set(options.excludeKinds ?? []);
+  const hostKinds = (options.kinds ?? TAGGABLE_KINDS).filter((kind) => !excluded.has(kind));
+  const filters = KIND_FILTERS
+    .map((filter) => ({ ...filter, kinds: filter.kinds.filter((kind) => hostKinds.includes(kind)) }))
+    .filter((filter) => filter.kinds.length);
+  let activeFilter = null;
+
   const input = document.createElement('input');
-  input.type = 'text';
+  input.type = 'search';
   input.className = 'entity-tagger__picker';
-  input.placeholder = 'Type @ to add a connection';
+  input.placeholder = 'Search anything to connect';
   input.setAttribute('aria-label', options.heading ?? 'Add a connection');
+
+  const filterBar = document.createElement('div');
+  filterBar.className = 'entity-tagger__filters';
+  filterBar.setAttribute('role', 'group');
+  filterBar.setAttribute('aria-label', 'Search only');
+  const filterButtons = [{ id: null, label: 'All' }, ...filters].map((filter) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'entity-tagger__filter';
+    button.textContent = filter.label;
+    button.dataset.filter = filter.id ?? 'all';
+    button.addEventListener('click', () => {
+      activeFilter = filter.id ? filters.find((entry) => entry.id === filter.id) ?? null : null;
+      syncFilters();
+      input.placeholder = activeFilter ? `Search ${activeFilter.label.toLowerCase()}` : 'Search anything to connect';
+      picker.open();
+      input.focus();
+    });
+    return button;
+  });
+  function syncFilters() {
+    for (const button of filterButtons) {
+      const pressed = (activeFilter?.id ?? 'all') === button.dataset.filter;
+      button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    }
+  }
+  syncFilters();
+  filterBar.append(...filterButtons);
 
   const chipsHost = document.createElement('div');
   chipsHost.className = 'entity-tagger__chips';
@@ -111,9 +147,19 @@ export function mountEntityTagger(options) {
 
   const picker = createEntityPicker({
     input,
+    mode: 'field',
+    minQueryLength: 2,
     allowedKinds: options.allowedKinds ?? null,
     emptyText: options.emptyText ?? 'No matches.',
-    search: options.search,
+    search: async (query, signal) => {
+      const result = await options.search(query, signal, activeFilter ? [...activeFilter.kinds] : hostKinds);
+      // A page never offers itself as its own connection.
+      const groups = {};
+      for (const [kind, items] of Object.entries(result?.groups ?? {})) {
+        groups[kind] = (items ?? []).filter((item) => item.ref !== options.sourceRef);
+      }
+      return { groups };
+    },
     onSelect: (item) => {
       input.value = '';
       const pendingId = `pending:${item.ref}:${relationshipType}`;
@@ -169,7 +215,7 @@ export function mountEntityTagger(options) {
   });
 
   field.append(chipsHost, input);
-  root.append(field, picker.root, status);
+  root.append(filterBar, field, picker.root, status);
   options.host.replaceChildren(root);
 
   async function refresh() {

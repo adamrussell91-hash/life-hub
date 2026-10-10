@@ -52,7 +52,8 @@ import {
   positionKey,
   unitKey
 } from './universal-link-blobs.mjs';
-import { getGithubOrganisation, getGithubPerson } from './github-professional-data.mjs';
+import { getGithubOrganisation, getGithubPerson, listGithubPdEvents } from './github-professional-data.mjs';
+import { importedPdEventById } from './notion-pd-events.mjs';
 import { classKey, defaultGetContentStore as defaultGetTeachingStore, getJSON as getTeachingJSON } from './teaching-blobs.mjs';
 import {
   resolveKnowledgePage,
@@ -346,16 +347,30 @@ export async function resolvePdGroup(id, accessContext, { getStore = defaultGetP
   };
 }
 
+// An imported Notion PD event lives only in `pd-events.json` until the
+// event list first copies it into Blobs (event-repository.mjs). It is
+// still a real event the operator can see and tag, so a missing Blob
+// record falls back to the source row. A Blob tombstone never does.
 export async function resolveEvent(
   id,
   accessContext,
-  { getStore = defaultGetProfessionalStore } = {}
+  { getStore = defaultGetProfessionalStore, env, fetchImpl, listImportedEvents = listGithubPdEvents } = {}
 ) {
   if (!isValidEventId(id)) throw endpointNotFoundError();
   const ref = formatEntityRef({ namespace: 'professional', kind: 'event', id });
   if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
   const store = await getStore();
-  const record = parseEventRecord(await getProfessionalJSON(store, eventKey(id), { consistency: 'strong' }));
+  const raw = await getProfessionalJSON(store, eventKey(id), { consistency: 'strong' });
+  let record = parseEventRecord(raw);
+  if (isDeletedRecord(record)) throw endpointNotFoundError();
+  if (!record && raw == null) {
+    const rows = await listImportedEvents({ env, fetchImpl }).catch(() => []);
+    const imported = importedPdEventById(rows, id);
+    if (imported) {
+      const { source, notion_id, knowledge_notes, ...fields } = imported; // eslint-disable-line no-unused-vars
+      record = parseEventRecord(fields);
+    }
+  }
   if (!record || isDeletedRecord(record)) throw endpointNotFoundError();
   return {
     ref,
