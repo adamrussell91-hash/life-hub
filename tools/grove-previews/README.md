@@ -11,7 +11,7 @@ No app, CSS, runtime dependency, storage or build changes.
 23 ground props and three animated animals (doe, stag, fox). All currently delivered models are
 Quaternius: Stylized Nature MegaKit Source for trees and ground, Ultimate
 Animated Animal Pack for animals. No Cube Pets or Kenney models. Visually matching one-off additions from other
-creators are permitted after review; none is currently delivered.
+creators are permitted after review. Four working one-off animals are now delivered in the local project-use bundle; see the canonical Grove hand-off above.
 All CC0; original publisher licence texts retained. The manifest names every
 source file and adaptation.
 
@@ -28,13 +28,11 @@ Reeds, lily pads and stumps/logs are gaps: MegaKit has no specifically named
 models for them. Earlier non-Quaternius assets have been removed from this
 delivery, rather than relabelled as Quaternius.
 
-Missing animated animals: woodland rabbit, flying bird, squirrel and swimming
-duck. The inspected Ultimate Animated Animal Pack contains 12 glTF animals,
-including delivered deer/stag/fox but none of those four species. Quaternius's
-other rabbit leads are a plush character and an anthropomorphic Ultimate
-Monsters character, not compatible woodland rabbits. See `sourcing-options.md`
-for verified links and remaining requirements. No flight/swim clips were
-invented. Optional animals and licensed seamless audio are not delivered.
+The four formerly missing animal slots are filled by the verified local bundle:
+Spring hare/squirrel with Grove-added clips, Soltorch robin with publisher
+flight/hop clips, and an attributed mallard with Grove-added walk/swim clips.
+The public CC0 manifest still has three animals. See the canonical hand-off and
+`animal-audit.json` for the local install path and exact licence status.
 
 ## Reproduce
 
@@ -99,3 +97,14 @@ folder for both normalisation and previews. Selection entries may specify
 asset must never be recorded as CC0. Set `GROVE_RENDER_REPORT` to a local report
 path too, so previewing the local selection cannot replace the public report.
 Default invocation still prepares the repository's existing CC0 selection.
+
+## Ready animal tooling
+
+- `animate-spring.py`: Blender source rig-control loops; accepts `--source` and `--output` after Blender's `--` argument separator. Source scripts stay disabled.
+- `rig-mallard.py`: imports the uncompressed attributed source GLB, creates a four-bone rig and loops; accepts `--source` and `--output`.
+- `centre-from-report.mjs <bundle>`: applies actual browser-measured origin correction to mesh and skeleton together; rerender afterwards.
+- `verify-animal-motion.mjs`: with `GROVE_OUTPUT_DIR=<bundle>`, samples skinned vertices across each clip; rejects frozen/exploding motion and discontinuities in Grove-generated loops.
+- `install-project-animals.mjs <bundle> [repo]`: verifies clip availability, hashes and motion, then installs into the gitignored project-only folder.
+- `serve-animal-demo.mjs <bundle>`: local preview with shared loader and independently animated half-size babies.
+- `check-animal-demo.mjs <url> <bundle>`: exercises every clip and verifies clone independence, baby scale and missing-clip errors.
+- `animal-demo/`: reusable loader and preview template. These are ingredient tools; the Grove app remains unbuilt.

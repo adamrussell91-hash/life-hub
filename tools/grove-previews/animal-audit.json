@@ -1,5 +1,5 @@
 {
-  "inspected_at": "2026-10-10",
+  "inspected_at": "2026-10-11",
   "local_delivery_path": "/Users/adamrussell/Documents/Codex/2026-10-10/ground-streams-lakes-generated-in-code/outputs/grove-local-animals",
   "public_models_added": 0,
   "public_repo_private_at_check": false,
@@ -39,21 +39,38 @@
         "url": "https://soltorchgames.itch.io/animated-low-poly-bird-sample",
         "attribution": null
       },
-      "notes": "Local project asset only. Authored clips preserved: idle, hop, fly, eat. Hop remains hop, not relabelled walk. Not CC0 and not published to public repo."
+      "notes": "Local project asset only. Authored clips preserved: idle, hop, fly, eat. Hop remains hop, not relabelled walk. Not CC0 and not published to public repo.",
+      "animation_roles": {
+        "idle": "idle",
+        "locomotion": "hop",
+        "flight": "fly",
+        "feed": "eat"
+      },
+      "clip_origin": "publisher-authored"
     },
     {
-      "id": "animal-rabbit-hare-rig",
+      "id": "animal-rabbit-hare",
       "slot": "animal-rabbit",
       "kind": "animal",
       "variant": 1,
       "stage": null,
-      "file": "models/animals/animal-rabbit-hare-rig.glb",
-      "preview": "previews/animal-rabbit-hare-rig.png",
-      "bytes": 75224,
+      "file": "models/animals/animal-rabbit-hare.glb",
+      "preview": "previews/animal-rabbit-hare.png",
+      "bytes": 571700,
       "triangles": 496,
       "height_m": 0.4136,
-      "animations": [],
-      "animation_source_names": {},
+      "animations": [
+        "idle",
+        "hop",
+        "run",
+        "eat"
+      ],
+      "animation_source_names": {
+        "idle": "idle",
+        "hop": "hop",
+        "run": "run",
+        "eat": "eat"
+      },
       "source": {
         "pack": "Bloom & Burrow: Spring Animal Asset Pack",
         "author": "GameDev.tv and contributors",
@@ -66,21 +83,38 @@
         "url": "https://gamedev.tv/assets/spring-assets",
         "attribution": null
       },
-      "notes": "Rigged local candidate, not an animated must-have replacement. Source has no multi-frame actions or NLA clips. Export selected mesh plus deformation rig, omitted controls/cameras/lights, and preserved packed palette. GLTF limits joints to four influences per vertex. Needs authored idle and locomotion animation. Not CC0; do not publish to public repo."
+      "notes": "Grove-generated looping rig-control animations baked from GameDev.tv source; not publisher-supplied motion. Local project-use only.",
+      "animation_roles": {
+        "idle": "idle",
+        "locomotion": "hop",
+        "fast": "run",
+        "feed": "eat"
+      },
+      "clip_origin": "Grove-generated and baked"
     },
     {
-      "id": "animal-squirrel-rig",
+      "id": "animal-squirrel",
       "slot": "animal-squirrel",
       "kind": "animal",
       "variant": 1,
       "stage": null,
-      "file": "models/animals/animal-squirrel-rig.glb",
-      "preview": "previews/animal-squirrel-rig.png",
-      "bytes": 71456,
+      "file": "models/animals/animal-squirrel.glb",
+      "preview": "previews/animal-squirrel.png",
+      "bytes": 534824,
       "triangles": 477,
       "height_m": 0.109,
-      "animations": [],
-      "animation_source_names": {},
+      "animations": [
+        "idle",
+        "walk",
+        "run",
+        "eat"
+      ],
+      "animation_source_names": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "eat": "eat"
+      },
       "source": {
         "pack": "Bloom & Burrow: Spring Animal Asset Pack",
         "author": "GameDev.tv and contributors",
@@ -93,7 +127,191 @@
         "url": "https://gamedev.tv/assets/spring-assets",
         "attribution": null
       },
-      "notes": "Rigged local candidate, not an animated must-have replacement. Source has no multi-frame actions or NLA clips. Export selected mesh plus deformation rig, omitted controls/cameras/lights, and preserved packed palette. GLTF limits joints to four influences per vertex. Needs authored idle and locomotion animation. Not CC0; do not publish to public repo."
+      "notes": "Grove-generated looping rig-control animations baked from GameDev.tv source; not publisher-supplied motion. Local project-use only.",
+      "animation_roles": {
+        "idle": "idle",
+        "locomotion": "walk",
+        "fast": "run",
+        "feed": "eat"
+      },
+      "clip_origin": "Grove-generated and baked"
+    },
+    {
+      "id": "animal-duck-mallard",
+      "slot": "animal-duck",
+      "kind": "animal",
+      "variant": 1,
+      "stage": null,
+      "file": "models/animals/animal-duck-mallard.glb",
+      "preview": "previews/animal-duck-mallard.png",
+      "bytes": 37412,
+      "triangles": 652,
+      "height_m": 0.3083,
+      "animations": [
+        "idle",
+        "walk",
+        "swim",
+        "eat"
+      ],
+      "animation_source_names": {
+        "idle": "idle",
+        "walk": "walk",
+        "swim": "swim",
+        "eat": "eat"
+      },
+      "source": {
+        "pack": "Mallard duck",
+        "author": "Poly by Google",
+        "page_url": "https://poly.pizza/m/frSLi6b6Vid",
+        "original_file": "b5b79a83-4dc0-4d6d-94ae-fb618129e1f7.glb",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC-BY-3.0",
+        "url": "https://creativecommons.org/licenses/by/3.0/",
+        "attribution": "Mallard duck by Poly by Google, https://poly.pizza/m/frSLi6b6Vid, CC BY 3.0; adapted for Grove."
+      },
+      "notes": "Grove-added deformation rig and looping idle/walk/swim/eat clips. Original mesh by Poly by Google, CC BY 3.0. Place water at the manifest waterline; locomotion is in place.",
+      "animation_roles": {
+        "idle": "idle",
+        "locomotion": "walk",
+        "water": "swim",
+        "feed": "eat"
+      },
+      "clip_origin": "Grove-generated and baked",
+      "waterline_m": 0.085
+    },
+    {
+      "id": "animal-deer-doe",
+      "slot": "animal-deer",
+      "kind": "animal",
+      "variant": 1,
+      "stage": null,
+      "file": "models/animals/animal-deer-doe.glb",
+      "preview": "previews/animal-deer-doe.png",
+      "bytes": 202052,
+      "triangles": 2098,
+      "height_m": 1.5551,
+      "animations": [
+        "eat",
+        "run",
+        "idle",
+        "walk"
+      ],
+      "animation_source_names": {
+        "eat": "Eating",
+        "run": "Gallop",
+        "idle": "Idle",
+        "walk": "Walk"
+      },
+      "source": {
+        "pack": "Ultimate Animated Animal Pack",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/ultimateanimatedanimals.html",
+        "original_file": "Deer.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Kept idle, walk, run and eat only; combat/death clips removed.",
+      "animation_roles": {
+        "idle": "idle",
+        "locomotion": "walk",
+        "fast": "run",
+        "feed": "eat"
+      },
+      "clip_origin": "publisher-authored"
+    },
+    {
+      "id": "animal-deer-stag",
+      "slot": "animal-deer",
+      "kind": "animal",
+      "variant": 1,
+      "stage": null,
+      "file": "models/animals/animal-deer-stag.glb",
+      "preview": "previews/animal-deer-stag.png",
+      "bytes": 192268,
+      "triangles": 3670,
+      "height_m": 2.0012,
+      "animations": [
+        "eat",
+        "run",
+        "idle",
+        "walk"
+      ],
+      "animation_source_names": {
+        "eat": "Eating",
+        "run": "Gallop",
+        "idle": "Idle",
+        "walk": "Walk"
+      },
+      "source": {
+        "pack": "Ultimate Animated Animal Pack",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/ultimateanimatedanimals.html",
+        "original_file": "Stag.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Kept idle, walk, run and eat only; combat/death clips removed.",
+      "animation_roles": {
+        "idle": "idle",
+        "locomotion": "walk",
+        "fast": "run",
+        "feed": "eat"
+      },
+      "clip_origin": "publisher-authored"
+    },
+    {
+      "id": "animal-fox",
+      "slot": "animal-fox",
+      "kind": "animal",
+      "variant": 1,
+      "stage": null,
+      "file": "models/animals/animal-fox.glb",
+      "preview": "previews/animal-fox.png",
+      "bytes": 208196,
+      "triangles": 1848,
+      "height_m": 0.4079,
+      "animations": [
+        "eat",
+        "run",
+        "idle",
+        "walk"
+      ],
+      "animation_source_names": {
+        "eat": "Eating",
+        "run": "Gallop",
+        "idle": "Idle",
+        "walk": "Walk"
+      },
+      "source": {
+        "pack": "Ultimate Animated Animal Pack",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/ultimateanimatedanimals.html",
+        "original_file": "Fox.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Kept idle, walk, run and eat only; combat/death clips removed.",
+      "animation_roles": {
+        "idle": "idle",
+        "locomotion": "walk",
+        "fast": "run",
+        "feed": "eat"
+      },
+      "clip_origin": "publisher-authored"
     }
   ],
   "browser_reports": [
@@ -116,61 +334,343 @@
         {
           "name": "fly",
           "duration": 0.6666666865348816,
-          "moves": true
+          "moves": true,
+          "vertex_displacement_m": 0.25991397994946563,
+          "loop_seam_m": 0,
+          "sample_count": 9
         },
         {
           "name": "hop",
           "duration": 0.3333333432674408,
-          "moves": true
+          "moves": true,
+          "vertex_displacement_m": 0.059773401418033945,
+          "loop_seam_m": 0,
+          "sample_count": 9
         },
         {
           "name": "idle",
           "duration": 5,
-          "moves": true
+          "moves": true,
+          "vertex_displacement_m": 0.025338681879673457,
+          "loop_seam_m": 0,
+          "sample_count": 9
         },
         {
           "name": "eat",
           "duration": 5,
-          "moves": true
+          "moves": true,
+          "vertex_displacement_m": 0.1752434576178101,
+          "loop_seam_m": 0,
+          "sample_count": 9
         }
       ],
       "sha256": "935b630b85c929bb83417ad811ed3c3f5f6d65ef05cc6d38d3568d6ad90fa9d0"
     },
     {
-      "file": "models/animals/animal-rabbit-hare-rig.glb",
-      "height_m": 0.41360729464070967,
+      "file": "models/animals/animal-rabbit-hare.glb",
+      "height_m": 0.41360729559415016,
       "bounds": {
         "min": [
-          -0.02605333696073089,
-          4.514352138169499e-07,
-          -0.17499470482203372
+          -0.026053356278768373,
+          -1.2414114874959026e-17,
+          -0.17499469823673136
         ],
         "max": [
-          0.0260533369607309,
-          0.4136077460759235,
-          0.17499468931857953
+          0.026053356278768453,
+          0.41360729559415016,
+          0.1749946982367314
         ]
       },
-      "animations": [],
-      "sha256": "30030cd4c366e51b23f5d97324f2827ed864d3da31c46c7f6e74591b3b8b1af4"
+      "animations": [
+        {
+          "name": "idle",
+          "duration": 4.041666507720947,
+          "moves": true,
+          "vertex_displacement_m": 0.0061080038955042965,
+          "loop_seam_m": 0,
+          "sample_count": 9
+        },
+        {
+          "name": "hop",
+          "duration": 0.8333333134651184,
+          "moves": true,
+          "vertex_displacement_m": 0.0438642396985542,
+          "loop_seam_m": 0,
+          "sample_count": 9
+        },
+        {
+          "name": "run",
+          "duration": 0.625,
+          "moves": true,
+          "vertex_displacement_m": 0.04378511755898602,
+          "loop_seam_m": 0,
+          "sample_count": 9
+        },
+        {
+          "name": "eat",
+          "duration": 4.041666507720947,
+          "moves": true,
+          "vertex_displacement_m": 0.040902915382223765,
+          "loop_seam_m": 0,
+          "sample_count": 9
+        }
+      ],
+      "sha256": "af296ddedfbded1efed7fcd5611e796d3f300b92d7770766830fa0bc15a0eecb"
     },
     {
-      "file": "models/animals/animal-squirrel-rig.glb",
-      "height_m": 0.10904489992419186,
+      "file": "models/animals/animal-squirrel.glb",
+      "height_m": 0.10904489994543745,
       "bounds": {
         "min": [
-          -0.015398424666086345,
-          -4.819977716971846e-07,
-          -0.13999997608543838
+          -0.015398425661318216,
+          -4.820190173159878e-07,
+          -0.1399999760854384
         ],
         "max": [
-          0.015398419100015966,
-          0.10904441792642017,
-          0.13999999365863222
+          0.01539841910001479,
+          0.10904441792642014,
+          0.139999993654701
         ]
       },
-      "animations": [],
-      "sha256": "cd5afeea353183d1b34f1b251814a41b8c63c7ef6be355194e2240223a8dbd51"
+      "animations": [
+        {
+          "name": "idle",
+          "duration": 4.041666507720947,
+          "moves": true,
+          "vertex_displacement_m": 0.025792478999950838,
+          "loop_seam_m": 0,
+          "sample_count": 9
+        },
+        {
+          "name": "walk",
+          "duration": 1.0416666269302368,
+          "moves": true,
+          "vertex_displacement_m": 0.04751765399827204,
+          "loop_seam_m": 0,
+          "sample_count": 9
+        },
+        {
+          "name": "run",
+          "duration": 0.7083333134651184,
+          "moves": true,
+          "vertex_displacement_m": 0.04573949260750311,
+          "loop_seam_m": 0,
+          "sample_count": 9
+        },
+        {
+          "name": "eat",
+          "duration": 4.041666507720947,
+          "moves": true,
+          "vertex_displacement_m": 0.025792478999950838,
+          "loop_seam_m": 0,
+          "sample_count": 9
+        }
+      ],
+      "sha256": "b19ec5c00a4a3fc8d07ec37cb401ee33031defd77984da0f336fa08fd8695f8b"
+    },
+    {
+      "file": "models/animals/animal-duck-mallard.glb",
+      "height_m": 0.30826750604737274,
+      "bounds": {
+        "min": [
+          -0.0809122020340784,
+          2.2407401242818814e-06,
+          -0.21000011790953524
+        ],
+        "max": [
+          0.0809122020340784,
+          0.308269746787497,
+          0.20999994104523706
+        ]
+      },
+      "animations": [
+        {
+          "name": "idle",
+          "duration": 4.041666507720947,
+          "moves": true,
+          "vertex_displacement_m": 0.006499247707735745,
+          "loop_seam_m": 0,
+          "sample_count": 9
+        },
+        {
+          "name": "walk",
+          "duration": 1.0416666269302368,
+          "moves": true,
+          "vertex_displacement_m": 0.048970345910561555,
+          "loop_seam_m": 0,
+          "sample_count": 9
+        },
+        {
+          "name": "swim",
+          "duration": 2.0416667461395264,
+          "moves": true,
+          "vertex_displacement_m": 0.0618735787048338,
+          "loop_seam_m": 0,
+          "sample_count": 9
+        },
+        {
+          "name": "eat",
+          "duration": 4.041666507720947,
+          "moves": true,
+          "vertex_displacement_m": 0.05015288653028131,
+          "loop_seam_m": 0,
+          "sample_count": 9
+        }
+      ],
+      "sha256": "018e0127cc705ca5e7d36e3d94dcf593b2a0edeeb53291bac546da3dac34c625"
+    },
+    {
+      "file": "models/animals/animal-deer-doe.glb",
+      "height_m": 1.5550771206682825,
+      "bounds": {
+        "min": [
+          -0.2654623785003274,
+          4.314631522739452e-05,
+          -0.8000013269879219
+        ],
+        "max": [
+          0.26546270708466724,
+          1.55512026698351,
+          0.8000007659621481
+        ]
+      },
+      "animations": [
+        {
+          "name": "eat",
+          "duration": 6,
+          "moves": true,
+          "vertex_displacement_m": 1.0916606435595648,
+          "loop_seam_m": 3.9651751452263184e-05,
+          "sample_count": 9
+        },
+        {
+          "name": "run",
+          "duration": 0.5333333611488342,
+          "moves": true,
+          "vertex_displacement_m": 1.254069855898852,
+          "loop_seam_m": 1.001349884166558e-05,
+          "sample_count": 9
+        },
+        {
+          "name": "idle",
+          "duration": 3.3333332538604736,
+          "moves": true,
+          "vertex_displacement_m": 0.06778901916466971,
+          "loop_seam_m": 1.8565803684533755e-05,
+          "sample_count": 9
+        },
+        {
+          "name": "walk",
+          "duration": 1.1666666269302368,
+          "moves": true,
+          "vertex_displacement_m": 0.5560039868377408,
+          "loop_seam_m": 3.253636837513563e-05,
+          "sample_count": 9
+        }
+      ],
+      "sha256": "1cb40c56504e9171409876bd24c1385cd87a6049782a76d3c2b9b1061fb65126"
+    },
+    {
+      "file": "models/animals/animal-deer-stag.glb",
+      "height_m": 2.001234567190252,
+      "bounds": {
+        "min": [
+          -0.4718311431263709,
+          -8.359461812821808e-06,
+          -0.8999363997557759
+        ],
+        "max": [
+          0.4718311431263618,
+          2.001226207728439,
+          0.9000002114032756
+        ]
+      },
+      "animations": [
+        {
+          "name": "eat",
+          "duration": 12.100000381469727,
+          "moves": true,
+          "vertex_displacement_m": 1.2360498928329213,
+          "loop_seam_m": 1.918861702576713e-05,
+          "sample_count": 9
+        },
+        {
+          "name": "run",
+          "duration": 0.5333333611488342,
+          "moves": true,
+          "vertex_displacement_m": 1.2701966068602528,
+          "loop_seam_m": 2.3810970859461378e-05,
+          "sample_count": 9
+        },
+        {
+          "name": "idle",
+          "duration": 3.3333332538604736,
+          "moves": true,
+          "vertex_displacement_m": 0.12367116610789669,
+          "loop_seam_m": 2.0243245717171954e-05,
+          "sample_count": 9
+        },
+        {
+          "name": "walk",
+          "duration": 1.1666666269302368,
+          "moves": true,
+          "vertex_displacement_m": 0.5630128342356734,
+          "loop_seam_m": 4.47340154150766e-05,
+          "sample_count": 9
+        }
+      ],
+      "sha256": "767a274d352db6914edab0598ec5c28607cff0d0ecf21c295b9caa700161c8dd"
+    },
+    {
+      "file": "models/animals/animal-fox.glb",
+      "height_m": 0.4079481107249285,
+      "bounds": {
+        "min": [
+          -0.0806286019910738,
+          -7.31370057143252e-06,
+          -0.4066504388194655
+        ],
+        "max": [
+          0.08062860393260461,
+          0.40794079702435704,
+          0.44999989750199176
+        ]
+      },
+      "animations": [
+        {
+          "name": "eat",
+          "duration": 2.5333333015441895,
+          "moves": true,
+          "vertex_displacement_m": 0.2773920990958379,
+          "loop_seam_m": 1.3446189805060849e-05,
+          "sample_count": 9
+        },
+        {
+          "name": "run",
+          "duration": 0.5666666626930237,
+          "moves": true,
+          "vertex_displacement_m": 0.4244027089671837,
+          "loop_seam_m": 1.0365814217039304e-05,
+          "sample_count": 9
+        },
+        {
+          "name": "idle",
+          "duration": 3.3333332538604736,
+          "moves": true,
+          "vertex_displacement_m": 0.029866620051111542,
+          "loop_seam_m": 8.273477230980042e-06,
+          "sample_count": 9
+        },
+        {
+          "name": "walk",
+          "duration": 1.0666667222976685,
+          "moves": true,
+          "vertex_displacement_m": 0.24314870666936367,
+          "loop_seam_m": 5.95696252769784e-06,
+          "sample_count": 9
+        }
+      ],
+      "sha256": "f406ed8f92885718df9bfa7cec10d9d433ff392e8b8b6ada67bf66e3ec0b2579"
     }
   ],
   "spring_animation_audit": {
@@ -244,5 +744,101 @@
         "nla_strips": 0
       }
     ]
-  }
+  },
+  "demo_reports": [
+    {
+      "id": "animal-bird-robin",
+      "independent_skeleton": true,
+      "baby_scale": 0.5,
+      "missing_clip_rejected": true,
+      "clips": [
+        "fly",
+        "hop",
+        "idle",
+        "eat"
+      ]
+    },
+    {
+      "id": "animal-rabbit-hare",
+      "independent_skeleton": true,
+      "baby_scale": 0.5,
+      "missing_clip_rejected": true,
+      "clips": [
+        "idle",
+        "hop",
+        "run",
+        "eat"
+      ]
+    },
+    {
+      "id": "animal-squirrel",
+      "independent_skeleton": true,
+      "baby_scale": 0.5,
+      "missing_clip_rejected": true,
+      "clips": [
+        "idle",
+        "walk",
+        "run",
+        "eat"
+      ]
+    },
+    {
+      "id": "animal-duck-mallard",
+      "independent_skeleton": true,
+      "baby_scale": 0.5,
+      "missing_clip_rejected": true,
+      "clips": [
+        "idle",
+        "walk",
+        "swim",
+        "eat"
+      ]
+    },
+    {
+      "id": "animal-deer-doe",
+      "independent_skeleton": true,
+      "baby_scale": 0.5,
+      "missing_clip_rejected": true,
+      "clips": [
+        "eat",
+        "run",
+        "idle",
+        "walk"
+      ]
+    },
+    {
+      "id": "animal-deer-stag",
+      "independent_skeleton": true,
+      "baby_scale": 0.5,
+      "missing_clip_rejected": true,
+      "clips": [
+        "eat",
+        "run",
+        "idle",
+        "walk"
+      ]
+    },
+    {
+      "id": "animal-fox",
+      "independent_skeleton": true,
+      "baby_scale": 0.5,
+      "missing_clip_rejected": true,
+      "clips": [
+        "eat",
+        "run",
+        "idle",
+        "walk"
+      ]
+    }
+  ],
+  "local_installed_path": "/Users/adamrussell/Documents/Codex/2026-10-10/ground-streams-lakes-generated-in-code/work/life-hub/apps/life/assets/grove/project-only",
+  "ready_animal_slots": [
+    "animal-rabbit",
+    "animal-squirrel",
+    "animal-bird",
+    "animal-duck",
+    "animal-deer",
+    "animal-fox"
+  ],
+  "full_motion_report_file": "project-only/motion-report.json"
 }

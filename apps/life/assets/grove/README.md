@@ -5,47 +5,71 @@
 
 Grove is a quiet Three.js forest drawn from completed-task history, viewed from above at an angle. It lives below Day and Tasks, separately from them. Home shows today's clearing; tapping it opens the wider forest.
 
-## Download hand-off for Claude
+## Working animal hand-off for Claude
 
-Adam has downloaded the packs below. Check the local files before asking for
-another purchase. Extra project-only files are prepared outside the public repo;
-this repo was still public when checked on 10 October 2026. Adam plans to make
-it private. The public model manifest still contains three animals; that does
-not mean the local project has no additional ingredients.
+**Prepared and tested on 11 October 2026: all required animal slots now have
+working movement clips.** The local project bundle contains seven GLBs. Core
+vegetation remains Quaternius MegaKit Source; core deer/fox remain Quaternius.
+The hare, squirrel, robin and mallard are matching one-off additions.
 
-| Local source | Inspected result |
-| --- | --- |
-| `~/Downloads/Stylized Nature MegaKit[Source]/` | Quaternius, purchased, 116 glTF models, verified CC0; selected vegetation already delivered. |
-| `~/Downloads/low-poly-australian-animals/` | 10 FBX files; source/licence and usable clips remain pending. |
-| `~/Downloads/Animated Low Poly Animals.unitypackage` | Verified public source: [Acorn Bringer](https://acornbringer.itch.io/assets-animated-low-poly-animals). Nine FBX creatures. Unity metadata defines authored bird flight and walking frame ranges; not yet converted or cleared for asset redistribution. |
-| `~/Downloads/4 Rigged Spring Animals.blend` + `Animals Colour.png` | [GameDev.tv Bloom & Burrow](https://gamedev.tv/assets/spring-assets): hare, squirrel, fox, stag. Blender 5.0.1 confirms rigs but no multi-frame actions or NLA clips. Hare and squirrel exported as local rigged GLBs; they still need idle/locomotion animation. |
-| `~/Downloads/LookToTheBirds_FreeSample_AmericanRobin_v1.0.zip` | [Soltorch American Robin](https://soltorchgames.itch.io/animated-low-poly-bird-sample): 20 authored clips. Prepared local GLB retains `idle`, `hop`, `fly`, `eat`; each passed browser motion checks. It hops rather than walks. |
+| Model | Available clips | Motion source |
+| --- | --- | --- |
+| Spring hare | `idle`, `hop`, `run`, `eat` | Original Grove rig-control loops, baked in Blender 5.0.1 |
+| Spring squirrel | `idle`, `walk`, `run`, `eat` | Original Grove rig-control loops, baked in Blender 5.0.1 |
+| Soltorch robin | `idle`, `hop`, `fly`, `eat` | Publisher-authored clips retained |
+| Mallard, Poly by Google | `idle`, `walk`, `swim`, `eat` | Original Grove four-bone rig and motion loops |
+| Quaternius doe, stag, fox | `idle`, `walk`, `run`, `eat` | Publisher-authored clips retained |
 
-The second Spring `.blend` and `Animals Colour (1).png` downloads are duplicates,
-not another species pack. The accompanying `GameDev.tv General Asset License
-2.0.txt` was found and inspected. Both that licence and the robin's bundled
-licence allow finished-project use but prohibit redistributing standalone
-assets, including modified versions. The local prepared files stay out of the
-public asset collection. Making the repo private addresses public sharing,
-but does not turn those licences into CC0.
+The downloaded [GameDev.tv Spring pack](https://gamedev.tv/assets/spring-assets)
+still has only single-frame source actions; the delivered hare/squirrel now
+have **added animation**, not hidden publisher clips. The
+[robin](https://soltorchgames.itch.io/animated-low-poly-bird-sample) hops on the
+ground and flies. The [mallard](https://poly.pizza/m/frSLi6b6Vid) is CC BY 3.0;
+retain its supplied credit in the finished app. The toy-like Gobkit duck was
+inspected and rejected for visual fit. No Cube Pets or Kenney models added.
 
-**Prepared local hand-off:** `outputs/grove-local-animals/` in the Codex task
-workspace, alongside `work/`, not inside the repository. It contains a manifest,
-three optimised GLBs, previews, original licence texts, measured bounds and
-SHA-256-linked browser reports. The exact absolute folder is recorded in
+### Where Claude gets the files
+
+The project-use assets are installed locally at
+`apps/life/assets/grove/project-only/` in this checkout. This folder is
+intentionally gitignored: the repo was still public when checked on 11 October,
+and the Spring/robin licences prohibit standalone public asset redistribution.
+The exact local source bundle is recorded in
 [animal-audit.json](../../../../tools/grove-previews/animal-audit.json).
 
-- Bird: usable authored flight/idle/hop/eat clips, 160,176-byte GLB.
-- Hare and squirrel: usable meshes/rigs, 75,224 / 71,456-byte GLBs, **zero supplied
-  locomotion clips**. They do not yet complete the animated rabbit/squirrel slots.
-- Duck: still missing. Soltorch's [Wetlands pack](https://soltorchgames.itch.io/animated-low-poly-birds-wetlands)
-  lists a mallard with 17 clips; the public page does not verify a swim clip.
+For another **local checkout on Adam's Mac**, run from its repository root:
 
-Detailed download hashes: [downloaded-candidates.json](../../../../tools/grove-previews/downloaded-candidates.json).
+```bash
+node tools/grove-previews/install-project-animals.mjs "/Users/adamrussell/Documents/Codex/2026-10-10/ground-streams-lakes-generated-in-code/outputs/grove-local-animals"
+node tools/grove-previews/serve-animal-demo.mjs apps/life/assets/grove/project-only
+```
+
+The installer checks required clips and model hashes against the motion reports
+before copying. The bundle also has a ZIP, manifest, original licence texts,
+credits, GLBs, previews, browser motion/deformation reports and a live demo.
+The files are available to local Claude; a cloud-only Claude session needs the
+local ZIP attached or another authorised private project-file transfer.
+Public Git alone cannot supply the licensed models.
+
+Use `demo/animal-loader.mjs` with Three.js `GLTFLoader`, `MeshoptDecoder` and
+`SkeletonUtils.clone`. `create(id, {baby: true})` makes a half-size animal with
+its own skeleton/mixer. `play('locomotion')` resolves species-specific walk/hop;
+`play('water')` selects the duck's swim loop. All locomotion is in place: the
+future Grove scene provides paths, parent-following and water avoidance. The
+mallard waterline is recorded in its manifest (0.085 m above the model base).
+These are gentle prototype motion loops; animation timing/foot contact can be
+polished when the real scene establishes movement speed and terrain.
+
+Browser checks sampled actual deformed vertices through each full clip,
+verified finite bounds and loop continuity, and tested independent parent/baby
+skeletons plus every clip button. Existing public inventory remains 67 CC0
+Quaternius GLBs; the local animal bundle is separate from that public manifest.
+
+Other local downloads are preserved: Australian animals (source/licence and
+clip checks pending), Acorn Bringer's Unity animal pack (not needed for these
+filled slots), and duplicate Spring downloads. Detailed download hashes:
+[downloaded-candidates.json](../../../../tools/grove-previews/downloaded-candidates.json).
 MegaKit inventory: [source-edition-inventory.json](../../../../tools/grove-previews/source-edition-inventory.json).
-Adam originally identified the extra packs as SilverAnimations. The confirmed
-Spring and Acorn sources above differ; the original report is retained in the
-inventory, alongside the verified publisher identities.
 
 ## Appearance and behaviour
 
@@ -212,7 +236,7 @@ Run every model through the same pipeline, using `@gltf-transform/cli` via `npx`
 3. **Real-world size:** a mature tree about 4–7 m tall, a rabbit about 0.35 m long, a deer about 1.6 m. Record the measured height in the manifest.
 4. **Clean up:** no cameras or lights. Merge duplicate materials. Keep flat or vertex colours; textures only if the pack needs them, at most 512 px.
 5. **Optimise:** `gltf-transform optimize in.glb out.glb --compress meshopt --texture-compress webp`. Do **not** use Draco; the page loads the meshopt decoder only.
-6. **Animation names:** rename clips to `idle`, `walk`, `run`, `eat`, `sit`, `fly`, `swim` where they match. Record the original names in the manifest.
+6. **Animation names:** rename clips to `idle`, `walk`, `hop`, `run`, `eat`, `sit`, `fly`, `swim` where they match. Record the original names in the manifest.
 
 ## 6. Previews (so Claude can see what it's getting)
 
