@@ -28,12 +28,12 @@ assert.equal(manifest.version,1);assert.equal(manifest.budget_bytes,26214400);as
 assert.equal(models.length,manifest.assets.length);assert.equal(previews.length,manifest.assets.length);
 const io=new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({'meshopt.decoder':MeshoptDecoder});await MeshoptDecoder.ready;
 const seen=new Set(),expectedModels=new Set(),expectedPreviews=new Set();
-const licenseFiles={'Stylized Nature MegaKit (Standard)':'quaternius-stylized-nature-megakit.txt','Ultimate Animated Animal Pack':'quaternius-ultimate-animated-animals.txt','Nature Kit':'kenney-nature-kit.txt'};
+const licenseFiles={'Stylized Nature MegaKit (Source)':'quaternius-stylized-nature-megakit-source.txt','Ultimate Animated Animal Pack':'quaternius-ultimate-animated-animals.txt'};
 const licenseDoc=await fs.readFile(path.join(grove,'LICENSES.md'),'utf8');
 for(const a of manifest.assets){
  assert(!seen.has(a.id));seen.add(a.id);assert(/^[a-z0-9-]+$/.test(a.id));
  assert(['tree','ground','animal'].includes(a.kind));assert(['sapling','young','mature',null].includes(a.stage));
- assert(a.source.page_url.startsWith('https://'));assert(a.source.author&&a.source.original_file&&a.source.downloaded_at);assert(Number.isInteger(a.variant)&&a.variant>0);
+ assert.equal(a.source.author,'Quaternius');assert(a.source.page_url.startsWith('https://'));assert(a.source.author&&a.source.original_file&&a.source.downloaded_at);assert(Number.isInteger(a.variant)&&a.variant>0);
  assert.equal(a.license.id,'CC0-1.0');assert.equal(a.license.attribution,null);assert.equal(a.license.url,'https://creativecommons.org/publicdomain/zero/1.0/');
  const license=licenseFiles[a.source.pack];assert(license);assert.match(await fs.readFile(path.join(grove,'licenses',license),'utf8'),/CC0/i);assert(licenseDoc.includes(a.source.page_url));
  const file=path.resolve(grove,a.file),preview=path.resolve(grove,a.preview);assert(file.startsWith(grove+'/models/'));assert(preview.startsWith(grove+'/previews/'));expectedModels.add(file);expectedPreviews.add(preview);

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generated_at": "2026-10-10T09:17:19.152Z",
+  "generated_at": "2026-10-10T11:56:09.043Z",
   "budget_bytes": 26214400,
-  "total_bytes": 7771347,
+  "total_bytes": 12190698,
   "assets": [
     {
       "id": "tree-life-1-sapling",
@@ -18,7 +18,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/Pine_1.gltf",
@@ -45,7 +45,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/Pine_1.gltf",
@@ -72,7 +72,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/Pine_1.gltf",
@@ -99,7 +99,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/Pine_2.gltf",
@@ -126,7 +126,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/Pine_2.gltf",
@@ -153,7 +153,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/Pine_2.gltf",
@@ -180,7 +180,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/Pine_3.gltf",
@@ -207,7 +207,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/Pine_3.gltf",
@@ -234,7 +234,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/Pine_3.gltf",
@@ -261,7 +261,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_1.gltf",
@@ -288,7 +288,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_1.gltf",
@@ -315,7 +315,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_1.gltf",
@@ -342,7 +342,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_2.gltf",
@@ -369,7 +369,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_2.gltf",
@@ -396,7 +396,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_2.gltf",
@@ -423,7 +423,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_3.gltf",
@@ -450,7 +450,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_3.gltf",
@@ -477,7 +477,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_3.gltf",
@@ -498,16 +498,16 @@
       "stage": "sapling",
       "file": "models/trees/tree-health-1-sapling.glb",
       "preview": "previews/tree-health-1-sapling.png",
-      "bytes": 127808,
-      "triangles": 6255,
+      "bytes": 233344,
+      "triangles": 6374,
       "height_m": 0.65,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_1.gltf",
+        "original_file": "glTF/Birch_1.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -515,7 +515,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh."
+      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant."
     },
     {
       "id": "tree-health-1-young",
@@ -525,16 +525,16 @@
       "stage": "young",
       "file": "models/trees/tree-health-1-young.glb",
       "preview": "previews/tree-health-1-young.png",
-      "bytes": 127812,
-      "triangles": 6255,
+      "bytes": 233320,
+      "triangles": 6374,
       "height_m": 2.4,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_1.gltf",
+        "original_file": "glTF/Birch_1.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -542,7 +542,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh."
+      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant."
     },
     {
       "id": "tree-health-1-mature",
@@ -552,16 +552,16 @@
       "stage": "mature",
       "file": "models/trees/tree-health-1-mature.glb",
       "preview": "previews/tree-health-1-mature.png",
-      "bytes": 127808,
-      "triangles": 6255,
+      "bytes": 233328,
+      "triangles": 6374,
       "height_m": 5.35,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_1.gltf",
+        "original_file": "glTF/Birch_1.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -569,7 +569,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh."
+      "notes": "Distinct authored Birch mesh from Source edition."
     },
     {
       "id": "tree-health-2-sapling",
@@ -579,16 +579,16 @@
       "stage": "sapling",
       "file": "models/trees/tree-health-2-sapling.glb",
       "preview": "previews/tree-health-2-sapling.png",
-      "bytes": 113188,
-      "triangles": 5633,
+      "bytes": 232444,
+      "triangles": 6635,
       "height_m": 0.65,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_2.gltf",
+        "original_file": "glTF/Birch_2.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -596,7 +596,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh."
+      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant."
     },
     {
       "id": "tree-health-2-young",
@@ -606,16 +606,16 @@
       "stage": "young",
       "file": "models/trees/tree-health-2-young.glb",
       "preview": "previews/tree-health-2-young.png",
-      "bytes": 113180,
-      "triangles": 5633,
+      "bytes": 232452,
+      "triangles": 6635,
       "height_m": 2.4,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_2.gltf",
+        "original_file": "glTF/Birch_2.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -623,7 +623,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh."
+      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant."
     },
     {
       "id": "tree-health-2-mature",
@@ -633,16 +633,16 @@
       "stage": "mature",
       "file": "models/trees/tree-health-2-mature.glb",
       "preview": "previews/tree-health-2-mature.png",
-      "bytes": 113184,
-      "triangles": 5633,
+      "bytes": 232440,
+      "triangles": 6635,
       "height_m": 5.7,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_2.gltf",
+        "original_file": "glTF/Birch_2.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -650,7 +650,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh."
+      "notes": "Distinct authored Birch mesh from Source edition."
     },
     {
       "id": "tree-health-3-sapling",
@@ -660,16 +660,16 @@
       "stage": "sapling",
       "file": "models/trees/tree-health-3-sapling.glb",
       "preview": "previews/tree-health-3-sapling.png",
-      "bytes": 100048,
-      "triangles": 3503,
+      "bytes": 227252,
+      "triangles": 5807,
       "height_m": 0.65,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_3.gltf",
+        "original_file": "glTF/Birch_3.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -677,7 +677,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh."
+      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant."
     },
     {
       "id": "tree-health-3-young",
@@ -687,16 +687,16 @@
       "stage": "young",
       "file": "models/trees/tree-health-3-young.glb",
       "preview": "previews/tree-health-3-young.png",
-      "bytes": 100040,
-      "triangles": 3503,
+      "bytes": 227260,
+      "triangles": 5807,
       "height_m": 2.4,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_3.gltf",
+        "original_file": "glTF/Birch_3.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -704,7 +704,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh."
+      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant."
     },
     {
       "id": "tree-health-3-mature",
@@ -714,16 +714,16 @@
       "stage": "mature",
       "file": "models/trees/tree-health-3-mature.glb",
       "preview": "previews/tree-health-3-mature.png",
-      "bytes": 100100,
-      "triangles": 3503,
+      "bytes": 227252,
+      "triangles": 5807,
       "height_m": 6.05,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_3.gltf",
+        "original_file": "glTF/Birch_3.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -731,7 +731,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh."
+      "notes": "Distinct authored Birch mesh from Source edition."
     },
     {
       "id": "tree-wedding-1-sapling",
@@ -741,16 +741,16 @@
       "stage": "sapling",
       "file": "models/trees/tree-wedding-1-sapling.glb",
       "preview": "previews/tree-wedding-1-sapling.png",
-      "bytes": 137304,
-      "triangles": 4065,
+      "bytes": 286876,
+      "triangles": 12870,
       "height_m": 0.65,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_4.gltf",
+        "original_file": "glTF/CherryBlossom_1.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -758,7 +758,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pink-leaf broadleaf stand-in; blossom petals are not modelled."
+      "notes": "Distinct authored CherryBlossom mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Textures capped at 128 px to meet the 300 KB budget. Authored blossom foliage recoloured pink, retaining its alpha mask."
     },
     {
       "id": "tree-wedding-1-young",
@@ -768,16 +768,16 @@
       "stage": "young",
       "file": "models/trees/tree-wedding-1-young.glb",
       "preview": "previews/tree-wedding-1-young.png",
-      "bytes": 137284,
-      "triangles": 4065,
+      "bytes": 286856,
+      "triangles": 12870,
       "height_m": 2.4,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_4.gltf",
+        "original_file": "glTF/CherryBlossom_1.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -785,7 +785,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pink-leaf broadleaf stand-in; blossom petals are not modelled."
+      "notes": "Distinct authored CherryBlossom mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Textures capped at 128 px to meet the 300 KB budget. Authored blossom foliage recoloured pink, retaining its alpha mask."
     },
     {
       "id": "tree-wedding-1-mature",
@@ -795,16 +795,16 @@
       "stage": "mature",
       "file": "models/trees/tree-wedding-1-mature.glb",
       "preview": "previews/tree-wedding-1-mature.png",
-      "bytes": 137292,
-      "triangles": 4065,
-      "height_m": 5.35,
+      "bytes": 286856,
+      "triangles": 12870,
+      "height_m": 5.3499,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_4.gltf",
+        "original_file": "glTF/CherryBlossom_1.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -812,7 +812,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pink-leaf broadleaf stand-in; blossom petals are not modelled."
+      "notes": "Distinct authored CherryBlossom mesh from Source edition. Textures capped at 128 px to meet the 300 KB budget. Authored blossom foliage recoloured pink, retaining its alpha mask."
     },
     {
       "id": "tree-wedding-2-sapling",
@@ -822,16 +822,16 @@
       "stage": "sapling",
       "file": "models/trees/tree-wedding-2-sapling.glb",
       "preview": "previews/tree-wedding-2-sapling.png",
-      "bytes": 131820,
-      "triangles": 3174,
+      "bytes": 291888,
+      "triangles": 13160,
       "height_m": 0.65,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_5.gltf",
+        "original_file": "glTF/CherryBlossom_2.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -839,7 +839,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pink-leaf broadleaf stand-in; blossom petals are not modelled."
+      "notes": "Distinct authored CherryBlossom mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Textures capped at 128 px to meet the 300 KB budget. Authored blossom foliage recoloured pink, retaining its alpha mask."
     },
     {
       "id": "tree-wedding-2-young",
@@ -849,16 +849,16 @@
       "stage": "young",
       "file": "models/trees/tree-wedding-2-young.glb",
       "preview": "previews/tree-wedding-2-young.png",
-      "bytes": 131812,
-      "triangles": 3174,
+      "bytes": 291904,
+      "triangles": 13160,
       "height_m": 2.4,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_5.gltf",
+        "original_file": "glTF/CherryBlossom_2.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -866,7 +866,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pink-leaf broadleaf stand-in; blossom petals are not modelled."
+      "notes": "Distinct authored CherryBlossom mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Textures capped at 128 px to meet the 300 KB budget. Authored blossom foliage recoloured pink, retaining its alpha mask."
     },
     {
       "id": "tree-wedding-2-mature",
@@ -876,16 +876,16 @@
       "stage": "mature",
       "file": "models/trees/tree-wedding-2-mature.glb",
       "preview": "previews/tree-wedding-2-mature.png",
-      "bytes": 131816,
-      "triangles": 3174,
-      "height_m": 5.7,
+      "bytes": 291904,
+      "triangles": 13160,
+      "height_m": 5.7001,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
-        "original_file": "glTF/CommonTree_5.gltf",
+        "original_file": "glTF/CherryBlossom_2.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -893,7 +893,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source geometry per mature variant. Pink-leaf broadleaf stand-in; blossom petals are not modelled."
+      "notes": "Distinct authored CherryBlossom mesh from Source edition. Textures capped at 128 px to meet the 300 KB budget. Authored blossom foliage recoloured pink, retaining its alpha mask."
     },
     {
       "id": "tree-other-1-sapling",
@@ -909,7 +909,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_4.gltf",
@@ -936,7 +936,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_4.gltf",
@@ -963,7 +963,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_4.gltf",
@@ -990,7 +990,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_5.gltf",
@@ -1017,7 +1017,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_5.gltf",
@@ -1044,7 +1044,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/CommonTree_5.gltf",
@@ -1071,7 +1071,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/TwistedTree_1.gltf",
@@ -1098,7 +1098,7 @@
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Stylized Nature MegaKit (Standard)",
+        "pack": "Stylized Nature MegaKit (Source)",
         "author": "Quaternius",
         "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
         "original_file": "glTF/TwistedTree_2.gltf",
@@ -1119,16 +1119,16 @@
       "stage": null,
       "file": "models/ground/grass-1.glb",
       "preview": "previews/grass-1.png",
-      "bytes": 3852,
-      "triangles": 132,
+      "bytes": 5224,
+      "triangles": 155,
       "height_m": 0.25,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "grass.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Grass_Common_Short.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1136,7 +1136,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "grass-2",
@@ -1146,16 +1146,16 @@
       "stage": null,
       "file": "models/ground/grass-2.glb",
       "preview": "previews/grass-2.png",
-      "bytes": 5188,
-      "triangles": 224,
+      "bytes": 7612,
+      "triangles": 370,
       "height_m": 0.25,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "grass_large.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Grass_Wide_Short.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1163,7 +1163,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "grass-3",
@@ -1173,16 +1173,16 @@
       "stage": null,
       "file": "models/ground/grass-3.glb",
       "preview": "previews/grass-3.png",
-      "bytes": 2384,
-      "triangles": 36,
+      "bytes": 10680,
+      "triangles": 494,
       "height_m": 0.25,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "grass_leafs.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Grass_Wispy_Short.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1190,7 +1190,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "grass-4",
@@ -1200,16 +1200,16 @@
       "stage": null,
       "file": "models/ground/grass-4.glb",
       "preview": "previews/grass-4.png",
-      "bytes": 3904,
-      "triangles": 144,
+      "bytes": 6988,
+      "triangles": 319,
       "height_m": 0.25,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "grass_leafsLarge.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Grass_Common_Tall.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1217,7 +1217,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "flower-1",
@@ -1227,16 +1227,16 @@
       "stage": null,
       "file": "models/ground/flower-1.glb",
       "preview": "previews/flower-1.png",
-      "bytes": 3840,
-      "triangles": 75,
+      "bytes": 23440,
+      "triangles": 135,
       "height_m": 0.3,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "flower_redA.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Flower_1_Single.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1244,7 +1244,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source mesh; petal material recoloured so the six entries have red, orange, yellow, cream, purple and blue flowers. Green foliage palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "flower-2",
@@ -1254,16 +1254,16 @@
       "stage": null,
       "file": "models/ground/flower-2.glb",
       "preview": "previews/flower-2.png",
-      "bytes": 3952,
-      "triangles": 83,
+      "bytes": 26680,
+      "triangles": 293,
       "height_m": 0.3,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "flower_redB.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Flower_2_Single.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1271,7 +1271,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source mesh; petal material recoloured so the six entries have red, orange, yellow, cream, purple and blue flowers. Green foliage palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "flower-3",
@@ -1281,16 +1281,16 @@
       "stage": null,
       "file": "models/ground/flower-3.glb",
       "preview": "previews/flower-3.png",
-      "bytes": 3832,
-      "triangles": 69,
+      "bytes": 26328,
+      "triangles": 285,
       "height_m": 0.3,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "flower_yellowA.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Flower_3_Single.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1298,7 +1298,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source mesh; petal material recoloured so the six entries have red, orange, yellow, cream, purple and blue flowers. Green foliage palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "flower-4",
@@ -1308,16 +1308,16 @@
       "stage": null,
       "file": "models/ground/flower-4.glb",
       "preview": "previews/flower-4.png",
-      "bytes": 4572,
-      "triangles": 148,
+      "bytes": 30752,
+      "triangles": 642,
       "height_m": 0.3,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "flower_yellowB.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Flower_4_Single.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1325,7 +1325,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source mesh; petal material recoloured so the six entries have red, orange, yellow, cream, purple and blue flowers. Green foliage palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "flower-5",
@@ -1335,16 +1335,16 @@
       "stage": null,
       "file": "models/ground/flower-5.glb",
       "preview": "previews/flower-5.png",
-      "bytes": 3856,
-      "triangles": 75,
-      "height_m": 0.3,
+      "bytes": 24476,
+      "triangles": 93,
+      "height_m": 0.2999,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "flower_purpleA.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Flower_6.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1352,7 +1352,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source mesh; petal material recoloured so the six entries have red, orange, yellow, cream, purple and blue flowers. Green foliage palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "flower-6",
@@ -1362,16 +1362,16 @@
       "stage": null,
       "file": "models/ground/flower-6.glb",
       "preview": "previews/flower-6.png",
-      "bytes": 4016,
-      "triangles": 85,
+      "bytes": 26520,
+      "triangles": 286,
       "height_m": 0.3,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "flower_purpleB.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Flower_7_Single.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1379,7 +1379,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct source mesh; petal material recoloured so the six entries have red, orange, yellow, cream, purple and blue flowers. Green foliage palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "bush-1",
@@ -1389,16 +1389,16 @@
       "stage": null,
       "file": "models/ground/bush-1.glb",
       "preview": "previews/bush-1.png",
-      "bytes": 2464,
-      "triangles": 32,
+      "bytes": 30392,
+      "triangles": 900,
       "height_m": 0.7,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "plant_bush.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Bush_Common.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1406,7 +1406,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "bush-2",
@@ -1416,16 +1416,16 @@
       "stage": null,
       "file": "models/ground/bush-2.glb",
       "preview": "previews/bush-2.png",
-      "bytes": 3624,
-      "triangles": 104,
-      "height_m": 0.6999,
+      "bytes": 28828,
+      "triangles": 864,
+      "height_m": 0.7001,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "plant_bushDetailed.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Bush_Large.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1433,7 +1433,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "bush-3",
@@ -1443,16 +1443,16 @@
       "stage": null,
       "file": "models/ground/bush-3.glb",
       "preview": "previews/bush-3.png",
-      "bytes": 2412,
-      "triangles": 30,
+      "bytes": 21248,
+      "triangles": 522,
       "height_m": 0.7,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "plant_bushTriangle.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Bush_Long_1.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1460,7 +1460,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "bush-4",
@@ -1470,16 +1470,16 @@
       "stage": null,
       "file": "models/ground/bush-4.glb",
       "preview": "previews/bush-4.png",
-      "bytes": 2520,
-      "triangles": 39,
-      "height_m": 0.6999,
+      "bytes": 116672,
+      "triangles": 5389,
+      "height_m": 0.7,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "plant_bushLargeTriangle.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Bush_Long_2.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1487,7 +1487,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "rock-1",
@@ -1497,16 +1497,16 @@
       "stage": null,
       "file": "models/ground/rock-1.glb",
       "preview": "previews/rock-1.png",
-      "bytes": 3164,
-      "triangles": 16,
+      "bytes": 9528,
+      "triangles": 342,
       "height_m": 0.5,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "rock_smallA.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Rock_Medium_1.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1514,7 +1514,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "rock-2",
@@ -1524,16 +1524,16 @@
       "stage": null,
       "file": "models/ground/rock-2.glb",
       "preview": "previews/rock-2.png",
-      "bytes": 3284,
-      "triangles": 24,
+      "bytes": 8356,
+      "triangles": 244,
       "height_m": 0.65,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "rock_smallB.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Rock_Medium_2.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1541,7 +1541,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "rock-3",
@@ -1551,16 +1551,16 @@
       "stage": null,
       "file": "models/ground/rock-3.glb",
       "preview": "previews/rock-3.png",
-      "bytes": 4048,
-      "triangles": 80,
-      "height_m": 0.7999,
+      "bytes": 11780,
+      "triangles": 522,
+      "height_m": 0.8,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "rock_largeA.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Rock_Medium_3.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1568,7 +1568,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "rock-4",
@@ -1578,16 +1578,16 @@
       "stage": null,
       "file": "models/ground/rock-4.glb",
       "preview": "previews/rock-4.png",
-      "bytes": 5044,
-      "triangles": 85,
-      "height_m": 0.9501,
+      "bytes": 23496,
+      "triangles": 1726,
+      "height_m": 0.95,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "rock_largeB.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Rock_Big_1.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1595,7 +1595,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "rock-5",
@@ -1605,16 +1605,16 @@
       "stage": null,
       "file": "models/ground/rock-5.glb",
       "preview": "previews/rock-5.png",
-      "bytes": 5568,
-      "triangles": 136,
-      "height_m": 1.1,
+      "bytes": 25144,
+      "triangles": 1924,
+      "height_m": 1.1001,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "rock_tallA.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Rock_Big_2.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1622,88 +1622,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
-    },
-    {
-      "id": "stump-1",
-      "slot": "stump",
-      "kind": "ground",
-      "variant": 1,
-      "stage": null,
-      "file": "models/ground/stump-1.glb",
-      "preview": "previews/stump-1.png",
-      "bytes": 2572,
-      "triangles": 56,
-      "height_m": 0.5,
-      "animations": [],
-      "animation_source_names": {},
-      "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "stump_round.glb",
-        "downloaded_at": "2026-10-10"
-      },
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "attribution": null
-      },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
-    },
-    {
-      "id": "stump-2",
-      "slot": "stump",
-      "kind": "ground",
-      "variant": 2,
-      "stage": null,
-      "file": "models/ground/stump-2.glb",
-      "preview": "previews/stump-2.png",
-      "bytes": 3420,
-      "triangles": 120,
-      "height_m": 0.5,
-      "animations": [],
-      "animation_source_names": {},
-      "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "stump_old.glb",
-        "downloaded_at": "2026-10-10"
-      },
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "attribution": null
-      },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
-    },
-    {
-      "id": "stump-3",
-      "slot": "stump",
-      "kind": "ground",
-      "variant": 3,
-      "stage": null,
-      "file": "models/ground/stump-3.glb",
-      "preview": "previews/stump-3.png",
-      "bytes": 4124,
-      "triangles": 200,
-      "height_m": 0.4999,
-      "animations": [],
-      "animation_source_names": {},
-      "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "log.glb",
-        "downloaded_at": "2026-10-10"
-      },
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "attribution": null
-      },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "mushroom-1",
@@ -1713,16 +1632,16 @@
       "stage": null,
       "file": "models/ground/mushroom-1.glb",
       "preview": "previews/mushroom-1.png",
-      "bytes": 3492,
-      "triangles": 48,
+      "bytes": 12724,
+      "triangles": 880,
       "height_m": 0.2,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "mushroom_red.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Mushroom_Common.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1730,7 +1649,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "mushroom-2",
@@ -1740,16 +1659,16 @@
       "stage": null,
       "file": "models/ground/mushroom-2.glb",
       "preview": "previews/mushroom-2.png",
-      "bytes": 3488,
-      "triangles": 48,
+      "bytes": 11656,
+      "triangles": 704,
       "height_m": 0.2,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "mushroom_redTall.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Mushroom_RedCap.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1757,7 +1676,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "mushroom-3",
@@ -1767,16 +1686,16 @@
       "stage": null,
       "file": "models/ground/mushroom-3.glb",
       "preview": "previews/mushroom-3.png",
-      "bytes": 4812,
-      "triangles": 144,
+      "bytes": 19000,
+      "triangles": 1640,
       "height_m": 0.2,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "mushroom_tanGroup.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Mushroom_Oyster.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1784,115 +1703,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
-    },
-    {
-      "id": "reed-1",
-      "slot": "reed",
-      "kind": "ground",
-      "variant": 1,
-      "stage": null,
-      "file": "models/ground/reed-1.glb",
-      "preview": "previews/reed-1.png",
-      "bytes": 2280,
-      "triangles": 44,
-      "height_m": 0.85,
-      "animations": [],
-      "animation_source_names": {},
-      "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "plant_flatShort.glb",
-        "downloaded_at": "2026-10-10"
-      },
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "attribution": null
-      },
-      "notes": "Flat grass-like waterside plant stand-in; no cattail seed head. Only two distinct meshes available. Green foliage and brown wood palette adjusted for Grove."
-    },
-    {
-      "id": "reed-2",
-      "slot": "reed",
-      "kind": "ground",
-      "variant": 2,
-      "stage": null,
-      "file": "models/ground/reed-2.glb",
-      "preview": "previews/reed-2.png",
-      "bytes": 2208,
-      "triangles": 32,
-      "height_m": 1.1,
-      "animations": [],
-      "animation_source_names": {},
-      "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "plant_flatTall.glb",
-        "downloaded_at": "2026-10-10"
-      },
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "attribution": null
-      },
-      "notes": "Flat grass-like waterside plant stand-in; no cattail seed head. Only two distinct meshes available. Green foliage and brown wood palette adjusted for Grove."
-    },
-    {
-      "id": "lily-1",
-      "slot": "lily",
-      "kind": "ground",
-      "variant": 1,
-      "stage": null,
-      "file": "models/ground/lily-1.glb",
-      "preview": "previews/lily-1.png",
-      "bytes": 3708,
-      "triangles": 52,
-      "height_m": 0.04,
-      "animations": [],
-      "animation_source_names": {},
-      "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "lily_small.glb",
-        "downloaded_at": "2026-10-10"
-      },
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "attribution": null
-      },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
-    },
-    {
-      "id": "lily-2",
-      "slot": "lily",
-      "kind": "ground",
-      "variant": 2,
-      "stage": null,
-      "file": "models/ground/lily-2.glb",
-      "preview": "previews/lily-2.png",
-      "bytes": 5060,
-      "triangles": 86,
-      "height_m": 0.04,
-      "animations": [],
-      "animation_source_names": {},
-      "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "lily_large.glb",
-        "downloaded_at": "2026-10-10"
-      },
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "attribution": null
-      },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
       "id": "bridge-1",
@@ -1902,16 +1713,16 @@
       "stage": null,
       "file": "models/ground/bridge-1.glb",
       "preview": "previews/bridge-1.png",
-      "bytes": 6648,
-      "triangles": 288,
-      "height_m": 0.6499,
+      "bytes": 76816,
+      "triangles": 3500,
+      "height_m": 0.12,
       "animations": [],
       "animation_source_names": {},
       "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "bridge_woodRoundNarrow.glb",
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/RockPath_Round_Wide.gltf",
         "downloaded_at": "2026-10-10"
       },
       "license": {
@@ -1919,7 +1730,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": " Green foliage and brown wood palette adjusted for Grove."
+      "notes": "Authored stepping-stone path, supplied for the bridge/stepping-stones slot. Not a wooden bridge."
     },
     {
       "id": "animal-deer-doe",
