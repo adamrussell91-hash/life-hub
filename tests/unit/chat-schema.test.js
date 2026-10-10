@@ -524,3 +524,64 @@ test('measurements accepts retained extra numeric tape sites', () => {
   assert.equal(result.valid, true, JSON.stringify(result.errors));
   assert.equal(result.record.extra_metrics[0].value, 31.5);
 });
+
+test('planned Cindy AMRAP gets round-slots; completed trimmed AMRAP stays trimmed', () => {
+  const thin = [
+    {
+      name: 'Push Up',
+      tracking: 'bodyweight_reps',
+      superset_group: 1,
+      superset_label: 'Cindy',
+      block: { kind: 'circuit', format: 'amrap', time_cap_sec: 180 },
+      sets: [{ reps: 5, cable_type: 'none' }]
+    },
+    {
+      name: 'Bench Dip',
+      tracking: 'bodyweight_reps',
+      superset_group: 1,
+      sets: [{ reps: 5, cable_type: 'none' }]
+    }
+  ];
+  const planned = validateLogEntry({
+    type: 'workout',
+    date: '2026-10-10',
+    fields: {
+      title: 'Cindy night',
+      session_kind: 'strength',
+      day_type: 'workout_30',
+      status: 'planned',
+      exercises: thin
+    }
+  }, { id: 'cindy-planned', now: '2026-10-10T18:00:00+11:00' });
+  assert.equal(planned.valid, true, JSON.stringify(planned.errors));
+  assert.equal(planned.record.exercises[0].sets.length, 6);
+  assert.equal(planned.record.exercises[1].sets.length, 6);
+
+  const trimmed = [
+    {
+      ...thin[0],
+      block: { kind: 'circuit', format: 'amrap', time_cap_sec: 180, result: { rounds: 2, time_sec: 180 } },
+      sets: [{ reps: 5, cable_type: 'none' }, { reps: 5, cable_type: 'none' }]
+    },
+    {
+      ...thin[1],
+      sets: [{ reps: 5, cable_type: 'none' }, { reps: 5, cable_type: 'none' }]
+    }
+  ];
+  const completed = validateLogEntry({
+    type: 'workout',
+    date: '2026-10-10',
+    notes: 'Cindy night — 2 rounds',
+    fields: {
+      title: 'Cindy night',
+      session_kind: 'strength',
+      day_type: 'workout_30',
+      status: 'completed',
+      exercises: trimmed
+    }
+  }, { id: 'cindy-done', now: '2026-10-10T20:00:00+11:00' });
+  assert.equal(completed.valid, true, JSON.stringify(completed.errors));
+  assert.equal(completed.record.exercises[0].sets.length, 2);
+  assert.equal(completed.record.exercises[1].sets.length, 2);
+  assert.equal(completed.record.exercises[0].block.result.rounds, 2);
+});

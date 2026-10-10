@@ -561,5 +561,15 @@ test('AEKE stats land on the record; an AMRAP drops the rounds you never played'
   assert.equal(fields.exercises[0].sets.length, 2);
   assert.equal(fields.exercises[1].sets.length, 2);
   assert.equal(fields.exercises[0].block.result.rounds, 2);
+  // Confirm persistence must not re-pad the trimmed AMRAP (the bug that undid finish).
+  const { validateLogEntry } = await import('../../netlify/functions/_shared/chat-schema.mjs');
+  const persisted = validateLogEntry(confirms[0].candidate, {
+    id: 'amrap-finish',
+    now: '2026-10-10T20:00:00+11:00'
+  });
+  assert.equal(persisted.valid, true, JSON.stringify(persisted.errors));
+  assert.equal(persisted.record.exercises[0].sets.length, 2);
+  assert.equal(persisted.record.exercises[1].sets.length, 2);
+  assert.equal(persisted.record.exercises[0].block.result.rounds, 2);
   controller.destroy();
 });

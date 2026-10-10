@@ -38,14 +38,66 @@ test('formatSupersetBlockLabel prefers explicit labels', () => {
 });
 
 import {
+  amrapRoundCapacity,
   buildLoggerSteps,
   buildSessionSteps,
   copyExerciseStructure,
-  formatBlockScheme
+  formatBlockScheme,
+  provisionAmrapCircuitRounds
 } from '../../apps/life/js/core/workout-plan-groups.js';
 import { validateRecord } from '../../apps/life/js/core/validate.js';
 import { collapseSetSplitExercises } from '../../netlify/functions/_shared/workout-history.mjs';
 import { buildTemplateRecord } from '../../netlify/functions/_shared/workout-templates.mjs';
+
+test('amrapRoundCapacity plans enough Cindy round-slots for a 3-minute window', () => {
+  assert.equal(amrapRoundCapacity(180), 6);
+  assert.equal(amrapRoundCapacity(180, 3), 3);
+  assert.equal(amrapRoundCapacity(null), 8);
+});
+
+test('provisionAmrapCircuitRounds expands a one-set AMRAP Cindy to capacity', () => {
+  const exercises = [
+    { name: 'Push Up', tracking: 'bodyweight_reps', superset_group: 1, superset_label: 'Cindy',
+      block: { kind: 'circuit', format: 'amrap', time_cap_sec: 180 },
+      sets: [{ reps: 5, cable_type: 'none' }] },
+    { name: 'Bench Dip', tracking: 'bodyweight_reps', superset_group: 1, sets: [{ reps: 5, cable_type: 'none' }] },
+    { name: 'Bodyweight Russian Twist', tracking: 'bodyweight_reps', superset_group: 1, sets: [{ reps: 5, cable_type: 'none' }] },
+    { name: 'Bent Leg Reverse Crunch', tracking: 'bodyweight_reps', superset_group: 1, sets: [{ reps: 5, cable_type: 'none' }] }
+  ];
+  provisionAmrapCircuitRounds(exercises);
+  for (const exercise of exercises) {
+    assert.equal(exercise.sets.length, 6);
+    assert.deepEqual(exercise.sets.map(set => set.reps), [5, 5, 5, 5, 5, 5]);
+  }
+  const { steps } = buildLoggerSteps(exercises);
+  assert.equal(steps.filter(step => step.kind === 'round').length, 6);
+});
+
+test('provisionAmrapCircuitRounds still works when Chadwick omits block.kind', () => {
+  const exercises = [
+    { name: 'Push Up', tracking: 'bodyweight_reps', superset_group: 1, superset_label: 'Cindy',
+      block: { format: 'amrap', time_cap_sec: 180 }, sets: [{ reps: 5, cable_type: 'none' }] },
+    { name: 'Bench Dip', tracking: 'bodyweight_reps', superset_group: 1, sets: [{ reps: 5, cable_type: 'none' }] }
+  ];
+  provisionAmrapCircuitRounds(exercises);
+  assert.equal(exercises[0].block.kind, 'circuit');
+  assert.equal(exercises[0].sets.length, 6);
+  assert.equal(exercises[1].sets.length, 6);
+});
+
+test('collapseSetSplitExercises does not re-pad a trimmed completed AMRAP', () => {
+  const out = collapseSetSplitExercises([
+    {
+      name: 'Push Up',
+      superset_group: 1,
+      block: { kind: 'circuit', format: 'amrap', time_cap_sec: 180, result: { rounds: 2, time_sec: 180 } },
+      sets: [{ reps: 5 }, { reps: 5 }]
+    },
+    { name: 'Bench Dip', superset_group: 1, sets: [{ reps: 5 }, { reps: 5 }] }
+  ], { keepGroups: true });
+  assert.equal(out[0].sets.length, 2);
+  assert.equal(out[1].sets.length, 2);
+});
 
 const sets = n => Array.from({ length: n }, () => ({ reps: 10, weight_kg: 20, cable_type: 'constant_force' }));
 

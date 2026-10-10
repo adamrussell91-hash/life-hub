@@ -101,6 +101,73 @@ test('Pump Report tallies ghosts, PRs, failure, volume delta and a Chadwick line
   assert.match(report.chadwick, /Bar Press/);
 });
 
+import {
+  buildLastCircuits,
+  circuitFamilyKey,
+  compareCircuitGhost,
+  isCircuitMember
+} from '../../apps/life/js/app/fitness-progression.js';
+
+test('Cindy family keys fold Pump & Dump nicknames onto one ghost lane', () => {
+  assert.equal(circuitFamilyKey('Cindy'), 'cindy');
+  assert.equal(circuitFamilyKey('Pump & Dump finisher'), 'cindy');
+  assert.equal(circuitFamilyKey('Pump & Dump'), 'cindy');
+  assert.equal(circuitFamilyKey('pump and dump'), 'cindy');
+  assert.equal(circuitFamilyKey('Cindy Remix'), 'cindy');
+});
+
+test('circuit ghosts race whole-circuit score, not per-move reps', () => {
+  assert.deepEqual(
+    compareCircuitGhost({ rounds: 5, time_sec: 180 }, { rounds: 3, time_sec: 180 }, 'amrap'),
+    { verdict: 'beat', label: '+2 rounds' }
+  );
+  assert.deepEqual(
+    compareCircuitGhost({ rounds: 3, time_sec: 96 }, { rounds: 3, time_sec: 110 }, 'for_time'),
+    { verdict: 'beat', label: '−14s' }
+  );
+  const cindy = [
+    { name: 'Push Up', tracking: 'bodyweight_reps', superset_group: 1, superset_label: 'Cindy',
+      block: { kind: 'circuit', format: 'amrap', time_cap_sec: 180, result: { rounds: 5, time_sec: 180 } },
+      sets: [{ reps: 5 }, { reps: 5 }, { reps: 5 }, { reps: 5 }, { reps: 5 }] },
+    { name: 'Bench Dip', tracking: 'bodyweight_reps', superset_group: 1, sets: [{ reps: 5 }, { reps: 5 }, { reps: 5 }, { reps: 5 }, { reps: 5 }] }
+  ];
+  assert.equal(isCircuitMember(cindy[0], cindy), true);
+  assert.equal(isCircuitMember(cindy[1], cindy), true);
+  const report = buildPumpReport({ title: 'Cindy night', exercises: cindy }, {
+    lastPerformance: {
+      'push up': { sets: [{ reps: 5 }, { reps: 5 }, { reps: 5 }, { reps: 5 }, { reps: 5 }] },
+      'bench dip': { sets: [{ reps: 5 }, { reps: 5 }, { reps: 5 }, { reps: 5 }, { reps: 5 }] }
+    },
+    lastCircuits: {
+      cindy: { label: 'Pump & Dump', date: '2026-10-06', format: 'amrap', result: { rounds: 3, time_sec: 180 } }
+    }
+  });
+  assert.equal(report.ghostsRaced, 1, 'one circuit ghost, not ten fixed-rep set ghosts');
+  assert.equal(report.ghostsBeaten, 1);
+  assert.equal(report.circuits[0].ghost.verdict, 'beat');
+});
+
+test('buildLastCircuits keeps the latest Cindy score under the family key', () => {
+  const circuits = buildLastCircuits([
+    done('2026-10-04', {
+      exercises: [{
+        name: 'Push Up', superset_group: 1, superset_label: 'Cindy',
+        block: { kind: 'circuit', format: 'for_time', result: { rounds: 3, time_sec: 96 } },
+        sets: [{ reps: 5 }]
+      }]
+    }),
+    done('2026-10-06', {
+      exercises: [{
+        name: 'Push Up', superset_group: 1, superset_label: 'Pump & Dump',
+        block: { kind: 'circuit', format: 'amrap', time_cap_sec: 180, result: { rounds: 5, time_sec: 180 } },
+        sets: [{ reps: 5 }]
+      }]
+    })
+  ], '2026-10-10');
+  assert.equal(circuits.cindy.result.rounds, 5);
+  assert.equal(circuits.cindy.label, 'Pump & Dump');
+});
+
 test('chadwickLine falls back to honest, earned lines', () => {
   assert.match(chadwickLine({ ghostsRaced: 4, ghostsBeaten: 3 }), /3 of 4 sets/);
   assert.match(chadwickLine({ failureSets: 3 }), /3 sets taken to failure/);
