@@ -1,3 +1,4 @@
+import { clickMenuAction, holdDelete, menuItem } from './helpers/hub-list';
 import { describe, it, expect } from 'vitest';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES } from '@/blocks/create-block';
@@ -185,22 +186,20 @@ describe('card stack editor', () => {
     };
     rebuild();
     const add = () =>
-      (mount.querySelector('.block-editor__card-stack-add') as HTMLButtonElement).click();
+      (mount.querySelector('.hub-list__add') as HTMLButtonElement).click();
     for (let i = 0; i < 5; i += 1) add();
     expect(latest.block_type === 'card_stack' && latest.content.cards).toHaveLength(8);
     expect(
-      (mount.querySelector('.block-editor__card-stack-add') as HTMLButtonElement).disabled
+      (mount.querySelector('.hub-list__add') as HTMLButtonElement).disabled
     ).toBe(true);
     while (latest.block_type === 'card_stack' && latest.content.cards.length > 1) {
-      (mount.querySelector('.block-editor__card-stack-remove') as HTMLButtonElement).click();
+      holdDelete(mount.querySelector('.hub-list__row .hub-list__more')!);
     }
     expect(latest.block_type === 'card_stack' && latest.content.cards).toHaveLength(1);
-    expect(
-      (mount.querySelector('.block-editor__card-stack-remove') as HTMLButtonElement).disabled
-    ).toBe(true);
+    expect(menuItem(mount.querySelector('.hub-list__row .hub-list__more')!, 'delete')?.disabled).toBe(true);
   });
 
-  it('reorders cards with up/down', () => {
+  it('reorders cards from the row menu', () => {
     const block = createBlock('card_stack', 'cs1');
     if (block.block_type !== 'card_stack') throw new Error('expected card_stack');
     block.content.cards[0]!.title = 'A';
@@ -217,8 +216,7 @@ describe('card stack editor', () => {
       );
     };
     rebuild();
-    const downs = mount.querySelectorAll('.block-editor__card-stack-down');
-    (downs[0] as HTMLButtonElement).click();
+    clickMenuAction(mount.querySelector('.hub-list__row .hub-list__more')!, 'down');
     expect(latest.block_type === 'card_stack' && latest.content.cards.map((card) => card.title)).toEqual([
       'B',
       'A',
