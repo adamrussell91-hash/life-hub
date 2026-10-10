@@ -124,25 +124,26 @@ async function bootApp(root: HTMLElement): Promise<void> {
         let fixture: JournalFixture;
         let journalVersion: string | undefined;
         let displayTitle: string | undefined;
+        let tripForJournal: import('@/types').Trip | undefined;
         if (journalUseFixture()) {
           fixture = klIstanbulFixture();
         } else {
           const envelope = await ensureJournal(route.tripId);
           fixture = envelope.journal;
           journalVersion = envelope.version;
-          if (!fixture.title.trim()) {
-            try {
-              const { trip } = await getTrip(route.tripId);
-              displayTitle = trip.title;
-            } catch {
-              /* title stays blank until trip load works */
-            }
+          try {
+            const { trip } = await getTrip(route.tripId);
+            tripForJournal = trip;
+            if (!fixture.title.trim()) displayTitle = trip.title;
+          } catch {
+            /* title stays blank until trip load works */
           }
         }
         journalHandle = renderJournal(shell.canvas, {
           fixture,
           journalVersion,
           displayTitle,
+          trip: tripForJournal,
           momentId: route.momentId,
           patternOff: journalPatternOff()
         });

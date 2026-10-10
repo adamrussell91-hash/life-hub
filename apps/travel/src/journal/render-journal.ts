@@ -1,4 +1,6 @@
-import type { JournalFixture, JournalLeg, JournalTransition } from '@/journal/types';
+import type { JournalFixture, JournalLeg } from '@/journal/types';
+import type { Trip } from '@/types';
+import { renderJournalTransition, transitionForFromLeg } from '@/journal/transitions';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { prefersReducedMotion } from '../../design-kit/js/hub-motion.js';
 import { getPattern } from '@/journal/patterns/registry';
@@ -24,50 +26,9 @@ export interface RenderJournalOptions {
   journalVersion?: string;
   /** Trip title when journal.title is still empty (live API journal). */
   displayTitle?: string;
+  /** Trip itinerary for transition ticket links (optional in fixture preview). */
+  trip?: Trip;
   onChapterJump?: (id: string) => void;
-}
-
-function transitionModeLabel(mode: JournalTransition['mode']): string {
-  const map: Record<JournalTransition['mode'], string> = {
-    flight: '✈',
-    train: '🚆',
-    car: '🚗',
-    ferry: '⛴',
-    other: '→',
-  };
-  return map[mode] ?? '→';
-}
-
-function renderTransition(trn: JournalTransition): HTMLElement {
-  const block = document.createElement('div');
-  block.className = 'journal-transition';
-  block.setAttribute('data-journal-transition', trn.id);
-  block.id = trn.id;
-
-  const date = document.createElement('p');
-  date.className = 'journal-transition__date num';
-  if (trn.local_date) date.textContent = formatDisplayDate(trn.local_date);
-
-  const mode = document.createElement('span');
-  mode.className = 'journal-transition__mode';
-  mode.setAttribute('aria-hidden', 'true');
-  mode.textContent = transitionModeLabel(trn.mode);
-
-  const route = document.createElement('p');
-  route.className = 'journal-transition__route';
-  const dep = trn.departure_label ?? 'Departure';
-  const arr = trn.arrival_label ?? 'Arrival';
-  route.textContent = `${dep} → ${arr}`;
-
-  const details = document.createElement('button');
-  details.type = 'button';
-  details.className = 'btn btn--ghost journal-transition__details';
-  details.textContent = 'View journey details';
-  details.disabled = true;
-  details.title = 'Coming in Phase 3';
-
-  block.append(date, mode, route, details);
-  return block;
 }
 
 function renderLegPattern(leg: JournalLeg, patternOff: boolean): HTMLElement | null {
@@ -175,7 +136,9 @@ export function renderJournal(
 
   let liveFixture: JournalFixture = opts.fixture;
   let liveVersion = opts.journalVersion ?? 'fixture';
+  let liveTrip = opts.trip;
   const journalDoc = () => liveFixture as JournalDocument;
+  const legsById = () => new Map(liveFixture.legs.map((leg) => [leg.id, leg]));
   const toolbarTitle = () =>
     opts.displayTitle?.trim() || liveFixture.title.trim() || 'Your trip';
 
@@ -425,10 +388,24 @@ export function renderJournal(
 
       host.append(legSection);
 
-      const trn = liveFixture.transitions.find(
-        (t) => t.lifecycle === 'live' && t.from_leg_id === leg.id,
-      );
-      if (trn) host.append(renderTransition(trn));
+      const trn = transitionForFromLeg(liveFixture, leg.id);
+      if (trn) {
+        host.append(
+          renderJournalTransition({
+            trn,
+            tripId: liveFixture.trip_id,
+            ctx: { legsById: legsById(), trip: liveTrip },
+            journal: journalDoc(),
+            version: liveVersion,
+            anchor: root,
+            onJournalSaved: (envelope) => {
+              liveFixture = envelope.journal;
+              liveVersion = envelope.version;
+              rebuildStory();
+            },
+          }),
+        );
+      }
     }
   }
 

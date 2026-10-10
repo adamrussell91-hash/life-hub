@@ -30,6 +30,13 @@ export interface JournalMedia extends JournalDeletedMeta {
   lifecycle: JournalLifecycle;
   /** SHA-256 hex of original bytes when known (live API journal). */
   checksum?: string;
+  caption?: string;
+}
+
+export interface JournalTransitionDisplayOverride {
+  local_date?: string;
+  departure_label?: string;
+  arrival_label?: string;
 }
 
 export interface JournalMoment extends JournalDeletedMeta {
@@ -77,6 +84,10 @@ export interface JournalTransition extends JournalDeletedMeta {
   local_date?: string;
   departure_label?: string;
   arrival_label?: string;
+  /** Linked trip itinerary item (flight/train ticket). Journal display only — never mutates bookings on save. */
+  itinerary_item_id?: string;
+  /** Owner-corrected labels; does not write back to itinerary. */
+  display_override?: JournalTransitionDisplayOverride;
 }
 
 export interface JournalFixture extends JournalDeletedMeta {
