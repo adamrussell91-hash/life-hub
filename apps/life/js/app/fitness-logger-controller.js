@@ -285,6 +285,8 @@ export function createFitnessLoggerController({
       rounds: roundsDone,
       ...(timeSec > 0 ? { time_sec: timeSec } : {})
     };
+    // Layout blocks snapshot result at relayout — keep the live score/ghost in sync.
+    block.result = owner.block.result;
   }
 
   function toggleCircuitClock(block) {
@@ -346,6 +348,7 @@ export function createFitnessLoggerController({
     if (!owner) return;
     owner.block = { kind: 'circuit', ...(owner.block ?? {}) };
     owner.block.result = { ...(owner.block.result ?? {}), [field]: Math.max(0, Number(value) || 0) };
+    block.result = owner.block.result;
     touchDraft();
   }
 

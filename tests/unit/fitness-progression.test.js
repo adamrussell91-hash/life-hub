@@ -112,6 +112,8 @@ test('Cindy family keys fold Pump & Dump nicknames onto one ghost lane', () => {
   assert.equal(circuitFamilyKey('Cindy'), 'cindy');
   assert.equal(circuitFamilyKey('Pump & Dump finisher'), 'cindy');
   assert.equal(circuitFamilyKey('Pump & Dump'), 'cindy');
+  assert.equal(circuitFamilyKey('pump and dump'), 'cindy');
+  assert.equal(circuitFamilyKey('Cindy Remix'), 'cindy');
 });
 
 test('circuit ghosts race whole-circuit score, not per-move reps', () => {

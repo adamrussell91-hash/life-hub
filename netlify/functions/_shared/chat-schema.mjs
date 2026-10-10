@@ -3,6 +3,7 @@ import { validateRecord } from '../../../apps/life/js/core/validate.js';
 import { isCalendarDate } from '../../../apps/life/js/core/time.js';
 import { buildMedicalSlug } from '../../../apps/life/js/app/medical-model.js';
 import { coerceCalendarDate, normalizeMedicalFields, splitLongTitle } from '../../../apps/life/js/app/medical-normalize.js';
+import { provisionAmrapCircuitRounds } from '../../../apps/life/js/core/workout-plan-groups.js';
 import { collapseSetSplitExercises } from './workout-history.mjs';
 import { slugifyWorkoutTitle } from './workout-templates.mjs';
 
@@ -527,11 +528,22 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
   }
 
   const today = now.slice(0, 10);
-  const normalizedFields = type === 'medical'
+  let normalizedFields = type === 'medical'
     ? normalizeMedicalFields(fields, { notes, today })
     : type === 'workout' && Array.isArray(fields.exercises)
       ? { ...fields, exercises: collapseSetSplitExercises(fields.exercises, { keepGroups: true }) }
       : fields;
+  // Planned AMRAPs only — never re-pad a completed Cindy after gym trims unplayed rounds.
+  if (
+    type === 'workout'
+    && normalizedFields?.status === 'planned'
+    && Array.isArray(normalizedFields.exercises)
+  ) {
+    normalizedFields = {
+      ...normalizedFields,
+      exercises: provisionAmrapCircuitRounds(normalizedFields.exercises)
+    };
+  }
   const resolvedDate = type === 'medical'
     ? (coerceCalendarDate(date, { today }) ?? date)
     : date;

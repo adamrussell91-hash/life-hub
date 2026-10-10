@@ -82,7 +82,12 @@ export function circuitFamilyKey(label) {
     .replace(/\s+/g, ' ')
     .trim();
   if (!raw) return '';
-  if (/\bcindy\b/.test(raw) || raw === 'pump dump' || raw === 'pump & dump') return 'cindy';
+  if (
+    /\bcindy\b/.test(raw)
+    || raw === 'pump dump'
+    || raw === 'pump & dump'
+    || raw === 'pump and dump'
+  ) return 'cindy';
   return raw.replace(/\s*&\s*/g, ' & ');
 }
 

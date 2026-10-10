@@ -73,13 +73,30 @@ test('provisionAmrapCircuitRounds expands a one-set AMRAP Cindy to capacity', ()
   assert.equal(steps.filter(step => step.kind === 'round').length, 6);
 });
 
-test('collapseSetSplitExercises provisions thin AMRAP groups when keepGroups is on', () => {
+test('provisionAmrapCircuitRounds still works when Chadwick omits block.kind', () => {
+  const exercises = [
+    { name: 'Push Up', tracking: 'bodyweight_reps', superset_group: 1, superset_label: 'Cindy',
+      block: { format: 'amrap', time_cap_sec: 180 }, sets: [{ reps: 5, cable_type: 'none' }] },
+    { name: 'Bench Dip', tracking: 'bodyweight_reps', superset_group: 1, sets: [{ reps: 5, cable_type: 'none' }] }
+  ];
+  provisionAmrapCircuitRounds(exercises);
+  assert.equal(exercises[0].block.kind, 'circuit');
+  assert.equal(exercises[0].sets.length, 6);
+  assert.equal(exercises[1].sets.length, 6);
+});
+
+test('collapseSetSplitExercises does not re-pad a trimmed completed AMRAP', () => {
   const out = collapseSetSplitExercises([
-    { name: 'Push Up', superset_group: 1, block: { kind: 'circuit', format: 'amrap', time_cap_sec: 180 }, sets: [{ reps: 5 }] },
-    { name: 'Bench Dip', superset_group: 1, sets: [{ reps: 5 }] }
+    {
+      name: 'Push Up',
+      superset_group: 1,
+      block: { kind: 'circuit', format: 'amrap', time_cap_sec: 180, result: { rounds: 2, time_sec: 180 } },
+      sets: [{ reps: 5 }, { reps: 5 }]
+    },
+    { name: 'Bench Dip', superset_group: 1, sets: [{ reps: 5 }, { reps: 5 }] }
   ], { keepGroups: true });
-  assert.equal(out[0].sets.length, 6);
-  assert.equal(out[1].sets.length, 6);
+  assert.equal(out[0].sets.length, 2);
+  assert.equal(out[1].sets.length, 2);
 });
 
 const sets = n => Array.from({ length: n }, () => ({ reps: 10, weight_kg: 20, cable_type: 'constant_force' }));

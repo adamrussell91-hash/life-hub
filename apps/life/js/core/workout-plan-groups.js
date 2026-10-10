@@ -63,10 +63,10 @@ export function provisionAmrapCircuitRounds(exercises = []) {
   }
   for (const members of groups.values()) {
     if (members.length < 2) continue;
-    const owner = members.find(exercise => (
-      exercise?.block?.kind === 'circuit' && exercise.block.format === 'amrap'
-    ));
+    // format: amrap is the signal — Chadwick sometimes omits kind: circuit.
+    const owner = members.find(exercise => exercise?.block?.format === 'amrap');
     if (!owner) continue;
+    if (owner.block.kind == null) owner.block.kind = 'circuit';
     const target = amrapRoundCapacity(owner.block?.time_cap_sec);
     for (const exercise of members) {
       const sets = Array.isArray(exercise.sets) ? exercise.sets : [];

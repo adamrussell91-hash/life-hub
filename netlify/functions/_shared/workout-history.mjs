@@ -1,7 +1,7 @@
 import { addCalendarDays, daysBetween, isCalendarDate } from '../../../apps/life/js/core/time.js';
 import { buildFitnessModel, REGION_KEYS } from '../../../apps/life/js/app/fitness-model.js';
 import { buildLibraryByName } from '../../../apps/life/js/app/muscle-maps.js';
-import { copyExerciseStructure, provisionAmrapCircuitRounds } from '../../../apps/life/js/core/workout-plan-groups.js';
+import { copyExerciseStructure } from '../../../apps/life/js/core/workout-plan-groups.js';
 
 export const FITNESS_SESSION_PATH =
   /^data\/fitness\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
@@ -52,12 +52,7 @@ export function collapseSetSplitExercises(exercises, { keepGroups = false } = {}
     const existing = out[existingIndex];
     existing.sets = [...(existing.sets ?? []), ...sets];
   });
-  if (keepGroups) {
-    inferAlternationGroups(out, positionsByOut);
-    // Chadwick often ships AMRAP CINDYs with one set per member; expand so gym
-    // mode can log whole rounds in the window instead of forcing + Round spam.
-    provisionAmrapCircuitRounds(out);
-  }
+  if (keepGroups) inferAlternationGroups(out, positionsByOut);
   return out;
 }
 
