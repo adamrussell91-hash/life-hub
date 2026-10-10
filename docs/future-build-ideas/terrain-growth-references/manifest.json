@@ -1,0 +1,144 @@
+{
+  "retrieved": "2026-10-10",
+  "purpose": "Unmodified upstream source reference snapshots; not runtime modules",
+  "sources": [
+    {
+      "repository": "https://github.com/redblobgames/mapgen2",
+      "commit": "f16f485a62510344afe13e9c6aa01f7fa25be17e",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "mapgen2/LICENSE.txt",
+          "url": "https://github.com/redblobgames/mapgen2/blob/f16f485a62510344afe13e9c6aa01f7fa25be17e/LICENSE",
+          "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+        },
+        {
+          "upstreamPath": "water.js",
+          "localPath": "mapgen2/water.js.txt",
+          "url": "https://github.com/redblobgames/mapgen2/blob/f16f485a62510344afe13e9c6aa01f7fa25be17e/water.js",
+          "sha256": "cb8b60a8be13c3362063a997bdbc72ad7bd224acde86a857307f5a748c675b03"
+        },
+        {
+          "upstreamPath": "elevation.js",
+          "localPath": "mapgen2/elevation.js.txt",
+          "url": "https://github.com/redblobgames/mapgen2/blob/f16f485a62510344afe13e9c6aa01f7fa25be17e/elevation.js",
+          "sha256": "ef958e5eabc74445b452cfff9115ca31cc209991c824a4a070e1eab1ffbbc525"
+        },
+        {
+          "upstreamPath": "rivers.js",
+          "localPath": "mapgen2/rivers.js.txt",
+          "url": "https://github.com/redblobgames/mapgen2/blob/f16f485a62510344afe13e9c6aa01f7fa25be17e/rivers.js",
+          "sha256": "5183c05277d10c214ebdd632dba5cc2306cec4af212b3c869af0a081da3c1e9c"
+        },
+        {
+          "upstreamPath": "util.js",
+          "localPath": "mapgen2/util.js.txt",
+          "url": "https://github.com/redblobgames/mapgen2/blob/f16f485a62510344afe13e9c6aa01f7fa25be17e/util.js",
+          "sha256": "ca7b39f4100fed28595e112aea6ff847d496a674b1b453f3f88c081daeb2a0af"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "mapgen2/package.json.txt",
+          "url": "https://github.com/redblobgames/mapgen2/blob/f16f485a62510344afe13e9c6aa01f7fa25be17e/package.json",
+          "sha256": "5aec1029ef5a2e0db6e9e1d04765c6ee06158a3a7a7b59c5fc9a1f126d055e6c"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/redblobgames/mapgen4",
+      "commit": "c1d8cb018a11a8b9e17d59233c36c176429d37eb",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "mapgen4/LICENSE.txt",
+          "url": "https://github.com/redblobgames/mapgen4/blob/c1d8cb018a11a8b9e17d59233c36c176429d37eb/LICENSE",
+          "sha256": "c5accbbd8546e94c34aed24afe689a617627d18eed5a6c48277e48db57c23851"
+        },
+        {
+          "upstreamPath": "map.ts",
+          "localPath": "mapgen4/map.ts.txt",
+          "url": "https://github.com/redblobgames/mapgen4/blob/c1d8cb018a11a8b9e17d59233c36c176429d37eb/map.ts",
+          "sha256": "2ffc8c40c1af53c7146143c35cb23b09c37cfb690f65d389890c1da54c97b79c"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "mapgen4/package.json.txt",
+          "url": "https://github.com/redblobgames/mapgen4/blob/c1d8cb018a11a8b9e17d59233c36c176429d37eb/package.json",
+          "sha256": "bb838db4650a839d492029d99bef6fc547b790576289bc34094de8ef78293df8"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/jwagner/simplex-noise.js",
+      "commit": "6bfff874f5f0efed6375a9bf27fbd39b3cec6b4e",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "simplex-noise.js/LICENSE.txt",
+          "url": "https://github.com/jwagner/simplex-noise.js/blob/6bfff874f5f0efed6375a9bf27fbd39b3cec6b4e/LICENSE",
+          "sha256": "01951c4f7d8e7ce92540c4f575a2aec39738b39d25a06a96059d82ed83fb594e"
+        },
+        {
+          "upstreamPath": "simplex-noise.ts",
+          "localPath": "simplex-noise.js/simplex-noise.ts.txt",
+          "url": "https://github.com/jwagner/simplex-noise.js/blob/6bfff874f5f0efed6375a9bf27fbd39b3cec6b4e/simplex-noise.ts",
+          "sha256": "54ed75fe5352210fb47247c38d2cc0e8ab565f469e6515ddcea04e24d44313ea"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "simplex-noise.js/package.json.txt",
+          "url": "https://github.com/jwagner/simplex-noise.js/blob/6bfff874f5f0efed6375a9bf27fbd39b3cec6b4e/package.json",
+          "sha256": "9549a06c228e610471a104795c318b1c008e9994ec63807f66cfa43328938b6c"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/tweenjs/tween.js",
+      "commit": "84a27a74febbda783eebb7ee3e7d7c7abfd25009",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "tween.js/LICENSE.txt",
+          "url": "https://github.com/tweenjs/tween.js/blob/84a27a74febbda783eebb7ee3e7d7c7abfd25009/LICENSE",
+          "sha256": "c95fecd88f2709bfc34e4d1f1ccc36d17048990e6ba26c283cfecdef0432936b"
+        },
+        {
+          "upstreamPath": "src/Easing.ts",
+          "localPath": "tween.js/src__Easing.ts.txt",
+          "url": "https://github.com/tweenjs/tween.js/blob/84a27a74febbda783eebb7ee3e7d7c7abfd25009/src/Easing.ts",
+          "sha256": "329f46b0e433e7ddb5e93fc606f935e6143ef564b8586c5054a6a47938710dcc"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "tween.js/package.json.txt",
+          "url": "https://github.com/tweenjs/tween.js/blob/84a27a74febbda783eebb7ee3e7d7c7abfd25009/package.json",
+          "sha256": "866db5e4b761dd50ccdc0aadcbccadb01f3491231b57047e8322bdcc68d11f3a"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/pajama-studio/lowpoly-tree-generator",
+      "commit": "4377dd602717e04705e73943cd8f0ed8d21bba91",
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "localPath": "lowpoly-tree-generator/LICENSE.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/LICENSE",
+          "sha256": "113ca778e1689cd12270a412d9ac4872d7fc12a7990f7afab5712f0d75c278ef"
+        },
+        {
+          "upstreamPath": "examples/basic.js",
+          "localPath": "lowpoly-tree-generator/examples__basic.js.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/examples/basic.js",
+          "sha256": "4e6521103bc5dc46e86db2eeb916ea334d3e52d91f6d15900472fb43aef1242e"
+        },
+        {
+          "upstreamPath": "package.json",
+          "localPath": "lowpoly-tree-generator/package.json.txt",
+          "url": "https://github.com/pajama-studio/lowpoly-tree-generator/blob/4377dd602717e04705e73943cd8f0ed8d21bba91/package.json",
+          "sha256": "703be1ad2e254ed5fe8182f26a5c66acf01a5a98b489db86e02bc0a1a91923ad"
+        }
+      ]
+    }
+  ]
+}

@@ -4,6 +4,8 @@ Research date: 7 October 2026.
 Author: ChatGPT.
 Purpose: public repositories, free assets and inexpensive tools for Metropolis.
 
+**Terrain and growing trees update, 10 October 2026:** See [the focused code research pack](life-city-terrain-growth.md) for noise hills, terrain-following streams, basin-filling lakes and sapling growth with an arrival wobble. It includes commit-pinned upstream source snapshots, demos and adaptation notes for Adam's Forest Island-style visual reference.
+
 ## Recommendation
 
 Start with PixiJS 8, Kenney's Isometric Tiles family, Tiled and PixiJS AssetPack. Evaluate selected IsoCity modules before writing projection, sorting and transport movement from scratch. Use Blender to render additional CC0 models into sprites under a fixed camera.
@@ -139,4 +141,8 @@ Use public CC0 packs as the first asset source for a public repository. MIT and 
 Resource availability changes the effort estimate for several ideas in the brief. Animated pets and balloons no longer require every movement frame to be drawn from scratch. Personal likenesses, festival rules, source data and coherent art direction still require specific work.
 
 The essential custom work is the Life Hub to city mapping, stable geography, signal vocabulary and truthful missing data states. External city code supplies rendering and movement. No external game supplies those product decisions.
+
+## History
+
+- **2026-10-10:** Linked the terrain/water/tree-growth research and source snapshots. The original catalogue and its renderer recommendation remain intact.
 
