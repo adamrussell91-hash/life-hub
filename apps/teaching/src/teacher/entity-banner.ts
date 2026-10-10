@@ -186,6 +186,7 @@ export function renderEntityBanner(
     dialogClosed = false;
 
     const next = document.createElement('dialog');
+    let drivePickerOpen = false;
     next.className = 'entity-banner__dialog';
     next.setAttribute('aria-label', 'Change cover');
 
@@ -217,6 +218,13 @@ export function renderEntityBanner(
       media,
       titleFallback: titleText,
       editable: true,
+      onDrivePickerVisibilityChange: (open) => {
+        drivePickerOpen = open;
+        if (dialog !== next || dialogClosed) return;
+        next.hidden = open;
+        if (open) next.close();
+        else next.showModal();
+      },
       onSave: async (cover) => {
         await options.onSave?.(cover);
         current = cover;
@@ -228,7 +236,8 @@ export function renderEntityBanner(
     pickerDispose = picker.dispose;
 
     next.addEventListener('close', () => {
-      closeCoverDialog();
+      // close() also fires when temporarily yielding the top layer to Google.
+      if (!drivePickerOpen && !next.open) closeCoverDialog();
     });
 
     next.showModal();

@@ -1,6 +1,8 @@
 import type { Cover, Media } from '@/schemas';
 import { CoverSchema, resolveCoverUrl, coverAltText } from '@/schemas';
 import { isHttpUrl } from '@/blocks/url-safety';
+import { openDrivePicker } from '@/teacher/drive-picker';
+import { uploadMediaFile } from '@/teacher/media-api';
 
 export interface CoverPickerOptions {
   cover?: Cover | null;
@@ -8,6 +10,8 @@ export interface CoverPickerOptions {
   titleFallback?: string;
   onSave: (cover: Cover | null) => void | Promise<void>;
   editable?: boolean;
+  /** Native modals must release the top layer while Google's picker is open. */
+  onDrivePickerVisibilityChange?: (open: boolean) => void;
 }
 
 export interface CoverPickerHandle {
@@ -17,7 +21,7 @@ export interface CoverPickerHandle {
 }
 
 /**
- * Cover hero with optional teacher edit: URL + image library pick + remove.
+ * Cover hero with optional teacher edit: URL, image library, Drive and removal.
  * Prefer `renderEntityBanner` for class-page read view; use this for dialogs
  * and other edit surfaces that need the full toolbar inline.
  */
@@ -28,6 +32,8 @@ export function mountCoverPicker(
   const editable = options.editable !== false;
   let current: Cover | null = options.cover ?? null;
   let busy = false;
+  let disposed = false;
+  const driveAbort = new AbortController();
 
   const root = document.createElement('div');
   root.className = 'cover-picker';
@@ -82,12 +88,26 @@ export function mountCoverPicker(
   libraryBtn.className = 'btn btn--ghost';
   libraryBtn.textContent = 'Choose from library';
 
+  const driveBtn = document.createElement('button');
+  driveBtn.type = 'button';
+  driveBtn.className = 'btn btn--ghost cover-picker__drive-btn';
+  // Decorative Drive mark; the visible label provides the accessible name.
+  driveBtn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="#0F9D58" d="M8 2h8L8 16H0z"/><path fill="#F4B400" d="M16 2l8 14h-8L8 2z"/><path fill="#4285F4" d="M0 16h24l-4 6H4z"/></svg>';
+  const driveLabel = document.createElement('span');
+  driveLabel.textContent = 'Choose from Google Drive';
+  driveBtn.append(driveLabel);
+
+  const progress = document.createElement('p');
+  progress.className = 'cover-picker__progress';
+  progress.setAttribute('role', 'status');
+  progress.hidden = true;
+
   const library = document.createElement('div');
   library.className = 'cover-picker__library';
   library.hidden = true;
   library.dataset.coverLibrary = '';
 
-  toolbar.append(urlInput, altInput, applyBtn, libraryBtn, removeBtn, library, error);
+  toolbar.append(urlInput, altInput, applyBtn, libraryBtn, driveBtn, removeBtn, library, progress, error);
   root.append(hero, toolbar);
   host.replaceChildren(root);
 
@@ -97,6 +117,9 @@ export function mountCoverPicker(
   const syncButtons = (): void => {
     applyBtn.disabled = busy;
     libraryBtn.disabled = busy;
+    driveBtn.disabled = busy;
+    urlInput.disabled = busy;
+    altInput.disabled = busy;
     removeBtn.disabled = busy || current === null;
   };
 
@@ -128,15 +151,20 @@ export function mountCoverPicker(
     error.textContent = message;
   };
 
+  const saveCover = async (next: Cover | null): Promise<void> => {
+    await options.onSave(next);
+    if (disposed) return;
+    current = next;
+    renderPreview();
+  };
+
   const persist = async (next: Cover | null): Promise<void> => {
-    if (busy) return;
+    if (busy || disposed) return;
     busy = true;
     setError(null);
     syncButtons();
     try {
-      await options.onSave(next);
-      current = next;
-      renderPreview();
+      await saveCover(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to save cover.');
     } finally {
@@ -211,12 +239,56 @@ export function mountCoverPicker(
     if (!library.hidden) renderLibrary();
   });
 
+  driveBtn.addEventListener('click', () => {
+    if (busy || disposed) return;
+    void (async () => {
+      busy = true;
+      setError(null);
+      library.hidden = true;
+      syncButtons();
+      progress.hidden = false;
+      progress.textContent = 'Opening Google Drive…';
+      try {
+        let pick;
+        try {
+          options.onDrivePickerVisibilityChange?.(true);
+          pick = await openDrivePicker({ imagesOnly: true, signal: driveAbort.signal });
+        } finally {
+          if (!disposed) options.onDrivePickerVisibilityChange?.(false);
+        }
+        if (!pick || disposed) return;
+        if (pick.kind !== 'mirror' || !pick.file.type.startsWith('image/')) {
+          throw new Error('Choose an image to use as your cover.');
+        }
+        progress.textContent = 'Uploading cover…';
+        const media = await uploadMediaFile(pick.file, {
+          title: pick.title,
+          provider_file_id: pick.provider_file_id
+        });
+        if (disposed) return;
+        const url = resolveCoverUrl({ media_id: media.id }, [media]);
+        if (!url) throw new Error('Uploaded image has no usable URL.');
+        progress.textContent = 'Saving cover…';
+        await saveCover({ media_id: media.id, url, alt_text: altInput.value.trim() || pick.title });
+      } catch (err) {
+        if (!disposed) setError(err instanceof Error ? err.message : 'Unable to choose a Drive image.');
+      } finally {
+        busy = false;
+        progress.hidden = true;
+        syncButtons();
+        if (!disposed) driveBtn.focus();
+      }
+    })();
+  });
+
   renderPreview();
   syncButtons();
 
   return {
     root,
     dispose: () => {
+      disposed = true;
+      driveAbort.abort();
       host.replaceChildren();
     },
     getCover: () => current

@@ -99,6 +99,7 @@ type TokenClient = {
 
 type TokenResponse = {
   access_token?: string;
+  expires_in?: number | string;
   error?: string;
   error_description?: string;
 };
@@ -189,7 +190,13 @@ async function loadGoogleApis(): Promise<void> {
   });
 }
 
+let cachedToken: { clientId: string; token: string; expiresAt: number } | null = null;
+
 function requestAccessToken(clientId: string): Promise<string> {
+  if (cachedToken?.clientId === clientId && cachedToken.expiresAt > Date.now()) {
+    return Promise.resolve(cachedToken.token);
+  }
+  cachedToken = null;
   return new Promise((resolve, reject) => {
     const client = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
@@ -205,6 +212,14 @@ function requestAccessToken(clientId: string): Promise<string> {
           );
           return;
         }
+        const lifetime = Number(response.expires_in);
+        if (Number.isFinite(lifetime) && lifetime > 60) {
+          cachedToken = {
+            clientId,
+            token: response.access_token,
+            expiresAt: Date.now() + (lifetime - 60) * 1000
+          };
+        }
         resolve(response.access_token);
       },
       error_callback: (error) => {
@@ -219,23 +234,41 @@ function showPicker(opts: {
   accessToken: string;
   apiKey: string;
   appId?: string;
+  imagesOnly?: boolean;
+  signal?: AbortSignal;
 }): Promise<PickerDoc | null> {
-  return new Promise((resolve) => {
-    const builder = new google.picker.PickerBuilder()
-      .addView(google.picker.ViewId.DOCS)
-      .addView(google.picker.ViewId.DOCS_IMAGES)
-      .addView(google.picker.ViewId.PDFS)
+  opts.signal?.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const finish = (doc: PickerDoc | null) => {
+      opts.signal?.removeEventListener('abort', abort);
+      resolve(doc);
+    };
+    const abort = () => {
+      picker.setVisible(false);
+      opts.signal?.removeEventListener('abort', abort);
+      reject(opts.signal?.reason);
+    };
+    const builder = new google.picker.PickerBuilder();
+    if (opts.imagesOnly) {
+      builder.addView(google.picker.ViewId.DOCS_IMAGES);
+    } else {
+      builder
+        .addView(google.picker.ViewId.DOCS)
+        .addView(google.picker.ViewId.DOCS_IMAGES)
+        .addView(google.picker.ViewId.PDFS);
+    }
+    builder
       .setOAuthToken(opts.accessToken)
       .setDeveloperKey(opts.apiKey)
-      .setTitle('Select a file from Drive')
+      .setTitle(opts.imagesOnly ? 'Select a cover image from Drive' : 'Select a file from Drive')
       .setCallback((data: PickerCallbackData) => {
         if (data.action === google.picker.Action.CANCEL) {
-          resolve(null);
+          finish(null);
           return;
         }
         if (data.action === google.picker.Action.PICKED) {
           const doc = data.docs?.[0];
-          resolve(doc ?? null);
+          finish(doc ?? null);
         }
       });
 
@@ -243,16 +276,23 @@ function showPicker(opts: {
       builder.setAppId(opts.appId);
     }
 
-    builder.build().setVisible(true);
+    const picker = builder.build();
+    opts.signal?.addEventListener('abort', abort, { once: true });
+    picker.setVisible(true);
   });
 }
 
-async function fetchDriveFileMeta(fileId: string, accessToken: string): Promise<DriveFileMeta> {
+async function fetchDriveFileMeta(
+  fileId: string,
+  accessToken: string,
+  signal?: AbortSignal
+): Promise<DriveFileMeta> {
   const fields =
     'id,name,mimeType,webViewLink,webContentLink,thumbnailLink,capabilities,shared';
   const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=${encodeURIComponent(fields)}`;
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` }
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal
   });
   if (!response.ok) {
     throw new Error(`Could not read Drive file metadata (HTTP ${response.status})`);
@@ -268,11 +308,13 @@ async function downloadDriveFile(
   fileId: string,
   name: string,
   mimeType: string,
-  accessToken: string
+  accessToken: string,
+  signal?: AbortSignal
 ): Promise<File> {
   const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` }
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal
   });
   if (!response.ok) {
     throw new Error(`Could not download Drive file (HTTP ${response.status})`);
@@ -281,17 +323,27 @@ async function downloadDriveFile(
   return new File([blob], name, { type: mimeType || blob.type || 'application/octet-stream' });
 }
 
-export async function openDrivePicker(): Promise<DrivePickResult | null> {
+export async function openDrivePicker(
+  options: { imagesOnly?: boolean; signal?: AbortSignal } = {}
+): Promise<DrivePickResult | null> {
+  options.signal?.throwIfAborted();
   const { clientId, apiKey, appId } = await resolveGooglePickerConfig({
     vite: viteGoogleEnv(),
     loadRemote: loadRemotePickerConfig
   });
+  options.signal?.throwIfAborted();
   await loadGoogleApis();
+  options.signal?.throwIfAborted();
   const accessToken = await requestAccessToken(clientId);
-  const picked = await showPicker({ accessToken, apiKey, appId });
+  options.signal?.throwIfAborted();
+  const picked = await showPicker({
+    accessToken, apiKey, appId, imagesOnly: options.imagesOnly, signal: options.signal
+  });
+  options.signal?.throwIfAborted();
   if (!picked?.id) return null;
 
-  const meta = await fetchDriveFileMeta(picked.id, accessToken);
+  const meta = await fetchDriveFileMeta(picked.id, accessToken, options.signal);
+  options.signal?.throwIfAborted();
   // v1: skip permissions.list probe; conservative sharing from files.get only.
   const sharing = sharingFromDriveFile(meta, false);
 
@@ -312,7 +364,7 @@ export async function openDrivePicker(): Promise<DrivePickResult | null> {
     };
   }
 
-  const file = await downloadDriveFile(meta.id, meta.name, meta.mimeType, accessToken);
+  const file = await downloadDriveFile(meta.id, meta.name, meta.mimeType, accessToken, options.signal);
   return {
     kind: 'mirror',
     file,
