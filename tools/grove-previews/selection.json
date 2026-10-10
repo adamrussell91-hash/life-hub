@@ -203,10 +203,10 @@
     "kind": "tree",
     "variant": 1,
     "stage": "sapling",
-    "input": "nature/glTF/CommonTree_1.gltf",
+    "input": "nature/glTF/Birch_1.gltf",
     "target_height": 0.65,
-    "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh.",
-    "tint": "birch"
+    "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant.",
+    "tint": null
   },
   {
     "id": "tree-health-1-young",
@@ -214,10 +214,10 @@
     "kind": "tree",
     "variant": 1,
     "stage": "young",
-    "input": "nature/glTF/CommonTree_1.gltf",
+    "input": "nature/glTF/Birch_1.gltf",
     "target_height": 2.4,
-    "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh.",
-    "tint": "birch"
+    "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant.",
+    "tint": null
   },
   {
     "id": "tree-health-1-mature",
@@ -225,10 +225,10 @@
     "kind": "tree",
     "variant": 1,
     "stage": "mature",
-    "input": "nature/glTF/CommonTree_1.gltf",
+    "input": "nature/glTF/Birch_1.gltf",
     "target_height": 5.35,
-    "notes": "Distinct source geometry per mature variant. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh.",
-    "tint": "birch"
+    "notes": "Distinct authored Birch mesh from Source edition.",
+    "tint": null
   },
   {
     "id": "tree-health-2-sapling",
@@ -236,10 +236,10 @@
     "kind": "tree",
     "variant": 2,
     "stage": "sapling",
-    "input": "nature/glTF/CommonTree_2.gltf",
+    "input": "nature/glTF/Birch_2.gltf",
     "target_height": 0.65,
-    "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh.",
-    "tint": "birch"
+    "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant.",
+    "tint": null
   },
   {
     "id": "tree-health-2-young",
@@ -247,10 +247,10 @@
     "kind": "tree",
     "variant": 2,
     "stage": "young",
-    "input": "nature/glTF/CommonTree_2.gltf",
+    "input": "nature/glTF/Birch_2.gltf",
     "target_height": 2.4,
-    "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh.",
-    "tint": "birch"
+    "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant.",
+    "tint": null
   },
   {
     "id": "tree-health-2-mature",
@@ -258,10 +258,10 @@
     "kind": "tree",
     "variant": 2,
     "stage": "mature",
-    "input": "nature/glTF/CommonTree_2.gltf",
+    "input": "nature/glTF/Birch_2.gltf",
     "target_height": 5.7,
-    "notes": "Distinct source geometry per mature variant. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh.",
-    "tint": "birch"
+    "notes": "Distinct authored Birch mesh from Source edition.",
+    "tint": null
   },
   {
     "id": "tree-health-3-sapling",
@@ -269,10 +269,10 @@
     "kind": "tree",
     "variant": 3,
     "stage": "sapling",
-    "input": "nature/glTF/CommonTree_3.gltf",
+    "input": "nature/glTF/Birch_3.gltf",
     "target_height": 0.65,
-    "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh.",
-    "tint": "birch"
+    "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant.",
+    "tint": null
   },
   {
     "id": "tree-health-3-young",
@@ -280,10 +280,10 @@
     "kind": "tree",
     "variant": 3,
     "stage": "young",
-    "input": "nature/glTF/CommonTree_3.gltf",
+    "input": "nature/glTF/Birch_3.gltf",
     "target_height": 2.4,
-    "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh.",
-    "tint": "birch"
+    "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant.",
+    "tint": null
   },
   {
     "id": "tree-health-3-mature",
@@ -291,10 +291,10 @@
     "kind": "tree",
     "variant": 3,
     "stage": "mature",
-    "input": "nature/glTF/CommonTree_3.gltf",
+    "input": "nature/glTF/Birch_3.gltf",
     "target_height": 6.05,
-    "notes": "Distinct source geometry per mature variant. Pale-bark broadleaf stand-in; not a botanically distinct birch mesh.",
-    "tint": "birch"
+    "notes": "Distinct authored Birch mesh from Source edition.",
+    "tint": null
   },
   {
     "id": "tree-wedding-1-sapling",
@@ -302,10 +302,11 @@
     "kind": "tree",
     "variant": 1,
     "stage": "sapling",
-    "input": "nature/glTF/CommonTree_4.gltf",
+    "input": "nature/glTF/CherryBlossom_1.gltf",
     "target_height": 0.65,
-    "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pink-leaf broadleaf stand-in; blossom petals are not modelled.",
-    "tint": "blossom"
+    "notes": "Distinct authored CherryBlossom mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Textures capped at 128 px to meet the 300 KB budget. Authored blossom foliage recoloured pink, retaining its alpha mask.",
+    "tint": "blossom",
+    "texture_size": 128
   },
   {
     "id": "tree-wedding-1-young",
@@ -313,10 +314,11 @@
     "kind": "tree",
     "variant": 1,
     "stage": "young",
-    "input": "nature/glTF/CommonTree_4.gltf",
+    "input": "nature/glTF/CherryBlossom_1.gltf",
     "target_height": 2.4,
-    "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pink-leaf broadleaf stand-in; blossom petals are not modelled.",
-    "tint": "blossom"
+    "notes": "Distinct authored CherryBlossom mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Textures capped at 128 px to meet the 300 KB budget. Authored blossom foliage recoloured pink, retaining its alpha mask.",
+    "tint": "blossom",
+    "texture_size": 128
   },
   {
     "id": "tree-wedding-1-mature",
@@ -324,10 +326,11 @@
     "kind": "tree",
     "variant": 1,
     "stage": "mature",
-    "input": "nature/glTF/CommonTree_4.gltf",
+    "input": "nature/glTF/CherryBlossom_1.gltf",
     "target_height": 5.35,
-    "notes": "Distinct source geometry per mature variant. Pink-leaf broadleaf stand-in; blossom petals are not modelled.",
-    "tint": "blossom"
+    "notes": "Distinct authored CherryBlossom mesh from Source edition. Textures capped at 128 px to meet the 300 KB budget. Authored blossom foliage recoloured pink, retaining its alpha mask.",
+    "tint": "blossom",
+    "texture_size": 128
   },
   {
     "id": "tree-wedding-2-sapling",
@@ -335,10 +338,11 @@
     "kind": "tree",
     "variant": 2,
     "stage": "sapling",
-    "input": "nature/glTF/CommonTree_5.gltf",
+    "input": "nature/glTF/CherryBlossom_2.gltf",
     "target_height": 0.65,
-    "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pink-leaf broadleaf stand-in; blossom petals are not modelled.",
-    "tint": "blossom"
+    "notes": "Distinct authored CherryBlossom mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Textures capped at 128 px to meet the 300 KB budget. Authored blossom foliage recoloured pink, retaining its alpha mask.",
+    "tint": "blossom",
+    "texture_size": 128
   },
   {
     "id": "tree-wedding-2-young",
@@ -346,10 +350,11 @@
     "kind": "tree",
     "variant": 2,
     "stage": "young",
-    "input": "nature/glTF/CommonTree_5.gltf",
+    "input": "nature/glTF/CherryBlossom_2.gltf",
     "target_height": 2.4,
-    "notes": "Distinct source geometry per mature variant. Pack has no corresponding growth mesh; scaled source tree is supplied as a fallback, not a newly modelled stage. Pink-leaf broadleaf stand-in; blossom petals are not modelled.",
-    "tint": "blossom"
+    "notes": "Distinct authored CherryBlossom mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Textures capped at 128 px to meet the 300 KB budget. Authored blossom foliage recoloured pink, retaining its alpha mask.",
+    "tint": "blossom",
+    "texture_size": 128
   },
   {
     "id": "tree-wedding-2-mature",
@@ -357,10 +362,11 @@
     "kind": "tree",
     "variant": 2,
     "stage": "mature",
-    "input": "nature/glTF/CommonTree_5.gltf",
+    "input": "nature/glTF/CherryBlossom_2.gltf",
     "target_height": 5.7,
-    "notes": "Distinct source geometry per mature variant. Pink-leaf broadleaf stand-in; blossom petals are not modelled.",
-    "tint": "blossom"
+    "notes": "Distinct authored CherryBlossom mesh from Source edition. Textures capped at 128 px to meet the 300 KB budget. Authored blossom foliage recoloured pink, retaining its alpha mask.",
+    "tint": "blossom",
+    "texture_size": 128
   },
   {
     "id": "tree-other-1-sapling",
@@ -456,10 +462,11 @@
     "kind": "ground",
     "variant": 1,
     "stage": null,
-    "input": "kenney/grass.glb",
+    "input": "nature/glTF/Grass_Common_Short.gltf",
     "target_height": 0.25,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "grass-2",
@@ -467,10 +474,11 @@
     "kind": "ground",
     "variant": 2,
     "stage": null,
-    "input": "kenney/grass_large.glb",
+    "input": "nature/glTF/Grass_Wide_Short.gltf",
     "target_height": 0.25,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "grass-3",
@@ -478,10 +486,11 @@
     "kind": "ground",
     "variant": 3,
     "stage": null,
-    "input": "kenney/grass_leafs.glb",
+    "input": "nature/glTF/Grass_Wispy_Short.gltf",
     "target_height": 0.25,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "grass-4",
@@ -489,10 +498,11 @@
     "kind": "ground",
     "variant": 4,
     "stage": null,
-    "input": "kenney/grass_leafsLarge.glb",
+    "input": "nature/glTF/Grass_Common_Tall.gltf",
     "target_height": 0.25,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "flower-1",
@@ -500,15 +510,11 @@
     "kind": "ground",
     "variant": 1,
     "stage": null,
-    "input": "kenney/flower_redA.glb",
+    "input": "nature/glTF/Flower_1_Single.gltf",
     "target_height": 0.3,
-    "notes": "Distinct source mesh; petal material recoloured so the six entries have red, orange, yellow, cream, purple and blue flowers. Green foliage palette adjusted for Grove.",
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
     "tint": null,
-    "flower_colour": [
-      0.8,
-      0.035,
-      0.055
-    ]
+    "texture_size": 128
   },
   {
     "id": "flower-2",
@@ -516,15 +522,11 @@
     "kind": "ground",
     "variant": 2,
     "stage": null,
-    "input": "kenney/flower_redB.glb",
+    "input": "nature/glTF/Flower_2_Single.gltf",
     "target_height": 0.3,
-    "notes": "Distinct source mesh; petal material recoloured so the six entries have red, orange, yellow, cream, purple and blue flowers. Green foliage palette adjusted for Grove.",
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
     "tint": null,
-    "flower_colour": [
-      0.94,
-      0.29,
-      0.035
-    ]
+    "texture_size": 128
   },
   {
     "id": "flower-3",
@@ -532,15 +534,11 @@
     "kind": "ground",
     "variant": 3,
     "stage": null,
-    "input": "kenney/flower_yellowA.glb",
+    "input": "nature/glTF/Flower_3_Single.gltf",
     "target_height": 0.3,
-    "notes": "Distinct source mesh; petal material recoloured so the six entries have red, orange, yellow, cream, purple and blue flowers. Green foliage palette adjusted for Grove.",
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
     "tint": null,
-    "flower_colour": [
-      0.9,
-      0.68,
-      0.025
-    ]
+    "texture_size": 128
   },
   {
     "id": "flower-4",
@@ -548,15 +546,11 @@
     "kind": "ground",
     "variant": 4,
     "stage": null,
-    "input": "kenney/flower_yellowB.glb",
+    "input": "nature/glTF/Flower_4_Single.gltf",
     "target_height": 0.3,
-    "notes": "Distinct source mesh; petal material recoloured so the six entries have red, orange, yellow, cream, purple and blue flowers. Green foliage palette adjusted for Grove.",
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
     "tint": null,
-    "flower_colour": [
-      0.9,
-      0.87,
-      0.75
-    ]
+    "texture_size": 128
   },
   {
     "id": "flower-5",
@@ -564,15 +558,11 @@
     "kind": "ground",
     "variant": 5,
     "stage": null,
-    "input": "kenney/flower_purpleA.glb",
+    "input": "nature/glTF/Flower_6.gltf",
     "target_height": 0.3,
-    "notes": "Distinct source mesh; petal material recoloured so the six entries have red, orange, yellow, cream, purple and blue flowers. Green foliage palette adjusted for Grove.",
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
     "tint": null,
-    "flower_colour": [
-      0.33,
-      0.07,
-      0.62
-    ]
+    "texture_size": 128
   },
   {
     "id": "flower-6",
@@ -580,15 +570,11 @@
     "kind": "ground",
     "variant": 6,
     "stage": null,
-    "input": "kenney/flower_purpleB.glb",
+    "input": "nature/glTF/Flower_7_Single.gltf",
     "target_height": 0.3,
-    "notes": "Distinct source mesh; petal material recoloured so the six entries have red, orange, yellow, cream, purple and blue flowers. Green foliage palette adjusted for Grove.",
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
     "tint": null,
-    "flower_colour": [
-      0.045,
-      0.29,
-      0.8
-    ]
+    "texture_size": 128
   },
   {
     "id": "bush-1",
@@ -596,10 +582,11 @@
     "kind": "ground",
     "variant": 1,
     "stage": null,
-    "input": "kenney/plant_bush.glb",
+    "input": "nature/glTF/Bush_Common.gltf",
     "target_height": 0.7,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "bush-2",
@@ -607,10 +594,11 @@
     "kind": "ground",
     "variant": 2,
     "stage": null,
-    "input": "kenney/plant_bushDetailed.glb",
+    "input": "nature/glTF/Bush_Large.gltf",
     "target_height": 0.7,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "bush-3",
@@ -618,10 +606,11 @@
     "kind": "ground",
     "variant": 3,
     "stage": null,
-    "input": "kenney/plant_bushTriangle.glb",
+    "input": "nature/glTF/Bush_Long_1.gltf",
     "target_height": 0.7,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "bush-4",
@@ -629,10 +618,11 @@
     "kind": "ground",
     "variant": 4,
     "stage": null,
-    "input": "kenney/plant_bushLargeTriangle.glb",
+    "input": "nature/glTF/Bush_Long_2.gltf",
     "target_height": 0.7,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "rock-1",
@@ -640,10 +630,11 @@
     "kind": "ground",
     "variant": 1,
     "stage": null,
-    "input": "kenney/rock_smallA.glb",
+    "input": "nature/glTF/Rock_Medium_1.gltf",
     "target_height": 0.5,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "rock-2",
@@ -651,10 +642,11 @@
     "kind": "ground",
     "variant": 2,
     "stage": null,
-    "input": "kenney/rock_smallB.glb",
+    "input": "nature/glTF/Rock_Medium_2.gltf",
     "target_height": 0.6499999999999999,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "rock-3",
@@ -662,10 +654,11 @@
     "kind": "ground",
     "variant": 3,
     "stage": null,
-    "input": "kenney/rock_largeA.glb",
+    "input": "nature/glTF/Rock_Medium_3.gltf",
     "target_height": 0.7999999999999999,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "rock-4",
@@ -673,10 +666,11 @@
     "kind": "ground",
     "variant": 4,
     "stage": null,
-    "input": "kenney/rock_largeB.glb",
+    "input": "nature/glTF/Rock_Big_1.gltf",
     "target_height": 0.95,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "rock-5",
@@ -684,43 +678,11 @@
     "kind": "ground",
     "variant": 5,
     "stage": null,
-    "input": "kenney/rock_tallA.glb",
+    "input": "nature/glTF/Rock_Big_2.gltf",
     "target_height": 1.1,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
-  },
-  {
-    "id": "stump-1",
-    "slot": "stump",
-    "kind": "ground",
-    "variant": 1,
-    "stage": null,
-    "input": "kenney/stump_round.glb",
-    "target_height": 0.5,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
-  },
-  {
-    "id": "stump-2",
-    "slot": "stump",
-    "kind": "ground",
-    "variant": 2,
-    "stage": null,
-    "input": "kenney/stump_old.glb",
-    "target_height": 0.5,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
-  },
-  {
-    "id": "stump-3",
-    "slot": "stump",
-    "kind": "ground",
-    "variant": 3,
-    "stage": null,
-    "input": "kenney/log.glb",
-    "target_height": 0.5,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "mushroom-1",
@@ -728,10 +690,11 @@
     "kind": "ground",
     "variant": 1,
     "stage": null,
-    "input": "kenney/mushroom_red.glb",
+    "input": "nature/glTF/Mushroom_Common.gltf",
     "target_height": 0.2,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "mushroom-2",
@@ -739,10 +702,11 @@
     "kind": "ground",
     "variant": 2,
     "stage": null,
-    "input": "kenney/mushroom_redTall.glb",
+    "input": "nature/glTF/Mushroom_RedCap.gltf",
     "target_height": 0.2,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "mushroom-3",
@@ -750,54 +714,11 @@
     "kind": "ground",
     "variant": 3,
     "stage": null,
-    "input": "kenney/mushroom_tanGroup.glb",
+    "input": "nature/glTF/Mushroom_Oyster.gltf",
     "target_height": 0.2,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
-  },
-  {
-    "id": "reed-1",
-    "slot": "reed",
-    "kind": "ground",
-    "variant": 1,
-    "stage": null,
-    "input": "kenney/plant_flatShort.glb",
-    "target_height": 0.85,
-    "notes": "Flat grass-like waterside plant stand-in; no cattail seed head. Only two distinct meshes available. Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
-  },
-  {
-    "id": "reed-2",
-    "slot": "reed",
-    "kind": "ground",
-    "variant": 2,
-    "stage": null,
-    "input": "kenney/plant_flatTall.glb",
-    "target_height": 1.1,
-    "notes": "Flat grass-like waterside plant stand-in; no cattail seed head. Only two distinct meshes available. Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
-  },
-  {
-    "id": "lily-1",
-    "slot": "lily",
-    "kind": "ground",
-    "variant": 1,
-    "stage": null,
-    "input": "kenney/lily_small.glb",
-    "target_height": 0.04,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
-  },
-  {
-    "id": "lily-2",
-    "slot": "lily",
-    "kind": "ground",
-    "variant": 2,
-    "stage": null,
-    "input": "kenney/lily_large.glb",
-    "target_height": 0.04,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "bridge-1",
@@ -805,10 +726,11 @@
     "kind": "ground",
     "variant": 1,
     "stage": null,
-    "input": "kenney/bridge_woodRoundNarrow.glb",
-    "target_height": 0.65,
-    "notes": " Green foliage and brown wood palette adjusted for Grove.",
-    "tint": null
+    "input": "nature/glTF/RockPath_Round_Wide.gltf",
+    "target_height": 0.12,
+    "notes": "Authored stepping-stone path, supplied for the bridge/stepping-stones slot. Not a wooden bridge.",
+    "tint": null,
+    "texture_size": 128
   },
   {
     "id": "animal-deer-doe",

@@ -5,43 +5,33 @@ No app, CSS, runtime dependency, storage or build changes.
 
 ## Contents and limitations
 
-74 GLBs: 41 trees (13 variants with three size stages, plus two twisted trees),
-30 ground props, and three animated animals (doe, stag, fox). One family for
-all trees: Quaternius Stylized Nature MegaKit Standard. One family for all
-animals: Quaternius Ultimate Animated Animal Pack. Ground props: Kenney Nature
-Kit. All CC0, original licence texts retained. The manifest names every source
-file and every adaptation.
+67 GLBs: 41 trees (13 variants with three size stages, plus two twisted trees),
+23 ground props and three animated animals (doe, stag, fox). All models are
+Quaternius: Stylized Nature MegaKit Source for trees and ground, Ultimate
+Animated Animal Pack for animals. No Cube Pets or other creators' models.
+All CC0; original publisher licence texts retained. The manifest names every
+source file and adaptation.
 
-The free Standard MegaKit contains 68 of 116 models. It has no matching true
-sapling/young meshes. The delivered size stages reuse each variant's geometry
-at 0.65 m, 2.4 m and roughly 5.35–6.05 m; these are **scaled fallbacks**.
-Growth can interpolate scale without loading all three copies. Pale-bark
-broadleaf meshes stand in for birch; pink foliage stands in for blossom.
-Variants within each hub have distinct source geometry; recolours are not
-counted as additional variants. Different hubs can reuse geometry.
+The purchased Source MegaKit contains 116 models, including five birch and five
+cherry-blossom variants. Three birch and two cherry-blossom variants replace
+recoloured stand-ins. No dedicated sapling/young meshes are included. The three
+size stages reuse each variant at 0.65 m, 2.4 m and roughly 5.35–6.05 m: **scaled
+fallbacks**, not separately authored stages. Blossom foliage is tinted pink
+while retaining its alpha mask. Variants within each hub have distinct meshes.
 
-Reed coverage is two flat waterside plants, not three true reed/cattail meshes.
-Six flowers have different source meshes and six adapted petal colours.
-The little wooden bridge is a complete mesh, not a modular bridge segment.
+Ground cover includes four grasses, six flowers, four bushes, five rocks,
+three mushrooms and a stepping-stone path. Publisher materials are retained.
+Reeds, lily pads and stumps/logs are gaps: MegaKit has no specifically named
+models for them. Earlier non-Quaternius assets have been removed from this
+delivery, rather than relabelled as Quaternius.
 
-Missing animals: rabbit, flying bird, squirrel and swimming duck. Publisher's
-Ultimate Animated Animal Pack download was inspected: 12 glTF files cover
-alpaca, bull, cow, deer, donkey, fox, horses, husky, shiba inu, stag and wolf.
-Poly Pizza squirrel/duck/rabbit searches did not yield a verified compatible
-CC0 animated member of this family. Its Quaternius rabbit result is an
-anthropomorphic plush character, not a woodland rabbit:
-https://poly.pizza/m/SwKX8OIlw8. Existing Kenney Cube Pets covers bunny/deer/fox/
-parrot with idle/walk/eat, but adopting only its bunny/parrot would mix animal
-families, and the parrot has no fly clip. No invented fly/swim animation was
-used to label a static model as animated.
-
-Nice-to-haves (Australian wildlife, hedgehog, owl, frog, butterfly and sound)
-are not delivered: no matching verified animated CC0 assets were established
-in the selected family; no licensed seamless audio was downloaded. Search
-starting points for further curation: https://poly.pizza/search/squirrel,
-https://poly.pizza/search/duck, https://poly.pizza/search/rabbit,
-https://quaternius.com/packs/ultimateanimatedanimals.html and
-https://freesound.org/search/?q=forest+stream.
+Missing animated animals: woodland rabbit, flying bird, squirrel and swimming
+duck. The inspected Ultimate Animated Animal Pack contains 12 glTF animals,
+including delivered deer/stag/fox but none of those four species. Quaternius's
+other rabbit leads are a plush character and an anthropomorphic Ultimate
+Monsters character, not compatible woodland rabbits. See `sourcing-options.md`
+for verified links and remaining requirements. No flight/swim clips were
+invented. Optional animals and licensed seamless audio are not delivered.
 
 ## Reproduce
 
@@ -54,13 +44,12 @@ never a logged-in browser session.
 Keep downloaded original packs outside the repo in a source directory:
 
 ```text
-<sources>/nature-sources/glTF/          free Standard archive's glTF folder
+<sources>/nature-sources/glTF/          purchased Source archive's glTF folder
 <sources>/animal-sources/Deer.gltf      embedded buffers, publisher original
 <sources>/animal-sources/Stag.gltf
 <sources>/animal-sources/Fox.gltf
 ```
 
-Kenney originals resolve to this repo's existing `assets/kenney/kenney_nature-kit/`.
 `selection.json` describes source selection, target dimensions and adaptations.
 
 ```sh
