@@ -33,8 +33,16 @@ describe('capture sheet docked actions (R4)', () => {
     handle.destroy();
   });
 
-  it('uses 48px mode buttons and docked action row styles', () => {
+  it('docks the action row with safe-area padding and 44px-tall buttons', () => {
+    expect(css).toMatch(/\.sheet\.addform\s*\{[^}]*overflow:\s*hidden/);
+    expect(css).toMatch(/\.addform__actions\s*\{[^}]*safe-area-inset-bottom/);
     expect(css).toMatch(/\.addform__actions \.btn[\s\S]*?min-height:\s*2\.75rem/);
+    expect(css).toMatch(
+      /@media \(max-width: 719px\)[\s\S]*?\.addform__actions \.btn[\s\S]*?min-height:\s*3rem/
+    );
+  });
+
+  it('uses 48px mode buttons and keyboard inset on capture sheet', () => {
     expect(journalCss).toMatch(/\.journal-capture__mode\s*\{[^}]*min-height:\s*3rem/);
     expect(journalCss).toMatch(/vv-keyboard-open[\s\S]*journal-capture-sheet/);
   });

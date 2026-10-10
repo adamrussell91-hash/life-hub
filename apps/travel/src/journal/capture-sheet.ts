@@ -419,7 +419,9 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
     const onDiscard = () => {
       discardOpen = false;
       discardBar.hidden = true;
-      finishClose(after);
+      void clearCaptureDraft(options.tripId, options.legId, localDate).then(() =>
+        finishClose(after)
+      );
     };
     keepEditingBtn.onclick = onKeep;
     discardBtn.onclick = onDiscard;
