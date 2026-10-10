@@ -249,6 +249,28 @@ export interface RestoreJournalExportDeps {
 }
 
 /** Stub restore: imports JSON document via ensureJournal + saveJournal (no media bytes). */
+/** Download the portable export bundle as a single JSON file (manifest + file contents). */
+export async function downloadJournalExportBundle(
+  journal: JournalDocument,
+  exportedAt = new Date().toISOString(),
+): Promise<void> {
+  const { manifest, files } = await buildJournalExportBundle(journal, exportedAt);
+  const payload = {
+    manifest,
+    files: files.map((file) => ({ path: file.path, content: file.content })),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `travel-journal-${journal.trip_id}-${exportedAt.slice(0, 10)}.json`;
+  anchor.rel = 'noopener';
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function restoreJournalFromExport(
   tripId: string,
   files: Record<string, string>,

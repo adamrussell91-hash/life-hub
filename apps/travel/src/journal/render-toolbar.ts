@@ -3,6 +3,8 @@ export interface RenderToolbarOptions {
   onChapter: () => void;
   onImportPhotos?: () => void;
   onSearchJournal?: () => void;
+  onExportJournal?: () => void;
+  onShareJournal?: () => void;
   onAddMoment?: () => void;
   onTrash?: () => void;
 }
@@ -45,7 +47,8 @@ export function renderToolbar(options: RenderToolbarOptions): HTMLElement {
     { label: 'Import photos', action: options.onImportPhotos, disabled: !options.onImportPhotos },
     { label: 'Search journal', action: options.onSearchJournal, disabled: !options.onSearchJournal },
     { label: 'Pattern appearance', disabled: true },
-    { label: 'Export', disabled: true },
+    { label: 'Export', action: options.onExportJournal, disabled: !options.onExportJournal },
+    { label: 'Share', action: options.onShareJournal, disabled: !options.onShareJournal },
     { label: 'Trash', action: options.onTrash, disabled: !options.onTrash },
   ];
 

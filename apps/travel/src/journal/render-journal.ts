@@ -17,6 +17,8 @@ import { createDayMapPreview } from '@/journal/map-preview';
 import { getActiveJournalDayMap } from '@/journal/map-expanded';
 import { openTrashView } from '@/journal/trash-view';
 import { openJournalSearch } from '@/journal/search-sheet';
+import { openJournalShareSheet } from '@/journal/share-sheet';
+import { downloadJournalExportBundle, stripJournalForExport } from '@/journal/export-bundle';
 import {
   JOURNAL_MOMENT_PAGE_SIZE,
   attachMomentPrefetchObserver,
@@ -145,6 +147,7 @@ export function renderJournal(
   let dayMapOverlay: { destroy(): void } | null = null;
   let trashOverlay: { destroy(): void } | null = null;
   let searchOverlay: { destroy(): void } | null = null;
+  let shareOverlay: { destroy(): void } | null = null;
 
   let liveFixture: JournalFixture = opts.fixture;
   let liveVersion = opts.journalVersion ?? 'fixture';
@@ -230,6 +233,21 @@ export function renderJournal(
         },
       });
       cleanups.push(() => searchOverlay?.destroy());
+    },
+    onExportJournal: () => {
+      void downloadJournalExportBundle(stripJournalForExport(journalDoc()));
+    },
+    onShareJournal: () => {
+      shareOverlay?.destroy();
+      shareOverlay = openJournalShareSheet({
+        tripId: liveFixture.trip_id,
+        journal: journalDoc(),
+        anchor: root,
+        onClose: () => {
+          shareOverlay = null;
+        },
+      });
+      cleanups.push(() => shareOverlay?.destroy());
     },
     onTrash: () => {
       trashOverlay?.destroy();
