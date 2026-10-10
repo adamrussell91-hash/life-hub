@@ -4,6 +4,7 @@ import { prefersReducedMotion } from '../../design-kit/js/hub-motion.js';
 import { getPattern } from '@/journal/patterns/registry';
 import { shouldShowDayMapPreview } from '@/journal/layout';
 import { openChapterJump } from '@/journal/chapter-jump';
+import { openImportSheet } from '@/journal/import-sheet';
 import { renderToolbar } from '@/journal/render-toolbar';
 import { renderMomentArticle } from '@/journal/render-moment';
 
@@ -157,9 +158,21 @@ export function renderJournal(
   if (opts.patternOff) root.classList.add('journal--pattern-off');
 
   let chapterOverlay: { destroy(): void } | null = null;
+  let importOverlay: { destroy(): void } | null = null;
 
   const toolbar = renderToolbar({
     title: opts.fixture.title,
+    onImportPhotos: () => {
+      importOverlay?.destroy();
+      importOverlay = openImportSheet({
+        fixture: opts.fixture,
+        anchor: root,
+        onClose: () => {
+          importOverlay = null;
+        },
+      });
+      cleanups.push(() => importOverlay?.destroy());
+    },
     onChapter: () => {
       chapterOverlay?.destroy();
       chapterOverlay = openChapterJump({
@@ -316,6 +329,7 @@ export function renderJournal(
     destroy() {
       for (const fn of cleanups) fn();
       chapterOverlay?.destroy();
+      importOverlay?.destroy();
       canvas.replaceChildren();
     },
   };
