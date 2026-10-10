@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Grove animal ingredients</title>
+<style>body{margin:0;background:#edf3e8;color:#23432e;font:16px system-ui}header{padding:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}h1{font-size:20px;margin:0}select,button{font:inherit;padding:10px;border:1px solid #a0b59e;border-radius:8px;background:white}canvas{display:block;width:100%;height:65vh}p{margin:12px 20px;max-width:900px}a{color:inherit}#clips{display:flex;gap:8px;flex-wrap:wrap}</style>
+<header><h1>Grove animal ingredients</h1><select id="species" aria-label="Animal"></select><div id="clips"></div></header><canvas id="view"></canvas><p id="status"></p><p>Parent and half-size baby use independent skeletons. Clips animate in place; Grove supplies paths, water avoidance and milestone behaviour.</p><p>Mallard duck by <a href="https://poly.pizza/m/frSLi6b6Vid">Poly by Google</a>, <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>; rig and animations added for Grove. <a href="../CREDITS.md">All credits and licences</a>.</p>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script><script type="module">
+import * as THREE from 'three';import {createAnimalLibrary} from './animal-loader.mjs';
+const library=await createAnimalLibrary('../');window.library=library;
+const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('#view'),antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();scene.background=new THREE.Color('#edf3e8');scene.add(new THREE.HemisphereLight(0xffffff,0x92aa7c,2));const sun=new THREE.DirectionalLight(0xffffff,2.3);sun.position.set(3,6,5);scene.add(sun);
+const camera=new THREE.OrthographicCamera(-1,1,1,-1,.001,100),select=document.querySelector('#species');let parent,baby,water;let token=0;
+for(const a of library.manifest.assets){const option=new Option(a.id.replace(/^animal-/,'').replaceAll('-',' '),a.id);select.add(option);}
+async function show(id){
+ const request=++token;const [p,b]=await Promise.all([library.create(id),library.create(id,{baby:true})]);if(request!==token){p.dispose();b.dispose();return;}parent?.dispose();baby?.dispose();if(water){scene.remove(water);water.geometry.dispose();water.material.dispose();water=null;}parent=p;baby=b;scene.add(p.object,b.object);
+ scene.updateMatrixWorld(true);for(const model of [p.object,b.object])model.traverse(n=>{if(n.isSkinnedMesh)n.skeleton.update();});
+ const box=new THREE.Box3().setFromObject(p.object,true),size=box.getSize(new THREE.Vector3()),span=Math.max(size.x,size.y,size.z);b.object.position.set(span*.95,0,0);
+ const center=new THREE.Vector3(span*.35,size.y*.45,0);camera.position.copy(center).add(new THREE.Vector3(.9,.6,1).normalize().multiplyScalar(5));camera.lookAt(center);camera.userData.span=span*1.3;
+ if(p.asset.waterline_m){water=new THREE.Mesh(new THREE.CircleGeometry(span*1.6,48),new THREE.MeshStandardMaterial({color:'#8bcfc1',roughness:.75}));water.rotation.x=-Math.PI/2;water.position.y=p.asset.waterline_m;water.visible=false;scene.add(water);}
+ const buttons=document.querySelector('#clips');buttons.replaceChildren();for(const clip of p.clips){const button=document.createElement('button');button.textContent=clip;button.onclick=()=>{p.play(clip);b.play(clip);if(water)water.visible=clip==='swim';};buttons.append(button);}
+ document.querySelector('#status').textContent=p.asset.clip_origin+' · '+p.clips.join(', ');window.currentAnimals=[p,b];window.ready=id;
+}
+select.onchange=()=>show(select.value);await show(select.value);
+let last=performance.now();function draw(now){const dt=Math.min((now-last)/1000,.05);last=now;parent?.update(dt);baby?.update(dt);const w=renderer.domElement.clientWidth,h=renderer.domElement.clientHeight;renderer.setSize(w,h,false);const extent=camera.userData.span||1;camera.top=extent;camera.bottom=-extent;camera.left=-extent*w/h;camera.right=extent*w/h;camera.updateProjectionMatrix();renderer.render(scene,camera);requestAnimationFrame(draw);}requestAnimationFrame(draw);
+</script></html>

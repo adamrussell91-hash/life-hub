@@ -24,3 +24,6 @@ apps/*/.ua/
 # Production records live in the private data repo, never this public repo.
 /data/mind/
 /data/governance/
+
+# Licensed Grove assets: local project hand-off, not public source distribution.
+/apps/life/assets/grove/project-only/

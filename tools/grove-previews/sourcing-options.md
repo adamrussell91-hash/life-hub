@@ -1,3 +1,5 @@
+> Status updated 11 October 2026: the formerly missing animal slots are now supplied in the local project-use bundle. This file records earlier sourcing research. Use the [canonical Grove hand-off](../../apps/life/assets/grove/README.md) for current readiness, clips, licence status and file access.
+
 # Quaternius-only sourcing status — 2026-10-10
 
 User direction: MegaKit trees and vegetation, Quaternius animals as the core;

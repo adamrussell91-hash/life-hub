@@ -12,11 +12,11 @@ import sharp from 'sharp';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../..');
 const sourceRoot = path.resolve(process.argv[2] || path.join(repo, '..'));
-const out = path.join(repo, 'apps/life/assets/grove');
+const out = process.env.GROVE_OUTPUT_DIR ? path.resolve(process.env.GROVE_OUTPUT_DIR) : path.join(repo, 'apps/life/assets/grove');
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS)
   .registerDependencies({'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder});
 await Promise.all([MeshoptDecoder.ready, MeshoptEncoder.ready]);
-const selection = JSON.parse(await fs.readFile(path.join(here, 'selection.json')));
+const selection = JSON.parse(await fs.readFile(process.env.GROVE_SELECTION || path.join(here, 'selection.json')));
 const only = process.env.GROVE_ONLY_KIND;
 const onlyIds = process.env.GROVE_ONLY_IDS?.split(',');
 const selected = a => (!only || a.kind===only) && (!onlyIds || onlyIds.includes(a.id));
@@ -33,7 +33,7 @@ for (const item of selection.filter(selected)) {
   for (const node of root.listNodes()) for (const ext of node.listExtensions()) {
     if (ext.extensionName === 'KHR_lights_punctual') node.setExtension(ext.extensionName, null);
   }
-  const clipMap = {Idle:'idle', Walk:'walk', Gallop:'run', Run:'run', Eating:'eat'};
+  const clipMap = item.clip_map || {Idle:'idle', Walk:'walk', Gallop:'run', Run:'run', Eating:'eat'};
   const animationSourceNames = {};
   for (const clip of root.listAnimations()) {
     const sourceName = clip.getName(), name = clipMap[sourceName];
@@ -87,7 +87,7 @@ for (const item of selection.filter(selected)) {
     triangles += p.getMode()===4 ? n/3 : p.getMode()===5 || p.getMode()===6 ? Math.max(0,n-2) : 0;
   }
   const pack = item.source?.pack || (family === 'nature' ? 'Stylized Nature MegaKit (Source)' : family === 'animals' ? 'Ultimate Animated Animal Pack' : 'Nature Kit');
-  assets.push({id:item.id,slot:item.slot,kind:item.kind,variant:item.variant,stage:item.stage,file,preview:`previews/${item.id}.png`,bytes:(await fs.stat(dest)).size,triangles,height_m: +(measured.max[1]-measured.min[1]).toFixed(4),animations:final.getRoot().listAnimations().map(a=>a.getName()),animation_source_names:animationSourceNames,source:{pack,author:item.source?.author || (family==='kenney'?'Kenney':'Quaternius'),page_url:item.source?.page_url || (family==='nature'?'https://quaternius.com/packs/stylizednaturemegakit.html':family==='animals'?'https://quaternius.com/packs/ultimateanimatedanimals.html':'https://kenney.nl/assets/nature-kit'),original_file:item.source?.original_file || original,downloaded_at:'2026-10-10'},license:{id:'CC0-1.0',url:'https://creativecommons.org/publicdomain/zero/1.0/',attribution:null},notes:item.notes});
+  assets.push({id:item.id,slot:item.slot,kind:item.kind,variant:item.variant,stage:item.stage,file,preview:`previews/${item.id}.png`,bytes:(await fs.stat(dest)).size,triangles,height_m: +(measured.max[1]-measured.min[1]).toFixed(4),animations:final.getRoot().listAnimations().map(a=>a.getName()),animation_source_names:animationSourceNames,source:{pack,author:item.source?.author || (family==='kenney'?'Kenney':'Quaternius'),page_url:item.source?.page_url || (family==='nature'?'https://quaternius.com/packs/stylizednaturemegakit.html':family==='animals'?'https://quaternius.com/packs/ultimateanimatedanimals.html':'https://kenney.nl/assets/nature-kit'),original_file:item.source?.original_file || original,downloaded_at:'2026-10-10'},license:item.license || {id:'CC0-1.0',url:'https://creativecommons.org/publicdomain/zero/1.0/',attribution:null},notes:item.notes});
   console.log(item.id, assets.at(-1).bytes);
 }
 assets.sort((a,b)=>selection.findIndex(s=>s.id===a.id)-selection.findIndex(s=>s.id===b.id));

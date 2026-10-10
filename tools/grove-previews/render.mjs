@@ -7,7 +7,7 @@ import sharp from 'sharp';
 import {createHash} from 'node:crypto';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const repo=path.resolve(here,'../..');
-const grove=path.join(repo,'apps/life/assets/grove');
+const grove=process.env.GROVE_OUTPUT_DIR ? path.resolve(process.env.GROVE_OUTPUT_DIR) : path.join(repo,'apps/life/assets/grove');
 const manifest=JSON.parse(await fs.readFile(path.join(grove,'manifest.json')));
 const html=`<!doctype html><html><head><style>body{margin:0}canvas{display:block}</style>
 <script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script></head><body><script type="module">
@@ -79,8 +79,7 @@ try{
  }
  if(errors.length)throw Error(errors.join('\n'));
  await fs.writeFile(path.join(grove,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
- await fs.writeFile(path.join(here,'render-report.json'),JSON.stringify(reports,null,2)+'\n');
- if(process.env.GROVE_RENDER_REPORT)await fs.writeFile(process.env.GROVE_RENDER_REPORT,JSON.stringify(reports,null,2)+'\n');
+ await fs.writeFile(process.env.GROVE_RENDER_REPORT || path.join(here,'render-report.json'),JSON.stringify(reports,null,2)+'\n');
  const cols=6,w=256,h=278,rows=Math.ceil(manifest.assets.length/cols),layers=[];
  for(const [i,asset]of manifest.assets.entries()){
   const left=(i%cols)*w,top=Math.floor(i/cols)*h;

@@ -119,6 +119,7 @@ describe('excursions dashboard', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     closeCardMenu();
     document.body.replaceChildren();
   });
@@ -151,6 +152,8 @@ describe('excursions dashboard', () => {
   });
 
   it('puts excursion cards on a clearance lane with Open page, countdown, and next action', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-01T12:00:00.000Z'));
     location.hash = '#/excursions';
     const canvas = await mount();
 
