@@ -35,76 +35,73 @@ async function signIn(page) {
   await page.locator('#app[data-state="ready"]').waitFor();
 }
 
-test('Dump for Clare is gone; the three hub cards each carry their own quick tool', async () => {
+test('Home shows the Now panel in place of the old hub cards', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
   try {
     await signIn(page);
     assert.equal(await page.locator('#clare-dump-form').count(), 0);
-    assert.equal(await page.locator('[data-hub-pulse="teaching"]').isVisible(), true);
-    assert.equal(await page.locator('[data-hub-pulse="knowledge"]').isVisible(), true);
-    assert.equal(await page.locator('[data-hub-pulse="tasks"]').isVisible(), true);
+    assert.equal(await page.locator('[data-hub-pulse]').count(), 0);
+    assert.equal(await page.locator('#home-now [data-now-capture]').isVisible(), true);
+    assert.equal(await page.locator('#home-now [data-now-track]').isVisible(), true);
+    assert.equal(await page.locator('#home-now [data-now-task-list]').isVisible(), true);
+    assert.equal(await page.locator('#home-now .now-jump').count(), 4);
   } finally {
     await context.close();
   }
 });
 
-test('each hub card expands and collapses independently', async () => {
+test('the capture bar switches between Task, Note and Book, and only enables with something to save', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
   try {
     await signIn(page);
-    const teachingToggle = page.locator('[data-hub-pulse="teaching"] [data-hub-pulse-toggle]');
-    const teachingBody = page.locator('#hub-pulse-body-teaching');
-    const tasksToggle = page.locator('[data-hub-pulse="tasks"] [data-hub-pulse-toggle]');
-    const tasksBody = page.locator('#hub-pulse-body-tasks');
+    const input = page.locator('[data-now-input]');
+    const submit = page.locator('[data-now-submit]');
+    assert.equal(await submit.isDisabled(), true);
+    await input.fill('Book physio');
+    assert.equal(await submit.isDisabled(), false);
+    await input.fill('');
+    assert.equal(await submit.isDisabled(), true);
 
-    assert.equal(await teachingBody.isVisible(), false);
-    await teachingToggle.click();
-    assert.equal(await teachingBody.isVisible(), true);
-    assert.equal(await teachingToggle.getAttribute('aria-expanded'), 'true');
+    await page.locator('[data-now-mode="note"]').click();
+    assert.equal(await page.locator('[data-now-mode="note"]').getAttribute('aria-checked'), 'true');
+    assert.equal(await input.getAttribute('placeholder'), "What's on your mind?");
+    assert.equal(await submit.textContent(), 'Save');
 
-    // Expanding Tasks does not collapse the already-open Teaching card.
-    await tasksToggle.click();
-    assert.equal(await tasksBody.isVisible(), true);
-    assert.equal(await teachingBody.isVisible(), true);
-
-    await teachingToggle.click();
-    assert.equal(await teachingBody.isVisible(), false);
-    assert.equal(await teachingToggle.getAttribute('aria-expanded'), 'false');
+    await page.locator('[data-now-mode="note"]').press('ArrowRight');
+    assert.equal(await page.locator('[data-now-mode="book"]').getAttribute('aria-checked'), 'true');
+    assert.equal(await submit.textContent(), 'Log');
   } finally {
     await context.close();
   }
 });
 
-test('the Knowledge quick-note Save button only enables once there is text', async () => {
+test('pressing / on Home jumps to the capture bar', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
   try {
     await signIn(page);
-    const text = page.locator('[data-knowledge-quick-text]');
-    const save = page.locator('[data-knowledge-quick-save]');
-    assert.equal(await save.isDisabled(), true);
-    await text.fill('Belonging notes for 10 English');
-    assert.equal(await save.isDisabled(), false);
-    await text.fill('');
-    assert.equal(await save.isDisabled(), true);
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('/');
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'now-capture-input');
   } finally {
     await context.close();
   }
 });
 
-test('Teaching and Tasks cards degrade to an honest empty/unbound state, never a crash, when their store is unbound', async () => {
+test('unbound stores degrade to honest copy, never a crash', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
   try {
     await signIn(page);
-    await page.locator('[data-hub-pulse="teaching"] [data-hub-pulse-toggle]').click();
-    await page.locator('[data-hub-pulse="tasks"] [data-hub-pulse-toggle]').click();
-    await page.waitForFunction(() => document.querySelector('[data-hub-pulse="teaching"]')?.dataset.hubState !== 'loading');
-    assert.equal(await page.locator('[data-hub-pulse="teaching"] .hub-agenda__empty').isVisible(), true);
-    assert.equal(await page.locator('[data-hub-pulse="tasks"] .hub-checklist__empty').isVisible(), true);
-    assert.equal(await page.locator('[data-hub-pulse="teaching"] [data-hub-status]').isVisible(), true);
+    await page.waitForFunction(() => !/Checking/.test(document.querySelector('[data-now-task-list]')?.textContent ?? 'Checking'));
+    const tasks = await page.locator('[data-now-task-list]').textContent();
+    assert.match(tasks, /isn't connected yet|Couldn't load your tasks|Nothing open/);
+    await page.locator('[data-now-mode="book"]').click();
+    const options = await page.locator('[data-now-options]').textContent();
+    assert.match(options, /Bookshelf|books|reading/);
+    assert.doesNotMatch(await page.locator('[data-now-day-headline]').textContent(), /undefined|NaN/);
   } finally {
     await context.close();
   }

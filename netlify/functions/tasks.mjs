@@ -197,6 +197,7 @@ export function createTasksHandler(deps = {}) {
           created_at: timestamp,
           updated_at: timestamp,
           completed_at: null,
+          ...(coerceOriginDate(parsed.value.due_date) ? { due_date: parsed.value.due_date } : {}),
           depends_on: [],
           tags: normalizeTags(parsed.value.tags),
           attachments: [],
@@ -225,10 +226,12 @@ export function createTasksHandler(deps = {}) {
               }
             : {})
         };
-        await setJSON(store, taskKey(id), task);
+        // A due date given at creation gets the same priority floor a PATCH would.
+        const saved = task.due_date ? applyDueDatePriorityFloor(task, parsed.value) : task;
+        await setJSON(store, taskKey(id), saved);
         const ids = await readTaskIndex(store);
         await writeTaskIndex(store, [...ids, id]);
-        return withCors(okResponse(201, task), request, env);
+        return withCors(okResponse(201, saved), request, env);
       }
 
       if (request.method === 'PATCH' || request.method === 'DELETE') {

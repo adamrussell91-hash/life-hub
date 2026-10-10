@@ -50,15 +50,23 @@ export function createTasksApi(fetchImpl = fetch) {
       const payload = await readJson(fetchImpl, '/api/stress-flags');
       return payload.data?.flags ?? [];
     },
-    async createTask({ title, domain = 'life' } = {}) {
+    async createTask({ title, domain = 'life', due_date: dueDate = null } = {}) {
       const response = await fetchImpl('/api/tasks', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ title, domain })
+        body: JSON.stringify({ title, domain, ...(dueDate ? { due_date: dueDate } : {}) })
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || payload?.ok !== true) {
         throw httpError('Create task failed', response.status, payload?.error?.code ?? 'request_failed');
+      }
+      return payload.data;
+    },
+    async deleteTask(id) {
+      const response = await fetchImpl(`/api/tasks?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        throw httpError('Delete task failed', response.status, payload?.error?.code ?? 'request_failed');
       }
       return payload.data;
     },
