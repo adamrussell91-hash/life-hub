@@ -84,7 +84,7 @@ This split is an **Open question** for the next round, not a decision.
 | Life City: Life Hub as a living transit city | Under critical review | [life-city.md](life-city.md) |
 | Life City build plan | Draft | [life-city-build-plan.md](life-city-build-plan.md) |
 | Life City resource catalogue | Research | [life-city-resources.md](life-city-resources.md) |
-| Life City terrain, water and growing trees | Code research and source snapshots | [life-city-terrain-growth.md](life-city-terrain-growth.md) |
+| Grove: a forest from completed-task history | Concept and collected raw ingredients | [grove.md](grove.md) |
 | Metropolis: the ground (Adam to fill in) | Brief | [life-city-ground.md](life-city-ground.md) |
 | Life City asset inventory | Inventory | [life-city-assets.md](life-city-assets.md) |
 | Notion → GitHub gap map | Future build inventory | [notion-github-gap-map.md](notion-github-gap-map.md) |
@@ -92,3 +92,5 @@ This split is an **Open question** for the next round, not a decision.
 ## History
 
 - **2026-10-10:** Indexed the terrain, water and tree-growth research pack beside the Life City resource catalogue.
+
+- **2026-10-10:** Indexed Grove separately from Life City, with a broad source collection and an inventory of existing animated animals and nature assets.

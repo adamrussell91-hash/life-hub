@@ -1,6 +1,6 @@
 # Upstream terrain and growth source snapshots
 
-Read [the research guide](../life-city-terrain-growth.md) first.
+Read [the research guide](../grove-resources.md) first.
 
 These are selected, unmodified upstream files retrieved on 10 October 2026. They are reference material, not runnable Life Hub modules. Original filenames are recorded in [manifest.json](manifest.json); nested paths are flattened using `__`, and every saved file has a `.txt` suffix. Restore the source extension only when deliberately extracting code into a build slice.
 
@@ -17,3 +17,5 @@ The manifest's commit links are the source of truth for exact versions. SHA-256 
 - `lowpoly-tree-generator/`: small faceted-tree usage example; the full generator is upstream.
 
 Multi-day growth persistence and a renderer adapter still belong to Life Hub. The pack adds no runtime dependency or live feature.
+
+The broader [Grove ingredients](../grove-ingredients/README.md) add full selected library source, official Three.js examples and a model inventory.
