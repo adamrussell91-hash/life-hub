@@ -170,6 +170,11 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
 
   // ── Events ────────────────────────────────────────────────────────────────
 
+  function toggleVisit(id) {
+    state.selectedVisit = state.selectedVisit === id ? null : id;
+    update();
+  }
+
   function wire(el) {
     el.addEventListener('click', event => {
       const t = event.target;
@@ -200,10 +205,7 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
         return update();
       }
       const visit = t.closest('[data-gh-visit]');
-      if (visit) {
-        state.selectedVisit = visit.dataset.ghVisit;
-        return update();
-      }
+      if (visit) return toggleVisit(visit.dataset.ghVisit);
       const open = t.closest('[data-gh-open]');
       if (open) return open.dataset.ghOpen === 'visit' ? openVisit() : openPlaces();
       const close = t.closest('[data-gh-close]');
@@ -226,8 +228,7 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
       const marker = event.target.closest?.('g[data-gh-visit]');
       if (!marker) return;
       event.preventDefault();
-      state.selectedVisit = marker.dataset.ghVisit;
-      update();
+      toggleVisit(marker.dataset.ghVisit);
     });
     el.addEventListener('change', event => {
       if (event.target.matches?.('[data-gh="remember"]')) state.remember = event.target.checked;
@@ -301,6 +302,16 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
       await run(() => api.removeVisit(data.ghId), { success: 'Visit removed' });
       state.selectedVisit = null;
       update();
+      return;
+    }
+    if (action === 'retire-car') {
+      const place = placeById(data.ghId);
+      if (!place || place.type !== 'car') return;
+      const retired = !place.details.retired;
+      await run(
+        () => api.savePlace({ ...place, details: { ...place.details, retired } }),
+        { success: retired ? 'Marked as no longer ours' : 'Marked as ours again' }
+      );
       return;
     }
     if (action === 'autofile') {
@@ -507,6 +518,29 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
       return;
     }
     body.innerHTML = state.tab === 'mailroom' ? mailroomView() : state.tab === 'garage' ? garageView() : state.tab === 'homes' ? homesView() : drivewayView();
+    wireRoadLabels();
+  }
+
+  function wireRoadLabels() {
+    for (const marker of host()?.querySelectorAll('g.gh-marker') ?? []) {
+      const viewport = marker.querySelector('.gh-marker__title');
+      const text = marker.querySelector('.gh-marker__title-text');
+      if (!viewport || !text) continue;
+      const start = () => {
+        marker.classList.remove('is-reading-title');
+        const shift = Math.max(0, text.scrollWidth - viewport.clientWidth);
+        if (shift <= 0) return;
+        marker.style.setProperty('--gh-title-shift', `-${shift}px`);
+        marker.style.setProperty('--gh-title-duration', `${Math.min(14, 2 + shift / 40)}s`);
+        void marker.getBoundingClientRect();
+        marker.classList.add('is-reading-title');
+      };
+      const stop = () => marker.classList.remove('is-reading-title');
+      marker.addEventListener('mouseenter', start);
+      marker.addEventListener('mouseleave', stop);
+      marker.addEventListener('focus', start);
+      marker.addEventListener('blur', stop);
+    }
   }
 
   function paintTabs() {
@@ -669,18 +703,19 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
       p.details.warrantyUntil ? ['Warranty', day(p.details.warrantyUntil), car.warrantyLeftDays >= 0 ? `${Math.round(car.warrantyLeftDays / 30.44)} months left` : 'Ended'] : null,
       car.odometer?.perMonth ? ['Driving', `${car.odometer.perMonth.toLocaleString('en-AU')} km`, 'a month, from your own log'] : null
     ].filter(Boolean);
-    return `<div class="gh-section-head gh-section-head--tight">${picker}<button class="btn btn--primary" type="button" data-gh-open="visit">Log a visit</button></div>
+    const retireLabel = p.details.retired ? 'Mark as ours again' : 'No longer ours';
+    return `<div class="gh-section-head gh-section-head--tight">${picker}<div class="gh-inline-actions gh-inline-actions--bar"><button class="btn btn--ghost" type="button" data-gh-act="retire-car" data-gh-id="${escapeHtml(p.id)}">${retireLabel}</button><button class="btn btn--primary" type="button" data-gh-open="visit">Log a visit</button></div></div>
       <div class="gh-grid">
-        <article class="gh-tile gh-car-hero">
+        <article class="gh-tile gh-car-hero${p.details.retired ? ' is-retired' : ''}">
           <p class="gh-kicker">${escapeHtml(p.details.model || 'Car')}${p.details.retired ? ' · no longer ours' : ''}</p>
           <h2 class="gh-h gh-h--big">${escapeHtml(p.name)}</h2>
           ${odometerDigits(car)}
-          <p class="gh-sub">${car.odometer ? `Last reading ${km(car.odometer.lastKm)} on ${day(car.odometer.lastDate)}.${car.odometer.isEstimate ? ' The faded digits are an estimate from how much you drive.' : ''}` : 'Log a visit with the odometer to start the estimate.'}</p>
+          <p class="gh-sub">${car.odometer ? `Last reading ${km(car.odometer.lastKm)} on ${day(car.odometer.lastDate)}.${car.odometer.isEstimate ? ' The faded digits are an estimate from how much you drive.' : ''}` : 'Log a visit with the odometer to start the estimate.'}${p.details.retired ? ' History stays; the Mailroom no longer catches mail for it.' : ''}</p>
         </article>
         <div class="gh-stats">${stats.map(([k, v, s]) => `<div class="gh-tile gh-stat"><p class="gh-kicker">${k}</p><p class="gh-stat__value">${v}</p><p class="gh-sub">${s}</p></div>`).join('')}</div>
       </div>
       <article class="gh-tile gh-road-tile">
-        <div class="gh-section-head gh-section-head--tight"><h2>Odometer Road</h2><p>Visits laid out by the kilometre. Tap a marker.</p></div>
+        <div class="gh-section-head gh-section-head--tight"><h2>Odometer Road</h2><p>Visits laid out by the kilometre. Tap a marker; tap again to clear.</p></div>
         ${roadSvg(car)}
         ${visitDetail(car)}
       </article>
@@ -693,6 +728,18 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
     if (!points.length) return '<p class="gh-muted">Markers appear once a visit has an odometer reading.</p>';
     const maxKm = Math.max(car.odometer?.estimate ?? 0, ...points.map(v => v.km), 1) * 1.08;
     const W = 1000;
+    const H = 248;
+    const ROAD_Y = 80;
+    const ROAD_H = 48;
+    const ROAD_MID = ROAD_Y + ROAD_H / 2;
+    const ROAD_BOT = ROAD_Y + ROAD_H;
+    const STEM = 28;
+    const DOT = 8;
+    // Same gap above and below the road: stem length + dot radius.
+    const UP_CY = ROAD_Y - STEM - DOT;
+    const DOWN_CY = ROAD_BOT + STEM + DOT;
+    const LABEL_W = 120;
+    const LABEL_H = 18;
     const x = value => 30 + (value / maxKm) * (W - 60);
     const step = maxKm > 150_000 ? 20_000 : 10_000;
     const ticks = [];
@@ -701,19 +748,25 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
       const up = i % 2 === 0;
       const on = v.id === state.selectedVisit;
       const cx = x(v.km);
+      const cy = up ? UP_CY : DOWN_CY;
+      const stemY1 = up ? cy + DOT : ROAD_BOT;
+      const stemY2 = up ? ROAD_Y : cy - DOT;
+      const foY = up ? cy - DOT - LABEL_H - 2 : cy + DOT + 2;
       return `<g class="gh-marker${on ? ' is-on' : ''}" data-gh-visit="${escapeHtml(v.id)}" role="button" tabindex="0" aria-label="${escapeHtml(`${v.title}, ${day(v.date)}, ${km(v.km)}`)}">
-        <line x1="${cx}" x2="${cx}" y1="${up ? 52 : 108}" y2="${up ? 80 : 128}" class="gh-marker__stem"></line>
-        <circle cx="${cx}" cy="${up ? 44 : 136}" r="${on ? 11 : 8}" class="gh-marker__dot"></circle>
-        <text x="${cx}" y="${up ? 22 : 166}" text-anchor="middle" class="gh-marker__label">${escapeHtml(v.title.length > 14 ? `${v.title.slice(0, 13)}…` : v.title)}</text>
+        <line x1="${cx}" x2="${cx}" y1="${stemY1}" y2="${stemY2}" class="gh-marker__stem"></line>
+        <circle cx="${cx}" cy="${cy}" r="${on ? 11 : 8}" class="gh-marker__dot"></circle>
+        <foreignObject x="${cx - LABEL_W / 2}" y="${foY}" width="${LABEL_W}" height="${LABEL_H}" class="gh-marker__fo">
+          <div xmlns="http://www.w3.org/1999/xhtml" class="gh-marker__title"><span class="gh-marker__title-text">${escapeHtml(v.title)}</span></div>
+        </foreignObject>
       </g>`;
     }).join('');
     const ghost = car.odometer?.isEstimate
-      ? `<g class="gh-ghost"><line x1="${x(car.odometer.lastKm)}" x2="${x(car.odometer.estimate)}" y1="104" y2="104"></line><rect x="${x(car.odometer.estimate) - 14}" y="90" width="28" height="28" rx="7"></rect><text x="${x(car.odometer.estimate)}" y="188" text-anchor="middle">you, probably</text></g>`
+      ? `<g class="gh-ghost"><line x1="${x(car.odometer.lastKm)}" x2="${x(car.odometer.estimate)}" y1="${ROAD_MID}" y2="${ROAD_MID}"></line><rect x="${x(car.odometer.estimate) - 14}" y="${ROAD_MID - 14}" width="28" height="28" rx="7"></rect><text x="${x(car.odometer.estimate)}" y="${H - 10}" text-anchor="middle">you, probably</text></g>`
       : '';
-    return `<div class="gh-scroll"><svg viewBox="0 0 ${W} 200" role="img" aria-label="Visits by odometer reading">
-      <rect x="10" y="80" width="${W - 20}" height="48" rx="12" class="gh-road"></rect>
-      <line x1="20" x2="${W - 20}" y1="104" y2="104" class="gh-road__centre"></line>
-      ${ticks.map(k => `<text x="${x(k)}" y="198" text-anchor="middle" class="gh-tick">${k / 1000}k</text>`).join('')}
+    return `<div class="gh-scroll"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Visits by odometer reading">
+      <rect x="10" y="${ROAD_Y}" width="${W - 20}" height="${ROAD_H}" rx="12" class="gh-road"></rect>
+      <line x1="20" x2="${W - 20}" y1="${ROAD_MID}" y2="${ROAD_MID}" class="gh-road__centre"></line>
+      ${ticks.map(k => `<text x="${x(k)}" y="${H - 28}" text-anchor="middle" class="gh-tick">${k / 1000}k</text>`).join('')}
       ${ghost}${markers}
     </svg></div>`;
   }

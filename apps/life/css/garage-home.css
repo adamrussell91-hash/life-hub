@@ -114,6 +114,8 @@ button.gh-tile:hover { box-shadow: var(--elev-2); transform: translateY(-1px); }
 .gh-stat__value { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-bold); color: var(--depth); letter-spacing: var(--tracking-tight); }
 .gh-stat__value small { font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--muted); }
 .gh-road-tile { margin-top: var(--hub-tile-gap, var(--space-3)); }
+.gh-inline-actions--bar { margin-top: 0; margin-left: auto; }
+.gh-car-hero.is-retired { opacity: 0.85; }
 .gh-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .gh-scroll > svg { display: block; width: 100%; min-width: 640px; height: auto; overflow: visible; }
 #garage-home-dashboard svg text { font-family: var(--font-ui); font-variant-numeric: tabular-nums; }
@@ -124,8 +126,12 @@ button.gh-tile:hover { box-shadow: var(--elev-2); transform: translateY(-1px); }
 .gh-marker__stem { stroke: var(--line); stroke-width: 2; }
 .gh-marker__dot { fill: var(--warm-white); stroke: var(--wave); stroke-width: 3; transition: r 0.2s; }
 .gh-marker.is-on .gh-marker__dot, .gh-marker:focus-visible .gh-marker__dot { fill: var(--wave); }
-.gh-marker__label { fill: var(--orca); font-size: 12px; font-weight: 600; }
-.gh-marker.is-on .gh-marker__label { fill: var(--depth); }
+.gh-marker__fo { overflow: visible; pointer-events: none; }
+.gh-marker__title { display: block; width: 100%; min-width: 0; overflow: hidden; text-align: center; font: var(--weight-semibold) 12px/18px var(--font-ui); color: var(--orca); white-space: nowrap; }
+.gh-marker.is-on .gh-marker__title { color: var(--depth); }
+.gh-marker__title-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-marker.is-reading-title .gh-marker__title-text { width: max-content; overflow: visible; text-overflow: clip; animation: gh-title-read var(--gh-title-duration, 4s) ease-in-out 1 forwards; }
+@keyframes gh-title-read { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(var(--gh-title-shift, 0)); } }
 .gh-ghost line { stroke: var(--high-sea); stroke-width: 3; stroke-dasharray: 4 6; }
 .gh-ghost rect { fill: none; stroke: var(--high-sea); stroke-width: 2; stroke-dasharray: 4 3; }
 .gh-ghost text { fill: var(--muted); font-size: 12px; }
@@ -228,4 +234,5 @@ button.gh-timeline__row:hover, .gh-timeline__row.is-on { background: var(--glass
 }
 @media (prefers-reduced-motion: reduce) {
   button.gh-tile, .gh-progress span, .gh-switch i, .gh-switch i::after, .gh-marker__dot { transition: none; }
+  .gh-marker.is-reading-title .gh-marker__title-text { width: max-content; overflow: visible; animation: none; }
 }

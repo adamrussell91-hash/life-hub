@@ -10,7 +10,7 @@ The Property page stays the home of an investment's money (rent ledger, loan, ta
 |-----|---------------|
 | Driveway | Mailroom count, **Needs you** (raised by what arrived: inspection soon, visit to log, service due, tax-time gaps) and a card per place |
 | Mailroom | Waiting / Filed / Ignored / All. Each email shows what Life Hub read (place, kind, dates, amounts, references). Approve, *Not home stuff*, or move to another place, optionally remembering the sender |
-| Garage | Per car: ghost odometer (estimate from your own log), Odometer Road (visits by km), every visit, log a visit |
+| Garage | Per car: ghost odometer (estimate from your own log), Odometer Road (visits by km; hover/focus scrolls long labels; tap again to clear), every visit, log a visit, **No longer ours** to retire a sold car (history stays, mail stops) |
 | Homes | Home we rent: inspection countdown + prep checklist, rent receipts, repair threads step by step, bills, lease. Investment: FY tax-time pack and still-needed checklist, with a hand-off to Property |
 
 ## Places and match words
