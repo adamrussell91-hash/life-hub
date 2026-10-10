@@ -25,14 +25,23 @@ window.renderAsset=async(file)=>{
  const light=new THREE.DirectionalLight(0xffffff,2.3);light.position.set(4,8,6);scene.add(light);
  const model=gltf.scene;scene.add(model);model.updateMatrixWorld(true);
  const initial=new THREE.Box3().setFromObject(model,true);
+ function vertices(){const values=[]; model.traverse(n=>{if(n.isMesh){const count=n.geometry.getAttribute('position').count;for(let i=0;i<count;i++){const p=new THREE.Vector3();n.getVertexPosition(i,p);p.applyMatrix4(n.matrixWorld);values.push(...p.toArray());}}});return values;}
  const animationChecks=[];
  for(const clip of gltf.animations){
-  const mixer=new THREE.AnimationMixer(model);const action=mixer.clipAction(clip);action.play();
-  mixer.setTime(0);model.updateMatrixWorld(true);
-  const before=[];model.traverse(n=>before.push(...n.matrixWorld.elements));
-  mixer.setTime(Math.min(.37,clip.duration*.43));model.updateMatrixWorld(true);
-  const after=[];model.traverse(n=>after.push(...n.matrixWorld.elements));
-  animationChecks.push({name:clip.name,duration:clip.duration,moves:before.some((v,i)=>Math.abs(v-after[i])>1e-5)});
+  const mixer=new THREE.AnimationMixer(model);const action=mixer.clipAction(clip);action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.play();
+  const poses=[], boxes=[];
+  for(const fraction of [0,.125,.25,.375,.5,.625,.75,.875,1]){
+   mixer.setTime(clip.duration*fraction);model.updateMatrixWorld(true);model.traverse(n=>{if(n.isSkinnedMesh)n.skeleton.update();});
+   const pose=vertices();if(pose.some(v=>!Number.isFinite(v)))throw Error('Non-finite deformation '+file+' '+clip.name);
+   poses.push(pose);const box=new THREE.Box3().setFromObject(model,true);boxes.push({min:box.min.toArray(),max:box.max.toArray()});
+  }
+  const base=poses[0],last=poses.at(-1);
+  const displacement=Math.max(...poses.slice(1).map(p=>Math.max(...p.map((v,i)=>Math.abs(v-base[i])))));
+  const seam=Math.max(...last.map((v,i)=>Math.abs(v-base[i])));
+  const maxSpan=Math.max(...boxes.flatMap(b=>b.max.map((v,i)=>v-b.min[i])));
+  const initialSpan=initial.getSize(new THREE.Vector3()).length();
+  if(maxSpan>initialSpan*2.5)throw Error('Exploding rig '+file+' '+clip.name);
+  animationChecks.push({name:clip.name,duration:clip.duration,moves:displacement>1e-5,vertex_displacement_m:displacement,loop_seam_m:seam,sampled_bounds:boxes});
   mixer.stopAllAction();mixer.uncacheRoot(model);
  }
  if(gltf.animations.length){const mixer=new THREE.AnimationMixer(model);mixer.clipAction(gltf.animations.find(a=>a.name==='idle')||gltf.animations[0]).play();mixer.setTime(.2);}
@@ -60,32 +69,33 @@ const server=http.createServer(async(req,res)=>{
  }catch{res.statusCode=404;res.end();}
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-const browser=await chromium.launch({headless:true,...(process.env.GROVE_CHROMIUM?{executablePath:process.env.GROVE_CHROMIUM}:{}),args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const browser=await chromium.launch({headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 try{
  const page=await browser.newPage({viewport:{width:512,height:512},deviceScaleFactor:1});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>window.ready);
- await fs.mkdir(path.join(grove,'previews'),{recursive:true});
+ await fs.mkdir(path.join(grove,'motion-previews'),{recursive:true});
  const reports=[];
  for(const asset of manifest.assets){
   const report=await page.evaluate(file=>window.renderAsset(file),asset.file);
   report.sha256=createHash('sha256').update(await fs.readFile(path.join(grove,asset.file))).digest('hex');
-  if(report.animations.some(a=>!a.moves))throw Error(`Non-moving animation in ${asset.id}`);
+  if(!report.animations.length || report.animations.some(a=>!a.moves))throw Error(`Missing/non-moving animation in ${asset.id}`);
+  if(asset.clip_origin?.startsWith('Grove-generated') && report.animations.some(a=>a.loop_seam_m>.0005))throw Error('Generated loop discontinuity: '+asset.id);
   // Browser-measured bounds include skinning; these are the engine's actual dimensions.
   asset.height_m=+report.height_m.toFixed(4);reports.push(report);
   const png=await page.screenshot();
-  await sharp(png).png({palette:true,colours:128,compressionLevel:9}).toFile(path.join(grove,asset.preview));
+  await sharp(png).png({palette:true,colours:128,compressionLevel:9}).toFile(path.join(grove,'motion-previews',asset.id+'.png'));
   console.log(asset.id,report.height_m.toFixed(3));
  }
  if(errors.length)throw Error(errors.join('\n'));
  await fs.writeFile(path.join(grove,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
- await fs.writeFile(process.env.GROVE_RENDER_REPORT || path.join(here,'render-report.json'),JSON.stringify(reports,null,2)+'\n');
+ await fs.writeFile(path.join(grove,'motion-report.json'),JSON.stringify(reports,null,2)+'\n');
  const cols=6,w=256,h=278,rows=Math.ceil(manifest.assets.length/cols),layers=[];
  for(const [i,asset]of manifest.assets.entries()){
   const left=(i%cols)*w,top=Math.floor(i/cols)*h;
-  layers.push({input:await sharp(path.join(grove,asset.preview)).resize(236,236).toBuffer(),left:left+10,top});
+  layers.push({input:await sharp(path.join(grove,'motion-previews',asset.id+'.png')).resize(236,236).toBuffer(),left:left+10,top});
   const label=asset.id;
   layers.push({input:Buffer.from(`<svg width="256" height="42"><rect width="256" height="42" fill="#eeeeee"/><text x="128" y="20" text-anchor="middle" font-family="Arial" font-size="11">${label}.glb</text></svg>`),left,top:top+236});
  }
- await sharp({create:{width:w*cols,height:h*rows,channels:3,background:'#eeeeee'}}).composite(layers).png({palette:true,colours:128,compressionLevel:9}).toFile(path.join(grove,'previews/_sheet.png'));
+ await sharp({create:{width:w*cols,height:h*rows,channels:3,background:'#eeeeee'}}).composite(layers).png({palette:true,colours:128,compressionLevel:9}).toFile(path.join(grove,'motion-previews/_sheet.png'));
 }finally{await browser.close();server.close();}

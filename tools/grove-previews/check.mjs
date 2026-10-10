@@ -10,7 +10,9 @@ import {MeshoptDecoder} from 'meshoptimizer';
 import sharp from 'sharp';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const grove=path.resolve(here,'../../apps/life/assets/grove');
-async function files(dir){const result=[];for(const entry of await fs.readdir(dir,{withFileTypes:true})){const p=path.join(dir,entry.name);result.push(...(entry.isDirectory()?await files(p):[p]));}return result;}
+// The gitignored project-use bundle has its own manifest and motion verifier.
+// Keep the public CC0 collection's inventory and budget independent of it.
+async function files(dir){const result=[];for(const entry of await fs.readdir(dir,{withFileTypes:true})){const p=path.join(dir,entry.name);if(p===path.join(grove,'project-only'))continue;result.push(...(entry.isDirectory()?await files(p):[p]));}return result;}
 const manifestPath=path.join(grove,'manifest.json');
 const manifest=JSON.parse(await fs.readFile(manifestPath));
 const reports=JSON.parse(await fs.readFile(path.join(here,'render-report.json')));

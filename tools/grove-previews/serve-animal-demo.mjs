@@ -1,0 +1,5 @@
+import fs from 'node:fs/promises';import http from 'node:http';import path from 'node:path';import {fileURLToPath} from 'node:url';
+const here=path.dirname(fileURLToPath(import.meta.url)),folder=path.resolve(process.argv[2]);
+const types={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.json':'application/json','.glb':'model/gltf-binary','.png':'image/png','.md':'text/plain'};
+const server=http.createServer(async(req,res)=>{try{let p=decodeURIComponent(new URL(req.url,'http://localhost').pathname);if(p==='/')p='/demo/index.html';const isThree=p.startsWith('/three/'),base=isThree?path.join(here,'node_modules/three'):folder;const file=path.resolve(base,isThree?p.slice(7):p.slice(1));if(!file.startsWith(base+path.sep))throw Error('Invalid path');res.setHeader('Content-Type',types[path.extname(file)]||'application/octet-stream');res.end(await fs.readFile(file));}catch{res.statusCode=404;res.end('Not found');}});
+server.listen(Number(process.env.PORT||0),'127.0.0.1',()=>console.log('Animal preview: http://127.0.0.1:'+server.address().port+'/demo/index.html'));

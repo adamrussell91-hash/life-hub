@@ -5,6 +5,72 @@
 
 Grove is a quiet Three.js forest drawn from completed-task history, viewed from above at an angle. It lives below Day and Tasks, separately from them. Home shows today's clearing; tapping it opens the wider forest.
 
+## Working animal hand-off for Claude
+
+**Prepared and tested on 11 October 2026: all required animal slots now have
+working movement clips.** The local project bundle contains seven GLBs. Core
+vegetation remains Quaternius MegaKit Source; core deer/fox remain Quaternius.
+The hare, squirrel, robin and mallard are matching one-off additions.
+
+| Model | Available clips | Motion source |
+| --- | --- | --- |
+| Spring hare | `idle`, `hop`, `run`, `eat` | Original Grove rig-control loops, baked in Blender 5.0.1 |
+| Spring squirrel | `idle`, `walk`, `run`, `eat` | Original Grove rig-control loops, baked in Blender 5.0.1 |
+| Soltorch robin | `idle`, `hop`, `fly`, `eat` | Publisher-authored clips retained |
+| Mallard, Poly by Google | `idle`, `walk`, `swim`, `eat` | Original Grove four-bone rig and motion loops |
+| Quaternius doe, stag, fox | `idle`, `walk`, `run`, `eat` | Publisher-authored clips retained |
+
+The downloaded [GameDev.tv Spring pack](https://gamedev.tv/assets/spring-assets)
+still has only single-frame source actions; the delivered hare/squirrel now
+have **added animation**, not hidden publisher clips. The
+[robin](https://soltorchgames.itch.io/animated-low-poly-bird-sample) hops on the
+ground and flies. The [mallard](https://poly.pizza/m/frSLi6b6Vid) is CC BY 3.0;
+retain its supplied credit in the finished app. The toy-like Gobkit duck was
+inspected and rejected for visual fit. No Cube Pets or Kenney models added.
+
+### Where Claude gets the files
+
+The project-use assets are installed locally at
+`apps/life/assets/grove/project-only/` in this checkout. This folder is
+intentionally gitignored: the repo was still public when checked on 11 October,
+and the Spring/robin licences prohibit standalone public asset redistribution.
+The exact local source bundle is recorded in
+[animal-audit.json](../../../../tools/grove-previews/animal-audit.json).
+
+For another **local checkout on Adam's Mac**, run from its repository root:
+
+```bash
+node tools/grove-previews/install-project-animals.mjs "/Users/adamrussell/Documents/Codex/2026-10-10/ground-streams-lakes-generated-in-code/outputs/grove-local-animals"
+node tools/grove-previews/serve-animal-demo.mjs apps/life/assets/grove/project-only
+```
+
+The installer checks required clips and model hashes against the motion reports
+before copying. The bundle also has a ZIP, manifest, original licence texts,
+credits, GLBs, previews, browser motion/deformation reports and a live demo.
+The files are available to local Claude; a cloud-only Claude session needs the
+local ZIP attached or another authorised private project-file transfer.
+Public Git alone cannot supply the licensed models.
+
+Use `demo/animal-loader.mjs` with Three.js `GLTFLoader`, `MeshoptDecoder` and
+`SkeletonUtils.clone`. `create(id, {baby: true})` makes a half-size animal with
+its own skeleton/mixer. `play('locomotion')` resolves species-specific walk/hop;
+`play('water')` selects the duck's swim loop. All locomotion is in place: the
+future Grove scene provides paths, parent-following and water avoidance. The
+mallard waterline is recorded in its manifest (0.085 m above the model base).
+These are gentle prototype motion loops; animation timing/foot contact can be
+polished when the real scene establishes movement speed and terrain.
+
+Browser checks sampled actual deformed vertices through each full clip,
+verified finite bounds and loop continuity, and tested independent parent/baby
+skeletons plus every clip button. Existing public inventory remains 67 CC0
+Quaternius GLBs; the local animal bundle is separate from that public manifest.
+
+Other local downloads are preserved: Australian animals (source/licence and
+clip checks pending), Acorn Bringer's Unity animal pack (not needed for these
+filled slots), and duplicate Spring downloads. Detailed download hashes:
+[downloaded-candidates.json](../../../../tools/grove-previews/downloaded-candidates.json).
+MegaKit inventory: [source-edition-inventory.json](../../../../tools/grove-previews/source-edition-inventory.json).
+
 ## Appearance and behaviour
 
 - Original scenery with the soft, cheerful low-poly feel of Adam's Forest Island screenshot.
@@ -178,7 +244,7 @@ Run every model through the same pipeline, using `@gltf-transform/cli` via `npx`
 3. **Real-world size:** a mature tree about 4–7 m tall, a rabbit about 0.35 m long, a deer about 1.6 m. Record the measured height in the manifest.
 4. **Clean up:** no cameras or lights. Merge duplicate materials. Keep flat or vertex colours; textures only if the pack needs them, at most 512 px.
 5. **Optimise:** `gltf-transform optimize in.glb out.glb --compress meshopt --texture-compress webp`. Do **not** use Draco; the page loads the meshopt decoder only.
-6. **Animation names:** rename clips to `idle`, `walk`, `run`, `eat`, `sit`, `fly`, `swim` where they match. Record the original names in the manifest.
+6. **Animation names:** rename clips to `idle`, `walk`, `hop`, `run`, `eat`, `sit`, `fly`, `swim` where they match. Record the original names in the manifest.
 
 ## 6. Previews (so Claude can see what it's getting)
 
