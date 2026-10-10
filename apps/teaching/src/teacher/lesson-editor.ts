@@ -186,9 +186,21 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     const pageHost = document.createElement('div');
 
+    // Connections stay out of the way until the lesson has one; "Add
+    // connection" in the lesson menu reveals the box on demand.
     const tagsHost = document.createElement('div');
     tagsHost.className = 'lesson-editor__tags';
-    mountTagAnythingSection(tagsHost, `teaching:lesson:${lesson.id}`);
+    tagsHost.hidden = true;
+    mountTagAnythingSection(tagsHost, `teaching:lesson:${lesson.id}`, {
+      onLinksLoaded: (count) => {
+        if (count > 0) tagsHost.hidden = false;
+      }
+    });
+
+    function revealConnections(): void {
+      tagsHost.hidden = false;
+      tagsHost.querySelector<HTMLInputElement>('.entity-tagger__picker')?.focus();
+    }
 
     const compositionStatus = document.createElement('p');
     compositionStatus.className = 'lesson-editor__composition-status';
@@ -599,7 +611,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       },
       renderLinkedPreview: (compositionId) =>
         buildLinkedPreview(compositionId, compositionCache, queueCompositionFetch),
-      onToggleFullPage: toggleFullPage
+      onToggleFullPage: toggleFullPage,
+      showPageMenu: false
     });
 
     printLesson = () => openPrintLesson(lesson);
@@ -818,6 +831,42 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     const optionsMenu = mountPageOptionsMenu(
       [
         {
+          label: 'Publish',
+          className: 'context-bar__publish',
+          onSelect: () => {
+            void savePublishHandle?.publish();
+          }
+        },
+        {
+          label: 'Share',
+          className: 'context-bar__share',
+          onSelect: () => {
+            publicLinkHost.querySelector<HTMLButtonElement>('.public-link__trigger')?.click();
+          }
+        },
+        {
+          label: 'Student preview',
+          className: 'context-bar__preview',
+          href: studentPath,
+          target: '_blank',
+          onSelect: () => {
+            if (!lesson.published_at) return;
+            window.open(teacherPreviewUrl('lesson', lesson.id), '_blank', 'noopener,noreferrer');
+          }
+        },
+        {
+          label: 'History',
+          className: 'context-bar__history-item',
+          onSelect: () => {
+            historyPanel?.open();
+          }
+        },
+        {
+          label: 'Add connection',
+          className: 'context-bar__connections',
+          onSelect: revealConnections
+        },
+        {
           label: 'Alchemy Lab',
           className: 'context-bar__alchemy-lab',
           onSelect: () => {
@@ -833,33 +882,49 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           }
         },
         {
-          label: 'Student preview',
-          className: 'context-bar__preview',
-          href: studentPath,
-          target: '_blank',
+          label: 'Print',
+          className: 'context-bar__print',
           onSelect: () => {
-            if (!lesson.published_at) return;
-            window.open(teacherPreviewUrl('lesson', lesson.id), '_blank', 'noopener,noreferrer');
+            openPrintLesson(lesson);
           }
         },
         {
-          label: 'Share',
-          className: 'context-bar__share',
+          label: 'Export JSON',
+          className: 'context-bar__export',
           onSelect: () => {
-            publicLinkHost.querySelector<HTMLButtonElement>('.public-link__trigger')?.click();
+            void downloadPortableExport('lesson', lesson.id, lesson.slug).catch(() => {
+              window.alert('Unable to export this lesson.');
+            });
           }
         },
         {
-          label: 'History',
-          className: 'context-bar__history-item',
+          label: 'Save as lesson template',
+          className: 'context-bar__save-template',
           onSelect: () => {
-            historyPanel?.open();
+            void saveLessonAsTemplate();
+          }
+        },
+        {
+          label: 'Move to trash',
+          danger: true,
+          className: 'context-bar__trash',
+          onSelect: () => {
+            void confirmAndTrash('lesson', lesson.id, lesson.title, () => {
+              navigate('/lessons');
+            });
           }
         }
       ],
       { label: 'Lesson options' }
     );
     pageOptionsDispose = optionsMenu.dispose;
+
+    const publishItem = optionsMenu.el.querySelector<HTMLElement>('.context-bar__publish');
+    saveController.subscribe((state) => {
+      if (publishItem) {
+        publishItem.textContent = state === 'unpublished_changes' ? 'Publish changes' : 'Publish';
+      }
+    });
 
     function syncPreviewLink(): void {
       const preview = optionsMenu.el.querySelector<HTMLAnchorElement>('.context-bar__preview');

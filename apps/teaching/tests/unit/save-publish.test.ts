@@ -535,45 +535,50 @@ describe('mountSavePublishControls', () => {
     });
   });
 
-  it('renders Save and Publish buttons and reflects state in the save slot', () => {
+  it('renders no Save or Publish buttons and reflects state in the save slot', () => {
     mountSavePublishControls({ contextBar, controller });
 
     const saveSlot = contextBar.querySelector('[data-save-slot]');
     expect(saveSlot?.textContent).toBe(SAVE_STATE_LABEL.saved);
 
-    const saveButton = contextBar.querySelector('.context-bar__save');
-    const publishButton = contextBar.querySelector('.context-bar__publish');
-    expect(saveButton?.textContent).toBe('Save');
-    expect(publishButton?.textContent).toBe('Publish');
+    expect(contextBar.querySelector<HTMLElement>('.context-bar__save')?.hidden).toBe(true);
+    expect(contextBar.querySelector('.context-bar__publish')).toBeNull();
   });
 
-  it('clicking Save triggers an immediate save', async () => {
-    apiPutMock.mockResolvedValue(lesson);
+  it('shows Retry save only after a failed save, and retrying saves immediately', async () => {
+    apiPutMock.mockRejectedValueOnce(new Error('offline'));
     mountSavePublishControls({ contextBar, controller });
+    const retry = contextBar.querySelector<HTMLButtonElement>('.context-bar__save')!;
 
-    contextBar.querySelector<HTMLButtonElement>('.context-bar__save')!.click();
+    await controller.saveNow();
+    expect(contextBar.querySelector('[data-save-slot]')?.textContent).toBe(
+      SAVE_STATE_LABEL.save_failed
+    );
+    expect(retry.hidden).toBe(false);
+    expect(retry.textContent).toBe('Retry save');
+
+    apiPutMock.mockResolvedValue(lesson);
+    retry.click();
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(apiPutMock).toHaveBeenCalledTimes(1);
+    expect(apiPutMock).toHaveBeenCalledTimes(2);
     expect(contextBar.querySelector('[data-save-slot]')?.textContent).toBe(SAVE_STATE_LABEL.saved);
+    expect(retry.hidden).toBe(true);
   });
 
-  it('clicking Publish reports success via onPublishSuccess', async () => {
+  it('publish() reports success via onPublishSuccess', async () => {
     apiPostMock.mockResolvedValue({ student_path: '/s/lessons/lesson_001' });
     const onPublishSuccess = vi.fn();
-    mountSavePublishControls({ contextBar, controller, onPublishSuccess });
+    const handle = mountSavePublishControls({ contextBar, controller, onPublishSuccess });
 
-    contextBar.querySelector<HTMLButtonElement>('.context-bar__publish')!.click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    await handle.publish();
 
     expect(onPublishSuccess).toHaveBeenCalledWith('/s/lessons/lesson_001');
     expect(contextBar.querySelector('[data-save-slot]')?.textContent).toBe(SAVE_STATE_LABEL.published);
   });
 
-  it('clicking Publish reports a checklist via onPublishFailure on a 400', async () => {
+  it('publish() reports a checklist via onPublishFailure on a 400', async () => {
     apiPostMock.mockRejectedValue(
       new ApiClientError({
         code: 'validation_error',
@@ -582,12 +587,9 @@ describe('mountSavePublishControls', () => {
       })
     );
     const onPublishFailure = vi.fn();
-    mountSavePublishControls({ contextBar, controller, onPublishFailure });
+    const handle = mountSavePublishControls({ contextBar, controller, onPublishFailure });
 
-    contextBar.querySelector<HTMLButtonElement>('.context-bar__publish')!.click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    await handle.publish();
 
     expect(onPublishFailure).toHaveBeenCalledWith(['title: Title is required to publish']);
   });

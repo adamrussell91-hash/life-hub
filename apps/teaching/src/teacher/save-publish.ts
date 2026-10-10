@@ -281,12 +281,20 @@ export interface SavePublishMountOptions {
 }
 
 export interface SavePublishHandle {
+  /**
+   * Runs the publish flow (restricted-media check, flush, publish). Lives
+   * behind the page's options menu rather than a header button; concurrent
+   * calls while one is in flight are ignored.
+   */
+  publish(): Promise<void>;
   dispose(): void;
 }
 
 /**
- * Renders Save + Publish controls into the context bar and wires the
- * existing `[data-save-slot]` element to the controller's state.
+ * Wires the existing `[data-save-slot]` element to the controller's state.
+ * Autosave is the only save path, so there is no Save button: a "Retry
+ * save" button appears only after a save fails. Publish is not rendered
+ * here either; the host calls `handle.publish()` from its options menu.
  */
 export function mountSavePublishControls(options: SavePublishMountOptions): SavePublishHandle {
   const { contextBar, controller } = options;
@@ -298,50 +306,47 @@ export function mountSavePublishControls(options: SavePublishMountOptions): Save
   const actions = document.createElement('div');
   actions.className = 'context-bar__actions';
 
-  const saveButton = document.createElement('button');
-  saveButton.type = 'button';
-  saveButton.className = 'btn btn--secondary context-bar__save hub-save-toggle';
-  saveButton.textContent = 'Save';
-  saveButton.addEventListener('click', () => {
+  const retryButton = document.createElement('button');
+  retryButton.type = 'button';
+  retryButton.className = 'btn btn--secondary context-bar__save hub-save-toggle';
+  retryButton.textContent = 'Retry save';
+  retryButton.hidden = true;
+  retryButton.addEventListener('click', () => {
     void controller.saveNow();
   });
 
-  const publishButton = document.createElement('button');
-  publishButton.type = 'button';
-  publishButton.className = 'btn btn--high-sea context-bar__publish';
-  publishButton.textContent = 'Publish';
-  publishButton.addEventListener('click', () => {
-    publishButton.disabled = true;
-    void (async () => {
-      try {
-        if (options.getPublishMediaContext) {
-          const ctx = await options.getPublishMediaContext();
-          const warnings = collectRestrictedDriveMediaWarnings(ctx);
-          if (warnings.length > 0) {
-            const proceed = await askConfirmCard({
-              eyebrow: 'Publish',
-              title: 'Restricted Drive media detected',
-              supporting: `${formatPublishMediaWarnings(warnings)} Publish anyway?`,
-              confirmLabel: 'Publish anyway',
-              discardLabel: 'Cancel'
-            });
-            if (!proceed) return;
-          }
+  let publishing = false;
+  async function publish(): Promise<void> {
+    if (publishing) return;
+    publishing = true;
+    try {
+      if (options.getPublishMediaContext) {
+        const ctx = await options.getPublishMediaContext();
+        const warnings = collectRestrictedDriveMediaWarnings(ctx);
+        if (warnings.length > 0) {
+          const proceed = await askConfirmCard({
+            eyebrow: 'Publish',
+            title: 'Restricted Drive media detected',
+            supporting: `${formatPublishMediaWarnings(warnings)} Publish anyway?`,
+            confirmLabel: 'Publish anyway',
+            discardLabel: 'Cancel'
+          });
+          if (!proceed) return;
         }
-
-        const outcome = await controller.publish();
-        if (outcome.ok) {
-          options.onPublishSuccess?.(outcome.studentPath);
-        } else {
-          options.onPublishFailure?.(outcome.issues);
-        }
-      } finally {
-        publishButton.disabled = false;
       }
-    })();
-  });
 
-  actions.append(saveButton, publishButton);
+      const outcome = await controller.publish();
+      if (outcome.ok) {
+        options.onPublishSuccess?.(outcome.studentPath);
+      } else {
+        options.onPublishFailure?.(outcome.issues);
+      }
+    } finally {
+      publishing = false;
+    }
+  }
+
+  actions.append(retryButton);
   contextBar.append(actions);
 
   const unsubscribe = controller.subscribe((state) => {
@@ -354,17 +359,26 @@ export function mountSavePublishControls(options: SavePublishMountOptions): Save
     text.className = 'teacher-layout__save-text';
     if (state === 'unpublished_changes') {
       text.append('Saved · ');
-      const unpublished = document.createElement('b');
+      // The one visible publish affordance now that Publish lives in the
+      // options menu: the status itself is the shortcut.
+      const unpublished = document.createElement('button');
+      unpublished.type = 'button';
+      unpublished.className = 'teacher-layout__save-publish';
+      unpublished.title = 'Publish these changes';
       unpublished.textContent = 'Unpublished changes';
+      unpublished.addEventListener('click', () => {
+        void publish();
+      });
       text.append(unpublished);
     } else {
       text.textContent = SAVE_STATE_LABEL[state];
     }
     saveSlot.append(dot, text);
-    saveButton.disabled = state === 'saving';
+    retryButton.hidden = state !== 'save_failed';
   });
 
   return {
+    publish,
     dispose() {
       unsubscribe();
       actions.remove();

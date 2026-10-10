@@ -425,9 +425,23 @@ a:hover {
   background: var(--high-sea);
 }
 
-.teacher-layout__context-bar-save-slot[data-save-state='unpublished_changes'] b {
+.teacher-layout__save-publish {
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--high-sea-ink);
+  font: inherit;
   font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.teacher-layout__save-publish:hover {
+  text-decoration: underline;
+}
+
+.teacher-layout__save-publish:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--wave) 45%, transparent);
+  outline-offset: 2px;
 }
 
 .teacher-layout__context-bar-save-slot[data-save-state='published'] .teacher-layout__save-dot {
@@ -469,6 +483,10 @@ a:hover {
 .teacher-layout__context-bar--editor .context-bar__actions {
   margin-left: auto;
   padding-top: 2px;
+}
+
+.teacher-layout__context-bar--editor .context-bar__save[hidden] {
+  display: none;
 }
 
 .teacher-layout__context-bar--editor .context-bar__save {
@@ -8257,29 +8275,34 @@ body.is-lesson-builder-full-page .hub-utilities {
   outline-offset: 2px;
 }
 
-.lesson-page__mode {
+.lesson-page__meta {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: var(--space-2);
   margin: var(--space-4) 0 var(--space-2);
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  color: var(--muted);
 }
 
-.lesson-page__mode-label {
-  font-weight: var(--weight-medium);
+.lesson-page__meta-outcomes {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
+.lesson-page__meta .outcome-strip {
+  margin-bottom: 0;
+}
+
+/* Matches .outcome-chip so lesson type reads as one more tag, not a form field. */
 .lesson-page__mode-select {
-  min-width: 12rem;
-  padding: 6px 10px;
+  min-height: 1.75rem;
+  padding: 0.15rem 1.4rem 0.15rem 0.5rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-xs);
-  background: #fff;
+  background: transparent;
   color: var(--ink);
-  font: inherit;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .lesson-page__mode-select:focus-visible {

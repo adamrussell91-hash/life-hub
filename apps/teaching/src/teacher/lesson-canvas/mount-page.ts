@@ -86,6 +86,12 @@ export type MountLessonPageOptions = {
   outcomesCatalog?: CurriculumOutcome[];
   subject?: { id: string; outcome_ids: string[] };
   onToggleFullPage?: () => void;
+  /**
+   * Render the in-canvas page menu (Export, Print, Trash…). The lesson
+   * editor passes false and carries those items in its single header menu,
+   * so the page never shows two kebabs.
+   */
+  showPageMenu?: boolean;
 };
 
 export type LessonPageHandle = {
@@ -773,6 +779,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     { label: 'Page menu', className: 'lesson-page__more', triggerClassName: 'lesson-page__more-btn' }
   );
 
+  const showPageMenu = options.showPageMenu ?? true;
   const chrome = document.createElement('div');
   chrome.className = 'lesson-page__chrome';
   chrome.append(optionsMenu.el);
@@ -805,14 +812,14 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     }
   });
 
-  const modeRow = document.createElement('label');
-  modeRow.className = 'lesson-page__mode';
-  const modeLabel = document.createElement('span');
-  modeLabel.className = 'lesson-page__mode-label';
-  modeLabel.textContent = 'Pedagogical mode';
+  // Lesson type sits as a quiet chip at the head of the outcomes row
+  // rather than a labelled form field above the canvas.
+  const metaRow = document.createElement('div');
+  metaRow.className = 'lesson-page__meta';
   const modeSelect = document.createElement('select');
   modeSelect.className = 'lesson-page__mode-select';
-  modeSelect.setAttribute('aria-label', 'Pedagogical mode');
+  modeSelect.setAttribute('aria-label', 'Lesson type');
+  modeSelect.title = 'Lesson type';
   for (const mode of PEDAGOGICAL_MODES) {
     const option = document.createElement('option');
     option.value = mode;
@@ -824,12 +831,13 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     const pedagogical_mode = modeSelect.value as PedagogicalMode;
     emitLesson({ ...lesson, pedagogical_mode });
   });
-  modeRow.append(modeLabel, modeSelect);
+  metaRow.append(modeSelect);
 
   const canvasHost = document.createElement('div');
   canvasHost.className = 'lesson-page__canvas';
 
-  root.append(chrome, coverHost, modeRow, canvasHost);
+  if (showPageMenu) root.append(chrome);
+  root.append(coverHost, metaRow, canvasHost);
 
   const canvas = mountBlockCanvas(canvasHost, {
     blocks: lesson.blocks,
@@ -851,7 +859,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   });
 
   const stripHost = document.createElement('div');
-  root.insertBefore(stripHost, canvasHost);
+  stripHost.className = 'lesson-page__meta-outcomes';
+  metaRow.append(stripHost);
   const strip =
     options.subject && options.outcomesCatalog
       ? mountOutcomeStrip(stripHost, {

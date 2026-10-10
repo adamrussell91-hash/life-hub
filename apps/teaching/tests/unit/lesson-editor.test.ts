@@ -298,7 +298,9 @@ describe('mountLessonEditor', () => {
     fab?.click();
     expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(false);
     expect(fab?.hidden).toBe(true);
-    expect(refs.canvas.querySelector('[aria-label="Print"]')).not.toBeNull();
+    // One menu for the page: Print lives in the header Lesson options menu.
+    expect(refs.canvas.querySelector('.lesson-page__more')).toBeNull();
+    expect(refs.contextBar.querySelector('.context-bar__print')).not.toBeNull();
     expect(refs.canvas.querySelector('.lesson-editor__add-block-select')).toBeNull();
     const a4Tab = [...refs.canvas.querySelectorAll('.lesson-editor__mode-tab')].find(
       (el) => el.textContent === 'A4'
