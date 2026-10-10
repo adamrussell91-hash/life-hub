@@ -4,6 +4,8 @@ The left rail is **the same component on every hub**. Glass/tile overlays may ch
 
 Read this before adding or restyling a rail destination. Snippet: `snippets/rail.html`. CSS: `rail.css` (also pulled in by `chrome.css`).
 
+The accordion's legacy `.hub-row` and `.hub-label` classes also exist on canvas cards and form labels. `cards.css` and `forms.css` must exclude elements inside `.hub-rail`. Never repair this collision with a hub-specific rail reset or stylesheet-order dependency.
+
 **Phones:** the rail is hidden under `720px`. Use the locked bottom bar + More sheet instead (`MOBILE.md`). Do not force the rail back on as a compact top strip.
 
 ## Locked (do not reinvent)
