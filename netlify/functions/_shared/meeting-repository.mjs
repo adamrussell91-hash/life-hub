@@ -379,6 +379,29 @@ export function createMeetingRepository(deps = {}) {
     return { meeting: projectMeeting(record), links, retried: true };
   }
 
+  /** Import-only (migration). Explicit id; refuses if the key exists in any state. Not on HTTP. */
+  async function importMeetingWithId(recordInput) {
+    const parsed = parseMeetingRecord(recordInput);
+    if (!parsed) {
+      throw validationError('invalid_imported_record', 'The imported Meeting record is not valid.');
+    }
+    if (!isValidMeetingId(parsed.id)) {
+      throw validationError('invalid_meeting_id', 'Imported Meeting id is invalid.');
+    }
+    const key = meetingKey(parsed.id);
+    const existing = await getJSON(professionalStore, key, { consistency: 'strong' });
+    if (existing) {
+      return {
+        meeting: projectMeeting(parseMeetingRecord(existing) ?? parsed),
+        links: [],
+        created: false
+      };
+    }
+    await setJSON(professionalStore, key, parsed);
+    await setJSON(professionalStore, meetingIndexKey(parsed.id), meetingIndexRecord(parsed));
+    return { meeting: projectMeeting(parsed), links: [], created: true };
+  }
+
   return {
     getMeeting,
     listMeetings,
@@ -387,6 +410,7 @@ export function createMeetingRepository(deps = {}) {
     updateMeeting,
     transitionState,
     rescheduleMeeting,
-    retryLinks
+    retryLinks,
+    importMeetingWithId
   };
 }

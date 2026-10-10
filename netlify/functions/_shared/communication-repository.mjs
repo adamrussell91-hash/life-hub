@@ -578,6 +578,29 @@ export function createCommunicationRepository(deps = {}) {
     };
   }
 
+  /** Import-only (migration). Explicit id; refuses if the key exists in any state. Not on HTTP. */
+  async function importCommunicationWithId(recordInput) {
+    const parsed = parseCommunicationRecord(recordInput);
+    if (!parsed) {
+      throw validationError('invalid_imported_record', 'The imported Communication record is not valid.');
+    }
+    if (!isValidCommunicationId(parsed.id)) {
+      throw validationError('invalid_communication_id', 'Imported Communication id is invalid.');
+    }
+    const key = communicationKey(parsed.id);
+    const existing = await getJSON(professionalStore, key, { consistency: 'strong' });
+    if (existing) {
+      return {
+        communication: projectCommunication(parseCommunicationRecord(existing) ?? parsed),
+        links: [],
+        created: false
+      };
+    }
+    await setJSON(professionalStore, key, parsed);
+    await setJSON(professionalStore, communicationIndexKey(parsed.id), communicationIndexRecord(parsed));
+    return { communication: projectCommunication(parsed), links: [], created: true };
+  }
+
   return {
     getCommunication,
     listCommunications,
@@ -585,7 +608,8 @@ export function createCommunicationRepository(deps = {}) {
     updateCommunication,
     retryLinks,
     createFollowUp,
-    retryFollowUp
+    retryFollowUp,
+    importCommunicationWithId
   };
 }
 

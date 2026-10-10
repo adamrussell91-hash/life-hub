@@ -835,7 +835,8 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
     if (kind !== 'person' && kind !== 'organisation') {
       throw adoptError('unsupported_adopt_kind', 'Only imported People and Organisations can be adopted.');
     }
-    const parsed = kind === 'person' ? parsePersonRecord(record) : parseOrganisationRecord(record);
+    const parseRecord = kind === 'person' ? parsePersonRecord : parseOrganisationRecord;
+    const parsed = parseRecord(record);
     if (!parsed) {
       throw adoptError(
         'invalid_imported_record',
@@ -845,11 +846,14 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
     if (kind === 'person' && parsed.is_self) {
       throw adoptError('self_not_adoptable', 'The self Person cannot be adopted through this path.');
     }
-    const existing =
-      kind === 'person'
-        ? parsePersonRecord(await getJSON(store, entityKeyFor(kind, parsed.id), STRONG))
-        : parseOrganisationRecord(await getJSON(store, entityKeyFor(kind, parsed.id), STRONG));
-    if (existing) return { record: existing, ref: formatEntityRef({ namespace: 'shared', kind, id: existing.id }), adopted: false };
+    const existing = parseRecord(await getJSON(store, entityKeyFor(kind, parsed.id), STRONG));
+    if (existing) {
+      return {
+        record: existing,
+        ref: formatEntityRef({ namespace: 'shared', kind, id: existing.id }),
+        adopted: false
+      };
+    }
 
     const timestamp = now();
     const adopted = Object.freeze({ ...parsed, updated_at: timestamp });
