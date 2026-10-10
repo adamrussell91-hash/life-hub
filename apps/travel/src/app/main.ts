@@ -87,6 +87,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
     const route = parseRoute();
     const generation = ++routeGeneration;
 
+    if (route.name !== 'journal') {
+      journalHandle?.destroy();
+      journalHandle = null;
+    }
+
     try {
       if (route.name === 'trips') {
         // Always show the list at #/ so New trip stays reachable with one holiday.
@@ -106,8 +111,6 @@ async function bootApp(root: HTMLElement): Promise<void> {
       }
 
       if (route.name === 'journal') {
-        journalHandle?.destroy();
-        journalHandle = null;
         currentTripId = route.tripId;
         renderHighlight('trip');
         const fixture = klIstanbulFixture();
@@ -118,9 +121,6 @@ async function bootApp(root: HTMLElement): Promise<void> {
         });
         return;
       }
-
-      journalHandle?.destroy();
-      journalHandle = null;
 
       if (route.name === 'trip') {
         currentTripId = route.tripId;

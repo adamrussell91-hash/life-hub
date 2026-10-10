@@ -402,7 +402,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(10, 21, 54, 0.35);
+  background: color-mix(in srgb, var(--depth) 28%, transparent);
 }
 
 @media (min-width: 720px) {

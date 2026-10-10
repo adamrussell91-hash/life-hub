@@ -178,8 +178,6 @@ export function renderJournal(
         daySection.append(empty, add);
       }
 
-      const showMap = shouldShowDayMapPreview(moments);
-      let mapShown = false;
       for (let i = 0; i < moments.length; i++) {
         const moment = moments[i]!;
         daySection.append(renderMomentArticle(opts.fixture, moment));
@@ -192,17 +190,17 @@ export function renderJournal(
           conn.setAttribute('aria-hidden', 'true');
           daySection.append(conn);
         }
+      }
 
-        if (showMap && !mapShown && moment.coordinates) {
-          mapShown = true;
-          const mapBtn = document.createElement('button');
-          mapBtn.type = 'button';
-          mapBtn.className = 'journal-day__map-preview';
-          mapBtn.textContent = 'Open photo stops for this day';
-          mapBtn.disabled = true;
-          mapBtn.title = 'Coming in Phase 3';
-          daySection.append(mapBtn);
-        }
+      if (shouldShowDayMapPreview(moments)) {
+        const mapBtn = document.createElement('button');
+        mapBtn.type = 'button';
+        mapBtn.className = 'journal-day__map-preview';
+        mapBtn.setAttribute('data-journal-day-map', day.id);
+        mapBtn.textContent = 'Open photo stops for this day';
+        mapBtn.disabled = true;
+        mapBtn.title = 'Coming in Phase 3';
+        daySection.append(mapBtn);
       }
 
       legSection.append(daySection);

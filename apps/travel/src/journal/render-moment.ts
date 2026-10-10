@@ -1,8 +1,5 @@
 import type { JournalFixture, JournalMedia, JournalMoment } from '@/journal/types';
-import {
-  photoLayout,
-  truncateReflectionLines,
-} from '@/journal/layout';
+import { photoLayout, reflectionLikelyOverflows } from '@/journal/layout';
 
 function mediaById(fixture: JournalFixture): Map<string, JournalMedia> {
   return new Map(fixture.media.map((m) => [m.id, m]));
@@ -123,32 +120,39 @@ function renderMetadata(host: HTMLElement, moment: JournalMoment): void {
 }
 
 function renderReflection(host: HTMLElement, text: string): void {
-  const { preview, remainder } = truncateReflectionLines(text, 6);
   const block = document.createElement('div');
   block.className = 'journal-moment__reflection';
-  if (remainder) block.classList.add('journal-moment__reflection--clamped');
   const p = document.createElement('p');
-  p.textContent = preview;
+  p.textContent = text;
   block.append(p);
-  if (remainder) {
-    const more = document.createElement('p');
-    more.className = 'journal-moment__reflection-more';
-    more.hidden = true;
-    more.textContent = remainder;
-    block.append(more);
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'journal-moment__read-more';
-    btn.textContent = 'Read more';
-    btn.addEventListener('click', () => {
-      more.hidden = false;
-      btn.hidden = true;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'journal-moment__read-more';
+  btn.textContent = 'Read more';
+  btn.hidden = true;
+
+  const syncReadMore = (): void => {
+    if (!reflectionLikelyOverflows(text, 6)) {
       block.classList.remove('journal-moment__reflection--clamped');
-      p.textContent = text;
-    });
-    block.append(btn);
-  }
+      btn.hidden = true;
+      return;
+    }
+    block.classList.add('journal-moment__reflection--clamped');
+    const overflows =
+      p.scrollHeight > p.clientHeight + 1 || text.split('\n').length > 6;
+    btn.hidden = !overflows;
+    if (!overflows) block.classList.remove('journal-moment__reflection--clamped');
+  };
+
+  btn.addEventListener('click', () => {
+    block.classList.remove('journal-moment__reflection--clamped');
+    btn.hidden = true;
+  });
+
+  block.append(btn);
   host.append(block);
+  requestAnimationFrame(syncReadMore);
 }
 
 function renderAudioStub(host: HTMLElement): void {

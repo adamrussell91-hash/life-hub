@@ -4,6 +4,7 @@ import {
   photoLayout,
   shouldShowDayMapPreview,
   storyColumnMaxRem,
+  reflectionLikelyOverflows,
   truncateReflectionLines,
 } from '@/journal/layout';
 
@@ -38,6 +39,12 @@ describe('journal layout helpers', () => {
     const { preview, remainder } = truncateReflectionLines(text, 6);
     expect(preview).toBe(text);
     expect(remainder).toBeNull();
+  });
+
+  it('flags reflections that exceed the line budget', () => {
+    const sevenLines = ['1', '2', '3', '4', '5', '6', '7'].join('\n');
+    expect(reflectionLikelyOverflows(sevenLines, 6)).toBe(true);
+    expect(reflectionLikelyOverflows('short note', 6)).toBe(false);
   });
 });
 

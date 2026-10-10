@@ -28,3 +28,10 @@ export function truncateReflectionLines(
     remainder: lines.slice(maxLines).join('\n'),
   };
 }
+
+/** Heuristic for when reflection UI should apply line-clamp (measure refines in DOM). */
+export function reflectionLikelyOverflows(text: string, maxLines = 6): boolean {
+  if (text.split('\n').length > maxLines) return true;
+  const avgCharsPerLine = 52;
+  return text.length > maxLines * avgCharsPerLine;
+}
