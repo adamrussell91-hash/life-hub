@@ -14,7 +14,16 @@ import {
   createMorphingValuesPopover
 } from '../../../../packages/design-kit/js/morphing-popover.js';
 import { describeSet, resolveTrackingType } from '../core/exercise-tracking.js';
-import { TWINGE_SITES, compareToGhost, focusCue, ghostForSet, readinessAdvice } from './fitness-progression.js';
+import {
+  TWINGE_SITES,
+  compareCircuitGhost,
+  compareToGhost,
+  describeCircuitGhost,
+  focusCue,
+  ghostForSet,
+  lastCircuitFor,
+  readinessAdvice
+} from './fitness-progression.js';
 import { resolveExerciseThumbSrc } from './muscle-maps.js';
 import { REGION_LABELS, resolveExerciseRegion } from './fitness-model.js';
 import {
@@ -285,7 +294,7 @@ function renderRest(root, rest, actions) {
   return panel;
 }
 
-function renderBlockBanner(root, draft, { block, step, circuit, actions }) {
+function renderBlockBanner(root, draft, { block, step, circuit, lastCircuits, actions }) {
   const banner = el(root, 'section', {
     className: `gym-block gym-block--${block.kind}`,
     data: { fitnessLogger: 'block', blockKind: block.kind }
@@ -329,7 +338,26 @@ function renderBlockBanner(root, draft, { block, step, circuit, actions }) {
   const scheme = formatBlockScheme(block);
   if (scheme) banner.append(el(root, 'p', { className: 'gym-block__scheme', text: scheme }));
 
-  if (block.kind === 'circuit') banner.append(renderCircuitClock(root, draft, { block, circuit, actions }));
+  if (block.kind === 'circuit') {
+    const previous = lastCircuitFor(block, lastCircuits);
+    const ghostLine = describeCircuitGhost(previous);
+    if (ghostLine) {
+      const ghost = el(root, 'div', { className: 'gym-ghost', data: { fitnessLogger: 'circuit-ghost' } });
+      ghost.append(el(root, 'p', { className: 'gym-ghost__line', text: ghostLine }));
+      const live = compareCircuitGhost(block.result, previous?.result, block.format || 'amrap');
+      if (live) {
+        ghost.append(el(root, 'p', {
+          className: 'gym-ghost__verdict',
+          text: live.verdict === 'beat' ? `Beating it: ${live.label}`
+            : live.verdict === 'matched' ? 'Level with it — one more round beats it'
+              : `Behind it: ${live.label}`,
+          data: { fitnessLogger: 'circuit-ghost-verdict', verdict: live.verdict }
+        }));
+      }
+      banner.append(ghost);
+    }
+    banner.append(renderCircuitClock(root, draft, { block, circuit, actions }));
+  }
   return banner;
 }
 
@@ -1207,6 +1235,7 @@ export function renderFitnessLogger(root, draft, {
   rest = null,
   circuits = {},
   lastPerformance = null,
+  lastCircuits = null,
   celebration = null,
   targetFor = null,
   readinessOpen = false,
@@ -1318,7 +1347,13 @@ export function renderFitnessLogger(root, draft, {
   if (finishedAll) stage.append(renderWrapUp(root, draft, { actions }));
   const block = step ? blocks[step.blockIndex] : null;
   if (block && isGroupedBlock(block)) {
-    stage.append(renderBlockBanner(root, draft, { block, step, circuit: circuits[step.blockIndex], actions }));
+    stage.append(renderBlockBanner(root, draft, {
+      block,
+      step,
+      circuit: circuits[step.blockIndex],
+      lastCircuits,
+      actions
+    }));
   }
   if (!step) {
     const empty = el(root, 'article', { className: 'gym-card' });
@@ -1484,7 +1519,12 @@ export function renderPumpReport(root, report, { onClose } = {}) {
     circuits.append(el(root, 'h3', { text: 'Circuits' }));
     const list = el(root, 'ul');
     for (const circuit of report.circuits) {
-      list.append(el(root, 'li', { text: `${circuit.name}: ${formatBlockResult({ result: circuit.result })}` }));
+      const score = formatBlockResult({ result: circuit.result });
+      const ghostBit = circuit.ghost?.verdict === 'beat' ? ` · beat ghost (${circuit.ghost.label})`
+        : circuit.ghost?.verdict === 'matched' ? ' · matched ghost'
+          : circuit.ghost?.verdict === 'below' ? ` · behind ghost (${circuit.ghost.label})`
+            : '';
+      list.append(el(root, 'li', { text: `${circuit.name}: ${score}${ghostBit}` }));
     }
     circuits.append(list);
     stage.append(circuits);

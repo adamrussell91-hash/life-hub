@@ -4,6 +4,8 @@
  * one-paragraph dumps, and "*between sets:*" supersets.
  */
 
+import { amrapRoundCapacity, provisionAmrapCircuitRounds } from './workout-plan-groups.js';
+
 const ITEM_START = /(?:^|\n|\s)(\d+)[\.)]\s+(?=\*\*|[A-Z])/g;
 const SET_SPLIT = /(?:\s+-\s+|\n\s*-\s+|\n)\s*(?=Set\s*\d+\s*:)/i;
 const SET_HEAD = /^Set\s*(\d+)\s*:\s*/i;
@@ -450,8 +452,12 @@ function readGroupSettings(text, settings) {
   if (/\bfor time\b/i.test(text)) settings.format = 'for_time';
   if (/\bamrap\b|as many rounds/i.test(text)) {
     settings.format = 'amrap';
-    const cap = /(\d+)\s*min/i.exec(text);
-    if (cap) settings.time_cap_sec = Number(cap[1]) * 60;
+    const mins = /(\d+)\s*min(?:ute)?s?\b/i.exec(text);
+    const secs = /(\d+)\s*(?:s|secs?|seconds)\b/i.exec(text);
+    const clock = /(\d+)\s*:\s*(\d{2})\b/.exec(text);
+    if (mins) settings.time_cap_sec = Number(mins[1]) * 60;
+    else if (clock) settings.time_cap_sec = Number(clock[1]) * 60 + Number(clock[2]);
+    else if (secs) settings.time_cap_sec = Number(secs[1]);
   }
   if (/\bcircuit\b/i.test(text)) settings.kind = 'circuit';
   const rest = /rest\s*(\d+)\s*(s|secs?|seconds|min)\b/i.exec(text);
@@ -534,10 +540,14 @@ export function parseLetteredWorkoutChat(text) {
     groupNumber += 1;
     const { settings } = group;
     const kind = settings.kind ?? (group.members.length >= 3 ? 'circuit' : 'superset');
+    // AMRAP without an explicit "N rounds" still needs round-slots planned —
+    // score is whole circuits in the window, not one lonely set.
+    const expandTo = settings.rounds
+      ?? (settings.format === 'amrap' ? amrapRoundCapacity(settings.time_cap_sec) : null);
     group.members.forEach((member, index) => {
       member.superset_group = groupNumber;
-      if (settings.rounds && member.sets.length === 1) {
-        member.sets = Array.from({ length: settings.rounds }, () => ({ ...member.sets[0] }));
+      if (expandTo && member.sets.length === 1) {
+        member.sets = Array.from({ length: expandTo }, () => ({ ...member.sets[0] }));
       }
       if (index !== 0) return;
       if (group.label) member.superset_label = group.label;
@@ -552,9 +562,11 @@ export function parseLetteredWorkoutChat(text) {
   }
   if (!groupNumber && exercises.length < 3) return null;
 
+  const loaded = exercises.map(item => item.exercise);
+  provisionAmrapCircuitRounds(loaded);
   return {
     intro: introLines.join('\n').trim(),
-    exercises: exercises.map(item => item.exercise),
+    exercises: loaded,
     outro: outroLines.join('\n').trim(),
     lettered: true
   };

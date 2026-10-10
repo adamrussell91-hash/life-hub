@@ -12,6 +12,7 @@
  */
 import { resolveTrackingType } from '../core/exercise-tracking.js';
 import { addCalendarDays, daysBetween, getSydneyWeekStart } from '../core/time.js';
+import { formatBlockResult } from '../core/workout-plan-groups.js';
 import {
   REGION_LABELS,
   canonicalExerciseName,
@@ -65,6 +66,120 @@ export function ghostForSet(previous, setIndex) {
   const sets = previous?.sets ?? [];
   if (!sets.length || setIndex < 0) return null;
   return sets[Math.min(setIndex, sets.length - 1)] ?? null;
+}
+
+/**
+ * Stable key for a named circuit (Cindy / Pump & Dump). Strip trailing edition
+ * words so "Pump & Dump finisher" still finds last week's "Pump & Dump", and
+ * fold Cindy nicknames onto one family — the score is the whole AMRAP, not the
+ * individual push-up / dip / twist / crunch ghosts.
+ */
+export function circuitFamilyKey(label) {
+  const raw = String(label ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9&\s]/g, ' ')
+    .replace(/\b(?:finisher|remix|edition|lite|style)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!raw) return '';
+  if (/\bcindy\b/.test(raw) || raw === 'pump dump' || raw === 'pump & dump') return 'cindy';
+  return raw.replace(/\s*&\s*/g, ' & ');
+}
+
+/** True when this exercise is a member of a circuit block (score the block, not the set). */
+export function isCircuitMember(exercise, exercises = []) {
+  if (exercise?.block?.kind === 'circuit') return true;
+  const group = exercise?.superset_group;
+  if (group == null) return false;
+  return (exercises ?? []).some(item => (
+    item?.superset_group === group && item?.block?.kind === 'circuit'
+  ));
+}
+
+export function circuitOwner(exercises = []) {
+  return (exercises ?? []).find(item => item?.block?.kind === 'circuit') ?? null;
+}
+
+/**
+ * Compare a live circuit score to last time's. AMRAP: more rounds (+ extra reps)
+ * wins. For-time: same (or more) rounds in less time wins.
+ */
+export function compareCircuitGhost(now, then, format = 'amrap') {
+  if (!now || !then) return null;
+  const nowRounds = num(now.rounds) ?? 0;
+  const thenRounds = num(then.rounds) ?? 0;
+  const nowExtra = num(now.extra_reps) ?? 0;
+  const thenExtra = num(then.extra_reps) ?? 0;
+  if (format === 'for_time') {
+    const nowTime = positive(now.time_sec);
+    const thenTime = positive(then.time_sec);
+    if (nowRounds > thenRounds) {
+      return { verdict: 'beat', label: `+${nowRounds - thenRounds} round${nowRounds - thenRounds === 1 ? '' : 's'}` };
+    }
+    if (nowRounds < thenRounds) {
+      return { verdict: 'below', label: `${nowRounds - thenRounds} rounds` };
+    }
+    if (nowTime != null && thenTime != null) {
+      const delta = thenTime - nowTime;
+      if (delta > 0) return { verdict: 'beat', label: `−${delta}s` };
+      if (delta === 0) return { verdict: 'matched', label: 'matched' };
+      return { verdict: 'below', label: `+${Math.abs(delta)}s` };
+    }
+    return null;
+  }
+  const nowScore = nowRounds * 1000 + nowExtra;
+  const thenScore = thenRounds * 1000 + thenExtra;
+  const roundDelta = nowRounds - thenRounds;
+  const extraDelta = nowExtra - thenExtra;
+  if (nowScore > thenScore) {
+    if (roundDelta > 0) return { verdict: 'beat', label: `+${roundDelta} round${roundDelta === 1 ? '' : 's'}` };
+    return { verdict: 'beat', label: `+${extraDelta} extra rep${Math.abs(extraDelta) === 1 ? '' : 's'}` };
+  }
+  if (nowScore === thenScore) return { verdict: 'matched', label: 'matched' };
+  if (roundDelta < 0) return { verdict: 'below', label: `${roundDelta} rounds` };
+  return { verdict: 'below', label: `${extraDelta} extra reps` };
+}
+
+/** Last completed circuit scores keyed by family, for gym-mode Cindy ghosts. */
+export function buildLastCircuits(events, date) {
+  const latest = new Map();
+  for (const { record } of events ?? []) {
+    if (record?.type !== 'workout' || record.status !== 'completed' || !record.date || record.date >= date) continue;
+    for (const exercise of record.exercises ?? []) {
+      if (exercise?.block?.kind !== 'circuit' || !exercise.block?.result) continue;
+      const label = typeof exercise.superset_label === 'string' && exercise.superset_label.trim()
+        ? exercise.superset_label.trim()
+        : exercise.name;
+      const key = circuitFamilyKey(label);
+      if (!key) continue;
+      const existing = latest.get(key);
+      if (existing && existing.date > record.date) continue;
+      latest.set(key, {
+        key,
+        label,
+        date: record.date,
+        format: exercise.block.format || 'amrap',
+        result: { ...exercise.block.result },
+        timeCapSec: positive(exercise.block.time_cap_sec)
+      });
+    }
+  }
+  return Object.fromEntries(latest);
+}
+
+export function lastCircuitFor(block, lastCircuits) {
+  if (!block || !lastCircuits) return null;
+  const key = circuitFamilyKey(block.label);
+  if (key && lastCircuits[key]) return lastCircuits[key];
+  return null;
+}
+
+export function describeCircuitGhost(previous) {
+  if (!previous?.result) return '';
+  const score = formatBlockResult({ result: previous.result });
+  if (!score) return '';
+  const when = previous.date ? ` (${previous.date})` : '';
+  return `Ghost · ${previous.label || 'circuit'} last time${when}: ${score}`;
 }
 
 /**
@@ -300,6 +415,7 @@ function volumeOf(exercises) {
  */
 export function buildPumpReport(draft, {
   lastPerformance = null,
+  lastCircuits = null,
   exerciseBests = null,
   board = null,
   libraryByName = null,
@@ -316,6 +432,17 @@ export function buildPumpReport(draft, {
   const prs = [];
   const beats = [];
   for (const exercise of exercises) {
+    // Circuit members are not raced set-for-set — CINDY ghosts are the whole
+    // score (rounds in the window), tallied once on the block below.
+    if (isCircuitMember(exercise, exercises)) {
+      const tracking = resolveTrackingType(exercise);
+      for (const set of exercise.sets ?? []) {
+        if (!isHardSet(set, tracking) && tracking !== 'timed') continue;
+        setsLogged += 1;
+        if (set.failed) failureSets += 1;
+      }
+      continue;
+    }
     const key = exerciseKey(exercise?.name);
     const tracking = resolveTrackingType(exercise);
     const previous = lastPerformance?.[key] ?? null;
@@ -346,7 +473,19 @@ export function buildPumpReport(draft, {
   const buildBoard = board ? projectBuildBoard(board, draft, libraryByName) : [];
   const circuits = exercises
     .filter(exercise => exercise?.block?.result)
-    .map(exercise => ({ name: exercise.superset_label || exercise.name, result: exercise.block.result }));
+    .map(exercise => {
+      const name = exercise.superset_label || exercise.name;
+      const previous = lastCircuits?.[circuitFamilyKey(name)] ?? null;
+      const ghost = compareCircuitGhost(exercise.block.result, previous?.result, exercise.block.format || 'amrap');
+      if (ghost) {
+        ghostsRaced += 1;
+        if (ghost.verdict === 'beat') {
+          ghostsBeaten += 1;
+          beats.push({ name, label: ghost.label });
+        } else if (ghost.verdict === 'matched') ghostsMatched += 1;
+      }
+      return { name, result: exercise.block.result, ghost };
+    });
 
   let streak = null;
   if (weekStreak?.thisWeek && draft?.session_kind !== 'walk') {

@@ -6,6 +6,7 @@ import {
   buildBenchmarkWall,
   buildBuildBoard,
   buildExerciseBests,
+  buildLastCircuits,
   buildSeasonStatus,
   buildWeekStreak
 } from './fitness-progression.js';
@@ -652,6 +653,7 @@ export function buildFitnessModel({ events, date, libraryByName = null, targetsC
     nextPlanned: selectNextPlanned(workoutEvts, date),
     workingWeights: buildWorkingWeights(workoutEvts, date),
     lastPerformance: buildLastPerformance(workoutEvts, date),
+    lastCircuits: buildLastCircuits(workoutEvts, date),
     exerciseBests: buildExerciseBests(workoutEvts, date),
     buildBoard: buildBuildBoard(workoutEvts, date, libraryByName),
     lastSessionVolume: lastSessionVolume(workoutEvts, date),
