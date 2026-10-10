@@ -2392,6 +2392,47 @@ a:hover {
   align-items: center;
 }
 
+.cover-picker__actions {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cover-picker__actions .btn {
+  flex: 1 1 12rem;
+  justify-content: center;
+}
+
+.cover-picker__label {
+  flex: 1 1 100%;
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-meta);
+  font-weight: var(--weight-semibold);
+  color: var(--ink-muted);
+}
+
+.cover-picker__status {
+  flex: 1 1 100%;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-meta);
+  color: var(--ink);
+}
+
+.cover-picker__link-row {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.cover-picker__remove {
+  margin-right: auto;
+}
+
 .cover-picker__url,
 .cover-picker__alt {
   flex: 1 1 10rem;
@@ -2408,8 +2449,10 @@ a:hover {
 .cover-picker__library {
   flex: 1 1 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
   gap: var(--space-2);
+  max-height: 18rem;
+  overflow-y: auto;
 }
 
 .cover-picker__library-item {
@@ -2427,6 +2470,27 @@ a:hover {
   text-align: left;
 }
 
+.cover-picker__library-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cover-picker__library-item:hover,
+.cover-picker__library-item:focus-visible {
+  border-color: var(--accent);
+}
+
+.cover-picker__library-item--current {
+  border-color: var(--marine);
+  box-shadow: 0 0 0 2px var(--marine);
+}
+
+.cover-picker__library-item:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
 .cover-picker__library-item img {
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -2434,8 +2498,15 @@ a:hover {
   border-radius: var(--radius-sm);
 }
 
-.cover-picker__error,
 .cover-picker__library-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-meta);
+  color: var(--ink);
+}
+
+.cover-picker__error {
   flex: 1 1 100%;
   margin: 0;
   font-family: var(--font-ui);

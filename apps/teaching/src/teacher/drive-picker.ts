@@ -99,6 +99,7 @@ type TokenClient = {
 
 type TokenResponse = {
   access_token?: string;
+  expires_in?: number | string;
   error?: string;
   error_description?: string;
 };
@@ -123,6 +124,13 @@ type DriveFileMeta = {
   thumbnailLink?: string;
   shared?: boolean;
   capabilities?: { canShare?: boolean };
+};
+
+type DocsView = {
+  setIncludeFolders: (include: boolean) => DocsView;
+  setSelectFolderEnabled: (enabled: boolean) => DocsView;
+  setMimeTypes: (mimeTypes: string) => DocsView;
+  setMode: (mode: unknown) => DocsView;
 };
 
 type PickerBuilder = {
@@ -152,6 +160,8 @@ declare global {
     picker: {
       Action: { CANCEL: string; PICKED: string };
       ViewId: { DOCS: unknown; DOCS_IMAGES: unknown; PDFS: unknown };
+      DocsViewMode: { GRID: unknown; LIST: unknown };
+      DocsView: new (viewId?: unknown) => DocsView;
       PickerBuilder: new () => PickerBuilder;
     };
   };
@@ -189,7 +199,24 @@ async function loadGoogleApis(): Promise<void> {
   });
 }
 
+// Reused for the token's life so repeat picks skip the Google popup.
+// In memory only: gone on reload, never written to storage.
+let cachedToken: { clientId: string; token: string; expiresAt: number } | null = null;
+const TOKEN_EXPIRY_MARGIN_MS = 60_000;
+
+/** Test hook: forget the in-memory Drive token. */
+export function resetDriveTokenCache(): void {
+  cachedToken = null;
+}
+
 function requestAccessToken(clientId: string): Promise<string> {
+  if (
+    cachedToken &&
+    cachedToken.clientId === clientId &&
+    cachedToken.expiresAt - TOKEN_EXPIRY_MARGIN_MS > Date.now()
+  ) {
+    return Promise.resolve(cachedToken.token);
+  }
   return new Promise((resolve, reject) => {
     const client = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
@@ -205,6 +232,12 @@ function requestAccessToken(clientId: string): Promise<string> {
           );
           return;
         }
+        const expiresInSec = Number(response.expires_in) || 3600;
+        cachedToken = {
+          clientId,
+          token: response.access_token,
+          expiresAt: Date.now() + expiresInSec * 1000
+        };
         resolve(response.access_token);
       },
       error_callback: (error) => {
@@ -219,15 +252,27 @@ function showPicker(opts: {
   accessToken: string;
   apiKey: string;
   appId?: string;
+  imagesOnly?: boolean;
 }): Promise<PickerDoc | null> {
   return new Promise((resolve) => {
-    const builder = new google.picker.PickerBuilder()
-      .addView(google.picker.ViewId.DOCS)
-      .addView(google.picker.ViewId.DOCS_IMAGES)
-      .addView(google.picker.ViewId.PDFS)
+    const builder = new google.picker.PickerBuilder();
+    if (opts.imagesOnly) {
+      // Thumbnail grid of images, with folders so a "Cover images" folder is browsable.
+      const images = new google.picker.DocsView(google.picker.ViewId.DOCS_IMAGES)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(false)
+        .setMode(google.picker.DocsViewMode.GRID);
+      builder.addView(images).setTitle('Choose an image from Drive');
+    } else {
+      builder
+        .addView(google.picker.ViewId.DOCS)
+        .addView(google.picker.ViewId.DOCS_IMAGES)
+        .addView(google.picker.ViewId.PDFS)
+        .setTitle('Select a file from Drive');
+    }
+    builder
       .setOAuthToken(opts.accessToken)
       .setDeveloperKey(opts.apiKey)
-      .setTitle('Select a file from Drive')
       .setCallback((data: PickerCallbackData) => {
         if (data.action === google.picker.Action.CANCEL) {
           resolve(null);
@@ -281,17 +326,27 @@ async function downloadDriveFile(
   return new File([blob], name, { type: mimeType || blob.type || 'application/octet-stream' });
 }
 
-export async function openDrivePicker(): Promise<DrivePickResult | null> {
+export interface OpenDrivePickerOptions {
+  /** Show only images (grid view, folders browsable) and reject non-image picks. */
+  imagesOnly?: boolean;
+}
+
+export async function openDrivePicker(
+  options: OpenDrivePickerOptions = {}
+): Promise<DrivePickResult | null> {
   const { clientId, apiKey, appId } = await resolveGooglePickerConfig({
     vite: viteGoogleEnv(),
     loadRemote: loadRemotePickerConfig
   });
   await loadGoogleApis();
   const accessToken = await requestAccessToken(clientId);
-  const picked = await showPicker({ accessToken, apiKey, appId });
+  const picked = await showPicker({ accessToken, apiKey, appId, imagesOnly: options.imagesOnly });
   if (!picked?.id) return null;
 
   const meta = await fetchDriveFileMeta(picked.id, accessToken);
+  if (options.imagesOnly && !meta.mimeType.startsWith('image/')) {
+    throw new Error('That file is not an image. Choose a JPG, PNG, GIF or WebP.');
+  }
   // v1: skip permissions.list probe; conservative sharing from files.get only.
   const sharing = sharingFromDriveFile(meta, false);
 

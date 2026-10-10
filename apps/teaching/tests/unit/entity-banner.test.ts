@@ -90,7 +90,7 @@ describe('renderEntityBanner', () => {
 
     const url = dialog!.querySelector<HTMLInputElement>('.cover-picker__url')!;
     url.value = 'https://cdn.example.com/banner.jpg';
-    dialog!.querySelector<HTMLButtonElement>('.cover-picker button.btn--secondary')!.click();
+    dialog!.querySelector<HTMLButtonElement>('.cover-picker__apply')!.click();
 
     await Promise.resolve();
     await Promise.resolve();
@@ -235,7 +235,6 @@ describe('renderEntityBanner', () => {
     // The dialog opened afterwards offers the newly arrived library entry.
     host.querySelector<HTMLButtonElement>('.entity-banner__edit')!.click();
     const dialog = document.querySelector<HTMLDialogElement>('.entity-banner__dialog')!;
-    findButton(dialog, 'Choose from library')!.click();
     expect(dialog.querySelector('.cover-picker__library-item')).not.toBeNull();
     expect(dialog.querySelector('.cover-picker__library-empty')).toBeNull();
   });

@@ -1,5 +1,6 @@
 import type { Cover, Media } from '@/schemas';
 import { coverAltText, resolveCoverUrl } from '@/schemas';
+import { applyCreatedMedia } from '@/app/curriculum-state';
 import { mountCoverPicker } from '@/teacher/cover-picker';
 
 export interface EntityBannerOptions {
@@ -61,6 +62,8 @@ export function renderEntityBanner(
   let dialog: HTMLDialogElement | null = null;
   let pickerDispose: (() => void) | null = null;
   let dialogClosed = true;
+  // True while the dialog steps out of the top layer for the Google Drive picker.
+  let dialogSuspended = false;
 
   const root = document.createElement('div');
   root.className = options.size === 'hero' ? 'entity-banner entity-banner--hero' : 'entity-banner';
@@ -217,6 +220,22 @@ export function renderEntityBanner(
       media,
       titleFallback: titleText,
       editable: true,
+      onMediaCreated: (created) => {
+        media = [created, ...media.filter((entry) => entry.id !== created.id)];
+        void applyCreatedMedia(created);
+      },
+      onExternalPicker: (open) => {
+        // A modal dialog makes the rest of the page inert, Google's picker
+        // included, so hide it while Drive is open and bring it back after.
+        if (dialogClosed || dialog !== next) return;
+        if (open) {
+          dialogSuspended = true;
+          if (next.open) next.close();
+        } else {
+          if (!next.open) next.showModal();
+          dialogSuspended = false;
+        }
+      },
       onSave: async (cover) => {
         await options.onSave?.(cover);
         current = cover;
@@ -228,6 +247,8 @@ export function renderEntityBanner(
     pickerDispose = picker.dispose;
 
     next.addEventListener('close', () => {
+      // The close event is async: it can land after the dialog was re-shown.
+      if (dialogSuspended || next.open) return;
       closeCoverDialog();
     });
 
