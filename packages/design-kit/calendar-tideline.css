@@ -373,7 +373,9 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-card__form .cal-pop__acts{grid-column:1/-1;margin-top:var(--space-1)}
 @media (max-width:719px){
   /* Sheet sits above the fixed bottom bar (mobile.css .hub-mobile-nav: 4.65rem + safe area), not under it. */
-  .cal-pop.cal-pop--card{position:fixed;z-index:40;left:var(--space-3)!important;right:var(--space-3);top:auto!important;bottom:calc(4.65rem + env(safe-area-inset-bottom,0px) + var(--space-2));width:auto;max-height:min(70vh,calc(100dvh - 4.65rem - env(safe-area-inset-bottom,0px) - var(--space-8)));overflow:auto;overscroll-behavior:contain}
+  .cal-pop,.cal-pop.cal-pop--card{position:fixed;z-index:40;left:var(--space-3)!important;right:var(--space-3);top:auto!important;bottom:calc(4.65rem + env(safe-area-inset-bottom,0px) + var(--space-2));width:auto;max-height:min(70vh,calc(100dvh - 4.65rem - env(safe-area-inset-bottom,0px) - var(--space-8)));overflow:auto;overscroll-behavior:contain}
+  .cal-pop__acts{position:sticky;bottom:0;background:var(--paper);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .cal-pop__acts .btn,.cal-review__acts .btn{min-height:44px}
   .cal-card__field input,.cal-card__field textarea,.cal-card__field select{font-size:16px}
 }
 

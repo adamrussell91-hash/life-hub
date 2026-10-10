@@ -66,7 +66,7 @@ Week view. Structure and motion follow the Tideline VISUAL-SPEC.
 | Vitals | Sleep h, energy, meals, symptom — logs never become grid chips |
 | Walls | Hatch + lock pill; nothing proposes into a wall |
 | Ghosts | Dashed chips / `overItem` decorations from `GET /api/calendar-ghosts`; Accept/Dismiss → `POST { id, decision }` only |
-| Popover | Receipt from `acceptPlan()`; client never builds writes |
+| Popover | Receipt from `acceptPlan()`; client never builds writes. On phone, proposal previews use the same docked sheet as item cards, with sticky actions and 44px buttons above the bottom bar and safe area. |
 | Free evening | Dashed “N h free” when the Yours band is open enough |
 | Phone | One day + week strip under 720px |
 
