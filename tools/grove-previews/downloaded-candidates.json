@@ -1,0 +1,121 @@
+{
+  "inspected_at": "2026-10-10",
+  "local_root": "~/Downloads",
+  "purpose": "Downloaded source candidates for Claude; not published model assets",
+  "packs": [
+    {
+      "name": "Stylized Nature MegaKit[Source]",
+      "creator": "Quaternius",
+      "page_url": "https://quaternius.itch.io/stylized-nature-megakit",
+      "license_status": "verified CC0 in bundled License_Source.txt",
+      "model_count": 116,
+      "inventory": "source-edition-inventory.json",
+      "status": "selected models already normalised in Grove; original engine projects remain local"
+    },
+    {
+      "name": "low-poly-australian-animals",
+      "creator": "SilverAnimations (user reported)",
+      "page_url": null,
+      "license_status": "pending source/purchase confirmation; no licence file in inspected folder",
+      "models": [
+        {
+          "file": "Crocodile.fbx",
+          "bytes": 1424156,
+          "sha256": "76bd6de7b22d2c66d166c0b6ebd78b3e240fb84d8a7727274b8f281c1547a2d5"
+        },
+        {
+          "file": "Dingo.fbx",
+          "bytes": 1465948,
+          "sha256": "680ab26371cb0bec79f345a283b129810a04bc410be25237634b6e4339caac7d"
+        },
+        {
+          "file": "Emu.fbx",
+          "bytes": 1260956,
+          "sha256": "61eb0542f71c17df63df62fc2d975149b37474b15bd753963d32cf4c9be261f3"
+        },
+        {
+          "file": "Kangaroo.fbx",
+          "bytes": 1481404,
+          "sha256": "e58d7bd8eb346508c8fc4281562d6fca2f4e9ed124fc1dd228f72493f5c3ea38"
+        },
+        {
+          "file": "Koala.fbx",
+          "bytes": 1541644,
+          "sha256": "eb03b23b64ebd0d7014f837f1df786530fc55983235c16be7ea6236a78a3af69"
+        },
+        {
+          "file": "Kookaburra.fbx",
+          "bytes": 2069932,
+          "sha256": "5925b1ad3a2d112bdeda578b1fa88b585fd04ac2d985a015659534b5a50de88f"
+        },
+        {
+          "file": "Magpie.fbx",
+          "bytes": 2064396,
+          "sha256": "2f593a7bc0b86644d28780554d024376a3867100a3796e94d5417cbfb47ccb0f"
+        },
+        {
+          "file": "Platypus.fbx",
+          "bytes": 897996,
+          "sha256": "e8f2a9993db81240ca4ed077272833f8708251b47fdbec7f1280ac1ce24a03f8"
+        },
+        {
+          "file": "Tasmanian Devil.fbx",
+          "bytes": 1249948,
+          "sha256": "cb3e458c2016acbcee1f017e182e62743633c50024b084e6dde7dd7bd6f754d5"
+        },
+        {
+          "file": "Wombat.fbx",
+          "bytes": 737516,
+          "sha256": "afccbf1ab62094cfcc8d7af1fc068ce1e3f076a5aa879debbc95404a4825a5fa"
+        }
+      ],
+      "status": "FBX presence verified; rigs, clips, visual match and redistribution terms not yet validated",
+      "creator_reported_by_user": "SilverAnimations",
+      "creator_verification": "not independently confirmed"
+    },
+    {
+      "name": "Animated Low Poly Animals.unitypackage",
+      "creator": "Acorn Bringer (identified by internal package paths)",
+      "page_url": null,
+      "license_status": "pending exact download page and applicable licence",
+      "archive": {
+        "file": "Animated Low Poly Animals.unitypackage",
+        "bytes": 1012750,
+        "sha256": "fdefc1339e4812843ce0394f9b0da49a1a6e89dbf6a928baaa8f35a8a9829068"
+      },
+      "mesh_paths": [
+        "Assets/Acorn Bringer Assets/Animated Low Poly Animals/Meshes/Character_Skipper.fbx",
+        "Assets/Acorn Bringer Assets/Animated Low Poly Animals/Meshes/Character_Firefly.fbx",
+        "Assets/Acorn Bringer Assets/Animated Low Poly Animals/Meshes/Character_Frog.fbx",
+        "Assets/Acorn Bringer Assets/Animated Low Poly Animals/Meshes/Character_Turtle.fbx",
+        "Assets/Acorn Bringer Assets/Animated Low Poly Animals/Meshes/Character_Finch.fbx",
+        "Assets/Acorn Bringer Assets/Animated Low Poly Animals/Meshes/Character_Butterfly.fbx",
+        "Assets/Acorn Bringer Assets/Animated Low Poly Animals/Meshes/Character_Bird.fbx",
+        "Assets/Acorn Bringer Assets/Animated Low Poly Animals/Meshes/Character_BumbleBee.fbx",
+        "Assets/Acorn Bringer Assets/Animated Low Poly Animals/Meshes/Character_Fish.fbx"
+      ],
+      "status": "archive inspected without importing Unity or running included code; animation clips and visual fit not yet validated",
+      "creator_reported_by_user": "SilverAnimations",
+      "creator_verification": "not independently confirmed"
+    },
+    {
+      "name": "4 Rigged Spring Animals.blend",
+      "creator": "SilverAnimations (user reported)",
+      "page_url": null,
+      "license_status": "pending source confirmation",
+      "file": {
+        "file": "4 Rigged Spring Animals.blend",
+        "bytes": 1929431,
+        "sha256": "1fc0f648e32d9422e0ae8b370f62fab2cd2af175a9dae4608cb5c152a3988604"
+      },
+      "texture": {
+        "file": "Animals Colour.png",
+        "bytes": 2970,
+        "sha256": "ebd54a24f6e2790308b73ee8e4a18fd76fb635b31224ac9127643b3231d6268c"
+      },
+      "status": "files present; species, rigs, clips and art fit not inspected in Blender",
+      "creator_reported_by_user": "SilverAnimations",
+      "creator_verification": "not independently confirmed"
+    }
+  ]
+}

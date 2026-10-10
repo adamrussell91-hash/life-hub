@@ -5,6 +5,29 @@
 
 Grove is a quiet Three.js forest drawn from completed-task history, viewed from above at an angle. It lives below Day and Tasks, separately from them. Home shows today's clearing; tapping it opens the wider forest.
 
+## Download hand-off for Claude
+
+Adam has already downloaded the packs below. He identifies the three extra
+animal downloads as SilverAnimations. Creator/store pages still need to be
+verified; the Unity archive itself uses Acorn Bringer internal paths. Check the local Downloads folder
+before requesting another purchase or treating these ingredients as absent.
+This is a record of locally available sources, not approval to publish every
+source file or a claim that every model matches Grove.
+
+| Local download | Verified contents / current status |
+| --- | --- |
+| `~/Downloads/Stylized Nature MegaKit[Source]/` | Purchased Quaternius Source edition; 116 glTF models; bundled Source licence verified CC0. Selected trees/vegetation are already normalised here. Includes original engine projects outside the repository. |
+| `~/Downloads/low-poly-australian-animals/` | 10 FBX files: crocodile, dingo, emu, kangaroo, koala, kookaburra, magpie, platypus, Tasmanian devil and wombat. Creator/page/licence confirmation and rig/clip/visual checks pending. |
+| `~/Downloads/Animated Low Poly Animals.unitypackage` | Internal paths identify Acorn Bringer; nine FBX meshes: skipper, firefly, frog, turtle, finch, butterfly, bird, bumblebee and fish. Exact source/licence and usable clip checks pending. |
+| `~/Downloads/4 Rigged Spring Animals.blend` + `Animals Colour.png` | Both files present. Species, rig/clip contents, visual fit and source/licence checks pending. Filename alone does not establish which animals or animations are included. |
+
+Detailed file hashes and package paths: [downloaded-candidates.json](../../../../tools/grove-previews/downloaded-candidates.json).
+MegaKit inventory: [source-edition-inventory.json](../../../../tools/grove-previews/source-edition-inventory.json).
+Grove keeps MegaKit/Quaternius as its core. These extra animals are candidates
+for matching one-offs; pending downloads do not yet close the listed gaps.
+Raw files for those three candidate packs remain local while their licences
+and suitability are checked.
+
 ## Appearance and behaviour
 
 - Original scenery with the soft, cheerful low-poly feel of Adam's Forest Island screenshot.
