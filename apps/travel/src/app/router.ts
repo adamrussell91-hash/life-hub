@@ -1,6 +1,7 @@
 export type Route =
   | { name: 'trips' }
   | { name: 'trip'; tripId: string; cityId?: string; date?: string }
+  | { name: 'journal'; tripId: string; momentId?: string }
   | { name: 'today' };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -17,7 +18,7 @@ function safeSegment(segment: string): string | null {
   return decoded;
 }
 
-/** Hash routes (§2.1): `#/`, `#/trip/:tripId[/:cityId/:date]`, `#/today`.
+/** Hash routes (§2.1): `#/`, `#/trip/:tripId[/:cityId/:date]`, `#/trip/:tripId/journal[/:momentId]`, `#/today`.
  * Anything else falls back to the trips list. */
 export function parseRoute(hash: string = location.hash): Route {
   const raw = hash.replace(/^#\/?/, '').split('?')[0] ?? '';
@@ -31,6 +32,14 @@ export function parseRoute(hash: string = location.hash): Route {
     const tripId = safeSegment(segments[1]!);
     if (!tripId) return { name: 'trips' };
     if (segments.length === 2) return { name: 'trip', tripId };
+    if (segments[2] === 'journal') {
+      if (segments.length === 3) return { name: 'journal', tripId };
+      if (segments.length === 4) {
+        const momentId = safeSegment(segments[3]!);
+        if (momentId) return { name: 'journal', tripId, momentId };
+      }
+      return { name: 'trips' };
+    }
     if (segments.length === 4) {
       const cityId = safeSegment(segments[2]!);
       const date = segments[3]!;
@@ -55,6 +64,26 @@ export function tripRoute(tripId: string, cityId?: string, date?: string): strin
   return `#/trip/${encodeURIComponent(tripId)}`;
 }
 
+export function journalRoute(tripId: string, momentId?: string): string {
+  const base = `#/trip/${encodeURIComponent(tripId)}/journal`;
+  if (momentId) return `${base}/${encodeURIComponent(momentId)}`;
+  return base;
+}
+
 export function navigate(hash: string): void {
   location.hash = hash;
+}
+
+function patternOffTruthy(value: string | null): boolean {
+  return value === '1' || value === 'true';
+}
+
+/** Evidence / dev flag: `?patternOff=1` on the page URL or on the hash query (`#/trip/…/journal?patternOff=1`). */
+export function journalPatternOff(
+  loc: Pick<Location, 'hash' | 'search'> = location,
+): boolean {
+  if (patternOffTruthy(new URLSearchParams(loc.search).get('patternOff'))) return true;
+  const q = loc.hash.indexOf('?');
+  if (q === -1) return false;
+  return patternOffTruthy(new URLSearchParams(loc.hash.slice(q + 1)).get('patternOff'));
 }

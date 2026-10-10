@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Travel journal export</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; line-height: 1.5; color: #1a1a1a; background: #fafafa; }
+    body { margin: 0 auto; max-width: 42rem; padding: 1.25rem; }
+    h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
+    h2 { font-size: 1.1rem; margin: 1.5rem 0 0.35rem; }
+    .meta { color: #555; font-size: 0.9rem; margin-bottom: 1rem; }
+    article { margin: 0.75rem 0; padding: 0.75rem 0; border-bottom: 1px solid #ddd; }
+    .place { font-weight: 600; }
+    .text { white-space: pre-wrap; }
+    .err { color: #8b0000; }
+    img { max-width: 100%; height: auto; border-radius: 4px; }
+    .caption { font-size: 0.85rem; color: #444; margin-top: 0.25rem; }
+    .photo-notes { font-size: 0.85rem; color: #333; margin: 0.35rem 0 0; padding-left: 1rem; }
+    .authorship { font-size: 0.8rem; color: #666; font-style: italic; margin: 0 0 0.35rem; }
+    .authorship--corey { color: #6b4; }
+  </style>
+</head>
+<body>
+  <div id="app" class="meta">Loading journal…</div>
+  <script>
+    (function () {
+      var app = document.getElementById('app');
+      function esc(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+      function mediaById(list) {
+        var map = {};
+        (list || []).forEach(function (m) { map[m.id] = m; });
+        return map;
+      }
+      function annotationMap(payload) {
+        var map = {};
+        (payload && payload.items || []).forEach(function (doc) {
+          if (doc && doc.media_id) map[doc.media_id] = doc;
+        });
+        return map;
+      }
+      function authorshipLabel(mom) {
+        if (mom.author === 'corey') return "Corey's perspective — not your words";
+        return 'Adam — your journal';
+      }
+      function noteLines(doc) {
+        var out = [];
+        (doc.regions || []).forEach(function (r) {
+          if (r && r.note && String(r.note).trim()) out.push(String(r.note).trim());
+        });
+        return out;
+      }
+      function render(journal, annotationsPayload) {
+        var html = '<h1>' + esc(journal.title || 'Untitled trip') + '</h1>';
+        html += '<p class="meta">Trip ' + esc(journal.trip_id) + ' · revision ' + esc(String(journal.revision)) + '</p>';
+        var legs = (journal.legs || []).slice().sort(function (a, b) { return a.order - b.order; });
+        var media = mediaById(journal.media);
+        var notesByMedia = annotationMap(annotationsPayload);
+        legs.forEach(function (leg) {
+          html += '<h2>' + esc(leg.destination) + '</h2>';
+          var moments = (journal.moments || []).filter(function (m) {
+            return m.leg_id === leg.id && m.lifecycle === 'live';
+          }).sort(function (a, b) { return a.display_order - b.display_order; });
+          moments.forEach(function (mom) {
+            html += '<article><p class="authorship' + (mom.author === 'corey' ? ' authorship--corey' : '') + '">' + esc(authorshipLabel(mom)) + '</p>';
+            html += '<div class="meta">' + esc(mom.local_date) + (mom.local_time ? ' ' + esc(mom.local_time) : '') + '</div>';
+            if (mom.place && mom.place.name) html += '<div class="place">' + esc(mom.place.name) + '</div>';
+            if (mom.text) html += '<div class="text">' + esc(mom.text) + '</div>';
+            (mom.media_ids || []).forEach(function (id) {
+              var m = media[id];
+              if (!m) return;
+              var src = '../media/' + esc(id) + '/display.jpg';
+              html += '<figure><img src="' + src + '" alt="" width="' + esc(String(m.width)) + '" height="' + esc(String(m.height)) + '" loading="lazy" />';
+              if (m.caption) html += '<figcaption class="caption">' + esc(m.caption) + '</figcaption>';
+              if (m.transcript) html += '<p class="caption">Transcript: ' + esc(m.transcript) + '</p>';
+              var notes = noteLines(notesByMedia[id] || {});
+              if (notes.length) {
+                html += '<ul class="photo-notes">';
+                notes.forEach(function (n) { html += '<li>' + esc(n) + '</li>'; });
+                html += '</ul>';
+              }
+              html += '</figure>';
+            });
+            html += '</article>';
+          });
+        });
+        app.innerHTML = html;
+      }
+      Promise.all([
+        fetch('../data/journal.json').then(function (r) {
+          if (!r.ok) throw new Error('journal.json missing');
+          return r.json();
+        }),
+        fetch('../data/annotations.json').then(function (r) {
+          if (!r.ok) return { items: [] };
+          return r.json();
+        }),
+      ])
+        .then(function (pair) { render(pair[0], pair[1]); })
+        .catch(function (e) {
+          app.innerHTML = '<p class="err">Could not load export: ' + esc(e.message) + '</p>';
+        });
+    })();
+  </script>
+</body>
+</html>
