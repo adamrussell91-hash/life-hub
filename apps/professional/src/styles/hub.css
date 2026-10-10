@@ -6360,3 +6360,30 @@ button.org-chart__unit-label:focus-visible {
     padding: var(--space-2) var(--space-3);
   }
 }
+
+/* Keep event composer actions reachable above locked mobile navigation (R4). */
+@media (max-width: 719px) {
+  .event-form.event-compose { padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px)); }
+  .event-form.event-compose input:not([type='checkbox']),
+  .event-form.event-compose select { font-size: var(--text-md); min-width: 0; }
+  .event-compose__footer {
+    position: fixed;
+    left: var(--space-4);
+    right: var(--space-4);
+    bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+    z-index: 30;
+    padding: var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+  }
+  .event-compose__footer .event-compose__actions { display: contents; }
+  .event-compose__footer .btn { flex: 1; min-height: 2.75rem; }
+  .event-compose__footer .error { order: -1; width: 100%; }
+}
+
+@media (max-width: 719px) {
+  .page-header:has(+ .hub-canvas__body :is(.event-page, .event-compose)) { flex-wrap: wrap; }
+  .page-header:has(+ .hub-canvas__body :is(.event-page, .event-compose)) .page-header__copy { flex-basis: 100%; }
+  .event-form.event-compose .event-compose__sr { width: 1px; min-width: 1px; max-width: 1px; min-height: 1px; padding: 0; }
+}

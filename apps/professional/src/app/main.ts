@@ -1,6 +1,8 @@
 import '../../design-kit/tokens.css';
 import '../../design-kit/overlays.css';
 import '../../design-kit/chrome.css';
+import '../../design-kit/forms.css';
+import '../../design-kit/cards.css';
 import '../../design-kit/sign-in.css';
 import '../../design-kit/motion.css';
 import '../../design-kit/entity-links.css';
@@ -25,6 +27,7 @@ import '../styles/thread-page.css';
 import '../styles/meeting-page.css';
 import '../styles/event-page.css';
 
+import { clearEventReadCache } from '@/api/client';
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, viewChrome, type HubShellRefs } from '@/shell/shell';
@@ -79,7 +82,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
       await logout();
       await boot(root);
     },
-    onRefresh: () => void paint()
+    onRefresh: () => { clearEventReadCache(); void paint(); }
   });
 
   let routeGeneration = 0;
@@ -267,11 +270,17 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'event') {
+      let eventTitle = 'Loading…';
       renderPageHeader(shell, { eyebrow: 'Calendar · Event', title: 'Loading…' });
       await renderEventPage(shell.canvas, route.id, {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
+          eventTitle = title;
           renderPageHeader(shell, { eyebrow: 'Calendar · Event', title });
+        },
+        onActionsReady: (actions) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'Calendar · Event', title: eventTitle, actions });
         },
         isCurrent: () => generation === routeGeneration
       });

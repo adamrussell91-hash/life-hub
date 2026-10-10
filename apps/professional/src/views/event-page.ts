@@ -1,5 +1,6 @@
+import { eventOptions } from '@/components/event-options';
 import { getEvent, updateEvent, deleteEvent } from '@/api/events';
-import { createUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
+import { createUniversalLink, listUniversalLinksForEntity, endUniversalLink } from '@/api/universal-links';
 import { createPdGroup, getPdGroup } from '@/api/pd-groups';
 import { createKnowledgeNote } from '@/api/knowledge-notes';
 import { mountBlockPage } from '@/components/block-page';
@@ -20,12 +21,13 @@ const PD = 'professional_development';
 type Loaded = {
   record: EventRecord;
   group: PdGroupRecord | null;
+  groupLinkId: string | null;
   members: EventRecord[];
   notedTalks: Map<string, string>;
 };
 
-async function load(id: string): Promise<Loaded> {
-  const record = (await getEvent(id)).event;
+async function loadRelated(record: EventRecord): Promise<Loaded> {
+  const id = record.id;
   const eventRef = `professional:event:${id}`;
   const links = await listUniversalLinksForEntity(eventRef);
   const current = links.outgoing.filter((entry) => entry.link.status === 'current');
@@ -42,25 +44,29 @@ async function load(id: string): Promise<Loaded> {
   let members: EventRecord[] = [record];
   if (groupEntry) {
     const groupId = groupEntry.endpoint!.ref.split(':').pop()!;
-    group = (await getPdGroup(groupId)).group;
-    const memberRefs = (await listUniversalLinksForEntity(groupEntry.endpoint!.ref)).incoming
+    const [groupResult, groupLinks] = await Promise.all([getPdGroup(groupId), listUniversalLinksForEntity(groupEntry.endpoint!.ref)]);
+    group = groupResult.group;
+    const memberRefs = groupLinks.incoming
       .filter((entry) => entry.link.relationship_type === 'in_pd_group' && entry.link.status === 'current')
       .map((entry) => entry.link.source_ref.split(':').pop()!);
     members = await Promise.all(memberRefs.map(async (memberId) => (memberId === id ? record : (await getEvent(memberId)).event)));
   }
-  return { record, group, members, notedTalks };
+  return { record, group, groupLinkId: groupEntry?.link.id ?? null, members, notedTalks };
 }
 
 export async function renderEventPage(
   canvas: HTMLElement,
   id: string,
-  options: { isCurrent: () => boolean; onTitleReady: (title: string) => void }
+  options: { isCurrent: () => boolean; onTitleReady: (title: string) => void; onActionsReady?: (actions: HTMLElement) => void }
 ): Promise<void> {
+  if (!options.isCurrent()) return;
   showViewLoading(canvas, 'Loading…');
   let data: Loaded;
   try {
-    data = await load(id);
+    const record = (await getEvent(id)).event;
+    data = {record, group:null, groupLinkId:null, members:[record], notedTalks:new Map((record.knowledge_notes ?? []).map(note => [note.talk_id, note.href]))};
   } catch (err) {
+    if (!options.isCurrent()) return;
     renderLoadError(canvas, err, () => void renderEventPage(canvas, id, options));
     return;
   }
@@ -88,10 +94,11 @@ export async function renderEventPage(
   toggleRow.append(toggle, el('b', undefined, 'Counts as PD'),
     el('span', 'muted', isPd ? 'Feeds the PD dashboard' : 'Off. No hours or evidence.'));
   root.append(toggleRow);
-  const edit = el('button', 'btn btn--secondary', 'Edit event');
-  edit.type = 'button';
-  edit.dataset.part = 'edit-event';
-  edit.addEventListener('click', () => void renderEventNewView(canvas, {
+  const editEvent = () => {
+    if (!options.isCurrent()) return;
+    options.onActionsReady?.(el('div'));
+    void renderEventNewView(canvas, {
+    isCurrent: options.isCurrent,
     draft: {
       title: data.record.title, start: data.record.start, end: data.record.end,
       timeZone: data.record.time_zone, allDay: data.record.all_day,
@@ -110,11 +117,8 @@ export async function renderEventPage(
       for (const link of payload.pendingLinks) await createUniversalLink({ source_ref: eventRef, ...link });
       await rerender();
     }
-  }));
-  root.append(edit);
-  const remove = el('button', 'btn btn--ghost', 'Delete event');
-  remove.type = 'button';
-  remove.dataset.part = 'delete-event';
+    });
+  };
   const confirmation = el('section', 'confirm-card');
   confirmation.hidden = true;
   confirmation.style.display = 'none';
@@ -124,7 +128,7 @@ export async function renderEventPage(
   const actions = el('div', 'confirm-card__actions');
   const discard = el('button', 'btn btn--ghost', 'Keep event');
   discard.type = 'button';
-  discard.addEventListener('click', () => { confirmation.hidden = true; confirmation.style.display = 'none'; remove.focus(); });
+  discard.addEventListener('click', () => { confirmation.hidden = true; confirmation.style.display = 'none'; pageActions.querySelector('button')?.focus(); });
   const confirm = el('button', 'btn btn--primary', 'Delete event');
   confirm.type = 'button';
   confirm.dataset.part = 'confirm-delete';
@@ -141,23 +145,31 @@ export async function renderEventPage(
       confirm.disabled = false;
     }
   });
-  remove.addEventListener('click', () => { confirmation.hidden = false; confirmation.style.removeProperty('display'); discard.focus(); });
+  const pageActions = eventOptions(editEvent, () => { confirmation.hidden = false; confirmation.style.removeProperty('display'); discard.focus(); });
+  options.onActionsReady?.(pageActions);
+  if (!options.onActionsReady) { const toolbar = el('div', 'event-page__toolbar'); toolbar.append(pageActions); root.prepend(toolbar); }
   actions.append(discard, confirm);
   confirmation.append(actions, status);
-  root.append(remove, confirmation);
+  root.append(confirmation);
 
+  let relationsReady = false;
+  const shapeHost = el('div');
+  const seriesHost = el('div');
+  const relatedStatus = el('div', 'canvas-status', 'Loading linked records…');
+  relatedStatus.setAttribute('role', 'status');
   if (isPd) {
-    root.append(shapePicker());
+    shapeHost.append(shapePicker());
+    root.append(shapeHost);
     root.append(talksCard());
     root.append(buildPdFields(data.record, (next) => { data.record = next; }), buildLearningTaskPanel(data.record, rerender));
-    if (data.group) root.append(seriesStrip(data.group));
+    root.append(seriesHost);
   }
 
   const notes = el('section', 'event-page__notes');
   notes.append(el('h3', undefined, isPd ? 'Reflection and notes' : 'Notes'));
   const body = el('div');
   notes.append(body);
-  root.append(notes);
+  root.append(relatedStatus, notes);
   mountBlockPage(body, {
     blocks: (data.record.blocks ?? []) as never[],
     editable: true,
@@ -166,39 +178,74 @@ export async function renderEventPage(
     }
   });
   canvas.replaceChildren(root);
+  await enrich();
+
+  async function enrich(): Promise<void> {
+    try {
+      const related = await loadRelated(data.record);
+      if (!options.isCurrent() || !canvas.contains(root)) return;
+      data.group = related.group; data.groupLinkId = related.groupLinkId;
+      data.members = related.members; data.notedTalks = related.notedTalks;
+      relationsReady = true; relatedStatus.replaceChildren();
+      if (isPd) {
+        shapeHost.replaceChildren(shapePicker());
+        if (data.group) seriesHost.replaceChildren(seriesStrip(data.group));
+        for (const row of root.querySelectorAll<HTMLElement>('[data-talk-id]')) {
+          const href = data.notedTalks.get(row.dataset.talkId!);
+          const existing = row.querySelector<HTMLElement>('.kn');
+          if (href !== undefined) {
+            const link = el('a', 'kn', '✓ Knowledge note');
+            if (href) link.href = href;
+            existing?.replaceWith(link);
+          } else if (existing instanceof HTMLButtonElement) existing.disabled = false;
+        }
+      }
+    } catch {
+      if (!options.isCurrent() || !canvas.contains(root)) return;
+      const retry = el('button', 'btn btn--secondary', 'Retry links');
+      retry.type = 'button';
+      retry.addEventListener('click', () => {relatedStatus.textContent = 'Loading linked records…'; void enrich();});
+      relatedStatus.replaceChildren(el('p', undefined, 'Linked records could not load.'), retry);
+    }
+  }
 
   function shapePicker(): HTMLElement {
-    const group = el('div', 'shape');
-    group.dataset.part = 'shape';
-    group.setAttribute('role', 'radiogroup');
-    group.setAttribute('aria-label', 'PD shape');
+    const field = el('div', 'hub-field event-page__format');
+    field.dataset.part = 'shape';
+    const label = el('label', 'hub-label', 'Event format');
+    const select = el('select', 'hub-select');
+    select.id = `event-format-${id}`; label.htmlFor = select.id;
+    select.disabled = !relationsReady;
     const currentShape = data.group?.shape ?? 'one_off';
-    const shapeOptions: Array<[string, string, string]> = [
-      ['one_off', 'One-off', 'One Zoom, one day, one session'],
-      ['series', 'Series', 'Sessions weeks apart, one program'],
-      ['program', 'Program', 'Multi-day seminar, one event per day']
-    ];
-    for (const [value, label, help] of shapeOptions) {
-      const button = el('button', `shape__opt${value === currentShape ? ' is-on' : ''}`) as HTMLButtonElement;
-      button.type = 'button';
-      button.setAttribute('role', 'radio');
-      button.setAttribute('aria-checked', String(value === currentShape));
-      button.append(el('b', undefined, label), el('small', undefined, help));
-      button.addEventListener('click', async () => {
-        if (value === currentShape || value === 'one_off') return;
-        await updateEvent(id, { event_type: data.record.event_type });
-        const { group: created } = await createPdGroup({ shape: value as 'series' | 'program', title: data.record.title });
-        await createUniversalLink({ source_ref: eventRef, target_ref: `professional:pd_group:${created.id}`, relationship_type: 'in_pd_group' });
-        await rerender();
-      });
-      group.append(button);
+    for (const [value, name] of [['one_off', 'One-off'], ['series', 'Series'], ['program', 'Program']]) {
+      const option = el('option', undefined, name); option.value = value!; select.append(option);
     }
-    return group;
+    select.value = currentShape;
+    const error = el('p', 'hub-field__error');
+    error.setAttribute('role', 'status');
+    select.addEventListener('change', async () => {
+      const value = select.value;
+      if (value === currentShape) return;
+      select.disabled = true;
+      try {
+        if (value !== 'one_off') {
+          const {group} = await createPdGroup({shape:value as 'series' | 'program', title:data.record.title});
+          await createUniversalLink({source_ref:eventRef, target_ref:`professional:pd_group:${group.id}`, relationship_type:'in_pd_group'});
+        }
+        if (data.groupLinkId) await endUniversalLink(data.groupLinkId);
+        await rerender();
+      } catch (err) {
+        error.textContent = err instanceof Error ? err.message : 'Could not change the event format.';
+        select.value = currentShape; select.disabled = false;
+      }
+    });
+    field.append(label, select, error);
+    return field;
   }
 
   function seriesStrip(group: PdGroupRecord): HTMLElement {
     const totals = groupTotals(data.members);
-    const card = el('section', 'card');
+    const card = el('section', 'hub-card');
     card.dataset.part = 'series';
     const title = el('h3', undefined, `${group.shape === 'series' ? 'The series' : 'The program'} · ${totals.hoursDone}/${totals.hoursTotal} h`);
     const open = el('a', 'btn btn--ghost', 'Open') as HTMLAnchorElement;
@@ -220,7 +267,7 @@ export async function renderEventPage(
   }
 
   function talksCard(): HTMLElement {
-    const card = el('section', 'card');
+    const card = el('section', 'hub-card');
     card.dataset.part = 'talks';
     card.append(el('h3', undefined, 'Talks and activities'));
     const list = el('div', 'prog');
@@ -229,13 +276,13 @@ export async function renderEventPage(
     const note = talkHoursNote(data.record.talks ?? [], data.record.hours);
     if (note) card.append(el('p', 'muted', note));
     const form = el('form', 'talk-add');
-    const time = el('input') as HTMLInputElement;
+    const time = el('input', 'hub-input') as HTMLInputElement;
     time.type = 'time';
     time.setAttribute('aria-label', 'Talk time');
-    const title = el('input') as HTMLInputElement;
+    const title = el('input', 'hub-input') as HTMLInputElement;
     title.placeholder = 'Talk or activity';
     title.setAttribute('aria-label', 'Talk title');
-    const hours = el('input') as HTMLInputElement;
+    const hours = el('input', 'hub-input') as HTMLInputElement;
     hours.type = 'number';
     hours.step = '0.25';
     hours.min = '0';
@@ -259,6 +306,7 @@ export async function renderEventPage(
 
   function talkRow(talk: EventTalk): HTMLElement {
     const row = el('div', 'pi');
+    row.dataset.talkId = talk.id;
     row.append(el('span', 'pi__time', talk.time ?? ''), el('span', 'pi__title', talk.title),
       el('span', 'pi__who', [talk.presenter, talk.hours != null ? `${talk.hours} h` : null].filter(Boolean).join(' · ')));
     const href = data.notedTalks.get(talk.id);
@@ -269,6 +317,7 @@ export async function renderEventPage(
     } else {
       const make = el('button', 'kn is-draft', '＋ Make note') as HTMLButtonElement;
       make.type = 'button';
+      make.disabled = !relationsReady;
       make.dataset.talkNote = talk.id;
       make.addEventListener('click', async () => {
         make.disabled = true;
