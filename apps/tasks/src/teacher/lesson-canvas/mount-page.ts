@@ -1,4 +1,10 @@
 import { isLinkedSection } from '@/blocks/composition-link';
+import { offerTimedUndo } from '../../../design-kit/js/hub-feedback.js';
+import {
+  HUB_LIST_ICONS,
+  createHubMenuButton
+} from '../../../design-kit/js/hub-list.js';
+import { blockTypeLabel, createBlockTypeLabel } from '@/blocks/block-meta';
 import {
   createFromInsertMenu,
   cloneBlockWithNewIds,
@@ -33,7 +39,6 @@ import {
   moveBlockTo,
   type DropRootMode
 } from '@/teacher/lesson-canvas/drop';
-import { renderCardMenu } from '@/views/card-menu';
 
 const DND_MIME = 'application/x-teaching-hub-block';
 
@@ -423,30 +428,72 @@ export function mountBlockCanvas(
   }
 
   function deleteBlock(block: Block): void {
-    selectedId = null;
-    options.onSelect?.(null);
+    const location = findBlockLocation(blocks, block.id);
+    if (selectedId === block.id) {
+      selectedId = null;
+      options.onSelect?.(null);
+    }
     emit(deleteBlocksById(blocks, [block.id]));
+    offerTimedUndo({
+      message: `${blockTypeLabel(block)} block deleted`,
+      onUndo: () => {
+        const parent = location?.parent ?? { kind: 'root' as const };
+        const result = insertAt(blocks, parent, location?.index ?? blocks.length, block, { rootMode });
+        if (!result.ok) {
+          setHint(result.message);
+          return;
+        }
+        emit(result.blocks);
+      }
+    });
   }
 
+
   function createBlockMenu(block: Block): HTMLElement {
-    const editing = selectedId === block.id;
-    const menu = renderCardMenu(
-      `${block.block_type.replace(/_/g, ' ')} block menu`,
-      [
-        {
-          id: editing ? 'done' : 'edit',
-          label: editing ? 'Done' : 'Edit',
-          onSelect: () => select(editing ? null : block.id)
-        },
-        { id: 'up', label: 'Move up', onSelect: () => moveBy(block.id, -1) },
-        { id: 'down', label: 'Move down', onSelect: () => moveBy(block.id, 1) },
-        { id: 'duplicate', label: 'Duplicate', onSelect: () => duplicateBlock(block) },
-        { id: 'delete', label: 'Delete', danger: true, onSelect: () => deleteBlock(block) }
-      ],
-      { heading: 'Block' }
+    return createHubMenuButton(
+      () => {
+        const editing = selectedId === block.id;
+        const index = blocks.findIndex((row) => row.id === block.id);
+        return [
+          {
+            label: editing ? 'Done' : 'Edit',
+            icon: editing ? HUB_LIST_ICONS.check : HUB_LIST_ICONS.edit,
+            dataset: { blockAction: editing ? 'done' : 'edit' },
+            onSelect: () => select(editing ? null : block.id)
+          },
+          {
+            label: 'Move up',
+            icon: HUB_LIST_ICONS.up,
+            disabled: index <= 0,
+            dataset: { blockAction: 'up' },
+            onSelect: () => moveBy(block.id, -1)
+          },
+          {
+            label: 'Move down',
+            icon: HUB_LIST_ICONS.down,
+            disabled: index < 0 || index >= blocks.length - 1,
+            dataset: { blockAction: 'down' },
+            onSelect: () => moveBy(block.id, 1)
+          },
+          {
+            label: 'Duplicate',
+            icon: HUB_LIST_ICONS.copy,
+            dataset: { blockAction: 'duplicate' },
+            onSelect: () => duplicateBlock(block)
+          },
+          'separator',
+          {
+            label: 'Delete block',
+            icon: HUB_LIST_ICONS.trash,
+            danger: true,
+            hold: true,
+            dataset: { blockAction: 'delete' },
+            onSelect: () => deleteBlock(block)
+          }
+        ];
+      },
+      { label: `${blockTypeLabel(block)} block options`, className: 'lesson-page__block-menu' }
     );
-    menu.classList.add('lesson-page__block-menu');
-    return menu;
   }
 
   function createEditChrome(block: Block): HTMLElement {
@@ -455,15 +502,18 @@ export function mountBlockCanvas(
 
     const done = document.createElement('button');
     done.type = 'button';
-    done.className = 'btn btn--secondary lesson-page__done';
+    done.className = 'btn btn--primary lesson-page__done';
     done.textContent = 'Done';
     done.addEventListener('click', (event) => {
       event.stopPropagation();
       select(null);
     });
 
+    const spacer = document.createElement('span');
+    spacer.className = 'lesson-page__toolbar-spacer';
+
     const visibility = createVisibilitySelect(block, onBlockChange, latestBlock(block.id, block));
-    bar.append(done, visibility);
+    bar.append(createBlockTypeLabel(block), visibility, spacer, done);
 
     if (block.block_type === 'section' && !isLinkedSection(block) && options.onSaveComposition) {
       const saveComposition = document.createElement('button');
@@ -579,7 +629,7 @@ export function mountBlockCanvas(
       } else if (canEdit && selectedId === block.id) {
         const editor = createBlockEditor(block, onBlockChange, latestBlock(block.id, block), editorCtx());
         editor.querySelectorAll('.block-editor__move-up, .block-editor__move-down').forEach((el) => el.remove());
-        row.append(editor, createEditChrome(block));
+        row.append(createEditChrome(block), editor);
       } else {
         row.append(preview(block));
       }

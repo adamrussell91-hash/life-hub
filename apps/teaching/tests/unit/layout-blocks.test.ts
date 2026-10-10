@@ -393,13 +393,14 @@ describe('layout block editors', () => {
       },
       () => latest as Extract<Block, { block_type: 'columns' }>
     );
+    document.body.append(el);
     const firstPane = el.querySelectorAll('.block-editor__column-pane')[0]!;
-    const addSelect = firstPane.querySelector('select') as HTMLSelectElement;
-    const addButton = firstPane.querySelector(
-      'button.block-editor__nested-add'
-    ) as HTMLButtonElement;
-    addSelect.value = 'heading';
-    addButton.click();
+    firstPane.querySelector<HTMLButtonElement>('.hub-list__add')!.click();
+    const search = document.querySelector<HTMLInputElement>('.hub-insert__search')!;
+    search.value = 'heading';
+    search.dispatchEvent(new Event('input'));
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    el.remove();
     const updated = onChange.mock.calls.at(-1)![0] as Extract<
       Block,
       { block_type: 'columns' }

@@ -1,3 +1,4 @@
+import { clickMenuAction, holdDelete, menuItem } from './helpers/hub-list';
 import { describe, it, expect } from 'vitest';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES } from '@/blocks/create-block';
@@ -191,22 +192,20 @@ describe('timeline editor', () => {
     };
     rebuild();
     const add = () =>
-      (mount.querySelector('.block-editor__timeline-add') as HTMLButtonElement).click();
+      (mount.querySelector('.hub-list__add') as HTMLButtonElement).click();
     for (let i = 0; i < 9; i += 1) add();
     expect(latest.block_type === 'timeline' && latest.content.events).toHaveLength(12);
     expect(
-      (mount.querySelector('.block-editor__timeline-add') as HTMLButtonElement).disabled
+      (mount.querySelector('.hub-list__add') as HTMLButtonElement).disabled
     ).toBe(true);
     while (latest.block_type === 'timeline' && latest.content.events.length > 1) {
-      (mount.querySelector('.block-editor__timeline-remove') as HTMLButtonElement).click();
+      holdDelete(mount.querySelector('.hub-list__row .hub-list__more')!);
     }
     expect(latest.block_type === 'timeline' && latest.content.events).toHaveLength(1);
-    expect(
-      (mount.querySelector('.block-editor__timeline-remove') as HTMLButtonElement).disabled
-    ).toBe(true);
+    expect(menuItem(mount.querySelector('.hub-list__row .hub-list__more')!, 'delete')?.disabled).toBe(true);
   });
 
-  it('reorders events with up/down', () => {
+  it('reorders events from the row menu', () => {
     const block = createBlock('timeline', 'tl1');
     if (block.block_type !== 'timeline') throw new Error('expected timeline');
     block.content.events[0]!.label = 'A';
@@ -223,8 +222,7 @@ describe('timeline editor', () => {
       );
     };
     rebuild();
-    const downs = mount.querySelectorAll('.block-editor__timeline-down');
-    (downs[0] as HTMLButtonElement).click();
+    clickMenuAction(mount.querySelector('.hub-list__row .hub-list__more')!, 'down');
     expect(latest.block_type === 'timeline' && latest.content.events.map((e) => e.label)).toEqual([
       'B',
       'A',

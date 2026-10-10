@@ -265,8 +265,7 @@
   font-weight: var(--weight-semibold);
 }
 
-.lesson-page__block--publish-error,
-.block-editor__nested-row.lesson-page__block--publish-error {
+.lesson-page__block--publish-error {
   outline: 2px solid var(--danger);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
@@ -791,35 +790,12 @@
   gap: var(--space-3);
 }
 
-.block-editor__accordion-item,
-.block-editor__question,
-.block-editor__gallery-item {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.55);
-}
-
-.block-editor__table-wrap {
-  display: grid;
-  gap: var(--space-2);
-  overflow-x: auto;
-}
-
 .block-editor__table-header-row,
 .block-editor__table-row {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(7rem, 1fr);
   gap: var(--space-1);
-}
-
-.block-editor__table-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
 }
 
 .lesson-editor__block-controls,
@@ -1315,7 +1291,6 @@
   }
 }
 
-
 /* ---- teaching-hub app.css 4379-5479 ---- */
 /* ── Media blocks (image / video / embed) ─────────────────────────────── */
 
@@ -1641,15 +1616,6 @@
   gap: var(--space-3);
 }
 
-.block-editor__timeline-item {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--glass);
-}
-
 .block-card-stack {
   display: grid;
   gap: var(--space-4);
@@ -1851,15 +1817,6 @@
 .block-editor__card-stack-items {
   display: grid;
   gap: var(--space-3);
-}
-
-.block-editor__card-stack-item {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--glass);
 }
 
 .block-card-stack--print .block-card-stack__print-list,
@@ -2625,23 +2582,9 @@
   min-width: 0;
 }
 
-.block-editor__tabs,
-.block-editor__tabs-panel {
+.block-editor__tabs {
   width: 100%;
   min-width: 0;
-}
-
-.block-editor__tabs-panel {
-  padding: var(--space-3) 0 0;
-}
-
-.block-editor__tabs-add {
-  width: 100%;
-}
-
-.block-editor__column-pane--drop {
-  outline: 2px dashed var(--wave);
-  outline-offset: 2px;
 }
 
 .block-editor__columns-widths {
@@ -2663,25 +2606,6 @@
 .block-editor__columns-width {
   width: 3.5rem;
 }
-
-.block-editor__tabs-panel-header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  align-items: center;
-}
-
-.block-editor__tab-label {
-  flex: 1 1 10rem;
-  min-width: 8rem;
-}
-
-.block-editor__nested-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
 
 /* ---- teaching-hub app.css 6370-6438 ---- */
 /* ── Learning activity print fallbacks ───────────────────────────────── */
@@ -2827,7 +2751,6 @@
   color: var(--text-muted, var(--muted));
   font-size: var(--text-sm);
 }
-
 
 /* ---- teaching-hub app.css 7359-8027 ---- */
 /* Lesson canvas */
@@ -3614,9 +3537,6 @@
 .lesson-page__block:not(.lesson-page__block--selected) .block-editor__toolbar {
   display: none;
 }
-
-
-
 
 /* BlockSuite whiteboard block */
 .block-whiteboard,

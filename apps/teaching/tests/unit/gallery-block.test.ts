@@ -1,3 +1,4 @@
+import { holdDelete, menuItem } from './helpers/hub-list';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES, TAB_CHILD_TYPES } from '@/blocks/create-block';
@@ -193,16 +194,16 @@ describe('createGalleryEditor', () => {
     const layout = el.querySelector('.block-editor__gallery-layout') as HTMLSelectElement;
     expect(layout.value).toBe('grid');
 
-    const rows = el.querySelectorAll('.block-editor__gallery-item');
+    const rows = el.querySelectorAll('.block-editor__gallery-items > .hub-list__row');
     expect(rows.length).toBe(3);
 
-    const add = el.querySelector('.block-editor__gallery-add') as HTMLButtonElement;
-    expect(add.disabled).toBe(false);
+    const add = () => el.querySelector('.hub-list__add') as HTMLButtonElement;
+    expect(add().disabled).toBe(false);
 
     // Fill to 12 via repeated add
-    for (let i = 0; i < 9; i++) add.click();
-    expect(el.querySelectorAll('.block-editor__gallery-item').length).toBe(12);
-    expect(add.disabled).toBe(true);
+    for (let i = 0; i < 9; i++) add().click();
+    expect(el.querySelectorAll('.block-editor__gallery-items > .hub-list__row').length).toBe(12);
+    expect(add().disabled).toBe(true);
   });
 
   it('switching to comparison keeps first 2 items', () => {
@@ -220,10 +221,10 @@ describe('createGalleryEditor', () => {
     expect(latest.content.layout).toBe('comparison');
     expect(latest.content.items).toHaveLength(2);
     expect(latest.content.items.map((i) => i.id)).toEqual(['g1_i1', 'g1_i2']);
-    expect(el.querySelector('.block-editor__gallery-add')).toBeNull();
+    expect(el.querySelector('.hub-list__add')).toBeNull();
   });
 
-  it('remove disabled at 2 for grid', () => {
+  it('delete is off at 2 images for grid', () => {
     const block = createBlock('gallery', 'g1');
     if (block.block_type !== 'gallery') throw new Error('expected gallery');
     let latest = block;
@@ -231,12 +232,11 @@ describe('createGalleryEditor', () => {
       latest = next;
     });
 
-    const removes = () =>
-      el.querySelectorAll('.block-editor__gallery-remove') as NodeListOf<HTMLButtonElement>;
+    const menus = () => [...el.querySelectorAll('.hub-list__row .hub-list__more')];
 
-    removes()[0]!.click();
+    holdDelete(menus()[0]!);
     expect(latest.content.items).toHaveLength(2);
-    expect([...removes()].every((b) => b.disabled)).toBe(true);
+    expect(menus().every((m) => menuItem(m, 'delete')?.disabled)).toBe(true);
   });
 });
 

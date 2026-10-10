@@ -1,3 +1,4 @@
+import { holdDelete, menuItem } from './helpers/hub-list';
 import { describe, expect, it } from 'vitest';
 import { createBlock } from '@/blocks/create-block';
 import { createTableEditor } from '@/blocks/registry';
@@ -20,13 +21,10 @@ describe('createTableEditor row and column deletion', () => {
       () => latest
     );
 
-    const removeRows = editor.querySelectorAll<HTMLButtonElement>(
-      '.block-editor__table-remove-row'
-    );
-    removeRows[1]!.click();
+    holdDelete(editor.querySelectorAll('.hub-list__row .hub-list__more')[1]!);
 
     expect(latest.content.rows).toEqual([['A1', 'B1', 'C1']]);
-    expect(editor.querySelectorAll('.block-editor__table-row-wrap')).toHaveLength(1);
+    expect(editor.querySelectorAll('.hub-list__row')).toHaveLength(1);
   });
 
   it('removes the selected column from headers and every row', () => {
@@ -47,10 +45,7 @@ describe('createTableEditor row and column deletion', () => {
       () => latest
     );
 
-    const removeColumns = editor.querySelectorAll<HTMLButtonElement>(
-      '.block-editor__table-remove-column'
-    );
-    removeColumns[1]!.click();
+    holdDelete(editor.querySelectorAll('.block-editor__table-column-menu')[1]!);
 
     expect(latest.content.headers).toEqual(['A', 'C']);
     expect(latest.content.rows).toEqual([
@@ -67,9 +62,7 @@ describe('createTableEditor row and column deletion', () => {
     block.content.rows = [['Value']];
 
     const editor = createTableEditor(block, () => undefined);
-    const removeColumn = editor.querySelector<HTMLButtonElement>(
-      '.block-editor__table-remove-column'
-    );
+    const removeColumn = menuItem(editor.querySelector('.block-editor__table-column-menu')!, 'delete');
 
     expect(removeColumn?.disabled).toBe(true);
   });
@@ -87,13 +80,10 @@ describe('createTableEditor row and column deletion', () => {
       () => latest
     );
 
-    editor.querySelector<HTMLButtonElement>('.block-editor__table-remove-row')!.click();
+    holdDelete(editor.querySelector('.hub-list__row .hub-list__more')!);
     expect(latest.content.rows).toEqual([]);
 
-    const addRow = Array.from(editor.querySelectorAll<HTMLButtonElement>('button')).find(
-      (button) => button.textContent === 'Add row'
-    );
-    addRow!.click();
+    editor.querySelector<HTMLButtonElement>('.hub-list__add')!.click();
 
     expect(latest.content.rows).toEqual([['', '', '']]);
   });
@@ -111,10 +101,7 @@ describe('createTableEditor row and column deletion', () => {
       () => latest
     );
 
-    const addColumn = Array.from(editor.querySelectorAll<HTMLButtonElement>('button')).find(
-      (button) => button.textContent === 'Add column'
-    );
-    addColumn!.click();
+    editor.querySelector<HTMLButtonElement>('[aria-label="Add column"]')!.click();
 
     expect(latest.content.headers).toHaveLength(4);
     expect(latest.content.rows[0]).toHaveLength(4);

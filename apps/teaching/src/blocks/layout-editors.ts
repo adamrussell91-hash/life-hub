@@ -9,14 +9,13 @@ import { trySetColumnWidths } from '@/blocks/column-widths';
 import {
   COLUMN_CHILD_TYPES,
   SECTION_CHILD_TYPES,
-  TAB_CHILD_TYPES
+  TAB_CHILD_TYPES,
+  cloneBlockWithNewIds
 } from '@/blocks/create-block';
 import { editorShell, type BlockChangeHandler, type BlockEditorContext } from '@/blocks/editors';
 import { createNestedBlocksEditor } from '@/blocks/nested-blocks-editor';
-import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import type { CleanupFn } from '@atlaskit/pragmatic-drag-and-drop/types';
-import { isNestedBlockDrag } from '@/blocks/teaching-pragmatic-dnd';
 import type { Block } from '@/schemas/block';
+import { createHubTabStrip } from '../../design-kit/js/hub-list.js';
 
 type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
@@ -96,6 +95,9 @@ export function createSectionEditor(
     blocks: block.content.blocks,
     allowedTypes: SECTION_CHILD_TYPES,
     context,
+    label: 'Blocks in this section',
+    empty: { title: 'This section is empty', detail: ' Add the first block to it.' },
+    read: () => getLatest().content.blocks,
     idFactory: () => `${getLatest().id}_child`,
     onChange: (nextBlocks) => {
       onChange({
@@ -168,15 +170,16 @@ export function createColumnsEditor(
   const panes = document.createElement('div');
   panes.className = 'block-editor__column-panes';
 
-  let paneCleanups: CleanupFn[] = [];
+  const group = `columns-${block.id}-${Math.random().toString(36).slice(2, 8)}`;
 
-  function applyMove(fromCol: number, fromIndex: number, toCol: number): void {
+  function applyMove(fromCol: number, fromIndex: number, toCol: number, toIndex?: number): void {
     const latest = getLatest();
     const moved = moveBlockBetweenColumns(
       latest.content.columns as ColumnSlot[],
       fromCol,
       fromIndex,
-      toCol
+      toCol,
+      toIndex
     );
     onChange({
       ...latest,
@@ -236,56 +239,19 @@ export function createColumnsEditor(
       .map((col) => `${col.width}fr`)
       .join(' ');
 
-    for (const stop of paneCleanups) stop();
-    paneCleanups = [];
-
     current.content.columns.forEach((col, colIndex) => {
       const pane = document.createElement('div');
       pane.className = 'block-editor__column-pane';
       const label = document.createElement('p');
-      label.className = 'block-editor__hint';
-      label.textContent = `Column ${colIndex + 1} (${col.width}/12)`;
-
-      pane.addEventListener('dragover', (event) => {
-        event.preventDefault();
-        pane.classList.add('block-editor__column-pane--drop');
-      });
-      pane.addEventListener('dragleave', () => {
-        pane.classList.remove('block-editor__column-pane--drop');
-      });
-      pane.addEventListener('drop', (event) => {
-        event.preventDefault();
-        pane.classList.remove('block-editor__column-pane--drop');
-        const raw = event.dataTransfer?.getData('application/x-th-col-move');
-        if (!raw) return;
-        const [fromColS, fromIndexS] = raw.split(':');
-        const fromCol = Number.parseInt(fromColS ?? '', 10);
-        const fromIndex = Number.parseInt(fromIndexS ?? '', 10);
-        if (!Number.isFinite(fromCol) || !Number.isFinite(fromIndex)) return;
-        applyMove(fromCol, fromIndex, colIndex);
-      });
-
-      paneCleanups.push(
-        dropTargetForElements({
-          element: pane,
-          canDrop: ({ source }) => isNestedBlockDrag(source.data) && source.data.kind === 'nested-block',
-          onDragEnter: () => pane.classList.add('block-editor__column-pane--drop'),
-          onDragLeave: () => pane.classList.remove('block-editor__column-pane--drop'),
-          onDrop: ({ source }) => {
-            pane.classList.remove('block-editor__column-pane--drop');
-            const data = source.data;
-            if (!isNestedBlockDrag(data) || data.kind !== 'nested-block') return;
-            if (data.fromCol === colIndex) return;
-            applyMove(data.fromCol, data.fromIndex, colIndex);
-          }
-        })
-      );
-
+      label.className = 'block-editor__column-pane-label';
+      label.textContent = `Column ${colIndex + 1} · ${col.width}/12`;
 
       const nested = createNestedBlocksEditor({
         blocks: col.blocks,
         allowedTypes: COLUMN_CHILD_TYPES,
         context,
+        label: `Blocks in column ${colIndex + 1}`,
+        read: () => getLatest().content.columns[colIndex]?.blocks ?? [],
         idFactory: () => `${getLatest().id}_c${colIndex}`,
         onChange: (nextBlocks) => {
           const latest = getLatest();
@@ -305,8 +271,12 @@ export function createColumnsEditor(
         columnMove: {
           columnCount: current.content.columns.length,
           columnIndex: colIndex,
+          group,
           onMoveToColumn: (toCol, fromIndex) => {
             applyMove(colIndex, fromIndex, toCol);
+          },
+          onReceive: (fromCol, fromIndex, toIndex) => {
+            applyMove(fromCol, fromIndex, colIndex, toIndex);
           }
         }
       });
@@ -320,139 +290,103 @@ export function createColumnsEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+const preferredTabsPanel = new Map<string, number>();
+
+export function rememberTabsPanel(blockId: string, index: number): void {
+  preferredTabsPanel.set(blockId, index);
+}
+
+export function applyRememberedTabsPanel(root: ParentNode, blockId: string): void {
+  const buttons = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  if (buttons.length === 0) return;
+  buttons[preferredPanelIndex(blockId, buttons.length)]?.click();
+}
+
+function preferredPanelIndex(blockId: string, tabCount: number): number {
+  const stored = preferredTabsPanel.get(blockId) ?? 0;
+  const next = Math.max(0, Math.min(stored, tabCount - 1));
+  preferredTabsPanel.set(blockId, next);
+  return next;
+}
+
+const TABS_MIN = 2;
+const TABS_MAX = 8;
+
+/**
+ * Tabs are edited as the strip students see: rename on the tab, drag sideways,
+ * ··· to move / duplicate / hold-to-delete, + to add. One panel shows at a time.
+ * The open tab is remembered so the preview and the editor stay on the same one.
+ */
 export function createTabsEditor(
   block: TabsBlock,
   onChange: BlockChangeHandler<TabsBlock>,
   getLatest: () => TabsBlock = () => block,
   context: BlockEditorContext = {}
 ): HTMLElement {
+  type Tab = TabsBlock['content']['tabs'][number];
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields block-editor__tabs';
+  let seq = 0;
 
-  const panelsRoot = document.createElement('div');
-  panelsRoot.className = 'block-editor__tabs-panels';
-
-  const addBtn = document.createElement('button');
-  addBtn.type = 'button';
-  addBtn.className = 'btn btn--ghost block-editor__tabs-add';
-  addBtn.textContent = 'Add tab';
-
-  function emitTabs(tabs: TabsBlock['content']['tabs']): void {
-    onChange({
-      ...getLatest(),
-      content: { tabs }
-    });
-    rebuild();
+  function emitTabs(tabs: Tab[]): void {
+    onChange({ ...getLatest(), content: { tabs } });
   }
 
-  function rebuild(): void {
-    const current = getLatest();
-    panelsRoot.replaceChildren();
-    addBtn.disabled = current.content.tabs.length >= 8;
+  function patchTab(tabId: string, blocks: Block[]): void {
+    const latest = getLatest();
+    emitTabs(
+      latest.content.tabs.map((t) =>
+        t.id === tabId ? { ...t, blocks: blocks as Tab['blocks'] } : t
+      )
+    );
+  }
 
-    current.content.tabs.forEach((panel, panelIndex) => {
-      const pane = document.createElement('div');
-      pane.className = 'block-editor__tabs-panel';
-
-      const header = document.createElement('div');
-      header.className = 'block-editor__tabs-panel-header';
-
-      const label = document.createElement('input');
-      label.type = 'text';
-      label.className = 'block-editor__tab-label';
-      label.value = panel.label;
-      label.placeholder = `Tab ${panelIndex + 1} label`;
-      label.setAttribute('aria-label', `Tab ${panelIndex + 1} label`);
-      label.addEventListener('input', () => {
-        const latest = getLatest();
-        const tabs = latest.content.tabs.map((t, i) =>
-          i === panelIndex ? { ...t, label: label.value } : t
-        );
-        onChange({
-          ...latest,
-          content: { tabs }
-        });
-      });
-
-      const up = document.createElement('button');
-      up.type = 'button';
-      up.className = 'btn btn--ghost';
-      up.textContent = '↑';
-      up.disabled = panelIndex === 0;
-      up.addEventListener('click', () => {
-        if (panelIndex === 0) return;
-        const tabs = [...getLatest().content.tabs];
-        const tmp = tabs[panelIndex - 1]!;
-        tabs[panelIndex - 1] = tabs[panelIndex]!;
-        tabs[panelIndex] = tmp;
-        emitTabs(tabs);
-      });
-
-      const down = document.createElement('button');
-      down.type = 'button';
-      down.className = 'btn btn--ghost';
-      down.textContent = '↓';
-      down.disabled = panelIndex === current.content.tabs.length - 1;
-      down.addEventListener('click', () => {
-        const tabs = [...getLatest().content.tabs];
-        if (panelIndex >= tabs.length - 1) return;
-        const tmp = tabs[panelIndex + 1]!;
-        tabs[panelIndex + 1] = tabs[panelIndex]!;
-        tabs[panelIndex] = tmp;
-        emitTabs(tabs);
-      });
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn btn--ghost block-editor__tabs-remove';
-      remove.textContent = 'Remove tab';
-      remove.disabled = current.content.tabs.length <= 2;
-      remove.addEventListener('click', () => {
-        const latest = getLatest();
-        if (latest.content.tabs.length <= 2) return;
-        emitTabs(latest.content.tabs.filter((_, i) => i !== panelIndex));
-      });
-
-      header.append(label, up, down, remove);
-
-      const nested = createNestedBlocksEditor({
-        blocks: panel.blocks,
+  const strip = createHubTabStrip<Tab>({
+    tabs: block.content.tabs,
+    active: preferredPanelIndex(block.id, block.content.tabs.length),
+    onActiveChange: (index) => rememberTabsPanel(getLatest().id, index),
+    label: 'Tabs',
+    min: TABS_MIN,
+    max: TABS_MAX,
+    minReason: 'A tabs block needs at least two tabs. Delete the whole block from its ··· menu instead.',
+    maxReason: 'A tabs block holds up to eight tabs.',
+    read: () => getLatest().content.tabs,
+    onChange: emitTabs,
+    getLabel: (tab) => tab.label,
+    setLabel: (tab, label) => ({ ...tab, label }),
+    countChildren: (tab) => tab.blocks.length,
+    create: (index) => ({
+      id: `${getLatest().id}_t${index + 1}_${Date.now().toString(36)}${(seq += 1)}`,
+      label: '',
+      blocks: []
+    }),
+    duplicate: (tab) => {
+      const id = `${getLatest().id}_t${Date.now().toString(36)}${(seq += 1)}`;
+      let n = 0;
+      return {
+        id,
+        label: tab.label ? `${tab.label} copy` : '',
+        blocks: tab.blocks.map((child) =>
+          cloneBlockWithNewIds(child, () => `${id}_n${(n += 1)}`)
+        ) as Tab['blocks']
+      };
+    },
+    renderPanel: (tab) =>
+      createNestedBlocksEditor({
+        blocks: tab.blocks,
         allowedTypes: TAB_CHILD_TYPES,
         context,
-        idFactory: () => `${getLatest().id}_t${panelIndex}`,
-        onChange: (nextBlocks) => {
-          const latest = getLatest();
-          const tabs = latest.content.tabs.map((t, i) =>
-            i === panelIndex
-              ? {
-                  ...t,
-                  blocks: nextBlocks as TabsBlock['content']['tabs'][number]['blocks']
-                }
-              : t
-          );
-          onChange({
-            ...latest,
-            content: { tabs }
-          });
-        }
-      });
-
-      pane.append(header, nested);
-      panelsRoot.append(pane);
-    });
-  }
-
-  addBtn.addEventListener('click', () => {
-    const latest = getLatest();
-    if (latest.content.tabs.length >= 8) return;
-    const n = latest.content.tabs.length + 1;
-    emitTabs([
-      ...latest.content.tabs,
-      { id: `${latest.id}_t${n}_${Date.now()}`, label: '', blocks: [] }
-    ]);
+        label: `Blocks in ${tab.label || 'this tab'}`,
+        empty: {
+          title: `${tab.label ? `“${tab.label}”` : 'This tab'} is empty`,
+          detail: ' Add the first block. Students won’t see an empty tab.'
+        },
+        read: () => getLatest().content.tabs.find((t) => t.id === tab.id)?.blocks ?? [],
+        idFactory: () => `${tab.id}_b`,
+        onChange: (next) => patchTab(tab.id, next)
+      })
   });
 
-  rebuild();
-  fields.append(panelsRoot, addBtn);
+  fields.append(strip.el);
   return editorShell(block, onChange, fields, getLatest);
 }

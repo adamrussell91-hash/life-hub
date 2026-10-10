@@ -258,7 +258,7 @@ describe('renderUnitSequence', () => {
     expect(controls).not.toBeNull();
 
     const buttons = [...controls.querySelectorAll('button')];
-    expect(buttons.map((btn) => btn.textContent?.trim())).toEqual(['↑', '↓', '⋯']);
+    expect(buttons.map((btn) => btn.getAttribute('aria-label'))).toEqual(['Move up', 'Move down', 'More actions']);
 
     for (const btn of buttons) {
       expect(btn.hasAttribute('hidden')).toBe(false);

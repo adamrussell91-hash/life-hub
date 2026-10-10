@@ -1,4 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { rememberTabsPanel } from '@/blocks/layout-editors';
+import { closeHubMenu } from '../../design-kit/js/hub-list.js';
+import { resetHubFeedbackForTests } from '../../design-kit/js/hub-feedback.js';
+import { clickMenuAction, holdDelete, menuItem } from './helpers/hub-list';
 import { createBlock, cloneBlockWithNewIds, TAB_CHILD_TYPES } from '@/blocks/create-block';
 import {
   createTabsEditor,
@@ -7,6 +11,12 @@ import {
 } from '@/blocks/registry';
 import { sanitizeBlocksDeep } from '@/blocks/sanitize-blocks';
 import { BlockSchema, type Block } from '@/schemas/block';
+
+afterEach(() => {
+  closeHubMenu();
+  resetHubFeedbackForTests();
+  document.body.replaceChildren();
+});
 
 const timestamps = {
   created_at: '2026-01-01T00:00:00.000Z',
@@ -315,91 +325,143 @@ describe('renderTabsBlock', () => {
   });
 });
 
+type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
+
+function tabsBlock(id = 'tabs1'): TabsBlock {
+  const block = createBlock('tabs', id);
+  if (block.block_type !== 'tabs') throw new Error('expected tabs');
+  return block;
+}
+
+function mountEditor(initial: TabsBlock, onChange = vi.fn()) {
+  let latest: Block = initial;
+  const el = createTabsEditor(
+    initial,
+    (next) => {
+      latest = next;
+      onChange(next);
+    },
+    () => latest as TabsBlock
+  );
+  return { el, onChange, latest: () => latest as TabsBlock };
+}
+
+function tabNames(root: ParentNode): HTMLInputElement[] {
+  return [...root.querySelectorAll<HTMLInputElement>('.hub-tabstrip__name')];
+}
+
+function activeName(root: ParentNode): HTMLInputElement | null {
+  return root.querySelector<HTMLInputElement>('.hub-tabstrip__tab.is-active .hub-tabstrip__name');
+}
+
+function openTab(root: ParentNode, index: number): void {
+  tabNames(root)[index]!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+}
+
 describe('createTabsEditor', () => {
-  it('label input updates panel label', () => {
-    const block = createBlock('tabs', 'tabs1');
-    const onChange = vi.fn();
-    let latest = block;
-    const el = createTabsEditor(
-      block as Extract<Block, { block_type: 'tabs' }>,
-      (b) => {
-        latest = b;
-        onChange(b);
-      },
-      () => latest as Extract<Block, { block_type: 'tabs' }>
-    );
-    const input = el.querySelector('.block-editor__tab-label') as HTMLInputElement;
+  it('edits tabs as a strip and shows one panel at a time', () => {
+    const block = tabsBlock();
+    block.content.tabs[0]!.label = 'Noelle';
+    block.content.tabs[1]!.label = 'Henry';
+    block.content.tabs[2]!.label = 'Brendan';
+    rememberTabsPanel(block.id, 0);
+
+    const { el } = mountEditor(block);
+    document.body.append(el);
+    expect(el.querySelectorAll('[role="tab"]')).toHaveLength(3);
+    expect(el.querySelectorAll('.hub-tabstrip__panel')).toHaveLength(1);
+    expect(activeName(el)?.value).toBe('Noelle');
+
+    openTab(el, 1);
+    expect(activeName(el)?.value).toBe('Henry');
+    expect(el.querySelectorAll('.hub-tabstrip__panel')).toHaveLength(1);
+  });
+
+  it('renames the active tab on the tab itself', () => {
+    const block = tabsBlock();
+    rememberTabsPanel(block.id, 0);
+    const { el, onChange } = mountEditor(block);
+    const input = activeName(el)!;
     input.value = 'Sources';
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    const updated = onChange.mock.calls.at(-1)![0] as Extract<Block, { block_type: 'tabs' }>;
+    const updated = onChange.mock.calls.at(-1)![0] as TabsBlock;
     expect(updated.content.tabs[0]!.label).toBe('Sources');
+    expect(updated.content.tabs[1]!.label).toBe(block.content.tabs[1]!.label);
   });
 
-  it('add panel works until max 8; remove until min 2', () => {
-    const block = createBlock('tabs', 'tabs1');
-    const onChange = vi.fn();
-    let latest = block;
-    const el = createTabsEditor(
-      block as Extract<Block, { block_type: 'tabs' }>,
-      (b) => {
-        latest = b;
-        onChange(b);
-      },
-      () => latest as Extract<Block, { block_type: 'tabs' }>
-    );
+  it('adds a block into the active tab only from the empty-tab prompt', () => {
+    const block = tabsBlock();
+    rememberTabsPanel(block.id, 1);
+    const { el, onChange } = mountEditor(block);
+    expect(el.querySelector('.hub-list__empty')).toBeTruthy();
+    el.querySelector<HTMLButtonElement>('.hub-list__chip')!.click();
+    const updated = onChange.mock.calls.at(-1)![0] as TabsBlock;
+    expect(updated.content.tabs[0]!.blocks).toHaveLength(0);
+    expect(updated.content.tabs[1]!.blocks[0]?.block_type).toBe('rich_text');
+    expect(updated.content.tabs[2]!.blocks).toHaveLength(0);
+  });
 
-    const addBtn = el.querySelector('.block-editor__tabs-add') as HTMLButtonElement;
-    for (let i = 0; i < 5; i += 1) {
-      addBtn.click();
-    }
-    expect(
-      (onChange.mock.calls.at(-1)![0] as Extract<Block, { block_type: 'tabs' }>).content.tabs
-        .length
-    ).toBe(8);
-    expect(addBtn.disabled).toBe(true);
+  it('can add columns inside the active tab from the block picker', () => {
+    const block = tabsBlock();
+    rememberTabsPanel(block.id, 0);
+    const { el, onChange } = mountEditor(block);
+    document.body.append(el);
+    const more = [...el.querySelectorAll<HTMLButtonElement>('.hub-list__chip')].find((b) =>
+      b.textContent?.includes('More blocks')
+    )!;
+    more.click();
+    document.querySelector<HTMLButtonElement>('.hub-insert__option[data-value="columns"]')!.click();
+    const updated = onChange.mock.calls.at(-1)![0] as TabsBlock;
+    expect(updated.content.tabs[0]!.blocks[0]?.block_type).toBe('columns');
+  });
 
-    // Rebuild editor from latest so remove buttons reflect 8 panels
-    const el2 = createTabsEditor(
-      latest as Extract<Block, { block_type: 'tabs' }>,
-      (b) => {
-        latest = b;
-        onChange(b);
-      },
-      () => latest as Extract<Block, { block_type: 'tabs' }>
-    );
+  it('adds tabs until 8, deletes by hold until 2, then explains why delete is off', () => {
+    const block = tabsBlock();
+    rememberTabsPanel(block.id, 0);
+    const { el, latest } = mountEditor(block);
+    document.body.append(el);
+    for (let i = 0; i < 5; i += 1) el.querySelector<HTMLButtonElement>('.hub-tabstrip__add')!.click();
+    expect(latest().content.tabs.length).toBe(8);
+    expect(el.querySelector<HTMLButtonElement>('.hub-tabstrip__add')!.disabled).toBe(true);
+
+    // A plain click on Delete never deletes.
+    menuItem(el.querySelector('.hub-tabstrip__tab.is-active .hub-tabstrip__more')!, 'delete')!.click();
+    expect(latest().content.tabs.length).toBe(8);
+
     for (let i = 0; i < 6; i += 1) {
-      const remove = el2.querySelector('.block-editor__tabs-remove') as HTMLButtonElement;
-      remove.click();
+      holdDelete(el.querySelector('.hub-tabstrip__tab.is-active .hub-tabstrip__more')!);
     }
-    expect(
-      (latest as Extract<Block, { block_type: 'tabs' }>).content.tabs.length
-    ).toBe(2);
-    const removeDisabled = el2.querySelector(
-      '.block-editor__tabs-remove'
-    ) as HTMLButtonElement;
-    expect(removeDisabled.disabled).toBe(true);
+    expect(latest().content.tabs.length).toBe(2);
+    const del = menuItem(el.querySelector('.hub-tabstrip__tab.is-active .hub-tabstrip__more')!, 'delete')!;
+    expect(del.disabled).toBe(true);
+    expect(document.querySelector('.hub-action-menu__reason')?.textContent).toMatch(/at least two tabs/);
   });
 
-  it('can add columns inside a tab panel', () => {
-    const block = createBlock('tabs', 'tabs1');
-    const onChange = vi.fn();
-    let latest = block;
-    const el = createTabsEditor(
-      block as Extract<Block, { block_type: 'tabs' }>,
-      (b) => {
-        latest = b;
-        onChange(b);
-      },
-      () => latest as Extract<Block, { block_type: 'tabs' }>
-    );
-    const firstPanel = el.querySelectorAll('.block-editor__tabs-panel')[0]!;
-    const addSelect = firstPanel.querySelector('select') as HTMLSelectElement;
-    const addButton = firstPanel.querySelector(
-      'button.block-editor__nested-add'
-    ) as HTMLButtonElement;
-    addSelect.value = 'columns';
-    addButton.click();
-    const updated = onChange.mock.calls.at(-1)![0] as Extract<Block, { block_type: 'tabs' }>;
-    expect(updated.content.tabs[0]!.blocks[0]!.block_type).toBe('columns');
+  it('undo restores a deleted tab with its blocks', () => {
+    const block = tabsBlock();
+    block.content.tabs[1]!.blocks = [createBlock('heading', 'h')];
+    rememberTabsPanel(block.id, 1);
+    const { el, latest } = mountEditor(block);
+    document.body.append(el);
+    holdDelete(el.querySelector('.hub-tabstrip__tab.is-active .hub-tabstrip__more')!);
+    expect(latest().content.tabs).toHaveLength(2);
+    [...document.querySelectorAll<HTMLButtonElement>('.hub-toast button')]
+      .find((b) => b.textContent === 'Undo')!
+      .click();
+    expect(latest().content.tabs).toHaveLength(3);
+    expect(latest().content.tabs[1]!.blocks[0]?.id).toBe('h');
+  });
+
+  it('moves a tab right from its menu', () => {
+    const block = tabsBlock();
+    block.content.tabs[0]!.label = 'A';
+    block.content.tabs[1]!.label = 'B';
+    rememberTabsPanel(block.id, 0);
+    const { el, latest } = mountEditor(block);
+    document.body.append(el);
+    clickMenuAction(el.querySelector('.hub-tabstrip__tab.is-active .hub-tabstrip__more')!, 'right');
+    expect(latest().content.tabs.map((t) => t.label).slice(0, 2)).toEqual(['B', 'A']);
+    expect(activeName(el)?.value).toBe('A');
   });
 });
+

@@ -1,189 +1,101 @@
-import { createBlockEditor } from '@/blocks/editors';
+import { createBlockEditor, type BlockEditorContext } from '@/blocks/editors';
 import {
-  BLOCK_GROUPS,
-  INSERT_MENU_LABEL,
   createFromInsertMenu,
   cloneBlockWithNewIds,
-  expandGroupTypesForMenu,
   type NewBlockType
 } from '@/blocks/create-block';
+import {
+  blockTypeLabel,
+  createBlockTypeLabel,
+  createEmptyBlocksPrompt,
+  openBlockPicker
+} from '@/blocks/block-meta';
 import type { Block } from '@/schemas/block';
-import { createEditorFilter, type HubFilterControl } from '@/views/hub-kit';
+import { HUB_LIST_ICONS, createHubList } from '../../design-kit/js/hub-list.js';
+
+const PALETTE_MIME = 'application/x-teaching-hub-block';
 
 export interface NestedBlocksEditorOptions {
   blocks: Block[];
   allowedTypes: readonly NewBlockType[];
   onChange: (blocks: Block[]) => void;
   idFactory: () => string;
+  /** Passed to every child editor so nested image/library pickers see the same media. */
+  context?: BlockEditorContext;
+  /** Accessible name for the list, e.g. "Blocks in Learn". */
+  label?: string;
+  /** Empty container prompt; omit for a plain "Add block" row. */
+  empty?: { title: string; detail: string };
+  /** Fresh blocks for Undo after the parent rebuilt this list. */
+  read?: () => readonly Block[];
   columnMove?: {
     columnCount: number;
     columnIndex: number;
+    /** Lists sharing a group accept each other's drags. */
+    group: string;
     onMoveToColumn: (toColumnIndex: number, fromIndex: number) => void;
+    onReceive: (fromColumnIndex: number, fromIndex: number, toIndex: number) => void;
   };
 }
 
 export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HTMLElement {
-  const root = document.createElement('div');
-  root.className = 'block-editor__nested-list';
-
-  let blocks = [...options.blocks];
   let counter = 0;
-
   const nextId = () => {
     counter += 1;
     return options.idFactory() + `_n${counter}`;
   };
+  const columnMove = options.columnMove;
 
-  function emit(next: Block[]): void {
-    blocks = next;
-    options.onChange(next);
-    render();
-  }
-
-  function render(): void {
-    root.replaceChildren();
-
-    blocks.forEach((block, index) => {
-      const row = document.createElement('div');
-      row.className = 'block-editor__nested-row';
-      row.dataset.blockId = block.id;
-
-      const controls = document.createElement('div');
-      controls.className = 'block-editor__nested-controls';
-
-      const up = document.createElement('button');
-      up.type = 'button';
-      up.className = 'btn btn--ghost';
-      up.textContent = '↑';
-      up.disabled = index === 0;
-      up.addEventListener('click', () => {
-        if (index === 0) return;
-        const next = [...blocks];
-        const tmp = next[index - 1]!;
-        next[index - 1] = next[index]!;
-        next[index] = tmp;
-        emit(next);
-      });
-
-      const down = document.createElement('button');
-      down.type = 'button';
-      down.className = 'btn btn--ghost';
-      down.textContent = '↓';
-      down.disabled = index === blocks.length - 1;
-      down.addEventListener('click', () => {
-        if (index >= blocks.length - 1) return;
-        const next = [...blocks];
-        const tmp = next[index + 1]!;
-        next[index + 1] = next[index]!;
-        next[index] = tmp;
-        emit(next);
-      });
-
-      const dup = document.createElement('button');
-      dup.type = 'button';
-      dup.className = 'btn btn--ghost';
-      dup.textContent = 'Duplicate';
-      dup.addEventListener('click', () => {
-        const clone = cloneBlockWithNewIds(blocks[index]!, nextId);
-        const next = [...blocks];
-        next.splice(index + 1, 0, clone);
-        emit(next);
-      });
-
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'btn btn--ghost';
-      del.textContent = 'Delete';
-      del.addEventListener('click', () => {
-        emit(blocks.filter((_, i) => i !== index));
-      });
-
-      controls.append(up, down, dup, del);
-
-      const columnMove = options.columnMove;
-      if (columnMove && columnMove.columnCount > 1) {
-        let move: HubFilterControl;
-        move = createEditorFilter({
-          key: 'Move',
-          value: '',
-          defaultValue: '',
-          options: [
-            { value: '', label: 'Move to column…' },
-            ...Array.from({ length: columnMove.columnCount }, (_, i) => i)
+  const list = createHubList<Block>({
+    items: options.blocks,
+    variant: 'blocks',
+    noun: 'block',
+    label: options.label ?? 'Blocks',
+    getKey: (block) => block.id,
+    itemLabel: (block) => createBlockTypeLabel(block),
+    describe: (block) => blockTypeLabel(block),
+    insertBetween: true,
+    read: options.read,
+    pick: (anchor, done) =>
+      openBlockPicker(anchor, options.allowedTypes, (value) => done(createFromInsertMenu(value, nextId()))),
+    duplicate: (block) => cloneBlockWithNewIds(block, nextId),
+    onChange: (next) => options.onChange(next),
+    renderItem: (block, ctx) =>
+      createBlockEditor(block, (updated) => ctx.update(updated), () => ctx.current, options.context),
+    group: columnMove?.group,
+    dragData: (_block, index) => ({ col: columnMove?.columnIndex ?? 0, index }),
+    onTransfer: columnMove
+      ? (source, toIndex) => {
+          const from = source.data as { col: number; index: number };
+          columnMove.onReceive(from.col, from.index, toIndex);
+        }
+      : undefined,
+    extraMenuItems:
+      columnMove && columnMove.columnCount > 1
+        ? (_block, index) =>
+            Array.from({ length: columnMove.columnCount }, (_, i) => i)
               .filter((i) => i !== columnMove.columnIndex)
-              .map((i) => ({ value: String(i), label: `Column ${i + 1}` }))
-          ],
-          className: 'block-editor__nested-move-column',
-          ariaLabel: 'Move to column',
-          onChange: (value) => {
-            if (!value) return;
-            const to = Number.parseInt(value, 10);
-            move.setValue('');
-            if (!Number.isFinite(to)) return;
-            columnMove.onMoveToColumn(to, index);
-          }
-        });
-        controls.append(move.el);
+              .map((i) => ({
+                label: `Move to column ${i + 1}`,
+                icon: HUB_LIST_ICONS.columns,
+                dataset: { listAction: `column-${i}` },
+                onSelect: () => columnMove.onMoveToColumn(i, index)
+              }))
+        : undefined,
+    empty: options.empty
+      ? (insert, pick) =>
+          createEmptyBlocksPrompt({
+            ...options.empty!,
+            allowed: options.allowedTypes,
+            idFactory: nextId,
+            insert,
+            pick
+          })
+      : undefined
+  });
 
-        row.draggable = true;
-        row.addEventListener('dragstart', (event) => {
-          event.dataTransfer?.setData(
-            'application/x-th-col-move',
-            `${columnMove.columnIndex}:${index}`
-          );
-          if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
-        });
-      }
-
-      const editor = createBlockEditor(
-        block,
-        (updated) => {
-          const next = [...blocks];
-          next[index] = updated;
-          blocks = next;
-          options.onChange(next);
-        },
-        () => blocks[index]!
-      );
-
-      row.append(controls, editor);
-      root.append(row);
-    });
-
-    const addRow = document.createElement('div');
-    addRow.className = 'block-editor__nested-add-row';
-
-    const addTypeOptions = BLOCK_GROUPS.flatMap((group) => {
-      const baseTypes = group.types.filter((t) => options.allowedTypes.includes(t));
-      return expandGroupTypesForMenu(baseTypes).map((type) => ({
-        value: type,
-        label: INSERT_MENU_LABEL[type]
-      }));
-    });
-    const addType = createEditorFilter({
-      key: 'Add',
-      value: addTypeOptions[0]?.value ?? 'rich_text',
-      options: addTypeOptions,
-      className: 'block-editor__add-nested-type',
-      ariaLabel: 'Add nested block type',
-      onChange: () => undefined
-    });
-
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'btn btn--ghost block-editor__nested-add';
-    addBtn.textContent = 'Add block';
-    addBtn.addEventListener('click', () => {
-      emit([...blocks, createFromInsertMenu(addType.getValue(), nextId())]);
-    });
-
-    addRow.append(addType.el, addBtn);
-    root.append(addRow);
-  }
-
-  render();
-
-  const PALETTE_MIME = 'application/x-teaching-hub-block';
+  const root = list.el;
+  root.classList.add('block-editor__nested-list');
 
   function carriesPalette(event: DragEvent): boolean {
     return Array.from(event.dataTransfer?.types ?? []).includes(PALETTE_MIME);
@@ -203,6 +115,7 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     }
   }
 
+  // Blocks dragged in from the page palette land at the end of this list.
   root.addEventListener('dragover', (event) => {
     if (!carriesPalette(event)) return;
     event.preventDefault();
@@ -213,7 +126,7 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     if (!type) return;
     event.preventDefault();
     event.stopPropagation();
-    emit([...blocks, createFromInsertMenu(type, nextId())]);
+    list.insert(list.items.length, createFromInsertMenu(type, nextId()));
   });
 
   return root;

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { closeHubMenu } from '../../design-kit/js/hub-list.js';
 import { createBlock } from '@/blocks/create-block';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
@@ -384,9 +385,11 @@ describe('mountLessonPage', () => {
     expect(host.querySelector('[data-block-id="ch1"] .block-editor')).not.toBeNull();
     expect(host.querySelector('.lesson-page__inspector')).toBeNull();
 
-    const toolbarText = host.textContent ?? '';
-    expect(toolbarText).toContain('Duplicate');
-    expect(toolbarText).toContain('Delete');
+    host.querySelector<HTMLButtonElement>('[data-block-id="ch1"] .lesson-page__block-menu')!.click();
+    const menuText = document.querySelector('.hub-action-menu')?.textContent ?? '';
+    expect(menuText).toContain('Duplicate');
+    expect(menuText).toContain('Delete block');
+    closeHubMenu();
     expect(
       host.querySelector('.block-editor__visibility, [aria-label="Visibility"], select')
     ).not.toBeNull();

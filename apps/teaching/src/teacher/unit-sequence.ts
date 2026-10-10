@@ -1,6 +1,7 @@
 import type { ScheduledLesson, Unit } from '@/schemas';
 import { unitDateProgress, unitDateSpan } from '@/schedule/unit-progress';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { HUB_LIST_ICONS } from '../../design-kit/js/hub-list.js';
 
 export type SequenceUnit = Pick<Unit, 'id' | 'title'> &
   Partial<Pick<Unit, 'start_date' | 'end_date'>>;
@@ -164,7 +165,8 @@ function buildLessonRow(
 
   const up = document.createElement('button');
   up.type = 'button';
-  up.textContent = '↑';
+  up.className = 'hub-list__more';
+  up.innerHTML = HUB_LIST_ICONS.up;
   up.setAttribute('aria-label', 'Move up');
   up.addEventListener('click', (event) => {
     event.preventDefault();
@@ -174,7 +176,8 @@ function buildLessonRow(
 
   const down = document.createElement('button');
   down.type = 'button';
-  down.textContent = '↓';
+  down.className = 'hub-list__more';
+  down.innerHTML = HUB_LIST_ICONS.down;
   down.setAttribute('aria-label', 'Move down');
   down.addEventListener('click', (event) => {
     event.preventDefault();
@@ -184,7 +187,8 @@ function buildLessonRow(
 
   const overflow = document.createElement('button');
   overflow.type = 'button';
-  overflow.textContent = '⋯';
+  overflow.className = 'hub-list__more';
+  overflow.innerHTML = HUB_LIST_ICONS.more;
   overflow.setAttribute('aria-label', 'More actions');
   overflow.addEventListener('click', (event) => {
     event.preventDefault();
