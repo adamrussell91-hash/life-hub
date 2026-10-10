@@ -86,6 +86,22 @@ describe('renderJournal', () => {
     expect(scrollIntoView.mock.calls[0]?.[0]).toMatchObject({ behavior: 'auto' });
   });
 
+  it('uses toolbar h1 for trip title and disables Add moment stub', () => {
+    const root = document.createElement('div');
+    renderJournal(root, { fixture: klIstanbulFixture() });
+    const title = root.querySelector('.journal-toolbar__title');
+    expect(title?.tagName).toBe('H1');
+    const addBtn = root.querySelector('.journal-toolbar__add') as HTMLButtonElement | null;
+    expect(addBtn?.disabled).toBe(true);
+    expect(addBtn?.getAttribute('aria-label')).toContain('Phase 2');
+  });
+
+  it('adds journal--pattern-off when patternOff option is true', () => {
+    const root = document.createElement('div');
+    renderJournal(root, { fixture: klIstanbulFixture(), patternOff: true });
+    expect(root.querySelector('.journal')?.classList.contains('journal--pattern-off')).toBe(true);
+  });
+
   it('shows Read more on the long reflection fixture moment', async () => {
     const root = document.createElement('div');
     renderJournal(root, { fixture: klIstanbulFixture() });

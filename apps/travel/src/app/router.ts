@@ -73,3 +73,17 @@ export function journalRoute(tripId: string, momentId?: string): string {
 export function navigate(hash: string): void {
   location.hash = hash;
 }
+
+function patternOffTruthy(value: string | null): boolean {
+  return value === '1' || value === 'true';
+}
+
+/** Evidence / dev flag: `?patternOff=1` on the page URL or on the hash query (`#/trip/…/journal?patternOff=1`). */
+export function journalPatternOff(
+  loc: Pick<Location, 'hash' | 'search'> = location,
+): boolean {
+  if (patternOffTruthy(new URLSearchParams(loc.search).get('patternOff'))) return true;
+  const q = loc.hash.indexOf('?');
+  if (q === -1) return false;
+  return patternOffTruthy(new URLSearchParams(loc.hash.slice(q + 1)).get('patternOff'));
+}

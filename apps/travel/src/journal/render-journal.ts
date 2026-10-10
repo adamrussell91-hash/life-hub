@@ -174,9 +174,6 @@ export function renderJournal(
       });
       cleanups.push(() => chapterOverlay?.destroy());
     },
-    onAddMoment: () => {
-      /* Phase 1 stub — not a nav slot */
-    },
   });
 
   const timeline = document.createElement('div');
@@ -230,7 +227,8 @@ export function renderJournal(
         add.className = 'btn btn--secondary journal-day__add';
         add.textContent = 'Add moment';
         add.disabled = true;
-        add.title = 'Coming in Phase 3';
+        add.title = 'Coming in Phase 2';
+        add.setAttribute('aria-label', 'Add moment — Coming in Phase 2');
         daySection.append(empty, add);
       }
 

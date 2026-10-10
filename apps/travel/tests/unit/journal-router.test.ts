@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRoute, journalRoute } from '@/app/router';
+import { journalPatternOff, parseRoute, journalRoute } from '@/app/router';
 
 describe('journal routes', () => {
   it('parses #/trip/:tripId/journal', () => {
@@ -29,5 +29,15 @@ describe('journal routes', () => {
       cityId: 'lis',
       date: '2027-03-04'
     });
+  });
+
+  it('reads patternOff from search or hash query', () => {
+    expect(
+      journalPatternOff({ search: '?patternOff=1', hash: '#/trip/trp_1/journal' }),
+    ).toBe(true);
+    expect(
+      journalPatternOff({ search: '', hash: '#/trip/trp_1/journal?patternOff=1' }),
+    ).toBe(true);
+    expect(journalPatternOff({ search: '', hash: '#/trip/trp_1/journal' })).toBe(false);
   });
 });

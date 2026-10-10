@@ -19,7 +19,7 @@ import {
 } from '@/auth/gate';
 import { ApiClientError } from '@/api/client';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, type HubShellRefs, type RailHighlight } from '@/shell/shell';
-import { parseRoute } from '@/app/router';
+import { journalPatternOff, parseRoute } from '@/app/router';
 import { klIstanbulFixture } from '@/journal/fixtures/kl-istanbul';
 import { renderJournal } from '@/journal/render-journal';
 import { renderTripsList } from '@/views/trips-list';
@@ -114,11 +114,12 @@ async function bootApp(root: HTMLElement): Promise<void> {
         currentTripId = route.tripId;
         renderHighlight('trip');
         const fixture = klIstanbulFixture();
-        renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: fixture.title });
+        renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: '' });
         journalHandle?.destroy();
         journalHandle = renderJournal(shell.canvas, {
           fixture,
-          momentId: route.momentId
+          momentId: route.momentId,
+          patternOff: journalPatternOff()
         });
         return;
       }
