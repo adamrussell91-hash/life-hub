@@ -26,6 +26,33 @@ function baseMoment(overrides: Partial<JournalMoment> = {}): JournalMoment {
   };
 }
 
+describe('Codex check 4 — split merge move without lost media', () => {
+  it('splits, merges, and moves without duplicating or dropping attachments', () => {
+    const moment = baseMoment();
+    const { a, b } = splitMoment(moment, ['med_a', 'med_c'], 'mom_new');
+    expect([...a.media_ids, ...b.media_ids].sort()).toEqual(moment.media_ids.sort());
+
+    const merged = mergeMoments(
+      [
+        baseMoment({ id: 'mom_a', media_ids: ['med_a'], display_order: 1 }),
+        baseMoment({ id: 'mom_b', media_ids: ['med_b'], display_order: 2 }),
+      ],
+      { locationFromMomentId: 'mom_a' },
+    );
+    expect(merged.media_ids).toEqual(['med_a', 'med_b']);
+
+    const fixture = klIstanbulFixture();
+    const kul = fixture.moments.find((m) => m.id === 'mom_kul_pair')!;
+    const { moment: moved } = moveMoment(
+      kul,
+      { legId: 'leg_ist', localDate: '2026-03-04', timezoneMode: 'keep_wall_clock' },
+      fixture.legs,
+    );
+    expect(moved.leg_id).toBe('leg_ist');
+    expect(moved.media_ids).toEqual(kul.media_ids);
+  });
+});
+
 describe('splitMoment media accounting', () => {
   it('partitions media exactly once with no empty sides', () => {
     const moment = baseMoment();

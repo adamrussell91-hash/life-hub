@@ -64,6 +64,27 @@ describe('buildSegments', () => {
   });
 });
 
+describe('Codex check 3 — delete middle stop', () => {
+  it('recomputes neighbouring segments when a located stop is removed and restored', () => {
+    const live = [
+      moment({ id: 'a', display_order: 1, coordinates: { lat: 0, lon: 0 } }),
+      moment({ id: 'b', display_order: 2, coordinates: { lat: 1, lon: 1 } }),
+      moment({ id: 'c', display_order: 3, coordinates: { lat: 2, lon: 2 } }),
+    ];
+    expect(buildSegments(buildPhotoStops(live))).toHaveLength(2);
+
+    const withoutMiddle = live.map((row) =>
+      row.id === 'b' ? { ...row, lifecycle: 'deleted' as const } : row,
+    );
+    const afterDelete = buildSegments(buildPhotoStops(withoutMiddle));
+    expect(afterDelete).toHaveLength(1);
+    expect(afterDelete[0]?.fromMomentId).toBe('a');
+    expect(afterDelete[0]?.toMomentId).toBe('c');
+
+    expect(buildSegments(buildPhotoStops(live))).toHaveLength(2);
+  });
+});
+
 describe('visualDedupeKey', () => {
   it('clusters coordinates that differ only within display epsilon', () => {
     expect(visualDedupeKey(41.0082, 28.9784)).toBe(visualDedupeKey(41.00821, 28.97841));

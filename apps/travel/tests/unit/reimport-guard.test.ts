@@ -16,7 +16,7 @@ function asDoc(): JournalDocument {
   };
 }
 
-describe('applyReimport', () => {
+describe('Codex check 2 — manual edits survive reimport', () => {
   it('preserves manual place, time, order, and text on matching moments', () => {
     const existing = asDoc();
     const moment = existing.moments.find((m) => m.id === 'mom_kul_long_place')!;
@@ -41,7 +41,9 @@ describe('applyReimport', () => {
     expect(row.text).toBe('Kept reflection');
     expect(row.display_order).toBe(99);
   });
+});
 
+describe('applyReimport', () => {
   it('skips duplicate checksum media and keeps owner captions', () => {
     const existing = asDoc();
     existing.media.push({

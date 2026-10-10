@@ -114,6 +114,22 @@ describe('renderJournal', () => {
     expect(root.querySelector('.journal')?.classList.contains('journal--pattern-off')).toBe(true);
   });
 
+  it('Codex check 7 — omits deleted moments from the rendered timeline', () => {
+    const fixture = klIstanbulFixture();
+    const doomed = fixture.moments.find((m) => m.lifecycle === 'live');
+    expect(doomed).toBeTruthy();
+    const journal = {
+      ...fixture,
+      moments: fixture.moments.map((m) =>
+        m.id === doomed!.id ? { ...m, lifecycle: 'deleted' as const } : m,
+      ),
+    };
+    const root = document.createElement('div');
+    renderJournal(root, { fixture: journal });
+    expect(root.querySelector(`[data-journal-moment][id="${doomed!.id}"]`)).toBeNull();
+    expect(root.querySelector(`#${doomed!.id}`)).toBeNull();
+  });
+
   it('shows Read more on the long reflection fixture moment', async () => {
     const root = document.createElement('div');
     renderJournal(root, { fixture: klIstanbulFixture() });

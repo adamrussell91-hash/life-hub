@@ -6,7 +6,7 @@ import { createTravelJournalHandler } from '../../netlify/functions/travel-journ
 const env = { LIFE_HUB_PASSPHRASE_HASH: 'configured', SESSION_SECRET: 'x'.repeat(32) };
 const TRIP = 'trp_journal_live01';
 
-test('stripDeletedFromJournal removes deleted rows from normal read shape', () => {
+test('Codex check 7 — stripDeletedFromJournal removes deleted rows from normal read shape', () => {
   const journal = emptyJournal(TRIP);
   const legId = 'leg_live01';
   journal.legs = [
