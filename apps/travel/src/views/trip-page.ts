@@ -26,6 +26,7 @@ import { renderShareSheet } from '@/components/share-sheet';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
 import { formatCountdown, formatLongRange, formatShortRange, formatWeekdayDate } from '@/lib/date-label';
 import { I } from '@/lib/icons';
+import { journalRoute } from '@/app/router';
 import type { Marker } from 'maplibre-gl';
 
 export interface TripPageOptions {
@@ -121,7 +122,11 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
   publicBtn.type = 'button';
   publicBtn.className = 'btn ghost';
   publicBtn.innerHTML = `${I.link}Public link`;
-  acts.append(addCityBtn, addBtn, publicBtn);
+  const journalLink = document.createElement('a');
+  journalLink.className = 'btn ghost';
+  journalLink.href = journalRoute(tripId);
+  journalLink.textContent = 'Journal';
+  acts.append(addCityBtn, addBtn, journalLink, publicBtn);
   top.append(titleBlock, acts);
   wrap.append(top);
 

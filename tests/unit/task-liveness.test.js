@@ -67,7 +67,8 @@ test('record liveness: every hub deleted state is gone, archived is not', () => 
     { status: 'open', bucket: 'trash' },
     { lifecycle_status: 'deleted' },
     { lifecycle_status: 'deidentified' },
-    { deleted_at: '2026-09-01' }
+    { deleted_at: '2026-09-01' },
+    { lifecycle: 'deleted' }
   ]) {
     assert.equal(isDeletedRecord(record), true, JSON.stringify(record));
   }

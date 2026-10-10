@@ -6,6 +6,7 @@ import '../../design-kit/sign-in.css';
 import '../../design-kit/motion.css';
 import '../../design-kit/mobile.css';
 import '../styles/travel.css';
+import '../styles/journal.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
@@ -18,14 +19,22 @@ import {
 } from '@/auth/gate';
 import { ApiClientError } from '@/api/client';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, type HubShellRefs, type RailHighlight } from '@/shell/shell';
-import { parseRoute } from '@/app/router';
+import { journalPatternOff, parseRoute } from '@/app/router';
+import { ensureJournal } from '@/api/journal';
+import { klIstanbulFixture } from '@/journal/fixtures/kl-istanbul';
+import type { JournalFixture } from '@/journal/types';
+import { renderJournal, type JournalViewHandle } from '@/journal/render-journal';
 import { renderTripsList } from '@/views/trips-list';
 import { renderTripPage } from '@/views/trip-page';
 import { renderTodayView } from '@/views/today';
 import { renderPublicTrip } from '@/views/public-trip';
-import { listTrips } from '@/api/travel';
+import { getTrip, listTrips } from '@/api/travel';
 import { pickPrimaryTrip } from '@/lib/pick-trip';
 import { registerServiceWorker, mountOfflineBanner } from '@/lib/offline';
+
+function journalUseFixture(): boolean {
+  return new URLSearchParams(location.search).get('fixture') === '1';
+}
 
 function publicToken(): string | null {
   const match = /\/travel\/t\/([^/]+)\/?$/.exec(location.pathname) ?? /^\/t\/([^/]+)\/?$/.exec(location.pathname);
@@ -69,7 +78,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
       await logout();
       await boot(root);
     },
-    onRefresh: () => void paint(),
+    onRefresh: () => void paint({ refresh: true }),
     onAdd: () => {
       if (!location.hash.startsWith('#/trip/')) location.hash = '#/';
     }
@@ -78,12 +87,31 @@ async function bootApp(root: HTMLElement): Promise<void> {
 
   let routeGeneration = 0;
   let currentTripId: string | null = null;
+  let journalHandle: JournalViewHandle | null = null;
 
-  async function paint(): Promise<void> {
+  async function paint(options?: { refresh?: boolean }): Promise<void> {
     const route = parseRoute();
     const generation = ++routeGeneration;
 
+    if (route.name !== 'journal') {
+      journalHandle?.destroy();
+      journalHandle = null;
+    }
+
     try {
+      if (
+        options?.refresh &&
+        route.name === 'journal' &&
+        journalHandle &&
+        !journalUseFixture()
+      ) {
+        renderHighlight('trip');
+        renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: '' });
+        const envelope = await ensureJournal(route.tripId);
+        if (generation !== routeGeneration) return;
+        journalHandle.reconcile(envelope);
+        return;
+      }
       if (route.name === 'trips') {
         // Always show the list at #/ so New trip stays reachable with one holiday.
         // Bare /travel/ (empty hash) opens the primary trip in bootApp instead.
@@ -98,6 +126,40 @@ async function bootApp(root: HTMLElement): Promise<void> {
         renderHighlight('today');
         renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: 'Today' });
         await renderTodayView(shell.canvas, { isCurrent: () => generation === routeGeneration });
+        return;
+      }
+
+      if (route.name === 'journal') {
+        currentTripId = route.tripId;
+        renderHighlight('trip');
+        renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: '' });
+        journalHandle?.destroy();
+        let fixture: JournalFixture;
+        let journalVersion: string | undefined;
+        let displayTitle: string | undefined;
+        let tripForJournal: import('@/types').Trip | undefined;
+        if (journalUseFixture()) {
+          fixture = klIstanbulFixture();
+        } else {
+          const envelope = await ensureJournal(route.tripId);
+          fixture = envelope.journal;
+          journalVersion = envelope.version;
+          try {
+            const { trip } = await getTrip(route.tripId);
+            tripForJournal = trip;
+            if (!fixture.title.trim()) displayTitle = trip.title;
+          } catch {
+            /* title stays blank until trip load works */
+          }
+        }
+        journalHandle = renderJournal(shell.canvas, {
+          fixture,
+          journalVersion,
+          displayTitle,
+          trip: tripForJournal,
+          momentId: route.momentId,
+          patternOff: journalPatternOff()
+        });
         return;
       }
 

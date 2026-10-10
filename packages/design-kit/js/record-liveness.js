@@ -8,6 +8,7 @@
  *     (the Someday "remove" / merge-away state, not ordinary archiving)
  *   - Teaching (classes, lessons, units, scheduled lessons, …): status 'trashed', trashed_at
  *   - People / organisations: lifecycle_status 'deleted' / 'deidentified'
+ *   - Travel journal entities: lifecycle 'deleted' (legs, days, moments, media, transitions)
  *   - Generic: status 'deleted' / 'removed', deleted_at, removed_at
  * Do not re-implement this check inline; import it.
  */
@@ -21,6 +22,7 @@ export function isDeletedRecord(record) {
   if (DELETED_STATUSES.has(String(record.status))) return true;
   if (DELETED_LIFECYCLE.has(String(record.lifecycle_status))) return true;
   if (DELETED_BUCKETS.has(String(record.bucket))) return true;
+  if (record.lifecycle === 'deleted') return true;
   return Boolean(record.trashed_at || record.deleted_at || record.removed_at);
 }
 
