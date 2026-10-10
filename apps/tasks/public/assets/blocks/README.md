@@ -41,3 +41,7 @@ PNG exports from Documents/`teaching hub page content icons`, renamed to palette
 | `tabs.png` | `tabs.png` |
 | `collection.png` | `collection.png` |
 | `outcomes.png` | `outcomes.png` |
+
+`card_stack.png` and `whiteboard.png` had no export in the source folder, so they were drawn in-repo to match (same stroke weight, transparent ground). Replace them if a designed export arrives.
+
+Icons are served under the app base (`/teaching/assets/blocks/…`, `/tasks/assets/blocks/…`) via `blockIconSrc` in `src/blocks/block-meta.ts`. A root-absolute `/assets/blocks/…` path 404s on the umbrella site.

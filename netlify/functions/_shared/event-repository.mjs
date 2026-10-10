@@ -1,3 +1,6 @@
+import { isDeletedRecord, withoutDeleted } from './record-liveness.mjs';
+import { listGithubPdEvents } from './github-professional-data.mjs';
+import { importedPdEventById, projectNotionPdEvent, pdPlacementKey } from './notion-pd-events.mjs';
 import {
   EVENT_SCHEMA_VERSION,
   PERMITTED_CREATE_LINK_TYPES,
@@ -13,7 +16,7 @@ import {
   validateEventFieldUpdate,
   validateEventRescheduleInput
 } from './event-schema.mjs';
-import { mapBounded } from './blobs-list.mjs';
+import { mapBounded, listBlobKeys } from './blobs-list.mjs';
 import { formatEntityRef } from './entity-ref.mjs';
 import { resolveEntity as defaultResolveEntity } from './entity-resolvers.mjs';
 import {
@@ -36,6 +39,7 @@ import {
 } from './professional-entity-links.mjs';
 
 const LIST_BATCH_SIZE = 10;
+const STRONG = { consistency: 'strong' };
 
 function validationError(code, message) {
   return Object.assign(new Error(message), { status: 400, code });
@@ -68,6 +72,7 @@ export function createEventRepository(deps = {}) {
     ...deps,
     resolveEntity: deps.resolveEntity ?? defaultResolveEntity
   });
+  const loadImportedEvents = deps.listImportedEvents ?? (() => listGithubPdEvents({ env: deps.env ?? process.env }));
   const generateId = deps.generateId ?? generateEventId;
 
   async function loadJournal(operationId) {
@@ -92,26 +97,65 @@ export function createEventRepository(deps = {}) {
 
   async function getEvent(id) {
     if (!isValidEventId(id)) throw notFound();
-    const record = parseEventRecord(await getJSON(professionalStore, eventKey(id)));
-    if (!record) throw notFound();
+    const record = await loadEditableEvent(id);
     const journal = await loadOpenJournalForEvent(id);
-    return projectEvent(record, simplifyIncomplete(journal));
+    const migration = await getJSON(professionalStore, `events/imports/${id}`, STRONG);
+    let notes = [];
+    if (migration?.notes?.length) {
+      const context = createAccessContext({ workflow: 'professional' });
+      if (migration.complete) {
+        const links = createUniversalLinkRepository({ store: await getUniversalLinkStore(), resolveEntity, now });
+        const current = await links.listForEntity(`professional:event:${id}`, context);
+        notes = current.outgoing.filter(entry => entry.link.relationship_type === 'talk_note' && entry.link.status === 'current')
+          .map(entry => ({ talk_id: entry.link.metadata?.talk_id, page_id: entry.link.target_ref.split(':').pop(),
+            title: entry.endpoint?.display_label ?? '', href: entry.endpoint?.href ?? '' }));
+      } else {
+        for (const note of migration.notes) {
+          try {
+            await resolveEntity(`knowledge:page:${note.page_id}`, context);
+            notes.push(note);
+          } catch { /* Deleted or unavailable notes never reach live views. */ }
+        }
+      }
+    }
+    return { ...projectEvent(record, simplifyIncomplete(journal)), ...(notes.length ? {knowledge_notes: notes} : {}) };
   }
 
   async function listEvents() {
-    const indexKeys = await listEventIndexKeys(professionalStore);
+    const [indexKeys, recordKeys] = await Promise.all([listEventIndexKeys(professionalStore), listBlobKeys(professionalStore, 'events/records/')]);
     const ids = [
       ...new Set(
-        indexKeys
-          .map((key) => key.slice('events/index/'.length))
+        [...indexKeys.map(key => key.slice('events/index/'.length)), ...recordKeys.map(key => key.slice('events/records/'.length))]
           .filter((id) => isValidEventId(id))
       )
     ];
     const records = (
-      await mapBounded(ids, LIST_BATCH_SIZE, async (id) => parseEventRecord(await getJSON(professionalStore, eventKey(id))))
+      await mapBounded(ids, LIST_BATCH_SIZE, async (id) => parseEventRecord(await getJSON(professionalStore, eventKey(id), STRONG)))
     ).filter(Boolean);
-    records.sort(compareEventsSoonestFirst);
-    return mapBounded(records, LIST_BATCH_SIZE, async (record) =>
+    const knownIds = new Set(records.map(record => record.id));
+    const placements = new Set(records.map(record => pdPlacementKey(record.title, record.start)));
+    for (const row of await loadImportedEvents().catch(() => [])) {
+      const imported = projectNotionPdEvent(row);
+      if (!imported || knownIds.has(imported.id) || placements.has(pdPlacementKey(imported.title, imported.start))) continue;
+      let record;
+      try {
+        record = await loadEditableEvent(imported.id, imported);
+      } catch (error) {
+        // A tombstone can already exist even while the eventual index listing
+        // still omits it. It must suppress this source row, not fail the list.
+        if (error?.status === 404) continue;
+        throw error;
+      }
+      records.push(record);
+      knownIds.add(record.id);
+      placements.add(pdPlacementKey(record.title, record.start));
+    }
+    const live = withoutDeleted(records);
+    for (const record of live) {
+      if (!indexKeys.includes(eventIndexKey(record.id))) await setJSON(professionalStore, eventIndexKey(record.id), eventIndexRecord(record));
+    }
+    live.sort(compareEventsSoonestFirst);
+    return mapBounded(live, LIST_BATCH_SIZE, async (record) =>
       projectEvent(record, simplifyIncomplete(await loadOpenJournalForEvent(record.id)))
     );
   }
@@ -255,52 +299,120 @@ export function createEventRepository(deps = {}) {
     return { event: projectEvent(record), links, created: true };
   }
 
+  // Keep a durable import journal until existing Knowledge associations have
+  // been registered as normal Universal Links. Retry without the source snapshot.
+  async function migrateKnowledgeNotes(id) {
+    const key = `events/imports/${id}`;
+    const migration = await getJSON(professionalStore, key, STRONG);
+    if (!migration?.notes?.length || migration.complete) return;
+    try {
+      const store = await getUniversalLinkStore();
+      const links = createUniversalLinkRepository({ store, resolveEntity, now });
+      const context = createAccessContext({ workflow: 'professional' });
+      for (const note of migration.notes) {
+        await links.createLink({
+          source_ref: `professional:event:${id}`, target_ref: `knowledge:page:${note.page_id}`,
+          relationship_type: 'talk_note', metadata: { talk_id: note.talk_id }
+        }, context);
+      }
+      await setJSON(professionalStore, key, { ...migration, complete: true });
+    } catch {
+      // The native event stays usable; the journal preserves its notes while
+      // an unavailable endpoint or relationship store is retried on the next read.
+    }
+  }
+
+  async function loadEditableEvent(id, snapshot = null) {
+    if (!isValidEventId(id)) throw notFound();
+    const stored = parseEventRecord(await getJSON(professionalStore, eventKey(id), STRONG));
+    if (isDeletedRecord(stored)) throw notFound();
+    if (stored) {
+      // Older saves kept the native event but its note relationships were
+      // still hydrated from the snapshot. Preserve them before retiring it.
+      if (stored.talks?.some(talk => talk.id.startsWith('t_')) &&
+          !await getJSON(professionalStore, `events/imports/${id}`, STRONG)) {
+        const previous = deps.loadImportedEvent
+          ? await deps.loadImportedEvent(id).catch(() => null)
+          : importedPdEventById(await loadImportedEvents().catch(() => []), id);
+        if (previous?.knowledge_notes?.length) {
+          await setJSON(professionalStore, `events/imports/${id}`,
+            { notes: previous.knowledge_notes, complete: false }, { onlyIfNew: true });
+        }
+      }
+      if (!await getJSON(professionalStore, eventIndexKey(id), STRONG)) await setJSON(professionalStore, eventIndexKey(id), eventIndexRecord(stored));
+      await migrateKnowledgeNotes(id);
+      return stored;
+    }
+    const imported = snapshot ?? (deps.loadImportedEvent
+      ? await deps.loadImportedEvent(id)
+      : importedPdEventById(await loadImportedEvents().catch(() => []), id));
+    if (!imported) throw notFound();
+    const { source, notion_id, knowledge_notes, ...record } = imported;
+    const parsed = parseEventRecord(record);
+    if (!parsed) throw notFound();
+    if (knowledge_notes?.length) {
+      await setJSON(professionalStore, `events/imports/${id}`, { notes: knowledge_notes, complete: false }, { onlyIfNew: true });
+    }
+    await setJSON(professionalStore, eventKey(id), parsed, { onlyIfNew: true });
+    const authoritative = parseEventRecord(await getJSON(professionalStore, eventKey(id), STRONG)) ?? parsed;
+    if (isDeletedRecord(authoritative)) throw notFound();
+    await setJSON(professionalStore, eventIndexKey(id), eventIndexRecord(authoritative));
+    await migrateKnowledgeNotes(id);
+    return authoritative;
+  }
+
+  async function writeEventChange(id, change) {
+    await loadEditableEvent(id);
+    const entry = typeof professionalStore.getWithMetadata === 'function'
+      ? await professionalStore.getWithMetadata(eventKey(id), { type: 'json', ...STRONG })
+      : null;
+    const existing = parseEventRecord(entry?.data ?? await getJSON(professionalStore, eventKey(id), STRONG));
+    if (!existing || isDeletedRecord(existing)) throw notFound();
+    const updated = change(existing);
+    const result = await setJSON(professionalStore, eventKey(id), updated,
+      entry?.etag ? { onlyIfMatch: entry.etag } : {});
+    if (result?.modified === false) {
+      throw Object.assign(new Error('This event changed. Reload it before saving again.'), { status: 409, code: 'event_changed' });
+    }
+    await setJSON(professionalStore, eventIndexKey(id), eventIndexRecord(updated));
+    return updated;
+  }
+
   async function updateEvent(id, patchInput) {
     assertNoAccessFields(patchInput);
     const patch = validateEventFieldUpdate(patchInput);
-    const existing = parseEventRecord(await getJSON(professionalStore, eventKey(id)));
-    if (!existing) throw notFound();
-    const updated = { ...existing, ...patch, updated_at: now() };
-    await setJSON(professionalStore, eventKey(id), updated);
-    await setJSON(professionalStore, eventIndexKey(id), eventIndexRecord(updated));
+    const updated = await writeEventChange(id, (existing) => ({ ...existing, ...patch, updated_at: now() }));
     const journal = await loadOpenJournalForEvent(id);
     return projectEvent(updated, simplifyIncomplete(journal));
   }
 
+  async function deleteEvent(id) {
+    await writeEventChange(id, (existing) => ({ ...existing, deleted_at: now(), updated_at: now() }));
+    return { deleted: true, id };
+  }
+
   async function transitionState(id, nextState) {
-    const existing = parseEventRecord(await getJSON(professionalStore, eventKey(id)));
-    if (!existing) throw notFound();
-    assertEventStateTransition(existing.occurrence_state, nextState);
-    const updated = { ...existing, occurrence_state: nextState, updated_at: now() };
-    await setJSON(professionalStore, eventKey(id), updated);
-    await setJSON(professionalStore, eventIndexKey(id), eventIndexRecord(updated));
+    const updated = await writeEventChange(id, (existing) => {
+      assertEventStateTransition(existing.occurrence_state, nextState);
+      return { ...existing, occurrence_state: nextState, updated_at: now() };
+    });
     return projectEvent(updated);
   }
 
   async function rescheduleEvent(id, input) {
     assertNoAccessFields(input);
     const validated = validateEventRescheduleInput(input);
-    const existing = parseEventRecord(await getJSON(professionalStore, eventKey(id)));
-    if (!existing) throw notFound();
-    assertEventStateTransition(existing.occurrence_state, 'rescheduled');
-    const updated = {
-      ...existing,
-      start: validated.start,
-      end: validated.end,
-      time_zone: validated.time_zone,
-      all_day: validated.all_day,
-      occurrence_state: 'rescheduled',
-      updated_at: now()
-    };
-    await setJSON(professionalStore, eventKey(id), updated);
-    await setJSON(professionalStore, eventIndexKey(id), eventIndexRecord(updated));
+    const updated = await writeEventChange(id, (existing) => {
+      assertEventStateTransition(existing.occurrence_state, 'rescheduled');
+      return { ...existing, ...validated, occurrence_state: 'rescheduled', updated_at: now() };
+    });
     return projectEvent(updated);
   }
 
   async function retryLinks(id) {
     if (!isValidEventId(id)) throw notFound();
-    const record = parseEventRecord(await getJSON(professionalStore, eventKey(id)));
-    if (!record) throw notFound();
+    const record = parseEventRecord(await getJSON(professionalStore, eventKey(id), STRONG));
+    if (!record || isDeletedRecord(record)) throw notFound();
     const journal = await loadOpenJournalForEvent(id);
     if (!journal || journal.status === 'committed') {
       return { event: projectEvent(record), links: [], retried: false };
@@ -343,6 +455,7 @@ export function createEventRepository(deps = {}) {
     listScheduleProjections,
     createEvent,
     updateEvent,
+    deleteEvent,
     transitionState,
     rescheduleEvent,
     retryLinks

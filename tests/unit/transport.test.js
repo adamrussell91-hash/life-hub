@@ -218,7 +218,12 @@ test('Day dial: no school place yet → a one-time form; the reason shows when T
   assert.equal(host.querySelector('[data-part="leave-wedge"]'), null, 'no plan, no wedge');
   form.querySelector('[name="school"]').value = 'Sydney Boys High';
   form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
-  await new Promise((r) => setTimeout(r, 80));
+  // The response and subsequent render are asynchronous; a fixed delay can
+  // observe the loading state when the full suite competes for the event loop.
+  const deadline = Date.now() + 5000;
+  while (!/did not answer in time/.test(host.querySelector('[data-part="getting-there"]')?.textContent ?? '') && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
   const post = calls.find(([path, body]) => path === '/api/transport' && body);
   assert.deepEqual(post[1], { places: { home: '', school: 'Sydney Boys High' } });
   assert.match(host.querySelector('[data-part="getting-there"]').textContent, /did not answer in time/);

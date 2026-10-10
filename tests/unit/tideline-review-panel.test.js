@@ -60,31 +60,36 @@ const BROKEN = {
   }
 };
 
-function mount(ghosts) {
+function mount(ghosts, { hub = 'tasks', phone = false } = {}) {
   const window = new Window({ url: 'https://tasks.example/' });
+  globalThis.sessionStorage = window.sessionStorage;
   // Force tideline's clockFor() onto the sync test clock (no browser raf).
   window.requestAnimationFrame = undefined;
+  if (phone) window.matchMedia = (query) => ({ matches: query === '(max-width: 719px)', addEventListener() {}, removeEventListener() {} });
   const doc = window.document;
+  const requests = [];
   const host = doc.createElement('div');
   doc.body.append(host);
   renderTideline(doc, host, {
-    hub: 'tasks',
+    hub,
     events: [],
     ghosts,
     week: WEEK,
     today: TODAY,
     nowHour: 12,
-    apiFetch: async () =>
-      new window.Response(JSON.stringify({ ok: true, receipt: 'ok' }), {
+    apiFetch: async (...args) => {
+      requests.push(args);
+      return new window.Response(JSON.stringify({ ok: true, receipt: 'ok' }), {
         status: 200,
         headers: { 'content-type': 'application/json' }
-      }),
+      });
+    },
     routeFor: () => null,
     onSwitchView: () => {},
     onShiftRange: () => {},
     onSelectDate: () => {}
   });
-  return { window, host, doc };
+  return { window, host, doc, requests };
 }
 
 test('Review opens Waiting for review panel with pending changes', () => {
@@ -130,3 +135,30 @@ test('tideline CSS hides the review panel when [hidden]', () => {
   const css = readFileSync(join(rootDir, 'packages/design-kit/calendar-tideline.css'), 'utf8');
   assert.match(css, /\.cal-review\[hidden\]\s*\{\s*display:\s*none/);
 });
+
+for (const phone of [false, true]) {
+  test('Show on calendar reveals a filtered Clare proposal' + (phone ? ' on its phone day' : ''), () => {
+    const clare = {
+      ...PROTECT, id: 'g-clare', agent: 'clare', label: 'Prepare Term 4 resources',
+      date: '2026-09-23',
+      chip: { ...PROTECT.chip, id: 'g-clare', title: 'Prepare Term 4 resources', date: '2026-09-23' }
+    };
+    const { host, requests } = mount([clare], { hub: 'teaching', phone });
+    assert.equal(host.querySelector('[data-filter="tasks"]').getAttribute('aria-pressed'), 'false');
+    host.querySelector('[data-action="review"]').click();
+    host.querySelector('[data-action="reveal-ghost"]').click();
+    assert.equal(host.querySelector('[data-part="review-panel"]').hidden, true);
+    assert.equal(host.querySelector('[data-filter="tasks"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(host.querySelector('[data-filter="fitness"]').getAttribute('aria-pressed'), 'false');
+    const chip = host.querySelector('[data-id="g-clare"]');
+    assert.ok(chip, 'proposal is painted on its date');
+    assert.equal(chip.hidden, false);
+    assert.equal(chip.classList.contains('is-filter-hidden'), false);
+    const pop = host.querySelector('[data-part="chip-popover"]');
+    assert.equal(pop.hidden, false);
+    assert.match(pop.textContent, /Prepare Term 4 resources/);
+    assert.ok(pop.querySelector('[data-accept="g-clare"]'));
+    assert.equal(requests.length, 0, 'preview never sends an accept decision');
+    if (phone) assert.equal(host.querySelector('[data-day="2026-09-23"]').getAttribute('aria-pressed'), 'true');
+  });
+}

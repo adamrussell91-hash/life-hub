@@ -15,7 +15,14 @@ const TAGGABLE_KINDS = 'person,organisation,task,application,program,page,unit,l
  * generic `tagged_with` relationship, so a pair nobody has declared a
  * specific relationship type for still works.
  */
-export function mountTagAnythingSection(host: HTMLElement, sourceRef: string) {
+export function mountTagAnythingSection(
+  host: HTMLElement,
+  sourceRef: string,
+  options: {
+    /** Called with the number of current tags each time the list loads. */
+    onLinksLoaded?: (count: number) => void;
+  } = {}
+) {
   return mountEntityTagger({
     host,
     sourceRef,
@@ -23,7 +30,14 @@ export function mountTagAnythingSection(host: HTMLElement, sourceRef: string) {
       const result = await searchEntities(query, TAGGABLE_KINDS, { signal });
       return { groups: result.groups };
     },
-    listLinks: (ref: string) => listUniversalLinksForEntity(ref),
+    listLinks: async (ref: string) => {
+      const links = await listUniversalLinksForEntity(ref);
+      const count = [...links.outgoing, ...links.incoming].filter(
+        (entry) => entry.link.status === 'current' && entry.link.relationship_type === 'tagged_with'
+      ).length;
+      options.onLinksLoaded?.(count);
+      return links;
+    },
     createLink: (input) => createUniversalLink(input),
     suppressLink: (linkId: string) => suppressUniversalLink(linkId)
   });

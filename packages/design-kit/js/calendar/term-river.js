@@ -26,7 +26,7 @@ import { filterKeyForItem } from './calendar-filter.js';
 /** Life log types never become river points (same set as Tideline chips). */
 const LOG_TYPES = new Set([
   'meal', 'diary', 'sleep', 'skincare', 'heart', 'weight',
-  'composition', 'measurements', 'bloods', 'fragrance', 'medication', 'work_session'
+  'composition', 'measurements', 'bloods', 'fragrance', 'medication', 'work_session', 'readiness_checkin'
 ]);
 
 /**
@@ -50,43 +50,30 @@ export function riverItemsFromHubEvents(events) {
     const id = record.id || event.path;
     if (!id) continue;
 
-    if (type === 'project' || (record.kind === 'project' && (record.start_date || record.from))) {
-      const from = record.start_date || record.from;
-      const to = record.due_date || record.to || record.end_date;
-      if (!from || !to) continue;
-      const item = {
-        id,
-        title: record.title || 'Project',
-        type: 'project',
-        from,
-        to,
-        shape: 'bar',
-        source: type
-      };
-      const key = filterKeyForItem(item);
-      if (key) item.filterKey = key;
-      out.push(item);
-      continue;
-    }
+    const isDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+    const from = record.start_date || record.from || record.date;
+    const to = record.end_date || record.to || (type === 'project' || record.kind === 'project' ? record.due_date : null);
+    const span = isDate(from) && isDate(to) && to >= from
+      && (type === 'project' || record.kind === 'project' || to > from);
+    const date = record.date || record.due_date || record.start_date;
+    if (!span && !isDate(date)) continue;
 
-    const date = record.date || record.due_date;
-    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-
+    // Retain the source envelope and record: item cards and routes need their ids,
+    // paths and relationships even when the river paints a reduced visual shape.
     const item = {
+      ...event,
+      ...record,
+      record,
       id,
       title: record.title || type,
       type,
-      date,
-      shape: 'point',
-      source: type
+      source: event.source || type,
+      shape: span ? 'bar' : type === 'task' ? 'diamond' : 'point',
+      ...(span ? { from, to } : { date })
     };
     if (typeof record.time === 'string') item.start = record.time;
     if (typeof record.end_time === 'string') item.end = record.end_time;
-    if (record.kind) item.kind = record.kind;
-    if (record.event_type) item.event_type = record.event_type;
     if (type === 'scheduled_lesson' || record.isClass === true) item.isClass = true;
-    if (record.protected === true) item.protected = true;
-    if (record.with) item.with = record.with;
     const key = filterKeyForItem(item);
     if (key) item.filterKey = key;
     out.push(item);
@@ -94,14 +81,24 @@ export function riverItemsFromHubEvents(events) {
   return out;
 }
 
-/** Visual RIVER.ITEMS first (shape wins); hub overlays fill ids the visual never painted. */
+/** Live items own their content and geometry; visual-only annotations and items survive. */
 export function mergeRiverItems(visualItems, hubItems) {
+  const live = new Map((hubItems ?? []).filter(item => item?.id).map(item => [item.id, item]));
   const seen = new Set();
   const out = [];
   for (const item of [...(visualItems ?? []), ...(hubItems ?? [])]) {
     if (!item?.id || seen.has(item.id)) continue;
     seen.add(item.id);
-    out.push(item);
+    const overlay = live.get(item.id);
+    const merged = overlay ? { ...overlay } : item;
+    if (overlay) {
+      for (const field of ['lane', 'sub', 'kind']) {
+        if (merged[field] == null && item[field] != null) merged[field] = item[field];
+      }
+      // A proposed block's boolean flag may share a structured visual write preview.
+      if (overlay.ghost === true && item.ghost && typeof item.ghost === 'object') merged.ghost = item.ghost;
+    }
+    out.push(merged);
   }
   return out;
 }

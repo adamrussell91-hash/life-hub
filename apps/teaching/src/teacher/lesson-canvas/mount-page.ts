@@ -1,4 +1,11 @@
 import { isLinkedSection } from '@/blocks/composition-link';
+import { offerTimedUndo } from '../../../design-kit/js/hub-feedback.js';
+import {
+  HUB_LIST_ICONS,
+  createHubMenuButton
+} from '../../../design-kit/js/hub-list.js';
+import { blockTypeLabel, createBlockTypeLabel } from '@/blocks/block-meta';
+import { applyRememberedTabsPanel, rememberTabsPanel } from '@/blocks/layout-editors';
 import {
   createFromInsertMenu,
   cloneBlockWithNewIds,
@@ -86,6 +93,12 @@ export type MountLessonPageOptions = {
   outcomesCatalog?: CurriculumOutcome[];
   subject?: { id: string; outcome_ids: string[] };
   onToggleFullPage?: () => void;
+  /**
+   * Render the in-canvas page menu (Export, Print, Trash…). The lesson
+   * editor passes false and carries those items in its single header menu,
+   * so the page never shows two kebabs.
+   */
+  showPageMenu?: boolean;
 };
 
 export type LessonPageHandle = {
@@ -472,39 +485,72 @@ export function mountBlockCanvas(
   }
 
   function deleteBlock(block: Block): void {
-    selectedId = null;
-    options.onSelect?.(null);
+    const location = findBlockLocation(blocks, block.id);
+    if (selectedId === block.id) {
+      selectedId = null;
+      options.onSelect?.(null);
+    }
     emit(deleteBlocksById(blocks, [block.id]));
+    offerTimedUndo({
+      message: `${blockTypeLabel(block)} block deleted`,
+      onUndo: () => {
+        const parent = location?.parent ?? { kind: 'root' as const };
+        const result = insertAt(blocks, parent, location?.index ?? blocks.length, block, { rootMode });
+        if (!result.ok) {
+          setHint(result.message);
+          return;
+        }
+        emit(result.blocks);
+      }
+    });
   }
 
+
   function createBlockMenu(block: Block): HTMLElement {
-    const editing = selectedId === block.id;
-    const kind = block.block_type.replace(/_/g, ' ');
-    const menu = mountPageOptionsMenu(
-      [
-        {
-          label: editing ? 'Done' : 'Edit',
-          dataset: { blockAction: editing ? 'done' : 'edit' },
-          onSelect: () => select(editing ? null : block.id)
-        },
-        { label: 'Move up', dataset: { blockAction: 'up' }, onSelect: () => moveBy(block.id, -1) },
-        { label: 'Move down', dataset: { blockAction: 'down' }, onSelect: () => moveBy(block.id, 1) },
-        {
-          label: 'Duplicate',
-          dataset: { blockAction: 'duplicate' },
-          onSelect: () => duplicateBlock(block)
-        },
-        {
-          label: 'Delete',
-          danger: true,
-          dataset: { blockAction: 'delete' },
-          onSelect: () => deleteBlock(block)
-        }
-      ],
-      { label: `${kind} block menu`, className: 'lesson-page__block-menu' }
+    return createHubMenuButton(
+      () => {
+        const editing = selectedId === block.id;
+        const index = blocks.findIndex((row) => row.id === block.id);
+        return [
+          {
+            label: editing ? 'Done' : 'Edit',
+            icon: editing ? HUB_LIST_ICONS.check : HUB_LIST_ICONS.edit,
+            dataset: { blockAction: editing ? 'done' : 'edit' },
+            onSelect: () => select(editing ? null : block.id)
+          },
+          {
+            label: 'Move up',
+            icon: HUB_LIST_ICONS.up,
+            disabled: index <= 0,
+            dataset: { blockAction: 'up' },
+            onSelect: () => moveBy(block.id, -1)
+          },
+          {
+            label: 'Move down',
+            icon: HUB_LIST_ICONS.down,
+            disabled: index < 0 || index >= blocks.length - 1,
+            dataset: { blockAction: 'down' },
+            onSelect: () => moveBy(block.id, 1)
+          },
+          {
+            label: 'Duplicate',
+            icon: HUB_LIST_ICONS.copy,
+            dataset: { blockAction: 'duplicate' },
+            onSelect: () => duplicateBlock(block)
+          },
+          'separator',
+          {
+            label: 'Delete block',
+            icon: HUB_LIST_ICONS.trash,
+            danger: true,
+            hold: true,
+            dataset: { blockAction: 'delete' },
+            onSelect: () => deleteBlock(block)
+          }
+        ];
+      },
+      { label: `${blockTypeLabel(block)} block options`, className: 'lesson-page__block-menu' }
     );
-    menuDisposers.push(menu.dispose);
-    return menu.el;
   }
 
   function createEditChrome(block: Block): HTMLElement {
@@ -513,15 +559,18 @@ export function mountBlockCanvas(
 
     const done = document.createElement('button');
     done.type = 'button';
-    done.className = 'btn btn--secondary lesson-page__done';
+    done.className = 'btn btn--primary lesson-page__done';
     done.textContent = 'Done';
     done.addEventListener('click', (event) => {
       event.stopPropagation();
       select(null);
     });
 
+    const spacer = document.createElement('span');
+    spacer.className = 'lesson-page__toolbar-spacer';
+
     const visibility = createVisibilitySelect(block, onBlockChange, latestBlock(block.id, block));
-    bar.append(done, visibility);
+    bar.append(createBlockTypeLabel(block), visibility, spacer, done);
 
     if (block.block_type === 'section' && !isLinkedSection(block) && options.onSaveComposition) {
       const saveComposition = document.createElement('button');
@@ -578,7 +627,14 @@ export function mountBlockCanvas(
   }
 
   function preview(block: Block): HTMLElement {
-    return options.renderPreview?.(block) ?? renderBlock(block, 'teacher');
+    const el = options.renderPreview?.(block) ?? renderBlock(block, 'teacher');
+    if (block.block_type === 'tabs') {
+      el.querySelectorAll('[role="tab"]').forEach((btn, index) => {
+        btn.addEventListener('click', () => rememberTabsPanel(block.id, index));
+      });
+      applyRememberedTabsPanel(el, block.id);
+    }
+    return el;
   }
 
   function render(): void {
@@ -625,7 +681,7 @@ export function mountBlockCanvas(
       } else if (canEdit && selectedId === block.id) {
         const editor = createBlockEditor(block, onBlockChange, latestBlock(block.id, block), editorCtx());
         editor.querySelectorAll('.block-editor__move-up, .block-editor__move-down').forEach((el) => el.remove());
-        row.append(editor, createEditChrome(block));
+        row.append(createEditChrome(block), editor);
       } else {
         row.append(preview(block));
       }
@@ -773,6 +829,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     { label: 'Page menu', className: 'lesson-page__more', triggerClassName: 'lesson-page__more-btn' }
   );
 
+  const showPageMenu = options.showPageMenu ?? true;
   const chrome = document.createElement('div');
   chrome.className = 'lesson-page__chrome';
   chrome.append(optionsMenu.el);
@@ -805,14 +862,14 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     }
   });
 
-  const modeRow = document.createElement('label');
-  modeRow.className = 'lesson-page__mode';
-  const modeLabel = document.createElement('span');
-  modeLabel.className = 'lesson-page__mode-label';
-  modeLabel.textContent = 'Pedagogical mode';
+  // Lesson type sits as a quiet chip at the head of the outcomes row
+  // rather than a labelled form field above the canvas.
+  const metaRow = document.createElement('div');
+  metaRow.className = 'lesson-page__meta';
   const modeSelect = document.createElement('select');
   modeSelect.className = 'lesson-page__mode-select';
-  modeSelect.setAttribute('aria-label', 'Pedagogical mode');
+  modeSelect.setAttribute('aria-label', 'Lesson type');
+  modeSelect.title = 'Lesson type';
   for (const mode of PEDAGOGICAL_MODES) {
     const option = document.createElement('option');
     option.value = mode;
@@ -824,12 +881,13 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     const pedagogical_mode = modeSelect.value as PedagogicalMode;
     emitLesson({ ...lesson, pedagogical_mode });
   });
-  modeRow.append(modeLabel, modeSelect);
+  metaRow.append(modeSelect);
 
   const canvasHost = document.createElement('div');
   canvasHost.className = 'lesson-page__canvas';
 
-  root.append(chrome, coverHost, modeRow, canvasHost);
+  if (showPageMenu) root.append(chrome);
+  root.append(coverHost, metaRow, canvasHost);
 
   const canvas = mountBlockCanvas(canvasHost, {
     blocks: lesson.blocks,
@@ -851,7 +909,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   });
 
   const stripHost = document.createElement('div');
-  root.insertBefore(stripHost, canvasHost);
+  stripHost.className = 'lesson-page__meta-outcomes';
+  metaRow.append(stripHost);
   const strip =
     options.subject && options.outcomesCatalog
       ? mountOutcomeStrip(stripHost, {

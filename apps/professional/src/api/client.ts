@@ -1,3 +1,5 @@
+import { cachedEventRead, isEventRead, changesEventReads, clearEventReadCache } from './event-read-cache';
+export { clearEventReadCache } from './event-read-cache';
 import { getApiBaseUrl } from './config';
 import type { ApiErrorBody, ApiResult } from './types';
 
@@ -170,6 +172,7 @@ async function apiRequestOnce<T>(
 
   const result = await parseApiResponse<T>(response);
   if (!result.ok) {
+    if (response.status === 401 || response.status === 403) clearEventReadCache();
     throw new ApiClientError(result.error, response.status, result.data);
   }
   return result.data;
@@ -196,7 +199,9 @@ async function apiRequest<T>(
 }
 
 export function apiGet<T>(path: string, options?: ApiRequestOptions): Promise<T> {
-  return apiRequest<T>('GET', path, options);
+  if (!isEventRead(path)) return apiRequest<T>('GET', path, options);
+  const key = `${getApiBaseUrl(options?.baseUrl)}${path}`;
+  return cachedEventRead(key, () => apiRequest<T>('GET', path, {...options, signal: undefined}), options?.signal);
 }
 
 export function apiPost<T>(
@@ -204,7 +209,7 @@ export function apiPost<T>(
   body?: unknown,
   options?: ApiRequestOptions
 ): Promise<T> {
-  return apiRequest<T>('POST', path, { ...options, body });
+  return writeRequest<T>('POST', path, body, options);
 }
 
 export function apiPatch<T>(
@@ -212,5 +217,12 @@ export function apiPatch<T>(
   body?: unknown,
   options?: ApiRequestOptions
 ): Promise<T> {
-  return apiRequest<T>('PATCH', path, { ...options, body });
+  return writeRequest<T>('PATCH', path, body, options);
+}
+
+async function writeRequest<T>(method: string, path: string, body: unknown, options?: ApiRequestOptions): Promise<T> {
+  const invalidates = changesEventReads(path);
+  if (invalidates) clearEventReadCache();
+  try { return await apiRequest<T>(method, path, {...options, body}); }
+  finally { if (invalidates) clearEventReadCache(); }
 }

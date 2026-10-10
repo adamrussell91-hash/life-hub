@@ -1,3 +1,5 @@
+import { clearEventReadCache } from '@/api/client';
+beforeEach(() => clearEventReadCache());
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHomeView } from '@/views/home';
 import { parseRoute, railHighlightFor } from '@/app/router';

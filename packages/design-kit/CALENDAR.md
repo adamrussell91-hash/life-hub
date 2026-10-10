@@ -66,7 +66,7 @@ Week view. Structure and motion follow the Tideline VISUAL-SPEC.
 | Vitals | Sleep h, energy, meals, symptom — logs never become grid chips |
 | Walls | Hatch + lock pill; nothing proposes into a wall |
 | Ghosts | Dashed chips / `overItem` decorations from `GET /api/calendar-ghosts`; Accept/Dismiss → `POST { id, decision }` only |
-| Popover | Receipt from `acceptPlan()`; client never builds writes |
+| Popover | Receipt from `acceptPlan()`; client never builds writes. On phone, proposal previews use the same docked sheet as item cards, with sticky actions and 44px buttons above the bottom bar and safe area. |
 | Free evening | Dashed “N h free” when the Yours band is open enough |
 | Phone | One day + week strip under 720px |
 
@@ -160,3 +160,11 @@ Teaching, Tasks, and Professional mount the locked object through kit adapters. 
 | **Morning propose** | `netlify/functions/calendar-ghosts-propose-scheduled.mjs` |
 
 When the locked look changes, change the kit CSS and this file in the same PR. Do not “fix” one hub with a local skin.
+
+### Compact Term rows (approved 10 October 2026)
+
+Term uses dated compact rows in each identity lane: 28px on desktop and 44px on phones. Weeks scroll horizontally inside the calendar; lane names remain fixed. All items in a busy week remain available. Hover or keyboard focus reveals the full title and scrolls long text once; reduced motion disables that translation. Selecting a row opens the shared item card with its owning task/project route and edit API.
+
+Projects and multi-day events occupy continuous narrow tracks above individual deadlines/events. Their start/end geometry shares the school/holiday date scale with the week headings and Body graph. Body appointments sit below the readiness plot. The reading key identifies events, task deadlines, spans, logged capacity, forecast, uncertainty and the 40% threshold. Capacity and weekly booked load use the shared live Day/Week models, and source refreshes preserve horizontal scroll without replaying entrance animation. Year retains its SVG overview and the shared finite zoom controller.
+
+Implementation: `js/calendar/term-river-rows.js`, `calendar-term-river-rows.css`, and `js/calendar/term-river-capacity.js`, integrated by `render-term-river.js`.

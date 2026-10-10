@@ -1,4 +1,5 @@
 import { dependencyIndex } from './duration-model.js';
+import { isDeletedRecord, withoutDeleted } from '../record-liveness.js';
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_KEY = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -35,6 +36,76 @@ function planningOf(task, deps) {
   };
 }
 
+function relationshipsOf(task) {
+  const fields = {};
+  for (const key of ['parent_project_id', 'parent_task_id', 'parent_goal_id']) {
+    if (typeof task[key] === 'string' && task[key]) fields[key] = task[key];
+  }
+  for (const key of ['linked_project_ids', 'linked_goal_ids']) {
+    if (Array.isArray(task[key])) fields[key] = task[key].filter(id => typeof id === 'string' && id);
+  }
+  return fields;
+}
+
+/** Validate calendar days without rolling an impossible day into the following month. */
+function projectDateKey(value, timestamp = false) {
+  if (typeof value !== 'string') return null;
+  const key = timestamp ? value.slice(0, 10) : value;
+  if (!DATE_KEY.test(key)) return null;
+  const parsed = new Date(`${key}T00:00:00Z`);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== key) return null;
+  if (timestamp && value !== key) {
+    const instant = new Date(value);
+    if (!/^\d{4}-\d{2}-\d{2}T/.test(value) || !Number.isFinite(instant.getTime())) return null;
+    // Like Tasks chronology, ISO timestamps are instants; plain keys stay calendar days.
+    return `${instant.getFullYear()}-${String(instant.getMonth() + 1).padStart(2, '0')}-${String(instant.getDate()).padStart(2, '0')}`;
+  }
+  return key;
+}
+
+/** Tasks chronology rules: explicit end, else latest dated milestone / linked task. */
+export function tasksEventsFromProjects(projects, tasks = []) {
+  const liveTasks = withoutDeleted(tasks);
+  return withoutDeleted(projects).flatMap(project => {
+    // Finished / archived projects stay readable elsewhere, without an active calendar lane.
+    if (['completed', 'done', 'archived'].includes(project.status) || project.completed_at) return [];
+    if (typeof project.id !== 'string' || !project.id) return [];
+    const dates = [];
+    const add = value => { const key = projectDateKey(value); if (key) dates.push(key); };
+    for (const milestone of Array.isArray(project.milestones) ? project.milestones : []) {
+      if (milestone && !isDeletedRecord(milestone)) add(milestone.due_date);
+    }
+    if (project.type === 'excursion' && project.key_dates) {
+      for (const key of ['permission_note_due', 'staff_notification_due', 'payment_due', 'risk_assessment_due']) {
+        add(project.key_dates[key]);
+      }
+    }
+    for (const task of liveTasks) {
+      if (task.parent_project_id === project.id) add(task.due_date);
+    }
+    const end = projectDateKey(project.current_end_date) ?? projectDateKey(project.baseline_end_date)
+      ?? (dates.length ? dates.reduce((a, b) => a > b ? a : b) : null);
+    if (!end) return [];
+    const created = projectDateKey(project.created_at, true);
+    const starts = dates.filter(key => key <= end);
+    if (created) starts.push(created);
+    const earliest = starts.length ? starts.reduce((a, b) => a < b ? a : b) : end;
+    const start = earliest <= end ? earliest : end;
+    return [{
+      path: `projects:${project.id}`,
+      record: {
+        ...project,
+        type: 'project',
+        project_type: project.type,
+        title: typeof project.title === 'string' && project.title ? project.title : project.id,
+        start_date: start,
+        end_date: end
+      },
+      body: ''
+    }];
+  });
+}
+
 function bookmarkOf(task) {
   return task?.bookmark && typeof task.bookmark.note === 'string' && task.bookmark.note.trim()
     ? { note: task.bookmark.note.trim(), at: task.bookmark.at ?? null }
@@ -47,6 +118,7 @@ function isDoneTask(task) {
 }
 
 export function tasksEventsFromTasks(tasks) {
+  tasks = withoutDeleted(tasks);
   const deps = dependencyIndex(tasks);
   const stepsOf = new Map();
   for (const task of tasks ?? []) {
@@ -69,7 +141,8 @@ export function tasksEventsFromTasks(tasks) {
         title: typeof task.title === 'string' && task.title ? task.title : task.id,
         ...(bookmark ? { bookmark } : {}),
         ...(progress ? { progress } : {}),
-        ...planning
+        ...planning,
+        ...relationshipsOf(task)
       },
       body: ''
     }));
@@ -96,6 +169,7 @@ export function tasksEventsFromTasks(tasks) {
         waiting_on: typeof task.waiting_on === 'string' && task.waiting_on ? task.waiting_on : undefined,
         estimated_duration: Number.isFinite(task.estimated_duration) ? task.estimated_duration : undefined,
         ...planningOf(task, deps),
+        ...relationshipsOf(task),
         ...(bookmarkOf(task) ? { bookmark: bookmarkOf(task) } : {}),
         ...(taskProgress(task, stepsOf.get(task.id)) ? { progress: taskProgress(task, stepsOf.get(task.id)) } : {})
       },

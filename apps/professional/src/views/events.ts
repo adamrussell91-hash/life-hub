@@ -173,11 +173,13 @@ function chipsFromLinks(entries: UniversalLinkEntry[]): NonNullable<EventCompose
 export async function renderEventNewView(
   canvas: HTMLElement,
   options: {
+    isCurrent?: () => boolean;
     draft?: EventComposeDraft;
     onCancel?: () => void;
     onSave?: (payload: EventComposePayload) => Promise<void>;
   } = {}
 ): Promise<void> {
+  if (options.isCurrent && !options.isCurrent()) return;
   canvas.replaceChildren();
   const form = document.createElement('form');
   form.className = 'event-form event-compose';
@@ -457,8 +459,12 @@ export async function renderEventNewView(
   }
 
   function writeWall(date: string, startClock: string, endClock: string): void {
+    const startDay = splitWallLocal(start.value).date;
+    const endDay = splitWallLocal(end.value).date;
+    const daySpan = Math.round((Date.parse(endDay) - Date.parse(startDay)) / 86400000);
+    const nextEndDay = new Date(Date.parse(date) + Math.max(0, daySpan) * 86400000).toISOString().slice(0, 10);
     start.value = `${date}T${startClock}`;
-    end.value = `${date}T${endClock}`;
+    end.value = `${nextEndDay}T${endClock}`;
   }
 
   function paintCalendar(): void {
@@ -556,11 +562,11 @@ export async function renderEventNewView(
   }
 
   hours.className = 'event-compose__sr';
-  hours.value = hours.value || '0';
+  if (!draft) hours.value = hours.value || '0';
   const hoursValue = el('b', 'event-compose__stepper-value', hours.value === '0' ? '0.0' : Number(hours.value).toFixed(1));
   function paintHours(): void {
     const value = Number(hours.value || 0);
-    hoursValue.textContent = value.toFixed(1);
+    hoursValue.textContent = hours.value === '' ? 'Not logged' : value.toFixed(1);
   }
   function bumpHours(delta: number): void {
     const next = Math.max(0, Math.round((Number(hours.value || 0) + delta) * 2) / 2);
@@ -585,15 +591,6 @@ export async function renderEventNewView(
   const draftPriority = openedLabels.priority ?? '';
   const areaNames = new Set<string>(PRIORITY_AREAS);
   if (draftPriority) areaNames.add(draftPriority);
-  try {
-    const listed = await listEvents();
-    for (const event of listed.events ?? []) {
-      const name = splitEventLabels(event).priority;
-      if (name) areaNames.add(name);
-    }
-  } catch {
-    // The built-in areas still show when the event list cannot be loaded.
-  }
   const customAreas = [...areaNames]
     .filter((name) => !isPriorityArea(name))
     .sort((a, b) => a.localeCompare(b));
@@ -672,7 +669,7 @@ export async function renderEventNewView(
   function selectedPriority(): string | null {
     return priorityAreaName(chipButtons.find((node) => node.classList.contains('is-on'))?.dataset.priority);
   }
-  if (!draft?.accreditation) syncAccreditation();
+  if (!draft) syncAccreditation();
   paintHours();
   startTime.disabled = allDay.checked;
   endTime.disabled = allDay.checked;
@@ -831,6 +828,22 @@ export async function renderEventNewView(
   });
 
   canvas.append(form);
+  // Custom areas are optional enrichment; they must not delay the editor.
+  try {
+    const listed = await listEvents();
+    if ((options.isCurrent && !options.isCurrent()) || !canvas.contains(form)) return;
+    for (const event of listed.events ?? []) {
+      const name = splitEventLabels(event).priority;
+      if (!name || areaNames.has(name)) continue;
+      areaNames.add(name);
+      const chip = addPriorityChip(name, name);
+      chip.classList.remove('is-on');
+      chip.setAttribute('aria-pressed', 'false');
+      chipRow.insertBefore(chip, addArea);
+    }
+  } catch {
+    // Built-in and draft areas remain available if the optional list fails.
+  }
 }
 
 const OCCURRENCE_LABEL: Record<EventOccurrenceState, string> = {

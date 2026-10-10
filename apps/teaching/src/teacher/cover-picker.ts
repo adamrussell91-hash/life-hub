@@ -1,6 +1,10 @@
 import type { Cover, Media } from '@/schemas';
 import { CoverSchema, resolveCoverUrl, coverAltText } from '@/schemas';
 import { isHttpUrl } from '@/blocks/url-safety';
+import { applyCreatedMedia } from '@/app/curriculum-state';
+import { openDrivePicker, type DrivePickResult } from '@/teacher/drive-picker';
+import { uploadMediaFile } from '@/teacher/media-api';
+import { resolveMediaLibraryUrl } from '@/teacher/media-library-picker';
 
 export interface CoverPickerOptions {
   cover?: Cover | null;
@@ -8,6 +12,18 @@ export interface CoverPickerOptions {
   titleFallback?: string;
   onSave: (cover: Cover | null) => void | Promise<void>;
   editable?: boolean;
+  /** Defaults to the Google Drive Picker in images-only mode. */
+  pickFromDrive?: () => Promise<DrivePickResult | null>;
+  /** Defaults to `uploadMediaFile` (POST /api/media/upload). */
+  uploadFile?: (file: File, opts?: { title?: string; provider_file_id?: string }) => Promise<Media>;
+  /** Told about media this picker adds, so the library stays current. Defaults to `applyCreatedMedia`. */
+  onMediaCreated?: (media: Media) => void;
+  /**
+   * Called with `true` before an external picker (Google Drive) opens and `false`
+   * after it closes. A host modal dialog must step out of the top layer meanwhile,
+   * or the Drive picker renders behind it and cannot be clicked.
+   */
+  onExternalPicker?: (open: boolean) => void;
 }
 
 export interface CoverPickerHandle {
@@ -16,8 +32,14 @@ export interface CoverPickerHandle {
   getCover: () => Cover | null;
 }
 
+function libraryThumbUrl(media: Media): string {
+  return media.thumbnail_url ?? media.preview_url ?? media.download_url ?? '';
+}
+
 /**
- * Cover hero with optional teacher edit: URL + image library pick + remove.
+ * Cover hero with optional teacher edit. Google Drive and upload are the main
+ * actions; the image library shows straight away so one click sets the cover;
+ * paste-a-link and remove sit below.
  * Prefer `renderEntityBanner` for class-page read view; use this for dialogs
  * and other edit surfaces that need the full toolbar inline.
  */
@@ -26,8 +48,14 @@ export function mountCoverPicker(
   options: CoverPickerOptions
 ): CoverPickerHandle {
   const editable = options.editable !== false;
+  const driveAbort = new AbortController();
+  const pickFromDrive = options.pickFromDrive ?? (() => openDrivePicker({ imagesOnly: true, signal: driveAbort.signal }));
+  const uploadFile = options.uploadFile ?? uploadMediaFile;
+  const onMediaCreated = options.onMediaCreated ?? ((media: Media) => void applyCreatedMedia(media));
   let current: Cover | null = options.cover ?? null;
+  let mediaList: Media[] = [...options.media];
   let busy = false;
+  let disposed = false;
 
   const root = document.createElement('div');
   root.className = 'cover-picker';
@@ -50,58 +78,111 @@ export function mountCoverPicker(
   toolbar.className = 'cover-picker__toolbar';
   toolbar.hidden = !editable;
 
+  const status = document.createElement('p');
+  status.className = 'cover-picker__status';
+  status.hidden = true;
+  status.setAttribute('role', 'status');
+
   const error = document.createElement('p');
   error.className = 'cover-picker__error';
   error.hidden = true;
   error.setAttribute('role', 'alert');
+
+  const actions = document.createElement('div');
+  actions.className = 'cover-picker__actions';
+
+  const driveBtn = document.createElement('button');
+  driveBtn.type = 'button';
+  driveBtn.className = 'btn btn--primary cover-picker__drive';
+  driveBtn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="#0F9D58" d="M8 2h8L8 16H0z"/><path fill="#F4B400" d="M16 2l8 14h-8L8 2z"/><path fill="#4285F4" d="M0 16h24l-4 6H4z"/></svg>';
+  const driveLabel = document.createElement('span');
+  driveLabel.textContent = 'Choose from Google Drive';
+  driveBtn.append(driveLabel);
+
+  const uploadBtn = document.createElement('button');
+  uploadBtn.type = 'button';
+  uploadBtn.className = 'btn btn--secondary cover-picker__upload';
+  uploadBtn.textContent = 'Upload image';
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.hidden = true;
+  fileInput.dataset.coverFile = '';
+
+  actions.append(driveBtn, uploadBtn, fileInput);
+
+  const libraryHeading = document.createElement('p');
+  libraryHeading.className = 'cover-picker__label';
+  libraryHeading.textContent = 'Your images';
+
+  const library = document.createElement('div');
+  library.className = 'cover-picker__library';
+  library.dataset.coverLibrary = '';
+
+  const linkHeading = document.createElement('p');
+  linkHeading.className = 'cover-picker__label';
+  linkHeading.textContent = 'Or paste an image link';
+
+  const linkRow = document.createElement('div');
+  linkRow.className = 'cover-picker__link-row';
 
   const urlInput = document.createElement('input');
   urlInput.type = 'url';
   urlInput.className = 'cover-picker__url';
   urlInput.placeholder = 'https://…';
   urlInput.dataset.coverUrl = '';
+  urlInput.setAttribute('aria-label', 'Image link');
 
   const altInput = document.createElement('input');
   altInput.type = 'text';
   altInput.className = 'cover-picker__alt';
   altInput.placeholder = 'Alt text';
   altInput.dataset.coverAlt = '';
+  altInput.setAttribute('aria-label', 'Alt text');
 
   const applyBtn = document.createElement('button');
   applyBtn.type = 'button';
-  applyBtn.className = 'btn btn--secondary';
+  applyBtn.className = 'btn btn--secondary cover-picker__apply';
   applyBtn.textContent = 'Set URL';
+
+  linkRow.append(urlInput, altInput, applyBtn);
 
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
-  removeBtn.className = 'btn btn--ghost';
+  removeBtn.className = 'btn btn--ghost cover-picker__remove';
   removeBtn.textContent = 'Remove cover';
 
-  const libraryBtn = document.createElement('button');
-  libraryBtn.type = 'button';
-  libraryBtn.className = 'btn btn--ghost';
-  libraryBtn.textContent = 'Choose from library';
-
-  const library = document.createElement('div');
-  library.className = 'cover-picker__library';
-  library.hidden = true;
-  library.dataset.coverLibrary = '';
-
-  toolbar.append(urlInput, altInput, applyBtn, libraryBtn, removeBtn, library, error);
+  toolbar.append(
+    actions,
+    status,
+    error,
+    libraryHeading,
+    library,
+    linkHeading,
+    linkRow,
+    removeBtn
+  );
   root.append(hero, toolbar);
   host.replaceChildren(root);
 
   const imageMedia = () =>
-    options.media.filter((entry) => entry.media_type === 'image' && entry.status === 'active');
+    mediaList.filter((entry) => entry.media_type === 'image' && entry.status === 'active');
 
   const syncButtons = (): void => {
+    urlInput.disabled = busy;
+    altInput.disabled = busy;
     applyBtn.disabled = busy;
-    libraryBtn.disabled = busy;
+    driveBtn.disabled = busy;
+    uploadBtn.disabled = busy;
     removeBtn.disabled = busy || current === null;
+    for (const item of library.querySelectorAll<HTMLButtonElement>('button')) {
+      item.disabled = busy;
+    }
   };
 
   const renderPreview = (): void => {
-    const url = resolveCoverUrl(current ?? undefined, options.media);
+    const url = resolveCoverUrl(current ?? undefined, mediaList);
     if (url) {
       img.src = url;
       img.alt = coverAltText(current, options.titleFallback ?? 'Cover');
@@ -128,30 +209,79 @@ export function mountCoverPicker(
     error.textContent = message;
   };
 
+  const setStatus = (message: string | null): void => {
+    status.hidden = !message;
+    status.textContent = message ?? '';
+  };
+
+  const save = async (next: Cover | null): Promise<void> => {
+    await options.onSave(next);
+    if (disposed) return;
+    current = next;
+    renderPreview();
+  };
+
   const persist = async (next: Cover | null): Promise<void> => {
-    if (busy) return;
+    if (busy || disposed) return;
     busy = true;
     setError(null);
     syncButtons();
     try {
-      await options.onSave(next);
-      current = next;
-      renderPreview();
+      await save(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to save cover.');
     } finally {
       busy = false;
-      syncButtons();
+      if (!disposed) syncButtons();
+    }
+  };
+
+  const coverFromMedia = (media: Media): Cover => {
+    const url = resolveMediaLibraryUrl(media) ?? libraryThumbUrl(media);
+    return {
+      media_id: media.id,
+      url: url && isHttpUrl(url) ? url : undefined,
+      alt_text: altInput.value.trim() || media.title
+    };
+  };
+
+  /** Shared busy/status/error wrapper for the Drive and upload flows. */
+  const runAdd = async (working: string, task: () => Promise<Media | null>): Promise<void> => {
+    if (busy || disposed) return;
+    busy = true;
+    setError(null);
+    setStatus(working);
+    syncButtons();
+    try {
+      const media = await task();
+      if (!media || disposed) return;
+      mediaList = [media, ...mediaList.filter((entry) => entry.id !== media.id)];
+      onMediaCreated(media);
+      if (!disposed) renderLibrary();
+      setStatus('Saving cover…');
+      await save(coverFromMedia(media));
+      if (!disposed) renderLibrary();
+    } catch (err) {
+      if (!disposed) setError(err instanceof Error ? err.message : 'Unable to add that image.');
+    } finally {
+      busy = false;
+      if (!disposed) {
+        setStatus(null);
+        syncButtons();
+      }
     }
   };
 
   const renderLibrary = (): void => {
     library.replaceChildren();
-    const items = imageMedia();
+    // Newest first: what you just added is what you are most likely to want.
+    const items = [...imageMedia()].sort((a, b) =>
+      b.created_at.localeCompare(a.created_at)
+    );
     if (items.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'cover-picker__library-empty';
-      empty.textContent = 'No image resources in the library yet.';
+      empty.textContent = 'No images yet. Images you add from Drive or upload appear here.';
       library.append(empty);
       return;
     }
@@ -159,28 +289,66 @@ export function mountCoverPicker(
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'cover-picker__library-item';
-      const thumbUrl =
-        media.thumbnail_url ?? media.preview_url ?? media.download_url ?? '';
+      button.title = media.title;
+      if (current?.media_id === media.id) {
+        button.classList.add('cover-picker__library-item--current');
+        button.setAttribute('aria-current', 'true');
+      }
+      const thumbUrl = libraryThumbUrl(media);
       if (thumbUrl) {
         const thumb = document.createElement('img');
         thumb.src = thumbUrl;
-        thumb.alt = media.title;
+        thumb.alt = '';
+        thumb.loading = 'lazy';
         button.append(thumb);
       }
       const label = document.createElement('span');
       label.textContent = media.title;
       button.append(label);
       button.addEventListener('click', () => {
-        void persist({
-          media_id: media.id,
-          url: thumbUrl && isHttpUrl(thumbUrl) ? thumbUrl : undefined,
-          alt_text: altInput.value.trim() || media.title
+        void persist(coverFromMedia(media)).then(() => {
+          if (!disposed) renderLibrary();
         });
-        library.hidden = true;
       });
       library.append(button);
     }
   };
+
+  driveBtn.addEventListener('click', () => {
+    void runAdd('Opening Google Drive…', async () => {
+      options.onExternalPicker?.(true);
+      let pick: DrivePickResult | null;
+      try {
+        pick = await pickFromDrive();
+      } finally {
+        if (!disposed) options.onExternalPicker?.(false);
+      }
+      if (!pick || disposed) return null;
+      if (pick.kind !== 'mirror' || !pick.file.type.startsWith('image/')) {
+        throw new Error('That file is not an image. Choose a JPG, PNG, GIF or WebP.');
+      }
+      setStatus(`Adding ${pick.title}…`);
+      return uploadFile(pick.file, {
+        title: pick.title,
+        provider_file_id: pick.provider_file_id
+      });
+    });
+  });
+
+  uploadBtn.addEventListener('click', () => {
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = '';
+    if (!file) return;
+    if (file.type && !file.type.startsWith('image/')) {
+      setError('That file is not an image. Choose a JPG, PNG, GIF or WebP.');
+      return;
+    }
+    void runAdd(`Uploading ${file.name}…`, () => uploadFile(file, { title: file.name }));
+  });
 
   applyBtn.addEventListener('click', () => {
     const url = urlInput.value.trim();
@@ -206,17 +374,15 @@ export function mountCoverPicker(
     void persist(null);
   });
 
-  libraryBtn.addEventListener('click', () => {
-    library.hidden = !library.hidden;
-    if (!library.hidden) renderLibrary();
-  });
-
   renderPreview();
+  if (editable) renderLibrary();
   syncButtons();
 
   return {
     root,
     dispose: () => {
+      disposed = true;
+      driveAbort.abort();
       host.replaceChildren();
     },
     getCover: () => current

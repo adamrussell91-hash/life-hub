@@ -87,10 +87,12 @@ export function mergeNotionPdEvents(blobEvents, rows) {
       .filter((event) => event?.title && event?.start)
       .map((event) => pdPlacementKey(event.title, event.start))
   );
+  const ids = new Set((blobEvents || []).map(event => event.id));
   const extra = [];
   for (const row of rows || []) {
     const event = projectNotionPdEvent(row);
     if (!event) continue;
+    if (ids.has(event.id)) continue;
     const key = pdPlacementKey(event.title, event.start);
     if (taken.has(key)) continue;
     taken.add(key);

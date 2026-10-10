@@ -25,6 +25,7 @@ import {
   countByFilterKey,
   countHidden,
   defaultFilterForHub,
+  filterKeyForItem,
   isItemVisible,
   paintSourceFilter,
   readFilterState,
@@ -383,10 +384,21 @@ function openReviewPanel() {
 
 /** Reveal one pending ghost on the grid (chip / due popover) after the panel lists it. */
 function revealGhost(ghostId) {
-  const ghost = pendingVisibleGhosts().find((item) => item.id === ghostId);
+  const ghost = allPendingGhosts().find((item) => item.id === ghostId);
   if (!ghost) {
     showToast('<b>Nothing to review.</b> That proposal is no longer pending.');
     return;
+  }
+  const filterKey = filterKeyForItem(ghost.chip || ghost);
+  if (filterKey && filterState[filterKey] === false) {
+    const next = { ...filterState, [filterKey]: true };
+    writeFilterState(input?.hub || 'life', next);
+    updateTidelineFilter(next, { replay: false });
+  }
+  closeReview();
+  if (state.phone && model.week.includes(ghost.date) && state.phoneDay !== ghost.date) {
+    state.phoneDay = ghost.date;
+    mount({ entrance: false });
   }
   const anchor = resolveGhostAnchor(ghost);
   const chipId = ghost.overItem || ghost.id;
@@ -650,17 +662,19 @@ function paintTidelineSources(host = nodes.get('__sources')) {
     hidden,
     ambient: model.ambient,
     feedNote: input?.icalFeedNote ?? null,
-    onChange: (next) => {
-      filterState = next;
-      applyTidelineFilter({ replay: true });
-      paintTidelineSources(host);
-      const apply = host.parentElement?.querySelector?.('[data-part="apply-all"]');
-      if (apply) {
-        const { visible, hidden } = pendingGhostPartition();
-        apply.textContent = applyAllLabel(visible.length, hidden);
-      }
-    }
+    onChange: updateTidelineFilter
   });
+}
+
+function updateTidelineFilter(next, { replay = true } = {}) {
+  filterState = next;
+  applyTidelineFilter({ replay });
+  paintTidelineSources();
+  const apply = host.querySelector?.('[data-part="apply-all"]');
+  if (apply) {
+    const { visible, hidden } = pendingGhostPartition();
+    apply.textContent = applyAllLabel(visible.length, hidden);
+  }
 }
 
 function applyTidelineFilter({ replay = false } = {}) {

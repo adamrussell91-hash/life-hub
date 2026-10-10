@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { clickMenuAction } from './helpers/hub-list';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { trySetColumnWidths } from '@/blocks/column-widths';
 import { moveBlockBetweenColumns } from '@/blocks/column-move';
@@ -101,7 +102,7 @@ describe('moveBlockBetweenColumns', () => {
 });
 
 describe('nested columnMove', () => {
-  it('Move to column select calls onMoveToColumn', () => {
+  it('Move to column in the row menu calls onMoveToColumn', () => {
     const block = createBlock('heading', 'h1');
     const moves: number[] = [];
     const el = createNestedBlocksEditor({
@@ -112,17 +113,14 @@ describe('nested columnMove', () => {
       columnMove: {
         columnCount: 2,
         columnIndex: 0,
+        group: 'cols',
         onMoveToColumn: (to) => {
           moves.push(to);
-        }
+        },
+        onReceive: () => undefined
       }
     });
-    const select = el.querySelector(
-      'select.block-editor__nested-move-column'
-    ) as HTMLSelectElement;
-    expect(select).toBeTruthy();
-    select.value = '1';
-    select.dispatchEvent(new Event('change'));
+    clickMenuAction(el.querySelector('.hub-list__row .hub-list__more')!, 'column-1');
     expect(moves).toEqual([1]);
   });
 
@@ -182,12 +180,29 @@ describe('createColumnsEditor builder UX', () => {
     expect(latest.content.preset).toBe('custom');
     expect(el.querySelectorAll('input.block-editor__columns-width').length).toBe(2);
 
-    const move = el.querySelector(
-      'select.block-editor__nested-move-column'
-    ) as HTMLSelectElement;
-    move.value = '1';
-    move.dispatchEvent(new Event('change'));
+    clickMenuAction(el.querySelector('.hub-list__row .hub-list__more')!, 'column-1');
     expect(latest.content.columns[0]!.blocks).toHaveLength(0);
     expect(latest.content.columns[1]!.blocks[0]?.id).toBe('h1');
+  });
+
+  it('drags a block from one column into a slot in another', () => {
+    const block = createBlock('columns', 'cols');
+    if (block.block_type !== 'columns') return;
+    type Child = (typeof block.content.columns)[number]['blocks'][number];
+    block.content.columns[0]!.blocks = [createBlock('heading', 'h1') as Child];
+    block.content.columns[1]!.blocks = [createBlock('heading', 'h2') as Child];
+    let latest = block;
+    const el = createColumnsEditor(block, (n) => (latest = n), () => latest);
+    document.body.append(el);
+
+    const panes = el.querySelectorAll('.block-editor__column-pane');
+    panes[0]!.querySelector('.hub-list__grip')!.dispatchEvent(new Event('dragstart', { bubbles: true }));
+    const slot = panes[1]!.querySelector<HTMLElement>('.hub-list__gap[data-index="0"]')!;
+    slot.dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }));
+    slot.dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }));
+
+    expect(latest.content.columns[0]!.blocks).toHaveLength(0);
+    expect(latest.content.columns[1]!.blocks.map((b) => b.id)).toEqual(['h1', 'h2']);
+    el.remove();
   });
 });

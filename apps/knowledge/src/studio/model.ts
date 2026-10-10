@@ -233,10 +233,10 @@ export function insights(data: StudioData): Insight[] {
   if (missing.length) {
     out.push({
       id: `missing:${missing.length}`,
-      eyebrow: "Lost in the move",
+      eyebrow: "Missing notes",
       title: `${missing.length} notes your book pages cite never reached Knowledge.`,
-      body: `They're still in Notion: ${missing.slice(0, 3).map(n => `“${n.title}”`).join(", ")}${missing.length > 3 ? " and more" : ""}.`,
-      why: "Until they're imported they add nothing to Already Written.",
+      body: `These notes are missing from Knowledge: ${missing.slice(0, 3).map(n => `“${n.title}”`).join(", ")}${missing.length > 3 ? " and more" : ""}.`,
+      why: "Add them to Knowledge to include them in Already Written.",
     });
   }
 

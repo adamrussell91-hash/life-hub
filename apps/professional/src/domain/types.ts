@@ -405,7 +405,7 @@ export interface EventRecord {
   learning_operation?: FollowUpOperationProjection | null;
   talks?: EventTalk[];
   blocks?: unknown[];
-  /** Set on Notion PD rows read from life-hub-data. Those rows are not blob records. */
+  /** Legacy compatibility fields. Event APIs persist native records without these fields. */
   source?: 'notion';
   notion_id?: string;
   knowledge_notes?: Array<{ talk_id: string; page_id: string; title: string; href: string }>;

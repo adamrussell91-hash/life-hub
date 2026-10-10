@@ -6,6 +6,7 @@
 import { teachingEventsFromCurriculum } from './teaching-calendar.js';
 import {
   tasksEventsFromTasks,
+  tasksEventsFromProjects,
   tasksEventsFromWorkBlocks,
   tasksEventsFromWorkSessions,
   scheduleDiffActiveProposed
@@ -149,9 +150,10 @@ export function createHubSourceLoader(opts) {
     setBucket('tasks', { status: 'loading', error: null });
     inflight.tasks = (async () => {
       try {
-        const [tasksPayload, blocksPayload, profilePayload, missionPayload, diffPayload, sessionsPayload] =
+        const [tasksPayload, projectsPayload, blocksPayload, profilePayload, missionPayload, diffPayload, sessionsPayload] =
           await Promise.all([
             readOkJson(apiFetch, '/api/tasks'),
+            readOkJson(apiFetch, '/api/projects').catch(() => ({ data: { projects: [] } })),
             readOkJson(apiFetch, '/api/work-blocks').catch(() => ({ data: { work_blocks: [] } })),
             readOkJson(apiFetch, '/api/planning-profile').catch(() => ({ data: null })),
             readOkJson(apiFetch, '/api/workflow-state?id=week_mission%3Acurrent').catch(() => ({
@@ -171,6 +173,7 @@ export function createHubSourceLoader(opts) {
         }));
         const events = [
           ...tasksEventsFromTasks(tasksPayload.data?.tasks ?? []),
+          ...tasksEventsFromProjects(projectsPayload.data?.projects ?? [], tasksPayload.data?.tasks ?? []),
           ...tasksEventsFromWorkBlocks(blocksPayload.data?.work_blocks ?? []),
           ...tasksEventsFromWorkBlocks(ghostBlocks),
           ...tasksEventsFromWorkSessions(

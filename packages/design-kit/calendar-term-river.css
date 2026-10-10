@@ -1,3 +1,4 @@
+@import './calendar-term-river-rows.css';
 /* Term River. Ported verbatim from docs/proposals/calendar-reference/term-river/src/river.template.html. Tokens only. */
 
 .tr{
@@ -112,4 +113,20 @@
   .tr-legend{display:none}
   .tr-toast{left:var(--space-3);right:var(--space-3);bottom:var(--space-3)}
   .tr-pop{left:var(--space-3)!important;right:var(--space-3);width:auto}
+}
+
+/* Both zoom stops share one mounted chart and one finite motion controller. */
+.tr__views{display:grid;min-width:0;position:relative}
+.tr__views > .tr-chart,.tr__views > .tr-rows{grid-area:1/1;min-width:0;align-self:start}
+.tr .tr-legend{display:flex;flex-wrap:wrap}
+.tr .is-filter-hidden{visibility:hidden;pointer-events:none}
+.tr .lg-capacity,.tr .lg-forecast,.tr .lg-threshold{width:1.25rem;height:0;border-top:2px solid var(--wave);border-radius:0}
+.tr .lg-forecast{border-top-style:dashed}
+.tr .lg-threshold{border-top:2px dotted var(--pastel-peach-ink)}
+.tr .lg-band{background:color-mix(in srgb,var(--wave) 12%,transparent)}
+@media(max-width:719px){
+  .tr-pop,.tr-pop.cal-pop--card{position:fixed;z-index:40;left:var(--space-3)!important;right:var(--space-3);top:auto!important;bottom:calc(4.65rem + env(safe-area-inset-bottom,0px) + var(--space-2));width:auto;max-height:65dvh;overflow:auto;overscroll-behavior:contain}
+  .tr-pop input,.tr-pop textarea,.tr-pop select{font-size:var(--text-md);min-height:2.75rem}
+  .tr-pop .cal-pop__acts{position:sticky;bottom:0;background:var(--paper)}
+  .tr-pop button,.tr-pop a{min-height:2.75rem}
 }
