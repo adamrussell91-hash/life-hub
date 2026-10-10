@@ -1,4 +1,5 @@
 import type { JournalDocument } from '@/api/journal';
+import { resolveMediaTranscriptText } from '@/journal/transcripts';
 import type { JournalMedia, JournalMoment } from '@/journal/types';
 
 const IDB_NAME = 'lifehub-travel-journal-search';
@@ -106,12 +107,13 @@ function indexMoment(rows: JournalSearchRow[], moment: JournalMoment, journal: J
         label: extras.object_notes.trim(),
       });
     }
-    if (extras.transcript?.trim()) {
+    const transcript = resolveMediaTranscriptText(journal, media);
+    if (transcript) {
       pushRow(rows, {
         targetId: moment.id,
         momentId: moment.id,
         field: 'transcript',
-        label: extras.transcript.trim(),
+        label: transcript,
       });
     }
   }

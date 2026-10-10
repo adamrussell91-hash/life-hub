@@ -5,6 +5,10 @@ import {
   getMediaPhotoAnnotations,
 } from '@/journal/annotations';
 import {
+  buildAudioTranscriptsExportJson,
+  resolveMediaTranscriptText,
+} from '@/journal/transcripts';
+import {
   formatAuthorshipExportLabel,
   resolveMomentAuthor,
 } from '@/journal/corey-perspective';
@@ -123,8 +127,8 @@ function formatMomentLine(
     const item = media.get(id);
     if (!item) continue;
     if (item.caption?.trim()) lines.push(`[photo] ${item.caption.trim()}`);
-    const extras = item as JournalMedia & { transcript?: string };
-    if (extras.transcript?.trim()) lines.push(`[transcript] ${extras.transcript.trim()}`);
+    const transcript = resolveMediaTranscriptText(journal, item);
+    if (transcript) lines.push(`[transcript] ${transcript}`);
     const annotations = getMediaPhotoAnnotations(journal, id);
     if (annotations) lines.push(...formatMediaAnnotationsPlainText(annotations));
   }
@@ -173,7 +177,7 @@ function mediaPlaceholders(journal: JournalDocument): ExportMediaPlaceholder[] {
         display: `media/${media.id}/display.jpg`,
         derivatives,
       },
-      transcript: extras.transcript,
+      transcript: resolveMediaTranscriptText(journal, media) || undefined,
       audio_bundle_path: null,
     };
   });
@@ -206,11 +210,13 @@ export async function buildJournalExportBundle(
   const geoJson = JSON.stringify(buildJournalRouteGeoJson(stripped), null, 2);
   const mediaIndex = JSON.stringify({ items: mediaPlaceholders(stripped) }, null, 2);
   const annotationsJson = buildPhotoAnnotationsExportJson(stripped);
+  const transcriptsJson = buildAudioTranscriptsExportJson(stripped);
 
   const files: ExportBundleFile[] = [
     await fileEntry('data/journal.json', journalJson),
     await fileEntry('data/journal.txt', plainText),
     await fileEntry('data/annotations.json', annotationsJson),
+    await fileEntry('data/transcripts.json', transcriptsJson),
     await fileEntry('geo/route.geojson', geoJson),
     await fileEntry('media/index.json', mediaIndex),
     await fileEntry('reader/index.html', exportReaderHtml),
