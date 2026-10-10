@@ -7,7 +7,7 @@ import { calendarZoomHref, normalizeCalendarZoom, parseCalendarZoom } from '../.
 import { mountHubCalendar, type HubCalendarHandle } from '../../design-kit/js/calendar/mount-hub-calendar.js';
 import { saveCalendarItem } from '../../design-kit/js/calendar/calendar-item-actions.js';
 import { getApiBaseUrl } from '@/api/config';
-import { taskPageHash } from '@/domain/cards';
+import { projectPageHash, taskPageHash } from '@/domain/cards';
 import { tasksApi } from '@/services/client-api';
 import {
   isPlanWorkMode,
@@ -22,13 +22,18 @@ export const TASKS_CALENDAR_FILLS = {
 export function tasksRouteFor(item: unknown): string | null {
   const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : null;
   const record = row?.record && typeof row.record === 'object' ? (row.record as Record<string, unknown>) : null;
-  const type = String(record?.type || row?.source || '');
+  const type = String(record?.type || row?.type || row?.source || '');
   const id = String(record?.id || row?.id || '');
-  if ((type === 'task' || type === 'work_block' || row?.kind === 'task') && id) return taskPageHash(id);
+  if (type === 'work_block') {
+    const taskId = String(record?.task_id || row?.task_id || '');
+    return taskId ? taskPageHash(taskId) : null;
+  }
+  if ((type === 'task' || row?.kind === 'task') && id) return taskPageHash(id);
+  if (type === 'project' && id) return projectPageHash(id);
   if (type === 'scheduled_lesson' && id) return `/teaching/lessons/${encodeURIComponent(id)}`;
   if (type === 'professional_meeting' && id) return `/professional/#/meeting/${encodeURIComponent(id)}`;
   if (type === 'professional_event' && id) {
-    const ref = String(record?.source_ref || id);
+    const ref = String(record?.source_ref || row?.source_ref || id);
     const eventId = ref.includes(':') ? ref.split(':').pop()! : ref;
     return `/professional/#/event/${encodeURIComponent(eventId)}`;
   }

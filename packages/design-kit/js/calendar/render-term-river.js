@@ -10,6 +10,7 @@
  * Sections: 1 Constants · 2 Model · 3 Mount · 4 Render · 5 Interaction.
  */
 import { createMotion, EASE } from '../hub-motion-engine.js';
+import { mountCompactRiver } from './term-river-rows.js';
 import { TR } from '../term-river-geometry.js';
 import { addDaysKey, buildTimeScale } from '../school-time.js';
 import { formatDisplayDate } from '../format-display-date.js';
@@ -24,9 +25,8 @@ import {
   weeklyLoad,
   weeksBetween
 } from './term-river.js';
-import { capacityForDates, forecastSeries } from './capacity-model.js';
-import { isHoliday as isSchoolHoliday } from '../school-time.js';
-import { onCheckinsChange, withCheckins } from './readiness-checkins.js';
+import { buildRiverCapacity, buildRiverCommitments, riverInputFingerprint } from './term-river-capacity.js';
+import { onCheckinsChange } from './readiness-checkins.js';
 import { acceptPlan } from './ghost-writes.js';
 import {
   countByFilterKey,
@@ -106,6 +106,10 @@ let input = null;
 let engine = null;
 let root = null;
 let svg = null;
+let compact = null;
+let compactScroll = 0;
+let compactRange = null;
+let popAnchor = null;
 let W = 1000;
 let H = 600;
 let blendT = 0;
@@ -139,8 +143,6 @@ let TODAY = '';
 let TERMS = [];
 let ITEMS = [];
 let WALLS = [];
-let LOGGED = {};
-let PATTERN = [];
 let COMMITMENTS = [];
 let TIERS = [];
 let MONTHS = [];
@@ -152,7 +154,6 @@ let GROUPED = {};
 const STACKS = new Map();
 const STACKED = new Set();
 let SCHOOL_WEEK = '';
-let lastLogged = null;
 
 const addDays = addDaysKey;
 const dd = date => formatDisplayDate(date).slice(0, 5);
@@ -260,35 +261,7 @@ function monthFirsts() {
 
 /** Stamp of inputs that require a re-layout (not a Term↔Year tween). */
 function paintKey(inp) {
-  const riverData = inp?.visual?.RIVER;
-  const ghosts = Array.isArray(inp?.ghosts)
-    ? inp.ghosts.map(ghost => `${ghost?.id}:${ghost?.settled ?? ghost?.status ?? ''}`).join(',')
-    : '';
-  // Terms arrive async via hub-prefs. An early mount with [] must remount once they land —
-  // otherwise Week gets T3 labels while Term stays on the empty-terms fallback window.
-  const terms = Array.isArray(inp?.terms)
-    ? inp.terms.map(term => `${term?.term ?? ''}:${term?.starts_on ?? ''}:${term?.ends_on ?? ''}`).join(',')
-    : '';
-  // Hub overlays (Classes / Comms / …) load with events — must remount when they arrive,
-  // not only when visual.RIVER.ITEMS changes.
-  const events = Array.isArray(inp?.events)
-    ? `${inp.events.length}:${inp.events[0]?.record?.id ?? inp.events[0]?.id ?? ''}:${inp.events[inp.events.length - 1]?.record?.id ?? inp.events[inp.events.length - 1]?.id ?? ''}`
-    : '0';
-  return [
-    inp?.today ?? '',
-    ghosts,
-    terms,
-    events,
-    riverData?.TODAY ?? '',
-    riverData?.ZOOMS?.term?.from ?? '',
-    riverData?.ZOOMS?.term?.to ?? '',
-    riverData?.ZOOMS?.year?.from ?? '',
-    riverData?.ZOOMS?.year?.to ?? '',
-    zoomOverride?.term?.from ?? '',
-    zoomOverride?.term?.to ?? '',
-    zoomOverride?.year?.from ?? '',
-    zoomOverride?.year?.to ?? ''
-  ].join('|');
+  return [riverInputFingerprint(inp), JSON.stringify(zoomOverride)].join('|');
 }
 
 function shiftDateYear(key, delta) {
@@ -300,48 +273,20 @@ function shiftDateYear(key, delta) {
 function buildModel() {
   const data = river();
   TERMS = input?.terms?.length ? input.terms : (data.TERMS ?? input?.visual?.school_terms ?? []);
-  TODAY = data.TODAY ?? input?.today ?? TERMS[0]?.starts_on ?? '';
+  TODAY = input?.today ?? data.TODAY ?? TERMS[0]?.starts_on ?? '';
   const derived = deriveRiverZooms(TERMS, TODAY);
   ZOOMS = zoomOverride ?? data.ZOOMS ?? derived;
   YEAR = ZOOMS.year ?? derived.year;
   if (!TODAY) TODAY = YEAR.from;
   WALLS = data.WALLS ?? [];
-  LOGGED = data.LOGGED ?? {};
-  PATTERN = data.PATTERN ?? [];
-  COMMITMENTS = data.COMMITMENTS ?? [];
+  COMMITMENTS = buildRiverCommitments(input);
   // Visual RIVER.ITEMS alone left Term/Year blank while filter chips counted hub events.
   ITEMS = resolveItems(mergeRiverItems(data.ITEMS ?? [], riverItemsFromHubEvents(input?.events ?? [])));
 
   ALL_DAYS = [];
   for (let date = YEAR.from; date <= YEAR.to; date = addDays(date, 1)) ALL_DAYS.push(date);
 
-  // Capacity per day: logged where known, else the forecast (the Almanac's rule).
-  // Real logs always win: the hand-authored LOGGED fixture only paints the reference
-  // mock-up, which has no sleep / diary / check-in events of its own.
-  const liveEvents = withCheckins(input?.events ?? [], { apiFetch: input?.apiFetch, today: TODAY });
-  const hasLogs = liveEvents.some(e => ['sleep', 'diary', 'readiness_checkin'].includes(e?.record?.type));
-  if (hasLogs) LOGGED = {};
-  const loggedKeys = Object.keys(LOGGED).sort();
-  lastLogged = loggedKeys[loggedKeys.length - 1] ?? null;
-  const pattern = date => PATTERN.filter(p => date >= p.from && date <= p.to).reduce((sum, p) => sum + p.delta, 0);
-  CAP = new Map();
-  if (!loggedKeys.length) {
-    // Live data: the same capacityForDates every other view uses, check-ins included,
-    // so a day reads the same number here as in Day and Week.
-    for (const [date, row] of capacityForDates(liveEvents, ALL_DAYS, { isHoliday: date => isSchoolHoliday(date, TERMS), today: TODAY })) {
-      CAP.set(date, { pct: row.pct, low: row.low, high: row.high, forecast: row.forecast });
-    }
-  }
-  for (const date of ALL_DAYS) if (LOGGED[date] != null) CAP.set(date, { pct: LOGGED[date], forecast: false });
-  if (lastLogged) {
-    const future = forecastSeries(ALL_DAYS.filter(date => date > lastLogged), {
-      lastPct: LOGGED[lastLogged],
-      lastDate: lastLogged,
-      isHoliday: date => !inTerm(date),
-      pattern
-    });
-    for (const point of future) CAP.set(point.date, { pct: point.pct, low: point.low, high: point.high, forecast: true });
-  }
+  CAP = buildRiverCapacity({ ...input, today: TODAY, terms: TERMS }, ALL_DAYS);
 
   LOADS = weeklyLoad({ from: YEAR.from, to: YEAR.to, terms: TERMS, commitments: COMMITMENTS, capacityFor: capFor });
   GROUPED = byLane(ITEMS);
@@ -412,6 +357,9 @@ function ensureHatch(defs) {
 
 function mount({ entrance = false } = {}) {
   const view = doc.defaultView;
+  compactScroll = compact?.scroll?.scrollLeft ?? compactScroll;
+  compact?.dispose?.();
+  compact = null;
   engine?.dispose();
   engine = null;
   clearTimeout(toastTimer);
@@ -450,7 +398,7 @@ function mount({ entrance = false } = {}) {
   function applyRiverFilter(next) {
     writeFilterState(input?.hub || 'life', next);
     for (const [id, node] of nodes) {
-      if (!id.startsWith('item:') && !id.startsWith('bar:') && !id.startsWith('pt:')) continue;
+      if (!id.startsWith('item:') && !id.startsWith('bar:') && !id.startsWith('pt:') && !id.startsWith('row:')) continue;
       const itemId = id.slice(id.indexOf(':') + 1);
       const item =
         filterItems.find((row) => row.id === itemId) ||
@@ -482,11 +430,19 @@ function mount({ entrance = false } = {}) {
   });
 
   const card = el('div', 'tr__card', undefined, root, { 'data-part': 'card' });
-  if (state.phone) mountList(card);
-  else mountChart(card);
+  if (state.phone && state.zoom === 'year') mountList(card);
+  else {
+    const views = el('div', 'tr__views', undefined, card);
+    if (!state.phone) mountChart(views);
+    compact = mountCompactRiver({ doc, card: views, lanes: LANES, grouped: GROUPED, window: ZOOMS.term, terms: TERMS, today: TODAY, capacity: CAP, loads: LOADS, nodes, phone: state.phone });
+    const rangeKey = `${ZOOMS.term.from}|${ZOOMS.term.to}`;
+    if (compactRange === rangeKey) compact.scroll.scrollLeft = compactScroll;
+    else centerCompactToday();
+    compactRange = rangeKey;
+  }
   mountLegend(card);
   for (const [id, node] of nodes) {
-    if (!id.startsWith('item:') && !id.startsWith('bar:') && !id.startsWith('pt:')) continue;
+    if (!id.startsWith('item:') && !id.startsWith('bar:') && !id.startsWith('pt:') && !id.startsWith('row:')) continue;
     const itemId = id.slice(id.indexOf(':') + 1);
     const item =
       filterItems.find((row) => row.id === itemId) ||
@@ -503,7 +459,7 @@ function mount({ entrance = false } = {}) {
   nodes.set('__pop', el('div', 'tr-pop', '', root, { role: 'dialog', 'data-part': 'popover', hidden: '' }));
   nodes.set('__live', el('div', 'tr-sr', '', root, { 'aria-live': 'polite', 'data-part': 'announcer' }));
 
-  engine = createMotion({ apply, clock: clockFor(view) });
+  engine = createMotion({ apply, clock: clockFor(view), reducedMotion: () => view?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true });
   engine.place('__toast', { opacity: 0, y: TR.toastRise });
   engine.place('__pop', { opacity: 0, y: TR.popRise });
   engine.place('__zoom', { t: state.zoom === 'year' ? 1 : 0 });
@@ -530,6 +486,17 @@ function mount({ entrance = false } = {}) {
   publish(view);
   if (input) lastPaintKey = paintKey(input);
   if (state.toast && Date.now() < state.toast.until) showToast(state.toast.html, { resume: true });
+}
+
+function centerCompactToday() {
+  if (!compact) return;
+  const heading = compact.element.querySelector('.tr-rows__week-heading.is-current');
+  if (!heading) { compact.scroll.scrollLeft = 0; return; }
+  const box = heading.getBoundingClientRect();
+  const viewport = compact.scroll.getBoundingClientRect();
+  const label = compact.element.querySelector('.tr-rows__label')?.getBoundingClientRect().width ?? 0;
+  const target = compact.scroll.scrollLeft + box.left - viewport.left - label - Math.max(0, (viewport.width - label - box.width) / 2);
+  compact.scroll.scrollLeft = Math.max(0, target);
 }
 
 function mountChart(card) {
@@ -838,35 +805,44 @@ function mountLaneItems(group, laneId, top, h) {
 function mountBody(group, top, h) {
   const base = top + h - 12;
   const Y = value => base - (value / 100) * (h - 26);
-  const band = s('path', { class: 'tr-band' }, group);
-  const past = s('path', { class: 'tr-line' }, group);
-  const future = s('path', { class: 'tr-line is-forecast' }, group);
+  const segments = [];
+  for (const date of ALL_DAYS) {
+    const row = CAP.get(date);
+    if (!row) continue;
+    const previous = segments.at(-1);
+    const forecast = row.forecast === true;
+    const contiguous = previous && addDays(previous.dates.at(-1), 1) === date;
+    if (!previous || previous.forecast !== forecast || !contiguous) {
+      segments.push({ forecast, dates: contiguous ? [previous.dates.at(-1), date] : [date] });
+    } else previous.dates.push(date);
+  }
+  const paths = segments.map(segment => ({ ...segment,
+    line: s('path', { class: `tr-line${segment.forecast ? ' is-forecast' : ''}` }, group),
+    band: segment.forecast ? s('path', { class: 'tr-band' }, group) : null
+  }));
   const soften = s('line', { class: 'tr-soften', y1: Y(40), y2: Y(40) }, group);
   const label = s('text', { class: 'tr-t-soften', y: Y(40) - 4, 'text-anchor': 'end' }, group, '40%');
-  // With nothing logged there is no forecast to draw: the whole line stays solid.
-  const cut = lastLogged ?? ALL_DAYS[ALL_DAYS.length - 1] ?? YEAR.to;
   placers.push(X => {
     const mid = date => X(date) + 0.5 * (X(addDays(date, 1)) - X(date));
-    const points = ALL_DAYS.map(date => [mid(date), Y(capFor(date)), CAP.get(date)]);
-    const p = points
-      .filter((_, i) => ALL_DAYS[i] <= cut)
-      .map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`)
-      .join(' ');
-    const fIdx = ALL_DAYS.findIndex(date => date >= cut);
-    const f = points.slice(fIdx).map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
-    const fut = points.slice(fIdx + 1);
-    const up = fut.map(([x, , c], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${Y(c?.high ?? 0).toFixed(1)}`).join(' ');
-    const down = [...fut].reverse().map(([x, , c]) => `L${x.toFixed(1)} ${Y(c?.low ?? 0).toFixed(1)}`).join(' ');
-    set(past, { d: p });
-    set(future, { d: fut.length ? f : '' });
-    set(band, { d: fut.length ? `${up} ${down} Z` : '' });
+    const coordinate = (date, pct) => `${mid(date).toFixed(1)} ${Y(pct).toFixed(1)}`;
+    for (const segment of paths) {
+      set(segment.line, { d: segment.dates.map((date, i) => `${i ? 'L' : 'M'}${coordinate(date, capFor(date))}`).join(' ') });
+      if (!segment.band) continue;
+      const rows = segment.dates.filter(date => {
+        const row = CAP.get(date);
+        return row?.forecast && Number.isFinite(row.low) && Number.isFinite(row.high);
+      });
+      const up = rows.map((date, i) => `${i ? 'L' : 'M'}${coordinate(date, CAP.get(date).high)}`).join(' ');
+      const down = [...rows].reverse().map(date => `L${coordinate(date, CAP.get(date).low)}`).join(' ');
+      set(segment.band, { d: rows.length ? `${up} ${down} Z` : '' });
+    }
     set(soften, { x1: TR.labelW, x2: W - TR.padR });
     set(label, { x: W - TR.padR - 2 });
   });
 }
 
 function mountLegend(card) {
-  el('div', 'tr-legend', '<span><i class="lg-school"></i>School day</span><span><i class="lg-wall"></i>Wall (trips)</span>'
+  el('div', 'tr-legend', '<span>○ Event</span><span>◇ Task deadline</span><span>▬ Project / multi-day event</span><span><i class="lg-capacity"></i>Logged capacity</span><span><i class="lg-forecast"></i>Forecast</span><span><i class="lg-band"></i>Forecast range</span><span><i class="lg-threshold"></i>40% · ease commitments</span><span><i class="lg-school"></i>School day</span><span><i class="lg-wall"></i>Wall (trips)</span>'
     + '<span><i class="lg-ghost"></i>Agent proposal</span><span><i class="lg-over"></i>Over capacity</span>'
     + '<span class="tr-legend__note">Holidays are shown narrower, not squashed: they\u2019re where your life happens.</span>',
   card, { 'data-part': 'legend' });
@@ -888,10 +864,11 @@ function mountList(card) {
     }
     for (const item of items) {
       const ghost = Boolean(item.ghost);
-      const when = item.date ? dd(item.date) : `${dd(item.from)} – ${dd(item.to)}`;
-      el('button', `tr-list__item${ghost ? ' is-ghost' : ''}`,
+      const when = item.shape === 'bar' ? `${dd(item.from)} – ${dd(item.to)}` : dd(item.date);
+      const button = el('button', `tr-list__item${ghost ? ' is-ghost' : ''}`,
         `<span class="tr-list__t">${escapeHtml(item.title)}</span><span class="tr-list__d">${escapeHtml(when)}</span>`,
         section, { type: 'button', 'data-part': ghost ? 'ghost' : 'item', 'data-id': item.id });
+      nodes.set(`item:${item.id}`, button);
     }
   }
 }
@@ -902,7 +879,19 @@ function mountList(card) {
 function apply(id, props) {
   if (id === '__zoom') {
     blendT = props.t;
+    if (compact) {
+      compact.element.style.opacity = String(1 - blendT);
+      compact.element.style.display = blendT === 1 ? 'none' : '';
+      compact.element.inert = state.zoom !== 'term';
+      compact.element.style.pointerEvents = state.zoom === 'term' ? '' : 'none';
+      compact.element.setAttribute('aria-hidden', String(state.zoom !== 'term'));
+    }
     if (state.phone) return;
+    svg.style.opacity = String(blendT);
+    svg.style.display = blendT === 0 ? 'none' : '';
+    svg.inert = state.zoom !== 'year';
+    svg.style.pointerEvents = state.zoom === 'year' ? '' : 'none';
+    svg.setAttribute('aria-hidden', String(state.zoom !== 'year'));
     const A = scaleFor('term');
     const B = scaleFor('year');
     const X = date => A(date) + (B(date) - A(date)) * blendT;
@@ -1032,6 +1021,7 @@ function stepRiver(delta) {
 function riverToday() {
   zoomOverride = null;
   mount({ entrance: false });
+  if (state.zoom === 'term') centerCompactToday();
   announce('Back to today.');
 }
 
@@ -1066,9 +1056,9 @@ function writePreview(ghost) {
 function openPop(itemId, anchorId = itemId) {
   const item = itemById(itemId);
   const pop = nodes.get('__pop');
-  const target = root?.querySelector(`[data-id="${anchorId}"]`);
+  const target = (state.zoom === 'term' ? compact?.element?.querySelector(`[data-id="${anchorId}"]`) : null) ?? root?.querySelector(`[data-id="${anchorId}"]`);
   if (!item || !pop || !target || !engine) return;
-  const stack = anchorId === itemId ? STACKS.get(itemId) ?? [] : [];
+  const stack = state.zoom === 'year' && anchorId === itemId ? STACKS.get(itemId) ?? [] : [];
   if (stack.length > 1) {
     // Several items share this day: list them, each opens its own card.
     pop.innerHTML = `<b>${escapeHtml(dd(item.date))} · ${stack.length} items</b>`
@@ -1077,7 +1067,7 @@ function openPop(itemId, anchorId = itemId) {
     showPopAt(pop, target, itemId);
     return;
   }
-  const when = item.date ? dd(item.date) : `${dd(item.from)} – ${dd(item.to)}`;
+  const when = item.shape === 'bar' ? `${dd(item.from)} – ${dd(item.to)}` : dd(item.date);
   const lane = LANES.find(entry => (GROUPED[entry.id] ?? []).includes(item));
   const sub = item.sub && item.sub !== 'held' ? ` · ${item.sub}` : '';
   let html = `<b>${escapeHtml(item.title)}</b><p class="tr-pop__meta">${escapeHtml(when)} · ${escapeHtml(lane?.label ?? '')}${escapeHtml(sub)}</p>`;
@@ -1097,7 +1087,9 @@ function openPop(itemId, anchorId = itemId) {
   if (!(ghost && receipt)) {
     bindItemCard(pop, item, {
       onSave: async (patch) => {
-        await saveCalendarItem(input?.apiFetch, item, patch);
+        const moveOnly = Object.keys(patch).every(key => ['date', 'start_time', 'duration_min'].includes(key));
+        if (moveOnly && typeof input?.onReschedule === 'function') await input.onReschedule(item, patch);
+        else await saveCalendarItem(input?.apiFetch, item, patch);
         void input?.onSourcesChanged?.();
       },
       onClose: () => closePop()
@@ -1114,8 +1106,13 @@ function showPopAt(pop, target, itemId) {
   const left = bounds.right - box.right > TR.popWidth + TR.popGap
     ? box.right - bounds.left + TR.popGap
     : box.left - bounds.left - TR.popWidth - TR.popGap;
-  pop.style.left = `${Math.max(0, left)}px`;
-  pop.style.top = `${box.bottom - bounds.top + 6}px`;
+  pop.style.left = `${Math.max(0, Math.min(left, bounds.width - TR.popWidth))}px`;
+  const height = pop.getBoundingClientRect().height;
+  const top = Math.min(box.bottom + TR.popGap, (doc.defaultView?.innerHeight ?? box.bottom + height) - height - TR.popGap);
+  pop.style.top = `${Math.max(TR.popGap - bounds.top, top - bounds.top)}px`;
+  popAnchor = target;
+  pop.setAttribute('aria-label', 'Calendar item');
+  pop.querySelector('[data-card-close],button,input,a')?.focus({ preventScroll: true });
   popFor = itemId;
   engine.place('__pop', { opacity: 0, y: TR.popRise });
   engine.to('__pop', { opacity: 1, y: 0 }, { duration: TR.popMs });
@@ -1124,6 +1121,8 @@ function showPopAt(pop, target, itemId) {
 function closePop() {
   if (!popFor || !engine) return;
   popFor = null;
+  popAnchor?.focus?.({ preventScroll: true });
+  popAnchor = null;
   engine.to('__pop', { opacity: 0, y: TR.popRise }, { duration: TR.popMs });
   setTimeout(() => {
     if (popFor) return;
@@ -1295,7 +1294,7 @@ function observe() {
     const width = Math.round(entries[0].contentRect.width);
     // Never tear down mid-reveal (paint noise, or a real resize during the entrance).
     if (skipResize || perfNow() < entranceGuardUntil || engine?.busy()) {
-      lastHostW = width;
+      if (lastHostW && Math.abs(width - lastHostW) > 2) repaintAfter(Math.max(120, entranceGuardUntil - perfNow()));
       return;
     }
     if (lastHostW && Math.abs(width - lastHostW) > 2) {
@@ -1345,8 +1344,10 @@ export function renderTermRiver(nextDoc, riverHost, nextInput) {
   // Route zoom change (pill / Back / Forward): tween in place — no remount, no reveal.
   if (input.zoom !== lastZoomInput) {
     lastZoomInput = input.zoom;
-    lastPaintKey = key;
+    const changed = lastPaintKey !== key;
     if (nextZoom !== state.zoom) setZoom(nextZoom);
+    if (changed) repaintAfter(TR.zoomMs + 20);
+    else lastPaintKey = key;
     return;
   }
 
@@ -1371,6 +1372,10 @@ export function unmountTermRiver() {
   observer = null;
   unsubCheckins?.();
   unsubCheckins = null;
+  compact?.dispose?.();
+  compact = null;
+  compactScroll = 0;
+  compactRange = null;
   engine?.dispose();
   engine = null;
   nodes.clear();

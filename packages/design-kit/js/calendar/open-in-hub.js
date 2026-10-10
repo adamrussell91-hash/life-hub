@@ -17,6 +17,7 @@ const TYPE_HUB = Object.freeze({
   professional_event: 'professional',
   task: 'tasks',
   work_block: 'tasks',
+  project: 'tasks',
   knowledge_page: 'knowledge',
   medical: 'life',
   workout: 'life',
@@ -52,8 +53,9 @@ export function hubDomainForItem(item) {
   const row = /** @type {Record<string, unknown>} */ (item);
   if (typeof row.hub === 'string' && HUB_LABEL[row.hub]) return row.hub;
   if (typeof row.domain === 'string' && HUB_LABEL[row.domain]) return row.domain;
-  const source = String(row.source || row.type || row.record?.type || row.chip?.source || '');
-  if (TYPE_HUB[source]) return TYPE_HUB[source];
+  for (const source of [row.record?.type, row.type, row.source, row.chip?.source]) {
+    if (TYPE_HUB[String(source)]) return TYPE_HUB[String(source)];
+  }
   const kind = String(row.kind || row.chip?.kind || '');
   if (KIND_HUB[kind]) return KIND_HUB[kind];
   if (row.isClass === true || row.chip?.isClass === true) return 'teaching';

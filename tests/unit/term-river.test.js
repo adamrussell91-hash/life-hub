@@ -116,7 +116,73 @@ test('hub overlays become river points even when visual.RIVER.ITEMS is empty (Ye
     [{ id: 'comm-1', title: 'visual wins', date: '2026-02-04', shape: 'point' }],
     hub
   );
-  assert.equal(merged.find((item) => item.id === 'comm-1')?.title, 'visual wins');
+  assert.equal(merged.find((item) => item.id === 'comm-1')?.title, hub.find(item => item.id === 'comm-1').title);
   assert.ok(merged.length >= 6, 'visual + remaining hub overlays');
   assert.equal(mergeRiverItems([], hub).length, hub.length, 'empty visual still paints hub overlays');
+});
+
+test('river overlays retain record identity and relationships; tasks are diamonds and multi-day events are bars', () => {
+  const record = { id: 'block-1', type: 'work_block', task_id: 'task-1', project_id: 'project-1', date: '2026-10-14', title: 'Draft', source: 'manual' };
+  const [block, task, trip] = riverItemsFromHubEvents([
+    { path: 'tasks/work-block/block-1', source: 'tasks', record },
+    { path: 'tasks/task/task-1', record: { id: 'task-1', type: 'task', due_date: '2026-10-15' } },
+    { path: 'life/trip', record: { id: 'trip', type: 'calendar_block', date: '2026-10-15', end_date: '2026-10-18', kind: 'travel', tags: ['family'] } }
+  ]);
+  assert.equal(block.record, record);
+  assert.equal(block.path, 'tasks/work-block/block-1');
+  assert.equal(block.source, 'tasks');
+  assert.equal(block.task_id, 'task-1');
+  assert.equal(block.project_id, 'project-1');
+  assert.equal(task.shape, 'diamond');
+  assert.equal(trip.shape, 'bar');
+  assert.equal(trip.from, '2026-10-15');
+  assert.equal(trip.to, '2026-10-18');
+  assert.equal(laneFor(trip), 'friends');
+});
+
+test('live content and geometry win while visual lane annotations enrich the item card', () => {
+  const record = { id: 'p', type: 'project', start_date: '2026-10-14', due_date: '2026-11-10' };
+  const hub = riverItemsFromHubEvents([{ path: 'tasks/project/p', record }]);
+  const visual = { id: 'p', title: 'Visual title', shape: 'bar', from: '2026-10-13', to: '2026-11-11', lane: 'scholar' };
+  const [merged] = mergeRiverItems([visual], hub);
+  assert.equal(merged.record, record);
+  assert.equal(merged.path, 'tasks/project/p');
+  assert.equal(merged.type, 'project');
+  assert.equal(merged.title, hub[0].title);
+  assert.equal(merged.from, record.start_date);
+  assert.equal(merged.lane, 'scholar');
+});
+
+test('live relationship ids win over stale visual relationships and check-ins stay off river', () => {
+  const record = { id: 'block', type: 'work_block', date: '2026-10-14', task_id: 'live-task', project_id: 'live-project' };
+  const hub = riverItemsFromHubEvents([{ record }, { record: { id: 'checkin', type: 'readiness_checkin', date: '2026-10-14' } }]);
+  const [merged] = mergeRiverItems([{ id: 'block', task_id: 'stale-task', project_id: 'stale-project' }], hub);
+  assert.equal(merged.task_id, 'live-task');
+  assert.equal(merged.project_id, 'live-project');
+  assert.equal(hub.some(item => item.id === 'checkin'), false);
+});
+
+test('preserved source labels still map work blocks and projects to Tasks filters and routes', async () => {
+  const { filterKeyForItem } = await import('../../packages/design-kit/js/calendar/calendar-filter.js');
+  const { hubDomainForItem } = await import('../../packages/design-kit/js/calendar/open-in-hub.js');
+  const items = riverItemsFromHubEvents([
+    { source: 'tasks', record: { id: 'block', type: 'work_block', date: '2026-10-14', task_id: 'task' } },
+    { id: 'manual', source: 'manual', type: 'work_block', date: '2026-10-14' },
+    { source: 'tasks', record: { id: 'project', type: 'project', from: '2026-10-14', to: '2026-10-20' } }
+  ]);
+  for (const item of items) {
+    assert.equal(filterKeyForItem(item), 'tasks');
+    assert.equal(hubDomainForItem(item), 'tasks');
+  }
+});
+
+test('a renamed and rescheduled live task replaces stale visual content and geometry', () => {
+  const live = riverItemsFromHubEvents([{path:'tasks:t',record:{id:'t',type:'task',title:'Updated',due_date:'2026-10-20'}}]);
+  const [item] = mergeRiverItems([{id:'t',title:'Old',from:'2026-10-01',to:'2026-10-14',shape:'bar',lane:'scholar'}], live);
+  assert.equal(item.title, 'Updated');
+  assert.equal(item.date, '2026-10-20');
+  assert.equal(item.shape, 'diamond');
+  assert.equal(item.from, undefined);
+  assert.equal(item.to, undefined);
+  assert.equal(item.lane, 'scholar');
 });

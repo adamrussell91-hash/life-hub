@@ -145,6 +145,17 @@ const frames = (page, ms, probe) =>
 test('tasks calendar: filter toggle hides items; capacity unchanged', async () => {
   const { context, page } = await openTasksCalendar();
   try {
+    // First paint deliberately precedes source hydration. Compare the loaded
+    // model, not the temporary baseline against a late Life-source repaint.
+    await page.waitForLoadState('networkidle');
+    await page.waitForFunction(() => {
+      const caps = [...document.querySelectorAll('[data-part="tideline"] [data-part="capacity"]')];
+      return caps.length === 7 && caps.every(n => !/loading logs|logs unavailable/.test(n.textContent));
+    });
+    await page.evaluate(() => {
+      window.__tideline?.finish?.();
+      window.__filterRoot = document.querySelector('[data-part="tideline"]');
+    });
     const chip = page.locator('[data-part="sources"] button[data-filter="tasks"]').first();
     await chip.waitFor();
     const before = await page.evaluate(() => {
@@ -162,7 +173,7 @@ test('tasks calendar: filter toggle hides items; capacity unchanged', async () =
         caps: [...root.querySelectorAll('[data-part="capacity"]')].map((n) => n.dataset.pct),
         bands: window.__tideline?.heights?.() ?? null,
         visible: [...root.querySelectorAll('.cal-chip')].filter((n) => !n.hidden).length,
-        still: Boolean(root)
+        still: root === window.__filterRoot
       };
     });
     assert.deepEqual(after.caps, before.caps);

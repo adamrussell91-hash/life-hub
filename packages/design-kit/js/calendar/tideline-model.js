@@ -135,7 +135,7 @@ export function withMeta(clock, record) {
   return [clock, who, where].filter(Boolean).join(' · ');
 }
 
-function chipFromEvent(event) {
+export function chipFromEvent(event) {
   const record = event.record ?? {};
   if (!record.time || LOG_TYPES.has(record.type) || record.type === 'knowledge_page') return null;
   if (record.type === 'calendar_block' && (record.kind === 'wall' || record.kind === 'protected')) return null;
