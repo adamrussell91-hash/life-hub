@@ -319,12 +319,12 @@ async function searchEventKind(getProfessionalStore, query) {
   const indexKeys = await listEventIndexKeys(store);
   const ids = [...new Set(indexKeys.map((key) => key.slice(EVENT_INDEX_PREFIX.length)).filter(Boolean))];
   const records = await mapBounded(ids, READ_BATCH_SIZE, async (id) =>
-    parseEventRecord(await getProfessionalJSON(store, eventKey(id)))
+    parseEventRecord(await getProfessionalJSON(store, eventKey(id), { consistency: 'strong' }))
   );
 
   const out = [];
   for (const record of records) {
-    if (!record) continue;
+    if (!record || isDeletedRecord(record)) continue;
     const title = typeof record.title === 'string' ? record.title : '';
     const rank = matchRank(query, title, null);
     if (rank === null) continue;

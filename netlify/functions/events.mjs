@@ -13,7 +13,7 @@ import { parseEntityRef } from './_shared/entity-ref.mjs';
 import { createProfessionalTaskLinkOperationRepository } from './_shared/professional-task-link-operation.mjs';
 import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
 import { listGithubPdEvents } from './_shared/github-professional-data.mjs';
-import { importedPdEventById, mergeNotionPdEvents } from './_shared/notion-pd-events.mjs';
+import { importedPdEventById } from './_shared/notion-pd-events.mjs';
 
 export const config = { path: '/api/events' };
 
@@ -102,6 +102,8 @@ export function createEventsHandler(deps = {}) {
 
       const repo = createRepository({
         store,
+        listImportedEvents: () => loadGithubPdEvents({ env }),
+        loadImportedEvent: async (id) => importedPdEventById(await loadGithubPdEvents({ env }), id),
         now: eventNow,
         resolveEntity,
         getUniversalLinkStore,
@@ -123,15 +125,7 @@ export function createEventsHandler(deps = {}) {
         if (request.method === 'GET') {
           if (url.searchParams.has('id')) {
             const id = readId(url);
-            let event;
-            try {
-              event = await repo.getEvent(id);
-            } catch (error) {
-              if (error?.status !== 404) throw error;
-              const imported = importedPdEventById(await loadGithubPdEvents({ env }).catch(() => []), id);
-              if (!imported) throw error;
-              event = imported;
-            }
+            let event = await repo.getEvent(id);
             const learning_operation = await taskLinks.loadForTarget(
               `professional:event:${id}`,
               'learning_for'
@@ -147,16 +141,16 @@ export function createEventsHandler(deps = {}) {
               env
             );
           }
-          const [stored, imported] = await Promise.all([
-            repo.listEvents(),
-            loadGithubPdEvents({ env }).catch(() => [])
-          ]);
-          const events = mergeNotionPdEvents(stored, imported);
+          const events = await repo.listEvents();
           return withCors(okResponse(200, { events }), request, env);
         }
 
         if (request.method === 'POST') {
           const action = url.searchParams.get('action');
+          if (action === 'delete') {
+            const result = await repo.deleteEvent(readId(url));
+            return withCors(okResponse(200, result), request, env);
+          }
           if (action === 'retry-links') {
             const id = readId(url);
             const result = await repo.retryLinks(id);

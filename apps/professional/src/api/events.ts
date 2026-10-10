@@ -62,6 +62,11 @@ export function updateEvent(
   return apiPatch(`/api/events?${params.toString()}`, patch, { signal: options.signal });
 }
 
+export function deleteEvent(id: string): Promise<{ deleted: boolean; id: string }> {
+  const params = new URLSearchParams({ id, action: 'delete' });
+  return apiPost(`/api/events?${params.toString()}`, {});
+}
+
 export function rescheduleEvent(
   id: string,
   body: { start: string; end: string; time_zone: string; all_day?: boolean },

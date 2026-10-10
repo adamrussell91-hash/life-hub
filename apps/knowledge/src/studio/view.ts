@@ -250,7 +250,7 @@ export function mountStudio(host: HTMLElement, deps: StudioDeps): () => void {
       ${note.in_knowledge
         ? `<button class="studio-noterow__title" type="button" data-open-page="${escapeHtml(ref)}">${escapeHtml(note.title)}</button>`
         : `<span class="studio-noterow__title">${escapeHtml(note.title)}</span>`}
-      <span class="studio-noterow__meta">${note.in_knowledge ? words(note.words) : "Not imported from Notion yet"}${note.topic_label ? " · topic only" : ""}</span>
+      <span class="studio-noterow__meta">${note.in_knowledge ? words(note.words) : "Not available in Knowledge yet"}${note.topic_label ? " · topic only" : ""}</span>
       ${also.length || unlink ? `<span class="studio-noterow__also">${also.map(o => `<button class="studio-mini studio-mini--${o.area}" type="button" data-book="${escapeHtml(o.id)}">${escapeHtml(o.short)}</button>`).join("")}${unlink}</span>` : ""}
     </li>`;
   }
@@ -410,7 +410,7 @@ export function mountStudio(host: HTMLElement, deps: StudioDeps): () => void {
     } else {
       const merge = insights(data).find(i => i.id.startsWith(`merge:${b.id}:`));
       body = `<div class="studio-callout">${ICON_SPARK}<div><p><b>A blank page.</b> ${b.blurb ? "The idea lives in its description so far." : "Nothing is planned or linked yet."}</p>
-        <p>${merge ? escapeHtml(merge.title) : "Give it a chapter plan in Notion or here, then link notes to each chapter."}</p></div></div>`;
+        <p>${merge ? escapeHtml(merge.title) : "Give it a chapter plan here, then link notes to each chapter."}</p></div></div>`;
     }
     return `<section class="studio-desk studio-panel" aria-labelledby="studio-desk-title">
       <div class="studio-desk__head">
@@ -424,7 +424,7 @@ export function mountStudio(host: HTMLElement, deps: StudioDeps): () => void {
         <span class="studio-stage studio-stage--${STUDIO_STAGES.indexOf(b.stage)}">${escapeHtml(b.stage)}</span>
         ${tags.map(t => `<span class="studio-tag">${escapeHtml(t)}</span>`).join("")}
         <span class="studio-muted">Added ${escapeHtml(isoDay(b.added))}</span>
-        ${b.notion_url ? `<a class="studio-linkish" href="${escapeHtml(b.notion_url)}" target="_blank" rel="noopener">Notion page</a>` : ""}
+
       </div>
       ${stageHtml(b)}
       ${body}

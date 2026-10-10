@@ -189,8 +189,8 @@ export function createWatches(doc, { storage = globalThis.localStorage, radarApi
   function radarStatusLine() {
     const r = state.radar;
     if (r.status === 'loading') return 'Checking the radar…';
-    if (r.status === 'offline') return 'The radar is out of reach right now, so each watch sits at its Notion price.';
-    if (!r.lastRun) return 'The first shop check runs on Sunday morning. Until then each watch sits at its Notion price.';
+    if (r.status === 'offline') return 'The radar is out of reach right now, so each watch sits at its saved price.';
+    if (!r.lastRun) return 'The first shop check runs on Sunday morning. Until then each watch sits at its saved price.';
     const d = new Date(r.lastRun);
     return `Shops last checked ${d.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}. Checks run every Sunday morning.`;
   }
@@ -208,7 +208,7 @@ export function createWatches(doc, { storage = globalThis.localStorage, radarApi
       el('i', { style: `width:${(c.tracked / c.total) * 100}%`, 'data-kind': 'tracked' }),
       el('i', { style: `width:${(c.homepage / c.total) * 100}%`, 'data-kind': 'homepage' }),
       el('i', { style: `width:${(c.missing / c.total) * 100}%`, 'data-kind': 'missing' }));
-    $('#aes-radar-cover').textContent = `${c.tracked} of ${c.total} have a shop page the radar can check. ${c.homepage} only link to a brand homepage and ${c.missing} have no link yet. Add a product page link in Notion to put one on the radar.`;
+    $('#aes-radar-cover').textContent = `${c.tracked} of ${c.total} have a shop page the radar can check. ${c.homepage} only link to a brand homepage and ${c.missing} have no link yet. A product page link is needed to include a watch on the radar.`;
   }
 
   function drawDial(all) {
@@ -292,8 +292,8 @@ export function createWatches(doc, { storage = globalThis.localStorage, radarApi
       kids.push(el('div', { class: 'aes-radar__price' },
         el('span', { class: 'aes-display aes-radar__big', text: formatAud(it.price) }),
         it.live
-          ? (it.notionPrice ? el('span', { class: 'aes-radar__delta', 'data-dir': diff < 0 ? 'down' : diff > 0 ? 'up' : 'flat', text: diff ? `${diff < 0 ? '▼' : '▲'} ${formatAud(Math.abs(diff))} on Notion's ${formatAud(it.notionPrice)}` : `Same as Notion's ${formatAud(it.notionPrice)}` }) : null)
-          : el('span', { class: 'aes-meta', text: 'Notion price, not checked yet' })));
+          ? (it.notionPrice ? el('span', { class: 'aes-radar__delta', 'data-dir': diff < 0 ? 'down' : diff > 0 ? 'up' : 'flat', text: diff ? `${diff < 0 ? '▼' : '▲'} ${formatAud(Math.abs(diff))} on saved price of ${formatAud(it.notionPrice)}` : `Same as saved price of ${formatAud(it.notionPrice)}` }) : null)
+          : el('span', { class: 'aes-meta', text: 'saved price, not checked yet' })));
     }
     if (it.reading) {
       const r = it.reading;
@@ -302,7 +302,7 @@ export function createWatches(doc, { storage = globalThis.localStorage, radarApi
       if ((r.history ?? []).length > 1) kids.push(sparkline(r.history), el('p', { class: 'aes-meta', text: `Last ${r.history.length} weekly checks` }));
     }
     if (!it.trackable) {
-      kids.push(el('p', { class: 'aes-meta', text: it.group.items.some(x => x.url) ? 'Only a brand homepage is saved, so the radar can’t find this exact watch. Add its product page in Notion.' : 'No shop link saved yet. Add one in Notion and it joins the radar.' }));
+      kids.push(el('p', { class: 'aes-meta', text: it.group.items.some(x => x.url) ? 'Only a brand homepage is saved, so the radar can’t find this exact watch. A product page link is needed.' : 'No shop link saved yet. A shop link is needed for radar checks.' }));
     } else if (it.reading?.error && !it.reading.aud) {
       kids.push(el('p', { class: 'aes-meta', text: 'The last check could not read a price from the shop page.' }));
     }
@@ -399,9 +399,9 @@ export function createWatches(doc, { storage = globalThis.localStorage, radarApi
             el('dt', { text: k }),
             el('dd', { 'data-source-field': k }, k === 'Product URL' && p[k] ? link(p[k], p[k]) : format(k, p[k]))
           ])),
-          el('p', { class: 'aes-meta' }, link('Open in Notion', w.source.url))));
+          el('p', { class: 'aes-meta', text: '' })));
     }));
-    $('#aes-watch-source').replaceChildren(link('Watch Tracker in Notion', WATCH_SOURCE_URL));
+    $('#aes-watch-source').replaceChildren();
   }
 
   function wire() {

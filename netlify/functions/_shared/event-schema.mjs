@@ -160,6 +160,7 @@ export function validateTalks(value) {
 }
 
 const STORED_KEYS = new Set([
+  'deleted_at',
   'schema_version',
   'id',
   'title',
@@ -208,6 +209,7 @@ export function parseEventRecord(raw) {
   if (raw.certificate !== undefined && raw.certificate !== null && certificate === null) return null;
   if (typeof raw.created_at !== 'string' || typeof raw.updated_at !== 'string') return null;
   return {
+    ...(raw.deleted_at ? { deleted_at: raw.deleted_at } : {}),
     schema_version: raw.schema_version,
     id: raw.id,
     title: raw.title,
