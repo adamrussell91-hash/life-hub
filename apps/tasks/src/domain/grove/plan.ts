@@ -22,9 +22,9 @@ export const GROWTH_DAYS = 3;
 /** Minimum distance between two trunks, in metres. A mature canopy is about 2.5 m across. */
 export const TREE_SPACING = 2.6;
 /** Distance between neighbouring day clearings, in metres. */
-export const DAY_CELL = 30;
-/** Smallest a tree is drawn, as a fraction of its mature height (about a 0.7 m sapling). */
-export const SAPLING_SCALE = 0.13;
+export const DAY_CELL = 26;
+/** Smallest a tree is drawn, as a fraction of its mature height (about a 1.1 m sapling). */
+export const SAPLING_SCALE = 0.2;
 /** Each species' patch sits this far from the clearing centre, so species grow in their own patches. */
 const PATCH_OFFSET = 4.2;
 const MIN_RADIUS = 5;
