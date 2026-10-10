@@ -89,9 +89,7 @@ export async function inspectFile(file: File | Blob): Promise<InspectedPhoto> {
   const applied = orientationAppliedDims(width, height, orientation);
 
   const wall =
-    exifWallTimeString(raw.DateTimeOriginal) ??
-    exifWallTimeString(raw.CreateDate) ??
-    exifWallTimeString(raw.ModifyDate);
+    exifWallTimeString(raw.DateTimeOriginal) ?? exifWallTimeString(raw.CreateDate);
 
   const offsetMinutes =
     parseOffsetMinutes(raw.OffsetTimeOriginal) ??

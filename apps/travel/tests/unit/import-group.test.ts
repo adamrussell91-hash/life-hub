@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import exifr from 'exifr';
+
+vi.mock('exifr', () => ({
+  default: { parse: vi.fn() },
+}));
 import {
   coordsFromGps,
   DEFAULT_GROUPING_THRESHOLDS,
@@ -251,5 +256,17 @@ describe('inspectFile', () => {
     expect(inspected.needs_date).toBe(true);
     expect(inspected.provenance.file_last_modified).toBe('2026-04-06T20:00:00.000Z');
     expect(inspected.provenance.capture_time_source).toBe('none');
+  });
+
+  it('does not treat ModifyDate alone as capture wall time', async () => {
+    vi.mocked(exifr.parse).mockResolvedValue({
+      ModifyDate: '2026:04:06 15:30:00',
+    });
+    const blob = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' });
+    const inspected = await inspectFile(blob);
+    expect(inspected.capture_wall_time).toBeNull();
+    expect(inspected.needs_date).toBe(true);
+    expect(inspected.provenance.capture_time_source).toBe('none');
+    expect(inspected.raw_metadata.ModifyDate).toBe('2026:04:06 15:30:00');
   });
 });
