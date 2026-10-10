@@ -173,6 +173,26 @@ describe('embed hybrid render', () => {
     schema_version: 1 as const
   };
 
+  it.each(['pdf', 'generic'] as const)('displays uploaded PDFs with provider %s', (provider) => {
+    const url = 'https://api.adam-russell.com/api/media/media_mv21pvh5_2vsqei/file';
+    const el = renderBlock({ ...base, block_type: 'embed', content: {
+      url, provider, title: 'Tracking Syllabus Content.pdf'
+    } }, 'teacher');
+    const frame = el.querySelector('iframe');
+    expect(frame?.getAttribute('src')).toBe(url);
+    // A sandbox disables the native PDF viewer, leaving only an empty frame.
+    expect(frame?.hasAttribute('sandbox')).toBe(false);
+    expect(el.querySelector('a')?.getAttribute('href')).toBe(url);
+  });
+
+  it('keeps external frames sandboxed even when their title ends in PDF', () => {
+    const url = 'https://example.com/api/media/untrusted/file';
+    const el = renderBlock({ ...base, block_type: 'embed', content: {
+      url, provider: 'generic', title: 'Worksheet.pdf'
+    } }, 'teacher');
+    expect(el.querySelector('iframe')?.hasAttribute('sandbox')).toBe(true);
+  });
+
   it('renders slides iframe from embed_url', () => {
     const el = renderBlock(
       {
