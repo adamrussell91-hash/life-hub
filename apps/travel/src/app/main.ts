@@ -115,6 +115,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
         renderHighlight('trip');
         const fixture = klIstanbulFixture();
         renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: fixture.title });
+        journalHandle?.destroy();
         journalHandle = renderJournal(shell.canvas, {
           fixture,
           momentId: route.momentId

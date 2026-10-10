@@ -1,12 +1,33 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderJournal } from '@/journal/render-journal';
 import { klIstanbulFixture } from '@/journal/fixtures/kl-istanbul';
 
-function flushAnimationFrames(): Promise<void> {
+function flushAnimationFrames(depth = 2): Promise<void> {
   return new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    const tick = (left: number) => {
+      if (left <= 0) resolve();
+      else requestAnimationFrame(() => tick(left - 1));
+    };
+    tick(depth);
   });
 }
+
+function mockMatchMedia(reduced: boolean): void {
+  vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+    matches: reduced && query.includes('prefers-reduced-motion'),
+    media: query,
+    onchange: null,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    dispatchEvent: () => false,
+  }));
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('renderJournal', () => {
   it('renders toolbar, two leg headings, and a transition', () => {
@@ -33,6 +54,36 @@ describe('renderJournal', () => {
       expect(momentIndexes.length).toBeGreaterThan(0);
       expect(mapIndex).toBeGreaterThan(Math.max(...momentIndexes));
     }
+  });
+
+  it('skips hub-reveal when prefers-reduced-motion is set', async () => {
+    mockMatchMedia(true);
+    const root = document.createElement('div');
+    renderJournal(root, { fixture: klIstanbulFixture() });
+    await flushAnimationFrames();
+    expect(root.querySelector('.hub-reveal')).toBeNull();
+  });
+
+  it('applies hub-reveal entrance when motion is allowed', async () => {
+    mockMatchMedia(false);
+    const root = document.createElement('div');
+    renderJournal(root, { fixture: klIstanbulFixture() });
+    await flushAnimationFrames(4);
+    const reveal = root.querySelector('.hub-reveal');
+    expect(reveal).toBeTruthy();
+    expect(reveal?.classList.contains('is-in')).toBe(true);
+  });
+
+  it('uses instant scroll for chapter jump under reduced motion', async () => {
+    mockMatchMedia(true);
+    const scrollIntoView = vi
+      .spyOn(HTMLElement.prototype, 'scrollIntoView')
+      .mockImplementation(() => undefined);
+    const root = document.createElement('div');
+    renderJournal(root, { fixture: klIstanbulFixture(), momentId: 'mom_ist_reflection' });
+    await flushAnimationFrames();
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(scrollIntoView.mock.calls[0]?.[0]).toMatchObject({ behavior: 'auto' });
   });
 
   it('shows Read more on the long reflection fixture moment', async () => {

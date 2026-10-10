@@ -1,5 +1,6 @@
 import type { JournalFixture, JournalLeg, JournalTransition } from '@/journal/types';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { prefersReducedMotion } from '../../design-kit/js/hub-motion.js';
 import { getPattern } from '@/journal/patterns/registry';
 import { shouldShowDayMapPreview } from '@/journal/layout';
 import { openChapterJump } from '@/journal/chapter-jump';
@@ -69,14 +70,69 @@ function renderLegPattern(leg: JournalLeg, patternOff: boolean): HTMLElement | n
   return layer;
 }
 
-function scrollToChapter(id: string, onChapterJump?: (id: string) => void): void {
-  const target = document.getElementById(id);
+function scrollBehaviorFor(root: ParentNode): ScrollBehavior {
+  return prefersReducedMotion(root) ? 'auto' : 'smooth';
+}
+
+function chapterEl(journalRoot: HTMLElement, id: string): HTMLElement | null {
+  return (
+    journalRoot.querySelector<HTMLElement>(`#${CSS.escape(id)}`) ?? document.getElementById(id)
+  );
+}
+
+function resolveEntranceTarget(journalRoot: HTMLElement, focusId?: string): HTMLElement | null {
+  if (focusId) {
+    const hinted = chapterEl(journalRoot, focusId);
+    if (hinted) return hinted;
+  }
+  const view = journalRoot.ownerDocument?.defaultView;
+  const viewH = view?.innerHeight ?? 800;
+  const selectors = ['[data-journal-moment]', '[data-journal-day]', '[data-journal-leg]'];
+  let best: HTMLElement | null = null;
+  let bestTop = Infinity;
+  let bestRank = 3;
+  for (let rank = 0; rank < selectors.length; rank += 1) {
+    const sel = selectors[rank]!;
+    for (const el of journalRoot.querySelectorAll<HTMLElement>(sel)) {
+      const { top, bottom } = el.getBoundingClientRect();
+      if (bottom <= 0 || top >= viewH) continue;
+      if (top < bestTop - 0.5 || (Math.abs(top - bestTop) < 0.5 && rank < bestRank)) {
+        bestTop = top;
+        bestRank = rank;
+        best = el;
+      }
+    }
+  }
+  return (
+    best ??
+    journalRoot.querySelector<HTMLElement>(
+      '[data-journal-moment], [data-journal-day], [data-journal-leg]',
+    )
+  );
+}
+
+function playJournalEntrance(journalRoot: HTMLElement, focusId?: string): void {
+  if (prefersReducedMotion(journalRoot)) return;
+  const target = resolveEntranceTarget(journalRoot, focusId);
+  if (!target) return;
+  target.classList.add('hub-reveal');
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => target.classList.add('is-in'));
+  });
+}
+
+function scrollToChapter(
+  id: string,
+  journalRoot: HTMLElement,
+  onChapterJump?: (id: string) => void,
+): void {
+  const target = chapterEl(journalRoot, id);
   if (!target) return;
   const heading =
     target.querySelector<HTMLElement>('h2, h3, .journal-leg__title, .journal-day__date') ??
     target;
   heading.tabIndex = -1;
-  target.scrollIntoView({ block: 'start' });
+  target.scrollIntoView({ block: 'start', behavior: scrollBehaviorFor(journalRoot) });
   heading.focus({ preventScroll: true });
   onChapterJump?.(id);
 }
@@ -110,7 +166,7 @@ export function renderJournal(
         fixture: opts.fixture,
         anchor: root,
         onSelect: (id) => {
-          scrollToChapter(id, opts.onChapterJump);
+          scrollToChapter(id, root, opts.onChapterJump);
         },
         onClose: () => {
           chapterOverlay = null;
@@ -226,13 +282,19 @@ export function renderJournal(
       }
     })();
 
-  if (scrollId && document.getElementById(scrollId)) {
-    requestAnimationFrame(() => scrollToChapter(scrollId));
+  if (scrollId && chapterEl(root, scrollId)) {
+    requestAnimationFrame(() => {
+      scrollToChapter(scrollId, root);
+      playJournalEntrance(root, scrollId);
+    });
     if (opts.fixture.moments.some((m) => m.id === scrollId)) {
       persistLastView(opts.fixture.trip_id, scrollId);
     }
-  } else if (opts.fixture.moments[0]) {
-    persistLastView(opts.fixture.trip_id, opts.fixture.moments[0].id);
+  } else {
+    if (opts.fixture.moments[0]) {
+      persistLastView(opts.fixture.trip_id, opts.fixture.moments[0].id);
+    }
+    requestAnimationFrame(() => playJournalEntrance(root));
   }
 
   const observer = new IntersectionObserver(
