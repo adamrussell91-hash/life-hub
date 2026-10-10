@@ -3,6 +3,7 @@
  * Hosts supply `search` / `onSelect` / `onCreate` callbacks.
  * This module never contains API URLs, auth, or domain relationship keys.
  */
+import { kindGroupLabel } from './entity-kinds.js';
 
 const DEFAULT_DEBOUNCE_MS = 200;
 
@@ -25,12 +26,17 @@ const DEFAULT_DEBOUNCE_MS = 200;
  *   onCreate?: (query: string, kind: string) => void,
  *   emptyText?: string,
  *   debounceMs?: number,
- *   mode?: 'mention' | 'field'
+ *   mode?: 'mention' | 'field',
+ *   minQueryLength?: number
  * }} options
  *
  * `mode: 'mention'` (default) opens on `@` inside free text. `mode: 'field'`
  * is for a dedicated field (e.g. "Organisation"): the whole value is the
  * query, spaces included, no `@` needed.
+ *
+ * `minQueryLength` keeps the list closed (and makes no request) until the
+ * query has that many characters, for a server search that rejects
+ * shorter ones.
  */
 export function createEntityPicker(options) {
   const input = options.input;
@@ -42,6 +48,7 @@ export function createEntityPicker(options) {
   const emptyText = options.emptyText ?? 'No matching entities.';
   const debounceMs = Math.min(250, Math.max(150, options.debounceMs ?? DEFAULT_DEBOUNCE_MS));
   const fieldMode = options.mode === 'field';
+  const minQueryLength = Math.max(0, options.minQueryLength ?? 0);
 
   const root = document.createElement('div');
   root.className = 'entity-picker';
@@ -153,7 +160,7 @@ export function createEntityPicker(options) {
     for (const [kind, group] of groups) {
       const heading = document.createElement('p');
       heading.className = 'entity-picker__group';
-      heading.textContent = kind;
+      heading.textContent = kindGroupLabel(kind);
       listbox.append(heading);
       for (const item of group) {
         const option = document.createElement('button');
@@ -170,7 +177,8 @@ export function createEntityPicker(options) {
 
         const meta = document.createElement('span');
         meta.className = 'entity-picker__option-meta';
-        meta.textContent = [item.kind, item.supporting_label].filter(Boolean).join(' · ');
+        // The group heading already names the kind.
+        meta.textContent = item.supporting_label ?? '';
 
         option.append(label, meta);
         option.addEventListener('click', () => selectIndex(Number(option.dataset.index)));
@@ -277,6 +285,15 @@ export function createEntityPicker(options) {
     }
     mentionStart = mention.start;
     mentionQuery = mention.query;
+    if (mention.query.trim().length < minQueryLength) {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = null;
+      abortController?.abort();
+      abortController = null;
+      searchGeneration += 1;
+      setOpen(false);
+      return;
+    }
     scheduleSearch(mention.query);
   }
 
@@ -317,12 +334,7 @@ export function createEntityPicker(options) {
   return {
     root,
     open: () => {
-      const mention = readMention();
-      if (mention) {
-        mentionStart = mention.start;
-        mentionQuery = mention.query;
-        scheduleSearch(mention.query);
-      }
+      if (readMention()) onInput();
     },
     close,
     destroy() {

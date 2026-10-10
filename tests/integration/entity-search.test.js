@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createEntitiesHandler } from '../../netlify/functions/entities.mjs';
-import { createEntitySearchHandler } from '../../netlify/functions/entity-search.mjs';
+import { createEntitySearchHandler, matchRank } from '../../netlify/functions/entity-search.mjs';
+import { resolveEvent } from '../../netlify/functions/_shared/entity-resolvers.mjs';
+import { createAccessContext } from '../../netlify/functions/_shared/entity-access.mjs';
+import { projectNotionPdEvent } from '../../netlify/functions/_shared/notion-pd-events.mjs';
 import { eventIndexKey, eventKey, meetingIndexKey, meetingKey } from '../../netlify/functions/_shared/professional-blobs.mjs';
 import { unitKey, draftLessonKey, classKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
 
@@ -230,7 +233,7 @@ test('kinds param filters which kinds are searched', async () => {
   assert.equal(response.data.groups.organisation.length, 1);
 });
 
-test('caps combined results at 20', async () => {
+test('caps each kind at 10 when several kinds are searched, so one busy kind cannot crowd out the rest', async () => {
   const store = memoryStore();
   const entities = createEntitiesHandler(baseDeps(store));
   for (let i = 0; i < 25; i += 1) {
@@ -243,7 +246,10 @@ test('caps combined results at 20', async () => {
   }
   const search = createEntitySearchHandler(baseDeps(store));
   const response = await (await search(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Search' }))).json();
-  assert.equal(response.data.groups.person.length, 20);
+  assert.equal(response.data.groups.person.length, 10);
+  // Narrowed to the one kind, the whole overall allowance is available.
+  const narrowed = await (await search(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Search&kinds=person' }))).json();
+  assert.equal(narrowed.data.groups.person.length, 25);
 });
 
 test('a valid match is never hidden by candidate count: 250 non-matching records plus one match still finds the match', async () => {
@@ -330,7 +336,7 @@ test('B6: task results are returned, grouped separately, and ranked alongside pe
   assert.ok(response.data.groups.organisation.some(r => r.ref === unsw.ref));
 });
 
-test('B6: task search respects the combined cap of 20 across all kinds', async () => {
+test('B6: task results get their own allowance next to people', async () => {
   const store = memoryStore();
   const entities = createEntitiesHandler(baseDeps(store));
   for (let i = 0; i < 15; i += 1) {
@@ -347,8 +353,8 @@ test('B6: task search respects the combined cap of 20 across all kinds', async (
   const handler = createEntitySearchHandler(baseDeps(store, { getTasksStore: async () => tasksStore }));
 
   const response = await (await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Search' }))).json();
-  const total = response.data.groups.person.length + response.data.groups.organisation.length + response.data.groups.task.length;
-  assert.equal(total, 20);
+  assert.equal(response.data.groups.person.length, 10);
+  assert.equal(response.data.groups.task.length, 10);
 });
 
 test('B6: an unsupported kind (including student_reference) is rejected with 400, not silently dropped', async () => {
@@ -614,4 +620,96 @@ test('one failing provider does not blank the other kinds the tagger asked for',
   const body = await response.json();
   assert.deepEqual(body.data.groups.lesson.map(row => row.ref), ['teaching:lesson:lesson_cdx10_b']);
   assert.deepEqual(body.data.unavailable, ['page', 'task']);
+});
+
+// --- Multi-word, typo-tolerant matching and imported Notion PD events ---
+
+const WAGAN_ROW = {
+  notion_id: 'ed23e296216a4df1aefb8c1db677918b',
+  title: 'PD — Samuel Wagan Watson (Felicity Plunkett)',
+  start: '2026-03-29T23:30:00.000Z',
+  end: '2026-03-30T02:43:00.000Z',
+  all_day: false,
+  occurrence_state: 'scheduled',
+  attendance_state: null,
+  notes: [],
+  reason: 'notion-in-progress',
+  notion_status: 'In progress',
+  hours: null,
+  time_zone: 'Australia/Sydney'
+};
+
+async function searchEvents(q, { professionalStore = memoryStore(), rows = [WAGAN_ROW] } = {}) {
+  const handler = createEntitySearchHandler(baseDeps(memoryStore(), {
+    getProfessionalStore: async () => professionalStore,
+    listGithubPdEvents: async () => rows
+  }));
+  const params = new URLSearchParams({ q, kinds: 'event' });
+  return (await (await handler(request({ url: `https://api.adam-russell.com/api/entities/search?${params}` }))).json()).data;
+}
+
+test('matchRank: words in any order, punctuation ignored, one-letter typos tolerated', () => {
+  const title = 'PD — Samuel Wagan Watson (Felicity Plunkett)';
+  assert.equal(matchRank('pd', title, null), 0);
+  assert.equal(matchRank('wagan watson', title, null), 1);
+  assert.equal(matchRank('watson pd', title, null), 1);
+  assert.equal(matchRank('felicity plunk', title, null), 1);
+  assert.equal(matchRank('waggan', title, null), 2);
+  assert.equal(matchRank('wagan watsen', title, null), 2);
+  // Every typed word must match something; short words never fuzzy-match.
+  assert.equal(matchRank('walter wagan', title, null), null);
+  assert.equal(matchRank('wat', 'Math club', null), null);
+});
+
+test('an imported Notion PD event not yet copied into Blobs is searchable by any of its words', async () => {
+  const data = await searchEvents('wagan watson');
+  assert.equal(data.groups.event.length, 1);
+  assert.equal(data.groups.event[0].display_label, 'PD — Samuel Wagan Watson (Felicity Plunkett)');
+  assert.match(data.groups.event[0].ref, /^professional:event:event_/);
+  const typo = await searchEvents('waggan');
+  assert.equal(typo.groups.event.length, 1);
+});
+
+test('a copied or deleted imported PD event is answered by its Blob record, never twice', async () => {
+  const id = projectNotionPdEvent(WAGAN_ROW).id;
+  const copied = memoryStore();
+  const { source, notion_id, knowledge_notes, ...fields } = projectNotionPdEvent(WAGAN_ROW); // eslint-disable-line no-unused-vars
+  await copied.setJSON(eventIndexKey(id), true);
+  await copied.setJSON(eventKey(id), fields);
+  assert.equal((await searchEvents('wagan', { professionalStore: copied })).groups.event.length, 1);
+
+  const deleted = memoryStore();
+  await deleted.setJSON(eventKey(id), { ...fields, deleted_at: '2026-10-01T00:00:00.000Z' });
+  assert.equal((await searchEvents('wagan', { professionalStore: deleted })).groups.event.length, 0);
+});
+
+test('an imported PD event resolves for linking until it is copied, and stops once deleted', async () => {
+  const id = projectNotionPdEvent(WAGAN_ROW).id;
+  const context = createAccessContext({ workflow: 'professional' });
+  const empty = memoryStore();
+  const endpoint = await resolveEvent(id, context, {
+    getStore: async () => empty,
+    listImportedEvents: async () => [WAGAN_ROW]
+  });
+  assert.equal(endpoint.display_label, 'PD — Samuel Wagan Watson (Felicity Plunkett)');
+
+  const deleted = memoryStore();
+  const { source, notion_id, knowledge_notes, ...fields } = projectNotionPdEvent(WAGAN_ROW); // eslint-disable-line no-unused-vars
+  await deleted.setJSON(eventKey(id), { ...fields, deleted_at: '2026-10-01T00:00:00.000Z' });
+  await assert.rejects(resolveEvent(id, context, {
+    getStore: async () => deleted,
+    listImportedEvents: async () => [WAGAN_ROW]
+  }));
+});
+
+test('kinds that only had resolvers (communication, achievement, future, stepping stone) are searchable', async () => {
+  const handler = createEntitySearchHandler(baseDeps(memoryStore(), {
+    getProfessionalStore: async () => memoryStore()
+  }));
+  const response = await handler(request({
+    url: 'https://api.adam-russell.com/api/entities/search?q=ethics&kinds=communication,achievement,future,stepping_stone'
+  }));
+  assert.equal(response.status, 200);
+  const { groups } = (await response.json()).data;
+  for (const kind of ['communication', 'achievement', 'future', 'stepping_stone']) assert.deepEqual(groups[kind], []);
 });

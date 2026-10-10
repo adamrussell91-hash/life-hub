@@ -2,8 +2,16 @@ import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { displayLabelFor, parseIdentityIndexRecord, parseOrganisationRecord, parsePersonRecord } from './_shared/identity-schema.mjs';
 import { formatEntityRef } from './_shared/entity-ref.mjs';
-import { mapBounded } from './_shared/blobs-list.mjs';
-import { personHref, organisationHref, taskHref } from './_shared/entity-resolvers.mjs';
+import { listBlobKeys, mapBounded } from './_shared/blobs-list.mjs';
+import {
+  organisationHref,
+  personHref,
+  resolveAchievement,
+  resolveCommunication,
+  resolveFuture,
+  resolveSteppingStone,
+  taskHref
+} from './_shared/entity-resolvers.mjs';
 import {
   defaultGetUniversalLinkStore,
   getJSON,
@@ -25,7 +33,11 @@ import {
   meetingKey,
   EVENT_INDEX_PREFIX,
   MEETING_INDEX_PREFIX,
-  APPLICATION_INDEX_PREFIX
+  APPLICATION_INDEX_PREFIX,
+  CAREER_ACHIEVEMENT_PREFIX,
+  CAREER_FUTURE_PREFIX,
+  CAREER_STONE_PREFIX,
+  COMMUNICATION_PREFIX
 } from './_shared/professional-blobs.mjs';
 import { parseApplicationRecord } from './_shared/application-schema.mjs';
 import { parseEventRecord } from './_shared/event-schema.mjs';
@@ -35,8 +47,11 @@ import { listKnowledgePages, rankKnowledgePages } from './_shared/knowledge-data
 import {
   listGithubImportedStudentPeople,
   listGithubOrganisationCandidates,
+  listGithubPdEvents,
   listGithubPersonCandidates
 } from './_shared/github-professional-data.mjs';
+import { pdPlacementKey, projectNotionPdEvent } from './_shared/notion-pd-events.mjs';
+import { createAccessContext } from './_shared/entity-access.mjs';
 
 import { isDeletedRecord } from './_shared/record-liveness.mjs';
 
@@ -44,7 +59,11 @@ export const config = { path: '/api/entities/search' };
 
 const MIN_QUERY_LENGTH = 2;
 const MAX_QUERY_LENGTH = 100;
-const MAX_RESULTS = 20;
+// One busy kind (twenty people called "Sam") must not push every other kind
+// off the list, so each kind gets its own allowance inside the overall cap.
+// A search narrowed to a single kind gets the whole overall cap.
+const MAX_RESULTS = 40;
+const MAX_PER_KIND = 10;
 const READ_BATCH_SIZE = 10;
 
 // Task search (correction B6) uses the existing Tasks storage
@@ -71,7 +90,11 @@ const SUPPORTED_KINDS = new Set([
   'lesson',
   'class',
   'event',
-  'meeting'
+  'meeting',
+  'communication',
+  'achievement',
+  'future',
+  'stepping_stone'
 ]);
 const DEFAULT_KINDS = ['person', 'organisation', 'task'];
 // Every kind the generic tagger searches across at once.
@@ -81,16 +104,83 @@ function normalize(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
-// Exact prefix matches rank before token matches (implementation
-// programme: "sort exact prefix matches before token matches") — applied
-// across every group, not just within one kind, via the single flat sort
-// below.
-function matchRank(query, label, sortName) {
-  const q = normalize(query);
-  const candidates = [normalize(label), normalize(sortName)].filter(Boolean);
-  if (candidates.some(candidate => candidate.startsWith(q))) return 0;
-  if (candidates.some(candidate => candidate.split(/\s+/).some(token => token.startsWith(q)))) return 1;
+// Words, not raw text: "PD — Samuel Wagan Watson (Felicity Plunkett)"
+// tokenises to pd/samuel/wagan/watson/felicity/plunkett, so punctuation
+// never blocks a match.
+function tokenize(value) {
+  return normalize(value).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+// True when `a` and `b` differ by at most one insert, delete or swap of a
+// character ("waggan" vs "wagan").
+function withinOneEdit(a, b) {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  let j = 0;
+  let edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      i += 1;
+      j += 1;
+      continue;
+    }
+    edits += 1;
+    if (edits > 1) return false;
+    if (a.length > b.length) i += 1;
+    else if (b.length > a.length) j += 1;
+    else {
+      i += 1;
+      j += 1;
+    }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+
+// One query word against one title word: a prefix match, or (for words
+// long enough that a slip is likely a typo, not a different word) a
+// one-character typo of the title word or of its same-length prefix.
+function wordMatches(queryWord, labelWord, allowTypo) {
+  if (labelWord.startsWith(queryWord)) return 'exact';
+  if (!allowTypo || queryWord.length < 5) return null;
+  if (withinOneEdit(queryWord, labelWord)) return 'typo';
+  for (const length of [queryWord.length - 1, queryWord.length, queryWord.length + 1]) {
+    if (length < 3 || length >= labelWord.length) continue;
+    if (withinOneEdit(queryWord, labelWord.slice(0, length))) return 'typo';
+  }
   return null;
+}
+
+// Rank 0: the title starts with the whole query. Rank 1: every query word
+// starts a word of the title, in any order ("wagan watson", "watson pd").
+// Rank 2: the same, allowing a one-letter typo per word ("waggan").
+// Ranks are applied across every group together via the flat sort below.
+export function matchRank(query, label, sortName) {
+  const q = normalize(query);
+  if (!q) return null;
+  const candidates = [label, sortName].filter(value => typeof value === 'string' && value);
+  if (candidates.some(candidate => normalize(candidate).startsWith(q))) return 0;
+  const queryWords = tokenize(q);
+  if (!queryWords.length) return null;
+  let best = null;
+  for (const candidate of candidates) {
+    const labelWords = tokenize(candidate);
+    let typo = false;
+    const allMatch = queryWords.every((word) => {
+      let found = null;
+      for (const labelWord of labelWords) {
+        const result = wordMatches(word, labelWord, true);
+        if (result === 'exact') return true;
+        if (result === 'typo') found = 'typo';
+      }
+      if (found) typo = true;
+      return Boolean(found);
+    });
+    if (!allMatch) continue;
+    const rank = typo ? 2 : 1;
+    if (best === null || rank < best) best = rank;
+  }
+  return best;
 }
 
 // Search must never trust an index display label as authority (correction
@@ -314,30 +404,56 @@ async function searchTasksCollectionKind(getTasksStore, query, { indexKey, prefi
   return out;
 }
 
-async function searchEventKind(getProfessionalStore, query) {
-  const store = await getProfessionalStore();
-  const indexKeys = await listEventIndexKeys(store);
-  const ids = [...new Set(indexKeys.map((key) => key.slice(EVENT_INDEX_PREFIX.length)).filter(Boolean))];
-  const records = await mapBounded(ids, READ_BATCH_SIZE, async (id) =>
-    parseEventRecord(await getProfessionalJSON(store, eventKey(id), { consistency: 'strong' }))
-  );
+function eventResult(record, rank) {
+  return {
+    rank,
+    ref: formatEntityRef({ namespace: 'professional', kind: 'event', id: record.id }),
+    kind: 'event',
+    display_label: record.title,
+    supporting_label: record.occurrence_state,
+    href: `/professional/#/event/${encodeURIComponent(record.id)}`,
+    lifecycle_status: record.occurrence_state,
+    visibility: 'operator'
+  };
+}
 
+// Events come from two places: native Blob records, and the Notion PD rows
+// in `pd-events.json` that the event list copies into Blobs the first time
+// it loads. Until that copy has happened an imported event exists only in
+// the file, so search reads both, the same way `listEvents` merges them.
+// A Blob record (live or deleted) always wins over its source row.
+async function searchEventKind(getProfessionalStore, query, loadImportedEvents) {
+  const store = await getProfessionalStore();
+  const [indexKeys, recordKeys] = await Promise.all([
+    listEventIndexKeys(store),
+    listBlobKeys(store, 'events/records/')
+  ]);
+  const ids = [...new Set([
+    ...indexKeys.map((key) => key.slice(EVENT_INDEX_PREFIX.length)),
+    ...recordKeys.map((key) => key.slice('events/records/'.length))
+  ].filter(Boolean))];
+  const records = (await mapBounded(ids, READ_BATCH_SIZE, async (id) =>
+    parseEventRecord(await getProfessionalJSON(store, eventKey(id), { consistency: 'strong' }))
+  )).filter(Boolean);
+
+  const knownIds = new Set(records.map(record => record.id));
+  const placements = new Set(records.map(record => pdPlacementKey(record.title, record.start)));
   const out = [];
   for (const record of records) {
-    if (!record || isDeletedRecord(record)) continue;
+    if (isDeletedRecord(record)) continue;
     const title = typeof record.title === 'string' ? record.title : '';
     const rank = matchRank(query, title, null);
-    if (rank === null) continue;
-    out.push({
-      rank,
-      ref: formatEntityRef({ namespace: 'professional', kind: 'event', id: record.id }),
-      kind: 'event',
-      display_label: title,
-      supporting_label: record.occurrence_state,
-      href: `/professional/#/event/${encodeURIComponent(record.id)}`,
-      lifecycle_status: record.occurrence_state,
-      visibility: 'operator'
-    });
+    if (rank !== null) out.push(eventResult(record, rank));
+  }
+  for (const row of await loadImportedEvents()) {
+    const imported = projectNotionPdEvent(row);
+    if (!imported || knownIds.has(imported.id)) continue;
+    const placement = pdPlacementKey(imported.title, imported.start);
+    if (placements.has(placement)) continue;
+    knownIds.add(imported.id);
+    placements.add(placement);
+    const rank = matchRank(query, imported.title, null);
+    if (rank !== null) out.push(eventResult(imported, rank));
   }
   return out;
 }
@@ -413,10 +529,32 @@ async function searchTeachingRecordsKind(getTeachingStore, prefix, kind, query) 
   return out;
 }
 
+// Kinds with no index of their own: list the record keys, then let the
+// kind's resolver do what it already does for links (load, drop deleted
+// or hidden records, build the safe projection). Search and linking can
+// then never disagree about whether a record exists.
+async function searchResolvedKind(getProfessionalStore, prefix, resolve, query) {
+  const store = await getProfessionalStore();
+  const ids = (await listBlobKeys(store, prefix)).map(key => key.slice(prefix.length)).filter(Boolean);
+  const accessContext = createAccessContext({ workflow: 'professional' });
+  const resolved = await mapBounded(ids, READ_BATCH_SIZE, id =>
+    resolve(id, accessContext, { getStore: async () => store }).catch(() => null)
+  );
+  const out = [];
+  for (const endpoint of resolved) {
+    if (!endpoint) continue;
+    const rank = matchRank(query, endpoint.display_label, null);
+    if (rank === null) continue;
+    out.push({ rank, ...endpoint });
+  }
+  return out;
+}
+
 export function createEntitySearchHandler(deps = {}) {
   const getTasksStore = deps.getTasksStore ?? defaultGetTasksStore;
   const getProfessionalStore = deps.getProfessionalStore ?? defaultGetProfessionalStore;
   const getTeachingStore = deps.getTeachingStore ?? defaultGetTeachingStore;
+  const listImportedEvents = deps.listGithubPdEvents ?? listGithubPdEvents;
 
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
@@ -522,7 +660,7 @@ export function createEntitySearchHandler(deps = {}) {
         }))
         : [],
       requestedKinds.has('event')
-        ? settle('event', () => searchEventKind(getProfessionalStore, query))
+        ? settle('event', () => searchEventKind(getProfessionalStore, query, () => listImportedEvents({ env }).catch(() => [])))
         : [],
       requestedKinds.has('meeting')
         ? settle('meeting', () => searchMeetingKind(getProfessionalStore, query))
@@ -538,34 +676,37 @@ export function createEntitySearchHandler(deps = {}) {
         : [],
       requestedKinds.has('class')
         ? settle('class', () => searchTeachingRecordsKind(getTeachingStore, 'classes/', 'class', query))
+        : [],
+      requestedKinds.has('communication')
+        ? settle('communication', () => searchResolvedKind(getProfessionalStore, COMMUNICATION_PREFIX, resolveCommunication, query))
+        : [],
+      requestedKinds.has('achievement')
+        ? settle('achievement', () => searchResolvedKind(getProfessionalStore, CAREER_ACHIEVEMENT_PREFIX, resolveAchievement, query))
+        : [],
+      requestedKinds.has('future')
+        ? settle('future', () => searchResolvedKind(getProfessionalStore, CAREER_FUTURE_PREFIX, resolveFuture, query))
+        : [],
+      requestedKinds.has('stepping_stone')
+        ? settle('stepping_stone', () => searchResolvedKind(getProfessionalStore, CAREER_STONE_PREFIX, resolveSteppingStone, query))
         : []
     ]);
 
-    // Exact prefix matches rank before token matches across every group
-    // together, then the combined maximum of 20 is applied — both before
-    // splitting back out into per-kind groups.
-    const ranked = perKind
+    // Best matches first across every group together; then each kind keeps
+    // at most MAX_PER_KIND (unless it is the only kind asked for) and the
+    // whole response at most MAX_RESULTS.
+    const perKindCap = requestedKinds.size === 1 ? MAX_RESULTS : MAX_PER_KIND;
+    const groups = Object.fromEntries([...SUPPORTED_KINDS].map(kind => [kind, []]));
+    let total = 0;
+    const sorted = perKind
       .flat()
-      .sort((a, b) => (a.rank - b.rank) || a.display_label.localeCompare(b.display_label))
-      .slice(0, MAX_RESULTS)
-      .map(({ rank, ...result }) => result); // eslint-disable-line no-unused-vars
-
-    const groups = {
-      person: [],
-      organisation: [],
-      task: [],
-      application: [],
-      program: [],
-      goal: [],
-      project: [],
-      event: [],
-      meeting: [],
-      page: [],
-      unit: [],
-      lesson: [],
-      class: []
-    };
-    for (const result of ranked) groups[result.kind].push(result);
+      .sort((a, b) => (a.rank - b.rank) || a.display_label.localeCompare(b.display_label));
+    for (const { rank, ...result } of sorted) { // eslint-disable-line no-unused-vars
+      if (total >= MAX_RESULTS) break;
+      const group = groups[result.kind];
+      if (!group || group.length >= perKindCap) continue;
+      group.push(result);
+      total += 1;
+    }
 
     return withCors(
       okResponse(200, unavailable.length ? { groups, unavailable: [...new Set(unavailable)].sort() } : { groups }),
