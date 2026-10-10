@@ -8,6 +8,7 @@ import {
   deriveBatchOutcome,
   deriveBatchSummary,
   duplicateSkipReason,
+  importFileNeedsBlob,
   loadImportProposal,
   mergeMomentGroups,
   saveImportProposal,
@@ -96,6 +97,19 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   pickBtn.className = 'btn btn--secondary';
   pickBtn.textContent = 'Choose photos';
 
+  const missingBanner = document.createElement('div');
+  missingBanner.className = 'journal-import__missing-blobs';
+  missingBanner.hidden = true;
+  const missingText = document.createElement('p');
+  missingText.className = 'journal-import__missing-blobs-text';
+  const reselectBtn = document.createElement('button');
+  reselectBtn.type = 'button';
+  reselectBtn.className = 'btn btn--secondary';
+  reselectBtn.textContent = 'Choose photos again';
+  missingBanner.append(missingText, reselectBtn);
+
+  let reselectMode = false;
+
   const actions = document.createElement('div');
   actions.className = 'addform__actions';
 
@@ -108,6 +122,14 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   saveBtn.type = 'submit';
   saveBtn.className = 'btn btn--primary';
   saveBtn.textContent = 'Upload';
+
+  function refreshMissingBlobBanner(): void {
+    const missing = files.filter((f) => importFileNeedsBlob(f, blobs));
+    missingBanner.hidden = missing.length === 0;
+    if (missing.length) {
+      missingText.textContent = `${missing.length} photo${missing.length === 1 ? '' : 's'} must be selected again before upload can continue.`;
+    }
+  }
 
   function refreshHeader(): void {
     const uploadable = files.filter((f) => !f.skipReason && f.state !== 'complete');
@@ -159,6 +181,7 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
       progress.hidden = true;
       saveBtn.textContent = 'Upload';
     }
+    refreshMissingBlobBanner();
   }
 
   function renderGroups(): void {
@@ -209,6 +232,23 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
       { tripId, updatedAt: new Date().toISOString(), groups, files },
       blobs
     );
+  }
+
+  async function reselectBlobs(selected: File[]): Promise<void> {
+    for (const file of selected) {
+      const photo = await inspectFile(file);
+      const idx = files.findIndex((f) => f.checksum === photo.checksum);
+      if (idx < 0) continue;
+      blobs.set(photo.checksum, file);
+      const entry = files[idx]!;
+      files[idx] = {
+        ...entry,
+        name: file.name,
+        inspected: photo,
+      };
+    }
+    await persist();
+    renderGroups();
   }
 
   async function inspectBatch(selected: File[]): Promise<void> {
@@ -343,11 +383,20 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
     saveBtn.disabled = false;
   }
 
-  pickBtn.addEventListener('click', () => fileInput.click());
+  pickBtn.addEventListener('click', () => {
+    reselectMode = false;
+    fileInput.click();
+  });
+  reselectBtn.addEventListener('click', () => {
+    reselectMode = true;
+    fileInput.click();
+  });
   fileInput.addEventListener('change', () => {
     const list = fileInput.files ? [...fileInput.files] : [];
     if (!list.length) return;
-    void inspectBatch(list);
+    if (reselectMode) void reselectBlobs(list);
+    else void inspectBatch(list);
+    reselectMode = false;
     fileInput.value = '';
   });
 
@@ -374,7 +423,7 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
     if (ev.target === back) destroy();
   });
 
-  scroll.append(pickBtn, groupList, progress, fileInput);
+  scroll.append(missingBanner, pickBtn, groupList, progress, fileInput);
   form.append(scroll, actions);
   actions.append(cancelBtn, saveBtn);
   header.append(counts, disclosure);

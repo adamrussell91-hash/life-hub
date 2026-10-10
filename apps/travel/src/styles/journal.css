@@ -531,6 +531,19 @@
   color: var(--muted);
 }
 
+.journal-import__missing-blobs {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface-raised, var(--bg));
+}
+
+.journal-import__missing-blobs-text {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
 .journal-import__disclosure summary {
   cursor: pointer;
   font-size: var(--text-sm);

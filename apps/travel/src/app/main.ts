@@ -122,14 +122,17 @@ async function bootApp(root: HTMLElement): Promise<void> {
         renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: '' });
         journalHandle?.destroy();
         let fixture: JournalFixture;
+        let journalVersion: string | undefined;
         if (journalUseFixture()) {
           fixture = klIstanbulFixture();
         } else {
-          const { journal } = await ensureJournal(route.tripId);
-          fixture = journal;
+          const envelope = await ensureJournal(route.tripId);
+          fixture = envelope.journal;
+          journalVersion = envelope.version;
         }
         journalHandle = renderJournal(shell.canvas, {
           fixture,
+          journalVersion,
           momentId: route.momentId,
           patternOff: journalPatternOff()
         });

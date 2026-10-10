@@ -1,4 +1,5 @@
 import type { InspectedPhoto, ProposedMoment } from '@/journal/import-group';
+import type { JournalFixture } from '@/journal/types';
 
 export type ImportFileState =
   | 'selected'
@@ -60,6 +61,29 @@ const TERMINAL: ReadonlySet<ImportFileState> = new Set([
   'cancelled',
   'failed',
 ]);
+
+export interface JournalImportChecksumContext {
+  knownChecksums: string[];
+  deletedChecksums: string[];
+}
+
+/** Live/archived media checksums are known; deleted media checksums block re-import without restore. */
+export function journalImportChecksums(fixture: JournalFixture): JournalImportChecksumContext {
+  const knownChecksums: string[] = [];
+  const deletedChecksums: string[] = [];
+  for (const media of fixture.media) {
+    const checksum = media.checksum?.trim().toLowerCase();
+    if (!checksum || checksum.length < 64) continue;
+    if (media.lifecycle === 'deleted') deletedChecksums.push(checksum);
+    else knownChecksums.push(checksum);
+  }
+  return { knownChecksums, deletedChecksums };
+}
+
+export function importFileNeedsBlob(entry: ImportFileEntry, blobs: Map<string, Blob>): boolean {
+  if (TERMINAL.has(entry.state) || entry.skipReason) return false;
+  return !blobs.has(entry.checksum);
+}
 
 export function stableOperationId(tripId: string, checksum: string): string {
   return `op_imp_${tripId}_${checksum.slice(0, 24)}`;

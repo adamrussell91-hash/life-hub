@@ -4,6 +4,7 @@ import { prefersReducedMotion } from '../../design-kit/js/hub-motion.js';
 import { getPattern } from '@/journal/patterns/registry';
 import { shouldShowDayMapPreview } from '@/journal/layout';
 import { openChapterJump } from '@/journal/chapter-jump';
+import { journalImportChecksums } from '@/journal/import-review';
 import { openImportSheet } from '@/journal/import-sheet';
 import { renderToolbar } from '@/journal/render-toolbar';
 import { renderMomentArticle } from '@/journal/render-moment';
@@ -14,6 +15,7 @@ export interface RenderJournalOptions {
   fixture: JournalFixture;
   momentId?: string;
   patternOff?: boolean;
+  journalVersion?: string;
   onChapterJump?: (id: string) => void;
 }
 
@@ -164,8 +166,12 @@ export function renderJournal(
     title: opts.fixture.title,
     onImportPhotos: () => {
       importOverlay?.destroy();
+      const { knownChecksums, deletedChecksums } = journalImportChecksums(opts.fixture);
       importOverlay = openImportSheet({
         fixture: opts.fixture,
+        knownChecksums,
+        deletedChecksums,
+        journalVersion: opts.journalVersion,
         anchor: root,
         onClose: () => {
           importOverlay = null;

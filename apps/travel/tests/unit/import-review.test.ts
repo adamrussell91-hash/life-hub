@@ -4,6 +4,8 @@ import {
   createImportFile,
   deriveBatchOutcome,
   deriveBatchSummary,
+  importFileNeedsBlob,
+  journalImportChecksums,
   mergeMomentGroups,
   splitMomentGroup,
   stableOperationId,
@@ -23,6 +25,49 @@ function file(partial: Partial<ImportFileEntry> & { checksum: string }): ImportF
     ...partial,
   };
 }
+
+describe('journalImportChecksums', () => {
+  const checksum = 'a'.repeat(64);
+
+  it('splits live vs deleted media checksums', () => {
+    const ctx = journalImportChecksums({
+      id: 'jrn_test',
+      schema_version: 1,
+      trip_id: 'trp_test',
+      title: 't',
+      revision: 1,
+      lifecycle: 'live',
+      legs: [],
+      days: [],
+      moments: [],
+      transitions: [],
+      media: [
+        { id: 'med_1', url: '/x', width: 1, height: 1, lifecycle: 'live', checksum },
+        {
+          id: 'med_2',
+          url: '/y',
+          width: 1,
+          height: 1,
+          lifecycle: 'deleted',
+          checksum: 'b'.repeat(64),
+        },
+      ],
+    });
+    expect(ctx.knownChecksums).toEqual([checksum]);
+    expect(ctx.deletedChecksums).toEqual(['b'.repeat(64)]);
+  });
+});
+
+describe('importFileNeedsBlob', () => {
+  it('flags non-terminal files without blobs', () => {
+    const entry = file({ checksum: 'c'.repeat(64), state: 'proposed' });
+    expect(importFileNeedsBlob(entry, new Map())).toBe(true);
+    expect(importFileNeedsBlob(entry, new Map([[entry.checksum, new Blob()]]))).toBe(false);
+    expect(importFileNeedsBlob(file({ checksum: 'd'.repeat(64), state: 'complete' }), new Map())).toBe(
+      false
+    );
+  });
+});
 
 describe('stableOperationId', () => {
   it('is stable for the same trip and checksum', () => {

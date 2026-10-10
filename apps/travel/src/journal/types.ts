@@ -1,6 +1,6 @@
 /** Phase 1 journal read-model types (fixtures always use lifecycle `live`). */
 
-export type JournalLifecycle = 'live';
+export type JournalLifecycle = 'live' | 'deleted' | 'archived';
 
 export type JournalLocationSource = 'exif' | 'inferred' | 'manual';
 
@@ -22,6 +22,8 @@ export interface JournalMedia {
   width: number;
   height: number;
   lifecycle: JournalLifecycle;
+  /** SHA-256 hex of original bytes when known (live API journal). */
+  checksum?: string;
 }
 
 export interface JournalMoment {
