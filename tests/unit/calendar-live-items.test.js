@@ -168,8 +168,10 @@ test('clicking a Due row opens the item card; Save writes to the Tasks API', asy
   });
   // task-emails has a block today (wb-1) and no deadline time: it is on the grid, not in Due.
   assert.equal(host.querySelector('[data-part="due"][data-id="task-emails"]'), null);
-  const due = host.querySelector('[data-part="due"][data-id="task-timed"]');
-  assert.ok(due, 'Due row rendered');
+  // task-timed has a due time: a deadline marker at that hour in the day body, not the all-day row.
+  assert.equal(host.querySelector('[data-part="due"][data-id="task-timed"]'), null);
+  const due = host.querySelector('[data-part="day-body"] [data-part="deadline"][data-id="task-timed"]');
+  assert.ok(due, 'deadline marker rendered');
   assert.equal(due.getAttribute('role'), 'button');
   assert.match(due.getAttribute('title'), /Task/);
   assert.equal(due.dataset.movable, '1');

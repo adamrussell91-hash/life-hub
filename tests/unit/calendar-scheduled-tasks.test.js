@@ -235,7 +235,7 @@ test('Day Dial: a data remount keeps page scroll (tick → onSourcesChanged must
   win.close();
 });
 
-test('Week grid: ticks on blocks and Due rows, deadlines stay Due, hour lines drawn', async () => {
+test('Week grid: ticks on blocks and Due rows, timed deadlines sit at their hour, hour lines drawn', async () => {
   const { events } = todayModel();
   const { calls, apiFetch } = fakeApi();
   const win = new Window({ url: 'https://life-hub.adam-russell.com/#/calendar/week' });
@@ -251,7 +251,19 @@ test('Week grid: ticks on blocks and Due rows, deadlines stay Due, hour lines dr
   assert.ok(keith.classList.contains('is-done'));
   assert.equal(keith.classList.contains('is-ambient'), false, 'done paint, not the ambient dashed paint');
   assert.equal(keith.querySelector('[data-tick]').getAttribute('aria-pressed'), 'true');
-  assert.ok(host.querySelector('[data-part="due"][data-id="report"]'), 'deadline stays in Due');
+  // A due time is a moment at its hour (a marker), never a 5–7pm block and never the all-day row.
+  assert.equal(host.querySelector('[data-part="due"][data-id="report"]'), null, 'timed deadline leaves the all-day row');
+  const report = host.querySelector(`[data-part="day-body"][data-date="${TODAY}"] [data-part="deadline"][data-id="report"]`);
+  assert.ok(report, 'timed deadline is a marker in the day body');
+  assert.equal(report.dataset.at, '17');
+  assert.match(report.textContent, /due 5 pm/);
+  assert.equal(host.querySelector('.cal-chip[data-id="report"]'), null, 'still not a block');
+  // Every tick is the first thing in its card, in its own column beside the title.
+  for (const tick of host.querySelectorAll('.cal-chip [data-tick], .cal-due [data-tick]')) {
+    assert.equal(tick.parentElement.firstElementChild, tick);
+    assert.ok(tick.closest('.has-tick'), 'card marked has-tick');
+    assert.ok(tick.nextElementSibling?.matches('.cal-chip__text, .cal-due__text'), 'title text beside the tick');
+  }
 
   host.querySelector('[data-part="due"][data-id="untimed"] [data-tick]').click();
   await new Promise((r) => setTimeout(r, 20));

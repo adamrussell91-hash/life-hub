@@ -780,6 +780,8 @@ function mountAllDay(grid, date) {
   for (const due of day.due) {
     // Already a block on the grid this day, with no deadline time: not listed twice.
     if (due.onGrid) continue;
+    // A due time is drawn at its hour in the day body (mountBody), not here.
+    if (dueAtHour(due) != null) continue;
     const ghost = model.ghosts.find(item => item.id === due.ghostId);
     const moved = state.settled.get(due.ghostId);
     const allDayClass = due.kind === 'allday' ? ` is-allday k-${due.filterKey === 'events' ? 'event' : due.filterKey}${due.ambient ? ' is-ambient' : ''}` : '';
@@ -798,7 +800,7 @@ function mountAllDay(grid, date) {
       : '';
     const tick = canTickItem(due) ? tickHtml(due) : '';
     const doneClass = due.done ? ' is-done' : '';
-    const chip = el('div', `cal-due${promiseClass}${doneClass}`, `<b>${tick}${escapeHtml(due.title)}</b>${frag}${dueMeta ? `<span class="cal-due__meta">${escapeHtml(dueMeta)}</span>` : ''}${after}${bookmarkHtml}`, cell, {
+    const chip = el('div', `cal-due${promiseClass}${doneClass}${tick ? ' has-tick' : ''}`, `${tickedTitle(tick, escapeHtml(due.title))}${frag}${dueMeta ? `<span class="cal-due__meta">${escapeHtml(dueMeta)}</span>` : ''}${after}${bookmarkHtml}`, cell, {
       'data-part': 'due',
       'data-id': due.id,
       tabindex: '0',
@@ -896,6 +898,7 @@ function mountBody(grid, date) {
     }));
   });
   for (const chip of day.chips) mountChip(body, chip);
+  for (const due of day.due) if (!due.onGrid && dueAtHour(due) != null) mountDeadline(body, due);
   if (date === model.today) nodes.set('now', el('div', 'cal-now', `<span>${nowLabel(nowHour)}</span>`, body, { 'data-part': 'now-line' }));
   for (const wall of day.walls) {
     const [first, ...rest] = wall.label.split(' · ');
@@ -936,6 +939,40 @@ function tickHtml(item) {
   const done = isItemDone(item);
   const label = done ? `Mark ${item.title} not done` : `Mark ${item.title} done`;
   return `<button type="button" class="cal-tick${done ? ' is-done' : ''}" data-tick="${escapeHtml(item.id)}" aria-pressed="${done}" aria-label="${escapeHtml(label)}" title="${done ? 'Done · tap to reopen' : 'Mark done'}"></button>`;
+}
+
+/** Tick in its own column, level with the first line of the title (never inline). */
+function tickedTitle(tick, titleHtml) {
+  return tick ? `<b>${tick}<span class="cal-due__text">${titleHtml}</span></b>` : `<b>${titleHtml}</b>`;
+}
+
+/** The hour a task's due time sits at on the grid, or null (untimed, or outside the day's bands). */
+function dueAtHour(due) {
+  if (due?.kind !== 'task' || !Number.isFinite(due.at) || !bands.length) return null;
+  return due.at >= bands[0].from && due.at <= bands[bands.length - 1].to ? due.at : null;
+}
+
+/**
+ * A deadline with a time: a marker at that hour, not a block. It does not book the
+ * day (that is what a planned work block is for), so it never adds load or hides free time.
+ */
+function mountDeadline(body, due) {
+  const tick = canTickItem(due) ? tickHtml(due) : '';
+  const frag = due.fragility && due.fragility.status !== 'fits'
+    ? `<span class="cal-due__flag is-${due.fragility.status}" title="${escapeHtml(due.fragility.text)}">${due.fragility.status === 'short' ? 'won’t fit' : 'fragile'}</span>`
+    : '';
+  const node = el('div', `cal-due cal-deadline${due.done ? ' is-done' : ''}${tick ? ' has-tick' : ''}`,
+    `${tickedTitle(tick, escapeHtml(due.title))}<span class="cal-due__meta">${escapeHtml(due.meta || '')}</span>${frag}`, body, {
+      'data-part': 'deadline',
+      'data-id': due.id,
+      'data-at': String(due.at),
+      tabindex: '0',
+      role: 'button',
+      title: `${due.title}\nTask · ${due.meta} · click for details`,
+      'aria-label': `${due.title}. Task, ${due.meta}. Open for details.`
+    });
+  if (chipIsMovable(due) && !due.moved) node.dataset.movable = '1';
+  nodes.set(`due:${due.id}`, node);
 }
 
 /** Optimistic tick: the item flips straight away, saves, and offers Undo. */
@@ -988,14 +1025,18 @@ function mountChip(body, chip) {
   if (chip.regained) classes.push('is-regained');
   if (ghost) classes.push('is-ghost');
   if (chip.ghost?.settled === 'accepted') classes.push('is-accepted');
-  const title = `${chip.kind === 'corey' ? '<span class="cal-mark"></span>' : ''}${!ghost && canTickItem(chip) ? tickHtml(chip) : ''}${chip.title}`;
+  const tick = !ghost && canTickItem(chip) ? tickHtml(chip) : '';
+  if (tick) classes.push('has-tick');
+  const title = tick
+    ? `<span class="cal-chip__text">${chip.title}</span>`
+    : `${chip.kind === 'corey' ? '<span class="cal-mark"></span>' : ''}${chip.title}`;
   const agent = ghost ? `<span class="cal-chip__agent"><span class="cal-av cal-av--sm ${ghost.agent === 'sara' ? 'cal-av--sara' : ''}">${AGENT_INITIAL[ghost.agent]}</span></span>` : '';
   const acts = ghost && ghost.kind !== 'bedtime'
     ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${ghost.id}" data-label="Accept">Accept</button><button type="button" data-dismiss="${ghost.id}">Dismiss</button></div>`
     : ghost ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${ghost.id}" data-label="Accept">Accept</button></div>` : '';
   const progress = chip.progress ? ` · ${chip.progress.done}/${chip.progress.total}` : '';
   const bookmark = chip.bookmark?.note ? `<div class="cal-chip__bm" title="Where you left it">↳ ${escapeHtml(chip.bookmark.note)}</div>` : '';
-  const node = el('div', classes.join(' '), `${agent}<div class="cal-chip__title">${title}</div><div class="cal-chip__meta">${escapeHtml(chip.meta ?? '')}${progress}</div>${bookmark}${acts}`, body, {
+  const node = el('div', classes.join(' '), `${agent}<div class="cal-chip__title">${tick}${title}</div><div class="cal-chip__meta">${escapeHtml(chip.meta ?? '')}${progress}</div>${bookmark}${acts}`, body, {
     'data-part': ghost ? 'ghost' : chip.isClass ? 'class' : 'chip',
     'data-id': chip.id,
     'data-kind': chip.kind,
@@ -1030,6 +1071,7 @@ function mountChip(body, chip) {
 
 export function layout(nextHeights) {
   const out = new Map();
+  const deadlines = [];
   bands.forEach((band, index) => {
     const top = yForHour(bands, nextHeights, band.from);
     out.set(`band:${index}`, { top, height: yForHour(bands, nextHeights, band.to) - top });
@@ -1058,7 +1100,17 @@ export function layout(nextHeights) {
       out.set(id, { top: top + 8, height: Math.max(0, raw - 16), fade: clamp01((raw - 90) / 40) });
     } else if (id === 'now') {
       out.set(id, { top: yForHour(bands, nextHeights, nowHour) });
+    } else if (type === 'due' && node.dataset?.at) {
+      deadlines.push({ id, date: node.parentNode?.dataset?.date ?? '', y: yForHour(bands, nextHeights, Number(node.dataset.at)) });
     }
+  }
+  // Deadline markers hang just below their hour line. Two near the same time stack, never overlap.
+  deadlines.sort((a, b) => a.date.localeCompare(b.date) || a.y - b.y);
+  let last = null;
+  for (const mark of deadlines) {
+    const top = last && last.date === mark.date ? Math.max(mark.y, last.top + CAL.deadlineGap) : mark.y;
+    out.set(mark.id, { top });
+    last = { date: mark.date, top };
   }
   return out;
 }
@@ -1776,7 +1828,8 @@ function applyOptimistic(current, target) {
     date: target.date,
     ...(target.start_time ? { time: target.start_time, duration_min: Math.round((item.end - item.start) * 60) } : {})
   };
-  const destination = nodes.get(`${isDue ? 'colallday' : 'colbody'}:${target.date}`);
+  // A timed deadline marker moves day and keeps its hour, so it stays in the day body.
+  const destination = nodes.get(`${isDue && !node.dataset?.at ? 'colallday' : 'colbody'}:${target.date}`);
   if (destination && destination !== parent) destination.append(node);
   if (!isDue) {
     node.dataset.start = String(item.start);

@@ -284,3 +284,15 @@
 .dd-face__nav > .dd-face__step{order:0}
 /* The caseback reuses the readiness chart, whose line colours live on .rf. */
 .dd-cb{--rf-clear:#d9801c;--rf-steady:#3f9460;--rf-wind:#1c8f9d;--rf-cloud:#6e8199;--rf-fog:#8178ab;--rf-rain:#3b7dd8;--rf-storm:#5b4c9c;--rf-recovery:#2e9c7a;--rf-evening:#5a63b5}
+
+/* ---------- tick column + timed deadlines (10/10/26) ---------- */
+/* The tick sits in its own column, level with the first line of the title; a wrapped title lines up beside it. */
+.dd-row__w b.has-tick{display:grid;grid-template-columns:14px minmax(0,1fr);column-gap:8px;align-items:start}
+.dd-row__w b.has-tick .cal-tick{margin:2px 0 0;margin-top:calc((1lh - 14px) / 2)}
+.dd-row__w.has-tick > :not(b){margin-left:22px}
+/* A task due at a set time: a notch across the event ring at that hour, not an arc. */
+.dd-due{stroke:var(--pastel-sage-ink);stroke-width:3;stroke-linecap:round;cursor:pointer}
+.dd-due:hover,.dd-due:focus-visible{stroke-width:4.5;outline:none}
+.dd-due.is-done{stroke:color-mix(in srgb,var(--pastel-sage-ink) 40%,#fff)}
+.dd-t-call.is-due{fill:var(--pastel-sage-ink)}
+.dd-t-call.is-due.is-done{fill:var(--muted);text-decoration:line-through}

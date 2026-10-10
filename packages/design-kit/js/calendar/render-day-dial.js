@@ -906,7 +906,7 @@ function mount({ entrance = false } = {}) {
   handleDeepLink(view, side);
   for (const chip of dayChips) {
     if (isItemVisible(chip, filterState)) continue;
-    const arc = nodes.get(`arc:${chip.id}`);
+    const arc = nodes.get(`arc:${chip.id}`) ?? nodes.get(`due:${chip.id}`);
     if (arc) {
       arc.setAttribute('visibility', 'hidden');
       arc.classList?.add?.('is-filter-hidden');
@@ -1082,6 +1082,24 @@ function mountDial(size) {
     }, ev));
     arcs.push({ id: ghost.id, h1: toHour(ghost.chip.start), h2: toHour(ghost.chip.end), r1: e1 + 4, r2: e2 - 4 });
   }
+  // Tasks due at a set time: a notch across the event ring at that hour. A due time
+  // books nothing, so it is never an arc; planned time is the linked work block's arc.
+  const deadlines = dueMarks(day);
+  for (const due of deadlines) {
+    const a = point(cx, cy, e1 - 3, due.at);
+    const b = point(cx, cy, e2 + 3, due.at);
+    const mark = s('line', {
+      class: `dd-due${due.done ? ' is-done' : ''}`,
+      x1: a.x.toFixed(1), y1: a.y.toFixed(1), x2: b.x.toFixed(1), y2: b.y.toFixed(1),
+      tabindex: 0,
+      role: 'button',
+      'data-part': 'due-mark',
+      'data-id': due.id,
+      'aria-label': `${due.title}. ${due.meta}. Open for details.`
+    }, ev);
+    s('title', {}, mark, `${due.title} · ${due.meta}`);
+    nodes.set(`due:${due.id}`, mark);
+  }
   // What actually happened: a thin track just outside the events (tracked work, finished workouts).
   const actual = date <= input.today ? (day?.actual ?? []) : [];
   if (actual.length) {
@@ -1208,6 +1226,9 @@ function mountDial(size) {
         cls: chip.kind === 'corey' ? 'is-corey' : ''
       });
     }
+    for (const due of deadlines) {
+      calls.push({ id: due.id, hour: due.at, height: 28, text: String(due.title ?? ''), sub: due.meta, cls: `is-due${due.done ? ' is-done' : ''}` });
+    }
     for (const dot of logDots) calls.push({ id: dot.id, hour: dot.h, height: 14, text: dot.label, cls: dot.cls === 'is-symptom' ? 'is-symptom' : 'is-meal' });
     if (overflowNow) {
       const lights = lightsOutFor(date, ghosts, profileSleep);
@@ -1306,6 +1327,11 @@ function mountDial(size) {
     // On a compact dial the time is in the Tonight heading; no label outside the ring.
     if (!rings.compact) nodes.set('hand-label', s('text', { class: 'dd-t-now' }, svg, `now ${clock12(nowHour).replace(' pm', '').replace(' am', '')}`));
   }
+}
+
+/** Tasks due at a set time that day (not already on the ring as a block). */
+function dueMarks(day) {
+  return (day?.due ?? []).filter(due => due.kind === 'task' && !due.onGrid && Number.isFinite(due.at));
 }
 
 /** How full the shown week is, for the moon: committed hours across its days. */
@@ -1688,7 +1714,9 @@ function renderRows(wrap, rows, ghosts) {
     // Tasks and work blocks tick off right here, the same gesture as the Tasks board.
     const item = row.itemId ? findDialItem(row.itemId) : null;
     const tick = item && canTickItem(item) ? tickHtml(item) : '';
-    const words = el('div', 'dd-row__w', `<b>${tick}${mark}${escapeHtml(row.title)}</b><span>${escapeHtml(row.note)}</span>`, node);
+    // The tick gets its own column, level with the first line of the title.
+    const titleHtml = tick ? `<b class="has-tick">${tick}<span>${mark}${escapeHtml(row.title)}</span></b>` : `<b>${mark}${escapeHtml(row.title)}</b>`;
+    const words = el('div', `dd-row__w${tick ? ' has-tick' : ''}`, `${titleHtml}<span>${escapeHtml(row.note)}</span>`, node);
     if (!row.ghostId) continue;
     const ghost = ghosts.find(item => item.id === row.ghostId);
     if (!ghost) continue;
@@ -2172,7 +2200,7 @@ function wire(section) {
       // Every arc opens the item card (context, edit, ↗ new tab) — never a silent jump.
       return id === popFor ? closePop() : openPop(id);
     }
-    const dot = target.closest?.('[data-part="log-dot"],[data-part="callout"]');
+    const dot = target.closest?.('[data-part="log-dot"],[data-part="callout"],[data-part="due-mark"]');
     if (dot) {
       const id = dot.getAttribute('data-id');
       return id === popFor ? closePop() : openPop(id, nodes.get(`arc:${id}`) ?? dot);
@@ -2206,7 +2234,7 @@ function wire(section) {
       event.preventDefault();
       return;
     }
-    if ((event.key === 'Enter' || event.key === ' ') && (target?.getAttribute?.('data-row-item') || target?.classList?.contains?.('dd-log'))) {
+    if ((event.key === 'Enter' || event.key === ' ') && (target?.getAttribute?.('data-row-item') || target?.classList?.contains?.('dd-log') || target?.classList?.contains?.('dd-due'))) {
       const id = target.getAttribute('data-row-item') || target.getAttribute('data-id');
       openPop(id, target);
       event.preventDefault();
