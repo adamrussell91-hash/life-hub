@@ -29,15 +29,15 @@
 | Mental health and diary | Mental Health | Life Hub Mind | ✅ Migrated structure |
 | Goals | Life Hub and Tasks | Life Hub and Tasks Hub | ✅ Place exists |
 | Future book ideas | Book Ideas database | Writing Projects | ✅ Migrated structure |
-| House records | House | No equivalent area | ❌ No place |
-| Home documents | Certificates, contracts, council records, valuations | No document vault | ❌ No place |
+| House records | House | Life Hub Garage & Home (Homes) | 🟠 Partial — place exists; Notion history partly imported |
+| Home documents | Certificates, contracts, council records, valuations | Garage & Home Mailroom (filed) + Homes | 🟠 Partial — Notion Home Documents imported 10 Oct 2026 (excl. renovation / investment / rego) |
 | Renovations | Renovation Tracker | No equivalent | ❌ No place |
 | Finance | Finances 2026 | No Finance section | ❌ No place |
 | Bills, income and expenses | Finance databases | Tasks only handles actions | ❌ No proper place |
 | Tax records | Tax Return pages and evidence | No equivalent | ❌ No place |
 | Insurance policies | Car, contents, landlord, health, property | No general insurance store | ❌ No place |
 | Investment property | Property details, costs, documents | Life Hub property records | ✅ Migrated structure |
-| Car records | Car Maintenance Tracker | No vehicle area | ❌ No place |
+| Car records | Car Maintenance Tracker | Life Hub Garage & Home (Garage) | ✅ Migrated structure — Notion visits imported 10 Oct 2026 |
 | Watch collection | Watch Tracker | Nothing equivalent | ❌ No place |
 | Fragrance collection | Fragrance Tracker | Life Hub fragrance collection | ✅ Migrated structure |
 | Hair tracking | Hair Process Tracker | Only incidental references | 🟠 Partial |
@@ -66,3 +66,4 @@ A Notion area is not considered missing merely because its records have not yet 
 
 - **7 October 2026 — ChatGPT:** Created the initial cross comparison from the Notion and GitHub audit. No implementation decisions made.
 - **8 October 2026 — Adam:** Marked future book ideas, investment property and fragrance collection as migrated into Life Hub.
+- **10 October 2026 — Cursor:** Imported Notion Car Maintenance Tracker (17 visits → Garage) and Home Documents (23 filed Mailroom items → Homes; skipped renovation, investment management contract, and rego). No investment place, renovation tracker, or insurance/rego policies.
