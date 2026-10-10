@@ -155,3 +155,37 @@ test('GET /api/schedule-projections includes the imported PD event', async () =>
   assert.equal(projections[0].event_type, 'professional_development');
   assert.equal(projections[0].title, '2026 NSW HALT Conference');
 });
+
+
+test('editing an existing PD event persists under its original id and keeps linked notes without duplicating it', async () => {
+  const records = new Map();
+  const store = {
+    async get(key) { return records.get(key) ?? null; },
+    async setJSON(key, value) { records.set(key, structuredClone(value)); },
+    async list({ prefix = '' } = {}) { return { blobs: [...records.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key })) }; }
+  };
+  const handler = createEventsHandler({
+    env, now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store,
+    getUniversalLinkStore: async () => emptyStore(),
+    getTasksStore: async () => emptyStore(),
+    listGithubPdEvents: async () => [row()]
+  });
+  const id = notionPdEventId(NOTION_ID);
+  const url = `https://api.adam-russell.com/api/events?id=${id}`;
+  const patch = { title: 'My updated PD event', hours: 2, event_type: 'general', blocks: [] };
+  const saved = await handler(new Request(url, {
+    method: 'PATCH', headers: { ...Object.fromEntries(authed(url).headers), 'content-type': 'application/json' },
+    body: JSON.stringify(patch)
+  }));
+  assert.equal(saved.status, 200, await saved.clone().text());
+  const reloaded = (await (await handler(authed(url))).json()).data.event;
+  assert.equal(reloaded.id, id);
+  assert.equal(reloaded.title, patch.title);
+  assert.equal(reloaded.hours, 2);
+  assert.equal(reloaded.event_type, 'general');
+  assert.equal(reloaded.knowledge_notes[0].href, projectNotionPdEvent(row()).knowledge_notes[0].href);
+  const events = (await (await handler(authed('https://api.adam-russell.com/api/events'))).json()).data.events;
+  assert.equal(events.length, 1);
+  assert.equal(events[0].title, patch.title);
+});

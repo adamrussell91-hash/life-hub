@@ -18,6 +18,7 @@ vi.mock('@/api/events', () => ({
   updateEvent: vi.fn(async (_id: string, patch: object) => { current = { ...current, ...patch }; return { event: current }; })
 }));
 vi.mock('@/views/events', () => ({
+  renderEventNewView: vi.fn(async () => {}),
   buildLearningTaskPanel: () => Object.assign(document.createElement('section'), { className: 'learning-stub' }),
   buildPdFields: () => Object.assign(document.createElement('section'), { className: 'pd-fields-stub' })
 }));
@@ -45,7 +46,9 @@ vi.mock('@/components/block-page', () => ({
   })
 }));
 
+import { renderEventNewView } from '@/views/events';
 import { renderEventPage } from '@/views/event-page';
+import { mountBlockPage } from '@/components/block-page';
 import { updateEvent } from '@/api/events';
 import { createKnowledgeNote } from '@/api/knowledge-notes';
 import { createUniversalLink } from '@/api/universal-links';
@@ -81,7 +84,7 @@ describe('event page', () => {
     await vi.waitFor(() => expect(canvas.querySelector('.pd-fields-stub')).toBeNull());
   });
 
-  it('a Notion PD event shows the knowledge note and does not offer edits', async () => {
+  it('an existing PD event keeps its knowledge note and offers editing', async () => {
     current = {
       ...base,
       source: 'notion',
@@ -92,10 +95,25 @@ describe('event page', () => {
     const canvas = await render();
     expect(canvas.querySelector('a.kn')?.getAttribute('href')).toBe('/knowledge/#page/page_notion_abc');
     expect(canvas.querySelector('[data-talk-note]')).toBeNull();
-    expect(canvas.querySelector('.talk-add')).toBeNull();
-    expect(canvas.querySelector('.pd-fields-stub')).toBeNull();
-    expect(canvas.querySelector('[data-part="shape"]')).toBeNull();
-    expect((canvas.querySelector('[data-part="pd-switch"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(canvas.querySelector('.talk-add')).not.toBeNull();
+    expect(canvas.querySelector('.pd-fields-stub')).not.toBeNull();
+    expect(canvas.querySelector('[data-part="shape"]')).not.toBeNull();
+    expect(canvas.textContent).not.toMatch(/notion|brought across/i);
+    expect(mountBlockPage).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ editable: true }));
+    expect((canvas.querySelector('[data-part="pd-switch"]') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('Edit event loads the current fields and saves changes to the same event', async () => {
+    const canvas = await render();
+    canvas.querySelector<HTMLButtonElement>('[data-part="edit-event"]')!.click();
+    expect(renderEventNewView).toHaveBeenLastCalledWith(canvas, expect.objectContaining({
+      draft: expect.objectContaining({ title: base.title, hours: base.hours })
+    }));
+    const options = vi.mocked(renderEventNewView).mock.calls.at(-1)![1]!;
+    await options.onSave!({ title: 'Revised PD', location: null, allDay: false, hours: 2,
+      accreditation: null, priorityArea: null, certificate: null, startIso: base.start,
+      endIso: base.end, timeZone: base.time_zone, pendingLinks: [] });
+    expect(updateEvent).toHaveBeenLastCalledWith(EVENT_ID, expect.objectContaining({ title: 'Revised PD', hours: 2 }));
   });
 
   it('Make note creates a Knowledge page and links it to the talk', async () => {

@@ -255,11 +255,21 @@ export function createEventRepository(deps = {}) {
     return { event: projectEvent(record), links, created: true };
   }
 
+  async function loadEditableEvent(id) {
+    const stored = parseEventRecord(await getJSON(professionalStore, eventKey(id)));
+    if (stored) return stored;
+    const imported = await deps.loadImportedEvent?.(id);
+    if (!imported) throw notFound();
+    const { source, notion_id, knowledge_notes, ...record } = imported;
+    const parsed = parseEventRecord(record);
+    if (!parsed) throw notFound();
+    return parsed;
+  }
+
   async function updateEvent(id, patchInput) {
     assertNoAccessFields(patchInput);
     const patch = validateEventFieldUpdate(patchInput);
-    const existing = parseEventRecord(await getJSON(professionalStore, eventKey(id)));
-    if (!existing) throw notFound();
+    const existing = await loadEditableEvent(id);
     const updated = { ...existing, ...patch, updated_at: now() };
     await setJSON(professionalStore, eventKey(id), updated);
     await setJSON(professionalStore, eventIndexKey(id), eventIndexRecord(updated));
@@ -268,8 +278,7 @@ export function createEventRepository(deps = {}) {
   }
 
   async function transitionState(id, nextState) {
-    const existing = parseEventRecord(await getJSON(professionalStore, eventKey(id)));
-    if (!existing) throw notFound();
+    const existing = await loadEditableEvent(id);
     assertEventStateTransition(existing.occurrence_state, nextState);
     const updated = { ...existing, occurrence_state: nextState, updated_at: now() };
     await setJSON(professionalStore, eventKey(id), updated);
@@ -280,8 +289,7 @@ export function createEventRepository(deps = {}) {
   async function rescheduleEvent(id, input) {
     assertNoAccessFields(input);
     const validated = validateEventRescheduleInput(input);
-    const existing = parseEventRecord(await getJSON(professionalStore, eventKey(id)));
-    if (!existing) throw notFound();
+    const existing = await loadEditableEvent(id);
     assertEventStateTransition(existing.occurrence_state, 'rescheduled');
     const updated = {
       ...existing,

@@ -102,6 +102,7 @@ export function createEventsHandler(deps = {}) {
 
       const repo = createRepository({
         store,
+        loadImportedEvent: async (id) => importedPdEventById(await loadGithubPdEvents({ env }), id),
         now: eventNow,
         resolveEntity,
         getUniversalLinkStore,
@@ -132,6 +133,8 @@ export function createEventsHandler(deps = {}) {
               if (!imported) throw error;
               event = imported;
             }
+            const snapshot = importedPdEventById(await loadGithubPdEvents({ env }).catch(() => []), id);
+            if (snapshot) event = { ...event, knowledge_notes: snapshot.knowledge_notes };
             const learning_operation = await taskLinks.loadForTarget(
               `professional:event:${id}`,
               'learning_for'
@@ -174,7 +177,12 @@ export function createEventsHandler(deps = {}) {
                 env
               );
             }
-            await repo.getEvent(id);
+            try {
+              await repo.getEvent(id);
+            } catch (error) {
+              if (error?.status !== 404) throw error;
+              await repo.updateEvent(id, { event_type: 'professional_development' });
+            }
             const result = await taskLinks.linkTask({
               targetRef: `professional:event:${id}`,
               relationshipType: 'learning_for',
