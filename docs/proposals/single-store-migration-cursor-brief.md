@@ -1,6 +1,6 @@
 # Cursor brief: one store for Professional data (retire the Notion JSON reads)
 
-**Status:** ready to build. Phase 1 can be built now. Phase 2 (communications) can be built and dry-run, but not applied until Adam answers Decision D4. Phase 3 starts only after Phases 1 and 2 are live.
+**Status:** ready to build. Phases 1 and 2 can be built now. Phase 3 starts only after Phases 1 and 2 are live.
 **Written:** 10/10/26 by Claude Code, after the @-connections investigation ([#769](https://github.com/adamrussell91-hash/life-hub/pull/769)).
 **Builder:** Cursor. Read this whole file before writing any code. Where this brief says STOP, stop and report; do not improvise.
 
@@ -14,10 +14,10 @@ Professional Hub data lives in two places. Records made in the app live in **Net
 
 | # | Decision |
 |---|----------|
-| D1 | **Netlify Blobs is the one store.** This reverses the earlier choice recorded at the top of `netlify/functions/_shared/github-professional-data.mjs` ("canonical home is GitHub… chose not to duplicate it into Netlify storage"). Adam reversed it on 10/10/26. Update that comment in Phase 3. |
+| D1 | **Netlify Blobs is the one store.** Most Professional data already lives there. The header comment of `netlify/functions/_shared/github-professional-data.mjs` ("canonical home is GitHub… chose not to duplicate it into Netlify storage") is out of date; replace it in Phase 3. |
 | D2 | **Ids never change.** Every imported record keeps the id the site already uses for it (`person_<hash>`, `organisation_<hash>`, `event_<hash>` from the existing derive functions). Universal Links, org charts, tags and URLs already point at these ids. Never call `randomUUID`, `generatePersonId`, `generateEventId` or any other random-id generator for an imported record. |
 | D3 | **The JSON files become a frozen archive.** Never edit, move or delete anything in `life-hub-data/data/professional/`. Never write to the `life-hub-data` repo at all. |
-| D4 | **Communications (Phase 2): needs Adam.** 292 of 632 Notion communication rows name a student (`student_name`). Copying them into Blobs moves student information into the Professional store. Phase 2 builds and dry-runs only. **Do not run Phase 2 `--apply` until Adam has answered the D4 question in the Phase 2 PR.** |
+| D4 | **Copy every communication, student ones included.** Adam decided 10/10/26. 292 of the 632 Notion communication rows name a student (`student_name`). They are copied as they are: the student's name stays in the text exactly where the list shows it today. No person links to students are created (Phase 2 step 4). |
 | D5 | **Out of scope:** Knowledge notes (they already live in one place, `knowledge-hub-data`); Life Hub data; the `email`, `phone`, `tags`, `notion_url` and `source_notes` fields in `people.json` (the site doesn't show them today and this work must not start showing them); the tie-inference scripts under `scripts/` that read `people.json` directly. List anything else you find that merges a JSON file with Blobs in the PR body. Do not migrate it. |
 
 ## 3. What exists today (verified against `main` at `92cbf0f1`)
@@ -26,7 +26,7 @@ Professional Hub data lives in two places. Records made in the app live in **Net
 |---|---|---|---|---|
 | People (adults) | `people.json` | 211 (210 contacts + Adam's own "self" record) | `people-collection.mjs`, `people-dedupe.mjs`, `entity-search.mjs`, `entity-resolvers.mjs` (`resolvePerson`), `entity-overview.mjs`, `people-agent.mjs`, `person-workplace.mjs`, `entities.mjs` | **Yes:** `identityRepo.adoptImportedIdentity({ kind: 'person', record })` in `identity-repository.mjs:834`. Refuses the self Person. |
 | People (students) | `people.json`, rows where `original_category === 'Student (Communications database)'` | 127 | same as above, plus `organisations-collection.mjs`; excluded from every colleague list by `isImportedStudentPerson` | Same adopt path. **See rule R6.** |
-| Self Person (Adam) | `people.json`, row with `is_self: true` | 1 | `getGithubActiveSelfPerson` → `schedule-projections.mjs`, `career-overview.mjs` | **No.** Never adopt it. See Phase 1 step 2. |
+| Self Person (Adam) | `people.json`, row with `is_self: true` | 1 | `career-overview.mjs` `findActiveSelfPerson` (Blob first, then GitHub); `schedule-projections.mjs` reads **only** the GitHub row via `getGithubActiveSelfPerson` | **Not needed.** Adam's self Person already exists in Blobs. Never adopt the GitHub row. See Phase 1 step 2. |
 | Organisations | `organisations.json` | 107 | `organisations-collection.mjs`, `entity-search.mjs`, `entity-resolvers.mjs` (`resolveOrganisation`), `entity-overview.mjs` | **No.** `adoptImportedIdentity` throws `unsupported_adopt_kind` for organisations. Phase 1 extends it. |
 | Relationships | `relationships.json` | 327 (244 `employee_at`, 79 `professional_relationship`, 4 `member_of`) | `listGithubRelationshipEntries` → `entity-overview.mjs`, `people-collection.mjs`, `organisations-collection.mjs`, `person-workplace.mjs`, `career-overview.mjs`. Built in memory as fake links with `import_source: 'professional_data'`. | Partly: `person-workplace.mjs` `endWorkplace` writes a native copy that supersedes an imported link. |
 | PD events | `pd-events.json` | 28 | `event-repository.mjs` `listEvents` (copies each one into Blobs the first time the list loads, #767); `entity-search.mjs` and `resolveEvent` (fallback added in #769); `schedule-projections.mjs` | **Yes:** `event-repository.mjs` `loadEditableEvent(id, snapshot)`, also migrates `talk_note` links to Knowledge notes. |
@@ -51,7 +51,7 @@ The local clone's counts don't match `import-manifest.json` (350 / 18 / 74), so 
 - Phase 3 makes `people-collection.mjs`, `people-dedupe.mjs`, `organisations-collection.mjs` and `people-directory.mjs` build their student set from Blob records' `original_category` before removing the GitHub list.
 - Live check: the People page shows **zero** students before and after (register D6, D9).
 
-**R7 · Never adopt the self Person.** Skip the `is_self: true` row and report it. See Phase 1 step 2.
+**R7 · Never adopt the GitHub self Person.** Adam's self Person is already in Blobs. Skip the `is_self: true` row and report it. See Phase 1 step 2.
 
 **R8 · No personal data in git, logs or the PR.** Dry-run and apply reports go to a file **outside the repo** (default `os.tmpdir()`), not to stdout. The PR body may contain counts and ids only, never names, emails or communication text. Never print `GITHUB_TOKEN` or `NETLIFY_BLOBS_TOKEN`. Copy the token handling in `scripts/copy-hub-blobs.mjs`.
 
@@ -70,7 +70,7 @@ The local clone's counts don't match `import-manifest.json` (350 / 18 / 74), so 
 Files: `scripts/migrate-professional-imports.mjs` (new), `netlify/functions/_shared/identity-repository.mjs`, tests. **No changes to any reader in this PR.**
 
 1. **Extend `adoptImportedIdentity` to organisations.** Allow `kind: 'organisation'` and validate with `parseOrganisationRecord`. Keep the journal type, the operation-id shape (`deriveOperationId(['adopt_identity', kind, id])`) and the "existing record → return `adopted: false`" behaviour exactly as for people. Tests: adopting an org writes record + index; a second adopt returns `adopted: false`; an existing deleted org is not overwritten.
-2. **Self Person.** The dry run reports whether the self pointer (`SELF_POINTER_KEY = 'entities/self-pointer'` in `identity-repository.mjs`) points at a Blob Person with `is_self: true` and `lifecycle_status: 'active'`. Read it the way `identity-repository.mjs` does; don't guess the format. If none exists: **STOP. Do not create one, do not adopt the GitHub self row.** Write it in the report and the PR body; Adam decides.
+2. **Self Person.** Adam's self Person already exists in Blobs. Skip the GitHub `is_self` row (R7). The dry run confirms the Blob one with `findActiveSelfPerson(universalStore)` from `career-overview.mjs`, called **without** the GitHub fallback (pass a store; if it returns the GitHub row, that's the fallback talking). It reports the Blob self Person's id and whether `SELF_POINTER_KEY` (`'entities/self-pointer'`) points at it. If the Blob one somehow isn't found, report it and carry on with everything else. Never create or adopt a self Person.
 3. **People:** for each id from `listGithubPersonCandidates` **and** `listGithubImportedStudentPeople`, skip the self row (R7), apply R3, then `adoptImportedIdentity({ kind: 'person', record: await getGithubPerson(id) })`.
 4. **Organisations:** for each from `listGithubOrganisationCandidates`, apply R3, then adopt.
 5. **Relationships:** for every adopted or already-in-Blobs person, read `listGithubRelationshipEntries('person', id)`. For each imported link:
@@ -86,17 +86,15 @@ Files: `scripts/migrate-professional-imports.mjs` (new), `netlify/functions/_sha
 **Run order once PR A is merged** (Adam runs it, or Cursor with Adam watching):
 `node scripts/migrate-professional-imports.mjs` (dry run) → send Adam the counts → Adam says go → `--apply` → re-run the dry run, which must report `would_copy: 0` for every kind.
 
-### Phase 2: communications and Notion meetings (PR B, dry-run only until D4 is answered)
+### Phase 2: communications and Notion meetings (PR B)
 
 Files: the same script (an `--only=communications` flag), `communication-repository.mjs`, `meeting-repository.mjs`, `schedule-projection.mjs` (shared mapping only), tests.
 
 1. **Deterministic ids.** Add `notionCommunicationId(notionId)` → `communication_<uuid-shaped sha256 of "communication:" + notionId>` and `notionMeetingId(notionId)` → `meeting_<…of "meeting:" + notionId>`, copying the shape of `notionPdEventId` in `notion-pd-events.mjs`. They must match `COMMUNICATION_ID_PATTERN` / `MEETING_ID_PATTERN`. Unit-test the pattern match.
 2. **Explicit-id create.** Add an import-only path to each repository that accepts the derived id instead of calling `generateId()`, with the same validation, journal and index writes as the normal create, and refusing if the id exists (R3). It must not be reachable from any HTTP handler. Test that it isn't exported through `communications.mjs` / `meetings.mjs`.
 3. **Split by method** exactly as today: `isNotionMeetingMethod(row.method)` rows → meetings; everything else → communications. Map fields with the existing projections (`projectNotionMeetingListRecord`, `projectNotionCommunicationListRecord`), changing only the id, dropping `source`, and keeping only keys the schemas' `STORED_KEYS` allow. If a projected value fails the schema, report `failed` with the field name. Don't massage it.
-4. **No new links to students.** Do not turn `student_name` or `attendees` into person links. Their text stays where the projection already puts it.
-5. **Dry run only.** Post the counts in the PR and ask Adam the D4 question, word for word:
-   > "292 of the Notion communications name a student. Copy them into the Professional store as they are (student names stay in the text, no student links), or leave the student ones in the archive file and copy only the other 340?"
-   Build whichever he answers. Run `--apply` only after that.
+4. **No new links to students.** Do not turn `student_name` or `attendees` into person links. Their text stays where the projection already puts it. Every row is copied, student ones included (D4).
+5. **Run order** is the same as Phase 1: dry run → send Adam the counts → `--apply` on his go → a repeat dry run shows `would_copy: 0`.
 6. Old `notion_<hex>` URLs: `apps/professional/src/views/communications.ts:41` and `meetings.ts:116` open Notion for `notion_` ids. Leave them alone in this phase; Phase 3 removes them.
 
 ### Phase 3: delete the dual reads (PR C, only after Adam confirms Phases 1 and 2 are live)
@@ -107,7 +105,7 @@ Every item is a deletion or a simplification. Each numbered item is its own comm
 2. `entity-resolvers.mjs`: remove the GitHub fallbacks in `resolvePerson`, `resolveOrganisation` and `resolveEvent` (the last added in #769).
 3. `people-collection.mjs`, `people-dedupe.mjs`, `organisations-collection.mjs`, `people-directory.mjs`: read Blobs only, with the student set from `original_category` **first** (R6).
 4. `entity-overview.mjs`, `person-workplace.mjs` (`adoptIfImported`, `endWorkplace`'s imported branch, `isImported`), `career-overview.mjs`, `people-agent.mjs`, `entities.mjs`: remove the GitHub reads and adopt-on-first-edit branches.
-5. `schedule-projections.mjs`, `career-overview.mjs`: self Person from Blobs only (Phase 1 step 2 guaranteed it exists).
+5. `schedule-projections.mjs`: replace `getGithubActiveSelfPerson` with `findActiveSelfPerson` from `career-overview.mjs`; then remove its GitHub fallback. The self Person comes from Blobs only (confirmed in Phase 1 step 2).
 6. `event-repository.mjs`: remove `loadImportedEvents`, the imported loop in `listEvents`, and the snapshot branch of `loadEditableEvent`. **Keep** `migrateKnowledgeNotes` and the `events/imports/<id>` journal read until a check shows every journal is `complete: true`; list the incomplete ones in the PR.
 7. `events.mjs`, `communications.mjs`, `meetings.mjs`, `schedule-projections.mjs`: remove `listGithub*` reads and `mergeBlobAndNotionRecords` callers; delete the Notion projection functions nothing calls any more.
 8. `apps/professional/src/views/communications.ts`, `meetings.ts`: remove the `notion_` → Notion-link branches.
@@ -126,7 +124,7 @@ Before Phase 1 `--apply`, record these numbers from the live site in the PR: Peo
 | C4 | Opens a Teaching unit → Connections → types "wagan watson" | the event "PD — Samuel Wagan Watson (Felicity Plunkett)" appears; tagging it saves and shows on the event page |
 | C5 | Opens the Events list | the same count as before; deleted events stay deleted |
 | C6 | (after Phase 2) Opens a former Notion meeting from Meetings | it opens a hub meeting page, not Notion, with the same title and date |
-| C7 | (after Phase 2) Opens the Communications list | the same count as before (minus any student rows Adam chose to leave behind, D4) |
+| C7 | (after Phase 2) Opens the Communications list | the same count as before, student ones included |
 | C8 | (after Phase 3) Any page above, with `GITHUB_TOKEN` unset in a deploy preview | everything above still works. Proves nothing reads the JSON any more. |
 
 A check that fails means the phase isn't done (register P3). Don't tick it on a unit test.
