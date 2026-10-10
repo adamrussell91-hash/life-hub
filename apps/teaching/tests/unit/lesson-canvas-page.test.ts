@@ -235,7 +235,6 @@ describe('mountLessonPage', () => {
 
     host.querySelector<HTMLButtonElement>('.entity-banner__edit')!.click();
     const dialog = document.querySelector<HTMLDialogElement>('.entity-banner__dialog')!;
-    findButton(dialog, 'Choose from library')!.click();
     expect(dialog.querySelector('.cover-picker__library-item')).not.toBeNull();
   });
 
