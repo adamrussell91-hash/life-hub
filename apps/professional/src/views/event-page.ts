@@ -1,4 +1,4 @@
-import { getEvent, updateEvent } from '@/api/events';
+import { getEvent, updateEvent, deleteEvent } from '@/api/events';
 import { createUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
 import { createPdGroup, getPdGroup } from '@/api/pd-groups';
 import { createKnowledgeNote } from '@/api/knowledge-notes';
@@ -112,6 +112,39 @@ export async function renderEventPage(
     }
   }));
   root.append(edit);
+  const remove = el('button', 'btn btn--ghost', 'Delete event');
+  remove.type = 'button';
+  remove.dataset.part = 'delete-event';
+  const confirmation = el('section', 'confirm-card');
+  confirmation.hidden = true;
+  confirmation.style.display = 'none';
+  confirmation.setAttribute('aria-label', 'Delete event');
+  confirmation.append(el('h3', undefined, 'Delete this event?'),
+    el('p', undefined, 'This removes the event from Professional Hub and the calendar. Linked Knowledge notes stay in Knowledge.'));
+  const actions = el('div', 'confirm-card__actions');
+  const discard = el('button', 'btn btn--ghost', 'Keep event');
+  discard.type = 'button';
+  discard.addEventListener('click', () => { confirmation.hidden = true; confirmation.style.display = 'none'; remove.focus(); });
+  const confirm = el('button', 'btn btn--primary', 'Delete event');
+  confirm.type = 'button';
+  confirm.dataset.part = 'confirm-delete';
+  const status = el('p', 'event-form__status');
+  status.setAttribute('role', 'status');
+  confirm.addEventListener('click', async () => {
+    confirm.disabled = true;
+    status.textContent = '';
+    try {
+      await deleteEvent(id);
+      window.location.hash = '#/events';
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : 'Could not delete the event. Try again.';
+      confirm.disabled = false;
+    }
+  });
+  remove.addEventListener('click', () => { confirmation.hidden = false; confirmation.style.removeProperty('display'); discard.focus(); });
+  actions.append(discard, confirm);
+  confirmation.append(actions, status);
+  root.append(remove, confirmation);
 
   if (isPd) {
     root.append(shapePicker());

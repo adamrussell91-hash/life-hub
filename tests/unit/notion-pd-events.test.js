@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createEventsHandler } from '../../netlify/functions/events.mjs';
+import { createUniversalLinkRepository } from '../../netlify/functions/_shared/universal-link-repository.mjs';
+import { resolveEvent } from '../../netlify/functions/_shared/entity-resolvers.mjs';
+import { createAccessContext } from '../../netlify/functions/_shared/entity-access.mjs';
 import { createScheduleProjectionsHandler } from '../../netlify/functions/schedule-projections.mjs';
 import {
   listGithubPdEvents,
@@ -118,6 +121,7 @@ function authed(url) {
 
 test('GET /api/events places the imported PD event on the list and by id', async () => {
   const handler = createEventsHandler({
+    resolveEntity: async ref => ({ref, kind:'page', display_label:'PD note', visibility:'operator', lifecycle_status:'active', href:'/knowledge/#page/note'}),
     env,
     now: () => Date.parse('2026-08-01T01:00:00Z'),
     getContentStore: async () => emptyStore(),
@@ -135,7 +139,7 @@ test('GET /api/events places the imported PD event on the list and by id', async
     authed(`https://api.adam-russell.com/api/events?id=${encodeURIComponent(events[0].id)}`)
   );
   assert.equal(one.status, 200);
-  assert.equal((await one.json()).data.event.notion_id, NOTION_ID);
+  assert.equal((await one.json()).data.event.id, notionPdEventId(NOTION_ID));
 });
 
 test('GET /api/schedule-projections includes the imported PD event', async () => {
@@ -160,14 +164,15 @@ test('GET /api/schedule-projections includes the imported PD event', async () =>
 test('editing an existing PD event persists under its original id and keeps linked notes without duplicating it', async () => {
   const records = new Map();
   const store = {
-    async get(key) { return records.get(key) ?? null; },
-    async setJSON(key, value) { records.set(key, structuredClone(value)); },
+    async get(key, options = {}) { if (key.startsWith('events/records/') && options.consistency !== 'strong') return null; return records.get(key) ?? null; },
+    async setJSON(key, value, options = {}) { if (options.onlyIfNew && records.has(key)) return {modified: false}; records.set(key, structuredClone(value)); return {modified: true}; },
     async list({ prefix = '' } = {}) { return { blobs: [...records.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key })) }; }
   };
   const handler = createEventsHandler({
+    resolveEntity: async ref => ({ref, kind:'page', display_label:'PD note', visibility:'operator', lifecycle_status:'active', href:'/knowledge/#page/note'}),
     env, now: () => Date.parse('2026-08-01T01:00:00Z'),
     getContentStore: async () => store,
-    getUniversalLinkStore: async () => emptyStore(),
+    getUniversalLinkStore: async () => store,
     getTasksStore: async () => emptyStore(),
     listGithubPdEvents: async () => [row()]
   });
@@ -184,8 +189,88 @@ test('editing an existing PD event persists under its original id and keeps link
   assert.equal(reloaded.title, patch.title);
   assert.equal(reloaded.hours, 2);
   assert.equal(reloaded.event_type, 'general');
-  assert.equal(reloaded.knowledge_notes[0].href, projectNotionPdEvent(row()).knowledge_notes[0].href);
+  assert.equal(reloaded.knowledge_notes[0].href, '/knowledge/#page/note');
   const events = (await (await handler(authed('https://api.adam-russell.com/api/events'))).json()).data.events;
   assert.equal(events.length, 1);
   assert.equal(events[0].title, patch.title);
+});
+
+
+test('existing events become stored events, can be deleted and never reappear in lists, calendar, or direct reads', async () => {
+  const records = new Map();
+  const store = {
+    async get(key, options = {}) { if (key.startsWith('events/records/') && options.consistency !== 'strong') return null; return records.get(key) ?? null; },
+    async setJSON(key, value, options = {}) { if (options.onlyIfNew && records.has(key)) return {modified: false}; records.set(key, structuredClone(value)); return {modified: true}; },
+    async list({ prefix = '' } = {}) { return { blobs: [...records.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key })) }; }
+  };
+  let sourceAvailable = true;
+  const deps = { resolveEntity: async ref => ({ref, kind:'page', display_label:'PD note', visibility:'operator', lifecycle_status:'active', href:'/knowledge/#page/note'}), env, now: () => Date.parse('2026-08-01T01:00:00Z'),
+    scheduleNow: () => '2026-08-01T01:00:00.000Z', getContentStore: async () => store,
+    getUniversalLinkStore: async () => store, getTasksStore: async () => emptyStore(),
+    listGithubPdEvents: async () => sourceAvailable ? [row()] : [], listGithubCommunications: async () => [] };
+  const handler = createEventsHandler(deps);
+  const id = notionPdEventId(NOTION_ID);
+  const url = `https://api.adam-russell.com/api/events?id=${id}`;
+  const first = (await (await handler(authed(url))).json()).data.event;
+  assert.equal(first.source, undefined);
+  assert.equal(first.id, id);
+  assert.ok(records.has(`events/records/${id}`), 'must exist in native event storage before editing');
+  sourceAvailable = false;
+  const withoutSource = (await (await handler(authed(url))).json()).data.event;
+  assert.equal(withoutSource.knowledge_notes[0].page_id, first.knowledge_notes[0].page_id);
+  sourceAvailable = true;
+  const context = createAccessContext({ workflow: 'professional' });
+  assert.equal((await resolveEvent(id, context, {getStore: async () => store})).ref, `professional:event:${id}`);
+  const response = await handler(new Request(`${url}&action=delete`, { method: 'POST', headers: authed(url).headers }));
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.equal((await handler(authed(url))).status, 404);
+  await assert.rejects(() => resolveEvent(id, context, {getStore: async () => store}), {status: 404});
+  const list = (await (await handler(authed('https://api.adam-russell.com/api/events'))).json()).data.events;
+  assert.deepEqual(list, []);
+  const staleList = store.list;
+  store.list = async () => ({blobs: []});
+  assert.deepEqual((await (await handler(authed('https://api.adam-russell.com/api/events'))).json()).data.events, []);
+  store.list = staleList;
+  const schedule = createScheduleProjectionsHandler(deps);
+  const calendar = (await (await schedule(authed('https://api.adam-russell.com/api/schedule-projections'))).json()).data.projections;
+  assert.deepEqual(calendar, []);
+  const edit = await handler(new Request(url, { method: 'PATCH', headers: { ...Object.fromEntries(authed(url).headers), 'content-type': 'application/json' }, body: JSON.stringify({title: 'Resurrected'}) }));
+  assert.equal(edit.status, 404);
+});
+
+
+test('migrated event notes are native Universal Links even after the source disappears', async () => {
+  const values = new Map();
+  const store = { async get(key) { return values.get(key) ?? null; },
+    async setJSON(key, value, options = {}) { if (options.onlyIfNew && values.has(key)) return {modified:false}; values.set(key, structuredClone(value)); return {modified:true}; },
+    async list({prefix = ''} = {}) { return {blobs: [...values.keys()].filter(key => key.startsWith(prefix)).map(key => ({key}))}; } };
+  let rows = [row()];
+  let noteDeleted = false;
+  const resolveEntity = async (ref) => {
+    if (noteDeleted && ref.startsWith('knowledge:page:')) throw Object.assign(new Error('Not found'), {status:404, code:'endpoint_not_found'});
+    return {ref, kind: 'page', display_label: 'PD note', supporting_label: null, href: '/knowledge/#page/note', visibility: 'operator', lifecycle_status: 'active'};
+  };
+  const handler = createEventsHandler({env, now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store, getUniversalLinkStore: async () => store,
+    getTasksStore: async () => emptyStore(), listGithubPdEvents: async () => rows, resolveEntity});
+  const id = notionPdEventId(NOTION_ID);
+  const {source, notion_id, knowledge_notes, ...previouslySaved} = projectNotionPdEvent(row());
+  values.set(`events/records/${id}`, {...previouslySaved, title:'Previously edited', hours:3});
+  const upgraded = await (await handler(authed(`https://api.adam-russell.com/api/events?id=${id}`))).json();
+  assert.equal(upgraded.data.event.title, 'Previously edited');
+  assert.equal(upgraded.data.event.hours, 3);
+  assert.equal(upgraded.data.event.knowledge_notes.length, 1);
+  rows = [];
+  const links = createUniversalLinkRepository({store, resolveEntity});
+  const result = await links.listForEntity(`professional:event:${id}`, createAccessContext({workflow:'professional'}));
+  assert.equal(result.outgoing.length, 1);
+  assert.equal(result.outgoing[0].link.relationship_type, 'talk_note');
+  assert.equal(result.outgoing[0].link.target_ref, `knowledge:page:${row().notes[0].page_id}`);
+  assert.equal(values.get(`events/imports/${id}`).complete, true);
+  noteDeleted = true;
+  const reloaded = await (await handler(authed(`https://api.adam-russell.com/api/events?id=${id}`))).json();
+  assert.equal(reloaded.data.event.knowledge_notes, undefined, 'deleted notes do not leak through the migration journal');
+  values.get(`events/imports/${id}`).complete = false;
+  const pending = await (await handler(authed(`https://api.adam-russell.com/api/events?id=${id}`))).json();
+  assert.equal(pending.data.event.knowledge_notes, undefined, 'pending migration also respects note liveness');
 });

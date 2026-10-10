@@ -355,8 +355,8 @@ export async function resolveEvent(
   const ref = formatEntityRef({ namespace: 'professional', kind: 'event', id });
   if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
   const store = await getStore();
-  const record = parseEventRecord(await getProfessionalJSON(store, eventKey(id)));
-  if (!record) throw endpointNotFoundError();
+  const record = parseEventRecord(await getProfessionalJSON(store, eventKey(id), { consistency: 'strong' }));
+  if (!record || isDeletedRecord(record)) throw endpointNotFoundError();
   return {
     ref,
     kind: 'event',

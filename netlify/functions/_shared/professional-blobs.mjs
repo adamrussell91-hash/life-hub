@@ -177,9 +177,9 @@ export async function getJSON(store, key, options = {}) {
   return store.get(key, { type: 'json', ...options });
 }
 
-export async function setJSON(store, key, value) {
-  if (typeof store.setJSON === 'function') return store.setJSON(key, value);
-  if (typeof store.set === 'function') return store.set(key, JSON.stringify(value));
+export async function setJSON(store, key, value, options = {}) {
+  if (typeof store.setJSON === 'function') return store.setJSON(key, value, options);
+  if (typeof store.set === 'function') return store.set(key, JSON.stringify(value), options);
   throw new Error('Professional content store cannot write.');
 }
 

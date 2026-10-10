@@ -14,6 +14,7 @@ const base = {
 let current = { ...base };
 
 vi.mock('@/api/events', () => ({
+  deleteEvent: vi.fn(async () => ({deleted: true})),
   getEvent: vi.fn(async () => ({ event: current })),
   updateEvent: vi.fn(async (_id: string, patch: object) => { current = { ...current, ...patch }; return { event: current }; })
 }));
@@ -49,7 +50,7 @@ vi.mock('@/components/block-page', () => ({
 import { renderEventNewView } from '@/views/events';
 import { renderEventPage } from '@/views/event-page';
 import { mountBlockPage } from '@/components/block-page';
-import { updateEvent } from '@/api/events';
+import { updateEvent, deleteEvent } from '@/api/events';
 import { createKnowledgeNote } from '@/api/knowledge-notes';
 import { createUniversalLink } from '@/api/universal-links';
 
@@ -114,6 +115,14 @@ describe('event page', () => {
       accreditation: null, priorityArea: null, certificate: null, startIso: base.start,
       endIso: base.end, timeZone: base.time_zone, pendingLinks: [] });
     expect(updateEvent).toHaveBeenLastCalledWith(EVENT_ID, expect.objectContaining({ title: 'Revised PD', hours: 2 }));
+  });
+
+  it('offers deletion with a confirmation and deletes the existing event', async () => {
+    const canvas = await render();
+    canvas.querySelector<HTMLButtonElement>('[data-part="delete-event"]')!.click();
+    expect(canvas.querySelector('.confirm-card')).not.toBeNull();
+    canvas.querySelector<HTMLButtonElement>('[data-part="confirm-delete"]')!.click();
+    await vi.waitFor(() => expect(deleteEvent).toHaveBeenCalledWith(EVENT_ID));
   });
 
   it('Make note creates a Knowledge page and links it to the talk', async () => {
