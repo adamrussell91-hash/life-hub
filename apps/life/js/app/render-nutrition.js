@@ -2,6 +2,7 @@ import { countUp, playCardMotion } from './chart-kit/animate.js';
 import { buildConsistencyStrip } from './chart-kit/consistency-strip.js';
 import { renderMealHistory } from './render-meal-history.js';
 import { renderNutritionToday } from './render-nutrition-today.js';
+import { renderCreatine } from './render-creatine.js';
 import { formatGrams } from '../core/aggregate.js';
 import { formatDisplayDate, formatWeekday } from '../core/time.js';
 
@@ -13,6 +14,7 @@ export function renderNutrition(root, model, options = {}) {
   const quiet = options.quiet === true;
   renderNutritionToday(root, model, { quiet, now: options.now });
   renderMealHistory(root, model);
+  renderCreatine(root, model.creatine, { quiet });
   renderChallengeTrackers(root, model.challenges);
   renderConsistencyStrip(root, model.month, { quiet });
 

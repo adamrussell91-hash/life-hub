@@ -10149,6 +10149,53 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 .nutrition-today__note .is-empty { color: var(--muted); font-style: italic; }
 
 /* ── Nutrition: week grid (inside Meal history) + selected day ────────── */
+.creatine-card { width: 50%; min-width: 0; box-sizing: border-box; padding: var(--space-6); container-type: inline-size; }
+.creatine-card p { margin: 0; }
+.creatine-card__heading { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); flex-wrap: nowrap; margin-top: var(--space-1); min-width: 0; }
+.creatine-card__heading h3 { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); line-height: var(--leading-snug); }
+.creatine-card__eta { font-size: var(--text-base); font-weight: var(--weight-medium); line-height: var(--leading-snug); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.creatine-card__eta-compact, .creatine-card__eta-short { display: none; }
+@container (max-width: 400px) {
+  .creatine-card__eta { font-size: var(--text-sm); }
+  .creatine-card__eta-full { display: none; }
+  .creatine-card__eta-compact { display: inline; }
+}
+@container (max-width: 280px) {
+  .creatine-card__eta-compact { display: none; }
+  .creatine-card__eta-short { display: inline; }
+  .creatine-card__heading h3 { font-size: var(--text-base); }
+}
+.creatine-card .creatine-card__routine { margin-top: var(--space-1); font-size: var(--text-xs); color: var(--muted); }
+.creatine-card__plot { margin-top: var(--space-4); min-width: 0; }
+.creatine-card__chart { display: block; width: 100%; height: auto; overflow: visible; }
+.creatine-card__chart text { font-family: var(--font-ui); font-size: var(--text-xs); fill: var(--muted); }
+.creatine-card__chart .creatine-zone-label { font-weight: var(--weight-semibold); fill: var(--success); }
+.creatine-zone { fill: var(--pastel-sage); }
+.creatine-guide { stroke: var(--line); stroke-width: 1; }
+.creatine-stores-area { fill: var(--wave); opacity: 0.07; }
+.creatine-forecast-band { fill: var(--wave); opacity: 0.08; }
+.creatine-stores-line { fill: none; stroke: var(--wave); stroke-width: 2.6; stroke-linecap: round; }
+.creatine-forecast { fill: none; stroke: var(--wave); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 3 5; opacity: 0.48; }
+.creatine-dose-link { fill: none; stroke: var(--wave); stroke-width: 1; opacity: 0.25; }
+.creatine-pending { fill: var(--paper); stroke: var(--wave); stroke-width: 1.8; }
+.creatine-current { fill: var(--wave); }
+.creatine-card__chart .creatine-now { fill: var(--wave); font-weight: var(--weight-medium); }
+.creatine-card__legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); margin-top: var(--space-2); font-size: var(--text-xs); color: var(--muted); }
+.creatine-card__legend span { display: flex; align-items: center; gap: var(--space-2); }
+.creatine-key { display: inline-block; width: var(--space-2); height: var(--space-2); flex: none; border-radius: var(--radius-full); }
+.creatine-key--solid { background: var(--wave); }
+.creatine-key--open { border: 1.5px solid var(--wave); }
+.creatine-key--forecast { width: var(--space-4); height: 0; border-top: 2px dashed var(--wave); border-radius: 0; opacity: 0.55; }
+.creatine-card__intake { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; border-top: 1px solid var(--line); margin-top: var(--space-4); padding-top: var(--space-3); font-size: var(--text-xs); }
+.creatine-card__intake strong { font-weight: var(--weight-semibold); }
+.creatine-card__intake span, .creatine-card__empty { color: var(--muted); }
+.creatine-card__chart[hidden], .creatine-card__legend[hidden], .creatine-card__empty[hidden] { display: none; }
+@media (max-width: 720px) {
+  .creatine-card { width: 100%; padding: var(--space-4); }
+  .creatine-card__legend { gap: var(--space-2) var(--space-4); }
+  .creatine-card__eta { font-size: var(--text-sm); }
+}
+
 .nutrition-week-row { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--space-grid); align-items: stretch; }
 .nutrition-week-row > .metric-card { min-width: 0; }
 .meal-log-card { display: flex; flex-direction: column; }

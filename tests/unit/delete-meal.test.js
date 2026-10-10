@@ -194,7 +194,7 @@ Lunch — on track
 `;
   const cn = `# Central Node
 
-## ⚡ Today's Status
+## ⚡ Today's Status (Tuesday 8 September 2026)
 **Nutrition:** 900 kcal, 60g P, 30g F.
 **Flags:** custard — duplicate.
 
@@ -233,13 +233,16 @@ Lunch — on track
     date: '2026-09-08',
     meals: ['snack'],
     paths: ['data/nutrition/2026/09/2026-09-08-snack.md']
-  }]);
+  }], { date: '2026-09-08', now: new Date('2026-09-08T06:00:00Z') });
   assert.equal(result.updated, true);
-  assert.equal(writes.length, 1);
-  assert.equal(writes[0].path, 'central-node.md');
-  assert.match(writes[0].content, /\*\*Nutrition:\*\* 500 kcal/);
-  assert.match(writes[0].content, /Removed meal log for snack/);
-  assert.doesNotMatch(writes[0].content, /Logged custard — duplicate for snack/);
+  assert.deepEqual(writes.map(write => write.path).sort(), ['central-node.md', 'data/nutrition/creatine-index.json']);
+  const centralWrite = writes.find(write => write.path === 'central-node.md');
+  const cacheWrite = writes.find(write => write.path === 'data/nutrition/creatine-index.json');
+  assert.equal(Object.keys(JSON.parse(cacheWrite.content).records).length, 1);
+  assert.match(centralWrite.content, /\*\*Nutrition:\*\* 500 kcal/);
+  assert.match(centralWrite.content, /\*\*Creatine:\*\*.*0 g logged today/);
+  assert.match(centralWrite.content, /Removed meal log for snack/);
+  assert.doesNotMatch(centralWrite.content, /Logged custard — duplicate for snack/);
 });
 
 test('Removed meal log shares the meal Recent Action fingerprint', () => {

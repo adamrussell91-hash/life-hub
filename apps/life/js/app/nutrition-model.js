@@ -2,6 +2,7 @@ import { aggregateNutrition, hasRecoveryBonus, resolveDayType } from '../core/ag
 import { getDayTargets } from '../core/targets.js';
 import { comparePeriods } from '../core/trends.js';
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
+import { buildCreatineModel } from '../core/creatine.js';
 import {
   activeChallengesForDate,
   tallyChallenge
@@ -98,7 +99,7 @@ const averageProtein = days => (
   days.length === 0 ? 0 : days.reduce((sum, day) => sum + day.protein_g, 0) / days.length
 );
 
-export function buildNutritionModel({ events, targetsConfig, date, nutritionChallenges = null, history = null, freshness = null }) {
+export function buildNutritionModel({ events, targetsConfig, date, now, nutritionChallenges = null, history = null, freshness = null }) {
   if (!date) throw new RangeError('Nutrition display date is unavailable');
 
   const nutrition = aggregateNutrition(events, date);
@@ -206,6 +207,7 @@ export function buildNutritionModel({ events, targetsConfig, date, nutritionChal
 
   return {
     date,
+    creatine: buildCreatineModel({ events, date, now, history, freshness }),
     nutrition,
     dayType,
     targets,

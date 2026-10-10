@@ -28,7 +28,7 @@ import {
   EXERCISE_LIBRARY_PATH,
   parseExerciseLibrary
 } from './_shared/exercise-library.mjs';
-import { persistLogEntry, renderMarkdown, syncCentralNodeAfterMealDeletes } from './_shared/persist-log.mjs';
+import { persistLogEntry, renderMarkdown, syncCentralNodeAfterMealDeletes, syncCentralNodeAfterCreatineWrites } from './_shared/persist-log.mjs';
 import { mealDeletesFromWrites, resolveMealWritePath } from './_shared/delete-meal.mjs';
 import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { sendDiaryToDayOne } from './_shared/dayone-send.mjs';
@@ -340,7 +340,7 @@ export function createChatConfirmHandler({
       // Never trust the request `slug` here — that field is overloaded as the
       // agent id on other confirm kinds, and a photo Confirm with slug=brisket
       // would write data/nutrition/…/…-brisket.md instead of …-lunch-1600.md.
-      pathSlug = validation.record.type === 'meal' || BODY_LOG_TYPES.has(validation.record.type)
+      pathSlug = ['meal','creatine','creatine_plan'].includes(validation.record.type) || BODY_LOG_TYPES.has(validation.record.type)
         ? buildRecordSlug(validation.record)
         : parsed.slug;
       path = buildCanonicalPath({
@@ -408,7 +408,8 @@ export function createChatConfirmHandler({
         notes: validation.notes,
         path,
         existingSha: sha,
-        nowDateKey: getSydneyDateKey(new Date(now()))
+        nowDateKey: getSydneyDateKey(new Date(now())),
+        now: new Date(now())
       });
 
       let persisted;
@@ -1454,11 +1455,18 @@ export function createChatConfirmHandler({
     const mealDeletions = mealDeletesFromWrites(accepted);
     if (mealDeletions.length) {
       try {
-        const cn = await syncCentralNodeAfterMealDeletes(client, mealDeletions);
+        const cn = await syncCentralNodeAfterMealDeletes(client, mealDeletions, {date:getSydneyDateKey(new Date(now())), now:new Date(now())});
         centralNodeUpdated = cn?.updated === true;
       } catch {
         centralNodeUpdated = false;
       }
+    }
+
+    if (!mealDeletions.length && accepted.some(write => /^data\/nutrition\/\d{4}\/\d{2}\/\d{4}-\d{2}-\d{2}-.*\.md$/.test(write.path ?? ''))) {
+      try {
+        const cn = await syncCentralNodeAfterCreatineWrites(client, {date:getSydneyDateKey(new Date(now())),now:new Date(now())});
+        centralNodeUpdated = cn?.updated === true;
+      } catch { centralNodeUpdated = false; }
     }
 
     const decision = decisionFieldsFromAction({

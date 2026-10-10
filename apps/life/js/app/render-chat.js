@@ -26,7 +26,7 @@ function finishConfirmMount(root, list, card) {
   syncChatPendingConfirmsVisibility(root);
 }
 
-const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'tags', 'highlights', 'challenges', 'products', 'system_note']);
+const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'tags', 'highlights', 'challenges', 'products', 'system_note', 'dose_key']);
 const WORKOUT_HEADER_FIELDS = new Set(['title', 'session_kind', 'day_type', 'status', 'duration_min']);
 const UNREAD_SELECTOR = '.floating-chat-button, [data-section="chat"]';
 const UNREAD_CLASS = 'has-unread';
@@ -673,7 +673,7 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
   head.className = 'confirm-card__head';
   const title = root.createElement('h3');
   title.className = 'confirm-card__title';
-  title.textContent = plannedWorkout ? 'Proposed session' : capitalise(record.type) || 'Record';
+  title.textContent = plannedWorkout ? 'Proposed session' : record.type === 'creatine_plan' ? 'Creatine routine' : capitalise(record.type) || 'Record';
   head.append(title);
   const when = [proposalShortDate(record.date), typeof record.time === 'string' ? record.time.trim() : '']
     .filter(Boolean)

@@ -6,7 +6,7 @@ import { coerceCalendarDate, normalizeMedicalFields, splitLongTitle } from '../.
 import { collapseSetSplitExercises } from './workout-history.mjs';
 import { slugifyWorkoutTitle } from './workout-templates.mjs';
 
-const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'bloods', 'skincare', 'mind_session', 'medical', 'medication'];
+const RECORD_TYPES = ['meal', 'creatine', 'creatine_plan', 'workout', 'diary', 'weight', 'composition', 'measurements', 'bloods', 'skincare', 'mind_session', 'medical', 'medication'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const DOMAIN_PROPERTIES = {
@@ -23,7 +23,22 @@ const DOMAIN_PROPERTIES = {
     sodium_mg: { type: 'number' },
     calcium_mg: { type: 'number' },
     polyphenol_score: { type: 'number' },
-    omega3: { type: 'string', enum: ['high', 'medium', 'low', 'none'] }
+    omega3: { type: 'string', enum: ['high', 'medium', 'low', 'none'] },
+    creatine_g: { type: 'number', minimum: 0, maximum: 100, description: 'Creatine supplement grams actually taken with this meal; omit when unreported.' },
+    creatine_product: { type: 'string' },
+    creatine_time: { type: 'string', pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$', description: 'Actual intake HH:MM when different from meal time.' }
+  },
+  creatine: {
+    grams: { type: 'number', minimum: 0, maximum: 100, description: 'Actual supplement intake grams. Zero corrects/removes a previously recorded dose.' },
+    product: { type: 'string' },
+    dose_key: { type: 'string', pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', description: 'Required stable identity for this individual dose (e.g. dose-1). Reuse for retries/corrections; use a distinct key for each additional dose, even at the same minute.' }
+  },
+  creatine_plan: {
+    daily_g: { type: 'number', minimum: 0, maximum: 30, description: 'Confirmed daily routine grams; zero for paused.' },
+    maintenance_g: { type: 'number', minimum: 3, maximum: 5 },
+    mode: { type: 'string', enum: ['loading', 'maintenance', 'paused'] },
+    baseline: { type: 'number', minimum: 0, maximum: 1, description: 'Optional model baseline only when Adam explicitly provides established intake history. Never infer or invent.' },
+    baseline_date: { type: 'string', description: 'Optional YYYY-MM-DD date for explicit established history, on or before this plan effective date.' }
   },
   workout: {
     title: { type: 'string' },
@@ -372,6 +387,10 @@ const DOMAIN_PROPERTIES = {
 };
 
 const MEAL_REQUIRED_FIELDS = ['meal', 'calories', 'protein_g', 'fat_g', 'sodium_mg', 'calcium_mg', 'polyphenol_score', 'omega3'];
+const CREATINE_REQUIRED_FIELDS = {
+  creatine: ['grams', 'dose_key'],
+  creatine_plan: ['daily_g', 'maintenance_g', 'mode']
+};
 
 export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
   const fieldsSchema = allowedTypes.length === 1
@@ -380,13 +399,14 @@ export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
         description: `The exact fields for a ${allowedTypes[0]} record. Only these keys are allowed — using any other key name is rejected.`,
         properties: DOMAIN_PROPERTIES[allowedTypes[0]],
         additionalProperties: false,
-        ...(allowedTypes[0] === 'meal' ? { required: MEAL_REQUIRED_FIELDS } : {})
+        ...(allowedTypes[0] === 'meal' ? { required: MEAL_REQUIRED_FIELDS }
+          : CREATINE_REQUIRED_FIELDS[allowedTypes[0]] ? { required: CREATINE_REQUIRED_FIELDS[allowedTypes[0]] } : {})
       }
     : {
         type: 'object',
         description: `Domain-specific fields for the chosen type. Only these exact keys are allowed per type — using any other key name is rejected:\n${
           allowedTypes.map(t => `- ${t}: ${Object.keys(DOMAIN_PROPERTIES[t]).join(', ')}`).join('\n')
-        }\nFor meals, always include: ${MEAL_REQUIRED_FIELDS.join(', ')}.`
+        }\nFor meals, always include: ${MEAL_REQUIRED_FIELDS.join(', ')}. Meal creatine_g is optional finite grams 0–100, creatine_product is an optional string, and creatine_time is optional HH:MM (actual intake clock when different from meal time). For creatine, grams is required finite 0–100 (zero permits correcting/removing a dose), product is an optional string, and dose_key is required lowercase slug matching ^[a-z0-9]+(?:-[a-z0-9]+)*$; reuse dose_key for a correction/retry and use a new key for a separate dose even at the same minute. For creatine_plan, daily_g is required finite 0–30, maintenance_g is required finite 3–5, and mode is required loading, maintenance or paused (daily_g zero for paused). Plans use date as their effective date. Optional baseline is finite 0–1; optional baseline_date is a valid YYYY-MM-DD date on or before date. Only include baseline/baseline_date when Adam explicitly supplies established history; never infer either.`
       };
 
   return {
@@ -439,6 +459,13 @@ export function buildPlannedWorkoutSlug(title) {
  */
 export function buildRecordSlug(record) {
   if (!record || typeof record !== 'object') throw new TypeError('record is required');
+  if (record.type === 'creatine') {
+    if (typeof record.dose_key !== 'string' || !SLUG.test(record.dose_key)) {
+      throw new TypeError(`Invalid creatine dose_key: ${record.dose_key}`);
+    }
+    return `creatine-${record.dose_key}`;
+  }
+  if (record.type === 'creatine_plan') return 'creatine-plan';
   if (record.type === 'meal') {
     if (typeof record.meal !== 'string' || !SLUG.test(record.meal)) {
       throw new TypeError(`Invalid meal slot: ${record.meal}`);

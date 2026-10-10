@@ -265,11 +265,12 @@ test('a Penelope follow-up that mentions planning stays with Penelope instead of
   assert.deepEqual(events[0], { type: 'agent', slug: 'penelope' });
 });
 
-test('Brisket meal turns emit status heartbeats, only load today+yesterday blobs, and finish with a proposal', async () => {
+test('Brisket meal turns emit status heartbeats, load bounded creatine history alongside the recent meal digest, and finish with a proposal', async () => {
   const todaySha = '1'.repeat(40);
   const yesterdaySha = '2'.repeat(40);
   const oldSha = '3'.repeat(40);
   const foodSha = '4'.repeat(40);
+  const ancientSha = '6'.repeat(40);
   const mealYaml = `---
 schema_version: 1
 id: meal-today
@@ -283,9 +284,14 @@ meal: dinner
 calories: 600
 protein_g: 40
 fat_g: 20
+sodium_mg: 500
+calcium_mg: 180
+polyphenol_score: 3
+omega3: low
 ---
 `;
   const readShas = [];
+  let receivedSystem;
   const fetchImpl = async (url, options) => {
     if (url.includes('/commits/')) {
       return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
@@ -295,7 +301,8 @@ fat_g: 20
         tree: [
           { path: 'data/nutrition/2026/08/2026-08-01-dinner.md', type: 'blob', sha: todaySha, size: mealYaml.length },
           { path: 'data/nutrition/2026/07/2026-07-31-lunch.md', type: 'blob', sha: yesterdaySha, size: mealYaml.length },
-          { path: 'data/nutrition/2026/07/2026-07-25-lunch.md', type: 'blob', sha: oldSha, size: mealYaml.length },
+          { path: 'data/nutrition/2026/07/2026-07-27-lunch.md', type: 'blob', sha: oldSha, size: mealYaml.length },
+          { path: 'data/nutrition/2026/04/2026-04-01-lunch.md', type: 'blob', sha: ancientSha, size: mealYaml.length },
           { path: 'data/food-library.json', type: 'blob', sha: foodSha, size: 2 },
           { path: 'central-node.md', type: 'blob', sha: '5'.repeat(40), size: 20 }
         ]
@@ -304,11 +311,16 @@ fat_g: 20
     if (url.includes(`/git/blobs/${todaySha}`) || url.includes(`/git/blobs/${yesterdaySha}`)) {
       readShas.push(url.slice(-40));
       await new Promise(resolve => setTimeout(resolve, 15));
-      return Response.json({ content: Buffer.from(mealYaml).toString('base64'), encoding: 'base64' });
+      const content = url.includes(`/git/blobs/${yesterdaySha}`) ? mealYaml.replaceAll('2026-08-01', '2026-07-31').replace('id: meal-today', 'id: meal-yesterday') : mealYaml;
+      return Response.json({ content: Buffer.from(content).toString('base64'), encoding: 'base64' });
     }
     if (url.includes(`/git/blobs/${oldSha}`)) {
       readShas.push(oldSha);
-      throw new Error('old blob should not be fetched for chat digest');
+      return Response.json({ content: Buffer.from(mealYaml.replace('2026-08-01', '2026-07-27').replace('id: meal-today', 'id: meal-old').replace('fat_g: 20', 'fat_g: 20\ncreatine_g: 7')).toString('base64'), encoding: 'base64' });
+    }
+    if (url.includes(`/git/blobs/${ancientSha}`)) {
+      readShas.push(ancientSha);
+      throw new Error('distant meal history is outside the bounded creatine scan');
     }
     if (url.includes(`/git/blobs/${foodSha}`)) {
       return Response.json({ content: Buffer.from('[]').toString('base64'), encoding: 'base64' });
@@ -327,7 +339,8 @@ fat_g: 20
     now: () => Date.parse('2026-08-01T06:00:00Z'),
     fetchImpl,
     createAnthropicClient: () => ({
-      async *streamMessage({ executeTools }) {
+      async *streamMessage({ executeTools, system }) {
+        receivedSystem = system;
         yield { type: 'search', query: 'homemade lasagna nutrition AU' };
         const saved = await executeTools({
           id: 'call_food',
@@ -383,7 +396,11 @@ fat_g: 20
   assert.equal(proposal.record.type, 'meal');
   assert.equal(proposal.record.sodium_mg, 980);
   assert.ok(events.some(event => event.type === 'text' && /lasagna/i.test(event.delta)));
-  assert.ok(!readShas.includes(oldSha), `chat must not load week-old blobs; read ${readShas.join(',')}`);
+  assert.ok(!readShas.includes(ancientSha), 'ordinary distant meals must remain outside the bounded scan');
+  assert.ok(readShas.includes(oldSha), 'creatine loading history must include last week’s embedded intake');
+  assert.match(receivedSystem, /Creatine tracker/);
+  assert.match(receivedSystem, /2026-07-27: 7 g/);
+  assert.doesNotMatch(receivedSystem, /creatine history could not be loaded/i);
   assert.ok(readShas.includes(todaySha) || readShas.includes(yesterdaySha));
   assert.ok(elapsed < 5000, `smoke took too long: ${elapsed}ms`);
 });

@@ -1,3 +1,5 @@
+import { loadCreatineSnapshot, applyCreatineSummary } from './creatine-store.mjs';
+import { getSydneyDateKey } from '../../../apps/life/js/core/time.js';
 import { load } from 'js-yaml';
 import { parseEventDocument, TYPE_DOMAINS } from '../../../apps/life/js/core/records.js';
 import {
@@ -38,6 +40,8 @@ export function renderMarkdown(record, notes) {
 export function describeRecordForLog(record, notes, { medicalAppend = false } = {}) {
   const label = typeof notes === 'string' && notes.trim() !== '' ? notes.trim() : null;
   switch (record.type) {
+    case 'creatine': return `Logged ${record.grams} g creatine${record.product ? ` (${record.product})` : ''}.`;
+    case 'creatine_plan': return `Updated creatine routine: ${record.mode}, ${record.daily_g} g/day; maintenance ${record.maintenance_g} g/day.`;
     case 'meal': {
       const macros = [
         record.calories != null ? `${record.calories} kcal` : null,
@@ -102,7 +106,7 @@ export function shouldSyncCentralNode(record) {
   return true;
 }
 
-export async function persistLogEntry(client, { record, notes, path, existingSha, nowDateKey }) {
+export async function persistLogEntry(client, { record, notes, path, existingSha, nowDateKey, now = new Date() }) {
   if (record?.type === 'workout' && record.status === 'planned' && existingSha) {
     try {
       const text = decodeBlob(await client.readBlob(existingSha));
@@ -127,7 +131,7 @@ export async function persistLogEntry(client, { record, notes, path, existingSha
     centralNodeUpdated = true;
   } else {
     try {
-      const cn = await syncCentralNodeAfterLog(client, record, notes);
+      const cn = await syncCentralNodeAfterLog(client, record, notes, {date:nowDateKey ?? getSydneyDateKey(now), now});
       centralNodeUpdated = cn?.updated === true;
     } catch {
       centralNodeUpdated = false;
@@ -149,7 +153,18 @@ function agentNameForType(type) {
   return AGENTS.find(agent => agent.recordTypes.includes(type))?.name ?? 'Life Hub';
 }
 
-async function syncCentralNodeAfterLog(client, record, notes) {
+async function retryWriteConflict(operation) {
+  for (let attempt = 0; ; attempt += 1) {
+    try { return await operation(); }
+    catch (error) { if (error?.code !== 'write_conflict' || attempt >= 2) throw error; }
+  }
+}
+
+async function syncCentralNodeAfterLog(client, record, notes, options) {
+  return retryWriteConflict(() => syncCentralNodeAfterLogOnce(client, record, notes, options));
+}
+
+async function syncCentralNodeAfterLogOnce(client, record, notes, {date, now}) {
   const current = await client.resolveTree();
   const entry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
 
@@ -171,7 +186,9 @@ async function syncCentralNodeAfterLog(client, record, notes) {
     nutritionTotals = await sumDayMealTotals(client, current.tree, record);
   }
 
-  const updated = applyLogToCentralNode(content, {
+  let updated = record.type === 'meal' && record.date !== date
+    ? appendRecentAction(content, actionLine)
+    : applyLogToCentralNode(content, {
     record,
     actionLine,
     nutritionTotals,
@@ -179,6 +196,10 @@ async function syncCentralNodeAfterLog(client, record, notes) {
       ? notes
       : null
   });
+  if (['meal','creatine','creatine_plan'].includes(record.type)) {
+    const snapshot = await loadCreatineSnapshot(client, {date, now, tree:current.tree, persist:true});
+    updated = applyCreatineSummary(updated, snapshot.model);
+  }
   if (updated === content) return { updated: false, reason: 'unchanged' };
 
   await client.writeFile({
@@ -277,7 +298,11 @@ function addMealTotals(a, b) {
  * After meal file deletes land, refresh Status Nutrition from remaining meals
  * and upsert a Recent Action line per removed slot.
  */
-export async function syncCentralNodeAfterMealDeletes(client, deletions) {
+export async function syncCentralNodeAfterMealDeletes(client, deletions, options = {}) {
+  return retryWriteConflict(() => syncCentralNodeAfterMealDeletesOnce(client, deletions, options));
+}
+
+async function syncCentralNodeAfterMealDeletesOnce(client, deletions, {date = getSydneyDateKey(), now = new Date()} = {}) {
   if (!Array.isArray(deletions) || deletions.length === 0) {
     return { updated: false, reason: 'nothing_to_sync' };
   }
@@ -299,8 +324,9 @@ export async function syncCentralNodeAfterMealDeletes(client, deletions) {
 
   let updated = content;
   const dates = [...new Set(deletions.map(item => item.date).filter(Boolean))];
-  for (const date of dates) {
-    const totals = await sumDayMealFiles(client, current.tree, { date });
+  for (const deletedDate of dates) {
+    if (deletedDate !== date) continue;
+    const totals = await sumDayMealFiles(client, current.tree, { date:deletedDate });
     updated = upsertStatusField(
       updated,
       'Nutrition',
@@ -316,6 +342,8 @@ export async function syncCentralNodeAfterMealDeletes(client, deletions) {
     }
   }
 
+  const snapshot = await loadCreatineSnapshot(client, {date, now, tree:current.tree, persist:true});
+  updated = applyCreatineSummary(updated, snapshot.model);
   if (updated === content) return { updated: false, reason: 'unchanged' };
 
   await client.writeFile({
@@ -325,6 +353,21 @@ export async function syncCentralNodeAfterMealDeletes(client, deletions) {
     message: 'chore(central-node): sync meal delete into Status'
   });
   return { updated: true };
+}
+
+/** OS corrections/deletions of standalone doses or plans also refresh the
+ * current summary. No meal totals are touched by a supplement-only mutation. */
+export async function syncCentralNodeAfterCreatineWrites(client, {date = getSydneyDateKey(), now = new Date()} = {}) {
+  return retryWriteConflict(async () => {
+    const current = await client.resolveTree();
+    const entry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
+    const content = entry ? decodeBlob(await client.readBlob(entry.sha)) : loadCentralNodeSeed();
+    if (!content) return {updated:false,reason:'unreadable_central_node'};
+    const snapshot = await loadCreatineSnapshot(client, {date, now, tree:current.tree, persist:true});
+    const updated = applyCreatineSummary(content, snapshot.model);
+    if (updated !== content) await client.writeFile({path:CENTRAL_NODE_PATH,content:updated,...(entry ? {sha:entry.sha} : {}),message:'chore(central-node): sync creatine mutation'});
+    return {updated:true};
+  });
 }
 
 async function appendMindInsight(client, record, nowDateKey) {

@@ -1,3 +1,5 @@
+import { loadCreatineSnapshot, creatineContext } from './_shared/creatine-store.mjs';
+import { createReportedCreatineGuard } from '../../apps/life/js/core/creatine-intake.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mergeMedicalFields, resolveMedicalLogCandidate, parseMedicalEventTolerant } from '../../apps/life/js/app/medical-normalize.js';
 import { isSaraAnalystTool, executeSaraAnalystTool, createHistoryLoader } from './_shared/sara-analyst-tools.mjs';
@@ -1809,6 +1811,14 @@ export function createChatHandler({
         const forceToolChoice = surfaceTurn.enabled && surfaceTurn.kernel?.plan?.workflow !== 'none'
           ? surfaceTurn.forceToolChoice
           : activation.forceToolChoice && !(evidencePack.active && evidencePack.answerable);
+        if (['brisket','sara','hammond','chadwick'].includes(slug)) {
+          try {
+            const creatine = await loadCreatineSnapshot(client, {date:today, now:nowInstant, tree:repoTree});
+            centralNodeLog += creatineContext(creatine);
+          } catch {
+            centralNodeLog += '\nCreatine intake history unavailable: do not treat unavailable records as missed intake or invent a current level/ETA. Existing CN estimate may be stale; dose logging still works.';
+          }
+        }
         const system = buildSystemPrompt({
           slug,
           today,
@@ -1876,6 +1886,7 @@ export function createChatHandler({
         });
 
         let pendingLogRejection = null;
+        const creatineGuard = createReportedCreatineGuard(parsed.message);
         let governanceLogAppendedThisTurn = false;
         let turnErrored = false;
         // Persists a Confirm-class Central Node patch to the durable pending queue
@@ -3001,7 +3012,9 @@ export function createChatHandler({
                 if (event.input?.type === 'mind_session') {
                   send({ type: 'status', text: 'Saving your session…' });
                 }
-                let medicalInput = event.input;
+                const creatineInput = slug === 'brisket' ? creatineGuard.prepare(event.input) : {candidate:event.input};
+                if (creatineInput.error) return JSON.stringify({ok:false,error:'duplicate_intake',instruction:creatineInput.error});
+                let medicalInput = creatineInput.candidate;
                 if (slug === 'sara' && event.input?.type === 'medical' && event.input?.new_visit !== true) {
                   // log_entry creates. If this visit is already on record, say where — never make a second one.
                   const existingVisit = findLikelyDuplicate(medicalEvents, event.input, { today });
@@ -3038,6 +3051,7 @@ export function createChatHandler({
                   const outcome = await persistOrProposeLogEntry({
                     client, slug, today, validation, send: emit, userMessage: parsed.message, exerciseLibraryEntries
                   });
+                  if (!outcome.error && slug === 'brisket') creatineGuard.accept(medicalInput);
                   if (outcome.status === 'written') {
                     return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
                   }
@@ -3512,7 +3526,9 @@ export function createChatHandler({
                 });
               }
             } else if (event.type === 'tool_call' && event.name === 'log_entry') {
-              let medicalInput = event.input;
+              const creatineInput = slug === 'brisket' ? creatineGuard.prepare(event.input) : {candidate:event.input};
+              if (creatineInput.error) { send({type:'record_rejected',errors:[creatineInput.error]}); continue; }
+              let medicalInput = creatineInput.candidate;
               if (event.input?.type === 'medical') {
                 try {
                   medicalInput = await resolveMedicalLogCandidate(client, event.input, {
@@ -3530,9 +3546,10 @@ export function createChatHandler({
               });
               if (validation.valid) {
                 try {
-                  await persistOrProposeLogEntry({
+                  const outcome = await persistOrProposeLogEntry({
                     client, slug, today, validation, send: emit, userMessage: parsed.message, exerciseLibraryEntries
                   });
+                  if (!outcome.error && slug === 'brisket') creatineGuard.accept(medicalInput);
                 } catch {
                   pendingLogRejection = {
                     errors: ['Could not prepare that record. Retry with a simpler payload.']
