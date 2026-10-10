@@ -17,6 +17,16 @@ import { createDayMapPreview } from '@/journal/map-preview';
 import { getActiveJournalDayMap } from '@/journal/map-expanded';
 import { openTrashView } from '@/journal/trash-view';
 import { openJournalSearch } from '@/journal/search-sheet';
+import {
+  JOURNAL_MOMENT_PAGE_SIZE,
+  attachMomentPrefetchObserver,
+  computeInitialMomentWindow,
+  expandMomentWindowEarlier,
+  expandMomentWindowLater,
+  orderedLiveMoments,
+  visibleMomentIdSet,
+  type MomentWindow,
+} from '@/journal/media-loading';
 
 const LAST_VIEW_KEY = (tripId: string) => `lifehub.travel.journal.lastView.${tripId}`;
 
@@ -147,7 +157,7 @@ export function renderJournal(
   function onJournalSaved(envelope: { journal: JournalDocument; version: string }): void {
     liveFixture = envelope.journal;
     liveVersion = envelope.version;
-    rebuildStory();
+    rebuildStory(true);
   }
 
   function momentCtx(): import('@/journal/render-moment').RenderMomentContext {
@@ -258,6 +268,38 @@ export function renderJournal(
   const story = document.createElement('div');
   story.className = 'journal__story';
 
+  let detachPrefetch: (() => void) | null = null;
+  let momentWindow: MomentWindow = { start: 0, end: 0 };
+  let orderedMoments = orderedLiveMoments(liveFixture);
+  let visibleMomentIds = new Set<string>();
+
+  function applyMomentWindow(focusMomentId?: string): void {
+    orderedMoments = orderedLiveMoments(liveFixture);
+    const focusIndex =
+      focusMomentId !== undefined
+        ? orderedMoments.findIndex((m) => m.id === focusMomentId)
+        : -1;
+    momentWindow = computeInitialMomentWindow(
+      orderedMoments.length,
+      focusIndex >= 0 ? focusIndex : undefined,
+    );
+    visibleMomentIds = visibleMomentIdSet(orderedMoments, momentWindow);
+  }
+
+  function refreshMomentWindow(): void {
+    orderedMoments = orderedLiveMoments(liveFixture);
+    momentWindow = {
+      start: Math.min(momentWindow.start, orderedMoments.length),
+      end: Math.min(Math.max(momentWindow.end, momentWindow.start), orderedMoments.length),
+    };
+    if (momentWindow.end === momentWindow.start && orderedMoments.length > 0) {
+      momentWindow.end = Math.min(orderedMoments.length, JOURNAL_MOMENT_PAGE_SIZE);
+    }
+    visibleMomentIds = visibleMomentIdSet(orderedMoments, momentWindow);
+  }
+
+  applyMomentWindow(opts.momentId);
+
   const observer = new IntersectionObserver(
     (entries) => {
       const visible = entries
@@ -271,12 +313,28 @@ export function renderJournal(
     { root: null, threshold: 0.4 },
   );
 
-  function rebuildStory(): void {
+  function rebuildStory(resetWindow = false, focusMomentId?: string): void {
+    if (resetWindow) applyMomentWindow(focusMomentId);
+    else refreshMomentWindow();
     story.replaceChildren();
     paintStoryInto(story);
+    detachPrefetch?.();
+    detachPrefetch = attachMomentPrefetchObserver(root, liveFixture.trip_id, liveFixture, orderedMoments);
     for (const el of story.querySelectorAll('[data-journal-moment]')) {
       observer.observe(el);
     }
+  }
+
+  function paginationButton(
+    label: string,
+    onClick: () => void,
+  ): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn--secondary journal__page-btn';
+    btn.textContent = label;
+    btn.addEventListener('click', onClick);
+    return btn;
   }
 
   function paintStoryInto(host: HTMLElement): void {
@@ -312,9 +370,36 @@ export function renderJournal(
       return;
     }
 
+    const hiddenBefore = momentWindow.start;
+    const hiddenAfter = orderedMoments.length - momentWindow.end;
+    if (hiddenBefore > 0) {
+      const wrap = document.createElement('div');
+      wrap.className = 'journal__page-actions journal__page-actions--earlier';
+      wrap.append(
+        paginationButton(`Load earlier (${Math.min(hiddenBefore, JOURNAL_MOMENT_PAGE_SIZE)} more)`, () => {
+          const anchor = host.querySelector<HTMLElement>('[data-journal-moment]');
+          const anchorTop = anchor?.getBoundingClientRect().top ?? 0;
+          const anchorId = anchor?.id;
+          momentWindow = expandMomentWindowEarlier(momentWindow);
+          visibleMomentIds = visibleMomentIdSet(orderedMoments, momentWindow);
+          rebuildStory();
+          requestAnimationFrame(() => {
+            if (!anchorId) return;
+            const el = document.getElementById(anchorId);
+            if (!el) return;
+            const delta = el.getBoundingClientRect().top - anchorTop;
+            host.ownerDocument?.defaultView?.scrollBy(0, delta);
+          });
+        }),
+      );
+      host.append(wrap);
+    }
+
     const legs = [...liveFixture.legs]
       .filter((l) => l.lifecycle === 'live')
       .sort((a, b) => a.order - b.order);
+
+    const firstVisibleId = orderedMoments[momentWindow.start]?.id;
 
   for (const leg of legs) {
     const legSection = document.createElement('section');
@@ -369,7 +454,12 @@ export function renderJournal(
 
       for (let i = 0; i < moments.length; i++) {
         const moment = moments[i]!;
-        daySection.append(renderMomentArticle(liveFixture, moment, momentCtx()));
+        if (!visibleMomentIds.has(moment.id)) continue;
+        daySection.append(
+          renderMomentArticle(liveFixture, moment, momentCtx(), {
+            mediaEager: moment.id === firstVisibleId,
+          }),
+        );
 
         const prev = moments[i - 1];
         if (prev?.coordinates && moment.coordinates) {
@@ -417,15 +507,29 @@ export function renderJournal(
             onJournalSaved: (envelope) => {
               liveFixture = envelope.journal;
               liveVersion = envelope.version;
-              rebuildStory();
+              rebuildStory(true);
             },
           }),
         );
       }
     }
+
+    if (hiddenAfter > 0) {
+      const wrap = document.createElement('div');
+      wrap.className = 'journal__page-actions journal__page-actions--later';
+      wrap.append(
+        paginationButton(`Load more (${Math.min(hiddenAfter, JOURNAL_MOMENT_PAGE_SIZE)} more)`, () => {
+          momentWindow = expandMomentWindowLater(momentWindow, orderedMoments.length);
+          visibleMomentIds = visibleMomentIdSet(orderedMoments, momentWindow);
+          rebuildStory();
+        }),
+      );
+      host.append(wrap);
+    }
   }
 
   paintStoryInto(story);
+  detachPrefetch = attachMomentPrefetchObserver(root, liveFixture.trip_id, liveFixture, orderedMoments);
 
   timeline.append(story);
   root.append(toolbar, timeline);
@@ -464,7 +568,10 @@ export function renderJournal(
   for (const el of root.querySelectorAll('[data-journal-moment]')) {
     observer.observe(el);
   }
-  cleanups.push(() => observer.disconnect());
+  cleanups.push(() => {
+    observer.disconnect();
+    detachPrefetch?.();
+  });
 
   return {
     destroy() {

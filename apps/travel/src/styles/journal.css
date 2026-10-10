@@ -132,6 +132,18 @@
   }
 }
 
+.journal__page-actions {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-4) 0;
+}
+
+.journal__page-btn {
+  min-height: 44px;
+  width: 100%;
+  max-width: 20rem;
+}
+
 /* Leg */
 .journal-leg {
   position: relative;

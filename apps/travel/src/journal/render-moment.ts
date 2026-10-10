@@ -1,6 +1,7 @@
 import type { JournalDocument } from '@/api/journal';
 import type { JournalFixture, JournalMedia, JournalMoment } from '@/journal/types';
 import { photoLayout, reflectionLikelyOverflows } from '@/journal/layout';
+import { configureJournalImage } from '@/journal/media-loading';
 import { buildMomentMenuItems, type MomentMenuAction } from '@/journal/moment-menu';
 import { openEditMomentSheet } from '@/journal/edit-moment-sheet';
 import { openMergeSheet } from '@/journal/merge-sheet';
@@ -141,6 +142,8 @@ function renderPhotoGrid(
   host: HTMLElement,
   moment: JournalMoment,
   mediaMap: Map<string, JournalMedia>,
+  tripId: string,
+  mediaEager: boolean,
 ): void {
   const ids = moment.media_ids;
   if (ids.length === 0) return;
@@ -152,43 +155,32 @@ function renderPhotoGrid(
     .map((id) => mediaMap.get(id))
     .filter((m): m is JournalMedia => Boolean(m));
 
-  if (layout === 'single') {
+  const addImg = (m: JournalMedia, layoutSlot: typeof layout, className?: string): void => {
     const img = document.createElement('img');
-    img.src = resolved[0]!.url;
-    img.alt = '';
-    img.width = resolved[0]!.width;
-    img.height = resolved[0]!.height;
-    img.loading = 'lazy';
-    img.decoding = 'async';
+    if (className) img.className = className;
+    configureJournalImage(img, { tripId, media: m, layout: layoutSlot, eager: mediaEager });
     grid.append(img);
+  };
+
+  if (layout === 'single') {
+    addImg(resolved[0]!, 'single');
   } else if (layout === 'pair') {
     for (const m of resolved.slice(0, 2)) {
-      const img = document.createElement('img');
-      img.src = m.url;
-      img.alt = '';
-      img.loading = 'lazy';
-      grid.append(img);
+      addImg(m, 'pair');
     }
   } else {
     const lead = resolved[0];
     if (lead) {
-      const img = document.createElement('img');
-      img.className = 'journal-moment__photo-lead';
-      img.src = lead.url;
-      img.alt = '';
-      img.loading = 'lazy';
-      grid.append(img);
+      addImg(lead, layout, 'journal-moment__photo-lead');
     }
     const pair = document.createElement('div');
     pair.className = 'journal-moment__photo-pair';
+    grid.append(pair);
     for (const m of resolved.slice(1, 3)) {
       const img = document.createElement('img');
-      img.src = m.url;
-      img.alt = '';
-      img.loading = 'lazy';
+      configureJournalImage(img, { tripId, media: m, layout: 'pair', eager: mediaEager });
       pair.append(img);
     }
-    grid.append(pair);
     if (layout === 'lead-pair-more' && ids.length > 3) {
       const more = document.createElement('button');
       more.type = 'button';
@@ -268,10 +260,16 @@ function renderAudioStub(host: HTMLElement): void {
   host.append(row);
 }
 
+export interface RenderMomentOptions {
+  /** First visible moment in the paginated window — eager-load lead photos. */
+  mediaEager?: boolean;
+}
+
 export function renderMomentArticle(
   fixture: JournalFixture,
   moment: JournalMoment,
   ctx?: RenderMomentContext,
+  options?: RenderMomentOptions,
 ): HTMLElement {
   const article = document.createElement('article');
   article.className = 'journal-moment';
@@ -285,7 +283,13 @@ export function renderMomentArticle(
     renderMetadata(article, moment);
     if (moment.text) renderReflection(article, moment.text);
   } else {
-    renderPhotoGrid(article, moment, mediaMap);
+    renderPhotoGrid(
+      article,
+      moment,
+      mediaMap,
+      ctx?.tripId ?? fixture.trip_id,
+      Boolean(options?.mediaEager),
+    );
     renderMetadata(article, moment);
     if (moment.text) renderReflection(article, moment.text);
     renderAudioStub(article);

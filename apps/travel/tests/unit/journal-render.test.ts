@@ -130,6 +130,54 @@ describe('renderJournal', () => {
     expect(root.querySelector(`#${doomed!.id}`)).toBeNull();
   });
 
+  it('reserves media aspect and eager-loads the first paginated moment', () => {
+    const root = document.createElement('div');
+    renderJournal(root, { fixture: klIstanbulFixture() });
+    const img = root.querySelector('#mom_kul_single img') as HTMLImageElement | null;
+    expect(img?.width).toBe(1200);
+    expect(img?.height).toBe(800);
+    expect(img?.loading).toBe('eager');
+    const lazy = root.querySelector('#mom_kul_pair img') as HTMLImageElement | null;
+    expect(lazy?.loading).toBe('lazy');
+  });
+
+  it('paginates moments beyond 30 with load controls', () => {
+    const base = klIstanbulFixture();
+    const extra = Array.from({ length: 32 }, (_, i) => ({
+      id: `mom_page_${i}`,
+      leg_id: 'leg_kul',
+      local_date: '2026-03-02',
+      media_ids: [] as string[],
+      display_order: 100 + i,
+      lifecycle: 'live' as const,
+      text: `Extra ${i}`,
+    }));
+    const fixture = {
+      ...base,
+      moments: [...base.moments, ...extra],
+      days: base.days.some((d) => d.local_date === '2026-03-02')
+        ? base.days
+        : [
+            ...base.days,
+            {
+              id: 'day_kul_extra',
+              leg_id: 'leg_kul',
+              local_date: '2026-03-02',
+              lifecycle: 'live' as const,
+            },
+          ],
+    };
+    const root = document.createElement('div');
+    renderJournal(root, { fixture });
+    expect(root.querySelectorAll('[data-journal-moment]').length).toBe(30);
+    expect(root.querySelector('.journal__page-actions--later')).toBeTruthy();
+    const loadMore = root.querySelector(
+      '.journal__page-actions--later button',
+    ) as HTMLButtonElement;
+    loadMore.click();
+    expect(root.querySelectorAll('[data-journal-moment]').length).toBe(40);
+  });
+
   it('shows Read more on the long reflection fixture moment', async () => {
     const root = document.createElement('div');
     renderJournal(root, { fixture: klIstanbulFixture() });
