@@ -4,6 +4,8 @@ import { createTabsEditor, rememberTabsPanel } from '@/blocks/layout-editors';
 import { renderTabsBlock, renderBlock } from '@/blocks/registry';
 import { mountBlockCanvas } from '@/teacher/lesson-canvas/mount-page';
 import type { Block } from '@/schemas/block';
+import { clickMenuAction, holdDelete, menuItem } from './helpers/hub-list';
+import { closeHubMenu } from '../../design-kit/js/hub-list.js';
 
 type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
 
@@ -33,6 +35,7 @@ function tabButton(root: ParentNode, label: string): HTMLButtonElement | undefin
 }
 
 afterEach(() => {
+  closeHubMenu();
   document.body.replaceChildren();
 });
 
@@ -71,8 +74,20 @@ describe('renderTabsBlock', () => {
   });
 });
 
+function tabNames(root: ParentNode): HTMLInputElement[] {
+  return [...root.querySelectorAll<HTMLInputElement>('.hub-tabstrip__name')];
+}
+
+function activeName(root: ParentNode): HTMLInputElement | null {
+  return root.querySelector<HTMLInputElement>('.hub-tabstrip__tab.is-active .hub-tabstrip__name');
+}
+
+function openTab(root: ParentNode, index: number): void {
+  tabNames(root)[index]!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+}
+
 describe('createTabsEditor', () => {
-  it('shows one panel at a time and switches on tab click', () => {
+  it('edits tabs as a strip and shows one panel at a time', () => {
     const block = tabsBlock();
     block.content.tabs[0]!.label = 'Noelle';
     block.content.tabs[1]!.label = 'Henry';
@@ -80,83 +95,108 @@ describe('createTabsEditor', () => {
     rememberTabsPanel(block.id, 0);
 
     const { el } = mountEditor(block);
+    document.body.append(el);
     expect(el.querySelectorAll('[role="tab"]')).toHaveLength(3);
-    expect(el.querySelectorAll('.block-editor__tabs-panel')).toHaveLength(1);
-    expect(el.querySelector('.block-editor__tab-label')).toHaveProperty('value', 'Noelle');
+    expect(el.querySelectorAll('.hub-tabstrip__panel')).toHaveLength(1);
+    expect(activeName(el)?.value).toBe('Noelle');
+    expect(el.querySelector('select')).toBeNull();
 
-    tabButton(el, 'Henry')?.click();
-    expect(el.querySelector('.block-editor__tab-label')).toHaveProperty('value', 'Henry');
-    expect(el.querySelectorAll('.block-editor__tabs-panel')).toHaveLength(1);
+    openTab(el, 1);
+    expect(activeName(el)?.value).toBe('Henry');
+    expect(el.querySelectorAll('.hub-tabstrip__panel')).toHaveLength(1);
   });
 
-  it('label input updates the active panel only', () => {
+  it('renames the active tab on the tab itself', () => {
     const block = tabsBlock();
     rememberTabsPanel(block.id, 0);
     const { el, onChange } = mountEditor(block);
-    const input = el.querySelector('.block-editor__tab-label') as HTMLInputElement;
+    const input = activeName(el)!;
     input.value = 'Sources';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     const updated = onChange.mock.calls.at(-1)![0] as TabsBlock;
     expect(updated.content.tabs[0]!.label).toBe('Sources');
-    expect(updated.content.tabs[1]!.label).toBe('');
+    expect(updated.content.tabs[1]!.label).toBe(block.content.tabs[1]!.label);
   });
 
-  it('adds a block into the active tab only', () => {
+  it('adds a block into the active tab only from the empty-tab prompt', () => {
     const block = tabsBlock();
     rememberTabsPanel(block.id, 1);
     const { el, onChange } = mountEditor(block);
-    const add = el.querySelector('button.block-editor__nested-add') as HTMLButtonElement;
-    add.click();
+    expect(el.querySelector('.hub-list__empty')).toBeTruthy();
+    el.querySelector<HTMLButtonElement>('.hub-list__chip')!.click();
     const updated = onChange.mock.calls.at(-1)![0] as TabsBlock;
     expect(updated.content.tabs[0]!.blocks).toHaveLength(0);
     expect(updated.content.tabs[1]!.blocks[0]?.block_type).toBe('rich_text');
     expect(updated.content.tabs[2]!.blocks).toHaveLength(0);
   });
 
-  it('can add columns inside the active tab via the kit filter', () => {
+  it('can add columns inside the active tab from the block picker', () => {
     const block = tabsBlock();
     rememberTabsPanel(block.id, 0);
     const { el, onChange } = mountEditor(block);
-    const typeBtn = el.querySelector<HTMLButtonElement>('.block-editor__add-nested-type');
-    typeBtn?.click();
-    document.querySelector<HTMLButtonElement>('[data-hub-option="columns"]')?.click();
-    el.querySelector<HTMLButtonElement>('button.block-editor__nested-add')?.click();
+    document.body.append(el);
+    const more = [...el.querySelectorAll<HTMLButtonElement>('.hub-list__chip')].find((b) =>
+      b.textContent?.includes('More blocks')
+    )!;
+    more.click();
+    document.querySelector<HTMLButtonElement>('.hub-insert__option[data-value="columns"]')!.click();
     const updated = onChange.mock.calls.at(-1)![0] as TabsBlock;
     expect(updated.content.tabs[0]!.blocks[0]?.block_type).toBe('columns');
   });
 
-  it('add panel works until max 8; remove until min 2', () => {
+  it('adds tabs until 8, deletes by hold until 2, then explains why delete is off', () => {
     const block = tabsBlock();
     rememberTabsPanel(block.id, 0);
-    const { el, onChange, latest } = mountEditor(block);
-    const addBtn = el.querySelector('.block-editor__tabs-add') as HTMLButtonElement;
-    for (let i = 0; i < 5; i += 1) addBtn.click();
-    expect((onChange.mock.calls.at(-1)![0] as TabsBlock).content.tabs.length).toBe(8);
-    expect(addBtn.disabled).toBe(true);
+    const { el, latest } = mountEditor(block);
+    document.body.append(el);
+    for (let i = 0; i < 5; i += 1) el.querySelector<HTMLButtonElement>('.hub-tabstrip__add')!.click();
+    expect(latest().content.tabs.length).toBe(8);
+    expect(el.querySelector<HTMLButtonElement>('.hub-tabstrip__add')!.disabled).toBe(true);
 
-    let current = latest();
-    const el2 = createTabsEditor(
-      current,
-      (next) => {
-        current = next;
-        onChange(next);
-      },
-      () => current
-    );
+    // A plain click on Delete never deletes.
+    menuItem(el.querySelector('.hub-tabstrip__tab.is-active .hub-tabstrip__more')!, 'delete')!.click();
+    expect(latest().content.tabs.length).toBe(8);
+
     for (let i = 0; i < 6; i += 1) {
-      el2.querySelector<HTMLButtonElement>('.block-editor__tabs-remove')?.click();
+      holdDelete(el.querySelector('.hub-tabstrip__tab.is-active .hub-tabstrip__more')!);
     }
-    expect(current.content.tabs.length).toBe(2);
-    expect(el2.querySelector<HTMLButtonElement>('.block-editor__tabs-remove')?.disabled).toBe(
-      true
-    );
+    expect(latest().content.tabs.length).toBe(2);
+    const del = menuItem(el.querySelector('.hub-tabstrip__tab.is-active .hub-tabstrip__more')!, 'delete')!;
+    expect(del.disabled).toBe(true);
+    expect(document.querySelector('.hub-action-menu__reason')?.textContent).toMatch(/at least two tabs/);
+  });
+
+  it('undo restores a deleted tab with its blocks', () => {
+    const block = tabsBlock();
+    block.content.tabs[1]!.blocks = [createBlock('heading', 'h')];
+    rememberTabsPanel(block.id, 1);
+    const { el, latest } = mountEditor(block);
+    document.body.append(el);
+    holdDelete(el.querySelector('.hub-tabstrip__tab.is-active .hub-tabstrip__more')!);
+    expect(latest().content.tabs).toHaveLength(2);
+    [...document.querySelectorAll<HTMLButtonElement>('.hub-toast button')]
+      .find((b) => b.textContent === 'Undo')!
+      .click();
+    expect(latest().content.tabs).toHaveLength(3);
+    expect(latest().content.tabs[1]!.blocks[0]?.id).toBe('h');
+  });
+
+  it('moves a tab right from its menu', () => {
+    const block = tabsBlock();
+    block.content.tabs[0]!.label = 'A';
+    block.content.tabs[1]!.label = 'B';
+    rememberTabsPanel(block.id, 0);
+    const { el, latest } = mountEditor(block);
+    document.body.append(el);
+    clickMenuAction(el.querySelector('.hub-tabstrip__tab.is-active .hub-tabstrip__more')!, 'right');
+    expect(latest().content.tabs.map((t) => t.label).slice(0, 2)).toEqual(['B', 'A']);
+    expect(activeName(el)?.value).toBe('A');
   });
 });
 
 function enterBlockEdit(root: ParentNode, selector = '[data-block-type="tabs"]'): HTMLElement {
   const row = root.querySelector<HTMLElement>(selector)!;
-  row.querySelector<HTMLButtonElement>('.lesson-page__block-menu')!.click();
-  document.querySelector<HTMLButtonElement>('[data-card-menu-item="edit"]')!.click();
+  clickMenuAction(row.querySelector('.lesson-page__block-menu')!, 'edit');
   return root.querySelector<HTMLElement>(selector)!;
 }
 
@@ -177,8 +217,8 @@ describe('project page tabs canvas', () => {
 
     const row = host.querySelector<HTMLElement>('[data-block-type="tabs"]')!;
     tabButton(row, 'Henry')?.click();
-    expect(row.querySelector('.block-editor__tab-label')).toBeNull();
-    expect(row.querySelector('button.block-editor__nested-add')).toBeNull();
+    expect(row.querySelector('.hub-tabstrip__name')).toBeNull();
+    expect(row.querySelector('.hub-list__add')).toBeNull();
     expect(tabButton(row, 'Henry')?.getAttribute('aria-selected')).toBe('true');
     expect(row.querySelector('.lesson-page__block-menu')).toBeTruthy();
   });
@@ -200,13 +240,13 @@ describe('project page tabs canvas', () => {
     tabButton(host, 'Henry')?.click();
     const editing = enterBlockEdit(host);
     expect(editing.querySelector('.lesson-page__inspector')).toBeNull();
-    expect(editing.querySelectorAll('.block-editor__tabs-panel')).toHaveLength(1);
-    expect(editing.querySelector('.block-editor__tab-label')).toHaveProperty('value', 'Henry');
-    expect(editing.querySelector('button.block-editor__nested-add')).toBeTruthy();
+    expect(editing.querySelectorAll('.hub-tabstrip__panel')).toHaveLength(1);
+    expect(activeName(editing)?.value).toBe('Henry');
+    expect(editing.querySelector('.hub-list__empty, .hub-list__add')).toBeTruthy();
 
     editing.querySelector<HTMLButtonElement>('.lesson-page__done')!.click();
     const published = host.querySelector<HTMLElement>('[data-block-type="tabs"]')!;
-    expect(published.querySelector('.block-editor__tab-label')).toBeNull();
+    expect(published.querySelector('.hub-tabstrip__name')).toBeNull();
     expect(tabButton(published, 'Henry')?.getAttribute('aria-selected')).toBe('true');
   });
 
@@ -220,6 +260,6 @@ describe('project page tabs canvas', () => {
       editable: false
     });
     expect(host.querySelector('.lesson-page__block-menu')).toBeNull();
-    expect(host.querySelector('.block-editor__tab-label')).toBeNull();
+    expect(host.querySelector('.hub-tabstrip__name')).toBeNull();
   });
 });

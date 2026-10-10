@@ -46,12 +46,14 @@ describe('block editors use kit filters', () => {
       columnMove: {
         columnCount: 2,
         columnIndex: 0,
-        onMoveToColumn: () => undefined
+        group: 'cols',
+        onMoveToColumn: () => undefined,
+        onReceive: () => undefined
       }
     });
     expect(nested.querySelector('select')).toBeNull();
-    expect(nested.querySelector('.block-editor__nested-move-column')?.tagName).toBe('BUTTON');
-    expect(nested.querySelector('.block-editor__add-nested-type')?.tagName).toBe('BUTTON');
+    expect(nested.querySelector('.hub-list__more')?.tagName).toBe('BUTTON');
+    expect(nested.querySelector('.hub-list__add')?.tagName).toBe('BUTTON');
 
     const spacer = createSpacerEditor(
       createBlock('spacer', 's1') as Extract<Block, { block_type: 'spacer' }>,

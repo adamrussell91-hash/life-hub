@@ -1,3 +1,4 @@
+import { holdDelete, menuItem } from './helpers/hub-list';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { BlockSchema } from '@/schemas/block';
 import {
@@ -898,16 +899,16 @@ describe('learning activity editors', () => {
       shuffle.dispatchEvent(new Event('change'));
       expect(latest.content.shuffle).toBe(true);
 
-      expect(el.querySelectorAll('.block-editor__flashcards-item').length).toBe(2);
+      expect(el.querySelectorAll('.block-editor__flashcards-items > .hub-list__row').length).toBe(2);
 
-      const add = el.querySelector('.block-editor__flashcards-add') as HTMLButtonElement;
-      expect(add.disabled).toBe(false);
-      for (let i = 0; i < 18; i++) add.click();
-      expect(el.querySelectorAll('.block-editor__flashcards-item').length).toBe(20);
-      expect(add.disabled).toBe(true);
+      const add = () => el.querySelector('.hub-list__add') as HTMLButtonElement;
+      expect(add().disabled).toBe(false);
+      for (let i = 0; i < 18; i++) add().click();
+      expect(el.querySelectorAll('.block-editor__flashcards-items > .hub-list__row').length).toBe(20);
+      expect(add().disabled).toBe(true);
     });
 
-    it('remove disabled at 1 card; updates front/back on input', () => {
+    it('delete is off at 1 card; updates front/back on input', () => {
       const block = createBlock('flashcards', 'fc1');
       if (block.block_type !== 'flashcards') throw new Error('expected flashcards');
       let latest = block;
@@ -915,12 +916,11 @@ describe('learning activity editors', () => {
         latest = next;
       });
 
-      const removes = () =>
-        el.querySelectorAll('.block-editor__flashcards-remove') as NodeListOf<HTMLButtonElement>;
+      const menus = () => [...el.querySelectorAll('.hub-list__row .hub-list__more')];
 
-      removes()[0]!.click();
+      holdDelete(menus()[0]!);
       expect(latest.content.cards).toHaveLength(1);
-      expect([...removes()].every((b) => b.disabled)).toBe(true);
+      expect(menus().every((m) => menuItem(m, 'delete')?.disabled)).toBe(true);
 
       const front = el.querySelector('.block-editor__flashcards-front') as HTMLInputElement;
       front.value = 'Term';
@@ -995,11 +995,11 @@ describe('learning activity editors', () => {
       block.content.items = [{ id: 'sc1_i1', label: 'One' }];
 
       const el = createSelfCheckEditor(block, () => {});
-      const add = el.querySelector('.block-editor__self-check-item-add') as HTMLButtonElement;
+      const add = () => el.querySelector('.block-editor__self-check-items .hub-list__add') as HTMLButtonElement;
 
-      for (let i = 0; i < 11; i++) add.click();
-      expect(el.querySelectorAll('.block-editor__self-check-item').length).toBe(12);
-      expect(add.disabled).toBe(true);
+      for (let i = 0; i < 11; i++) add().click();
+      expect(el.querySelectorAll('.block-editor__self-check-items .hub-list__row').length).toBe(12);
+      expect(add().disabled).toBe(true);
     });
   });
 

@@ -1,5 +1,6 @@
 import type { City, GuideIcon, Trip } from '@/types';
 import { patchTrip } from '@/api/travel';
+import { createHubList } from '../../design-kit/js/hub-list.js';
 
 export interface ArrivalGuideSheetOptions {
   trip: Trip;
@@ -57,14 +58,24 @@ export function renderArrivalGuideSheet(host: HTMLElement, options: ArrivalGuide
   grid.append(rowsHost);
 
   type RowDraft = { icon: GuideIcon; label: string; detail: string };
-  const rows: RowDraft[] = (guide?.rows?.length ? guide.rows : defaultRows()).map((r) => {
+  let rows: RowDraft[] = (guide?.rows?.length ? guide.rows : defaultRows()).map((r) => {
     const parts = splitGuideText(r.text);
     return { icon: r.icon, label: parts.label, detail: parts.detail };
   });
 
-  function paintRows(): void {
-    rowsHost.replaceChildren();
-    rows.forEach((row, index) => {
+  // Same add / drag / ··· / hold-to-delete list as every hub builder.
+  const tipList = createHubList<RowDraft>({
+    items: rows,
+    noun: 'tip',
+    label: 'Arrival tips',
+    itemLabel: (_row, index) => `Tip ${index + 1}`,
+    describe: (row, index) => row.label.trim() || `Tip ${index + 1}`,
+    create: () => ({ icon: 'phone', label: '', detail: '' }),
+    duplicate: (row) => ({ ...row }),
+    onChange: (next) => {
+      rows = next;
+    },
+    renderItem: (row, ctx) => {
       const block = document.createElement('div');
       block.className = 'guide-row';
 
@@ -77,7 +88,7 @@ export function renderArrivalGuideSheet(host: HTMLElement, options: ArrivalGuide
         iconSelect.append(o);
       }
       iconSelect.addEventListener('change', () => {
-        row.icon = iconSelect.value as GuideIcon;
+        ctx.update({ ...ctx.current, icon: iconSelect.value as GuideIcon });
       });
 
       const labelInput = document.createElement('input');
@@ -86,7 +97,7 @@ export function renderArrivalGuideSheet(host: HTMLElement, options: ArrivalGuide
       labelInput.placeholder = 'Label';
       labelInput.autocomplete = 'off';
       labelInput.addEventListener('input', () => {
-        row.label = labelInput.value;
+        ctx.update({ ...ctx.current, label: labelInput.value });
       });
 
       const detailInput = document.createElement('textarea');
@@ -94,38 +105,14 @@ export function renderArrivalGuideSheet(host: HTMLElement, options: ArrivalGuide
       detailInput.value = row.detail;
       detailInput.placeholder = 'Tip for landing day';
       detailInput.addEventListener('input', () => {
-        row.detail = detailInput.value;
+        ctx.update({ ...ctx.current, detail: detailInput.value });
       });
 
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'mini';
-      removeBtn.textContent = 'Remove';
-      removeBtn.addEventListener('click', () => {
-        rows.splice(index, 1);
-        paintRows();
-      });
-
-      block.append(
-        field('Icon', iconSelect),
-        field('Label', labelInput),
-        field('Tip', detailInput, true),
-        removeBtn
-      );
-      rowsHost.append(block);
-    });
-  }
-  paintRows();
-
-  const addRowBtn = document.createElement('button');
-  addRowBtn.type = 'button';
-  addRowBtn.className = 'btn ghost full';
-  addRowBtn.textContent = 'Add tip';
-  addRowBtn.addEventListener('click', () => {
-    rows.push({ icon: 'phone', label: '', detail: '' });
-    paintRows();
+      block.append(field('Icon', iconSelect), field('Label', labelInput), field('Tip', detailInput, true));
+      return block;
+    }
   });
-  grid.append(addRowBtn);
+  rowsHost.append(tipList.el);
   scroll.append(grid);
 
   const errorNote = document.createElement('p');

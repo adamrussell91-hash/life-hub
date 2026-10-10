@@ -1,4 +1,10 @@
 import katex from 'katex';
+import { offerTimedUndo } from '../../design-kit/js/hub-feedback.js';
+import {
+  HUB_LIST_ICONS,
+  createHubList,
+  createHubMenuButton
+} from '../../design-kit/js/hub-list.js';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/ai/models';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildChartSvg, CHART_SERIES_COLOR_OPTIONS } from '@/blocks/chart-svg';
@@ -141,6 +147,24 @@ function createMediaSizeSelect(
     ariaLabel: 'Size',
     onChange
   });
+}
+
+type Choice = { el: HTMLElement; getValue(): string; setValue(value: string): void };
+
+/** One labelled choice control. Tasks uses the kit filter pill, never a native select. */
+function createChoice(options: {
+  key: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  className: string;
+  ariaLabel: string;
+  onChange: (value: string) => void;
+}): Choice {
+  return createEditorFilter(options);
+}
+
+function asChoice(control: HubFilterControl): Choice {
+  return control;
 }
 
 export function editorShell<T extends Block>(
@@ -1116,18 +1140,65 @@ export function createAttachmentEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+/* ── Repeatable item lists ───────────────────────────────────────────────
+ * Every list inside a block (accordion items, table rows, questions, gallery
+ * images, timeline events, cards, checklist items, chart series and points)
+ * uses the kit list builder: grip to drag, ··· for move / duplicate /
+ * hold-to-delete, Undo after delete, "Add …" at the end. Do not hand-roll
+ * Up / Down / Remove buttons in a block editor.
+ */
+
+type FieldKind = 'text' | 'url' | 'number' | 'textarea';
+
+function editorField(
+  className: string,
+  value: string,
+  placeholder: string,
+  label: string,
+  onInput: (value: string) => void,
+  kind: FieldKind = 'text',
+  rows = 3
+): HTMLInputElement | HTMLTextAreaElement {
+  const field =
+    kind === 'textarea' ? document.createElement('textarea') : document.createElement('input');
+  if (field instanceof HTMLTextAreaElement) field.rows = rows;
+  else field.type = kind;
+  field.className = className;
+  field.value = value;
+  field.placeholder = placeholder;
+  field.setAttribute('aria-label', label);
+  field.addEventListener('input', () => onInput(field.value));
+  return field;
+}
+
+/** Two fields side by side (stacks on a phone). */
+function fieldPair(...nodes: HTMLElement[]): HTMLElement {
+  const pair = document.createElement('div');
+  pair.className = 'block-editor__pair';
+  pair.append(...nodes);
+  return pair;
+}
+
+function fragmentOf(...nodes: Node[]): DocumentFragment {
+  const fragment = document.createDocumentFragment();
+  fragment.append(...nodes);
+  return fragment;
+}
+
+function itemId(prefix: string): string {
+  return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
 export function createAccordionEditor(
   block: Extract<Block, { block_type: 'accordion' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'accordion' }>>,
   getLatest: () => Extract<Block, { block_type: 'accordion' }> = () => block
 ): HTMLElement {
+  type Item = { title: string; body: string };
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
-  const itemsContainer = document.createElement('div');
-  itemsContainer.className = 'block-editor__accordion-items';
-
-  let items = block.content.items.map((item) => ({ ...item }));
+  let items: Item[] = block.content.items.map((item) => ({ title: item.title, body: item.body }));
 
   const emitChange = () => {
     onChange({
@@ -1136,67 +1207,38 @@ export function createAccordionEditor(
     });
   };
 
-  function renderItems(): void {
-    itemsContainer.replaceChildren();
-
-    items.forEach((item, index) => {
-      const row = document.createElement('div');
-      row.className = 'block-editor__accordion-item';
-
-      const title = document.createElement('input');
-      title.type = 'text';
-      title.className = 'block-editor__accordion-title';
-      title.value = item.title;
-      title.placeholder = 'Section title';
-      title.setAttribute('aria-label', `Accordion item ${index + 1} title`);
-
-      const body = document.createElement('textarea');
-      body.className = 'block-editor__accordion-body';
-      body.value = item.body;
-      body.rows = 3;
-      body.placeholder = 'Section body';
-      body.setAttribute('aria-label', `Accordion item ${index + 1} body`);
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn btn--ghost block-editor__accordion-remove';
-      remove.textContent = 'Remove';
-      remove.disabled = items.length <= 1;
-      remove.addEventListener('click', () => {
-        items = items.filter((_, i) => i !== index);
-        if (items.length === 0) {
-          items = [{ title: '', body: '' }];
-        }
-        emitChange();
-        renderItems();
-      });
-
-      title.addEventListener('input', () => {
-        items[index] = { ...items[index]!, title: title.value };
-        emitChange();
-      });
-      body.addEventListener('input', () => {
-        items[index] = { ...items[index]!, body: body.value };
-        emitChange();
-      });
-
-      row.append(title, body, remove);
-      itemsContainer.append(row);
-    });
-  }
-
-  const addButton = document.createElement('button');
-  addButton.type = 'button';
-  addButton.className = 'btn btn--secondary block-editor__accordion-add';
-  addButton.textContent = 'Add item';
-  addButton.addEventListener('click', () => {
-    items = [...items, { title: '', body: '' }];
-    emitChange();
-    renderItems();
+  const list = createHubList<Item>({
+    items,
+    noun: 'item',
+    label: 'Accordion items',
+    itemLabel: (_item, index) => `Item ${index + 1}`,
+    describe: (item, index) => item.title.trim() || `Item ${index + 1}`,
+    min: 1,
+    minReason: 'An accordion needs at least one item.',
+    create: () => ({ title: '', body: '' }),
+    duplicate: (item) => ({ ...item }),
+    onChange: (next) => {
+      items = next;
+      emitChange();
+    },
+    renderItem: (item, ctx) =>
+      fragmentOf(
+        editorField('block-editor__accordion-title', item.title, 'Title students click', `Accordion item ${ctx.index + 1} title`, (value) =>
+          ctx.update({ ...ctx.current, title: value })
+        ),
+        editorField(
+          'block-editor__accordion-body',
+          item.body,
+          'What opens underneath',
+          `Accordion item ${ctx.index + 1} body`,
+          (value) => ctx.update({ ...ctx.current, body: value }),
+          'textarea'
+        )
+      )
   });
+  list.el.classList.add('block-editor__accordion-items');
 
-  renderItems();
-  fields.append(itemsContainer, addButton);
+  fields.append(list.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1211,8 +1253,8 @@ export function createTableEditor(
   let headers = [...block.content.headers];
   let rows = block.content.rows.map((row) => [...row]);
 
-  const tableWrap = document.createElement('div');
-  tableWrap.className = 'block-editor__table-wrap';
+  const table = document.createElement('div');
+  table.className = 'block-editor__table';
 
   const emitChange = () => {
     onChange({
@@ -1224,81 +1266,154 @@ export function createTableEditor(
     });
   };
 
-  function ensureRowWidth(row: string[]): string[] {
-    while (row.length < headers.length) row.push('');
-    if (row.length > headers.length) row.length = headers.length;
-    return row;
+  function fitRow(row: string[]): string[] {
+    const next = [...row];
+    while (next.length < headers.length) next.push('');
+    next.length = headers.length;
+    return next;
   }
 
-  function renderTable(): void {
-    tableWrap.replaceChildren();
+  function setColumns(nextHeaders: string[], nextRows: string[][]): void {
+    headers = nextHeaders;
+    rows = nextRows;
+    emitChange();
+    render();
+  }
 
-    const headerRow = document.createElement('div');
-    headerRow.className = 'block-editor__table-header-row';
+  function moveColumn(from: number, to: number): void {
+    if (to < 0 || to >= headers.length) return;
+    const order = headers.map((_, i) => i);
+    const [moved] = order.splice(from, 1);
+    order.splice(to, 0, moved!);
+    setColumns(
+      order.map((i) => headers[i]!),
+      rows.map((row) => {
+        const fitted = fitRow(row);
+        return order.map((i) => fitted[i]!);
+      })
+    );
+  }
+
+  function removeColumn(index: number): void {
+    if (headers.length <= 1) return;
+    const goneHeader = headers[index]!;
+    const goneCells = rows.map((row) => fitRow(row)[index] ?? '');
+    setColumns(
+      headers.filter((_, i) => i !== index),
+      rows.map((row) => fitRow(row).filter((_, i) => i !== index))
+    );
+    offerTimedUndo({
+      message: `Column “${goneHeader || index + 1}” deleted`,
+      onUndo: () => {
+        const at = Math.min(index, headers.length);
+        const nextHeaders = [...headers];
+        nextHeaders.splice(at, 0, goneHeader);
+        setColumns(
+          nextHeaders,
+          rows.map((row, r) => {
+            const next = fitRow(row);
+            next.splice(at, 0, goneCells[r] ?? '');
+            return next;
+          })
+        );
+      }
+    });
+  }
+
+  function addColumn(): void {
+    setColumns(
+      [...headers, `Column ${headers.length + 1}`],
+      rows.map((row) => [...fitRow(row), ''])
+    );
+  }
+
+  function cellsStyle(el: HTMLElement): void {
+    el.style.setProperty('--table-cols', String(headers.length));
+  }
+
+  function render(): void {
+    table.replaceChildren();
+    cellsStyle(table);
+
+    const head = document.createElement('div');
+    head.className = 'block-editor__table-head';
+    const cells = document.createElement('div');
+    cells.className = 'block-editor__table-cells block-editor__table-header-row';
+    cellsStyle(cells);
 
     headers.forEach((header, colIndex) => {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'block-editor__table-header';
-      input.value = header;
-      input.setAttribute('aria-label', `Column ${colIndex + 1} header`);
-      input.addEventListener('input', () => {
-        headers[colIndex] = input.value;
+      const cell = document.createElement('div');
+      cell.className = 'block-editor__table-header-cell';
+      const input = editorField('block-editor__table-header', header, `Column ${colIndex + 1}`, `Column ${colIndex + 1} header`, (value) => {
+        headers[colIndex] = value;
         emitChange();
       });
-      headerRow.append(input);
+      const atMin = headers.length <= 1;
+      const menu = createHubMenuButton(
+        () => [
+          { label: 'Move left', icon: HUB_LIST_ICONS.left, disabled: colIndex === 0, dataset: { listAction: 'left' }, onSelect: () => moveColumn(colIndex, colIndex - 1) },
+          { label: 'Move right', icon: HUB_LIST_ICONS.right, disabled: colIndex === headers.length - 1, dataset: { listAction: 'right' }, onSelect: () => moveColumn(colIndex, colIndex + 1) },
+          'separator',
+          {
+            label: 'Delete column',
+            icon: HUB_LIST_ICONS.trash,
+            danger: true,
+            hold: true,
+            disabled: atMin,
+            reason: atMin ? 'A table needs at least one column.' : undefined,
+            dataset: { listAction: 'delete' },
+            onSelect: () => removeColumn(colIndex)
+          }
+        ],
+        { label: `Column ${colIndex + 1} options`, className: 'block-editor__table-column-menu' }
+      );
+      cell.append(input, menu);
+      cells.append(cell);
     });
-    tableWrap.append(headerRow);
 
-    rows.forEach((row, rowIndex) => {
-      ensureRowWidth(row);
-      const rowEl = document.createElement('div');
-      rowEl.className = 'block-editor__table-row';
+    const addCol = document.createElement('button');
+    addCol.type = 'button';
+    addCol.className = 'hub-list__more block-editor__table-add-column';
+    addCol.setAttribute('aria-label', 'Add column');
+    addCol.title = 'Add column';
+    addCol.innerHTML = HUB_LIST_ICONS.plus;
+    addCol.addEventListener('click', addColumn);
 
-      row.forEach((cell, colIndex) => {
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'block-editor__table-cell';
-        input.value = cell;
-        input.setAttribute('aria-label', `Row ${rowIndex + 1} column ${colIndex + 1}`);
-        input.addEventListener('input', () => {
-          rows[rowIndex]![colIndex] = input.value;
-          emitChange();
+    head.append(document.createElement('span'), cells, addCol);
+
+    const list = createHubList<string[]>({
+      items: rows.map((row) => fitRow(row)),
+      noun: 'row',
+      label: 'Table rows',
+      variant: 'compact',
+      create: () => headers.map(() => ''),
+      duplicate: (row) => [...row],
+      onChange: (next) => {
+        rows = next.map((row) => [...row]);
+        emitChange();
+      },
+      renderItem: (row, ctx) => {
+        const rowCells = document.createElement('div');
+        rowCells.className = 'block-editor__table-cells block-editor__table-row';
+        cellsStyle(rowCells);
+        row.forEach((cell, colIndex) => {
+          rowCells.append(
+            editorField('block-editor__table-cell', cell, '', `Row ${ctx.index + 1} column ${colIndex + 1}`, (value) => {
+              const next = [...ctx.current];
+              next[colIndex] = value;
+              ctx.update(next);
+            })
+          );
         });
-        rowEl.append(input);
-      });
-
-      tableWrap.append(rowEl);
+        return rowCells;
+      }
     });
+
+    table.append(head, list.el);
   }
 
-  const actions = document.createElement('div');
-  actions.className = 'block-editor__table-actions';
-
-  const addRow = document.createElement('button');
-  addRow.type = 'button';
-  addRow.className = 'btn btn--secondary';
-  addRow.textContent = 'Add row';
-  addRow.addEventListener('click', () => {
-    rows = [...rows, Array.from({ length: headers.length }, () => '')];
-    emitChange();
-    renderTable();
-  });
-
-  const addCol = document.createElement('button');
-  addCol.type = 'button';
-  addCol.className = 'btn btn--secondary';
-  addCol.textContent = 'Add column';
-  addCol.addEventListener('click', () => {
-    headers = [...headers, `Column ${headers.length + 1}`];
-    rows = rows.map((row) => [...ensureRowWidth(row), '']);
-    emitChange();
-    renderTable();
-  });
-
-  actions.append(addRow, addCol);
-  renderTable();
-  fields.append(tableWrap, actions);
+  render();
+  fields.append(table);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1307,18 +1422,18 @@ export function createQuestionSetEditor(
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'question_set' }>>,
   getLatest: () => Extract<Block, { block_type: 'question_set' }> = () => block
 ): HTMLElement {
+  type ResponseSpace = 'none' | 'short' | 'medium' | 'long' | 'extended';
+  type QuestionDraft = {
+    id: string;
+    prompt: string;
+    kind: 'short_answer' | 'multiple_choice';
+    options?: string[];
+    response_space?: ResponseSpace;
+  };
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
-  const title = document.createElement('input');
-  title.type = 'text';
-  title.className = 'block-editor__question-set-title';
-  title.value = block.content.title ?? '';
-  title.placeholder = 'Set title (optional)';
-  title.setAttribute('aria-label', 'Question set title');
-
-  const questionsContainer = document.createElement('div');
-  questionsContainer.className = 'block-editor__questions';
+  const title = editorField('block-editor__question-set-title', block.content.title ?? '', 'Set title (optional)', 'Question set title', () => emitChange());
 
   const RESPONSE_SPACE_OPTIONS = [
     { value: 'none', label: 'None' },
@@ -1326,17 +1441,15 @@ export function createQuestionSetEditor(
     { value: 'medium', label: 'Medium' },
     { value: 'long', label: 'Long' },
     { value: 'extended', label: 'Extended' }
-  ] as const;
+  ];
 
-  let questions = block.content.questions.map((q) => ({
+  let questions: QuestionDraft[] = block.content.questions.map((q) => ({
     id: q.id,
     prompt: q.prompt,
     kind: q.kind,
-    options: q.options ? [...q.options] : undefined as string[] | undefined,
-    response_space:
-      q.kind === 'short_answer' ? (q.response_space ?? ('medium' as const)) : undefined
+    options: q.options ? [...q.options] : undefined,
+    response_space: q.kind === 'short_answer' ? (q.response_space ?? 'medium') : undefined
   }));
-  let questionCounter = questions.length;
 
   const emitChange = () => {
     onChange({
@@ -1356,21 +1469,52 @@ export function createQuestionSetEditor(
     });
   };
 
-  function renderQuestions(): void {
-    questionsContainer.replaceChildren();
+  const splitOptions = (raw: string) =>
+    raw
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
 
-    questions.forEach((question, index) => {
-      const row = document.createElement('div');
-      row.className = 'block-editor__question';
+  const list = createHubList<QuestionDraft>({
+    items: questions,
+    noun: 'question',
+    label: 'Questions',
+    getKey: (q) => q.id,
+    itemLabel: (_q, index) => `Question ${index + 1}`,
+    describe: (_q, index) => `Question ${index + 1}`,
+    min: 1,
+    minReason: 'A question set needs at least one question.',
+    create: () => ({ id: itemId('q'), prompt: '', kind: 'short_answer', response_space: 'medium' }),
+    duplicate: (q) => ({ ...q, id: itemId('q'), options: q.options ? [...q.options] : undefined }),
+    onChange: (next) => {
+      questions = next;
+      emitChange();
+    },
+    renderItem: (question, ctx) => {
+      const n = ctx.index + 1;
+      const prompt = editorField('block-editor__question-prompt', question.prompt, 'Question', `Question ${n} prompt`, (value) => ctx.update({ ...ctx.current, prompt: value }), 'textarea', 2);
 
-      const prompt = document.createElement('textarea');
-      prompt.className = 'block-editor__question-prompt';
-      prompt.value = question.prompt;
-      prompt.rows = 2;
-      prompt.placeholder = 'Prompt';
-      prompt.setAttribute('aria-label', `Question ${index + 1} prompt`);
+      const options = editorField(
+        'block-editor__question-options',
+        (question.options ?? []).join('\n'),
+        'Answer options, one per line',
+        `Question ${n} options`,
+        (value) => ctx.update({ ...ctx.current, options: splitOptions(value) }),
+        'textarea'
+      );
+      options.hidden = question.kind !== 'multiple_choice';
 
-      const kind = createEditorFilter({
+      const responseSpace = createChoice({
+        key: 'Space',
+        value: question.response_space ?? 'medium',
+        options: RESPONSE_SPACE_OPTIONS,
+        className: 'block-editor__question-response-space',
+        ariaLabel: `Question ${n} response space`,
+        onChange: (value) => ctx.update({ ...ctx.current, response_space: value as ResponseSpace })
+      });
+      responseSpace.el.hidden = question.kind !== 'short_answer';
+
+      const kind = createChoice({
         key: 'Kind',
         value: question.kind,
         options: [
@@ -1378,130 +1522,30 @@ export function createQuestionSetEditor(
           { value: 'multiple_choice', label: 'Multiple choice' }
         ],
         className: 'block-editor__question-kind',
-        ariaLabel: `Question ${index + 1} kind`,
-        onChange: () => {
-          const nextKind = kind.getValue() as 'short_answer' | 'multiple_choice';
-          questions[index] = {
-            ...questions[index]!,
+        ariaLabel: `Question ${n} kind`,
+        onChange: (value) => {
+          const nextKind = value as QuestionDraft['kind'];
+          ctx.update({
+            ...ctx.current,
             kind: nextKind,
-            options:
-              nextKind === 'multiple_choice'
-                ? options.value
-                    .split('\n')
-                    .map((line) => line.trim())
-                    .filter(Boolean)
-                : undefined,
+            options: nextKind === 'multiple_choice' ? splitOptions(options.value) : undefined,
             response_space: nextKind === 'short_answer' ? 'medium' : undefined
-          };
+          });
           options.hidden = nextKind !== 'multiple_choice';
           responseSpace.el.hidden = nextKind !== 'short_answer';
-          if (nextKind === 'short_answer') {
-            responseSpace.setValue('medium');
-          }
-          emitChange();
+          if (nextKind === 'short_answer') responseSpace.setValue('medium');
         }
       });
 
-      const responseSpace = createEditorFilter({
-        key: 'Space',
-        value: question.response_space ?? 'medium',
-        options: RESPONSE_SPACE_OPTIONS.map((option) => ({
-          value: option.value,
-          label: option.label
-        })),
-        className: 'block-editor__question-response-space',
-        ariaLabel: `Question ${index + 1} response space`,
-        onChange: () => {
-          questions[index] = {
-            ...questions[index]!,
-            response_space: responseSpace.getValue() as
-              | 'none'
-              | 'short'
-              | 'medium'
-              | 'long'
-              | 'extended'
-          };
-          emitChange();
-        }
-      });
-      responseSpace.el.hidden = question.kind !== 'short_answer';
-
-      const options = document.createElement('textarea');
-      options.className = 'block-editor__question-options';
-      options.rows = 3;
-      options.placeholder = 'Options (one per line)';
-      options.value = (question.options ?? []).join('\n');
-      options.hidden = question.kind !== 'multiple_choice';
-      options.setAttribute('aria-label', `Question ${index + 1} options`);
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn btn--ghost';
-      remove.textContent = 'Remove';
-      remove.disabled = questions.length <= 1;
-      remove.addEventListener('click', () => {
-        questions = questions.filter((_, i) => i !== index);
-        if (questions.length === 0) {
-          questionCounter += 1;
-          questions = [
-            {
-              id: `q_${questionCounter}`,
-              prompt: '',
-              kind: 'short_answer' as const,
-              options: undefined,
-              response_space: 'medium' as const
-            }
-          ];
-        }
-        emitChange();
-        renderQuestions();
-      });
-
-      prompt.addEventListener('input', () => {
-        questions[index] = { ...questions[index]!, prompt: prompt.value };
-        emitChange();
-      });
-
-      options.addEventListener('input', () => {
-        questions[index] = {
-          ...questions[index]!,
-          options: options.value
-            .split('\n')
-            .map((line) => line.trim())
-            .filter(Boolean)
-        };
-        emitChange();
-      });
-
-      row.append(prompt, kind.el, responseSpace.el, options, remove);
-      questionsContainer.append(row);
-    });
-  }
-
-  title.addEventListener('input', emitChange);
-
-  const addButton = document.createElement('button');
-  addButton.type = 'button';
-  addButton.className = 'btn btn--secondary';
-  addButton.textContent = 'Add question';
-  addButton.addEventListener('click', () => {
-    questionCounter += 1;
-    questions = [
-      ...questions,
-      {
-        id: `q_${questionCounter}`,
-        prompt: '',
-        kind: 'short_answer' as const,
-        options: undefined,
-        response_space: 'medium' as const
-      }
-    ];
-    emitChange();
-    renderQuestions();
+      const settings = document.createElement('div');
+      settings.className = 'block-editor__inline-settings';
+      settings.append(kind.el, responseSpace.el);
+      return fragmentOf(prompt, settings, options);
+    }
   });
+  list.el.classList.add('block-editor__questions');
 
-  renderQuestions();
-  fields.append(title, questionsContainer, addButton);
+  fields.append(title, list.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1510,11 +1554,12 @@ export function createGalleryEditor(
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'gallery' }>>,
   getLatest: () => Extract<Block, { block_type: 'gallery' }> = () => block
 ): HTMLElement {
+  type GalleryItem = { id: string; url: string; alt_text: string; caption?: string };
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
   let layout = block.content.layout;
-  let items = block.content.items.map((entry) => ({ ...entry }));
+  let items: GalleryItem[] = block.content.items.map((entry) => ({ ...entry }));
 
   const emitChange = () => {
     onChange({
@@ -1532,7 +1577,47 @@ export function createGalleryEditor(
     });
   };
 
-  const layoutSelect = createEditorFilter({
+  const sizeSelect = asChoice(createMediaSizeSelect(block.variant, emitChange));
+  const listHost = document.createElement('div');
+
+  const emptyItem = (): GalleryItem => ({ id: itemId(`${getLatest().id}_i`), url: '', alt_text: '' });
+
+  function renderList(): void {
+    const comparison = layout === 'comparison';
+    const list = createHubList<GalleryItem>({
+      items,
+      noun: 'image',
+      label: 'Gallery images',
+      getKey: (entry) => entry.id,
+      itemLabel: (_entry, index) => (comparison ? (index === 0 ? 'Before' : 'After') : `Image ${index + 1}`),
+      describe: (_entry, index) => `Image ${index + 1}`,
+      min: 2,
+      max: comparison ? 2 : 12,
+      minReason: comparison ? 'A comparison shows exactly two images.' : 'A gallery needs at least two images.',
+      maxReason: comparison ? 'A comparison shows exactly two images.' : 'A gallery holds up to twelve images.',
+      addLabel: comparison ? false : 'Add image',
+      create: emptyItem,
+      duplicate: (entry) => ({ ...entry, id: itemId(`${getLatest().id}_i`) }),
+      onChange: (next) => {
+        items = next;
+        emitChange();
+      },
+      renderItem: (entry, ctx) => {
+        const n = ctx.index + 1;
+        return fragmentOf(
+          editorField('block-editor__gallery-url', entry.url, 'Image link (https://…)', `Gallery image ${n} URL`, (value) => ctx.update({ ...ctx.current, url: value }), 'url'),
+          fieldPair(
+            editorField('block-editor__gallery-alt', entry.alt_text, 'Alt text (required to publish)', `Gallery image ${n} alt text`, (value) => ctx.update({ ...ctx.current, alt_text: value })),
+            editorField('block-editor__gallery-caption', entry.caption ?? '', 'Caption (optional)', `Gallery image ${n} caption`, (value) => ctx.update({ ...ctx.current, caption: value || undefined }))
+          )
+        );
+      }
+    });
+    list.el.classList.add('block-editor__gallery-items');
+    listHost.replaceChildren(list.el);
+  }
+
+  const layoutSelect = createChoice({
     key: 'Layout',
     value: layout,
     options: [
@@ -1542,146 +1627,21 @@ export function createGalleryEditor(
     ],
     className: 'block-editor__gallery-layout',
     ariaLabel: 'Gallery layout',
-    onChange: () => {
-      layout = layoutSelect.getValue() as typeof layout;
-      if (layout === 'comparison' && items.length > 2) {
-        items = items.slice(0, 2);
-      }
-      while (layout === 'comparison' && items.length < 2) {
-        items = [...items, emptyItem(`${getLatest().id}_i${items.length + 1}`)];
-      }
+    onChange: (value) => {
+      layout = value as typeof layout;
+      if (layout === 'comparison' && items.length > 2) items = items.slice(0, 2);
+      while (layout === 'comparison' && items.length < 2) items = [...items, emptyItem()];
       emitChange();
-      renderItems();
+      renderList();
     }
   });
 
-  const sizeSelect = createMediaSizeSelect(block.variant, emitChange);
+  const settings = document.createElement('div');
+  settings.className = 'block-editor__inline-settings';
+  settings.append(layoutSelect.el, sizeSelect.el);
 
-  const itemsContainer = document.createElement('div');
-  itemsContainer.className = 'block-editor__gallery-items';
-
-  const addButton = document.createElement('button');
-  addButton.type = 'button';
-  addButton.className = 'btn btn--secondary block-editor__gallery-add';
-  addButton.textContent = 'Add image';
-
-  function emptyItem(id: string) {
-    return { id, url: '', alt_text: '', caption: undefined as string | undefined };
-  }
-
-  function renderItems(): void {
-    itemsContainer.replaceChildren();
-    const comparison = layout === 'comparison';
-    const atMin = items.length <= 2;
-    const atMax = items.length >= 12;
-
-    items.forEach((entry, index) => {
-      const row = document.createElement('div');
-      row.className = 'block-editor__gallery-item';
-
-      const url = document.createElement('input');
-      url.type = 'url';
-      url.className = 'block-editor__gallery-url';
-      url.value = entry.url;
-      url.placeholder = 'Image URL (https://…)';
-      url.setAttribute('aria-label', `Gallery image ${index + 1} URL`);
-
-      const alt = document.createElement('input');
-      alt.type = 'text';
-      alt.className = 'block-editor__gallery-alt';
-      alt.value = entry.alt_text;
-      alt.placeholder = 'Alt text (required to publish)';
-      alt.setAttribute('aria-label', `Gallery image ${index + 1} alt text`);
-
-      const caption = document.createElement('input');
-      caption.type = 'text';
-      caption.className = 'block-editor__gallery-caption';
-      caption.value = entry.caption ?? '';
-      caption.placeholder = 'Caption (optional)';
-      caption.setAttribute('aria-label', `Gallery image ${index + 1} caption`);
-
-      const up = document.createElement('button');
-      up.type = 'button';
-      up.className = 'btn btn--ghost block-editor__gallery-up';
-      up.textContent = 'Up';
-      up.disabled = index === 0;
-      up.addEventListener('click', () => {
-        if (index === 0) return;
-        const next = [...items];
-        const tmp = next[index - 1]!;
-        next[index - 1] = next[index]!;
-        next[index] = tmp;
-        items = next;
-        emitChange();
-        renderItems();
-      });
-
-      const down = document.createElement('button');
-      down.type = 'button';
-      down.className = 'btn btn--ghost block-editor__gallery-down';
-      down.textContent = 'Down';
-      down.disabled = index === items.length - 1;
-      down.addEventListener('click', () => {
-        if (index >= items.length - 1) return;
-        const next = [...items];
-        const tmp = next[index + 1]!;
-        next[index + 1] = next[index]!;
-        next[index] = tmp;
-        items = next;
-        emitChange();
-        renderItems();
-      });
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn btn--ghost block-editor__gallery-remove';
-      remove.textContent = 'Remove';
-      remove.disabled = comparison || atMin;
-      remove.addEventListener('click', () => {
-        if (comparison || items.length <= 2) return;
-        items = items.filter((_, i) => i !== index);
-        emitChange();
-        renderItems();
-      });
-
-      url.addEventListener('input', () => {
-        items[index] = { ...items[index]!, url: url.value };
-        emitChange();
-      });
-      alt.addEventListener('input', () => {
-        items[index] = { ...items[index]!, alt_text: alt.value };
-        emitChange();
-      });
-      caption.addEventListener('input', () => {
-        items[index] = {
-          ...items[index]!,
-          caption: caption.value || undefined
-        };
-        emitChange();
-      });
-
-      row.append(url, alt, caption, up, down, remove);
-      itemsContainer.append(row);
-    });
-
-    if (comparison) {
-      addButton.remove();
-    } else if (!addButton.isConnected) {
-      fields.append(addButton);
-    }
-    addButton.disabled = atMax;
-  }
-
-  addButton.addEventListener('click', () => {
-    if (layout === 'comparison' || items.length >= 12) return;
-    const id = `${getLatest().id}_i${Date.now()}`;
-    items = [...items, emptyItem(id)];
-    emitChange();
-    renderItems();
-  });
-
-  fields.append(layoutSelect.el, sizeSelect.el, itemsContainer, addButton);
-  renderItems();
+  renderList();
+  fields.append(settings, listHost);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1704,11 +1664,7 @@ export function createTimelineEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
-  const eventsContainer = document.createElement('div');
-  eventsContainer.className = 'block-editor__timeline-items';
-
   let events: TimelineEventDraft[] = block.content.events.map((event) => ({ ...event }));
-  let eventCounter = events.length;
 
   const emitChange = () => {
     onChange({
@@ -1728,159 +1684,46 @@ export function createTimelineEditor(
     });
   };
 
-  function renderEvents(): void {
-    eventsContainer.replaceChildren();
-
-    events.forEach((event, index) => {
-      const row = document.createElement('div');
-      row.className = 'block-editor__timeline-item';
-
-      const when = document.createElement('input');
-      when.type = 'text';
-      when.className = 'block-editor__timeline-when';
-      when.value = event.when;
-      when.placeholder = 'When';
-      when.setAttribute('aria-label', `Timeline event ${index + 1} when`);
-
-      const label = document.createElement('input');
-      label.type = 'text';
-      label.className = 'block-editor__timeline-label';
-      label.value = event.label;
-      label.placeholder = 'Label';
-      label.setAttribute('aria-label', `Timeline event ${index + 1} label`);
-
-      const description = document.createElement('textarea');
-      description.className = 'block-editor__timeline-description';
-      description.value = event.description;
-      description.rows = 3;
-      description.placeholder = 'Description';
-      description.setAttribute('aria-label', `Timeline event ${index + 1} description`);
-
-      const imageUrl = document.createElement('input');
-      imageUrl.type = 'url';
-      imageUrl.className = 'block-editor__timeline-image-url';
-      imageUrl.value = event.image_url ?? '';
-      imageUrl.placeholder = 'Image URL (optional)';
-      imageUrl.setAttribute('aria-label', `Timeline event ${index + 1} image URL`);
-
-      const imageAlt = document.createElement('input');
-      imageAlt.type = 'text';
-      imageAlt.className = 'block-editor__timeline-image-alt';
-      imageAlt.value = event.image_alt ?? '';
-      imageAlt.placeholder = 'Image alt (required if URL set)';
-      imageAlt.setAttribute('aria-label', `Timeline event ${index + 1} image alt`);
-
-      const linkUrl = document.createElement('input');
-      linkUrl.type = 'url';
-      linkUrl.className = 'block-editor__timeline-link-url';
-      linkUrl.value = event.link_url ?? '';
-      linkUrl.placeholder = 'Link URL (optional)';
-      linkUrl.setAttribute('aria-label', `Timeline event ${index + 1} link URL`);
-
-      const linkLabel = document.createElement('input');
-      linkLabel.type = 'text';
-      linkLabel.className = 'block-editor__timeline-link-label';
-      linkLabel.value = event.link_label ?? '';
-      linkLabel.placeholder = 'Link label (optional)';
-      linkLabel.setAttribute('aria-label', `Timeline event ${index + 1} link label`);
-
-      const up = document.createElement('button');
-      up.type = 'button';
-      up.className = 'btn btn--ghost block-editor__timeline-up';
-      up.textContent = 'Up';
-      up.disabled = index === 0;
-      up.addEventListener('click', () => {
-        if (index === 0) return;
-        const next = [...events];
-        const current = next[index]!;
-        next[index] = next[index - 1]!;
-        next[index - 1] = current;
-        events = next;
-        emitChange();
-        renderEvents();
-      });
-
-      const down = document.createElement('button');
-      down.type = 'button';
-      down.className = 'btn btn--ghost block-editor__timeline-down';
-      down.textContent = 'Down';
-      down.disabled = index >= events.length - 1;
-      down.addEventListener('click', () => {
-        if (index >= events.length - 1) return;
-        const next = [...events];
-        const current = next[index]!;
-        next[index] = next[index + 1]!;
-        next[index + 1] = current;
-        events = next;
-        emitChange();
-        renderEvents();
-      });
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn btn--ghost block-editor__timeline-remove';
-      remove.textContent = 'Remove';
-      remove.disabled = events.length <= 1;
-      remove.addEventListener('click', () => {
-        if (events.length <= 1) return;
-        events = events.filter((_, i) => i !== index);
-        emitChange();
-        renderEvents();
-      });
-
-      const patch = (partial: Partial<TimelineEventDraft>) => {
-        events[index] = { ...events[index]!, ...partial };
-        emitChange();
-      };
-
-      when.addEventListener('input', () => patch({ when: when.value }));
-      label.addEventListener('input', () => patch({ label: label.value }));
-      description.addEventListener('input', () => patch({ description: description.value }));
-      imageUrl.addEventListener('input', () => patch({ image_url: imageUrl.value }));
-      imageAlt.addEventListener('input', () => patch({ image_alt: imageAlt.value }));
-      linkUrl.addEventListener('input', () => patch({ link_url: linkUrl.value }));
-      linkLabel.addEventListener('input', () => patch({ link_label: linkLabel.value }));
-
-      row.append(
-        when,
-        label,
-        description,
-        imageUrl,
-        imageAlt,
-        linkUrl,
-        linkLabel,
-        up,
-        down,
-        remove
+  const list = createHubList<TimelineEventDraft>({
+    items: events,
+    noun: 'event',
+    label: 'Timeline events',
+    getKey: (event) => event.id,
+    itemLabel: (_event, index) => `Event ${index + 1}`,
+    describe: (event, index) => event.label.trim() || `Event ${index + 1}`,
+    min: 1,
+    max: 12,
+    minReason: 'A timeline needs at least one event.',
+    maxReason: 'A timeline holds up to twelve events.',
+    create: () => ({ id: itemId(`${getLatest().id}_e`), when: '', label: '', description: '' }),
+    duplicate: (event) => ({ ...event, id: itemId(`${getLatest().id}_e`) }),
+    onChange: (next) => {
+      events = next;
+      emitChange();
+    },
+    renderItem: (event, ctx) => {
+      const n = ctx.index + 1;
+      const patch = (partial: Partial<TimelineEventDraft>) => ctx.update({ ...ctx.current, ...partial });
+      return fragmentOf(
+        fieldPair(
+          editorField('block-editor__timeline-when', event.when, 'When', `Timeline event ${n} when`, (value) => patch({ when: value })),
+          editorField('block-editor__timeline-label', event.label, 'Label', `Timeline event ${n} label`, (value) => patch({ label: value }))
+        ),
+        editorField('block-editor__timeline-description', event.description, 'What happened', `Timeline event ${n} description`, (value) => patch({ description: value }), 'textarea'),
+        fieldPair(
+          editorField('block-editor__timeline-image-url', event.image_url ?? '', 'Image link (optional)', `Timeline event ${n} image URL`, (value) => patch({ image_url: value }), 'url'),
+          editorField('block-editor__timeline-image-alt', event.image_alt ?? '', 'Image alt (required if image set)', `Timeline event ${n} image alt`, (value) => patch({ image_alt: value }))
+        ),
+        fieldPair(
+          editorField('block-editor__timeline-link-url', event.link_url ?? '', 'Link (optional)', `Timeline event ${n} link URL`, (value) => patch({ link_url: value }), 'url'),
+          editorField('block-editor__timeline-link-label', event.link_label ?? '', 'Link label (optional)', `Timeline event ${n} link label`, (value) => patch({ link_label: value }))
+        )
       );
-      eventsContainer.append(row);
-    });
-
-    addButton.disabled = events.length >= 12;
-  }
-
-  const addButton = document.createElement('button');
-  addButton.type = 'button';
-  addButton.className = 'btn btn--secondary block-editor__timeline-add';
-  addButton.textContent = 'Add event';
-  addButton.addEventListener('click', () => {
-    if (events.length >= 12) return;
-    eventCounter += 1;
-    events = [
-      ...events,
-      {
-        id: `${getLatest().id}_e${eventCounter}`,
-        when: '',
-        label: '',
-        description: ''
-      }
-    ];
-    emitChange();
-    renderEvents();
+    }
   });
+  list.el.classList.add('block-editor__timeline-items');
 
-  renderEvents();
-  fields.append(eventsContainer, addButton);
+  fields.append(list.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1903,18 +1746,9 @@ export function createCardStackEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
-  const title = document.createElement('input');
-  title.type = 'text';
-  title.className = 'block-editor__card-stack-title';
-  title.value = block.content.title ?? '';
-  title.placeholder = 'Stack heading (optional)';
-  title.setAttribute('aria-label', 'Card stack heading');
-
-  const cardsContainer = document.createElement('div');
-  cardsContainer.className = 'block-editor__card-stack-items';
+  const title = editorField('block-editor__card-stack-title', block.content.title ?? '', 'Stack heading (optional)', 'Card stack heading', () => emitChange());
 
   let cards: CardStackDraft[] = block.content.cards.map((card) => ({ ...card }));
-  let cardCounter = cards.length;
 
   const emitChange = () => {
     onChange({
@@ -1935,165 +1769,63 @@ export function createCardStackEditor(
     });
   };
 
-  function renderCards(): void {
-    cardsContainer.replaceChildren();
-
-    cards.forEach((card, index) => {
-      const row = document.createElement('div');
-      row.className = 'block-editor__card-stack-item';
-
-      const number = document.createElement('input');
-      number.type = 'text';
-      number.className = 'block-editor__card-stack-number';
-      number.value = card.number ?? '';
-      number.placeholder = 'Number (optional)';
-      number.setAttribute('aria-label', `Card ${index + 1} number`);
-
-      const eyebrow = document.createElement('input');
-      eyebrow.type = 'text';
-      eyebrow.className = 'block-editor__card-stack-eyebrow';
-      eyebrow.value = card.eyebrow;
-      eyebrow.placeholder = 'Eyebrow';
-      eyebrow.setAttribute('aria-label', `Card ${index + 1} eyebrow`);
-
-      const cardTitle = document.createElement('input');
-      cardTitle.type = 'text';
-      cardTitle.className = 'block-editor__card-stack-card-title';
-      cardTitle.value = card.title;
-      cardTitle.placeholder = 'Title';
-      cardTitle.setAttribute('aria-label', `Card ${index + 1} title`);
-
-      const description = document.createElement('textarea');
-      description.className = 'block-editor__card-stack-description';
-      description.value = card.description;
-      description.rows = 3;
-      description.placeholder = 'Description';
-      description.setAttribute('aria-label', `Card ${index + 1} description`);
-
-      const imageUrl = document.createElement('input');
-      imageUrl.type = 'url';
-      imageUrl.className = 'block-editor__card-stack-image-url';
-      imageUrl.value = card.image_url ?? '';
-      imageUrl.placeholder = 'Image URL (optional)';
-      imageUrl.setAttribute('aria-label', `Card ${index + 1} image URL`);
-
-      const imageAlt = document.createElement('input');
-      imageAlt.type = 'text';
-      imageAlt.className = 'block-editor__card-stack-image-alt';
-      imageAlt.value = card.image_alt ?? '';
-      imageAlt.placeholder = 'Image alt (required if URL set)';
-      imageAlt.setAttribute('aria-label', `Card ${index + 1} image alt`);
-
-      const tint = document.createElement('select');
-      tint.className = 'block-editor__card-stack-tint';
-      tint.setAttribute('aria-label', `Card ${index + 1} tint`);
-      for (const value of CARD_STACK_TINTS) {
-        const opt = document.createElement('option');
-        opt.value = value;
-        opt.textContent = CARD_STACK_TINT_LABEL[value];
-        opt.selected = card.tint === value;
-        tint.append(opt);
-      }
-
-      const up = document.createElement('button');
-      up.type = 'button';
-      up.className = 'btn btn--ghost block-editor__card-stack-up';
-      up.textContent = 'Up';
-      up.disabled = index === 0;
-      up.addEventListener('click', () => {
-        if (index === 0) return;
-        const next = [...cards];
-        const current = next[index]!;
-        next[index] = next[index - 1]!;
-        next[index - 1] = current;
-        cards = next;
-        emitChange();
-        renderCards();
+  const list = createHubList<CardStackDraft>({
+    items: cards,
+    noun: 'card',
+    label: 'Cards',
+    getKey: (card) => card.id,
+    itemLabel: (_card, index) => `Card ${index + 1}`,
+    describe: (card, index) => card.title.trim() || `Card ${index + 1}`,
+    min: 1,
+    max: CARD_STACK_MAX_CARDS,
+    minReason: 'A card stack needs at least one card.',
+    maxReason: `A card stack holds up to ${CARD_STACK_MAX_CARDS} cards.`,
+    create: (index) => ({
+      id: itemId(`${getLatest().id}_c`),
+      eyebrow: '',
+      title: '',
+      description: '',
+      tint: nextCardStackTint(index)
+    }),
+    duplicate: (card) => ({ ...card, id: itemId(`${getLatest().id}_c`) }),
+    onChange: (next) => {
+      cards = next;
+      emitChange();
+    },
+    renderItem: (card, ctx) => {
+      const n = ctx.index + 1;
+      const patch = (partial: Partial<CardStackDraft>) => ctx.update({ ...ctx.current, ...partial });
+      const tint = createChoice({
+        key: 'Tint',
+        value: card.tint,
+        options: CARD_STACK_TINTS.map((value) => ({ value, label: CARD_STACK_TINT_LABEL[value] })),
+        className: 'block-editor__card-stack-tint',
+        ariaLabel: `Card ${n} tint`,
+        onChange: (value) => patch({ tint: value as CardStackTint })
       });
-
-      const down = document.createElement('button');
-      down.type = 'button';
-      down.className = 'btn btn--ghost block-editor__card-stack-down';
-      down.textContent = 'Down';
-      down.disabled = index >= cards.length - 1;
-      down.addEventListener('click', () => {
-        if (index >= cards.length - 1) return;
-        const next = [...cards];
-        const current = next[index]!;
-        next[index] = next[index + 1]!;
-        next[index + 1] = current;
-        cards = next;
-        emitChange();
-        renderCards();
-      });
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn btn--ghost block-editor__card-stack-remove';
-      remove.textContent = 'Remove';
-      remove.disabled = cards.length <= 1;
-      remove.addEventListener('click', () => {
-        if (cards.length <= 1) return;
-        cards = cards.filter((_, i) => i !== index);
-        emitChange();
-        renderCards();
-      });
-
-      const patch = (partial: Partial<CardStackDraft>) => {
-        cards[index] = { ...cards[index]!, ...partial };
-        emitChange();
-      };
-
-      number.addEventListener('input', () => patch({ number: number.value }));
-      eyebrow.addEventListener('input', () => patch({ eyebrow: eyebrow.value }));
-      cardTitle.addEventListener('input', () => patch({ title: cardTitle.value }));
-      description.addEventListener('input', () => patch({ description: description.value }));
-      imageUrl.addEventListener('input', () => patch({ image_url: imageUrl.value }));
-      imageAlt.addEventListener('input', () => patch({ image_alt: imageAlt.value }));
-      tint.addEventListener('change', () => patch({ tint: tint.value as CardStackTint }));
-
-      row.append(
-        number,
-        eyebrow,
-        cardTitle,
-        description,
-        imageUrl,
-        imageAlt,
-        tint,
-        up,
-        down,
-        remove
+      const settings = document.createElement('div');
+      settings.className = 'block-editor__inline-settings';
+      settings.append(
+        editorField('block-editor__card-stack-number', card.number ?? '', 'Number (optional)', `Card ${n} number`, (value) => patch({ number: value })),
+        tint.el
       );
-      cardsContainer.append(row);
-    });
-
-    addButton.disabled = cards.length >= CARD_STACK_MAX_CARDS;
-  }
-
-  const addButton = document.createElement('button');
-  addButton.type = 'button';
-  addButton.className = 'btn btn--secondary block-editor__card-stack-add';
-  addButton.textContent = 'Add card';
-  addButton.addEventListener('click', () => {
-    if (cards.length >= CARD_STACK_MAX_CARDS) return;
-    cardCounter += 1;
-    cards = [
-      ...cards,
-      {
-        id: `${getLatest().id}_c${cardCounter}`,
-        eyebrow: '',
-        title: '',
-        description: '',
-        tint: nextCardStackTint(cards.length)
-      }
-    ];
-    emitChange();
-    renderCards();
+      return fragmentOf(
+        fieldPair(
+          editorField('block-editor__card-stack-eyebrow', card.eyebrow, 'Eyebrow', `Card ${n} eyebrow`, (value) => patch({ eyebrow: value })),
+          editorField('block-editor__card-stack-card-title', card.title, 'Title', `Card ${n} title`, (value) => patch({ title: value }))
+        ),
+        editorField('block-editor__card-stack-description', card.description, 'Description', `Card ${n} description`, (value) => patch({ description: value }), 'textarea'),
+        fieldPair(
+          editorField('block-editor__card-stack-image-url', card.image_url ?? '', 'Image link (optional)', `Card ${n} image URL`, (value) => patch({ image_url: value }), 'url'),
+          editorField('block-editor__card-stack-image-alt', card.image_alt ?? '', 'Image alt (required if image set)', `Card ${n} image alt`, (value) => patch({ image_alt: value }))
+        ),
+        settings
+      );
+    }
   });
+  list.el.classList.add('block-editor__card-stack-items');
 
-  title.addEventListener('input', () => emitChange());
-  renderCards();
-  fields.append(title, cardsContainer, addButton);
+  fields.append(title, list.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -2114,7 +1846,6 @@ export function createFlashcardsEditor(
   fields.className = 'block-editor__fields';
 
   let cards: FlashcardDraft[] = block.content.cards.map((card) => ({ ...card }));
-  let cardCounter = cards.length;
 
   const shuffle = document.createElement('input');
   shuffle.type = 'checkbox';
@@ -2125,9 +1856,6 @@ export function createFlashcardsEditor(
   const shuffleLabel = document.createElement('label');
   shuffleLabel.className = 'block-editor__flashcards-shuffle-label';
   shuffleLabel.append(shuffle, document.createTextNode(' Shuffle cards'));
-
-  const cardsContainer = document.createElement('div');
-  cardsContainer.className = 'block-editor__flashcards-items';
 
   const emitChange = () => {
     onChange({
@@ -2145,127 +1873,43 @@ export function createFlashcardsEditor(
     });
   };
 
-  function renderCards(): void {
-    cardsContainer.replaceChildren();
-    const atMin = cards.length <= 1;
-    const atMax = cards.length >= 20;
-
-    cards.forEach((card, index) => {
-      const row = document.createElement('div');
-      row.className = 'block-editor__flashcards-item';
-
-      const front = document.createElement('input');
-      front.type = 'text';
-      front.className = 'block-editor__flashcards-front';
-      front.value = card.front;
-      front.placeholder = 'Front';
-      front.setAttribute('aria-label', `Flashcard ${index + 1} front`);
-
-      const back = document.createElement('input');
-      back.type = 'text';
-      back.className = 'block-editor__flashcards-back';
-      back.value = card.back;
-      back.placeholder = 'Back';
-      back.setAttribute('aria-label', `Flashcard ${index + 1} back`);
-
-      const imageUrl = document.createElement('input');
-      imageUrl.type = 'url';
-      imageUrl.className = 'block-editor__flashcards-image-url';
-      imageUrl.value = card.image_url ?? '';
-      imageUrl.placeholder = 'Image URL (optional)';
-      imageUrl.setAttribute('aria-label', `Flashcard ${index + 1} image URL`);
-
-      const imageAlt = document.createElement('input');
-      imageAlt.type = 'text';
-      imageAlt.className = 'block-editor__flashcards-image-alt';
-      imageAlt.value = card.image_alt ?? '';
-      imageAlt.placeholder = 'Image alt (required if URL set)';
-      imageAlt.setAttribute('aria-label', `Flashcard ${index + 1} image alt`);
-
-      const up = document.createElement('button');
-      up.type = 'button';
-      up.className = 'btn btn--ghost block-editor__flashcards-up';
-      up.textContent = 'Up';
-      up.disabled = index === 0;
-      up.addEventListener('click', () => {
-        if (index === 0) return;
-        const next = [...cards];
-        const current = next[index]!;
-        next[index] = next[index - 1]!;
-        next[index - 1] = current;
-        cards = next;
-        emitChange();
-        renderCards();
-      });
-
-      const down = document.createElement('button');
-      down.type = 'button';
-      down.className = 'btn btn--ghost block-editor__flashcards-down';
-      down.textContent = 'Down';
-      down.disabled = index >= cards.length - 1;
-      down.addEventListener('click', () => {
-        if (index >= cards.length - 1) return;
-        const next = [...cards];
-        const current = next[index]!;
-        next[index] = next[index + 1]!;
-        next[index + 1] = current;
-        cards = next;
-        emitChange();
-        renderCards();
-      });
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn btn--ghost block-editor__flashcards-remove';
-      remove.textContent = 'Remove';
-      remove.disabled = atMin;
-      remove.addEventListener('click', () => {
-        if (cards.length <= 1) return;
-        cards = cards.filter((_, i) => i !== index);
-        emitChange();
-        renderCards();
-      });
-
-      const patch = (partial: Partial<FlashcardDraft>) => {
-        cards[index] = { ...cards[index]!, ...partial };
-        emitChange();
-      };
-
-      front.addEventListener('input', () => patch({ front: front.value }));
-      back.addEventListener('input', () => patch({ back: back.value }));
-      imageUrl.addEventListener('input', () => patch({ image_url: imageUrl.value }));
-      imageAlt.addEventListener('input', () => patch({ image_alt: imageAlt.value }));
-
-      row.append(front, back, imageUrl, imageAlt, up, down, remove);
-      cardsContainer.append(row);
-    });
-
-    addButton.disabled = atMax;
-  }
-
-  const addButton = document.createElement('button');
-  addButton.type = 'button';
-  addButton.className = 'btn btn--secondary block-editor__flashcards-add';
-  addButton.textContent = 'Add card';
-  addButton.addEventListener('click', () => {
-    if (cards.length >= 20) return;
-    cardCounter += 1;
-    cards = [
-      ...cards,
-      {
-        id: `${getLatest().id}_c${cardCounter}`,
-        front: '',
-        back: ''
-      }
-    ];
-    emitChange();
-    renderCards();
+  const list = createHubList<FlashcardDraft>({
+    items: cards,
+    noun: 'card',
+    label: 'Flashcards',
+    getKey: (card) => card.id,
+    itemLabel: (_card, index) => `Card ${index + 1}`,
+    describe: (card, index) => card.front.trim() || `Card ${index + 1}`,
+    min: 1,
+    max: 20,
+    minReason: 'A flashcard set needs at least one card.',
+    maxReason: 'A flashcard set holds up to twenty cards.',
+    create: () => ({ id: itemId(`${getLatest().id}_c`), front: '', back: '' }),
+    duplicate: (card) => ({ ...card, id: itemId(`${getLatest().id}_c`) }),
+    onChange: (next) => {
+      cards = next;
+      emitChange();
+    },
+    renderItem: (card, ctx) => {
+      const n = ctx.index + 1;
+      const patch = (partial: Partial<FlashcardDraft>) => ctx.update({ ...ctx.current, ...partial });
+      return fragmentOf(
+        fieldPair(
+          editorField('block-editor__flashcards-front', card.front, 'Front', `Flashcard ${n} front`, (value) => patch({ front: value })),
+          editorField('block-editor__flashcards-back', card.back, 'Back', `Flashcard ${n} back`, (value) => patch({ back: value }))
+        ),
+        fieldPair(
+          editorField('block-editor__flashcards-image-url', card.image_url ?? '', 'Image link (optional)', `Flashcard ${n} image URL`, (value) => patch({ image_url: value }), 'url'),
+          editorField('block-editor__flashcards-image-alt', card.image_alt ?? '', 'Image alt (required if image set)', `Flashcard ${n} image alt`, (value) => patch({ image_alt: value }))
+        )
+      );
+    }
   });
+  list.el.classList.add('block-editor__flashcards-items');
 
   shuffle.addEventListener('change', emitChange);
 
-  renderCards();
-  fields.append(shuffleLabel, cardsContainer, addButton);
+  fields.append(shuffleLabel, list.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -2339,48 +1983,13 @@ export function createSelfCheckEditor(
 
   let mode = block.content.mode;
   let items: SelfCheckItemDraft[] = (block.content.items ?? []).map((item) => ({ ...item }));
-  let itemCounter = items.length;
 
-  const title = document.createElement('input');
-  title.type = 'text';
-  title.className = 'block-editor__self-check-title';
-  title.value = block.content.title ?? '';
-  title.placeholder = 'Title (optional)';
-  title.setAttribute('aria-label', 'Self check title');
+  const title = editorField('block-editor__self-check-title', block.content.title ?? '', 'Title (optional)', 'Self check title', () => emitChange());
+  const prompt = editorField('block-editor__self-check-prompt', block.content.prompt, 'Prompt', 'Self check prompt', () => emitChange(), 'textarea');
+  const answer = editorField('block-editor__self-check-answer', block.content.answer ?? '', 'Answer', 'Self check answer', () => emitChange(), 'textarea');
 
-  const modeSelect = createEditorFilter({
-    key: 'Mode',
-    value: mode,
-    options: [
-      { value: 'reveal', label: 'Reveal answer' },
-      { value: 'checklist', label: 'Checklist' },
-      { value: 'confidence', label: 'Confidence rating' }
-    ],
-    className: 'block-editor__self-check-mode',
-    ariaLabel: 'Self check mode',
-    onChange: () => {
-      mode = modeSelect.getValue() as typeof mode;
-      renderModeFields();
-      emitChange();
-    }
-  });
-
-  const prompt = document.createElement('textarea');
-  prompt.className = 'block-editor__self-check-prompt';
-  prompt.value = block.content.prompt;
-  prompt.rows = 3;
-  prompt.placeholder = 'Prompt';
-  prompt.setAttribute('aria-label', 'Self check prompt');
-
-  const answer = document.createElement('textarea');
-  answer.className = 'block-editor__self-check-answer';
-  answer.value = block.content.answer ?? '';
-  answer.rows = 3;
-  answer.placeholder = 'Answer';
-  answer.setAttribute('aria-label', 'Self check answer');
-
-  const itemsContainer = document.createElement('div');
-  itemsContainer.className = 'block-editor__self-check-items';
+  const itemsHost = document.createElement('div');
+  itemsHost.className = 'block-editor__self-check-items';
 
   const emitChange = () => {
     onChange({
@@ -2398,82 +2007,62 @@ export function createSelfCheckEditor(
     });
   };
 
+  const newItem = (): SelfCheckItemDraft => ({ id: itemId(`${getLatest().id}_i`), label: '' });
+
   function renderItems(): void {
-    itemsContainer.replaceChildren();
-
-    items.forEach((item, index) => {
-      const row = document.createElement('div');
-      row.className = 'block-editor__self-check-item';
-
-      const label = document.createElement('input');
-      label.type = 'text';
-      label.className = 'block-editor__self-check-item-label';
-      label.value = item.label;
-      label.placeholder = 'Checklist item';
-      label.setAttribute('aria-label', `Checklist item ${index + 1}`);
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn btn--ghost block-editor__self-check-item-remove';
-      remove.textContent = 'Remove';
-      remove.disabled = items.length <= 1;
-      remove.addEventListener('click', () => {
-        items = items.filter((_, i) => i !== index);
-        if (items.length === 0) {
-          itemCounter += 1;
-          items = [{ id: `${getLatest().id}_i${itemCounter}`, label: '' }];
-        }
+    const list = createHubList<SelfCheckItemDraft>({
+      items,
+      noun: 'item',
+      label: 'Checklist items',
+      variant: 'compact',
+      getKey: (item) => item.id,
+      describe: (item, index) => item.label.trim() || `Item ${index + 1}`,
+      min: 1,
+      max: 12,
+      minReason: 'A checklist needs at least one item.',
+      maxReason: 'A checklist holds up to twelve items.',
+      create: newItem,
+      duplicate: (item) => ({ ...item, id: itemId(`${getLatest().id}_i`) }),
+      onChange: (next) => {
+        items = next;
         emitChange();
-        renderItems();
-      });
-
-      label.addEventListener('input', () => {
-        items[index] = { ...items[index]!, label: label.value };
-        emitChange();
-      });
-
-      row.append(label, remove);
-      itemsContainer.append(row);
+      },
+      renderItem: (item, ctx) =>
+        editorField('block-editor__self-check-item-label', item.label, 'Checklist item', `Checklist item ${ctx.index + 1}`, (value) =>
+          ctx.update({ ...ctx.current, label: value })
+        )
     });
-
-    addItemButton.disabled = items.length >= 12;
+    itemsHost.replaceChildren(list.el);
   }
-
-  const addItemButton = document.createElement('button');
-  addItemButton.type = 'button';
-  addItemButton.className = 'btn btn--secondary block-editor__self-check-item-add';
-  addItemButton.textContent = 'Add item';
-  addItemButton.addEventListener('click', () => {
-    if (items.length >= 12) return;
-    itemCounter += 1;
-    items = [...items, { id: `${getLatest().id}_i${itemCounter}`, label: '' }];
-    emitChange();
-    renderItems();
-  });
 
   function renderModeFields(): void {
     const showAnswer = mode === 'reveal' || mode === 'confidence';
     const showItems = mode === 'checklist';
-
     answer.hidden = !showAnswer;
-    itemsContainer.hidden = !showItems;
-    addItemButton.hidden = !showItems;
-
-    if (showItems && items.length === 0) {
-      itemCounter += 1;
-      items = [{ id: `${getLatest().id}_i${itemCounter}`, label: '' }];
-      renderItems();
-    } else if (showItems) {
-      renderItems();
-    }
+    itemsHost.hidden = !showItems;
+    if (showItems && items.length === 0) items = [newItem()];
+    if (showItems) renderItems();
   }
 
-  title.addEventListener('input', emitChange);
-  prompt.addEventListener('input', emitChange);
-  answer.addEventListener('input', emitChange);
+  const modeSelect = createChoice({
+    key: 'Mode',
+    value: mode,
+    options: [
+      { value: 'reveal', label: 'Reveal answer' },
+      { value: 'checklist', label: 'Checklist' },
+      { value: 'confidence', label: 'Confidence rating' }
+    ],
+    className: 'block-editor__self-check-mode',
+    ariaLabel: 'Self check mode',
+    onChange: (value) => {
+      mode = value as typeof mode;
+      renderModeFields();
+      emitChange();
+    }
+  });
 
   renderModeFields();
-  fields.append(title, modeSelect.el, prompt, answer, itemsContainer, addItemButton);
+  fields.append(title, modeSelect.el, prompt, answer, itemsHost);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -2529,9 +2118,30 @@ export function createChartEditor(
 
   let chartType = block.content.chart_type;
   let series: ChartSeriesDraft[] = seriesDraftFromBlock(block.content.series);
-  let seriesCounter = series.length;
 
-  const chartTypeSelect = createEditorFilter({
+  const title = editorField('block-editor__chart-title', block.content.title ?? '', 'Title (optional)', 'Chart title', () => emitChange());
+  const xLabel = editorField('block-editor__chart-x-label', block.content.x_label ?? '', 'X axis label (optional)', 'Chart X label', () => emitChange());
+  const yLabel = editorField('block-editor__chart-y-label', block.content.y_label ?? '', 'Y axis label (optional)', 'Chart Y label', () => emitChange());
+
+  const preview = document.createElement('div');
+  preview.className = 'block-editor__viz-preview block-editor__chart-preview';
+  preview.setAttribute('aria-label', 'Chart preview');
+
+  const content = () => ({
+    chart_type: chartType,
+    title: title.value.trim() || undefined,
+    x_label: xLabel.value.trim() || undefined,
+    y_label: yLabel.value.trim() || undefined,
+    series: seriesContentFromDraft(series)
+  });
+
+  const emitChange = () => {
+    const next = content();
+    preview.innerHTML = buildChartSvg(next);
+    onChange({ ...getLatest(), content: next });
+  };
+
+  const chartTypeSelect = createChoice({
     key: 'Type',
     value: chartType,
     options: [
@@ -2542,221 +2152,85 @@ export function createChartEditor(
     ],
     className: 'block-editor__chart-type',
     ariaLabel: 'Chart type',
-    onChange: () => {
-      chartType = chartTypeSelect.getValue() as typeof chartType;
+    onChange: (value) => {
+      chartType = value as typeof chartType;
       emitChange();
     }
   });
 
-  const title = document.createElement('input');
-  title.type = 'text';
-  title.className = 'block-editor__chart-title';
-  title.value = block.content.title ?? '';
-  title.placeholder = 'Title (optional)';
-  title.setAttribute('aria-label', 'Chart title');
-
-  const xLabel = document.createElement('input');
-  xLabel.type = 'text';
-  xLabel.className = 'block-editor__chart-x-label';
-  xLabel.value = block.content.x_label ?? '';
-  xLabel.placeholder = 'X axis label (optional)';
-  xLabel.setAttribute('aria-label', 'Chart X label');
-
-  const yLabel = document.createElement('input');
-  yLabel.type = 'text';
-  yLabel.className = 'block-editor__chart-y-label';
-  yLabel.value = block.content.y_label ?? '';
-  yLabel.placeholder = 'Y axis label (optional)';
-  yLabel.setAttribute('aria-label', 'Chart Y label');
-
-  const seriesContainer = document.createElement('div');
-  seriesContainer.className = 'block-editor__chart-series';
-
-  const preview = document.createElement('div');
-  preview.className = 'block-editor__viz-preview block-editor__chart-preview';
-  preview.setAttribute('aria-label', 'Chart preview');
-
-  const emitChange = () => {
-    const content = {
-      chart_type: chartType,
-      title: title.value.trim() || undefined,
-      x_label: xLabel.value.trim() || undefined,
-      y_label: yLabel.value.trim() || undefined,
-      series: seriesContentFromDraft(series)
-    };
-    preview.innerHTML = buildChartSvg(content);
-    onChange({
-      ...getLatest(),
-      content
-    });
-  };
-
-  function renderSeries(): void {
-    seriesContainer.replaceChildren();
-    const atMinSeries = series.length <= 1;
-    const atMaxSeries = series.length >= 6;
-
-    series.forEach((entry, seriesIndex) => {
-      const row = document.createElement('div');
-      row.className = 'block-editor__chart-series-item';
-
-      const name = document.createElement('input');
-      name.type = 'text';
-      name.className = 'block-editor__chart-series-name';
-      name.value = entry.name;
-      name.placeholder = 'Series name';
-      name.setAttribute('aria-label', `Series ${seriesIndex + 1} name`);
-
-      const colour = createEditorFilter({
+  const seriesList = createHubList<ChartSeriesDraft>({
+    items: series,
+    noun: 'series',
+    label: 'Chart series',
+    getKey: (entry) => entry.id,
+    itemLabel: (_entry, index) => `Series ${index + 1}`,
+    describe: (entry, index) => entry.name.trim() || `Series ${index + 1}`,
+    min: 1,
+    max: 6,
+    minReason: 'A chart needs at least one series.',
+    maxReason: 'A chart holds up to six series.',
+    create: (index) => ({ id: itemId(`${getLatest().id}_s`), name: `Series ${index + 1}`, points: [{ x: '', y: 0 }] }),
+    duplicate: (entry) => ({
+      ...entry,
+      id: itemId(`${getLatest().id}_s`),
+      name: `${entry.name} copy`,
+      points: entry.points.map((point) => ({ ...point }))
+    }),
+    onChange: (next) => {
+      series = next;
+      emitChange();
+    },
+    renderItem: (entry, ctx) => {
+      const n = ctx.index + 1;
+      const name = editorField('block-editor__chart-series-name', entry.name, 'Series name', `Series ${n} name`, (value) => ctx.update({ ...ctx.current, name: value }));
+      const colour = createChoice({
         key: 'Colour',
         value: entry.color ?? '',
         options: [
           { value: '', label: 'Auto' },
-          ...CHART_SERIES_COLOR_OPTIONS.map((option) => ({
-            value: option.id,
-            label: option.label
-          }))
+          ...CHART_SERIES_COLOR_OPTIONS.map((option) => ({ value: option.id, label: option.label }))
         ],
         className: 'block-editor__chart-series-color',
-        ariaLabel: `Series ${seriesIndex + 1} colour`,
-        onChange: (value) => {
-          const next = value as ChartSeriesColor | '';
-          series[seriesIndex] = {
-            ...series[seriesIndex]!,
-            color: next === '' ? undefined : next
-          };
-          emitChange();
+        ariaLabel: `Series ${n} colour`,
+        onChange: (value) => ctx.update({ ...ctx.current, color: value === '' ? undefined : (value as ChartSeriesColor) })
+      });
+
+      const points = createHubList<ChartPointDraft>({
+        items: entry.points,
+        noun: 'point',
+        label: `Series ${n} points`,
+        variant: 'compact',
+        min: 1,
+        max: 24,
+        minReason: 'A series needs at least one point.',
+        maxReason: 'A series holds up to 24 points.',
+        create: () => ({ x: '', y: 0 }),
+        duplicate: (point) => ({ ...point }),
+        onChange: (next) => ctx.update({ ...ctx.current, points: next }),
+        renderItem: (point, pointCtx) => {
+          const m = pointCtx.index + 1;
+          const x = editorField('block-editor__chart-point-x', String(point.x), 'X', `Series ${n} point ${m} X`, (value) =>
+            pointCtx.update({ ...pointCtx.current, x: parseChartX(value) })
+          );
+          const y = editorField('block-editor__chart-point-y', String(point.y), 'Y', `Series ${n} point ${m} Y`, (value) =>
+            pointCtx.update({ ...pointCtx.current, y: parseChartY(value) }), 'number'
+          );
+          return fragmentOf(x, y);
         }
       });
-      const pointsContainer = document.createElement('div');
-      pointsContainer.className = 'block-editor__chart-points';
+      points.el.classList.add('block-editor__chart-points');
 
-      const atMinPoints = entry.points.length <= 1;
-      const atMaxPoints = entry.points.length >= 24;
-
-      entry.points.forEach((point, pointIndex) => {
-        const pointRow = document.createElement('div');
-        pointRow.className = 'block-editor__chart-point';
-
-        const xInput = document.createElement('input');
-        xInput.type = 'text';
-        xInput.className = 'block-editor__chart-point-x';
-        xInput.value = String(point.x);
-        xInput.placeholder = 'X';
-        xInput.setAttribute('aria-label', `Series ${seriesIndex + 1} point ${pointIndex + 1} X`);
-
-        const yInput = document.createElement('input');
-        yInput.type = 'number';
-        yInput.className = 'block-editor__chart-point-y';
-        yInput.value = String(point.y);
-        yInput.placeholder = 'Y';
-        yInput.setAttribute('aria-label', `Series ${seriesIndex + 1} point ${pointIndex + 1} Y`);
-
-        const removePoint = document.createElement('button');
-        removePoint.type = 'button';
-        removePoint.className = 'btn btn--ghost block-editor__chart-remove-point';
-        removePoint.textContent = 'Remove point';
-        removePoint.disabled = atMinPoints;
-        removePoint.addEventListener('click', () => {
-          if (series[seriesIndex]!.points.length <= 1) return;
-          series[seriesIndex] = {
-            ...series[seriesIndex]!,
-            points: series[seriesIndex]!.points.filter((_, i) => i !== pointIndex)
-          };
-          emitChange();
-          renderSeries();
-        });
-
-        xInput.addEventListener('input', () => {
-          series[seriesIndex]!.points[pointIndex] = {
-            ...series[seriesIndex]!.points[pointIndex]!,
-            x: parseChartX(xInput.value)
-          };
-          emitChange();
-        });
-        yInput.addEventListener('input', () => {
-          series[seriesIndex]!.points[pointIndex] = {
-            ...series[seriesIndex]!.points[pointIndex]!,
-            y: parseChartY(yInput.value)
-          };
-          emitChange();
-        });
-
-        pointRow.append(xInput, yInput, removePoint);
-        pointsContainer.append(pointRow);
-      });
-
-      const addPoint = document.createElement('button');
-      addPoint.type = 'button';
-      addPoint.className = 'btn btn--ghost block-editor__chart-add-point';
-      addPoint.textContent = 'Add point';
-      addPoint.disabled = atMaxPoints;
-      addPoint.addEventListener('click', () => {
-        if (series[seriesIndex]!.points.length >= 24) return;
-        series[seriesIndex] = {
-          ...series[seriesIndex]!,
-          points: [...series[seriesIndex]!.points, { x: '', y: 0 }]
-        };
-        emitChange();
-        renderSeries();
-      });
-
-      const removeSeries = document.createElement('button');
-      removeSeries.type = 'button';
-      removeSeries.className = 'btn btn--ghost block-editor__chart-remove-series';
-      removeSeries.textContent = 'Remove series';
-      removeSeries.disabled = atMinSeries;
-      removeSeries.addEventListener('click', () => {
-        if (series.length <= 1) return;
-        series = series.filter((_, i) => i !== seriesIndex);
-        emitChange();
-        renderSeries();
-      });
-
-      name.addEventListener('input', () => {
-        series[seriesIndex] = { ...series[seriesIndex]!, name: name.value };
-        emitChange();
-      });
-
-      row.append(name, colour.el, pointsContainer, addPoint, removeSeries);
-      seriesContainer.append(row);
-    });
-
-    addSeriesButton.disabled = atMaxSeries;
-  }
-
-  const addSeriesButton = document.createElement('button');
-  addSeriesButton.type = 'button';
-  addSeriesButton.className = 'btn btn--secondary block-editor__chart-add-series';
-  addSeriesButton.textContent = 'Add series';
-  addSeriesButton.addEventListener('click', () => {
-    if (series.length >= 6) return;
-    seriesCounter += 1;
-    series = [
-      ...series,
-      {
-        id: `${getLatest().id}_s${seriesCounter}`,
-        name: `Series ${seriesCounter}`,
-        points: [{ x: '', y: 0 }]
-      }
-    ];
-    emitChange();
-    renderSeries();
+      return fragmentOf(fieldPair(name, colour.el), points.el);
+    }
   });
+  seriesList.el.classList.add('block-editor__chart-series');
 
-  title.addEventListener('input', emitChange);
-  xLabel.addEventListener('input', emitChange);
-  yLabel.addEventListener('input', emitChange);
+  const settings = document.createElement('div');
+  settings.className = 'block-editor__inline-settings';
+  settings.append(chartTypeSelect.el);
 
-  renderSeries();
-  preview.innerHTML = buildChartSvg({
-    chart_type: chartType,
-    title: title.value.trim() || undefined,
-    x_label: xLabel.value.trim() || undefined,
-    y_label: yLabel.value.trim() || undefined,
-    series: seriesContentFromDraft(series)
-  });
-  fields.append(chartTypeSelect.el, title, xLabel, yLabel, seriesContainer, addSeriesButton, preview);
+  preview.innerHTML = buildChartSvg(content());
+  fields.append(settings, title, fieldPair(xLabel, yLabel), seriesList.el, preview);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -3220,10 +2694,10 @@ export function createBlockEditor(
     case 'spacer':
       return createSpacerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'spacer' }>);
     case 'section':
-      return createSectionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'section' }>);
+      return createSectionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'section' }>, context);
     case 'columns':
-      return createColumnsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'columns' }>);
+      return createColumnsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'columns' }>, context);
     case 'tabs':
-      return createTabsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'tabs' }>);
+      return createTabsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'tabs' }>, context);
   }
 }
