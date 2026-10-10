@@ -824,23 +824,31 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
     return { record, ref: formatEntityRef({ namespace: 'shared', kind, id: entityId }) };
   }
 
-  // Brings a GitHub-imported Person (Notion import in life-hub-data) into
-  // this store under its existing derived id, so ordinary field updates and
-  // lifecycle changes can target it. Every reader resolves Blob before
-  // GitHub for the same id, so the adopted record simply takes over. It is
-  // journaled as a `create_identity`, which `repairIdentityOperation`
-  // already knows how to replay. The imported self Person is never adopted
-  // here: the self pointer has its own claim protocol.
+  // Brings a GitHub-imported Person or Organisation (Notion import in
+  // life-hub-data) into this store under its existing derived id, so ordinary
+  // field updates and lifecycle changes can target it. Every reader resolves
+  // Blob before GitHub for the same id, so the adopted record simply takes
+  // over. It is journaled as a `create_identity`, which
+  // `repairIdentityOperation` already knows how to replay. The imported self
+  // Person is never adopted here: the self pointer has its own claim protocol.
   async function adoptImportedIdentity({ kind, record }) {
-    if (kind !== 'person') {
-      throw adoptError('unsupported_adopt_kind', 'Only imported People can be adopted.');
+    if (kind !== 'person' && kind !== 'organisation') {
+      throw adoptError('unsupported_adopt_kind', 'Only imported People and Organisations can be adopted.');
     }
-    const parsed = parsePersonRecord(record);
-    if (!parsed) throw adoptError('invalid_imported_record', 'The imported Person record is not valid.');
-    if (parsed.is_self) {
+    const parsed = kind === 'person' ? parsePersonRecord(record) : parseOrganisationRecord(record);
+    if (!parsed) {
+      throw adoptError(
+        'invalid_imported_record',
+        kind === 'person' ? 'The imported Person record is not valid.' : 'The imported Organisation record is not valid.'
+      );
+    }
+    if (kind === 'person' && parsed.is_self) {
       throw adoptError('self_not_adoptable', 'The self Person cannot be adopted through this path.');
     }
-    const existing = parsePersonRecord(await getJSON(store, entityKeyFor(kind, parsed.id), STRONG));
+    const existing =
+      kind === 'person'
+        ? parsePersonRecord(await getJSON(store, entityKeyFor(kind, parsed.id), STRONG))
+        : parseOrganisationRecord(await getJSON(store, entityKeyFor(kind, parsed.id), STRONG));
     if (existing) return { record: existing, ref: formatEntityRef({ namespace: 'shared', kind, id: existing.id }), adopted: false };
 
     const timestamp = now();
