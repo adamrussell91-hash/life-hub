@@ -2,6 +2,7 @@ import type { JournalFixture, JournalMoment } from '@/journal/types';
 
 export type MomentMenuAction =
   | 'edit'
+  | 'annotate'
   | 'reorder'
   | 'split'
   | 'merge'
@@ -40,6 +41,16 @@ export function buildMomentMenuItems(
       label: 'Edit moment',
       disabled: !live,
       title: live ? 'Edit reflection, time, and place' : 'Deleted moments cannot be edited',
+    },
+    {
+      action: 'annotate',
+      label: 'Annotate photos',
+      disabled: !live || mediaCount < 1,
+      title: !live
+        ? 'Deleted moments cannot be annotated'
+        : mediaCount < 1
+          ? 'Add photos to annotate'
+          : 'Add region notes on photos (stored separately from originals)',
     },
     {
       action: 'reorder',

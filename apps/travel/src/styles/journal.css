@@ -1242,3 +1242,84 @@ html.vv-keyboard-open .sheet.addform.journal-move-sheet {
 .journal-trash__actions .btn {
   min-height: 2.75rem;
 }
+
+.journal-moment__photo-frame {
+  position: relative;
+  display: block;
+}
+
+.journal-moment__annotation-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.journal-moment__photos--annotations-visible .journal-moment__annotation-svg {
+  opacity: 1;
+}
+
+.journal-moment__annotation-svg rect {
+  fill: color-mix(in srgb, var(--accent) 25%, transparent);
+  stroke: var(--accent);
+  stroke-width: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .journal-moment__annotation-svg {
+    transition: opacity 0.15s ease;
+  }
+}
+
+.journal-moment__annotation-toggle {
+  min-height: 2.75rem;
+  margin-bottom: var(--space-2);
+}
+
+.journal-annotation-sheet__preview {
+  position: relative;
+  margin-bottom: var(--space-3);
+}
+
+.journal-annotation-sheet__preview img {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-md);
+}
+
+.journal-annotation-sheet__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.journal-annotation-sheet__svg rect {
+  fill: color-mix(in srgb, var(--accent) 20%, transparent);
+  stroke: var(--accent);
+  stroke-width: 0.35;
+}
+
+.journal-annotation-sheet__add {
+  min-height: 2.75rem;
+  width: 100%;
+  margin-bottom: var(--space-3);
+}
+
+.journal-annotation-sheet__region {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.journal-annotation-sheet__region textarea {
+  width: 100%;
+  min-height: 4.5rem;
+}
+
+html.vv-keyboard-open .sheet.addform.journal-annotation-sheet {
+  max-height: min(100dvh, var(--vv-height, 100dvh));
+}

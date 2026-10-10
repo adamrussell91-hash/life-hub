@@ -100,6 +100,7 @@ describe('buildJournalExportBundle', () => {
     const paths = new Set(files.map((f) => f.path));
     expect(paths.has('data/journal.json')).toBe(true);
     expect(paths.has('data/journal.txt')).toBe(true);
+    expect(paths.has('data/annotations.json')).toBe(true);
     expect(paths.has('data/checksums.json')).toBe(true);
     expect(paths.has('geo/route.geojson')).toBe(true);
     expect(paths.has('reader/index.html')).toBe(true);

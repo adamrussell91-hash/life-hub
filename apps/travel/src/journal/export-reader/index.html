@@ -16,6 +16,7 @@
     .err { color: #8b0000; }
     img { max-width: 100%; height: auto; border-radius: 4px; }
     .caption { font-size: 0.85rem; color: #444; margin-top: 0.25rem; }
+    .photo-notes { font-size: 0.85rem; color: #333; margin: 0.35rem 0 0; padding-left: 1rem; }
   </style>
 </head>
 <body>
@@ -31,11 +32,26 @@
         (list || []).forEach(function (m) { map[m.id] = m; });
         return map;
       }
-      function render(journal) {
+      function annotationMap(payload) {
+        var map = {};
+        (payload && payload.items || []).forEach(function (doc) {
+          if (doc && doc.media_id) map[doc.media_id] = doc;
+        });
+        return map;
+      }
+      function noteLines(doc) {
+        var out = [];
+        (doc.regions || []).forEach(function (r) {
+          if (r && r.note && String(r.note).trim()) out.push(String(r.note).trim());
+        });
+        return out;
+      }
+      function render(journal, annotationsPayload) {
         var html = '<h1>' + esc(journal.title || 'Untitled trip') + '</h1>';
         html += '<p class="meta">Trip ' + esc(journal.trip_id) + ' · revision ' + esc(String(journal.revision)) + '</p>';
         var legs = (journal.legs || []).slice().sort(function (a, b) { return a.order - b.order; });
         var media = mediaById(journal.media);
+        var notesByMedia = annotationMap(annotationsPayload);
         legs.forEach(function (leg) {
           html += '<h2>' + esc(leg.destination) + '</h2>';
           var moments = (journal.moments || []).filter(function (m) {
@@ -52,6 +68,12 @@
               html += '<figure><img src="' + src + '" alt="" width="' + esc(String(m.width)) + '" height="' + esc(String(m.height)) + '" loading="lazy" />';
               if (m.caption) html += '<figcaption class="caption">' + esc(m.caption) + '</figcaption>';
               if (m.transcript) html += '<p class="caption">Transcript: ' + esc(m.transcript) + '</p>';
+              var notes = noteLines(notesByMedia[id] || {});
+              if (notes.length) {
+                html += '<ul class="photo-notes">';
+                notes.forEach(function (n) { html += '<li>' + esc(n) + '</li>'; });
+                html += '</ul>';
+              }
               html += '</figure>';
             });
             html += '</article>';
@@ -59,9 +81,17 @@
         });
         app.innerHTML = html;
       }
-      fetch('../data/journal.json')
-        .then(function (r) { if (!r.ok) throw new Error('journal.json missing'); return r.json(); })
-        .then(render)
+      Promise.all([
+        fetch('../data/journal.json').then(function (r) {
+          if (!r.ok) throw new Error('journal.json missing');
+          return r.json();
+        }),
+        fetch('../data/annotations.json').then(function (r) {
+          if (!r.ok) return { items: [] };
+          return r.json();
+        }),
+      ])
+        .then(function (pair) { render(pair[0], pair[1]); })
         .catch(function (e) {
           app.innerHTML = '<p class="err">Could not load export: ' + esc(e.message) + '</p>';
         });

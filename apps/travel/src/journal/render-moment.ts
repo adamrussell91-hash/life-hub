@@ -9,6 +9,12 @@ import { openMoveSheet } from '@/journal/move-sheet';
 import { openReorderSheet } from '@/journal/reorder-sheet';
 import { openSplitSheet } from '@/journal/split-sheet';
 import { openDeleteConfirmSheet } from '@/journal/delete-confirm-sheet';
+import { openPhotoAnnotationSheet } from '@/journal/annotation-sheet';
+import {
+  getMediaPhotoAnnotations,
+  momentHasPhotoAnnotations,
+  regionSvgAttrs,
+} from '@/journal/annotations';
 
 function mediaById(fixture: JournalFixture): Map<string, JournalMedia> {
   return new Map(fixture.media.map((m) => [m.id, m]));
@@ -111,6 +117,22 @@ function handleMenuAction(
     case 'edit':
       setSheetOverlay(openEditMomentSheet(base));
       break;
+    case 'annotate': {
+      const firstId = moment.media_ids[0];
+      const media = firstId ? ctx.fixture.media.find((m) => m.id === firstId) : undefined;
+      if (!media) break;
+      setSheetOverlay(
+        openPhotoAnnotationSheet({
+          tripId: ctx.tripId,
+          journal: ctx.journal,
+          version: ctx.version,
+          media,
+          anchor: ctx.anchor,
+          onSaved: (envelope) => ctx.onJournalSaved?.(envelope),
+        }),
+      );
+      break;
+    }
     case 'reorder':
       setSheetOverlay(openReorderSheet(base));
       break;
@@ -138,12 +160,40 @@ function handleMenuAction(
   }
 }
 
+function mountAnnotationOverlay(
+  wrap: HTMLElement,
+  mediaId: string,
+  journal: JournalDocument,
+  visible: boolean,
+): void {
+  const doc = getMediaPhotoAnnotations(journal, mediaId);
+  if (!doc || doc.regions.length === 0) return;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.classList.add('journal-moment__annotation-svg');
+  svg.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  if (!visible) svg.setAttribute('hidden', '');
+  for (const region of doc.regions) {
+    const attrs = regionSvgAttrs(region);
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', attrs.x);
+    rect.setAttribute('y', attrs.y);
+    rect.setAttribute('width', attrs.width);
+    rect.setAttribute('height', attrs.height);
+    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    title.textContent = region.note.trim() || 'Photo note';
+    rect.append(title);
+    svg.append(rect);
+  }
+  wrap.append(svg);
+}
+
 function renderPhotoGrid(
   host: HTMLElement,
   moment: JournalMoment,
   mediaMap: Map<string, JournalMedia>,
   tripId: string,
   mediaEager: boolean,
+  journal?: JournalDocument,
 ): void {
   const ids = moment.media_ids;
   if (ids.length === 0) return;
@@ -155,11 +205,25 @@ function renderPhotoGrid(
     .map((id) => mediaMap.get(id))
     .filter((m): m is JournalMedia => Boolean(m));
 
+  let annotationsVisible = false;
+  const syncAnnotationVisibility = (): void => {
+    grid.classList.toggle('journal-moment__photos--annotations-visible', annotationsVisible);
+    for (const svg of grid.querySelectorAll('.journal-moment__annotation-svg')) {
+      if (annotationsVisible) svg.removeAttribute('hidden');
+      else svg.setAttribute('hidden', '');
+      svg.setAttribute('aria-hidden', annotationsVisible ? 'false' : 'true');
+    }
+  };
+
   const addImg = (m: JournalMedia, layoutSlot: typeof layout, className?: string): void => {
+    const frame = document.createElement('div');
+    frame.className = 'journal-moment__photo-frame';
     const img = document.createElement('img');
     if (className) img.className = className;
     configureJournalImage(img, { tripId, media: m, layout: layoutSlot, eager: mediaEager });
-    grid.append(img);
+    frame.append(img);
+    if (journal) mountAnnotationOverlay(frame, m.id, journal, annotationsVisible);
+    grid.append(frame);
   };
 
   if (layout === 'single') {
@@ -177,9 +241,13 @@ function renderPhotoGrid(
     pair.className = 'journal-moment__photo-pair';
     grid.append(pair);
     for (const m of resolved.slice(1, 3)) {
+      const frame = document.createElement('div');
+      frame.className = 'journal-moment__photo-frame';
       const img = document.createElement('img');
       configureJournalImage(img, { tripId, media: m, layout: 'pair', eager: mediaEager });
-      pair.append(img);
+      frame.append(img);
+      if (journal) mountAnnotationOverlay(frame, m.id, journal, annotationsVisible);
+      pair.append(frame);
     }
     if (layout === 'lead-pair-more' && ids.length > 3) {
       const more = document.createElement('button');
@@ -191,6 +259,22 @@ function renderPhotoGrid(
       grid.append(more);
     }
   }
+
+  if (journal && momentHasPhotoAnnotations(journal, ids)) {
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'btn btn--ghost journal-moment__annotation-toggle';
+    toggle.textContent = 'Show photo notes';
+    toggle.setAttribute('aria-pressed', 'false');
+    toggle.addEventListener('click', () => {
+      annotationsVisible = !annotationsVisible;
+      toggle.setAttribute('aria-pressed', annotationsVisible ? 'true' : 'false');
+      toggle.textContent = annotationsVisible ? 'Hide photo notes' : 'Show photo notes';
+      syncAnnotationVisibility();
+    });
+    grid.before(toggle);
+  }
+
   host.append(grid);
 }
 
@@ -289,6 +373,7 @@ export function renderMomentArticle(
       mediaMap,
       ctx?.tripId ?? fixture.trip_id,
       Boolean(options?.mediaEager),
+      ctx?.journal,
     );
     renderMetadata(article, moment);
     if (moment.text) renderReflection(article, moment.text);

@@ -18,11 +18,12 @@ describe('buildMomentMenuItems', () => {
     expect(split?.title).toMatch(/two photos/i);
   });
 
-  it('lists all six actions', () => {
+  it('lists all menu actions including annotate', () => {
     const fixture = klIstanbulFixture();
     const items = buildMomentMenuItems(fixture, fixture.moments[0]!);
     expect(items.map((i) => i.action)).toEqual([
       'edit',
+      'annotate',
       'reorder',
       'split',
       'merge',

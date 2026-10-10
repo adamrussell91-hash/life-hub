@@ -1,4 +1,9 @@
 import type { JournalDocument } from '@/api/journal';
+import {
+  buildPhotoAnnotationsExportJson,
+  formatMediaAnnotationsPlainText,
+  getMediaPhotoAnnotations,
+} from '@/journal/annotations';
 import type { JournalLeg, JournalLifecycle, JournalMedia, JournalMoment } from '@/journal/types';
 import { buildPhotoStops, buildSegments } from '@/journal/map-connections';
 import exportReaderHtml from '@/journal/export-reader/index.html?raw';
@@ -99,7 +104,11 @@ export function buildJournalRouteGeoJson(journal: JournalDocument): GeoJSON.Feat
   return { type: 'FeatureCollection', features };
 }
 
-function formatMomentLine(moment: JournalMoment, media: Map<string, JournalMedia>): string {
+function formatMomentLine(
+  moment: JournalMoment,
+  media: Map<string, JournalMedia>,
+  journal: JournalDocument,
+): string {
   const lines: string[] = [];
   const head = [moment.local_date, moment.local_time].filter(Boolean).join(' ');
   if (head) lines.push(head);
@@ -111,6 +120,8 @@ function formatMomentLine(moment: JournalMoment, media: Map<string, JournalMedia
     if (item.caption?.trim()) lines.push(`[photo] ${item.caption.trim()}`);
     const extras = item as JournalMedia & { transcript?: string };
     if (extras.transcript?.trim()) lines.push(`[transcript] ${extras.transcript.trim()}`);
+    const annotations = getMediaPhotoAnnotations(journal, id);
+    if (annotations) lines.push(...formatMediaAnnotationsPlainText(annotations));
   }
   return lines.join('\n');
 }
@@ -125,7 +136,7 @@ export function formatJournalPlainText(journal: JournalDocument): string {
       .filter((m) => m.leg_id === leg.id && m.lifecycle === 'live')
       .sort((a, b) => a.display_order - b.display_order);
     for (const moment of moments) {
-      chunks.push(formatMomentLine(moment, media), '');
+      chunks.push(formatMomentLine(moment, media, journal), '');
     }
   }
   return chunks.join('\n').trimEnd() + '\n';
@@ -189,10 +200,12 @@ export async function buildJournalExportBundle(
   const plainText = formatJournalPlainText(stripped);
   const geoJson = JSON.stringify(buildJournalRouteGeoJson(stripped), null, 2);
   const mediaIndex = JSON.stringify({ items: mediaPlaceholders(stripped) }, null, 2);
+  const annotationsJson = buildPhotoAnnotationsExportJson(stripped);
 
   const files: ExportBundleFile[] = [
     await fileEntry('data/journal.json', journalJson),
     await fileEntry('data/journal.txt', plainText),
+    await fileEntry('data/annotations.json', annotationsJson),
     await fileEntry('geo/route.geojson', geoJson),
     await fileEntry('media/index.json', mediaIndex),
     await fileEntry('reader/index.html', exportReaderHtml),
