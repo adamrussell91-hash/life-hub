@@ -76,7 +76,9 @@ html[data-hub="life"] .hub-card {
   align-items: center;
 }
 
-.hub-row {
+/* Accordion rows share this legacy class. Rail paint belongs to rail.css,
+   regardless of stylesheet order or a hub's canvas glass overlay. */
+.hub-row:not(:where(.hub-rail .hub-row)) {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;

@@ -48,7 +48,8 @@ describe('primary rail navigation', () => {
     expect(hubCss).toMatch(/\.hub-rail__section-panel\[data-open="true"\]/);
     expect(hubCss).toMatch(/align-self:\s*start;/);
     expect(hubCss).toMatch(/min-height:\s*100dvh;/);
-    expect(hubCss).toMatch(/\.hub-rail \.hub-row\s*\{/);
+    // Accordion paint comes from the shared kit, including hover/current states.
+    expect(hubCss).not.toMatch(/\.hub-rail \.hub-row\s*\{/);
     expect(cardsCss).toMatch(/\.hub-canvas \.hub-row\s*\{/);
     expect(cardsCss).not.toMatch(/(?:^|\n)\.hub-row\s*\{/);
     const host = document.createElement('div');
