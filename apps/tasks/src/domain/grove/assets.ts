@@ -48,3 +48,13 @@ export const SPECIES_LABEL: Record<GroveSpecies, string> = {
   other: 'Leafy · Other',
   late: 'Gnarled · finished late'
 };
+
+/** Phone key: the hub alone. */
+export const SPECIES_SHORT: Record<GroveSpecies, string> = {
+  life: 'Life',
+  teaching: 'Teaching',
+  health: 'Health',
+  wedding: 'Wedding',
+  other: 'Other',
+  late: 'Late'
+};
