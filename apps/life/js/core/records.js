@@ -5,6 +5,8 @@ const PATH = /^data\/(nutrition|fitness|mind|sleep|heart|skincare|fragrance|body
 
 export const TYPE_DOMAINS = {
   meal: 'nutrition',
+  creatine: 'nutrition',
+  creatine_plan: 'nutrition',
   workout: 'fitness',
   diary: 'mind',
   mind_session: 'mind',
@@ -35,7 +37,7 @@ function rawScalar(yaml, key) {
 function preserveTemporalScalars(record, yaml) {
   if (record === null || typeof record !== 'object' || Array.isArray(record)) return record;
   const preserved = { ...record };
-  for (const key of ['date', 'created_at', 'updated_at']) {
+  for (const key of ['date', 'created_at', 'updated_at', 'baseline_date']) {
     if (record[key] instanceof Date) preserved[key] = rawScalar(yaml, key);
   }
   return preserved;

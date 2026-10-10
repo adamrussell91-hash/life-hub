@@ -1,3 +1,4 @@
+import { candidateContainsCreatine } from '../../../apps/life/js/core/creatine-intake.js';
 import {
   forceLogNudgeFor,
   forceStatusFor,
@@ -17,6 +18,7 @@ function noteLogEntry(toolCall, seenTypes) {
   if (toolCall?.name !== 'log_entry') return false;
   const type = toolCall.input?.type;
   if (typeof type === 'string' && type) seenTypes.add(type);
+  if (candidateContainsCreatine(toolCall.input)) seenTypes.add('creatine_intake');
   return true;
 }
 
@@ -88,7 +90,7 @@ export async function* streamWithAgentLogForce(anthropic, {
 
     const nudge = missingBodyTypes.length
       ? saraBodyCoverageNudge(missingBodyTypes)
-      : forceLogNudgeFor(slug);
+      : forceLogNudgeFor(slug, userMessage);
 
     const forceMessages = [
       ...(streamOpts.messages ?? []),

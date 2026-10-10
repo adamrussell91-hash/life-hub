@@ -317,9 +317,10 @@ function harness(options = {}) {
       documentRoot.querySelector('#app-status').textContent = message;
     },
     buildNutritionModel: input => ({ date: input.date, source: input, kind: 'nutrition' }),
-    renderNutrition(documentRoot, model) {
+    renderNutrition(documentRoot, model, renderOptions) {
       calls.nutritionRenders = (calls.nutritionRenders ?? 0) + 1;
       calls.lastNutritionSource = model.source;
+      calls.lastNutritionOptions = renderOptions;
       documentRoot.querySelector('#nutrition-dashboard').hidden = false;
     },
     buildFitnessModel: input => ({ date: input.date, source: input, kind: 'fitness' }),
@@ -498,6 +499,23 @@ test('concurrent refreshes collapse and automatic refresh pauses while hidden', 
   state.root.visibilityState = 'hidden';
   state.clock.tick();
   assert.equal(state.calls.syncs, 1);
+});
+
+test('existing refresh clock quietly recomputes Nutrition while offline without adding a timer', async () => {
+  const state = harness({ hash: '#/nutrition', liveResult: liveData({ changed: false }) });
+  await state.controller.start();
+  const initialRenders = state.calls.nutritionRenders;
+  state.navigatorTarget.onLine = false;
+  const advanced = new Date(NOW.getTime() + 600_000);
+  state.setNow(advanced);
+  state.clock.tick();
+  assert.equal(state.calls.nutritionRenders, initialRenders + 1);
+  assert.equal(state.calls.lastNutritionSource.now.toISOString(), advanced.toISOString());
+  assert.equal(state.calls.lastNutritionOptions.quiet, true);
+  assert.equal(state.clock.activeIntervals, 1);
+  state.root.visibilityState = 'hidden';
+  state.clock.tick();
+  assert.equal(state.calls.nutritionRenders, initialRenders + 1);
 });
 
 test('known session expiry is scheduled at the exact deadline and invalidates the shell', async () => {
