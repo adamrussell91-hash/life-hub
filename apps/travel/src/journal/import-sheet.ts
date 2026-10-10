@@ -165,6 +165,7 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
       !files.length ||
       summary.inspecting > 0 ||
       summary.uploading > 0 ||
+      files.some((f) => importFileNeedsBlob(f, blobs)) ||
       (outcome !== 'in_progress' && summary.proposed === 0 && summary.partial === 0 && summary.failed === 0);
     if (summary.uploading > 0 || summary.partial > 0) {
       progress.hidden = false;
@@ -292,6 +293,7 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   }
 
   async function runUpload(): Promise<void> {
+    if (files.some((f) => importFileNeedsBlob(f, blobs))) return;
     const queue = new UploadQueue({
       concurrency: 2,
       upload: async (task) => {
