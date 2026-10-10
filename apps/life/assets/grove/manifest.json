@@ -2,7 +2,7 @@
   "version": 1,
   "generated_at": "2026-10-10T11:56:09.043Z",
   "budget_bytes": 26214400,
-  "total_bytes": 12190698,
+  "total_bytes": 12363782,
   "assets": [
     {
       "id": "tree-life-1-sapling",
@@ -498,7 +498,7 @@
       "stage": "sapling",
       "file": "models/trees/tree-health-1-sapling.glb",
       "preview": "previews/tree-health-1-sapling.png",
-      "bytes": 233344,
+      "bytes": 247940,
       "triangles": 6374,
       "height_m": 0.65,
       "animations": [],
@@ -515,7 +515,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant."
+      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Autumn-orange leaves hue-shifted to green for Grove."
     },
     {
       "id": "tree-health-1-young",
@@ -525,7 +525,7 @@
       "stage": "young",
       "file": "models/trees/tree-health-1-young.glb",
       "preview": "previews/tree-health-1-young.png",
-      "bytes": 233320,
+      "bytes": 247916,
       "triangles": 6374,
       "height_m": 2.4,
       "animations": [],
@@ -542,7 +542,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant."
+      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Autumn-orange leaves hue-shifted to green for Grove."
     },
     {
       "id": "tree-health-1-mature",
@@ -552,7 +552,7 @@
       "stage": "mature",
       "file": "models/trees/tree-health-1-mature.glb",
       "preview": "previews/tree-health-1-mature.png",
-      "bytes": 233328,
+      "bytes": 247924,
       "triangles": 6374,
       "height_m": 5.35,
       "animations": [],
@@ -569,7 +569,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct authored Birch mesh from Source edition."
+      "notes": "Distinct authored Birch mesh from Source edition. Autumn-orange leaves hue-shifted to green for Grove."
     },
     {
       "id": "tree-health-2-sapling",
@@ -579,7 +579,7 @@
       "stage": "sapling",
       "file": "models/trees/tree-health-2-sapling.glb",
       "preview": "previews/tree-health-2-sapling.png",
-      "bytes": 232444,
+      "bytes": 247240,
       "triangles": 6635,
       "height_m": 0.65,
       "animations": [],
@@ -596,7 +596,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant."
+      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Autumn-orange leaves hue-shifted to green for Grove."
     },
     {
       "id": "tree-health-2-young",
@@ -606,7 +606,7 @@
       "stage": "young",
       "file": "models/trees/tree-health-2-young.glb",
       "preview": "previews/tree-health-2-young.png",
-      "bytes": 232452,
+      "bytes": 247248,
       "triangles": 6635,
       "height_m": 2.4,
       "animations": [],
@@ -623,7 +623,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant."
+      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Autumn-orange leaves hue-shifted to green for Grove."
     },
     {
       "id": "tree-health-2-mature",
@@ -633,7 +633,7 @@
       "stage": "mature",
       "file": "models/trees/tree-health-2-mature.glb",
       "preview": "previews/tree-health-2-mature.png",
-      "bytes": 232440,
+      "bytes": 247236,
       "triangles": 6635,
       "height_m": 5.7,
       "animations": [],
@@ -650,7 +650,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct authored Birch mesh from Source edition."
+      "notes": "Distinct authored Birch mesh from Source edition. Autumn-orange leaves hue-shifted to green for Grove."
     },
     {
       "id": "tree-health-3-sapling",
@@ -660,7 +660,7 @@
       "stage": "sapling",
       "file": "models/trees/tree-health-3-sapling.glb",
       "preview": "previews/tree-health-3-sapling.png",
-      "bytes": 227252,
+      "bytes": 240624,
       "triangles": 5807,
       "height_m": 0.65,
       "animations": [],
@@ -677,7 +677,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant."
+      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Autumn-orange leaves hue-shifted to green for Grove."
     },
     {
       "id": "tree-health-3-young",
@@ -687,7 +687,7 @@
       "stage": "young",
       "file": "models/trees/tree-health-3-young.glb",
       "preview": "previews/tree-health-3-young.png",
-      "bytes": 227260,
+      "bytes": 240632,
       "triangles": 5807,
       "height_m": 2.4,
       "animations": [],
@@ -704,7 +704,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant."
+      "notes": "Distinct authored Birch mesh from Source edition. Pack has no dedicated sapling/young mesh; this size stage scales its source variant. Autumn-orange leaves hue-shifted to green for Grove."
     },
     {
       "id": "tree-health-3-mature",
@@ -714,7 +714,7 @@
       "stage": "mature",
       "file": "models/trees/tree-health-3-mature.glb",
       "preview": "previews/tree-health-3-mature.png",
-      "bytes": 227252,
+      "bytes": 240624,
       "triangles": 5807,
       "height_m": 6.05,
       "animations": [],
@@ -731,7 +731,7 @@
         "url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "attribution": null
       },
-      "notes": "Distinct authored Birch mesh from Source edition."
+      "notes": "Distinct authored Birch mesh from Source edition. Autumn-orange leaves hue-shifted to green for Grove."
     },
     {
       "id": "tree-wedding-1-sapling",
@@ -1704,6 +1704,114 @@
         "attribution": null
       },
       "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
+    },
+    {
+      "id": "reed-1",
+      "slot": "reed",
+      "kind": "ground",
+      "variant": 1,
+      "stage": null,
+      "file": "models/ground/reed-1.glb",
+      "preview": "previews/reed-1.png",
+      "bytes": 2248,
+      "triangles": 44,
+      "height_m": 0.85,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Nature Kit",
+        "author": "Kenney",
+        "page_url": "https://kenney.nl/assets/nature-kit",
+        "original_file": "plant_flatShort.glb",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Kenney waterside plant kept for Grove water edges; teal city palette recoloured to Grove greens. No cattail seed head."
+    },
+    {
+      "id": "reed-2",
+      "slot": "reed",
+      "kind": "ground",
+      "variant": 2,
+      "stage": null,
+      "file": "models/ground/reed-2.glb",
+      "preview": "previews/reed-2.png",
+      "bytes": 2180,
+      "triangles": 32,
+      "height_m": 1.1,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Nature Kit",
+        "author": "Kenney",
+        "page_url": "https://kenney.nl/assets/nature-kit",
+        "original_file": "plant_flatTall.glb",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Kenney waterside plant kept for Grove water edges; teal city palette recoloured to Grove greens. No cattail seed head."
+    },
+    {
+      "id": "lily-1",
+      "slot": "lily",
+      "kind": "ground",
+      "variant": 1,
+      "stage": null,
+      "file": "models/ground/lily-1.glb",
+      "preview": "previews/lily-1.png",
+      "bytes": 3668,
+      "triangles": 52,
+      "height_m": 0.04,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Nature Kit",
+        "author": "Kenney",
+        "page_url": "https://kenney.nl/assets/nature-kit",
+        "original_file": "lily_small.glb",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Kenney lily pad kept for Grove lakes; teal city palette recoloured to Grove greens."
+    },
+    {
+      "id": "lily-2",
+      "slot": "lily",
+      "kind": "ground",
+      "variant": 2,
+      "stage": null,
+      "file": "models/ground/lily-2.glb",
+      "preview": "previews/lily-2.png",
+      "bytes": 5004,
+      "triangles": 86,
+      "height_m": 0.04,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Nature Kit",
+        "author": "Kenney",
+        "page_url": "https://kenney.nl/assets/nature-kit",
+        "original_file": "lily_large.glb",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Kenney lily pad kept for Grove lakes; teal city palette recoloured to Grove greens."
     },
     {
       "id": "bridge-1",

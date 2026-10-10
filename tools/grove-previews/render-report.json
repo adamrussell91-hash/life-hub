@@ -339,7 +339,7 @@
       ]
     },
     "animations": [],
-    "sha256": "af9517223fba1c8cf0b75fac27686ddcd45673a3e3ad6c520c1bef43d0384617"
+    "sha256": "27b8f2bbe209bd3f42cd6c42ab76d06abcc54cf2941f364dde9255050edcd160"
   },
   {
     "file": "models/trees/tree-health-1-young.glb",
@@ -357,7 +357,7 @@
       ]
     },
     "animations": [],
-    "sha256": "130681f617edb4f729f933e81f45f0148c127e8c68796009ada1d362b549a20c"
+    "sha256": "0bad43693a24786e2261ffaadc46a2b4322ad4b0c39bd2b24035735ef61e3ed8"
   },
   {
     "file": "models/trees/tree-health-1-mature.glb",
@@ -375,7 +375,7 @@
       ]
     },
     "animations": [],
-    "sha256": "5c0b1a9f115a484c6c7e227d84f0b48d322bd3323ce68a1396b234352ef3adfc"
+    "sha256": "af1c01afc6836798b17804c3898162aab66edfe8624cf03542804f7e307f5542"
   },
   {
     "file": "models/trees/tree-health-2-sapling.glb",
@@ -393,7 +393,7 @@
       ]
     },
     "animations": [],
-    "sha256": "8d91460b1bd9a65df23ff3f033a55f04f3650d93c2c359562d7dec16692907ae"
+    "sha256": "b3c0daff93fa2d3c20fa420672ca459d9edd71440feb8201736ae6ad08cf35f0"
   },
   {
     "file": "models/trees/tree-health-2-young.glb",
@@ -411,7 +411,7 @@
       ]
     },
     "animations": [],
-    "sha256": "2fa5b4913cad8bf06a8eeb44c891538d533514fc4a990f880dad8f41dfb80900"
+    "sha256": "f49f88581e0026255faf4de38f112908c08b5385cd87c39bed630451e7eafbb6"
   },
   {
     "file": "models/trees/tree-health-2-mature.glb",
@@ -429,7 +429,7 @@
       ]
     },
     "animations": [],
-    "sha256": "65ec76322b99db59570c944c813c2d60493a7d5ecf5d871619d5e9b65dfb1cd6"
+    "sha256": "a3222c7dafa27489b858746639fff83599f9cdbbcbe6f6af558cdce7746b7396"
   },
   {
     "file": "models/trees/tree-health-3-sapling.glb",
@@ -447,7 +447,7 @@
       ]
     },
     "animations": [],
-    "sha256": "7aa274d317405b13923d7f509404dfb7d9b578d6b39525f9705b47551c5c983b"
+    "sha256": "b1d145aacc909566ecb693014764ef128d3f4eeff30283b4295da7bc20724387"
   },
   {
     "file": "models/trees/tree-health-3-young.glb",
@@ -465,7 +465,7 @@
       ]
     },
     "animations": [],
-    "sha256": "867dcd91f20cbc5cbcb379ac92040a5f4007d77465871a0e3accfba73df4de9b"
+    "sha256": "8e18d0227d6268e2246d4101a4b648c4fc5804e638de588429090d0acaf36719"
   },
   {
     "file": "models/trees/tree-health-3-mature.glb",
@@ -483,7 +483,7 @@
       ]
     },
     "animations": [],
-    "sha256": "c99ffaeb0e81b6626da2712759e05551fbaea7a9e5b8bf2a5e58217f9a2310e8"
+    "sha256": "146f30e4da25d311079d1461d62d505ceea304aa55af697bc5e398bdacf51312"
   },
   {
     "file": "models/trees/tree-wedding-1-sapling.glb",
@@ -1132,6 +1132,78 @@
     },
     "animations": [],
     "sha256": "e63dea61f1802bdf80fb65195f43e8dd40b03da844c56ce22e5bf410be511661"
+  },
+  {
+    "file": "models/ground/reed-1.glb",
+    "height_m": 0.8500300179861701,
+    "bounds": {
+      "min": [
+        -0.5019089198715687,
+        -0.000015008993085041666,
+        -0.5019089198715687
+      ],
+      "max": [
+        0.5019089198715687,
+        0.850015008993085,
+        0.5019089198715687
+      ]
+    },
+    "animations": [],
+    "sha256": "9fbde899cd35b3e5718f68091c163d0e21f8f0b5dd676faa2c72a2c99ae44c89"
+  },
+  {
+    "file": "models/ground/reed-2.glb",
+    "height_m": 1.1,
+    "bounds": {
+      "min": [
+        -0.5254936368907743,
+        0,
+        -0.5254936368907743
+      ],
+      "max": [
+        0.5254936368907743,
+        1.1,
+        0.5254936368907743
+      ]
+    },
+    "animations": [],
+    "sha256": "d87da650087d1f55fb43129c24fe7c9509cc0f8b49fd799ede4c1d8ef577c4eb"
+  },
+  {
+    "file": "models/ground/lily-1.glb",
+    "height_m": 0.0399980458530169,
+    "bounds": {
+      "min": [
+        -0.09440323879430862,
+        9.777440438223095e-7,
+        -0.10899999737739563
+      ],
+      "max": [
+        0.09440323879430862,
+        0.03999902359706073,
+        0.10899999737739563
+      ]
+    },
+    "animations": [],
+    "sha256": "db19b4ba40bc370d2afed449c150383cfe06317abb2f9f2436abeeed2d7f82ca"
+  },
+  {
+    "file": "models/ground/lily-2.glb",
+    "height_m": 0.03999902813337141,
+    "bounds": {
+      "min": [
+        -0.05548599175857597,
+        4.859333142953615e-7,
+        -0.06406531209532608
+      ],
+      "max": [
+        0.05548599175857597,
+        0.039999514066685705,
+        0.06406531209532608
+      ]
+    },
+    "animations": [],
+    "sha256": "c941ec389f543bb523e5690c0ebb61f16c5027f47da5ff1da979aa85cd8dd57a"
   },
   {
     "file": "models/ground/bridge-1.glb",

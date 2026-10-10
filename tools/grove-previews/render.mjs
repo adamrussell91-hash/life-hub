@@ -60,7 +60,7 @@ const server=http.createServer(async(req,res)=>{
  }catch{res.statusCode=404;res.end();}
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-const browser=await chromium.launch({headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const browser=await chromium.launch({headless:true,...(process.env.GROVE_CHROMIUM?{executablePath:process.env.GROVE_CHROMIUM}:{}),args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 try{
  const page=await browser.newPage({viewport:{width:512,height:512},deviceScaleFactor:1});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
