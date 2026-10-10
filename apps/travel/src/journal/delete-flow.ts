@@ -8,6 +8,11 @@ import type {
 } from '@/journal/types';
 import { offerTimedUndo } from '../../design-kit/js/hub-feedback.js';
 import { persistJournalPatch } from '@/journal/journal-sheet-save';
+import {
+  applySouvenirDeleteForMoment,
+  applySouvenirRestoreForMoment,
+  countLiveSouvenirsForMoment,
+} from '@/journal/souvenirs';
 
 export const JOURNAL_UNDO_MS = 10_000;
 
@@ -19,6 +24,7 @@ export interface DeleteImpact {
   days: number;
   legs: number;
   transitions: number;
+  souvenirs: number;
 }
 
 export interface DeleteTarget {
@@ -83,6 +89,7 @@ export function deleteImpactSummary(
     days: 0,
     legs: 0,
     transitions: 0,
+    souvenirs: 0,
   };
   if (target.kind === 'moment') {
     const moment = journal.moments.find((m) => m.id === target.id && m.lifecycle === 'live');
@@ -91,6 +98,7 @@ export function deleteImpactSummary(
       ...empty,
       moments: 1,
       media: moment.media_ids.length,
+      souvenirs: countLiveSouvenirsForMoment(journal, moment.id),
     };
   }
   if (target.kind === 'day') {
@@ -140,7 +148,11 @@ export function deleteImpactSummary(
 
 export function impactConfirmCopy(target: DeleteTarget, impact: DeleteImpact): string {
   if (target.kind === 'moment') {
-    return 'Delete this moment? You can undo for 10 seconds or restore it from Trash.';
+    const souvenirLine =
+      impact.souvenirs > 0
+        ? ` ${impact.souvenirs} linked souvenir${impact.souvenirs === 1 ? '' : 's'} leave your collection until you restore this moment.`
+        : '';
+    return `Delete this moment? You can undo for 10 seconds or restore it from Trash.${souvenirLine}`;
   }
   if (target.kind === 'day') {
     return `Delete this day from your journal? This removes ${impact.moments} moment${
@@ -177,7 +189,7 @@ export function applySoftDelete(
         media = media.map((row) => (row.id === mediaId ? patched : row));
       }
     }
-    next = { ...next, moments, media };
+    next = applySouvenirDeleteForMoment({ ...next, moments, media }, moment);
     return bumpRevision(next);
   }
 
@@ -200,6 +212,9 @@ export function applySoftDelete(
     }
     const days = next.days.map((d) => (d.id === target.id ? markDeleted(d) : d));
     next = { ...next, moments, media, days };
+    for (const m of momentsOnDay) {
+      next = applySouvenirDeleteForMoment(next, m);
+    }
     return bumpRevision(next);
   }
 
@@ -207,11 +222,12 @@ export function applySoftDelete(
     const leg = next.legs.find((l) => l.id === target.id && l.lifecycle === 'live');
     if (!leg) return journal;
     const cascade = leg.id;
+    const momentsOnLeg = next.moments.filter((m) => m.lifecycle === 'live' && m.leg_id === leg.id);
     const moments = next.moments.map((m) =>
       m.lifecycle === 'live' && m.leg_id === leg.id ? markDeleted(m, cascade) : m,
     );
     let media = next.media;
-    for (const m of next.moments.filter((row) => row.leg_id === leg.id && row.lifecycle === 'live')) {
+    for (const m of momentsOnLeg) {
       for (const id of m.media_ids) {
         const patched = softDeleteMediaIfOrphan({ ...next, moments }, id, cascade);
         if (patched) media = media.map((row) => (row.id === id ? patched : row));
@@ -228,11 +244,15 @@ export function applySoftDelete(
     const legs = next.legs.map((l) => (l.id === target.id ? markDeleted(l) : l));
     const leg_ids = next.leg_ids.filter((id) => id !== target.id);
     next = { ...next, moments, media, days, transitions, legs, leg_ids };
+    for (const m of momentsOnLeg) {
+      next = applySouvenirDeleteForMoment(next, m);
+    }
     return bumpRevision(next);
   }
 
   if (target.kind === 'trip') {
     const cascade = next.id;
+    const liveMoments = next.moments.filter((m) => m.lifecycle === 'live');
     next = {
       ...next,
       lifecycle: 'deleted',
@@ -246,6 +266,9 @@ export function applySoftDelete(
       ),
       leg_ids: [],
     };
+    for (const m of liveMoments) {
+      next = applySouvenirDeleteForMoment(next, m);
+    }
     return bumpRevision(next);
   }
 
@@ -284,16 +307,24 @@ export function applyRestore(
         media = media.map((m) => (m.id === mediaId ? reviveRow(m) : m));
       }
     }
-    return bumpRevision({ ...journal, moments, media });
+    const withSouvenirs = applySouvenirRestoreForMoment({ ...journal, moments, media }, target.id);
+    return bumpRevision(withSouvenirs);
   }
 
   if (target.kind === 'day') {
     const day = journal.days.find((d) => d.id === target.id);
     if (!day || day.lifecycle === 'live') return journal;
+    const cascadeMomentIds = journal.moments
+      .filter((m) => m.lifecycle === 'deleted' && m.deleted_with === target.id)
+      .map((m) => m.id);
     const days = journal.days.map((d) => (d.id === target.id ? reviveRow(d) : d));
     const moments = journal.moments.map((m) => reviveCascade(m, target.id));
     let media = journal.media.map((m) => reviveCascade(m, target.id));
-    return bumpRevision({ ...journal, days, moments, media });
+    let next: JournalDocument = { ...journal, days, moments, media };
+    for (const momentId of cascadeMomentIds) {
+      next = applySouvenirRestoreForMoment(next, momentId);
+    }
+    return bumpRevision(next);
   }
 
   if (target.kind === 'leg') {
@@ -308,19 +339,29 @@ export function applyRestore(
           (legs.find((l) => l.id === a)?.order ?? 0) - (legs.find((l) => l.id === b)?.order ?? 0),
       );
     }
+    const cascadeMomentIds = journal.moments
+      .filter((m) => m.lifecycle === 'deleted' && m.deleted_with === target.id)
+      .map((m) => m.id);
     const days = journal.days.map((d) => reviveCascade(d, target.id));
     const moments = journal.moments.map((m) => reviveCascade(m, target.id));
     const transitions = journal.transitions.map((t) => reviveCascade(t, target.id));
     const media = journal.media.map((m) => reviveCascade(m, target.id));
-    return bumpRevision({ ...journal, legs, leg_ids, days, moments, transitions, media });
+    let next: JournalDocument = { ...journal, legs, leg_ids, days, moments, transitions, media };
+    for (const momentId of cascadeMomentIds) {
+      next = applySouvenirRestoreForMoment(next, momentId);
+    }
+    return bumpRevision(next);
   }
 
   if (target.kind === 'trip') {
     if (journal.lifecycle === 'live') return journal;
     const cascade = journal.id;
+    const cascadeMomentIds = journal.moments
+      .filter((m) => m.lifecycle === 'deleted' && m.deleted_with === cascade)
+      .map((m) => m.id);
     const legs = journal.legs.map((l) => reviveCascade(l, cascade));
     const leg_ids = legs.filter((l) => l.lifecycle === 'live').map((l) => l.id);
-    return bumpRevision({
+    let next: JournalDocument = {
       ...journal,
       lifecycle: 'live',
       legs,
@@ -329,7 +370,11 @@ export function applyRestore(
       moments: journal.moments.map((m) => reviveCascade(m, cascade)),
       media: journal.media.map((m) => reviveCascade(m, cascade)),
       transitions: journal.transitions.map((t) => reviveCascade(t, cascade)),
-    });
+    };
+    for (const momentId of cascadeMomentIds) {
+      next = applySouvenirRestoreForMoment(next, momentId);
+    }
+    return bumpRevision(next);
   }
 
   return journal;

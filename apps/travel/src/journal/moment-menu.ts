@@ -3,6 +3,7 @@ import type { JournalFixture, JournalMoment } from '@/journal/types';
 export type MomentMenuAction =
   | 'edit'
   | 'annotate'
+  | 'souvenir'
   | 'reorder'
   | 'split'
   | 'merge'
@@ -51,6 +52,14 @@ export function buildMomentMenuItems(
         : mediaCount < 1
           ? 'Add photos to annotate'
           : 'Add region notes on photos (stored separately from originals)',
+    },
+    {
+      action: 'souvenir',
+      label: 'Add souvenir',
+      disabled: !live,
+      title: live
+        ? 'Save a keepsake linked to this moment'
+        : 'Deleted moments cannot add souvenirs',
     },
     {
       action: 'reorder',

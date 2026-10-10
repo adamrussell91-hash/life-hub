@@ -10,6 +10,7 @@ import { openReorderSheet } from '@/journal/reorder-sheet';
 import { openSplitSheet } from '@/journal/split-sheet';
 import { openDeleteConfirmSheet } from '@/journal/delete-confirm-sheet';
 import { openPhotoAnnotationSheet } from '@/journal/annotation-sheet';
+import { openAddSouvenirSheet } from '@/journal/souvenirs-sheet';
 import {
   getMediaPhotoAnnotations,
   momentHasPhotoAnnotations,
@@ -133,6 +134,18 @@ function handleMenuAction(
       );
       break;
     }
+    case 'souvenir':
+      setSheetOverlay(
+        openAddSouvenirSheet({
+          tripId: ctx.tripId,
+          journal: ctx.journal,
+          version: ctx.version,
+          moment,
+          anchor: ctx.anchor,
+          onSaved: (envelope) => ctx.onJournalSaved?.(envelope),
+        }),
+      );
+      break;
     case 'reorder':
       setSheetOverlay(openReorderSheet(base));
       break;

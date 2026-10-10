@@ -1323,3 +1323,59 @@ html.vv-keyboard-open .sheet.addform.journal-move-sheet {
 html.vv-keyboard-open .sheet.addform.journal-annotation-sheet {
   max-height: min(100dvh, var(--vv-height, 100dvh));
 }
+
+.journal-souvenirs__title {
+  font-size: var(--text-md);
+  margin: 0;
+}
+
+.journal-souvenirs__rule {
+  margin: var(--space-2) var(--space-4) 0;
+}
+
+.journal-souvenirs__add {
+  margin: var(--space-3) var(--space-4);
+}
+
+.journal-souvenirs__list {
+  margin: 0 var(--space-4) var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.journal-souvenirs__item {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.journal-souvenirs__row {
+  flex: 1;
+  text-align: left;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line-subtle);
+  background: var(--surface-raised);
+  min-height: 44px;
+}
+
+.journal-souvenirs__row-title {
+  display: block;
+  font-weight: 600;
+}
+
+.journal-souvenirs__row-meta {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.journal-souvenirs__remove {
+  align-self: center;
+  min-height: 44px;
+}
+
+html.vv-keyboard-open .sheet.addform.journal-souvenir-sheet {
+  max-height: min(100dvh, var(--vv-height, 100dvh));
+}

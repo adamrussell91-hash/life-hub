@@ -24,6 +24,7 @@ describe('buildMomentMenuItems', () => {
     expect(items.map((i) => i.action)).toEqual([
       'edit',
       'annotate',
+      'souvenir',
       'reorder',
       'split',
       'merge',

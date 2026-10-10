@@ -18,6 +18,7 @@ import { createDayMapPreview } from '@/journal/map-preview';
 import { getActiveJournalDayMap } from '@/journal/map-expanded';
 import { openTrashView } from '@/journal/trash-view';
 import { openJournalSearch } from '@/journal/search-sheet';
+import { openSouvenirsCollection } from '@/journal/souvenirs-sheet';
 import { openJournalShareSheet } from '@/journal/share-sheet';
 import { downloadJournalExportBundle, stripJournalForExport } from '@/journal/export-bundle';
 import {
@@ -154,6 +155,7 @@ export function renderJournal(
   let dayMapOverlay: { destroy(): void } | null = null;
   let trashOverlay: { destroy(): void } | null = null;
   let searchOverlay: { destroy(): void } | null = null;
+  let souvenirsOverlay: { destroy(): void } | null = null;
   let shareOverlay: { destroy(): void } | null = null;
 
   let liveFixture: JournalFixture = opts.fixture;
@@ -240,6 +242,23 @@ export function renderJournal(
         },
       });
       cleanups.push(() => searchOverlay?.destroy());
+    },
+    onSouvenirs: () => {
+      souvenirsOverlay?.destroy();
+      souvenirsOverlay = openSouvenirsCollection({
+        tripId: liveFixture.trip_id,
+        journal: journalDoc(),
+        version: liveVersion,
+        anchor: root,
+        onSaved: onJournalSaved,
+        onJumpToMoment: (id) => {
+          scrollToChapter(id, root, opts.onChapterJump);
+        },
+        onClose: () => {
+          souvenirsOverlay = null;
+        },
+      });
+      cleanups.push(() => souvenirsOverlay?.destroy());
     },
     onExportJournal: () => {
       void downloadJournalExportBundle(stripJournalForExport(journalDoc()));
