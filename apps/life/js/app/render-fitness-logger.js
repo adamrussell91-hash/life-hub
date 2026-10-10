@@ -1296,11 +1296,13 @@ export function renderFitnessLogger(root, draft, {
       data: { fitnessLogger: 'celebration', kind: celebration.kind },
       attrs: { role: 'status', 'aria-live': 'assertive' }
     });
+    // Only a PR earns the big art card. A matched ghost is a slim strip so it
+    // doesn't shove the next set card down the screen.
     const hero = draft.exercises?.[celebration.exerciseIndex];
     const momentArt = celebration.kind === 'pr'
       ? (regionArt(exerciseRegion(hero, draft)) ?? exerciseArt(hero))
-      : exerciseArt(hero);
-    const image = anatomyImage(root, momentArt, 'gym-art gym-moment__art');
+      : null;
+    const image = momentArt ? anatomyImage(root, momentArt, 'gym-art gym-moment__art') : null;
     if (image) {
       moment.className += ' gym-moment--art';
       moment.append(image);

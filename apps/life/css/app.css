@@ -3564,7 +3564,19 @@ body.is-gym-mode { overflow: hidden; }
   background: linear-gradient(135deg, var(--high-sea), color-mix(in srgb, var(--high-sea) 60%, var(--pastel-gold)));
   color: var(--depth);
 }
-.gym-moment--matched { background: var(--marine); color: var(--on-dark); }
+.gym-moment--matched {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.2rem 0.5rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.8rem;
+  background: var(--marine);
+  color: var(--on-dark);
+}
+.gym-moment--matched .gym-moment__title { font-size: var(--text-sm); letter-spacing: 0.04em; }
+.gym-moment--matched .gym-moment__detail { color: var(--on-dark-muted); font-weight: 500; }
 .gym-moment__title {
   margin: 0;
   font-size: var(--text-lg);
