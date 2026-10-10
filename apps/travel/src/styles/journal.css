@@ -851,6 +851,15 @@
   color: var(--muted);
 }
 
+.journal-offline-status {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--paper) 92%, var(--ink) 8%);
+  border-radius: var(--radius-md);
+}
+
 .journal-capture__discard {
   margin: var(--space-2) 0;
 }

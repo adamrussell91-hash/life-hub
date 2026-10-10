@@ -11,7 +11,8 @@ import { isJournalStoryEmpty, resolveCaptureContext } from '@/journal/capture-co
 import { openCaptureSheet } from '@/journal/capture-sheet';
 import { openImportSheet } from '@/journal/import-sheet';
 import { renderToolbar } from '@/journal/render-toolbar';
-import type { JournalDocument } from '@/api/journal';
+import type { JournalDocument, JournalEnvelope } from '@/api/journal';
+import { mountJournalOfflineStatus } from '@/journal/offline-status';
 import { renderMomentArticle } from '@/journal/render-moment';
 import { createDayMapPreview } from '@/journal/map-preview';
 import { getActiveJournalDayMap } from '@/journal/map-expanded';
@@ -130,10 +131,16 @@ function persistLastView(tripId: string, momentId: string): void {
   }
 }
 
+export interface JournalViewHandle {
+  destroy(): void;
+  /** Merge server journal without remounting sheets or resetting scroll. */
+  reconcile(envelope: JournalEnvelope): void;
+}
+
 export function renderJournal(
   canvas: HTMLElement,
   opts: RenderJournalOptions,
-): { destroy(): void } {
+): JournalViewHandle {
   canvas.replaceChildren();
   const cleanups: Array<() => void> = [];
 
@@ -551,6 +558,7 @@ export function renderJournal(
 
   timeline.append(story);
   root.append(toolbar, timeline);
+  cleanups.push(mountJournalOfflineStatus(root));
   canvas.append(root);
 
   cleanups.push(() => {
@@ -591,12 +599,29 @@ export function renderJournal(
     detachPrefetch?.();
   });
 
+  function reconcile(envelope: JournalEnvelope): void {
+    const view = root.ownerDocument?.defaultView;
+    const anchor = resolveEntranceTarget(root);
+    const anchorTop = anchor?.getBoundingClientRect().top;
+    liveFixture = envelope.journal;
+    liveVersion = envelope.version;
+    rebuildStory(false);
+    if (anchor && anchorTop !== undefined && view) {
+      requestAnimationFrame(() => {
+        const delta = anchor.getBoundingClientRect().top - anchorTop;
+        if (Math.abs(delta) > 0.5) view.scrollBy(0, delta);
+      });
+    }
+  }
+
   return {
+    reconcile,
     destroy() {
       for (const fn of cleanups) fn();
       chapterOverlay?.destroy();
       importOverlay?.destroy();
       captureOverlay?.destroy();
+      captureOverlay = null;
       canvas.replaceChildren();
     },
   };

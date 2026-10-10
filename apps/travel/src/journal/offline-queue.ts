@@ -55,14 +55,36 @@ interface JournalOpsStore {
 
 let storeOverride: JournalOpsStore | null = null;
 let cachedPendingCount = 0;
+const pendingCountListeners = new Set<(count: number) => void>();
 
 export function __setJournalOpsStoreForTests(store: JournalOpsStore | null): void {
   storeOverride = store;
   cachedPendingCount = 0;
+  notifyPendingCountListeners();
+}
+
+function notifyPendingCountListeners(): void {
+  for (const listener of pendingCountListeners) listener(cachedPendingCount);
+}
+
+/** Subscribe to pending journal op count (includes initial read). */
+export function subscribeJournalPendingCount(listener: (count: number) => void): () => void {
+  pendingCountListeners.add(listener);
+  listener(cachedPendingCount);
+  void refreshPendingCount().catch(() => {
+    cachedPendingCount = 0;
+    notifyPendingCountListeners();
+  });
+  return () => pendingCountListeners.delete(listener);
 }
 
 async function refreshPendingCount(): Promise<number> {
-  cachedPendingCount = await countPendingJournalOps();
+  try {
+    cachedPendingCount = await countPendingJournalOps();
+  } catch {
+    cachedPendingCount = 0;
+  }
+  notifyPendingCountListeners();
   return cachedPendingCount;
 }
 
@@ -162,8 +184,12 @@ export async function listJournalOps(): Promise<JournalQueuedOp[]> {
 }
 
 export async function countPendingJournalOps(): Promise<number> {
-  const rows = await listJournalOps();
-  return rows.filter(isJournalOpPending).length;
+  try {
+    const rows = await listJournalOps();
+    return rows.filter(isJournalOpPending).length;
+  } catch {
+    return 0;
+  }
 }
 
 function downloadPendingOpsJson(ops: JournalQueuedOp[]): void {

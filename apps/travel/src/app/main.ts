@@ -23,7 +23,7 @@ import { journalPatternOff, parseRoute } from '@/app/router';
 import { ensureJournal } from '@/api/journal';
 import { klIstanbulFixture } from '@/journal/fixtures/kl-istanbul';
 import type { JournalFixture } from '@/journal/types';
-import { renderJournal } from '@/journal/render-journal';
+import { renderJournal, type JournalViewHandle } from '@/journal/render-journal';
 import { renderTripsList } from '@/views/trips-list';
 import { renderTripPage } from '@/views/trip-page';
 import { renderTodayView } from '@/views/today';
@@ -78,7 +78,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
       await logout();
       await boot(root);
     },
-    onRefresh: () => void paint(),
+    onRefresh: () => void paint({ refresh: true }),
     onAdd: () => {
       if (!location.hash.startsWith('#/trip/')) location.hash = '#/';
     }
@@ -87,9 +87,9 @@ async function bootApp(root: HTMLElement): Promise<void> {
 
   let routeGeneration = 0;
   let currentTripId: string | null = null;
-  let journalHandle: { destroy(): void } | null = null;
+  let journalHandle: JournalViewHandle | null = null;
 
-  async function paint(): Promise<void> {
+  async function paint(options?: { refresh?: boolean }): Promise<void> {
     const route = parseRoute();
     const generation = ++routeGeneration;
 
@@ -99,6 +99,19 @@ async function bootApp(root: HTMLElement): Promise<void> {
     }
 
     try {
+      if (
+        options?.refresh &&
+        route.name === 'journal' &&
+        journalHandle &&
+        !journalUseFixture()
+      ) {
+        renderHighlight('trip');
+        renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: '' });
+        const envelope = await ensureJournal(route.tripId);
+        if (generation !== routeGeneration) return;
+        journalHandle.reconcile(envelope);
+        return;
+      }
       if (route.name === 'trips') {
         // Always show the list at #/ so New trip stays reachable with one holiday.
         // Bare /travel/ (empty hash) opens the primary trip in bootApp instead.
