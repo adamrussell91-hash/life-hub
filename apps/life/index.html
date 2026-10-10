@@ -382,82 +382,84 @@
             </div>
           </section>
 
-          <section class="hub-pulse" aria-labelledby="hubs-heading">
+          <section class="now-panel" id="home-now" aria-labelledby="now-heading">
             <div class="section-heading">
               <div>
-                <p class="section-kicker">Hubs</p>
-                <h2 id="hubs-heading">Open a hub</h2>
+                <p class="section-kicker">Across the hubs</p>
+                <h2 id="now-heading">Now</h2>
               </div>
+              <p class="now-panel__hint">Press <kbd>/</kbd> to capture</p>
             </div>
-            <div class="hub-pulse-grid">
 
-              <article class="metric-card hub-pulse-card" data-hub-pulse="teaching">
-                <header class="hub-pulse-card__header">
-                  <a class="hub-pulse-card__link" href="/teaching/">
-                    <p class="metric-label">Teaching</p>
-                  </a>
-                  <button class="hub-pulse-card__toggle" type="button" data-hub-pulse-toggle aria-expanded="false" aria-controls="hub-pulse-body-teaching" aria-label="Expand today's lessons">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-                  </button>
-                </header>
-                <p class="metric-context">Today's lessons</p>
-                <p class="hub-pulse-card__glance" data-hub-glance>Checking…</p>
-                <p class="metric-caption" data-hub-status hidden></p>
-                <div class="hub-pulse-card__body" id="hub-pulse-body-teaching" hidden>
-                  <div class="hub-agenda" data-teaching-agenda></div>
-                  <a class="hub-pulse-card__more" href="/teaching/">Open full timetable →</a>
+            <form class="now-capture" data-now-capture autocomplete="off" novalidate>
+              <div class="now-capture__row">
+                <div class="now-capture__modes" role="radiogroup" aria-label="What are you adding?" data-now-modes>
+                  <button type="button" class="now-capture__mode" role="radio" aria-checked="true" data-now-mode="task">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>Task</button>
+                  <button type="button" class="now-capture__mode" role="radio" aria-checked="false" tabindex="-1" data-now-mode="note">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"/><path d="M9 12h6M9 16h4"/></svg>Note</button>
+                  <button type="button" class="now-capture__mode" role="radio" aria-checked="false" tabindex="-1" data-now-mode="book">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/></svg>Book</button>
+                </div>
+                <label class="now-capture__field" for="now-capture-input">
+                  <span class="sr-only">Capture</span>
+                  <input id="now-capture-input" type="text" data-now-input placeholder="Add a task…" maxlength="500">
+                </label>
+                <button class="now-capture__go" type="submit" data-now-submit disabled>Add</button>
+              </div>
+              <div class="now-capture__options" data-now-options></div>
+              <div class="now-capture__toast" data-now-toast role="status" aria-live="polite" hidden></div>
+            </form>
+
+            <div class="now-panel__duo">
+              <article class="metric-card now-day" aria-labelledby="now-day-heading">
+                <div class="now-card__head">
+                  <h3 id="now-day-heading"><a href="#/calendar" class="now-card__title">Shape of the day</a></h3>
+                  <div class="hub-pills now-day__tabs" role="tablist" aria-label="Which day" data-now-day-tabs hidden>
+                    <button type="button" class="hub-pills__btn" role="tab" aria-selected="true" data-now-day="today">Today</button>
+                    <button type="button" class="hub-pills__btn" role="tab" aria-selected="false" tabindex="-1" data-now-day="next"></button>
+                  </div>
+                </div>
+                <p class="now-day__headline" data-now-day-headline>Checking your day…</p>
+                <p class="now-day__sub" data-now-day-sub></p>
+                <div class="now-day__track" data-now-track aria-label="Day timeline"></div>
+                <div class="now-day__legend" aria-hidden="true">
+                  <span><i class="now-tone now-tone--lesson"></i>Lesson</span>
+                  <span><i class="now-tone now-tone--school"></i>School</span>
+                  <span><i class="now-tone now-tone--calendar"></i>Calendar</span>
+                  <span><i class="now-tone now-tone--work"></i>Work block</span>
+                  <span><i class="now-tone now-tone--due"></i>Task due</span>
+                </div>
+                <a class="now-next" href="/teaching/" data-now-next hidden>
+                  <span class="now-next__when" data-now-next-when></span>
+                  <span class="now-next__what"><b data-now-next-class></b><span data-now-next-lesson></span></span>
+                  <span class="now-next__go">Open timetable →</span>
+                </a>
+              </article>
+
+              <article class="metric-card now-tasks" aria-labelledby="now-tasks-heading">
+                <div class="now-card__head">
+                  <h3 id="now-tasks-heading"><a href="/tasks/" class="now-card__title">Tasks</a></h3>
+                  <div class="hub-pills" role="group" aria-label="Filter tasks" data-now-task-filter>
+                    <button type="button" class="hub-pills__btn" aria-pressed="true" data-now-filter="all">All</button>
+                    <button type="button" class="hub-pills__btn" aria-pressed="false" data-now-filter="life">Life</button>
+                    <button type="button" class="hub-pills__btn" aria-pressed="false" data-now-filter="teaching">School</button>
+                  </div>
+                </div>
+                <ul class="now-tasks__list" data-now-task-list></ul>
+                <div class="now-tasks__foot">
+                  <span data-now-task-summary>Checking…</span>
+                  <a href="/tasks/">See the board →</a>
                 </div>
               </article>
-
-              <article class="metric-card hub-pulse-card" data-hub-pulse="knowledge">
-                <header class="hub-pulse-card__header">
-                  <a class="hub-pulse-card__link" href="/knowledge/">
-                    <p class="metric-label">Knowledge</p>
-                  </a>
-                  <button class="hub-pulse-card__toggle" type="button" data-hub-pulse-toggle aria-expanded="false" aria-controls="hub-pulse-body-knowledge" aria-label="Expand new note options">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-                  </button>
-                </header>
-                <p class="metric-context">New note</p>
-                <form class="hub-knowledge-quick" data-knowledge-quick-form>
-                  <label class="sr-only" for="knowledge-quick-text">New note</label>
-                  <textarea id="knowledge-quick-text" class="hub-knowledge-quick__text" data-knowledge-quick-text rows="1" placeholder="What's on your mind?"></textarea>
-                  <p class="metric-caption" data-hub-status hidden></p>
-                  <div class="hub-pulse-card__body" id="hub-pulse-body-knowledge" hidden>
-                    <label class="hub-knowledge-quick__clementine">
-                      <input type="checkbox" data-knowledge-quick-clementine checked>
-                      <span>Ask Clementine to file this</span>
-                    </label>
-                  </div>
-                  <div class="hub-knowledge-quick__actions">
-                    <button class="btn btn--primary" type="submit" data-knowledge-quick-save disabled>Save note</button>
-                  </div>
-                  <p class="hub-knowledge-quick__result" data-knowledge-quick-result hidden></p>
-                </form>
-              </article>
-
-              <article class="metric-card hub-pulse-card" data-hub-pulse="tasks">
-                <header class="hub-pulse-card__header">
-                  <a class="hub-pulse-card__link" href="/tasks/">
-                    <p class="metric-label">Tasks</p>
-                  </a>
-                  <button class="hub-pulse-card__toggle" type="button" data-hub-pulse-toggle aria-expanded="false" aria-controls="hub-pulse-body-tasks" aria-label="Expand task list">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-                  </button>
-                </header>
-                <p class="metric-context">Board</p>
-                <p class="hub-pulse-card__count" data-hub-count>—</p>
-                <p class="metric-caption" data-hub-status hidden></p>
-                <div class="hub-pulse-card__body" id="hub-pulse-body-tasks" hidden>
-                  <div class="hub-checklist" data-task-checklist></div>
-                  <form class="hub-task-add" data-task-add-form>
-                    <label class="sr-only" for="task-add-input">Add a task</label>
-                    <input type="text" id="task-add-input" class="hub-task-add__input" data-task-add-input placeholder="Add a task…" required>
-                  </form>
-                </div>
-              </article>
-
             </div>
+
+            <nav class="now-jumps" aria-label="Open a hub">
+              <a class="now-jump" href="/teaching/"><b>Teaching</b><span data-now-jump="teaching">Checking…</span></a>
+              <a class="now-jump" href="/knowledge/"><b>Knowledge</b><span data-now-jump="knowledge">Checking…</span><span class="now-jump__bar" data-now-jump-bar hidden><i></i></span></a>
+              <a class="now-jump" href="/tasks/"><b>Tasks</b><span data-now-jump="tasks">Checking…</span></a>
+              <a class="now-jump" href="/professional/"><b>Professional</b><span data-now-jump="professional">Checking…</span></a>
+            </nav>
           </section>
         </section>
 

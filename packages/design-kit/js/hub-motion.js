@@ -29,7 +29,7 @@ const CARD_SELECTOR = [
 const CARD_SKIP = '.confirm-card, [role="dialog"], .create-modal, .search-palette, .hub-morph-dialog';
 
 const MAGNET_SELECTOR = [
-  '.hub-pulse-card',
+  '.now-jump',
   '.home-class-tile',
   '.dashboard-overview__tile'
 ].join(',');
@@ -53,8 +53,7 @@ const scrollHideState = new WeakMap();
 const COUNT_SELECTOR = [
   '[data-value]',
   '[data-hub-count]',
-  '[data-percent]',
-  '.hub-pulse-card__count'
+  '[data-percent]'
 ].join(',');
 
 const SKIP_VALUE_KEYS = new Set([
