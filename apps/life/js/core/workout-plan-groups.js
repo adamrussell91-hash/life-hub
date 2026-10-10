@@ -55,25 +55,27 @@ function cloneRoundTemplate(set) {
 export function provisionAmrapCircuitRounds(exercises = []) {
   if (!Array.isArray(exercises) || !exercises.length) return exercises;
   const groups = new Map();
-  exercises.forEach((exercise, index) => {
+  for (const exercise of exercises) {
     const group = exercise?.superset_group;
-    if (group == null) return;
+    if (group == null) continue;
     if (!groups.has(group)) groups.set(group, []);
-    groups.get(group).push({ exercise, index });
-  });
+    groups.get(group).push(exercise);
+  }
   for (const members of groups.values()) {
     if (members.length < 2) continue;
-    const owner = members.find(({ exercise }) => exercise?.block?.kind === 'circuit'
-      && exercise.block.format === 'amrap')?.exercise;
+    const owner = members.find(exercise => (
+      exercise?.block?.kind === 'circuit' && exercise.block.format === 'amrap'
+    ));
     if (!owner) continue;
     const target = amrapRoundCapacity(owner.block?.time_cap_sec);
-    for (const { exercise } of members) {
+    for (const exercise of members) {
       const sets = Array.isArray(exercise.sets) ? exercise.sets : [];
       if (sets.length >= target) continue;
-      const template = cloneRoundTemplate(sets[0] ?? { reps: 0, weight_kg: 0, cable_type: 'none' });
-      const next = sets.map(set => ({ ...set }));
-      while (next.length < target) next.push({ ...template });
-      exercise.sets = next;
+      const template = cloneRoundTemplate(sets[0]);
+      exercise.sets = [
+        ...sets.map(set => ({ ...set })),
+        ...Array.from({ length: target - sets.length }, () => ({ ...template }))
+      ];
     }
   }
   return exercises;

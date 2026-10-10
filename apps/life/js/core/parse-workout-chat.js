@@ -4,7 +4,7 @@
  * one-paragraph dumps, and "*between sets:*" supersets.
  */
 
-import { amrapRoundCapacity, provisionAmrapCircuitRounds } from './workout-plan-groups.js';
+import { provisionAmrapCircuitRounds } from './workout-plan-groups.js';
 
 const ITEM_START = /(?:^|\n|\s)(\d+)[\.)]\s+(?=\*\*|[A-Z])/g;
 const SET_SPLIT = /(?:\s+-\s+|\n\s*-\s+|\n)\s*(?=Set\s*\d+\s*:)/i;
@@ -540,10 +540,9 @@ export function parseLetteredWorkoutChat(text) {
     groupNumber += 1;
     const { settings } = group;
     const kind = settings.kind ?? (group.members.length >= 3 ? 'circuit' : 'superset');
-    // AMRAP without an explicit "N rounds" still needs round-slots planned —
-    // score is whole circuits in the window, not one lonely set.
-    const expandTo = settings.rounds
-      ?? (settings.format === 'amrap' ? amrapRoundCapacity(settings.time_cap_sec) : null);
+    // Explicit "N rounds" expands here; AMRAP time-cap slots come from
+    // provisionAmrapCircuitRounds after the block is attached.
+    const expandTo = settings.rounds ?? null;
     group.members.forEach((member, index) => {
       member.superset_group = groupNumber;
       if (expandTo && member.sets.length === 1) {
@@ -562,11 +561,9 @@ export function parseLetteredWorkoutChat(text) {
   }
   if (!groupNumber && exercises.length < 3) return null;
 
-  const loaded = exercises.map(item => item.exercise);
-  provisionAmrapCircuitRounds(loaded);
   return {
     intro: introLines.join('\n').trim(),
-    exercises: loaded,
+    exercises: provisionAmrapCircuitRounds(exercises.map(item => item.exercise)),
     outro: outroLines.join('\n').trim(),
     lettered: true
   };

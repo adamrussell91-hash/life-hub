@@ -91,13 +91,9 @@ export function isCircuitMember(exercise, exercises = []) {
   if (exercise?.block?.kind === 'circuit') return true;
   const group = exercise?.superset_group;
   if (group == null) return false;
-  return (exercises ?? []).some(item => (
+  return exercises.some(item => (
     item?.superset_group === group && item?.block?.kind === 'circuit'
   ));
-}
-
-export function circuitOwner(exercises = []) {
-  return (exercises ?? []).find(item => item?.block?.kind === 'circuit') ?? null;
 }
 
 /**
@@ -110,15 +106,14 @@ export function compareCircuitGhost(now, then, format = 'amrap') {
   const thenRounds = num(then.rounds) ?? 0;
   const nowExtra = num(now.extra_reps) ?? 0;
   const thenExtra = num(then.extra_reps) ?? 0;
+  const roundDelta = nowRounds - thenRounds;
   if (format === 'for_time') {
     const nowTime = positive(now.time_sec);
     const thenTime = positive(then.time_sec);
-    if (nowRounds > thenRounds) {
-      return { verdict: 'beat', label: `+${nowRounds - thenRounds} round${nowRounds - thenRounds === 1 ? '' : 's'}` };
+    if (roundDelta > 0) {
+      return { verdict: 'beat', label: `+${roundDelta} round${roundDelta === 1 ? '' : 's'}` };
     }
-    if (nowRounds < thenRounds) {
-      return { verdict: 'below', label: `${nowRounds - thenRounds} rounds` };
-    }
+    if (roundDelta < 0) return { verdict: 'below', label: `${roundDelta} rounds` };
     if (nowTime != null && thenTime != null) {
       const delta = thenTime - nowTime;
       if (delta > 0) return { verdict: 'beat', label: `−${delta}s` };
@@ -129,10 +124,11 @@ export function compareCircuitGhost(now, then, format = 'amrap') {
   }
   const nowScore = nowRounds * 1000 + nowExtra;
   const thenScore = thenRounds * 1000 + thenExtra;
-  const roundDelta = nowRounds - thenRounds;
   const extraDelta = nowExtra - thenExtra;
   if (nowScore > thenScore) {
-    if (roundDelta > 0) return { verdict: 'beat', label: `+${roundDelta} round${roundDelta === 1 ? '' : 's'}` };
+    if (roundDelta > 0) {
+      return { verdict: 'beat', label: `+${roundDelta} round${roundDelta === 1 ? '' : 's'}` };
+    }
     return { verdict: 'beat', label: `+${extraDelta} extra rep${Math.abs(extraDelta) === 1 ? '' : 's'}` };
   }
   if (nowScore === thenScore) return { verdict: 'matched', label: 'matched' };
@@ -147,9 +143,7 @@ export function buildLastCircuits(events, date) {
     if (record?.type !== 'workout' || record.status !== 'completed' || !record.date || record.date >= date) continue;
     for (const exercise of record.exercises ?? []) {
       if (exercise?.block?.kind !== 'circuit' || !exercise.block?.result) continue;
-      const label = typeof exercise.superset_label === 'string' && exercise.superset_label.trim()
-        ? exercise.superset_label.trim()
-        : exercise.name;
+      const label = String(exercise.superset_label ?? '').trim() || exercise.name;
       const key = circuitFamilyKey(label);
       if (!key) continue;
       const existing = latest.get(key);
@@ -168,10 +162,8 @@ export function buildLastCircuits(events, date) {
 }
 
 export function lastCircuitFor(block, lastCircuits) {
-  if (!block || !lastCircuits) return null;
-  const key = circuitFamilyKey(block.label);
-  if (key && lastCircuits[key]) return lastCircuits[key];
-  return null;
+  const key = circuitFamilyKey(block?.label);
+  return key ? lastCircuits?.[key] ?? null : null;
 }
 
 export function describeCircuitGhost(previous) {

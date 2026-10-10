@@ -348,9 +348,7 @@ function renderBlockBanner(root, draft, { block, step, circuit, lastCircuits, ac
       if (live) {
         ghost.append(el(root, 'p', {
           className: 'gym-ghost__verdict',
-          text: live.verdict === 'beat' ? `Beating it: ${live.label}`
-            : live.verdict === 'matched' ? 'Level with it — one more round beats it'
-              : `Behind it: ${live.label}`,
+          text: liveCircuitGhostVerdict(live),
           data: { fitnessLogger: 'circuit-ghost-verdict', verdict: live.verdict }
         }));
       }
@@ -359,6 +357,19 @@ function renderBlockBanner(root, draft, { block, step, circuit, lastCircuits, ac
     banner.append(renderCircuitClock(root, draft, { block, circuit, actions }));
   }
   return banner;
+}
+
+function liveCircuitGhostVerdict(live) {
+  if (live.verdict === 'beat') return `Beating it: ${live.label}`;
+  if (live.verdict === 'matched') return 'Level with it — one more round beats it';
+  return `Behind it: ${live.label}`;
+}
+
+function pumpCircuitGhostBit(ghost) {
+  if (ghost?.verdict === 'beat') return ` · beat ghost (${ghost.label})`;
+  if (ghost?.verdict === 'matched') return ' · matched ghost';
+  if (ghost?.verdict === 'below') return ` · behind ghost (${ghost.label})`;
+  return '';
 }
 
 function renderCircuitClock(root, draft, { block, circuit, actions }) {
@@ -1520,11 +1531,7 @@ export function renderPumpReport(root, report, { onClose } = {}) {
     const list = el(root, 'ul');
     for (const circuit of report.circuits) {
       const score = formatBlockResult({ result: circuit.result });
-      const ghostBit = circuit.ghost?.verdict === 'beat' ? ` · beat ghost (${circuit.ghost.label})`
-        : circuit.ghost?.verdict === 'matched' ? ' · matched ghost'
-          : circuit.ghost?.verdict === 'below' ? ` · behind ghost (${circuit.ghost.label})`
-            : '';
-      list.append(el(root, 'li', { text: `${circuit.name}: ${score}${ghostBit}` }));
+      list.append(el(root, 'li', { text: `${circuit.name}: ${score}${pumpCircuitGhostBit(circuit.ghost)}` }));
     }
     circuits.append(list);
     stage.append(circuits);
