@@ -17,6 +17,8 @@
     img { max-width: 100%; height: auto; border-radius: 4px; }
     .caption { font-size: 0.85rem; color: #444; margin-top: 0.25rem; }
     .photo-notes { font-size: 0.85rem; color: #333; margin: 0.35rem 0 0; padding-left: 1rem; }
+    .authorship { font-size: 0.8rem; color: #666; font-style: italic; margin: 0 0 0.35rem; }
+    .authorship--corey { color: #6b4; }
   </style>
 </head>
 <body>
@@ -39,6 +41,10 @@
         });
         return map;
       }
+      function authorshipLabel(mom) {
+        if (mom.author === 'corey') return "Corey's perspective — not your words";
+        return 'Adam — your journal';
+      }
       function noteLines(doc) {
         var out = [];
         (doc.regions || []).forEach(function (r) {
@@ -58,7 +64,8 @@
             return m.leg_id === leg.id && m.lifecycle === 'live';
           }).sort(function (a, b) { return a.display_order - b.display_order; });
           moments.forEach(function (mom) {
-            html += '<article><div class="meta">' + esc(mom.local_date) + (mom.local_time ? ' ' + esc(mom.local_time) : '') + '</div>';
+            html += '<article><p class="authorship' + (mom.author === 'corey' ? ' authorship--corey' : '') + '">' + esc(authorshipLabel(mom)) + '</p>';
+            html += '<div class="meta">' + esc(mom.local_date) + (mom.local_time ? ' ' + esc(mom.local_time) : '') + '</div>';
             if (mom.place && mom.place.name) html += '<div class="place">' + esc(mom.place.name) + '</div>';
             if (mom.text) html += '<div class="text">' + esc(mom.text) + '</div>';
             (mom.media_ids || []).forEach(function (id) {

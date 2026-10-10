@@ -12,6 +12,9 @@ export type JournalLocationSource = 'exif' | 'inferred' | 'manual';
 
 export type JournalTransitionMode = 'flight' | 'train' | 'car' | 'ferry' | 'other';
 
+/** Owner journal vs Corey's separate perspective lane (never authoritative user truth). */
+export type JournalMomentAuthor = 'adam' | 'corey';
+
 export interface JournalCoordinates {
   lat: number;
   lon: number;
@@ -51,6 +54,7 @@ export interface JournalMoment extends JournalDeletedMeta {
   coordinates?: JournalCoordinates;
   location_source?: JournalLocationSource;
   text?: string;
+  author?: JournalMomentAuthor;
 }
 
 export interface JournalDay extends JournalDeletedMeta {

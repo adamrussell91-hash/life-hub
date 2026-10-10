@@ -20,6 +20,12 @@ import { openTrashView } from '@/journal/trash-view';
 import { openJournalSearch } from '@/journal/search-sheet';
 import { openSouvenirsCollection } from '@/journal/souvenirs-sheet';
 import { openJournalShareSheet } from '@/journal/share-sheet';
+import {
+  filterMomentsForPerspectiveDisplay,
+  journalHasCoreyMoments,
+  readCoreyPerspectiveVisible,
+  writeCoreyPerspectiveVisible,
+} from '@/journal/corey-perspective';
 import { downloadJournalExportBundle, stripJournalForExport } from '@/journal/export-bundle';
 import {
   JOURNAL_MOMENT_PAGE_SIZE,
@@ -223,8 +229,24 @@ export function renderJournal(
     cleanups.push(() => captureOverlay?.destroy());
   }
 
+  let showCoreyPerspective = readCoreyPerspectiveVisible(liveFixture.trip_id);
+
+  function orderedMomentsForView(): ReturnType<typeof orderedLiveMoments> {
+    return filterMomentsForPerspectiveDisplay(
+      orderedLiveMoments(liveFixture),
+      showCoreyPerspective,
+    );
+  }
+
   const toolbar = renderToolbar({
     title: toolbarTitle(),
+    hasCoreyMoments: journalHasCoreyMoments(journalDoc()),
+    showCoreyPerspective,
+    onToggleCoreyPerspective: (next) => {
+      showCoreyPerspective = next;
+      writeCoreyPerspectiveVisible(liveFixture.trip_id, next);
+      rebuildStory(true);
+    },
     onAddMoment: () => openCapture(),
     onImportPhotos: () => {
       openImport();
@@ -314,11 +336,11 @@ export function renderJournal(
 
   let detachPrefetch: (() => void) | null = null;
   let momentWindow: MomentWindow = { start: 0, end: 0 };
-  let orderedMoments = orderedLiveMoments(liveFixture);
+  let orderedMoments = orderedMomentsForView();
   let visibleMomentIds = new Set<string>();
 
   function applyMomentWindow(focusMomentId?: string): void {
-    orderedMoments = orderedLiveMoments(liveFixture);
+    orderedMoments = orderedMomentsForView();
     const focusIndex =
       focusMomentId !== undefined
         ? orderedMoments.findIndex((m) => m.id === focusMomentId)
@@ -331,7 +353,7 @@ export function renderJournal(
   }
 
   function refreshMomentWindow(): void {
-    orderedMoments = orderedLiveMoments(liveFixture);
+    orderedMoments = orderedMomentsForView();
     momentWindow = {
       start: Math.min(momentWindow.start, orderedMoments.length),
       end: Math.min(Math.max(momentWindow.end, momentWindow.start), orderedMoments.length),
@@ -474,14 +496,17 @@ export function renderJournal(
       dayHeading.textContent = formatDisplayDate(day.local_date);
       daySection.append(dayHeading);
 
-      const moments = liveFixture.moments
-        .filter(
-          (m) =>
-            m.lifecycle === 'live' &&
-            m.leg_id === leg.id &&
-            m.local_date === day.local_date,
-        )
-        .sort((a, b) => a.display_order - b.display_order);
+      const moments = filterMomentsForPerspectiveDisplay(
+        liveFixture.moments
+          .filter(
+            (m) =>
+              m.lifecycle === 'live' &&
+              m.leg_id === leg.id &&
+              m.local_date === day.local_date,
+          )
+          .sort((a, b) => a.display_order - b.display_order),
+        showCoreyPerspective,
+      );
 
       if (day.empty_marker && moments.length === 0) {
         const empty = document.createElement('p');

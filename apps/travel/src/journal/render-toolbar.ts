@@ -8,6 +8,9 @@ export interface RenderToolbarOptions {
   onShareJournal?: () => void;
   onAddMoment?: () => void;
   onTrash?: () => void;
+  showCoreyPerspective?: boolean;
+  onToggleCoreyPerspective?: (next: boolean) => void;
+  hasCoreyMoments?: boolean;
 }
 
 export function renderToolbar(options: RenderToolbarOptions): HTMLElement {
@@ -93,6 +96,22 @@ export function renderToolbar(options: RenderToolbarOptions): HTMLElement {
     addBtn.addEventListener('click', options.onAddMoment);
   }
   addRow.append(addBtn);
+
+  if (options.hasCoreyMoments && options.onToggleCoreyPerspective) {
+    const coreyToggle = document.createElement('button');
+    coreyToggle.type = 'button';
+    coreyToggle.className = 'btn btn--secondary journal-toolbar__corey-toggle';
+    const visible = options.showCoreyPerspective !== false;
+    coreyToggle.setAttribute('aria-pressed', visible ? 'true' : 'false');
+    coreyToggle.textContent = visible ? "Hide Corey's lines" : "Show Corey's lines";
+    coreyToggle.addEventListener('click', () => {
+      const next = coreyToggle.getAttribute('aria-pressed') !== 'true';
+      coreyToggle.setAttribute('aria-pressed', next ? 'true' : 'false');
+      coreyToggle.textContent = next ? "Hide Corey's lines" : "Show Corey's lines";
+      options.onToggleCoreyPerspective?.(next);
+    });
+    addRow.append(coreyToggle);
+  }
 
   bar.append(row, addRow);
   return bar;

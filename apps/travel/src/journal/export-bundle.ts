@@ -4,6 +4,10 @@ import {
   formatMediaAnnotationsPlainText,
   getMediaPhotoAnnotations,
 } from '@/journal/annotations';
+import {
+  formatAuthorshipExportLabel,
+  resolveMomentAuthor,
+} from '@/journal/corey-perspective';
 import type { JournalLeg, JournalLifecycle, JournalMedia, JournalMoment } from '@/journal/types';
 import { buildPhotoStops, buildSegments } from '@/journal/map-connections';
 import exportReaderHtml from '@/journal/export-reader/index.html?raw';
@@ -110,6 +114,7 @@ function formatMomentLine(
   journal: JournalDocument,
 ): string {
   const lines: string[] = [];
+  lines.push(formatAuthorshipExportLabel(resolveMomentAuthor(moment)));
   const head = [moment.local_date, moment.local_time].filter(Boolean).join(' ');
   if (head) lines.push(head);
   if (moment.place?.name) lines.push(moment.place.name);

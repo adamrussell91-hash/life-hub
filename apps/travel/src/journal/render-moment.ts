@@ -16,6 +16,7 @@ import {
   momentHasPhotoAnnotations,
   regionSvgAttrs,
 } from '@/journal/annotations';
+import { resolveMomentAuthor } from '@/journal/corey-perspective';
 
 function mediaById(fixture: JournalFixture): Map<string, JournalMedia> {
   return new Map(fixture.media.map((m) => [m.id, m]));
@@ -370,8 +371,18 @@ export function renderMomentArticle(
 ): HTMLElement {
   const article = document.createElement('article');
   article.className = 'journal-moment';
+  if (resolveMomentAuthor(moment) === 'corey') {
+    article.classList.add('journal-moment--corey');
+  }
   article.id = moment.id;
   article.setAttribute('data-journal-moment', moment.id);
+
+  if (resolveMomentAuthor(moment) === 'corey') {
+    const badge = document.createElement('p');
+    badge.className = 'journal-moment__corey-badge';
+    badge.textContent = "Corey's perspective — not your words";
+    article.append(badge);
+  }
 
   const mediaMap = mediaById(fixture);
   const textOnly = moment.media_ids.length === 0;
