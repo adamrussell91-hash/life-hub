@@ -1,0 +1,23 @@
+import * as THREE from 'three'
+import {
+  buildLowpolyTreeGeometry,
+  createLowpolyTreeRecipe,
+} from '../src/index.js'
+
+const recipe = createLowpolyTreeRecipe({
+  bendX: 0.28,
+  upperBendX: -0.12,
+  rootCount: 5,
+  rootLength: 0.9,
+  canopyClusterCount: 4,
+})
+const { geometry, stats } = buildLowpolyTreeGeometry(recipe, { triangleBudget: 500 })
+const material = new THREE.MeshLambertMaterial({
+  color: 0xffffff,
+  flatShading: true,
+  vertexColors: true,
+})
+const tree = new THREE.Mesh(geometry, material)
+
+console.log(stats)
+export { recipe, tree }

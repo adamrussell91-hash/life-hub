@@ -1,8 +1,6 @@
 {
   "version": 1,
   "generated_at": "2026-10-10T09:17:19.152Z",
-  "budget_bytes": 26214400,
-  "total_bytes": 0,
   "assets": [
     {
       "id": "grass-1",
@@ -814,5 +812,6 @@
       },
       "notes": " Green foliage and brown wood palette adjusted for Grove."
     }
-  ]
+  ],
+  "purpose": "Preserved former Grove Kenney assets for possible city use; not active Grove manifest"
 }

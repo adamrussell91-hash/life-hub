@@ -1,8 +1,10 @@
 # Quaternius-only sourcing status — 2026-10-10
 
-User direction: MegaKit trees and vegetation, Quaternius animals, no Cube Pets.
+User direction: MegaKit trees and vegetation, Quaternius animals as the core;
+visually matching one-off models from other creators may fill gaps after review.
+No Kenney style or Cube Pets.
 This replaces the earlier mixed-provider shortlist. No other animal pack is
-recommended or incorporated here.
+currently incorporated here. Visual review is required for one-off candidates.
 
 ## Acquired and verified
 

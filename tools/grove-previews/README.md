@@ -1,14 +1,17 @@
 # Grove asset preparation
 
-Asset-only delivery for `docs/proposals/grove-assets-codex-brief.md` (PR #779).
+Preparation tooling for the canonical collection at
+[`apps/life/assets/grove/README.md`](../../apps/life/assets/grove/README.md).
+The original PR #779 brief and concept now redirect there.
 No app, CSS, runtime dependency, storage or build changes.
 
 ## Contents and limitations
 
 67 GLBs: 41 trees (13 variants with three size stages, plus two twisted trees),
-23 ground props and three animated animals (doe, stag, fox). All models are
+23 ground props and three animated animals (doe, stag, fox). All currently delivered models are
 Quaternius: Stylized Nature MegaKit Source for trees and ground, Ultimate
-Animated Animal Pack for animals. No Cube Pets or other creators' models.
+Animated Animal Pack for animals. No Cube Pets or Kenney models. Visually matching one-off additions from other
+creators are permitted after review; none is currently delivered.
 All CC0; original publisher licence texts retained. The manifest names every
 source file and adaptation.
 
