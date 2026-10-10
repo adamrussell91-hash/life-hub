@@ -65,6 +65,30 @@ test('validateJournal rejects unknown location_source on moments', () => {
   );
 });
 
+test('validateJournal rejects media keys outside travel/journal trip namespace', () => {
+  const tripId = 'trp_test01';
+  const journal = emptyJournal(tripId);
+  const mediaId = makeMediaId();
+  journal.media = [
+    {
+      id: mediaId,
+      lifecycle: 'live',
+      original_key: 'knowledge/other-hub/photo.jpg'
+    }
+  ];
+  assert.throws(
+    () => validateJournal(journal),
+    (err) => err.code === 'validation_error' && String(err.path).includes('original_key')
+  );
+
+  journal.media[0].original_key = `travel/journal/${tripId}/${mediaId}/original`;
+  journal.media[0].derivative_keys = { 320: 'travel/journal/wrong_trip/x/der/320.jpg' };
+  assert.throws(
+    () => validateJournal(journal),
+    (err) => err.code === 'validation_error' && String(err.path).includes('derivative_keys')
+  );
+});
+
 test('journal id helpers use required prefixes', () => {
   assert.match(makeJournalId(), /^jrn_[a-z2-7]{12}$/);
   assert.match(makeLegId(), /^leg_[a-z2-7]{12}$/);

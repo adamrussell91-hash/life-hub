@@ -1,4 +1,5 @@
 import { DATE_RE, TIME_RE } from './travel-schema.mjs';
+import { isJournalMediaKey } from './travel-journal-r2.mjs';
 
 const LOCATION_SOURCES = new Set(['exif', 'inferred', 'manual']);
 const LIFECYCLES = new Set(['live', 'deleted', 'archived']);
@@ -108,7 +109,7 @@ function validatePlace(place, path) {
   requireString(place, 'name', `${path}.name`);
 }
 
-function validateMedia(media, path) {
+function validateMedia(media, path, tripId) {
   if (!isObject(media)) throw fail(path, `${path} must be an object`);
   requireId(media.id, 'med', `${path}.id`);
   requireLifecycle(media.lifecycle, `${path}.lifecycle`);
@@ -117,6 +118,9 @@ function validateMedia(media, path) {
   }
   if (media.original_key !== undefined) {
     requireString(media, 'original_key', `${path}.original_key`, { min: 1 });
+    if (!isJournalMediaKey(tripId, media.original_key)) {
+      throw fail(`${path}.original_key`, 'original_key must stay under travel/journal for this trip');
+    }
   }
   if (media.upload_state !== undefined) {
     const states = new Set(['pending', 'uploading', 'backed_up', 'failed']);
@@ -135,6 +139,17 @@ function validateMedia(media, path) {
   }
   if (media.derivative_keys !== undefined) {
     if (!isObject(media.derivative_keys)) throw fail(`${path}.derivative_keys`, 'derivative_keys must be an object');
+    for (const [widthKey, derivativeKey] of Object.entries(media.derivative_keys)) {
+      if (typeof derivativeKey !== 'string' || derivativeKey.length === 0) {
+        throw fail(`${path}.derivative_keys.${widthKey}`, 'derivative key must be a non-empty string');
+      }
+      if (!isJournalMediaKey(tripId, derivativeKey)) {
+        throw fail(
+          `${path}.derivative_keys.${widthKey}`,
+          'derivative key must stay under travel/journal for this trip'
+        );
+      }
+    }
   }
   if (media.width !== undefined && (typeof media.width !== 'number' || media.width < 1)) {
     throw fail(`${path}.width`, 'width must be a positive number');
@@ -261,7 +276,7 @@ export function validateJournal(doc) {
 
   const mediaIds = new Set();
   doc.media.forEach((media, i) => {
-    validateMedia(media, `media[${i}]`);
+    validateMedia(media, `media[${i}]`, doc.trip_id);
     if (mediaIds.has(media.id)) throw fail(`media[${i}].id`, 'duplicate media id');
     mediaIds.add(media.id);
   });

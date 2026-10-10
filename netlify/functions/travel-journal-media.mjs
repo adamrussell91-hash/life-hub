@@ -6,6 +6,7 @@ import {
 } from './_shared/travel-http.mjs';
 import {
   DERIVATIVE_WIDTHS,
+  isJournalMediaKey,
   journalMediaDerivativeKey,
   journalMediaOriginalKey,
   travelJournalPresignGet,
@@ -14,6 +15,12 @@ import {
 
 export const config = { path: '/api/travel-journal-media' };
 
+function resolveStoredJournalKey(tripId, stored) {
+  if (typeof stored !== 'string' || stored.length === 0) return { missing: true };
+  if (!isJournalMediaKey(tripId, stored)) return { invalid: true };
+  return { key: stored };
+}
+
 function resolveMediaKey(tripId, media, variant, widthParam) {
   if (variant === 'derivative') {
     const width = Number(widthParam);
@@ -21,14 +28,16 @@ function resolveMediaKey(tripId, media, variant, widthParam) {
     const derivatives = media.derivative_keys;
     if (derivatives && typeof derivatives === 'object') {
       const stored = derivatives[String(width)] ?? derivatives[width];
-      if (typeof stored === 'string' && stored.length > 0) return stored;
+      const resolved = resolveStoredJournalKey(tripId, stored);
+      if (resolved.invalid) return { invalid: true };
+      if (resolved.key) return { key: resolved.key };
     }
-    return journalMediaDerivativeKey(tripId, media.id, width);
+    return { key: journalMediaDerivativeKey(tripId, media.id, width) };
   }
-  if (typeof media.original_key === 'string' && media.original_key.length > 0) {
-    return media.original_key;
-  }
-  return journalMediaOriginalKey(tripId, media.id);
+  const original = resolveStoredJournalKey(tripId, media.original_key);
+  if (original.invalid) return { invalid: true };
+  if (original.key) return { key: original.key };
+  return { key: journalMediaOriginalKey(tripId, media.id) };
 }
 
 export function createTravelJournalMediaHandler(deps = {}) {
@@ -53,10 +62,20 @@ export function createTravelJournalMediaHandler(deps = {}) {
       return errorResponse(404, 'not_found', 'Media not found.', false, PRIVATE_CACHE);
     }
 
-    const key = resolveMediaKey(tripId, media, variant, widthParam);
-    if (!key) {
+    const resolved = resolveMediaKey(tripId, media, variant, widthParam);
+    if (!resolved) {
       return errorResponse(404, 'not_found', 'Media object not available.', false, PRIVATE_CACHE);
     }
+    if (resolved.invalid) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'Media object key is not allowed.',
+        false,
+        PRIVATE_CACHE
+      );
+    }
+    const key = resolved.key;
 
     try {
       const signedUrl = await travelJournalPresignGet(ctx.env, {

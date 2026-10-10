@@ -39,6 +39,25 @@ export function travelJournalR2Unbound() {
   });
 }
 
+export function journalMediaKeyPrefix(tripId) {
+  return `travel/journal/${tripId}/`;
+}
+
+export function isJournalMediaKey(tripId, key) {
+  if (typeof tripId !== 'string' || !TRIP_ID_RE.test(tripId)) return false;
+  if (typeof key !== 'string' || key.length === 0) return false;
+  return key.startsWith(journalMediaKeyPrefix(tripId));
+}
+
+export function assertJournalMediaKey(tripId, key) {
+  if (!isJournalMediaKey(tripId, key)) {
+    throw Object.assign(new Error('R2 key must stay under travel/journal for this trip'), {
+      code: 'validation_error',
+      status: 400
+    });
+  }
+}
+
 export function journalMediaOriginalKey(tripId, mediaId) {
   const idErr = requireTripMediaIds(tripId, mediaId);
   if (idErr) throw Object.assign(new Error(idErr.error), { code: 'validation_error' });

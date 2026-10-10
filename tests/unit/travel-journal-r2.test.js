@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MAX_JOURNAL_MEDIA_BYTES,
+  assertJournalMediaKey,
+  isJournalMediaKey,
   journalMediaDerivativeKey,
   journalMediaOriginalKey,
   parseJournalMediaSignRequest,
@@ -13,6 +15,19 @@ import {
 const TRIP = 'trp_journal_r201';
 const MEDIA = 'med_journal_r201';
 const CHECKSUM = 'a'.repeat(64);
+
+test('isJournalMediaKey accepts canonical keys and rejects foreign prefixes', () => {
+  const canonical = journalMediaOriginalKey(TRIP, MEDIA);
+  assert.equal(isJournalMediaKey(TRIP, canonical), true);
+  assert.equal(isJournalMediaKey(TRIP, 'travel/journal/other_trip/x/original'), false);
+  assert.equal(isJournalMediaKey(TRIP, 'knowledge/uploads/secret.jpg'), false);
+  assert.throws(() => assertJournalMediaKey(TRIP, 'knowledge/evil'), (err) => {
+    assert.equal(err.code, 'validation_error');
+    assert.equal(err.status, 400);
+    return true;
+  });
+  assert.doesNotThrow(() => assertJournalMediaKey(TRIP, canonical));
+});
 
 test('journal media keys stay under travel/journal prefix', () => {
   assert.equal(
