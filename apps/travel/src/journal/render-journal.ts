@@ -11,6 +11,8 @@ import { openImportSheet } from '@/journal/import-sheet';
 import { renderToolbar } from '@/journal/render-toolbar';
 import type { JournalDocument } from '@/api/journal';
 import { renderMomentArticle } from '@/journal/render-moment';
+import { createDayMapPreview } from '@/journal/map-preview';
+import { getActiveJournalDayMap } from '@/journal/map-expanded';
 
 const LAST_VIEW_KEY = (tripId: string) => `lifehub.travel.journal.lastView.${tripId}`;
 
@@ -167,6 +169,7 @@ export function renderJournal(
   let chapterOverlay: { destroy(): void } | null = null;
   let importOverlay: { destroy(): void } | null = null;
   let captureOverlay: { destroy(): void } | null = null;
+  let dayMapOverlay: { destroy(): void } | null = null;
 
   const journalDoc = opts.fixture as JournalDocument;
   const toolbarTitle =
@@ -335,14 +338,21 @@ export function renderJournal(
       }
 
       if (shouldShowDayMapPreview(moments)) {
-        const mapBtn = document.createElement('button');
-        mapBtn.type = 'button';
-        mapBtn.className = 'journal-day__map-preview';
-        mapBtn.setAttribute('data-journal-day-map', day.id);
-        mapBtn.textContent = 'Open photo stops for this day';
-        mapBtn.disabled = true;
-        mapBtn.title = 'Coming in Phase 3';
-        daySection.append(mapBtn);
+        daySection.append(
+          createDayMapPreview({
+            moments,
+            dayId: day.id,
+            localDate: day.local_date,
+            anchor: root,
+            onOpen: (handle) => {
+              dayMapOverlay?.destroy();
+              dayMapOverlay = handle;
+            },
+            onClose: () => {
+              dayMapOverlay = null;
+            },
+          }),
+        );
       }
 
       legSection.append(daySection);
@@ -357,6 +367,11 @@ export function renderJournal(
   timeline.append(story);
   root.append(toolbar, timeline);
   canvas.append(root);
+
+  cleanups.push(() => {
+    dayMapOverlay?.destroy();
+    getActiveJournalDayMap()?.destroy();
+  });
 
   const scrollId =
     opts.momentId ??
