@@ -18,4 +18,5 @@ export const CAL: {
   popRise: number;
   popWidth: number;
   popGap: number;
+  deadlineGap: number;
 };

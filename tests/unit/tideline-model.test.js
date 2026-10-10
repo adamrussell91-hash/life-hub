@@ -205,3 +205,24 @@ test('an accepted bedtime Life block still paints when the visual file is coveri
   assert.equal(chip.kind, 'health');
   assert.equal(chip.title, 'Wind down · lights out 10:00 pm');
 });
+
+test('chips sharing time get side-by-side lanes; lone chips keep the full width', async () => {
+  const { assignLanes } = await import('../../packages/design-kit/js/calendar/tideline-model.js');
+  const chips = [
+    { id: 'brunch', start: 11, end: 13 },
+    { id: 'parents', start: 10.5, end: 11.5 },
+    { id: 'korea', start: 11.25, end: 12 },
+    { id: 'tea', start: 15, end: 16 },
+    { id: 'later', start: 12, end: 12.5 }
+  ];
+  assignLanes(chips);
+  const by = Object.fromEntries(chips.map((chip) => [chip.id, chip]));
+  assert.deepEqual([by.parents.lane, by.brunch.lane, by.korea.lane], [0, 1, 2]);
+  assert.equal(by.later.lane, 0, 'reuses a lane freed by an earlier chip');
+  for (const id of ['parents', 'brunch', 'korea', 'later']) assert.equal(by[id].lanes, 3, `${id} shares the cluster width`);
+  assert.equal(by.tea.lanes, 1);
+  assert.equal(by.later.laneSpan, 1, 'brunch (lane 1) still runs at 12');
+  const pair = assignLanes([{ id: 'a', start: 9, end: 12 }, { id: 'b', start: 9, end: 10 }, { id: 'c', start: 9.5, end: 10 }, { id: 'd', start: 10.5, end: 11 }]);
+  const d = pair.find((chip) => chip.id === 'd');
+  assert.deepEqual([d.lane, d.lanes, d.laneSpan], [1, 3, 2], 'widens into the free lane to its right');
+});

@@ -20,5 +20,6 @@ export const CAL = {
   popMs: 180, // chip popover in / out
   popRise: 4,
   popWidth: 288,
-  popGap: 8
+  popGap: 8,
+  deadlineGap: 40 // two deadline markers in one column: the second sits this far below the first
 };
