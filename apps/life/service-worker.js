@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v208';
+const CACHE_NAME = 'life-hub-shell-v209';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -50,6 +50,8 @@ const SHELL_FILES = [
   'js/app/heal-shell-styles.js',
   'js/app/api-session.js',
   'js/app/app-controller.js',
+  'js/app/now-panel.js',
+  'js/shell/now-panel-model.js',
   'js/app/agent-avatars.js',
   'js/app/agent-colour.js',
   'js/app/agent-protocols.js',

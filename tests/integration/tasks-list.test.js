@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createTasksHandler } from '../../netlify/functions/tasks.mjs';
+import { taskKey } from '../../netlify/functions/_shared/tasks-blobs.mjs';
 import { createWorkBlocksHandler } from '../../netlify/functions/work-blocks.mjs';
 
 const SECRET = 's'.repeat(32);
@@ -357,4 +358,31 @@ test('Tasks POST rejects a missing domain', async () => {
   const response = await handler(request({ method: 'POST', body: { title: 'Untitled' } }));
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error.code, 'validation_error');
+});
+
+test('Tasks POST keeps a valid due date from a quick capture and drops an invalid one', async () => {
+  const store = memoryStore({ 'tasks/_index': [] });
+  const handler = createTasksHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  });
+  const dated = await handler(request({
+    method: 'POST',
+    origin: 'https://life-hub.adam-russell.com',
+    body: { title: 'Book physio', domain: 'health', due_date: '2026-08-01' }
+  }));
+  assert.equal(dated.status, 201);
+  const body = await dated.json();
+  assert.equal(body.data.due_date, '2026-08-01');
+  assert.equal(body.data.domain, 'health');
+  assert.equal((await store.get(taskKey(body.data.id), { type: 'json' })).due_date, '2026-08-01');
+
+  const undated = await handler(request({
+    method: 'POST',
+    origin: 'https://life-hub.adam-russell.com',
+    body: { title: 'Someday thing', domain: 'life', due_date: 'next week' }
+  }));
+  const plain = await undated.json();
+  assert.equal(Object.prototype.hasOwnProperty.call(plain.data, 'due_date'), false);
 });

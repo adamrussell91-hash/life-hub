@@ -202,7 +202,10 @@ Home of the umbrella. Brand click → Home.
 - [ ] Energy / protein / fat rings show numbers and a fill, or a labelled empty day.
 - [ ] Movement card and logging 5-box strip match today’s records (or show none, explicitly).
 - [ ] Week strip has seven cells.
-- [ ] Hub pulse cards for Teaching / Knowledge / Tasks show a count or a fail-visible status, not `—` forever. Click each card. It opens that hub, not a 404 and not an old host.
+- [ ] Now panel: the four hub links (Teaching / Knowledge / Tasks / Professional) each show one live line or a fail-visible status, never `Checking…` forever. Click each. It opens that hub, not a 404 and not an old host.
+- [ ] Now capture bar: press `/` and the box takes focus. Switch Task → Note → Book; the placeholder, options row and button label change. Book lists reading-now books or says none are marked. **Do not submit.**
+- [ ] Shape of the day: headline and strip agree (a lesson in the strip is counted in the headline), the now line sits at the current time, and on a day without lessons the next lesson card names a real class. If a second day tab shows, it switches the strip.
+- [ ] Tasks list: rows show a due label (late / Today / weekday / dd/mm) or none. **Do not tick a task.**
 - [ ] Dump for Clare: type a few words. Calendar chip expands a date/time row. **Do not Dump or Schedule.** Confirm the primary buttons are present and the date chip shows `dd/mm/yy`. Close the schedule row.
 - [ ] Brief opens something readable or a labelled error. Do not apply proposals.
 - [ ] Protocol select lists the Clare protocols. Changing it does not navigate away.
@@ -596,7 +599,7 @@ From each hub, using rail switcher **and** mobile More → Hubs:
 - [ ] Life → Teaching → Knowledge → Tasks → Life. Each landing page is that hub’s home, signed in, correct `data-hub`.
 - [ ] A Knowledge connected link to a Teaching unit opens `/teaching/…`, not a retired host.
 - [ ] A Knowledge connected link to a Tasks project opens `/tasks/#/project/…`.
-- [ ] Life Home hub-pulse cards match those same umbrella paths.
+- [ ] Life Home Now panel hub links (and the Shape of the day / Tasks titles) match those same umbrella paths.
 - [ ] After the loop, Back stack is not a trap of blank shells.
 
 Out of scope: widgets on `jade-melomakarona-ea20fe`.

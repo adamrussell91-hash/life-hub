@@ -46,15 +46,35 @@ export function createKnowledgeApi(fetchImpl = fetch) {
         status: data.status === 'unavailable' ? 'unavailable' : 'ready'
       };
     },
-    async createPage({ title, body } = {}) {
+    async createPage({ title, body, origins } = {}) {
       const response = await fetchImpl('/api/knowledge/pages', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ title, body })
+        body: JSON.stringify({ title, body, ...(Array.isArray(origins) ? { origins } : {}) })
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || payload?.ok !== true) {
         throw httpError('Save note failed', response.status, payload?.error?.code ?? 'request_failed');
+      }
+      return payload.data;
+    },
+    async getShelf() {
+      const response = await fetchImpl('/api/knowledge/shelf');
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        throw httpError('Bookshelf failed', response.status, payload?.error?.code ?? 'request_failed');
+      }
+      return payload.data;
+    },
+    async updateShelf(body) {
+      const response = await fetchImpl('/api/knowledge/shelf', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        throw httpError(payload?.error?.message || 'Bookshelf save failed', response.status, payload?.error?.code ?? 'request_failed');
       }
       return payload.data;
     },
