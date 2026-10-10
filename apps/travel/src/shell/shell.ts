@@ -158,8 +158,11 @@ function buildNavLink(item: NavItem, highlight: RailHighlight): HTMLAnchorElemen
 function syncMobileChrome(shellRoot: HTMLElement, active: RailHighlight, tripHref: string, onAdd?: () => void | Promise<void>): void {
   // Trip · Today · Trips on the bar so the list is reachable with one holiday;
   // Add + Public live in More (multi-trip home needs Trips as a first-class dest).
+  // currentHub must NOT be 'life': Travel is a Life section at /travel/, and the
+  // kit skips the current hub from More → Hubs. Using 'life' hid Home on phones
+  // (desktop still has ← Life; the rail is display:none under 720px).
   mountMobileChrome(shellRoot, {
-    currentHub: 'life',
+    currentHub: 'travel',
     primary: [
       { id: 'trip', label: 'Trip', paths: RAIL_ICON_PATHS.trip, href: tripHref, current: active === 'trip' },
       { id: 'today', label: 'Today', paths: RAIL_ICON_PATHS.today, href: '#/today', current: active === 'today' },
@@ -184,7 +187,9 @@ export function renderPrimaryNav(shell: HubShellRefs, active: RailHighlight, opt
   const items = navItems(tripHref);
   shell.railNav.append(...items.map((item) => buildNavLink(item, active)));
 
-  appendHubSwitcher(hubSwitcherHost(shell.railNav), 'life');
+  // Travel is not an umbrella hub id; do not mark Life as current or phones
+  // (and the rail) lose a clear path back to Life Home.
+  appendHubSwitcher(hubSwitcherHost(shell.railNav), 'travel');
 
   const shellRoot = shell.railNav.closest('.hub-layout')?.parentElement ?? shell.railNav.ownerDocument.body;
   if (shellRoot instanceof HTMLElement) syncMobileChrome(shellRoot, active, tripHref, options.onAdd);
