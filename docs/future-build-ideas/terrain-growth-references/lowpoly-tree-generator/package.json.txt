@@ -1,0 +1,56 @@
+{
+  "name": "@rand-monster/lowpoly-tree-generator",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "A parameter-driven low-poly tree generator with CSG-welded wood and clustered canopies.",
+  "license": "MIT",
+  "sideEffects": false,
+  "homepage": "https://rand.monster/editor/trees",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rand-monster/lowpoly-tree-generator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rand-monster/lowpoly-tree-generator/issues"
+  },
+  "keywords": [
+    "threejs",
+    "low-poly",
+    "procedural-generation",
+    "tree-generator",
+    "webgpu",
+    "csg"
+  ],
+  "exports": {
+    ".": "./src/index.js",
+    "./animation": "./src/animation.js",
+    "./archetypes": "./src/archetypes.js",
+    "./controller": "./src/controller.js",
+    "./profile": "./src/profile.js",
+    "./vines": "./src/vines.js"
+  },
+  "files": [
+    "src",
+    "examples",
+    "README.md",
+    "CREDITS.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "peerDependencies": {
+    "three": ">=0.179.0"
+  },
+  "dependencies": {
+    "three-bvh-csg": "^0.0.18",
+    "three-mesh-bvh": "0.9.7"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
