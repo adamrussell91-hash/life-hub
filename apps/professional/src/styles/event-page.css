@@ -21,47 +21,6 @@
   flex-wrap: wrap;
 }
 
-/* ── Shape picker ── */
-.shape {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-
-@media (max-width: 620px) {
-  .shape {
-    grid-template-columns: 1fr;
-  }
-}
-
-.shape__opt {
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  text-align: left;
-  cursor: pointer;
-}
-
-.shape__opt b {
-  display: block;
-  font-size: var(--text-sm);
-}
-
-.shape__opt small {
-  display: block;
-  font-size: var(--text-2xs);
-  color: var(--muted);
-  line-height: 1.35;
-  margin-top: 2px;
-}
-
-.shape__opt.is-on {
-  border-color: var(--high-sea);
-  box-shadow: 0 0 0 3px var(--warning-surface);
-  background: var(--pastel-peach);
-}
-
 /* ── Series / program strip ── */
 .series {
   display: flex;
@@ -75,7 +34,7 @@
   flex: 1 0 150px;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--paper);
   position: relative;
   text-decoration: none;
   color: inherit;
@@ -110,8 +69,8 @@
 }
 
 .series__session.is-current {
-  background: var(--pastel-peach);
-  border-color: var(--high-sea);
+  background: var(--pastel-blue);
+  border-color: var(--wave);
 }
 
 .series__session.is-future {
@@ -179,9 +138,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
-  padding: 3px var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-xs);
   white-space: nowrap;
   background: var(--pastel-lilac);
@@ -211,3 +170,19 @@
   display: grid;
   gap: var(--space-3);
 }
+
+.event-page__toolbar { display: flex; justify-content: flex-end; }
+.event-options-menu .hub-menu__opt { min-height: 2.75rem; }
+.event-options-menu [data-part="delete-event"] { color: var(--danger); }
+.event-page__format { max-width: 20rem; }
+.event-page .confirm-card[hidden] { display: none; }
+@media (max-width: 719px) {
+  .event-page .talk-add input { min-width: 0; font-size: var(--text-md); }
+  .event-page .hub-pills__btn, .event-page .talk-add .btn,
+  .event-page .confirm-card__actions .btn { min-height: 2.75rem; }
+  .event-page .confirm-card__actions { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+.event-page .hub-card h3 { margin: 0 0 var(--space-3); font-size: var(--text-md); color: var(--navy); }
+.event-page .canvas-status:empty, .event-page .hub-field__error:empty { display: none; }
+.event-page__format .hub-select { font-size: var(--text-md); }

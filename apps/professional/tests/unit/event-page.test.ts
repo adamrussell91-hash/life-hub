@@ -52,12 +52,15 @@ import { renderEventPage } from '@/views/event-page';
 import { mountBlockPage } from '@/components/block-page';
 import { updateEvent, deleteEvent } from '@/api/events';
 import { createKnowledgeNote } from '@/api/knowledge-notes';
-import { createUniversalLink } from '@/api/universal-links';
+import { createUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
 
 async function render() {
   const canvas = document.createElement('div');
   document.body.append(canvas);
-  await renderEventPage(canvas, EVENT_ID, { isCurrent: () => true, onTitleReady: () => {} });
+  const header = document.createElement('header');
+  document.body.append(header);
+  await renderEventPage(canvas, EVENT_ID, { isCurrent: () => true, onTitleReady: () => {},
+    onActionsReady: (actions: HTMLElement) => header.replaceChildren(actions) });
   return canvas;
 }
 
@@ -67,10 +70,25 @@ describe('event page', () => {
     current = { ...base };
   });
 
+  it('does not overwrite another route when a save completes late', async () => {
+    let active = true;
+    let finish!: (value: Awaited<ReturnType<typeof updateEvent>>) => void;
+    vi.mocked(updateEvent).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderEventPage(canvas, EVENT_ID, { isCurrent: () => active, onTitleReady: () => {} });
+    canvas.querySelector<HTMLButtonElement>('[data-part="pd-switch"]')!.click();
+    active = false;
+    canvas.textContent = 'Destination page';
+    finish({ event: base as Awaited<ReturnType<typeof updateEvent>>['event'] });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(canvas.textContent).toBe('Destination page');
+  });
+
   it('PD event shows the switch on, shape, series strip, talks and PD panels', async () => {
     const canvas = await render();
     expect(canvas.querySelector('[data-part="pd-switch"]')?.getAttribute('aria-checked')).toBe('true');
-    expect(canvas.querySelector('[data-part="shape"] [aria-checked="true"]')?.textContent).toContain('Series');
+    expect(canvas.querySelector<HTMLSelectElement>('[data-part="shape"] select.hub-select')?.value).toBe('series');
     expect(canvas.querySelector('[data-part="series"]')).not.toBeNull();
     expect(canvas.querySelector('[data-part="talks"]')?.textContent).toContain('Keynote · Reading against the grain');
     expect(canvas.querySelector('.pd-fields-stub')).not.toBeNull();
@@ -106,7 +124,8 @@ describe('event page', () => {
 
   it('Edit event loads the current fields and saves changes to the same event', async () => {
     const canvas = await render();
-    canvas.querySelector<HTMLButtonElement>('[data-part="edit-event"]')!.click();
+    document.querySelector<HTMLButtonElement>('[aria-label="Event options"]')!.click();
+    document.querySelector<HTMLButtonElement>('[data-part="edit-event"]')!.click();
     expect(renderEventNewView).toHaveBeenLastCalledWith(canvas, expect.objectContaining({
       draft: expect.objectContaining({ title: base.title, hours: base.hours })
     }));
@@ -119,10 +138,35 @@ describe('event page', () => {
 
   it('offers deletion with a confirmation and deletes the existing event', async () => {
     const canvas = await render();
-    canvas.querySelector<HTMLButtonElement>('[data-part="delete-event"]')!.click();
+    document.querySelector<HTMLButtonElement>('[aria-label="Event options"]')!.click();
+    document.querySelector<HTMLButtonElement>('[data-part="delete-event"]')!.click();
     expect(canvas.querySelector('.confirm-card')).not.toBeNull();
     canvas.querySelector<HTMLButtonElement>('[data-part="confirm-delete"]')!.click();
     await vi.waitFor(() => expect(deleteEvent).toHaveBeenCalledWith(EVENT_ID));
+  });
+
+  it('keeps edit and delete out of the canvas and inside the closed Options menu', async () => {
+    const canvas = await render();
+    expect(canvas.querySelector('[data-part="edit-event"]')).toBeNull();
+    expect(canvas.querySelector('[data-part="delete-event"]')).toBeNull();
+    const trigger = document.querySelector<HTMLButtonElement>('[aria-label="Event options"]')!;
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    trigger.click();
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(document.querySelector('[role="menu"]')?.textContent).toContain('Edit event');
+    document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape'}));
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('paints event editing before slow relationships settle', async () => {
+    let finish!: (value: {outgoing: never[]; incoming: never[]}) => void;
+    vi.mocked(listUniversalLinksForEntity).mockImplementationOnce(() => new Promise(resolve => {finish = resolve;}));
+    const canvas = document.createElement('div'); document.body.append(canvas);
+    const rendering = renderEventPage(canvas, EVENT_ID, {isCurrent:() => true, onTitleReady:() => {}});
+    try {
+      await vi.waitFor(() => expect(canvas.querySelector('[data-part="pd-switch"]')).not.toBeNull(), {timeout:200});
+      expect(canvas.querySelector('.block-page-stub')).not.toBeNull();
+    } finally {finish({outgoing:[], incoming:[]}); await rendering;}
   });
 
   it('Make note creates a Knowledge page and links it to the talk', async () => {

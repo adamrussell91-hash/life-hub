@@ -1,0 +1,71 @@
+/* Shared form fields. Tokens only.
+ * Search pills live in filters.css (.hub-search). Do not put .hub-search
+ * on a labelled form field — that class is list/search chrome only.
+ * Snippet: snippets/hub-field.html
+ */
+
+.hub-field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.hub-label {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--orca);
+}
+
+.hub-input,
+.hub-select,
+.hub-textarea,
+input.hub-input,
+select.hub-select,
+textarea.hub-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.hub-textarea,
+textarea.hub-textarea {
+  min-height: 8rem;
+  resize: vertical;
+  line-height: var(--leading-normal);
+}
+
+.hub-input::placeholder,
+.hub-textarea::placeholder {
+  color: var(--shallow);
+}
+
+.hub-input:focus-visible,
+.hub-select:focus-visible,
+.hub-textarea:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+  background: var(--paper);
+}
+
+.hub-check {
+  accent-color: var(--wave);
+}
+
+.hub-field__hint {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.hub-field__error {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+

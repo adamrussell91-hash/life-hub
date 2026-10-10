@@ -173,11 +173,13 @@ function chipsFromLinks(entries: UniversalLinkEntry[]): NonNullable<EventCompose
 export async function renderEventNewView(
   canvas: HTMLElement,
   options: {
+    isCurrent?: () => boolean;
     draft?: EventComposeDraft;
     onCancel?: () => void;
     onSave?: (payload: EventComposePayload) => Promise<void>;
   } = {}
 ): Promise<void> {
+  if (options.isCurrent && !options.isCurrent()) return;
   canvas.replaceChildren();
   const form = document.createElement('form');
   form.className = 'event-form event-compose';
@@ -589,15 +591,6 @@ export async function renderEventNewView(
   const draftPriority = openedLabels.priority ?? '';
   const areaNames = new Set<string>(PRIORITY_AREAS);
   if (draftPriority) areaNames.add(draftPriority);
-  try {
-    const listed = await listEvents();
-    for (const event of listed.events ?? []) {
-      const name = splitEventLabels(event).priority;
-      if (name) areaNames.add(name);
-    }
-  } catch {
-    // The built-in areas still show when the event list cannot be loaded.
-  }
   const customAreas = [...areaNames]
     .filter((name) => !isPriorityArea(name))
     .sort((a, b) => a.localeCompare(b));
@@ -835,6 +828,22 @@ export async function renderEventNewView(
   });
 
   canvas.append(form);
+  // Custom areas are optional enrichment; they must not delay the editor.
+  try {
+    const listed = await listEvents();
+    if ((options.isCurrent && !options.isCurrent()) || !canvas.contains(form)) return;
+    for (const event of listed.events ?? []) {
+      const name = splitEventLabels(event).priority;
+      if (!name || areaNames.has(name)) continue;
+      areaNames.add(name);
+      const chip = addPriorityChip(name, name);
+      chip.classList.remove('is-on');
+      chip.setAttribute('aria-pressed', 'false');
+      chipRow.insertBefore(chip, addArea);
+    }
+  } catch {
+    // Built-in and draft areas remain available if the optional list fails.
+  }
 }
 
 const OCCURRENCE_LABEL: Record<EventOccurrenceState, string> = {
