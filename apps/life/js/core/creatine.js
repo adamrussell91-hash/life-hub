@@ -53,7 +53,10 @@ export function buildCreatineModel({ events = [], date, now = new Date(), histor
     const timeKnown = typeof time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time);
     const at = Date.parse(sydneyLocalStamp(record.date, timeKnown ? time : '12:00'));
     if (at > clock) return [];
-    return [{ grams, date: record.date, at, timeKnown, product: record.creatine_product ?? record.product ?? null }];
+    return [{ grams, date: record.date, at, timeKnown, time: timeKnown ? time : null,
+      recordType: record.type, meal: record.meal ?? null, recordId: record.id ?? null,
+      savedAt: record.updated_at ?? record.created_at ?? null,
+      product: record.creatine_product ?? record.product ?? null }];
   }).sort((a, b) => a.at - b.at);
   const released = (dose, at) => clamp((at - dose.at) / DAY) * dose.grams;
   const gramsBetween = (from, to) => doses.reduce((sum, dose) => sum + released(dose, to) - released(dose, from), 0);
