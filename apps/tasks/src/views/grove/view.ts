@@ -59,8 +59,10 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   generation += 1;
   const gen = generation;
 
-  const today = toHubDateKey(new Date());
-  const route = groveRoute(new URLSearchParams(hashQuery()), today);
+  let today = toHubDateKey(new Date());
+  const query = new URLSearchParams(hashQuery());
+  const followsToday = !isDateKey(query.get('date'));
+  const route = groveRoute(query, today);
 
   const page = el('div', 'grove-page');
   page.dataset.view = route.view;
@@ -99,6 +101,8 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   const caption = el('p', 'grove-caption');
   caption.setAttribute('aria-live', 'polite');
   caption.textContent = 'Growing the forest…';
+  const boundary = el('p', 'grove-boundary');
+  boundary.hidden = true;
   const key = el('div', 'grove-key');
   const card = el('div', 'grove-card');
   card.hidden = true;
@@ -127,7 +131,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     framing.textContent = overview ? 'Show selected clearing' : `Show whole ${route.view}`;
     card.hidden = true;
   });
-  hud.append(bar, caption, key, card, wildlife, qualitySelect, credits, framing);
+  hud.append(bar, caption, boundary, key, card, wildlife, qualitySelect, credits, framing);
 
   let tasks: Task[];
   try {
@@ -143,15 +147,19 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   const [hubPrefs, planningProfile, books] = await calendar;
   if (gen !== generation) return;
   terms = groveTerms({hubPrefs, planningProfile});
+  let acceptedBooks = books;
   back.href = groveHash(route.view, navDate(-1), today);
   forward.href = groveHash(route.view, navDate(1), today);
   let loaded:Awaited<ReturnType<AnnualGroveLoader['load']>>;try{loaded=await annualLoader.load({tasks,view:route.view,anchor:route.date,now:new Date(),terms,books});}catch(error){if(gen!==generation)return;renderLoadError(stage,error,()=>void renderGroveView(canvas),'Could not prepare annual Grove');return;}if(gen!==generation)return;let plan=loaded.plan;
   paintHud(plan);
   let mountRevision = 0;
+  let mountedAnchor: string | null = null;
   await mount(plan);if(gen!==generation)return;
 
   function paintHud(next: AnnualGrovePlan): void {
     caption.textContent = next.view === 'week' ? weekCaption(next) : next.view === 'day' ? dayCaption(next) : periodCaption(next);
+    boundary.hidden = !next.boundary;
+    boundary.textContent = next.boundary ? `${next.years.join(' and ')} have separate annual landscapes. Each tree belongs to its completion year.` : '';
     key.replaceChildren();
     const list = el('ul', 'grove-key__list');
     for (const species of GROVE_SPECIES) {
@@ -196,7 +204,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
 
   async function mount(next: AnnualGrovePlan): Promise<void> {
     const revision = ++mountRevision;
-    const cameraState=sceneHandle?.cameraState();
+    const cameraState=mountedAnchor === next.anchor ? sceneHandle?.cameraState() : undefined;
     const { mountAnnualGroveScene } = await import('./annual-scene');
     if (gen !== generation || revision !== mountRevision) return;
     const byId = new Map(next.contextTrees.map((t) => [t.id, t]));
@@ -223,7 +231,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
         return;
       }
       sceneHandle?.dispose();
-      sceneHandle = handle;handle.setQuality(quality);
+      sceneHandle = handle; mountedAnchor = next.anchor; handle.setQuality(quality);
     } catch (error) {
       if (gen !== generation || revision !== mountRevision) return;
       sceneHandle?.dispose();sceneHandle=null;
@@ -234,14 +242,32 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
 
   // Finishing or reopening a task refreshes the annual planting from history.
   let pending: number | null = null;
+  let refreshRevision = 0;
   const replant = () => {
+    const request = ++refreshRevision;
+    const current = () => gen === generation && request === refreshRevision;
     if (pending != null) window.clearTimeout(pending);
     pending = window.setTimeout(async () => {
       pending = null;
       const fresh = await tasksApi.listTasks().catch(() => null);
-      if (!fresh || gen !== generation) return;
-      const refreshedBooks=await groveBooks().catch(()=>books);
-      try{loaded=await annualLoader.load({tasks:fresh,view:route.view,anchor:route.date,now:new Date(),terms,books:refreshedBooks});}catch(error){if(error instanceof DOMException&&error.name==='AbortError')return;console.error(error);return;}if(gen!==generation)return;plan=loaded.plan;
+      if (!fresh || !current()) return;
+      const refreshedBooks=await groveBooks().catch(()=>acceptedBooks);
+      if (!current()) return;
+      const now = new Date();
+      const nextToday = toHubDateKey(now);
+      const anchor = followsToday ? nextToday : route.date;
+      let delivery: typeof loaded;
+      try { delivery = await annualLoader.load({tasks:fresh,view:route.view,anchor,now,terms,books:refreshedBooks}); }
+      catch(error){if(!current() || error instanceof DOMException&&error.name==='AbortError')return;console.error(error);return;}
+      if (!current()) return;
+      acceptedBooks = refreshedBooks;
+      loaded = delivery; plan = loaded.plan; today = nextToday; route.date = anchor;
+      for (const [index, view] of (['day','week','term','year'] as const).entries()) {
+        (pills.children[index] as HTMLAnchorElement).href = groveHash(view, route.date, today);
+      }
+      back.href = groveHash(route.view, navDate(-1), today);
+      todayLink.href = groveHash(route.view, today, today);
+      forward.href = groveHash(route.view, navDate(1), today);
       paintHud(plan);
       card.hidden = true;
       await mount(plan);

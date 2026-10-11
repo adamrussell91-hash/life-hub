@@ -55,7 +55,9 @@ export async function createAnnualAnimals(world:AnnualWorld,plan:AnnualGrovePlan
  if(!eligible.length)return result();
  const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
  let catalogue:{assets:Asset[]};
- try{const response=await fetch(groveAssetUrl('animal-catalogue.json'));if(!response.ok)throw Error('Catalogue unavailable');catalogue=await response.json() as {assets:Asset[]};}
+ try{const response=await fetch(groveAssetUrl('animal-catalogue.json'));if(!response.ok)throw Error('Catalogue unavailable');catalogue=await response.json() as {assets:Asset[]};
+  if(!catalogue || !Array.isArray(catalogue.assets) || catalogue.assets.some(a=>!a || typeof a.id!=='string' || !a.id || typeof a.file!=='string' || !a.file || !a.roles || typeof a.roles!=='object' || Array.isArray(a.roles) || Object.values(a.roles).some(role=>typeof role!=='string') || !Number.isFinite(a.waterline) || !(a.credit==null || typeof a.credit==='string')) || new Set(catalogue.assets.map(a=>a.id)).size!==catalogue.assets.length)throw Error('Invalid catalogue');
+ }
  catch{missing.push(...eligible.map(m=>m.species+': asset unavailable'));return result();}
  const assets=new Map(catalogue.assets.map(a=>[a.id,a]));
  const obstacles=plan.contextTrees.filter(t=>t.worldYear===world.key.year&&Math.hypot(t.x-day.cx,t.z-day.cz)<42).map(t=>({x:t.x,z:t.z}));
