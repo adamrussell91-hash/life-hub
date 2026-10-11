@@ -18,5 +18,5 @@ async function show(id){
  document.querySelector('#status').textContent=p.asset.clip_origin+' · '+p.clips.join(', ');window.currentAnimals=[p,b];window.ready=id;
 }
 select.onchange=()=>show(select.value);await show(select.value);
-let last=performance.now();function draw(now){const dt=Math.min((now-last)/1000,.05);last=now;parent?.update(dt);baby?.update(dt);const w=renderer.domElement.clientWidth,h=renderer.domElement.clientHeight;renderer.setSize(w,h,false);const extent=camera.userData.span||1;camera.top=extent;camera.bottom=-extent;camera.left=-extent*w/h;camera.right=extent*w/h;camera.updateProjectionMatrix();renderer.render(scene,camera);requestAnimationFrame(draw);}requestAnimationFrame(draw);
+let last=performance.now();function draw(now){const dt=Math.max(0,Math.min((now-last)/1000,.05));last=now;parent?.update(dt);baby?.update(dt);const w=renderer.domElement.clientWidth,h=renderer.domElement.clientHeight;renderer.setSize(w,h,false);const extent=camera.userData.span||1;camera.top=extent;camera.bottom=-extent;camera.left=-extent*w/h;camera.right=extent*w/h;camera.updateProjectionMatrix();renderer.render(scene,camera);requestAnimationFrame(draw);}requestAnimationFrame(draw);
 </script></html>
