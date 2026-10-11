@@ -21,8 +21,8 @@ function noise(seed:string,x:number,z:number):number {
 }
 const ellipse=(x:number,z:number,cx:number,cz:number,rx:number,rz:number)=>Math.hypot((x-cx)/rx,(z-cz)/rz);
 
-export function generateHeightfield(key:WorldKey) {
-  const identity=worldIdentity(key),rand=seededRandom(`${identity}:basins`);
+export function generateHeightfield(key:WorldKey,attempt=0) {
+  const identity=worldIdentity(key)+(attempt===0?'':':attempt:'+attempt),rand=seededRandom(`${identity}:basins`);
   const cx=-165+(rand()-.5)*25,cz=-115+(rand()-.5)*25,rx=100+rand()*12,rz=72+rand()*10;
   const island=Object.freeze({cx:cx+10,cz:cz+4,rx:24,rz:18,height:8});
   const basins:readonly BasinShape[]=Object.freeze([

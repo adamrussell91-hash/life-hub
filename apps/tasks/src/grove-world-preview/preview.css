@@ -11,3 +11,7 @@ body {margin:0;background:var(--paper);font-family:var(--font-ui);}
 .world-preview__stage canvas {display:block;max-width:100%;touch-action:none;}
 .world-preview__legend,#metrics,#status {font-size:var(--text-sm);line-height:1.5;overflow-wrap:anywhere;}
 @media(max-width:719px){.world-preview {padding:var(--space-4);} .world-preview__stage{height:50dvh;}}
+
+.world-preview__layer {display:flex;align-items:center;gap:var(--space-2);margin:var(--space-3) 0;min-width:0;}
+.world-preview__layer select {font:inherit;font-size:16px;min-height:44px;max-width:100%;min-width:0;padding:var(--space-2);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--paper);color:var(--ink);}
+.world-preview__layer select {appearance:none;height:44px;min-width:44px;box-sizing:border-box;}

@@ -71,7 +71,7 @@ export function channelGeometry(g:WorldGrid,bed:Float32Array,points:readonly Cha
    for(let z=minZ;z<=maxZ;z++)for(let x=minX;x<=maxX;x++)for(const ids of terrainTriangleIds(g,x,z)){
     let polygon=ids.map(id=>gridPoint(g,id,bed));
     for(let j=0;j<3;j++){const p=ribbon[j]!,q=ribbon[(j+1)%3]!;polygon=clipPolygon(polygon,v=>Math.sign(orientation)*((q.x-p.x)*(v.z-p.z)-(q.z-p.z)*(v.x-p.x)),interpolate);}
-    polygon=clipPolygon(polygon,p=>surface(p)-SHORE_DEPTH-p.h,interpolate);addFan(out,polygon,surface);
+    polygon=clipPolygon(polygon,p=>surface(p)+1e-5-p.h,interpolate);addFan(out,polygon,surface);
    }
   }
  }return new Float32Array(out);
