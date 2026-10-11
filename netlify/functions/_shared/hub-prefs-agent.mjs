@@ -1,3 +1,4 @@
+import {parseGroveHistory,validateGroveHistory} from '../../../packages/grove-history/validate.mjs';
 // Clare / Hammond: narrow Confirm patch for Tasks meta/hub_prefs.
 // Constraints / About Me stay on existing propose_central_node_patch (CN).
 // Sleep wall / lights-out: prefer propose_calendar_ghost kind bedtime — not prefs.
@@ -70,6 +71,7 @@ export function parseHubPrefsRecord(raw) {
     : [];
   return {
     schema_version: 1,
+    ...(parseGroveHistory(body.grove_history) ? {grove_history:parseGroveHistory(body.grove_history)} : {}),
     timezone: typeof body.timezone === 'string' && body.timezone.trim() ? body.timezone : DEFAULT_TZ,
     updated_at: typeof body.updated_at === 'string' ? body.updated_at : null,
     dismissed_insight_ids: dismissed,
