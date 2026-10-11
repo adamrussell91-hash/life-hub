@@ -1,6 +1,7 @@
 import { access, copyFile, cp, mkdir, readdir, rm, readFile, writeFile } from 'node:fs/promises';
 import { groveAnimalCatalogue } from './lib/grove-animal-catalogue.mjs';
 import { fileURLToPath } from 'node:url';
+import { basename } from 'node:path';
 import { rewritePublishedKitSpecifiers } from './lib/rewrite-published-kit-imports.mjs';
 
 const projectRoot = new URL('../', import.meta.url);
@@ -71,7 +72,7 @@ export async function prepareWeb() {
     ...publishedDirectories.map(directory => cp(
       new URL(`${directory}/`, lifeRoot),
       new URL(`${directory}/`, publishRoot),
-      { recursive: true }
+      { recursive: true, filter: source => !basename(source).startsWith('.grove-install-') }
     )),
     ...publishedFiles.map(file => copyFile(
       new URL(file, lifeRoot),

@@ -91,7 +91,7 @@ async function* readClareDumpSse(body: ReadableStream<Uint8Array>): AsyncGenerat
 }
 
 export const tasksApi = {
-  listTasks: () => apiGet<{ tasks: Task[] }>('/api/tasks').then((r) => mergeListedTasks(r.tasks)),
+  listTasks: (options?: {includeCachedOnly?: boolean}) => apiGet<{ tasks: Task[] }>('/api/tasks').then((r) => mergeListedTasks(r.tasks, options)),
   getTask: (id: string) =>
     apiGet<Task>(`/api/tasks?id=${encodeURIComponent(id)}`).then((task) => rememberFetchedTask(task)),
   createTask: (body: unknown) =>

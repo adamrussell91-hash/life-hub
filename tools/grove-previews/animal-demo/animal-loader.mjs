@@ -22,7 +22,7 @@ export async function createAnimalLibrary(baseURL){
    if(!clip)throw Error(id+' has no clip '+name);
    const action=mixer.clipAction(clip);if(action===current)return;
    action.reset().play();if(current && fade>0){action.crossFadeFrom(current,fade,false);}else{current?.stop();}current=action;
-  },update(seconds){if(!Number.isFinite(seconds)||seconds<0)throw Error('Invalid animation delta');mixer.update(seconds);},dispose(){mixer.stopAllAction();mixer.uncacheRoot(object);object.removeFromParent();}};
+  },update(seconds){if(!Number.isFinite(seconds)||seconds<0)throw Error('Invalid animation delta');mixer.update(seconds);},dispose(){mixer.stopAllAction();mixer.uncacheRoot(object);const skeletons=new Set();object.traverse(n=>{if(n.isSkinnedMesh)skeletons.add(n.skeleton);});for(const skeleton of skeletons)skeleton.dispose();object.removeFromParent();}};
   animal.play('idle',0);return animal;
  }};
 }

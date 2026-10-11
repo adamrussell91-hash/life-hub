@@ -12,7 +12,7 @@ try{
    if(Math.abs(b.object.scale.x/p.object.scale.x-.5)>1e-6)throw Error('Baby scale '+id);
    const before=babyBones.map(n=>n.quaternion.toArray());p.play('locomotion',0);p.update(.31);const unchanged=babyBones.every((n,i)=>n.quaternion.toArray().every((v,j)=>Math.abs(v-before[i][j])<1e-9));if(!unchanged)throw Error('Parent animation changes baby '+id);
    let unknownRejected=false;try{p.play('missing-clip')}catch{unknownRejected=true;}if(!unknownRejected)throw Error('Missing clip silently accepted');
-   p.dispose();b.dispose();return {id,independent_skeleton:true,baby_scale:.5,missing_clip_rejected:true,clips:window.currentAnimals[0].clips};
+   const ownedSkeletons=new Set();for(const actor of [p,b])actor.object.traverse(n=>{if(n.isSkinnedMesh){n.skeleton.computeBoneTexture();ownedSkeletons.add(n.skeleton);}});p.dispose();b.dispose();if([...ownedSkeletons].some(s=>s.boneTexture!==null))throw Error('Clone skeleton bone texture not disposed '+id);return {id,independent_skeleton:true,bone_texture_disposed:true,baby_scale:.5,missing_clip_rejected:true,clips:window.currentAnimals[0].clips};
   },id);reports.push(result);
   for(const name of result.clips)await page.getByRole('button',{name,exact:true}).click();
  }

@@ -64,7 +64,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       // grove.html is Home's chromeless preview of today's clearing.
-      input: { main: path.resolve(__dirname, 'index.html'), grove: path.resolve(__dirname, 'grove.html') }
+      input: { main: path.resolve(__dirname, 'index.html'), grove: path.resolve(__dirname, 'grove.html'), groveWorldPreview: path.resolve(__dirname, 'grove-world-preview.html') }
     }
   },
   server: { port: 5175 },

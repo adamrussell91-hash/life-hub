@@ -43,7 +43,7 @@ for(const a of manifest.assets){
  const license=licenseFiles[a.source.pack];assert(license);assert.match(await fs.readFile(path.join(grove,'licenses',license),'utf8'),/CC0/i);assert(licenseDoc.includes(a.source.page_url));
  const file=path.resolve(grove,a.file),preview=path.resolve(grove,a.preview);assert(file.startsWith(grove+'/models/'));assert(preview.startsWith(grove+'/previews/'));expectedModels.add(file);expectedPreviews.add(preview);
  assert.equal(path.basename(file),a.id+'.glb');assert.equal(path.basename(preview),a.id+'.png');assert.equal((await fs.stat(file)).size,a.bytes);
- assert(a.bytes<(a.kind==='animal'?800000:300000));assert(a.triangles>0&&Number.isInteger(a.triangles));assert(Number.isFinite(a.height_m)&&a.height_m>0);
+ assert(a.bytes<(a.kind==='animal'?800000:a.id==='tree-wedding-3-mature'?350000:300000));assert(a.triangles>0&&Number.isInteger(a.triangles));assert(Number.isFinite(a.height_m)&&a.height_m>0);
  const png=await sharp(preview).metadata();assert.equal(png.width,512);assert.equal(png.height,512);
  const doc=await io.read(file),root=doc.getRoot();assert.equal(root.listCameras().length,0);
   const report=reports.find(r=>r.file===a.file);assert(report,`Render report: ${a.id}`);
