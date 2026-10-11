@@ -1,0 +1,249 @@
+✖ missing input skips without keys (51.095834ms)
+✖ strict twenty transfer installs cleanly and retains existing key (43.289833ms)
+✖ missing deployment key rejects without mutation (53.141667ms)
+✖ missing input key rejects without mutation (40.650542ms)
+✖ wrong deployment key rejects without mutation (40.824041ms)
+✖ wrong input key rejects without mutation (46.347125ms)
+✖ tampered input rejects without mutation (39.659459ms)
+✖ tampered original rejects without mutation (41.334625ms)
+✖ rejects 8 models before installation (40.645083ms)
+✖ rejects 19 models before installation (40.41275ms)
+✖ rejects 21 models before installation (40.810459ms)
+✖ rejects archive symlinks before installation (40.329625ms)
+✖ rejects archive outside bundle before installation (46.119209ms)
+✖ rejects legacy input before installation (56.658875ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 0
+ℹ fail 14
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 678.830458
+
+✖ failing tests:
+
+test at tests/unit/grove-release-transfer.test.js:34:1
+✖ missing input skips without keys (51.095834ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   skipped: true
+  - }
+  
+      at file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:34:128
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { skipped: true },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:35:1
+✖ strict twenty transfer installs cleanly and retains existing key (43.289833ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   assets: 20,
+  -   skipped: false
+  - }
+  
+      at file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:35:103
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { assets: 20, skipped: false },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:36:144
+✖ missing deployment key rejects without mutation (53.141667ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:36:767
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:36:144
+✖ missing input key rejects without mutation (40.650542ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:36:767
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:36:144
+✖ wrong deployment key rejects without mutation (40.824041ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:36:767
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:36:144
+✖ wrong input key rejects without mutation (46.347125ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:36:767
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:36:144
+✖ tampered input rejects without mutation (39.659459ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:36:767
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:36:144
+✖ tampered original rejects without mutation (41.334625ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:36:767
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:37:30
+✖ rejects 8 models before installation (40.645083ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:37:297
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /ready|catalogue|20/i,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:37:30
+✖ rejects 19 models before installation (40.41275ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:37:297
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /ready|catalogue|20/i,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:37:30
+✖ rejects 21 models before installation (40.810459ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:37:297
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /ready|catalogue|20/i,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:38:1
+✖ rejects archive symlinks before installation (40.329625ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:38:130
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /Links|special/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:39:1
+✖ rejects archive outside bundle before installation (46.119209ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:39:300
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /path/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/unit/grove-release-transfer.test.js:40:1
+✖ rejects legacy input before installation (56.658875ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:40:286
+      at async run (file:///private/tmp/grove-phase2-life-hub/tests/unit/grove-release-transfer.test.js:33:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /modern|inventory/i,
+    operator: 'rejects',
+    diff: 'simple'
+  }

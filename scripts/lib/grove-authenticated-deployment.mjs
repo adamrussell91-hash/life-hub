@@ -23,7 +23,7 @@ async function migrateExactLegacy(source){
  await fs.writeFile(path.join(source,'SHA256SUMS.json'),JSON.stringify(await fileInventory(source),null,2)+'\n');
  await verifyHashInventory(source);return manifest;
 }
-export async function installAuthenticatedGroveDeployment(sealed,key,repository){
+export async function installAuthenticatedGroveDeployment(sealed,key,repository,{requireModern=false}={}){
  // Authentication completes before any archive parsing or extraction.
  const clear=openBundle(sealed,key),temp=await fs.mkdtemp(path.join(os.tmpdir(),'grove-authenticated-assets-'));
  try{
@@ -33,6 +33,7 @@ export async function installAuthenticatedGroveDeployment(sealed,key,repository)
   const types=execFileSync('tar',['-tvzf',archive],{encoding:'utf8'}).trim().split('\n');if(types.some(line=>!['-','d'].includes(line[0])))throw Error('Links or special files in deployment archive');
   execFileSync('tar',['-xzf',archive,'-C',temp]);const source=path.join(temp,'bundle');
   let modern=true;try{await fs.access(path.join(source,'SHA256SUMS.json'));}catch(e){if(e.code!=='ENOENT')throw e;modern=false;}
+  if(requireModern&&!modern)throw Error('Release requires modern hash inventory');
   let manifest;if(modern){await verifyHashInventory(source);manifest=JSON.parse(await fs.readFile(path.join(source,'manifest.json')));verifyRequiredCatalogue(manifest);const reports=JSON.parse(await fs.readFile(path.join(source,'motion-report.json')));verifyMotionReports(reports,manifest.assets);for(const a of manifest.assets)verifyDeclaredModelHash(a,reports.find(r=>r.file===a.file),await fs.readFile(modelPath(source,a.file)));}else manifest=await migrateExactLegacy(source);
   const repo=path.resolve(repository);execFileSync('git',['check-ignore','-q','apps/life/assets/grove/project-only/manifest.json'],{cwd:repo});const target=path.join(repo,'apps/life/assets/grove/project-only');await replaceAnimalBundle(source,target);
   return {assets:manifest.assets.length,migrated_legacy:!modern};
