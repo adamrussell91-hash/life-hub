@@ -1,0 +1,72 @@
+[
+  {
+    "source": "Assets/SilverDelivery/LowWorld_ForestAnimalsKit/textures/t_lowworld_forestanimals.png",
+    "file": "t_lowworld_forestanimals.png",
+    "sha256": "0816f2279f18bfa6d981478e35186d44a746e8810c7f2674491852c3f3d094c5",
+    "metadata_sha256": "9b9e48cfc929b9c4787f90ba90a21c9588e9783155d013231e1a181f8725bf0a",
+    "bytes": 2428
+  },
+  {
+    "source": "Assets/SilverDelivery/LowWorld_ForestAnimalsKit/models/smesh_boar.fbx",
+    "file": "smesh_boar.fbx",
+    "sha256": "1a0c524cf8a052b3701df46897c590548dc73504d76a8513910af16473f53b26",
+    "metadata_sha256": "8277bd5006eecdf23bcd4d042c754667d9aa2a02bc268cdeae95dd044912faaa",
+    "bytes": 872556
+  },
+  {
+    "source": "Assets/SilverDelivery/LowWorld_ForestAnimalsKit/models/smesh_fox.fbx",
+    "file": "smesh_fox.fbx",
+    "sha256": "d378af23edc40d892c93d2814cb125ba2af32bd5add836bc2847f87740175137",
+    "metadata_sha256": "fe7a401d4ee8b637cb4222b6df53595b133d63d9f336f348269404319488398a",
+    "bytes": 906396
+  },
+  {
+    "source": "Assets/SilverDelivery/LowWorld_ForestAnimalsKit/models/smesh_rabbit.fbx",
+    "file": "smesh_rabbit.fbx",
+    "sha256": "1e3fdd09da08dcc6b8634defa56cdec571b66135d9e714d4c397b83ab16bda12",
+    "metadata_sha256": "2312f84d19887e077dedc8bbb2d28d83f71b6e691d8ffec8f0e7eecc347c4a5f",
+    "bytes": 489820
+  },
+  {
+    "source": "Assets/SilverDelivery/LowWorld_ForestAnimalsKit/models/smesh_bear.fbx",
+    "file": "smesh_bear.fbx",
+    "sha256": "13f2ce8c015d802514ab1e2d7ddd0fbfd0d642c182e4d1818aaceb5ea0a59272",
+    "metadata_sha256": "0240f313b9146e5548c080432df9c1a64a37bbd729ff8f7f3961a0d7b0313bcc",
+    "bytes": 793580
+  },
+  {
+    "source": "Assets/SilverDelivery/LowWorld_ForestAnimalsKit/models/smesh_wolf.fbx",
+    "file": "smesh_wolf.fbx",
+    "sha256": "84457c5780ae0ee20f7142a398296f4887382e77ff537248220212fcb81b1ad6",
+    "metadata_sha256": "19e4d714dcf4401c57a9292c5592af9fba26fcaa4bffc54bd884239aeb34efdb",
+    "bytes": 871852
+  },
+  {
+    "source": "Assets/SilverDelivery/LowWorld_ForestAnimalsKit/models/smesh_moose.fbx",
+    "file": "smesh_moose.fbx",
+    "sha256": "cfd9c29d6762509fc4f9d3d34caec9036e3e52168e7e7a014ddb7a3d144fa7b3",
+    "metadata_sha256": "13c8c59e787d4ce967dce19ca8a67b336fd0049de7de7e01c5c25b9d394168f5",
+    "bytes": 729788
+  },
+  {
+    "source": "Assets/SilverDelivery/LowWorld_ForestAnimalsKit/LowWorld_ForestAnimalsKit_ReadMe.txt",
+    "file": "LowWorld_ForestAnimalsKit_ReadMe.txt",
+    "sha256": "1afeaacdb19bfca2f5f58b7b7aed70d4e8f27edb34ec06df2519fdccdda0df81",
+    "metadata_sha256": "19aed508f4d6aec65a3727c40ee8544f24bbde237a99ec098862b28e2a971bba",
+    "bytes": 883
+  },
+  {
+    "source": "Assets/SilverDelivery/LowWorld_ForestAnimalsKit/models/smesh_stag.fbx",
+    "file": "smesh_stag.fbx",
+    "sha256": "c456ceb7d71bc4c32aefcad18a9991da42066d2f47a5dabe55196243645264af",
+    "metadata_sha256": "c169eddbe3fa916abb2e601e97c0163d0d581265dbfe03291072f75a9ffab4c3",
+    "bytes": 753068
+  },
+  {
+    "source": "Assets/SilverDelivery/LowWorld_ForestAnimalsKit/models/smesh_deer.fbx",
+    "file": "smesh_deer.fbx",
+    "sha256": "ac0be2c2c293c7d90f9ee053c278445923a96a3de414f0e6db2dd1b0f69053b8",
+    "metadata_sha256": "8ef47dca21e94eb836456455572cbe68206e8c7685eff328ceeb82179485d0ea",
+    "bytes": 731324
+  }
+]
