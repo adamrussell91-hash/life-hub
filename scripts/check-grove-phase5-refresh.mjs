@@ -27,7 +27,7 @@ for(const [name,engine]of [['chromium',chromium],['webkit',webkit]].filter(([n])
  if(!(await page.locator('.grove-caption').textContent()).includes('10/10/26'))throw Error('Explicit history moved at midnight');
  console.log('STEP midnight and pinned');
  // A late same-view snapshot must not resurrect a reopened/deleted task.
- holdTasks=true;await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));for(let i=0;i<60&&!heldTasks;i++)await page.waitForTimeout(50);if(!heldTasks)throw Error('No delayed task request');tasks=tasks.map(t=>({...t,status:"todo",bucket:"todo",completed_at:null,updated_at:"2026-10-11T02:00:00Z"}));await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.waitForFunction(()=>document.querySelector('.grove-caption')?.textContent?.includes('quiet meadow'),null,{timeout:15000});
+ holdTasks=true;await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));for(let i=0;i<60&&!heldTasks;i++)await page.waitForTimeout(50);if(!heldTasks)throw Error('No delayed task request');tasks=[];await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.waitForFunction(()=>document.querySelector('.grove-caption')?.textContent?.includes('quiet meadow'),null,{timeout:15000});
  await heldTasks.route.fulfill({json:{ok:true,data:{tasks:heldTasks.tasks}}});heldTasks=null;await page.waitForTimeout(1500);
  if(!(await page.locator('.grove-caption').textContent()).includes('quiet meadow'))throw Error('Old task snapshot resurrected a tree');
  // The most recent successful bookshelf survives a later unavailable response.
@@ -56,7 +56,7 @@ for(const [name,engine]of [['chromium',chromium],['webkit',webkit]].filter(([n])
  // No-WebGL devices receive a readable fallback without an unhandled rejection.
  await page.addInitScript(()=>{const getContext=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){return String(type).startsWith('webgl')?null:getContext.call(this,type,...args);};});
  await page.goto(base+'/grove.html');await page.waitForSelector('#grove[data-state="error"]',{timeout:60000});if(!(await page.locator('#grove').textContent()).includes('could not draw on this device')||await page.locator('#grove canvas').count())throw Error('Missing no-WebGL fallback');
- if(errors.length)throw Error(errors.join('\n'));await page.screenshot({path:out+'/phase5-'+name+'-'+width+'-home.png'});evidence.push({engine:name,width,midnight:true,pinnedHistory:true,latestTaskSnapshot:true,obsoleteBookResponse:true,newYearNotice:true,acceptedBooksPreserved:true,midnightCamera:true,rapidYearLatest:true,homePreserved:true,noWebGLFallback:true,errors});await page.close();console.log('PASS refresh '+name+' '+width);
+ if(errors.length)throw Error(errors.join('\n'));await page.screenshot({path:out+'/phase5-'+name+'-'+width+'-home.png'});evidence.push({engine:name,width,midnight:true,pinnedHistory:true,latestTaskSnapshot:true,remoteDeletion:true,obsoleteBookResponse:true,newYearNotice:true,acceptedBooksPreserved:true,midnightCamera:true,rapidYearLatest:true,homePreserved:true,noWebGLFallback:true,errors});await page.close();console.log('PASS refresh '+name+' '+width);
  }}finally{await browser.close();}
 }
 await writeFile(out+'/phase5-refresh-evidence.json',JSON.stringify(evidence,null,2));
