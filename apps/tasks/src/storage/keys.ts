@@ -85,6 +85,11 @@ export function hubPrefsKey(): string {
   return 'meta/hub_prefs';
 }
 
+/** Private Grove history is independent of whole-preferences writes. */
+export function groveHistoryKey(): string {
+  return 'meta/grove_history';
+}
+
 /** Per-agent operating manual — agents may rewrite from chat. */
 export function agentProtocolKey(slug: string): string {
   return `agent_protocols/${slug}`;

@@ -12,6 +12,13 @@ import { readJsonObject } from './_shared/teaching-record-get.mjs';
 export const config = { path: '/api/hub-prefs' };
 
 const HUB_PREFS_KEY = 'meta/hub_prefs';
+const GROVE_HISTORY_KEY = 'meta/grove_history';
+const strongRead = (store,key) => store.get(key,{type:'json',consistency:'strong'});
+async function readPrivatePrefs(store) {
+  const prefs=parseHubPrefs(await strongRead(store,HUB_PREFS_KEY));
+  const history=parseGroveHistory(await strongRead(store,GROVE_HISTORY_KEY));
+  return history ? {...prefs,grove_history:history} : prefs;
+}
 const DEFAULT_TZ = 'Australia/Sydney';
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 // Keep in step with NSW_2026_TERMS in apps/tasks/src/domain/hub-prefs.ts.
@@ -77,7 +84,6 @@ function parseHubPrefs(raw) {
     : [];
   return {
     schema_version: 1,
-    ...(parseGroveHistory(body.grove_history) ? {grove_history:parseGroveHistory(body.grove_history)} : {}),
     timezone: typeof body.timezone === 'string' && body.timezone.trim() ? body.timezone : DEFAULT_TZ,
     updated_at: typeof body.updated_at === 'string' ? body.updated_at : null,
     dismissed_insight_ids: dismissed,
@@ -91,7 +97,7 @@ export function createHubPrefsHandler(deps = {}) {
     const { env, store } = context;
     try {
       if (request.method === 'GET') {
-        const prefs = parseHubPrefs(await store.get(HUB_PREFS_KEY, {type:'json',consistency:'strong'}));
+        const prefs = await readPrivatePrefs(store);
         return withCors(okResponse(200, prefs), request, env);
       }
 
@@ -101,15 +107,19 @@ export function createHubPrefsHandler(deps = {}) {
 
       const parsed = await readJsonObject(request);
       if (parsed.error) return withCors(parsed.error, request, env);
-      if (Object.prototype.hasOwnProperty.call(parsed.value,'grove_history')) validateGroveHistory(parsed.value.grove_history);
-      const current = parseHubPrefs(await store.get(HUB_PREFS_KEY, {type:'json',consistency:'strong'}));
-      const next = parseHubPrefs({
-        ...current,
-        ...(parsed.value && typeof parsed.value === 'object' ? parsed.value : {}),
-        updated_at: new Date().toISOString()
-      });
-      await setJSON(store, HUB_PREFS_KEY, next);
-      return withCors(okResponse(200, next), request, env);
+      const incoming=parsed.value;
+      const hasHistory=Object.prototype.hasOwnProperty.call(incoming,'grove_history');
+      const history=hasHistory ? validateGroveHistory(incoming.grove_history) : undefined;
+      const {grove_history:ignoredHistory,...prefsPatch}=incoming;
+      // History imports must never replace a snapshot of unrelated preferences.
+      // Its independent blob also survives every existing whole-preferences agent writer.
+      if (Object.keys(prefsPatch).length) {
+        const current=parseHubPrefs(await strongRead(store,HUB_PREFS_KEY));
+        const next=parseHubPrefs({...current,...prefsPatch,updated_at:new Date().toISOString()});
+        await setJSON(store,HUB_PREFS_KEY,next);
+      }
+      if (hasHistory) await setJSON(store,GROVE_HISTORY_KEY,history);
+      return withCors(okResponse(200, await readPrivatePrefs(store)), request, env);
     } catch (error) {
       return withCors(errorResponse(400, 'bad_request', error.message, false), request, env);
     }
