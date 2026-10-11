@@ -17,3 +17,13 @@ Verification:
 - Full gate/build/GPU deliberately not run per delegated task instruction; parent owns those before PR/deployment. No secret/auth access, network, upload, or publish performed.
 
 Operational limit: installation and ciphertext replacement are separate filesystem transactions; a ciphertext write failure fails the job and prevents artifact publication, but can leave the verified incoming private installation on the disposable Actions runner. Retry starts from checkout and original ciphertext. Neither malformed nor unauthenticated input mutates the installation.
+
+## Review round 1 fix
+
+Addressed the sole Important finding in task-1-review.md: recovery ciphertext artifact names now include `${{ github.run_attempt }}` (`grove-deployment-ciphertext-1`, `grove-deployment-ciphertext-2`, etc.), matching existing Pages retry handling. Parent retrieval must request the exact successful run-attempt suffix. Release plan reference updated narrowly.
+
+Added parsed-workflow regression covering a retained first-attempt artifact followed by a retry, plus assertions for conditional input handling, success-only ciphertext upload, exact encrypted file selection and pre-install ordering.
+
+RED: `node --test tests/unit/grove-release-workflow.test.js` produced 1 pass / 1 expected failure: retry artifact name collided with the first attempt. Evidence: task-1-retry-red.log.
+
+GREEN: `node --test tests/unit/grove-release-transfer.test.js tests/unit/grove-release-workflow.test.js` produced 16 passes / 0 failures / 0 skips. Evidence: task-1-retry-green.log. No full gate/build/GPU or network work performed.

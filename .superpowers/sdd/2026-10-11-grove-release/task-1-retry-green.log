@@ -1,0 +1,24 @@
+✔ missing input skips without keys (77.84125ms)
+✔ strict twenty transfer installs cleanly and retains existing key (116.304291ms)
+✔ missing deployment key rejects without mutation (51.488458ms)
+✔ missing input key rejects without mutation (58.935125ms)
+✔ wrong deployment key rejects without mutation (43.07125ms)
+✔ wrong input key rejects without mutation (41.059708ms)
+✔ tampered input rejects without mutation (40.637459ms)
+✔ tampered original rejects without mutation (41.783958ms)
+✔ rejects 8 models before installation (75.964ms)
+✔ rejects 19 models before installation (83.278709ms)
+✔ rejects 21 models before installation (77.595375ms)
+✔ rejects archive symlinks before installation (54.557875ms)
+✔ rejects archive outside bundle before installation (50.09825ms)
+✔ rejects legacy input before installation (91.162125ms)
+✔ ciphertext recovery artifacts remain distinct when a later build failure requires a retry (1.261541ms)
+✔ release transfer is conditional and recovery upload selects only durable ciphertext after success (0.136958ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 964.416125
