@@ -6,7 +6,7 @@ const base=process.env.GROVE_WORLD_URL||'http://127.0.0.1:5187',out=process.env.
 if(!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname))throw Error('Local preview required');
 await mkdir(out,{recursive:true});const evidence=[];
 for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
- const browser=await engine.launch({headless:true});try{for(const width of [1440,390]){
+ const browser=await engine.launch({headless:true,...(name==='chromium'&&process.env.GROVE_HARDWARE_GPU==='1'?{channel:'chrome',args:['--use-angle=metal']}:{})});try{for(const width of [1440,390]){
   const page=await browser.newPage({viewport:{width,height:width===390?844:1100}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base+'/grove-world-preview.html');await page.waitForSelector('#landscape[data-state="ready"]',{timeout:60000});
   const weeks=Number(await page.locator('#landscape').getAttribute('data-weeks'));if(weeks!==53)throw Error('Missing calendar ownership: '+weeks);

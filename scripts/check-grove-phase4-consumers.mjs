@@ -5,7 +5,7 @@ const base=process.env.GROVE_WORLD_URL||'http://127.0.0.1:5187',out=process.env.
 if(!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname))throw Error('Local acceptance only');
 await mkdir(out,{recursive:true});const evidence=[];
 for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
- const browser=await engine.launch({headless:true});try{const page=await browser.newPage(),errors=[];page.on('pageerror',e=>{errors.push(e.message);console.log('PAGEERROR',e.message);});page.on('console',e=>{if(e.type()==='error')console.log('CONSOLE',e.text());});
+ const browser=await engine.launch({headless:true,...(name==='chromium'&&process.env.GROVE_HARDWARE_GPU==='1'?{channel:'chrome',args:['--use-angle=metal']}:{})});try{const page=await browser.newPage(),errors=[];page.on('pageerror',e=>{errors.push(e.message);console.log('PAGEERROR',e.message);});page.on('console',e=>{if(e.type()==='error')console.log('CONSOLE',e.text());});
  const tasks=Array.from({length:283*5},(_,i)=>({id:`grove-${i}`,title:`Finished task ${i+1}`,domain:['life','teaching','health','wedding','other'][i%5],status:'done',bucket:'done',completed_at:new Date(Date.UTC(2026,0,1+Math.floor(i/5),0,i%5)).toISOString(),due_date:null,created_at:'2026-01-01T00:00:00Z',updated_at:'2026-10-10T00:00:00Z'}));
  await page.addInitScript(()=>{const Original=Date;globalThis.Date=class extends Original{constructor(...args){super(...(args.length?args:['2026-10-10T09:00:00Z']));}static now(){return new Original('2026-10-10T09:00:00Z').getTime();}};});
  await page.route('**/api/tasks',route=>{if(route.request().method()!=='GET')throw Error('Unexpected task write');return route.fulfill({json:{ok:true,data:{tasks}}});});
