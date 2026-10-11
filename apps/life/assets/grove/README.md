@@ -358,3 +358,7 @@ One entry per file. Claude's engine reads this file, so it must be complete and 
 ## 9. Hand-off
 
 When the PR is up, Adam will tell Claude Code. Claude reads `manifest.json` and the contact sheet, then builds Grove's day and week view first, then the term and year zoom, and adds animals last.
+
+## Production release status
+
+The four-area completion pass is shipped in [PR #791](https://github.com/adamrussell91-hash/life-hub/pull/791), with a successful [Pages deployment](https://github.com/adamrussell91-hash/life-hub/actions/runs/38100432730). All eight live model files match the checked build; the encrypted archive is absent from the website. The umbrella API publishes the same release. Full details and verification are in [BUILD-PLAN.md](BUILD-PLAN.md). Optional enhancements remain separate.
