@@ -49,10 +49,10 @@ Files: tools/grove-previews/animal-bundle-integrity.mjs, install-project-animals
 
 ## Task 4 — Phase 5 acceptance and recovery
 
-- [ ] Run native consumer/race/midnight/fallback/rapid-year/motion/picking checks at1440 and390 in Chromium/WebKit, including real Mac GPU interaction timings.
-- [ ] Run unchanged required repository gate, then serial production build and baseline full Tasks type comparison.
-- [ ] Save fresh clause matrix, reviews, screenshots/raw results and explicit remaining physical-phone/deployment gates.
-- [ ] Commit verified changes, refresh both recovery patches/bundle and delivery checksums; verify forward/reverse Git trees and assets.
+- [x] Run native consumer/race/midnight/fallback/rapid-year/motion/picking checks at1440 and390 in Chromium/WebKit, including real Mac GPU interaction timings.
+- [x] Run unchanged required repository gate, then serial production build and baseline full Tasks type comparison.
+- [x] Save fresh clause matrix, reviews, screenshots/raw results and explicit remaining physical-phone/deployment gates.
+- [x] Commit verified changes, refresh both recovery patches/bundle and delivery checksums; verify forward/reverse Git trees and assets.
 
 ## Task 5 — Reuse decoded near-tree resources during interaction
 
@@ -66,3 +66,5 @@ Files: apps/tasks/src/views/grove/annual-trees.ts, apps/tasks/src/grove-world-pr
 - [x] Dispose library resources exactly once with renderer disposal; async loads resolving after disposal release their source resources immediately and do not attach stale trees. A failed model remains a silhouette and does not poison other models.
 - [x] TDD meaningful repeated-subset reuse, borrowed-versus-owned disposal, shared texture/geometry release, delayed load after disposal, fallback and original cap/style/transform tests. No GPU/full gate/build in implementer; parent runs native weekly interaction/lifecycle profiling, final gate/build/type comparison.
 - [x] Independent spec/resource code review clean before final acceptance. Keep the reusable-model cache bounded and report any new public API or material ownership tradeoff.
+
+Closure: required gate, production build, unchanged67-error full Tasks baseline, final native matrix and independent review passed. Both recovery patches verified against exact Git trees in both directions; bundle and asset/delivery inventories verified. Physical phone and deployed encrypted20-model acceptance remain explicit release gates. Branch kept local under the existing no-push/no-deploy instruction.
