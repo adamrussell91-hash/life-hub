@@ -1,9 +1,13 @@
+import type {WaterQuality} from '@/domain/grove/motion';
+import {AnnualGroveLoader} from '@/domain/grove/annual-loader';
+import type {AnnualGrovePlan} from '@/domain/grove/annual-plan';
+import type {AnnualTree} from '@/domain/grove/planting';
 import {groveBooks} from '@/domain/grove/books';
 /**
  * Grove (`#/grove?view=day|week&date=YYYY-MM-DD`): the forest grown from finished tasks.
  * The page reads task history and draws it; it never writes anything.
  */
-import { buildGrovePlan, type GrovePlan, type GroveTree, type GroveView } from '@/domain/grove/plan';
+import { type GroveView } from '@/domain/grove/plan';
 import { GROVE_SPECIES, SPECIES_LABEL, SPECIES_SHORT } from '@/domain/grove/assets';
 import { adjacentGroveDate, groveTerms, type GroveTerm } from '@/domain/grove/calendar';
 import { isDateKey } from '@/domain/grove/dates';
@@ -18,10 +22,11 @@ import type { GroveSceneHandle } from './scene';
 import { dayCaption, finishedLine, undatedNote, periodCaption, weekCaption } from './copy';
 import './grove.css';
 
+const annualLoader=new AnnualGroveLoader();
 let detach: (() => void) | null = null;
-let sceneHandle: GroveSceneHandle | null = null;
+let sceneHandle: (GroveSceneHandle&{setQuality(quality:WaterQuality):void}) | null = null;
 let generation = 0;
-let wildlifePaused = false;
+let wildlifePaused = false;let quality:WaterQuality='medium';
 
 export function groveRoute(query: URLSearchParams, today: string): { view: GroveView; date: string } {
   const rawView = query.get('view');
@@ -46,6 +51,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
 }
 
 export async function renderGroveView(canvas: HTMLElement): Promise<void> {
+  annualLoader.cancel();
   detach?.();
   detach = null;
   sceneHandle?.dispose();
@@ -98,15 +104,16 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   card.hidden = true;
   card.setAttribute('role', 'dialog');
   card.setAttribute('aria-label', 'Tree');
-  const wildlife = el('button', 'btn btn--secondary grove-wildlife', wildlifePaused ? 'Resume wildlife' : 'Pause wildlife');
-  wildlife.type = 'button';wildlife.hidden = true;
+  const wildlife = el('button', 'btn btn--secondary grove-wildlife', wildlifePaused ? 'Resume motion' : 'Pause motion');
+  wildlife.type = 'button';wildlife.hidden = false;
   wildlife.setAttribute('aria-pressed', String(wildlifePaused));
   wildlife.addEventListener('click', () => {
     wildlifePaused = !wildlifePaused;
-    wildlife.textContent = wildlifePaused ? 'Resume wildlife' : 'Pause wildlife';
+    wildlife.textContent = wildlifePaused ? 'Resume motion' : 'Pause motion';
     wildlife.setAttribute('aria-pressed', String(wildlifePaused));
     sceneHandle?.setWildlifePaused(wildlifePaused);
   });
+  const qualitySelect=el('select','btn btn--secondary grove-quality');qualitySelect.setAttribute('aria-label','Water quality');for(const level of ['low','medium','high'] as const){const option=el('option','',level.charAt(0).toUpperCase()+level.slice(1)+' water');option.value=level;qualitySelect.append(option);}qualitySelect.value=quality;qualitySelect.addEventListener('change',()=>{quality=qualitySelect.value as WaterQuality;sceneHandle?.setQuality(quality);});
   const credits = el('details', 'grove-credits');
   const creditSummary = el('summary', '', 'Wildlife credits');
   const creditText = el('p');
@@ -120,7 +127,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     framing.textContent = overview ? 'Show selected clearing' : `Show whole ${route.view}`;
     card.hidden = true;
   });
-  hud.append(bar, caption, key, card, wildlife, credits, framing);
+  hud.append(bar, caption, key, card, wildlife, qualitySelect, credits, framing);
 
   let tasks: Task[];
   try {
@@ -138,12 +145,12 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   terms = groveTerms({hubPrefs, planningProfile});
   back.href = groveHash(route.view, navDate(-1), today);
   forward.href = groveHash(route.view, navDate(1), today);
-  let plan = buildGrovePlan({ tasks, view: route.view, anchor: route.date, now: new Date(), terms, books });
+  let loaded:Awaited<ReturnType<AnnualGroveLoader['load']>>;try{loaded=await annualLoader.load({tasks,view:route.view,anchor:route.date,now:new Date(),terms,books});}catch(error){if(gen!==generation)return;renderLoadError(stage,error,()=>void renderGroveView(canvas),'Could not prepare annual Grove');return;}if(gen!==generation)return;let plan=loaded.plan;
   paintHud(plan);
   let mountRevision = 0;
-  await mount(plan, 'all');
+  await mount(plan, 'all');if(gen!==generation)return;
 
-  function paintHud(next: GrovePlan): void {
+  function paintHud(next: AnnualGrovePlan): void {
     caption.textContent = next.view === 'week' ? weekCaption(next) : next.view === 'day' ? dayCaption(next) : periodCaption(next);
     key.replaceChildren();
     const list = el('ul', 'grove-key__list');
@@ -166,7 +173,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     key.hidden = !key.childElementCount;
   }
 
-  function showCard(tree: GroveTree | null, x: number, y: number): void {
+  function showCard(tree: AnnualTree | null, x: number, y: number): void {
     if (!tree) {
       card.hidden = true;
       return;
@@ -187,29 +194,28 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     card.style.top = `${top}px`;
   }
 
-  async function mount(next: GrovePlan, wobble: ReadonlySet<string> | 'all'): Promise<void> {
+  async function mount(next: AnnualGrovePlan, wobble: ReadonlySet<string> | 'all'): Promise<void> {
     const revision = ++mountRevision;
     const cameraState=sceneHandle?.cameraState();
-    const { mountGroveScene } = await import('./scene');
+    const { mountAnnualGroveScene } = await import('./annual-scene');
     if (gen !== generation || revision !== mountRevision) return;
     const byId = new Map(next.trees.map((t) => [t.id, t]));
     try {
-      const handle = await mountGroveScene(stage, {
-        plan: next,
+      const handle = await mountAnnualGroveScene(stage, {
+        ...loaded,plan: next,
         interactive: true,
-        reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-        wobble,
+
         wildlifePaused,
         cameraState,
         onWildlife: (count, missing, lines) => {
           if (gen !== generation || revision !== mountRevision) return;
-          wildlife.hidden = count === 0 || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          wildlife.hidden = false;
           creditText.textContent = lines.join(' · ');
           credits.hidden = !lines.length;
           page.dataset.wildlifeCount = String(count);
           page.dataset.unavailableWildlife = missing.join(',');
         },
-        focusKey: next.days.some((d) => d.key === today) ? today : next.anchor,
+
         onPick: (id, x, y) => showCard(id ? byId.get(id) ?? null : null, x, y)
       });
       if (gen !== generation || revision !== mountRevision) {
@@ -217,7 +223,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
         return;
       }
       sceneHandle?.dispose();
-      sceneHandle = handle;
+      sceneHandle = handle;handle.setQuality(quality);
     } catch (error) {
       if (gen !== generation || revision !== mountRevision) return;
       sceneHandle?.dispose();sceneHandle=null;
@@ -235,7 +241,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
       const fresh = await tasksApi.listTasks().catch(() => null);
       if (!fresh || gen !== generation) return;
       const before = new Set(plan.trees.map((t) => t.id));
-      plan = buildGrovePlan({ tasks: fresh, view: route.view, anchor: route.date, now: new Date(), terms, books });
+      try{loaded=await annualLoader.load({tasks:fresh,view:route.view,anchor:route.date,now:new Date(),terms,books});}catch(error){if(error instanceof DOMException&&error.name==='AbortError')return;console.error(error);return;}if(gen!==generation)return;plan=loaded.plan;
       paintHud(plan);
       card.hidden = true;
       await mount(plan, new Set(plan.trees.filter((t) => !before.has(t.id)).map((t) => t.id)));
@@ -282,6 +288,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
 
 /** Called by the shell when another view takes the canvas. */
 export function unmountGroveView(): void {
+  annualLoader.cancel();
   detach?.();
   detach = null;
   sceneHandle?.dispose();

@@ -2,7 +2,7 @@
 <html lang="en" data-hub="tasks">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Grove annual geography preview</title></head>
 <body><main class="world-preview">
-  <header><p class="world-preview__eyebrow">Grove · Phase 3</p><h1>Annual landscape</h1><p>Annual activity prototype · weekly regions and terrain-aware planting. Synthetic records only.</p></header>
+  <header><p class="world-preview__eyebrow">Grove · Phase 4</p><h1>Annual landscape</h1><p>Animated annual world · shared water and wildlife motion. Synthetic records only.</p></header>
   <div class="world-preview__controls">
     <button id="previous" class="btn btn--secondary" aria-label="Previous year">‹</button>
     <label for="year">Year <input id="year" type="number" min="1900" max="9999" step="1" value="2026"></label>
@@ -13,6 +13,9 @@
     <label>Anchor <input id="anchor" type="date" value="2026-06-10"></label>
     <label>View <select id="view"><option value="year">Year</option><option value="term">Term</option><option value="week">Week</option><option value="day">Day</option></select></label>
     <label>Synthetic trees <select id="fixture"><option value="0">0</option><option value="200">200 in one week</option><option value="1500">1,500</option><option value="5000">5,000</option><option value="10000">10,000</option></select></label>
+    <label>Quality <select id="quality"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></label>
+    <label>Scene <select id="scene-mode"><option value="annual">Annual world</option><option value="prototype">Synthetic water prototype</option></select></label>
+    <button id="motion" class="btn btn--secondary">Pause motion</button>
     <button id="frame" class="btn btn--secondary">Focus selection</button>
   </div>
   <p id="boundary" hidden></p><p id="picked" role="status">Select a tree to inspect its task.</p>
