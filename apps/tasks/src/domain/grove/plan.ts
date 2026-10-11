@@ -17,7 +17,7 @@ import { toHubDateKey } from '@/domain/queries';
 import { GROVE_SPECIES, HUB_SPECIES, PROP_VARIANTS, TREE_VARIANTS, type GrovePropKind, type GroveSpecies } from './assets';
 import { addDays, daysBetween, isDateKey, mondayOf, weekdayIndex } from './dates';
 import { hashString, seededRandom } from './random';
-import { wildlifeMilestones, type WildlifeMilestone } from './wildlife';
+import { wildlifeMilestones, type GroveBookInput, type WildlifeMilestone } from './wildlife';
 import { sampleTerrain } from './terrain';
 import { groveCalendar, groveDateKeys, grovePeriod, type GroveTerm } from './calendar';
 
@@ -276,6 +276,7 @@ export function buildGrovePlan(input: {
   now: Date;
   timeZone?: string;
   terms?: readonly GroveTerm[];
+  books?: readonly GroveBookInput[];
 }): GrovePlan {
   const nowMs = input.now.getTime();
   const today = toHubDateKey(input.now, input.timeZone);
@@ -328,6 +329,6 @@ export function buildGrovePlan(input: {
     undated,
     periodLabel: period.label,
     provisionalCalendar: period.provisional,
-    wildlife: wildlifeMilestones(completions.filter(c => c.completedMs <= nowMs), [...historicalTerms.values()], keys.at(-1)! < today ? keys.at(-1)! : today)
+    wildlife: wildlifeMilestones(completions.filter(c => c.completedMs <= nowMs), [...historicalTerms.values()], keys.at(-1)! < today ? keys.at(-1)! : today, input.books)
   };
 }

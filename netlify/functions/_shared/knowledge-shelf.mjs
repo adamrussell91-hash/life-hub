@@ -103,6 +103,11 @@ export function cleanBookPatch(raw) {
     else if (raw.reading === true) patch.reading = { page: null };
     else throw invalid('Reading must be an object, true, or null.');
   }
+  if (raw.completed_on !== undefined) {
+    if (raw.completed_on === null) patch.completed_on = null;
+    else if (typeof raw.completed_on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.completed_on) && Number.isFinite(Date.parse(raw.completed_on+'T12:00:00Z')) && new Date(raw.completed_on+'T12:00:00Z').toISOString().slice(0,10) === raw.completed_on) patch.completed_on = raw.completed_on;
+    else throw invalid('A valid book completion date is required.');
+  }
   return patch;
 }
 
@@ -152,6 +157,10 @@ export async function readShelf(store) {
 
 export async function saveBook(store, raw, { now = new Date().toISOString() } = {}) {
   const patch = cleanBookPatch(raw);
+  const today = new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Sydney',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(now));
+  if (patch.completed_on && patch.completed_on > today) throw invalid('A book completion date cannot be in the future.');
+  if (patch.completed_on) patch.reading = null;
+  else if (patch.reading) patch.completed_on = null;
   const key = shelfBookKey(patch.label);
   const books = await getJSON(store, BOOKS_KEY);
   const current = books[key] ?? { label: patch.label };

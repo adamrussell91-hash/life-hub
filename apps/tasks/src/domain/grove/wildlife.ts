@@ -1,12 +1,13 @@
 /** Milestones come only from live dated history. Motion is cosmetic and carries no saved state. */
 import type {GroveCompletion} from './plan';
 import type {GroveTerm} from './calendar';
-import {addDays,mondayOf} from './dates';
+import {addDays,mondayOf,isDateKey} from './dates';
 import {seededRandom} from './random';
-export type WildlifeSpecies='hare'|'deer'|'fox'|'squirrel'|'robin'|'mallard';
+export type GroveBookInput={label?:string;completed_on?:string|null};
+export type WildlifeSpecies='hare'|'deer'|'fox'|'squirrel'|'robin'|'mallard'|'owl';
 export type WildlifeMilestone={species:WildlifeSpecies;earnedOn:string;reason:string;baby:boolean};
-export const WILDLIFE_MODEL:Record<WildlifeSpecies,string>={hare:'animal-rabbit-hare',deer:'animal-deer-doe',fox:'animal-fox',squirrel:'animal-squirrel',robin:'animal-bird-robin',mallard:'animal-duck-mallard'};
-export function wildlifeMilestones(completions:readonly GroveCompletion[],terms:readonly GroveTerm[],through:string):WildlifeMilestone[] {
+export const WILDLIFE_MODEL:Record<WildlifeSpecies,string>={hare:'animal-rabbit-hare',deer:'animal-deer-doe',fox:'animal-fox',squirrel:'animal-squirrel',robin:'animal-bird-robin',mallard:'animal-duck-mallard',owl:'animal-owl'};
+export function wildlifeMilestones(completions:readonly GroveCompletion[],terms:readonly GroveTerm[],through:string,books:readonly GroveBookInput[]=[]):WildlifeMilestone[] {
   const live=[...completions].filter(c=>c.dayKey<=through).sort((a,b)=>a.completedMs-b.completedMs || a.id.localeCompare(b.id));
   const days=new Map<string,number>(),weeks=new Map<string,Set<string>>(),weekCounts=new Map<string,number>();
   for(const c of live) {days.set(c.dayKey,(days.get(c.dayKey)??0)+1);const week=mondayOf(c.dayKey);const set=weeks.get(week)??new Set();set.add(c.dayKey);weeks.set(week,set);weekCounts.set(week,(weekCounts.get(week)??0)+1);}
@@ -22,6 +23,8 @@ export function wildlifeMilestones(completions:readonly GroveCompletion[],terms:
     return live.filter(c=>mondayOf(c.dayKey)===week)[19]!.dayKey;
   });
   add('mallard',busy,'A week with twenty finished tasks');
+  const finished=books.filter(b=>isDateKey(b.completed_on) && b.completed_on!<=through).map(b=>b.completed_on!).sort();
+  add('owl',finished,'A finished book');
   return earned;
 }
 export type PathPoint={x:number;z:number};

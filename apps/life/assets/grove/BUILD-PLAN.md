@@ -22,11 +22,11 @@
 - [x] Render faceted hills, lake surfaces and connected streams. Place MegaKit vegetation above dry terrain; reeds/lilies use the previously approved Kenney exceptions. Use static water highlights rather than a costly permanent shader loop.
 
 ## Wildlife
-- [x] Derive fixed recognisable milestones: hare first five-task day; deer first complete Monday–Sunday week; fox first completed school term with completions; squirrel first 25 Teaching completions; robin first 10 Life/Health completions; mallard first 20-completion week. No points UI or guessed book completions. Owl awaits an actual book-completion data source and matching model.
+- [x] Derive fixed recognisable milestones: hare first five-task day; deer first complete Monday–Sunday week; fox first completed school term with completions; squirrel first 25 Teaching completions; robin first 10 Life/Health completions; mallard first 20-completion week. No points UI or guessed book completions. Owl uses explicit Bookshelf completion dates and a credited Poly by Google model with original Grove motion.
 - [x] Load available assets, clone independent skeletons, move in-place clips along deterministic dry/water-safe paths, graze/idle, fly the robin, swim the mallard, and add a half-size baby for a repeated hare/deer milestone. No terrain crossing by land animals. Pause when hidden/offscreen or reduced-motion; offer a wildlife pause control.
 - [x] Keep restricted originals/GLBs out of public Git. Local installer and ZIP remain Claude's source. Public builds gracefully use only available species; document exact deployment requirement and credits.
 
-## Verification and delivery
+## Verification of #790 and delivery
 - [x] Real-entry browser checks at 1440/390 for all views, task picking, date navigation, Home embed, reduced motion, wildlife pause, missing optional pack, and unmount cleanup.
 - [x] Inspect rendered screenshots against the approved soft faceted style; record deviations here.
 - [x] Run Grove tests, Tasks typecheck/build, public model validator, and mandatory root pre-PR gate.
@@ -47,6 +47,20 @@
 - Term/Year use instanced faceted stand-ins, as planned; Day/Week use the purchased MegaKit meshes. Phone broad views frame the anchor clearing and allow panning; desktop fits the whole period. Resize/replant retains the user’s camera. Tiny/offscreen wildlife does not run a permanent animation loop.
 - Lakes use Priority-Flood spill levels. Streams follow the explicitly carved low valley as a continuous ribbon; individual short drainage edges are not rendered as disconnected strips. Water is static, with reeds and lily pads, and shares the wet mask used by planting and motion. No ripple shader or ambient audio is added in this slice.
 - Trees mature over three real days using the authored mature mesh at smaller scale; unique authored sapling meshes are not required.
-- The owl/book milestone remains deferred until an actual book-completion source and matching model exist. Missing optional animal files are skipped gracefully; they never become placeholder cubes.
+- Book/owl and full animal deployment were completed in the follow-up below. Missing model files still fail gracefully; they never become placeholder cubes.
 - Main advanced during the build; its unrelated #789 changes were merged cleanly. #788 was recovered from its merged stack branch without discarding #786’s local animal hand-off.
 - Delivery happens after committing this verification record. The integration PR’s GitHub state is authoritative for creation and merge status.
+
+## Completion pass — 11 October
+
+- [x] Eight-model bundle packaged with authenticated encryption; GitHub Actions key installed and install round trip verified. The Pages workflow installs before building; no licensed plaintext source or key enters Git.
+- [x] Explicit `completed_on` date in existing Bookshelf metadata and Book facts UI; dates survive other edits, clear on rereading, reject impossible/future dates. Grove reads the same signed-in shelf and awards one owl. No new game store/job.
+- [x] Owl source/credit recorded; original four-joint rig and four looping clips pass vertex deformation and seam verification.
+- [x] Phone Book facts R4 failure reproduced and fixed: independently scrolling fields, docked 44px actions, 16px controls, safe-area padding. Chromium and WebKit Save/reopen/rereading checks pass at desktop and 390px.
+- [x] Whole-period framing added; phones can show the full week/term/year and return to the selected clearing.
+- [x] Final Chromium and WebKit suites: Day/Week/Term/Year at 1440 and 390px, nine milestone actors, no page errors/overflow; picking/Escape, whole-period framing, pause/reduced motion, public-only fallback, embed and disposal pass. Bookshelf Save/reopen/rereading also pass in both engines at both sizes.
+- [x] Signed-in account: 108 year trees, 22 week trees, configured holiday meadow rather than guessed terms; Home iframe renders. A labelled temporary test task grows one oak and its picked link opens the correct task. Reopening removes completion; the test record is retained inactive rather than permanently deleted.
+- [x] Graph teardown race reproduced with fake timers and fixed; a rapid Branch→Lines transition remains visible. Home clearing refreshes on the existing task-change event.
+- [x] Final mandatory pre-PR gate passes: root 5,615 tests (one existing skip), Tasks 1,178 tests and Professional typecheck. Knowledge's 1,249 tests and all eight models' motion/deformation checks pass. No test checks weakened.
+- [ ] Production release/catalogue/API verification. See the PR and local acceptance report for the final deployment evidence.
+- Optional audio, water animation, extra species and dedicated young meshes remain out of this completion pass.

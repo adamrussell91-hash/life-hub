@@ -45,6 +45,10 @@ jobs:
             test-output.log
             tasks-vitest-output.log
           if-no-files-found: ignore
+      - name: Install Grove project assets
+        run: node scripts/install-grove-deployment-assets.mjs
+        env:
+          GROVE_ASSET_KEY: ${{ secrets.GROVE_ASSET_KEY }}
       - run: npm run build
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}

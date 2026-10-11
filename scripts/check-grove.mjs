@@ -1,15 +1,17 @@
 import {createRequire} from 'node:module';
 const sharp=createRequire(new URL('../tools/grove-previews/package.json',import.meta.url))('sharp');
-import {chromium} from '../node_modules/playwright/index.mjs';
+import {chromium,webkit} from '../node_modules/playwright/index.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 const output=new URL((process.env.GROVE_REPORT_DIR || '/tmp/grove-browser-report') + '/','file:///');await mkdir(output,{recursive:true});
 const base=process.env.GROVE_BASE_URL || 'http://127.0.0.1:5175';
 if(!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname))throw Error('Grove checks use a local mock app only');
-const browser=await chromium.launch({headless:true});
+const engine=process.env.GROVE_BROWSER==='webkit'?webkit:chromium;
+const browser=await engine.launch({headless:true});
 const context=await browser.newContext({viewport:{width:1440,height:1000}});
-const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+const page=await context.newPage(),errors=[];page.on('pageerror',e=>{errors.push(e.message);console.log('Page error at',page.url(),e.message);});
 let tasks=Array.from({length:283*5},(_,i)=>({id:`grove-${i}`,title:`Finished task ${i+1}`,domain:['life','teaching','health','wedding','other'][i%5],status:'done',bucket:'done',completed_at:new Date(Date.UTC(2026,0,1+Math.floor(i/5),0,i%5)).toISOString(),due_date:null,created_at:'2026-01-01T00:00:00Z',updated_at:'2026-10-10T00:00:00Z'}));
 await page.addInitScript(()=>{const Original=Date;globalThis.Date=class extends Original{constructor(...args){super(...(args.length?args:['2026-10-10T09:00:00Z']));}static now(){return new Original('2026-10-10T09:00:00Z').getTime();}};});
+await page.route('**/api/knowledge/shelf',route=>route.fulfill({json:{ok:true,data:{books:[{label:'Acceptance book',completed_on:'2026-08-01'}],placements:[]}}}));
 await page.route('**/api/tasks',route=>route.fulfill({json:{ok:true,data:{tasks}}}));
 await page.goto(`${base}/#/grove`);
 if(await page.locator('#sign-in-passphrase').isVisible()){await page.locator('#sign-in-passphrase').fill('tasks-hub-local');await page.getByRole('button',{name:'Sign in',exact:true}).click();}
@@ -27,9 +29,16 @@ for(const width of [1440,390]) {
     for (let i=0;i<pixels.length;i+=info.channels) if(pixels[i+1]>pixels[i]*1.1 && pixels[i+1]>pixels[i+2]*1.1) green++;
     data.terrainPixels = green;
     if(green < info.width*info.height*.01) {await writeFile(new URL(`failed-${view}-${width}.png`,output),stage);throw Error(`Blank terrain in ${view} at ${width}: ${green} green pixels`);}
-    if(Number(data.animals)!==8 || data.missing)throw Error('Expected all eight milestone actors: '+JSON.stringify(data));
+    if(Number(data.animals)!==9 || data.missing)throw Error('Expected all nine milestone actors: '+JSON.stringify(data));
     if(data.overflow || data.canvases!==1 || data.active?.toLowerCase()!==view)throw Error(JSON.stringify({view,width,data}));
     await writeFile(new URL(`${view}-${width}.png`,output),stage);results.push({view,width,...data});console.log(`Checked ${view} ${width}`);
+    if(view!=='day') {
+      await page.getByRole('button',{name:`Show whole ${view}`,exact:true}).click();
+      if(await page.locator('.grove-stage').getAttribute('data-frame')!=='overview')throw Error('Whole period did not frame');
+      await page.screenshot({path:new URL(`overview-${view}-${width}.png`,output).pathname});
+      await page.getByRole('button',{name:'Show selected clearing',exact:true}).click();
+      if(await page.locator('.grove-stage').getAttribute('data-frame')!=='clearing')throw Error('Selected clearing did not frame');
+    }
     const pause=page.getByRole('button',{name:'Pause wildlife',exact:true});if(await pause.isVisible()){await pause.click();await page.getByRole('button',{name:'Resume wildlife',exact:true}).waitFor();await page.getByRole('button',{name:'Resume wildlife',exact:true}).click();}
   }
 }

@@ -85,6 +85,8 @@ export async function renderGraphView(canvas: HTMLElement): Promise<void> {
   let view = graphViewFromHash();
   let mount: (LinesMount | BranchMount | OrbitMount) | null = null;
   let mountedView: GraphPageView | null = null;
+  let disposed = false;
+  let paintRevision = 0;
 
   const page = el('div', 'graph-page');
   const pills = () =>
@@ -274,6 +276,10 @@ export async function renderGraphView(canvas: HTMLElement): Promise<void> {
   }
 
   async function paintView(): Promise<void> {
+    if (disposed) return;
+    const revision = ++paintRevision;
+    // The latest paint owns visibility, including returning to the mounted view or list.
+    stage.classList.remove('is-fading');
     view = graphViewFromHash();
     paintChrome();
     insights = rankInsights(buildGraphInsights(scopedTasks(), workingProjects, new Date(), dismissed));
@@ -400,6 +406,7 @@ export async function renderGraphView(canvas: HTMLElement): Promise<void> {
       if (mount && !prefersReducedMotion()) {
         stage.classList.add('is-fading');
         await new Promise((resolve) => window.setTimeout(resolve, 160));
+        if (disposed || revision !== paintRevision) return;
       }
       mount?.teardown();
       mount = null;
@@ -464,11 +471,13 @@ export async function renderGraphView(canvas: HTMLElement): Promise<void> {
     tasks: scopedTasks().slice(0, 40),
     projects: workingProjects.slice(0, 20)
   }).then((enriched) => {
+    if (disposed) return;
     if (Array.isArray(enriched?.insights) && enriched.insights.length) {
       insights = rankInsights(enriched.insights as GraphInsight[]);
       paintInsights();
     }
   }).catch(() => {
+    if (disposed) return;
     matchCount.textContent = `${matchCount.textContent} Clare offline, showing basic insights`.trim();
   });
 
@@ -478,6 +487,8 @@ export async function renderGraphView(canvas: HTMLElement): Promise<void> {
   await paintView();
 
   const teardown = () => {
+    disposed = true;
+    paintRevision += 1;
     document.removeEventListener('keydown', onKey);
     stopChanged();
     stopDeleted();

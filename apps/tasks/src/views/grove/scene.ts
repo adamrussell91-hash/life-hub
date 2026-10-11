@@ -39,6 +39,7 @@ import { propModelFile, treeModelFile } from '@/domain/grove/assets';
 import type { GroveDay, GrovePlan, GroveTree } from '@/domain/grove/plan';
 import { shoreProps } from '@/domain/grove/shore';
 import { sampleTerrain } from '@/domain/grove/terrain';
+import {frameGroveDays} from '@/domain/grove/framing';
 import { createGroveAnimals } from './animals';
 import { createGroveGround } from './ground';
 import { groveAssetUrl } from './asset-url';
@@ -66,6 +67,7 @@ export type GroveSceneOptions = {
 
 export type GroveSceneHandle = {
   resize(): void;
+  frame(mode:'overview'|'clearing'): void;
   setWildlifePaused(paused: boolean): void;
   cameraState(): GroveCameraState;
   dispose(): void;
@@ -375,7 +377,7 @@ export async function mountGroveScene(host: HTMLElement, options: GroveSceneOpti
   }
 
   /** Fit the frame to the clearings (not the island), so trees are as large as the screen allows. */
-  function fit(width: number, height: number): void {
+  function fit(width: number, height: number, mode:'auto'|'overview'|'clearing'='auto'): void {
     const aspect = width / Math.max(1, height);
     camera.updateMatrixWorld(true);
     const view = camera.matrixWorldInverse;
@@ -398,7 +400,9 @@ export async function mountGroveScene(host: HTMLElement, options: GroveSceneOpti
     frameDays(plan.days);
     // If the whole window would draw a mature tree under ~25 px, frame the focus day and let the rest pan in.
     const metres = Math.max((box.max.x - box.min.x) / width, (box.max.y - box.min.y) / height);
-    if (width < 720 && 1 / metres < 4.5 && focus) frameDays([focus]);
+    const framedDays=frameGroveDays(plan.days,focus,width,metres,mode);
+    frameDays(framedDays);
+    host.dataset.frame=framedDays.length===plan.days.length?'overview':'clearing';
     const padX = (box.max.x - box.min.x) * 0.06;
     const padTop = (box.max.y - box.min.y) * 0.16; // room for the toolbar and caption
     const padBottom = (box.max.y - box.min.y) * 0.06;
@@ -543,6 +547,7 @@ export async function mountGroveScene(host: HTMLElement, options: GroveSceneOpti
 
   return {
     resize,
+    frame(mode) {fit(host.clientWidth || 1,host.clientHeight || 1,mode);requestRender();},
     cameraState() {
       const focus=controls?.target??target;
       return {position:[camera.position.x,camera.position.y,camera.position.z],target:[focus.x,focus.y,focus.z],zoom:camera.zoom,left:camera.left,right:camera.right,top:camera.top,bottom:camera.bottom};

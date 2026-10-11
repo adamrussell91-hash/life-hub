@@ -52,6 +52,7 @@ export type BookModel = {
   lastNotePage?: number;
   densestChapter?: ChapterModel;
   reading?: { page?: number };
+  completedOn?: string;
   links: BookLink[];
   latestActivity?: string;
 };
@@ -247,6 +248,7 @@ function modelBook(
     noteCount: notes.length,
     lastNotePage,
     densestChapter,
+    completedOn: facts?.completed_on,
     reading: facts?.reading ? { page: facts.reading.page ?? undefined } : undefined,
     links,
     latestActivity: activity[activity.length - 1],

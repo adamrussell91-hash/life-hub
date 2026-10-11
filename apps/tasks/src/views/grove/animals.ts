@@ -55,7 +55,7 @@ export async function createGroveAnimals(plan:GrovePlan,origin:{x:number;z:numbe
         const size=(milestone.species==='squirrel' ? 2.5 : milestone.species==='robin' ? 1.3 : 1)*(baby?.5:1);
         object.scale.multiplyScalar(size);
         object.traverse((node:Obj)=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}});
-        const actor:Actor={object,mixer:new AnimationMixer(object),source,asset,path,baby,swimming:inWater,bird:milestone.species==='robin',offset:index*3,current:null,role:''};
+        const actor:Actor={object,mixer:new AnimationMixer(object),source,asset,path,baby,swimming:inWater,bird:milestone.species==='robin' || milestone.species==='owl',offset:index*3,current:null,role:''};
         actors.push(actor);root.add(object);play(actor,'idle');
       }
     } catch(error) {missing.push(milestone.species);console.warn('Grove wildlife model unavailable',id,error);}
