@@ -26,6 +26,10 @@ Red/green unit checks cover shared terrain edges, water-area conservation, clipp
 
 Implementation notes: unsupported routed drops with no continuous wet endpoint join remain geography descriptors but do not produce a render sheet. Receipt recomputes canonical water clipping only, to prove exact coverage; terrain is not rebuilt on the main thread. This validation has a measurable startup cost and does not claim the final Phase 5 responsiveness budget.
 
-Annual consumers initially focus the anchor clearing, with full selected-period framing and a whole annual landscape for Year. Near models prioritise that clearing; authored model loading is capped at 200 trees. Wildlife eligibility is memoized per focus date so historical babies and earned species do not leak backward in time.
+Annual consumers initially focus the anchor clearing, with full selected-period framing and a whole annual landscape for Year. Near models prioritise that clearing; authored model loading is capped at 64 nearest trees. Wildlife eligibility is memoized per focus date so historical babies and earned species do not leak backward in time.
 
 The verified existing project-only eight-animal bundle was installed from the local delivery referenced by apps/life/assets/grove/README.md. No purchased source files or private GLBs are added to Git or exported patches.
+
+Dense active-motion regression prompted a 64-tree authored model budget; remaining trees retain pickable silhouettes. Path safety skips shoreline-distance calculation because its decision uses only exact water classification and slope. The safety predicates and continuous wet-segment tests remain unchanged.
+
+Authored replacements retain invisible silhouette hit volumes with the same task IDs; model branches do not narrow phone tap targets. The diagnostic Frame selection control also scrolls the framed landscape into view after the extra motion/quality controls extend the phone toolbar.

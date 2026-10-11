@@ -148,7 +148,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   let loaded:Awaited<ReturnType<AnnualGroveLoader['load']>>;try{loaded=await annualLoader.load({tasks,view:route.view,anchor:route.date,now:new Date(),terms,books});}catch(error){if(gen!==generation)return;renderLoadError(stage,error,()=>void renderGroveView(canvas),'Could not prepare annual Grove');return;}if(gen!==generation)return;let plan=loaded.plan;
   paintHud(plan);
   let mountRevision = 0;
-  await mount(plan, 'all');if(gen!==generation)return;
+  await mount(plan);if(gen!==generation)return;
 
   function paintHud(next: AnnualGrovePlan): void {
     caption.textContent = next.view === 'week' ? weekCaption(next) : next.view === 'day' ? dayCaption(next) : periodCaption(next);
@@ -194,7 +194,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     card.style.top = `${top}px`;
   }
 
-  async function mount(next: AnnualGrovePlan, wobble: ReadonlySet<string> | 'all'): Promise<void> {
+  async function mount(next: AnnualGrovePlan): Promise<void> {
     const revision = ++mountRevision;
     const cameraState=sceneHandle?.cameraState();
     const { mountAnnualGroveScene } = await import('./annual-scene');
@@ -232,7 +232,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     }
   }
 
-  // Finishing (or reopening) a task elsewhere in the hub replants. Only the new trees wobble.
+  // Finishing or reopening a task refreshes the annual planting from history.
   let pending: number | null = null;
   const replant = () => {
     if (pending != null) window.clearTimeout(pending);
@@ -240,11 +240,10 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
       pending = null;
       const fresh = await tasksApi.listTasks().catch(() => null);
       if (!fresh || gen !== generation) return;
-      const before = new Set(plan.trees.map((t) => t.id));
       try{loaded=await annualLoader.load({tasks:fresh,view:route.view,anchor:route.date,now:new Date(),terms,books});}catch(error){if(error instanceof DOMException&&error.name==='AbortError')return;console.error(error);return;}if(gen!==generation)return;plan=loaded.plan;
       paintHud(plan);
       card.hidden = true;
-      await mount(plan, new Set(plan.trees.filter((t) => !before.has(t.id)).map((t) => t.id)));
+      await mount(plan);
     }, 400);
   };
   // Phone: fill the space between the page header (whose stats strip loads late) and the tab bar.

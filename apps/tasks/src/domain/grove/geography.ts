@@ -57,7 +57,7 @@ export function segmentTouchesWater(w:AnnualWorld,a:ShorePoint,b:ShorePoint):boo
 export function isLandPathSafe(w:AnnualWorld,points:readonly ShorePoint[],maxSlope=.5):boolean{
  if(!Number.isFinite(maxSlope)||maxSlope<0||points.length===0)throw Error('Invalid land path constraints');
  for(const p of points)sampleBedGrid(w.grid,w.hydrology.bed,p.x,p.z);
- const safe=(p:ShorePoint)=>{const s=sampleGeography(w,p.x,p.z);return s.waterType==='dry'&&s.slope<=maxSlope;};
+ const safe=(p:ShorePoint)=>{const s=sampleGeography(w,p.x,p.z,0);return s.waterType==='dry'&&s.slope<=maxSlope;};
  if(!safe(points[0]!))return false;
  for(let i=1;i<points.length;i++){const a=points[i-1]!,b=points[i]!;if(segmentTouchesWater(w,a,b))return false;const steps=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)/(w.grid.step/4)));
   for(let k=1;k<=steps;k++)if(!safe({x:a.x+(b.x-a.x)*k/steps,z:a.z+(b.z-a.z)*k/steps}))return false;
