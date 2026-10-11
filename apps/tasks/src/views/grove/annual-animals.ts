@@ -52,7 +52,7 @@ export async function createAnnualAnimals(world: AnnualWorld, plan: AnnualGroveP
         length: number;
     }[] = [];
     const started = performance.now(), signal = options.signal, wide = plan.view === 'year' || plan.view === 'term', day = plan.days.find(d => d.key === focusKey) ?? plan.days.find(d => d.today) ?? plan.days[0];
-    let disposed = false, preparationMs = 0;
+    let disposed = false, preparationMs = 0, hasHabitat = !wide;
     const released = new Set<object>();
     const abortError = () => new DOMException('Obsolete wildlife request', 'AbortError');
     const check = () => {
@@ -162,7 +162,7 @@ export async function createAnnualAnimals(world: AnnualWorld, plan: AnnualGroveP
         return active;
     }
     function diagnostics() { return { preparationMs, routes: routes.map(r => ({ ...r, regionIds: r.regionIds.slice() })), actors: actors.map(a => { const p = a.motion.snapshot(a.baby ? 1.5 : 0); return { worldYear: world.key.year, model: a.asset.id, encounter: a.encounter.id, species: a.encounter.species, mode: a.route.mode, baby: a.baby, x: a.object.position.x, y: a.object.position.y, z: a.object.position.z, lift: p.lift, routeDistance: p.routeDistance, activity: p.activity, destination: p.destination }; }) }; }
-    const result = () => { preparationMs = performance.now() - started; return { root, missing, credits, count: actors.length, swimmers: actors.filter(a => a.encounter.swimming).length, swimmerError: () => actors.filter(a => a.encounter.swimming).reduce((error, a) => Math.max(error, Math.abs(a.object.position.y - annualAnimalHeight(world, a.object.position.x, a.object.position.z, true, a.asset.waterline, a.object.scale.y, heightScale))), 0), diagnostics, update, dispose }; };
+    const result = () => { preparationMs = performance.now() - started; return { root, missing, credits, hasHabitat, count: actors.length, swimmers: actors.filter(a => a.encounter.swimming).length, swimmerError: () => actors.filter(a => a.encounter.swimming).reduce((error, a) => Math.max(error, Math.abs(a.object.position.y - annualAnimalHeight(world, a.object.position.x, a.object.position.z, true, a.asset.waterline, a.object.scale.y, heightScale))), 0), diagnostics, update, dispose }; };
     try {
         check();
         if (!wide && (!day || day.future || day.worldYear !== world.key.year))
@@ -172,6 +172,13 @@ export async function createAnnualAnimals(world: AnnualWorld, plan: AnnualGroveP
             return result();
         const prepared = wide ? await buildAnnualRoamingRoutes(world, plan, encounters, signal) : [];
         check();
+        if (wide) {
+            hasHabitat = prepared.length > 0;
+            if (!hasHabitat) {
+                missing.push(...encounters.map(e => e.species + ': no safe ' + (e.swimming ? 'water' : 'land') + ' path nearby'));
+                return result();
+            }
+        }
         const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
         let catalogue: {
             assets: Asset[];

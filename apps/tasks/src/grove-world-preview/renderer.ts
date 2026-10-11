@@ -78,16 +78,17 @@ export function createWorldPreview(host:HTMLElement,onPick:(tree:AnnualTree,x:nu
   content=root;host.dataset.triangles=String((append?Number(host.dataset.triangles):0)+terrainTriangles+waterTriangles);host.dataset.waterTriangles=String(waterTriangles);host.dataset.layer=layer;render();
  }
  function clearActors(){host.dataset.wildlifeRoutes='[]';host.dataset.wildlifePreparationMs='0';animalController?.abort();animalController=null;refineTrees=()=>{};window.clearTimeout(refineTimer);sceneRevision++;for(const a of animals)a.dispose();animals=[];nearTrees?.dispose();nearTrees=null;}
- function animalHabitat(worlds:AnnualWorld[],activity:AnnualGrovePlan|undefined){
-  if(!activity)return undefined;
-  if(activity.view!=='year'&&activity.view!=='term')return worlds.find(w=>w.key.year===Number(activity.anchor.slice(0,4)));
+ function animalHabitats(worlds:AnnualWorld[],activity:AnnualGrovePlan|undefined){
+  if(!activity)return [];
+  if(activity.view!=='year'&&activity.view!=='term')return worlds.filter(w=>w.key.year===Number(activity.anchor.slice(0,4)));
   const cutoff=activity.to<activity.today?activity.to:activity.today,encounters=annualEncounters(activity,activity.anchor);
   // Annual islands are disconnected. Own one shared population in the most
-  // completed eligible habitat; the selected early anchor cannot suppress it.
+  // completed eligible habitat with usable routes, trying this preference
+  // order until one is suitable. Never bridge annual islands.
   const earliest=encounters.map(e=>e.earnedOn).sort()[0];
   const ranked=worlds.map(world=>{const regions=new Map(world.regions?.weeks.map(r=>[r.id,r])??[]),open=new Set<string>();for(const t of activity.contextTrees){const r=regions.get(t.regionId);if(earliest&&r&&t.worldYear===world.key.year&&Number.isFinite(t.completedMs)&&t.dayKey>=activity.from&&t.dayKey<=cutoff&&r.from<=t.dayKey&&t.dayKey<=r.to&&earliest<=r.to)open.add(r.id);}return {world,open:open.size};});
   ranked.sort((a,b)=>b.open-a.open||b.world.key.year-a.world.key.year);
-  return ranked[0]?.world;
+  return ranked.map(r=>r.world);
  }
  function showAnnual(worlds:AnnualWorld[],next:DiagnosticLayer,activity?:AnnualGrovePlan,payloads=meshPayloads){clearActors();const revision=sceneRevision;host.dataset.animalsReady='false';host.dataset.wildlifeRoutes='[]';host.dataset.wildlifePreparationMs='0';host.dataset.wildlifeCount='0';host.dataset.swimmers='0';host.dataset.swimmerHeightError='0';host.dataset.authoredTrees='0';host.dataset.wildlifeCredits='';host.dataset.unavailableWildlife='';meshPayloads=payloads;annual=worlds;host.dataset.scene='annual';host.dataset.terrainChunks=String(payloads.reduce((n,p)=>n+p.terrain.length,0));plan=activity;worlds.forEach((w,i)=>show(w,next,i>0));
   if(plan){const selected=new Set(plan.trees.map(t=>t.id));const treeGroups=new Map<string,AnnualTree[]>(),farTreeGroups=new Map<string,AnnualTree[]>();for(const tree of plan.contextTrees){const key=tree.worldYear+':'+tree.regionId+':'+tree.species+':'+selected.has(tree.id),group=treeGroups.get(key)??[];group.push(tree);treeGroups.set(key,group);const farKey=tree.species+':'+selected.has(tree.id),farGroup=farTreeGroups.get(farKey)??[];farGroup.push(tree);farTreeGroups.set(farKey,farGroup);}for(const [far,groups] of [[false,treeGroups],[true,farTreeGroups]] as const)for(const trees of groups.values()){const species=trees[0]!.species,active=selected.has(trees[0]!.id);
@@ -96,10 +97,22 @@ export function createWorldPreview(host:HTMLElement,onPick:(tree:AnnualTree,x:nu
   }
   const propGroups=new Map<string,AnnualGrovePlan['baselineProps']>(),farPropGroups=new Map<string,AnnualGrovePlan['baselineProps']>();for(const prop of [...plan.baselineProps,...plan.activityProps]){const key=prop.worldYear+':'+prop.regionId+':'+prop.kind,group=propGroups.get(key)??[];group.push(prop);propGroups.set(key,group);const farGroup=farPropGroups.get(prop.kind)??[];farGroup.push(prop);farPropGroups.set(prop.kind,farGroup);}for(const [far,groups] of [[false,propGroups],[true,farPropGroups]] as const)for(const props of groups.values()){const kind=props[0]!.kind;const geometry=new ConeGeometry(kind==='rock'?.65:.3,kind==='rock'?1:.7,kind==='rock'?5:3),material=new MeshStandardMaterial({color:kind==='rock'?'#9b9f91':kind==='flower'?'#d7b77c':'#839e62',roughness:1}),mesh=new InstancedMesh(geometry,material,props.length),dummy=new Object3D();props.forEach((p,i)=>{dummy.position.set(p.x+offset(p.worldYear),p.height*heightScale+.35,p.z);dummy.scale.setScalar(p.scale);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);});mesh.computeBoundingSphere();content.add(mesh);owned.push(mesh,geometry,material);(far?farVegetation:spatialVegetation).push(mesh);}
   }
-  const root=content,near=[...(options.focusedDay?(plan?.trees.filter(t=>t.dayKey===plan?.anchor)??[]):(plan?.view==='year'||plan?.view==='term'?[]:plan?.trees??[]))].sort((a,b)=>Number(b.dayKey===plan?.anchor)-Number(a.dayKey===plan?.anchor)||Math.abs(Date.parse(a.dayKey)-Date.parse(plan?.anchor??a.dayKey))-Math.abs(Date.parse(b.dayKey)-Date.parse(plan?.anchor??b.dayKey))||Math.hypot(a.x-(plan?.days.find(d=>d.key===plan?.anchor)?.cx??0),a.z-(plan?.days.find(d=>d.key===plan?.anchor)?.cz??0))-Math.hypot(b.x-(plan?.days.find(d=>d.key===plan?.anchor)?.cx??0),b.z-(plan?.days.find(d=>d.key===plan?.anchor)?.cz??0)));const animalPlan=plan,animalWorld=animalHabitat(worlds,plan);
+  const root=content,near=[...(options.focusedDay?(plan?.trees.filter(t=>t.dayKey===plan?.anchor)??[]):(plan?.view==='year'||plan?.view==='term'?[]:plan?.trees??[]))].sort((a,b)=>Number(b.dayKey===plan?.anchor)-Number(a.dayKey===plan?.anchor)||Math.abs(Date.parse(a.dayKey)-Date.parse(plan?.anchor??a.dayKey))-Math.abs(Date.parse(b.dayKey)-Date.parse(plan?.anchor??b.dayKey))||Math.hypot(a.x-(plan?.days.find(d=>d.key===plan?.anchor)?.cx??0),a.z-(plan?.days.find(d=>d.key===plan?.anchor)?.cz??0))-Math.hypot(b.x-(plan?.days.find(d=>d.key===plan?.anchor)?.cx??0),b.z-(plan?.days.find(d=>d.key===plan?.anchor)?.cz??0)));const animalPlan=plan,candidates=animalHabitats(worlds,plan);
   animalController=new AbortController();
-  const animalJob=animalPlan&&animalWorld?createAnnualAnimals(animalWorld,animalPlan,animalPlan.anchor,heightScale,{signal:animalController.signal}):Promise.resolve(null);
-  void animalJob.then(a=>{if(disposed||revision!==sceneRevision){a?.dispose();return;}if(a){a.root.position.x=offset(animalWorld!.key.year);root.add(a.root);animals=[a];host.dataset.wildlifeRoutes=JSON.stringify(a.diagnostics().routes);host.dataset.wildlifePreparationMs=String(a.diagnostics().preparationMs);host.dataset.wildlifeCount=String(a.count);host.dataset.swimmers=String(a.swimmers);host.dataset.swimmerHeightError=String(a.swimmerError());host.dataset.wildlifeCredits=a.credits.join(' · ');host.dataset.unavailableWildlife=a.missing.join(',');}host.dataset.animalsReady='true';refreshMotion();render();}).catch(error=>{if(disposed||revision!==sceneRevision)return;host.dataset.animalsReady='true';if(error?.name!=='AbortError')host.dataset.unavailableWildlife='Wildlife unavailable';render();});
+  const signal=animalController.signal;
+  const animalJob=(async()=>{
+   if(!animalPlan)return null;
+   const wide=animalPlan.view==='year'||animalPlan.view==='term',missing:string[]=[];
+   for(const world of candidates){
+    if(signal.aborted)throw new DOMException('Obsolete wildlife request','AbortError');
+    const a=await createAnnualAnimals(world,animalPlan,animalPlan.anchor,heightScale,{signal});
+    if(signal.aborted){a.dispose();throw new DOMException('Obsolete wildlife request','AbortError');}
+    if(!wide||a.hasHabitat)return {a,world,missing:a.missing};
+    missing.push(...a.missing);a.dispose();
+   }
+   return {a:null,world:null,missing:[...new Set(missing)]};
+  })();
+  void animalJob.then(selected=>{const a=selected?.a;if(disposed||revision!==sceneRevision){a?.dispose();return;}if(a){a.root.position.x=offset(selected!.world!.key.year);root.add(a.root);animals=[a];host.dataset.wildlifeRoutes=JSON.stringify(a.diagnostics().routes);host.dataset.wildlifePreparationMs=String(a.diagnostics().preparationMs);host.dataset.wildlifeCount=String(a.count);host.dataset.swimmers=String(a.swimmers);host.dataset.swimmerHeightError=String(a.swimmerError());host.dataset.wildlifeCredits=a.credits.join(' · ');host.dataset.unavailableWildlife=a.missing.join(',');}else if(selected){host.dataset.unavailableWildlife=selected.missing.join(',');}host.dataset.animalsReady='true';refreshMotion();render();}).catch(error=>{if(disposed||revision!==sceneRevision)return;host.dataset.animalsReady='true';if(error?.name!=='AbortError')host.dataset.unavailableWildlife='Wildlife unavailable';render();});
   let nearRevision=0,lastNear='';const originals=new Map<InstanceType<typeof InstancedMesh>,Map<number,InstanceType<typeof Matrix4>>>(),nearProxies:InstanceType<typeof InstancedMesh>[]=[];
   refineTrees=()=>{
    if(disposed||revision!==sceneRevision)return;

@@ -15,6 +15,8 @@ vi.mock('three', async (original) => {
 });
 import { createWorldPreview } from '@/grove-world-preview/renderer';
 import { fixture, assets } from '../helpers/grove-wide';
+import { Group } from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { WorldMeshes } from '@/domain/grove/world-meshes';
 function setup() {
     assets();
@@ -113,7 +115,6 @@ it('chooses completed habitat across a Term boundary without multiplying populat
     }
     const trees = plan.contextTrees.map(t => ({ ...t, id: t.id + '-2027', regionId: t.regionId + '-2027', worldYear: 2027, dayKey: t.dayKey.replace('2026', '2027'), completedMs: Date.parse(t.dayKey.replace('2026', '2027')) }));
     plan.contextTrees.push(...trees);
-
     plan.view = 'term';
     plan.from = '2026-12-20';
     plan.to = '2027-01-21';
@@ -126,6 +127,90 @@ it('chooses completed habitat across a Term boundary without multiplying populat
         expect(d.actors.length).toBeGreaterThan(0);
         expect(d.actors.length).toBeLessThanOrEqual(11);
         expect(new Set(d.routes.map((r: any) => r.worldYear))).toEqual(new Set([2027]));
+    }
+    finally {
+        preview.dispose();
+    }
+});
+function fallbackFixture(input: ReturnType<typeof setup>) {
+    const { world, plan, payload } = input;
+    const preferred = structuredClone(world);
+    preferred.key = { ...world.key, year: 2027 };
+    preferred.identity = 'unsafe-2027';
+    for (const week of preferred.regions!.weeks) {
+        week.id += '-2027';
+        week.from = week.from.replace('2026', '2027');
+        week.to = week.to.replace('2026', '2027');
+    }
+    for (let i = 0; i < preferred.hydrology.bed.length; i++)
+        preferred.hydrology.bed[i] = (i % preferred.grid.size) * preferred.grid.step * .8;
+    plan.contextTrees.push(...plan.contextTrees.map(t => ({ ...t, id: t.id + '-2027', regionId: t.regionId + '-2027', worldYear: 2027, dayKey: t.dayKey.replace('2026', '2027'), completedMs: Date.parse(t.dayKey.replace('2026', '2027')) })));
+    plan.view = 'term';
+    plan.to = '2027-01-21';
+    plan.today = '2027-01-21';
+    return { preferred, payloads: [payload, { ...payload, identity: preferred.identity }] };
+}
+it('falls back when preferred completed-year habitat has no safe routes', async () => {
+    const input = setup(), { preferred, payloads } = fallbackFixture(input), { host, preview, world, plan } = input;
+    preview.showAnnual([world, preferred], 'elevation', plan, payloads);
+    try {
+        await waitReady(host);
+        const d = preview.wildlifeDiagnostics();
+        expect(d.actors.length).toBeGreaterThan(0);
+        expect(d.actors.length).toBeLessThanOrEqual(11);
+        expect(new Set(d.routes.map(r => r.worldYear))).toEqual(new Set([2026]));
+    }
+    finally {
+        preview.dispose();
+    }
+});
+it('cancels fallback loading and never attaches its late population', async () => {
+    const input = setup(), { preferred, payloads } = fallbackFixture(input), { host, preview, world, plan, payload } = input;
+    let finish: ((value: unknown) => void) | undefined;
+    vi.mocked(GLTFLoader.prototype.loadAsync).mockImplementation((file: string) => file.includes('animal') ? new Promise(resolve => { finish = resolve; }) as never : Promise.resolve({ scene: new Group(), animations: [] }) as never);
+    preview.showAnnual([world, preferred], 'elevation', plan, payloads);
+    try {
+        for (let i = 0; i < 100 && !finish; i++)
+            await new Promise(r => setTimeout(r, 2));
+        expect(finish).toBeTypeOf('function');
+        const empty = { ...plan, wildlife: [], wildlifeAt: () => [] };
+        preview.showAnnual([world], 'elevation', empty, [payload]);
+        await waitReady(host);
+        finish!({ scene: new Group(), animations: [] });
+        await new Promise(r => setTimeout(r, 10));
+        expect(host.dataset.wildlifeCount).toBe('0');
+        expect(preview.wildlifeDiagnostics().actors).toEqual([]);
+        expect(preview.wildlifeDiagnostics().routes).toEqual([]);
+    }
+    finally {
+        preview.dispose();
+    }
+});
+it.each([{ laterWeeks: 3, want: 2027 }, { laterWeeks: 1, want: 2026 }])('preserves completed-week ranking and latest-year ties with $laterWeeks later weeks', async ({ laterWeeks, want }) => {
+    const input = setup(), { preferred, payloads } = fallbackFixture(input), { host, preview, world, plan } = input;
+    preferred.hydrology.bed.fill(0);
+    plan.contextTrees = plan.contextTrees.filter(t => t.worldYear === 2026 || Number(t.regionId.split('-')[1]) < laterWeeks);
+    preview.showAnnual([world, preferred], 'elevation', plan, payloads);
+    try {
+        await waitReady(host);
+        const d = preview.wildlifeDiagnostics();
+        expect(d.actors.length).toBeGreaterThan(0);
+        expect(d.actors.length).toBeLessThanOrEqual(11);
+        expect(new Set(d.routes.map(r => r.worldYear))).toEqual(new Set([want]));
+    }
+    finally {
+        preview.dispose();
+    }
+});
+it('keeps unavailable-route diagnostics when all ranked habitats are unsuitable', async () => {
+    const input = setup(), { preferred, payloads } = fallbackFixture(input), { host, preview, world, plan } = input;
+    world.hydrology.bed.set(preferred.hydrology.bed);
+    preview.showAnnual([world, preferred], 'elevation', plan, payloads);
+    try {
+        await waitReady(host);
+        expect(host.dataset.wildlifeCount).toBe('0');
+        expect(preview.wildlifeDiagnostics().actors).toEqual([]);
+        expect(host.dataset.unavailableWildlife).toContain('no safe land path nearby');
     }
     finally {
         preview.dispose();
