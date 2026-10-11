@@ -2,6 +2,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { groveAnimalCatalogue } from '../../scripts/lib/grove-animal-catalogue.mjs';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -36,6 +37,11 @@ function groveAssetsPlugin(): Plugin {
     name: 'tasks-hub-grove-assets',
     configureServer(server) {
       server.middlewares.use('/assets/grove', (req, res, next) => {
+        if (req.url?.split('?')[0] === '/animal-catalogue.json') {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(groveAnimalCatalogue(root)));
+          return;
+        }
         const relative = decodeURIComponent((req.url ?? '/').split('?')[0] ?? '/');
         const file = path.resolve(root, `.${relative}`);
         if (!file.startsWith(root + path.sep) || !existsSync(file) || !statSync(file).isFile()) {

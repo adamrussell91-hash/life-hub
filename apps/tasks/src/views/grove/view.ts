@@ -4,7 +4,8 @@
  */
 import { buildGrovePlan, type GrovePlan, type GroveTree, type GroveView } from '@/domain/grove/plan';
 import { GROVE_SPECIES, SPECIES_LABEL, SPECIES_SHORT } from '@/domain/grove/assets';
-import { addDays, isDateKey } from '@/domain/grove/dates';
+import { adjacentGroveDate, groveTerms, type GroveTerm } from '@/domain/grove/calendar';
+import { isDateKey } from '@/domain/grove/dates';
 import { taskPageHash } from '@/domain/cards';
 import { toHubDateKey } from '@/domain/queries';
 import { hashQuery } from '@/shell/shell';
@@ -13,15 +14,17 @@ import { TASKS_CHANGED, TASKS_DELETED } from '@/services/task-cache';
 import { renderLoadError } from '@/views/feedback';
 import type { Task } from '@/schemas/task';
 import type { GroveSceneHandle } from './scene';
-import { dayCaption, finishedLine, undatedNote, weekCaption } from './copy';
+import { dayCaption, finishedLine, undatedNote, periodCaption, weekCaption } from './copy';
 import './grove.css';
 
 let detach: (() => void) | null = null;
 let sceneHandle: GroveSceneHandle | null = null;
 let generation = 0;
+let wildlifePaused = false;
 
 export function groveRoute(query: URLSearchParams, today: string): { view: GroveView; date: string } {
-  const view: GroveView = query.get('view') === 'week' ? 'week' : 'day';
+  const rawView = query.get('view');
+  const view: GroveView = rawView === 'week' || rawView === 'term' || rawView === 'year' ? rawView : 'day';
   const raw = query.get('date');
   return { view, date: isDateKey(raw) ? raw : today };
 }
@@ -64,23 +67,25 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   const pills = el('div', 'hub-pills grove-bar__views');
   pills.setAttribute('role', 'tablist');
   pills.setAttribute('aria-label', 'Grove view');
-  for (const view of ['day', 'week'] as const) {
-    const btn = el('a', 'hub-pills__btn', view === 'day' ? 'Day' : 'Week');
+  for (const view of ['day', 'week', 'term', 'year'] as const) {
+    const btn = el('a', 'hub-pills__btn', view.charAt(0).toUpperCase() + view.slice(1));
     btn.href = groveHash(view, route.date, today);
     btn.setAttribute('role', 'tab');
     btn.setAttribute('aria-selected', String(view === route.view));
     pills.append(btn);
   }
-  const step = route.view === 'week' ? 7 : 1;
+  let terms: GroveTerm[] = [];
+  const calendar = Promise.all([tasksApi.getHubPrefs().catch(() => null), tasksApi.getPlanningProfile().catch(() => null)]);
+  const navDate = (direction: -1 | 1) => adjacentGroveDate(route.view, route.date, direction, terms);
   const nav = el('div', 'grove-bar__nav');
   const back = el('a', 'btn btn--secondary grove-bar__step', '‹');
-  back.href = groveHash(route.view, addDays(route.date, -step), today);
-  back.setAttribute('aria-label', route.view === 'week' ? 'Previous week' : 'Previous day');
+  back.href = groveHash(route.view, navDate(-1), today);
+  back.setAttribute('aria-label', `Previous ${route.view}`);
   const todayLink = el('a', 'btn btn--secondary', 'Today');
   todayLink.href = groveHash(route.view, today, today);
   const forward = el('a', 'btn btn--secondary grove-bar__step', '›');
-  forward.href = groveHash(route.view, addDays(route.date, step), today);
-  forward.setAttribute('aria-label', route.view === 'week' ? 'Next week' : 'Next day');
+  forward.href = groveHash(route.view, navDate(1), today);
+  forward.setAttribute('aria-label', `Next ${route.view}`);
   nav.append(back, todayLink, forward);
   bar.append(pills, nav);
 
@@ -92,7 +97,20 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   card.hidden = true;
   card.setAttribute('role', 'dialog');
   card.setAttribute('aria-label', 'Tree');
-  hud.append(bar, caption, key, card);
+  const wildlife = el('button', 'btn btn--secondary grove-wildlife', wildlifePaused ? 'Resume wildlife' : 'Pause wildlife');
+  wildlife.type = 'button';wildlife.hidden = true;
+  wildlife.setAttribute('aria-pressed', String(wildlifePaused));
+  wildlife.addEventListener('click', () => {
+    wildlifePaused = !wildlifePaused;
+    wildlife.textContent = wildlifePaused ? 'Resume wildlife' : 'Pause wildlife';
+    wildlife.setAttribute('aria-pressed', String(wildlifePaused));
+    sceneHandle?.setWildlifePaused(wildlifePaused);
+  });
+  const credits = el('details', 'grove-credits');
+  const creditSummary = el('summary', '', 'Wildlife credits');
+  const creditText = el('p');
+  credits.append(creditSummary, creditText);credits.hidden = true;
+  hud.append(bar, caption, key, card, wildlife, credits);
 
   let tasks: Task[];
   try {
@@ -105,12 +123,18 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   }
   if (gen !== generation) return;
 
-  let plan = buildGrovePlan({ tasks, view: route.view, anchor: route.date, now: new Date() });
+  const [hubPrefs, planningProfile] = await calendar;
+  if (gen !== generation) return;
+  terms = groveTerms({hubPrefs, planningProfile});
+  back.href = groveHash(route.view, navDate(-1), today);
+  forward.href = groveHash(route.view, navDate(1), today);
+  let plan = buildGrovePlan({ tasks, view: route.view, anchor: route.date, now: new Date(), terms });
   paintHud(plan);
+  let mountRevision = 0;
   await mount(plan, 'all');
 
   function paintHud(next: GrovePlan): void {
-    caption.textContent = next.view === 'week' ? weekCaption(next) : dayCaption(next);
+    caption.textContent = next.view === 'week' ? weekCaption(next) : next.view === 'day' ? dayCaption(next) : periodCaption(next);
     key.replaceChildren();
     const list = el('ul', 'grove-key__list');
     for (const species of GROVE_SPECIES) {
@@ -154,8 +178,10 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   }
 
   async function mount(next: GrovePlan, wobble: ReadonlySet<string> | 'all'): Promise<void> {
+    const revision = ++mountRevision;
+    const cameraState=sceneHandle?.cameraState();
     const { mountGroveScene } = await import('./scene');
-    if (gen !== generation) return;
+    if (gen !== generation || revision !== mountRevision) return;
     const byId = new Map(next.trees.map((t) => [t.id, t]));
     try {
       const handle = await mountGroveScene(stage, {
@@ -163,16 +189,28 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
         interactive: true,
         reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
         wobble,
+        wildlifePaused,
+        cameraState,
+        onWildlife: (count, missing, lines) => {
+          if (gen !== generation || revision !== mountRevision) return;
+          wildlife.hidden = count === 0 || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          creditText.textContent = lines.join(' · ');
+          credits.hidden = !lines.length;
+          page.dataset.wildlifeCount = String(count);
+          page.dataset.unavailableWildlife = missing.join(',');
+        },
         focusKey: next.days.some((d) => d.key === today) ? today : next.anchor,
         onPick: (id, x, y) => showCard(id ? byId.get(id) ?? null : null, x, y)
       });
-      if (gen !== generation) {
+      if (gen !== generation || revision !== mountRevision) {
         handle.dispose();
         return;
       }
       sceneHandle?.dispose();
       sceneHandle = handle;
     } catch (error) {
+      if (gen !== generation || revision !== mountRevision) return;
+      sceneHandle?.dispose();sceneHandle=null;
       console.error(error);
       stage.replaceChildren(el('p', 'grove-status', 'The forest could not draw on this device.'));
     }
@@ -187,7 +225,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
       const fresh = await tasksApi.listTasks().catch(() => null);
       if (!fresh || gen !== generation) return;
       const before = new Set(plan.trees.map((t) => t.id));
-      plan = buildGrovePlan({ tasks: fresh, view: route.view, anchor: route.date, now: new Date() });
+      plan = buildGrovePlan({ tasks: fresh, view: route.view, anchor: route.date, now: new Date(), terms });
       paintHud(plan);
       card.hidden = true;
       await mount(plan, new Set(plan.trees.filter((t) => !before.has(t.id)).map((t) => t.id)));

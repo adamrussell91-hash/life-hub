@@ -45,3 +45,10 @@ export function undatedNote(count: number): string | null {
     ? '1 older finished task has no finish date, so it is not planted.'
     : `${count} older finished tasks have no finish date, so they are not planted.`;
 }
+
+export function periodCaption(plan: GrovePlan): string {
+  const label = plan.periodLabel;
+  const dates = `${formatDisplayDate(plan.from)} to ${formatDisplayDate(plan.to)}`;
+  const growth = plan.trees.length ? trees(plan.trees.length) : 'open meadow';
+  return `${label} · ${dates} · ${growth}${plan.provisionalCalendar ? ' · provisional dates' : ''}`;
+}

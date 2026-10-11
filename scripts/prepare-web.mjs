@@ -1,4 +1,6 @@
 import { access, copyFile, cp, mkdir, readdir, rm, readFile, writeFile } from 'node:fs/promises';
+import { groveAnimalCatalogue } from './lib/grove-animal-catalogue.mjs';
+import { fileURLToPath } from 'node:url';
 import { rewritePublishedKitSpecifiers } from './lib/rewrite-published-kit-imports.mjs';
 
 const projectRoot = new URL('../', import.meta.url);
@@ -80,6 +82,7 @@ export async function prepareWeb() {
     copyDesignKitIcons()
   ]);
 
+  await writeFile(new URL('assets/grove/animal-catalogue.json', publishRoot), JSON.stringify(groveAnimalCatalogue(fileURLToPath(new URL('assets/grove/', lifeRoot))), null, 2));
   await rewritePublishedKitImports(new URL('js/', publishRoot));
 
   await Promise.all(spaApps.map(name => copyBuiltSpa(name)));

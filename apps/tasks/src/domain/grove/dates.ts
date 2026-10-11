@@ -4,7 +4,9 @@ const DAY_MS = 86_400_000;
 const KEY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isDateKey(value: unknown): value is string {
-  return typeof value === 'string' && KEY.test(value);
+  if (typeof value !== 'string' || !KEY.test(value)) return false;
+  const ms = Date.parse(`${value}T12:00:00Z`);
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0,10) === value;
 }
 
 function toMs(key: string): number {

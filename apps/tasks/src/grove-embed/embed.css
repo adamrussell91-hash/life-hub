@@ -44,3 +44,6 @@ body.grove-embed {
 .grove-embed__caption:empty {
   display: none;
 }
+
+.grove-embed__credits { position: absolute; bottom: 0; left: var(--space-2); right: var(--space-2); font-size: var(--text-xs); color: var(--muted); background: var(--paper); margin: 0; padding: var(--space-1); }
+.grove-embed__credits:empty { display: none; }

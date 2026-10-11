@@ -17,7 +17,7 @@ describe('Grove route', () => {
   it('defaults to today and the day view, and ignores a bad date', () => {
     expect(groveRoute(new URLSearchParams(''), '2026-10-10')).toEqual({ view: 'day', date: '2026-10-10' });
     expect(groveRoute(new URLSearchParams('view=week&date=2026-10-01'), '2026-10-10')).toEqual({ view: 'week', date: '2026-10-01' });
-    expect(groveRoute(new URLSearchParams('view=year&date=tomorrow'), '2026-10-10')).toEqual({ view: 'day', date: '2026-10-10' });
+    expect(groveRoute(new URLSearchParams('view=bogus&date=tomorrow'), '2026-10-10')).toEqual({ view: 'day', date: '2026-10-10' });
   });
 });
 
@@ -48,4 +48,12 @@ describe('Grove copy', () => {
     expect(undatedNote(1)).toContain('1 older finished task');
     expect(undatedNote(3)).toContain('3 older finished tasks');
   });
+});
+
+it('accepts broad forest views from the URL', () => {
+  expect(groveRoute(new URLSearchParams('view=year&date=2026-02-01'), '2026-10-10')).toEqual({view: 'year', date: '2026-02-01'});
+  expect(groveRoute(new URLSearchParams('view=term'), '2026-10-10').view).toBe('term');
+});
+it('rejects impossible calendar dates', () => {
+  expect(groveRoute(new URLSearchParams('date=2026-02-31'), '2026-10-10').date).toBe('2026-10-10');
 });
