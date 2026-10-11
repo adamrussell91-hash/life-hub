@@ -118,3 +118,21 @@ describe('task cache', () => {
     expect(mergeListedTasks([]).map((item) => item.id)).toEqual(['task_gone']);
   });
 });
+
+describe('authoritative Grove task membership', () => {
+  beforeEach(resetTaskCache);
+  it('removes a server-deleted completion without discarding the ordinary optimistic cache', () => {
+    const done = task({id:'remote-deleted',title:'Finished elsewhere',status:'done',completed_at:'2026-08-01T00:00:00Z'});
+    mergeListedTasks([done]);
+    expect(mergeListedTasks([], {includeCachedOnly:false})).toEqual([]);
+    expect(mergeListedTasks([]).map(t=>t.id)).toEqual(['remote-deleted']);
+  });
+  it('keeps newer local reopen state for existing IDs and excludes deleted or cache-only IDs', () => {
+    const server = task({id:'existing',title:'Existing',status:'done',completed_at:'2026-08-01T00:00:00Z'});
+    rememberCreatedTask({...server,status:'open',completed_at:null,updated_at:'2026-08-02T00:00:00Z'});
+    rememberCreatedTask(task({id:'cached-only',title:'Not on server'}));
+    rememberDeletedTask('deleted');
+    const merged=mergeListedTasks([server,task({id:'deleted',title:'Deleted'})],{includeCachedOnly:false});
+    expect(merged.map(t=>({id:t.id,status:t.status,completed_at:t.completed_at}))).toEqual([{id:'existing',status:'open',completed_at:null}]);
+  });
+});

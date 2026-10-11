@@ -135,7 +135,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
 
   let tasks: Task[];
   try {
-    tasks = await tasksApi.listTasks();
+    tasks = await tasksApi.listTasks({includeCachedOnly:false});
   } catch (err) {
     if (gen !== generation) return;
     renderLoadError(stage, err, () => void renderGroveView(canvas), 'Could not load finished tasks');
@@ -249,7 +249,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     if (pending != null) window.clearTimeout(pending);
     pending = window.setTimeout(async () => {
       pending = null;
-      const fresh = await tasksApi.listTasks().catch(() => null);
+      const fresh = await tasksApi.listTasks({includeCachedOnly:false}).catch(() => null);
       if (!fresh || !current()) return;
       const refreshedBooks=await groveBooks().catch(()=>acceptedBooks);
       if (!current()) return;

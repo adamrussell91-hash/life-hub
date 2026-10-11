@@ -16,15 +16,16 @@ export function filterCachedTasks(tasks: Task[]): Task[] {
     .map((task) => listed.get(task.id) ?? task);
 }
 
-/** Merge a fresh list with locally created/updated/deleted tasks. */
-export function mergeListedTasks(fetched: Task[]): Task[] {
+/** Merge local updates/deletions; authoritative readers can exclude cached-only IDs. */
+export function mergeListedTasks(fetched: Task[], options: {includeCachedOnly?: boolean} = {}): Task[] {
   for (const task of fetched) {
     if (deleted.has(task.id)) continue;
     const current = listed.get(task.id);
     const incoming = normalizeTask(task);
     listed.set(task.id, current ? pickNewer(incoming, current) : incoming);
   }
-  return [...listed.values()].filter((task) => !deleted.has(task.id));
+  const sourceIds = options.includeCachedOnly === false ? new Set(fetched.map(task => task.id)) : null;
+  return [...listed.values()].filter((task) => !deleted.has(task.id) && (!sourceIds || sourceIds.has(task.id)));
 }
 
 export function rememberCreatedTask(task: Task): void {

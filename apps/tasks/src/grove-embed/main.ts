@@ -27,7 +27,7 @@ async function start(root: HTMLElement): Promise<void> {
 
   let tasks;
   try {
-    tasks = await tasksApi.listTasks();
+    tasks = await tasksApi.listTasks({includeCachedOnly:false});
   } catch (err) {
     if (current !== revision || handle) return;
     const status = Number((err as { status?: number })?.status);
