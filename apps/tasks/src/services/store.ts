@@ -1,4 +1,4 @@
-import {validateGroveHistory} from '../../../../packages/grove-history/validate.mjs';
+import {parseGroveHistory,validateGroveHistory} from '../../../../packages/grove-history/validate.mjs';
 import { TaskSchema, type Task, type TaskDomain } from '@/schemas/task';
 import {
   TaskPropertyConfigSchema,
@@ -814,19 +814,22 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
       return emptyCalibration(domain, nowIso());
     },
     async getHubPrefs(): Promise<HubPrefs> {
-      return parseHubPrefs(await kv.getJSON(keys.hubPrefsKey()));
+      const prefs=parseHubPrefs(await kv.getJSON(keys.hubPrefsKey()));
+      delete prefs.grove_history;
+      const history=parseGroveHistory(await kv.getJSON(keys.groveHistoryKey()));
+      return history ? {...prefs,grove_history:history} : prefs;
     },
     async updateHubPrefs(patch: Partial<HubPrefs>): Promise<HubPrefs> {
-      if (Object.prototype.hasOwnProperty.call(patch,'grove_history')) validateGroveHistory(patch.grove_history);
-      const prefs: HubPrefs = {
-        ...DEFAULT_HUB_PREFS,
-        ...(await this.getHubPrefs()),
-        ...patch,
-        schema_version: 1,
-        updated_at: nowIso()
-      };
-      await kv.setJSON(keys.hubPrefsKey(), parseHubPrefs(prefs));
-      return parseHubPrefs(prefs);
+      const hasHistory=Object.prototype.hasOwnProperty.call(patch,'grove_history');
+      const history=hasHistory ? validateGroveHistory(patch.grove_history) : undefined;
+      const {grove_history:ignoredHistory,...prefsPatch}=patch;
+      if (Object.keys(prefsPatch).length) {
+        const prefs=parseHubPrefs({...DEFAULT_HUB_PREFS,...await this.getHubPrefs(),...prefsPatch,schema_version:1,updated_at:nowIso()});
+        delete prefs.grove_history;
+        await kv.setJSON(keys.hubPrefsKey(),prefs);
+      }
+      if (hasHistory) await kv.setJSON(keys.groveHistoryKey(),history);
+      return this.getHubPrefs();
     },
     async graphInsights(input: {
       view?: string;
