@@ -127,6 +127,8 @@ export async function prepareNavigation(w:AnnualWorld,open:Set<number>,trees:Tre
   const edges=new Map<string,{center:number;midpoint:PathPoint}[]>(),buckets=new Map<string,number[]>();
   const vertexKey=(x:number,z:number)=>Math.round(x*1e5)+':'+Math.round(z*1e5);
   const connect=(i:number,j:number)=>{const a=nodes[i]!,b=nodes[j]!;
+   const distance=Math.hypot(b.x-a.x,b.z-a.z);
+   if(!Number.isFinite(distance)||distance<=0)return;
    const regions=segmentRegions(w,a,b,owners);
    if(regions.every(r=>open.has(r))&&swimEdge(w,a,b)&&swimEdge(w,b,a)){
     a.edges.push(j);b.edges.push(i);edgeRegions.set(navigationEdgeKey(i,j),i<j?regions:regions.slice().reverse());
