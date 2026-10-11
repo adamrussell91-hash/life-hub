@@ -38,6 +38,7 @@ export function selectDisplayDate(events) {
 export function buildHomeModel({
   events,
   targetsConfig,
+  libraryByName = null,
   date,
   governanceLogMarkdown
 } = {}) {
@@ -54,7 +55,7 @@ export function buildHomeModel({
   const sweepMissedLine = typeof governanceLogMarkdown === 'string'
     ? formatDailySweepMissedLine(governanceLogMarkdown, date)
     : null;
-  const forecastCards = buildHomeForecastCards({ events, date, targetsConfig });
+  const forecastCards = buildHomeForecastCards({ events, date, targetsConfig, libraryByName });
 
   return {
     date,

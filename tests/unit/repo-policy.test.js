@@ -127,3 +127,12 @@ test('date ranges require one canonical ordered date pair no longer than 366 day
     assert.throws(() => parseDateRange(new URL(`https://life.test/api/repo/manifest${query}`)), TypeError, query);
   }
 });
+
+test('exercise library is synced in every date window and admitted to the private cache', () => {
+  const path = 'data/exercise-library.json';
+  const range = { from: '2026-09-14', to: '2026-10-11' };
+  const entry = blob(path, 'a'.repeat(40), 100);
+  assert.equal(isAllowedRepositoryPath(path), true);
+  assert.equal(isClientFileInRange(path, range), true);
+  assert.deepEqual(selectManifestEntries([entry], range), [{ path, sha: entry.sha, size: 100 }]);
+});

@@ -732,3 +732,50 @@ test('a failing forward window rejects like any other window (no silent missing 
   };
   await assert.rejects(() => loadLiveEvents({ sync, loadYaml: load, date }), /forward failed/);
 });
+
+test('shared sync library classifies Home stimulus on fresh and cached loads', async () => {
+  const library = [
+    { name: 'Bar Press', target_area: 'Chest' },
+    { name: 'Incline Press', target_area: 'Chest' },
+    { name: 'Flat Fly', target_area: 'Chest' },
+    { name: 'Single Arm Row with Chest Supported', target_area: 'Back' },
+    { name: 'Cable Bar Curl', target_area: 'Arms' },
+    { name: 'Bar Hip Thrust', target_area: 'Glutes' },
+    { name: 'One Grip Russian Twist', target_area: 'Full Body' }
+  ];
+  const exercises = library.map(({ name }) => ({ name, sets: [{ reps: 10, weight_kg: 20, cable_type: 'constant_force' }] }));
+  exercises[0].sets.push({ reps: 0, weight_kg: 20, cable_type: 'constant_force' }, { reps: 10, weight_kg: 0, cable_type: 'none' });
+  const completed = raw('data/fitness/2026/10/2026-10-11-workout.md', `---\ntitle: Region test\nday_type: workout_30\ntype: workout\ndate: '2026-10-11'\nstatus: completed\nsession_kind: strength\nfocus: [chest, arms, back, glutes]\nexercises: ${JSON.stringify(exercises)}\n---\n`);
+  const planned = raw('data/fitness/2026/10/2026-10-10-planned.md', `---\ntitle: Planned test\nday_type: workout_30\ntype: workout\ndate: '2026-10-10'\nstatus: planned\nsession_kind: strength\nexercises: ${JSON.stringify(exercises)}\n---\n`);
+  const files = [raw('data/exercise-library.json', JSON.stringify(library)), completed, planned];
+  for (const backfill of [true, false]) {
+    const result = await loadLiveEvents({ date: '2026-10-11', loadYaml: load, backfill,
+      sync: async ({ validateFile }) => {
+        for (const file of files) assert.deepEqual(validateFile(file), { valid: true });
+        return { files, commitSha: SHA };
+      }
+    });
+    assert.equal(result.libraryByName.get('Bar Press').target_area, 'Chest');
+    const chart = buildHomeModel({ ...result, date: '2026-10-11' }).forecastCards.stimulus.chart;
+    assert.equal(chart.windowDays, 28);
+    const byRegion = Object.fromEntries(chart.regions.map(row => [row.key, row.setsPerWeek]));
+    assert.equal(byRegion.chest, 0.8); // three sets / four weeks, rounded to one decimal
+    assert.equal(byRegion.back, 0.3);
+    assert.equal(byRegion.arms, 0.3);
+    assert.equal(byRegion.legs, 0.3);
+    assert.equal(byRegion.full_body, 0.3);
+    assert.equal(chart.keys.find(row => row.key === 'upper_sets').recent, 6);
+  }
+});
+
+test('malformed exercise library is reported without crashing the dashboard', async () => {
+  const file = raw('data/exercise-library.json', '{}');
+  const result = await loadLiveEvents({ date: '2026-10-11', loadYaml: load, backfill: false,
+    sync: async ({ validateFile }) => {
+      assert.deepEqual(validateFile(file), { valid: false, code: 'invalid_exercise_library' });
+      return { files: [file] };
+    }
+  });
+  assert.equal(result.libraryByName, null);
+  assert.ok(result.warnings.some(row => row.code === 'invalid_exercise_library'));
+});
