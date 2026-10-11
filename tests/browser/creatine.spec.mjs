@@ -61,7 +61,22 @@ for (const width of [1440, 800, 390, 320]) {
       assert.ok(geometry.zoneLabel.bottom < geometry.zone.y, 'target label must sit above its band');
       assert.match(geometry.label, /days to target|In target zone/);
       assert.match(await card.textContent(), /10 g today.*Coles creatine/s);
-      assert.equal(await card.locator('button').count(), 1);
+      assert.equal(await card.locator('button').count(), 2);
+      const tip = card.locator('.creatine-card__tooltip');
+      if(width>720) {
+        const current=await card.locator('.creatine-current').boundingBox();
+        await page.mouse.move(current.x+current.width/2,current.y+current.height/2);
+      } else await card.locator('.creatine-card__receipt').click();
+      await tip.waitFor({state:'visible'});
+      assert.match(await tip.textContent(), /30\/07\/26.*07:30.*10 g.*Separate dose/s);
+      const tipBox=await tip.boundingBox();const cardBox=await card.boundingBox();
+      assert.ok(tipBox.x>=cardBox.x && tipBox.x+tipBox.width<=cardBox.x+cardBox.width+1,'tooltip fits phone/card width');
+      assert.ok(tipBox.y>=0 && tipBox.y+tipBox.height<=1000,'tooltip fits viewport');
+      assert.ok((await card.locator('.creatine-card__receipt').boundingBox()).height>=44);
+      if(process.env.CREATINE_SCREENSHOT_DIR) await card.screenshot({path:process.env.CREATINE_SCREENSHOT_DIR+'/creatine-inspect-'+width+'.png'});
+      await card.locator('svg').focus();await page.keyboard.press('ArrowRight');
+      assert.match(await tip.textContent(), /Forecast.*31\/07\/26.*not a saved intake/s);
+      await page.keyboard.press('Escape');await tip.waitFor({state:'hidden'});
       const info = card.locator('.hub-chart-info');
       await info.click();
       const note = page.locator('#hub-chart-info-creatine');

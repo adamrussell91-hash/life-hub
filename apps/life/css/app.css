@@ -10429,3 +10429,10 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   .consistency-strip__plot { height: 4.5rem; }
   .consistency-strip__week { color: transparent; }
 }
+
+/* Creatine uses the shared chart tip; intake inspection also works by tap/focus. */
+.creatine-card__plot { position: relative; }
+.creatine-card__tooltip { max-width: min(22rem, 100%); box-sizing: border-box; transition: none; }
+.creatine-card__tooltip[hidden] { display: none; }
+.creatine-card__receipt { appearance: none; background: none; border: 0; padding: 0; min-height: 44px; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.creatine-card__receipt:focus-visible, .creatine-card__chart:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; border-radius: var(--radius-xs); }

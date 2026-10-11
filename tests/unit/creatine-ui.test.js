@@ -33,7 +33,7 @@ test('creatine card renders actual intake, default routine, estimate info and do
   assert.match(card.textContent, /10 g today/);
   assert.match(card.textContent, /Coles creatine/);
   assert.match(card.textContent, /Muscle stores.*Recent dose.*Forecast/s);
-  assert.equal(card.querySelectorAll('button').length, 1);
+  assert.equal(card.querySelectorAll('button').length, 2);
   assert.ok(card.querySelector('button.hub-chart-info'));
   assert.ok(card.querySelector('[data-role="pending-dose"]'));
   assert.ok(card.querySelector('[data-role="forecast"]'));
@@ -153,4 +153,36 @@ test('elastic curve stays below target until the conservative estimate reaches i
   assert.ok(reached.current.y < reached.targetY);
   const fallback = buildCreatineElastic({ ...sample, trace: [] });
   assert.ok(fallback.current.y > fallback.targetY, 'fallback current geometry must use the same basis');
+});
+
+
+test('saved meal intake is explicit and inspectable by focus, date and exact intake time', async () => {
+  const { renderCreatine } = await import('../../apps/life/js/app/render-creatine.js');
+  const window = new Window(); const doc=window.document;
+  doc.body.innerHTML='<article id="nutrition-creatine"></article>';
+  const meal={path:'data/nutrition/2026/10/2026-10-11-breakfast-1000.md',record:{type:'meal',id:'breakfast',date:'2026-10-11',time:'10:00',meal:'breakfast',creatine_g:10,updated_at:'2026-10-11T10:09:48+11:00'}};
+  const estimate=buildNutritionModel({events:[meal],date:'2026-10-11',now:new Date('2026-10-11T10:12:00+11:00'),history:ready}).creatine;
+  const cleanup=renderCreatine(doc,estimate,{quiet:true});
+  const receipt=doc.querySelector('.creatine-card__intake');
+  assert.match(receipt.textContent,/10 g today.*Logged.*10:00/s);
+  receipt.querySelector('button').dispatchEvent(new window.Event('focus'));
+  const tip=doc.querySelector('.creatine-card__tooltip');
+  assert.equal(tip.hidden,false);
+  assert.match(tip.textContent,/11\/10\/26.*10:00.*10 g.*Breakfast/s);
+  assert.match(tip.textContent,/Saved.*10:09/s);
+  doc.querySelector('svg').dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowLeft'}));
+  assert.match(tip.textContent,/10\/10\/26.*No creatine logged/s);
+  doc.querySelector('svg').dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape'}));
+  assert.equal(tip.hidden,true);
+  cleanup(); window.happyDOM.abort();
+});
+
+test('unknown intake times stay unknown in inspection; future points are forecasts, not saved doses',async()=>{
+  const { renderCreatine }=await import('../../apps/life/js/app/render-creatine.js');
+  const window=new Window();const doc=window.document;doc.body.innerHTML='<article id="nutrition-creatine"></article>';
+  const estimate=buildNutritionModel({events:[{record:{type:'creatine',date,time:null,grams:5,dose_key:'unknown'}}],date,now:new Date('2026-10-10T18:00:00+11:00'),history:ready}).creatine;
+  renderCreatine(doc,estimate,{quiet:true});doc.querySelector('.creatine-card__intake button').dispatchEvent(new window.Event('focus'));
+  const tip=doc.querySelector('.creatine-card__tooltip');assert.match(tip.textContent,/Time not recorded/);assert.doesNotMatch(tip.textContent,/12:00/);
+  doc.querySelector('svg').dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight'}));assert.match(tip.textContent,/Forecast.*11\/10\/26.*not a saved intake/s);
+  window.happyDOM.abort();
 });
