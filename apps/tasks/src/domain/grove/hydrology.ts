@@ -3,7 +3,7 @@ import type {generateHeightfield,WorldGrid} from './heightfield';
 import {gridPoint,lakeGeometry,shoreLoops,shoreIntersection,channelGeometry,type Lake,type Channel,type ChannelPoint,type ChannelEnd,type Fall} from './water';
 export const HYDROLOGY_RECIPE=Object.freeze({version:1,areaThreshold:160,maxCarve:.35,iterations:1});
 export type Drainage={level:Float32Array;receiver:Int32Array;accumulation:Uint32Array;order:Int32Array;outlets:Int32Array};
-export type Hydrology=Drainage&{recipeVersion:number;bed:Float32Array;lakeId:Int32Array;lakes:readonly Lake[];channels:readonly Channel[];falls:readonly Fall[];quality:Readonly<{dryFraction:number;channelLength:number;substantialLakes:number}>};
+export type Hydrology=Drainage&{recipeVersion:number;bed:Float32Array;gradedBed:Float32Array;gradingPasses:number;lakeId:Int32Array;lakes:readonly Lake[];channels:readonly Channel[];falls:readonly Fall[];quality:Readonly<{dryFraction:number;channelLength:number;substantialLakes:number}>};
 type Entry={id:number;height:number};
 class Heap{
  private items:Entry[]=[];
@@ -54,7 +54,10 @@ function extractChannels(bed:Float32Array,d:Drainage,lakeId:Int32Array,lakes:rea
  for(const lake of lakes){let id=lake.downstreamReceiver;sources.set(id,lake.id);let steps=0;while(id>=0&&lakeId[id]===-1&&d.receiver[id]!>=0&&!selected[id]){selected[id]=1;id=d.receiver[id]!;if(++steps>n)throw Error('Invalid lake outlet route');}}
  for(let id=0;id<n;id++)if(selected[id]&&lakeId[d.receiver[id]!]===-1)incoming[d.receiver[id]!]!++;
  const chains:Channel[]=[];
- const height=(id:number)=>lakeId[id]!>=0?lakes[lakeId[id]!]!.waterElevation:d.level[id]!;
+ const surface=d.level.slice();
+ for(let id=0;id<n;id++)if(lakeId[id]===-1)surface[id]=surface[id]!+.12;
+ for(let k=d.order.length-1;k>=0;k--){const id=d.order[k]!,to=d.receiver[id]!;if(to>=0&&lakeId[to]===-1)surface[to]=Math.min(surface[to]!,surface[id]!);}
+ const height=(id:number)=>surface[id]!;
  for(let start=0;start<n;start++)if(selected[start]&&(incoming[start]!==1||sources.has(start))){
   const ids=[start];let id=start;
   while(true){const next=d.receiver[id]!;ids.push(next);if(next<0)throw Error('Selected channel without outlet');if(lakeId[next]!>=0||d.receiver[next]===-1||incoming[next]!==1||sources.has(next))break;id=next;if(ids.length>n)throw Error('Cyclic channel');}
@@ -72,10 +75,47 @@ function extractChannels(bed:Float32Array,d:Drainage,lakeId:Int32Array,lakes:rea
   if(cleaned.length<2)continue;
   const triangles=channelGeometry(g,bed,cleaned);
   chains.push({id:chains.length,points:cleaned,start:sourceLake===undefined?null:{type:'lake',id:sourceLake},end,length:cleaned[cleaned.length-1]!.distance,contributingArea:d.accumulation[endId]!*g.step*g.step,triangles,shoreLoops:shoreLoops(triangles)});
- }return chains;
+ }
+ // Multiple lakes can share one dry spill cell. Keep a separate shore-to-node
+ // connector for each, rather than losing all but the last source in the map.
+ for(const lake of lakes)if(!chains.some(c=>c.start?.type==='lake'&&c.start.id===lake.id)){
+  const to=lake.downstreamReceiver,a=gridPoint(g,lake.outletCell,bed),b=gridPoint(g,to,bed),start=shoreIntersection(a,b,lake.shoreLoops);
+  const targetLake=lakeId[to]!,end:ChannelEnd=targetLake>=0?{type:'lake',id:targetLake}:d.receiver[to]===-1?{type:'outlet',id:to}:{type:'junction',id:to};
+  const finish=targetLake>=0?shoreIntersection(a,b,lakes[targetLake]!.shoreLoops):b,length=Math.hypot(finish.x-start.x,finish.z-start.z);
+  if(length<=1e-5)throw Error('Degenerate lake spill connector');
+  const width=Math.min(5,1.4+Math.sqrt(d.accumulation[to]!)*.018),points:ChannelPoint[]=[{...start,cell:lake.outletCell,waterElevation:lake.waterElevation,distance:0,width},{x:finish.x,z:finish.z,cell:to,waterElevation:Math.min(lake.waterElevation,height(to)),distance:length,width}];
+  const triangles=channelGeometry(g,bed,points);chains.push({id:chains.length,points,start:{type:'lake',id:lake.id},end,length,contributingArea:d.accumulation[to]!*g.step*g.step,triangles,shoreLoops:shoreLoops(triangles)});
+ }
+ return chains;
 }
+
+/** Raise enclosed reserves above their solved spill, retaining the original field.
+ * At most three preparation passes; this is separate from the one incision pass. */
+function gradeDryGround(field:ReturnType<typeof generateHeightfield>){
+ const g=field.grid,gradedBed=field.bed.slice();let gradingPasses=0;
+ const smooth=(t:number)=>{const v=Math.max(0,Math.min(1,t));return v*v*(3-2*v);};
+ for(let pass=0;pass<3;pass++){
+  const d=analyseDrainage(gradedBed,g.size),features:{cx:number;cz:number;rx:number;rz:number;inner:number;outer:number;height:number;dome:number}[]=[];
+  for(const m of field.meadows){let spill=-Infinity,wet=false;
+   for(let id=0;id<gradedBed.length;id++){const p=gridPoint(g,id,gradedBed);if(Math.hypot(p.x-m.cx,p.z-m.cz)<m.radius*.65){spill=Math.max(spill,d.level[id]!);if(d.level[id]!-gradedBed[id]!>.02)wet=true;}}
+   features.push({cx:m.cx,cz:m.cz,rx:m.radius,rz:m.radius,inner:.65,outer:1.3,height:wet?spill+.5:m.height,dome:.5});
+  }
+  for(const b of field.basins)if(b.island){const i=b.island;let water=-Infinity;
+   for(let id=0;id<gradedBed.length;id++){const p=gridPoint(g,id,gradedBed);if(Math.hypot((p.x-i.cx)/i.rx,(p.z-i.cz)/i.rz)<1.25&&d.level[id]!-gradedBed[id]!>.02)water=Math.max(water,d.level[id]!);}
+   if(Number.isFinite(water))features.push({cx:i.cx,cz:i.cz,rx:i.rx,rz:i.rz,inner:.55,outer:1.25,height:water+2,dome:0});
+  }
+  let changed=false;
+  for(let id=0;id<gradedBed.length;id++){const p=gridPoint(g,id,gradedBed);let height=gradedBed[id]!;
+   for(const f of features){const q=Math.hypot((p.x-f.cx)/f.rx,(p.z-f.cz)/f.rz);if(q<f.outer){const crown=f.height+f.dome*(1-smooth(q/f.inner)),target=crown+(height-crown)*smooth((q-f.inner)/(f.outer-f.inner));height=Math.max(height,target);}}
+   height=Math.min(height,field.bed[id]!+6);if(height>gradedBed[id]!+1e-5){gradedBed[id]=height;changed=true;}
+  }
+  if(!changed)break;gradingPasses++;
+ }
+ return {gradedBed,gradingPasses};
+}
+
 export function generateHydrology(field:ReturnType<typeof generateHeightfield>):Hydrology{
- const g=field.grid,initial=analyseDrainage(field.bed,g.size),firstLakes=labelLakes(field.bed,initial,g),bed=field.bed.slice();
+ const g=field.grid,{gradedBed,gradingPasses}=gradeDryGround(field),initial=analyseDrainage(gradedBed,g.size),firstLakes=labelLakes(gradedBed,initial,g),bed=gradedBed.slice();
  for(let id=0;id<bed.length;id++)if(initial.accumulation[id]!>=HYDROLOGY_RECIPE.areaThreshold&&firstLakes.lakeId[id]===-1){
   const p=gridPoint(g,id,bed),x=id%g.size,z=Math.floor(id/g.size);
   if(x===0||z===0||x===g.size-1||z===g.size-1||field.meadows.some(m=>Math.hypot(p.x-m.cx,p.z-m.cz)<m.radius*.65))continue;
@@ -86,5 +126,25 @@ export function generateHydrology(field:ReturnType<typeof generateHeightfield>):
   const drop=channel.points[i]!.waterElevation-channel.points[j]!.waterElevation;if(drop>=2){falls.push({channelId:channel.id,from:i,to:j,drop});i=j;break;}
  }
  const quality={dryFraction:lakeId.reduce((sum,id)=>sum+(id<0?1:0),0)/bed.length,channelLength:channels.reduce((sum,c)=>sum+c.length,0),substantialLakes:lakes.filter(l=>l.cells.length>=64).length};
- return {...drainage,recipeVersion:HYDROLOGY_RECIPE.version,bed,lakeId,lakes,channels,falls,quality};
+ return {...drainage,gradedBed,gradingPasses,recipeVersion:HYDROLOGY_RECIPE.version,bed,lakeId,lakes,channels,falls,quality};
+}
+
+/** Quality acceptance uses final terrain and water, not proposed basin levels. */
+export function hasDryReserves(field:Pick<ReturnType<typeof generateHeightfield>,'grid'|'meadows'|'basins'>,h:Hydrology):boolean{
+ const g=field.grid;
+ for(let id=0;id<h.bed.length;id++){
+  const p=gridPoint(g,id,h.bed),x=id%g.size,z=Math.floor(id/g.size);
+  if(!field.meadows.some(m=>Math.hypot(p.x-m.cx,p.z-m.cz)<m.radius*.55))continue;
+  if(h.lakeId[id]!==-1||x===0||z===0||x===g.size-1||z===g.size-1)return false;
+  const sx=(h.bed[id+1]!-h.bed[id-1]!)/(2*g.step),sz=(h.bed[id+g.size]!-h.bed[id-g.size]!)/(2*g.step);
+  if(Math.hypot(sx,sz)>.15)return false;
+ }
+ for(const c of h.channels)for(let k=0;k<c.triangles.length;k+=3)if(field.meadows.some(m=>Math.hypot(c.triangles[k]!-m.cx,c.triangles[k+2]!-m.cz)<m.radius*.55))return false;
+ for(const b of field.basins)if(b.island){
+  const i=b.island;let water=-Infinity;
+  for(let id=0;id<h.bed.length;id++){const p=gridPoint(g,id,h.bed);if(h.lakeId[id]!>=0&&Math.hypot((p.x-i.cx)/i.rx,(p.z-i.cz)/i.rz)<1.25)water=Math.max(water,h.level[id]!);}
+  const cell=Math.round((i.cz-g.z0)/g.step)*g.size+Math.round((i.cx-g.x0)/g.step);
+  if(!Number.isFinite(water)||h.lakeId[cell]!==-1||h.bed[cell]!<=water+1)return false;
+ }
+ return true;
 }

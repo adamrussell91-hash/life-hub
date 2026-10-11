@@ -1,4 +1,4 @@
-/** Fresh, local-only Phase 1 worker and diagnostic acceptance. */
+/** Fresh, local-only annual hydrology worker and diagnostic acceptance. */
 import {chromium,webkit} from '../node_modules/playwright/index.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -16,12 +16,14 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    await page.waitForSelector('#landscape[data-state="ready"][data-year="2026"]',{timeout:30000});
    const data=await page.evaluate(()=>{
     const stage=document.querySelector('#landscape');
-    const targets=[...document.querySelectorAll('button,input')].map(e=>({height:e.getBoundingClientRect().height,width:e.getBoundingClientRect().width}));
+    const targets=[...document.querySelectorAll('button,input,select')].map(e=>({height:e.getBoundingClientRect().height,width:e.getBoundingClientRect().width}));
     return {...stage.dataset,canvases:stage.querySelectorAll('canvas').length,overflow:document.documentElement.scrollWidth>innerWidth,targets};
    });
    if(data.samples!=='66049'||data.bytes!=='264196'||data.canvases!==1||data.overflow||Number(data.triangles)<131072)throw Error(JSON.stringify(data));
    if(data.targets.some(t=>t.height<44||t.width<44))throw Error('Controls below 44 px');
-   await page.screenshot({path:path.join(out,`phase1-${name}-${width}.png`),fullPage:true});
+   if(!data.lakes||Number(data.lakes)<1||Number(data.channels)<1)throw Error('Missing solved drainage');
+   for(const layer of ['lakes','receivers','accumulation','outlets','elevation']){await page.locator('#layer').selectOption(layer);await page.waitForSelector('#landscape[data-layer="'+layer+'"]');}
+   await page.screenshot({path:path.join(out,`phase2-${name}-${width}.png`),fullPage:true});
    await page.evaluate(()=>{
     const year=document.querySelector('#year');
     for(const value of ['2027','2028','2029']){year.value=value;year.dispatchEvent(new Event('change',{bubbles:true}));}
@@ -50,4 +52,4 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
   }
  }finally{await browser.close();}
 }
-await writeFile(path.join(out,'phase1-browser-evidence.json'),JSON.stringify(results,null,2));
+await writeFile(path.join(out,'phase2-browser-evidence.json'),JSON.stringify(results,null,2));

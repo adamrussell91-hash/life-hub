@@ -17,7 +17,7 @@ function setup(){const ports:Transport[]=[];const client=new AnnualWorldClient((
 describe('annual worker protocol',()=>{
  it('generates the real field and transfers exclusive buffer ownership',()=>{
   const result=buildWorldResponse({type:'generate',id:1,key:worldKeyForYear(2026)});
-  expect(result.message.type).toBe('success');expect(result.transfer).toHaveLength(1);
+  expect(result.message.type).toBe('success');expect(result.transfer.length).toBeGreaterThan(7);
   if(result.message.type==='success'){
    expect(result.transfer[0]).toBe(result.message.world.bed.buffer);
    const received=structuredClone(result.message,{transfer:result.transfer});
@@ -47,13 +47,23 @@ describe('annual generation lifecycle',()=>{
   const {client,ports}=setup(),pending=client.generate(2026);
   ports[0]!.reply({type:'failure',id:999,error:'stale'});ports[0]!.success();expect((await pending).world.key.year).toBe(2026);client.dispose();
  });
- it.each(['wrong-key','invalid-bed','invalid-summary','unknown-type'])('rejects malformed %s output and releases resources',async(kind)=>{
+ it.each(['wrong-key','invalid-bed','invalid-summary','invalid-hydrology','cyclic-hydrology','invalid-channel-height','unknown-type'])('rejects malformed %s output and releases resources',async(kind)=>{
   const {client,ports}=setup(),pending=client.generate(2026),world=generateAnnualWorld(worldKeyForYear(kind==='wrong-key'?2027:2026));
   let response:any={type:'success',id:ports[0]!.request.id,world:structuredClone(world),generationMs:1};
   if(kind==='invalid-bed')response.world.bed[0]=NaN;
   if(kind==='invalid-summary')response.world.summary.bedBytes=0;
+  if(kind==='invalid-hydrology')response.world.hydrology.level[0]=NaN;
+  if(kind==='cyclic-hydrology')response.world.hydrology.receiver[258]=258;
+  if(kind==='invalid-channel-height')response.world.hydrology.channels.find((c:any)=>c.triangles.length>=9).triangles[1]=999;
   if(kind==='unknown-type')response.type='surprise';
   ports[0]!.reply(response);await expect(pending).rejects.toThrow(/invalid/i);expect(ports[0]!.terminated).toBe(true);client.dispose();
+ });
+ it.each(['lake','channel'])('rejects missing %s triangles',async(kind)=>{
+  const {client,ports}=setup(),pending=client.generate(2026),world=structuredClone(generateAnnualWorld(worldKeyForYear(2026)));
+  const descriptors=kind==='lake'?world.hydrology.lakes:world.hydrology.channels;
+  descriptors.find(c=>c.triangles.length>=9)!.triangles=new Float32Array();
+  ports[0]!.reply({type:'success',id:ports[0]!.request.id,world,generationMs:1});
+  expect(await pending.then(()=> 'accepted',()=> 'rejected')).toBe('rejected');client.dispose();
  });
  it.each(['failure','error','messageerror'])('rejects %s and terminates',async(kind)=>{
   const {client,ports}=setup(),pending=client.generate(2026),p=ports[0]!;
