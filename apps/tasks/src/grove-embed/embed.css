@@ -1,0 +1,49 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body.grove-embed {
+  background: linear-gradient(180deg, #dcecf4 0%, #eef5f0 70%, #f4f1e8 100%);
+  font-family: Inter, system-ui, sans-serif;
+  overflow: hidden;
+}
+
+#grove {
+  position: relative;
+  height: 100%;
+}
+
+.grove-embed__stage {
+  position: absolute;
+  inset: 0;
+}
+
+.grove-embed__stage canvas {
+  display: block;
+}
+
+.grove-embed__caption {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  max-width: calc(100% - 1.5rem);
+  margin: 0;
+  padding: 0.35rem 0.8rem;
+  background: var(--paper, #fff);
+  border: 1px solid var(--line, #ddd);
+  border-radius: 999px;
+  color: var(--ink, #222);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grove-embed__caption:empty {
+  display: none;
+}
+
+.grove-embed__credits { position: absolute; bottom: 0; left: var(--space-2); right: var(--space-2); font-size: var(--text-xs); color: var(--muted); background: var(--paper); margin: 0; padding: var(--space-1); }
+.grove-embed__credits:empty { display: none; }

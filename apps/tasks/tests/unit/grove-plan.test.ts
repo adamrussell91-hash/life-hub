@@ -201,3 +201,36 @@ describe('placement', () => {
     expect(p.counts).toMatchObject({ life: 6, teaching: 6, health: 6, wedding: 6, other: 0, late: 0 });
   });
 });
+
+
+describe('continued history and calendar views', () => {
+  const terms = [
+    { term: 1, starts_on: '2026-02-02', ends_on: '2026-04-02' },
+    { term: 2, starts_on: '2026-04-22', ends_on: '2026-07-03' },
+    { term: 3, starts_on: '2026-07-21', ends_on: '2026-09-25' },
+    { term: 4, starts_on: '2026-10-13', ends_on: '2026-12-17' }
+  ] as const;
+  it('does not move the first tree when a new species arrives', () => {
+    const a = done('first', '2026-10-10T01:00:00Z');
+    const before = plan([a]).trees[0]!;
+    const after = plan([a, done('second', '2026-10-10T02:00:00Z', {domain: 'teaching'})]).trees[0]!;
+    expect([after.x, after.z, after.rotation]).toEqual([before.x, before.z, before.rotation]);
+  });
+  it('uses the exact configured term, including its short first week', () => {
+    const p = buildGrovePlan({tasks: [], view: 'term', anchor: '2026-04-23', now: NOW, terms});
+    expect([p.from, p.to, p.days.length]).toEqual(['2026-04-22', '2026-07-03', 73]);
+    expect(p.periodLabel).toBe('Term 2');
+  });
+  it('shows the holiday itself between two terms', () => {
+    const p = buildGrovePlan({tasks: [], view: 'term', anchor: '2026-10-10', now: NOW, terms});
+    expect([p.from, p.to]).toEqual(['2026-09-26', '2026-10-12']);
+    expect(p.days.every(d => d.holiday)).toBe(true);
+  });
+  it('year includes holiday completions and leap days without losing trees', () => {
+    const p = buildGrovePlan({tasks: [done('holiday', '2026-04-10T01:00:00Z')], view: 'year', anchor: '2026-04-10', now: NOW, terms});
+    expect(p.days).toHaveLength(365);
+    expect(p.trees.map(t => t.id)).toEqual(['holiday']);
+    expect(p.days.find(d => d.key === '2026-04-10')!.holiday).toBe(true);
+    expect(groveWindow('year', '2024-01-01')).toHaveLength(366);
+  });
+});

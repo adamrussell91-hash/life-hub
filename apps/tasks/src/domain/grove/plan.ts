@@ -17,21 +17,24 @@ import { toHubDateKey } from '@/domain/queries';
 import { GROVE_SPECIES, HUB_SPECIES, PROP_VARIANTS, TREE_VARIANTS, type GrovePropKind, type GroveSpecies } from './assets';
 import { addDays, daysBetween, isDateKey, mondayOf, weekdayIndex } from './dates';
 import { hashString, seededRandom } from './random';
+import { wildlifeMilestones, type WildlifeMilestone } from './wildlife';
+import { sampleTerrain } from './terrain';
+import { groveCalendar, groveDateKeys, grovePeriod, type GroveTerm } from './calendar';
 
 export const GROWTH_DAYS = 3;
 /** Minimum distance between two trunks, in metres. A mature canopy is about 2.5 m across. */
 export const TREE_SPACING = 2.6;
 /** Distance between neighbouring day clearings, in metres. */
-export const DAY_CELL = 30;
-/** Smallest a tree is drawn, as a fraction of its mature height (about a 0.7 m sapling). */
-export const SAPLING_SCALE = 0.13;
+export const DAY_CELL = 26;
+/** Smallest a tree is drawn, as a fraction of its mature height (about a 1.1 m sapling). */
+export const SAPLING_SCALE = 0.2;
 /** Each species' patch sits this far from the clearing centre, so species grow in their own patches. */
 const PATCH_OFFSET = 4.2;
 const MIN_RADIUS = 5;
 const EPOCH_MONDAY = '2024-01-01';
 const DAY_MS = 86_400_000;
 
-export type GroveView = 'day' | 'week';
+export type GroveView = 'day' | 'week' | 'term' | 'year';
 export type GroveStage = 'sapling' | 'young' | 'mature';
 
 /** The fields Grove reads from a task. Everything else is ignored. */
@@ -82,6 +85,7 @@ export type GroveDay = {
   /** Monday = 0. */
   weekday: number;
   weekend: boolean;
+  holiday: boolean;
   future: boolean;
   today: boolean;
   /** Clearing centre in world metres. Stable for a date whatever the view. */
@@ -103,6 +107,9 @@ export type GrovePlan = {
   counts: Record<GroveSpecies, number>;
   /** Done tasks with no usable completion time. Shown as a note, never planted. */
   undated: number;
+  periodLabel: string;
+  provisionalCalendar: boolean;
+  wildlife: WildlifeMilestone[];
 };
 
 function isDone(task: GroveTaskInput): boolean {
@@ -164,10 +171,8 @@ export function scaleFor(growth: number): number {
   return SAPLING_SCALE + (1 - SAPLING_SCALE) * eased;
 }
 
-export function groveWindow(view: GroveView, anchor: string): string[] {
-  if (view === 'day') return [anchor];
-  const monday = mondayOf(anchor);
-  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+export function groveWindow(view: GroveView, anchor: string, terms: readonly GroveTerm[] = []): string[] {
+  return groveDateKeys(view, anchor, terms);
 }
 
 /** Clearing centre for a date: a weekly row, nudged so the forest never reads as a grid. */
@@ -181,8 +186,7 @@ export function dayCentre(key: string): { x: number; z: number } {
 }
 
 /** Where a species' patch sits in a clearing. The wheel turns a little each day. */
-function patchCentre(dayKey: string, species: GroveSpecies, alone: boolean): { x: number; z: number } {
-  if (alone) return { x: 0, z: 0 };
+function patchCentre(dayKey: string, species: GroveSpecies): { x: number; z: number } {
   const turn = seededRandom(`wheel:${dayKey}`)() * Math.PI * 2;
   const angle = turn + (GROVE_SPECIES.indexOf(species) / GROVE_SPECIES.length) * Math.PI * 2;
   return { x: Math.cos(angle) * PATCH_OFFSET, z: Math.sin(angle) * PATCH_OFFSET };
@@ -191,11 +195,10 @@ function patchCentre(dayKey: string, species: GroveSpecies, alone: boolean): { x
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 function placeTrees(dayKey: string, completions: GroveCompletion[], nowMs: number): GroveTree[] {
-  const alone = new Set(completions.map((c) => c.species)).size <= 1;
   const placed: GroveTree[] = [];
   for (const completion of completions) {
     const rand = seededRandom(`tree:${completion.id}`);
-    const patch = patchCentre(dayKey, completion.species, alone);
+    const patch = patchCentre(dayKey, completion.species);
     const spin = rand() * Math.PI * 2;
     let x = patch.x;
     let z = patch.z;
@@ -205,7 +208,7 @@ function placeTrees(dayKey: string, completions: GroveCompletion[], nowMs: numbe
       const a = spin + k * GOLDEN_ANGLE;
       const cx = patch.x + Math.cos(a) * r + (rand() - 0.5) * 0.6;
       const cz = patch.z + Math.sin(a) * r + (rand() - 0.5) * 0.6;
-      if (placed.every((t) => Math.hypot(t.x - cx, t.z - cz) >= TREE_SPACING)) {
+      if (!sampleTerrain(dayCentre(dayKey).x + cx, dayCentre(dayKey).z + cz).wet && placed.every((t) => Math.hypot(t.x - cx, t.z - cz) >= TREE_SPACING)) {
         x = cx;
         z = cz;
         break;
@@ -235,7 +238,7 @@ function placeProps(day: { key: string; weekend: boolean; radius: number }, tree
   const rand = seededRandom(`props:${day.key}`);
   const props: GroveProp[] = [];
   const clear = (x: number, z: number, gap: number) =>
-    trees.every((t) => Math.hypot(t.x - x, t.z - z) >= gap) &&
+    !sampleTerrain(dayCentre(day.key).x + x, dayCentre(day.key).z + z).wet && trees.every((t) => Math.hypot(t.x - x, t.z - z) >= gap) &&
     props.every((p) => Math.hypot(p.x - x, p.z - z) >= 0.45);
   const scatter = (kind: GrovePropKind, count: number, inner: number, outer: number, gap: number, size: [number, number]) => {
     for (let i = 0, tries = 0; i < count && tries < count * 12; tries += 1) {
@@ -272,13 +275,16 @@ export function buildGrovePlan(input: {
   anchor: string;
   now: Date;
   timeZone?: string;
+  terms?: readonly GroveTerm[];
 }): GrovePlan {
   const nowMs = input.now.getTime();
   const today = toHubDateKey(input.now, input.timeZone);
-  const keys = groveWindow(input.view, input.anchor);
+  const period = grovePeriod(input.view, input.anchor, input.terms);
+  const keys = groveWindow(input.view, input.anchor, input.terms);
   const { completions, undated } = groveCompletions(input.tasks, input.timeZone);
   const byDay = new Map<string, GroveCompletion[]>();
   for (const completion of completions) {
+    if (completion.completedMs > nowMs) continue;
     const list = byDay.get(completion.dayKey);
     if (list) list.push(completion);
     else byDay.set(completion.dayKey, [completion]);
@@ -296,6 +302,7 @@ export function buildGrovePlan(input: {
       key,
       weekday,
       weekend,
+      holiday: !period.terms.some(t => t.starts_on <= key && t.ends_on >= key),
       future: key > today,
       today: key === today,
       cx: round(centre.x),
@@ -305,6 +312,10 @@ export function buildGrovePlan(input: {
       props: placeProps({ key, weekend, radius }, trees)
     };
   });
+  const historicalTerms = new Map<string,GroveTerm>();
+  for(const date of new Set([input.anchor,...completions.filter(c=>c.completedMs<=nowMs).map(c=>c.dayKey.slice(0,4)+'-01-01')])) {
+    for(const term of groveCalendar(date,input.terms).terms) historicalTerms.set(term.starts_on,term);
+  }
   return {
     view: input.view,
     anchor: input.anchor,
@@ -314,6 +325,9 @@ export function buildGrovePlan(input: {
     days,
     trees: days.flatMap((d) => d.trees),
     counts,
-    undated
+    undated,
+    periodLabel: period.label,
+    provisionalCalendar: period.provisional,
+    wildlife: wildlifeMilestones(completions.filter(c => c.completedMs <= nowMs), [...historicalTerms.values()], keys.at(-1)! < today ? keys.at(-1)! : today)
   };
 }
