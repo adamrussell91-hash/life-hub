@@ -253,7 +253,13 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     const height = Math.max(320, Math.round(window.innerHeight - top - (nav?.offsetHeight ?? 0) - 12));
     if (Math.abs(page.offsetHeight - height) > 2) page.style.height = `${height}px`;
   };
-  const pageObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(fitPage) : null;
+  // Writing page height inside the body's observer delivery can trigger WebKit's
+  // resize-loop error. Coalesce those writes into the next animation frame.
+  let fitFrame = 0;
+  const pageObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
+    if (fitFrame) return;
+    fitFrame = requestAnimationFrame(() => { fitFrame = 0; fitPage(); });
+  }) : null;
   pageObserver?.observe(document.body);
   window.addEventListener('resize', fitPage);
   fitPage();
@@ -270,6 +276,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     window.removeEventListener('keydown', onKey);
     window.removeEventListener('resize', fitPage);
     pageObserver?.disconnect();
+    if (fitFrame) cancelAnimationFrame(fitFrame);
   };
 }
 

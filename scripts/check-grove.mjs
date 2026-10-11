@@ -8,7 +8,7 @@ if(!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname))throw Err
 const engine=process.env.GROVE_BROWSER==='webkit'?webkit:chromium;
 const browser=await engine.launch({headless:true});
 const context=await browser.newContext({viewport:{width:1440,height:1000}});
-const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+const page=await context.newPage(),errors=[];page.on('pageerror',e=>{errors.push(e.message);console.log('Page error at',page.url(),e.message);});
 let tasks=Array.from({length:283*5},(_,i)=>({id:`grove-${i}`,title:`Finished task ${i+1}`,domain:['life','teaching','health','wedding','other'][i%5],status:'done',bucket:'done',completed_at:new Date(Date.UTC(2026,0,1+Math.floor(i/5),0,i%5)).toISOString(),due_date:null,created_at:'2026-01-01T00:00:00Z',updated_at:'2026-10-10T00:00:00Z'}));
 await page.addInitScript(()=>{const Original=Date;globalThis.Date=class extends Original{constructor(...args){super(...(args.length?args:['2026-10-10T09:00:00Z']));}static now(){return new Original('2026-10-10T09:00:00Z').getTime();}};});
 await page.route('**/api/knowledge/shelf',route=>route.fulfill({json:{ok:true,data:{books:[{label:'Acceptance book',completed_on:'2026-08-01'}],placements:[]}}}));
