@@ -38,9 +38,9 @@ function proteinPerKg(training, forecast) {
   };
 }
 
-function recentPace(items, asOf, forecast, targetsConfig) {
+function recentPace(items, asOf, forecast, targetsConfig, libraryByName) {
   if (!items || !asOf) return null;
-  const summary = summariseTrainingBehaviour(items, { asOf, days: 7 }, { targetsConfig });
+  const summary = summariseTrainingBehaviour(items, { asOf, days: 7 }, { targetsConfig, libraryByName });
   const protein = recentCompleteProtein(items, asOf);
   const weight = Number(forecast?.current?.weight_kg);
   let proteinValue = null;
@@ -62,7 +62,7 @@ function recentPace(items, asOf, forecast, targetsConfig) {
   };
 }
 
-export function buildStimulusChartData(training, forecast, { items = null, asOf = null, targetsConfig = null } = {}) {
+export function buildStimulusChartData(training, forecast, { items = null, asOf = null, targetsConfig = null, libraryByName = null } = {}) {
   const days = Number(training?.window?.days ?? 0);
   const weeks = days / 7;
   const byRegion = training?.loaded_sets_by_muscle_group ?? {};
@@ -70,7 +70,7 @@ export function buildStimulusChartData(training, forecast, { items = null, asOf 
     ?? round(upperBodySetsPerWeek(byRegion, days), 1);
   const protein = proteinPerKg(training, forecast);
   const gate = LEAN_PRESERVATION_GATE;
-  const recentByKey = recentPace(items, asOf, forecast, targetsConfig);
+  const recentByKey = recentPace(items, asOf, forecast, targetsConfig, libraryByName);
   const keys = [
     {
       key: 'sessions',

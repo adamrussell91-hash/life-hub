@@ -123,14 +123,14 @@ function stimulusCopy(training, upperSetsPerWeek) {
   };
 }
 
-function stimulusCard(forecast, events, date, targetsConfig) {
+function stimulusCard(forecast, events, date, targetsConfig, libraryByName) {
   const training = forecast.input_quality?.training_support
     ?? summariseTrainingBehaviour(
       events,
       { asOf: date, days: STIMULUS_FALLBACK_DAYS },
-      { targetsConfig }
+      { targetsConfig, libraryByName }
     );
-  const chart = buildStimulusChartData(training, forecast, { items: events, asOf: date, targetsConfig });
+  const chart = buildStimulusChartData(training, forecast, { items: events, asOf: date, targetsConfig, libraryByName });
   const upper = chart.keys.find(item => item.key === 'upper_sets')?.value ?? null;
   const copy = stimulusCopy(training, upper);
   return {
@@ -175,17 +175,18 @@ function scaleCard(forecast, events, date) {
 }
 
 /** Home pulse view of the forecast engine. Body keeps the full panel. */
-export function buildHomeForecastCards({ events, date, targetsConfig } = {}) {
+export function buildHomeForecastCards({ events, date, targetsConfig, libraryByName = null } = {}) {
   if (!date) throw new RangeError('Home forecast date is unavailable');
   const forecast = buildForecast({
     items: events,
     asOf: date,
+    libraryByName,
     targetsConfig
   });
   return {
     recomp: buildRecompChartData(forecast, date),
     paths: pathsCard(forecast),
-    stimulus: stimulusCard(forecast, events, date, targetsConfig),
+    stimulus: stimulusCard(forecast, events, date, targetsConfig, libraryByName),
     scale: scaleCard(forecast, events, date)
   };
 }
