@@ -62,5 +62,7 @@
 - [x] Signed-in account: 108 year trees, 22 week trees, configured holiday meadow rather than guessed terms; Home iframe renders. A labelled temporary test task grows one oak and its picked link opens the correct task. Reopening removes completion; the test record is retained inactive rather than permanently deleted.
 - [x] Graph teardown race reproduced with fake timers and fixed; a rapid Branch→Lines transition remains visible. Home clearing refreshes on the existing task-change event.
 - [x] Final mandatory pre-PR gate passes: root 5,615 tests (one existing skip), Tasks 1,178 tests and Professional typecheck. Knowledge's 1,249 tests and all eight models' motion/deformation checks pass. No test checks weakened.
-- [ ] Production release/catalogue/API verification. See the PR and local acceptance report for the final deployment evidence.
+- [x] Production released through [PR #791](https://github.com/adamrussell91-hash/life-hub/pull/791), merge `92d01b94`. [Pages run](https://github.com/adamrussell91-hash/life-hub/actions/runs/38100432730) succeeds, including encrypted installation. All eight live GLBs return 200 and match the verified local build byte-for-byte; the deployment archive returns 404. Netlify publishes the same merge commit for the API. Chromium/WebKit final phone interactions and cleanup pass with zero errors.
+
+The four completion areas are finished. In Bookshelf, open Book facts and set Finished on for a genuinely completed book; that dated event earns the owl. Existing reading progress is never treated as a finished book. The final live-account and local reports stay in the Codex handoff outputs, not in public Git.
 - Optional audio, water animation, extra species and dedicated young meshes remain out of this completion pass.
