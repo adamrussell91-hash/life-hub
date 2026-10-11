@@ -23,3 +23,9 @@ Keep diagnostic synthetic labels, region layer, counts/picking and New Year owne
 ## Evidence
 
 Red/green unit checks cover shared terrain edges, water-area conservation, clipped flow coordinate interpolation, fall joins and invalid drops, bounded clock continuity/suspension, continuous land/swim safety, slopes/duck waterline and quality invariance. Chromium/WebKit at 1440/390 cover animation, frozen time on pause/reduced/hidden/offscreen, quality switching, prototype falls/spray, wildlife loading, stress/picking, annual route/Home, lifecycle cleanup and shader errors. Run unchanged pre-PR gate and production build, compare Tasks TypeScript against 67 existing diagnostics, record draw calls/triangles and frame percentiles with hardware limitations. Save design/plan/report/patch/bundle/evidence, commit locally.
+
+Implementation notes: unsupported routed drops with no continuous wet endpoint join remain geography descriptors but do not produce a render sheet. Receipt recomputes canonical water clipping only, to prove exact coverage; terrain is not rebuilt on the main thread. This validation has a measurable startup cost and does not claim the final Phase 5 responsiveness budget.
+
+Annual consumers initially focus the anchor clearing, with full selected-period framing and a whole annual landscape for Year. Near models prioritise that clearing; authored model loading is capped at 200 trees. Wildlife eligibility is memoized per focus date so historical babies and earned species do not leak backward in time.
+
+The verified existing project-only eight-animal bundle was installed from the local delivery referenced by apps/life/assets/grove/README.md. No purchased source files or private GLBs are added to Git or exported patches.

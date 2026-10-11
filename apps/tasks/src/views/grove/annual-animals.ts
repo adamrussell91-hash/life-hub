@@ -38,7 +38,7 @@ export async function createAnnualAnimals(world:AnnualWorld,plan:AnnualGrovePlan
  function dispose(){
   if(disposed)return;disposed=true;
   for(const actor of actors){actor.mixer.stopAllAction();actor.mixer.uncacheRoot(actor.object);}
-  const released=new Set<object>();
+  const released=new Set<object>();for(const actor of actors)actor.object.traverse((node:Obj)=>{if(node.skeleton&&!released.has(node.skeleton)){released.add(node.skeleton);node.skeleton.dispose();}});
   for(const source of sources)source.scene.traverse((node:Obj)=>{
    if(node.geometry&&!released.has(node.geometry)){released.add(node.geometry);node.geometry.dispose();}
    for(const material of Array.isArray(node.material)?node.material:node.material?[node.material]:[]){
@@ -48,9 +48,9 @@ export async function createAnnualAnimals(world:AnnualWorld,plan:AnnualGrovePlan
    }
   });root.clear();actors.length=0;sources.length=0;
  }
- const result=()=>({root,missing,credits,count:actors.length,update,dispose});
+ const result=()=>({root,missing,credits,count:actors.length,swimmers:actors.filter(a=>a.swimming).length,swimmerError:()=>actors.filter(a=>a.swimming).reduce((error,a)=>Math.max(error,Math.abs(a.object.position.y-annualAnimalHeight(world,a.object.position.x,a.object.position.z,true,a.asset.waterline,a.object.scale.y,heightScale))),0),update,dispose});
  if(!day||day.future||day.worldYear!==world.key.year||!plan.wildlife.length)return result();
- const eligible=plan.wildlife.filter(m=>m.earnedOn<=day.key);
+ const eligible=(plan.wildlifeAt?.(day.key)??plan.wildlife).filter(m=>m.earnedOn<=day.key);
  if(!eligible.length)return result();
  const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
  let catalogue:{assets:Asset[]};

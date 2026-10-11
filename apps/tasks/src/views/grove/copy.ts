@@ -11,7 +11,7 @@ function weekdayName(key: string): string {
   return new Date(`${key}T12:00:00Z`).toLocaleDateString('en-AU', { weekday: 'long', timeZone: 'UTC' });
 }
 
-export function dayCaption(plan: GrovePlan): string {
+export function dayCaption(plan: Pick<GrovePlan,'from'|'to'|'today'|'periodLabel'|'provisionalCalendar'> & {days:readonly {trees:readonly unknown[];future:boolean}[];trees:readonly unknown[]}): string {
   const key = plan.from;
   const day = plan.days[0];
   const n = day?.trees.length ?? 0;
@@ -22,13 +22,13 @@ export function dayCaption(plan: GrovePlan): string {
   return `${when} ${date} · ${trees(n)}`;
 }
 
-export function weekCaption(plan: GrovePlan): string {
+export function weekCaption(plan: Pick<GrovePlan,'from'|'to'|'today'|'periodLabel'|'provisionalCalendar'> & {days:readonly {trees:readonly unknown[];future:boolean}[];trees:readonly unknown[]}): string {
   const n = plan.trees.length;
   const range = `${formatDisplayDate(plan.from)} to ${formatDisplayDate(plan.to)}`;
   return n ? `Week of ${range} · ${trees(n)}` : `Week of ${range} · open meadow`;
 }
 
-export function finishedLine(tree: GroveTree): string {
+export function finishedLine(tree: Pick<GroveTree,'completedAt'|'dayKey'|'stage'>): string {
   const time = new Date(tree.completedAt).toLocaleTimeString('en-AU', {
     hour: 'numeric',
     minute: '2-digit',
@@ -46,7 +46,7 @@ export function undatedNote(count: number): string | null {
     : `${count} older finished tasks have no finish date, so they are not planted.`;
 }
 
-export function periodCaption(plan: GrovePlan): string {
+export function periodCaption(plan: Pick<GrovePlan,'from'|'to'|'today'|'periodLabel'|'provisionalCalendar'> & {days:readonly {trees:readonly unknown[];future:boolean}[];trees:readonly unknown[]}): string {
   const label = plan.periodLabel;
   const dates = `${formatDisplayDate(plan.from)} to ${formatDisplayDate(plan.to)}`;
   const growth = plan.trees.length ? trees(plan.trees.length) : 'open meadow';

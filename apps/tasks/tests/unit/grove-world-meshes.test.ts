@@ -5,16 +5,16 @@ import {buildWorldMeshes,buildFallMesh,validateWorldMeshes,meshBuffers} from '@/
 import {channelGeometry,pointInTriangle,type Channel} from '@/domain/grove/water';
 vi.setConfig({testTimeout:30000});
 const area=(p:Float32Array)=>{let a=0;for(let i=0;i<p.length;i+=9)a+=Math.abs((p[i+3]!-p[i]!)*(p[i+8]!-p[i+2]!)-(p[i+6]!-p[i]!)*(p[i+5]!-p[i+2]!))/2;return a;};
-let world:AnnualWorld;beforeAll(()=>{world=generateAnnualWorld(worldKeyForYear(2026));});
+let world:AnnualWorld;beforeAll(()=>{world=generateAnnualWorld(worldKeyForYear(2026));},30000);
 describe('worker spatial meshes',()=>{
  it('partitions the final bed without changing geography, with matching seam samples',()=>{
   const m=buildWorldMeshes(world);expect(m.identity).toBe(world.identity);expect(m.terrain).toHaveLength(64);
   expect(m.terrain.reduce((n,c)=>n+c.positions.length/9,0)).toBe(256*256*2);
-  for(const c of m.terrain){expect(c.positions.length).toBe(c.normals.length);expect(c.colors.length).toBe(c.positions.length);for(let i=0;i<c.positions.length;i+=3){const x=Math.round((c.positions[i]!-world.grid.x0)/world.grid.step),z=Math.round((c.positions[i+2]!-world.grid.z0)/world.grid.step);expect(c.positions[i+1]).toBe(world.hydrology.bed[z*world.grid.size+x]);}}
+  for(const c of m.terrain){expect(c.positions.length).toBe(c.normals.length);expect(c.colors.length).toBe(c.positions.length);for(let i=0;i<c.positions.length;i+=3){const x=Math.round((c.positions[i]!-world.grid.x0)/world.grid.step),z=Math.round((c.positions[i+2]!-world.grid.z0)/world.grid.step);if(c.positions[i+1]!==world.hydrology.bed[z*world.grid.size+x])throw Error('Terrain sample changed');}}
   expect(()=>validateWorldMeshes(m,world)).not.toThrow();expect(new Set(meshBuffers(m)).size).toBe(meshBuffers(m).length);
  });
  it('conserves the exact wet triangles and level lakes across chunk boundaries',()=>{
-  const m=buildWorldMeshes(world);for(const [kind,ds] of [['lake',world.hydrology.lakes],['stream',world.hydrology.channels]] as const)for(const d of ds){const chunks=m.water.filter(c=>c.kind===kind&&c.sourceId===d.id);expect(chunks.reduce((a,c)=>a+area(c.positions),0)).toBeCloseTo(area(d.triangles),2);for(const c of chunks){expect(c.flow.length).toBe(c.positions.length/3*2);expect(c.phase.length).toBe(c.flow.length);for(let i=0;i<c.positions.length/3;i++){expect(c.phase[i*2]).toBe(c.positions[i*3]);expect(c.phase[i*2+1]).toBe(c.positions[i*3+2]);if(kind==='lake')expect(c.positions[i*3+1]).toBe(d.waterElevation);}}}
+  const m=buildWorldMeshes(world);for(const [kind,ds] of [['lake',world.hydrology.lakes],['stream',world.hydrology.channels]] as const)for(const d of ds){const chunks=m.water.filter(c=>c.kind===kind&&c.sourceId===d.id);expect(chunks.reduce((a,c)=>a+area(c.positions),0)).toBeCloseTo(area(d.triangles),2);for(const c of chunks){expect(c.flow.length).toBe(c.positions.length/3*2);expect(c.phase.length).toBe(c.flow.length);for(let i=0;i<c.positions.length/3;i++){if(c.phase[i*2]!==c.positions[i*3]||c.phase[i*2+1]!==c.positions[i*3+2]||kind==='lake'&&c.positions[i*3+1]!==d.waterElevation)throw Error('Wet attribute changed');}}}
  });
  it('requires intact attributes, unique IDs, finite bounds and ownership',()=>{
   for(const alter of [(m:any)=>delete m.terrain,(m:any)=>m.terrain[0].normals=new Float32Array(3),(m:any)=>m.water[0].flow[0]=NaN,(m:any)=>m.terrain[0].bounds.min[0]=Infinity,(m:any)=>m.terrain[1].id=m.terrain[0].id]){const m=structuredClone(buildWorldMeshes(world));alter(m);expect(()=>validateWorldMeshes(m,world)).toThrow(/mesh/i);}

@@ -67,3 +67,5 @@ describe('annual task planting',()=>{
  },20000);
  it('reports a missing boundary world instead of dropping its dated tasks',()=>expect(()=>build([task('old','2026-12-31'),task('new','2027-01-01')],{view:'week',anchor:'2026-12-31'})).toThrow(/annual world/i));
 });
+
+it('keeps babies tied to the focused date and memoizes repeated focus queries',()=>{const tasks=[...Array.from({length:5},(_,i)=>task('first-'+i,'2026-06-10')),...Array.from({length:5},(_,i)=>task('second-'+i,'2026-06-11'))],plan=build(tasks,{view:'week',anchor:'2026-06-10',now:new Date('2026-06-12T00:00:00Z')});expect(plan.wildlife.find(m=>m.species==='hare')?.baby).toBe(true);const earlier=plan.wildlifeAt('2026-06-10');expect(earlier.find(m=>m.species==='hare')?.baby).toBe(false);expect(plan.wildlifeAt('2026-06-10')).toBe(earlier);});

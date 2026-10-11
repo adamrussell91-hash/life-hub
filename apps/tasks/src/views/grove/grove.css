@@ -270,3 +270,6 @@
 .grove-framing { position: absolute; top: 6.2rem; right: var(--space-3); min-height: 44px; background: var(--paper); font-size: var(--text-xs); }
 .grove-framing[hidden] { display: none; }
 @media (max-width: 719px) { .grove-framing { top: 9rem; } }
+
+.grove-quality { position:absolute;right:var(--space-3);bottom:calc(var(--space-3) + 3.5rem);pointer-events:auto;min-height:44px;max-width:9rem;background:var(--paper);font-size:var(--text-xs); }
+@media(max-width:719px){.grove-quality{bottom:calc(var(--space-3) + 4rem);}}
