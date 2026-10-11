@@ -17,7 +17,7 @@ before(async () => {
 });
 after(async () => { await browser?.close(); server?.closeAllConnections(); server?.close(); });
 
-for (const type of ['creatine', 'creatine_plan']) {
+for (const type of ['creatine', 'creatine_plan', 'meal']) {
   test(type + ' Confirm card keeps edited phone actions visible and hides internal identity', async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, reducedMotion: 'reduce' });
     await context.route('https://fonts.googleapis.com/**', route => route.abort());
@@ -34,7 +34,9 @@ for (const type of ['creatine', 'creatine_plan']) {
       await page.locator('#chat-view').waitFor({ state: 'visible' });
       await page.evaluate(async recordType => {
         const { appendRecordProposal } = await import('/js/app/render-chat.js');
-        const record = recordType === 'creatine'
+        const record = recordType === 'meal'
+          ? {type:'meal',date:'2026-07-30',time:'08:00',meal:'breakfast',calories:358,protein_g:42.2,fat_g:11.5,carbs_g:17.45,sodium_mg:209,calcium_mg:350,creatine_g:10}
+          : recordType === 'creatine'
           ? { type: recordType, date: '2026-07-30', time: '08:00', grams: 7, dose_key: 'dose-1', product: 'Coles creatine' }
           : { type: recordType, date: '2026-07-30', time: '08:00', daily_g: 5, maintenance_g: 5, mode: 'loading' };
         const proposal = appendRecordProposal(document, { path: 'data/nutrition/2026/07/2026-07-30-' + recordType + '.md', record, notes: 'Recorded routine details. '.repeat(40) });
@@ -44,13 +46,14 @@ for (const type of ['creatine', 'creatine_plan']) {
       }, type);
       const card = page.locator('#chat-pending-confirms .record-proposal');
       await card.waitFor({ state: 'visible' });
-      assert.equal(await card.locator('.confirm-card__title').textContent(), type === 'creatine' ? 'Creatine' : 'Creatine routine');
+      assert.equal(await card.locator('.confirm-card__title').textContent(), type === 'meal' ? 'Meal' : type === 'creatine' ? 'Creatine' : 'Creatine routine');
       assert.equal(await card.locator('[data-field="dose_key"]').count(), 0);
       assert.doesNotMatch(await card.textContent(), /dose_key|dose-1|creatine_plan/);
+      if(type==='meal') assert.match(await card.locator('.confirm-card__pills').textContent(), /Creatine.*10 g/s);
       if (process.env.CREATINE_SCREENSHOT_DIR) await card.screenshot({ path: process.env.CREATINE_SCREENSHOT_DIR + '/creatine-confirm-' + type + '-collapsed-390.png' });
       await card.getByRole('button', { name: 'Show all & edit' }).click();
       await card.locator('textarea[data-field="notes"]').fill('Updated notes after checking the routine. '.repeat(50));
-      await card.locator('[data-field="' + (type === 'creatine' ? 'grams' : 'daily_g') + '"]').fill(type === 'creatine' ? '8' : '5');
+      await card.locator('[data-field="' + (type === 'meal' ? 'creatine_g' : type === 'creatine' ? 'grams' : 'daily_g') + '"]').fill(type === 'creatine' ? '8' : '5');
       // A shorter visual viewport exercises the action dock after long entry.
       await page.setViewportSize({ width: 390, height: 600 });
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));

@@ -323,3 +323,5 @@ Prefer named shortcuts when they fit: `track_open_challenge` / `track_log_progre
 
 
 Creatine in protein water or a smoothie belongs on the drink’s meal record as `creatine_g`; do not propose a separate creatine card for that same intake. `creatine_product` is the actual supplement (for example Coles creatine), never the protein-water mix or carrier drink. Omit it if unknown. A zero in the last-week intake scan means no intake was logged on that day, not a measured zero muscle store or proof the user had none.
+
+When confirming a drink with creatine, explicitly say the meal Confirm card includes the creatine quantity; one confirmation saves both. After a successful save, intake date/time and grams are inspectable on the Creatine chart or its daily-intake receipt. Do not claim pending proposals are already saved.
