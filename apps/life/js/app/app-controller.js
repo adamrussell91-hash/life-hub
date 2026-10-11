@@ -1386,7 +1386,7 @@ export function createAppController(dependencies) {
   }
 
   function paintFitness(templatesState) {
-    const libraryByName = templatesState?.libraryByName ?? null;
+    const libraryByName = latestResult?.libraryByName ?? templatesState?.libraryByName ?? null;
     const model = buildFitnessModel({ ...latestResult, libraryByName });
     renderFitness(root, model, {
       logger: fitnessLogger,
@@ -1771,7 +1771,8 @@ export function createAppController(dependencies) {
       ? buildForecast({
           items: latestResult.events,
           asOf: latestResult.date,
-          targetsConfig: latestResult.targetsConfig
+          targetsConfig: latestResult.targetsConfig,
+          libraryByName: latestResult.libraryByName ?? null
         })
       : null;
     const charts = typeof buildBodyChartData === 'function'
