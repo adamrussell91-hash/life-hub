@@ -1,6 +1,6 @@
 /** Annual actors use the same solved footprint as terrain and water rendering. */
 import type {AnnualWorld} from './world';
-import {distanceToSegment,isLandPathSafe,sampleGeography} from './geography';
+import {distanceToSegment,isLandPathSafe,sampleGeography,waterFacesAlongSegment} from './geography';
 import {seededRandom} from './random';
 import type {PathPoint} from './wildlife';
 
@@ -21,9 +21,9 @@ export function isSwimPathSafe(world:AnnualWorld,path:readonly PathPoint[]):bool
  if(path.length===1)return sampleGeography(world,path[0]!.x,path[0]!.z,0).waterType!=='dry';
  for(let segment=1;segment<path.length;segment++){
   const a=path[segment-1]!,b=path[segment]!,intervals:[number,number][]=[];
-  for(const descriptor of [...world.hydrology.lakes,...world.hydrology.channels]){
-   const t=descriptor.triangles;
-   for(let i=0;i<t.length;i+=9){
+  for(const face of waterFacesAlongSegment(world,a,b)){
+   const t=face.triangles,i=face.offset;
+   {
     const area=(t[i+3]!-t[i]!)*(t[i+8]!-t[i+2]!)-(t[i+5]!-t[i+2]!)*(t[i+6]!-t[i]!);
     if(Math.abs(area)<1e-12)continue;
     const sign=Math.sign(area);let lo=0,hi=1;
