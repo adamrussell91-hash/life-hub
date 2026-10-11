@@ -21,4 +21,15 @@ export function verifyRequiredCatalogue(manifest){
  if(!manifest||!Array.isArray(manifest.assets)||manifest.assets.some(a=>!a||typeof a.id!=='string')||new Set(manifest.assets.map(a=>a.id)).size!==manifest.assets.length)throw Error('Invalid animal catalogue assets');
  for(const[id,clips]of Object.entries(REQUIRED_ANIMATIONS)){const a=manifest.assets.find(a=>a.id===id);if(a)clipNames(a.animations,a.id);if(!a||clips.some(c=>!a.animations.includes(c)))throw Error('Not ready: '+id);}
  if(manifest.assets.length!==20)throw Error('Expected exactly 20 ready animal models');
+ for(const asset of manifest.assets){
+  if(asset.kind!=='animal')throw Error('Invalid animal kind '+asset.id);
+  if(typeof asset.file!=='string'||!/^models\/animals\/[a-z0-9-]+\.glb$/.test(asset.file))throw Error('Invalid animal model file '+asset.id);
+  const roles=asset.animation_roles;
+  if(!roles||typeof roles!=='object'||Array.isArray(roles)||!roles.idle||!roles.locomotion||Object.values(roles).some(clip=>typeof clip!=='string'||!asset.animations.includes(clip)))throw Error('Invalid animal animation roles '+asset.id);
+  if(asset.waterline_m!==undefined&&(!Number.isFinite(asset.waterline_m)||asset.waterline_m<0))throw Error('Invalid animal waterline '+asset.id);
+  const license=asset.license;
+  if(!license||typeof license!=='object'||typeof license.id!=='string'||!license.id||!(license.attribution===null||typeof license.attribution==='string'))throw Error('Invalid animal licence '+asset.id);
+  if(license.id.startsWith('CC-BY-')&&!license.attribution?.trim())throw Error('Missing required animal attribution '+asset.id);
+ }
+ if(new Set(manifest.assets.map(a=>a.file)).size!==manifest.assets.length)throw Error('Duplicate animal model file');
 }
