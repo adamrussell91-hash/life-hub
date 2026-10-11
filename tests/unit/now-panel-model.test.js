@@ -8,6 +8,7 @@ import {
   formatClock,
   formatLessonWhen,
   hubJumpLines,
+  isOpenTask,
   lessonsThisWeek,
   nowTasks,
   readingNow,
@@ -138,6 +139,31 @@ test('the task list orders overdue, today, dated, then undated newest first, and
   assert.deepEqual(nowTasks(tasks, { today: TODAY, domain: 'teaching' }).map(task => task.id), ['today', 'later']);
   assert.equal(nowTasks(tasks, { today: TODAY })[1].hub, 'School');
   assert.deepEqual(taskSummary(tasks, TODAY), { open: 5, overdue: 1, dueToday: 1 });
+});
+
+test('Home open work excludes Someday and Goals', () => {
+  const board = { id: 'board', title: 'Pay rates', status: 'open', domain: 'life', due_date: TODAY };
+  const someday = {
+    id: 'someday',
+    title: 'See a performance at the Royal Albert Hall',
+    status: 'deferred',
+    domain: 'life',
+    bucket: 'someday',
+    someday_kind: 'bucket_list'
+  };
+  const goal = {
+    id: 'goal_1',
+    title: 'Run a half marathon',
+    status: 'active',
+    sphere: 'life',
+    structure: 'woop'
+  };
+  const tasks = [board, someday, goal];
+  assert.equal(isOpenTask(board), true);
+  assert.equal(isOpenTask(someday), false);
+  assert.equal(isOpenTask(goal), false);
+  assert.deepEqual(nowTasks(tasks, { today: TODAY }).map(task => task.id), ['board']);
+  assert.deepEqual(taskSummary(tasks, TODAY), { open: 1, overdue: 0, dueToday: 1 });
 });
 
 test('reading now keeps books marked as reading, most recently touched first', () => {

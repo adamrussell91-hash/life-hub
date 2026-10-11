@@ -50,8 +50,14 @@ function blockTone(chip) {
   return 'calendar';
 }
 
+/** Open board work only — not done/dead, Someday, or Goals (/api/goals shape). */
 export function isOpenTask(task) {
-  return Boolean(task && typeof task.id === 'string' && task.status !== 'done' && task.status !== 'dead');
+  if (!task || typeof task.id !== 'string') return false;
+  if (task.status === 'done' || task.status === 'dead') return false;
+  if (task.bucket === 'someday') return false;
+  // Goals are a separate collection (sphere/structure); never fill Home's daily glance.
+  if (task.kind === 'goal' || task.sphere != null || task.structure != null) return false;
+  return true;
 }
 
 /**
