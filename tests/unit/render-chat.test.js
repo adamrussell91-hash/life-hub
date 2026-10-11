@@ -752,3 +752,12 @@ test('creatine confirmations use human titles and keep dose identity out of edit
  const plan=appendRecordProposal(root,{path:'data/nutrition/2026/10/2026-10-10-creatine-plan.md',record:{type:'creatine_plan',date:'2026-10-10',daily_g:5,maintenance_g:5,mode:'loading'}});
  assert.equal(findByClass(plan.card,'confirm-card__title').textContent,'Creatine routine');
 });
+
+
+test('meal confirmation always surfaces embedded creatine before the five-pill cutoff',()=>{
+ const root=new FakeDocument();
+ const proposal=appendRecordProposal(root,{path:'data/nutrition/2026/10/2026-10-11-breakfast-1000.md',record:{type:'meal',date:'2026-10-11',time:'10:00',meal:'breakfast',calories:358,protein_g:42.2,fat_g:11.5,carbs_g:17.45,sodium_mg:209,creatine_g:10}});
+ const pills=findByClass(proposal.card,'confirm-card__pills');
+ const text=node=>node.textContent+' '+node.children.map(text).join(' ');
+ assert.match(text(pills),/Creatine.*10 g/s);
+});

@@ -591,6 +591,7 @@ const SUMMARY_MAX_PILLS = 5;
 function summaryPillText(key, value, inputs) {
   const text = String(value ?? '').trim();
   if (!text) return null;
+  if (key === 'creatine_g') return {label:'Creatine',value:text + ' g'};
   if (key === 'mood') {
     const score = String(inputs.mood_score?.value ?? '').trim();
     return { label: 'Mood', value: score ? `${text} · ${score}` : text };
@@ -607,7 +608,13 @@ function summaryPillText(key, value, inputs) {
 function renderProposalSummary(root, pills, excerpt, inputs) {
   pills.replaceChildren?.();
   let count = 0;
-  for (const [key, input] of Object.entries(inputs)) {
+  const orderedInputs = Object.entries(inputs);
+  if (inputs.creatine_g && String(inputs.creatine_g.value).trim() !== '') {
+    const index = orderedInputs.findIndex(([key]) => key === 'creatine_g');
+    const [creatine] = orderedInputs.splice(index, 1);
+    orderedInputs.splice(Math.min(1, orderedInputs.length), 0, creatine);
+  }
+  for (const [key, input] of orderedInputs) {
     if (key === 'notes' || SUMMARY_SKIP_FIELDS.has(key) || count >= SUMMARY_MAX_PILLS) continue;
     const pill = summaryPillText(key, input.value, inputs);
     if (!pill) continue;
