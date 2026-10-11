@@ -1,3 +1,4 @@
+import {parseGroveHistory,type GroveHistory} from '../../../../packages/grove-history/validate.mjs';
 import { HUB_TZ } from '@/domain/queries';
 import type { SchoolTerm } from '@/domain/school-time';
 
@@ -13,6 +14,7 @@ export type SchoolYearTerms = {
 
 export type HubPrefs = {
   schema_version: 1;
+  grove_history?: GroveHistory;
   /** IANA timezone Clare uses for "today" / due words. Default Australia/Sydney. */
   timezone: string;
   updated_at: string | null;
@@ -217,6 +219,7 @@ export function parseHubPrefs(raw: unknown): HubPrefs {
     : [];
   return {
     schema_version: 1,
+    ...(parseGroveHistory(body.grove_history) ? {grove_history:parseGroveHistory(body.grove_history)} : {}),
     timezone,
     updated_at: typeof body.updated_at === 'string' ? body.updated_at : null,
     dismissed_insight_ids: dismissed,
