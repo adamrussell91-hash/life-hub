@@ -51,6 +51,13 @@ describe('annual roaming routes',()=>{
   expect(isSwimPathSafe(w,r!.points)).toBe(true);expect(r!.regionIds.length).toBeGreaterThan(1);
   expect(await buildAnnualRoamingRoutes(w,plan([]),[animal('otter','mallard',true)])).toEqual([]);
  });
+ // Duplicate wet face centers alone must not count as reachable travel.
+ it('returns no swimmer route when duplicate triangles offer only coincident open candidates',async()=>{
+  const w=fixture(),p=plan([0]),triangle=[6,2,6,10,2,6,8,2,12];
+  w.regions!.owner.fill(1);w.regions!.owner[4*9+4]=0;
+  w.hydrology.lakes[0]!.triangles=new Float32Array([...triangle,...triangle]);
+  expect(await buildAnnualRoamingRoutes(w,p,[animal('duck','mallard',true)])).toEqual([]);
+ });
  it('never shortcuts a narrow dry gap between nearby water surfaces',async()=>{
   const w=fixture([[0,6,7.999,10],[8.001,6,16,10]]),[r]=await buildAnnualRoamingRoutes(w,plan(),[animal('duck','mallard',true)]);
   expect(r).toBeDefined();expect(isSwimPathSafe(w,r!.points)).toBe(true);expect(r!.points.every(p=>p.x<8)||r!.points.every(p=>p.x>8)).toBe(true);

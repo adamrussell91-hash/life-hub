@@ -42,10 +42,12 @@ async function circuit(w:AnnualWorld,graph:NavigationGraph,eligible:Set<number>,
   if(next!==undefined){order.push(next);stack.push({node:next,remaining:[...children.get(next)??[]]});}else{stack.pop();if(stack.length)order.push(stack.at(-1)!.node);}await budget.checkpoint();
  }
  if(order.length<2)return;
- const visitedRegions=[nodes[root]!.region];
+ const visitedRegions=[nodes[root]!.region];let travelDistance=0;
  for(let k=1;k<order.length;k++){const a=order[k-1]!,b=order[k]!,edge=graph.edgeRegions.get(navigationEdgeKey(a,b));
+  travelDistance+=Math.hypot(nodes[b]!.x-nodes[a]!.x,nodes[b]!.z-nodes[a]!.z);
   visitedRegions.push(...(edge?(a<b?edge:edge.slice().reverse()):[nodes[b]!.region]));if(k%32===0)await budget.checkpoint();
  }
+ if(!Number.isFinite(travelDistance)||travelDistance<=0)return;
  const regionIds=[...new Set(visitedRegions.map(r=>w.regions!.weeks[r]!.id))];
  return {id:encounter.id,points:order.map(i=>({x:nodes[i]!.x,z:nodes[i]!.z})),regionIds,mode:encounter.swimming?'water':encounter.species==='robin'||encounter.species==='owl'?'flight':'land'};
 }
