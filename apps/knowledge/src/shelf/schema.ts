@@ -26,6 +26,7 @@ export const ShelfBookSchema = z.object({
   reading: z.object({ page: z.number().int().positive().nullable().optional(), updated_at: z.string().optional() }).optional(),
   /** Set when Claude estimated the facts; cleared once Adam pastes or types real ones. */
   estimated: z.object({ by: z.string(), confidence: z.enum(["high", "medium", "low"]), at: z.string() }).optional(),
+  completed_on: z.string().optional(),
   updated_at: z.string().optional(),
 });
 export type ShelfBook = z.infer<typeof ShelfBookSchema>;
@@ -101,6 +102,7 @@ export type BookFactsInput = {
   chapters?: Chapter[] | null;
   notebook?: string | null;
   reading?: { page?: number | null } | true | null;
+  completed_on?: string | null;
 };
 
 export type PlacementInput = {

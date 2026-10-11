@@ -363,6 +363,10 @@ export function createAppController(dependencies) {
   bind(windowTarget, 'tasks-hub:tasks-changed', event => {
     const tasks = event?.detail;
     if (!Array.isArray(tasks) || !tasks.length) return;
+    // The clearing has its own task snapshot; reload it after a Home tick/add/reopen.
+    const groveFrame = root.querySelector?.('#home-grove iframe');
+    const groveSource = groveFrame?.getAttribute('src');
+    if (groveSource) groveFrame.setAttribute('src', groveSource);
     const incoming = tasksEventsFromTasks(tasks);
     // Every task in the event, not just the ones still drawn: a task ticked off or
     // undated must drop its old open copy.

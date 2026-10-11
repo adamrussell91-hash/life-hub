@@ -67,6 +67,8 @@ export async function saveBookFacts(input: BookFactsInput): Promise<ShelfBook> {
   const current = data.books.find(book => bookKey(book.label) === key) ?? { label: input.label };
   const reading = input.reading === true ? { page: current.reading?.page ?? null } : input.reading;
   const next = strip({ ...current, ...input, reading: reading ? { page: reading.page ?? null, updated_at: new Date().toISOString() } : reading }) as ShelfBook;
+  if (input.completed_on) delete next.reading;
+  else if (input.reading) delete next.completed_on;
   data.books = [...data.books.filter(book => bookKey(book.label) !== key), next];
   writeLocal(data);
   return next;

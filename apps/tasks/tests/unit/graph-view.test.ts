@@ -124,6 +124,42 @@ describe('graph view pills', () => {
     expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
   });
 
+  it('cancels a pending view transition when the graph is torn down', async () => {
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderGraphView(canvas);
+    vi.useFakeTimers();
+    try {
+      const branch = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')]
+        .find((btn) => btn.textContent === 'Branch');
+      branch?.click();
+      const stage = canvas.querySelector('.graph-lines')!.parentElement!;
+      resetGraphSession();
+      canvas.replaceChildren();
+      await vi.advanceTimersByTimeAsync(200);
+      expect(stage.querySelector('.graph-branch')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the current view visible when a transition is superseded', async () => {
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderGraphView(canvas);
+    vi.useFakeTimers();
+    try {
+      const pills = () => [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')];
+      pills().find((btn) => btn.textContent === 'Branch')?.click();
+      pills().find((btn) => btn.textContent === 'Lines')?.click();
+      await vi.advanceTimersByTimeAsync(200);
+      expect(canvas.querySelector('.graph-lines')).not.toBeNull();
+      expect(canvas.querySelector('.graph-stage')?.classList.contains('is-fading')).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('remounts when a leftover host sits on the canvas', async () => {
     const canvas = document.createElement('main');
     document.body.append(canvas);
