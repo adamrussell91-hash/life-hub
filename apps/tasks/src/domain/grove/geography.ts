@@ -4,17 +4,38 @@ import {pointInTriangle,type ShorePoint} from './water';
 type Face={type:'lake'|'stream';id:number;offset:number;triangles:Float32Array};
 type Index={buckets:Map<number,Face[]>;shores:readonly (readonly ShorePoint[])[]};
 const indices=new WeakMap<AnnualWorld,Index>();
-function indexWorld(w:AnnualWorld):Index{
- const cached=indices.get(w);if(cached)return cached;const g=w.grid,buckets=new Map<number,Face[]>(),shores:(readonly ShorePoint[])[]=[];
+function* buildIndex(w:AnnualWorld):Generator<void,Index>{
+ const g=w.grid,buckets=new Map<number,Face[]>(),shores:(readonly ShorePoint[])[]=[];
  for(const [type,descriptors] of [['lake',w.hydrology.lakes],['stream',w.hydrology.channels]] as const)for(const d of descriptors){
   shores.push(...d.shoreLoops);const t=d.triangles;
   for(let i=0;i<t.length;i+=9){const xs=[t[i]!,t[i+3]!,t[i+6]!],zs=[t[i+2]!,t[i+5]!,t[i+8]!];
    const loX=Math.max(0,Math.floor((Math.min(...xs)-g.x0)/g.step)),hiX=Math.min(g.size-1,Math.floor((Math.max(...xs)-g.x0)/g.step));
    const loZ=Math.max(0,Math.floor((Math.min(...zs)-g.z0)/g.step)),hiZ=Math.min(g.size-1,Math.floor((Math.max(...zs)-g.z0)/g.step));
-   for(let z=loZ;z<=hiZ;z++)for(let x=loX;x<=hiX;x++){const id=z*g.size+x,list=buckets.get(id)||[];list.push({type,id:d.id,offset:i,triangles:t});buckets.set(id,list);}
+   const face={type,id:d.id,offset:i,triangles:t};
+   for(let z=loZ;z<=hiZ;z++)for(let x=loX;x<=hiX;x++){const id=z*g.size+x,list=buckets.get(id)||[];list.push(face);buckets.set(id,list);yield;}
   }
  }
- const index={buckets,shores};indices.set(w,index);return index;
+ return {buckets,shores};
+}
+function indexWorld(w:AnnualWorld):Index{
+ const cached=indices.get(w);if(cached)return cached;
+ const builder=buildIndex(w);let result=builder.next();while(!result.done)result=builder.next();
+ indices.set(w,result.value);return result.value;
+}
+/** Prepare the same immutable footprint index in bounded, cancellable caller chunks. */
+export async function prepareGeography(w:AnnualWorld,checkpoint:()=>Promise<void>):Promise<void>{
+ if(indices.has(w))return;
+ const builder=buildIndex(w);let result=builder.next(),count=0;
+ while(!result.done){if(++count%64===0)await checkpoint();result=builder.next();}
+ indices.set(w,result.value);
+}
+/** Only faces in the segment's grid bounds are needed for exact footprint clipping. */
+export function waterFacesAlongSegment(w:AnnualWorld,a:ShorePoint,b:ShorePoint):readonly Face[]{
+ const index=indexWorld(w),g=w.grid,faces=new Set<Face>();
+ const loX=Math.max(0,Math.floor((Math.min(a.x,b.x)-g.x0)/g.step)),hiX=Math.min(g.size-1,Math.floor((Math.max(a.x,b.x)-g.x0)/g.step));
+ const loZ=Math.max(0,Math.floor((Math.min(a.z,b.z)-g.z0)/g.step)),hiZ=Math.min(g.size-1,Math.floor((Math.max(a.z,b.z)-g.z0)/g.step));
+ for(let z=loZ;z<=hiZ;z++)for(let x=loX;x<=hiX;x++)for(const face of index.buckets.get(z*g.size+x)||[])faces.add(face);
+ return [...faces];
 }
 export function distanceToSegment(x:number,z:number,a:ShorePoint,b:ShorePoint){const dx=b.x-a.x,dz=b.z-a.z,den=dx*dx+dz*dz,t=den?Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/den)):0;return {distance:Math.hypot(x-a.x-dx*t,z-a.z-dz*t),t};}
 export function sampleGeography(w:AnnualWorld,x:number,z:number,clearanceLimit?:number){
