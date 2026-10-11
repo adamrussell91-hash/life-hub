@@ -14,6 +14,7 @@ const html=`<!doctype html><html><head><style>body{margin:0}canvas{display:block
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+import {clone} from 'three/addons/utils/SkeletonUtils.js';
 const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
 renderer.setSize(512,512);renderer.setPixelRatio(1);renderer.outputColorSpace=THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
@@ -25,6 +26,10 @@ window.renderAsset=async(file)=>{
  const light=new THREE.DirectionalLight(0xffffff,2.3);light.position.set(4,8,6);scene.add(light);
  const model=gltf.scene;scene.add(model);model.updateMatrixWorld(true);
  const initial=new THREE.Box3().setFromObject(model,true);
+ const originalSkins=[],cloneSkins=[],baby=clone(model);model.traverse(n=>{if(n.isSkinnedMesh)originalSkins.push(n);});baby.traverse(n=>{if(n.isSkinnedMesh)cloneSkins.push(n);});
+ if(!originalSkins.length)throw Error('Missing deformation skin '+file);
+ for(let j=0;j<originalSkins.length;j++){const n=originalSkins[j],c=cloneSkins[j];if(c.skeleton===n.skeleton||c.skeleton.bones.some(b=>n.skeleton.bones.includes(b)))throw Error('Shared baby skeleton');const w=n.geometry.getAttribute('skinWeight'),idx=n.geometry.getAttribute('skinIndex');for(let i=0;i<w.count;i++){let sum=0;for(let k=0;k<4;k++){const value=w.getComponent(i,k);if(!Number.isFinite(value)||value<0||idx.getComponent(i,k)>=n.skeleton.bones.length)throw Error('Invalid skin weights');sum+=value;}if(Math.abs(sum-1)>.002)throw Error('Unnormalised skin weights');}}
+
  function vertices(){const values=[]; model.traverse(n=>{if(n.isMesh){const count=n.geometry.getAttribute('position').count;for(let i=0;i<count;i++){const p=new THREE.Vector3();n.getVertexPosition(i,p);p.applyMatrix4(n.matrixWorld);values.push(...p.toArray());}}});return values;}
  const animationChecks=[];
  for(const clip of gltf.animations){
@@ -38,10 +43,13 @@ window.renderAsset=async(file)=>{
   const base=poses[0],last=poses.at(-1);
   const displacement=Math.max(...poses.slice(1).map(p=>Math.max(...p.map((v,i)=>Math.abs(v-base[i])))));
   const seam=Math.max(...last.map((v,i)=>Math.abs(v-base[i])));
+  // Relative vertex vectors reject whole-model translations posing as skin deformation.
+  const relativeDisplacement=Math.max(...poses.slice(1).map(p=>Math.max(...p.map((v,i)=>Math.abs((v-p[i%3])-(base[i]-base[i%3]))))));
+  if(relativeDisplacement<1e-5)throw Error('No relative vertex deformation '+file+' '+clip.name);
   const maxSpan=Math.max(...boxes.flatMap(b=>b.max.map((v,i)=>v-b.min[i])));
   const initialSpan=initial.getSize(new THREE.Vector3()).length();
   if(maxSpan>initialSpan*2.5)throw Error('Exploding rig '+file+' '+clip.name);
-  animationChecks.push({name:clip.name,duration:clip.duration,moves:displacement>1e-5,vertex_displacement_m:displacement,loop_seam_m:seam,sampled_bounds:boxes});
+  animationChecks.push({name:clip.name,duration:clip.duration,moves:displacement>1e-5,vertex_displacement_m:displacement,relative_deformation_m:relativeDisplacement,loop_seam_m:seam,sampled_bounds:boxes});
   mixer.stopAllAction();mixer.uncacheRoot(model);
  }
  if(gltf.animations.length){const mixer=new THREE.AnimationMixer(model);mixer.clipAction(gltf.animations.find(a=>a.name==='idle')||gltf.animations[0]).play();mixer.setTime(.2);}
@@ -53,7 +61,7 @@ window.renderAsset=async(file)=>{
  const extent=Math.max(...points.flatMap(p=>[Math.abs(p.x),Math.abs(p.y)]))*1.14;
  camera.left=-extent;camera.right=extent;camera.top=extent;camera.bottom=-extent;camera.updateProjectionMatrix();
  renderer.render(scene,camera);
- const report={file,height_m:initial.max.y-initial.min.y,bounds:{min:initial.min.toArray(),max:initial.max.toArray()},animations:animationChecks};
+ const report={file,height_m:initial.max.y-initial.min.y,bounds:{min:initial.min.toArray(),max:initial.max.toArray()},animations:animationChecks,independent_baby_skeleton:true,skin_weights_valid:true};
  model.traverse(n=>{if(n.isMesh){n.geometry.dispose();for(const m of Array.isArray(n.material)?n.material:[n.material]){for(const value of Object.values(m))if(value?.isTexture)value.dispose();m.dispose();}}});
  return report;
 };window.ready=true;
@@ -80,7 +88,7 @@ try{
   const report=await page.evaluate(file=>window.renderAsset(file),asset.file);
   report.sha256=createHash('sha256').update(await fs.readFile(path.join(grove,asset.file))).digest('hex');
   if(!report.animations.length || report.animations.some(a=>!a.moves))throw Error(`Missing/non-moving animation in ${asset.id}`);
-  if(asset.clip_origin?.startsWith('Grove-generated') && report.animations.some(a=>a.loop_seam_m>.0005))throw Error('Generated loop discontinuity: '+asset.id);
+  if((asset.id.startsWith('animal-forest-')||asset.clip_origin?.startsWith('Grove-generated')) && report.animations.some(a=>a.loop_seam_m>.0005))throw Error('Generated loop discontinuity: '+asset.id);
   // Browser-measured bounds include skinning; these are the engine's actual dimensions.
   asset.height_m=+report.height_m.toFixed(4);reports.push(report);
   const png=await page.screenshot();

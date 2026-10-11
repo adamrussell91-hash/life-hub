@@ -1,0 +1,22 @@
+body {margin:0;background:var(--paper);font-family:var(--font-ui);}
+.world-preview {padding:var(--space-6);color:var(--ink);min-width:0;}
+.world-preview header p,.world-preview__legend,#metrics {color:var(--muted);}
+.world-preview__eyebrow {text-transform:uppercase;font-size:var(--text-xs);letter-spacing:.08em;}
+.world-preview h1 {font-size:var(--text-2xl);margin:var(--space-2) 0;}
+.world-preview__controls {display:flex;align-items:center;gap:var(--space-3);margin:var(--space-4) 0;}
+.world-preview__controls .btn {min-width:44px;min-height:44px;font-size:var(--text-xl);}
+.world-preview__controls label {display:flex;align-items:center;gap:var(--space-2);}
+.world-preview__controls input {font:inherit;font-size:16px;width:7rem;min-height:44px;padding:var(--space-2);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--paper);color:inherit;}
+.world-preview__stage {height:clamp(300px,65dvh,760px);width:100%;min-width:0;overflow:hidden;border-radius:var(--radius-lg);background:var(--glass);}
+.world-preview__stage canvas {display:block;max-width:100%;touch-action:none;}
+.world-preview__legend,#metrics,#status {font-size:var(--text-sm);line-height:1.5;overflow-wrap:anywhere;}
+@media(max-width:719px){.world-preview {padding:var(--space-4);} .world-preview__stage{height:50dvh;}}
+
+.world-preview__layer {display:flex;align-items:center;gap:var(--space-2);margin:var(--space-3) 0;min-width:0;}
+.world-preview__layer select {font:inherit;font-size:16px;min-height:44px;max-width:100%;min-width:0;padding:var(--space-2);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--paper);color:var(--ink);}
+.world-preview__layer select {appearance:none;height:44px;min-width:44px;box-sizing:border-box;}
+
+.world-preview__activity {display:flex;flex-wrap:wrap;gap:var(--space-3);margin:var(--space-3) 0;}
+.world-preview__activity label {display:flex;align-items:center;gap:var(--space-2);min-width:0;}
+.world-preview__activity input,.world-preview__activity select {box-sizing:border-box;appearance:none;min-height:44px;min-width:44px;max-width:100%;font:inherit;font-size:16px;padding:var(--space-2);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--paper);color:var(--ink);}
+.world-preview__activity button {min-height:44px;}
