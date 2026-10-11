@@ -1,5 +1,5 @@
 import {afterEach,describe,it,expect,vi} from 'vitest';
-import {BoxGeometry,Group,Matrix4,Mesh,MeshStandardMaterial,Texture} from 'three';
+import {BoxGeometry,Group,InstancedMesh,Matrix4,Mesh,MeshStandardMaterial,Texture} from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createAnnualTrees,createAnnualTreeLibrary} from '@/views/grove/annual-trees';
 import type {AnnualTree} from '@/domain/grove/planting';
@@ -72,6 +72,33 @@ describe('scene-owned annual tree library',()=>{
   library.dispose();const source=new Group();source.add(new Mesh(f.geometry,f.material));finish({scene:source});
   for(const result of await Promise.all([first,second])){expect(result.ids.size).toBe(0);expect(result.batches).toHaveLength(0);result.dispose();}
   expect(GLTFLoader.prototype.loadAsync).toHaveBeenCalledTimes(1);expect(gd).toHaveBeenCalledTimes(1);expect(td).toHaveBeenCalledTimes(1);
+ });
+ it('cleans already-built instances when a second distinct model arrives after library disposal',async()=>{
+  const f=fixture(),library=createAnnualTreeLibrary(),early=new Group();early.add(new Mesh(f.geometry,f.material));
+  const lateTexture=new Texture(),lateMaterial=new MeshStandardMaterial({map:lateTexture}),lateGeometry=new BoxGeometry(2,3,2),late=new Group();late.add(new Mesh(lateGeometry,lateMaterial));
+  const resourceDisposals=[f.geometry,f.material,f.texture,lateGeometry,lateMaterial,lateTexture].map(resource=>vi.spyOn(resource,'dispose'));
+  const clones=vi.spyOn(f.material,'clone');
+  let resolveEarly!:(value:any)=>void,resolveLate!:(value:any)=>void,built!:()=>void;
+  const whenBuilt=new Promise<void>(resolve=>{built=resolve;});
+  const compute=InstancedMesh.prototype.computeBoundingSphere;
+  const instances=vi.spyOn(InstancedMesh.prototype,'computeBoundingSphere').mockImplementation(function(this:InstancedMesh){compute.call(this);built();});
+  vi.mocked(GLTFLoader.prototype.loadAsync)
+   .mockImplementationOnce(()=>new Promise(resolve=>{resolveEarly=resolve;}))
+   .mockImplementationOnce(()=>new Promise(resolve=>{resolveLate=resolve;}));
+  const pending=createAnnualTrees([f.trees[0]!,{...f.trees[1]!,variant:2}],()=>0,1,undefined,library);
+  resolveEarly({scene:early});await whenBuilt;
+  expect(instances).toHaveBeenCalledTimes(1);
+  const instanceDispose=vi.spyOn(instances.mock.contexts[0]!,'dispose');
+  expect(clones).toHaveBeenCalledTimes(2);
+  const cloneDisposals=clones.mock.results.map(result=>vi.spyOn(result.value as MeshStandardMaterial,'dispose'));
+  library.dispose();library.dispose();
+  expect(instanceDispose).not.toHaveBeenCalled();
+  resolveLate({scene:late});const result=await pending;
+  expect(result.batches).toHaveLength(0);expect(result.ids.size).toBe(0);expect(result.root.children).toHaveLength(0);
+  result.dispose();result.dispose();library.dispose();
+  expect(instanceDispose).toHaveBeenCalledTimes(1);
+  for(const dispose of [...resourceDisposals,...cloneDisposals])expect(dispose).toHaveBeenCalledTimes(1);
+  expect(GLTFLoader.prototype.loadAsync).toHaveBeenCalledTimes(2);
  });
  it('retains failed silhouettes while other files load, and bounds snapshots to 64 trees',async()=>{
   const f=fixture(),library=createAnnualTreeLibrary();vi.mocked(GLTFLoader.prototype.loadAsync).mockRejectedValueOnce(new Error('missing'));
