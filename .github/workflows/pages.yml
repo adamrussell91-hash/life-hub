@@ -45,6 +45,20 @@ jobs:
             test-output.log
             tasks-vitest-output.log
           if-no-files-found: ignore
+      - name: Transfer Grove release input
+        if: ${{ hashFiles('apps/life/assets/grove/deployment/release-input.enc') != '' }}
+        run: node scripts/transfer-grove-release.mjs
+        env:
+          GROVE_ASSET_KEY: ${{ secrets.GROVE_ASSET_KEY }}
+          GROVE_RELEASE_INPUT_KEY: ${{ secrets.GROVE_RELEASE_INPUT_KEY }}
+      - name: Save Grove deployment ciphertext
+        if: ${{ success() && hashFiles('apps/life/assets/grove/deployment/release-input.enc') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: grove-deployment-ciphertext
+          path: apps/life/assets/grove/deployment/animals.enc
+          if-no-files-found: error
+          retention-days: 7
       - name: Install Grove project assets
         run: node scripts/install-grove-deployment-assets.mjs
         env:
