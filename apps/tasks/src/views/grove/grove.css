@@ -264,7 +264,7 @@
 .grove-credits summary { min-height: 2.75rem; display: flex; align-items: center; cursor: pointer; }
 .grove-credits p { margin: 0; max-width: 30rem; overflow-wrap: anywhere; }
 @media (max-width: 719px) {
-  .grove-credits { left: auto; right: var(--space-3); bottom: calc(var(--space-3) + 10.5rem); max-width: calc(100% - 2 * var(--space-3)); }
+  .grove-credits { left: auto; right: var(--space-3); bottom: calc(var(--space-3) + 14.5rem); max-width: calc(100% - 2 * var(--space-3)); }
 }
 
 .grove-framing { position: absolute; top: 6.2rem; right: var(--space-3); min-height: 44px; background: var(--paper); font-size: var(--text-xs); }
@@ -272,4 +272,4 @@
 @media (max-width: 719px) { .grove-framing { top: 9rem; } }
 
 .grove-quality { position:absolute;right:var(--space-3);bottom:calc(var(--space-3) + 3.5rem);pointer-events:auto;min-height:44px;max-width:9rem;background:var(--paper);font-size:var(--text-xs); }
-@media(max-width:719px){.grove-quality{bottom:calc(var(--space-3) + 4rem);}}
+@media(max-width:719px){.grove-quality{bottom:calc(var(--space-3) + 11rem);}}

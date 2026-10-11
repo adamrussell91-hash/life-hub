@@ -39,7 +39,7 @@ async function load(){
 layer.addEventListener('change',()=>preview?.setLayer(layer.value as DiagnosticLayer));
 year.addEventListener('change',()=>{anchor.value=year.value+'-06-10';void load();});
 for(const selector of ['#previous','#next'])document.querySelector(selector)!.addEventListener('click',()=>{year.value=String(Number(year.value)+(selector==='#next'?1:-1));anchor.value=year.value+'-06-10';void load();});
-anchor.addEventListener('change',()=>{year.value=anchor.value.slice(0,4);void load();});view.addEventListener('change',()=>void load());fixture.addEventListener('change',()=>void load());document.querySelector('#frame')!.addEventListener('click',()=>preview?.focus());
+anchor.addEventListener('change',()=>{year.value=anchor.value.slice(0,4);void load();});view.addEventListener('change',()=>void load());fixture.addEventListener('change',()=>void load());document.querySelector('#frame')!.addEventListener('click',()=>{stage.scrollIntoView({block:'center'});preview?.focus();});
 window.addEventListener('pagehide',()=>{revision++;for(const c of clients.values())c.dispose();clients.clear();preview?.dispose();preview=null;stage.dataset.state='suspended';});
 window.addEventListener('pageshow',event=>{if(event.persisted){initialise();void load();}});
 let motionPaused=false;void load();

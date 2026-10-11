@@ -10,24 +10,26 @@
 
 Files: domain/grove/world-meshes.ts, world-protocol.ts, world-client tests, tests/unit/grove-world-meshes.test.ts.
 
-- [ ] Add red tests for buildWorldMeshes(world): spatial terrain 32-cell chunks, final-bed edges, clipped water area conservation, channel coordinates, level lakes, valid sheet joins and synthetic drop rejection.
-- [ ] Implement typed arrays and stable chunk IDs. Clip water at chunk planes with interpolated flow coordinates; preserve triangle masks. Worker adds mesh payload and transfers each unique buffer once. Recipient validates required shapes/finite bounds/ownership.
-- [ ] Run focused Vitest, commit, then fresh spec and quality review.
+- [x] Add red tests for buildWorldMeshes(world): spatial terrain 32-cell chunks, final-bed edges, clipped water area conservation, channel coordinates, level lakes, valid sheet joins and synthetic drop rejection.
+- [x] Implement typed arrays and stable chunk IDs. Clip water at chunk planes with interpolated flow coordinates; preserve triangle masks. Worker adds mesh payload and transfers each unique buffer once. Recipient validates required shapes/finite bounds/ownership.
+- [x] Run focused Vitest, commit, then fresh spec and quality review.
 
 ## Task 2 — Shared motion, shader and wildlife
 
 Files: domain/grove/motion.ts, annual-wildlife.ts; views/grove/waterRenderer.ts, annual-animals.ts; tests/unit/grove-motion.test.ts and grove-annual-wildlife.test.ts.
 
-- [ ] Add red tests for freeze/resume/no catch-up and long-period continuity; wet/slope/obstacle rejection, connected swim and sampled waterline.
-- [ ] Implement original static-position lake/stream/fall GLSL, bounded instanced spray and receiving foam with low/medium/high uniforms/budgets. Record evaluated revision and rationale.
-- [ ] Implement annual paths and existing authored animal/mixer lifecycle using sampled heights; bound actors, retain milestone/baby eligibility and honest missing assets.
-- [ ] Run focused checks and fresh source reviews; commit.
+- [x] Add red tests for freeze/resume/no catch-up and long-period continuity; wet/slope/obstacle rejection, connected swim and sampled waterline.
+- [x] Implement original static-position lake/stream/fall GLSL, bounded instanced spray and receiving foam with low/medium/high uniforms/budgets. Record evaluated revision and rationale.
+- [x] Implement annual paths and existing authored animal/mixer lifecycle using sampled heights; bound actors, retain milestone/baby eligibility and honest missing assets.
+- [x] Run focused checks and fresh source reviews; commit.
 
 ## Task 3 — Scene, diagnostic and annual consumers
 
 Files: grove-world-preview renderer/main/HTML, views/grove/annual-scene.ts, view.ts, Home preview consumer; scripts/check-grove-phase4.mjs.
 
-- [ ] Add red browser checks for advancing phase, pause/resume/reduced/hidden/offscreen, quality, prototype falls, safe duck and shader errors.
-- [ ] Integrate worker chunks, original shaders and annual actors with one clock. Render on demand when suspended; dispose effects/listeners. Preserve Phase 3 counts/picking/boundary checks.
-- [ ] Migrate local Grove/Home consumers preserving calendar/task routes/refresh/cards and fallback. Near authored models and distant silhouettes share task-ID picking.
-- [ ] Fresh reviews, unchanged gate, production build, baseline typecheck comparison, browser acceptance and packaged verified patches/bundle.
+- [x] Add red browser checks for advancing phase, pause/resume/reduced/hidden/offscreen, quality, prototype falls, safe duck and shader errors.
+- [x] Integrate worker chunks, original shaders and annual actors with one clock. Render on demand when suspended; dispose effects/listeners. Preserve Phase 3 counts/picking/boundary checks.
+- [x] Migrate local Grove/Home consumers preserving calendar/task routes/refresh/cards and fallback. Near authored models and distant silhouettes share task-ID picking.
+- [x] Fresh reviews, unchanged gate, production build, baseline typecheck comparison, browser acceptance and packaged verified patches/bundle.
+
+Completed locally on 11/10/26. Final validation and limitations are recorded in the Phase 4 delivery package. No deployment or GitHub push was requested. The real February 23 clearing verifies an authored duck on its actual annual wet mask; the labelled prototype demonstrates a fall where the inspected 2026 annual world has none.
