@@ -4,8 +4,8 @@ import {mkdir,writeFile} from 'node:fs/promises';
 const base=process.env.GROVE_WORLD_URL||'http://127.0.0.1:5187',out=process.env.GROVE_WORLD_REPORT_DIR||'/tmp/grove-final-performance';
 if(!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname))throw Error('Local preview required');
 await mkdir(out,{recursive:true});const evidence=[];
-for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
- const browser=await engine.launch({headless:true});try{for(const width of [1440,390]){
+for(const [name,engine] of [['chromium',chromium],['webkit',webkit]].filter(([name])=>!process.env.GROVE_PERFORMANCE_ENGINE||process.env.GROVE_PERFORMANCE_ENGINE===name)){
+ const browser=await engine.launch({headless:true,...(name==='chromium'&&process.env.GROVE_HARDWARE_GPU==='1'?{channel:'chrome',args:['--use-angle=metal']}:{})});try{for(const width of [1440,390]){
   const page=await browser.newPage({viewport:{width,height:width===390?844:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(()=>{globalThis.groveLongTasks=[];try{new PerformanceObserver(list=>groveLongTasks.push(...list.getEntries().map(e=>({start:e.startTime,duration:e.duration})))).observe({type:'longtask',buffered:true});}catch{}});
   await page.goto(base+'/grove-world-preview.html');await page.waitForSelector('#landscape[data-state="ready"]',{timeout:60000});evidence.push({engine:name,width,startup:await page.locator('#landscape').evaluate(e=>({...e.dataset})),longTaskObserverSupported:await page.evaluate(()=>PerformanceObserver.supportedEntryTypes?.includes('longtask')??false)});
@@ -23,7 +23,7 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
   // Repeated lifecycle cycles must leave one canvas and comparable live geometry allocation.
   const allocations=[],textures=[];for(let cycle=0;cycle<3;cycle++){
    await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true})));if(await page.locator('#landscape canvas').count())throw Error('Disposed canvas retained');
-   await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));await page.waitForSelector('#landscape[data-state="ready"][data-animals-ready="true"] canvas',{timeout:60000});await page.waitForSelector('#landscape[data-authored-trees="64"]',{timeout:60000});await page.waitForTimeout(500);
+   await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));await page.waitForSelector('#landscape[data-state="ready"][data-animals-ready="true"] canvas',{timeout:60000});await page.locator('#frame').click();await page.waitForSelector('#landscape[data-authored-trees="64"]',{timeout:60000});await page.waitForTimeout(500);
    textures.push(Number(await page.locator('#landscape').getAttribute('data-gpu-textures')));allocations.push(Number(await page.locator('#landscape').getAttribute('data-gpu-geometries')));
   }
   if(Math.max(...textures)-Math.min(...textures)>4)throw Error('Repeated mounts retain textures: '+textures);

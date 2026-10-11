@@ -14,6 +14,10 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
   await page.locator('#fixture').selectOption('10000');await page.waitForSelector('#landscape[data-context-trees="10000"]',{timeout:60000});
   await page.locator('#view').selectOption('year');await page.waitForSelector('#landscape[data-selected-trees="10000"]');
   const species=JSON.parse(await page.locator('#landscape').getAttribute('data-species'));if(['life','health','teaching','wedding','other'].some(s=>!species[s]))throw Error('Synthetic species missing');
+  await page.locator('#landscape').scrollIntoViewIfNeeded();await page.waitForTimeout(250);
+  if(await page.locator('#landscape').getAttribute('data-vegetation-mode')!=='overview')throw Error('Year overview must use aggregate vegetation');
+  const overviewPick=await page.locator('#landscape').evaluate(e=>({x:Number(e.dataset.pickX),y:Number(e.dataset.pickY)}));
+  await page.mouse.click(overviewPick.x,overviewPick.y);await page.waitForSelector('#landscape[data-picked-id^="synthetic-"]');
   await page.screenshot({path:path.join(out,'phase3-'+name+'-'+width+'-year.png'),fullPage:true});
   await page.locator('#fixture').selectOption('200');await page.waitForSelector('#landscape[data-context-trees="200"]');
   await page.locator('#view').selectOption('week');await page.waitForSelector('#landscape[data-selected-trees="200"]');

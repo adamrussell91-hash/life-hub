@@ -18,7 +18,7 @@ Files: tools/grove-previews/prepare-forest-expansion.*, rig-quadrupeds.*, expans
 
 ## Task 2 — Tree expansion and companions
 
-Files: domain/grove/assets.ts, forest-companions.ts, annual-animals.ts, annual-trees.ts, shared renderer; unit tests; public tree manifest/models/previews.
+Files: domain/grove/assets.ts, companions.ts, annual-animals.ts, annual-trees.ts, shared renderer; unit tests; public tree manifest/models/previews.
 
 - [x] Write failing tests for companion earn dates, future exclusion, deterministic rotation/caps and no invented thresholds. Use earned milestone fixtures, assert skunk needs hare and otter needs mallard; test no eligible milestone means no companions.
 - [x] Add exact source tree variants using existing normalize pipeline and preserve existing variant numbers. Test referenced model presence and new variant cardinalities.
@@ -38,15 +38,17 @@ Files: world-client/protocol/worker validation if measurements justify; diagnost
 
 ## Task 4 — Recovery and release preparation
 
-- [ ] Export Phase4-base and combined-main patches, Git bundle; forward isolated-index/reverse checks and bundle verification.
+- [x] Export Phase4-base and combined-main patches, Git bundle; forward isolated-index/reverse checks and bundle verification.
 - [x] Package private project-use animal models separately with credits/licenses/motion hashes; never include raw licensed assets in public patches.
-- [ ] Save screenshots, performance/raw logs, acceptance matrix and remaining real-device limitations; hash delivery files and open report/preview.
-- [ ] Prepare reviewable release artifacts and complete only authorised, available release actions. Do not claim physical-device or deployed acceptance without evidence.
+- [x] Save screenshots, performance/raw logs, acceptance matrix and remaining real-device limitations; hash delivery files and open report/preview.
+- [x] Prepare reviewable release artifacts and complete only authorised, available release actions. Do not claim physical-device or deployed acceptance without evidence.
 
 ## Acceptance evidence
 
-The unchanged repository gate passes, including all1324 Tasks tests and Professional typecheck. Production Tasks build passes; full Tasks TypeScript remains exactly the existing67 errors with no new errors. Native Chromium/WebKit desktop and390px functional/motion/consumer checks pass. Twenty private animated models and25 mature public tree variants are verified, with Australian animals excluded.
+The unchanged repository gate passes, including all1328 Tasks tests and Professional typecheck. Production Tasks build passes; full Tasks TypeScript remains exactly the existing67 errors with no new errors. Native Chromium/WebKit desktop and390px functional/motion/consumer checks pass. Twenty private animated models and25 mature public tree variants are verified, with Australian animals excluded.
 
-Wide-view vegetation uses global instanced groups below zoom3, retaining region batches and a64 authored-tree cap in close views. Fresh resource/picking review found no actionable issues. Dense performance evidence is recorded separately and must not be read as physical-device acceptance.
+Wide-view vegetation uses global instanced groups below zoom3, retaining region batches and a64 authored-tree cap in close views. Fresh resource/picking review found no actionable issues. All16 default Chromium/WebKit dense cases and eight installed Chrome Metal cases pass bounds/error/resource checks. Apple GPU and Metal/M1 active-scene medians are17ms and16.7ms respectively. Three repeated mounts per viewport maintain stable live geometry/texture allocations. Phone-width results are layout tests, not physical-phone acceptance. Synchronous transfer and metadata freezing peaked at33ms and39ms; canonical generation/validation remains in the worker.
 
 Release limitation: the tracked authenticated animal delivery still contains the original8 models. The verified20-model archive is ready; `scripts/seal-grove-deployment-assets.mjs` requires the matching existing GROVE_ASSET_KEY before replacing ciphertext. No deployment/push or physical-phone acceptance has been claimed.
+
+Final tap acceptance: the added native Year-view test exposed WebKit phone subpixel hit rounding. The renderer now falls back to the closest finite, depth-visible eligible tree within12px desktop or22px phone only after mesh picking misses. Four focused tests and fresh read-only review pass. The unchanged final repository gate passes177 Tasks files/1328 tests plus5618 root tests (six documented skips); production build passes and the TypeScript baseline remains67 errors without additions.

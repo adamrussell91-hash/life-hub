@@ -1,3 +1,4 @@
+import {nearestProjectedItem} from '@/views/grove/picking';
 import {annualFramePoints} from '@/domain/grove/annual-framing';
 /** Diagnostic only: inspect solved geography, with vertical exaggeration x3. */
 import {Scene,WebGLRenderer,OrthographicCamera,Group,Mesh,MeshStandardMaterial,BufferGeometry,Float32BufferAttribute,Color,HemisphereLight,DirectionalLight,DoubleSide,LineSegments,LineBasicMaterial,Points,PointsMaterial,InstancedMesh,ConeGeometry,Object3D,Raycaster,Vector2,Vector3,Frustum,Matrix4} from 'three';
@@ -38,7 +39,9 @@ export function createWorldPreview(host:HTMLElement,onPick:(tree:AnnualTree,x:nu
  document.addEventListener('visibilitychange',visibility);motionQuery.addEventListener('change',reduced);
  const intersection=new IntersectionObserver(entries=>{intersecting=entries.some(e=>e.isIntersecting);refreshMotion();});intersection.observe(host);
  let down={x:0,y:0};const pointerDown=(e:PointerEvent)=>{cancelCamera();down={x:e.clientX,y:e.clientY};};
- const pointerUp=(e:PointerEvent)=>{if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>4)return;const r=renderer.domElement.getBoundingClientRect(),ray=new Raycaster();ray.setFromCamera(new Vector2((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2),camera);const hit=ray.intersectObjects(pickMeshes.filter(mesh=>mesh.visible||mesh.userData.hitProxy))[0];if(hit?.instanceId!==undefined){const t=pickTrees.get(hit.object as InstanceType<typeof InstancedMesh>)?.[hit.instanceId];if(t)onPick(t,e.clientX,e.clientY);}};
+ const pointerUp=(e:PointerEvent)=>{if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>4)return;const r=renderer.domElement.getBoundingClientRect(),ray=new Raycaster();ray.setFromCamera(new Vector2((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2),camera);const hit=ray.intersectObjects(pickMeshes.filter(mesh=>mesh.visible||mesh.userData.hitProxy))[0];let tree=hit?.instanceId!==undefined?pickTrees.get(hit.object as InstanceType<typeof InstancedMesh>)?.[hit.instanceId]:undefined;
+  if(!tree&&host.dataset.scene==='annual'){const point=new Vector3();function* projected(){for(const t of plan?.contextTrees??[]){point.set(t.x+offset(t.worldYear),t.height*heightScale+4*t.scale,t.z).project(camera);yield {item:t,x:r.left+(point.x+1)*r.width/2,y:r.top+(1-point.y)*r.height/2,depth:point.z};}}tree=nearestProjectedItem(projected(),e.clientX,e.clientY,r.width<600?22:12);}
+  if(tree)onPick(tree,e.clientX,e.clientY);};
  renderer.domElement.addEventListener('pointerdown',pointerDown);renderer.domElement.addEventListener('pointerup',pointerUp);
  const resize=()=>{const width=host.clientWidth||1,height=host.clientHeight||1,aspect=width/height,half=aspect<1?610/aspect:610;
   camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;camera.updateProjectionMatrix();renderer.setSize(width,height,false);renderer.domElement.style.width='100%';renderer.domElement.style.height='100%';render();};
