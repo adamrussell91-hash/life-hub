@@ -252,20 +252,10 @@
   min-height: 2.75rem; background: var(--paper); font-size: var(--text-xs);
 }
 .grove-wildlife[hidden] { display: none; }
-.grove-credits { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); margin: 0; color: var(--muted); font-size: var(--text-xs); pointer-events: auto; }
-.grove-credits:empty { display: none; }
 @media (max-width: 719px) {
   .grove-wildlife { bottom: calc(var(--space-3) + 7.5rem); }
-  .grove-credits { left: var(--space-3); right: 4.5rem; transform: none; font-size: var(--text-xs); }
 }
 
-.grove-credits[hidden] { display: none; }
-.grove-credits { bottom: var(--space-1); background: var(--paper); border-radius: var(--radius-md); max-width: calc(100% - 2 * var(--space-3)); padding: var(--space-1) var(--space-2); }
-.grove-credits summary { min-height: 2.75rem; display: flex; align-items: center; cursor: pointer; }
-.grove-credits p { margin: 0; max-width: 30rem; overflow-wrap: anywhere; }
-@media (max-width: 719px) {
-  .grove-credits { left: auto; right: var(--space-3); bottom: calc(var(--space-3) + 14.5rem); max-width: calc(100% - 2 * var(--space-3)); }
-}
 
 .grove-framing { position: absolute; top: 6.2rem; right: var(--space-3); min-height: 44px; background: var(--paper); font-size: var(--text-xs); }
 .grove-framing[hidden] { display: none; }
