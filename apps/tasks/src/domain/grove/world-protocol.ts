@@ -1,3 +1,4 @@
+import {buildWorldMeshes,meshBuffers,type WorldMeshes} from './world-meshes';
 import {validateRegions} from './regions';
 import {hydrologyBuffers,validateHydrology} from './hydrology-validation';
 import {generateAnnualWorld,freezeAnnualWorld,type AnnualWorld} from './world';
@@ -5,14 +6,14 @@ import {worldIdentity,WORLD_RECIPE_V1,type WorldKey} from './world-key';
 
 export type WorldRequest={type:'generate';id:number;key:WorldKey};
 export type WorldResponse=
-  | {type:'success';id:number;world:AnnualWorld;generationMs:number}
+  | {type:'success';id:number;world:AnnualWorld;meshes:WorldMeshes;generationMs:number}
   | {type:'failure';id:number;error:string};
 
 export function buildWorldResponse(request:WorldRequest):{message:WorldResponse;transfer:ArrayBuffer[]} {
   try {
     if(request.type!=='generate'||!Number.isSafeInteger(request.id)||request.id<1)throw new Error('Invalid world request');
-    const start=performance.now(),world=generateAnnualWorld(request.key);
-    return {message:{type:'success',id:request.id,world,generationMs:performance.now()-start},transfer:[...hydrologyBuffers(world),world.regions!.owner.buffer as ArrayBuffer]};
+    const start=performance.now(),world=generateAnnualWorld(request.key),meshes=buildWorldMeshes(world);
+    return {message:{type:'success',id:request.id,world,meshes,generationMs:performance.now()-start},transfer:[...new Set([...hydrologyBuffers(world),world.regions!.owner.buffer as ArrayBuffer,...meshBuffers(meshes)])]};
   } catch(error) {
     return {message:{type:'failure',id:request?.id??0,error:error instanceof Error?error.message:'Annual generation failed'},transfer:[]};
   }

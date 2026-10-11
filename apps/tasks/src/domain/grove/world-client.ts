@@ -1,3 +1,4 @@
+import {validateWorldMeshes,type WorldMeshes} from './world-meshes';
 import {acceptWorldResponse,type WorldRequest} from './world-protocol';
 import {worldKeyForYear,type WorldKey} from './world-key';
 import type {AnnualWorld} from './world';
@@ -9,7 +10,7 @@ export type WorldWorkerPort={
   postMessage(value:WorldRequest):void;
   terminate():void;
 };
-export type WorldGeneration=Readonly<{world:AnnualWorld;generationMs:number}>;
+export type WorldGeneration=Readonly<{world:AnnualWorld;meshes:WorldMeshes;generationMs:number}>;
 type Pending={id:number;worker:WorldWorkerPort;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>};
 const abort=()=>new DOMException('Annual world request cancelled','AbortError');
 const nativeWorker=():WorldWorkerPort=>{
@@ -46,14 +47,14 @@ export class AnnualWorldClient {
       this.pending={id,worker,reject,timer};
       worker.onmessage=event=>{
         if(this.pending?.id!==id)return;
-        const data=event.data as {id?:number;type?:string;error?:unknown;world?:unknown;generationMs?:unknown}|null;
+        const data=event.data as {id?:number;type?:string;error?:unknown;world?:unknown;meshes?:unknown;generationMs?:unknown}|null;
         if(!data||typeof data!=='object'){fail(new Error('Invalid annual worker message'));return;}
         if(data.id!==id)return;
         if(data.type==='failure'){fail(new Error(typeof data.error==='string'?data.error:'Annual generation failed'));return;}
         try {
           if(data.type!=='success'||typeof data.generationMs!=='number'||!Number.isFinite(data.generationMs)||data.generationMs<0)throw new Error('Invalid annual worker result');
-          const world=acceptWorldResponse(data.world,key);
-          cleanup();resolve(Object.freeze({world,generationMs:data.generationMs}));
+          const world=acceptWorldResponse(data.world,key),meshes=validateWorldMeshes(data.meshes,world);
+          cleanup();resolve(Object.freeze({world,meshes,generationMs:data.generationMs}));
         }catch(error){fail(error instanceof Error?error:new Error('Invalid annual worker result'));}
       };
       worker.onerror=event=>{event.preventDefault?.();fail(new Error(event.message||'Annual world worker failed'));};

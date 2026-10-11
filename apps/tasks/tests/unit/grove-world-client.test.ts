@@ -4,6 +4,7 @@ afterEach(()=>new Promise<void>(resolve=>setTimeout(resolve,0)));
 import {AnnualWorldClient,type WorldWorkerPort} from '@/domain/grove/world-client';
 import {generateAnnualWorld} from '@/domain/grove/world';
 import {worldKeyForYear} from '@/domain/grove/world-key';
+import {buildWorldMeshes} from '@/domain/grove/world-meshes';
 import {buildWorldResponse} from '@/domain/grove/world-protocol';
 // Full annual terrain, regions and receipt validation run for these transport fixtures.
 vi.setConfig({testTimeout:30000});
@@ -14,7 +15,7 @@ class Transport implements WorldWorkerPort {
  postMessage(value:unknown){this.request=value;}
  terminate(){this.terminated=true;}
  reply(value:unknown){this.onmessage?.({data:value} as MessageEvent);}
- success(){this.reply({type:'success',id:this.request.id,world:generateAnnualWorld(this.request.key),generationMs:12});}
+ success(){const world=generateAnnualWorld(this.request.key);this.reply({type:'success',id:this.request.id,world,meshes:buildWorldMeshes(world),generationMs:12});}
 }
 function setup(){const ports:Transport[]=[];const client=new AnnualWorldClient(()=>{const port=new Transport();ports.push(port);return port;});return {client,ports};}
 
@@ -24,9 +25,12 @@ describe('annual worker protocol',()=>{
   expect(result.message.type).toBe('success');expect(result.transfer.length).toBeGreaterThan(7);
   if(result.message.type==='success'){
    expect(result.transfer[0]).toBe(result.message.world.bed.buffer);
+   expect(new Set(result.transfer).size).toBe(result.transfer.length);
+   const meshOwnership=result.message.meshes.terrain[0]!.positions.buffer;expect(result.transfer.filter(b=>b===meshOwnership)).toHaveLength(1);
    const ownership=result.message.world.regions!.owner.buffer;expect(result.transfer.filter(b=>b===ownership)).toHaveLength(1);
    const received=structuredClone(result.message,{transfer:result.transfer});
    expect(result.message.world.regions!.owner.byteLength).toBe(0);expect(received.world.regions!.owner.length).toBe(66049);
+   expect(result.message.meshes.terrain[0]!.positions.byteLength).toBe(0);expect(received.meshes.terrain[0]!.positions.length).toBe(32*32*18);
    expect(result.message.world.bed.byteLength).toBe(0);expect(received.world.bed.byteLength).toBe(264196);
   }
  });
@@ -39,7 +43,7 @@ describe('annual worker protocol',()=>{
 describe('annual generation lifecycle',()=>{
  it('accepts and freezes a matching result, then releases the worker',async()=>{
   const {client,ports}=setup(),pending=client.generate(2026);ports[0]!.success();
-  const delivery=await pending;expect(delivery.world.key.year).toBe(2026);expect(delivery.generationMs).toBe(12);
+  const delivery=await pending;expect(delivery.world.key.year).toBe(2026);expect(delivery.generationMs).toBe(12);expect(delivery.meshes.identity).toBe(delivery.world.identity);
   expect(Object.isFrozen(delivery.world)).toBe(true);expect(ports[0]!.terminated).toBe(true);client.dispose();
  });
  it('terminates superseded work and ignores already queued stale callbacks',async()=>{
@@ -53,9 +57,9 @@ describe('annual generation lifecycle',()=>{
   const {client,ports}=setup(),pending=client.generate(2026);
   ports[0]!.reply({type:'failure',id:999,error:'stale'});ports[0]!.success();expect((await pending).world.key.year).toBe(2026);client.dispose();
  });
- it.each(['wrong-key','invalid-bed','invalid-summary','invalid-hydrology','cyclic-hydrology','invalid-channel-height','missing-regions','invalid-region-owner','invalid-region-capacity','invalid-region-site','unknown-type'])('rejects malformed %s output and releases resources',async(kind)=>{
+ it.each(['wrong-key','invalid-bed','invalid-summary','invalid-hydrology','cyclic-hydrology','invalid-channel-height','missing-regions','invalid-region-owner','invalid-region-capacity','invalid-region-site','missing-meshes','corrupt-mesh','unknown-type'])('rejects malformed %s output and releases resources',async(kind)=>{
   const {client,ports}=setup(),pending=client.generate(2026),world=generateAnnualWorld(worldKeyForYear(kind==='wrong-key'?2027:2026));
-  let response:any={type:'success',id:ports[0]!.request.id,world:structuredClone(world),generationMs:1};
+  let response:any={type:'success',id:ports[0]!.request.id,world:structuredClone(world),meshes:buildWorldMeshes(world),generationMs:1};
   if(kind==='invalid-bed')response.world.bed[0]=NaN;
   if(kind==='invalid-summary')response.world.summary.bedBytes=0;
   if(kind==='invalid-hydrology')response.world.hydrology.level[0]=NaN;
@@ -65,6 +69,8 @@ describe('annual generation lifecycle',()=>{
   if(kind==='invalid-region-owner')response.world.regions.owner[0]=32767;
   if(kind==='invalid-region-capacity')response.world.regions.weeks[0].sites.length=199;
   if(kind==='invalid-region-site')response.world.regions.weeks[0].sites[0].height+=1;
+  if(kind==='missing-meshes')delete response.meshes;
+  if(kind==='corrupt-mesh')response.meshes.terrain[0].positions[0]=NaN;
   if(kind==='unknown-type')response.type='surprise';
   ports[0]!.reply(response);await expect(pending).rejects.toThrow(/invalid/i);expect(ports[0]!.terminated).toBe(true);client.dispose();
  });
