@@ -13,42 +13,57 @@ import { tasksApi } from '@/services/client-api';
 import { dayCaption } from '@/views/grove/copy';
 
 const loader=new AnnualGroveLoader();let handle:GroveSceneHandle|null=null,revision=0;
+let acceptedBooks: Awaited<ReturnType<typeof groveBooks>> = [];
 async function start(root: HTMLElement): Promise<void> {
-  const current=++revision;loader.cancel();handle?.dispose();handle=null;root.replaceChildren();
-  const calendar = Promise.all([tasksApi.getHubPrefs().catch(() => null),tasksApi.getPlanningProfile().catch(() => null), groveBooks().catch(() => [])]);
+  const current=++revision;loader.cancel();
+  const calendar = Promise.all([tasksApi.getHubPrefs().catch(() => null),tasksApi.getPlanningProfile().catch(() => null), groveBooks().catch(() => acceptedBooks)]);
   const stage = document.createElement('div');
   stage.className = 'grove-embed__stage';
   const caption = document.createElement('p');
   caption.className = 'grove-embed__caption';
   const credits = document.createElement('p');
   credits.className = 'grove-embed__credits';
-  root.append(stage, caption, credits);
+  if (!handle) root.replaceChildren(stage, caption, credits);
 
   let tasks;
   try {
     tasks = await tasksApi.listTasks();
   } catch (err) {
+    if (current !== revision || handle) return;
     const status = Number((err as { status?: number })?.status);
     caption.textContent = status === 401 || status === 403 ? 'Sign in to Tasks to see your clearing' : 'The clearing could not load';
     root.dataset.state = 'error';
     return;
   }
-  const now = new Date();
+  if(current!==revision)return;
   const [hubPrefs, planningProfile, books] = await calendar;
+  const now = new Date();
   if(current!==revision)return;
   try{const loaded=await loader.load({ tasks, view: 'day', anchor: toHubDateKey(now), now, terms:groveTerms({hubPrefs,planningProfile}), books });
   if(current!==revision)return;const plan=loaded.plan;
   caption.textContent = dayCaption(plan);
     const { mountAnnualGroveScene } = await import('@/views/grove/annual-scene');
-    if(current!==revision)return;const mounted=await mountAnnualGroveScene(stage, {
+    if(current!==revision)return;
+    // Keep the current canvas visible while the replacement mounts at the same size.
+    stage.style.visibility = 'hidden';
+    root.append(stage);
+    const mounted=await mountAnnualGroveScene(stage, {
       ...loaded,
       interactive: false,
 
       onWildlife: (_count, _missing, lines) => { credits.textContent = lines.join(' · '); }
     });
-    if(current!==revision){mounted.dispose();return;}handle=mounted;root.dataset.state = 'ready';
+    if(current!==revision){mounted.dispose();stage.remove();return;}
+    acceptedBooks = books;
+    const previous = handle; handle = mounted;
+    stage.style.removeProperty('visibility');
+    root.replaceChildren(stage, caption, credits);
+    previous?.dispose(); root.dataset.state = 'ready';
   } catch (error) {
+    stage.remove();
     if(current!==revision)return;console.error(error);
+    if(handle)return;
+    root.replaceChildren(stage,caption,credits);
     caption.textContent = 'The clearing could not draw on this device';
     root.dataset.state = 'error';
   }

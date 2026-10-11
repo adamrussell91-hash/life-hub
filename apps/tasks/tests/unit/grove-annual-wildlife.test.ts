@@ -69,3 +69,9 @@ it('caps babies with adults, freezes mixers at delta zero and releases shared mo
   animals.dispose();animals.dispose();expect(geometryDispose).toHaveBeenCalledTimes(1);expect(materialDispose).toHaveBeenCalledTimes(1);expect(textureDispose).toHaveBeenCalledTimes(1);expect(animals.root.children).toHaveLength(0);
  }finally{load.mockRestore();fetchSpy.mockRestore();mixer.mockRestore();}
 });
+
+it.each([{}, {assets:null}, {assets:{}}, {assets:[null]}])('degrades malformed catalogue %j to unavailable wildlife without rejecting the scene',async catalogue=>{
+ const fetchSpy=vi.spyOn(globalThis,'fetch').mockResolvedValue({ok:true,json:async()=>catalogue} as Response);
+ const world={...fixture([]),key:worldKeyForYear(2026)},plan={days:[{key:'2026-10-09',future:false,worldYear:2026,cx:5,cz:5}],contextTrees:[],wildlife:[{species:'hare',earnedOn:'2026-10-08',baby:false}]} as unknown as AnnualGrovePlan;
+ try{const animals=await createAnnualAnimals(world,plan,'2026-10-09');expect(animals.count).toBe(0);expect(animals.missing).toContain('hare: asset unavailable');animals.dispose();}finally{fetchSpy.mockRestore();}
+});

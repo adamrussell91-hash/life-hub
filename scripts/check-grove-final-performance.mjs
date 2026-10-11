@@ -14,7 +14,15 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]].filter(([na
    await page.locator('#view').selectOption(count===200?'week':'year');await page.waitForTimeout(700);
    if(count===200){await page.locator('#frame').click();await page.waitForSelector('#landscape[data-authored-trees="64"]',{timeout:60000});await page.waitForTimeout(700);}await page.waitForSelector('#landscape[data-animals-ready="true"]',{timeout:60000});
    await page.locator('#landscape').scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelector('#landscape')?.dataset.motion==='running',null,{timeout:60000});
-   const sample=await page.evaluate(()=>new Promise(resolve=>{const times=[];let previous=performance.now();function step(now){times.push(now-previous);previous=now;if(times.length===60){times.sort((a,b)=>a-b);resolve({medianMs:times[30],p95Ms:times[57],maxMs:times[59],dataset:{...document.querySelector('#landscape').dataset},userAgent:navigator.userAgent,hardwareConcurrency:navigator.hardwareConcurrency,gpu:(()=>{const gl=document.querySelector('#landscape canvas').getContext('webgl2'),ext=gl?.getExtension('WEBGL_debug_renderer_info');return ext?{vendor:gl.getParameter(ext.UNMASKED_VENDOR_WEBGL),renderer:gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)}:null;})(),longTasks:globalThis.groveLongTasks.splice(0)});}else requestAnimationFrame(step);}requestAnimationFrame(step);}));
+   const samplePromise=page.evaluate(()=>new Promise(resolve=>{const times=[];let previous=performance.now();function step(now){times.push(now-previous);previous=now;if(times.length===60){times.sort((a,b)=>a-b);resolve({medianMs:times[30],p95Ms:times[57],maxMs:times[59],dataset:{...document.querySelector('#landscape').dataset},userAgent:navigator.userAgent,hardwareConcurrency:navigator.hardwareConcurrency,gpu:(()=>{const gl=document.querySelector('#landscape canvas').getContext('webgl2'),ext=gl?.getExtension('WEBGL_debug_renderer_info');return ext?{vendor:gl.getParameter(ext.UNMASKED_VENDOR_WEBGL),renderer:gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)}:null;})(),longTasks:globalThis.groveLongTasks.splice(0)});}else requestAnimationFrame(step);}requestAnimationFrame(step);}));
+   if(process.env.GROVE_PERFORMANCE_INTERACTION==='1'){
+    const bounds=await page.locator('#landscape canvas').boundingBox();
+    await page.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);await page.mouse.down({button:'right'});
+    for(let i=0;i<12;i++){await page.mouse.move(bounds.x+bounds.width/2+Math.sin(i)*24,bounds.y+bounds.height/2+Math.cos(i)*12,{steps:2});await page.waitForTimeout(35);}
+    await page.mouse.up({button:'right'});await page.mouse.wheel(0,-100);await page.mouse.wheel(0,100);
+   }
+   const sample=await samplePromise;
+   sample.interaction=process.env.GROVE_PERFORMANCE_INTERACTION==='1'?'native pointer pan and wheel zoom during frame sampling':'idle camera with motion';
    if(Number(sample.dataset.authoredTrees)>64||Number(sample.dataset.wildlifeCount)>11||errors.length)throw Error(JSON.stringify({sample,errors}));
    evidence.push({engine:name,width,count,environment:'headless local browser; physical device acceptance pending',...sample});
    await writeFile(out+'/final-performance-evidence.json',JSON.stringify(evidence,null,2));
