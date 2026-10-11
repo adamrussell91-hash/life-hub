@@ -118,10 +118,6 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     sceneHandle?.setWildlifePaused(wildlifePaused);
   });
   const qualitySelect=el('select','btn btn--secondary grove-quality');qualitySelect.setAttribute('aria-label','Water quality');for(const level of ['low','medium','high'] as const){const option=el('option','',level.charAt(0).toUpperCase()+level.slice(1)+' water');option.value=level;qualitySelect.append(option);}qualitySelect.value=quality;qualitySelect.addEventListener('change',()=>{quality=qualitySelect.value as WaterQuality;sceneHandle?.setQuality(quality);});
-  const credits = el('details', 'grove-credits');
-  const creditSummary = el('summary', '', 'Wildlife credits');
-  const creditText = el('p');
-  credits.append(creditSummary, creditText);credits.hidden = true;
   let overview=!window.matchMedia('(max-width: 719px)').matches&&route.view!=='day';
   const framing = el('button', 'btn btn--secondary grove-framing', overview?'Show selected clearing':`Show whole ${route.view}`);
   framing.type = 'button';framing.hidden = route.view === 'day';
@@ -131,7 +127,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     framing.textContent = overview ? 'Show selected clearing' : `Show whole ${route.view}`;
     card.hidden = true;
   });
-  hud.append(bar, caption, boundary, key, card, wildlife, qualitySelect, credits, framing);
+  hud.append(bar, caption, boundary, key, card, wildlife, qualitySelect, framing);
 
   let tasks: Task[];
   try {
@@ -215,11 +211,9 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
 
         wildlifePaused,
         cameraState,frameMode:overview?'overview':'clearing',
-        onWildlife: (count, missing, lines) => {
+        onWildlife: (count, missing) => {
           if (gen !== generation || revision !== mountRevision) return;
           wildlife.hidden = false;
-          creditText.textContent = lines.join(' · ');
-          credits.hidden = !lines.length;
           page.dataset.wildlifeCount = String(count);
           page.dataset.unavailableWildlife = missing.join(',');
         },
