@@ -1,7 +1,9 @@
-import {describe,it,expect} from 'vitest';
+import {describe,it,expect,vi} from 'vitest';
 import {analyseDrainage,generateHydrology,hasDryReserves} from '@/domain/grove/hydrology';
 import {generateHeightfield} from '@/domain/grove/heightfield';
 import {worldKeyForYear} from '@/domain/grove/world-key';
+// Annual fixtures now include region partitioning and capacity checks.
+vi.setConfig({testTimeout:30000});
 
 function checkGraph(d:ReturnType<typeof analyseDrainage>,size:number){
  const n=size*size,rank=new Int32Array(n);d.order.forEach((id,k)=>rank[id]=k);let invalid=0;

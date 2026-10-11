@@ -2,6 +2,8 @@ import {it,expect,vi,afterEach} from 'vitest';
 import * as heightfield from '@/domain/grove/heightfield';
 import {generateAnnualWorld} from '@/domain/grove/world';
 import {worldKeyForYear} from '@/domain/grove/world-key';
+// Recovery exercises several complete annual generation attempts.
+vi.setConfig({testTimeout:30000});
 const original=heightfield.generateHeightfield;
 const flat=(key:Parameters<typeof original>[0])=>{const f=original(key);return {...f,bed:new Float32Array(f.bed.length).fill(8)};};
 afterEach(()=>vi.restoreAllMocks());

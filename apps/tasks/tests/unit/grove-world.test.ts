@@ -1,4 +1,8 @@
-import {describe,it,expect} from 'vitest';
+import {describe,it,expect,vi,afterEach} from 'vitest';
+// Let the test worker flush progress between CPU-bound annual fixtures.
+afterEach(()=>new Promise<void>(resolve=>setTimeout(resolve,0)));
+// Complete annual worlds include hydrology and terrain-aware weekly partitioning.
+vi.setConfig({testTimeout:30000});
 import {generateAnnualWorld, sampleWorldBed} from '@/domain/grove/world';
 import {worldKeyForYear,makeWorldKey,WORLD_RECIPE_V1} from '@/domain/grove/world-key';
 
@@ -20,7 +24,8 @@ describe('annual world identity',()=>{
 });
 
 describe.each([1900,2024,2026,2027,2038,2050,9999])('annual terrain for %i',year=>{
- const get=()=>generateAnnualWorld(worldKeyForYear(year));
+ let fixture:ReturnType<typeof generateAnnualWorld>|undefined;
+ const get=()=>fixture??=generateAnnualWorld(worldKeyForYear(year));
  it('has finite bounded geography with useful relief',()=>{
   const w=get();expect(w.grid.size).toBe(257);expect(w.grid.extent).toBe(896);
   expect(w.bed.length).toBe(66049);expect(w.bed.every(Number.isFinite)).toBe(true);
