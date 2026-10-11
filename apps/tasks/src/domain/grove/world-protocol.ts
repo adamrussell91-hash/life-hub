@@ -1,3 +1,4 @@
+import {validateRegions} from './regions';
 import {hydrologyBuffers,validateHydrology} from './hydrology-validation';
 import {generateAnnualWorld,freezeAnnualWorld,type AnnualWorld} from './world';
 import {worldIdentity,WORLD_RECIPE_V1,type WorldKey} from './world-key';
@@ -11,7 +12,7 @@ export function buildWorldResponse(request:WorldRequest):{message:WorldResponse;
   try {
     if(request.type!=='generate'||!Number.isSafeInteger(request.id)||request.id<1)throw new Error('Invalid world request');
     const start=performance.now(),world=generateAnnualWorld(request.key);
-    return {message:{type:'success',id:request.id,world,generationMs:performance.now()-start},transfer:hydrologyBuffers(world)};
+    return {message:{type:'success',id:request.id,world,generationMs:performance.now()-start},transfer:[...hydrologyBuffers(world),world.regions!.owner.buffer as ArrayBuffer]};
   } catch(error) {
     return {message:{type:'failure',id:request?.id??0,error:error instanceof Error?error.message:'Annual generation failed'},transfer:[]};
   }
@@ -38,5 +39,6 @@ export function acceptWorldResponse(value:unknown,key:WorldKey):AnnualWorld {
   for(const h of w.bed){if(!finite(h))throw invalid();min=Math.min(min,h);max=Math.max(max,h);}
   if(!w.summary||w.summary.minHeight!==min||w.summary.maxHeight!==max||w.summary.bedBytes!==w.bed.byteLength)throw invalid();
   validateHydrology(w);
+  validateRegions(w);
   return freezeAnnualWorld(w);
 }

@@ -1,9 +1,10 @@
+import {generateRegions,type AnnualRegions} from './regions';
 /** Geography is derived only from WorldKey and versioned recipes. */
 import {generateHeightfield,type WorldGrid,type BasinShape,type MeadowReserve} from './heightfield';
 import {generateHydrology,hasDryReserves,type Hydrology} from './hydrology';
 import {makeWorldKey,worldIdentity,type WorldKey} from './world-key';
 export type AnnualWorld=Readonly<{
- key:WorldKey;identity:string;grid:WorldGrid;bed:Float32Array;
+ regions?:AnnualRegions;key:WorldKey;identity:string;grid:WorldGrid;bed:Float32Array;
  basins:readonly BasinShape[];meadows:readonly MeadowReserve[];hydrology:Hydrology;
  generation:Readonly<{attempt:number;fallback:boolean;hydrologyVersion:number}>;
  summary:Readonly<{minHeight:number;maxHeight:number;bedBytes:number}>;
@@ -23,7 +24,8 @@ export function generateAnnualWorld(requested:WorldKey):AnnualWorld{
  }
  if(!field||!hydrology){fallback=true;field=generateHeightfield(makeWorldKey(2026,1));hydrology=generateHydrology(field);if(!validGeography(hydrology)||!hasDryReserves(field,hydrology))throw Error('Annual geography fallback failed validation');}
  let minHeight=Infinity,maxHeight=-Infinity;for(const height of field.bed){minHeight=Math.min(minHeight,height);maxHeight=Math.max(maxHeight,height);}
- return freezeAnnualWorld({key,identity:worldIdentity(key),...field,hydrology,generation:{attempt,fallback,hydrologyVersion:1},summary:{minHeight,maxHeight,bedBytes:field.bed.byteLength}});
+ const world:AnnualWorld={key,identity:worldIdentity(key),...field,hydrology,generation:{attempt,fallback,hydrologyVersion:1},summary:{minHeight,maxHeight,bedBytes:field.bed.byteLength}};
+ return freezeAnnualWorld({...world,regions:generateRegions(world)});
 }
 export function sampleBedGrid(grid:WorldGrid,bed:Float32Array,x:number,z:number):number{
  const g=grid;if(!Number.isFinite(x)||!Number.isFinite(z)||x<g.x0||z<g.z0||x>g.x0+g.extent||z>g.z0+g.extent)throw Error('Position outside annual world');
