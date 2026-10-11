@@ -1,0 +1,268 @@
+.grove-page {
+  position: relative;
+  height: calc(100dvh - 8rem);
+  min-height: 24rem;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: linear-gradient(180deg, #dcecf4 0%, #eef5f0 55%, var(--paper) 100%);
+  border: 1px solid var(--line);
+}
+
+.grove-stage {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+.grove-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.grove-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.grove-hud a,
+.grove-hud button,
+.grove-card,
+.grove-key {
+  pointer-events: auto;
+}
+
+.grove-bar {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  right: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.grove-bar__views .hub-pills__btn {
+  text-decoration: none;
+}
+
+.grove-bar__views {
+  background: var(--paper);
+  box-shadow: var(--elev-1);
+}
+
+.grove-bar__nav {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.grove-bar .btn {
+  text-decoration: none;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding-inline: var(--space-3);
+  background: var(--paper);
+  box-shadow: var(--elev-1);
+}
+
+.grove-bar__step {
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+.grove-caption {
+  position: absolute;
+  top: calc(var(--space-3) + 3.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 2 * var(--space-3));
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  box-shadow: var(--elev-1);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grove-caption:empty {
+  display: none;
+}
+
+.grove-key {
+  position: absolute;
+  left: var(--space-3);
+  bottom: var(--space-3);
+  max-width: min(18rem, calc(100% - 2 * var(--space-3)));
+  padding: var(--space-2) var(--space-3);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-1);
+  color: var(--ink);
+  font-size: var(--text-xs);
+}
+
+.grove-key[hidden],
+.grove-card[hidden] {
+  display: none;
+}
+
+.grove-key__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grove-key__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.grove-key__dot {
+  flex: 0 0 auto;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: var(--radius-full);
+}
+
+/* Species swatches match the leaves in the scene, not the hub palette. */
+.grove-key__dot--life { background: #3f7a3a; }
+.grove-key__dot--teaching { background: #5f8f37; }
+.grove-key__dot--health { background: #9cc24a; }
+.grove-key__dot--wedding { background: #e7a1bf; }
+.grove-key__dot--other { background: #76a447; }
+.grove-key__dot--late { background: #9c2f2f; }
+
+.grove-key__short {
+  display: none;
+}
+
+.grove-key__note {
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+}
+
+.grove-key__list + .grove-key__note {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+.grove-card {
+  position: absolute;
+  width: min(16rem, calc(100% - 2 * var(--space-3)));
+  padding: var(--space-3);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-2);
+  color: var(--ink);
+}
+
+.grove-card__title {
+  margin: 0 0 var(--space-1);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.grove-card__meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.grove-card__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  margin-top: var(--space-1);
+  color: var(--wave);
+  font-weight: var(--weight-medium);
+}
+
+.grove-hud a:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.grove-status {
+  margin: 0;
+  padding: var(--space-8) var(--space-4);
+  color: var(--ink);
+  text-align: center;
+}
+
+@media (max-width: 719px) {
+  /* First paint only; view.ts then fits the page between the header and the tab bar. */
+  .grove-page {
+    height: calc(100dvh - 15rem - env(safe-area-inset-bottom, 0px));
+    min-height: 20rem;
+    border-radius: var(--radius-md);
+  }
+
+  .grove-key {
+    right: 4.5rem; /* clear of the chat button */
+    max-width: none;
+  }
+
+  .grove-key__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-3);
+  }
+
+  .grove-key__long {
+    display: none;
+  }
+
+  .grove-key__short {
+    display: inline;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .grove-caption {
+    top: calc(var(--space-3) + 3.4rem);
+  }
+}
+
+@media (max-width: 719px) {
+  .grove-bar { gap: var(--space-1); }
+  .grove-bar__views { width: 100%; justify-content: center; }
+  .grove-bar__views .hub-pills__btn { flex: 1; min-height: 2.75rem; text-align: center; }
+  .grove-bar__nav { margin-inline: auto; }
+  .grove-caption { top: calc(var(--space-3) + 6.4rem); }
+}
+
+.grove-wildlife {
+  position: absolute; right: var(--space-3); bottom: var(--space-3);
+  min-height: 2.75rem; background: var(--paper); font-size: var(--text-xs);
+}
+.grove-wildlife[hidden] { display: none; }
+.grove-credits { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); margin: 0; color: var(--muted); font-size: var(--text-xs); pointer-events: auto; }
+.grove-credits:empty { display: none; }
+@media (max-width: 719px) {
+  .grove-wildlife { bottom: calc(var(--space-3) + 7.5rem); }
+  .grove-credits { left: var(--space-3); right: 4.5rem; transform: none; font-size: var(--text-xs); }
+}
+
+.grove-credits[hidden] { display: none; }
+.grove-credits { bottom: var(--space-1); background: var(--paper); border-radius: var(--radius-md); max-width: calc(100% - 2 * var(--space-3)); padding: var(--space-1) var(--space-2); }
+.grove-credits summary { min-height: 2.75rem; display: flex; align-items: center; cursor: pointer; }
+.grove-credits p { margin: 0; max-width: 30rem; overflow-wrap: anywhere; }
+@media (max-width: 719px) {
+  .grove-credits { left: auto; right: var(--space-3); bottom: calc(var(--space-3) + 10.5rem); max-width: calc(100% - 2 * var(--space-3)); }
+}

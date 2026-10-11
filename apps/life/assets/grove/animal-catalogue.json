@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "animal-deer-doe",
+      "file": "models/animals/animal-deer-doe.glb",
+      "animations": [
+        "eat",
+        "run",
+        "idle",
+        "walk"
+      ],
+      "roles": {
+        "idle": "idle",
+        "locomotion": "walk",
+        "feed": "eat",
+        "fast": "run"
+      },
+      "waterline": 0.085,
+      "credit": null
+    },
+    {
+      "id": "animal-deer-stag",
+      "file": "models/animals/animal-deer-stag.glb",
+      "animations": [
+        "eat",
+        "run",
+        "idle",
+        "walk"
+      ],
+      "roles": {
+        "idle": "idle",
+        "locomotion": "walk",
+        "feed": "eat",
+        "fast": "run"
+      },
+      "waterline": 0.085,
+      "credit": null
+    },
+    {
+      "id": "animal-fox",
+      "file": "models/animals/animal-fox.glb",
+      "animations": [
+        "eat",
+        "run",
+        "idle",
+        "walk"
+      ],
+      "roles": {
+        "idle": "idle",
+        "locomotion": "walk",
+        "feed": "eat",
+        "fast": "run"
+      },
+      "waterline": 0.085,
+      "credit": null
+    }
+  ]
+}
