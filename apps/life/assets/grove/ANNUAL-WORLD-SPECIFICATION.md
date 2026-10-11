@@ -299,3 +299,103 @@ These are engineering validation items. They do not require another asset pack b
 A complete annual place exists from the beginning. Weeks focus on neighbouring portions of connected geography. Your dated work fills groves while preserving open meadows, shorelines and water corridors. Hills, lakes, islands and waterfalls belong to the annual landform. Animated surfaces communicate moving water without a physical fluid simulation.
 
 The existing engine supplies the foundation and assets. The next build supplies annual geography, coherent drainage, weekly ownership, stable planting, animated water and regional rendering.
+
+
+19. Free water movement resources and selection plan
+
+Research addition by Codex, 11 October 2026. These are candidate resources, not installed or verified Grove dependencies. Publisher documentation supplies the feature and licence descriptions below. Runtime compatibility and performance remain prototype acceptance items.
+
+19.1 Stylised Three.js water shaders
+
+Repository: https://github.com/boona13/threejs-grass-water-shaders
+Publisher documentation: https://github.com/boona13/threejs-grass-water-shaders/blob/main/README.md
+Licence: MIT. Preserve the applicable copyright and licence notice in reused source and distributions.
+
+This is the preferred starting point for a Grove water surface prototype. The publisher describes animated water normals, procedural sky reflection, interactive ripples, foam around intersecting objects, painted pond and river masks, shoreline variation and configurable colours. The repo includes TypeScript wrappers, shader source and a runnable scene.
+
+The README targets Three.js ^0.170 and modern WebGL2. Check the actual installed Grove version and shader requirements before importing. The small repository and demo are evidence of a starting implementation, rather than evidence of production readiness in Grove.
+
+Candidate reuse:
+Lake surface shading with restrained turquoise colours and gentle ripples.
+Procedural noise and animated highlights.
+Foam near rocks and shore intersections.
+Shader source adapted to Grove geometry and a shared clock.
+
+Required Grove adaptations:
+Derive masks from annual hydrology rather than manually painted circles and capsules.
+Support separate level surfaces for lakes at different elevations.
+Use channel distance and downstream direction for winding stream animation.
+Join tributaries and lake outlets without gaps.
+Keep visual shorelines consistent with planting and animal masks.
+Support pause, reduced motion, offscreen suspension and disposal.
+Match the faceted art direction rather than retaining a realistic demo appearance.
+
+The supplied surface wrapper is not a complete annual river or waterfall engine. Evaluate shader reuse separately from adopting its entire wrapper. Do not replace existing vegetation assets with its grass system merely because both live in the same repo.
+
+19.2 Three.quarks for waterfall particles
+
+Repository: https://github.com/Alchemist0823/three.quarks
+Documentation: https://quarks.art/
+Licence: MIT. Preserve the applicable copyright and licence notice.
+
+Three.quarks provides a TypeScript particle and visual effects system for Three.js. Its publisher documents batched rendering, configurable emitters and behaviours, and effect loading from JSON.
+
+Candidate Grove use:
+Sparse falling droplets.
+Local spray and mist beneath waterfalls.
+Short splash effects at receiving pools.
+Bounded decorative particles around visible water features.
+
+This is an optional particle dependency, not the water surface or drainage solution. Falling water sheets and surface foam still need Grove geometry and shader logic.
+
+Compare a small native Three.js instanced particle implementation against Three.quarks. Adopt the library only if batching, authoring or lifecycle support materially simplifies the required effects. Verify dependency size and version compatibility before selection.
+
+Limit particles to visible waterfalls and the active camera region. Use fixed emission budgets and predictable lifetimes. Retain static foam in reduced motion and low quality modes. Avoid requiring the external visual editor at runtime.
+
+19.3 Three.js Particle Fluids for physical simulation
+
+Repository: https://github.com/dgreenheck/threejs-particle-fluids
+Live demonstration: https://dgreenheck.github.io/threejs-particle-fluids
+Licence: MIT. Preserve the applicable copyright and licence notice.
+
+The publisher describes GPU particle physics for liquids and other materials. Documentation currently requires Three.js r184 and a browser with WebGPU, with no WebGL fallback.
+
+This is a physical simulation research option rather than the recommended Grove dependency. Existing Grove uses a WebGL rendering path. Adoption would require renderer and compatibility evaluation beyond adding animated water.
+
+Consider only if a later scope introduces direct fluid interaction, pouring, displaced volumes or other behaviour unavailable from the agreed surface animation approach. No phone performance claim has been verified for Grove.
+
+19.4 Existing Grove status versus candidate code
+
+The previously inspected production engine has static water surfaces and basin and drainage calculations. Those calculations describe geography. They do not supply an animated water shader or a physical fluid solver.
+
+None of these candidates replaces the annual geography work. The annual engine must still generate lake elevations, channel geometry, flow directions, outlets, waterfall drops and shared wet ground masks.
+
+19.5 Recommended first prototype
+
+Build one bounded scene containing:
+A level lake with an irregular shoreline.
+A winding stream feeding or leaving the lake.
+A routed elevation drop with one waterfall and a receiving pool.
+Existing Grove trees, rocks and one swimming duck for scale and integration.
+
+Evaluate the stylised water shader source first. Add a small animated waterfall sheet. Compare native instanced spray with Three.quarks if particles are needed.
+
+Prototype gates:
+Water follows the winding channel rather than a global texture direction.
+Lake height stays level.
+Stream, lake and waterfall surfaces meet continuously.
+Duck waterline and wet ground sampling agree with the rendered surface.
+Colour, reflection, foam and ripple amplitude suit the existing art.
+Pause, reduced motion and hidden tab behaviour work.
+Chromium and WebKit phone layouts and rendering work.
+Record frame time, draw calls, particle counts and disposal results.
+Preserve source licences and verify rights for any separately supplied textures.
+Pin selected source commits or dependency versions after evaluation.
+
+Do not adopt all three resources together. Start with surface shader reuse, add a particle library only if justified, and leave physical fluid simulation outside the agreed build.
+
+19.6 Forward integration
+
+If the prototype passes, add the selected shader and effects to Stage 5 of this specification. Use annual hydrology descriptors as their inputs. Keep Stage 1 drainage correctness and Stage 4 mesh continuity as prerequisites for full world rollout.
+
+Record the selected implementation, pinned revision, licence location, changes from upstream and measured limitations in the delivery evidence. Research notes do not constitute verified production performance.
