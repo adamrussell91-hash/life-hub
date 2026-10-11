@@ -1,3 +1,4 @@
+import {validateGroveHistory} from '../../../../packages/grove-history/validate.mjs';
 import { TaskSchema, type Task, type TaskDomain } from '@/schemas/task';
 import {
   TaskPropertyConfigSchema,
@@ -816,6 +817,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
       return parseHubPrefs(await kv.getJSON(keys.hubPrefsKey()));
     },
     async updateHubPrefs(patch: Partial<HubPrefs>): Promise<HubPrefs> {
+      if (Object.prototype.hasOwnProperty.call(patch,'grove_history')) validateGroveHistory(patch.grove_history);
       const prefs: HubPrefs = {
         ...DEFAULT_HUB_PREFS,
         ...(await this.getHubPrefs()),

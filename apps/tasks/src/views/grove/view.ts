@@ -1,3 +1,5 @@
+import {applyGroveHistory,isGroveHistoryId} from '@/domain/grove/private-history';
+import {createGroveHistoryImport} from './history-import';
 import type {WaterQuality} from '@/domain/grove/motion';
 import {AnnualGroveLoader} from '@/domain/grove/annual-loader';
 import type {AnnualGrovePlan} from '@/domain/grove/annual-plan';
@@ -5,7 +7,7 @@ import type {AnnualTree} from '@/domain/grove/planting';
 import {groveBooks} from '@/domain/grove/books';
 /**
  * Grove (`#/grove?view=day|week&date=YYYY-MM-DD`): the forest grown from finished tasks.
- * The page reads task history and draws it; it never writes anything.
+ * History import saves private Grove preferences; task records are read-only here.
  */
 import { type GroveView } from '@/domain/grove/plan';
 import { GROVE_SPECIES, SPECIES_LABEL, SPECIES_SHORT } from '@/domain/grove/assets';
@@ -97,6 +99,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   forward.setAttribute('aria-label', `Next ${route.view}`);
   nav.append(back, todayLink, forward);
   bar.append(pills, nav);
+  bar.append(createGroveHistoryImport(tasksApi.updateHubPrefs,()=>void renderGroveView(canvas),()=>gen===generation));
 
   const caption = el('p', 'grove-caption');
   caption.setAttribute('aria-live', 'polite');
@@ -142,11 +145,14 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
 
   const [hubPrefs, planningProfile, books] = await calendar;
   if (gen !== generation) return;
-  terms = groveTerms({hubPrefs, planningProfile});
+  const baseTerms = groveTerms({hubPrefs, planningProfile});
+  const historyInputs=(live:readonly import('@/domain/grove/plan').GroveTaskInput[],liveBooks:typeof books,now:Date)=>applyGroveHistory({history:hubPrefs?.grove_history,tasks:live,terms:baseTerms,books:liveBooks,now});
+  const initial=historyInputs(tasks,books,new Date());
+  terms = initial.terms;
   let acceptedBooks = books;
   back.href = groveHash(route.view, navDate(-1), today);
   forward.href = groveHash(route.view, navDate(1), today);
-  let loaded:Awaited<ReturnType<AnnualGroveLoader['load']>>;try{loaded=await annualLoader.load({tasks,view:route.view,anchor:route.date,now:new Date(),terms,books});}catch(error){if(gen!==generation)return;renderLoadError(stage,error,()=>void renderGroveView(canvas),'Could not prepare annual Grove');return;}if(gen!==generation)return;let plan=loaded.plan;
+  let loaded:Awaited<ReturnType<AnnualGroveLoader['load']>>;try{loaded=await annualLoader.load({tasks:initial.tasks,view:route.view,anchor:route.date,now:new Date(),terms,books:initial.books});}catch(error){if(gen!==generation)return;renderLoadError(stage,error,()=>void renderGroveView(canvas),'Could not prepare annual Grove');return;}if(gen!==generation)return;let plan=loaded.plan;
   paintHud(plan);
   let mountRevision = 0;
   let mountedAnchor: string | null = null;
@@ -187,9 +193,11 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
       el('p', 'grove-card__meta', SPECIES_LABEL[tree.species]),
       el('p', 'grove-card__meta', finishedLine(tree))
     );
-    const open = el('a', 'grove-card__link', 'Open task');
-    open.href = taskPageHash(tree.id);
-    card.append(open);
+    if (!isGroveHistoryId(tree.id)) {
+      const open = el('a', 'grove-card__link', 'Open task');
+      open.href = taskPageHash(tree.id);
+      card.append(open);
+    }
     card.hidden = false;
     const bounds = page.getBoundingClientRect();
     const left = Math.min(Math.max(8, x - bounds.left + 12), bounds.width - card.offsetWidth - 8);
@@ -250,8 +258,10 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
       const now = new Date();
       const nextToday = toHubDateKey(now);
       const anchor = followsToday ? nextToday : route.date;
+      const inputs=historyInputs(fresh,refreshedBooks,now);
+      terms=inputs.terms;
       let delivery: typeof loaded;
-      try { delivery = await annualLoader.load({tasks:fresh,view:route.view,anchor,now,terms,books:refreshedBooks}); }
+      try { delivery = await annualLoader.load({tasks:inputs.tasks,view:route.view,anchor,now,terms,books:inputs.books}); }
       catch(error){if(!current() || error instanceof DOMException&&error.name==='AbortError')return;console.error(error);return;}
       if (!current()) return;
       acceptedBooks = refreshedBooks;
