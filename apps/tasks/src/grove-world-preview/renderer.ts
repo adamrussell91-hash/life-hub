@@ -87,7 +87,7 @@ export function createWorldPreview(host:HTMLElement,onPick:(tree:AnnualTree,x:nu
    if(disposed||revision!==sceneRevision)return;
    const candidates=(plan?.contextTrees??near).filter(t=>Math.hypot(t.x+offset(t.worldYear)-controls.target.x,t.z-controls.target.z)<90).sort((a,b)=>Math.hypot(a.x+offset(a.worldYear)-controls.target.x,a.z-controls.target.z)-Math.hypot(b.x+offset(b.worldYear)-controls.target.x,b.z-controls.target.z)).slice(0,64);
    const chosen=camera.zoom<3?[]:candidates,signature=chosen.map(t=>t.id).join('|');if(signature===lastNear)return;lastNear=signature;const request=++nearRevision;
-   void createAnnualTrees(chosen,offset,heightScale).then(t=>{if(disposed||revision!==sceneRevision||request!==nearRevision){t.dispose();return;}
+   void createAnnualTrees(chosen,offset,heightScale,new Set(plan?.trees.map(t=>t.id)??[])).then(t=>{if(disposed||revision!==sceneRevision||request!==nearRevision){t.dispose();return;}
    if(nearTrees){root.remove(nearTrees.root);for(const b of nearTrees.batches){pickMeshes=pickMeshes.filter(m=>m!==b.mesh);pickTrees.delete(b.mesh);}nearTrees.dispose();nearTrees=null;}
    for(const [mesh,matrices] of originals){for(const [index,matrix] of matrices)mesh.setMatrixAt(index,matrix);mesh.instanceMatrix.needsUpdate=true;}originals.clear();
    for(const proxy of nearProxies){root.remove(proxy);pickMeshes=pickMeshes.filter(m=>m!==proxy);pickTrees.delete(proxy);owned=owned.filter(r=>r!==proxy);proxy.dispose();}nearProxies.length=0;nearTrees=t;root.add(t.root);// Retain the silhouette's generous hit volume when an authored model replaces it.
