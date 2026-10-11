@@ -144,6 +144,7 @@ export interface KeyBuilders {
   metaSeededKey: () => string;
   taskPropertiesKey: () => string;
   hubPrefsKey: () => string;
+  groveHistoryKey: () => string;
   agentProtocolKey: (slug: string) => string;
   mapKey: (id: string) => string;
   mapsIndexKey: () => string;
