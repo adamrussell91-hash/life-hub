@@ -1,9 +1,117 @@
 {
   "version": 1,
-  "generated_at": "2026-10-10T11:56:09.043Z",
+  "generated_at": "2026-10-11T07:27:57.461Z",
   "budget_bytes": 26214400,
-  "total_bytes": 13455164,
+  "total_bytes": 16168497,
   "assets": [
+    {
+      "id": "reed-1",
+      "slot": "reed",
+      "kind": "ground",
+      "variant": 1,
+      "stage": null,
+      "file": "models/ground/reed-1.glb",
+      "preview": "previews/reed-1.png",
+      "bytes": 2248,
+      "triangles": 44,
+      "height_m": 0.85,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Nature Kit",
+        "author": "Kenney",
+        "page_url": "https://kenney.nl/assets/nature-kit",
+        "original_file": "plant_flatShort.glb",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Kenney waterside plant kept for Grove water edges; teal city palette recoloured to Grove greens. No cattail seed head."
+    },
+    {
+      "id": "reed-2",
+      "slot": "reed",
+      "kind": "ground",
+      "variant": 2,
+      "stage": null,
+      "file": "models/ground/reed-2.glb",
+      "preview": "previews/reed-2.png",
+      "bytes": 2180,
+      "triangles": 32,
+      "height_m": 1.1,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Nature Kit",
+        "author": "Kenney",
+        "page_url": "https://kenney.nl/assets/nature-kit",
+        "original_file": "plant_flatTall.glb",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Kenney waterside plant kept for Grove water edges; teal city palette recoloured to Grove greens. No cattail seed head."
+    },
+    {
+      "id": "lily-1",
+      "slot": "lily",
+      "kind": "ground",
+      "variant": 1,
+      "stage": null,
+      "file": "models/ground/lily-1.glb",
+      "preview": "previews/lily-1.png",
+      "bytes": 3668,
+      "triangles": 52,
+      "height_m": 0.04,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Nature Kit",
+        "author": "Kenney",
+        "page_url": "https://kenney.nl/assets/nature-kit",
+        "original_file": "lily_small.glb",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Kenney lily pad kept for Grove lakes; teal city palette recoloured to Grove greens."
+    },
+    {
+      "id": "lily-2",
+      "slot": "lily",
+      "kind": "ground",
+      "variant": 2,
+      "stage": null,
+      "file": "models/ground/lily-2.glb",
+      "preview": "previews/lily-2.png",
+      "bytes": 5004,
+      "triangles": 86,
+      "height_m": 0.04,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Nature Kit",
+        "author": "Kenney",
+        "page_url": "https://kenney.nl/assets/nature-kit",
+        "original_file": "lily_large.glb",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Kenney lily pad kept for Grove lakes; teal city palette recoloured to Grove greens."
+    },
     {
       "id": "tree-life-1-sapling",
       "slot": "tree-life",
@@ -1706,114 +1814,6 @@
       "notes": "Authored MegaKit Source geometry; size and pivot normalised. Publisher materials retained."
     },
     {
-      "id": "reed-1",
-      "slot": "reed",
-      "kind": "ground",
-      "variant": 1,
-      "stage": null,
-      "file": "models/ground/reed-1.glb",
-      "preview": "previews/reed-1.png",
-      "bytes": 2248,
-      "triangles": 44,
-      "height_m": 0.85,
-      "animations": [],
-      "animation_source_names": {},
-      "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "plant_flatShort.glb",
-        "downloaded_at": "2026-10-10"
-      },
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "attribution": null
-      },
-      "notes": "Kenney waterside plant kept for Grove water edges; teal city palette recoloured to Grove greens. No cattail seed head."
-    },
-    {
-      "id": "reed-2",
-      "slot": "reed",
-      "kind": "ground",
-      "variant": 2,
-      "stage": null,
-      "file": "models/ground/reed-2.glb",
-      "preview": "previews/reed-2.png",
-      "bytes": 2180,
-      "triangles": 32,
-      "height_m": 1.1,
-      "animations": [],
-      "animation_source_names": {},
-      "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "plant_flatTall.glb",
-        "downloaded_at": "2026-10-10"
-      },
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "attribution": null
-      },
-      "notes": "Kenney waterside plant kept for Grove water edges; teal city palette recoloured to Grove greens. No cattail seed head."
-    },
-    {
-      "id": "lily-1",
-      "slot": "lily",
-      "kind": "ground",
-      "variant": 1,
-      "stage": null,
-      "file": "models/ground/lily-1.glb",
-      "preview": "previews/lily-1.png",
-      "bytes": 3668,
-      "triangles": 52,
-      "height_m": 0.04,
-      "animations": [],
-      "animation_source_names": {},
-      "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "lily_small.glb",
-        "downloaded_at": "2026-10-10"
-      },
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "attribution": null
-      },
-      "notes": "Kenney lily pad kept for Grove lakes; teal city palette recoloured to Grove greens."
-    },
-    {
-      "id": "lily-2",
-      "slot": "lily",
-      "kind": "ground",
-      "variant": 2,
-      "stage": null,
-      "file": "models/ground/lily-2.glb",
-      "preview": "previews/lily-2.png",
-      "bytes": 5004,
-      "triangles": 86,
-      "height_m": 0.04,
-      "animations": [],
-      "animation_source_names": {},
-      "source": {
-        "pack": "Nature Kit",
-        "author": "Kenney",
-        "page_url": "https://kenney.nl/assets/nature-kit",
-        "original_file": "lily_large.glb",
-        "downloaded_at": "2026-10-10"
-      },
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "attribution": null
-      },
-      "notes": "Kenney lily pad kept for Grove lakes; teal city palette recoloured to Grove greens."
-    },
-    {
       "id": "bridge-1",
       "slot": "bridge",
       "kind": "ground",
@@ -1950,6 +1950,276 @@
         "attribution": null
       },
       "notes": "Kept idle, walk, run and eat only; combat/death clips removed."
+    },
+    {
+      "id": "tree-life-4-mature",
+      "slot": "tree-life",
+      "kind": "tree",
+      "variant": 4,
+      "stage": "mature",
+      "file": "models/trees/tree-life-4-mature.glb",
+      "preview": "previews/tree-life-4-mature.png",
+      "bytes": 101832,
+      "triangles": 3366,
+      "height_m": 6.4,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Pine_4.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Distinct authored Pine mesh from Source edition; growth stages scale this mature source. Height bounded to fit task clearings."
+    },
+    {
+      "id": "tree-life-5-mature",
+      "slot": "tree-life",
+      "kind": "tree",
+      "variant": 5,
+      "stage": "mature",
+      "file": "models/trees/tree-life-5-mature.glb",
+      "preview": "previews/tree-life-5-mature.png",
+      "bytes": 66440,
+      "triangles": 1646,
+      "height_m": 6.75,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Pine_5.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Distinct authored Pine mesh from Source edition; growth stages scale this mature source. Height bounded to fit task clearings."
+    },
+    {
+      "id": "tree-health-4-mature",
+      "slot": "tree-health",
+      "kind": "tree",
+      "variant": 4,
+      "stage": "mature",
+      "file": "models/trees/tree-health-4-mature.glb",
+      "preview": "previews/tree-health-4-mature.png",
+      "bytes": 227552,
+      "triangles": 5774,
+      "height_m": 6.4,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Birch_4.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Distinct authored Birch mesh from Source edition; growth stages scale this mature source. Height bounded to fit task clearings."
+    },
+    {
+      "id": "tree-health-5-mature",
+      "slot": "tree-health",
+      "kind": "tree",
+      "variant": 5,
+      "stage": "mature",
+      "file": "models/trees/tree-health-5-mature.glb",
+      "preview": "previews/tree-health-5-mature.png",
+      "bytes": 205036,
+      "triangles": 5104,
+      "height_m": 6.75,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/Birch_5.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Distinct authored Birch mesh from Source edition; growth stages scale this mature source. Height bounded to fit task clearings."
+    },
+    {
+      "id": "tree-wedding-3-mature",
+      "slot": "tree-wedding",
+      "kind": "tree",
+      "variant": 3,
+      "stage": "mature",
+      "file": "models/trees/tree-wedding-3-mature.glb",
+      "preview": "previews/tree-wedding-3-mature.png",
+      "bytes": 337724,
+      "triangles": 14737,
+      "height_m": 6.0498,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/CherryBlossom_3.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Distinct authored CherryBlossom mesh from Source edition; growth stages scale this mature source. Height bounded to fit task clearings. Blossom foliage recoloured pink while preserving alpha mask. Authored topology and UVs retained; this model has an explicit 350 KB ceiling (others 300 KB)."
+    },
+    {
+      "id": "tree-wedding-4-mature",
+      "slot": "tree-wedding",
+      "kind": "tree",
+      "variant": 4,
+      "stage": "mature",
+      "file": "models/trees/tree-wedding-4-mature.glb",
+      "preview": "previews/tree-wedding-4-mature.png",
+      "bytes": 271364,
+      "triangles": 12385,
+      "height_m": 6.4,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/CherryBlossom_4.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Distinct authored CherryBlossom mesh from Source edition; growth stages scale this mature source. Height bounded to fit task clearings. Blossom foliage recoloured pink while preserving alpha mask."
+    },
+    {
+      "id": "tree-wedding-5-mature",
+      "slot": "tree-wedding",
+      "kind": "tree",
+      "variant": 5,
+      "stage": "mature",
+      "file": "models/trees/tree-wedding-5-mature.glb",
+      "preview": "previews/tree-wedding-5-mature.png",
+      "bytes": 253540,
+      "triangles": 12576,
+      "height_m": 6.75,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/CherryBlossom_5.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Distinct authored CherryBlossom mesh from Source edition; growth stages scale this mature source. Height bounded to fit task clearings. Blossom foliage recoloured pink while preserving alpha mask."
+    },
+    {
+      "id": "tree-late-3-mature",
+      "slot": "tree-late",
+      "kind": "tree",
+      "variant": 3,
+      "stage": "mature",
+      "file": "models/trees/tree-late-3-mature.glb",
+      "preview": "previews/tree-late-3-mature.png",
+      "bytes": 257696,
+      "triangles": 10084,
+      "height_m": 6.05,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/TwistedTree_3.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Distinct authored TwistedTree mesh from Source edition; growth stages scale this mature source. Height bounded to fit task clearings."
+    },
+    {
+      "id": "tree-late-4-mature",
+      "slot": "tree-late",
+      "kind": "tree",
+      "variant": 4,
+      "stage": "mature",
+      "file": "models/trees/tree-late-4-mature.glb",
+      "preview": "previews/tree-late-4-mature.png",
+      "bytes": 252928,
+      "triangles": 9595,
+      "height_m": 6.4,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/TwistedTree_4.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Distinct authored TwistedTree mesh from Source edition; growth stages scale this mature source. Height bounded to fit task clearings."
+    },
+    {
+      "id": "tree-late-5-mature",
+      "slot": "tree-late",
+      "kind": "tree",
+      "variant": 5,
+      "stage": "mature",
+      "file": "models/trees/tree-late-5-mature.glb",
+      "preview": "previews/tree-late-5-mature.png",
+      "bytes": 265184,
+      "triangles": 10102,
+      "height_m": 6.75,
+      "animations": [],
+      "animation_source_names": {},
+      "source": {
+        "pack": "Stylized Nature MegaKit (Source)",
+        "author": "Quaternius",
+        "page_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+        "original_file": "glTF/TwistedTree_5.gltf",
+        "downloaded_at": "2026-10-10"
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution": null
+      },
+      "notes": "Distinct authored TwistedTree mesh from Source edition; growth stages scale this mature source. Height bounded to fit task clearings."
     }
   ]
 }

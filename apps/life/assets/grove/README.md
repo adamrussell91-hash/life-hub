@@ -214,12 +214,12 @@ Tasks carry a hub (`domain`): `life`, `teaching`, `health`, `wedding`, `other`. 
 
 | Slot id | Hub | Species feel | Variants | Growth stages |
 |---|---|---|---|---|
-| `tree-life` | Life | Pine or fir | 3 | sapling, young, mature |
+| `tree-life` | Life | Pine or fir | 5 | growth scales mature; legacy stage models for 1–3 |
 | `tree-teaching` | Teaching | Round broadleaf (oak) | 3 | sapling, young, mature |
-| `tree-health` | Health | Birch (pale trunk) | 3 | sapling, young, mature |
-| `tree-wedding` | Wedding | Blossom (cherry, pink) | 2 | sapling, young, mature |
+| `tree-health` | Health | Birch (pale trunk) | 5 | growth scales mature; legacy stage models for 1–3 |
+| `tree-wedding` | Wedding | Blossom (cherry, pink) | 5 | growth scales mature; legacy stage models for 1–2 |
 | `tree-other` | Other | Generic leafy | 2 | sapling, young, mature |
-| `tree-late` | Overdue tasks finished late | Gnarled or twisted, still alive | 2 | mature only |
+| `tree-late` | Overdue tasks finished late | Gnarled or twisted, still alive | 5 | growth scales mature |
 
 Growth stages: prefer real separate meshes (many packs ship small and large versions of each tree). If a species has no sapling, take the smallest bush-like tree from the same pack and note it in the manifest. Claude will scale between stages.
 
@@ -362,3 +362,5 @@ When the PR is up, Adam will tell Claude Code. Claude reads `manifest.json` and 
 ## Production release status
 
 The four-area completion pass is shipped in [PR #791](https://github.com/adamrussell91-hash/life-hub/pull/791), with a successful [Pages deployment](https://github.com/adamrussell91-hash/life-hub/actions/runs/38100432730). All eight live model files match the checked build; the encrypted archive is absent from the website. The umbrella API publishes the same release. Full details and verification are in [BUILD-PLAN.md](BUILD-PLAN.md). Optional enhancements remain separate.
+
+Final expansion retains the first fifteen mature source identities and adds Pine4/5, Birch4/5, Cherry3/4/5 and Twisted3/4/5. Twenty-five distinct mature trees now supply runtime growth by scale. Added heights remain 6.05–6.75 m, preserving tree topology/UVs/colours. Cherry3 alone uses a bounded 350 KB model ceiling to retain its authored foliage geometry; the other public static models retain the 300 KB ceiling. The whole public collection remains within 25 MiB.

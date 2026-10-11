@@ -12,12 +12,12 @@ export const HUB_SPECIES: ReadonlySet<string> = new Set(['life', 'teaching', 'he
 
 /** Distinct authored meshes per species. Growth stages scale the mature mesh. */
 export const TREE_VARIANTS: Record<GroveSpecies, number> = {
-  life: 3,
+  life: 5,
   teaching: 3,
-  health: 3,
-  wedding: 2,
+  health: 5,
+  wedding: 5,
   other: 2,
-  late: 2
+  late: 5
 };
 
 export const GROVE_PROPS = ['grass', 'flower', 'bush', 'rock', 'mushroom'] as const;
