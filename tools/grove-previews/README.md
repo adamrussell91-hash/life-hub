@@ -7,18 +7,17 @@ No app, CSS, runtime dependency, storage or build changes.
 
 ## Contents and limitations
 
-67 GLBs: 41 trees (13 variants with three size stages, plus two twisted trees),
-23 ground props and three animated animals (doe, stag, fox). All currently delivered models are
+81 GLBs: 51 tree files (25 mature variants, with legacy scaled growth files for the first thirteen),
+27 ground props and three animated animals (doe, stag, fox). Main authored models are
 Quaternius: Stylized Nature MegaKit Source for trees and ground, Ultimate
-Animated Animal Pack for animals. No Cube Pets or Kenney models. Visually matching one-off additions from other
-creators are permitted after review. Four working one-off animals are now delivered in the local project-use bundle; see the canonical Grove hand-off above.
+Animated Animal Pack for animals. Kenney supplies only water-edge reeds and lily pads; no Cube Pets models. Visually matching one-off additions from other
+creators are permitted after review. Twenty verified animals are now delivered in the local project-use bundle; see the canonical Grove hand-off above.
 All CC0; original publisher licence texts retained. The manifest names every
 source file and adaptation.
 
 The purchased Source MegaKit contains 116 models, including five birch and five
-cherry-blossom variants. Three birch and two cherry-blossom variants replace
-recoloured stand-ins. No dedicated sapling/young meshes are included. The three
-size stages reuse each variant at 0.65 m, 2.4 m and roughly 5.35–6.05 m: **scaled
+cherry-blossom variants. All five birch and five cherry-blossom sources are prepared; the first three birch and first two blossom identities remain stable. No dedicated sapling/young meshes are included. The three
+size stages reuse each variant at 0.65 m, 2.4 m and roughly 5.35–6.75 m: **scaled
 fallbacks**, not separately authored stages. Blossom foliage is tinted pink
 while retaining its alpha mask. Variants within each hub have distinct meshes.
 
@@ -108,3 +107,5 @@ Default invocation still prepares the repository's existing CC0 selection.
 - `serve-animal-demo.mjs <bundle>`: local preview with shared loader and independently animated half-size babies.
 - `check-animal-demo.mjs <url> <bundle>`: exercises every clip and verifies clone independence, baby scale and missing-clip errors.
 - `animal-demo/`: reusable loader and preview template. These are ingredient tools; the Grove app remains unbuilt.
+
+Final expansion adds Pine4/5, Birch4/5, Cherry3/4/5 and Twisted3/4/5 as mature models. Runtime growth scales these meshes, preserving their topology/UVs/colours. Cherry3 has a documented 350 KB ceiling to retain authored foliage; all other static assets remain below 300 KB. `tree-expansion-evidence.json` records exact sources, SHA-256s and browser bounds. See `FOREST-EXPANSION.md` for the separate private animal bundle.
