@@ -5,14 +5,14 @@ import {AnnualWorldClient,type WorldWorkerPort} from '@/domain/grove/world-clien
 import {generateAnnualWorld} from '@/domain/grove/world';
 import {worldKeyForYear} from '@/domain/grove/world-key';
 import {buildWorldMeshes} from '@/domain/grove/world-meshes';
-import {buildWorldResponse} from '@/domain/grove/world-protocol';
+import {buildWorldResponse,worldTransferBuffers} from '@/domain/grove/world-protocol';
 // Full annual terrain, regions and receipt validation run for these transport fixtures.
 vi.setConfig({testTimeout:30000});
 
 class Transport implements WorldWorkerPort {
  onmessage:WorldWorkerPort['onmessage']=null;onerror:WorldWorkerPort['onerror']=null;onmessageerror:WorldWorkerPort['onmessageerror']=null;
- request:any;terminated=false;
- postMessage(value:unknown){this.request=value;}
+ request:any;terminated=false;autoValidate=true;
+ postMessage(value:any){this.request=value;if(value.type==='validate'&&this.autoValidate)this.reply(buildWorldResponse(value).message);}
  terminate(){this.terminated=true;}
  reply(value:unknown){this.onmessage?.({data:value} as MessageEvent);}
  success(){const world=generateAnnualWorld(this.request.key);this.reply({type:'success',id:this.request.id,world,meshes:buildWorldMeshes(world),generationMs:12});}
@@ -32,6 +32,12 @@ describe('annual worker protocol',()=>{
    expect(result.message.world.regions!.owner.byteLength).toBe(0);expect(received.world.regions!.owner.length).toBe(66049);
    expect(result.message.meshes.terrain[0]!.positions.byteLength).toBe(0);expect(received.meshes.terrain[0]!.positions.length).toBe(32*32*18);
    expect(result.message.world.bed.byteLength).toBe(0);expect(received.world.bed.byteLength).toBe(264196);
+   const buffers=worldTransferBuffers(received.world,received.meshes);expect(new Set(buffers).size).toBe(buffers.length);
+   const request=structuredClone({type:'validate' as const,id:1,key:worldKeyForYear(2026),world:received.world,meshes:received.meshes,generationMs:received.generationMs},{transfer:buffers});
+   expect(received.world.hydrology.bed.byteLength).toBe(0);expect(received.world.regions!.owner.byteLength).toBe(0);expect(received.meshes.water[0]!.positions.byteLength).toBe(0);
+   const validated=buildWorldResponse(request);expect(validated.message.type).toBe('validated');
+   if(validated.message.type==='validated'){const returned=structuredClone(validated.message,{transfer:validated.transfer});expect(validated.message.world.hydrology.bed.byteLength).toBe(0);expect(returned.world.hydrology.bed.length).toBe(66049);expect(returned.world.regions!.owner.length).toBe(66049);expect(returned.meshes.terrain[0]!.positions.length).toBe(32*32*18);expect(returned.meshes.water[0]!.positions.byteLength).toBeGreaterThan(0);}
+
   }
  });
  it('serialises invalid generation errors',()=>{
@@ -100,5 +106,22 @@ describe('annual generation lifecycle',()=>{
  });
  it('rejects invalid year before allocating a worker',async()=>{
   const factory=vi.fn(),client=new AnnualWorldClient(factory);await expect(client.generate(NaN)).rejects.toThrow(/year/i);expect(factory).not.toHaveBeenCalled();client.dispose();
+ });
+});
+
+
+describe('off-thread receipt validation',()=>{
+ it('hands received buffers back to the worker and does not mount before validation',async()=>{
+  const port=new Transport();port.autoValidate=false;const client=new AnnualWorldClient(()=>port),pending=client.generate(2026);
+  let delivered=false;void pending.then(()=>{delivered=true;},()=>{});
+  port.success();
+  expect(port.request.type).toBe('validate');
+  await Promise.resolve();expect(delivered).toBe(false);
+  client.dispose();await expect(pending).rejects.toMatchObject({name:'AbortError'});
+ });
+ it('rejects an unsolicited validated result before generation has delivered a field',async()=>{
+  const {client,ports}=setup(),pending=client.generate(2026);
+  ports[0]!.reply({type:'validated',id:ports[0]!.request.id,world:{},meshes:{},generationMs:1});
+  await expect(pending).rejects.toThrow(/invalid/i);client.dispose();
  });
 });

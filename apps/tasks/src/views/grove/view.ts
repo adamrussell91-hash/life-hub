@@ -118,9 +118,9 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   const creditSummary = el('summary', '', 'Wildlife credits');
   const creditText = el('p');
   credits.append(creditSummary, creditText);credits.hidden = true;
-  const framing = el('button', 'btn btn--secondary grove-framing', `Show whole ${route.view}`);
+  let overview=!window.matchMedia('(max-width: 719px)').matches&&route.view!=='day';
+  const framing = el('button', 'btn btn--secondary grove-framing', overview?'Show selected clearing':`Show whole ${route.view}`);
   framing.type = 'button';framing.hidden = route.view === 'day';
-  let overview = false;
   framing.addEventListener('click',()=>{
     overview = !overview;
     sceneHandle?.frame(overview?'overview':'clearing');
@@ -199,14 +199,14 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     const cameraState=sceneHandle?.cameraState();
     const { mountAnnualGroveScene } = await import('./annual-scene');
     if (gen !== generation || revision !== mountRevision) return;
-    const byId = new Map(next.trees.map((t) => [t.id, t]));
+    const byId = new Map(next.contextTrees.map((t) => [t.id, t]));
     try {
       const handle = await mountAnnualGroveScene(stage, {
         ...loaded,plan: next,
         interactive: true,
 
         wildlifePaused,
-        cameraState,
+        cameraState,frameMode:overview?'overview':'clearing',
         onWildlife: (count, missing, lines) => {
           if (gen !== generation || revision !== mountRevision) return;
           wildlife.hidden = false;
@@ -240,12 +240,17 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
       pending = null;
       const fresh = await tasksApi.listTasks().catch(() => null);
       if (!fresh || gen !== generation) return;
-      try{loaded=await annualLoader.load({tasks:fresh,view:route.view,anchor:route.date,now:new Date(),terms,books});}catch(error){if(error instanceof DOMException&&error.name==='AbortError')return;console.error(error);return;}if(gen!==generation)return;plan=loaded.plan;
+      const refreshedBooks=await groveBooks().catch(()=>books);
+      try{loaded=await annualLoader.load({tasks:fresh,view:route.view,anchor:route.date,now:new Date(),terms,books:refreshedBooks});}catch(error){if(error instanceof DOMException&&error.name==='AbortError')return;console.error(error);return;}if(gen!==generation)return;plan=loaded.plan;
       paintHud(plan);
       card.hidden = true;
       await mount(plan);
     }, 400);
   };
+  // Refresh derived growth and the local day without regenerating cached geography.
+  const refreshTime=()=>{if(!document.hidden)replant();};
+  const growthTimer=window.setInterval(refreshTime,60000);
+  document.addEventListener('visibilitychange',refreshTime);
   // Phone: fill the space between the page header (whose stats strip loads late) and the tab bar.
   const phone = window.matchMedia('(max-width: 719px)');
   const fitPage = () => {
@@ -276,6 +281,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   window.addEventListener('keydown', onKey);
   detach = () => {
     if (pending != null) window.clearTimeout(pending);
+    window.clearInterval(growthTimer);document.removeEventListener('visibilitychange',refreshTime);
     window.removeEventListener(TASKS_CHANGED, replant);
     window.removeEventListener(TASKS_DELETED, replant);
     window.removeEventListener('keydown', onKey);
