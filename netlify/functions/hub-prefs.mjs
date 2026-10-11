@@ -1,3 +1,4 @@
+import {parseGroveHistory,validateGroveHistory} from '../../packages/grove-history/validate.mjs';
 import {
   errorResponse,
   methodNotAllowed,
@@ -5,7 +6,7 @@ import {
   withCors
 } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
-import { defaultGetTasksStore, getJSON, setJSON } from './_shared/tasks-blobs.mjs';
+import { defaultGetTasksStore, setJSON } from './_shared/tasks-blobs.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 
 export const config = { path: '/api/hub-prefs' };
@@ -76,6 +77,7 @@ function parseHubPrefs(raw) {
     : [];
   return {
     schema_version: 1,
+    ...(parseGroveHistory(body.grove_history) ? {grove_history:parseGroveHistory(body.grove_history)} : {}),
     timezone: typeof body.timezone === 'string' && body.timezone.trim() ? body.timezone : DEFAULT_TZ,
     updated_at: typeof body.updated_at === 'string' ? body.updated_at : null,
     dismissed_insight_ids: dismissed,
@@ -89,7 +91,7 @@ export function createHubPrefsHandler(deps = {}) {
     const { env, store } = context;
     try {
       if (request.method === 'GET') {
-        const prefs = parseHubPrefs(await getJSON(store, HUB_PREFS_KEY));
+        const prefs = parseHubPrefs(await store.get(HUB_PREFS_KEY, {type:'json',consistency:'strong'}));
         return withCors(okResponse(200, prefs), request, env);
       }
 
@@ -99,7 +101,8 @@ export function createHubPrefsHandler(deps = {}) {
 
       const parsed = await readJsonObject(request);
       if (parsed.error) return withCors(parsed.error, request, env);
-      const current = parseHubPrefs(await getJSON(store, HUB_PREFS_KEY));
+      if (Object.prototype.hasOwnProperty.call(parsed.value,'grove_history')) validateGroveHistory(parsed.value.grove_history);
+      const current = parseHubPrefs(await store.get(HUB_PREFS_KEY, {type:'json',consistency:'strong'}));
       const next = parseHubPrefs({
         ...current,
         ...(parsed.value && typeof parsed.value === 'object' ? parsed.value : {}),
