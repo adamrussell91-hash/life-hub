@@ -1,3 +1,4 @@
+import { buildLibraryByName } from './muscle-maps.js';
 import { parseEventDocument } from '../core/records.js';
 import { validateRecord } from '../core/validate.js';
 import { addCalendarDays, daysBetween, isCalendarDate } from '../core/time.js';
@@ -8,6 +9,14 @@ import {
   parseNutritionChallenges
 } from '../core/nutrition-challenges.js';
 import { PENDING_CN_PATCHES_PATH, parsePendingCnPatches } from '../core/pending-cn-patches.js';
+
+const EXERCISE_LIBRARY_PATH = 'data/exercise-library.json';
+
+function parseExerciseLibrary(content) {
+  const entries = JSON.parse(content);
+  if (!Array.isArray(entries)) throw new TypeError('Invalid exercise library');
+  return buildLibraryByName(entries);
+}
 
 const TARGETS_PATH = 'config/targets.yml';
 const AGENTS_PATH = 'config/agents.yml';
@@ -125,6 +134,7 @@ export async function loadLiveEvents({
       events: parsedFiles.events,
       history: { from: historyFrom, loading: historyLoading },
       targetsConfig: parsedFiles.targetsConfig,
+      libraryByName: parsedFiles.libraryByName,
       agentsConfig: parsedFiles.agentsConfig,
       centralNodeMarkdown: parsedFiles.centralNodeMarkdown,
       governanceLogMarkdown: parsedFiles.governanceLogMarkdown,
@@ -209,7 +219,9 @@ export async function loadLiveEvents({
 function createValidator(loadYaml) {
   return file => {
     try {
-      if (file.path === TARGETS_PATH || file.path === AGENTS_PATH) {
+      if (file.path === EXERCISE_LIBRARY_PATH) {
+        parseExerciseLibrary(file.content);
+      } else if (file.path === TARGETS_PATH || file.path === AGENTS_PATH) {
         loadYaml(file.content);
       } else if (file.path === CENTRAL_NODE_PATH || file.path === GOVERNANCE_LOG_PATH) {
         // Freeform markdown, no schema to violate -- any string content is acceptable.
@@ -235,7 +247,8 @@ function createValidator(loadYaml) {
     } catch {
       return {
         valid: false,
-        code: file.path === TARGETS_PATH ? 'invalid_targets'
+        code: file.path === EXERCISE_LIBRARY_PATH ? 'invalid_exercise_library'
+          : file.path === TARGETS_PATH ? 'invalid_targets'
           : file.path === AGENTS_PATH ? 'invalid_agents'
           : 'invalid_event'
       };
@@ -250,6 +263,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
   const events = [];
   const warnings = [];
   let targetsConfig = null;
+  let libraryByName = null;
   let agentsConfig = null;
   let centralNodeMarkdown = null;
   let governanceLogMarkdown = null;
@@ -270,7 +284,8 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
       warnings.push(entry.warning);
       continue;
     }
-    if (entry.kind === 'targets') targetsConfig = entry.value;
+    if (entry.kind === 'exercise_library') libraryByName = entry.value;
+    else if (entry.kind === 'targets') targetsConfig = entry.value;
     else if (entry.kind === 'agents') agentsConfig = entry.value;
     else if (entry.kind === 'central_node') centralNodeMarkdown = entry.value;
     else if (entry.kind === 'governance_log') governanceLogMarkdown = entry.value;
@@ -288,6 +303,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
   return {
     events,
     targetsConfig,
+    libraryByName,
     agentsConfig,
     centralNodeMarkdown,
     governanceLogMarkdown,
@@ -315,6 +331,7 @@ function parseLinkedRecord(text, path, loadYaml) {
 
 function parseFile(file, loadYaml) {
   try {
+    if (file.path === EXERCISE_LIBRARY_PATH) return { kind: 'exercise_library', value: parseExerciseLibrary(file.content) };
     if (file.path === TARGETS_PATH) return { kind: 'targets', value: loadYaml(file.content) };
     if (file.path === AGENTS_PATH) return { kind: 'agents', value: loadYaml(file.content) };
     if (file.path === CENTRAL_NODE_PATH) return { kind: 'central_node', value: file.content };
@@ -349,7 +366,8 @@ function parseFile(file, loadYaml) {
     return {
       warning: {
         path: file.path,
-        code: file.path === TARGETS_PATH ? 'invalid_targets'
+        code: file.path === EXERCISE_LIBRARY_PATH ? 'invalid_exercise_library'
+          : file.path === TARGETS_PATH ? 'invalid_targets'
           : file.path === AGENTS_PATH ? 'invalid_agents'
           : file.path === NUTRITION_CHALLENGES_PATH ? 'invalid_nutrition_challenges'
           : 'invalid_event'

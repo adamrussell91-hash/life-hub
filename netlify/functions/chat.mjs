@@ -842,7 +842,9 @@ export function createChatHandler({
           const current = await client.resolveTree();
           repoTree = current.tree ?? [];
           const manifest = selectManifestEntries(current.tree, { from, to: today });
-          const dataEntries = manifest.filter(entry => entry.path.startsWith('data/'));
+          // The shared client manifest includes the library; chat loads it separately below.
+          const dataEntries = manifest.filter(entry => entry.path.startsWith('data/')
+            && entry.path !== EXERCISE_LIBRARY_PATH);
           const centralNodeEntry = current.tree.find(entry => entry.path === 'central-node.md' && entry.type === 'blob');
           centralNodeSha = centralNodeEntry?.sha;
           const governanceLogEntry = needsHammondTools
