@@ -2,13 +2,20 @@
 <html lang="en" data-hub="tasks">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Grove annual geography preview</title></head>
 <body><main class="world-preview">
-  <header><p class="world-preview__eyebrow">Grove · Phase 2</p><h1>Annual landscape</h1><p>Annual drainage prototype · solved lakes, channels and world outlets.</p></header>
+  <header><p class="world-preview__eyebrow">Grove · Phase 3</p><h1>Annual landscape</h1><p>Annual activity prototype · weekly regions and terrain-aware planting. Synthetic records only.</p></header>
   <div class="world-preview__controls">
     <button id="previous" class="btn btn--secondary" aria-label="Previous year">‹</button>
     <label for="year">Year <input id="year" type="number" min="1900" max="9999" step="1" value="2026"></label>
     <button id="next" class="btn btn--secondary" aria-label="Next year">›</button>
   </div>
-  <label class="world-preview__layer" for="layer">Diagnostic <select id="layer"><option value="elevation">Elevation</option><option value="lakes">Lake IDs</option><option value="receivers">Drainage receivers</option><option value="accumulation">Contributing area</option><option value="outlets">World outlets</option></select></label>
+  <label class="world-preview__layer" for="layer">Diagnostic <select id="layer"><option value="regions">Weekly regions</option><option value="elevation">Elevation</option><option value="lakes">Lake IDs</option><option value="receivers">Drainage receivers</option><option value="accumulation">Contributing area</option><option value="outlets">World outlets</option></select></label>
+  <div class="world-preview__activity">
+    <label>Anchor <input id="anchor" type="date" value="2026-06-10"></label>
+    <label>View <select id="view"><option value="year">Year</option><option value="term">Term</option><option value="week">Week</option><option value="day">Day</option></select></label>
+    <label>Synthetic trees <select id="fixture"><option value="0">0</option><option value="200">200 in one week</option><option value="1500">1,500</option><option value="5000">5,000</option><option value="10000">10,000</option></select></label>
+    <button id="frame" class="btn btn--secondary">Focus selection</button>
+  </div>
+  <p id="boundary" hidden></p><p id="picked" role="status">Select a tree to inspect its task.</p>
   <p id="status" role="status" aria-live="polite">Preparing the annual world…</p>
   <div id="landscape" class="world-preview__stage" aria-label="Annual terrain, solved lakes, channels and drainage diagnostics"></div>
   <p class="world-preview__legend">Gentle meadows · hills and valleys · level lakes · connected channels · dry islands. Relief is enlarged ×3 for inspection. Drag to turn, pinch or scroll to zoom.</p>

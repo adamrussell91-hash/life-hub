@@ -2,50 +2,42 @@ import '../../design-kit/tokens.css';
 import '../../design-kit/actions.css';
 import './preview.css';
 import {AnnualWorldClient} from '@/domain/grove/world-client';
+import type {AnnualWorld} from '@/domain/grove/world';
+import {buildAnnualGrovePlan} from '@/domain/grove/annual-plan';
+import {AnnualPlantingSession} from '@/domain/grove/planting';
+import {grovePeriod} from '@/domain/grove/calendar';
+import type {GroveView,GroveTaskInput} from '@/domain/grove/plan';
+import {formatDisplayDateRange} from '../../design-kit/js/format-display-date.js';
 import {createWorldPreview,type DiagnosticLayer} from './renderer';
-
-const year=document.querySelector<HTMLInputElement>('#year')!;
-const stage=document.querySelector<HTMLElement>('#landscape')!;
-const status=document.querySelector<HTMLElement>('#status')!;
-const metrics=document.querySelector<HTMLElement>('#metrics')!;
-const layer=document.querySelector<HTMLSelectElement>('#layer')!;
-let client=new AnnualWorldClient();
+const year=document.querySelector<HTMLInputElement>('#year')!,anchor=document.querySelector<HTMLInputElement>('#anchor')!,view=document.querySelector<HTMLSelectElement>('#view')!,fixture=document.querySelector<HTMLSelectElement>('#fixture')!,stage=document.querySelector<HTMLElement>('#landscape')!,status=document.querySelector<HTMLElement>('#status')!,metrics=document.querySelector<HTMLElement>('#metrics')!,layer=document.querySelector<HTMLSelectElement>('#layer')!,boundary=document.querySelector<HTMLElement>('#boundary')!;
+const worlds=new Map<number,AnnualWorld>(),clients=new Map<number,AnnualWorldClient>(),session=new AnnualPlantingSession();
 let preview:ReturnType<typeof createWorldPreview>|null=null,revision=0;
-function initialisePreview(){
-  try{preview=createWorldPreview(stage);}catch(error){status.textContent=error instanceof Error?`The preview could not draw: ${error.message}`:'The preview could not draw on this device';stage.dataset.state='error';}
+function initialise(){try{preview=createWorldPreview(stage,tree=>{stage.dataset.pickedId=tree.id;document.querySelector('#picked')!.textContent=tree.title+' · '+tree.dayKey+' · '+tree.species;});}catch(error){status.textContent=String(error);stage.dataset.state='error';}}
+initialise();
+function records(world:AnnualWorld):GroveTaskInput[]{
+ const count=Number(fixture.value),period=grovePeriod(view.value as GroveView,anchor.value),first=period.from.startsWith(String(world.key.year))?period.from:world.key.year+'-01-01',start=Date.UTC(world.key.year,0,1),days=(Date.UTC(world.key.year+1,0,1)-start)/86400000;
+ return Array.from({length:count},(_,i)=>({id:'synthetic-'+world.key.year+'-'+i,title:'Synthetic task '+(i+1),status:'done',domain:['life','health','teaching','wedding','other'][i%5],completed_at:count===200?first+'T12:00:00+11:00':new Date(start+Math.floor(i*days/count)*86400000+3600000).toISOString()}));
 }
-initialisePreview();
-
-async function load() {
-  const current=++revision,selected=Number(year.value);
-  if(!preview)return;
-  stage.dataset.state='loading';status.textContent=`Generating ${year.value}…`;metrics.textContent='';
-  const start=performance.now();
-  try{
-    const delivery=await client.generate(selected);
-    if(current!==revision)return;
-    const world=delivery.world;preview.show(world,layer.value as DiagnosticLayer);
-    stage.dataset.year=String(world.key.year);stage.dataset.identity=world.identity;stage.dataset.state='ready';
-    stage.dataset.samples=String(world.bed.length);stage.dataset.bytes=String(world.bed.byteLength);stage.dataset.generationMs=String(delivery.generationMs);
-    stage.dataset.attempt=String(world.generation.attempt);stage.dataset.fallback=String(world.generation.fallback);
-    stage.dataset.lakes=String(world.hydrology.lakes.length);stage.dataset.channels=String(world.hydrology.channels.length);stage.dataset.outlets=String(world.hydrology.outlets.length);stage.dataset.falls=String(world.hydrology.falls.length);
-    stage.dataset.gradingPasses=String(world.hydrology.gradingPasses);
-    stage.dataset.transferBytes=String([world.bed,world.hydrology.bed,world.hydrology.gradedBed,world.hydrology.level,world.hydrology.receiver,world.hydrology.order,world.hydrology.accumulation,world.hydrology.outlets,world.hydrology.lakeId,...world.hydrology.lakes.map(l=>l.triangles),...world.hydrology.channels.map(c=>c.triangles)].reduce((sum,a)=>sum+a.byteLength,0));
-    stage.dataset.totalMs=String(performance.now()-start);
-    status.textContent=`${world.key.year} landscape ready · generator ${world.key.generatorVersion}${world.generation.fallback?' · fallback landscape':''}`;
-    metrics.textContent=`${world.grid.extent} m across · ${world.grid.size} × ${world.grid.size} samples · elevation ${world.summary.minHeight.toFixed(1)}–${world.summary.maxHeight.toFixed(1)} m · ${world.hydrology.lakes.length} lakes/ponds · ${world.hydrology.channels.length} channel links · generated in ${Math.round(delivery.generationMs)} ms`;
-  }catch(error){
-    if(current!==revision||error instanceof DOMException&&error.name==='AbortError')return;
-    stage.dataset.state='error';status.textContent=error instanceof Error?error.message:'Annual landscape could not generate';
-  }
+async function load(){
+ const current=++revision;if(!preview)return;stage.dataset.state='loading';status.textContent='Preparing annual activity…';const start=performance.now();
+ try{
+  const selected=Number(year.value);if(!Number.isInteger(selected)||selected<1900||selected>9999)throw Error('Year must be between 1900 and 9999');
+  const period=grovePeriod(view.value as GroveView,anchor.value),years=[...new Set([Number(period.from.slice(0,4)),Number(period.to.slice(0,4))])];
+  for(const [y,c] of clients)if(!years.includes(y)){c.dispose();clients.delete(y);}
+  for(const y of worlds.keys())if(worlds.size>4&&!years.includes(y))worlds.delete(y);
+  const deliveries=await Promise.all(years.map(async y=>{if(worlds.has(y))return {world:worlds.get(y)!,generationMs:0};let client=clients.get(y);if(!client){client=new AnnualWorldClient();clients.set(y,client);}const result=await client.generate(y);worlds.set(y,result.world);return result;}));
+  if(current!==revision)return;const loaded=deliveries.map(d=>d.world),world=loaded[0]!,now=new Date(Date.UTC(Math.max(...years),11,31,12,59,59,999)),plan=buildAnnualGrovePlan({worlds:loaded,tasks:loaded.flatMap(records),view:view.value as GroveView,anchor:anchor.value,now,timeZone:'Australia/Sydney',session});
+  preview.showAnnual(loaded,layer.value as DiagnosticLayer,plan);
+  Object.assign(stage.dataset,{year:String(world.key.year),years:years.join(','),identity:world.identity,state:'ready',species:JSON.stringify(plan.counts),weeks:String(loaded.reduce((n,w)=>n+w.regions!.weeks.length,0)),contextTrees:String(plan.contextTrees.length),selectedTrees:String(plan.trees.length),samples:String(world.bed.length),bytes:String(world.bed.byteLength),generationMs:String(deliveries.reduce((n,d)=>n+d.generationMs,0)),attempt:String(world.generation.attempt),fallback:String(world.generation.fallback),lakes:String(world.hydrology.lakes.length),channels:String(world.hydrology.channels.length),outlets:String(world.hydrology.outlets.length),falls:String(world.hydrology.falls.length),gradingPasses:String(world.hydrology.gradingPasses),totalMs:String(performance.now()-start)});
+  boundary.hidden=!plan.boundary;boundary.textContent='Year boundary: '+years.join(' and ')+' have separate landscapes and task ownership.';
+  status.textContent=formatDisplayDateRange(plan.from,plan.to)+' · '+plan.trees.length+' selected / '+plan.contextTrees.length+' annual trees · synthetic clock '+now.toISOString().slice(0,10);
+  metrics.textContent=world.grid.extent+' m across each world · '+stage.dataset.weeks+' weekly regions · '+world.hydrology.lakes.length+' lakes · '+world.hydrology.channels.length+' channel links · '+(plan.provisionalCalendar?'provisional term calendar':'configured term calendar');
+ }catch(error){if(current!==revision||error instanceof DOMException&&error.name==='AbortError')return;stage.dataset.state='error';status.textContent=error instanceof Error?error.message:String(error);}
 }
 layer.addEventListener('change',()=>preview?.setLayer(layer.value as DiagnosticLayer));
-year.addEventListener('change',()=>void load());
-document.querySelector('#previous')!.addEventListener('click',()=>{year.value=String(Number(year.value)-1);void load();});
-document.querySelector('#next')!.addEventListener('click',()=>{year.value=String(Number(year.value)+1);void load();});
-window.addEventListener('pagehide',()=>{revision++;client.dispose();preview?.dispose();preview=null;stage.dataset.state='suspended';});
-window.addEventListener('pageshow',event=>{
-  if(!event.persisted)return;
-  client=new AnnualWorldClient();initialisePreview();void load();
-});
+year.addEventListener('change',()=>{anchor.value=year.value+'-06-10';void load();});
+for(const selector of ['#previous','#next'])document.querySelector(selector)!.addEventListener('click',()=>{year.value=String(Number(year.value)+(selector==='#next'?1:-1));anchor.value=year.value+'-06-10';void load();});
+anchor.addEventListener('change',()=>{year.value=anchor.value.slice(0,4);void load();});view.addEventListener('change',()=>void load());fixture.addEventListener('change',()=>void load());document.querySelector('#frame')!.addEventListener('click',()=>preview?.focus());
+window.addEventListener('pagehide',()=>{revision++;for(const c of clients.values())c.dispose();clients.clear();preview?.dispose();preview=null;stage.dataset.state='suspended';});
+window.addEventListener('pageshow',event=>{if(event.persisted){initialise();void load();}});
 void load();

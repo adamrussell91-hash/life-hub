@@ -24,6 +24,9 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    if(!data.lakes||Number(data.lakes)<1||Number(data.channels)<1)throw Error('Missing solved drainage');
    for(const layer of ['lakes','receivers','accumulation','outlets','elevation']){await page.locator('#layer').selectOption(layer);await page.waitForSelector('#landscape[data-layer="'+layer+'"]');}
    await page.screenshot({path:path.join(out,`phase2-${name}-${width}.png`),fullPage:true});
+   // Complete one additional world before the rapid switch; cancelled workers can end before emitting browser events.
+   await page.locator('#year').fill('2027');await page.locator('#year').dispatchEvent('change');
+   await page.waitForSelector('#landscape[data-state="ready"][data-year="2027"]',{timeout:30000});
    await page.evaluate(()=>{
     const year=document.querySelector('#year');
     for(const value of ['2027','2028','2029']){year.value=value;year.dispatchEvent(new Event('change',{bubbles:true}));}

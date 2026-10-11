@@ -1,4 +1,8 @@
-import {describe,it,expect} from 'vitest';
+import {describe,it,expect,vi,afterEach} from 'vitest';
+// Let the test worker flush progress between CPU-bound annual fixtures.
+afterEach(()=>new Promise<void>(resolve=>setTimeout(resolve,0)));
+// Complete annual worlds include hydrology and terrain-aware weekly partitioning.
+vi.setConfig({testTimeout:30000});
 import {sampleGeography,isLandPathSafe} from '@/domain/grove/geography';
 import {generateAnnualWorld} from '@/domain/grove/world';
 import {worldKeyForYear} from '@/domain/grove/world-key';

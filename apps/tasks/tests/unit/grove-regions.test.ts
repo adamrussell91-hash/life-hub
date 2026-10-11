@@ -1,4 +1,6 @@
-import {describe,it,expect} from 'vitest';
+import {describe,it,expect,afterEach} from 'vitest';
+// Let the test worker flush progress between CPU-bound annual fixtures.
+afterEach(()=>new Promise<void>(resolve=>setTimeout(resolve,0)));
 import {calendarWeeks,regionForDate,validateRegions} from '@/domain/grove/regions';
 import {generateAnnualWorld} from '@/domain/grove/world';
 import {worldKeyForYear} from '@/domain/grove/world-key';

@@ -1,4 +1,6 @@
-import {describe,it,expect,vi} from 'vitest';
+import {describe,it,expect,vi,afterEach} from 'vitest';
+// Let the test worker flush progress between CPU-bound annual fixtures.
+afterEach(()=>new Promise<void>(resolve=>setTimeout(resolve,0)));
 import {AnnualWorldClient,type WorldWorkerPort} from '@/domain/grove/world-client';
 import {generateAnnualWorld} from '@/domain/grove/world';
 import {worldKeyForYear} from '@/domain/grove/world-key';
