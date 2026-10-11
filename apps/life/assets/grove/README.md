@@ -79,7 +79,7 @@ when the current bundle is installed, or the three public Quaternius models othe
 The catalogue preserves natural hop/fly/swim roles and required credits. The
 mallard credit is visible through Wildlife credits and in Home's preview.
 
-The currently committed encrypted Pages delivery contains the original eight-model project-use bundle. Deployment can migrate that exact legacy bundle only after authentication and matching the pinned original inventory. Publishing the twelve expansion models requires sealing the verified twenty-model bundle with the existing key; release and real-device acceptance remain pending.
+The committed encrypted Pages delivery contains the verified twenty-model project-use bundle, sealed with the existing deployment key. Deployment requires its complete modern hash inventory, model catalogue and motion reports. Exact authenticated legacy-eight migration remains available for historical releases. Physical-phone acceptance remains pending.
 `deployment/animals.enc` is AES-256-GCM ciphertext; `GROVE_ASSET_KEY` is a GitHub
 Actions secret, never a repository file or frontend variable. The installer
 checks model hashes and motion reports. A missing/wrong key fails the deployment
@@ -362,6 +362,8 @@ When the PR is up, Adam will tell Claude Code. Claude reads `manifest.json` and 
 ## Production release status
 
 The original eight-model four-area completion pass was shipped in [PR #791](https://github.com/adamrussell91-hash/life-hub/pull/791), with a successful [Pages deployment](https://github.com/adamrussell91-hash/life-hub/actions/runs/38100432730). Its eight live model files matched the checked build; the encrypted archive is absent from the website. The umbrella API publishes the same release. Full details and verification are in [BUILD-PLAN.md](BUILD-PLAN.md). Optional enhancements remain separate.
+
+The annual landscape and twenty-animal expansion release is recorded in [PR #795](https://github.com/adamrussell91-hash/life-hub/pull/795). The one-use encrypted transfer was resealed inside GitHub Actions without rotating the deployment key; the durable archive replaces that transfer input.
 
 Final expansion retains the first fifteen mature source identities and adds Pine4/5, Birch4/5, Cherry3/4/5 and Twisted3/4/5. Twenty-five distinct mature trees now supply runtime growth by scale. Added heights remain 6.05–6.75 m, preserving tree topology/UVs/colours. Cherry3 alone uses a bounded 350 KB model ceiling to retain its authored foliage geometry; the other public static models retain the 300 KB ceiling. The whole public collection remains within 25 MiB.
 
