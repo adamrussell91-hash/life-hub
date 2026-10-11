@@ -40,3 +40,11 @@ describe('history-derived wildlife',()=>{
     for(let t=0;t<100;t+=.05) {const p=pathPose(path,t,.7);expect(sampleTerrain(p.x,p.z).wet).toBe(false);}
   });
 });
+
+it('owl uses only explicit valid completed-book dates, never page progress or future dates',()=>{
+  const books=[{label:'A',completed_on:'2026-10-02'},{label:'Future',completed_on:'2027-01-01'},{label:'Bad',completed_on:'2026-02-30'},{label:'Reading',reading:{page:300}}];
+  const input={tasks:[],view:'day' as const,anchor:'2026-10-10',now:new Date('2026-10-10T00:00:00Z'),books};
+  expect(buildGrovePlan(input).wildlife.filter(m=>m.species==='owl')).toEqual([{species:'owl',earnedOn:'2026-10-02',reason:'A finished book',baby:false}]);
+  expect(buildGrovePlan({...input,books:[]}).wildlife).toEqual([]);
+  expect(buildGrovePlan({...input,anchor:'2026-10-01'}).wildlife).toEqual([]);
+});

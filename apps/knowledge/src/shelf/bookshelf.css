@@ -965,7 +965,8 @@ body.is-bookshelf-immersive .local-banner {
 
 .shelf-sheet textarea,
 .shelf-sheet select,
-.shelf-sheet input[type="number"] {
+.shelf-sheet input[type="number"],
+.shelf-sheet input[type="date"] {
   width: 100%;
   box-sizing: border-box;
   padding: var(--space-2) var(--space-3);
@@ -3410,3 +3411,16 @@ body.is-map-expanded {
 .map-road__line { fill: none; stroke: var(--map-ink); stroke-width: 1.3; stroke-dasharray: 5 4; }
 .map-road.is-on .map-road__line { stroke-width: 2; }
 .map-road__town { fill: var(--map-deck); stroke: var(--map-ink); stroke-width: 1; }
+
+/* Book facts: fields scroll independently so finish dates never bury Save. */
+.shelf-sheet--facts { display: flex; flex-direction: column; overflow: hidden; }
+.shelf-sheet__fields { min-height: 0; overflow-y: auto; }
+.shelf-sheet__actions { flex: none; padding-top: var(--space-3); }
+@media (max-width: 719px) {
+  .shelf-sheet-backdrop:has(.shelf-sheet--facts) { padding: 0; align-items: end; }
+  .shelf-sheet--facts { width: 100%; max-height: 92dvh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: var(--space-4); padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px)); }
+  .shelf-sheet--facts input[type], .shelf-sheet--facts select, .shelf-sheet--facts textarea { font-size: 16px; }
+  .shelf-sheet__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shelf-sheet__actions > span { display: none; }
+  .shelf-sheet__actions .btn { min-height: 44px; white-space: normal; }
+}

@@ -95,3 +95,16 @@ test('Shelf can take a book record off the shelf', async () => {
   assert.deepEqual(await deleteBook(store, '~10%'), { label: '~10%', removed: false });
   await assert.rejects(() => deleteBook(store, ''), /title is required/);
 });
+
+ test('Shelf stores explicit book completion, preserves the date and clears it on rereading', async () => {
+  const store = memoryStore();
+  await saveBook(store, {label:'Finished book', reading:{page:120}}, {now:NOW});
+  const finished = await saveBook(store, {label:'Finished book', completed_on:'2026-10-02'}, {now:NOW});
+  assert.equal(finished.completed_on,'2026-10-02');
+  assert.equal(finished.reading,undefined);
+  assert.equal((await saveBook(store,{label:'Finished book',author:'Someone'},{now:NOW})).completed_on,'2026-10-02');
+  assert.equal((await saveBook(store,{label:'Finished book',reading:true},{now:NOW})).completed_on,undefined);
+  await assert.rejects(()=>saveBook(store,{label:'X',completed_on:'2026-02-30'},{now:NOW}),/completion date/);
+  await assert.rejects(()=>saveBook(store,{label:'X',completed_on:'2027-01-01'},{now:NOW}),/future/);
+  await assert.rejects(()=>saveBook(store,{label:'X',completed_on:'2026-99-99'},{now:NOW}),/completion date/);
+});

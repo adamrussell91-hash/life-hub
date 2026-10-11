@@ -752,6 +752,8 @@ export function createMockApi({ seed }: MockApiOptions) {
       }
     }
 
+    if (path === '/api/knowledge/shelf' && method === 'GET') return json(200, {ok:true,data:{books:[],placements:[]}});
+
     if (path === '/api/hub-prefs') {
       if (method === 'GET') {
         return json(200, { ok: true, data: await s.getHubPrefs() });

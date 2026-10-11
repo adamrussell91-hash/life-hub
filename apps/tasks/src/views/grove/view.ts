@@ -1,3 +1,4 @@
+import {groveBooks} from '@/domain/grove/books';
 /**
  * Grove (`#/grove?view=day|week&date=YYYY-MM-DD`): the forest grown from finished tasks.
  * The page reads task history and draws it; it never writes anything.
@@ -75,7 +76,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
     pills.append(btn);
   }
   let terms: GroveTerm[] = [];
-  const calendar = Promise.all([tasksApi.getHubPrefs().catch(() => null), tasksApi.getPlanningProfile().catch(() => null)]);
+  const calendar = Promise.all([tasksApi.getHubPrefs().catch(() => null), tasksApi.getPlanningProfile().catch(() => null), groveBooks().catch(() => [])]);
   const navDate = (direction: -1 | 1) => adjacentGroveDate(route.view, route.date, direction, terms);
   const nav = el('div', 'grove-bar__nav');
   const back = el('a', 'btn btn--secondary grove-bar__step', '‹');
@@ -110,7 +111,16 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   const creditSummary = el('summary', '', 'Wildlife credits');
   const creditText = el('p');
   credits.append(creditSummary, creditText);credits.hidden = true;
-  hud.append(bar, caption, key, card, wildlife, credits);
+  const framing = el('button', 'btn btn--secondary grove-framing', `Show whole ${route.view}`);
+  framing.type = 'button';framing.hidden = route.view === 'day';
+  let overview = false;
+  framing.addEventListener('click',()=>{
+    overview = !overview;
+    sceneHandle?.frame(overview?'overview':'clearing');
+    framing.textContent = overview ? 'Show selected clearing' : `Show whole ${route.view}`;
+    card.hidden = true;
+  });
+  hud.append(bar, caption, key, card, wildlife, credits, framing);
 
   let tasks: Task[];
   try {
@@ -123,12 +133,12 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   }
   if (gen !== generation) return;
 
-  const [hubPrefs, planningProfile] = await calendar;
+  const [hubPrefs, planningProfile, books] = await calendar;
   if (gen !== generation) return;
   terms = groveTerms({hubPrefs, planningProfile});
   back.href = groveHash(route.view, navDate(-1), today);
   forward.href = groveHash(route.view, navDate(1), today);
-  let plan = buildGrovePlan({ tasks, view: route.view, anchor: route.date, now: new Date(), terms });
+  let plan = buildGrovePlan({ tasks, view: route.view, anchor: route.date, now: new Date(), terms, books });
   paintHud(plan);
   let mountRevision = 0;
   await mount(plan, 'all');
@@ -225,7 +235,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
       const fresh = await tasksApi.listTasks().catch(() => null);
       if (!fresh || gen !== generation) return;
       const before = new Set(plan.trees.map((t) => t.id));
-      plan = buildGrovePlan({ tasks: fresh, view: route.view, anchor: route.date, now: new Date(), terms });
+      plan = buildGrovePlan({ tasks: fresh, view: route.view, anchor: route.date, now: new Date(), terms, books });
       paintHud(plan);
       card.hidden = true;
       await mount(plan, new Set(plan.trees.filter((t) => !before.has(t.id)).map((t) => t.id)));

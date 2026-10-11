@@ -266,3 +266,7 @@
 @media (max-width: 719px) {
   .grove-credits { left: auto; right: var(--space-3); bottom: calc(var(--space-3) + 10.5rem); max-width: calc(100% - 2 * var(--space-3)); }
 }
+
+.grove-framing { position: absolute; top: 6.2rem; right: var(--space-3); min-height: 44px; background: var(--paper); font-size: var(--text-xs); }
+.grove-framing[hidden] { display: none; }
+@media (max-width: 719px) { .grove-framing { top: 9rem; } }

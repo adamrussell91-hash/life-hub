@@ -1,3 +1,4 @@
+import {groveBooks} from '@/domain/grove/books';
 /**
  * Home's Grove preview (`/tasks/grove.html`): today's clearing, no hub chrome.
  * Home frames it in a link to the full forest, so this page takes no input.
@@ -11,7 +12,7 @@ import { tasksApi } from '@/services/client-api';
 import { dayCaption } from '@/views/grove/copy';
 
 async function start(root: HTMLElement): Promise<void> {
-  const calendar = Promise.all([tasksApi.getHubPrefs().catch(() => null),tasksApi.getPlanningProfile().catch(() => null)]);
+  const calendar = Promise.all([tasksApi.getHubPrefs().catch(() => null),tasksApi.getPlanningProfile().catch(() => null), groveBooks().catch(() => [])]);
   const stage = document.createElement('div');
   stage.className = 'grove-embed__stage';
   const caption = document.createElement('p');
@@ -30,8 +31,8 @@ async function start(root: HTMLElement): Promise<void> {
     return;
   }
   const now = new Date();
-  const [hubPrefs, planningProfile] = await calendar;
-  const plan = buildGrovePlan({ tasks, view: 'day', anchor: toHubDateKey(now), now, terms:groveTerms({hubPrefs,planningProfile}) });
+  const [hubPrefs, planningProfile, books] = await calendar;
+  const plan = buildGrovePlan({ tasks, view: 'day', anchor: toHubDateKey(now), now, terms:groveTerms({hubPrefs,planningProfile}), books });
   caption.textContent = dayCaption(plan);
   try {
     const { mountGroveScene } = await import('@/views/grove/scene');

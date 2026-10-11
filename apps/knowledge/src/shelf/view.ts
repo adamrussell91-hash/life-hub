@@ -1383,6 +1383,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
           <label style="margin-top:var(--space-2)">Page I'm on<input type="number" id="facts-reading-page" min="1" inputmode="numeric" value="${book.reading?.page ?? ""}" /></label>
         </div>
       </div>
+      <label>Finished on<input type="date" id="facts-completed" value="${book.completedOn ?? ''}" max="${new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Sydney',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}" /></label>
       <label>Paste book facts from ChatGPT
         <textarea id="facts-paste" spellcheck="false" placeholder='{"label": "${esc(book.label)}", "author": "…", "pages": 396, "chapters": [{"label": "1", "title": "…", "start": 11}]}'></textarea>
       </label>
@@ -1405,6 +1406,13 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         <button class="btn btn--ghost" type="button" data-cancel>Cancel</button>
         <button class="btn btn--primary" type="button" data-save>Save</button>
       </div>`, `${book.label} facts`);
+    sheet.classList.add('shelf-sheet--facts');
+    const actions = sheet.lastElementChild as HTMLElement;
+    actions.classList.add('shelf-sheet__actions');
+    const fields = document.createElement('div');
+    fields.className = 'shelf-sheet__fields';
+    while (sheet.firstElementChild !== actions) fields.append(sheet.firstElementChild!);
+    sheet.prepend(fields);
     const error = sheet.querySelector<HTMLElement>("[data-error]")!;
     const fail = (message: string) => {
       error.textContent = message;
@@ -1454,6 +1462,12 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         fail("Couldn't reach the clipboard, so the prompt is in the box. Copy it from there.");
       }
     };
+    sheet.querySelector<HTMLInputElement>("#facts-reading")!.onchange = () => {
+      if (sheet.querySelector<HTMLInputElement>("#facts-reading")!.checked) sheet.querySelector<HTMLInputElement>("#facts-completed")!.value = '';
+    };
+    sheet.querySelector<HTMLInputElement>("#facts-completed")!.onchange = () => {
+      if (sheet.querySelector<HTMLInputElement>("#facts-completed")!.value) sheet.querySelector<HTMLInputElement>("#facts-reading")!.checked = false;
+    };
     sheet.querySelector<HTMLButtonElement>("[data-save]")!.onclick = async () => {
       error.hidden = true;
       const pasted = sheet.querySelector<HTMLTextAreaElement>("#facts-paste")!.value.trim();
@@ -1462,12 +1476,15 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       const readingOn = sheet.querySelector<HTMLInputElement>("#facts-reading")!.checked;
       const readingPage = Number(sheet.querySelector<HTMLInputElement>("#facts-reading-page")!.value);
       const notebook = sheet.querySelector<HTMLSelectElement>("#facts-notebook")!.value;
+      const completedOn = sheet.querySelector<HTMLInputElement>("#facts-completed")!.value;
+      if (completedOn && completedOn > sheet.querySelector<HTMLInputElement>("#facts-completed")!.max) return fail('The finish date cannot be in the future.');
       try {
         await saveFacts({
           ...parsed.facts,
           label: book.label,
           notebook: notebook || null,
-          reading: readingOn ? { page: Number.isInteger(readingPage) && readingPage > 0 ? readingPage : null } : null,
+          reading: !completedOn && readingOn ? { page: Number.isInteger(readingPage) && readingPage > 0 ? readingPage : null } : null,
+          completed_on: completedOn || null,
         }, "Book facts saved.");
         close();
       } catch (err) {

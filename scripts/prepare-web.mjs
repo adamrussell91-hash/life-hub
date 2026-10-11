@@ -82,6 +82,7 @@ export async function prepareWeb() {
     copyDesignKitIcons()
   ]);
 
+  await rm(new URL('assets/grove/deployment/', publishRoot), {recursive:true,force:true});
   await writeFile(new URL('assets/grove/animal-catalogue.json', publishRoot), JSON.stringify(groveAnimalCatalogue(fileURLToPath(new URL('assets/grove/', lifeRoot))), null, 2));
   await rewritePublishedKitImports(new URL('js/', publishRoot));
 
