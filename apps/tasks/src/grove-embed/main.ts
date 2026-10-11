@@ -59,3 +59,8 @@ if (root) void start(root);
 
 window.addEventListener('pagehide',()=>{revision++;loader.cancel();handle?.dispose();handle=null;});
 window.addEventListener('pageshow',event=>{if(event.persisted&&root)void start(root);});
+
+// The Home clearing can remain open across midnight or a growth boundary.
+const refreshTime=()=>{if(root&&!document.hidden)void start(root);};
+window.setInterval(refreshTime,60000);
+document.addEventListener('visibilitychange',refreshTime);

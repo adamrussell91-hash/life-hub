@@ -1,16 +1,16 @@
-import {validateWorldMeshes,type WorldMeshes} from './world-meshes';
-import {acceptWorldResponse,type WorldRequest} from './world-protocol';
+import {type WorldMeshes} from './world-meshes';
+import {worldTransferBuffers,type WorldRequest} from './world-protocol';
 import {worldKeyForYear,type WorldKey} from './world-key';
-import type {AnnualWorld} from './world';
+import {freezeAnnualWorld,type AnnualWorld} from './world';
 
 export type WorldWorkerPort={
   onmessage:((event:MessageEvent<unknown>)=>void)|null;
   onerror:((event:ErrorEvent)=>void)|null;
   onmessageerror:((event:MessageEvent)=>void)|null;
-  postMessage(value:WorldRequest):void;
+  postMessage(value:WorldRequest,transfer?:Transferable[]):void;
   terminate():void;
 };
-export type WorldGeneration=Readonly<{world:AnnualWorld;meshes:WorldMeshes;generationMs:number}>;
+export type WorldGeneration=Readonly<{world:AnnualWorld;meshes:WorldMeshes;generationMs:number;validationMs:number;receiptMs:number;transferMs:number;freezeMs:number}>;
 type Pending={id:number;worker:WorldWorkerPort;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>};
 const abort=()=>new DOMException('Annual world request cancelled','AbortError');
 const nativeWorker=():WorldWorkerPort=>{
@@ -45,16 +45,27 @@ export class AnnualWorldClient {
       const fail=(error:Error)=>{if(this.pending?.id!==id)return;cleanup();reject(error);};
       const timer=setTimeout(()=>fail(new Error('Annual world generation timed out')),30000);
       this.pending={id,worker,reject,timer};
+      let phase:'generation'|'validation'='generation',receiptStart=0,transferMs=0;
       worker.onmessage=event=>{
         if(this.pending?.id!==id)return;
-        const data=event.data as {id?:number;type?:string;error?:unknown;world?:unknown;meshes?:unknown;generationMs?:unknown}|null;
+        const data=event.data as {id?:number;type?:string;error?:unknown;world?:unknown;meshes?:unknown;generationMs?:unknown;validationMs?:unknown}|null;
         if(!data||typeof data!=='object'){fail(new Error('Invalid annual worker message'));return;}
         if(data.id!==id)return;
         if(data.type==='failure'){fail(new Error(typeof data.error==='string'?data.error:'Annual generation failed'));return;}
         try {
-          if(data.type!=='success'||typeof data.generationMs!=='number'||!Number.isFinite(data.generationMs)||data.generationMs<0)throw new Error('Invalid annual worker result');
-          const world=acceptWorldResponse(data.world,key),meshes=validateWorldMeshes(data.meshes,world);
-          cleanup();resolve(Object.freeze({world,meshes,generationMs:data.generationMs}));
+          if(typeof data.generationMs!=='number'||!Number.isFinite(data.generationMs)||data.generationMs<0)throw new Error('Invalid annual worker result');
+          if(phase==='generation'){
+            if(data.type!=='success')throw new Error('Invalid annual worker result');
+            // Strict canonical validation runs in the worker before a scene can receive buffers.
+            phase='validation';receiptStart=performance.now();
+            const transferStart=performance.now(),buffers=worldTransferBuffers(data.world,data.meshes);worker.postMessage({type:'validate',id,key,world:data.world,meshes:data.meshes,generationMs:data.generationMs},buffers);transferMs=performance.now()-transferStart;
+            return;
+          }
+          if(data.type!=='validated'||typeof data.validationMs!=='number'||!Number.isFinite(data.validationMs)||data.validationMs<0)throw new Error('Invalid annual validated result');
+          const world=data.world as AnnualWorld,meshes=data.meshes as WorldMeshes;
+          // Cheap envelope check guards detached/unrelated delivery; all content was verified off-thread.
+          if(world?.key?.year!==key.year||world?.key?.generatorVersion!==key.generatorVersion||meshes?.identity!==world?.identity||!(world.bed instanceof Float32Array)||world.bed.length!==66049||!Array.isArray(meshes.terrain)||!meshes.terrain.length)throw new Error('Invalid annual validated envelope');
+          const freezeStart=performance.now();freezeAnnualWorld(world);const freezeMs=performance.now()-freezeStart,receiptMs=performance.now()-receiptStart;cleanup();resolve(Object.freeze({world,meshes,generationMs:data.generationMs,validationMs:data.validationMs,receiptMs,transferMs,freezeMs}));
         }catch(error){fail(error instanceof Error?error:new Error('Invalid annual worker result'));}
       };
       worker.onerror=event=>{event.preventDefault?.();fail(new Error(event.message||'Annual world worker failed'));};

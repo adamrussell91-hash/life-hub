@@ -1,16 +1,22 @@
-import {buildWorldMeshes,meshBuffers,type WorldMeshes} from './world-meshes';
+import {buildWorldMeshes,meshBuffers,validateWorldMeshes,type WorldMeshes} from './world-meshes';
 import {validateRegions} from './regions';
 import {hydrologyBuffers,validateHydrology} from './hydrology-validation';
 import {generateAnnualWorld,freezeAnnualWorld,type AnnualWorld} from './world';
 import {worldIdentity,WORLD_RECIPE_V1,type WorldKey} from './world-key';
 
-export type WorldRequest={type:'generate';id:number;key:WorldKey};
+export type WorldRequest={type:'generate';id:number;key:WorldKey}|{type:'validate';id:number;key:WorldKey;world:unknown;meshes:unknown;generationMs:number};
 export type WorldResponse=
   | {type:'success';id:number;world:AnnualWorld;meshes:WorldMeshes;generationMs:number}
+  | {type:'validated';id:number;world:AnnualWorld;meshes:WorldMeshes;generationMs:number;validationMs:number}
   | {type:'failure';id:number;error:string};
 
 export function buildWorldResponse(request:WorldRequest):{message:WorldResponse;transfer:ArrayBuffer[]} {
   try {
+    if(request.type==='validate'){
+      if(!Number.isSafeInteger(request.id)||request.id<1||!Number.isFinite(request.generationMs)||request.generationMs<0)throw new Error('Invalid receipt validation request');
+      const start=performance.now(),world=acceptWorldResponse(request.world,request.key),meshes=validateWorldMeshes(request.meshes,world);
+      return {message:{type:'validated',id:request.id,world,meshes,generationMs:request.generationMs,validationMs:performance.now()-start},transfer:worldTransferBuffers(world,meshes)};
+    }
     if(request.type!=='generate'||!Number.isSafeInteger(request.id)||request.id<1)throw new Error('Invalid world request');
     const start=performance.now(),world=generateAnnualWorld(request.key),meshes=buildWorldMeshes(world);
     return {message:{type:'success',id:request.id,world,meshes,generationMs:performance.now()-start},transfer:[...new Set([...hydrologyBuffers(world),world.regions!.owner.buffer as ArrayBuffer,...meshBuffers(meshes)])]};
@@ -42,4 +48,14 @@ export function acceptWorldResponse(value:unknown,key:WorldKey):AnnualWorld {
   validateHydrology(w);
   validateRegions(w);
   return freezeAnnualWorld(w);
+}
+
+/** Collect only known buffer containers; never scan region/site/shore metadata on the UI. */
+export function worldTransferBuffers(world:unknown,meshes:unknown):ArrayBuffer[]{
+ const found=new Set<ArrayBuffer>();
+ const fields=(value:unknown)=>{if(!value||typeof value!=='object')return;for(const child of Object.values(value)){if(ArrayBuffer.isView(child)&&child.buffer instanceof ArrayBuffer&&child.buffer.byteLength)found.add(child.buffer);else if(child instanceof ArrayBuffer&&child.byteLength)found.add(child);}};
+ const entries=(value:unknown)=>{if(!Array.isArray(value))return;if(value.length>50000)throw Error('Invalid annual transport shape');for(const entry of value)fields(entry);};
+ const w=world as AnnualWorld|null,m=meshes as WorldMeshes|null;
+ fields(w);fields(w?.hydrology);fields(w?.regions);entries(w?.hydrology?.lakes);entries(w?.hydrology?.channels);
+ entries(m?.terrain);entries(m?.water);entries(m?.falls);return [...found];
 }

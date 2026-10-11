@@ -1,3 +1,4 @@
+import {companionEncounters} from '@/domain/grove/companions';
 /** Authored, skinned wildlife; annual geography owns every legal route and height. */
 import {AnimationMixer,Group,Object3D} from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -58,17 +59,18 @@ export async function createAnnualAnimals(world:AnnualWorld,plan:AnnualGrovePlan
  catch{missing.push(...eligible.map(m=>m.species+': asset unavailable'));return result();}
  const assets=new Map(catalogue.assets.map(a=>[a.id,a]));
  const obstacles=plan.contextTrees.filter(t=>t.worldYear===world.key.year&&Math.hypot(t.x-day.cx,t.z-day.cz)<42).map(t=>({x:t.x,z:t.z}));
- for(const [index,milestone] of eligible.entries()){
-  if(actors.length>=9)break;
-  const id=WILDLIFE_MODEL[milestone.species],asset=assets.get(id);if(!asset){missing.push(milestone.species+': asset unavailable');continue;}
-  const swimming=milestone.species==='mallard',path=swimming?annualSwimPath(world,day.cx,day.cz):annualLandPath(world,id+':'+day.key,day.cx-3+index,day.cz+4,obstacles);
+ const encounters=[...eligible.map(m=>({...m,id:WILDLIFE_MODEL[m.species],swimming:m.species==='mallard'})),...companionEncounters(eligible,day.key).map(m=>({...m,species:'companion',baby:false}))];
+ for(const [index,milestone] of encounters.entries()){
+  const limit=milestone.species==='companion'?11:9;if(actors.length>=limit){if(limit===9)continue;break;}
+  const id=milestone.id,asset=assets.get(id);if(!asset){missing.push(milestone.species+': asset unavailable');continue;}
+  const swimming=milestone.swimming,path=swimming?annualSwimPath(world,day.cx,day.cz):annualLandPath(world,id+':'+day.key,day.cx-3+index,day.cz+4,obstacles);
   if(path.length<2){missing.push(milestone.species+': no safe '+(swimming?'water':'land')+' path nearby');continue;}
   let source:Source;
   try{source=await loader.loadAsync(groveAssetUrl(asset.file)) as Source;sources.push(source);}
   catch{missing.push(milestone.species+': asset unavailable');continue;}
   const lengths=path.slice(1).map((p,i)=>Math.hypot(p.x-path[i]!.x,p.z-path[i]!.z)),total=lengths.reduce((a,b)=>a+b,0);
   for(const baby of milestone.baby?[false,true]:[false]){
-   if(actors.length>=9)break;
+   if(actors.length>=limit)break;
    const object=clone(source.scene),size=(milestone.species==='squirrel'?2.5:milestone.species==='robin'?1.3:1)*(baby?.5:1);
    object.scale.multiplyScalar(size);object.userData.wildlife=id;object.userData.baby=baby;object.userData.swimming=swimming;
    object.traverse((node:Obj)=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}});
