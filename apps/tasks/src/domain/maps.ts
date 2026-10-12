@@ -124,6 +124,16 @@ function escapeHtml(value: string): string {
     .replaceAll('"', '&quot;');
 }
 
+function exportTrackStroke(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  stroke: string
+): string {
+  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="8" stroke-linecap="round"/>`;
+}
+
 function renderExportSvg(map: TransitMap, years?: readonly SchoolYearTerms[] | null): string {
   const layout = layoutMap(map, years);
   const parts: string[] = [];
@@ -138,9 +148,10 @@ function renderExportSvg(map: TransitMap, years?: readonly SchoolYearTerms[] | n
     const tone = swatch(line.color);
     for (const track of line.tracks) {
       for (const cut of track.cuts) {
-        parts.push(
-          `<line x1="${track.x}" y1="${cut.y0}" x2="${track.x}" y2="${cut.y1}" stroke="${tone.stroke}" stroke-width="8" stroke-linecap="round"/>`
-        );
+        parts.push(exportTrackStroke(track.x, cut.y0, track.x, cut.y1, tone.stroke));
+      }
+      for (const fork of track.forks) {
+        parts.push(exportTrackStroke(fork.x1, fork.y1, fork.x2, fork.y2, tone.stroke));
       }
       for (const cap of [
         { disc: track.disc, place: 'above' as const },

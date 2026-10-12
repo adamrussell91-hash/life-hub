@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import * as keys from '@/storage/keys';
 import { createTasksStore, seedIfEmpty, type KvAdapter } from '@/services/store';
 import type { SeedData } from '@/services/types';
-import { TransitMapSchema } from '@/schemas/map';
+import { TransitMapSchema, type MapStation } from '@/schemas/map';
 import {
   attachTick,
   capsuleOccupies,
@@ -30,6 +30,7 @@ import {
   layoutMap,
   lineStrokeBoxes,
   MAP_LINE_GAP,
+  MAP_STATION_LANE_GAP,
   matchConnectTarget,
   moveLine,
   nearestLaidTrack,
@@ -39,11 +40,46 @@ import {
   resolveLineAttachTracks,
   schoolTerms,
   spanWeeks,
+  stationLaneX,
   stationPorts,
   underpassLaneY,
-  wrapEventLines
+  wrapEventLines,
+  type LaidTrackFork
 } from '@/domain/maps-layout';
 import { mapsOrSeed } from '@/views/maps';
+
+function datedProgram(
+  id: string,
+  label: string,
+  startsOn: string,
+  endsOn: string,
+  extras: Partial<MapStation> = {}
+): MapStation {
+  return {
+    id,
+    line_id: 'line_reasoning',
+    label,
+    y: 0,
+    height: 10,
+    tracks: ['senior'],
+    in_stroke: 'solid',
+    out_stroke: 'solid',
+    starts_on: startsOn,
+    ends_on: endsOn,
+    link: null,
+    planning: 'planned',
+    ...extras
+  };
+}
+
+function isCrossbar(fork: LaidTrackFork, y: number, xMain: number, xSide: number): boolean {
+  return (
+    fork.y1 === fork.y2 &&
+    fork.y1 === y &&
+    Math.min(fork.x1, fork.x2) === xMain &&
+    Math.max(fork.x1, fork.x2) === xSide
+  );
+}
 
 describe('map schema', () => {
   it('accepts a valid map and rejects a diagonal line', () => {
@@ -193,6 +229,60 @@ describe('year layout', () => {
       year
     );
     expect(sixMonths.height).toBeGreaterThan(short.height + 100);
+  });
+
+  it('sizes programs by calendar span, not label length', () => {
+    const year = 2026;
+    const long = applyDateSpanToStation(
+      datedProgram('st_long', 'The Philosophy of Power', '2026-07-20', '2026-10-30'),
+      year
+    );
+    const shortName = applyDateSpanToStation(
+      datedProgram('st_short', 'PSYOPS', '2026-07-20', '2026-10-30'),
+      year
+    );
+    expect(long.y).toBe(shortName.y);
+    expect(long.height).toBe(shortName.height);
+    expect(long.height).toBe(Math.max(24, dateToY(long.ends_on!, year) - dateToY(long.starts_on!, year)));
+  });
+
+  it('splits a year line around concurrent programs then joins again', () => {
+    const base = mindWorks2026Map();
+    const layout = layoutMap({
+      ...base,
+      stations: [
+        ...base.stations,
+        datedProgram('st_philosophy', 'The Philosophy of Power', '2026-07-20', '2026-10-30'),
+        datedProgram('st_psyops', 'PSYOPS', '2026-07-20', '2026-10-30')
+      ]
+    });
+    const philosophy = layout.stations.find((item) => item.id === 'st_philosophy')!;
+    const psyops = layout.stations.find((item) => item.id === 'st_psyops')!;
+    expect(philosophy.h).toBe(psyops.h);
+    expect(philosophy.y).toBe(psyops.y);
+    expect(new Set([philosophy.lane, psyops.lane])).toEqual(new Set([0, 1]));
+
+    const senior = layout.lines
+      .find((line) => line.id === 'line_reasoning')!
+      .tracks.find((track) => track.id === 'senior')!;
+    const onTrack = philosophy.lane === 0 ? philosophy : psyops;
+    const side = philosophy.lane === 1 ? philosophy : psyops;
+    const sideX = stationLaneX(senior.x, 1);
+    expect(onTrack.bodies[0]!.x).toBe(senior.x);
+    expect(side.bodies[0]!.x).toBe(sideX);
+    expect(side.bodies[0]!.x - onTrack.bodies[0]!.x).toBe(MAP_STATION_LANE_GAP);
+
+    // Equal spans: capsules are the rails — only the split and join bars are drawn.
+    expect(senior.forks).toHaveLength(2);
+    expect(senior.forks.some((fork) => isCrossbar(fork, philosophy.y, senior.x, sideX))).toBe(true);
+    expect(
+      senior.forks.some((fork) => isCrossbar(fork, philosophy.y + philosophy.h, senior.x, sideX))
+    ).toBe(true);
+
+    // Side rail only — main track is not gapped for the offset capsule alone.
+    expect(
+      senior.cuts.every((cut) => cut.y1 <= onTrack.y || cut.y0 >= onTrack.y + onTrack.h)
+    ).toBe(true);
   });
 
   it('spaces year lines evenly within each strand', () => {

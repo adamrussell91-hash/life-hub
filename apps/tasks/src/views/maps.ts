@@ -402,6 +402,29 @@ function discFill(color: MapColorToken): string {
   return discCss(color);
 }
 
+function appendTrackStroke(
+  parent: SVGElement,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  stroke: string,
+  className: string
+): void {
+  parent.append(
+    svgEl('line', {
+      x1: String(x1),
+      y1: String(y1),
+      x2: String(x2),
+      y2: String(y2),
+      stroke,
+      'stroke-width': '8',
+      'stroke-linecap': 'round',
+      class: className
+    })
+  );
+}
+
 function appendTrackCap(
   parent: SVGElement,
   disc: { cx: number; cy: number; r: number },
@@ -502,17 +525,17 @@ function renderMapSvg(
     });
     for (const item of line.tracks) {
       for (const cut of item.cuts) {
-        track.append(
-          svgEl('line', {
-            x1: String(item.x),
-            y1: String(cut.y0),
-            x2: String(item.x),
-            y2: String(cut.y1),
-            stroke: color,
-            'stroke-width': '8',
-            'stroke-linecap': 'round',
-            class: 'map-line'
-          })
+        appendTrackStroke(track, item.x, cut.y0, item.x, cut.y1, color, 'map-line');
+      }
+      for (const fork of item.forks) {
+        appendTrackStroke(
+          track,
+          fork.x1,
+          fork.y1,
+          fork.x2,
+          fork.y2,
+          color,
+          'map-line map-line--fork'
         );
       }
       appendTrackCap(track, item.disc, item.label, color, line.color, line.letter, 'above');
