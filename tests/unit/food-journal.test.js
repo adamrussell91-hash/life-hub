@@ -8,6 +8,7 @@ import {
   menuDishes,
   importDayOne,
   nearbyVenues,
+  dayOneDate,
 } from "../../apps/life/js/food-journal/model.js";
 import {
   mergeCapture,
@@ -467,4 +468,23 @@ test("capture preserves personal notes on a dish whose title is still blank", ()
   });
   assert.equal(next.dishes[0].notes, "My own note");
   assert.equal(next.dishes[0].rating, 4);
+});
+
+test("Day One import uses each entry timezone across midnight and preserves date only values", () => {
+  assert.equal(
+    dayOneDate({
+      creationDate: "2026-10-01T21:00:00Z",
+      timeZone: "Australia/Sydney",
+    }),
+    "2026-10-02",
+  );
+  assert.equal(
+    dayOneDate({
+      creationDate: "2026-10-01T21:00:00Z",
+      timeZone: "America/New_York",
+    }),
+    "2026-10-01",
+  );
+  assert.equal(dayOneDate({ creationDate: "2026-10-01" }), "2026-10-01");
+  assert.equal(dayOneDate({ creationDate: "2026-02-30T21:00:00Z" }), "");
 });

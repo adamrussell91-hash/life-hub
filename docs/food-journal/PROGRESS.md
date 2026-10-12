@@ -33,8 +33,8 @@ The browser suite exercises the real main/controller route at 1440/390/320, long
 Verified release commands:
 
 - npm run build: passed for all five SPA apps and published Life assets.
-- Focused unit tests: 16 passed.
+- Focused unit tests: 17 passed.
 - Browser acceptance: six passed, covering desktop, both phone widths, keyboard viewport, import/restore/delete/recipe actions, capture, backup, conflicts and shared list operations.
-- Mandatory gate: 5,694 root tests, 1,425 Tasks tests, static guards and Professional typecheck.
+- Mandatory gate: 5,695 root tests, 1,425 Tasks tests, static guards and Professional typecheck.
 
  No production journal data is created by these tests. The actual Day One export is not supplied, so migration tooling is ready and existing personal entries have not been imported.
