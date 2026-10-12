@@ -7,17 +7,18 @@ import {
 } from '@/curriculum/with-entity-status';
 import type { CreateKind, CreatedRecord } from '@/teacher/create/types';
 import { fetchCurriculum, type CurriculumResponse } from '@/teacher/nav';
-import type { Class, Media, ScheduledLesson } from '@/schemas';
+import type { Class, Media, ScheduledLesson, Lesson, Unit } from '@/schemas';
 import type { EntityStatus } from '@/recovery/lifecycle';
 import { createCurriculumCache } from './curriculum-cache';
 
 type StatusKey = `${CurriculumEntityType}:${string}`;
 
-const curriculumCache = createCurriculumCache(fetchCurriculum);
+const curriculumCache = createCurriculumCache(async () => mergePendingCurriculum(await fetchCurriculum()));
 
 const pendingCreates: Array<{ kind: CreateKind; entity: CreatedRecord }> = [];
 const pendingMedia: Media[] = [];
 const pendingStatuses = new Map<StatusKey, EntityStatus>();
+const pendingTimetables: Array<{ class: Class; unit: Unit; lessons: Lesson[]; scheduled_lessons: ScheduledLesson[] }> = [];
 
 function statusKey(type: CurriculumEntityType, id: string): StatusKey {
   return `${type}:${id}`;
@@ -47,6 +48,9 @@ function collectionHas(curriculum: CurriculumResponse, kind: CreateKind, id: str
 
 function applyPending(curriculum: CurriculumResponse): CurriculumResponse {
   let next = curriculum;
+  for (const result of pendingTimetables) {
+    if (next.classes.some(c=>c.id===result.class.id && c.status!=='trashed') && next.units.some(u=>u.id===result.unit.id && u.status!=='trashed')) next = withScheduledUnit(next,result);
+  }
   for (const seed of pendingCreates) {
     next = withCreatedEntity(next, seed.kind, seed.entity);
   }
@@ -68,6 +72,16 @@ function applyPending(curriculum: CurriculumResponse): CurriculumResponse {
 }
 
 function prunePending(curriculum: CurriculumResponse): void {
+  for (let index = pendingTimetables.length - 1; index >= 0; index--) {
+    const result = pendingTimetables[index]!;
+    const cls = curriculum.classes.find(c=>c.id===result.class.id);
+    const unit = curriculum.units.find(u=>u.id===result.unit.id);
+    if (!cls || !unit || cls.status==='trashed' || unit.status==='trashed' || (
+      JSON.stringify(cls.timetable)===JSON.stringify(result.class.timetable) &&
+      result.lessons.every(l=>curriculum.lessons.some(row=>row.id===l.id) && unit.lesson_ids.includes(l.id)) &&
+      result.scheduled_lessons.every(s=>curriculum.scheduled_lessons.some(row=>row.id===s.id))
+    )) pendingTimetables.splice(index,1);
+  }
   for (let index = pendingCreates.length - 1; index >= 0; index -= 1) {
     const seed = pendingCreates[index];
     if (seed && collectionHas(curriculum, seed.kind, seed.entity.id)) {
@@ -150,7 +164,11 @@ export function applyEntityStatus(
 export function applyScheduledUnitResult(result: {
   class: Class;
   scheduled_lessons: ScheduledLesson[];
+  unit?: Unit;
+  lessons?: Lesson[];
 }): CurriculumResponse | undefined {
+  if (result.unit && result.lessons) pendingTimetables.push({class:result.class,unit:result.unit,lessons:result.lessons,scheduled_lessons:result.scheduled_lessons});
+  for (const lesson of result.lessons ?? []) pendingCreates.push({ kind: 'lesson', entity: lesson });
   const current = curriculumCache.peek();
   if (!current) return undefined;
   const next = withScheduledUnit(current, result);
@@ -160,14 +178,19 @@ export function applyScheduledUnitResult(result: {
 
 export async function reconcileCurriculum(): Promise<CurriculumResponse> {
   const fresh = await fetchCurriculum();
-  const merged = applyPending(fresh);
-  prunePending(fresh);
-  const next = applyPending(merged);
+  const next = mergePendingCurriculum(fresh);
   curriculumCache.replace(next);
   return next;
 }
 
+/** Used by calendar source fetches as well as navigation reconciliation. */
+export function mergePendingCurriculum(fresh: CurriculumResponse): CurriculumResponse {
+  prunePending(fresh);
+  return applyPending(fresh);
+}
+
 export function resetCurriculumStateForTests(snapshot?: CurriculumResponse): void {
+  pendingTimetables.length = 0;
   pendingCreates.length = 0;
   pendingMedia.length = 0;
   pendingStatuses.clear();

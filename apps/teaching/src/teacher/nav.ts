@@ -13,6 +13,7 @@ export interface CurriculumLessonSummary {
   sequence: number;
   status: string;
   published: boolean;
+  planning_status?: 'planned' | 'not_planned';
   updated_at: string;
   published_at?: string;
   created_at?: string;

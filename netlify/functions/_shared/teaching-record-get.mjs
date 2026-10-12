@@ -40,7 +40,7 @@ function mergeRecord(existing, patch) {
   return next;
 }
 
-export function createTeachingRecordHandler({ keyFor, notFound, methods, versionKind, onDelete }, deps = {}) {
+export function createTeachingRecordHandler({ keyFor, notFound, methods, versionKind, onDelete, preparePatch }, deps = {}) {
   const allowed = new Set(methods ?? WRITE_METHODS);
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
@@ -52,7 +52,7 @@ export function createTeachingRecordHandler({ keyFor, notFound, methods, version
       return withCors(errorResponse(404, 'not_found', notFound, false), request, env);
     }
     const key = keyFor(id);
-    const record = await getJSON(store, key);
+    const record = await store.get(key, { type: 'json', consistency: 'strong' });
     if (!record) {
       return withCors(errorResponse(404, 'not_found', notFound, false), request, env);
     }
@@ -67,7 +67,12 @@ export function createTeachingRecordHandler({ keyFor, notFound, methods, version
     const parsed = await readJsonObject(request);
     if (parsed.error) return withCors(parsed.error, request, env);
     const checkpointReason = parsed.value.checkpoint_reason;
-    const next = mergeRecord(record, parsed.value);
+    let patch = parsed.value;
+    if (preparePatch) {
+      try { patch = preparePatch(record, patch); }
+      catch (error) { return withCors(errorResponse(400, 'validation_error', error.message, false), request, env); }
+    }
+    const next = mergeRecord(record, patch);
     delete next.checkpoint_reason;
     await setJSON(store, key, next);
 

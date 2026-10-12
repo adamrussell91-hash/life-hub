@@ -1,5 +1,12 @@
 import { apiPatch, apiPost } from '@/api/client';
-import type { Class, ClassHomepage, Cover, ScheduledLesson } from '@/schemas';
+import type { Class, ClassHomepage, Cover, ScheduledLesson, Lesson, Unit } from '@/schemas';
+import type { ClassTimetable } from '@/schedule/timetable';
+
+export interface TimetableScheduleResult { class: Class; unit: Unit; lessons: Lesson[]; scheduled_lessons: ScheduledLesson[] }
+export interface TimetableScheduleRequest { unit_id: string; start_date: string; end_date: string; timetable: ClassTimetable; omitted_slots: string[]; use_existing: boolean }
+export function postScheduleTimetable(classId: string, body: TimetableScheduleRequest): Promise<TimetableScheduleResult> {
+  return apiPost('/api/classes/' + classId + '/schedule-timetable', body);
+}
 
 export function postScheduleUnit(
   classId: string,

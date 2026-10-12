@@ -1,4 +1,6 @@
 import { teacherPreviewUrl } from '@/teacher/public-link';
+import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
+import { openScheduleUnitModal } from '@/teacher/sections/schedule-unit-modal';
 import { ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { CollectionResolveContext } from '@/blocks/collection-resolve';
@@ -197,6 +199,10 @@ export function renderClassPage(
   const optionsMenu = mountPageOptionsMenu(
     [
       {
+        label: 'Schedule existing unit lessons',
+        onSelect: () => openScheduleUnitModal({ curriculum, classId: cls.id, onSuccess: () => options.onScheduleMutated?.() })
+      },
+      {
         label: 'View as student',
         className: 'class-page__view-as-student',
         href: studentPath,
@@ -326,11 +332,9 @@ export function renderClassPage(
   errorBanner.setAttribute('role', 'alert');
 
   const addLessonsToCalendar = (): void => {
-    if (options.onScheduleUnit) {
-      options.onScheduleUnit();
-      return;
-    }
-    options.onCreateLesson?.();
+    if (options.onScheduleUnit) { options.onScheduleUnit(); return; }
+    if (options.onCreateLesson) { options.onCreateLesson(); return; }
+    openScheduleTimetableModal({ curriculum, classId: cls.id, onSuccess: () => options.onScheduleMutated?.() });
   };
 
   mountTeachingCalendar(calendarHost, {

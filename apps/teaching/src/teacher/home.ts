@@ -10,6 +10,8 @@ import {
 } from '@/teacher/hub-calendar';
 import { renderPageHeader } from '@/teacher/page-header';
 import { openBlankLesson } from '@/teacher/create/blank-lesson';
+import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
+import { peekCurriculum } from '@/app/curriculum-state';
 import { patchScheduledLesson } from '@/teacher/schedule-api';
 import { mountCreateControl } from '@/teacher/create/control';
 import { openCreateModal } from '@/teacher/create/modal';
@@ -86,16 +88,13 @@ export function renderTeacherHome(
   calendarHost.style.minWidth = '0';
 
   const openCalendarAdd = (): void => {
-    openBlankLesson({
-      curriculum,
-      onCreated: options.onCreated ?? (() => undefined)
-    });
+    openScheduleTimetableModal({ curriculum: peekCurriculum() ?? curriculum, onSuccess: () => { paintCalendarHost(); } });
   };
 
   const mountOpts = {
     today: scheduleToday,
     onQuickAdd: openCalendarAdd,
-    quickAddLabel: 'Create lesson',
+    quickAddLabel: 'Schedule lessons',
     onReschedule: (scheduledId: string, patch: { date?: string; start_time?: string | null }) => {
       void patchScheduledLesson(scheduledId, patch).then((updated) => {
         curriculum.scheduled_lessons = curriculum.scheduled_lessons.map((row) =>
