@@ -42,6 +42,7 @@ const MUST_HAVE = {
     'save_fitness_research',
     'save_fitness_coaching_profile',
     'save_workout_template',
+    'delete_planned_workout',
     'create_task',
     'remember_write_memory'
   ],
