@@ -1,7 +1,8 @@
+import { manresaTimetable } from '../fixtures/manresa-timetable.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { itemTypeLabel } from '../../packages/design-kit/js/calendar/calendar-item-actions.js';
-const { generateTimetableSessions, manresaTimetable } = await import('../../apps/teaching/src/schedule/timetable.js').catch(() => ({}));
+const { generateTimetableSessions } = await import('../../apps/teaching/src/schedule/timetable.js').catch(() => ({}));
 test('calendar identifies a teaching session as a lesson',()=>assert.equal(itemTypeLabel({record:{type:'scheduled_lesson'}}),'Lesson'));
 function generate(timetable, start = '2026-10-12', end = '2026-10-23') {
   assert.equal(typeof generateTimetableSessions, 'function', 'cycle scheduling is available');

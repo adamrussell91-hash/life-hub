@@ -1,7 +1,7 @@
 import { it, expect } from 'vitest';
 import seed from '../../fixtures/seed.json';
 import { createMockApi } from '../../scripts/mock-api';
-import { manresaTimetable } from '@/schedule/timetable';
+import { manresaTimetable } from '../../../../tests/fixtures/manresa-timetable.js';
 
 it('mock API adds new lessons to curriculum so the real calendar source sees them',async()=>{
   const input=structuredClone(seed);

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import seed from '../../fixtures/seed.json';
 import type { CurriculumResponse } from '@/teacher/nav';
-import { manresaTimetable } from '@/schedule/timetable';
+import { manresaTimetable } from '../../../../tests/fixtures/manresa-timetable.js';
 
 vi.mock('@/teacher/schedule-api',()=>({postScheduleTimetable:vi.fn().mockResolvedValue({class:{id:'c'},unit:{id:'u'},lessons:[],scheduled_lessons:[]})}));
 vi.mock('@/api/client',()=>({apiGet:vi.fn().mockResolvedValue({school_terms:[]})}));
@@ -34,16 +34,26 @@ describe('timetable composer',()=>{
     expect(body.omitted_slots).toEqual(['2026-10-12_1150']);expect(body.timetable.slots[1]!.end_time).toBe('15:10');
     await vi.waitFor(()=>expect(onSuccess).toHaveBeenCalled());
   });
-  it('offers Manresa preset without requiring the class code to contain Year 12',()=>{
-    expect(typeof module.openScheduleTimetableModal).toBe('function');
+  it('fixes the unit and imports editable times from text',()=>{
     const c=curriculum();delete c.classes[0]!.timetable;
+    c.units.push({...c.units[0]!,id:'other-unit',title:'Another unit'});
     module.openScheduleTimetableModal!({curriculum:c,unitId:c.units[0]!.id});
-    document.querySelector<HTMLButtonElement>('[data-timetable-action="manresa"]')!.click();
+    expect(document.querySelectorAll('[data-timetable-action^="unit-"]')).toHaveLength(0);
+    const paste=document.querySelector<HTMLTextAreaElement>('[data-timetable-field="paste"]');expect(paste).not.toBeNull();
+    paste!.value='Day 1 | P4 | 11:50–12:43 | A0214\nDay 2 | P5–6 | 1:24 pm–3:10 pm | A0214';paste!.dispatchEvent(new Event('input',{bubbles:true}));
+    document.querySelector<HTMLButtonElement>('[data-timetable-action="import"]')!.click();
+    expect(document.querySelectorAll('[data-timetable-time-row]')).toHaveLength(2);
+    expect(document.querySelector<HTMLInputElement>('[data-timetable-field="end-1"]')!.value).toBe('15:10');
+    setField('anchor-date','2026-10-12');setField('start-date','2026-10-12');setField('end-date','2026-10-13');
+    document.querySelector<HTMLButtonElement>('[data-timetable-action="preview"]')!.click();
+    expect(document.querySelectorAll('[data-timetable-slot]')).toHaveLength(2);
+  });
+  it('keeps saved times if any pasted row is invalid',()=>{
+    const c=curriculum();module.openScheduleTimetableModal!({curriculum:c,unitId:c.units[0]!.id});
+    const paste=document.querySelector<HTMLTextAreaElement>('[data-timetable-field="paste"]');expect(paste).not.toBeNull();
+    paste!.value='Day 1 | P4 | 11:50–12:43 | A0214\nDay 2 missing time';paste!.dispatchEvent(new Event('input',{bubbles:true}));
+    document.querySelector<HTMLButtonElement>('[data-timetable-action="import"]')!.click();
+    expect(document.querySelector('[role="alert"]')!.textContent).toContain('Line 2');
     expect(document.querySelectorAll('[data-timetable-time-row]')).toHaveLength(8);
-    expect(document.body.textContent).toContain('Year 12 English Advanced');
-    setField('start-date','2026-10-12');setField('end-date','2026-10-16');
-    const text=document.querySelector<HTMLInputElement>('[data-timetable-field="non-school"]')!;text.focus();
-    text.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
-    expect(document.querySelector('[data-timetable-dialog]')).not.toBeNull();
   });
 });

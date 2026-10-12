@@ -3621,6 +3621,7 @@ a:hover {
 .timetable-pair, .timetable-anchor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
 .timetable-time-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-2); padding-block: var(--space-3); border-bottom: 1px solid var(--line); }
 .timetable-time-row .btn { grid-column: 1 / -1; justify-self: end; }
+.timetable-paste { width: 100%; min-width: 0; box-sizing: border-box; resize: vertical; }
 .timetable-modal input { min-width: 0; width: 100%; }
 .timetable-modal input[type='checkbox'] { width: 20px; height: 20px; flex-shrink: 0; }
 .timetable-existing, .timetable-modal .schedule-modal__preview-item label { display: flex; align-items: center; gap: var(--space-3); min-height: 44px; }

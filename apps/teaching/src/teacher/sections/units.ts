@@ -376,6 +376,10 @@ export function renderUnitPage(
   const optionsMenu = mountPageOptionsMenu(
     [
       {
+        label: 'Schedule lessons',
+        onSelect: () => { openScheduleTimetableModal({ curriculum, unitId, onSuccess: () => options.onMutated?.() }); }
+      },
+      {
         label: 'History',
         onSelect: () => {
           historyPanel.open();
@@ -421,12 +425,7 @@ export function renderUnitPage(
   if (exportItem) exportItem.dataset.export = 'unit';
 
   renderPageHeader(canvas, {
-    actions: [(() => {
-      const button = document.createElement('button');
-      button.type = 'button'; button.className = 'btn btn--secondary'; button.textContent = 'Schedule lessons';
-      button.addEventListener('click', () => openScheduleTimetableModal({ curriculum, unitId, onSuccess: () => options.onMutated?.() }));
-      return button;
-    })(), historyHost, optionsMenu.el]
+    actions: [historyHost, optionsMenu.el]
   });
 
   const root = document.createElement('div');
