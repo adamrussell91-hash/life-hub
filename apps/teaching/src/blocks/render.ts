@@ -751,7 +751,7 @@ export function renderQuestionSetBlock(
         }
         li.append(lines);
       }
-    } else if (question.kind === 'short_answer') {
+    } else if (question.kind === 'short_answer' && question.response_space !== 'none') {
       const label = document.createElement('p');
       label.className = 'block-question-set__answer-label';
       label.textContent = 'Your response';
