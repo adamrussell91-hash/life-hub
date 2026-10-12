@@ -20,6 +20,7 @@ export const DOCK_TOOLS: ReadonlyArray<{ id: DockTool; label: string; hint: stri
 export type Dock = {
   root: HTMLElement;
   panel: HTMLElement;
+  body: HTMLElement;
   setActive: (tool: DockTool | null) => void;
   setPanel: (content: HTMLElement | null) => void;
   setTop: (px: number) => void;
@@ -28,6 +29,23 @@ export type Dock = {
 export function createDock(host: HTMLElement, onTool: (tool: DockTool) => void): Dock {
   const root = document.createElement("div");
   root.className = "neural-dock";
+  const reveal = el("button", { type: "button", class: "neural-dock__reveal", "data-dock-reveal": "", text: "Tools", "aria-label": "Show map tools", "aria-expanded": "false" });
+  const body = el("div", { class: "neural-dock__body" });
+  const setOpen = (open: boolean) => {
+    root.classList.toggle("is-drawer-open", open);
+    reveal.setAttribute("aria-expanded", String(open));
+  };
+  reveal.addEventListener("click", () => setOpen(true));
+  root.addEventListener("pointerenter", () => setOpen(true));
+  root.addEventListener("pointerleave", () => { if (!body.contains(document.activeElement)) setOpen(false); });
+  root.addEventListener("focusin", () => setOpen(true));
+  root.addEventListener("focusout", event => { if (!root.contains(event.relatedTarget as Node | null)) setOpen(false); });
+  root.addEventListener("keydown", event => {
+    if (event.key !== "Escape" || !root.closest(".is-universe-fullscreen.is-chrome-tucked")) return;
+    event.stopPropagation();
+    reveal.focus();
+    setOpen(false);
+  });
   const row = document.createElement("div");
   row.className = "neural-dock__row";
   row.setAttribute("role", "toolbar");
@@ -47,11 +65,13 @@ export function createDock(host: HTMLElement, onTool: (tool: DockTool) => void):
   const panel = document.createElement("div");
   panel.className = "neural-dock__panel";
   panel.hidden = true;
-  root.append(row, panel);
+  body.append(row, panel);
+  root.append(reveal, body);
   host.appendChild(root);
   return {
     root,
     panel,
+    body,
     setActive(tool) {
       for (const [id, button] of buttons) {
         const on = id === tool;

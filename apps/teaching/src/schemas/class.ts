@@ -2,6 +2,14 @@ import { z } from 'zod';
 import { BlockSchema } from './block';
 import { CommonFields, TrashFields } from './common';
 import { CoverSchema } from './cover';
+import { validateTimetable, type ClassTimetable } from '../schedule/timetable';
+
+export const ClassTimetableSchema = z.unknown().transform((value, ctx): ClassTimetable => {
+  try { return validateTimetable(value); } catch (error) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: error instanceof Error ? error.message : 'Invalid timetable' });
+    return z.NEVER;
+  }
+});
 
 export const ClassHomepageSchema = z.object({
   announcements: z.array(BlockSchema),
@@ -24,6 +32,7 @@ export const ClassSchema = z.object({
   current_unit_id: z.string().min(1).optional(),
   current_scheduled_lesson_id: z.string().min(1).optional(),
   meeting_days: z.array(z.number().int().min(1).max(7)).optional(),
+  timetable: ClassTimetableSchema.optional(),
   homepage: ClassHomepageSchema.optional(),
   cover: CoverSchema.optional()
 });

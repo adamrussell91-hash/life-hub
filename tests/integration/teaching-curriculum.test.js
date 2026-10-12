@@ -134,6 +134,7 @@ test('curriculum lists teacher classes and marks published lessons', async () =>
     sequence: 0,
     status: 'active',
     published: true,
+    planning_status: 'not_planned',
     updated_at: ''
   }]);
   assert.deepEqual(body.data.media.map(item => item.id), ['file-2']);
