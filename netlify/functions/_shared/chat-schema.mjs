@@ -425,7 +425,7 @@ export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
         replace_planned: {
           type: 'boolean',
           description:
-            'Workout planned only. When true, Confirm overwrites an already-planned session for that date even if the new title differs (override / replace / scrap today\'s plan). Without this flag, a differently titled plan becomes a second same-day session. Pass replace_title when more than one planned session exists that day.'
+            'Workout planned only. When true, Confirm deletes the already-planned session file completely and saves this new plan (even if the title differs). Without this flag, a differently titled plan becomes a second same-day session. Pass replace_title when more than one planned session exists that day. To delete with no replacement, use delete_planned_workout.'
         },
         replace_title: {
           type: 'string',
