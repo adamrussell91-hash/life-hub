@@ -896,7 +896,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
   let zoomReadyFor: string | null = null;
   /** Stage px per map unit at zoom 1 on the last paint. */
   let lastFit = 0;
-  let lastInspected: string | null = null;
+  /** Last selected id after paint — used to skip auto-scroll on save remounts. */
+  let lastSelectedId: string | null = null;
 
   const activeTouches = new Map<number, { x: number; y: number }>();
   let pinchStartDist = 0;
@@ -950,6 +951,17 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     const year = current.year ?? yearNow;
     const terms = schoolTerms(year, termYears);
     const layout = layoutMap(current, termYears);
+    // Remount wipes scroll hosts; keep the page (and side panels) where they were.
+    const scrollHost = canvas.closest('.hub-canvas');
+    const saved = {
+      canvasTop: canvas.scrollTop,
+      hostTop: scrollHost instanceof HTMLElement ? scrollHost.scrollTop : 0,
+      windowX: window.scrollX,
+      windowY: window.scrollY,
+      indexTop: canvas.querySelector<HTMLElement>('.map-index__list')?.scrollTop ?? 0,
+      inspectorTop: canvas.querySelector<HTMLElement>('.map-inspector')?.scrollTop ?? 0
+    };
+    const selectionChanged = selectedId !== lastSelectedId;
     canvas.replaceChildren();
     const toolbar = createMapToolbar({
       maps,
@@ -975,7 +987,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         },
         onRenameMap: (title) => {
           current.title = title;
-          void persist().then(() => paint());
+          paint();
+          void persist();
         },
         onExport: () => downloadHtml(current, termYears),
         onNewMap: () => {
@@ -1091,11 +1104,6 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     const inspector = buildInspector(year, terms);
     if (inspector) body.append(inspector);
     body.classList.toggle('has-inspector', Boolean(inspector));
-    if (selectedId) {
-      index
-        .querySelector<HTMLElement>(`.map-card-slot[data-map-item-id="${selectedId}"]`)
-        ?.scrollIntoView({ block: 'nearest' });
-    }
 
     svg.addEventListener(
       'wheel',
@@ -1367,10 +1375,22 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     }
     if (fit) lastFit = fit;
     applyCamera(svg, layout);
-    if (inspector && selectedId !== lastInspected && window.matchMedia?.('(max-width: 720px)').matches) {
+    canvas.scrollTop = saved.canvasTop;
+    if (scrollHost instanceof HTMLElement) scrollHost.scrollTop = saved.hostTop;
+    window.scrollTo(saved.windowX, saved.windowY);
+    const nextIndex = index.querySelector<HTMLElement>('.map-index__list');
+    if (nextIndex) nextIndex.scrollTop = saved.indexTop;
+    if (inspector && !selectionChanged) inspector.scrollTop = saved.inspectorTop;
+    // Only auto-scroll when the selection itself changed — not on every save remount.
+    if (selectionChanged && selectedId) {
+      index
+        .querySelector<HTMLElement>(`.map-card-slot[data-map-item-id="${selectedId}"]`)
+        ?.scrollIntoView({ block: 'nearest' });
+    }
+    if (inspector && selectionChanged && window.matchMedia?.('(max-width: 720px)').matches) {
       inspector.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }
-    lastInspected = inspector ? selectedId : null;
+    lastSelectedId = selectedId;
     const hint =
       toast ||
       (mode === 'edit' && !selectedId
@@ -1455,17 +1475,21 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         {
           onChange: (next, settled) => {
             current.lines = current.lines.map((item) => (item.id === id ? { ...item, ...next, id } : item));
-            if (settled) void persist().then(() => paint());
-            else schedulePersist();
+            if (settled) {
+              paint();
+              void persist();
+            } else schedulePersist();
           },
           onMove: (delta) => {
             current.lines = moveLine(current.lines, id, delta);
-            void persist().then(() => paint());
+            paint();
+            void persist();
           },
           onDelete: () => {
             current.lines = current.lines.filter((item) => item.id !== id);
             selectedId = null;
-            void persist().then(() => paint());
+            paint();
+            void persist();
           }
         }
       )
@@ -1529,7 +1553,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         const item = station ?? tick;
         if (!item) return;
         item.label = value;
-        void persist().then(() => paint());
+        paint();
+        void persist();
       }
     });
     body.push(inspectorField('Name', name));
@@ -1551,7 +1576,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
             const kept = station.tracks.filter((track) => allowed.has(track));
             station.tracks = kept.length ? kept : [lineTrackDefs(nextLine)[0]?.id ?? 'junior'];
           }
-          void persist().then(() => paint());
+          paint();
+          void persist();
         }
       });
       body.push(inspectorField('Line', lineFilter.el));
@@ -1574,7 +1600,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
       } else if (tick) {
         tick.attach = applyDateToTickAttach(tick, year).attach;
       }
-      void persist().then(() => paint());
+      paint();
+      void persist();
     };
     start.input.addEventListener('change', applyDates);
     end.input.addEventListener('change', applyDates);
@@ -1591,7 +1618,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
           const station = liveItem(id).station;
           if (!station) return;
           station.tracks = tracks.value();
-          void persist().then(() => paint());
+          paint();
+          void persist();
         });
         body.push(inspectorField('Year lines', tracks.root, 'Which year lines this program runs on.'));
       }
@@ -1642,7 +1670,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         }
         tick.connects_to = parseConnectValue(alsoValue, current);
         tick.attach = applyDateToTickAttach(tick, year).attach;
-        void persist().then(() => paint());
+        paint();
+        void persist();
       };
       attachPicker.root.addEventListener('click', applyAttach);
       alsoPicker.root.addEventListener('click', applyAttach);
@@ -1680,7 +1709,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
           if (!tick || (tick.attach.kind !== 'line' && tick.attach.kind !== 'station')) return;
           const { track: _legacy, ...rest } = tick.attach;
           tick.attach = { ...rest, tracks: tracks.value() };
-          void persist().then(() => paint());
+          paint();
+          void persist();
         });
         body.push(inspectorField('Year lines', tracks.root, yearHint));
       }
@@ -1746,7 +1776,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
       points: yearLinePoints(x),
       extra_tracks: []
     });
-    void persist().then(() => paint());
+    paint();
+    void persist();
   }
 
   function addStationNow(): void {
@@ -1774,7 +1805,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     current.stations.push(applyDateSpanToStation(draft, year));
     selectedId = draft.id;
     mode = 'edit';
-    void persist().then(() => paint());
+    paint();
+    void persist();
   }
 
   function addEventNow(): void {
@@ -1806,7 +1838,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     selectedId = draft.id;
     mode = 'edit';
     joining = false;
-    void persist().then(() => paint());
+    paint();
+    void persist();
   }
 
   async function deleteItemNow(id: string): Promise<void> {
