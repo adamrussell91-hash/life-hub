@@ -59,6 +59,7 @@ export function mountRichTextTiptap(options: {
       })
     ],
     content: sanitizeRichTextHtml(options.html) || '<p></p>',
+    parseOptions: { preserveWhitespace: 'full' },
     editorProps: {
       attributes: {
         class: 'block-editor__rich block-editor__rich-prose',
@@ -75,12 +76,17 @@ export function mountRichTextTiptap(options: {
 
   const surface = editor.view.dom as HTMLElement;
 
-  // Keep compatibility with callers/tests that mutate the DOM then fire `input`.
-  surface.addEventListener('input', () => {
-    if (quiet) return;
+  // Native typing belongs to ProseMirror's DOM observer. Replacing the whole
+  // document on each InputEvent resets the caret and discards trailing spaces.
+  // Keep the generic Event bridge for programmatic DOM updates only.
+  surface.addEventListener('input', (event) => {
+    if (quiet || (typeof InputEvent !== 'undefined' && event instanceof InputEvent)) return;
     const html = sanitizeRichTextHtml(surface.innerHTML);
     quiet = true;
-    editor.commands.setContent(html || '<p></p>', { emitUpdate: false });
+    editor.commands.setContent(html || '<p></p>', {
+      emitUpdate: false,
+      parseOptions: { preserveWhitespace: 'full' }
+    });
     quiet = false;
     publish(html);
   });
@@ -93,7 +99,10 @@ export function mountRichTextTiptap(options: {
     setHtml: (html, emit = true) => {
       const clean = sanitizeRichTextHtml(html) || '<p></p>';
       quiet = true;
-      editor.commands.setContent(clean, { emitUpdate: false });
+      editor.commands.setContent(clean, {
+        emitUpdate: false,
+        parseOptions: { preserveWhitespace: 'full' }
+      });
       quiet = false;
       if (emit) publish(clean);
     },

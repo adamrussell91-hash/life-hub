@@ -26,6 +26,37 @@ describe('mountRichTextTiptap', () => {
     handle.destroy();
   });
 
+  it('keeps spaces on load and HTML replacement', () => {
+    const handle = mountRichTextTiptap({ html: '<p>word </p>', onHtml: () => undefined });
+    document.body.append(handle.host);
+    expect(handle.editor.state.doc.textContent).toBe('word ');
+    handle.setHtml('<p> next  word </p>');
+    expect(handle.editor.state.doc.textContent).toBe(' next  word ');
+    handle.destroy();
+  });
+
+  it('leaves native typing to ProseMirror instead of replacing its document and caret', () => {
+    const handle = mountRichTextTiptap({ html: '<p>word</p>', onHtml: () => undefined });
+    document.body.append(handle.host);
+    handle.editor.commands.setTextSelection(3);
+    const before = handle.editor.state.selection.from;
+    handle.surface.querySelector('p')!.textContent = 'wo rd';
+    handle.surface.dispatchEvent(new InputEvent('input', {
+      bubbles: true, inputType: 'insertText', data: ' '
+    }));
+    expect(handle.editor.state.selection.from).toBe(before);
+    handle.destroy();
+  });
+
+  it('preserves a trailing space through the legacy DOM input bridge', () => {
+    const handle = mountRichTextTiptap({ html: '<p>word</p>', onHtml: () => undefined });
+    document.body.append(handle.host);
+    handle.surface.innerHTML = '<p>word </p>';
+    handle.surface.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(handle.editor.state.doc.textContent).toBe('word ');
+    handle.destroy();
+  });
+
   it('strips disallowed tags when publishing updates', () => {
     const published: string[] = [];
     const handle = mountRichTextTiptap({

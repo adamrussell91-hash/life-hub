@@ -99,6 +99,7 @@ describe('mountStudentLessonView', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     document.body.replaceChildren();
   });
 
@@ -122,7 +123,7 @@ describe('mountStudentLessonView', () => {
       ) as HTMLAnchorElement | null;
       expect(link).toBeTruthy();
       expect(link?.textContent).toBe('Back to unit');
-      expect(link?.getAttribute('href')).toBe('/s/units/unit_aotfw');
+      expect(link?.getAttribute('href')).toBe('https://class.adam-russell.com/s/units/unit_aotfw');
     });
   });
 
@@ -154,6 +155,7 @@ describe('mountStudentLessonView', () => {
   });
 
   it('class-scoped mount shows Back to class, Back to unit, and footer neighbors', async () => {
+    vi.stubGlobal('location', new URL('https://class.adam-russell.com/s/lessons/lesson_aotfw_008'));
     vi.mocked(apiGet).mockImplementation(async (path: string) => {
       if (path.includes('/published/classes/')) return publishedClass();
       if (path.includes('/published/lessons/')) return publishedLesson();
@@ -170,20 +172,20 @@ describe('mountStudentLessonView', () => {
 
     await vi.waitFor(() => {
       expect(root.querySelector('a.student-surface__back-class')?.getAttribute('href')).toBe(
-        `/s/classes/${CLASS_ID}`
+        `https://class.adam-russell.com/s/classes/${CLASS_ID}`
       );
       expect(root.querySelector('a.student-surface__back-unit')?.getAttribute('href')).toBe(
-        '/s/units/unit_aotfw'
+        'https://class.adam-russell.com/s/units/unit_aotfw'
       );
     });
 
     const prev = root.querySelector('a.student-lesson__nav-prev') as HTMLAnchorElement;
     const next = root.querySelector('a.student-lesson__nav-next') as HTMLAnchorElement;
     expect(prev.getAttribute('href')).toBe(
-      `/s/classes/${CLASS_ID}/lessons/lesson_aotfw_007`
+      `https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_aotfw_007`
     );
     expect(next.getAttribute('href')).toBe(
-      `/s/classes/${CLASS_ID}/lessons/lesson_aotfw_009`
+      `https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_aotfw_009`
     );
 
     prev.click();
@@ -314,7 +316,7 @@ describe('mountStudentLessonView', () => {
     });
   });
 
-  it('class-scoped mount renders hero title, lead, and meta', async () => {
+  it('class-scoped mount renders the shared cover title, content once, and meta', async () => {
     vi.mocked(apiGet).mockImplementation(async (path: string) => {
       if (path.includes('/published/classes/')) return publishedClass();
       if (path.includes('/published/lessons/')) return publishedLessonWithLead();
@@ -333,7 +335,8 @@ describe('mountStudentLessonView', () => {
       expect(root.querySelector('.lesson-hero__title')?.textContent).toBe('Memory');
     });
     expect(root.querySelectorAll('h1')).toHaveLength(1);
-    expect(root.querySelector('.lesson-hero__lead')?.textContent).toContain('Lead copy');
+    expect(root.querySelector('.lesson-hero__lead')).toBeNull();
+    expect(root.querySelector('.lesson-blocks')?.textContent).toContain('Lead copy');
     const meta = root.querySelector('.lesson-hero__meta');
     expect(meta).toBeTruthy();
     expect(meta?.textContent).toContain('Year 12 English Advanced');
@@ -350,7 +353,38 @@ describe('mountStudentLessonView', () => {
       expect(root.querySelector('.lesson-hero__title')?.textContent).toBe('Memory');
     });
     expect(root.querySelector('.lesson-hero__eyebrow')?.textContent).toBe('Lesson');
-    expect(root.querySelector('.lesson-hero__lead')?.textContent).toContain('Lead copy');
+    expect(root.querySelector('.lesson-hero__lead')).toBeNull();
+    expect(root.querySelector('.lesson-blocks')?.textContent).toContain('Lead copy');
     expect(root.querySelector('.lesson-hero__meta')).toBeNull();
+  });
+  it.each([true, false])('uses the planner cover and title overlay, cover present: %s', async (hasCover) => {
+    const lesson = {
+      ...publishedLessonWithLead(),
+      ...(hasCover ? { cover: { url: 'https://example.com/art.jpg', alt_text: 'Lesson artwork' } } : {})
+    };
+    vi.mocked(apiGet).mockResolvedValue(lesson);
+    const root = document.createElement('div');
+    document.body.append(root);
+    const handle = mountStudentLessonView({ root, lessonId: lesson.lesson_id });
+    await vi.waitFor(() => {
+      const cover = root.querySelector('.lesson-hero .lesson-page__cover');
+      expect(cover?.querySelector('.entity-banner--hero .entity-banner__scrim')).not.toBeNull();
+      const heading = cover?.querySelector('h1.entity-page-title__text');
+      expect(heading?.textContent).toBe(lesson.title);
+      expect(heading?.closest('.entity-page-title')).not.toBeNull();
+      expect(heading?.getAttribute('aria-hidden')).not.toBe('true');
+    });
+    expect(root.querySelectorAll('h1')).toHaveLength(1);
+    expect(root.querySelector('.student-hero__copy')).toBeNull();
+    expect(root.querySelector('.entity-banner__edit')).toBeNull();
+    expect(root.querySelector('.lesson-hero input, .lesson-hero textarea')).toBeNull();
+    if (hasCover) {
+      const image = root.querySelector<HTMLImageElement>('.entity-banner__image')!;
+      expect(image.src).toBe('https://example.com/art.jpg');
+      expect(image.alt).toBe('Lesson artwork');
+    } else {
+      expect(root.querySelector('.entity-banner__fallback')?.getAttribute('style')).toContain('var(--marine)');
+    }
+    handle.dispose();
   });
 });
