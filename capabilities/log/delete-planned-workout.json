@@ -1,0 +1,19 @@
+{
+  "id": "log.delete-planned-workout",
+  "tool_name": "delete_planned_workout",
+  "verb": "Delete",
+  "agents": ["chadwick"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Propose deleting a planned workout for a date (Confirm). Removes the fitness file completely — use when Adam wants the plan gone with no replacement. Pass title when several planned sessions exist that day.",
+  "inputs": {
+    "date": "YYYY-MM-DD",
+    "title": "optional planned session title when more than one exists"
+  },
+  "side_effects": [
+    "Renders a Confirm card listing the planned workout file to remove",
+    "On Confirm, deletes data/fitness/… planned workout markdown"
+  ],
+  "surfaces": ["confirm_card", "fitness_tab"],
+  "reads": ["data/fitness"]
+}

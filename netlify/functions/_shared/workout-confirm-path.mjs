@@ -372,9 +372,8 @@ export async function resolveWorkoutConfirmTarget(client, {
       };
     }
 
-    // Explicit override: retire an already-planned session even when the new
-    // title/slug differs. Overwrites that file in place (path slug may lag the
-    // new title — ponytail: rename+delete if Fitness ever keys off path alone).
+    // Explicit override: write the new plan to its canonical path and DELETE the
+    // retired planned file(s). Same-title override reuses one file (no delete).
     if (replacePlanned && record.status === 'planned') {
       const picked = pickPlannedWorkoutToReplace(sameDay, { replaceTitle });
       if (picked.error) {
@@ -389,12 +388,27 @@ export async function resolveWorkoutConfirmTarget(client, {
       if (picked.entry) {
         const blocked = refuseIfDowngrade(picked.entry, record.status, picked.entry.path);
         if (blocked) return blocked;
+        const replacedTitle = picked.entry.title || workoutSlugFromPath(picked.entry.path);
+        if (picked.entry.path === fallbackPath) {
+          return {
+            path: picked.entry.path,
+            existingSha: picked.entry.sha,
+            existingStatus: picked.entry.status,
+            replacedTitle,
+            replacePlanned: true,
+            retirePaths: []
+          };
+        }
+        const existingAtNew = sameDay.find(entry => entry.path === fallbackPath);
+        const blockedNew = refuseIfDowngrade(existingAtNew, record.status, fallbackPath);
+        if (blockedNew) return blockedNew;
         return {
-          path: picked.entry.path,
-          existingSha: picked.entry.sha,
-          existingStatus: picked.entry.status,
-          replacedTitle: picked.entry.title || workoutSlugFromPath(picked.entry.path),
-          replacePlanned: true
+          path: fallbackPath,
+          existingSha: existingAtNew?.sha,
+          existingStatus: existingAtNew?.status,
+          replacedTitle,
+          replacePlanned: true,
+          retirePaths: [{ path: picked.entry.path, sha: picked.entry.sha }]
         };
       }
     }

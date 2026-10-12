@@ -84,6 +84,7 @@ export const WRITE_GATEWAY_TOOLS = Object.freeze([
   // log_entry, so nothing reaches Nutrition graphs after Confirm.
   'log_entry',
   'delete_meal',
+  'delete_planned_workout',
   'record_visual_evidence',
   'create_task',
   'update_task',

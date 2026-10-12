@@ -3766,6 +3766,8 @@ async function persistOrProposeLogEntry({
 
   let existingSha = null;
   const replaceWarnings = [];
+  let retirePaths = [];
+  let proposalReplacePlanned = false;
 
   if (
     proposal.record.type === 'workout'
@@ -3789,9 +3791,13 @@ async function persistOrProposeLogEntry({
       }
       path = target.path;
       existingSha = target.existingSha ?? null;
+      proposalReplacePlanned = true;
+      retirePaths = Array.isArray(target.retirePaths) ? target.retirePaths : [];
       if (target.replacedTitle) {
         replaceWarnings.push(
-          `This replaces the planned session “${target.replacedTitle}”.`
+          retirePaths.length
+            ? `This deletes “${target.replacedTitle}” completely and saves the new plan.`
+            : `This replaces the planned session “${target.replacedTitle}”.`
         );
       }
     } catch {
@@ -3893,19 +3899,26 @@ async function persistOrProposeLogEntry({
     record: proposal.record,
     notes: proposal.notes,
     path,
-    ...(existingSha ? { overwrite: true } : {}),
+    ...(existingSha || retirePaths.length ? { overwrite: true } : {}),
+    ...(proposalReplacePlanned ? { replace_planned: true } : {}),
+    ...(typeof replaceTitle === 'string' && replaceTitle.trim()
+      ? { replace_title: replaceTitle.trim() }
+      : {}),
+    ...(retirePaths.length
+      ? { retire_paths: retirePaths.map(entry => entry.path).filter(Boolean) }
+      : {}),
     warnings
   });
   return {
     ok: true,
     status: 'awaiting_confirm',
     path,
-    ...(existingSha ? { overwrite: true } : {}),
+    ...(existingSha || retirePaths.length ? { overwrite: true } : {}),
     ...(restrictionWarnings.length || replaceWarnings.length
       ? {
           warnings: [...replaceWarnings, ...restrictionWarnings],
           tell_adam: replaceWarnings.length
-            ? 'Mention that Confirm replaces the existing planned session. It does not block the proposal.'
+            ? 'Mention that Confirm deletes the old planned session and saves the new one. It does not block the proposal.'
             : 'Mention the shelved warning in one line. It does not block the proposal.'
         }
       : {})

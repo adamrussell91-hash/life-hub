@@ -1135,6 +1135,10 @@ export function createChatController({
         overwrite,
         ...(typeof event.amend_path === 'string' && event.amend_path.trim()
           ? { path: event.amend_path.trim() }
+          : {}),
+        ...(event.replace_planned === true ? { replace_planned: true } : {}),
+        ...(typeof event.replace_title === 'string' && event.replace_title.trim()
+          ? { replace_title: event.replace_title.trim() }
           : {})
       });
       lockConfirmCardReceipt(proposal.card, {

@@ -142,7 +142,7 @@ test('pickPlannedWorkoutToReplace asks which session when two exist and no title
   assert.deepEqual(picked.titles, ['Wingspan', 'Dog Walk']);
 });
 
-test('replace_planned overwrites a differently titled planned session in place', async () => {
+test('replace_planned writes the new plan path and retires the old file for delete', async () => {
   const existing = 'data/fitness/2026/10/2026-10-12-workout-new-blood-wingspan-2-0.md';
   const target = await resolveWorkoutConfirmTarget(clientWith({
     path: existing,
@@ -158,13 +158,14 @@ test('replace_planned overwrites a differently titled planned session in place',
     slug: 'workout-evening-pump-chest-bias',
     replacePlanned: true
   });
-  assert.equal(target.path, existing);
-  assert.equal(target.existingSha, 'abc');
+  assert.equal(target.path, 'data/fitness/2026/10/2026-10-12-workout-evening-pump-chest-bias.md');
+  assert.equal(target.existingSha, undefined);
   assert.equal(target.replacedTitle, 'New Blood: Wingspan 2.0');
   assert.equal(target.replacePlanned, true);
+  assert.deepEqual(target.retirePaths, [{ path: existing, sha: 'abc' }]);
 });
 
-test('replace_planned with replace_title picks among multiple planned sessions', async () => {
+test('replace_planned with replace_title retires that planned session', async () => {
   const wingspan = 'data/fitness/2026/10/2026-10-12-workout-new-blood-wingspan-2-0.md';
   const walk = 'data/fitness/2026/10/2026-10-12-workout-dog-walk.md';
   const target = await resolveWorkoutConfirmTarget(clientWith([
@@ -181,8 +182,8 @@ test('replace_planned with replace_title picks among multiple planned sessions',
     replacePlanned: true,
     replaceTitle: 'Wingspan'
   });
-  assert.equal(target.path, wingspan);
-  assert.equal(target.existingSha, 'w1');
+  assert.equal(target.path, 'data/fitness/2026/10/2026-10-12-workout-evening-pump.md');
+  assert.deepEqual(target.retirePaths, [{ path: wingspan, sha: 'w1' }]);
   assert.equal(target.replacedTitle, 'New Blood: Wingspan 2.0');
 });
 
