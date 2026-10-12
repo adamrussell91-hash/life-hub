@@ -22,6 +22,10 @@ export const ScheduledLessonSchema = z.object({
     .nullable()
     .optional(),
   schedule_order: z.number().int(),
+  end_time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).optional(),
+  cycle_day: z.number().int().min(1).max(20).optional(),
+  period: z.string().max(40).optional(),
+  room: z.string().max(80).optional(),
   delivery_status: DeliveryStatusSchema,
   created_at: IsoDateSchema,
   updated_at: IsoDateSchema,

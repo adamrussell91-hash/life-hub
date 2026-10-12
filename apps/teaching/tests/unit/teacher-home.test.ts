@@ -4,9 +4,11 @@ vi.mock('@/app/router', () => ({ navigate: vi.fn() }));
 vi.mock('@/teacher/create/blank-lesson', () => ({
   openBlankLesson: vi.fn()
 }));
+vi.mock('@/teacher/sections/schedule-timetable-modal', () => ({ openScheduleTimetableModal: vi.fn() }));
 
 import { navigate } from '@/app/router';
 import { openBlankLesson } from '@/teacher/create/blank-lesson';
+import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
 import { renderTeacherHome } from '@/teacher/home';
 import type { CurriculumResponse } from '@/teacher/nav';
 
@@ -276,7 +278,7 @@ describe('teacher home dashboard', () => {
     expect(canvas.textContent).not.toContain('Introduction to An Artist of the Floating World');
   });
 
-  it('calendar add opens blank lesson flow instead of the home create menu', async () => {
+  it('calendar add opens timetable scheduling for blank calendar lessons', async () => {
     const onCreated = vi.fn();
     const result = renderTeacherHome(canvas, curriculum, { onCreated });
     dispose = result.dispose;
@@ -286,9 +288,9 @@ describe('teacher home dashboard', () => {
     });
     canvas.querySelector<HTMLButtonElement>('[data-calendar-quick-add]')?.click();
 
-    expect(openBlankLesson).toHaveBeenCalledWith({
+    expect(openScheduleTimetableModal).toHaveBeenCalledWith({
       curriculum,
-      onCreated
+      onSuccess: expect.any(Function)
     });
     expect(canvas.querySelector('[data-create-menu]')).toBeNull();
   });

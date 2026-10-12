@@ -86,6 +86,8 @@ import {
 } from '../src/blocks/resolve-linked-sections';
 import { runContentSearch } from '../src/search/run-content-search';
 import { applyScheduleUnit } from '../src/schedule/schedule-unit';
+import { scheduleTimetable } from '../../../netlify/functions/_shared/teaching-timetable-write.mjs';
+import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
 import { buildPublishedClass } from '../src/schedule/build-published-class';
@@ -1368,7 +1370,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       if (startTime !== null && (typeof startTime !== 'string' || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(startTime))) {
         return errorResponse(400, 'validation_error', 'start_time must be HH:MM');
       }
-      result = { ...result, start_time: startTime as string | null, updated_at: nowIso };
+      try { result = { ...result, ...prepareScheduledLessonPatch(result, { start_time: startTime }), updated_at: nowIso }; }
+      catch (error) { return errorResponse(400, 'validation_error', error instanceof Error ? error.message : 'Invalid time.'); }
       toPersist.set(id, result);
     }
 
@@ -3756,6 +3759,29 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
 
     const scheduleUnitMatch = SCHEDULE_UNIT_RE.exec(path);
+    const timetableMatch = /^\/api\/classes\/([^/]+)\/schedule-timetable$/.exec(path);
+    if (timetableMatch && method === 'POST') {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return errorResponse(400, 'validation_error', 'Enter a valid schedule.');
+      try {
+        const result = await scheduleTimetable({
+          get: async (key: string) => store.getJSON(key) ?? null,
+          getWithMetadata: async (key: string) => store.get(key) === undefined ? null : { data: store.getJSON(key), etag: store.get(key) },
+          setJSON: async (key: string, value: unknown, conditions: { onlyIfNew?: boolean; onlyIfMatch?: string } = {}) => {
+            const current = store.get(key);
+            if ((conditions.onlyIfNew && current !== undefined) || (conditions.onlyIfMatch !== undefined && conditions.onlyIfMatch !== current)) return { modified: false };
+            store.setJSON(key, value); return { modified: true, etag: store.get(key) };
+          },
+          list: async ({ prefix }: { prefix: string }) => ({ blobs: store.listKeys(prefix).map(key => ({ key })) })
+        }, timetableMatch[1], body);
+        for (const lesson of result.lessons) if (!seedIds.lessons.includes(lesson.id)) seedIds.lessons.push(lesson.id);
+        for (const row of result.scheduled_lessons) if (!seedIds.scheduled_lessons.includes(row.id)) seedIds.scheduled_lessons.push(row.id);
+        return okResponse(200, result);
+      } catch (error) {
+        const err = error as Error & { status?: number; code?: string };
+        return errorResponse(err.status ?? 500, err.code ?? 'schedule_failed', err.message);
+      }
+    }
     if (scheduleUnitMatch && method === 'POST') {
       return handleScheduleUnit(cookie, scheduleUnitMatch[1], body);
     }

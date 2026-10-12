@@ -144,8 +144,7 @@ describe('Teaching kit calendar (replaces class-calendar renderer)', () => {
       expect(host.querySelector('[data-part="tideline"]')).not.toBeNull();
     });
 
-    const chip = host.querySelector<HTMLElement>('.cal-chip[data-movable="1"]');
-    expect(chip).not.toBeNull();
+    await vi.waitFor(() => expect(host.querySelector<HTMLElement>('.cal-chip[data-movable="1"]')).not.toBeNull());
     expect(host.querySelector('[data-calendar-quick-add]')).not.toBeNull();
     expect(host.querySelector('.cal-bg--school[data-fill="periods"]')).not.toBeNull();
 
