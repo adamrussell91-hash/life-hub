@@ -10,6 +10,7 @@ import { getApiBaseUrl } from '@/api/config';
 import { withAppBase } from '@/app/base-path';
 import { navigate } from '@/app/router';
 import { patchScheduledLesson } from '@/teacher/schedule-api';
+import { mergePendingCurriculum } from '@/app/curriculum-state';
 
 export const TEACHING_CALENDAR_FILLS = { school: 'periods' } as const;
 /** Below this host width, dashboard embeds a link to the full Calendar page. */
@@ -51,9 +52,17 @@ export function teachingRouteFor(item: unknown): string | null {
   return null;
 }
 
-function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   // Pages host has no /api — Functions live on api.adam-russell.com (same as api/client).
-  return fetch(`${getApiBaseUrl()}${path}`, { credentials: 'include', ...(init ?? {}) });
+  const response = await fetch(`${getApiBaseUrl()}${path}`, { credentials: 'include', ...(init ?? {}) });
+  if (path==='/api/curriculum' && response.ok) {
+    const payload=await response.json();
+    if(payload.ok && payload.data && Array.isArray(payload.data.units) && Array.isArray(payload.data.lessons)) {
+      return new Response(JSON.stringify({...payload,data:mergePendingCurriculum(payload.data)}),{status:response.status,headers:{'content-type':'application/json'}});
+    }
+    return new Response(JSON.stringify(payload),{status:response.status,headers:{'content-type':'application/json'}});
+  }
+  return response;
 }
 
 let handle: HubCalendarHandle | null = null;

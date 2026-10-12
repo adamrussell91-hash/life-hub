@@ -33,6 +33,7 @@ export function toCurriculumLessonSummary(
     sequence: lesson.sequence,
     status: lesson.status,
     published,
+    planning_status: lesson.blocks.length ? 'planned' : 'not_planned',
     updated_at: lesson.updated_at,
     created_at: lesson.created_at,
     excerpt: lessonExcerpt(lesson),

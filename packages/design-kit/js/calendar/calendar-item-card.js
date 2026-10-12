@@ -113,6 +113,9 @@ function contextRows(item, values) {
   const when = whenLine(item, values);
   if (when) rows.push(['When', when]);
   if (record.class_title) rows.push(['Class', record.class_title]);
+  if (record.room) rows.push(['Room', record.room]);
+  if (record.cycle_day) rows.push(['Timetable', 'Day ' + record.cycle_day + (record.period ? ' · Period ' + record.period : '')]);
+  if (record.planning_status === 'not_planned') rows.push(['Lesson plan', 'Not planned yet']);
   if (typeof record.location === 'string' && record.location) rows.push(['Where', record.location]);
   if (record.feed) rows.push(['From', 'iCloud · read-only here']);
   // Tasks and work blocks show their status as pills (statusHtml), not a row.

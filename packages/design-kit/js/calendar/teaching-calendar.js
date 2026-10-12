@@ -1,4 +1,5 @@
 const TIME_KEY = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const minutes = time => Number(time.slice(0,2))*60 + Number(time.slice(3,5));
 
 export function teachingEventsFromCurriculum(data) {
   const titles = new Map();
@@ -26,9 +27,18 @@ export function teachingEventsFromCurriculum(data) {
         date: row.date,
         // Untimed lessons still fill the School band (default first period).
         time: TIME_KEY.test(row.start_time) ? row.start_time : '09:00',
-        duration_min: 60,
+        duration_min: TIME_KEY.test(row.start_time) && TIME_KEY.test(row.end_time) && row.end_time > row.start_time
+          ? minutes(row.end_time) - minutes(row.start_time) : 60,
         title: titles.get(row.lesson_id) || row.lesson_id || 'Lesson',
         class_title: classTitles.get(row.class_id),
+        unit_id: row.unit_id,
+        room: row.room,
+        period: row.period,
+        cycle_day: row.cycle_day,
+        planning_status: (() => {
+          const lesson = data?.lessons?.find(lesson => lesson.id === row.lesson_id);
+          return lesson?.planning_status ?? (Array.isArray(lesson?.blocks) ? (lesson.blocks.length ? 'planned' : 'not_planned') : undefined);
+        })(),
         delivery_status: typeof row.delivery_status === 'string' ? row.delivery_status : undefined
       },
       body: ''

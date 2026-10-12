@@ -13,7 +13,7 @@ const TIME_KEY = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const TYPE_LABEL = Object.freeze({
   task: 'Task',
   work_block: 'Work block',
-  scheduled_lesson: 'Class',
+  scheduled_lesson: 'Lesson',
   professional_meeting: 'Meeting',
   professional_event: 'Event',
   professional_communication: 'Comms',
