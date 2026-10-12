@@ -1,4 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {fetchPeopleDirectory, peekPeopleDirectory} from '@/api/people-directory';
 import {apiGet, apiPost, apiPatch, clearScheduleReadCache} from '@/api/client';
 
 const response = (data: unknown) => new Response(JSON.stringify({ok:true, data}), {status:200});
@@ -29,6 +30,41 @@ describe('schedule navigation cache', () => {
     await apiGet('/api/people/directory?fresh=1'); await apiGet('/api/people/directory?fresh=1');
     await apiGet('/api/people/directory');
     expect(fetch).toHaveBeenCalledTimes(4);
+  });
+  it.each(['/api/people/workplace','/api/entities/admin'])('reuses person profile reads and invalidates them after %s', async path => {
+    const paths = ['/api/entities/overview?ref=shared%3Aperson%3Ap1','/api/people/brief?id=p1','/api/people/remember?person_ref=p1','/api/people/link-proposals?person_ref=p1'];
+    for (const path of paths) { await apiGet(path); await apiGet(path); }
+    expect(fetch).toHaveBeenCalledTimes(4);
+    await apiPost(path, {});
+    for (const path of paths) await apiGet(path);
+    expect(fetch).toHaveBeenCalledTimes(9);
+  });
+  it('directory revalidation keeps cached profiles available', async () => {
+    const path = '/api/entities/overview?ref=shared%3Aperson%3Ap1';
+    await apiGet(path);
+    await apiGet('/api/people/directory?fresh=1');
+    await apiGet(path);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it('drops the directory snapshot on mutations and logout', async () => {
+    vi.mocked(fetch).mockImplementation(async () => response({people:[],organisations:[],counts:{people:0,organisations:0}}));
+    await fetchPeopleDirectory();
+    expect(peekPeopleDirectory()).not.toBeNull();
+    await apiPost('/api/people/workplace',{});
+    expect(peekPeopleDirectory()).toBeNull();
+    await fetchPeopleDirectory();
+    await apiPost('/api/logout',{});
+    expect(peekPeopleDirectory()).toBeNull();
+  });
+  it('an older directory response cannot replace a fresh snapshot', async () => {
+    let finish!: (value:Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => {finish=resolve;}));
+    const old=fetchPeopleDirectory();
+    vi.mocked(fetch).mockResolvedValue(response({people:[],organisations:[],counts:{people:2,organisations:1}}));
+    await fetchPeopleDirectory({fresh:true});
+    finish(response({people:[],organisations:[],counts:{people:1,organisations:0}}));
+    await old;
+    expect(peekPeopleDirectory()?.counts.people).toBe(2);
   });
   it('shares overlapping requests and gives each view its own copy', async () => {
     let finish!: (value:Response) => void;
