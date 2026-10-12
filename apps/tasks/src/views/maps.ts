@@ -26,10 +26,12 @@ import {
   LINE_COLORS,
   lineColorsNeedWriteback,
   moveLine,
+  nearestLaidTrack,
   nextLineLetter,
   nextLineX,
   normalizeLineColors,
   orthogonalPath,
+  resolveLineAttachTrack,
   schoolTerms,
   wrapEventLines,
   yearLinePoints,
@@ -44,7 +46,8 @@ import {
   createMapInspector,
   inspectorButton,
   inspectorField,
-  inspectorText
+  inspectorText,
+  yearTrackPicker
 } from '@/views/map-inspector';
 import { showViewLoading } from '@/views/feedback';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
@@ -204,11 +207,33 @@ function connectSelectValue(map: TransitMap, connectsTo: string | null): string 
   return line ? `line:${line.id}` : '';
 }
 
-function parseAttachValue(value: string, fallbackLineId: string, fallbackY: number): MapTick['attach'] {
+function attachTrackOf(attach: MapTick['attach'] | undefined): string | undefined {
+  return attach && (attach.kind === 'line' || attach.kind === 'station') ? attach.track : undefined;
+}
+
+function parseAttachValue(
+  value: string,
+  fallbackLineId: string,
+  fallbackY: number,
+  previous?: MapTick['attach']
+): MapTick['attach'] {
   const [kind, id] = value.split(':');
-  if (kind === 'station' && id) return { kind: 'station', station_id: id, side: 'right', offset: 0.5 };
+  const track = attachTrackOf(previous);
+  if (kind === 'station' && id) {
+    const side = previous?.kind === 'station' && previous.station_id === id ? previous.side : 'right';
+    const offset = previous?.kind === 'station' && previous.station_id === id ? previous.offset : 0.5;
+    return {
+      kind: 'station',
+      station_id: id,
+      side,
+      offset,
+      ...(track ? { track } : {})
+    };
+  }
   if (kind === 'event' && id) return { kind: 'event', event_id: id, side: 'right' };
-  return { kind: 'line', line_id: id || fallbackLineId, y: fallbackY };
+  const lineId = id || fallbackLineId;
+  const y = previous?.kind === 'line' && previous.line_id === lineId ? previous.y : fallbackY;
+  return { kind: 'line', line_id: lineId, y, ...(track ? { track } : {}) };
 }
 
 function parseConnectValue(value: string, map: TransitMap): string | null {
@@ -718,20 +743,36 @@ function applyJoin(map: TransitMap, from: JoinPick, to: JoinPick, y: number, yea
     return true;
   }
   if (eventFrom && to.kind === 'station') {
-    eventFrom.attach = { kind: 'station', station_id: to.id, side: 'right', offset: 0.5 };
+    const track = attachTrackOf(eventFrom.attach);
+    eventFrom.attach = {
+      kind: 'station',
+      station_id: to.id,
+      side: 'right',
+      offset: 0.5,
+      ...(track ? { track } : {})
+    };
     return true;
   }
   if (eventFrom && to.kind === 'line') {
-    eventFrom.attach = { kind: 'line', line_id: to.id, y };
+    const track = attachTrackOf(eventFrom.attach);
+    eventFrom.attach = { kind: 'line', line_id: to.id, y, ...(track ? { track } : {}) };
     eventFrom.starts_on = yToDate(y, year);
     return true;
   }
   if (eventTo && from.kind === 'station') {
-    eventTo.attach = { kind: 'station', station_id: from.id, side: 'right', offset: 0.5 };
+    const track = attachTrackOf(eventTo.attach);
+    eventTo.attach = {
+      kind: 'station',
+      station_id: from.id,
+      side: 'right',
+      offset: 0.5,
+      ...(track ? { track } : {})
+    };
     return true;
   }
   if (eventTo && from.kind === 'line') {
-    eventTo.attach = { kind: 'line', line_id: from.id, y };
+    const track = attachTrackOf(eventTo.attach);
+    eventTo.attach = { kind: 'line', line_id: from.id, y, ...(track ? { track } : {}) };
     eventTo.starts_on = yToDate(y, year);
     return true;
   }
@@ -1268,10 +1309,13 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
           const nextY = (laid?.cy ?? start.y) + dy;
           tick.starts_on = yToDate(nextY, year);
           if (tick.attach.kind === 'line') {
-            const nearest = [...layout.lines].sort(
-              (a, b) => Math.abs(a.x - (start.x + dx)) - Math.abs(b.x - (start.x + dx))
-            )[0];
-            tick.attach = { kind: 'line', line_id: nearest?.id ?? tick.attach.line_id, y: nextY };
+            const nearest = nearestLaidTrack(layout.lines, start.x + dx);
+            tick.attach = {
+              kind: 'line',
+              line_id: nearest?.lineId ?? tick.attach.line_id,
+              y: nextY,
+              track: nearest?.trackId ?? tick.attach.track
+            };
           }
           const next = applyDateToTickAttach(tick, year);
           tick.attach = next.attach;
@@ -1575,15 +1619,64 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         tick.attach = parseAttachValue(
           attachValue,
           current.lines[0]?.id ?? '',
-          tick.attach.kind === 'line' ? tick.attach.y : 200
+          tick.attach.kind === 'line' ? tick.attach.y : 200,
+          tick.attach
         );
+        // Keep a year line the new host still offers; otherwise fall back.
+        const next = tick.attach;
+        if (next.kind === 'line' || next.kind === 'station') {
+          let allowed: readonly string[] = [];
+          if (next.kind === 'line') {
+            const host = findLine(current, next.line_id);
+            allowed = host ? lineTrackDefs(host).map((track) => track.id) : [];
+          } else {
+            allowed = current.stations.find((item) => item.id === next.station_id)?.tracks ?? [];
+          }
+          const track = resolveLineAttachTrack(next.track, allowed);
+          if (track) tick.attach = { ...next, track };
+        }
         tick.connects_to = parseConnectValue(alsoValue, current);
         tick.attach = applyDateToTickAttach(tick, year).attach;
         void persist().then(() => paint());
       };
       attachPicker.root.addEventListener('click', applyAttach);
       alsoPicker.root.addEventListener('click', applyAttach);
-      body.push(inspectorField('Attach to', attachPicker.root), inspectorField('Also connect to', alsoPicker.root));
+      // Attach → year line → also-connect: year lines sit next to the host, not under the fold.
+      body.push(inspectorField('Attach to', attachPicker.root));
+
+      const attach = initial.tick.attach;
+      let yearDefs: TrackDef[] | null = null;
+      let yearHint = '';
+      if (attach.kind === 'line') {
+        const host = findLine(current, attach.line_id) ?? current.lines[0];
+        if (host) {
+          yearDefs = lineTrackDefs(host);
+          yearHint = 'Which year line on this strand the competition sits on.';
+        }
+      } else if (attach.kind === 'station') {
+        const host = current.stations.find((item) => item.id === attach.station_id);
+        const hostLine = host ? findLine(current, host.line_id) : null;
+        if (host && hostLine) {
+          const filtered = lineTrackDefs(hostLine).filter((track) => host.tracks.includes(track.id));
+          yearDefs = filtered.length ? filtered : lineTrackDefs(hostLine);
+          yearHint = 'Which year line on this program the competition sits on.';
+        }
+      }
+      if (yearDefs && (attach.kind === 'line' || attach.kind === 'station')) {
+        const tracks = yearTrackPicker(
+          resolveLineAttachTrack(attach.track, yearDefs.map((track) => track.id)),
+          yearDefs
+        );
+        tracks.root.addEventListener('change', () => {
+          const tick = liveItem(id).tick;
+          if (!tick || (tick.attach.kind !== 'line' && tick.attach.kind !== 'station')) return;
+          tick.attach = { ...tick.attach, track: tracks.value() };
+          void persist().then(() => paint());
+        });
+        body.push(inspectorField('Year lines', tracks.root, yearHint));
+      }
+
+      body.push(inspectorField('Also connect to', alsoPicker.root));
     }
 
     const actions = el('div', 'map-inspector__actions');
@@ -1683,10 +1776,16 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
       paint();
       return;
     }
+    const firstLine = current.lines[0]!;
     const draft: MapTick = {
       id: newId('tk'),
       label: 'New competition',
-      attach: { kind: 'line', line_id: current.lines[0]!.id, y: 200 },
+      attach: {
+        kind: 'line',
+        line_id: firstLine.id,
+        y: 200,
+        track: lineTrackDefs(firstLine)[0]?.id ?? 'junior'
+      },
       stroke: 'solid',
       connects_to: null,
       starts_on: terms.t1,
