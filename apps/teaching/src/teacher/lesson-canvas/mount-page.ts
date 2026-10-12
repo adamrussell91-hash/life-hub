@@ -538,6 +538,14 @@ export function mountBlockCanvas(
             dataset: { blockAction: 'duplicate' },
             onSelect: () => duplicateBlock(block)
           },
+          ...(block.block_type === 'section' && !isLinkedSection(block) && options.onSaveComposition
+            ? [{
+                label: 'Save as composition',
+                icon: HUB_LIST_ICONS.copy,
+                dataset: { blockAction: 'save-composition' },
+                onSelect: () => options.onSaveComposition?.(block.id)
+              }]
+            : []),
           'separator',
           {
             label: 'Delete block',
