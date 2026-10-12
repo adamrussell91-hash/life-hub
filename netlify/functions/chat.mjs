@@ -408,7 +408,8 @@ import { FORCED_PLAN_TEXT, resolveForcedChadwickPlan } from './_shared/chadwick-
 import { coerceChatWorkoutProposal } from '../../apps/life/js/core/workout-plan-detect.js';
 import {
   buildWorkoutNotesAmend,
-  loadCompletedWorkoutsForDate
+  loadCompletedWorkoutsForDate,
+  resolveWorkoutConfirmTarget
 } from './_shared/workout-confirm-path.mjs';
 import {
   forceStatusFor,
@@ -3051,8 +3052,31 @@ export function createChatHandler({
                 }
                 try {
                   const outcome = await persistOrProposeLogEntry({
-                    client, slug, today, validation, send: emit, userMessage: parsed.message, exerciseLibraryEntries
+                    client,
+                    slug,
+                    today,
+                    validation,
+                    send: emit,
+                    userMessage: parsed.message,
+                    exerciseLibraryEntries,
+                    replacePlanned: medicalInput?.replace_planned === true,
+                    replaceTitle: typeof medicalInput?.replace_title === 'string'
+                      ? medicalInput.replace_title
+                      : null
                   });
+                  if (outcome.error && outcome.error !== 'write_failed') {
+                    return JSON.stringify({
+                      ok: false,
+                      error: outcome.error,
+                      ...(outcome.message ? { message: outcome.message } : {}),
+                      ...(outcome.titles ? { titles: outcome.titles } : {}),
+                      instruction: outcome.error === 'planned_replace_ambiguous'
+                        ? 'Ask Adam which planned session to override, then call log_entry again with replace_planned: true and replace_title set to that title.'
+                        : outcome.error === 'planned_replace_not_found'
+                          ? 'No matching planned session. Call log_entry without replace_planned to propose a new plan, or fix replace_title.'
+                          : 'Fix replace_planned / replace_title and call log_entry again.'
+                    });
+                  }
                   if (!outcome.error && slug === 'brisket') creatineGuard.accept(medicalInput);
                   if (outcome.status === 'written') {
                     return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
@@ -3060,7 +3084,13 @@ export function createChatHandler({
                   if (outcome.error === 'write_failed') {
                     return JSON.stringify({ ok: false, error: 'write_failed' });
                   }
-                  return JSON.stringify({ ok: true, status: 'awaiting_confirm' });
+                  return JSON.stringify({
+                    ok: true,
+                    status: 'awaiting_confirm',
+                    ...(outcome.path ? { path: outcome.path } : {}),
+                    ...(outcome.overwrite ? { overwrite: true } : {}),
+                    ...(outcome.tell_adam ? { tell_adam: outcome.tell_adam } : {})
+                  });
                 } catch {
                   const errors = ['Could not prepare that record. Retry with a simpler payload.'];
                   pendingLogRejection = { errors };
@@ -3549,9 +3579,26 @@ export function createChatHandler({
               if (validation.valid) {
                 try {
                   const outcome = await persistOrProposeLogEntry({
-                    client, slug, today, validation, send: emit, userMessage: parsed.message, exerciseLibraryEntries
+                    client,
+                    slug,
+                    today,
+                    validation,
+                    send: emit,
+                    userMessage: parsed.message,
+                    exerciseLibraryEntries,
+                    replacePlanned: medicalInput?.replace_planned === true,
+                    replaceTitle: typeof medicalInput?.replace_title === 'string'
+                      ? medicalInput.replace_title
+                      : null
                   });
-                  if (!outcome.error && slug === 'brisket') creatineGuard.accept(medicalInput);
+                  if (outcome.error && outcome.error !== 'write_failed') {
+                    send({
+                      type: 'record_rejected',
+                      errors: [outcome.message || outcome.error]
+                    });
+                  } else if (!outcome.error && slug === 'brisket') {
+                    creatineGuard.accept(medicalInput);
+                  }
                 } catch {
                   pendingLogRejection = {
                     errors: ['Could not prepare that record. Retry with a simpler payload.']
@@ -3695,18 +3742,62 @@ async function proposeWorkoutNotesAmend({
   return { ok: true, status: 'awaiting_confirm', path: result.path, overwrite: true };
 }
 
-async function persistOrProposeLogEntry({ client, slug, today, validation, send, userMessage, exerciseLibraryEntries = [] }) {
+async function persistOrProposeLogEntry({
+  client,
+  slug,
+  today,
+  validation,
+  send,
+  userMessage,
+  exerciseLibraryEntries = [],
+  replacePlanned = false,
+  replaceTitle = null
+} = {}) {
   let proposal = validation;
   if (slug === 'chadwick' && proposal.record?.type === 'workout') {
     proposal = coerceChatWorkoutProposal(proposal, { userMessage });
   }
-  const path = buildCanonicalPath({
+  const recordSlug = buildRecordSlug(proposal.record);
+  let path = buildCanonicalPath({
     type: proposal.record.type,
     date: proposal.record.date,
-    slug: buildRecordSlug(proposal.record)
+    slug: recordSlug
   });
 
   let existingSha = null;
+  const replaceWarnings = [];
+
+  if (
+    proposal.record.type === 'workout'
+    && proposal.record.status === 'planned'
+    && replacePlanned
+  ) {
+    try {
+      const target = await resolveWorkoutConfirmTarget(client, {
+        record: proposal.record,
+        slug: recordSlug,
+        replacePlanned: true,
+        replaceTitle
+      });
+      if (target.blocked) {
+        return {
+          ok: false,
+          error: target.code || 'planned_replace_blocked',
+          message: target.error,
+          ...(target.titles ? { titles: target.titles } : {})
+        };
+      }
+      path = target.path;
+      existingSha = target.existingSha ?? null;
+      if (target.replacedTitle) {
+        replaceWarnings.push(
+          `This replaces the planned session “${target.replacedTitle}”.`
+        );
+      }
+    } catch {
+      // Fall through to a normal new-path proposal if the tree cannot be read.
+    }
+  }
 
   if (validation.record.type === 'medical') {
     try {
@@ -3791,19 +3882,32 @@ async function persistOrProposeLogEntry({ client, slug, today, validation, send,
     exerciseLibraryEntries,
     today
   );
+  const warnings = [
+    ...replaceWarnings,
+    ...restrictionWarnings,
+    ...lintWorkoutProposal(proposal.record)
+  ];
   // Shelved exercises are a warning on the card, never a refusal: Adam asked for it.
   send({
     type: 'record_proposal',
     record: proposal.record,
     notes: proposal.notes,
     path,
-    warnings: [...restrictionWarnings, ...lintWorkoutProposal(proposal.record)]
+    ...(existingSha ? { overwrite: true } : {}),
+    warnings
   });
   return {
     ok: true,
     status: 'awaiting_confirm',
-    ...(restrictionWarnings.length
-      ? { warnings: restrictionWarnings, tell_adam: 'Mention the shelved warning in one line. It does not block the proposal.' }
+    path,
+    ...(existingSha ? { overwrite: true } : {}),
+    ...(restrictionWarnings.length || replaceWarnings.length
+      ? {
+          warnings: [...replaceWarnings, ...restrictionWarnings],
+          tell_adam: replaceWarnings.length
+            ? 'Mention that Confirm replaces the existing planned session. It does not block the proposal.'
+            : 'Mention the shelved warning in one line. It does not block the proposal.'
+        }
       : {})
   };
 }

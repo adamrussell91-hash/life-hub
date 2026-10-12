@@ -9,6 +9,7 @@ import {
   FINISHED_SESSION_PLAN_ERROR,
   pickCompletedWorkoutForNotes,
   pickMatchingPlannedWorkout,
+  pickPlannedWorkoutToReplace,
   pickSameDayPlannedWorkout,
   planLooksLikeCompletedSession,
   resolveWorkoutConfirmTarget,
@@ -123,6 +124,92 @@ test('planned confirm creates a second file instead of overwriting a different t
   });
   assert.equal(target.path, 'data/fitness/2026/09/2026-09-05-workout-dog-walk-around-the-block.md');
   assert.equal(target.existingSha, undefined);
+});
+
+test('pickPlannedWorkoutToReplace takes the sole planned session', () => {
+  const picked = pickPlannedWorkoutToReplace([
+    { path: 'data/fitness/2026/10/2026-10-12-workout-new-blood-wingspan-2-0.md', status: 'planned', title: 'New Blood: Wingspan 2.0', sha: '1' }
+  ]);
+  assert.equal(picked.entry.title, 'New Blood: Wingspan 2.0');
+});
+
+test('pickPlannedWorkoutToReplace asks which session when two exist and no title is given', () => {
+  const picked = pickPlannedWorkoutToReplace([
+    { path: 'data/fitness/2026/10/2026-10-12-workout-a.md', status: 'planned', title: 'Wingspan' },
+    { path: 'data/fitness/2026/10/2026-10-12-workout-b.md', status: 'planned', title: 'Dog Walk' }
+  ]);
+  assert.equal(picked.error, 'ambiguous');
+  assert.deepEqual(picked.titles, ['Wingspan', 'Dog Walk']);
+});
+
+test('replace_planned overwrites a differently titled planned session in place', async () => {
+  const existing = 'data/fitness/2026/10/2026-10-12-workout-new-blood-wingspan-2-0.md';
+  const target = await resolveWorkoutConfirmTarget(clientWith({
+    path: existing,
+    sha: 'abc',
+    body: '---\nstatus: planned\ntitle: New Blood: Wingspan 2.0\n---\n'
+  }), {
+    record: {
+      type: 'workout',
+      date: '2026-10-12',
+      status: 'planned',
+      title: 'Evening Pump: Chest Bias'
+    },
+    slug: 'workout-evening-pump-chest-bias',
+    replacePlanned: true
+  });
+  assert.equal(target.path, existing);
+  assert.equal(target.existingSha, 'abc');
+  assert.equal(target.replacedTitle, 'New Blood: Wingspan 2.0');
+  assert.equal(target.replacePlanned, true);
+});
+
+test('replace_planned with replace_title picks among multiple planned sessions', async () => {
+  const wingspan = 'data/fitness/2026/10/2026-10-12-workout-new-blood-wingspan-2-0.md';
+  const walk = 'data/fitness/2026/10/2026-10-12-workout-dog-walk.md';
+  const target = await resolveWorkoutConfirmTarget(clientWith([
+    { path: wingspan, sha: 'w1', body: '---\nstatus: planned\ntitle: New Blood: Wingspan 2.0\n---\n' },
+    { path: walk, sha: 'w2', body: '---\nstatus: planned\ntitle: Dog Walk\n---\n' }
+  ]), {
+    record: {
+      type: 'workout',
+      date: '2026-10-12',
+      status: 'planned',
+      title: 'Evening Pump'
+    },
+    slug: 'workout-evening-pump',
+    replacePlanned: true,
+    replaceTitle: 'Wingspan'
+  });
+  assert.equal(target.path, wingspan);
+  assert.equal(target.existingSha, 'w1');
+  assert.equal(target.replacedTitle, 'New Blood: Wingspan 2.0');
+});
+
+test('replace_planned refuses when multiple planned sessions and no replace_title', async () => {
+  const target = await resolveWorkoutConfirmTarget(clientWith([
+    {
+      path: 'data/fitness/2026/10/2026-10-12-workout-a.md',
+      sha: 'a',
+      body: '---\nstatus: planned\ntitle: Wingspan\n---\n'
+    },
+    {
+      path: 'data/fitness/2026/10/2026-10-12-workout-b.md',
+      sha: 'b',
+      body: '---\nstatus: planned\ntitle: Dog Walk\n---\n'
+    }
+  ]), {
+    record: {
+      type: 'workout',
+      date: '2026-10-12',
+      status: 'planned',
+      title: 'Evening Pump'
+    },
+    slug: 'workout-evening-pump',
+    replacePlanned: true
+  });
+  assert.equal(target.blocked, true);
+  assert.equal(target.code, 'planned_replace_ambiguous');
 });
 
 test('planned confirm amends the matching titled plan', async () => {
