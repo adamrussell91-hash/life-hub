@@ -82,6 +82,7 @@ import {
   serializeMemoryStore
 } from '../agent-memory.mjs';
 import { findMealDeletePaths, isMealSlot } from '../delete-meal.mjs';
+import { findPlannedWorkoutDeleteTargets } from '../delete-planned-workout.mjs';
 import { explodeCompoundDumpTitle } from '../clare-dump.mjs';
 import { DUE_TIME_FIELD, taskBlockWrite, TIME_BLOCK_FIELDS } from '../task-block-write.mjs';
 
@@ -445,6 +446,23 @@ export function shortcutSchemas() {
           }
         },
         required: ['date', 'meal'],
+        additionalProperties: false
+      }
+    },
+    delete_planned_workout: {
+      name: 'delete_planned_workout',
+      description:
+        'Propose deleting a planned workout for a date (Confirm). Removes the fitness file completely — use when Adam wants the plan gone with no replacement. Pass title when more than one planned session exists that day. For replacing with a new plan, prefer log_entry with replace_planned: true instead.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'YYYY-MM-DD' },
+          title: {
+            type: 'string',
+            description: 'Optional title of the planned session when more than one exists that day'
+          }
+        },
+        required: ['date'],
         additionalProperties: false
       }
     },
@@ -1597,6 +1615,38 @@ async function handleDeleteMeal(ctx, input) {
   );
 }
 
+async function handleDeletePlannedWorkout(ctx, input) {
+  if (ctx.agentSlug !== 'chadwick') {
+    return deny('Only Chadwick can delete planned workout records');
+  }
+  const date = String(input.date || '').trim();
+  const title = typeof input.title === 'string' ? input.title.trim() : '';
+  if (!isCalendarDate(date)) return deny('date must be YYYY-MM-DD');
+  const tree = repoTreeOf(ctx);
+  const found = await findPlannedWorkoutDeleteTargets(ctx.client, date, {
+    ...(title ? { title } : {}),
+    tree
+  });
+  if (!found.ok) {
+    return deny(found.message || found.error || 'No planned workout to delete');
+  }
+  const label = found.entry.title || found.entry.path.split('/').pop();
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Delete planned workout ${label} for ${date}`,
+      surfaces: ['confirm_card', 'fitness_tab'],
+      reads: found.paths,
+      writes: found.paths.map(path => ({
+        path,
+        mode: 'delete',
+        content: '',
+        diff: `Remove ${path.split('/').pop()} completely`
+      }))
+    })
+  );
+}
+
 async function handleLookupFoodBrandAu(_ctx, input) {
   const brand = String(input.brand || '').trim();
   const product = String(input.product || '').trim();
@@ -2182,6 +2232,8 @@ export async function executeShortcut(toolName, input, ctx) {
         return await handlePlanWeekMeals(ctx, input);
       case 'delete_meal':
         return await handleDeleteMeal(ctx, input);
+      case 'delete_planned_workout':
+        return await handleDeletePlannedWorkout(ctx, input);
       case 'lookup_food_brand_au':
         return await handleLookupFoodBrandAu(ctx, input);
       case 'os_capability_scoreboard':
