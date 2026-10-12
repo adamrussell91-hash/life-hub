@@ -18,6 +18,7 @@ import {
   whiteboardKey
 } from './_shared/whiteboard-blobs.mjs';
 import { attachedOutcomeIds, filterBlocksForStudent, sanitizeBlocksDeep } from './_shared/teaching-student.mjs';
+import { materialiseLinkedCompositions } from './_shared/composition-blocks.mjs';
 
 export const config = { path: '/api/lessons/:id/publish' };
 
@@ -131,6 +132,19 @@ export function createLessonPublishHandler(deps = {}) {
       );
     }
 
+    let studentBlocks;
+    try {
+      const resolved = await materialiseLinkedCompositions(filterBlocksForStudent(draft.blocks), store, id);
+      studentBlocks = filterBlocksForStudent(resolved);
+    } catch (error) {
+      return withCors(errorResponse(
+        error.status === 400 ? 400 : 503,
+        error.status === 400 ? 'validation_error' : 'composition_load_failed',
+        error.status === 400 ? error.message : 'Publish aborted: linked compositions could not be loaded.',
+        error.status !== 400
+      ), request, env);
+    }
+
     const publishedAt = new Date().toISOString();
     try {
       await writeCheckpoint(blobJsonStore(store), {
@@ -154,7 +168,6 @@ export function createLessonPublishHandler(deps = {}) {
     }
 
     const outcomeIds = attachedOutcomeIds(draft);
-    const studentBlocks = filterBlocksForStudent(draft.blocks);
     let publishBlocks = studentBlocks;
     if (containsWhiteboard(studentBlocks)) {
       try {

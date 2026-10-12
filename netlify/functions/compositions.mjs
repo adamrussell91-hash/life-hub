@@ -10,17 +10,14 @@ import {
 } from './_shared/teaching-blobs.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { teachingWriteError } from './_shared/teaching-create.mjs';
+import { isIndependentSectionRoot } from './_shared/composition-blocks.mjs';
 
 export const config = { path: '/api/compositions' };
-
-function isSectionRoot(root) {
-  return Boolean(root && typeof root === 'object' && !Array.isArray(root) && root.type === 'section');
-}
 
 export async function createCompositionRecord(store, body) {
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   if (!title) throw teachingWriteError(400, 'validation_error', 'title is required');
-  if (!isSectionRoot(body.root)) {
+  if (!isIndependentSectionRoot(body.root)) {
     throw teachingWriteError(400, 'validation_error', 'root must be a section block');
   }
   const timestamp = new Date().toISOString();
@@ -45,7 +42,7 @@ export function createCompositionsHandler(deps = {}) {
     const { env, store } = context;
     try {
       if (request.method === 'GET') {
-        const compositions = (await listJSON(store, COMPOSITION_PREFIX))
+        const compositions = (await listJSON(store, COMPOSITION_PREFIX, { consistency: 'strong' }))
           .filter(entry => entry.status === 'active')
           .map(entry => ({ id: entry.id, title: entry.title, updated_at: entry.updated_at }))
           .sort((a, b) => String(a.title).localeCompare(String(b.title)));
