@@ -10,7 +10,13 @@ import {
   planMapItem,
   type MapItemKind
 } from '@/domain/maps-planning';
-import { applyDateSpanToStation, applyDateToTickAttach, lineTrackDefs, type TrackDef } from '@/domain/maps-layout';
+import {
+  applyDateSpanToStation,
+  applyDateToTickAttach,
+  lineTrackDefs,
+  resolveLineAttachTrack,
+  type TrackDef
+} from '@/domain/maps-layout';
 import { formatRelativeUpdated } from '@/domain/cards';
 import { mapsOrSeed } from '@/domain/maps';
 import { renderLineRail, type MapCardModel } from '@/views/map-cards';
@@ -18,6 +24,7 @@ import { closeCardMenu, renderCardMenu } from '@/views/card-menu';
 import { tasksApi } from '@/services/client-api';
 import { errorMessage, renderLoadError } from '@/views/feedback';
 import { createHubField, createHubFilter } from '@/views/hub-kit';
+import { yearTrackPicker } from '@/views/map-inspector';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -232,6 +239,42 @@ export async function renderMapItemPage(canvas: HTMLElement, ref: MapItemPageRef
           persist(true);
         });
         fields.append(tracks.root);
+      } else {
+        const tick = item as MapTick;
+        if (tick.attach.kind === 'line') {
+          const host = current.lines.find((entry) => entry.id === tick.attach.line_id) ?? current.lines[0];
+          if (host) {
+            const defs = lineTrackDefs(host);
+            const selected = resolveLineAttachTrack(
+              tick.attach.track,
+              defs.map((track) => track.id)
+            );
+            const tracks = yearTrackPicker(selected, defs);
+            tracks.root.addEventListener('change', () => {
+              if (tick.attach.kind !== 'line') return;
+              tick.attach = { ...tick.attach, track: tracks.value() };
+              persist(true);
+            });
+            fields.append(tracks.root);
+          }
+        } else if (tick.attach.kind === 'station') {
+          const host = current.stations.find((entry) => entry.id === tick.attach.station_id);
+          const hostLine = host ? current.lines.find((entry) => entry.id === host.line_id) : null;
+          if (host && hostLine) {
+            const defs = lineTrackDefs(hostLine).filter((track) => host.tracks.includes(track.id));
+            const selected = resolveLineAttachTrack(
+              tick.attach.track,
+              defs.map((track) => track.id)
+            );
+            const tracks = yearTrackPicker(selected, defs.length ? defs : lineTrackDefs(hostLine));
+            tracks.root.addEventListener('change', () => {
+              if (tick.attach.kind !== 'station') return;
+              tick.attach = { ...tick.attach, track: tracks.value() };
+              persist(true);
+            });
+            fields.append(tracks.root);
+          }
+        }
       }
 
       const foot = el('footer', 'task-card__foot');

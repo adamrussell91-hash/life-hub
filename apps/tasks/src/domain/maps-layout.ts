@@ -346,6 +346,35 @@ export function lineTrackDefs(line: MapLine): TrackDef[] {
   return [...standard, ...extra];
 }
 
+/** Fallback year line when a competition has no `attach.track` (middle, else first). */
+export function defaultTrackId(trackIds: readonly string[]): string | undefined {
+  return trackIds[1] ?? trackIds[0];
+}
+
+/** Resolve which year line a competition uses on a strand. */
+export function resolveLineAttachTrack(
+  attachTrack: string | undefined,
+  trackIds: readonly string[]
+): string | undefined {
+  if (attachTrack && trackIds.includes(attachTrack)) return attachTrack;
+  return defaultTrackId(trackIds);
+}
+
+/** Nearest year-line track across all strands (for drag-snap). */
+export function nearestLaidTrack(
+  lines: LaidLine[],
+  x: number
+): { lineId: string; trackId: string } | null {
+  let best: { lineId: string; trackId: string; dist: number } | null = null;
+  for (const line of lines) {
+    for (const track of line.tracks) {
+      const dist = Math.abs(track.x - x);
+      if (!best || dist < best.dist) best = { lineId: line.id, trackId: track.id, dist };
+    }
+  }
+  return best ? { lineId: best.lineId, trackId: best.trackId } : null;
+}
+
 export function evenTrackX(centerX: number, index: number, count: number, gap = MAP_TRACK_GAP): number {
   return centerX + (index - (count - 1) / 2) * gap;
 }
@@ -984,7 +1013,11 @@ function placeTick(
   if (attach.kind === 'line') {
     const line = lines.find((item) => item.id === attach.line_id);
     if (!line) return null;
-    const track = line.tracks.find((item) => item.id === attach.track) ?? line.tracks[1] ?? line.tracks[0];
+    const trackId = resolveLineAttachTrack(
+      attach.track,
+      line.tracks.map((item) => item.id)
+    );
+    const track = line.tracks.find((item) => item.id === trackId) ?? line.tracks[0];
     const x = track?.x ?? line.x;
     const y0 = tick.starts_on ? dateToY(tick.starts_on, year) : remapLegacyY(attach.y);
     return finishTick(tick, line.id, line.color, x, y0, strandParkX(line, x, 'right'), y0, 'right');
@@ -994,9 +1027,10 @@ function placeTick(
   if (!station || !line) return null;
   const dateY = tick.starts_on ? dateToY(tick.starts_on, year) : station.y + station.h * attach.offset;
   const body =
-    attach.side === 'left'
+    (attach.track ? station.bodies.find((item) => item.track === attach.track) : null) ??
+    (attach.side === 'left'
       ? station.bodies[0]
-      : station.bodies[station.bodies.length - 1];
+      : station.bodies[station.bodies.length - 1]);
   const bodyPorts = body
     ? station.ports.filter((port) => Math.abs(port.x - (attach.side === 'left' ? body.x - body.w / 2 : body.x + body.w / 2)) < 2)
     : station.ports;
@@ -1270,10 +1304,13 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
     } else {
       const line = lines.find((item) => item.id === attach.line_id);
       if (line) {
+        const trackId = resolveLineAttachTrack(
+          attach.track,
+          line.tracks.map((item) => item.id)
+        );
         const track =
-          line.tracks.find((item) => item.id === attach.track) ??
+          line.tracks.find((item) => item.id === trackId) ??
           line.tracks.find((item) => Math.abs(item.x - tick.x0) < 1) ??
-          line.tracks[1] ??
           line.tracks[0]!;
         from = {
           id: `${line.id}:${track.id}:week:${Math.round(tick.y0)}`,

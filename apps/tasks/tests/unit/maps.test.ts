@@ -25,6 +25,7 @@ import {
   applyDateSpanToStation,
   boxesOverlap,
   dateToY,
+  defaultTrackId,
   eventPorts,
   labelHitsForeignLine,
   layoutMap,
@@ -32,8 +33,10 @@ import {
   MAP_LINE_GAP,
   matchConnectTarget,
   moveLine,
+  nearestLaidTrack,
   normalizeLineColors,
   placeBox,
+  resolveLineAttachTrack,
   schoolTerms,
   spanWeeks,
   stationPorts,
@@ -342,6 +345,39 @@ describe('year layout', () => {
         expect(lineStrokeBoxes(line).some((box) => boxesOverlap(tick.labelBox, box))).toBe(false);
       }
     }
+  });
+
+  it('places a line-attached competition on the chosen year line, not the middle default', () => {
+    expect(defaultTrackId(['junior', 'rozelle', 'senior'])).toBe('rozelle');
+    expect(resolveLineAttachTrack('senior', ['junior', 'rozelle', 'senior'])).toBe('senior');
+    expect(resolveLineAttachTrack('missing', ['junior', 'rozelle', 'senior'])).toBe('rozelle');
+
+    const base = mindWorks2026Map();
+    const senior = layoutMap({
+      ...base,
+      ticks: [
+        {
+          id: 'tk_muna_senior',
+          label: 'Rotary MUNA',
+          attach: { kind: 'line', line_id: 'line_justice', y: 200, track: 'senior' },
+          stroke: 'solid',
+          connects_to: null,
+          starts_on: '2026-05-15',
+          ends_on: null,
+          link: null,
+          planning: 'planned'
+        }
+      ]
+    });
+    const justice = senior.lines.find((line) => line.id === 'line_justice')!;
+    const seniorX = justice.tracks.find((track) => track.id === 'senior')!.x;
+    const rozelleX = justice.tracks.find((track) => track.id === 'rozelle')!.x;
+    const tick = senior.ticks.find((item) => item.id === 'tk_muna_senior')!;
+    expect(tick.x0).toBe(seniorX);
+    expect(tick.x0).not.toBe(rozelleX);
+
+    const nearest = nearestLaidTrack(senior.lines, seniorX);
+    expect(nearest).toEqual({ lineId: 'line_justice', trackId: 'senior' });
   });
 
   it('slides a later line right when the first line grows a wide event', () => {

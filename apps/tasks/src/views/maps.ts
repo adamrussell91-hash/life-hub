@@ -26,10 +26,12 @@ import {
   LINE_COLORS,
   lineColorsNeedWriteback,
   moveLine,
+  nearestLaidTrack,
   nextLineLetter,
   nextLineX,
   normalizeLineColors,
   orthogonalPath,
+  resolveLineAttachTrack,
   schoolTerms,
   wrapEventLines,
   yearLinePoints,
@@ -44,7 +46,8 @@ import {
   createMapInspector,
   inspectorButton,
   inspectorField,
-  inspectorText
+  inspectorText,
+  yearTrackPicker
 } from '@/views/map-inspector';
 import { showViewLoading } from '@/views/feedback';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
@@ -204,11 +207,33 @@ function connectSelectValue(map: TransitMap, connectsTo: string | null): string 
   return line ? `line:${line.id}` : '';
 }
 
-function parseAttachValue(value: string, fallbackLineId: string, fallbackY: number): MapTick['attach'] {
+function attachTrackOf(attach: MapTick['attach'] | undefined): string | undefined {
+  if (!attach) return undefined;
+  if (attach.kind === 'line' || attach.kind === 'station') return attach.track;
+  return undefined;
+}
+
+function parseAttachValue(
+  value: string,
+  fallbackLineId: string,
+  fallbackY: number,
+  previous?: MapTick['attach']
+): MapTick['attach'] {
   const [kind, id] = value.split(':');
-  if (kind === 'station' && id) return { kind: 'station', station_id: id, side: 'right', offset: 0.5 };
+  const track = attachTrackOf(previous);
+  if (kind === 'station' && id) {
+    const side = previous?.kind === 'station' && previous.station_id === id ? previous.side : 'right';
+    const offset = previous?.kind === 'station' && previous.station_id === id ? previous.offset : 0.5;
+    return track
+      ? { kind: 'station', station_id: id, side, offset, track }
+      : { kind: 'station', station_id: id, side, offset };
+  }
   if (kind === 'event' && id) return { kind: 'event', event_id: id, side: 'right' };
-  return { kind: 'line', line_id: id || fallbackLineId, y: fallbackY };
+  const lineId = id || fallbackLineId;
+  const y = previous?.kind === 'line' && previous.line_id === lineId ? previous.y : fallbackY;
+  return track
+    ? { kind: 'line', line_id: lineId, y, track }
+    : { kind: 'line', line_id: lineId, y };
 }
 
 function parseConnectValue(value: string, map: TransitMap): string | null {
@@ -718,20 +743,32 @@ function applyJoin(map: TransitMap, from: JoinPick, to: JoinPick, y: number, yea
     return true;
   }
   if (eventFrom && to.kind === 'station') {
-    eventFrom.attach = { kind: 'station', station_id: to.id, side: 'right', offset: 0.5 };
+    const track = attachTrackOf(eventFrom.attach);
+    eventFrom.attach = track
+      ? { kind: 'station', station_id: to.id, side: 'right', offset: 0.5, track }
+      : { kind: 'station', station_id: to.id, side: 'right', offset: 0.5 };
     return true;
   }
   if (eventFrom && to.kind === 'line') {
-    eventFrom.attach = { kind: 'line', line_id: to.id, y };
+    const track = attachTrackOf(eventFrom.attach);
+    eventFrom.attach = track
+      ? { kind: 'line', line_id: to.id, y, track }
+      : { kind: 'line', line_id: to.id, y };
     eventFrom.starts_on = yToDate(y, year);
     return true;
   }
   if (eventTo && from.kind === 'station') {
-    eventTo.attach = { kind: 'station', station_id: from.id, side: 'right', offset: 0.5 };
+    const track = attachTrackOf(eventTo.attach);
+    eventTo.attach = track
+      ? { kind: 'station', station_id: from.id, side: 'right', offset: 0.5, track }
+      : { kind: 'station', station_id: from.id, side: 'right', offset: 0.5 };
     return true;
   }
   if (eventTo && from.kind === 'line') {
-    eventTo.attach = { kind: 'line', line_id: from.id, y };
+    const track = attachTrackOf(eventTo.attach);
+    eventTo.attach = track
+      ? { kind: 'line', line_id: from.id, y, track }
+      : { kind: 'line', line_id: from.id, y };
     eventTo.starts_on = yToDate(y, year);
     return true;
   }
@@ -1268,10 +1305,13 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
           const nextY = (laid?.cy ?? start.y) + dy;
           tick.starts_on = yToDate(nextY, year);
           if (tick.attach.kind === 'line') {
-            const nearest = [...layout.lines].sort(
-              (a, b) => Math.abs(a.x - (start.x + dx)) - Math.abs(b.x - (start.x + dx))
-            )[0];
-            tick.attach = { kind: 'line', line_id: nearest?.id ?? tick.attach.line_id, y: nextY };
+            const nearest = nearestLaidTrack(layout.lines, start.x + dx);
+            tick.attach = {
+              kind: 'line',
+              line_id: nearest?.lineId ?? tick.attach.line_id,
+              y: nextY,
+              track: nearest?.trackId ?? tick.attach.track
+            };
           }
           const next = applyDateToTickAttach(tick, year);
           tick.attach = next.attach;
@@ -1575,8 +1615,22 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         tick.attach = parseAttachValue(
           attachValue,
           current.lines[0]?.id ?? '',
-          tick.attach.kind === 'line' ? tick.attach.y : 200
+          tick.attach.kind === 'line' ? tick.attach.y : 200,
+          tick.attach
         );
+        // Keep a year line the new host still offers; otherwise fall back.
+        if (tick.attach.kind === 'line') {
+          const host = findLine(current, tick.attach.line_id);
+          const allowed = host ? lineTrackDefs(host).map((track) => track.id) : [];
+          const track = resolveLineAttachTrack(tick.attach.track, allowed);
+          if (track) tick.attach = { ...tick.attach, track };
+        } else if (tick.attach.kind === 'station') {
+          const stationId = tick.attach.station_id;
+          const host = current.stations.find((item) => item.id === stationId);
+          const allowed = host?.tracks ?? [];
+          const track = resolveLineAttachTrack(tick.attach.track, allowed);
+          if (track) tick.attach = { ...tick.attach, track };
+        }
         tick.connects_to = parseConnectValue(alsoValue, current);
         tick.attach = applyDateToTickAttach(tick, year).attach;
         void persist().then(() => paint());
@@ -1584,6 +1638,42 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
       attachPicker.root.addEventListener('click', applyAttach);
       alsoPicker.root.addEventListener('click', applyAttach);
       body.push(inspectorField('Attach to', attachPicker.root), inspectorField('Also connect to', alsoPicker.root));
+
+      const attach = initial.tick.attach;
+      if (attach.kind === 'line') {
+        const host = findLine(current, attach.line_id) ?? current.lines[0];
+        if (host) {
+          const defs = lineTrackDefs(host);
+          const selected = resolveLineAttachTrack(attach.track, defs.map((track) => track.id));
+          const tracks = yearTrackPicker(selected, defs);
+          tracks.root.addEventListener('change', () => {
+            const tick = liveItem(id).tick;
+            if (!tick || tick.attach.kind !== 'line') return;
+            tick.attach = { ...tick.attach, track: tracks.value() };
+            void persist().then(() => paint());
+          });
+          body.push(
+            inspectorField('Year lines', tracks.root, 'Which year line on this strand the competition sits on.')
+          );
+        }
+      } else if (attach.kind === 'station') {
+        const host = current.stations.find((item) => item.id === attach.station_id);
+        const hostLine = host ? findLine(current, host.line_id) : null;
+        if (host && hostLine) {
+          const defs = lineTrackDefs(hostLine).filter((track) => host.tracks.includes(track.id));
+          const selected = resolveLineAttachTrack(attach.track, defs.map((track) => track.id));
+          const tracks = yearTrackPicker(selected, defs.length ? defs : lineTrackDefs(hostLine));
+          tracks.root.addEventListener('change', () => {
+            const tick = liveItem(id).tick;
+            if (!tick || tick.attach.kind !== 'station') return;
+            tick.attach = { ...tick.attach, track: tracks.value() };
+            void persist().then(() => paint());
+          });
+          body.push(
+            inspectorField('Year lines', tracks.root, 'Which year line on this program the competition sits on.')
+          );
+        }
+      }
     }
 
     const actions = el('div', 'map-inspector__actions');
@@ -1683,10 +1773,16 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
       paint();
       return;
     }
+    const firstLine = current.lines[0]!;
     const draft: MapTick = {
       id: newId('tk'),
       label: 'New competition',
-      attach: { kind: 'line', line_id: current.lines[0]!.id, y: 200 },
+      attach: {
+        kind: 'line',
+        line_id: firstLine.id,
+        y: 200,
+        track: lineTrackDefs(firstLine)[0]?.id ?? 'junior'
+      },
       stroke: 'solid',
       connects_to: null,
       starts_on: terms.t1,
