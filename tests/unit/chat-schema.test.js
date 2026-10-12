@@ -288,6 +288,14 @@ test('the workout tool schema advertises coach_cues on each exercise so Chadwick
   );
 });
 
+test('the workout tool schema advertises replace_planned so Chadwick can override a set plan', () => {
+  const schema = logEntryToolSchema(['workout']);
+  const props = schema.input_schema.properties;
+  assert.equal(props.replace_planned?.type, 'boolean');
+  assert.match(props.replace_planned.description, /override|replace/i);
+  assert.equal(props.replace_title?.type, 'string');
+});
+
 test('the diary whitelist accepts every field validateDiary actually recognizes', () => {
   const result = validateLogEntry({
     type: 'diary',

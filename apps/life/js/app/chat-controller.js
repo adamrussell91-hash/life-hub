@@ -960,6 +960,7 @@ export function createChatController({
 
   function bindProposal(proposal, event) {
     if (!proposal) return;
+    if (event?.overwrite === true) proposal.confirm.dataset.overwrite = '1';
     proposal.confirm.addEventListener('click', () => {
       const overwrite = proposal.confirm.dataset.overwrite === '1' || event.overwrite === true;
       void confirmProposal(proposal, event, overwrite);

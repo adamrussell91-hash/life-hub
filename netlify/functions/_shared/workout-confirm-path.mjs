@@ -95,6 +95,50 @@ export function pickSameDayPlannedWorkout(entries) {
   return [...planned].sort((a, b) => String(a.path).localeCompare(String(b.path))).at(-1);
 }
 
+/**
+ * Which same-day planned session to retire when Adam asks to override/replace.
+ * Prefer an explicit replace_title; otherwise the sole planned file.
+ * Ambiguous (2+) without a title → null + ambiguous titles for the caller.
+ */
+export function pickPlannedWorkoutToReplace(entries, { replaceTitle } = {}) {
+  const planned = (entries ?? []).filter(entry => entry?.status === 'planned' && entry.path);
+  if (planned.length === 0) return { entry: null };
+  const needle = String(replaceTitle ?? '').trim().toLowerCase();
+  if (needle) {
+    const slugNeedle = needle.replace(/\s+/g, '-');
+    const match = planned.filter(entry => {
+      const entryTitle = String(entry.title ?? '').trim().toLowerCase();
+      const pathSlug = workoutSlugFromPath(entry.path);
+      return entryTitle === needle
+        || entryTitle.includes(needle)
+        || needle.includes(entryTitle)
+        || pathSlug.includes(slugNeedle);
+    });
+    if (match.length === 1) return { entry: match[0] };
+    if (match.length === 0) {
+      return {
+        entry: null,
+        error: 'not_found',
+        message: `No planned workout titled "${replaceTitle}".`,
+        titles: titlesOf(planned)
+      };
+    }
+    return {
+      entry: null,
+      error: 'ambiguous',
+      message: `Several planned sessions match "${replaceTitle}". Name which one: ${titlesOf(match).join(', ')}.`,
+      titles: titlesOf(match)
+    };
+  }
+  if (planned.length === 1) return { entry: planned[0] };
+  return {
+    entry: null,
+    error: 'ambiguous',
+    message: `Several planned sessions that day. Pass replace_title naming which to override: ${titlesOf(planned).join(', ')}.`,
+    titles: titlesOf(planned)
+  };
+}
+
 export async function annotateWorkoutEntries(client, entries) {
   const annotated = [];
   for (const entry of entries) {
@@ -288,7 +332,9 @@ export async function resolveWorkoutConfirmTarget(client, {
   record,
   slug,
   overwrite = false,
-  amendPath = null
+  amendPath = null,
+  replacePlanned = false,
+  replaceTitle = null
 } = {}) {
   const fallbackPath = buildCanonicalPath({
     type: record.type,
@@ -324,6 +370,33 @@ export async function resolveWorkoutConfirmTarget(client, {
         existingStatus: existing.status,
         notesAmend: true
       };
+    }
+
+    // Explicit override: retire an already-planned session even when the new
+    // title/slug differs. Overwrites that file in place (path slug may lag the
+    // new title — ponytail: rename+delete if Fitness ever keys off path alone).
+    if (replacePlanned && record.status === 'planned') {
+      const picked = pickPlannedWorkoutToReplace(sameDay, { replaceTitle });
+      if (picked.error) {
+        return {
+          blocked: true,
+          path: fallbackPath,
+          error: picked.message,
+          code: picked.error === 'ambiguous' ? 'planned_replace_ambiguous' : 'planned_replace_not_found',
+          titles: picked.titles ?? []
+        };
+      }
+      if (picked.entry) {
+        const blocked = refuseIfDowngrade(picked.entry, record.status, picked.entry.path);
+        if (blocked) return blocked;
+        return {
+          path: picked.entry.path,
+          existingSha: picked.entry.sha,
+          existingStatus: picked.entry.status,
+          replacedTitle: picked.entry.title || workoutSlugFromPath(picked.entry.path),
+          replacePlanned: true
+        };
+      }
     }
 
     const matched = pickMatchingPlannedWorkout(sameDay, { slug, title: record.title });

@@ -422,6 +422,16 @@ export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
         date: { type: 'string', description: 'Visit/log date. Prefer YYYY-MM-DD; AU forms like 27/10 or 27/10/2026 are accepted for medical visits.' },
         time: { type: 'string', description: 'HH:MM, optional' },
         new_visit: { type: 'boolean', description: 'Medical only. log_entry refuses a visit that looks like one already on record and names it. To add detail, change status, time or date, use update_medical_visit. Set true ONLY for a genuinely separate visit.' },
+        replace_planned: {
+          type: 'boolean',
+          description:
+            'Workout planned only. When true, Confirm overwrites an already-planned session for that date even if the new title differs (override / replace / scrap today\'s plan). Without this flag, a differently titled plan becomes a second same-day session. Pass replace_title when more than one planned session exists that day.'
+        },
+        replace_title: {
+          type: 'string',
+          description:
+            'Workout planned only. Optional title of the planned session to override when replace_planned is true and more than one planned workout exists that day.'
+        },
         notes: { type: 'string', description: 'Optional free-text note saved as the record body, e.g. what food was eaten or how a workout felt. Not a domain field — do not put this in fields.' },
         fields: fieldsSchema
       },

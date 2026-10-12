@@ -446,6 +446,8 @@ test('Chadwick prompt requires planned log_entry after design and CN-shaped prog
   assert.match(prompt, /put it into action|lock it in/i);
   assert.match(prompt, /Never say locked in/i);
   assert.match(prompt, /add_workout_notes/i);
+  assert.match(prompt, /replace_planned:\s*true/i);
+  assert.match(prompt, /Never say you cannot override/i);
 });
 
 test('the checked-in Chadwick protocol resolves the Job/stay-in-chat conflict', () => {
@@ -455,6 +457,8 @@ test('the checked-in Chadwick protocol resolves the Job/stay-in-chat conflict', 
   assert.match(protocol, /Confirm card/i);
   assert.match(protocol, /Amend, don't rebuild/i);
   assert.match(protocol, /Honor an explicit override/i);
+  assert.match(protocol, /replace_planned:\s*true/i);
+  assert.match(protocol, /Never claim you cannot change a plan already on Fitness/i);
   assert.doesNotMatch(protocol, /never the full programmed session/i);
   assert.doesNotMatch(protocol, /stay in chat until he asks to commit/i);
   assert.doesNotMatch(protocol, /When he asks you to lock today's session onto Fitness/);
