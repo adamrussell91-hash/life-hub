@@ -553,6 +553,33 @@ describe('mountLessonPage', () => {
     expect(onSaveTemplate).toHaveBeenCalledTimes(1);
   });
 
+  it('saves an independent section from its block menu without first opening the editor', () => {
+    const onSaveComposition = vi.fn();
+    mountLessonPage(host, {
+      lesson: makeLesson({ blocks: [createBlock('section', 'section_1')] }),
+      media: [], onChange: vi.fn(), idFactory: () => 'new_1', onSaveComposition
+    });
+    clickBlockMenuAction(host, '.lesson-page__block[data-block-type="section"]', 'save-composition');
+    expect(onSaveComposition).toHaveBeenCalledWith('section_1');
+    expect(host.querySelector('.lesson-page__toolbar')).toBeNull();
+  });
+
+  it('does not offer save-as-composition for linked sections or other block types', () => {
+    const section = createBlock('section', 'linked_1');
+    if (section.block_type !== 'section') throw new Error('expected section');
+    section.content.link = { mode: 'linked', source_composition_id: 'composition_1' };
+    mountLessonPage(host, {
+      lesson: makeLesson({ blocks: [section, createBlock('heading', 'heading_1')] }),
+      media: [], onChange: vi.fn(), idFactory: () => 'new_1', onSaveComposition: vi.fn(),
+      renderLinkedPreview: () => document.createElement('div')
+    });
+    for (const type of ['section', 'heading']) {
+      closeHubMenu();
+      host.querySelector<HTMLButtonElement>(`.lesson-page__block[data-block-type="${type}"] .lesson-page__block-menu`)!.click();
+      expect(document.querySelector('[data-block-action="save-composition"]')).toBeNull();
+    }
+  });
+
   it('keeps drop gaps pointer-events auto while a palette drag is active', () => {
     mount();
     const palette = document.createElement('div');

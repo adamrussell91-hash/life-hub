@@ -695,7 +695,7 @@ a:hover {
 
 .lesson-editor__composition-modal {
   width: min(48rem, calc(100vw - 2rem));
-  max-height: min(90vh, 52rem);
+  max-height: min(90dvh, 52rem);
   margin: auto;
   padding: var(--space-4) var(--space-5) var(--space-4);
   border: 1px solid var(--line);
@@ -707,6 +707,11 @@ a:hover {
 
 .lesson-editor__composition-modal::backdrop {
   background: rgba(12, 28, 48, 0.42);
+}
+
+.lesson-editor__composition-modal[open] {
+  display: flex;
+  flex-direction: column;
 }
 
 .lesson-editor__composition-modal-heading {
@@ -729,6 +734,7 @@ a:hover {
 }
 
 .lesson-editor__composition-modal-field {
+  flex-shrink: 0;
   display: grid;
   gap: var(--space-1);
   margin-bottom: var(--space-3);
@@ -752,6 +758,8 @@ a:hover {
 }
 
 .lesson-editor__composition-modal-editor {
+  flex: 1 1 auto;
+  min-height: 0;
   max-height: min(55vh, 28rem);
   overflow: auto;
   padding: var(--space-1) var(--space-px) var(--space-2);
@@ -759,11 +767,17 @@ a:hover {
 
 .lesson-editor__composition-modal-footer {
   display: flex;
+  flex-shrink: 0;
   justify-content: flex-end;
   gap: var(--space-2);
   margin-top: var(--space-3);
   padding-top: var(--space-3);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   border-top: 1px solid var(--line);
+}
+
+.lesson-editor__composition-modal-footer .btn {
+  min-height: 44px;
 }
 
 .lesson-editor__publish-panel {

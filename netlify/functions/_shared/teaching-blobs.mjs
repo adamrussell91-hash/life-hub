@@ -123,8 +123,8 @@ export async function defaultGetContentStore(env = process.env) {
   return getStore(teachingStoreOptions(env));
 }
 
-export async function getJSON(store, key) {
-  return store.get(key, { type: 'json' });
+export async function getJSON(store, key, options = {}) {
+  return store.get(key, { ...options, type: 'json' });
 }
 
 export async function setJSON(store, key, value) {
@@ -155,9 +155,9 @@ export function newId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export async function listJSON(store, prefix) {
+export async function listJSON(store, prefix, options = {}) {
   const keys = (await listBlobKeys(store, prefix)).filter(key => !isIndexKey(key));
-  const entries = await Promise.all(keys.map(key => getJSON(store, key)));
+  const entries = await Promise.all(keys.map(key => getJSON(store, key, options)));
   return dedupeRecords(entries);
 }
 
