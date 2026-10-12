@@ -3,7 +3,7 @@ import seed from '../../fixtures/seed.json';
 import * as state from '@/app/curriculum-state';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { TimetableScheduleResult } from '@/teacher/schedule-api';
-import { manresaTimetable } from '@/schedule/timetable';
+import { manresaTimetable } from '../../../../tests/fixtures/manresa-timetable.js';
 
 it('keeps confirmed lessons, unit membership and timetable visible through a stale calendar refresh',()=>{
   const before=structuredClone(seed) as unknown as CurriculumResponse;
