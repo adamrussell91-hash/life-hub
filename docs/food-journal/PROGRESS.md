@@ -26,15 +26,15 @@ W6: extraction fills blanks and preserves personal notes/ratings. Photo metadata
 
 ## Verification evidence
 
-The focused unit suite exercises schema errors, Custom Menu filters, Day One duplicates/deleted identities, photo association, batch limits, field preservation, private media reads, SHA conflicts, background completion, verified recipe sources and fraction scaling.
+The focused unit suite exercises schema errors, Custom Menu filters, Day One duplicates/deleted identities, photo association, batch limits, field preservation, private media reads, SHA conflicts, background completion, verified recipe sources and fraction and range scaling, including compact units.
 
 The browser suite exercises the real main/controller route at 1440/390/320, long form saves, reduced viewport actions, Custom Menu filtering, cooking cards, import selection, private photo capture, stored menu text, complete photo backup and duplicate safe restore.
 
 Verified release commands:
 
 - npm run build: passed for all five SPA apps and published Life assets.
-- Focused unit tests: 17 passed.
-- Browser acceptance: six passed, covering desktop, both phone widths, keyboard viewport, import/restore/delete/recipe actions, capture, backup, conflicts and shared list operations.
-- Mandatory gate: 5,695 root tests, 1,425 Tasks tests, static guards and Professional typecheck.
+- Focused unit tests: 18 passed.
+- Browser acceptance: nine passed, covering desktop, both phone widths, keyboard viewport, import/restore/delete/recipe actions, capture, backup, conflicts, shared list operations, successful background cooking card creation, cancelled research and failed initial loads.
+- Mandatory gate: 5,696 root tests, 1,425 Tasks tests, static guards and Professional typecheck.
 
  No production journal data is created by these tests. The actual Day One export is not supplied, so migration tooling is ready and existing personal entries have not been imported.

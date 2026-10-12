@@ -154,6 +154,35 @@ async function pageFor(width = 1440) {
         ],
       });
     },
+    client: {
+      async *streamMessage() {
+        const urls = Array.from(
+          { length: 10 },
+          (_, i) => `https://recipe.test/${i}`,
+        );
+        yield { type: "sources", sources: urls.map((url) => ({ url })) };
+        yield {
+          type: "text",
+          delta: JSON.stringify({
+            candidates: urls.map((url) => ({
+              title: "Recipe",
+              url,
+              reason: "Suitable",
+            })),
+            shortlist: urls.slice(0, 3),
+            recipe: {
+              title: "Croquettes",
+              servings: 2,
+              ingredients: ["100 g potatoes"],
+              steps: ["Cook."],
+              sources: urls
+                .slice(0, 3)
+                .map((url) => ({ title: "Recipe", url })),
+            },
+          }),
+        };
+      },
+    },
     signPut: async ({ key }) => "https://food-media.test/" + key,
     signGet: async ({ key }) => "https://food-media.test/" + key,
   };
@@ -540,5 +569,72 @@ test("the shared dish list adds, moves, requires hold for deletion and restores 
   assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 1);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 2);
+  await page.close();
+});
+
+test("cancelling successful background recipe research keeps the cooking editor closed", async () => {
+  const { page, read } = await pageFor(390);
+  await page.getByRole("tab", { name: "Custom Menu" }).click();
+  await page.getByLabel("Search Custom Menu").fill("Croquettes");
+  await page.getByRole("button", { name: "Recipe", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Research recipe", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.waitForTimeout(3000);
+  assert.equal(await page.locator(".food-sheet").count(), 0);
+  assert.equal(read().recipes.length, 1);
+  await page.close();
+});
+test("a failed initial load cannot produce an empty backup labelled as successful", async () => {
+  const { page } = await pageFor(390);
+  let downloads = 0;
+  page.on("download", () => downloads++);
+  await page.route("**/api/food-journal", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: false, error: { message: "Load failed." } }),
+    }),
+  );
+  await page.reload();
+  await page.locator('#app[data-state="ready"]').waitFor({ timeout: 20000 });
+  if (await page.locator("#food-journal-dashboard").evaluate((n) => n.hidden)) {
+    await page.locator("#more-nav-button").click();
+    await page.locator('#more-sheet [data-section="food-journal"]').click();
+  }
+  await page
+    .locator("[data-food-status]")
+    .filter({ hasText: "Load failed." })
+    .waitFor();
+  await page.getByRole("button", { name: "Backup", exact: true }).click();
+  await page
+    .getByText("Load your journal before backing up.", { exact: true })
+    .waitFor();
+  assert.equal(downloads, 0);
+  await page.close();
+});
+
+test("successful background recipe research opens a reviewable cooking card and saves it to the dish", async () => {
+  const { page, read, errors } = await pageFor(390);
+  await page.getByRole("tab", { name: "Custom Menu" }).click();
+  await page.getByLabel("Search Custom Menu").fill("Croquettes");
+  await page.getByRole("button", { name: "Recipe", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Research recipe", exact: true })
+    .click();
+  await page.getByLabel("Recipe title", { exact: true }).waitFor();
+  assert.equal(
+    await page.getByLabel("Recipe title", { exact: true }).inputValue(),
+    "Croquettes",
+  );
+  await phoneGate(page);
+  await page.getByRole("button", { name: "Save recipe", exact: true }).click();
+  await page.locator(".food-sheet").waitFor({ state: "detached" });
+  assert.equal(read().recipes.length, 2);
+  const recipe = read().recipes.find((r) => r.title === "Croquettes");
+  assert.equal(recipe.candidates.length, 10);
+  assert.equal(recipe.sources.length, 3);
+  assert.deepEqual(errors, []);
   await page.close();
 });
