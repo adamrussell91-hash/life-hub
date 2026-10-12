@@ -1466,6 +1466,10 @@ a:hover {
   -webkit-backdrop-filter: blur(var(--hub-glass-blur)) saturate(115%);
 }
 
+.lesson-hero {
+  margin-bottom: var(--space-8);
+}
+
 .student-hero__media {
   position: relative;
   aspect-ratio: 16 / 6;
@@ -3032,6 +3036,22 @@ a:hover {
   position: relative;
 }
 
+.unit-page__lessons-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.unit-page__add-lesson {
+  flex-shrink: 0;
+}
+
+.unit-page__add-lesson svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
 .unit-page__cover .entity-banner__title,
 .class-page__banner .entity-banner__title,
 .lesson-page__cover .entity-banner__title {
@@ -3051,7 +3071,8 @@ a:hover {
   pointer-events: none;
 }
 
-.entity-page-title .entity-page-title__input {
+.entity-page-title .entity-page-title__input,
+.entity-page-title .entity-page-title__text {
   min-width: 0;
   width: 100%;
   margin: 0;
@@ -3067,6 +3088,11 @@ a:hover {
   line-height: var(--leading-tight);
   text-shadow: 0 1px 2px rgba(10, 21, 54, 0.45);
   pointer-events: auto;
+}
+
+.entity-page-title .entity-page-title__text {
+  border-bottom: 0;
+  overflow-wrap: anywhere;
 }
 
 .entity-page-title .entity-page-title__input:hover {
@@ -3103,7 +3129,8 @@ a:hover {
     display: none;
   }
 
-  .entity-page-title .entity-page-title__input {
+  .entity-page-title .entity-page-title__input,
+  .entity-page-title .entity-page-title__text {
     font-size: var(--text-xl);
   }
 }
@@ -8242,7 +8269,9 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 .lesson-page {
   position: relative;
-  max-width: 62.5rem;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
 }
 
 .lesson-page__title:focus-visible {

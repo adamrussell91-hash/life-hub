@@ -1,5 +1,9 @@
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
+import { applyCreatedEntity, replaceCurriculum } from '@/app/curriculum-state';
+import { withCreatedEntity } from '@/curriculum/with-created-entity';
+import { DEFAULT_PEDAGOGICAL_MODE } from '@/curriculum/pedagogical-mode';
+import { postLesson } from '@/teacher/create/api';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import { isActiveLibraryStatus } from '@/curriculum/with-entity-status';
 import type { Block } from '@/schemas';
@@ -365,6 +369,8 @@ export function renderUnitPage(
   historyHost.className = 'history-panel-host unit-stub__history';
   let historyPanel: HistoryPanelHandle;
   const rowDisposers: Array<() => void> = [];
+  let disposed = false;
+  let creatingLesson = false;
 
   const optionsMenu = mountPageOptionsMenu(
     [
@@ -508,7 +514,68 @@ export function renderUnitPage(
   const lessonsHeading = document.createElement('h2');
   lessonsHeading.className = 'class-page__heading';
   lessonsHeading.textContent = 'Lessons';
-  lessonsSection.append(lessonsHeading);
+
+  const lessonsHeader = document.createElement('div');
+  lessonsHeader.className = 'unit-page__lessons-header';
+  const addLessonButton = document.createElement('button');
+  addLessonButton.type = 'button';
+  addLessonButton.className = 'icon-plus-btn unit-page__add-lesson';
+  addLessonButton.title = 'New lesson';
+  addLessonButton.setAttribute('aria-label', 'New lesson');
+  // Match the outline plus used by Tasks' New Task button.
+  const plus = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  plus.setAttribute('viewBox', '0 0 24 24');
+  plus.setAttribute('fill', 'none');
+  plus.setAttribute('stroke', 'currentColor');
+  plus.setAttribute('stroke-width', '1.75');
+  plus.setAttribute('stroke-linecap', 'round');
+  plus.setAttribute('stroke-linejoin', 'round');
+  plus.setAttribute('aria-hidden', 'true');
+  for (const d of ['M12 5v14', 'M5 12h14']) {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    plus.append(path);
+  }
+  addLessonButton.append(plus);
+
+  const lessonError = document.createElement('p');
+  lessonError.className = 'class-page__error';
+  lessonError.setAttribute('role', 'alert');
+  lessonError.hidden = true;
+
+  addLessonButton.addEventListener('click', async () => {
+    if (creatingLesson || disposed) return;
+    creatingLesson = true;
+    addLessonButton.disabled = true;
+    addLessonButton.setAttribute('aria-busy', 'true');
+    lessonError.hidden = true;
+    try {
+      const created = await postLesson({
+        title: 'Untitled lesson',
+        unit_id: unit.id,
+        pedagogical_mode: DEFAULT_PEDAGOGICAL_MODE
+      });
+      // Seed the shared snapshot before routing, as the existing create flow does.
+      if (!applyCreatedEntity('lesson', created)) {
+        replaceCurriculum(withCreatedEntity(curriculum, 'lesson', created));
+      }
+      if (!disposed) navigate(`/lessons/${created.id}`);
+    } catch (error: unknown) {
+      if (!disposed) {
+        lessonError.textContent = error instanceof Error ? error.message : 'Unable to create lesson. Please try again.';
+        lessonError.hidden = false;
+      }
+    } finally {
+      creatingLesson = false;
+      if (!disposed) {
+        addLessonButton.disabled = false;
+        addLessonButton.removeAttribute('aria-busy');
+      }
+    }
+  });
+
+  lessonsHeader.append(lessonsHeading, addLessonButton);
+  lessonsSection.append(lessonsHeader, lessonError);
 
   historyPanel = mountHistoryPanel({
     kind: 'unit',
@@ -610,6 +677,7 @@ export function renderUnitPage(
       banner.dispose();
       planEditor.dispose();
       outcomeStrip?.dispose();
+      disposed = true;
     }
   };
 }

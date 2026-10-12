@@ -1,7 +1,5 @@
 import { FAILURE } from '@/app/failure';
-import { withAppBase } from '@/app/base-path';
 import { ApiClientError } from '@/api/client';
-import { navigate } from '@/app/router';
 import {
   emptyMessageForCollection,
   resolveCollection
@@ -24,7 +22,8 @@ import {
   createStudentShell,
   renderStudentChrome,
   renderStudentStatus,
-  studentAnchor
+  studentAnchor,
+  wireStudentAnchor
 } from '@/student/shell';
 
 export interface MountStudentClassViewOptions {
@@ -226,11 +225,7 @@ function renderHomepageRegion(
       for (const anchor of collectionEl.querySelectorAll<HTMLAnchorElement>('a.student-class__link')) {
         const href = anchor.getAttribute('href');
         if (!href) continue;
-        anchor.href = withAppBase(href);
-        anchor.addEventListener('click', (event) => {
-          event.preventDefault();
-          navigate(href);
-        });
+        wireStudentAnchor(anchor, href);
       }
       list.append(collectionEl);
     } else {

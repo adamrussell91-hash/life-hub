@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/app/router', () => ({ navigate: vi.fn() }));
+vi.mock('@/teacher/create/api', () => ({ postLesson: vi.fn() }));
+vi.mock('@/api/universal-links', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/api/universal-links')>(),
+  listUniversalLinksForEntity: vi.fn().mockResolvedValue({ outgoing: [], incoming: [] })
+}));
 vi.mock('@/teacher/unit-api', () => ({ patchUnit: vi.fn().mockResolvedValue({}) }));
 vi.mock('@/teacher/history-panel', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/teacher/history-panel')>();
@@ -16,6 +21,9 @@ vi.mock('@/teacher/history-panel', async (importOriginal) => {
 });
 
 import { navigate } from '@/app/router';
+import { postLesson } from '@/teacher/create/api';
+import { peekCurriculum, replaceCurriculum } from '@/app/curriculum-state';
+import { DEFAULT_PEDAGOGICAL_MODE } from '@/curriculum/pedagogical-mode';
 import { patchUnit } from '@/teacher/unit-api';
 import { mountHistoryPanel, type HistoryPanelHandle } from '@/teacher/history-panel';
 import {
@@ -25,7 +33,7 @@ import {
   renderUnitStub
 } from '@/teacher/sections/units';
 import type { CurriculumResponse } from '@/teacher/nav';
-import type { Subject, Unit, Year } from '@/schemas';
+import type { Lesson, Subject, Unit, Year } from '@/schemas';
 
 /** Reaches the `onRestored` callback the unit page handed to the history panel. */
 const lastRestoreCallback = (): ((live: unknown) => void) => {
@@ -187,8 +195,82 @@ describe('units', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(postLesson).mockReset();
+    replaceCurriculum(structuredClone(curriculum));
     vi.stubGlobal('localStorage', new MemoryStorage());
     canvas = document.createElement('div');
+  });
+
+  const newLesson: Lesson = {
+    id: 'lesson_new', type: 'lesson', title: 'Untitled lesson', slug: 'untitled_lesson',
+    unit_id: unit.id, sequence: 3, status: 'active',
+    created_at: ISO, updated_at: ISO, schema_version: 1, blocks: [],
+    pedagogical_mode: DEFAULT_PEDAGOGICAL_MODE
+  };
+
+  it.each([unit.id, othello.id])('offers the shared plus for lessons in %s, including empty units', (unitId) => {
+    const handle = renderUnitPage(canvas, curriculum, unitId);
+    const button = canvas.querySelector<HTMLButtonElement>('[aria-label="New lesson"]');
+    expect(button).not.toBeNull();
+    expect(button?.classList.contains('icon-plus-btn')).toBe(true);
+    expect(button?.closest('[data-unit-section="lessons"]')).not.toBeNull();
+    expect(button?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    handle.dispose();
+  });
+
+  it('creates one lesson in the current unit and seeds the curriculum before opening it', async () => {
+    let resolve!: (lesson: Lesson) => void;
+    vi.mocked(postLesson).mockImplementation(() => new Promise<Lesson>((done) => { resolve = done; }));
+    const handle = renderUnitPage(canvas, curriculum, unit.id);
+    const button = canvas.querySelector<HTMLButtonElement>('[aria-label="New lesson"]')!;
+    expect(button).not.toBeNull();
+    button.click();
+    button.click();
+    expect(button.disabled).toBe(true);
+    expect(postLesson).toHaveBeenCalledTimes(1);
+    expect(postLesson).toHaveBeenCalledWith({
+      title: 'Untitled lesson', unit_id: unit.id, pedagogical_mode: DEFAULT_PEDAGOGICAL_MODE
+    });
+    expect(navigate).not.toHaveBeenCalled();
+    resolve(newLesson);
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/lessons/lesson_new'));
+    expect(peekCurriculum()?.lessons.find((lesson) => lesson.id === newLesson.id)?.unit_id).toBe(unit.id);
+    handle.dispose();
+    const returned = renderUnitPage(canvas, peekCurriculum()!, unit.id);
+    expect(canvas.textContent).toContain('Untitled lesson');
+    returned.dispose();
+  });
+
+  it('keeps failed creation in the same unit and allows retry', async () => {
+    vi.mocked(postLesson).mockRejectedValueOnce(new Error('Unable to create lesson.'));
+    const handle = renderUnitPage(canvas, curriculum, othello.id);
+    const button = canvas.querySelector<HTMLButtonElement>('[aria-label="New lesson"]')!;
+    expect(button).not.toBeNull();
+    button.click();
+    await vi.waitFor(() => expect(button.disabled).toBe(false));
+    const alert = canvas.querySelector<HTMLElement>('[data-unit-section="lessons"] [role="alert"]')!;
+    expect(alert.hidden).toBe(false);
+    expect(alert.textContent).toContain('Unable to create lesson');
+    expect(navigate).not.toHaveBeenCalled();
+    vi.mocked(postLesson).mockResolvedValueOnce({ ...newLesson, unit_id: othello.id });
+    button.click();
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/lessons/lesson_new'));
+    expect(postLesson).toHaveBeenLastCalledWith(expect.objectContaining({ unit_id: othello.id }));
+    expect(alert.hidden).toBe(true);
+    handle.dispose();
+  });
+
+  it('does not pull the user back to a lesson after the unit page is disposed', async () => {
+    let resolve!: (lesson: Lesson) => void;
+    vi.mocked(postLesson).mockImplementation(() => new Promise<Lesson>((done) => { resolve = done; }));
+    const handle = renderUnitPage(canvas, curriculum, unit.id);
+    const button = canvas.querySelector<HTMLButtonElement>('[aria-label="New lesson"]')!;
+    expect(button).not.toBeNull();
+    button.click();
+    handle.dispose();
+    resolve(newLesson);
+    await vi.waitFor(() => expect(peekCurriculum()?.lessons.some((lesson) => lesson.id === newLesson.id)).toBe(true));
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   afterEach(() => {
@@ -326,7 +408,9 @@ describe('units', () => {
     });
     expect(isolated.units.find((entry) => entry.id === unit.id)?.title).toBe(renamed.title);
     expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe(renamed.title);
-    expect(canvas.querySelector('.entity-page-title__status')?.textContent).toBe('Saved');
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.entity-page-title__status')?.textContent).toBe('Saved');
+    });
   });
 
   it('uses the shared banner and removes its cover without remounting the unit plan', async () => {
