@@ -110,6 +110,11 @@ test('Clementine chat starts the Worker write clock behind the Life session', as
     env,
     now,
     cwd,
+    // The quick research call also needs a mock, even when archivePull is supplied.
+    fetchImpl: async url => {
+      assert.equal(String(url), 'https://knowledge-hub-research.example/quick_research');
+      return new Response('{}', { status: 503 });
+    },
     archivePull: async () => ({
       query: 'memory',
       round: 1,
