@@ -13,8 +13,9 @@ import {
 import {
   applyDateSpanToStation,
   applyDateToTickAttach,
+  attachTracksOf,
   lineTrackDefs,
-  resolveLineAttachTrack,
+  resolveLineAttachTracks,
   type TrackDef
 } from '@/domain/maps-layout';
 import { formatRelativeUpdated } from '@/domain/cards';
@@ -256,13 +257,14 @@ export async function renderMapItemPage(canvas: HTMLElement, ref: MapItemPageRef
         }
         if (defs && (attach.kind === 'line' || attach.kind === 'station')) {
           const tracks = yearTrackPicker(
-            resolveLineAttachTrack(attach.track, defs.map((track) => track.id)),
+            resolveLineAttachTracks(attachTracksOf(attach), defs.map((track) => track.id)),
             defs
           );
           tracks.root.addEventListener('change', () => {
             const live = tick.attach;
             if (live.kind !== 'line' && live.kind !== 'station') return;
-            tick.attach = { ...live, track: tracks.value() };
+            const { track: _legacy, ...rest } = live;
+            tick.attach = { ...rest, tracks: tracks.value() };
             persist(true);
           });
           fields.append(tracks.root);
