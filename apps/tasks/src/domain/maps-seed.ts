@@ -115,7 +115,7 @@ export function mindWorks2026Map(): TransitMap {
       tick(
         'tk_muna',
         'Rotary MUNA',
-        { kind: 'line', line_id: 'line_justice', y: 200, track: 'junior' },
+        { kind: 'line', line_id: 'line_justice', y: 200, tracks: ['junior'] },
         '2026-05-15'
       ),
       tick(
@@ -135,7 +135,7 @@ export function mindWorks2026Map(): TransitMap {
       tick(
         'tk_davinci',
         'da Vinci Decathlon',
-        { kind: 'line', line_id: 'line_innovation', y: 260, track: 'rozelle' },
+        { kind: 'line', line_id: 'line_innovation', y: 260, tracks: ['rozelle'] },
         '2026-05-22',
         { connects_to: 'Rotary MUNA' }
       ),
@@ -149,7 +149,12 @@ export function mindWorks2026Map(): TransitMap {
       tick(
         'tk_evatt',
         'UN Evatt Competition',
-        { kind: 'station', station_id: 'st_advocacy', side: 'right', offset: 0.55 },
+        {
+          kind: 'line',
+          line_id: 'line_justice',
+          y: 200,
+          tracks: ['rozelle', 'senior']
+        },
         '2026-08-01',
         { connects_to: 'Rotary MUNA' }
       )

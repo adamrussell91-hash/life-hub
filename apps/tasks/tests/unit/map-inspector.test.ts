@@ -121,21 +121,25 @@ describe('map inspector', () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it('lets a competition pick one year line (radio), not a multi-select set', () => {
-    const picker = yearTrackPicker('rozelle', [
+  it('lets a competition tick several year lines (checkboxes), never none', () => {
+    const picker = yearTrackPicker(['rozelle'], [
       { id: 'junior', label: 'Junior' },
       { id: 'rozelle', label: 'Rozelle' },
       { id: 'senior', label: 'Senior' }
     ]);
     mount([picker.root]);
-    expect(picker.root.getAttribute('role')).toBe('radiogroup');
-    const radios = [...picker.root.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
-    expect(radios).toHaveLength(3);
-    expect(radios.map((box) => box.name).every((name) => name === radios[0]!.name)).toBe(true);
-    expect(picker.value()).toBe('rozelle');
-    radios[2]!.checked = true;
-    radios[0]!.checked = false;
-    radios[1]!.checked = false;
-    expect(picker.value()).toBe('senior');
+    expect(picker.root.getAttribute('role')).toBe('group');
+    const boxes = [...picker.root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+    expect(boxes).toHaveLength(3);
+    expect(picker.value()).toEqual(['rozelle']);
+    boxes[2]!.checked = true;
+    boxes[2]!.dispatchEvent(new Event('change'));
+    expect(picker.value()).toEqual(['rozelle', 'senior']);
+    boxes[1]!.checked = false;
+    boxes[1]!.dispatchEvent(new Event('change'));
+    boxes[2]!.checked = false;
+    boxes[2]!.dispatchEvent(new Event('change'));
+    // Last box snaps back on — at least one year line remains.
+    expect(picker.value().length).toBeGreaterThanOrEqual(1);
   });
 });

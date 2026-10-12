@@ -137,6 +137,8 @@ export type LaidTick = {
   cy: number;
   dash: boolean;
   connects_to: string | null;
+  /** Resolved year lines this competition sits on (for multi-stem connectors). */
+  tracks: string[];
   labelBox: LabelBox;
   labelSide: PortSide;
   ports: ConnectorPort[];
@@ -346,6 +348,19 @@ export function lineTrackDefs(line: MapLine): TrackDef[] {
   return [...standard, ...extra];
 }
 
+/** Legacy single-track field, or the first of `tracks`. */
+export function attachTrackOf(attach: { track?: string; tracks?: string[] } | undefined): string | undefined {
+  if (!attach) return undefined;
+  return attach.tracks?.[0] ?? attach.track;
+}
+
+/** Year lines on a competition attach (`tracks`, else legacy `track`). */
+export function attachTracksOf(attach: { track?: string; tracks?: string[] } | undefined): string[] {
+  if (!attach) return [];
+  if (attach.tracks?.length) return [...attach.tracks];
+  return attach.track ? [attach.track] : [];
+}
+
 /** Resolve which year line a competition uses on a strand (valid track, else middle, else first). */
 export function resolveLineAttachTrack(
   attachTrack: string | undefined,
@@ -353,6 +368,17 @@ export function resolveLineAttachTrack(
 ): string | undefined {
   if (attachTrack && trackIds.includes(attachTrack)) return attachTrack;
   return trackIds[1] ?? trackIds[0];
+}
+
+/** Resolve one or more year lines; keeps every valid pick, else the single default. */
+export function resolveLineAttachTracks(
+  requested: readonly string[] | undefined,
+  trackIds: readonly string[]
+): string[] {
+  const kept = (requested ?? []).filter((id) => trackIds.includes(id));
+  if (kept.length) return kept;
+  const fallback = resolveLineAttachTrack(undefined, trackIds);
+  return fallback ? [fallback] : [];
 }
 
 /** Nearest year-line track across all strands (for drag-snap). */
@@ -933,7 +959,8 @@ function finishTick(
   y0: number,
   cx: number,
   cy: number,
-  labelSide: PortSide
+  labelSide: PortSide,
+  tracks: string[] = []
 ): LaidTick {
   const laid: LaidTick = {
     id: tick.id,
@@ -946,6 +973,7 @@ function finishTick(
     cy,
     dash: tick.stroke === 'dotted',
     connects_to: tick.connects_to,
+    tracks,
     labelBox: { id: `tk-${tick.id}`, x: 0, y: 0, w: 10, h: 10 },
     labelSide,
     ports: []
@@ -1009,21 +1037,40 @@ function placeTick(
     const line = lines.find((item) => item.id === attach.line_id);
     if (!line) return null;
     const ids = line.tracks.map((item) => item.id);
-    const track =
-      line.tracks.find((item) => item.id === resolveLineAttachTrack(attach.track, ids)) ?? line.tracks[0];
+    const trackIds = resolveLineAttachTracks(attachTracksOf(attach), ids);
+    const laidTracks = trackIds
+      .map((id) => line.tracks.find((item) => item.id === id))
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
+    // Park from the outermost selected track so a multi-year competition still clears the strand.
+    const track = laidTracks[laidTracks.length - 1] ?? laidTracks[0] ?? line.tracks[0];
     const x = track?.x ?? line.x;
     const y0 = tick.starts_on ? dateToY(tick.starts_on, year) : remapLegacyY(attach.y);
-    return finishTick(tick, line.id, line.color, x, y0, strandParkX(line, x, 'right'), y0, 'right');
+    return finishTick(
+      tick,
+      line.id,
+      line.color,
+      x,
+      y0,
+      strandParkX(line, x, 'right'),
+      y0,
+      'right',
+      trackIds
+    );
   }
   const station = stations.find((item) => item.id === attach.station_id);
   const line = lines.find((item) => item.id === station?.line_id);
   if (!station || !line) return null;
   const dateY = tick.starts_on ? dateToY(tick.starts_on, year) : station.y + station.h * attach.offset;
+  const trackIds = resolveLineAttachTracks(
+    attachTracksOf(attach),
+    station.bodies.map((body) => body.track)
+  );
+  const bodies = trackIds
+    .map((id) => station.bodies.find((body) => body.track === id))
+    .filter((body): body is NonNullable<typeof body> => Boolean(body));
   const body =
-    (attach.track ? station.bodies.find((item) => item.track === attach.track) : null) ??
-    (attach.side === 'left'
-      ? station.bodies[0]
-      : station.bodies[station.bodies.length - 1]);
+    (attach.side === 'left' ? bodies[0] : bodies[bodies.length - 1]) ??
+    (attach.side === 'left' ? station.bodies[0] : station.bodies[station.bodies.length - 1]);
   const bodyPorts = body
     ? station.ports.filter((port) => Math.abs(port.x - (attach.side === 'left' ? body.x - body.w / 2 : body.x + body.w / 2)) < 2)
     : station.ports;
@@ -1039,7 +1086,8 @@ function placeTick(
     y0,
     attach.side === 'left' ? strandParkX(line, x0, 'left') : strandParkX(line, x0, 'right'),
     dateY,
-    attach.side
+    attach.side,
+    trackIds
   );
 }
 
@@ -1287,37 +1335,60 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
     const raw = map.ticks.find((item) => item.id === tick.id);
     const attach = raw?.attach;
     if (!attach) continue;
-    let from: ConnectorPort | null = null;
+    const fromPorts: ConnectorPort[] = [];
     if (attach.kind === 'station') {
       const station = stations.find((item) => item.id === attach.station_id);
-      from = station ? nearestPort(station.ports, attach.side, tick.cy) : null;
+      if (station) {
+        const wanted = new Set(
+          resolveLineAttachTracks(
+            attachTracksOf(attach),
+            station.bodies.map((body) => body.track)
+          )
+        );
+        const bodies = station.bodies.filter((body) => wanted.has(body.track));
+        const hosts = bodies.length ? bodies : [station.bodies[attach.side === 'left' ? 0 : station.bodies.length - 1]!].filter(Boolean);
+        for (const body of hosts) {
+          const bodyPorts = station.ports.filter(
+            (port) =>
+              Math.abs(port.x - (attach.side === 'left' ? body.x - body.w / 2 : body.x + body.w / 2)) < 2
+          );
+          const port = nearestPort(bodyPorts.length ? bodyPorts : station.ports, attach.side, tick.cy);
+          if (port) fromPorts.push({ ...port, id: `${port.id}:${body.track}` });
+        }
+      }
     } else if (attach.kind === 'event') {
       const host = ticks.find((item) => item.id === attach.event_id);
-      from = host?.ports.find((port) => port.side === attach.side) ?? host?.ports[0] ?? null;
+      const port = host?.ports.find((item) => item.side === attach.side) ?? host?.ports[0] ?? null;
+      if (port) fromPorts.push(port);
     } else {
       const line = lines.find((item) => item.id === attach.line_id);
       if (line) {
-        const trackId = resolveLineAttachTrack(
-          attach.track,
+        const trackIds = resolveLineAttachTracks(
+          attachTracksOf(attach),
           line.tracks.map((item) => item.id)
         );
-        const track =
-          line.tracks.find((item) => item.id === trackId) ??
-          line.tracks.find((item) => Math.abs(item.x - tick.x0) < 1) ??
-          line.tracks[0]!;
-        from = {
-          id: `${line.id}:${track.id}:week:${Math.round(tick.y0)}`,
-          ownerId: line.id,
-          owner: 'line',
-          side: tick.cx >= track.x ? 'right' : 'left',
-          index: 0,
-          x: track.x,
-          y: tick.y0
-        };
+        const laid =
+          trackIds
+            .map((id) => line.tracks.find((item) => item.id === id))
+            .filter((item): item is NonNullable<typeof item> => Boolean(item)) || [];
+        const tracks = laid.length
+          ? laid
+          : [
+              line.tracks.find((item) => Math.abs(item.x - tick.x0) < 1) ?? line.tracks[0]!
+            ].filter(Boolean);
+        for (const track of tracks) {
+          fromPorts.push({
+            id: `${line.id}:${track.id}:week:${Math.round(tick.y0)}`,
+            ownerId: line.id,
+            owner: 'line',
+            side: tick.cx >= track.x ? 'right' : 'left',
+            index: 0,
+            x: track.x,
+            y: tick.y0
+          });
+        }
       }
     }
-    const toSide = from?.side ? oppositeSide(from.side) : 'left';
-    const to = tick.ports.find((port) => port.side === toSide) ?? tick.ports[2] ?? null;
     const ownIds = new Set([
       tick.labelBox.id,
       `mark-${tick.id}`,
@@ -1331,10 +1402,13 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
       attach.kind === 'event' ? `tk-${attach.event_id}` : ''
     ]);
     const blocked = pathObstacles.filter((box) => !ownIds.has(box.id));
-    if (from && to) {
+    for (const [index, from] of fromPorts.entries()) {
+      const toSide = oppositeSide(from.side);
+      const to = tick.ports.find((port) => port.side === toSide) ?? tick.ports[2] ?? null;
+      if (!to) continue;
       const crosses = Math.abs(from.x - to.x) > MAP_EVENT_STEM + 8;
       connectors.push({
-        id: `link-${tick.id}`,
+        id: index === 0 ? `link-${tick.id}` : `link-${tick.id}-${index}`,
         from,
         to,
         path: crosses ? underpassPath(from, to, blocked) : routedOrthogonalPath(from, to, blocked),

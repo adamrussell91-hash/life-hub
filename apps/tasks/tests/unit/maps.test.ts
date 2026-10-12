@@ -36,6 +36,7 @@ import {
   normalizeLineColors,
   placeBox,
   resolveLineAttachTrack,
+  resolveLineAttachTracks,
   schoolTerms,
   spanWeeks,
   stationPorts,
@@ -346,19 +347,37 @@ describe('year layout', () => {
     }
   });
 
-  it('places a line-attached competition on the chosen year line, not the middle default', () => {
+  it('places a line-attached competition on chosen year lines and stems to each', () => {
     expect(resolveLineAttachTrack(undefined, ['junior', 'rozelle', 'senior'])).toBe('rozelle');
-    expect(resolveLineAttachTrack('senior', ['junior', 'rozelle', 'senior'])).toBe('senior');
-    expect(resolveLineAttachTrack('missing', ['junior', 'rozelle', 'senior'])).toBe('rozelle');
+    expect(resolveLineAttachTracks(['senior', 'missing'], ['junior', 'rozelle', 'senior'])).toEqual([
+      'senior'
+    ]);
+    expect(resolveLineAttachTracks(undefined, ['junior', 'rozelle', 'senior'])).toEqual(['rozelle']);
 
     const base = mindWorks2026Map();
-    const senior = layoutMap({
+    const multi = layoutMap({
       ...base,
       ticks: [
         {
-          id: 'tk_muna_senior',
-          label: 'Rotary MUNA',
-          attach: { kind: 'line', line_id: 'line_justice', y: 200, track: 'senior' },
+          id: 'tk_evatt_multi',
+          label: 'UN Evatt Competition',
+          attach: {
+            kind: 'line',
+            line_id: 'line_justice',
+            y: 200,
+            tracks: ['rozelle', 'senior']
+          },
+          stroke: 'solid',
+          connects_to: null,
+          starts_on: '2026-08-01',
+          ends_on: null,
+          link: null,
+          planning: 'planned'
+        },
+        {
+          id: 'tk_legacy_track',
+          label: 'Legacy single track',
+          attach: { kind: 'line', line_id: 'line_justice', y: 220, track: 'senior' },
           stroke: 'solid',
           connects_to: null,
           starts_on: '2026-05-15',
@@ -368,14 +387,24 @@ describe('year layout', () => {
         }
       ]
     });
-    const justice = senior.lines.find((line) => line.id === 'line_justice')!;
+    const justice = multi.lines.find((line) => line.id === 'line_justice')!;
     const seniorX = justice.tracks.find((track) => track.id === 'senior')!.x;
     const rozelleX = justice.tracks.find((track) => track.id === 'rozelle')!.x;
-    const tick = senior.ticks.find((item) => item.id === 'tk_muna_senior')!;
+    const tick = multi.ticks.find((item) => item.id === 'tk_evatt_multi')!;
+    expect(tick.tracks).toEqual(['rozelle', 'senior']);
     expect(tick.x0).toBe(seniorX);
     expect(tick.x0).not.toBe(rozelleX);
+    const stems = multi.connectors.filter((item) => item.id.startsWith('link-tk_evatt_multi'));
+    expect(stems).toHaveLength(2);
+    expect(stems.map((item) => item.from.x).sort((a, b) => a - b)).toEqual(
+      [rozelleX, seniorX].sort((a, b) => a - b)
+    );
 
-    const nearest = nearestLaidTrack(senior.lines, seniorX);
+    const legacy = multi.ticks.find((item) => item.id === 'tk_legacy_track')!;
+    expect(legacy.tracks).toEqual(['senior']);
+    expect(legacy.x0).toBe(seniorX);
+
+    const nearest = nearestLaidTrack(multi.lines, seniorX);
     expect(nearest).toEqual({ lineId: 'line_justice', trackId: 'senior' });
   });
 
