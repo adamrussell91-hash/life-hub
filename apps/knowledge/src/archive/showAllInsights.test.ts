@@ -93,6 +93,14 @@ describe("time", () => {
 });
 
 describe("guided walk", () => {
+  it("keeps every stop in the chosen theme, including at dead ends", () => {
+    const themed = [...nodes, leaf("H", "T2", { hubLabels: ["T1", "T2"] })];
+    const route = walkRoute(themed, links, 60, "E", "T1");
+    expect(route.length).toBeGreaterThan(1);
+    expect(route.every(id => ["A", "B", "C", "D", "H"].includes(id))).toBe(true);
+    expect(route).toContain("H");
+    expect(walkRoute(nodes, links, 60, undefined, "Missing")).toEqual([]);
+  });
   it("steps along strong links without repeating, jumping on at dead ends", () => {
     const route = walkRoute(nodes, links, 7);
     expect(new Set(route).size).toBe(route.length);
