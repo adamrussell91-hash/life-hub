@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { manresaTimetable } from '../../apps/teaching/src/schedule/timetable.js';
+import { manresaTimetable } from '../fixtures/manresa-timetable.js';
 import { teachingEventsFromCurriculum } from '../../packages/design-kit/js/calendar/teaching-calendar.js';
 import { createScheduledLessonHandler } from '../../netlify/functions/scheduled-lesson.mjs';
 import { buildCurriculum } from '../../netlify/functions/curriculum.mjs';

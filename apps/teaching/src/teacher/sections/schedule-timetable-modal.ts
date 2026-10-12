@@ -1,6 +1,6 @@
 import { apiGet } from '@/api/client';
 import { applyScheduledUnitResult } from '@/app/curriculum-state';
-import { generateTimetableSessions, validateTimetable, manresaTimetable, sessionKey, type ClassTimetable, type TimetableSession } from '@/schedule/timetable';
+import { generateTimetableSessions, validateTimetable, parseTimetableText, sessionKey, type ClassTimetable, type TimetableSession } from '@/schedule/timetable';
 import { resolveScheduleToday } from '@/schedule/today';
 import { postScheduleTimetable, type TimetableScheduleResult } from '@/teacher/schedule-api';
 import type { CurriculumResponse } from '@/teacher/nav';
@@ -22,6 +22,7 @@ export function openScheduleTimetableModal(options: {
   let startDate = resolveScheduleToday(curriculum.schedule_anchor_date);
   const addDays = (date:string, n:number) => new Date(Date.parse(date+'T00:00:00Z')+n*86400000).toISOString().slice(0,10);
   let endDate = addDays(startDate,6);
+  let pastedText = '';
   let useExisting = false, preview = false, submitting = false, closed = false;
   let sessions: TimetableSession[] = [];
   const omitted = new Set<string>();
@@ -103,12 +104,13 @@ export function openScheduleTimetableModal(options: {
       if(!classes.length){note('Create a class for this subject before scheduling lessons.');footer.append(button('Close','cancel',close));return;}
       note('Class');
       const choices=document.createElement('div');choices.className='timetable-choices';
-      classes.forEach(c=>{const b=button((c.title||c.code)+' · '+c.code,'class-'+c.id,()=>{classId=c.id;unitId=options.unitId ?? '';timetable=structuredClone(c.timetable ?? {anchor_date:startDate,anchor_day:1,cycle_length:10,slots:[],non_school_dates:[],cycle_overrides:{}});omitted.clear();render();});b.setAttribute('aria-pressed',String(c.id===classId));choices.append(b);});body.append(choices);
-      note('Unit');
+      classes.forEach(c=>{const b=button((c.title||c.code)+' · '+c.code,'class-'+c.id,()=>{pastedText='';classId=c.id;unitId=options.unitId ?? '';timetable=structuredClone(c.timetable ?? {anchor_date:startDate,anchor_day:1,cycle_length:10,slots:[],non_school_dates:[],cycle_overrides:{}});omitted.clear();render();});b.setAttribute('aria-pressed',String(c.id===classId));choices.append(b);});body.append(choices);
+      if(options.unitId) note('Unit: '+(curriculum.units.find(u=>u.id===options.unitId)?.title ?? ''));
+      else note('Unit');
       const units=curriculum.units.filter(u=>u.status==='active'&&u.subject_id===cls()?.subject_id);
       if(!unitId && units.length===1)unitId=units[0]!.id;
       const unitChoices=document.createElement('div');unitChoices.className='timetable-choices';
-      units.forEach(u=>{const b=button(u.title,'unit-'+u.id,()=>{unitId=u.id;omitted.clear();render();});b.setAttribute('aria-pressed',String(u.id===unitId));unitChoices.append(b);});body.append(unitChoices);
+      if(!options.unitId) units.forEach(u=>{const b=button(u.title,'unit-'+u.id,()=>{unitId=u.id;omitted.clear();render();});b.setAttribute('aria-pressed',String(u.id===unitId));unitChoices.append(b);});if(!options.unitId) body.append(unitChoices);
       if(!units.length)note('Create a unit for this class before scheduling lessons.');
       const ranges=document.createElement('div');ranges.className='timetable-choices';
       ranges.append(button('This week','this-week',()=>{const today=resolveScheduleToday(curriculum.schedule_anchor_date);const day=new Date(today+'T00:00:00Z').getUTCDay();startDate=addDays(today,-((day+6)%7));endDate=addDays(startDate,6);omitted.clear();render();}));
@@ -117,8 +119,17 @@ export function openScheduleTimetableModal(options: {
       const dates=document.createElement('div');dates.className='timetable-pair';body.append(dates);
       field('From','start-date','date',startDate,v=>{startDate=v;omitted.clear();},dates);
       field('Through','end-date','date',endDate,v=>{endDate=v;omitted.clear();},dates);
-      body.append(button('Use Manresa 11ENA6 timetable','manresa',()=>{timetable=manresaTimetable();render();}));
-      note('The timetable is saved on this class. Edit its times here, including splitting a double into two sessions. Existing calendar lessons keep their saved times.');
+      const pasteLabel=document.createElement('label');pasteLabel.className='schedule-modal__field';
+      const pasteCaption=document.createElement('span');pasteCaption.textContent='Paste your class timetable';
+      const paste=document.createElement('textarea');paste.className='schedule-modal__date timetable-paste';paste.dataset.timetableField='paste';paste.rows=4;paste.value=pastedText;
+      paste.placeholder='Day 1 | P4 | 11:50–12:43 | A0214\nDay 2 | P5–6 | 13:24–15:10 | A0214';
+      paste.addEventListener('input',()=>pastedText=paste.value);pasteLabel.append(pasteCaption,paste);body.append(pasteLabel);
+      note('One teaching session per line: day, period, start–end time, room. Tabs, commas or | separators work; period and room are optional. Paste only this class’s sessions.');
+      body.append(button('Use pasted timetable','import',()=>{
+        try { const slots=parseTimetableText(pastedText,timetable.cycle_length);timetable.slots=slots;omitted.clear();error.hidden=true;render(); }
+        catch(err){showError(err instanceof Error?err.message:'Check the pasted timetable.');}
+      }));
+      note('Your timetable is saved on this class when you add lessons. Reopen this scheduler to paste a replacement or edit its times, including splitting a double into two sessions. Existing calendar lessons keep their saved times.');
       const anchor=document.createElement('div');anchor.className='timetable-anchor';body.append(anchor);
       field('Anchor date','anchor-date','date',timetable.anchor_date,v=>timetable.anchor_date=v,anchor);
       field('Anchor day','anchor-day','number',String(timetable.anchor_day),v=>timetable.anchor_day=Number(v),anchor);

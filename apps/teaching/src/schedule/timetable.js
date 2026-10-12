@@ -63,14 +63,36 @@ export function generateTimetableSessions(input, startDate, endDate) {
   return rows;
 }
 
-export function manresaTimetable() {
-  return {anchor_date:'2026-10-12',anchor_day:1,cycle_length:10,non_school_dates:[],cycle_overrides:{},slots:[
-    {day:1,period:'4',start_time:'11:50',end_time:'12:43',room:'A0214'},
-    {day:2,period:'5–6',start_time:'13:24',end_time:'15:10',room:'A0214'},
-    {day:4,period:'5',start_time:'13:24',end_time:'14:17',room:'A0214'},
-    {day:5,period:'5',start_time:'13:24',end_time:'14:17',room:'A0214'},
-    {day:6,period:'1',start_time:'08:30',end_time:'09:23',room:'A0214'},
-    {day:8,period:'6',start_time:'14:17',end_time:'15:10',room:'A0215'},
-    {day:9,period:'4',start_time:'11:50',end_time:'12:43',room:'A0216'},
-    {day:10,period:'2',start_time:'09:23',end_time:'10:16',room:'A0214'}]};
+// Import explicit session rows, never silently drop an unreadable line.
+export function parseTimetableText(text, cycleLength) {
+  const slots=[];
+  for(const [index, raw] of String(text).split(/\r?\n/).entries()) {
+    const line=raw.trim();
+    if(!line || /^day\s*[,|\t].*start/i.test(line)) continue;
+    const fail=()=>{throw new Error(`Line ${index+1}: use day, period, start–end time and optional room.`);};
+    const day=line.match(/^(?:day\s*)?(\d{1,2})\b[\s,|]*(.*)$/i);
+    if(!day) fail();
+    const times=[...day[2].matchAll(/(?<!\d)(\d{1,2})[:.](\d{2})(?!\d)(?: *(am|pm))?/gi)];
+    if(times.length!==2 || Boolean(times[0][3])!==Boolean(times[1][3])) fail();
+    const clock=match=>{
+      let h=Number(match[1]);const m=Number(match[2]), meridiem=match[3]?.toLowerCase();
+      if(m>59 || (meridiem ? h<1 || h>12 : h>23)) fail();
+      if(meridiem) h=h%12+(meridiem==='pm'?12:0);
+      return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+    };
+    const start_time=clock(times[0]),end_time=clock(times[1]);
+    if(Number(day[1])<1 || Number(day[1])>cycleLength || start_time>=end_time) fail();
+    const clean=value=>value.trim().replace(/^[,|\s]+|[,|\s]+$/g,'');
+    const period=clean(day[2].slice(0,times[0].index)).replace(/^(?:period|p)\s*/i,'');
+    if(period && !/^\d+(?:\s*[-–]\s*\d+)?$/.test(period)) fail();
+    const between=day[2].slice(times[0].index+times[0][0].length,times[1].index);
+    if(!/^[-–—,|\s]+$/.test(between) && between.trim().toLowerCase()!=='to') fail();
+    const suffix=day[2].slice(times[1].index+times[1][0].length);
+    if(suffix && !/^[\s,|]/.test(suffix)) fail();
+    const room=clean(suffix).replace(/^room\s+/i,'');
+    slots.push({day:Number(day[1]),period,start_time,end_time,room});
+  }
+  if(!slots.length) throw new Error('Paste at least one teaching session with a day and start–end time.');
+  // Reuse the same overlap and size validation as manual entry.
+  return validateTimetable({anchor_date:'2000-01-03',anchor_day:1,cycle_length:cycleLength,slots}).slots;
 }
