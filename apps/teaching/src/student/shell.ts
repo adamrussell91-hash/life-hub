@@ -1,5 +1,5 @@
 import { createSkipLink } from '@/app/failure';
-import { withAppBase } from '@/app/base-path';
+import { CLASS_SITE_ORIGIN } from '@/app/class-site';
 import { navigate } from '@/app/router';
 
 export function createStudentShell(contentExtraClass = ''): {
@@ -41,9 +41,22 @@ export function studentAnchor(
 ): HTMLAnchorElement {
   const link = document.createElement('a');
   link.className = className;
-  link.href = withAppBase(href);
   if (text) link.textContent = text;
+  return wireStudentAnchor(link, href);
+}
+
+/** Public student links always belong to the class site, including in previews. */
+export function wireStudentAnchor(link: HTMLAnchorElement, href: string): HTMLAnchorElement {
+  link.href = `${CLASS_SITE_ORIGIN}${href.startsWith('/') ? href : `/${href}`}`;
   link.addEventListener('click', (event) => {
+    // Crossing from the umbrella must use normal navigation to the class host.
+    // On the class host, plain clicks can retain the existing SPA routing.
+    if (
+      typeof location === 'undefined' || location.origin !== CLASS_SITE_ORIGIN ||
+      event.defaultPrevented || event.button !== 0 ||
+      event.metaKey || event.ctrlKey || event.shiftKey || event.altKey ||
+      (link.target && link.target !== '_self')
+    ) return;
     event.preventDefault();
     navigate(href);
   });

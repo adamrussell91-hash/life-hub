@@ -113,15 +113,15 @@ describe('mountStudentClassView', () => {
     expect(root.querySelector('[data-class-section="current-lesson"]')).toBeNull();
 
     const unitLink = root.querySelector('a.student-unit-card');
-    expect(unitLink?.getAttribute('href')).toBe('/s/units/unit_aotfw');
+    expect(unitLink?.getAttribute('href')).toBe('https://class.adam-russell.com/s/units/unit_aotfw');
 
     const currentOpen = root.querySelector(
-      `.student-schedule__link[href="/s/classes/${CLASS_ID}/lessons/lesson_aotfw_008"]`
+      `.student-schedule__link[href="https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_aotfw_008"]`
     );
     expect(currentOpen).toBeNull();
 
     const publishedOpen = root.querySelector(
-      `.student-schedule__link[href="/s/classes/${CLASS_ID}/lessons/lesson_aotfw_001"]`
+      `.student-schedule__link[href="https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_aotfw_001"]`
     );
     expect(publishedOpen).not.toBeNull();
     expect(publishedOpen?.textContent).toContain('Intro');
@@ -155,7 +155,7 @@ describe('mountStudentClassView', () => {
 
     await vi.waitFor(() => {
       const open = root.querySelector(
-        `a[href="/s/classes/${CLASS_ID}/lessons/lesson_aotfw_008"]`
+        `a[href="https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_aotfw_008"]`
       );
       expect(open).not.toBeNull();
     });
@@ -210,8 +210,8 @@ describe('mountStudentClassView', () => {
       ...root.querySelectorAll('[data-homepage-region="custom"] a.block-collection__link')
     ];
     expect(links).toHaveLength(2);
-    expect(links[0]?.getAttribute('href')).toBe('/s/lessons/lesson_aotfw_001');
-    expect(links[1]?.getAttribute('href')).toBe('/s/lessons/lesson_aotfw_008');
+    expect(links[0]?.getAttribute('href')).toBe('https://class.adam-russell.com/s/lessons/lesson_aotfw_001');
+    expect(links[1]?.getAttribute('href')).toBe('https://class.adam-russell.com/s/lessons/lesson_aotfw_008');
   });
 
   it('shows class not found on 404', async () => {
