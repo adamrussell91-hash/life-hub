@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { MapLine } from '@/schemas/map';
-import { buildLineEditor, createMapInspector, inspectorText } from '@/views/map-inspector';
+import { buildLineEditor, createMapInspector, inspectorText, yearTrackPicker } from '@/views/map-inspector';
 
 function line(partial: Partial<MapLine> = {}): MapLine {
   return {
@@ -119,5 +119,23 @@ describe('map inspector', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     panel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets a competition pick one year line (radio), not a multi-select set', () => {
+    const picker = yearTrackPicker('rozelle', [
+      { id: 'junior', label: 'Junior' },
+      { id: 'rozelle', label: 'Rozelle' },
+      { id: 'senior', label: 'Senior' }
+    ]);
+    mount([picker.root]);
+    expect(picker.root.getAttribute('role')).toBe('radiogroup');
+    const radios = [...picker.root.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
+    expect(radios).toHaveLength(3);
+    expect(radios.map((box) => box.name).every((name) => name === radios[0]!.name)).toBe(true);
+    expect(picker.value()).toBe('rozelle');
+    radios[2]!.checked = true;
+    radios[0]!.checked = false;
+    radios[1]!.checked = false;
+    expect(picker.value()).toBe('senior');
   });
 });

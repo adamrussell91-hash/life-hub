@@ -1,7 +1,49 @@
 import type { MapColorToken, MapLine, YearTrack } from '@/schemas/map';
-import { canonicalLineColor, LINE_COLORS, YEAR_TRACKS, YEAR_TRACK_LABELS, addExtraYearTrack } from '@/domain/maps-layout';
+import {
+  canonicalLineColor,
+  LINE_COLORS,
+  YEAR_TRACKS,
+  YEAR_TRACK_LABELS,
+  addExtraYearTrack,
+  type TrackDef
+} from '@/domain/maps-layout';
 import { discCss, letterCss } from '@/domain/maps-colors';
 import { el } from '@/views/hub-kit';
+
+let yearTrackPickerSeq = 0;
+
+/**
+ * Single year-line choice for a competition (programs use multi-select checkboxes).
+ * Radios reuse `.map-tracks` so the inspector matches the program control.
+ */
+export function yearTrackPicker(
+  selected: string | null | undefined,
+  available: TrackDef[]
+): { root: HTMLElement; value: () => string } {
+  const root = el('div', 'map-tracks');
+  root.setAttribute('role', 'radiogroup');
+  root.setAttribute('aria-label', 'Year lines');
+  const name = `map-year-track-${++yearTrackPickerSeq}`;
+  const initial =
+    selected && available.some((track) => track.id === selected)
+      ? selected
+      : (available[0]?.id ?? 'junior');
+  for (const track of available) {
+    const label = el('label', 'map-tracks__item');
+    const box = document.createElement('input');
+    box.type = 'radio';
+    box.name = name;
+    box.value = track.id;
+    box.checked = track.id === initial;
+    label.append(box, document.createTextNode(track.label));
+    root.append(label);
+  }
+  return {
+    root,
+    value: () =>
+      root.querySelector<HTMLInputElement>('input:checked')?.value ?? available[0]?.id ?? 'junior'
+  };
+}
 
 /** Side panel beside the map: what is selected, and the controls to change it. */
 export function createMapInspector(options: {
