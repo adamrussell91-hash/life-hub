@@ -81,15 +81,20 @@ export const TickAttachSchema = z.discriminatedUnion('kind', [
     kind: z.literal('line'),
     line_id: z.string().min(1),
     y: z.number(),
-    track: z.string().min(1).optional()
+    /** @deprecated Prefer `tracks`. Kept so older maps still parse. */
+    track: z.string().min(1).optional(),
+    /** Year lines on this strand (Junior / Rozelle / Senior / extra). */
+    tracks: z.array(z.string().min(1)).min(1).optional()
   }),
   z.object({
     kind: z.literal('station'),
     station_id: z.string().min(1),
     side: z.enum(['left', 'right']),
     offset: z.number().min(0).max(1).default(0.5),
-    /** Year line on the host program (Junior / Rozelle / Senior / extra). */
-    track: z.string().min(1).optional()
+    /** @deprecated Prefer `tracks`. Kept so older maps still parse. */
+    track: z.string().min(1).optional(),
+    /** Year lines on the host program (Junior / Rozelle / Senior / extra). */
+    tracks: z.array(z.string().min(1)).min(1).optional()
   }),
   z.object({
     kind: z.literal('event'),
