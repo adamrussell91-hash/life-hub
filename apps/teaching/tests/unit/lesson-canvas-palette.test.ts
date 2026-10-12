@@ -34,11 +34,11 @@ describe('lesson palette catalog', () => {
     expect(blockIconSrc('embed:google_maps')).toBe('/assets/blocks/embed-google_maps.png');
   });
 
-  it('hides compositions family when the list is empty', () => {
+  it('keeps compositions available when the list is empty', () => {
     const empty = lessonPaletteFamilies([]);
-    expect(empty.find((f) => f.id === 'Compositions')?.disabled).toBe(true);
+    expect(empty.find((f) => f.id === 'Compositions')?.disabled).not.toBe(true);
     const withOne = lessonPaletteFamilies([{ id: 'comp_1', title: 'Hook' }]);
-    expect(withOne.find((f) => f.id === 'Compositions')?.disabled).toBe(false);
+    expect(withOne.find((f) => f.id === 'Compositions')?.disabled).not.toBe(true);
     expect(withOne.find((f) => f.id === 'Compositions')?.cards[0]).toMatchObject({
       kind: 'composition',
       id: 'comp_1',
@@ -48,10 +48,9 @@ describe('lesson palette catalog', () => {
 });
 
 describe('homepage palette catalog', () => {
-  it('uses homepage groups, includes collection, and omits learning and compositions', () => {
+  it('keeps homepage question sets and collections but omits lesson-only activities and compositions', () => {
     const families = homepagePaletteFamilies();
     expect(families.map((f) => f.id)).toEqual(HOMEPAGE_BLOCK_GROUPS.map((g) => g.label));
-    expect(families.map((f) => f.id)).not.toContain('Learning');
     expect(families.map((f) => f.id)).not.toContain('Compositions');
     expect(
       families.find((f) => f.id === 'Layout')?.cards.some((c) => c.kind === 'block' && c.type === 'collection')
@@ -59,6 +58,7 @@ describe('homepage palette catalog', () => {
     const types = families.flatMap((f) =>
       f.cards.filter((c) => c.kind === 'block').map((c) => c.type)
     );
+    expect(types).toContain('question_set');
     expect(types).not.toEqual(expect.arrayContaining(['flashcards', 'cloze', 'self_check', 'outcomes']));
   });
 });

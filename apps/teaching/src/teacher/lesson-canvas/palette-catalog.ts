@@ -28,6 +28,7 @@ export type PaletteCard = PaletteBlockCard | PaletteCompositionCard;
 export type PaletteFamily = {
   id: string;
   disabled?: boolean;
+  emptyMessage?: string;
   cards: PaletteCard[];
 };
 
@@ -51,13 +52,14 @@ export function homepagePaletteFamilies(): PaletteFamily[] {
 }
 
 export function lessonPaletteFamilies(
-  compositions: Array<{ id: string; title: string }>
+  compositions: Array<{ id: string; title: string }>,
+  emptyMessage = 'No saved compositions yet. Use “Save as composition” in a section’s menu to reuse it here.'
 ): PaletteFamily[] {
   const families: PaletteFamily[] = familiesFromGroups(LESSON_BLOCK_GROUPS);
 
   families.push({
     id: 'Compositions',
-    disabled: compositions.length === 0,
+    emptyMessage,
     cards: compositions.map((composition) => ({
       kind: 'composition' as const,
       id: composition.id,
