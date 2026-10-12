@@ -359,6 +359,47 @@ function openTab(root: ParentNode, index: number): void {
 }
 
 describe('createTabsEditor', () => {
+  it('keeps a video intact when text is added after reopening its tab', () => {
+    const block = tabsBlock('reopened_tabs');
+    const tab = block.content.tabs[0]!;
+    const video = createBlock('video', `${tab.id}_b_n1`);
+    if (video.block_type !== 'video') throw new Error('expected video');
+    video.content = { provider: 'youtube', external_id: 'abc123', title: 'Clip', size: 'medium' };
+    tab.blocks = [video];
+    rememberTabsPanel(block.id, 0);
+    const { el, latest } = mountEditor(block);
+    document.body.append(el);
+    el.querySelector<HTMLButtonElement>('.hub-tabstrip__panel .hub-list__add')!.click();
+    document.querySelector<HTMLButtonElement>('.hub-insert__option[data-value="rich_text"]')!.click();
+    const source = el.querySelector<HTMLTextAreaElement>('.hub-tabstrip__panel .block-editor__html')!;
+    source.value = '<p>What makes this unfamiliar?</p>';
+    source.dispatchEvent(new Event('input', { bubbles: true }));
+    const children = latest().content.tabs[0]!.blocks;
+    expect(children[0]).toEqual(video);
+    expect(children[1]?.block_type).toBe('rich_text');
+    expect(children[1]?.content).toEqual({ html: '<p>What makes this unfamiliar?</p>' });
+    expect(new Set(children.map(child => child.id)).size).toBe(2);
+    expect(BlockSchema.safeParse(latest()).success).toBe(true);
+  });
+
+  it('isolates text edits when saved video and text blocks already share an ID', () => {
+    const block = tabsBlock('legacy_duplicate_tabs');
+    const video = createBlock('video', 'duplicate');
+    if (video.block_type !== 'video') throw new Error('expected video');
+    video.content = { provider: 'youtube', external_id: 'abc123', title: 'Clip', size: 'medium' };
+    block.content.tabs[0]!.blocks = [video, rich('duplicate', '<p>Before</p>')];
+    rememberTabsPanel(block.id, 0);
+    const { el, latest } = mountEditor(block);
+    const source = el.querySelector<HTMLTextAreaElement>('.block-editor__html')!;
+    source.value = '<p>After</p>';
+    source.dispatchEvent(new Event('input', { bubbles: true }));
+    const children = latest().content.tabs[0]!.blocks;
+    expect(children[0]).toEqual(video);
+    expect(children[1]?.block_type).toBe('rich_text');
+    expect(children[1]?.content).toEqual({ html: '<p>After</p>' });
+    expect(new Set(children.map(child => child.id)).size).toBe(2);
+  });
+
   it('edits tabs as a strip and shows one panel at a time', () => {
     const block = tabsBlock();
     block.content.tabs[0]!.label = 'Noelle';

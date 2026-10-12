@@ -40,14 +40,31 @@ export interface NestedBlocksEditorOptions {
 
 export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HTMLElement {
   let counter = 0;
+  // The editor is rebuilt when a tab is switched or a section is reopened.
+  // Its local counter must not reuse IDs already present in the saved list.
+  const reservedIds = new Set(options.blocks.map((block) => block.id));
   const nextId = () => {
-    counter += 1;
-    return options.idFactory() + `_n${counter}`;
+    for (const block of options.read?.() ?? []) reservedIds.add(block.id);
+    let id: string;
+    do {
+      counter += 1;
+      id = options.idFactory() + `_n${counter}`;
+    } while (reservedIds.has(id));
+    reservedIds.add(id);
+    return id;
   };
+  // Older records may already contain collisions. Give each editor its own
+  // identity before mounting; the next user edit persists the repaired list.
+  const seenIds = new Set<string>();
+  const blocks = options.blocks.map((block) => {
+    const next = seenIds.has(block.id) ? { ...block, id: nextId() } : block;
+    seenIds.add(next.id);
+    return next;
+  });
   const columnMove = options.columnMove;
 
   const list = createHubList<Block>({
-    items: options.blocks,
+    items: blocks,
     variant: 'blocks',
     noun: 'block',
     label: options.label ?? 'Blocks',
