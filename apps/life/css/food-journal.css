@@ -1,0 +1,324 @@
+.food-toolbar,
+.food-actions,
+.food-pair,
+.food-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.food-toolbar {
+  margin-bottom: var(--space-4);
+}
+.food-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  width: 100%;
+}
+.food-grid > * {
+  min-width: 0;
+}
+.food-visit,
+.food-dish {
+  padding: 0;
+  overflow: hidden;
+}
+.food-card__body {
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.food-photo {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  display: block;
+}
+.food-visit__title {
+  font-size: var(--text-lg);
+  color: var(--navy);
+  font-weight: 600;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.food-dish__title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.food-meta {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin: 0;
+}
+.food-notes,
+.food-preview {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.food-error {
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+.food-stack > summary {
+  cursor: pointer;
+  color: var(--wave);
+  padding: var(--space-2) 0;
+}
+.food-stack__dishes {
+  display: grid;
+  gap: var(--space-2);
+}
+.food-stack .food-dish {
+  border: 0;
+  box-shadow: none;
+}
+.food-stack .food-card__body {
+  padding: var(--space-2) 0;
+}
+.food-stack .food-photo {
+  border-radius: var(--radius-sm);
+}
+.food-rating {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+.food-rating .btn {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+}
+.food-rating [aria-pressed="true"] {
+  background: var(--pastel-blue);
+  border-color: var(--wave);
+  color: var(--navy);
+}
+.food-filters {
+  align-items: end;
+  margin-bottom: var(--space-4);
+}
+.food-filters .hub-search {
+  flex: 1;
+  min-width: 0;
+}
+.food-filters .hub-filter {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+}
+.food-pair > .hub-field {
+  flex: 1;
+  min-width: 0;
+}
+.food-sheet.hub-morph-dialog__frame {
+  width: min(100%, 48rem);
+  max-height: 92dvh;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow: hidden;
+}
+.food-sheet > h2 {
+  font-size: var(--text-lg);
+  color: var(--navy);
+  margin: 0;
+}
+.food-sheet__fields {
+  overflow-y: auto;
+  min-height: 0;
+  display: grid;
+  gap: var(--space-4);
+  overscroll-behavior: contain;
+  padding: var(--space-1);
+}
+.food-sheet__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex: none;
+  padding-top: var(--space-2);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.food-sheet__actions .btn {
+  flex: 1;
+  min-height: 44px;
+}
+.food-sheet > .food-error {
+  margin: 0;
+  font-size: var(--text-sm);
+  max-height: 4rem;
+  overflow-y: auto;
+}
+.food-sheet .hub-field {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.food-sheet input,
+.food-sheet select,
+.food-sheet textarea {
+  width: 100%;
+  min-width: 0;
+}
+.food-sheet textarea {
+  min-height: 8rem;
+}
+.food-dish-editor {
+  display: grid;
+  gap: var(--space-2);
+}
+.food-thumbnails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.food-thumbnails .food-photo {
+  width: 5rem;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+}
+.food-capture {
+  display: grid;
+  gap: var(--space-2);
+}
+.food-check {
+  display: flex;
+  align-items: start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  min-width: 0;
+}
+.food-check input {
+  width: auto;
+  flex: none;
+}
+.food-import-list,
+.food-cooking {
+  display: grid;
+  gap: var(--space-2);
+}
+.food-menu-text {
+  white-space: pre-wrap;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+.food-sheet a {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--wave);
+}
+@media (max-width: 1100px) {
+  .food-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .food-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .food-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .food-filters .hub-search {
+    grid-column: 1/-1;
+    width: 100%;
+  }
+  .food-sheet.hub-morph-dialog__frame {
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    margin: 0;
+    padding: var(--space-4);
+    box-sizing: border-box;
+  }
+  .hub-morph-dialog:has(.food-sheet) {
+    align-items: end;
+    padding: 0;
+  }
+  .food-sheet .food-sheet__fields input,
+  .food-sheet .food-sheet__fields select,
+  .food-sheet .food-sheet__fields textarea,
+  .food-filters input,
+  .food-filters select {
+    font-size: var(--text-md);
+  }
+  .food-toolbar .btn {
+    min-height: 44px;
+  }
+  .food-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .food-sheet .hub-list__body {
+    min-width: 0;
+  }
+  .food-sheet .hub-list__row {
+    min-width: 0;
+  }
+  .food-sheet .hub-list__add {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 720px) {
+  .food-sheet
+    .food-sheet__fields
+    .hub-list__body
+    .hub-field
+    :is(input, select, textarea) {
+    font-size: var(--text-md);
+  }
+}
+
+.food-photo-wrap {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.food-filters .hub-filter {
+  max-width: 100%;
+  overflow: hidden;
+}
+.food-filters .hub-filter [data-hub-value] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.food-filters .hub-filter__key {
+  display: none;
+}
+#food-journal-dashboard > .hub-search {
+  box-sizing: border-box;
+  margin-bottom: var(--space-4);
+}
+
+.food-preview,
+.food-visit__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.food-dish .food-notes {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+@media (max-width: 720px) {
+  .hub-morph-dialog:has(.food-sheet) {
+    inset: var(--vv-offset-top, 0px) 0 auto;
+    height: var(--vv-height, 100dvh);
+    box-sizing: border-box;
+  }
+  .food-sheet.hub-morph-dialog__frame {
+    max-height: calc(var(--vv-height, 100dvh) * 0.92);
+  }
+}

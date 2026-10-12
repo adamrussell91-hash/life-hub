@@ -1,3 +1,5 @@
+import { createFoodJournalApi } from '../food-journal/api.js';
+import { createFoodJournalView } from '../food-journal/view.js';
 import { load } from '../../vendor/js-yaml.mjs';
 import { agentColour } from './agent-colour.js';
 import { createSessionApi } from './api-session.js';
@@ -114,6 +116,7 @@ const loadCached = async ({ date }) => loadLiveEvents({
 const chatPanel = createChatPanelController({ root: document });
 const chatApi = createChatApi(fetchImpl);
 const skincareApi = createSkincareApi(fetchImpl);
+const foodJournalView = createFoodJournalView({ root: document, api: createFoodJournalApi(fetchImpl) });
 const propertyView = createPropertyView({
   root: document,
   api: createPropertyApi(fetchImpl),
@@ -224,6 +227,7 @@ controller = createAppController({
   scheduleApi,
   renderFutureMap,
   loadFutureMapTrips,
+  foodJournalView,
   propertyView,
   garageHomeView,
   skincareController,
@@ -272,7 +276,7 @@ document.addEventListener('keydown', (event) => {
     placeholder: 'Jump in Life Hub',
     groups: [{
       heading: 'Go to',
-      items: ['home', 'chat', 'nutrition', 'fitness', 'body', 'mind', 'skincare', 'calendar', 'central-node', 'future-map'].map((id) => ({
+      items: ['home', 'chat', 'food-journal', 'nutrition', 'fitness', 'body', 'mind', 'skincare', 'calendar', 'central-node', 'future-map'].map((id) => ({
         id,
         label: id.replace(/-/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase()),
         onSelect: () => document.querySelector(`[data-section="${id}"]`)?.click()

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v210';
+const CACHE_NAME = 'life-hub-shell-v211';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -14,6 +14,13 @@ const SHELL_FILES = [
   'js/app/capture-inbox.js',
   'capture-inbox.html',
   'css/app.css',
+  'css/food-journal.css',
+  'js/food-journal/api.js',
+  'js/food-journal/model.js',
+  'js/food-journal/view.js',
+  'js/food-journal/capture.js',
+  'packages/design-kit/hub-list.css',
+  'packages/design-kit/js/hub-list.js',
   'css/aesthetics.css',
   'js/app/aesthetics/fragrance-photos.js',
   'packages/design-kit/tokens.css',
@@ -21,6 +28,8 @@ const SHELL_FILES = [
   'packages/design-kit/actions.css',
   'packages/design-kit/confirm-card.css',
   'packages/design-kit/filters.css',
+  'packages/design-kit/forms.css',
+  'packages/design-kit/cards.css',
   'packages/design-kit/sign-in.css',
   'packages/design-kit/motion.css',
   'packages/design-kit/morphing-popover.css',
