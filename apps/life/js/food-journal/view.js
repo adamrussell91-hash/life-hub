@@ -132,18 +132,30 @@ export function createFoodJournalView({
     const actions = el("div", "food-sheet__actions");
     actions.dataset.part = "form-actions";
     frame.append(heading, fields, error, actions);
+    let closed = false;
     const handle = openMorphingDialog({
       frame,
       trigger,
       label: title,
       closeButton: false,
       onClose: () => {
+        closed = true;
         if (dialog === handle) dialog = null;
         if (!trigger?.isConnected) host?.querySelector("button")?.focus();
       },
     });
     dialog = handle;
-    return { frame, fields, error, actions, close: () => handle.close() };
+    return {
+      frame,
+      fields,
+      error,
+      actions,
+      isOpen: () => !closed && dialog === handle && frame.isConnected,
+      close: () => {
+        closed = true;
+        handle.close();
+      },
+    };
   }
   async function persist(next) {
     if (busy) throw new Error("A save is already running.");
@@ -1127,7 +1139,7 @@ export function createFoodJournalView({
               action: "recipe",
               dish_id: dish.id,
             });
-            if (token !== epoch) return;
+            if (token !== epoch || !s.isOpen()) return;
             s.close();
             recipeEditor(recipe, trigger);
           } catch (err) {
@@ -1361,6 +1373,10 @@ export function createFoodJournalView({
     );
   }
   async function backup() {
+    if (!loaded) {
+      status("Load your journal before backing up.", true);
+      return;
+    }
     if (busy) return;
     const token = epoch;
     status("Preparing backup with photos.");
@@ -1533,22 +1549,33 @@ export function scaleIngredient(line, factor) {
     "⅝": 0.625,
     "⅞": 0.875,
   };
-  const number = (value) => {
+  const parse = (value) => {
     if (fractions[value] != null) return fractions[value];
-    const mixed = value.match(/^(\d+)\s+(\d+)\/(\d+)$/);
-    if (mixed) return Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3]);
-    const fraction = value.match(/^(\d+)\/(\d+)$/);
-    if (fraction) return Number(fraction[1]) / Number(fraction[2]);
+    let match = value.match(/^(\d+)([¼½¾⅓⅔⅛⅜⅝⅞])$/);
+    if (match) return Number(match[1]) + fractions[match[2]];
+    match = value.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
+    if (match) return Number(match[1]) + Number(match[2]) / Number(match[3]);
+    match = value.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (match) return Number(match[1]) / Number(match[2]);
     return Number(value);
   };
-  return line.replace(
-    /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?|[¼½¾⅓⅔⅛⅜⅝⅞])(?=\s|$)/,
-    (quantity) => {
-      const scaled = number(quantity) * factor;
-      return Number.isFinite(scaled)
-        ? String(Math.round(scaled * 100) / 100)
-        : quantity;
-    },
+  const quantity = String.raw`(?:\d+\s+\d+\s*\/\s*\d+|\d+\s*\/\s*\d+|\d+[¼½¾⅓⅔⅛⅜⅝⅞]|\d+(?:\.\d+)?|\.\d+|[¼½¾⅓⅔⅛⅜⅝⅞])`;
+  const scaled = (value) => {
+    const n = parse(value) * factor;
+    return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : value;
+  };
+  const range = new RegExp(
+    `^(${quantity})\\s*(to|or|[-–—])\\s*(${quantity})(?=\\s|$|[a-zA-Z])`,
+    "i",
+  );
+  if (range.test(line))
+    return line.replace(
+      range,
+      (_, a, separator, b) =>
+        `${scaled(a)} ${separator.toLowerCase() === "or" ? "or" : "to"} ${scaled(b)}`,
+    );
+  return line.replace(new RegExp(`^(${quantity})(?=\\s|$|[a-zA-Z])`), (value) =>
+    scaled(value),
   );
 }
 

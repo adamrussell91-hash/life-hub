@@ -488,3 +488,10 @@ test("Day One import uses each entry timezone across midnight and preserves date
   assert.equal(dayOneDate({ creationDate: "2026-10-01" }), "2026-10-01");
   assert.equal(dayOneDate({ creationDate: "2026-02-30T21:00:00Z" }), "");
 });
+
+test("portion scaling handles ranges, mixed unicode fractions and compact units", () => {
+  assert.equal(scaleIngredient("2 to 3 onions", 2), "4 to 6 onions");
+  assert.equal(scaleIngredient("2–3 onions", 2), "4 to 6 onions");
+  assert.equal(scaleIngredient("1½ cups flour", 2), "3 cups flour");
+  assert.equal(scaleIngredient("100g pasta", 2), "200g pasta");
+});
