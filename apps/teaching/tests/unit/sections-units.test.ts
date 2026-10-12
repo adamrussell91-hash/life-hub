@@ -201,6 +201,15 @@ describe('units', () => {
     canvas = document.createElement('div');
   });
 
+  it('offers scheduling only in the unit options menu',()=>{
+    renderUnitPage(canvas,curriculum,unit.id);
+    const buttons=[...canvas.querySelectorAll<HTMLButtonElement>('button')].filter(b=>b.textContent==='Schedule lessons');
+    expect(buttons).toHaveLength(1);expect(buttons[0]!.getAttribute('role')).toBe('menuitem');
+    canvas.querySelector<HTMLButtonElement>('.page-options__trigger')!.click();buttons[0]!.click();
+    expect(document.querySelector('[data-timetable-dialog]')).not.toBeNull();
+    document.querySelector<HTMLButtonElement>('[data-timetable-action="cancel"]')!.click();
+  });
+
   const newLesson: Lesson = {
     id: 'lesson_new', type: 'lesson', title: 'Untitled lesson', slug: 'untitled_lesson',
     unit_id: unit.id, sequence: 3, status: 'active',

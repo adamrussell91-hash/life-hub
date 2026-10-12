@@ -5,4 +5,6 @@ export function dateNumber(value:string):number;
 export function sessionKey(row:{date:string;start_time:string}):string;
 export function validateTimetable(input:unknown):ClassTimetable;
 export function generateTimetableSessions(input:unknown,startDate:string,endDate:string):TimetableSession[];
-export function manresaTimetable():ClassTimetable;
+
+
+export function parseTimetableText(text:string,cycleLength:number):TimetableSlot[];
