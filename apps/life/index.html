@@ -14,6 +14,8 @@
   <link rel="stylesheet" href="packages/design-kit/overlays.css">
   <link rel="stylesheet" href="packages/design-kit/actions.css">
   <link rel="stylesheet" href="packages/design-kit/filters.css">
+  <link rel="stylesheet" href="packages/design-kit/forms.css">
+  <link rel="stylesheet" href="packages/design-kit/cards.css">
   <link rel="stylesheet" href="packages/design-kit/sign-in.css">
   <link rel="stylesheet" href="packages/design-kit/motion.css">
   <link rel="stylesheet" href="packages/design-kit/morphing-popover.css">
@@ -37,6 +39,8 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/aesthetics.css">
   <link rel="stylesheet" href="css/property.css">
+  <link rel="stylesheet" href="css/food-journal.css">
+  <link rel="stylesheet" href="packages/design-kit/hub-list.css">
   <link rel="stylesheet" href="css/garage-home.css">
 </head>
 <body>
@@ -100,6 +104,7 @@
           <div class="hub-panel is-open" data-hub-panel="life">
             <div class="hub-panel-inner">
               <button class="hub-nav-item" type="button" data-section="nutrition"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c4-3 7-6.4 7-10.2A4.8 4.8 0 0 0 12 7a4.8 4.8 0 0 0-7 3.8C5 14.6 8 18 12 21Z"/><path d="M12 7c.4-2.2 1.8-3.8 3.8-4"/></svg></span><span>Nutrition</span></button>
+<button class="hub-nav-item hub-rail__link" type="button" data-section="food-journal"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v6a3 3 0 0 0 6 0V3M7 3v18M17 3v18M17 3c4 3 4 8 0 10"/></svg></span><span>Food Journal</span></button>
               <button class="hub-nav-item" type="button" data-section="fitness"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8v8M18 8v8M6 12h12M4 10v4M20 10v4"/></svg></span><span>Fitness</span></button>
               <button class="hub-nav-item" type="button" data-section="body"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3"/><path d="M6 20v-1a6 6 0 0 1 12 0v1"/></svg></span><span>Body</span></button>
               <button class="hub-nav-item" type="button" data-section="mind"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.2 6.2l2.5 2.5M15.3 15.3l2.5 2.5M17.8 6.2l-2.5 2.5M8.7 15.3l-2.5 2.5"/></svg></span><span>Mind</span></button>
@@ -520,7 +525,9 @@
           </section>
         </div>
 
+        <section id="food-journal-dashboard" class="dashboard" aria-label="Food Journal" hidden></section>
         <section id="nutrition-dashboard" class="dashboard" aria-label="Nutrition" hidden>
+          <div class="food-actions"><button class="btn btn--secondary" type="button" data-section="food-journal">Open Food Journal</button></div>
           <article id="nutrition-today" class="metric-card nutrition-today" aria-labelledby="nutrition-today-label">
             <p class="metric-label nutrition-today__kicker" id="nutrition-today-label">Today</p>
             <div class="nutrition-today__layout">
@@ -1572,6 +1579,7 @@
         <nav class="hub-more-sheet__nav" aria-label="Secondary destinations">
           <p class="hub-more-sheet__section">In this hub</p>
           <button type="button" data-section="nutrition"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c4-3 7-6.4 7-10.2A4.8 4.8 0 0 0 12 7a4.8 4.8 0 0 0-7 3.8C5 14.6 8 18 12 21Z"/><path d="M12 7c.4-2.2 1.8-3.8 3.8-4"/></svg></span>Nutrition</button>
+          <button type="button" data-section="food-journal"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 3v6a3 3 0 0 0 6 0V3M7 3v18M17 3v18M17 3c4 3 4 8 0 10"/></svg></span>Food Journal</button>
           <button type="button" data-section="fitness"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8v8M18 8v8M6 12h12M4 10v4M20 10v4"/></svg></span>Fitness</button>
           <button type="button" data-section="body"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3"/><path d="M6 20v-1a6 6 0 0 1 12 0v1"/></svg></span>Body</button>
           <button type="button" data-section="mind"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.2 6.2l2.5 2.5M15.3 15.3l2.5 2.5M17.8 6.2l-2.5 2.5M8.7 15.3l-2.5 2.5"/></svg></span>Mind</button>

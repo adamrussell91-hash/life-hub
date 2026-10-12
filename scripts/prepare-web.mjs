@@ -95,6 +95,10 @@ export async function prepareWeb() {
 
   const vendorDirectory = new URL('vendor/', publishRoot);
   await mkdir(vendorDirectory, { recursive: true });
+  await copyFile(new URL('node_modules/exifr/dist/full.esm.mjs', projectRoot), new URL('exifr.mjs', vendorDirectory));
+  await copyFile(new URL('node_modules/heic-to/dist/heic-to.js', projectRoot), new URL('heic-to.mjs', vendorDirectory));
+  await copyFile(new URL('node_modules/heic-to/LICENSE', projectRoot), new URL('heic-to-LICENSE.txt', vendorDirectory));
+  await copyFile(new URL('node_modules/exifr/LICENSE', projectRoot), new URL('exifr-LICENSE.txt', vendorDirectory));
   await copyFile(
     new URL('node_modules/js-yaml/dist/js-yaml.mjs', projectRoot),
     new URL('js-yaml.mjs', vendorDirectory)
