@@ -19,7 +19,9 @@ export function createWorldPreview(host:HTMLElement,onPick:(tree:AnnualTree,x:nu
  const heightScale=options.heightScale??3;
  const renderer=new WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));host.append(renderer.domElement);
  const scene=new Scene(),camera=new OrthographicCamera(-600,600,600,-600,1,5000);camera.position.set(780,950,780);camera.lookAt(0,0,0);
- const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=false;controls.enabled=options.interactive!==false;controls.minZoom=.25;controls.maxZoom=20;
+ // Tall phone iframes: base frustum ~610–1100, so clearing zoom needs a high ceiling.
+ const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=false;controls.enabled=options.interactive!==false;controls.minZoom=.25;controls.maxZoom=240;
+ const orthoHalf=(aspect:number)=>aspect<1?610/aspect:610;
  scene.add(new HemisphereLight(0xf4f7ff,0x7d8f5a,2));const sun=new DirectionalLight(0xfff3dd,2);sun.position.set(-600,1000,300);scene.add(sun);
  let content=new Group();scene.add(content);let owned:{dispose():void}[]=[],disposed=false,current:AnnualWorld|null=null,layer:DiagnosticLayer='elevation';
  let meshPayloads:WorldMeshes[]=[],waterEffects:ReturnType<typeof createAnnualWater>[]=[],quality:WaterQuality='medium';
@@ -49,8 +51,17 @@ export function createWorldPreview(host:HTMLElement,onPick:(tree:AnnualTree,x:nu
   if(!tree&&host.dataset.scene==='annual'){const point=new Vector3();function* projected(){for(const t of plan?.contextTrees??[]){point.set(t.x+offset(t.worldYear),t.height*heightScale+4*t.scale,t.z).project(camera);yield {item:t,x:r.left+(point.x+1)*r.width/2,y:r.top+(1-point.y)*r.height/2,depth:point.z};}}tree=nearestProjectedItem(projected(),e.clientX,e.clientY,r.width<600?22:12);}
   if(tree)onPick(tree,e.clientX,e.clientY);};
  renderer.domElement.addEventListener('pointerdown',pointerDown);renderer.domElement.addEventListener('pointerup',pointerUp);
- const resize=()=>{const width=host.clientWidth||1,height=host.clientHeight||1,aspect=width/height,half=aspect<1?610/aspect:610;
-  camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;camera.updateProjectionMatrix();renderer.setSize(width,height,false);renderer.domElement.style.width='100%';renderer.domElement.style.height='100%';render();};
+ let fitted=false;
+ const resize=()=>{const width=host.clientWidth||1,height=host.clientHeight||1,aspect=width/height;
+  if(fitted){
+   // Preserve fitted vertical world span; only reflow horizontal for aspect.
+   const midX=(camera.left+camera.right)/2,halfY=(camera.top-camera.bottom)/2,halfX=halfY*aspect;
+   camera.left=midX-halfX;camera.right=midX+halfX;
+  }else{
+   const half=orthoHalf(aspect);
+   camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;
+  }
+  camera.updateProjectionMatrix();renderer.setSize(width,height,false);renderer.domElement.style.width='100%';renderer.domElement.style.height='100%';render();};
  const observer=new ResizeObserver(resize);observer.observe(host);controls.addEventListener('change',render);controls.addEventListener('start',cancelCamera);controls.addEventListener('end',scheduleRefine);resize();
  function show(world:AnnualWorld,nextLayer=layer,append=false){
   if(disposed)return;current=world;layer=nextLayer;
@@ -134,9 +145,18 @@ export function createWorldPreview(host:HTMLElement,onPick:(tree:AnnualTree,x:nu
   cancelCamera();const fromPosition=camera.position.clone(),fromTarget=controls.target.clone(),fromZoom=camera.zoom;
   const points=annualFramePoints(annual,plan,selection,options.focusedDay??false,heightScale,offset);
   if(!points.length)return;const minX=Math.min(...points.map(p=>p.x)),maxX=Math.max(...points.map(p=>p.x)),minZ=Math.min(...points.map(p=>p.z)),maxZ=Math.max(...points.map(p=>p.z)),x=(minX+maxX)/2,z=(minZ+maxZ)/2,y=points.reduce((n,p)=>n+p.y,0)/points.length;
-  controls.target.set(x,y,z);camera.position.set(x+780,y+950,z+780);camera.zoom=1;camera.lookAt(x,y,z);camera.updateProjectionMatrix();camera.updateMatrixWorld();
-  let extent=.05;for(const px of [minX-8,maxX+8])for(const pz of [minZ-8,maxZ+8])for(const py of [y-20,y+20]){const p=new Vector3(px,py,pz).project(camera);extent=Math.max(extent,Math.abs(p.x),Math.abs(p.y));}
-  camera.zoom=Math.max(.25,Math.min(20,.85/extent));camera.updateProjectionMatrix();controls.update();camera.updateMatrixWorld();host.dataset.visibleSelectedTrees=String((plan?.trees??[]).filter(t=>{const p=new Vector3(t.x+offset(t.worldYear),t.height*heightScale,t.z).project(camera);return Math.abs(p.x)<=1&&Math.abs(p.y)<=1;}).length);render();
+  const aspect=(host.clientWidth||1)/Math.max(1,host.clientHeight||1),half=orthoHalf(aspect);
+  camera.top=half;camera.bottom=-half;camera.left=-half*aspect;camera.right=half*aspect;camera.zoom=1;
+  controls.target.set(x,y,z);camera.position.set(x+780,y+950,z+780);camera.lookAt(x,y,z);camera.updateProjectionMatrix();camera.updateMatrixWorld();
+  const span=Math.max(maxX-minX,maxZ-minZ,4);
+  if(selection){
+   // project() under-zooms tight clearings on tall iframes — size from ground span.
+   camera.zoom=Math.max(.25,Math.min(controls.maxZoom,(2*half)/Math.max(span/0.9,3.5)));
+  }else{
+   let extent=.05;for(const px of [minX-8,maxX+8])for(const pz of [minZ-8,maxZ+8])for(const py of [y-20,y+20]){const p=new Vector3(px,py,pz).project(camera);extent=Math.max(extent,Math.abs(p.x),Math.abs(p.y));}
+   camera.zoom=Math.max(.25,Math.min(controls.maxZoom,.85/extent));
+  }
+  camera.updateProjectionMatrix();controls.update();camera.updateMatrixWorld();fitted=true;host.dataset.visibleSelectedTrees=String((plan?.trees??[]).filter(t=>{const p=new Vector3(t.x+offset(t.worldYear),t.height*heightScale,t.z).project(camera);return Math.abs(p.x)<=1&&Math.abs(p.y)<=1;}).length);render();
   if(ease&&!motionQuery.matches&&!paused&&!document.hidden){const toPosition=camera.position.clone(),toTarget=controls.target.clone(),toZoom=camera.zoom,start=performance.now();const step=(now:number)=>{cameraRaf=0;if(disposed||motionQuery.matches||paused||document.hidden||!intersecting)return;const f=Math.min(1,(now-start)/450),t=f*f*(3-2*f);camera.position.lerpVectors(fromPosition,toPosition,t);controls.target.lerpVectors(fromTarget,toTarget,t);camera.zoom=fromZoom+(toZoom-fromZoom)*t;camera.updateProjectionMatrix();controls.update();render();if(f===1)scheduleRefine();if(f<1)cameraRaf=requestAnimationFrame(step);};step(start);}
  }
  function showPrototype(){

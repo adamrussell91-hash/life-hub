@@ -1,16 +1,16 @@
-import {groveBooks} from '@/domain/grove/books';
 /**
  * Home's Grove preview (`/tasks/grove.html`): today's clearing, no hub chrome.
  * Home frames it in a link to the full forest, so this page takes no input.
  */
 import '../../design-kit/tokens.css';
 import './embed.css';
+import {groveBooks} from '@/domain/grove/books';
 import {AnnualGroveLoader} from '@/domain/grove/annual-loader';
-import type {GroveSceneHandle} from '@/views/grove/scene';
 import {groveTerms} from '@/domain/grove/calendar';
-import { toHubDateKey } from '@/domain/queries';
-import { tasksApi } from '@/services/client-api';
-import { dayCaption } from '@/views/grove/copy';
+import {toHubDateKey} from '@/domain/queries';
+import {tasksApi} from '@/services/client-api';
+import {dayCaption} from '@/views/grove/copy';
+import type {GroveSceneHandle} from '@/views/grove/scene';
 
 const loader=new AnnualGroveLoader();let handle:GroveSceneHandle|null=null,revision=0;
 let acceptedBooks: Awaited<ReturnType<typeof groveBooks>> = [];
@@ -21,9 +21,7 @@ async function start(root: HTMLElement): Promise<void> {
   stage.className = 'grove-embed__stage';
   const caption = document.createElement('p');
   caption.className = 'grove-embed__caption';
-  const credits = document.createElement('p');
-  credits.className = 'grove-embed__credits';
-  if (!handle) root.replaceChildren(stage, caption, credits);
+  if (!handle) root.replaceChildren(stage, caption);
 
   let tasks;
   try {
@@ -50,20 +48,19 @@ async function start(root: HTMLElement): Promise<void> {
     const mounted=await mountAnnualGroveScene(stage, {
       ...loaded,
       interactive: false,
-
-      onWildlife: (_count, _missing, lines) => { credits.textContent = lines.join(' · '); }
+      frameMode: 'clearing'
     });
     if(current!==revision){mounted.dispose();stage.remove();return;}
     acceptedBooks = books;
     const previous = handle; handle = mounted;
     stage.style.removeProperty('visibility');
-    root.replaceChildren(stage, caption, credits);
+    root.replaceChildren(stage, caption);
     previous?.dispose(); root.dataset.state = 'ready';
   } catch (error) {
     stage.remove();
     if(current!==revision)return;console.error(error);
     if(handle)return;
-    root.replaceChildren(stage,caption,credits);
+    root.replaceChildren(stage,caption);
     caption.textContent = 'The clearing could not draw on this device';
     root.dataset.state = 'error';
   }
