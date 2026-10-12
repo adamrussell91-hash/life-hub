@@ -1,21 +1,19 @@
 import { FAILURE } from '@/app/failure';
-import { withAppBase } from '@/app/base-path';
 import { apiGet, ApiClientError } from '@/api/client';
-import { navigate } from '@/app/router';
 import { renderBlock } from '@/blocks/render';
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import { scheduleNeighbors } from '@/schedule/schedule-neighbors';
 import { formatStudentDate } from '@/student/format';
-import { renderStudentHero } from '@/student/hero';
+import { renderEntityBanner } from '@/teacher/entity-banner';
 import { mountPublicOutcomeChips } from '@/outcomes/strip';
 import type { PublicOutcome } from '@/curriculum/outcome-catalog';
-import { firstLeadFromBlocks } from '@/student/lesson-lead';
 import {
   fetchPublishedClass,
   type PublishedClass
 } from '@/student/published-class';
 import {
   createStudentShell,
+  studentAnchor,
   renderStudentChrome,
   renderStudentStatus
 } from '@/student/shell';
@@ -43,7 +41,6 @@ function renderPublishedLesson(
   const classTitle = cls?.title?.trim() ?? '';
   const scheduleDate =
     cls?.schedule.find((row) => row.lesson_id === lesson.lesson_id)?.date ?? '';
-  const lead = firstLeadFromBlocks(lesson.blocks);
 
   let meta: HTMLElement | undefined;
   if (classTitle || scheduleDate) {
@@ -63,21 +60,33 @@ function renderPublishedLesson(
     }
   }
 
-  content.append(
-    renderStudentHero({
-      title: lesson.title,
-      eyebrow: classTitle || 'Lesson',
-      lead: lead ?? undefined,
-      entityId: lesson.lesson_id,
-      cover: lesson.cover,
-      media: lesson.cover ? 'cover' : 'never',
-      extraClass: 'lesson-hero',
-      titleClass: 'lesson-hero__title',
-      eyebrowClass: 'lesson-hero__eyebrow',
-      leadClass: 'lesson-hero__lead',
-      meta
-    })
-  );
+  const hero = document.createElement('header');
+  hero.className = 'lesson-hero';
+  const coverHost = document.createElement('div');
+  coverHost.className = 'lesson-page__cover';
+  renderEntityBanner(coverHost, {
+    title: lesson.title,
+    eyebrow: 'Lesson',
+    entityId: lesson.lesson_id,
+    cover: lesson.cover,
+    media: [],
+    size: 'hero',
+    fallback: 'marine'
+  });
+  coverHost.querySelector('.entity-banner__eyebrow')?.classList.add('lesson-hero__eyebrow');
+
+  // Use the planner's title overlay and typography, with a semantic heading
+  // instead of its editable input. The banner's decorative title stays hidden.
+  const titleOverlay = document.createElement('div');
+  titleOverlay.className = 'entity-page-title';
+  const title = document.createElement('h1');
+  title.className = 'entity-page-title__text lesson-hero__title';
+  title.textContent = lesson.title;
+  titleOverlay.append(title);
+  coverHost.append(titleOverlay);
+  hero.append(coverHost);
+  if (meta) hero.append(meta);
+  content.append(hero);
 
   const publishedOutcomes = (lesson as PublishedLesson & { outcomes?: PublicOutcome[] }).outcomes;
   if (publishedOutcomes && publishedOutcomes.length > 0) {
@@ -125,9 +134,7 @@ function renderLessonNav(
 
   if (prev) {
     const href = `/s/classes/${classId}/lessons/${prev.lesson_id}`;
-    const link = document.createElement('a');
-    link.className = 'student-lesson__nav-prev student-pager__link';
-    link.href = withAppBase(href);
+    const link = studentAnchor(href, 'student-lesson__nav-prev student-pager__link');
     const dir = document.createElement('span');
     dir.className = 'student-pager__dir';
     dir.textContent = 'Previous';
@@ -135,18 +142,12 @@ function renderLessonNav(
     title.className = 'student-pager__title';
     title.textContent = prev.title;
     link.append(dir, title);
-    link.addEventListener('click', (event) => {
-      event.preventDefault();
-      navigate(href);
-    });
     nav.append(link);
   }
 
   if (next) {
     const href = `/s/classes/${classId}/lessons/${next.lesson_id}`;
-    const link = document.createElement('a');
-    link.className = 'student-lesson__nav-next student-pager__link';
-    link.href = withAppBase(href);
+    const link = studentAnchor(href, 'student-lesson__nav-next student-pager__link');
     const dir = document.createElement('span');
     dir.className = 'student-pager__dir';
     dir.textContent = 'Next';
@@ -154,10 +155,6 @@ function renderLessonNav(
     title.className = 'student-pager__title';
     title.textContent = next.title;
     link.append(dir, title);
-    link.addEventListener('click', (event) => {
-      event.preventDefault();
-      navigate(href);
-    });
     nav.append(link);
   }
 

@@ -42,7 +42,7 @@ describe('mountStudentUnitView', () => {
       expect(root.querySelector('.student-hero__title')?.textContent).toBe('AOTFW Unit');
       const links = [...root.querySelectorAll('a.student-unit__lesson-link')];
       expect(links).toHaveLength(2);
-      expect(links[0].getAttribute('href')).toBe('/s/lessons/lesson_aotfw_008');
+      expect(links[0].getAttribute('href')).toBe('https://class.adam-russell.com/s/lessons/lesson_aotfw_008');
       expect(links[0].textContent).toContain('Memory');
     });
   });
