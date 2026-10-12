@@ -392,7 +392,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         const data = await apiGet<{ compositions: CompositionSummary[] }>('/api/compositions');
         palette?.updateFamilies(lessonPaletteFamilies(data.compositions));
       } catch {
-        palette?.updateFamilies(lessonPaletteFamilies([]));
+        palette?.updateFamilies(lessonPaletteFamilies([], 'Unable to load compositions. Reload the page to try again.'));
         setCompositionStatus('Unable to load compositions.');
       }
     }
@@ -553,7 +553,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     }
 
     palette = mountLessonPalette(railHost, {
-      families: lessonPaletteFamilies([]),
+      families: lessonPaletteFamilies([], 'Loading compositions…'),
       onInsert: onPaletteInsert,
       onCompositionChoice: (id, mode) => {
         if (mode === 'copy') void insertSelectedComposition(id);

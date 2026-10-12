@@ -381,7 +381,7 @@ describe('units', () => {
     const families = [...(plan?.querySelectorAll('.lesson-palette__family') ?? [])].map((el) =>
       el.getAttribute('data-family')
     );
-    expect(families).not.toContain('Learning');
+    expect(families).toContain('Learning');
     expect(families).toContain('Layout');
   });
 

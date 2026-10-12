@@ -102,7 +102,11 @@ describe('mountHomepageEditor', () => {
     const families = [...container.querySelectorAll('.lesson-palette__family')].map(
       (el) => el.getAttribute('data-family')
     );
-    expect(families).not.toContain('Learning');
+    expect(families).toContain('Learning');
+    container.querySelector<HTMLButtonElement>('.lesson-palette__family[data-family="Learning"]')?.click();
+    expect([...container.querySelectorAll('.lesson-palette__card')].map(
+      (el) => el.getAttribute('data-block-type')
+    )).toEqual(['question_set']);
     expect(families).toContain('Layout');
     container.querySelector<HTMLButtonElement>('.lesson-palette__family[data-family="Layout"]')?.click();
     const types = [...container.querySelectorAll('.lesson-palette__card')].map(
