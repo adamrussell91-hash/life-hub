@@ -13,7 +13,7 @@ async function fixture(){
  for(const script of ['scripts/prepare-web.mjs','scripts/lib/grove-animal-catalogue.mjs','scripts/lib/rewrite-published-kit-imports.mjs'])await write(script,await fs.readFile(path.join(repository,script)));
  for(const folder of ['apps/life/assets','apps/life/css','apps/life/js','packages/design-kit/js','packages/design-kit/icons'])await fs.mkdir(path.join(root,folder),{recursive:true});
  for(const file of ['index.html','capture-inbox.html','manifest.webmanifest','service-worker.js','robots.txt'])await write('apps/life/'+file);
- await write('scripts/pages-spa-fallback.html');await write('node_modules/js-yaml/dist/js-yaml.mjs');
+ await write('scripts/pages-spa-fallback.html');await write('node_modules/js-yaml/dist/js-yaml.mjs');await write('node_modules/exifr/dist/full.esm.mjs');await write('node_modules/heic-to/dist/heic-to.js');await write('node_modules/heic-to/LICENSE');await write('node_modules/exifr/LICENSE');
  await write('apps/life/assets/grove/manifest.json',JSON.stringify({assets:[]}));
  await write('apps/life/assets/grove/project-only/manifest.json',JSON.stringify({assets:[]}));
  await write('apps/life/assets/grove/project-only/current.glb','verified current fixture');

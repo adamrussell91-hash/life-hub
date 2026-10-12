@@ -38,6 +38,7 @@ export const VERA_AGENT_SLUG = 'vera';
 
 const MORE_SECTIONS = new Set([
   'nutrition',
+  'food-journal',
   'fitness',
   'body',
   'mind',
@@ -52,6 +53,7 @@ const HASH_SECTIONS = new Set([
   'home',
   'chat',
   'nutrition',
+  'food-journal',
   'fitness',
   'skincare',
   'calendar',
@@ -124,6 +126,7 @@ export function createAppController(dependencies) {
     scheduleApi,
     renderFutureMap,
     loadFutureMapTrips,
+    foodJournalView,
     propertyView,
     garageHomeView,
     skincareController,
@@ -246,7 +249,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'future-map' || target === 'property' || target === 'garage-home' || target === 'more') continue;
+    if (target === 'home' || target === 'chat' || target === 'food-journal' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'future-map' || target === 'property' || target === 'garage-home' || target === 'more') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
@@ -287,6 +290,9 @@ export function createAppController(dependencies) {
   }
   for (const button of root.querySelectorAll?.('[data-section="garage-home"]') ?? []) {
     bind(button, 'click', () => showSection('garage-home'));
+  }
+  for (const button of root.querySelectorAll?.('[data-section="food-journal"]') ?? []) {
+    bind(button, 'click', () => showSection('food-journal'));
   }
   bind(root.querySelector('#central-node-map-button'), 'click', () => showSection('hub-map'));
   bindHubAccordion(root.querySelector('[data-hub-accordion]'));
@@ -758,6 +764,7 @@ export function createAppController(dependencies) {
   const SECTION_TITLES = {
     home: { eyebrow: 'Life Hub', title: 'Home' },
     chat: { eyebrow: 'Life Hub', title: 'Chat' },
+    'food-journal': { eyebrow: 'Life Hub', title: 'Food Journal' },
     nutrition: { eyebrow: 'Life Hub', title: 'Nutrition' },
     fitness: { eyebrow: 'Life Hub', title: 'Fitness' },
     skincare: { eyebrow: 'Life Hub', title: 'Aesthetics' },
@@ -817,6 +824,8 @@ export function createAppController(dependencies) {
   function setSectionVisibility(name) {
     const home = root.querySelector('#home-dashboard');
     const chat = root.querySelector('#chat-view');
+    const foodJournal = root.querySelector('#food-journal-dashboard');
+    if (foodJournal) foodJournal.hidden = name !== 'food-journal';
     const nutrition = root.querySelector('#nutrition-dashboard');
     const fitness = root.querySelector('#fitness-dashboard');
     const skincare = root.querySelector('#skincare-dashboard');
@@ -913,6 +922,7 @@ export function createAppController(dependencies) {
       consumeTravelPenelopeHandoff();
     }
     if (name === 'central-node') renderCentralNodeSection();
+    if (name === 'food-journal') foodJournalView?.show?.();
     if (name === 'property') propertyView?.show?.();
     if (name === 'garage-home') void garageHomeView?.show?.();
     if (name === 'future-map') {
@@ -1953,6 +1963,7 @@ export function createAppController(dependencies) {
   }
 
   function showSignedOut(message = '') {
+    foodJournalView?.reset?.();
     authenticated = false;
     clearRefreshTimer();
     clearSessionExpiryTimer();
