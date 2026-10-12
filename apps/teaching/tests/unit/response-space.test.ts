@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { BlockSchema, QuestionItemSchema, ResponseSpaceSchema } from '@/schemas/block';
 import { createBlock } from '@/blocks/create-block';
 import { createQuestionSetEditor } from '@/blocks/editors';
+import { renderQuestionSetBlock } from '@/blocks/render';
 import type { Block } from '@/schemas/block';
 
 const timestamps = {
@@ -79,6 +80,35 @@ describe('response_space create defaults', () => {
 });
 
 describe('response_space editor', () => {
+  it('selecting None removes writing space in teacher, student and print views', () => {
+    let latest = createBlock('question_set', 'qs_none') as Extract<Block, { block_type: 'question_set' }>;
+    latest.content.questions[0].prompt = 'Discuss this aloud.';
+    const editor = createQuestionSetEditor(latest, (next) => { latest = next; }, () => latest);
+    const space = editor.querySelector('.block-editor__question-response-space') as HTMLSelectElement;
+    space.value = 'none';
+    space.dispatchEvent(new Event('change'));
+    expect(latest.content.questions[0].response_space).toBe('none');
+
+    const saved = BlockSchema.parse(JSON.parse(JSON.stringify(latest))) as typeof latest;
+    for (const mode of ['teacher', 'student', 'print'] as const) {
+      const rendered = renderQuestionSetBlock(saved, mode);
+      expect(rendered.textContent).toContain('Discuss this aloud.');
+      expect(rendered.querySelector('.block-question-set__answer')).toBeNull();
+      expect(rendered.querySelector('.block-question-set__answer-label')).toBeNull();
+      expect(rendered.querySelector('.block-question-set__response-lines')).toBeNull();
+    }
+  });
+
+  it.each(['short', 'medium', 'long', 'extended', undefined] as const)(
+    'keeps on-screen writing space for %s', (response_space) => {
+      const block = createBlock('question_set', 'qs_space') as Extract<Block, { block_type: 'question_set' }>;
+      block.content.questions[0].response_space = response_space;
+      for (const mode of ['teacher', 'student'] as const) {
+        expect(renderQuestionSetBlock(block, mode).querySelector('.block-question-set__answer')).not.toBeNull();
+      }
+    }
+  );
+
   it('emits response_space for short answer and strips on MC', () => {
     const block = createBlock('question_set', 'qs_editor') as Extract<
       Block,
