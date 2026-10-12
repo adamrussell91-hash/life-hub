@@ -117,9 +117,15 @@ export async function prepareNavigation(w:AnnualWorld,open:Set<number>,trees:Tre
  };
  if(!water)for(let c=0;c<cells.length;c++){const id=add(point(w,c));if(id!==undefined)cells[c]=id;if(c%32===0)await budget.checkpoint();}
  if(!water){
-  for(let c=0;c<cells.length;c++){if(cells[c]!>=0){const a=nodes[cells[c]!]!;
-   for(const next of [c%g.size<g.size-1?c+1:-1,c+g.size<cells.length?c+g.size:-1])if(next>=0&&cells[next]!>=0){const b=nodes[cells[next]!]!;
-    if(trees.clear(a,b)&&allowedSegment(w,a,b,owners,open)&&isLandPathSafe(w,[a,b],.5)){a.edges.push(cells[next]!);b.edges.push(cells[c]!);}
+  // Cardinal + diagonal joins cut stair-step routes before corner polishing.
+  for(let c=0;c<cells.length;c++){if(cells[c]!>=0){const a=nodes[cells[c]!]!,x=c%g.size,z=Math.floor(c/g.size);
+   const east=x<g.size-1?c+1:-1,south=z<g.size-1?c+g.size:-1;
+   const se=east>=0&&south>=0?c+g.size+1:-1,sw=x>0&&south>=0?c+g.size-1:-1;
+   for(const next of [east,south,se,sw])if(next>=0&&cells[next]!>=0){const b=nodes[cells[next]!]!,key=navigationEdgeKey(cells[c]!,cells[next]!);
+    if(edgeRegions.has(key))continue;
+    if(trees.clear(a,b)&&allowedSegment(w,a,b,owners,open)&&isLandPathSafe(w,[a,b],.5)){
+     a.edges.push(cells[next]!);b.edges.push(cells[c]!);edgeRegions.set(key,segmentRegions(w,a,b,owners));
+    }
    }}if(c%16===0)await budget.checkpoint();
   }
  }else{

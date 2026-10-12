@@ -4,10 +4,38 @@ import type {WildlifeSpecies,PathPoint} from './wildlife';
 import {isDateKey} from './dates';
 import {hashString,seededRandom} from './random';
 import {NavigationBudget,TreeObstacles,prepareNavigation,navigationEdgeKey,type NavigationGraph} from './annual-navigation';
+import {sampleGeography} from './geography';
+import {roundRouteCorners} from './roaming-path';
 export type RoamingEncounter={id:string;species:WildlifeSpecies;earnedOn:string;swimming:boolean;baby:boolean};
 /** Ordered connected circuit; consumers may choose successive destination indices
  * and must travel the intervening points rather than interpolate a shortcut. */
 export type RoamingRoute={id:string;points:PathPoint[];regionIds:string[];mode:'land'|'water'|'flight'};
+function polishRoute(world:AnnualWorld,route:RoamingRoute,trees:TreeObstacles):RoamingRoute{
+ // Water footprints already leave non-grid arcs; bulging them can bridge elevation steps.
+ if(route.mode==='water')return route;
+ const root=route.points[0]!;
+ // Cheap local clearance: chamfers sit near already-legal vertices, so full path
+ // rescans would dominate dense-history preparation for little extra safety.
+ const accept=(segment:readonly PathPoint[])=>{
+  for(let i=0;i<segment.length;i++){
+   const p=segment[i]!,g=sampleGeography(world,p.x,p.z,0);
+   if(g.waterType!=='dry'||g.slope>.5||!trees.clear(p))return false;
+   if(i&&!trees.clear(segment[i-1]!,p))return false;
+  }
+  return true;
+ };
+ let points=roundRouteCorners(route.points,{maxCut:Math.min(1.2,world.grid.step*.35),samples:2,allowReverse:false,accept});
+ if(points.length<2)return route;
+ // Corner polish can drop the circuit root; re-anchor only when that still clears.
+ if(Math.hypot(points[0]!.x-root.x,points[0]!.z-root.z)>1e-6){
+  const anchored=[{x:root.x,z:root.z},...points];
+  const last=anchored.at(-1)!;
+  if(Math.hypot(anchored[0]!.x-last.x,anchored[0]!.z-last.z)>1e-6)anchored.push({x:root.x,z:root.z});
+  else anchored[anchored.length-1]={x:root.x,z:root.z};
+  if(accept(anchored))points=anchored;
+ }
+ return {...route,points};
+}
 async function circuit(w:AnnualWorld,graph:NavigationGraph,eligible:Set<number>,encounter:RoamingEncounter,seed:string,trees:TreeObstacles,budget:NavigationBudget):Promise<RoamingRoute|undefined>{
  const accessible=(i:number,j:number)=>eligible.has(graph.nodes[j]!.region)&&(graph.edgeRegions.get(navigationEdgeKey(i,j))??[]).every(r=>eligible.has(r));
  const nodes=graph.nodes,seen=new Uint8Array(nodes.length),components:{cells:number[];coverage:number}[]=[];
@@ -69,7 +97,8 @@ export async function buildAnnualRoamingRoutes(world:AnnualWorld,plan:AnnualGrov
  for(const encounter of accepted){const eligible=new Set([...open].filter(i=>world.regions!.weeks[i]!.to>=encounter.earnedOn));if(!eligible.size)continue;
   let graph=graphs.get(encounter.swimming);if(!graph){graph=await prepareNavigation(world,open,trees,encounter.swimming,budget);graphs.set(encounter.swimming,graph);}
   const seed=world.identity+':'+plan.from+':'+cutoff+':'+[...eligible].join(',')+':'+encounter.id;
-  const route=await circuit(world,graph,eligible,encounter,seed,trees,budget);if(route)routes.push(route);budget.check();
+  const route=await circuit(world,graph,eligible,encounter,seed,trees,budget);
+  if(route)routes.push(polishRoute(world,route,trees));budget.check();
  }
  return routes;
 }
