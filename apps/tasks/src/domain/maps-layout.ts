@@ -346,18 +346,13 @@ export function lineTrackDefs(line: MapLine): TrackDef[] {
   return [...standard, ...extra];
 }
 
-/** Fallback year line when a competition has no `attach.track` (middle, else first). */
-export function defaultTrackId(trackIds: readonly string[]): string | undefined {
-  return trackIds[1] ?? trackIds[0];
-}
-
-/** Resolve which year line a competition uses on a strand. */
+/** Resolve which year line a competition uses on a strand (valid track, else middle, else first). */
 export function resolveLineAttachTrack(
   attachTrack: string | undefined,
   trackIds: readonly string[]
 ): string | undefined {
   if (attachTrack && trackIds.includes(attachTrack)) return attachTrack;
-  return defaultTrackId(trackIds);
+  return trackIds[1] ?? trackIds[0];
 }
 
 /** Nearest year-line track across all strands (for drag-snap). */
@@ -1013,11 +1008,9 @@ function placeTick(
   if (attach.kind === 'line') {
     const line = lines.find((item) => item.id === attach.line_id);
     if (!line) return null;
-    const trackId = resolveLineAttachTrack(
-      attach.track,
-      line.tracks.map((item) => item.id)
-    );
-    const track = line.tracks.find((item) => item.id === trackId) ?? line.tracks[0];
+    const ids = line.tracks.map((item) => item.id);
+    const track =
+      line.tracks.find((item) => item.id === resolveLineAttachTrack(attach.track, ids)) ?? line.tracks[0];
     const x = track?.x ?? line.x;
     const y0 = tick.starts_on ? dateToY(tick.starts_on, year) : remapLegacyY(attach.y);
     return finishTick(tick, line.id, line.color, x, y0, strandParkX(line, x, 'right'), y0, 'right');

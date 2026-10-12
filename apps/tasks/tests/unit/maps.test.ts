@@ -25,7 +25,6 @@ import {
   applyDateSpanToStation,
   boxesOverlap,
   dateToY,
-  defaultTrackId,
   eventPorts,
   labelHitsForeignLine,
   layoutMap,
@@ -348,7 +347,7 @@ describe('year layout', () => {
   });
 
   it('places a line-attached competition on the chosen year line, not the middle default', () => {
-    expect(defaultTrackId(['junior', 'rozelle', 'senior'])).toBe('rozelle');
+    expect(resolveLineAttachTrack(undefined, ['junior', 'rozelle', 'senior'])).toBe('rozelle');
     expect(resolveLineAttachTrack('senior', ['junior', 'rozelle', 'senior'])).toBe('senior');
     expect(resolveLineAttachTrack('missing', ['junior', 'rozelle', 'senior'])).toBe('rozelle');
 

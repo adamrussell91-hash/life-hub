@@ -28,7 +28,7 @@ export function yearTrackPicker(
     selected && available.some((track) => track.id === selected)
       ? selected
       : (available[0]?.id ?? 'junior');
-  const radios = available.map((track) => {
+  for (const track of available) {
     const label = el('label', 'map-tracks__item');
     const box = document.createElement('input');
     box.type = 'radio';
@@ -37,11 +37,11 @@ export function yearTrackPicker(
     box.checked = track.id === initial;
     label.append(box, document.createTextNode(track.label));
     root.append(label);
-    return box;
-  });
+  }
   return {
     root,
-    value: () => radios.find((box) => box.checked)?.value ?? available[0]?.id ?? 'junior'
+    value: () =>
+      root.querySelector<HTMLInputElement>('input:checked')?.value ?? available[0]?.id ?? 'junior'
   };
 }
 

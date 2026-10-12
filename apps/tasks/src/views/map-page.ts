@@ -241,39 +241,31 @@ export async function renderMapItemPage(canvas: HTMLElement, ref: MapItemPageRef
         fields.append(tracks.root);
       } else {
         const tick = item as MapTick;
-        if (tick.attach.kind === 'line') {
-          const host = current.lines.find((entry) => entry.id === tick.attach.line_id) ?? current.lines[0];
-          if (host) {
-            const defs = lineTrackDefs(host);
-            const selected = resolveLineAttachTrack(
-              tick.attach.track,
-              defs.map((track) => track.id)
-            );
-            const tracks = yearTrackPicker(selected, defs);
-            tracks.root.addEventListener('change', () => {
-              if (tick.attach.kind !== 'line') return;
-              tick.attach = { ...tick.attach, track: tracks.value() };
-              persist(true);
-            });
-            fields.append(tracks.root);
-          }
-        } else if (tick.attach.kind === 'station') {
-          const host = current.stations.find((entry) => entry.id === tick.attach.station_id);
+        const { attach } = tick;
+        let defs: TrackDef[] | null = null;
+        if (attach.kind === 'line') {
+          const host = current.lines.find((entry) => entry.id === attach.line_id) ?? current.lines[0];
+          if (host) defs = lineTrackDefs(host);
+        } else if (attach.kind === 'station') {
+          const host = current.stations.find((entry) => entry.id === attach.station_id);
           const hostLine = host ? current.lines.find((entry) => entry.id === host.line_id) : null;
           if (host && hostLine) {
-            const defs = lineTrackDefs(hostLine).filter((track) => host.tracks.includes(track.id));
-            const selected = resolveLineAttachTrack(
-              tick.attach.track,
-              defs.map((track) => track.id)
-            );
-            const tracks = yearTrackPicker(selected, defs.length ? defs : lineTrackDefs(hostLine));
-            tracks.root.addEventListener('change', () => {
-              if (tick.attach.kind !== 'station') return;
-              tick.attach = { ...tick.attach, track: tracks.value() };
-              persist(true);
-            });
-            fields.append(tracks.root);
+            const filtered = lineTrackDefs(hostLine).filter((track) => host.tracks.includes(track.id));
+            defs = filtered.length ? filtered : lineTrackDefs(hostLine);
           }
+        }
+        if (defs && (attach.kind === 'line' || attach.kind === 'station')) {
+          const tracks = yearTrackPicker(
+            resolveLineAttachTrack(attach.track, defs.map((track) => track.id)),
+            defs
+          );
+          tracks.root.addEventListener('change', () => {
+            const live = tick.attach;
+            if (live.kind !== 'line' && live.kind !== 'station') return;
+            tick.attach = { ...live, track: tracks.value() };
+            persist(true);
+          });
+          fields.append(tracks.root);
         }
       }
 
