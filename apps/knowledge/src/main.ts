@@ -1272,7 +1272,8 @@ function renderGraph() {
     return;
   }
   const constellation = buildArchiveGraph(entries);
-  const excerptFor = (pageId: string) => entries.find(entry => entry.id === pageId)?.excerpt ?? "";
+  const excerpts = new Map(entries.map(entry => [entry.id, entry.excerpt ?? ""]));
+  const excerptFor = (pageId: string) => excerpts.get(pageId) ?? "";
 
   shell(`
     ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · graph stays on this canvas</p>` : ""}
@@ -1357,12 +1358,20 @@ function renderGraph() {
   });
 
   const search = app.querySelector<HTMLInputElement>(".graph-search")!;
-  search.oninput = () => {
-    graphSearch = search.value;
+  let searchTimer = 0;
+  const applySearch = () => {
+    window.clearTimeout(searchTimer);
     graphMount?.setSearch(graphSearch);
     writeGraphChrome();
   };
+  search.oninput = () => {
+    graphSearch = search.value;
+    window.clearTimeout(searchTimer);
+    if (!graphSearch.trim()) applySearch();
+    else searchTimer = window.setTimeout(applySearch, 180);
+  };
   search.onkeydown = event => {
+    if (event.key === "Enter") applySearch();
     if (event.key !== "Enter" || graphMode !== "universe" || !solarMount) return;
     event.preventDefault();
     event.stopPropagation();
@@ -1437,7 +1446,8 @@ function renderGraph() {
       applyUniverseViewState(wrap, document.body, graphMode === "universe" && universeDark, false);
       return;
     }
-    if (event.key !== "Enter") return;
+    if (event.key !== "Enter" || (event.target as HTMLElement | null)?.closest("input, select, textarea, button")) return;
+    if (graphMount?.canOpenSelected?.() === false) return;
     const open = preview.el.querySelector<HTMLButtonElement>("[data-open-note]");
     if (open && !preview.el.hidden) open.click();
   };
@@ -1512,6 +1522,7 @@ function renderGraph() {
   }
   graphMount = mounted;
   graphTeardown = () => {
+    window.clearTimeout(searchTimer);
     document.onkeydown = null;
     document.body.classList.remove("is-universe-fullscreen");
     graphMount = null;
