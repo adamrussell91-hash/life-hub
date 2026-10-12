@@ -369,7 +369,8 @@ export async function assembleEntityOverview(refInput, deps = {}) {
   }
 
   let shared_contexts_with_self = [];
-  if (ref.kind === 'person' && record.is_self !== true) {
+  const subjectOrgs = new Set(currentOrganisationContexts(current_relationships).map(org => org.ref));
+  if (ref.kind === 'person' && record.is_self !== true && subjectOrgs.size) {
     const self = await findActiveSelfPerson(store, github);
     if (self && self.id !== record.id) {
       const selfCanonical = formatEntityRef({ namespace: 'shared', kind: 'person', id: self.id });
@@ -385,7 +386,6 @@ export async function assembleEntityOverview(refInput, deps = {}) {
         ...selfListed.incoming.map((entry) => ({ ...entry, direction: 'incoming' })),
         ...selfGithub
       ]);
-      const subjectOrgs = new Set(currentOrganisationContexts(current_relationships).map((org) => org.ref));
       shared_contexts_with_self = currentOrganisationContexts(selfCurrent).filter((org) => subjectOrgs.has(org.ref));
     }
   }

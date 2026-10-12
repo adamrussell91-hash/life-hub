@@ -66,12 +66,15 @@ function endpointSummary(endpoint) {
 export async function findActiveSelfPerson(universalStore, options = {}) {
   if (universalStore) {
     const keys = await listPersonIndexKeys(universalStore);
-    for (const key of keys) {
-      const id = key.slice('entities/index/person/'.length);
-      const record = parsePersonRecord(await getJSON(universalStore, personKey(id)));
-      if (record?.is_self === true && record.lifecycle_status === 'active') {
-        return record;
-      }
+    // Stop after the first batch containing self; avoid hundreds of serial
+    // network round trips on every profile/brief read.
+    for (let start = 0; start < keys.length; start += 10) {
+      const records = await Promise.all(keys.slice(start, start + 10).map(key => {
+        const id = key.slice('entities/index/person/'.length);
+        return getJSON(universalStore, personKey(id)).then(parsePersonRecord);
+      }));
+      const self = records.find(record => record?.is_self === true && record.lifecycle_status === 'active');
+      if (self) return self;
     }
   }
   return getGithubActiveSelfPerson(options);

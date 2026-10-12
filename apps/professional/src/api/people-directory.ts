@@ -1,3 +1,4 @@
+import { scheduleReadRevision } from './schedule-read-cache';
 import { apiGet, apiPatch, apiPost } from './client';
 
 export interface DirectoryPersonRow {
@@ -58,21 +59,28 @@ export interface PeopleDirectoryResponse {
 }
 
 let lastDirectory: PeopleDirectoryResponse | null = null;
+let lastRevision = -1;
+let directoryRequest = 0;
 
 /** Last directory fetched this session, for instant first paint while a refresh runs. */
 export function peekPeopleDirectory(): PeopleDirectoryResponse | null {
-  return lastDirectory;
+  return lastRevision === scheduleReadRevision() && lastDirectory ? structuredClone(lastDirectory) : null;
 }
 
 /** `fresh` skips the server's short directory cache — use after the operator changes something. */
 export async function fetchPeopleDirectory(
   options: { signal?: AbortSignal; fresh?: boolean } = {}
 ): Promise<PeopleDirectoryResponse> {
+  const request = ++directoryRequest;
+  const revision = scheduleReadRevision();
   const data = await apiGet<PeopleDirectoryResponse>(
     options.fresh ? '/api/people/directory?fresh=1' : '/api/people/directory',
     { signal: options.signal }
   );
-  lastDirectory = data;
+  if (request === directoryRequest && revision === scheduleReadRevision()) {
+    lastDirectory = structuredClone(data);
+    lastRevision = revision;
+  }
   return data;
 }
 
