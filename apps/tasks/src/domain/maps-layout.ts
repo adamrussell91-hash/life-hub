@@ -25,6 +25,10 @@ export const MAP_STATION_FONT = 18;
 export const MAP_TICK_FONT = 16;
 export const MAP_LINE_STROKE = 8;
 export const MAP_TRACK_GAP = 160;
+/** Horizontal gap between parallel program rails when a year line splits. */
+export const MAP_STATION_LANE_GAP = 88;
+/** Vertical pad for lane collision and fork-cluster merging. */
+const STATION_Y_PAD = 12;
 export const MAP_DISC_LIFT = 48;
 /** Pill centre sits this far outside the disc edge, at both caps. */
 export const MAP_CAP_LABEL_GAP = 36;
@@ -76,6 +80,14 @@ export type LaidConnector = {
   under: boolean;
 };
 
+/** Orthogonal stroke for a year-line fork (split bar, side rail, or join bar). */
+export type LaidTrackFork = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+};
+
 export type LaidTrack = {
   id: string;
   label: string;
@@ -85,6 +97,8 @@ export type LaidTrack = {
   /** Cap at the bottom of the year line. */
   end: { cx: number; cy: number; r: number };
   cuts: Array<{ y0: number; y1: number }>;
+  /** Circuit-style split/join rails when concurrent programs share this year line. */
+  forks: LaidTrackFork[];
 };
 
 export type LaidStationBody = {
@@ -137,6 +151,8 @@ export type LaidTick = {
   cy: number;
   dash: boolean;
   connects_to: string | null;
+  /** Resolved year lines this competition sits on (for multi-stem connectors). */
+  tracks: string[];
   labelBox: LabelBox;
   labelSide: PortSide;
   ports: ConnectorPort[];
@@ -316,14 +332,18 @@ export function applyDateSpanToStation(station: MapStation, year: number): MapSt
   const end = station.ends_on || station.starts_on || `${year}-12-31`;
   const y = dateToY(start, year);
   const endY = dateToY(end, year);
-  const minH = estimateVerticalLabel(station.label, MAP_STATION_FONT).h + 28;
+  // Height follows the calendar span only — label length must not stretch short programs.
   return {
     ...station,
     starts_on: station.starts_on || start,
     ends_on: station.ends_on || end,
     y,
-    height: Math.max(minH, Math.max(24, endY - y))
+    height: Math.max(24, endY - y)
   };
+}
+
+export function stationLaneX(trackX: number, lane: number, gap = MAP_STATION_LANE_GAP): number {
+  return trackX + lane * gap;
 }
 
 export function applyDateToTickAttach(tick: MapTick, year: number): MapTick {
@@ -346,6 +366,19 @@ export function lineTrackDefs(line: MapLine): TrackDef[] {
   return [...standard, ...extra];
 }
 
+/** Legacy single-track field, or the first of `tracks`. */
+export function attachTrackOf(attach: { track?: string; tracks?: string[] } | undefined): string | undefined {
+  if (!attach) return undefined;
+  return attach.tracks?.[0] ?? attach.track;
+}
+
+/** Year lines on a competition attach (`tracks`, else legacy `track`). */
+export function attachTracksOf(attach: { track?: string; tracks?: string[] } | undefined): string[] {
+  if (!attach) return [];
+  if (attach.tracks?.length) return [...attach.tracks];
+  return attach.track ? [attach.track] : [];
+}
+
 /** Resolve which year line a competition uses on a strand (valid track, else middle, else first). */
 export function resolveLineAttachTrack(
   attachTrack: string | undefined,
@@ -353,6 +386,17 @@ export function resolveLineAttachTrack(
 ): string | undefined {
   if (attachTrack && trackIds.includes(attachTrack)) return attachTrack;
   return trackIds[1] ?? trackIds[0];
+}
+
+/** Resolve one or more year lines; keeps every valid pick, else the single default. */
+export function resolveLineAttachTracks(
+  requested: readonly string[] | undefined,
+  trackIds: readonly string[]
+): string[] {
+  const kept = (requested ?? []).filter((id) => trackIds.includes(id));
+  if (kept.length) return kept;
+  const fallback = resolveLineAttachTrack(undefined, trackIds);
+  return fallback ? [fallback] : [];
 }
 
 /** Nearest year-line track across all strands (for drag-snap). */
@@ -933,7 +977,8 @@ function finishTick(
   y0: number,
   cx: number,
   cy: number,
-  labelSide: PortSide
+  labelSide: PortSide,
+  tracks: string[] = []
 ): LaidTick {
   const laid: LaidTick = {
     id: tick.id,
@@ -946,6 +991,7 @@ function finishTick(
     cy,
     dash: tick.stroke === 'dotted',
     connects_to: tick.connects_to,
+    tracks,
     labelBox: { id: `tk-${tick.id}`, x: 0, y: 0, w: 10, h: 10 },
     labelSide,
     ports: []
@@ -1009,21 +1055,40 @@ function placeTick(
     const line = lines.find((item) => item.id === attach.line_id);
     if (!line) return null;
     const ids = line.tracks.map((item) => item.id);
-    const track =
-      line.tracks.find((item) => item.id === resolveLineAttachTrack(attach.track, ids)) ?? line.tracks[0];
+    const trackIds = resolveLineAttachTracks(attachTracksOf(attach), ids);
+    const laidTracks = trackIds
+      .map((id) => line.tracks.find((item) => item.id === id))
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
+    // Park from the outermost selected track so a multi-year competition still clears the strand.
+    const track = laidTracks[laidTracks.length - 1] ?? laidTracks[0] ?? line.tracks[0];
     const x = track?.x ?? line.x;
     const y0 = tick.starts_on ? dateToY(tick.starts_on, year) : remapLegacyY(attach.y);
-    return finishTick(tick, line.id, line.color, x, y0, strandParkX(line, x, 'right'), y0, 'right');
+    return finishTick(
+      tick,
+      line.id,
+      line.color,
+      x,
+      y0,
+      strandParkX(line, x, 'right'),
+      y0,
+      'right',
+      trackIds
+    );
   }
   const station = stations.find((item) => item.id === attach.station_id);
   const line = lines.find((item) => item.id === station?.line_id);
   if (!station || !line) return null;
   const dateY = tick.starts_on ? dateToY(tick.starts_on, year) : station.y + station.h * attach.offset;
+  const trackIds = resolveLineAttachTracks(
+    attachTracksOf(attach),
+    station.bodies.map((body) => body.track)
+  );
+  const bodies = trackIds
+    .map((id) => station.bodies.find((body) => body.track === id))
+    .filter((body): body is NonNullable<typeof body> => Boolean(body));
   const body =
-    (attach.track ? station.bodies.find((item) => item.track === attach.track) : null) ??
-    (attach.side === 'left'
-      ? station.bodies[0]
-      : station.bodies[station.bodies.length - 1]);
+    (attach.side === 'left' ? bodies[0] : bodies[bodies.length - 1]) ??
+    (attach.side === 'left' ? station.bodies[0] : station.bodies[station.bodies.length - 1]);
   const bodyPorts = body
     ? station.ports.filter((port) => Math.abs(port.x - (attach.side === 'left' ? body.x - body.w / 2 : body.x + body.w / 2)) < 2)
     : station.ports;
@@ -1039,7 +1104,8 @@ function placeTick(
     y0,
     attach.side === 'left' ? strandParkX(line, x0, 'left') : strandParkX(line, x0, 'right'),
     dateY,
-    attach.side
+    attach.side,
+    trackIds
   );
 }
 
@@ -1047,13 +1113,20 @@ function sharesTrack(a: LaidStation, b: LaidStation): boolean {
   return a.tracks.some((track) => b.tracks.includes(track));
 }
 
+function ySpanBox(station: LaidStation): LabelBox {
+  return { id: station.id, x: 0, y: station.y, w: 10, h: station.h };
+}
+
+function stationsOverlapVertically(a: LaidStation, b: LaidStation): boolean {
+  return boxesOverlap(ySpanBox(a), ySpanBox(b), STATION_Y_PAD);
+}
+
 function placeStationBodies(station: LaidStation, line: LaidLine | undefined): LaidStation {
-  const laneShift = station.lane * 52;
   const bodies = station.tracks.map((track) => {
     const laid = line?.tracks.find((item) => item.id === track);
     return {
       track,
-      x: (laid?.x ?? station.lineX) + laneShift,
+      x: stationLaneX(laid?.x ?? station.lineX, station.lane),
       y: station.y,
       w: MAP_STATION_W,
       h: station.h
@@ -1064,12 +1137,17 @@ function placeStationBodies(station: LaidStation, line: LaidLine | undefined): L
   const next: LaidStation = {
     ...station,
     bodies,
-    x: last?.x ?? station.lineX + laneShift,
+    x: last?.x ?? stationLaneX(station.lineX, station.lane),
     w: MAP_STATION_W,
     ports: []
   };
   next.ports = stationPorts(next);
   return next;
+}
+
+function compareStationLaneOrder(a: LaidStation, b: LaidStation): number {
+  // Stable: earlier start, then taller, then id — so equal-date pairs do not flicker lanes.
+  return a.y - b.y || b.h - a.h || a.id.localeCompare(b.id);
 }
 
 function assignStationLanes(stations: LaidStation[], lines: LaidLine[]): LaidStation[] {
@@ -1082,44 +1160,90 @@ function assignStationLanes(stations: LaidStation[], lines: LaidLine[]): LaidSta
   const out: LaidStation[] = [];
   for (const [lineId, group] of byLine) {
     const line = lines.find((item) => item.id === lineId);
-    const sorted = [...group].sort((a, b) => a.y - b.y);
-    const lanes: LaidStation[] = [];
+    const sorted = [...group].sort(compareStationLaneOrder);
+    const placed: LaidStation[] = [];
     for (const station of sorted) {
       let lane = 0;
       while (
-        lanes.some(
+        placed.some(
           (other) =>
-            other.lane === lane &&
-            sharesTrack(station, other) &&
-            boxesOverlap(
-              { id: station.id, x: 0, y: station.y, w: 10, h: station.h },
-              { id: other.id, x: 0, y: other.y, w: 10, h: other.h },
-              12
-            )
+            other.lane === lane && sharesTrack(station, other) && stationsOverlapVertically(station, other)
         )
       ) {
         lane += 1;
       }
-      const shifted = placeStationBodies({ ...station, lane }, line);
-      lanes.push(shifted);
-      out.push(shifted);
+      const next = placeStationBodies({ ...station, lane }, line);
+      placed.push(next);
+      out.push(next);
     }
   }
   return out;
 }
 
+type TrackBody = { lane: number; y0: number; y1: number };
+type ForkCluster = { y0: number; y1: number; lanes: TrackBody[] };
+
+function trackBodies(stations: LaidStation[], lineId: string, trackId: string): TrackBody[] {
+  return stations
+    .filter((station) => station.line_id === lineId && station.tracks.includes(trackId))
+    .map((station) => {
+      const body = station.bodies.find((item) => item.track === trackId);
+      const y0 = body?.y ?? station.y;
+      const h = body?.h ?? station.h;
+      return { lane: station.lane, y0, y1: y0 + h };
+    });
+}
+
+/** Merge overlapping program spans into fork regions (transitive). */
+function overlapClusters(bodies: TrackBody[]): ForkCluster[] {
+  if (!bodies.length) return [];
+  const sorted = [...bodies].sort((a, b) => a.y0 - b.y0 || a.y1 - b.y1);
+  const clusters: ForkCluster[] = [];
+  let open: ForkCluster = { y0: sorted[0]!.y0, y1: sorted[0]!.y1, lanes: [sorted[0]!] };
+  for (const body of sorted.slice(1)) {
+    if (body.y0 <= open.y1 + STATION_Y_PAD) {
+      open.y1 = Math.max(open.y1, body.y1);
+      open.lanes.push(body);
+      continue;
+    }
+    clusters.push(open);
+    open = { y0: body.y0, y1: body.y1, lanes: [body] };
+  }
+  clusters.push(open);
+  return clusters;
+}
+
+function forkSegment(x1: number, y1: number, x2: number, y2: number): LaidTrackFork {
+  return { x1, y1, x2, y2 };
+}
+
+/** Circuit-style split bar → side rail (gapped for capsules) → join bar. */
+function circuitForks(trackX: number, cluster: ForkCluster): LaidTrackFork[] {
+  const maxLane = Math.max(0, ...cluster.lanes.map((body) => body.lane));
+  if (maxLane < 1) return [];
+  const forks: LaidTrackFork[] = [];
+  for (let lane = 1; lane <= maxLane; lane += 1) {
+    const sideX = stationLaneX(trackX, lane);
+    const sideBlocks = cluster.lanes
+      .filter((body) => body.lane === lane)
+      .map(({ y0, y1 }) => ({ y0, y1 }));
+    forks.push(forkSegment(trackX, cluster.y0, sideX, cluster.y0));
+    for (const seg of cutVertical(cluster.y0, cluster.y1, sideBlocks)) {
+      forks.push(forkSegment(sideX, seg.y0, sideX, seg.y1));
+    }
+    forks.push(forkSegment(trackX, cluster.y1, sideX, cluster.y1));
+  }
+  return forks;
+}
+
 function applyTrackCuts(lines: LaidLine[], stations: LaidStation[]): void {
   for (const line of lines) {
     for (const track of line.tracks) {
-      const blocks = stations
-        .filter((station) => station.line_id === line.id && station.tracks.includes(track.id))
-        .map((station) => {
-          const body = station.bodies.find((item) => item.track === track.id);
-          const y = body?.y ?? station.y;
-          const h = body?.h ?? station.h;
-          return { y0: y, y1: y + h };
-        });
-      track.cuts = cutVertical(line.y0, line.y1, blocks);
+      const onTrack = trackBodies(stations, line.id, track.id);
+      // Main rail only gaps for the on-track (lane 0) capsules.
+      const mainBlocks = onTrack.filter((body) => body.lane === 0).map(({ y0, y1 }) => ({ y0, y1 }));
+      track.cuts = cutVertical(line.y0, line.y1, mainBlocks);
+      track.forks = overlapClusters(onTrack).flatMap((cluster) => circuitForks(track.x, cluster));
     }
   }
 }
@@ -1151,7 +1275,8 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
         x: tx,
         disc: { cx: tx, cy: discY, r: MAP_DISC_R },
         end: { cx: tx, cy: endY, r: MAP_DISC_R },
-        cuts: [{ y0: discY, y1: endY }]
+        cuts: [{ y0: discY, y1: endY }],
+        forks: []
       };
     });
     const center = tracks[Math.floor((count - 1) / 2)] ?? tracks[0]!;
@@ -1173,10 +1298,11 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
     const line = lines.find((item) => item.id === dated.line_id);
     const x = line?.x ?? MAP_FIRST_LINE_X;
     const y = dated.starts_on ? dated.y : remapLegacyY(dated.y);
-    const minH = estimateVerticalLabel(dated.label, MAP_STATION_FONT).h + 28;
+    // Dated programs: calendar span wins. Legacy (no dates): keep a label floor so old blobs stay readable.
+    const labelFloor = estimateVerticalLabel(dated.label, MAP_STATION_FONT).h + 28;
     const h = dated.starts_on
-      ? Math.max(minH, dated.height)
-      : Math.max(minH, remapLegacyY(dated.y + dated.height) - y);
+      ? Math.max(24, dated.height)
+      : Math.max(labelFloor, remapLegacyY(dated.y + dated.height) - y);
     const weeks = spanWeeks(dated.starts_on, dated.ends_on, year);
     const sourceLine = map.lines.find((item) => item.id === dated.line_id);
     const tracks = stationTracks(dated, sourceLine);
@@ -1287,37 +1413,60 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
     const raw = map.ticks.find((item) => item.id === tick.id);
     const attach = raw?.attach;
     if (!attach) continue;
-    let from: ConnectorPort | null = null;
+    const fromPorts: ConnectorPort[] = [];
     if (attach.kind === 'station') {
       const station = stations.find((item) => item.id === attach.station_id);
-      from = station ? nearestPort(station.ports, attach.side, tick.cy) : null;
+      if (station) {
+        const wanted = new Set(
+          resolveLineAttachTracks(
+            attachTracksOf(attach),
+            station.bodies.map((body) => body.track)
+          )
+        );
+        const bodies = station.bodies.filter((body) => wanted.has(body.track));
+        const hosts = bodies.length ? bodies : [station.bodies[attach.side === 'left' ? 0 : station.bodies.length - 1]!].filter(Boolean);
+        for (const body of hosts) {
+          const bodyPorts = station.ports.filter(
+            (port) =>
+              Math.abs(port.x - (attach.side === 'left' ? body.x - body.w / 2 : body.x + body.w / 2)) < 2
+          );
+          const port = nearestPort(bodyPorts.length ? bodyPorts : station.ports, attach.side, tick.cy);
+          if (port) fromPorts.push({ ...port, id: `${port.id}:${body.track}` });
+        }
+      }
     } else if (attach.kind === 'event') {
       const host = ticks.find((item) => item.id === attach.event_id);
-      from = host?.ports.find((port) => port.side === attach.side) ?? host?.ports[0] ?? null;
+      const port = host?.ports.find((item) => item.side === attach.side) ?? host?.ports[0] ?? null;
+      if (port) fromPorts.push(port);
     } else {
       const line = lines.find((item) => item.id === attach.line_id);
       if (line) {
-        const trackId = resolveLineAttachTrack(
-          attach.track,
+        const trackIds = resolveLineAttachTracks(
+          attachTracksOf(attach),
           line.tracks.map((item) => item.id)
         );
-        const track =
-          line.tracks.find((item) => item.id === trackId) ??
-          line.tracks.find((item) => Math.abs(item.x - tick.x0) < 1) ??
-          line.tracks[0]!;
-        from = {
-          id: `${line.id}:${track.id}:week:${Math.round(tick.y0)}`,
-          ownerId: line.id,
-          owner: 'line',
-          side: tick.cx >= track.x ? 'right' : 'left',
-          index: 0,
-          x: track.x,
-          y: tick.y0
-        };
+        const laid =
+          trackIds
+            .map((id) => line.tracks.find((item) => item.id === id))
+            .filter((item): item is NonNullable<typeof item> => Boolean(item)) || [];
+        const tracks = laid.length
+          ? laid
+          : [
+              line.tracks.find((item) => Math.abs(item.x - tick.x0) < 1) ?? line.tracks[0]!
+            ].filter(Boolean);
+        for (const track of tracks) {
+          fromPorts.push({
+            id: `${line.id}:${track.id}:week:${Math.round(tick.y0)}`,
+            ownerId: line.id,
+            owner: 'line',
+            side: tick.cx >= track.x ? 'right' : 'left',
+            index: 0,
+            x: track.x,
+            y: tick.y0
+          });
+        }
       }
     }
-    const toSide = from?.side ? oppositeSide(from.side) : 'left';
-    const to = tick.ports.find((port) => port.side === toSide) ?? tick.ports[2] ?? null;
     const ownIds = new Set([
       tick.labelBox.id,
       `mark-${tick.id}`,
@@ -1331,10 +1480,13 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
       attach.kind === 'event' ? `tk-${attach.event_id}` : ''
     ]);
     const blocked = pathObstacles.filter((box) => !ownIds.has(box.id));
-    if (from && to) {
+    for (const [index, from] of fromPorts.entries()) {
+      const toSide = oppositeSide(from.side);
+      const to = tick.ports.find((port) => port.side === toSide) ?? tick.ports[2] ?? null;
+      if (!to) continue;
       const crosses = Math.abs(from.x - to.x) > MAP_EVENT_STEM + 8;
       connectors.push({
-        id: `link-${tick.id}`,
+        id: index === 0 ? `link-${tick.id}` : `link-${tick.id}-${index}`,
         from,
         to,
         path: crosses ? underpassPath(from, to, blocked) : routedOrthogonalPath(from, to, blocked),

@@ -10,38 +10,43 @@ import {
 import { discCss, letterCss } from '@/domain/maps-colors';
 import { el } from '@/views/hub-kit';
 
-let yearTrackPickerSeq = 0;
-
 /**
- * Single year-line choice for a competition (programs use multi-select checkboxes).
- * Radios reuse `.map-tracks` so the inspector matches the program control.
+ * Multi year-line choice for a competition (same checkbox pattern as programs).
  */
 export function yearTrackPicker(
-  selected: string | null | undefined,
+  selected: readonly string[] | null | undefined,
   available: TrackDef[]
-): { root: HTMLElement; value: () => string } {
+): { root: HTMLElement; value: () => string[] } {
   const root = el('div', 'map-tracks');
-  root.setAttribute('role', 'radiogroup');
+  root.setAttribute('role', 'group');
   root.setAttribute('aria-label', 'Year lines');
-  const name = `map-year-track-${++yearTrackPickerSeq}`;
-  const initial =
-    selected && available.some((track) => track.id === selected)
-      ? selected
-      : (available[0]?.id ?? 'junior');
+  const picked = new Set(
+    (selected ?? []).filter((id) => available.some((track) => track.id === id))
+  );
+  if (!picked.size && available[0]) picked.add(available[0].id);
+  const boxes: HTMLInputElement[] = [];
   for (const track of available) {
     const label = el('label', 'map-tracks__item');
     const box = document.createElement('input');
-    box.type = 'radio';
-    box.name = name;
+    box.type = 'checkbox';
     box.value = track.id;
-    box.checked = track.id === initial;
+    box.checked = picked.has(track.id);
+    box.addEventListener('change', () => {
+      // Keep at least one year line ticked.
+      if (!box.checked && !boxes.some((item) => item !== box && item.checked)) {
+        box.checked = true;
+      }
+    });
     label.append(box, document.createTextNode(track.label));
     root.append(label);
+    boxes.push(box);
   }
   return {
     root,
-    value: () =>
-      root.querySelector<HTMLInputElement>('input:checked')?.value ?? available[0]?.id ?? 'junior'
+    value: () => {
+      const next = boxes.filter((box) => box.checked).map((box) => box.value);
+      return next.length ? next : [available[0]?.id ?? 'junior'];
+    }
   };
 }
 
