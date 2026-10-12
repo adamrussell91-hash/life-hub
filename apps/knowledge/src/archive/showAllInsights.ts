@@ -203,9 +203,12 @@ export function isRecent(node: GraphNodeDatum, window: RecentWindow, now: number
  * A guided walk: start at the best-linked note, then keep stepping to the strongest unvisited
  * neighbour; at a dead end, jump to the best-linked note not yet seen.
  */
-export function walkRoute(nodes: GraphNodeDatum[], links: GraphLinkDatum[], steps = 40, start?: string) {
+export function walkRoute(nodes: GraphNodeDatum[], links: GraphLinkDatum[], steps = 40, start?: string, theme?: string) {
+  const leaves = nodes.filter(node => node.kind === "leaf" && !node.departing &&
+    (!theme || node.parentKeyword === theme || node.hubLabels?.includes(theme)));
+  const allowed = new Set(leaves.map(node => node.id));
   const neighbours = noteNeighbours(links);
-  const leaves = nodes.filter(node => node.kind === "leaf" && !node.departing);
+  for (const [id, adjacent] of neighbours) neighbours.set(id, adjacent.filter(item => allowed.has(item.id)));
   const ranked = [...leaves].sort(
     (a, b) => (neighbours.get(b.id)?.length ?? 0) - (neighbours.get(a.id)?.length ?? 0) || a.id.localeCompare(b.id),
   );

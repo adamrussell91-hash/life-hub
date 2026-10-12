@@ -178,6 +178,7 @@ export function canvasRadius(worldR: number, k: number, minPx: number) {
 }
 
 export type GraphMount = (() => void) & {
+  canOpenSelected?: () => boolean;
   setSearch: (query: string) => void;
   setModel: (model: ArchiveGraphModel) => void;
   setTuning: (partial: Partial<ShowAllTuning>) => void;
@@ -190,12 +191,14 @@ export function attachGraphSearch(
   setModel: (model: ArchiveGraphModel) => void = () => {},
   setTuning: (partial: Partial<ShowAllTuning>) => void = () => {},
   setTheme: (theme: "dark" | "light") => void = () => {},
+  canOpenSelected: () => boolean = () => true,
 ): GraphMount {
   const stop = teardown as GraphMount;
   stop.setSearch = setSearch;
   stop.setModel = setModel;
   stop.setTuning = setTuning;
   stop.setTheme = setTheme;
+  stop.canOpenSelected = canOpenSelected;
   return stop;
 }
 
@@ -362,11 +365,12 @@ type DrawArgs = {
   hover: GraphNodeDatum | null;
   links?: GraphLinkDatum[];
   cluster?: Set<string>;
+  searchHits?: Set<string>;
 };
 
 export function nodeDrawState(node: GraphNodeDatum, args: DrawArgs): DrawEmphasis {
   if (isGraphSearching(args.query)) {
-    const hot = isSearchHot(node, args.query, args.nodes);
+    const hot = args.searchHits ? args.searchHits.has(node.id) : isSearchHot(node, args.query, args.nodes);
     return { hot, dim: !hot };
   }
   const cluster = args.cluster ?? selectionCluster(args.nodes, args.selected, args.links);
@@ -385,8 +389,8 @@ export function linkDrawState(
   args: DrawArgs,
 ): LinkEmphasis {
   if (isGraphSearching(args.query)) {
-    const sourceHot = isSearchHot(source, args.query, args.nodes);
-    const targetHot = isSearchHot(target, args.query, args.nodes);
+    const sourceHot = args.searchHits ? args.searchHits.has(source.id) : isSearchHot(source, args.query, args.nodes);
+    const targetHot = args.searchHits ? args.searchHits.has(target.id) : isSearchHot(target, args.query, args.nodes);
     const leafHot =
       (source.kind === "leaf" && sourceHot) || (target.kind === "leaf" && targetHot);
     const spokeFromHotHub = link.kind === "spoke" && (sourceHot || targetHot);

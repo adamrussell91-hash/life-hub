@@ -19,6 +19,8 @@ function recordingContext() {
   const texts: string[] = [];
   const paths: string[] = [];
   let dash: number[] = [];
+  const cells: Array<{ x: number; y: number }> = [];
+  let tx = 0, ty = 0, scale = 1;
   const ctx = {
     globalAlpha: 1,
     fillStyle: "#000",
@@ -33,10 +35,10 @@ function recordingContext() {
     clearRect() {},
     save() {},
     restore() {},
-    translate() {},
-    scale() {},
+    translate(x: number, y: number) { tx = x; ty = y; },
+    scale(k: number) { scale = k; },
     beginPath() {},
-    arc() {},
+    arc(x: number, y: number) { cells.push({ x: tx + x * scale, y: ty + y * scale }); },
     fill() {},
     createRadialGradient() {
       return { addColorStop() {} };
@@ -76,7 +78,7 @@ function recordingContext() {
       return [...dash];
     },
   };
-  return { ctx, strokes, texts, paths };
+  return { ctx, strokes, texts, paths, cells };
 }
 
 function installCanvas() {
@@ -127,6 +129,54 @@ function model(): ArchiveGraphModel {
 }
 
 describe("Show All strand drawing", () => {
+  it("lets dark Spark notes pass pointer gestures through to the canvas", () => {
+    vi.stubGlobal("devicePixelRatio", 1);
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const recorded = installCanvas();
+    const host = document.createElement("div");
+    document.body.append(host);
+    const selected = vi.fn();
+    const stop = mountForceGraph(host, model(), { onNoteSelect: selected }, { variant: "showAll", search: "", excerptFor: () => "" });
+    const canvas = host.querySelector("canvas")!;
+    canvas.setPointerCapture = vi.fn();
+    const cell = recorded.cells[0]!;
+    canvas.dispatchEvent(new MouseEvent("pointermove", { clientX: cell.x, clientY: cell.y }));
+    expect(host.querySelector<HTMLElement>(".graph-tip")!.hidden).toBe(false);
+    canvas.dispatchEvent(new MouseEvent("pointerdown", { clientX: cell.x, clientY: cell.y }));
+    canvas.dispatchEvent(new MouseEvent("pointerup", { clientX: cell.x, clientY: cell.y }));
+    expect(stop.canOpenSelected?.()).toBe(true);
+    selected.mockClear();
+    (canvas.setPointerCapture as ReturnType<typeof vi.fn>).mockClear();
+    host.querySelector<HTMLButtonElement>('[data-dock-tool="spark"]')!.click();
+    host.querySelector<HTMLInputElement>(".neural-dock__input")!.value = "Note A";
+    host.querySelector<HTMLFormElement>(".neural-dock__spark")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    canvas.dispatchEvent(new MouseEvent("pointermove", { clientX: cell.x, clientY: cell.y }));
+    expect(host.querySelector<HTMLElement>(".graph-tip")!.hidden).toBe(true);
+    expect(stop.canOpenSelected?.()).toBe(false);
+    canvas.dispatchEvent(new MouseEvent("pointerdown", { clientX: cell.x, clientY: cell.y }));
+    window.dispatchEvent(new MouseEvent("pointermove", { clientX: cell.x + 30, clientY: cell.y + 20 }));
+    window.dispatchEvent(new MouseEvent("pointerup", { clientX: cell.x + 30, clientY: cell.y + 20 }));
+    expect(canvas.setPointerCapture).not.toHaveBeenCalled();
+    expect(selected).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("lets the zoom slider inspect far closer than the old wheel limit", () => {
+    vi.stubGlobal("devicePixelRatio", 1);
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    installCanvas();
+    const host = document.createElement("div");
+    document.body.append(host);
+    const stop = mountForceGraph(host, model(), {}, { variant: "showAll", search: "", excerptFor: () => "" });
+    const input = host.querySelector<HTMLInputElement>('[aria-label="Map zoom"]');
+    expect(input).not.toBeNull();
+    input!.value = input!.max;
+    input!.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(Number(input!.dataset.scale)).toBeGreaterThan(10);
+    stop();
+  });
   afterEach(() => {
     resetShowAllTuning();
     document.body.innerHTML = "";
