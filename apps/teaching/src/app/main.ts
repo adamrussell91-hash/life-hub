@@ -26,6 +26,7 @@ import {
 } from '@/teacher/sections/scope-sequences';
 import { renderClassesIndex, renderClassPage, type ClassPageOptions } from '@/teacher/sections/classes';
 import { openScheduleUnitModal } from '@/teacher/sections/schedule-unit-modal';
+import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
 import { renderUnitsIndex, renderUnitPage } from '@/teacher/sections/units';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
 import { renderTemplatesPage } from '@/teacher/sections/templates';
@@ -499,7 +500,7 @@ function renderTeacherChatRoute(token: number): void {
 function renderTeacherCalendarRoute(token: number): void {
   const refs = mountTeacherShell();
   renderRailStatus(refs.railNav, 'Loading curriculum…');
-  void loadNavAndHandleErrors(refs, token, 'home', undefined, () => {
+  void loadNavAndHandleErrors(refs, token, 'home', undefined, (curriculum) => {
     if (token !== renderToken) return;
     refs.canvas.replaceChildren();
     renderPageHeader(refs.canvas, {
@@ -511,7 +512,14 @@ function renderTeacherCalendarRoute(token: number): void {
     host.className = 'teacher-calendar-host';
     host.style.minWidth = '0';
     refs.canvas.append(host);
-    calendarHandle = mountTeachingCalendar(host, { routeZoom: true });
+    calendarHandle = mountTeachingCalendar(host, {
+      routeZoom: true,
+      quickAddLabel: 'Schedule lessons',
+      onQuickAdd: () => openScheduleTimetableModal({
+        curriculum: peekCurriculum() ?? curriculum,
+        onSuccess: () => { calendarHandle?.reload(); }
+      })
+    });
   });
 }
 
@@ -585,7 +593,7 @@ function renderTeacherClassRoute(classId: string, token: number): void {
     },
     onScheduleUnit: () => {
       if (!currentCurriculum) return;
-      openScheduleUnitModal({
+      openScheduleTimetableModal({
         curriculum: currentCurriculum,
         classId,
         onSuccess: refreshAfterScheduleMutation

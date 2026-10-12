@@ -1,4 +1,5 @@
-import type { Class, ScheduledLesson } from '@/schemas';
+import type { Class, ScheduledLesson, Lesson, Unit } from '@/schemas';
+import { toCurriculumLessonSummary } from '@/curriculum/lesson-summary';
 import type { CurriculumResponse } from '@/teacher/nav';
 
 function upsertById<T extends { id: string }>(list: T[], row: T): T[] {
@@ -10,7 +11,7 @@ function upsertById<T extends { id: string }>(list: T[], row: T): T[] {
 
 export function withScheduledUnit(
   curriculum: CurriculumResponse,
-  result: { class: Class; scheduled_lessons: ScheduledLesson[] }
+  result: { class: Class; scheduled_lessons: ScheduledLesson[]; unit?: Unit; lessons?: Lesson[] }
 ): CurriculumResponse {
   let classes = curriculum.classes;
   if (classes.some((entry) => entry.id === result.class.id)) {
@@ -27,6 +28,8 @@ export function withScheduledUnit(
   return {
     ...curriculum,
     classes,
+    units: result.unit ? upsertById(curriculum.units, result.unit) : curriculum.units,
+    lessons: (result.lessons ?? []).reduce((list, lesson) => upsertById(list, toCurriculumLessonSummary(lesson, curriculum.lessons.find(l=>l.id===lesson.id)?.published ?? false)), curriculum.lessons),
     scheduled_lessons: scheduled
   };
 }

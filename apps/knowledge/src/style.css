@@ -6354,3 +6354,40 @@ body.is-universe-saver .universe-exits {
     padding: 6px 9px;
   }
 }
+
+/* Tucked Show All tools remain reachable without restoring the main menu. */
+.neural-dock__body { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); width: 100%; }
+.neural-dock__reveal { display: none; }
+.graph-wrap.is-universe-fullscreen.is-chrome-tucked .neural-dock {
+  top: max(var(--space-3), env(safe-area-inset-top, 0px)) !important;
+  opacity: 1; visibility: visible; translate: none; pointer-events: none;
+}
+.graph-wrap.is-universe-fullscreen.is-chrome-tucked .neural-dock__reveal {
+  display: block; pointer-events: auto; min-height: 44px; padding: 8px 14px;
+  border-radius: var(--radius-sm); border: 1px solid var(--line);
+  background: var(--paper, #fbf8f2); color: var(--ink, #13233a); cursor: pointer;
+}
+.graph-wrap.is-universe-fullscreen.is-chrome-tucked .neural-dock__body {
+  opacity: 0; visibility: hidden; translate: calc(100% + var(--space-3)) 0;
+  transition: translate 0.35s ease, opacity 0.2s ease, visibility 0s linear 0.35s;
+}
+.graph-wrap.is-universe-fullscreen.is-chrome-tucked .neural-dock.is-drawer-open .neural-dock__body {
+  opacity: 1; visibility: visible; translate: none; transition-delay: 0s;
+}
+.graph-zoom {
+  position: relative; pointer-events: auto; width: min(260px, 100%); padding: 10px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper, #fbf8f2);
+}
+.graph-zoom .hub-slider { padding: 0; border: 0; background: transparent; box-shadow: none; color: inherit; --hub-slider-thumb: var(--space-8); }
+.graph-zoom .hub-slider__value { display: none; }
+.graph-zoom .hub-slider__label { margin: 0 0 var(--space-2); align-self: flex-start; font-size: var(--text-sm); color: inherit; }
+.graph-zoom__value { position: absolute; right: 14px; top: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.graph-wrap.is-neural .graph-zoom,
+.graph-wrap.is-neural .neural-dock__reveal { background: #0b1019; color: #f4efe6; border-color: rgba(255,255,255,0.18); }
+@media (max-width: 720px) {
+  .neural-dock__row button, .neural-dock__panel button, .neural-dock__panel select { min-height: 44px; }
+  .neural-dock__panel { padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .graph-wrap.is-universe-fullscreen.is-chrome-tucked .neural-dock__body { transition: none; }
+}

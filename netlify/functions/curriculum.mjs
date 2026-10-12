@@ -39,6 +39,7 @@ function lessonSummary(lesson, publishedIds) {
     sequence: Number.isInteger(lesson.sequence) ? lesson.sequence : 0,
     status: lessonStatus(lesson),
     published: publishedIds.has(id),
+    planning_status: Array.isArray(lesson.blocks) && lesson.blocks.length ? 'planned' : 'not_planned',
     updated_at: typeof lesson.updated_at === 'string' ? lesson.updated_at : '',
     ...(typeof lesson.created_at === 'string' ? { created_at: lesson.created_at } : {}),
     ...(typeof lesson.published_at === 'string' ? { published_at: lesson.published_at } : {}),
@@ -56,6 +57,8 @@ function lessonSummary(lesson, publishedIds) {
 }
 
 export async function buildCurriculum(store) {
+  const source = store;
+  store = { get: (key, options) => source.get(key, { ...options, consistency: 'strong' }), list: options => source.list(options) };
   const [
     years,
     subjects,
@@ -89,11 +92,11 @@ export async function buildCurriculum(store) {
   // Trashed lessons/units/classes stay in the payload (the Trash view restores them), but
   // their calendar rows must not: a schedule row pointing at deleted work is gone too.
   // Computed per request, so restoring the parent brings its schedule back.
-  const deletedIds = new Set(
-    [...units, ...lessons, ...classes].filter(isDeletedRecord).map(row => row.id)
-  );
+  const liveUnitIds = new Set(withoutDeleted(units).map(row => row.id));
+  const liveLessonIds = new Set(withoutDeleted(lessons).map(row => row.id));
+  const liveClassIds = new Set(withoutDeleted(classes).map(row => row.id));
   const liveScheduled = withoutDeleted(scheduled_lessons).filter(row =>
-    !deletedIds.has(row.lesson_id) && !deletedIds.has(row.unit_id) && !deletedIds.has(row.class_id)
+    liveLessonIds.has(row.lesson_id) && liveUnitIds.has(row.unit_id) && liveClassIds.has(row.class_id)
   );
 
   return {

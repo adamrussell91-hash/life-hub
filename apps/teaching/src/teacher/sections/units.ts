@@ -1,4 +1,5 @@
 import { askTextCard } from '@/teacher/confirm-dialog';
+import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
 import { navigate } from '@/app/router';
 import { applyCreatedEntity, replaceCurriculum } from '@/app/curriculum-state';
 import { withCreatedEntity } from '@/curriculum/with-created-entity';
@@ -420,7 +421,12 @@ export function renderUnitPage(
   if (exportItem) exportItem.dataset.export = 'unit';
 
   renderPageHeader(canvas, {
-    actions: [historyHost, optionsMenu.el]
+    actions: [(() => {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'btn btn--secondary'; button.textContent = 'Schedule lessons';
+      button.addEventListener('click', () => openScheduleTimetableModal({ curriculum, unitId, onSuccess: () => options.onMutated?.() }));
+      return button;
+    })(), historyHost, optionsMenu.el]
   });
 
   const root = document.createElement('div');
