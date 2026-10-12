@@ -362,18 +362,23 @@ export function createChatConfirmHandler({
 
     let existingSha;
     let workoutNotesAmend = false;
+    let retirePaths = [];
     try {
       if (validation.record.type === 'workout') {
         const target = await resolveWorkoutConfirmTarget(client, {
           record: validation.record,
           slug: parsed.slug,
           overwrite: parsed.overwrite,
-          amendPath: parsed.amendPath
+          amendPath: parsed.amendPath,
+          replacePlanned: parsed.replacePlanned === true,
+          replaceTitle: parsed.replaceTitle
         });
         if (target.blocked) {
           return errorResponse(
             409,
-            'session_already_finished',
+            target.code === 'planned_replace_ambiguous' || target.code === 'planned_replace_not_found'
+              ? target.code
+              : 'session_already_finished',
             target.error || FINISHED_SESSION_PLAN_ERROR,
             false,
             PRIVATE_CACHE
@@ -382,6 +387,7 @@ export function createChatConfirmHandler({
         path = target.path;
         existingSha = target.existingSha;
         workoutNotesAmend = target.notesAmend === true || target.existingStatus === 'completed';
+        retirePaths = Array.isArray(target.retirePaths) ? target.retirePaths : [];
       } else if (validation.record.type === 'meal' && parsed.overwrite) {
         const current = await client.resolveTree();
         const target = resolveMealWritePath(current.tree, {
@@ -432,6 +438,25 @@ export function createChatConfirmHandler({
         )?.sha;
         persisted = await persistConfirmedRecord(refreshedSha);
       }
+
+      // Override path: new plan is on disk — now erase the superseded planned file(s).
+      for (const retired of retirePaths) {
+        if (!retired?.path || retired.path === path || !retired.sha) continue;
+        if (!parseWorkoutAmendPath(retired.path, { date: validation.record.date })) continue;
+        try {
+          await client.deleteFile({
+            path: retired.path,
+            sha: retired.sha,
+            message: `chore(fitness): delete superseded plan ${retired.path.split('/').pop()}`
+          });
+        } catch (error) {
+          if (!(error instanceof GitHubClientError && error.code === 'write_conflict')) {
+            throw error;
+          }
+          // File already gone or moved — the new plan is saved; treat as done.
+        }
+      }
+
       let exercisePersonalBests;
       if (
         validation.record.type === 'workout'
@@ -2183,6 +2208,8 @@ async function parseRequest(request) {
     amendPath: parseWorkoutAmendPath(body.path, {
       date: typeof body.candidate?.date === 'string' ? body.candidate.date : undefined
     }),
+    replacePlanned: body.replace_planned === true,
+    replaceTitle: typeof body.replace_title === 'string' ? body.replace_title.trim() : null,
     kind,
     id,
     accept: kind === 'action' && Array.isArray(body.accept) ? body.accept : null,

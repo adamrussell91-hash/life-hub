@@ -47,6 +47,18 @@
       ],
       "tool_name": "delete_meal"
     },
+    "log.delete-planned-workout": {
+      "file": "log/delete-planned-workout.json",
+      "agents": [
+        "chadwick"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "fitness_tab"
+      ],
+      "tool_name": "delete_planned_workout"
+    },
     "publish.cn-patch": {
       "file": "publish/cn-patch.json",
       "agents": [

@@ -80,6 +80,15 @@ const KEYWORD_HINTS = [
     ]
   },
   {
+    ids: ['log.delete-planned-workout'],
+    patterns: [
+      /delete (?:the |my |this |that )?(?:planned )?(?:workout|session|plan)/i,
+      /remove (?:the |my |this |that )?(?:planned )?(?:workout|session|plan)/i,
+      /scrap (?:the |my |this |that )?(?:planned )?(?:workout|session|plan)/i,
+      /clear (?:the |my |this |that )?(?:planned )?(?:workout|session|plan)/i
+    ]
+  },
+  {
     ids: ['log.entry', 'lookup.save-exercise-library'],
     patterns: [/workout/i, /session/i, /log (?:my )?sets/i]
   },
@@ -122,6 +131,7 @@ const PINNED_CAPABILITY_IDS = [
   'tasks.create',
   'tasks.update',
   'log.delete-meal',
+  'log.delete-planned-workout',
   'coordinate.request-cn-write',
   'remember.write-memory'
 ];
