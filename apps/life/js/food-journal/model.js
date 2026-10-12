@@ -1,4 +1,4 @@
-import { getSydneyDateKey } from "../core/time.js";
+import { getSydneyDateKey, isCalendarDate } from "../core/time.js";
 import { withoutDeleted } from "../../../../packages/design-kit/js/record-liveness.js";
 
 export const MEAL_TYPES = [
@@ -111,6 +111,34 @@ export function nearbyVenues(journal, gps) {
     .filter((v) => v.distance < 300)
     .sort((a, b) => a.distance - b.distance);
 }
+export function dayOneDate(entry) {
+  const raw = String(entry.creationDate || entry.date || "");
+  if (!isCalendarDate(raw.slice(0, 10))) return "";
+  if (raw.length === 10) return raw;
+  const instant = new Date(raw);
+  if (Number.isNaN(instant.valueOf())) return "";
+  const zone =
+    typeof entry.timeZone === "string" && entry.timeZone
+      ? entry.timeZone
+      : "Australia/Sydney";
+  try {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: zone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      })
+        .formatToParts(instant)
+        .filter((p) => p.type !== "literal")
+        .map((p) => [p.type, p.value]),
+    );
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  } catch {
+    return "";
+  }
+}
+
 export function importDayOne(payload, journal) {
   if (!Array.isArray(payload?.entries))
     throw new Error("Choose a Day One JSON export with entries.");
@@ -124,7 +152,7 @@ export function importDayOne(payload, journal) {
     skipped = [];
   for (const entry of payload.entries) {
     const source = String(entry.uuid || entry.id || "");
-    const date = String(entry.creationDate || entry.date || "").slice(0, 10);
+    const date = dayOneDate(entry);
     const text = String(entry.text || "").trim();
     if (!source || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !text) {
       skipped.push("Incomplete entry");
@@ -147,6 +175,11 @@ export function importDayOne(payload, journal) {
       date,
       title,
       source_id,
+      import_metadata: {
+        original_created_at: String(entry.creationDate || entry.date || ""),
+        time_zone: entry.timeZone || "Australia/Sydney",
+        zone_source: entry.timeZone ? "export" : "owner_default",
+      },
       notes: text,
       venue: {
         name: String(place.placeName || ""),
