@@ -7,6 +7,7 @@ import { createAiJobsHandler } from '../../netlify/functions/ai-jobs.mjs';
 import { createCompositionHandler } from '../../netlify/functions/composition.mjs';
 import { createCompositionsHandler } from '../../netlify/functions/compositions.mjs';
 import { createExportHandler } from '../../netlify/functions/export.mjs';
+import { createLessonPublishHandler } from '../../netlify/functions/lesson-publish.mjs';
 import { createRestoreFromTrashHandler } from '../../netlify/functions/restore-from-trash.mjs';
 import { createScopeSequenceHandler } from '../../netlify/functions/scope-sequence.mjs';
 import { createScopeSequencesHandler } from '../../netlify/functions/scope-sequences.mjs';
@@ -123,11 +124,23 @@ test('leftover Teaching operator routes reject anonymous callers', async () => {
 
 test('compositions list, create, and load', async () => {
   const store = memoryStore(seed);
+  const readStored = store.get.bind(store);
+  store.get = async (key, options = {}) => {
+    // A newly saved blob is unavailable through an eventually consistent read.
+    if (key.startsWith('templates/compositions/') && options.consistency !== 'strong') return null;
+    return readStored(key, options);
+  };
   const deps = { env, now, getContentStore: async () => store };
   const created = await read(await createCompositionsHandler(deps)(
     request('https://api.adam-russell.com/api/compositions', {
       method: 'POST',
-      body: { title: 'Essay frame', root: { type: 'section', content: { blocks: [] } } }
+      body: { title: 'Essay frame', root: {
+        id: 'section_1', type: 'block', block_type: 'section',
+        variant: 'medium', visibility: 'student_teacher',
+        content: { title: 'Essay frame', blocks: [] },
+        layout: {}, print: {}, settings: {},
+        created_at: '2026-08-01T00:00:00Z', updated_at: '2026-08-01T00:00:00Z', schema_version: 1
+      } }
     })
   ));
   assert.equal(created.status, 201);
@@ -140,7 +153,91 @@ test('compositions list, create, and load', async () => {
   const loaded = await read(await createCompositionHandler(deps)(
     request(`https://api.adam-russell.com/api/compositions/${created.body.data.id}`)
   ));
-  assert.equal(loaded.body.data.root.type, 'section');
+  assert.equal(loaded.body.data.root.type, 'block');
+  assert.equal(loaded.body.data.root.block_type, 'section');
+});
+
+test('compositions reject legacy-shaped and non-section roots instead of saving unusable records', async () => {
+  const store = memoryStore();
+  const handler = createCompositionsHandler({ env, now, getContentStore: async () => store });
+  for (const root of [
+    { type: 'section', content: { blocks: [] } },
+    { type: 'block', block_type: 'rich_text', content: { html: '<p>Text</p>' } },
+    { type: 'block', block_type: 'section' }
+  ]) {
+    const response = await handler(request('https://api.adam-russell.com/api/compositions', {
+      method: 'POST', body: { title: 'Invalid', root }
+    }));
+    assert.equal(response.status, 400);
+  }
+});
+
+test('publishing linked compositions freezes their source content while preserving the draft links', async () => {
+  const root = {
+    id: 'source_section', type: 'block', block_type: 'section', visibility: 'student_teacher',
+    content: { title: 'Reading pack', blocks: [
+      { id: 'source_text', type: 'block', block_type: 'rich_text', visibility: 'student_teacher', content: { html: '<p>Read this</p><script>bad()</script>' } },
+      { id: 'private_text', type: 'block', block_type: 'rich_text', visibility: 'teacher_only', content: { html: '<p>Private</p>' } }
+    ] }
+  };
+  const linked = (id) => ({
+    id, type: 'block', block_type: 'section', visibility: 'student_teacher',
+    content: { title: 'Reading pack', blocks: [], link: { mode: 'linked', source_composition_id: 'composition_1' } }
+  });
+  const draft = { ...seed['lessons/lesson_1'], blocks: [linked('linked_1'), linked('linked_2')] };
+  const store = memoryStore({
+    'lessons/lesson_1': draft,
+    'templates/compositions/composition_1': { id: 'composition_1', type: 'composition_template', status: 'active', root }
+  });
+  const handler = createLessonPublishHandler({ env, now, getContentStore: async () => store });
+  const response = await handler(request('https://api.adam-russell.com/api/lessons/lesson_1/publish', { method: 'POST' }));
+  assert.equal(response.status, 200);
+  const published = await store.get('published/lessons/lesson_1', { type: 'json' });
+  assert.equal(published.blocks.length, 2);
+  const childIds = [];
+  for (const section of published.blocks) {
+    assert.equal(section.content.link, undefined);
+    assert.equal(section.content.blocks.length, 1);
+    assert.equal(section.content.blocks[0].content.html, '<p>Read this</p>');
+    childIds.push(section.content.blocks[0].id);
+  }
+  assert.notEqual(childIds[0], childIds[1]);
+  assert.deepEqual((await store.get('lessons/lesson_1')).blocks, draft.blocks);
+  root.content.blocks[0].content.html = '<p>Changed source</p>';
+  assert.equal(published.blocks[0].content.blocks[0].content.html, '<p>Read this</p>');
+});
+
+test('publish refuses a missing linked composition without writing a partial student snapshot', async () => {
+  const store = memoryStore({ 'lessons/lesson_1': {
+    ...seed['lessons/lesson_1'], blocks: [{
+      id: 'linked_1', type: 'block', block_type: 'section', visibility: 'student_teacher',
+      content: { title: 'Missing', blocks: [], link: { mode: 'linked', source_composition_id: 'missing' } }
+    }]
+  } });
+  const handler = createLessonPublishHandler({ env, now, getContentStore: async () => store });
+  const response = await handler(request('https://api.adam-russell.com/api/lessons/lesson_1/publish', { method: 'POST' }));
+  assert.equal(response.status, 400);
+  assert.equal(await store.get('published/lessons/lesson_1'), null);
+});
+
+test('a teacher-only composition root stays out of the student snapshot', async () => {
+  const store = memoryStore({
+    'lessons/lesson_1': { ...seed['lessons/lesson_1'], blocks: [{
+      id: 'linked_1', type: 'block', block_type: 'section', visibility: 'student_teacher',
+      content: { title: 'Private source', blocks: [], link: { mode: 'linked', source_composition_id: 'private' } }
+    }] },
+    'templates/compositions/private': {
+      id: 'private', type: 'composition_template', status: 'active', root: {
+        id: 'private_root', type: 'block', block_type: 'section', visibility: 'teacher_only',
+        content: { title: 'Private source', blocks: [] }
+      }
+    }
+  });
+  const response = await createLessonPublishHandler({ env, now, getContentStore: async () => store })(
+    request('https://api.adam-russell.com/api/lessons/lesson_1/publish', { method: 'POST' })
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual((await store.get('published/lessons/lesson_1')).blocks, []);
 });
 
 test('trash lists trashed records and restore returns them to active', async () => {

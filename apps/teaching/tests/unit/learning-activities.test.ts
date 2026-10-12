@@ -230,11 +230,11 @@ describe('createBlock learning activities', () => {
     expect(NEW_BLOCK_TYPES).toContain('self_check');
 
     const learning = BLOCK_GROUPS.find((g) => g.label === 'Learning');
-    expect(learning?.types).toEqual(['flashcards', 'cloze', 'self_check']);
+    expect(learning?.types).toEqual(['question_set', 'flashcards', 'cloze', 'self_check']);
   });
 
-  it('excludes the Learning group from homepage block choices', () => {
-    expect(HOMEPAGE_BLOCK_GROUPS.map((group) => group.label)).not.toContain('Learning');
+  it('excludes lesson-only learning activities from homepage block choices', () => {
+    expect(HOMEPAGE_BLOCK_GROUPS.find((group) => group.label === 'Learning')?.types).toEqual(['question_set']);
     expect(HOMEPAGE_BLOCK_GROUPS.flatMap((group) => group.types)).not.toEqual(
       expect.arrayContaining(['flashcards', 'cloze', 'self_check', 'outcomes'])
     );

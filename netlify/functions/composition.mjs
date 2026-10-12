@@ -6,7 +6,8 @@ export const config = { path: '/api/compositions/:id' };
 export function createCompositionHandler(deps = {}) {
   return createTeachingRecordHandler({
     keyFor: compositionKey,
-    notFound: 'Composition not found'
+    notFound: 'Composition not found',
+    readOptions: { consistency: 'strong' }
   }, deps);
 }
 

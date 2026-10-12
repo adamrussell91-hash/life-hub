@@ -227,6 +227,14 @@ export function mountLessonPalette(
     flyout.setAttribute('role', 'listbox');
     flyout.setAttribute('aria-label', family.id);
 
+    if (family.cards.length === 0 && family.emptyMessage) {
+      const empty = document.createElement('p');
+      empty.className = 'hub-list__empty';
+      empty.setAttribute('role', 'status');
+      empty.textContent = family.emptyMessage;
+      flyout.append(empty);
+    }
+
     for (const card of family.cards) {
       const el = renderCard(card);
       bindCard(el, card);
@@ -306,8 +314,10 @@ export function mountLessonPalette(
   return {
     setShelved,
     updateFamilies(families: PaletteFamily[]) {
+      const openFamily = families.find((family) => family.id === openId && !family.disabled);
       closeFlyout();
       renderRail(families);
+      if (openFamily) openFlyout(openFamily);
     },
     showCompositionConfirm,
     hideCompositionConfirm,

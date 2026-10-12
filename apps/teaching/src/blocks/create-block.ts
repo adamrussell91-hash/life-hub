@@ -122,7 +122,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
       'heading',
       'callout',
       'quote',
-      'divider',
+      'table',
       'definition',
       'code',
       'html',
@@ -135,28 +135,29 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Teaching',
-    types: ['accordion', 'table', 'question_set', 'timeline', 'card_stack', 'outcomes']
+    types: ['outcomes']
   },
   {
     label: 'Learning',
-    types: ['flashcards', 'cloze', 'self_check']
+    types: ['question_set', 'flashcards', 'cloze', 'self_check']
   },
   {
     label: 'Visualisation',
-    types: ['chart', 'equation', 'diagram', 'mind_map', 'concept_map', 'whiteboard']
+    types: ['chart', 'table', 'timeline', 'equation', 'diagram', 'mind_map', 'concept_map', 'whiteboard']
   },
   {
     label: 'Layout',
-    types: ['section', 'columns', 'spacer', 'tabs', 'collection']
+    types: ['section', 'columns', 'divider', 'spacer', 'accordion', 'tabs', 'card_stack', 'collection']
   }
 ];
 
-export const HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.filter((group) => group.label !== 'Learning').map(
-  (group) =>
-    group.label === 'Teaching'
-      ? { ...group, types: group.types.filter((type) => type !== 'outcomes') }
-      : group
-);
+// Preserve homepage block availability even when a block changes category.
+export const HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
+  ...group,
+  types: group.types.filter(
+    (type) => !['flashcards', 'cloze', 'self_check', 'outcomes'].includes(type)
+  )
+})).filter((group) => group.types.length > 0);
 
 export const LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) =>
   group.label === 'Layout'

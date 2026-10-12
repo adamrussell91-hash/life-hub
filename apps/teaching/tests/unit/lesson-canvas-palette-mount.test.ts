@@ -213,19 +213,56 @@ describe('mountLessonPalette', () => {
     expect(onCompositionChoice).toHaveBeenCalledWith('composition_1', 'copy');
   });
 
-  it('does not allow drag from a disabled compositions family', () => {
+  it('opens an explanatory empty compositions panel without inserting or dragging', () => {
+    const onInsert = vi.fn();
     mountLessonPalette(host, {
       families: lessonPaletteFamilies([]),
-      onInsert: vi.fn()
+      onInsert
     });
 
-    const family = host.querySelector<HTMLElement>('[data-family="Compositions"]')!;
+    const family = host.querySelector<HTMLButtonElement>('[data-family="Compositions"]')!;
     expect(family.getAttribute('draggable')).not.toBe('true');
-    const noPointer = family.style.pointerEvents === 'none' || family.hasAttribute('disabled');
-    expect(noPointer).toBe(true);
+    expect(family.disabled).toBe(false);
+    family.click();
+    const flyout = host.querySelector('.lesson-palette__flyout');
+    expect(flyout).not.toBeNull();
+    expect(flyout?.textContent).toContain('No saved compositions');
+    expect(flyout?.textContent).toContain('Save as composition');
+    expect(flyout?.querySelectorAll('.lesson-palette__card')).toHaveLength(0);
+    expect(onInsert).not.toHaveBeenCalled();
 
     const dt = dispatchDragStart(family);
     expect(host.dataset.dragging).not.toBe('true');
     expect(dt.getData(MIME)).toBe('');
+  });
+
+  it('shows a composition load failure in the panel instead of an empty library', () => {
+    const handle = mountLessonPalette(host, {
+      families: lessonPaletteFamilies([], 'Loading compositions…'),
+      onInsert: vi.fn()
+    });
+    host.querySelector<HTMLButtonElement>('[data-family="Compositions"]')!.click();
+    handle.updateFamilies(lessonPaletteFamilies([], 'Unable to load compositions. Reload the page to try again.'));
+    const flyout = host.querySelector('.lesson-palette__flyout');
+    expect(flyout?.textContent).toContain('Unable to load compositions');
+    expect(flyout?.textContent).not.toContain('No saved compositions');
+  });
+
+  it('keeps the open compositions panel through loading, empty, and saved results', () => {
+    const onInsert = vi.fn();
+    const handle = mountLessonPalette(host, {
+      families: lessonPaletteFamilies([], 'Loading compositions…'),
+      onInsert
+    });
+    host.querySelector<HTMLButtonElement>('[data-family="Compositions"]')!.click();
+    expect(host.querySelector('.lesson-palette__flyout')?.textContent).toContain('Loading');
+    handle.updateFamilies(lessonPaletteFamilies([]));
+    expect(host.querySelector('.lesson-palette__flyout')?.textContent).toContain('No saved compositions');
+    handle.updateFamilies(lessonPaletteFamilies([{ id: 'comp_1', title: 'Exit ticket' }]));
+    const flyout = host.querySelector('.lesson-palette__flyout');
+    expect(flyout?.textContent).not.toContain('No saved compositions');
+    expect(flyout?.textContent).toContain('Exit ticket');
+    flyout?.querySelector<HTMLButtonElement>('[data-composition-id="comp_1"]')?.click();
+    expect(onInsert).toHaveBeenCalledWith({ kind: 'composition', id: 'comp_1' });
   });
 });
