@@ -6,7 +6,8 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { annualEncounters } from '@/domain/grove/companions';
 import { buildAnnualRoamingRoutes, type RoamingRoute, type RoamingEncounter } from '@/domain/grove/annual-roaming';
 import { createRoamingMotion } from '@/domain/grove/roaming-motion';
-import { annualLandPath, annualSwimPath, annualAnimalHeight } from '@/domain/grove/annual-wildlife';
+import { annualLandPath, annualSwimPath, annualAnimalHeight, isAnnualLandPathSafe, isSwimPathSafe } from '@/domain/grove/annual-wildlife';
+import { roundRouteCorners } from '@/domain/grove/roaming-path';
 import type { AnnualWorld } from '@/domain/grove/world';
 import type { AnnualGrovePlan } from '@/domain/grove/annual-plan';
 import { groveAssetUrl } from './asset-url';
@@ -236,8 +237,15 @@ export async function createAnnualAnimals(world: AnnualWorld, plan: AnnualGroveP
                 missing.push(encounter.species + ': asset unavailable');
                 continue;
             }
-            const motion = createRoamingMotion(route.points, { seed: world.identity + ':' + encounter.id + ':' + (wide ? plan.from : day!.key), species: encounter.species, mode: route.mode, roles: Object.keys(asset.roles), startFraction: wide ? index / encounters.length : 0 });
-            routes.push({ worldYear: world.key.year, model: asset.id, encounter: encounter.id, species: encounter.species, mode: route.mode, earnedOn: encounter.earnedOn, regionIds: route.regionIds, pointCount: route.points.length, length: motion.total });
+            let points = route.points;
+            if (!wide) {
+                const rounded = roundRouteCorners(points);
+                if (encounter.swimming ? isSwimPathSafe(world, rounded) : isAnnualLandPathSafe(world, rounded, obstacles)) {
+                    points = rounded;
+                }
+            }
+            const motion = createRoamingMotion(points, { seed: world.identity + ':' + encounter.id + ':' + (wide ? plan.from : day!.key), species: encounter.species, mode: route.mode, roles: Object.keys(asset.roles), startFraction: wide ? index / encounters.length : 0, model: asset.id, polished: true });
+            routes.push({ worldYear: world.key.year, model: asset.id, encounter: encounter.id, species: encounter.species, mode: route.mode, earnedOn: encounter.earnedOn, regionIds: route.regionIds, pointCount: points.length, length: motion.total });
             for (const baby of encounter.baby ? [false, true] : [false]) {
                 if (actors.length >= limit)
                     break;
