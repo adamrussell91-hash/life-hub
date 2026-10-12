@@ -6361,6 +6361,26 @@ button.org-chart__unit-label:focus-visible {
   }
 }
 
+/* Keep person editor actions reachable above locked mobile navigation (R4). */
+@media (max-width: 719px) {
+  .people-page .person-editor { padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px)); }
+  .people-page .person-editor input,
+  .people-page .person-editor select,
+  .people-page .person-editor textarea { font-size: var(--text-md); }
+  .people-page .person-editor:not([hidden]) .add-person-form__actions {
+    position: fixed;
+    left: var(--space-4);
+    right: var(--space-4);
+    bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+    z-index: 30;
+    padding: var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+  }
+  .people-page .person-editor .add-person-form__actions .btn { flex: 1; min-height: 2.75rem; }
+}
+
 /* Keep event composer actions reachable above locked mobile navigation (R4). */
 @media (max-width: 719px) {
   .event-form.event-compose { padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px)); }

@@ -188,6 +188,155 @@ describe('renderPeoplePage (W2 real entry)', () => {
     expect(full?.open).toBe(false);
   });
 
+  it('shows an editable profile while the directory and optional services are still pending', async () => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const releases: Array<() => void> = [];
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/api/people/directory') || /\/api\/people\/(brief|ledger|remember|link-proposals|today)/.test(url)) {
+        await new Promise<void>(resolve => releases.push(resolve));
+      }
+      return original(input, init);
+    });
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    const loading = renderPeoplePage(canvas, {selectedId: PERSON_ID});
+    try {
+      await vi.waitFor(() => expect(canvas.querySelector('.people-pane__name')?.textContent).toBe('Henry McLennan'), {timeout:300});
+      canvas.querySelector<HTMLButtonElement>('.people-pane__edit')!.click();
+      expect(canvas.querySelector<HTMLFormElement>('form[aria-label="Edit person"]')?.hidden).toBe(false);
+      expect(canvas.querySelector('[data-section="ledger"] .people-pane__loading')).toBeTruthy();
+    } finally {
+      vi.mocked(fetch).mockImplementation(original);
+      releases.forEach(release => release());
+      await loading;
+    }
+  });
+  it('revalidates the organisation directory on return', async () => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    let updated = false;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const response = await original(input, init);
+      if (updated && String(input).includes('/api/people/directory?fresh=1')) {
+        const body = await response.json();
+        body.data.people[0].organisation = {ref:'shared:organisation:new_org',display_name:'New workplace',monogram:'NW',logo_key:null,current:true};
+        body.data.people[0].organisations = [body.data.people[0].organisation];
+        return jsonResponse(body.data);
+      }
+      return response;
+    });
+    await renderPeoplePage(document.createElement('div'));
+    updated = true;
+    const canvas = document.createElement('div');
+    await renderPeoplePage(canvas);
+    expect(canvas.textContent).toContain('New workplace');
+  });
+
+  it('renders the ledger independently and keeps an open edit form when Remember finishes', async () => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    let release!: () => void;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).includes('/api/people/remember')) await new Promise<void>(resolve => {release=resolve;});
+      return original(input, init);
+    });
+    const canvas = document.createElement('div');
+    const loading = renderPeoplePage(canvas, {selectedId:PERSON_ID});
+    try {
+      await vi.waitFor(() => expect(canvas.querySelector('[data-section="ledger"]')?.textContent).toContain('Set up mentoring meeting'));
+      canvas.querySelector<HTMLButtonElement>('.people-pane__edit')!.click();
+      const form = canvas.querySelector<HTMLFormElement>('form[aria-label="Edit person"]')!;
+      form.querySelector<HTMLInputElement>('[aria-label="Name"]')!.value = 'Unsaved name';
+      release();
+      await loading;
+      expect(canvas.querySelector('form[aria-label="Edit person"]')).toBe(form);
+      expect(form.hidden).toBe(false);
+      expect(form.querySelector<HTMLInputElement>('[aria-label="Name"]')!.value).toBe('Unsaved name');
+    } finally { release?.(); await loading; }
+  });
+
+  it('a successful profile save updates its directory row and organisation group', async () => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    let saved = false;
+    const org = {ref:'shared:organisation:new_org',display_name:'New workplace',monogram:'NW',logo_key:null,current:true};
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url=String(input);
+      if (init?.method === 'PATCH' && url.includes('/api/entities?')) saved=true;
+      const response = await original(input, init);
+      if (!saved) return response;
+      const body = await response.json();
+      if (url.includes('/api/people/directory')) {
+        body.data.people[0].display_name='Henry Updated';
+        body.data.people[0].organisation=org;
+        body.data.people[0].organisations=[org];
+      }
+      if (url.includes('/api/entities/overview')) {
+        body.data.entity.display_name='Henry Updated';
+        body.data.current_relationships=[{link:{id:'workplace',relationship_type:'employee_at',status:'current',role:'Teacher',valid_to:null},endpoint:{ref:org.ref,kind:'organisation',display_label:org.display_name},direction:'outgoing'}];
+      }
+      return jsonResponse(body.data);
+    });
+    const canvas = document.createElement('div');
+    await renderPeoplePage(canvas,{selectedId:PERSON_ID});
+    canvas.querySelector<HTMLButtonElement>('.people-pane__edit')!.click();
+    const form=canvas.querySelector<HTMLFormElement>('form[aria-label="Edit person"]')!;
+    form.querySelector<HTMLInputElement>('[aria-label="Name"]')!.value='Henry Updated';
+    form.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.people-page__row-name')?.textContent).toBe('Henry Updated');
+      expect(canvas.textContent).toContain('New workplace');
+    });
+  });
+
+  it('shows late link proposals without replacing an open editor', async () => {
+    const original=vi.mocked(fetch).getMockImplementation()!;
+    let release!: () => void;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).includes('/api/people/link-proposals')) {
+        await new Promise<void>(resolve => {release=resolve;});
+        return jsonResponse({proposals:[{id:'proposal1',chip_label:'New connection',reason:'Linked meeting',status:'pending',person_ref:`shared:person:${PERSON_ID}`}],count:1});
+      }
+      return original(input,init);
+    });
+    const canvas=document.createElement('div');
+    const loading=renderPeoplePage(canvas,{selectedId:PERSON_ID});
+    try {
+      await vi.waitFor(() => expect(canvas.querySelector('.people-pane__edit')).toBeTruthy());
+      canvas.querySelector<HTMLButtonElement>('.people-pane__edit')!.click();
+      const form=canvas.querySelector<HTMLFormElement>('form[aria-label="Edit person"]')!;
+      form.querySelector<HTMLInputElement>('[aria-label="Name"]')!.value='Unsaved name';
+      release();
+      await loading;
+      expect(canvas.querySelector('.people-pane__chip--proposal')?.textContent).toContain('New connection');
+      expect(canvas.querySelector('form[aria-label="Edit person"]')).toBe(form);
+      expect(form.querySelector<HTMLInputElement>('[aria-label="Name"]')!.value).toBe('Unsaved name');
+    } finally { release?.(); await loading; }
+  });
+
+  it('merging a selected duplicate removes the deleted profile from the pane', async () => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const action = {kind:'twin',remove:{id:PERSON_ID,ref:`shared:person:${PERSON_ID}`,name:'Henry McLennan'},into:[{id:'survivor',ref:'shared:person:survivor',name:'Henry McLennan'}],student:false,links:1,blocked:null};
+    let merged=false;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url=String(input);
+      if (url.includes('/api/entities/admin')) {
+        if (JSON.parse(String(init?.body)).action === 'plan_people_dedupe') return jsonResponse({ready:[action],kept:[],unresolved:[]});
+        merged=true;
+        return jsonResponse({done:[action],failed:[],skipped:[],remaining:[]});
+      }
+      if (merged && url.includes('/api/people/directory')) return jsonResponse({people:[],organisations:[],counts:{people:0,organisations:0}});
+      return original(input,init);
+    });
+    const canvas=document.createElement('div');
+    await renderPeoplePage(canvas,{selectedId:PERSON_ID});
+    [...canvas.querySelectorAll('button')].find(button => button.textContent === 'Duplicates')!.click();
+    await vi.waitFor(() => expect([...canvas.querySelectorAll('button')].some(button => button.textContent === 'Merge selected')).toBe(true));
+    [...canvas.querySelectorAll('button')].find(button => button.textContent === 'Merge selected')!.click();
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-section="header"] .people-pane__name')).toBeNull();
+      expect(canvas.textContent).toContain('Select someone from the directory.');
+    });
+  });
+
   it('typing in search filters in place without a hashchange repaint', async () => {
     vi.useFakeTimers();
     try {
