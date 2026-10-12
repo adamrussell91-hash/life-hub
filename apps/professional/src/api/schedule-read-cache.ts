@@ -4,18 +4,25 @@ const MAX_ENTRIES = 200;
 type Entry = {promise: Promise<unknown>; expiresAt: number};
 const reads = new Map<string, Entry>();
 
-export function clearScheduleReadCache(): void { reads.clear(); }
+let revision = 0;
+export function scheduleReadRevision(): number { return revision; }
+export function clearScheduleReadCache(): void { revision++; reads.clear(); }
+export function clearDirectoryReadCache(): void {
+  for (const key of reads.keys()) {
+    if (new URL(key, 'https://hub.invalid').pathname === '/api/people/directory') reads.delete(key);
+  }
+}
 
 export function isScheduleRead(path: string): boolean {
   const url = new URL(path, 'https://hub.invalid');
   if (url.searchParams.get('fresh') === '1') return false;
-  if (['/api/events', '/api/pd-groups', '/api/schedule-projections', '/api/communications', '/api/meetings', '/api/threads', '/api/people/directory', '/api/people/ledger'].includes(url.pathname)) return true;
+  if (['/api/events', '/api/pd-groups', '/api/schedule-projections', '/api/communications', '/api/meetings', '/api/threads', '/api/people/directory', '/api/people/ledger', '/api/people/brief', '/api/people/remember', '/api/people/link-proposals', '/api/people/today', '/api/entities/overview'].includes(url.pathname)) return true;
   return url.pathname === '/api/universal-links' && /^professional:(event|pd_group|communication|meeting|thread):/.test(url.searchParams.get('entity_ref') ?? '');
 }
 
 export function changesScheduleReads(path: string): boolean {
   const pathname = path.split('?')[0]!;
-  return ['/api/events', '/api/pd-groups', '/api/universal-links', '/api/auth', '/api/logout', '/api/communications', '/api/meetings', '/api/threads', '/api/entities', '/api/tasks'].includes(pathname) || pathname.startsWith('/api/people/') || pathname.startsWith('/api/organisations/');
+  return ['/api/events', '/api/pd-groups', '/api/universal-links', '/api/auth', '/api/logout', '/api/communications', '/api/meetings', '/api/threads', '/api/entities', '/api/entities/admin', '/api/tasks'].includes(pathname) || pathname.startsWith('/api/people/') || pathname.startsWith('/api/organisations/');
 }
 
 function waitForRead<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {

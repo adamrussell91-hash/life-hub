@@ -3,6 +3,8 @@
  * Remember / Ask / Today / Clare–Hammond coordination fill the agent slots (I3).
  */
 
+import type { EntityOverview, PersonBrief } from '@/domain/types';
+import type { LedgerResponse, LinkProposal } from '@/api/people-directory';
 import { applyPeopleDedupe, fetchEntityOverview, fetchPeopleDedupePlan, type DedupeAction } from '@/api/entities';
 import { fetchPersonBrief } from '@/api/people-brief';
 import {
@@ -313,6 +315,9 @@ export async function renderPeoplePage(
   let selectedId = options.selectedId ?? null;
   let query = parseDirectoryQuery(hashQuery());
   let directory: PeopleDirectoryResponse | null = null;
+  let personLoad = 0;
+  let directoryLoad = 0;
+  const personOverviews = new Map<string, EntityOverview>();
   let personModels = new Map<string, PersonModel>();
   let phone = isPhone();
 
@@ -633,7 +638,78 @@ export async function renderPeoplePage(
     }
   }
 
+  function syncDirectoryPerson(id: string): void {
+    const model = personModels.get(id);
+    const overview = personOverviews.get(id);
+    const row = findRow(id);
+    if (!model || !overview || !row) return;
+    row.display_name = model.displayName;
+    row.initials = model.initials;
+    row.role_line = model.roleLine;
+    row.warmth = model.warmth;
+    row.warmth_band = model.warmthBand;
+    row.open_item_count = model.openItemCount;
+    row.you_owe_count = model.youOweCount;
+    row.they_owe_count = model.theyOweCount;
+    row.pending_proposal_count = model.pendingProposalCount;
+    row.organisations = [...overview.current_relationships, ...overview.historical_relationships]
+      .filter(e => ['employee_at', 'member_of'].includes(e.link.relationship_type) && e.endpoint.kind === 'organisation')
+      .map(e => ({ref:e.endpoint.ref, display_name:e.endpoint.display_label, monogram: model.organisation?.ref === e.endpoint.ref ? model.organisation.monogram : 'ORG', logo_key:directory?.organisations.find(o => o.ref === e.endpoint.ref)?.logo_key ?? null, current:e.link.status === 'current'}));
+    row.organisation = model.organisation ? row.organisations.find(o => o.ref === model.organisation!.ref) ?? null : null;
+  }
+
+  function buildPersonChips(model: PersonModel, id: string): HTMLElement {
+    const chips = el('div', 'people-pane__chips');
+    for (const chip of model.chips) {
+      if (chip.kind === 'proposal' && chip.proposalId) {
+        const c = el('span', 'people-pane__chip people-pane__chip--proposal');
+        c.append(document.createTextNode(chip.label + ' '));
+        const accept = el('button', 'people-pane__chip-act', '✓') as HTMLButtonElement;
+        accept.type = 'button';
+        accept.setAttribute('aria-label', 'Accept link proposal');
+        accept.title = 'Accept';
+        const decline = el('button', 'people-pane__chip-act', '✕') as HTMLButtonElement;
+        decline.type = 'button';
+        decline.setAttribute('aria-label', 'Decline link proposal');
+        decline.title = 'Decline';
+        const pid = chip.proposalId;
+        accept.addEventListener('click', () => {
+          void (async () => {
+            try {
+              await acceptLinkProposal(pid);
+              await loadPersonSections(id);
+            } catch (err) {
+              window.alert(err instanceof Error ? err.message : 'Accept failed.');
+            }
+          })();
+        });
+        decline.addEventListener('click', () => {
+          void (async () => {
+            try {
+              await declineLinkProposal(pid);
+              await loadPersonSections(id);
+            } catch (err) {
+              window.alert(err instanceof Error ? err.message : 'Decline failed.');
+            }
+          })();
+        });
+        c.append(accept, decline);
+        chips.append(c);
+      } else {
+        // L6: one line; a long job title truncates, full text on hover.
+        const c = el('span', `people-pane__chip people-pane__chip--${chip.kind}`);
+        c.append(el('span', 'people-pane__chip-text', chip.label));
+        c.title = chip.title ?? chip.label;
+        if (chip.orgMonogram) c.prepend(crestNode(chip.orgMonogram, 'sm'));
+        chips.append(c);
+      }
+    }
+    return chips;
+  }
+
   async function loadPersonSections(id: string): Promise<void> {
+    const load = ++personLoad;
+    const current = () => isCurrent() && selectedId === id && personLoad === load;
     const headerHost = pane.querySelector('[data-section="header"]') as HTMLElement | null;
     const nextHost = pane.querySelector('[data-section="next"] .people-pane__section-body') as HTMLElement | null;
     const ledgerHost = pane.querySelector('[data-section="ledger"] .people-pane__section-body') as HTMLElement | null;
@@ -655,334 +731,300 @@ export async function renderPeoplePage(
 
     try {
       const ref = personRef(id);
-      const [overview, brief, proposalsRes, ledgerRes, rememberRes] = await Promise.all([
-        fetchEntityOverview(ref),
-        fetchPersonBrief(id).catch(() => null),
-        fetchLinkProposals(ref, { status: 'pending' }).catch(() => ({ proposals: [], count: 0 })),
-        fetchPersonLedger(ref).catch(() => null),
-        fetchRememberFacts(ref).catch(() => ({ facts: [] as RememberFact[], count: 0 }))
-      ]);
-      if (!isCurrent() || selectedId !== id) return;
-
-      const ledgerForModel = ledgerRes
-        ? {
-            you_owe: (ledgerRes.you_owe ?? []).map((item) => ({
-              id: item.id,
-              direction: 'you_owe' as const,
-              text: item.text,
-              sourceLabel: item.source_label ?? 'task',
-              href: item.href ?? null,
-              derived: item.derived,
-              author: item.author,
-              status: item.status
-            })),
-            they_owe: (ledgerRes.they_owe ?? []).map((item) => ({
-              id: item.id,
-              direction: 'they_owe' as const,
-              text: item.text,
-              sourceLabel: item.source_label ?? 'task',
-              href: item.href ?? null,
-              derived: item.derived,
-              author: item.author,
-              status: item.status
-            })),
-            you_owe_count: ledgerRes.you_owe_count,
-            they_owe_count: ledgerRes.they_owe_count,
-            open_item_count: ledgerRes.open_item_count
-          }
-        : null;
-
-      const model = buildPersonModel({
-        overview,
-        brief,
-        ledger: ledgerForModel,
-        proposals: (proposalsRes.proposals ?? []).map((p) => ({
-          id: p.id,
-          chip_label: p.chip_label,
-          reason: p.reason,
-          status: p.status
-        }))
-      });
-      personModels.set(id, model);
-
-      if (directory) {
-        const row = findRow(id);
-        if (row) {
-          row.open_item_count = model.openItemCount;
-          row.you_owe_count = model.youOweCount;
-          row.they_owe_count = model.theyOweCount;
-          row.pending_proposal_count = model.pendingProposalCount;
-          row.role_line = model.roleLine;
-          row.warmth = model.warmth;
-          row.warmth_band = model.warmthBand;
-        }
-      }
-
-      // V4: Today strip + Next share one suggestion model for this person.
-      await reloadToday();
-      if (!isCurrent() || selectedId !== id) return;
-
-      if (headerHost) {
-        headerHost.replaceChildren();
-        const row = el('div', 'people-pane__header');
-        const ring = warmthRing(
-          model.warmth,
-          model.initials,
-          'lg',
-          model.organisation
-            ? {
-                monogram: model.organisation.monogram,
-                orgRef: model.organisation.ref,
-                logoKey:
-                  directory?.organisations.find((o) => o.ref === model.organisation?.ref)?.logo_key ??
-                  null
-              }
-            : undefined,
-          findRow(id)?.person_type === 'student'
-        );
-        ring.title = `${model.warmth} · ${model.warmthFeedNote}`;
-        row.append(ring);
-        const stack = el('div', 'people-pane__header-stack');
-        const nameRow = el('div', 'people-pane__name-row');
-        nameRow.append(el('h2', 'people-pane__name', model.displayName));
-        const personEntity = overview.entity;
-        if (personEntity.kind === 'person') {
-          const cleaned = cleanIdentityDisplayName(personEntity.display_name) || personEntity.display_name;
-          const currentRels = overview.current_relationships ?? [];
-          const proRel = currentRels.find((e) => e.link.relationship_type === 'professional_relationship');
-          const orgRel = currentRels.find(
-            (e) =>
-              (e.link.relationship_type === 'employee_at' || e.link.relationship_type === 'member_of') &&
-              e.endpoint.kind === 'organisation'
-          );
-          const editor = mountIdentityEditor(
-            cleaned === personEntity.display_name
-              ? personEntity
-              : { ...personEntity, display_name: cleaned },
-            () => {
-              void loadPersonSections(id);
-            },
-            {
-              relationshipRole: proRel?.link.role ?? null,
-              relationshipLinkId: proRel?.link.id ?? null,
-              // Current workplace only — a former one here would be re-joined
-              // the moment a job title is saved.
-              organisation: orgRel
-                ? { ref: orgRel.endpoint.ref, display_label: orgRel.endpoint.display_label }
-                : null,
-              workplaceLinkId: orgRel?.link.id ?? null,
-              jobTitle: orgRel?.link.role ?? null
+      // Start independent reads together; identity and edit controls need only the overview.
+      const overviewRead = fetchEntityOverview(ref);
+      const briefRead = fetchPersonBrief(id).catch(() => null);
+      const proposalsRead = fetchLinkProposals(ref, {status:'pending'}).catch(() => ({proposals:[] as LinkProposal[],count:0}));
+      const ledgerRead = fetchPersonLedger(ref).catch(() => null);
+      const rememberRead = fetchRememberFacts(ref).catch(() => ({facts:[] as RememberFact[],count:0}));
+      const overview = await overviewRead;
+      if (!current()) return;
+      personOverviews.set(id, overview);
+      let brief: PersonBrief | null = null;
+      let proposalsRes: {proposals:LinkProposal[];count:number} = {proposals:[],count:0};
+      let ledgerRes: LedgerResponse | null = null;
+      let rememberRes: {facts:RememberFact[];count:number} = {facts:[],count:0};
+      const ready = new Set<string>();
+      function paint(changed: string): void {
+        if (!current()) return;
+        ready.add(changed);
+        const ledgerForModel = ledgerRes
+          ? {
+              you_owe: (ledgerRes.you_owe ?? []).map((item) => ({
+                id: item.id,
+                direction: 'you_owe' as const,
+                text: item.text,
+                sourceLabel: item.source_label ?? 'task',
+                href: item.href ?? null,
+                derived: item.derived,
+                author: item.author,
+                status: item.status
+              })),
+              they_owe: (ledgerRes.they_owe ?? []).map((item) => ({
+                id: item.id,
+                direction: 'they_owe' as const,
+                text: item.text,
+                sourceLabel: item.source_label ?? 'task',
+                href: item.href ?? null,
+                derived: item.derived,
+                author: item.author,
+                status: item.status
+              })),
+              you_owe_count: ledgerRes.you_owe_count,
+              they_owe_count: ledgerRes.they_owe_count,
+              open_item_count: ledgerRes.open_item_count
             }
-          );
-          editor.button.classList.add('people-pane__edit');
-          nameRow.append(editor.button);
-          stack.append(nameRow);
-          const chips = el('div', 'people-pane__chips');
-          for (const chip of model.chips) {
-            if (chip.kind === 'proposal' && chip.proposalId) {
-              const c = el('span', 'people-pane__chip people-pane__chip--proposal');
-              c.append(document.createTextNode(chip.label + ' '));
-              const accept = el('button', 'people-pane__chip-act', '✓') as HTMLButtonElement;
-              accept.type = 'button';
-              accept.setAttribute('aria-label', 'Accept link proposal');
-              accept.title = 'Accept';
-              const decline = el('button', 'people-pane__chip-act', '✕') as HTMLButtonElement;
-              decline.type = 'button';
-              decline.setAttribute('aria-label', 'Decline link proposal');
-              decline.title = 'Decline';
-              const pid = chip.proposalId;
-              accept.addEventListener('click', () => {
-                void (async () => {
-                  try {
-                    await acceptLinkProposal(pid);
-                    await loadPersonSections(id);
-                  } catch (err) {
-                    window.alert(err instanceof Error ? err.message : 'Accept failed.');
-                  }
-                })();
-              });
-              decline.addEventListener('click', () => {
-                void (async () => {
-                  try {
-                    await declineLinkProposal(pid);
-                    await loadPersonSections(id);
-                  } catch (err) {
-                    window.alert(err instanceof Error ? err.message : 'Decline failed.');
-                  }
-                })();
-              });
-              c.append(accept, decline);
-              chips.append(c);
-            } else {
-              // L6: one line; a long job title truncates, full text on hover.
-              const c = el('span', `people-pane__chip people-pane__chip--${chip.kind}`);
-              c.append(el('span', 'people-pane__chip-text', chip.label));
-              c.title = chip.title ?? chip.label;
-              if (chip.orgMonogram) c.prepend(crestNode(chip.orgMonogram, 'sm'));
-              chips.append(c);
-            }
-          }
-          stack.append(chips);
-          const checkLinks = el('button', 'btn btn--ghost people-pane__check-links', 'Check for links') as HTMLButtonElement;
-          checkLinks.type = 'button';
-          const checkStatus = el('p', 'people-pane__check-status');
-          checkStatus.hidden = true;
-          checkLinks.addEventListener('click', () => {
-            void (async () => {
-              checkLinks.disabled = true;
-              checkLinks.textContent = 'Checking…';
-              checkStatus.hidden = true;
-              try {
-                const result = await runLinkInference();
-                await loadPersonSections(id);
-                checkStatus.hidden = false;
-                if (result.created > 0) {
-                  checkStatus.textContent = `Found ${result.created} link proposal${result.created === 1 ? '' : 's'} — accept or decline on the chips above.`;
-                } else {
-                  checkStatus.textContent = 'No new link proposals.';
+          : null;
+
+        const model = buildPersonModel({
+          overview,
+          brief,
+          ledger: ledgerForModel,
+          proposals: (proposalsRes.proposals ?? []).map((p) => ({
+            id: p.id,
+            chip_label: p.chip_label,
+            reason: p.reason,
+            status: p.status
+          }))
+        });
+        personModels.set(id, model);
+
+        syncDirectoryPerson(id);
+
+        if (headerHost && changed === 'overview') {
+          headerHost.replaceChildren();
+          const row = el('div', 'people-pane__header');
+          const ring = warmthRing(
+            model.warmth,
+            model.initials,
+            'lg',
+            model.organisation
+              ? {
+                  monogram: model.organisation.monogram,
+                  orgRef: model.organisation.ref,
+                  logoKey:
+                    directory?.organisations.find((o) => o.ref === model.organisation?.ref)?.logo_key ??
+                    null
                 }
-              } catch (err) {
-                window.alert(err instanceof Error ? err.message : 'Check for links failed.');
-              } finally {
-                checkLinks.disabled = false;
-                checkLinks.textContent = 'Check for links';
+              : undefined,
+            findRow(id)?.person_type === 'student'
+          );
+          ring.title = `${model.warmth} · ${model.warmthFeedNote}`;
+          row.append(ring);
+          const stack = el('div', 'people-pane__header-stack');
+          const nameRow = el('div', 'people-pane__name-row');
+          nameRow.append(el('h2', 'people-pane__name', model.displayName));
+          const personEntity = overview.entity;
+          if (personEntity.kind === 'person') {
+            const cleaned = cleanIdentityDisplayName(personEntity.display_name) || personEntity.display_name;
+            const currentRels = overview.current_relationships ?? [];
+            const proRel = currentRels.find((e) => e.link.relationship_type === 'professional_relationship');
+            const orgRel = currentRels.find(
+              (e) =>
+                (e.link.relationship_type === 'employee_at' || e.link.relationship_type === 'member_of') &&
+                e.endpoint.kind === 'organisation'
+            );
+            const editor = mountIdentityEditor(
+              cleaned === personEntity.display_name
+                ? personEntity
+                : { ...personEntity, display_name: cleaned },
+              () => {
+                void Promise.all([loadPersonSections(id), reloadDirectory()]);
+              },
+              {
+                relationshipRole: proRel?.link.role ?? null,
+                relationshipLinkId: proRel?.link.id ?? null,
+                // Current workplace only — a former one here would be re-joined
+                // the moment a job title is saved.
+                organisation: orgRel
+                  ? { ref: orgRel.endpoint.ref, display_label: orgRel.endpoint.display_label }
+                  : null,
+                workplaceLinkId: orgRel?.link.id ?? null,
+                jobTitle: orgRel?.link.role ?? null
               }
-            })();
-          });
-          stack.append(checkLinks, checkStatus);
-          row.append(stack);
-          headerHost.append(row, editor.form);
-        } else {
-          stack.append(nameRow);
-          row.append(stack);
-          headerHost.append(row);
+            );
+            editor.button.classList.add('people-pane__edit');
+            nameRow.append(editor.button);
+            stack.append(nameRow);
+            const chips = buildPersonChips(model, id);
+            stack.append(chips);
+            const checkLinks = el('button', 'btn btn--ghost people-pane__check-links', 'Check for links') as HTMLButtonElement;
+            checkLinks.type = 'button';
+            const checkStatus = el('p', 'people-pane__check-status');
+            checkStatus.hidden = true;
+            checkLinks.addEventListener('click', () => {
+              void (async () => {
+                checkLinks.disabled = true;
+                checkLinks.textContent = 'Checking…';
+                checkStatus.hidden = true;
+                try {
+                  const result = await runLinkInference();
+                  await loadPersonSections(id);
+                  checkStatus.hidden = false;
+                  if (result.created > 0) {
+                    checkStatus.textContent = `Found ${result.created} link proposal${result.created === 1 ? '' : 's'} — accept or decline on the chips above.`;
+                  } else {
+                    checkStatus.textContent = 'No new link proposals.';
+                  }
+                } catch (err) {
+                  window.alert(err instanceof Error ? err.message : 'Check for links failed.');
+                } finally {
+                  checkLinks.disabled = false;
+                  checkLinks.textContent = 'Check for links';
+                }
+              })();
+            });
+            stack.append(checkLinks, checkStatus);
+            row.append(stack);
+            headerHost.append(row, editor.form);
+          } else {
+            stack.append(nameRow);
+            row.append(stack);
+            headerHost.append(row);
+          }
         }
-      }
 
-      if (nextHost) {
-        nextHost.replaceChildren();
-        const suggestion = todayData?.suggestion;
-        if (suggestion?.note && suggestion.note !== 'No pattern yet' && suggestion.slot_id) {
-          const slot = todayData?.slots.find((s) => s.id === suggestion.slot_id);
-          const card = el('div', 'people-pane__next');
-          card.append(
+        if (changed === 'proposals') {
+          headerHost?.querySelector('.people-pane__chips')?.replaceWith(buildPersonChips(model, id));
+        }
+
+        if (nextHost && (changed === 'brief' || changed === 'today')) {
+          nextHost.replaceChildren();
+          const suggestion = todayData?.suggestion;
+          if (suggestion?.note && suggestion.note !== 'No pattern yet' && suggestion.slot_id) {
+            const slot = todayData?.slots.find((s) => s.id === suggestion.slot_id);
+            const card = el('div', 'people-pane__next');
+            card.append(
+              el(
+                'p',
+                undefined,
+                slot
+                  ? `You're free at ${slot.start_label}. ${suggestion.note}.`
+                  : suggestion.note
+              )
+            );
+            nextHost.append(card);
+          } else if (!model.next) {
+            setSectionState(
+              nextHost,
+              'empty',
+              suggestion?.note === 'No pattern yet'
+                ? 'No pattern yet'
+                : 'No upcoming meeting or event with them.'
+            );
+          } else {
+            const card = el('div', 'people-pane__next');
+            const when = formatDisplayDate(model.next.detail);
+            card.append(
+              el('p', undefined, `${model.next.title}${when ? ` · ${when}` : ''}`)
+            );
+            nextHost.append(card);
+          }
+        }
+
+        if (ledgerHost && (changed === 'ledger' || (changed === 'brief' && ready.has('ledger') && !ledgerRes))) {
+          ledgerHost.replaceChildren();
+          const reading = el('p', 'people-pane__clare-status');
+          reading.hidden = true;
+          reading.textContent = 'Clare is reading…';
+          ledgerHost.append(reading);
+
+          const grid = el('div', 'people-pane__ledger');
+          const you = el('div');
+          you.append(
             el(
-              'p',
-              undefined,
-              slot
-                ? `You're free at ${slot.start_label}. ${suggestion.note}.`
-                : suggestion.note
+              'div',
+              'people-pane__ledger-h people-pane__ledger-h--you',
+              `You owe ${model.displayName.split(' ')[0] ?? 'them'}`
             )
           );
-          nextHost.append(card);
-        } else if (!model.next) {
-          setSectionState(
-            nextHost,
-            'empty',
-            suggestion?.note === 'No pattern yet'
-              ? 'No pattern yet'
-              : 'No upcoming meeting or event with them.'
-          );
-        } else {
-          const card = el('div', 'people-pane__next');
-          const when = formatDisplayDate(model.next.detail);
-          card.append(
-            el('p', undefined, `${model.next.title}${when ? ` · ${when}` : ''}`)
-          );
-          nextHost.append(card);
-        }
-      }
-
-      if (ledgerHost) {
-        ledgerHost.replaceChildren();
-        const reading = el('p', 'people-pane__clare-status');
-        reading.hidden = true;
-        reading.textContent = 'Clare is reading…';
-        ledgerHost.append(reading);
-
-        const grid = el('div', 'people-pane__ledger');
-        const you = el('div');
-        you.append(
-          el(
-            'div',
-            'people-pane__ledger-h people-pane__ledger-h--you',
-            `You owe ${model.displayName.split(' ')[0] ?? 'them'}`
-          )
-        );
-        if (model.ledgerYouOwe.length === 0) {
-          you.append(el('p', 'people-pane__empty', 'Nothing open.'));
-        } else {
-          for (const item of model.ledgerYouOwe) {
-            you.append(renderLedgerItem(item, id));
+          if (model.ledgerYouOwe.length === 0) {
+            you.append(el('p', 'people-pane__empty', 'Nothing open.'));
+          } else {
+            for (const item of model.ledgerYouOwe) {
+              you.append(renderLedgerItem(item, id));
+            }
           }
-        }
-        const them = el('div');
-        them.append(
-          el(
-            'div',
-            'people-pane__ledger-h people-pane__ledger-h--them',
-            `${model.displayName.split(' ')[0] ?? 'They'} owe you`
-          )
-        );
-        if (model.ledgerTheyOwe.length === 0) {
-          them.append(el('p', 'people-pane__empty', 'Nothing to confirm.'));
-        } else {
-          for (const item of model.ledgerTheyOwe) {
-            them.append(renderLedgerItem(item, id));
-          }
-        }
-        grid.append(you, them);
-        ledgerHost.append(grid);
-      }
-
-      if (rememberHost) {
-        renderRememberSection(rememberHost, rememberRes.facts ?? [], id, model.displayName);
-      }
-
-      if (arcHost) {
-        arcHost.replaceChildren();
-        if (model.arcPoints.length === 0) {
-          setSectionState(arcHost, 'empty', 'No dated touchpoints linked yet.');
-        } else {
-          arcHost.append(
-            renderRelationshipArcSvg(
-              model.arcPoints.map((p) => ({
-                id: p.id,
-                at: p.at,
-                label: p.label
-              }))
+          const them = el('div');
+          them.append(
+            el(
+              'div',
+              'people-pane__ledger-h people-pane__ledger-h--them',
+              `${model.displayName.split(' ')[0] ?? 'They'} owe you`
             )
           );
+          if (model.ledgerTheyOwe.length === 0) {
+            them.append(el('p', 'people-pane__empty', 'Nothing to confirm.'));
+          } else {
+            for (const item of model.ledgerTheyOwe) {
+              them.append(renderLedgerItem(item, id));
+            }
+          }
+          grid.append(you, them);
+          ledgerHost.append(grid);
         }
-      }
 
-      if (linkedHost) {
-        renderLinkedEverywhere(linkedHost, overview.linked_records);
-      }
-      if (tagHost && !tagHost.childElementCount) {
-        // Tag from the person's side too — writes the same `tagged_with`
-        // link the note/task/event taggers write, and lists both directions.
-        mountTagAnythingSection(tagHost, ref);
-      }
-
-      if (fullHost) {
-        fullHost.replaceChildren();
-        const ul = el('ul', 'people-pane__full-list');
-        for (const entry of overview.current_relationships ?? []) {
-          const li = el('li');
-          li.textContent = `${relationshipWord(entry.link.relationship_type)}: ${entry.endpoint.display_label}`;
-          ul.append(li);
+        if (rememberHost && changed === 'remember') {
+          renderRememberSection(rememberHost, rememberRes.facts ?? [], id, model.displayName);
         }
-        if (!ul.childElementCount) {
-          fullHost.append(el('p', 'people-pane__empty', 'No current relationships in the full record.'));
-        } else {
-          fullHost.append(ul);
-        }
-      }
 
-      renderDirectory();
+        if (arcHost && changed === 'overview') {
+          arcHost.replaceChildren();
+          if (model.arcPoints.length === 0) {
+            setSectionState(arcHost, 'empty', 'No dated touchpoints linked yet.');
+          } else {
+            arcHost.append(
+              renderRelationshipArcSvg(
+                model.arcPoints.map((p) => ({
+                  id: p.id,
+                  at: p.at,
+                  label: p.label
+                }))
+              )
+            );
+          }
+        }
+
+        if (linkedHost && changed === 'overview') {
+          renderLinkedEverywhere(linkedHost, overview.linked_records);
+        }
+        if (tagHost && !tagHost.childElementCount) {
+          // Tag from the person's side too — writes the same `tagged_with`
+          // link the note/task/event taggers write, and lists both directions.
+          mountTagAnythingSection(tagHost, ref);
+        }
+
+        if (fullHost && changed === 'overview') {
+          fullHost.replaceChildren();
+          const ul = el('ul', 'people-pane__full-list');
+          for (const entry of overview.current_relationships ?? []) {
+            const li = el('li');
+            li.textContent = `${relationshipWord(entry.link.relationship_type)}: ${entry.endpoint.display_label}`;
+            ul.append(li);
+          }
+          if (!ul.childElementCount) {
+            fullHost.append(el('p', 'people-pane__empty', 'No current relationships in the full record.'));
+          } else {
+            fullHost.append(ul);
+          }
+        }
+
+        renderDirectory();
+      }
+      paint('overview');
+      await Promise.all([
+        briefRead.then(value => { brief = value; paint('brief'); }),
+        proposalsRead.then(value => { proposalsRes = value; paint('proposals'); }),
+        ledgerRead.then(value => { ledgerRes = value; paint('ledger'); }),
+        rememberRead.then(value => { rememberRes = value; paint('remember'); }),
+        ledgerRead.then(async () => {
+          if (!current()) return;
+          await reloadToday(current);
+          paint('today');
+        })
+      ]);
     } catch (err) {
-      if (!isCurrent() || selectedId !== id) return;
+      if (!current()) return;
       const msg = err instanceof Error ? err.message : 'Could not load this person.';
       if (nextHost) setSectionState(nextHost, 'error', msg);
       if (ledgerHost) setSectionState(ledgerHost, 'error', msg);
@@ -1143,6 +1185,7 @@ export async function renderPeoplePage(
   }
 
   function mountPaneSkeleton(): void {
+    personLoad++;
     pane.replaceChildren();
     if (!selectedId) {
       pane.append(el('p', 'people-pane__empty', 'Select someone from the directory.'));
@@ -1510,6 +1553,16 @@ export async function renderPeoplePage(
           let skipped = 0;
           while (pending.length) {
             const result = await applyPeopleDedupe(pending);
+            if (!isCurrent()) return;
+            personLoad++;
+            personModels.clear();
+            personOverviews.clear();
+            if (result.done.some(action => action.remove.id === selectedId)) {
+              selectedId = null;
+              applyQueryToHash();
+            }
+            // Hide any selected pre-merge record immediately, including between batches.
+            mountPaneSkeleton();
             done.push(...result.done.map((d) => d.remove.name));
             failed.push(...result.failed.map((f) => f.remove.name));
             skipped += result.skipped.length;
@@ -1521,6 +1574,7 @@ export async function renderPeoplePage(
           if (skipped) parts.push(`${skipped} changed since this list and were skipped.`);
           status.textContent = parts.join(' ');
           await reloadDirectory();
+          if (isCurrent()) await paintSelection();
         } catch (err) {
           status.textContent = err instanceof Error ? err.message : 'Merge failed.';
           merge.disabled = false;
@@ -1662,22 +1716,23 @@ export async function renderPeoplePage(
     todayStrip.append(label, scroller);
   }
 
-  async function reloadToday(): Promise<void> {
+  async function reloadToday(current = isCurrent): Promise<void> {
     try {
       const model = selectedId ? personModels.get(selectedId) : null;
       const hasMeet = Boolean(
         model?.ledgerYouOwe.some((i) => /meet/i.test(i.text)) ||
           model?.openItemCount
       );
-      todayData = await fetchTodayStrip({
+      const result = await fetchTodayStrip({
         person_ref: model?.ref,
         display_name: model?.displayName,
         has_meet_item: hasMeet
       });
-      if (!isCurrent()) return;
+      if (!current()) return;
+      todayData = result;
       renderTodayStrip();
     } catch {
-      if (!isCurrent()) return;
+      if (!current()) return;
       todayStrip.classList.add('people-page__today--compact');
       todayStrip.replaceChildren(
         el('p', 'people-pane__empty people-page__today-unavailable', 'Today strip unavailable.')
@@ -1705,24 +1760,16 @@ export async function renderPeoplePage(
   };
   mq.addEventListener('change', onMq);
 
-  async function reloadDirectory(options: { allowCached?: boolean } = {}): Promise<void> {
+  async function reloadDirectory(): Promise<void> {
+    const load = ++directoryLoad;
     try {
-      // Stale-while-revalidate: paint the last directory at once, then refresh.
-      const cached = options.allowCached ? peekPeopleDirectory() : null;
-      if (cached) {
-        directory = cached;
-        count.textContent = directoryCountLabel(cached);
-        await paintLayout();
-      }
-      directory = await fetchPeopleDirectory({ fresh: !options.allowCached });
-      if (!isCurrent()) return;
+      const result = await fetchPeopleDirectory({fresh:true});
+      if (!isCurrent() || load !== directoryLoad) return;
+      directory = result;
       count.textContent = directoryCountLabel(directory);
-      if (!selectedId && directory.people[0] && !phone) {
-        // Desktop: leave unselected until click — mockup shows a selection; pick first for empty hash? Plan: `#/people` is directory; selection optional.
-      }
-      await paintLayout();
+      renderDirectory();
     } catch (err) {
-      if (!isCurrent()) return;
+      if (!isCurrent() || load !== directoryLoad) return;
       count.textContent = 'Unavailable';
       listHost.replaceChildren(
         el('p', 'people-pane__error', err instanceof Error ? err.message : 'Directory failed to load.')
@@ -1730,8 +1777,10 @@ export async function renderPeoplePage(
     }
   }
 
+  directory = peekPeopleDirectory();
+  if (directory) count.textContent = directoryCountLabel(directory);
   syncControlLabels();
-  await reloadDirectory({ allowCached: true });
+  await Promise.all([paintLayout(), reloadDirectory()]);
 }
 
 /** @deprecated Use renderPeoplePage — kept for import compatibility during migration. */

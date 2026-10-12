@@ -1,4 +1,4 @@
-import { cachedScheduleRead, isScheduleRead, changesScheduleReads, clearScheduleReadCache } from './schedule-read-cache';
+import { cachedScheduleRead, isScheduleRead, changesScheduleReads, clearScheduleReadCache, clearDirectoryReadCache } from './schedule-read-cache';
 export { clearScheduleReadCache } from './schedule-read-cache';
 import { getApiBaseUrl } from './config';
 import type { ApiErrorBody, ApiResult } from './types';
@@ -199,7 +199,11 @@ async function apiRequest<T>(
 }
 
 export function apiGet<T>(path: string, options?: ApiRequestOptions): Promise<T> {
-  if (new URL(path, 'https://hub.invalid').searchParams.get('fresh') === '1') clearScheduleReadCache();
+  const url = new URL(path, 'https://hub.invalid');
+  if (url.searchParams.get('fresh') === '1') {
+    if (url.pathname === '/api/people/directory') clearDirectoryReadCache();
+    else clearScheduleReadCache();
+  }
   if (!isScheduleRead(path)) return apiRequest<T>('GET', path, options);
   const key = `${getApiBaseUrl(options?.baseUrl)}${path}`;
   return cachedScheduleRead(key, () => apiRequest<T>('GET', path, {...options, signal: undefined}), options?.signal);
