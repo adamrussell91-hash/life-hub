@@ -1,3 +1,4 @@
+import { canonical, contextSnapshot, blockRevision, findAlchemyBlock } from '../../../packages/alchemy/revisions.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -3345,6 +3346,27 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         return errorResponse(400, 'bad_request', 'lesson_id, block_id, and messages are required');
       }
       return okResponse(200, { text: 'mock-ai-reply' });
+    }
+
+    if (method === 'POST' && path === '/api/alchemy-blocks') {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      const query=body as {kind?:string;id?:string;blocks?:string[];validateOnly?:boolean;contextRevision?:string;instruction?:string};
+      if (!query || !['lesson','unit'].includes(query.kind||'') || !query.id || !Array.isArray(query.blocks) || query.blocks.length>4) return errorResponse(400,'alchemy_input','Choose up to four blocks.');
+      const entity=store.getJSON<Lesson|Unit>(query.kind==='lesson'?draftLessonKey(query.id):unitKey(query.id));
+      if(!entity) return errorResponse(404,'not_found','Lesson or unit not found.');
+      const unit=query.kind==='lesson'?store.getJSON<Unit>(unitKey((entity as Lesson).unit_id)):null;
+      const contextRevision=canonical({entity:contextSnapshot(entity),unit:unit?contextSnapshot(unit):null});
+      if(query.validateOnly)return okResponse(200,{valid:query.contextRevision===contextRevision});
+      const proposals=query.blocks.flatMap(id=>{
+        const block=findAlchemyBlock(entity.blocks||[],id);
+        if(!block)return [];
+        const replacement=structuredClone(block);
+        if(replacement.block_type==='heading')replacement.content.text=(query.instruction?.trim()?'Model together, then try independently: ':'Start with a worked example: ')+replacement.content.text;
+        else if(replacement.block_type==='rich_text')replacement.content.html='<p>First, model the process together. Then try independently.</p>'+replacement.content.html;
+        else return [];
+        return [{blockId:id,original:blockRevision(block),contextRevision,rationale:'Make the modelling step explicit before independent practice.',replacement,sources:[{id:'note_caesar',title:'Worked examples and scaffolding',excerpt:'Local fixture: model the process before independent practice.'}]}];
+      });
+      return okResponse(200,{proposals,assessed:query.blocks,contextRevision,mode:'local'});
     }
 
     if (method === 'POST' && path === '/api/alchemy-lab') {
