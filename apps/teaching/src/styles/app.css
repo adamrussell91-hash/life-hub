@@ -9893,3 +9893,240 @@ body.is-lesson-builder-full-page .hub-utilities {
     padding-bottom: var(--space-3, 0.75rem);
   }
 }
+
+/* Annotation threads (3b) */
+.block-annotation__threads {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2, 0.5rem);
+  overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
+  padding-bottom: 0.15rem;
+}
+
+.block-annotation__threads[hidden] {
+  display: none;
+}
+
+.block-annotation__thread-chip,
+.block-annotation__thread-pick {
+  flex: 0 0 auto;
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wave) 14%, var(--paper, #fff));
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.block-annotation__thread-chip.is-focused,
+.block-annotation__thread-chip[aria-pressed='true'] {
+  outline: 2px solid var(--wave);
+  outline-offset: 1px;
+}
+
+.block-annotation__focus-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.block-annotation__focus-bar[hidden],
+.block-annotation__step-bar[hidden] {
+  display: none;
+}
+
+.block-annotation__show-all,
+.block-annotation__step-btn,
+.block-annotation__thread-menu-item {
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 0.5rem);
+  background: var(--paper, #fff);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.block-annotation__thread-menu {
+  position: relative;
+}
+
+.block-annotation__thread-menu > summary {
+  min-height: 2.75rem;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 0.5rem);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.block-annotation__thread-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.block-annotation__thread-menu[open] {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.block-annotation__thread-menu-item[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--wave) 18%, var(--paper, #fff));
+}
+
+.block-annotation__step-bar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: start;
+}
+
+.block-annotation__step-meta {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.block-annotation__poem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.block-annotation__poem:has(.block-annotation__arcs-col) {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.block-annotation__arcs-col {
+  position: relative;
+  width: max-content;
+  min-width: 1.5rem;
+  flex: 0 0 auto;
+}
+
+.block-annotation__arcs {
+  display: block;
+  overflow: visible;
+}
+
+.block-annotation__arc-num {
+  fill: var(--paper, #fff);
+  font-size: 8px;
+  font-family: var(--font-ui);
+  pointer-events: none;
+}
+
+.block-annotation__stanzas {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.block-annotation__fold {
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0;
+  padding: 0 var(--space-2);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm, 0.35rem);
+  background: color-mix(in srgb, var(--mist, #9aa4b2) 12%, var(--paper, #fff));
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.block-annotation__line--fold {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.block-annotation__line.is-step .block-annotation__line-text {
+  background: color-mix(in srgb, var(--wave) 12%, transparent);
+}
+
+.block-annotation__pip {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper, #fff);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.block-annotation__pip--wave {
+  background: color-mix(in srgb, var(--wave) 22%, var(--paper, #fff));
+}
+.block-annotation__pip--sand {
+  background: color-mix(in srgb, var(--sand) 28%, var(--paper, #fff));
+}
+.block-annotation__pip--high-sea {
+  background: color-mix(in srgb, var(--high-sea) 22%, var(--paper, #fff));
+}
+.block-annotation__pip--shore {
+  background: color-mix(in srgb, var(--shore) 28%, var(--paper, #fff));
+}
+.block-annotation__pip--marine {
+  background: color-mix(in srgb, var(--marine) 22%, var(--paper, #fff));
+}
+.block-annotation__pip--navy {
+  background: color-mix(in srgb, var(--navy, #1b2a4a) 18%, var(--paper, #fff));
+}
+.block-annotation__pip--coral {
+  background: color-mix(in srgb, var(--coral, #c96b4a) 22%, var(--paper, #fff));
+}
+.block-annotation__pip--mist {
+  background: color-mix(in srgb, var(--mist, #9aa4b2) 28%, var(--paper, #fff));
+}
+
+.block-annotation__thread-fn-label {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .block-annotation--focus .block-annotation__line.is-step .block-annotation__line-text {
+    transition: background-color 160ms ease;
+  }
+}
+
+@media (max-width: 720px) {
+  .block-annotation__poem {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .block-annotation__arcs-col {
+    display: none;
+  }
+
+  .block-annotation__step-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .block-annotation__step-btn {
+    width: 100%;
+  }
+
+  .block-annotation__sheet .block-annotation__thread-chip {
+    display: block;
+    width: 100%;
+    margin-bottom: var(--space-2);
+  }
+}
