@@ -9602,13 +9602,27 @@ body.is-lesson-builder-full-page .hub-utilities {
   font-size: var(--text-xs);
 }
 
-.block-annotation__chip--sand { background: color-mix(in srgb, var(--sand) 22%, var(--paper, #fff)); }
-.block-annotation__chip--high-sea { background: color-mix(in srgb, var(--high-sea) 18%, var(--paper, #fff)); }
-.block-annotation__chip--shore { background: color-mix(in srgb, var(--shore) 22%, var(--paper, #fff)); }
-.block-annotation__chip--marine { background: color-mix(in srgb, var(--marine) 18%, var(--paper, #fff)); }
-.block-annotation__chip--navy { background: color-mix(in srgb, var(--navy, #1b2a4a) 16%, var(--paper, #fff)); }
-.block-annotation__chip--coral { background: color-mix(in srgb, var(--coral, #c96b4a) 18%, var(--paper, #fff)); }
-.block-annotation__chip--mist { background: color-mix(in srgb, var(--mist, #9aa4b2) 22%, var(--paper, #fff)); }
+.block-annotation__chip--sand {
+  background: color-mix(in srgb, var(--sand) 22%, var(--paper, #fff));
+}
+.block-annotation__chip--high-sea {
+  background: color-mix(in srgb, var(--high-sea) 18%, var(--paper, #fff));
+}
+.block-annotation__chip--shore {
+  background: color-mix(in srgb, var(--shore) 22%, var(--paper, #fff));
+}
+.block-annotation__chip--marine {
+  background: color-mix(in srgb, var(--marine) 18%, var(--paper, #fff));
+}
+.block-annotation__chip--navy {
+  background: color-mix(in srgb, var(--navy, #1b2a4a) 16%, var(--paper, #fff));
+}
+.block-annotation__chip--coral {
+  background: color-mix(in srgb, var(--coral, #c96b4a) 18%, var(--paper, #fff));
+}
+.block-annotation__chip--mist {
+  background: color-mix(in srgb, var(--mist, #9aa4b2) 22%, var(--paper, #fff));
+}
 
 .block-annotation__slider-row {
   display: grid;

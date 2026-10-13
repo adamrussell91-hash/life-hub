@@ -17,12 +17,14 @@ const text = dulceAnnotationFixture.content.text;
 
 describe('annotation layers (pure)', () => {
   it('studentStops excludes the teacher layer', () => {
-    const stops = studentStops(layers);
-    expect(stops.map((l) => l.id)).toEqual(['layer_structure', 'layer_imagery']);
+    expect(studentStops(layers).map((l) => l.id)).toEqual([
+      'layer_structure',
+      'layer_imagery'
+    ]);
     expect(teacherStops(layers).map((l) => l.kind)).toContain('teacher');
   });
 
-  it('visible set for stop 0, 2, and last', () => {
+  it('revealedLayers covers stop 0, mid, and last', () => {
     const stops = studentStops(layers);
     expect(revealedLayers(stops, 0)).toEqual([]);
     expect(revealedLayers(stops, 2).map((l) => l.id)).toEqual([
@@ -32,7 +34,7 @@ describe('annotation layers (pure)', () => {
     expect(revealedLayers(stops, stops.length)).toHaveLength(stops.length);
   });
 
-  it('toggle off layer 1 at stop 3 leaves later layers active', () => {
+  it('suppressing an early layer leaves later revealed layers active', () => {
     const stops = teacherStops(layers);
     let state = createLayerState(layers, { show_markers: true }, 'teacher');
     expect(state.stop).toBe(stops.length);
@@ -43,52 +45,37 @@ describe('annotation layers (pure)', () => {
     expect(active.has('layer_teacher')).toBe(true);
   });
 
-  it('markers list for a given state; show_markers:false gives none', () => {
+  it('markersFor lists hidden-layer markers; show_markers false yields none', () => {
     const stops = studentStops(layers);
     const state = {
       stop: 0,
       suppressed: new Set<string>(),
       openAnnotationId: null
     };
-    const markers = markersFor(
-      annotations,
-      layers,
-      stops,
-      state,
-      true,
-      (ann) => resolveAnnotation(text, ann)
-    );
+    const resolve = (ann: (typeof annotations)[number]) => resolveAnnotation(text, ann);
+    const markers = markersFor(annotations, layers, stops, state, true, resolve);
     expect(markers.length).toBeGreaterThan(0);
     expect(markers.every((m) => m.layerId !== 'layer_teacher')).toBe(true);
     expect(markers.every((m) => m.symbol.length > 0 && m.layerName.length > 0)).toBe(
       true
     );
-
-    const none = markersFor(
-      annotations,
-      layers,
-      stops,
-      state,
-      false,
-      (ann) => resolveAnnotation(text, ann)
-    );
-    expect(none).toEqual([]);
+    expect(markersFor(annotations, layers, stops, state, false, resolve)).toEqual([]);
   });
 
-  it('teacher layer is excluded from the student visible set', () => {
+  it('student mode never activates the teacher layer; default_layer_id sets stop', () => {
     const stops = studentStops(layers);
-    const state = {
+    const active = activeLayerIds(stops, {
       stop: stops.length,
       suppressed: new Set<string>(),
       openAnnotationId: null
-    };
-    const active = activeLayerIds(stops, state);
+    });
     expect(active.has('layer_teacher')).toBe(false);
-    const studentState = createLayerState(
-      layers,
-      { show_markers: true, default_layer_id: 'layer_imagery' },
-      'student'
-    );
-    expect(studentState.stop).toBe(2);
+    expect(
+      createLayerState(
+        layers,
+        { show_markers: true, default_layer_id: 'layer_imagery' },
+        'student'
+      ).stop
+    ).toBe(2);
   });
 });

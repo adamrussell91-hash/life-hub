@@ -109,19 +109,20 @@ describe('annotation render + sanitise', () => {
     expect(changes.length).toBeGreaterThan(0);
   });
 
+  // Slice 2a — settings, slider, chips, markers
   it('editor persists show_markers and default_layer_id', () => {
     const changes: Array<ReturnType<typeof BlockSchema.parse>> = [];
     const editor = createAnnotationEditor(dulceAnnotationFixture, (block) => {
       changes.push(block);
     });
-    const markers = editor.querySelector<HTMLInputElement>(
+    const showMarkers = editor.querySelector<HTMLInputElement>(
       '.block-editor__annotation-show-markers'
     )!;
     const defaultLayer = editor.querySelector<HTMLSelectElement>(
       '.block-editor__annotation-default-layer'
     )!;
-    markers.checked = false;
-    markers.dispatchEvent(new Event('change'));
+    showMarkers.checked = false;
+    showMarkers.dispatchEvent(new Event('change'));
     defaultLayer.value = 'layer_structure';
     defaultLayer.dispatchEvent(new Event('change'));
     const last = changes.at(-1);
@@ -142,12 +143,14 @@ describe('annotation render + sanitise', () => {
     slider.value = '2';
     slider.dispatchEvent(new Event('input'));
     expect(el.querySelectorAll('[data-annotation-id]').length).toBeGreaterThan(0);
+
     const chips = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip')];
-    expect(chips.length).toBe(2);
+    expect(chips).toHaveLength(2);
     chips[0]!.click();
     expect(slider.value).toBe('2');
-    const after = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip')];
-    expect(after[0]!.getAttribute('aria-pressed')).toBe('false');
+    // paint() replaces chip nodes — re-query after toggle.
+    const afterToggle = el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip');
+    expect(afterToggle[0]!.getAttribute('aria-pressed')).toBe('false');
     expect(el.querySelectorAll('.block-annotation__marker').length).toBeGreaterThan(0);
   });
 

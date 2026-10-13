@@ -3,6 +3,7 @@ import {
   orphans,
   type BuildAnchorSelection
 } from '@/blocks/annotation-anchor';
+import { studentStops } from '@/blocks/annotation-layers';
 import {
   parseAnnotationSource,
   serializeAnnotationSource
@@ -142,20 +143,19 @@ export function createAnnotationEditorFields(
 
   function paintDefaultLayerOptions(): void {
     const current = defaultLayer.value || block.content.settings.default_layer_id || '';
+    const choices = studentStops(layers);
     defaultLayer.replaceChildren();
     const textOnly = document.createElement('option');
     textOnly.value = '';
     textOnly.textContent = 'Text only';
     defaultLayer.append(textOnly);
-    for (const layer of layers) {
-      if (layer.kind === 'teacher') continue;
+    for (const layer of choices) {
       const opt = document.createElement('option');
       opt.value = layer.id;
       opt.textContent = layer.name;
       defaultLayer.append(opt);
     }
-    const stillValid =
-      current === '' || layers.some((layer) => layer.id === current && layer.kind !== 'teacher');
+    const stillValid = current === '' || choices.some((layer) => layer.id === current);
     defaultLayer.value = stillValid ? current : '';
   }
 
@@ -781,10 +781,6 @@ export function createAnnotationEditorFields(
           opt.selected = layer.kind === value;
           kind.append(opt);
         }
-        kind.addEventListener('change', () => {
-          ctx.update({ ...ctx.current, kind: kind.value as AnnotationLayerKind });
-        });
-
         const symbol = document.createElement('input');
         symbol.type = 'text';
         symbol.className = 'block-editor__annotation-layer-symbol';
@@ -800,7 +796,9 @@ export function createAnnotationEditorFields(
           });
         });
         kind.addEventListener('change', () => {
-          symbol.hidden = kind.value !== 'free';
+          const nextKind = kind.value as AnnotationLayerKind;
+          symbol.hidden = nextKind !== 'free';
+          ctx.update({ ...ctx.current, kind: nextKind });
         });
 
         const wrap = document.createElement('div');

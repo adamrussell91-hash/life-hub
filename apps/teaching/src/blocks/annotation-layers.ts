@@ -1,3 +1,4 @@
+import type { AnchorResolveResult } from '@/blocks/annotation-anchor';
 import type {
   AnnotationBlock,
   AnnotationItem,
@@ -43,6 +44,11 @@ export function stopsForMode(
   return mode === 'teacher' ? teacherStops(layers) : studentStops(layers);
 }
 
+export function clampStop(stop: number, stopCount: number): number {
+  if (stopCount <= 0) return 0;
+  return Math.max(0, Math.min(stop, stopCount));
+}
+
 export function createLayerState(
   layers: AnnotationLayer[],
   settings: AnnotationBlock['content']['settings'],
@@ -64,18 +70,12 @@ export function createLayerState(
   };
 }
 
-export function clampStop(stop: number, stopCount: number): number {
-  if (stopCount <= 0) return 0;
-  return Math.max(0, Math.min(stop, stopCount));
-}
-
 /** Layers revealed by the slider stop (not yet applying chip toggles). */
 export function revealedLayers(
   stops: AnnotationLayer[],
   stop: number
 ): AnnotationLayer[] {
-  const n = clampStop(stop, stops.length);
-  return stops.slice(0, n);
+  return stops.slice(0, clampStop(stop, stops.length));
 }
 
 /**
@@ -90,8 +90,7 @@ export function activeLayerIds(
 ): Set<string> {
   const active = new Set<string>();
   for (const layer of revealedLayers(stops, state.stop)) {
-    if (state.suppressed.has(layer.id)) continue;
-    active.add(layer.id);
+    if (!state.suppressed.has(layer.id)) active.add(layer.id);
   }
   return active;
 }
@@ -112,19 +111,17 @@ export function layerSymbol(layer: AnnotationLayer): string {
   return layer.name.trim().slice(0, 2) || '•';
 }
 
+/** Markers for annotations on the slider path that are not currently drawn. */
 export function markersFor(
   annotations: AnnotationItem[],
   layers: AnnotationLayer[],
   stops: AnnotationLayer[],
   state: AnnotationLayerState,
   showMarkers: boolean,
-  resolve: (
-    annotation: AnnotationItem
-  ) =>
-    | { status: 'ok'; stanzaId: string; lineId?: string; start?: number; end?: number }
-    | { status: 'orphan' }
+  resolve: (annotation: AnnotationItem) => AnchorResolveResult
 ): AnnotationMarker[] {
   if (!showMarkers) return [];
+
   const activeIds = activeLayerIds(stops, state);
   const layerMap = new Map(layers.map((layer) => [layer.id, layer]));
   const stopIds = new Set(stops.map((layer) => layer.id));
@@ -132,11 +129,14 @@ export function markersFor(
 
   for (const annotation of annotations) {
     if (!stopIds.has(annotation.layer_id)) continue;
+    // Skip annotations already shown as anchors / bars.
     if (isAnnotationActive(annotation, activeIds, state.suppressed)) continue;
+
     const resolved = resolve(annotation);
     if (resolved.status !== 'ok') continue;
     const layer = layerMap.get(annotation.layer_id);
     if (!layer) continue;
+
     out.push({
       annotationId: annotation.id,
       layerId: layer.id,

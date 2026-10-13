@@ -4,10 +4,12 @@ import {
   createLayerState,
   isAnnotationActive,
   markersFor,
+  revealedLayers,
   stepStop,
   stopsForMode,
   toggleSuppressed,
-  type AnnotationLayerState
+  type AnnotationLayerState,
+  type AnnotationMarker
 } from '@/blocks/annotation-layers';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { isHttpUrl } from '@/blocks/url-safety';
@@ -300,10 +302,8 @@ function renderLineText(
     }
     const slice = lineText.slice(mark.start, mark.end);
     const gran = mark.placed.resolved.granularity;
-    const className =
-      gran === 'word' || gran === 'phrase'
-        ? `block-annotation__anchor block-annotation__anchor--${gran}`
-        : 'block-annotation__anchor block-annotation__anchor--phrase';
+    const grainClass = gran === 'word' ? 'word' : 'phrase';
+    const className = `block-annotation__anchor block-annotation__anchor--${grainClass}`;
     frag.append(
       wrapSpan(slice, className, mark.placed.annotation, mark.placed.layer, root)
     );
@@ -316,7 +316,6 @@ function renderLineText(
 }
 
 function isTextControl(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
   if (
     target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement ||
@@ -324,7 +323,33 @@ function isTextControl(target: EventTarget | null): boolean {
   ) {
     return true;
   }
-  return target.isContentEditable;
+  return target instanceof HTMLElement && target.isContentEditable;
+}
+
+function pushGrouped<T>(map: Map<string, T[]>, key: string, item: T): void {
+  const list = map.get(key) ?? [];
+  list.push(item);
+  map.set(key, list);
+}
+
+function barAnchorLabel(kind: 'line' | 'stanza', layer?: AnnotationLayer): string {
+  const prefix = kind === 'stanza' ? 'Stanza annotation' : 'Line annotation';
+  return layer ? `${prefix}: ${layer.name}` : prefix;
+}
+
+function makeBarAnchor(
+  item: PlacedAnnotation,
+  kind: 'line' | 'stanza',
+  onOpen: (btn: HTMLButtonElement) => void
+): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `block-annotation__anchor block-annotation__anchor--${kind}`;
+  btn.dataset.annotationId = item.annotation.id;
+  btn.setAttribute('aria-expanded', 'false');
+  btn.setAttribute('aria-label', barAnchorLabel(kind, item.layer));
+  btn.addEventListener('click', () => onOpen(btn));
+  return btn;
 }
 
 function buildInteractiveView(
@@ -426,8 +451,7 @@ function buildInteractiveView(
       stopLabels.append(label);
     });
 
-    const revealed = stops.slice(0, state.stop);
-    for (const layer of revealed) {
+    for (const layer of revealedLayers(stops, state.stop)) {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = `block-annotation__chip block-annotation__chip--${layer.colour}`;
@@ -468,23 +492,20 @@ function buildInteractiveView(
     for (const item of placed) {
       const { resolved } = item;
       if (resolved.granularity === 'stanza') {
-        const list = stanzaBars.get(resolved.stanzaId) ?? [];
-        list.push(item);
-        stanzaBars.set(resolved.stanzaId, list);
+        pushGrouped(stanzaBars, resolved.stanzaId, item);
         continue;
       }
       if (!resolved.lineId) continue;
       if (resolved.granularity === 'line') {
-        const list = lineBars.get(resolved.lineId) ?? [];
-        list.push(item);
-        lineBars.set(resolved.lineId, list);
+        pushGrouped(lineBars, resolved.lineId, item);
         continue;
       }
       if (resolved.start == null || resolved.end == null) continue;
-      const key = `${resolved.stanzaId}:${resolved.lineId}`;
-      const list = byLine.get(key) ?? [];
-      list.push({ start: resolved.start, end: resolved.end, placed: item });
-      byLine.set(key, list);
+      pushGrouped(byLine, `${resolved.stanzaId}:${resolved.lineId}`, {
+        start: resolved.start,
+        end: resolved.end,
+        placed: item
+      });
     }
 
     const markers = markersFor(
@@ -495,13 +516,28 @@ function buildInteractiveView(
       content.settings.show_markers !== false,
       (annotation) => resolveAnnotation(content.text, annotation)
     );
-    const markersByLine = new Map<string, typeof markers>();
+    const markersByLine = new Map<string, AnnotationMarker[]>();
     for (const marker of markers) {
       if (!marker.lineId) continue;
-      const key = `${marker.stanzaId}:${marker.lineId}`;
-      const list = markersByLine.get(key) ?? [];
-      list.push(marker);
-      markersByLine.set(key, list);
+      pushGrouped(markersByLine, `${marker.stanzaId}:${marker.lineId}`, marker);
+    }
+
+    function openPlaced(item: PlacedAnnotation, btn: HTMLButtonElement): void {
+      state = { ...state, openAnnotationId: item.annotation.id };
+      openAnnotation(root, item.annotation, item.layer, btn);
+    }
+
+    function revealMarkerLayer(marker: AnnotationMarker): void {
+      const idx = stops.findIndex((layer) => layer.id === marker.layerId);
+      if (idx < 0) return;
+      const suppressed = new Set(state.suppressed);
+      suppressed.delete(marker.layerId);
+      state = {
+        ...state,
+        stop: Math.max(state.stop, idx + 1),
+        suppressed
+      };
+      paint();
     }
 
     for (const stanza of content.text.stanzas) {
@@ -512,20 +548,7 @@ function buildInteractiveView(
       const gutter = document.createElement('div');
       gutter.className = 'block-annotation__stanza-gutter';
       for (const item of stanzaBars.get(stanza.id) ?? []) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'block-annotation__anchor block-annotation__anchor--stanza';
-        btn.dataset.annotationId = item.annotation.id;
-        btn.setAttribute('aria-expanded', 'false');
-        btn.setAttribute(
-          'aria-label',
-          item.layer ? `Stanza annotation: ${item.layer.name}` : 'Stanza annotation'
-        );
-        btn.addEventListener('click', () => {
-          state = { ...state, openAnnotationId: item.annotation.id };
-          openAnnotation(root, item.annotation, item.layer, btn);
-        });
-        gutter.append(btn);
+        gutter.append(makeBarAnchor(item, 'stanza', (btn) => openPlaced(item, btn)));
       }
       stanzaEl.append(gutter);
 
@@ -540,20 +563,7 @@ function buildInteractiveView(
         const margin = document.createElement('div');
         margin.className = 'block-annotation__line-margin';
         for (const item of lineBars.get(line.id) ?? []) {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'block-annotation__anchor block-annotation__anchor--line';
-          btn.dataset.annotationId = item.annotation.id;
-          btn.setAttribute('aria-expanded', 'false');
-          btn.setAttribute(
-            'aria-label',
-            item.layer ? `Line annotation: ${item.layer.name}` : 'Line annotation'
-          );
-          btn.addEventListener('click', () => {
-            state = { ...state, openAnnotationId: item.annotation.id };
-            openAnnotation(root, item.annotation, item.layer, btn);
-          });
-          margin.append(btn);
+          margin.append(makeBarAnchor(item, 'line', (btn) => openPlaced(item, btn)));
         }
         row.append(margin);
 
@@ -577,19 +587,7 @@ function buildInteractiveView(
             dot.title = marker.layerName;
             dot.setAttribute('aria-label', `Hidden layer: ${marker.layerName}`);
             dot.textContent = marker.symbol;
-            dot.addEventListener('click', () => {
-              const idx = stops.findIndex((layer) => layer.id === marker.layerId);
-              if (idx >= 0) {
-                state = {
-                  ...state,
-                  stop: Math.max(state.stop, idx + 1),
-                  suppressed: new Set(
-                    [...state.suppressed].filter((id) => id !== marker.layerId)
-                  )
-                };
-                paint();
-              }
-            });
+            dot.addEventListener('click', () => revealMarkerLayer(marker));
             markerRow.append(dot);
           }
           textEl.append(markerRow);
@@ -649,27 +647,29 @@ function buildInteractiveView(
     const blockFocused = event.target === root || root.contains(event.target as Node);
     if (!onSlider && !blockFocused) return;
 
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-      event.preventDefault();
-      state = stepStop(state, stops, -1);
-      paint();
-      slider.focus();
-    } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      state = stepStop(state, stops, 1);
-      paint();
-      slider.focus();
-    } else if (event.key === 'Home') {
-      event.preventDefault();
-      state = { ...state, stop: 0 };
-      paint();
-      slider.focus();
-    } else if (event.key === 'End') {
-      event.preventDefault();
-      state = { ...state, stop: stops.length };
-      paint();
-      slider.focus();
+    let next: AnnotationLayerState | null = null;
+    switch (event.key) {
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        next = stepStop(state, stops, -1);
+        break;
+      case 'ArrowRight':
+      case 'ArrowUp':
+        next = stepStop(state, stops, 1);
+        break;
+      case 'Home':
+        next = { ...state, stop: 0 };
+        break;
+      case 'End':
+        next = { ...state, stop: stops.length };
+        break;
+      default:
+        return;
     }
+    event.preventDefault();
+    state = next;
+    paint();
+    slider.focus();
   });
 
   paint();
