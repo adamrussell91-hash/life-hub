@@ -36,3 +36,11 @@ test('expired lease allows a later key; late completion cannot release its lease
 test('store lacking conditional writes fails closed',async()=>{
  assert.equal(typeof createAlchemyBudget,'function'); const b=createAlchemyBudget({get:async()=>null,setJSON:async()=>undefined}); await assert.rejects(b.reserve({key:'a',mode:'passive'}));
 });
+test('result persistence completes before the lease is released',async()=>{
+ const {store,budget}=setup();const t=await budget.reserve({key:'a',mode:'manual'});const write=store.setJSON;let release;store.setJSON=async(key,data,c)=>{if(key.includes('/results/'))await new Promise(r=>release=r);return write(key,data,c);};const finished=budget.finish(t,{result:{done:true}});await new Promise(r=>setImmediate(r));await assert.rejects(budget.reserve({key:'b',mode:'manual'}),e=>e.code==='alchemy_busy');release();await finished;
+});
+test('an oversized selection cannot permanently disable valid future checks',async()=>{
+ const {budget,advance}=setup();const ticket=await budget.reserve({key:'big',mode:'manual'});
+ await budget.finish(ticket,{error:{status:400,code:'alchemy_input_limit'}});advance(600001);
+ assert.ok(await budget.reserve({key:'small',mode:'manual'}));
+});

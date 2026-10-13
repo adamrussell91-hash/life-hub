@@ -21,6 +21,7 @@ export function createAlchemyBudget(store, { now = Date.now, timeZone = 'Austral
   }
   return {
     async cached(key) { return (await store.get(cacheKey(key), { type: 'json', consistency: 'strong' }))?.result ?? null; },
+    async remember(key,result) { await store.setJSON(cacheKey(key), { result }, { onlyIfNew: true }); },
     async reserve({ key, mode }) {
       const time = now(), id = randomUUID();
       await change(state => {
@@ -45,12 +46,13 @@ export function createAlchemyBudget(store, { now = Date.now, timeZone = 'Austral
       return { id, key, mode };
     },
     async finish(ticket, { result, error, usage } = {}) {
+      if (!error && result !== undefined) await store.setJSON(cacheKey(ticket.key), { result }, { onlyIfNew: true });
       await change(state => {
         if (state.lease?.id !== ticket.id) return state;
         delete state.lease;
         if (error) {
           state.failures = (state.failures || 0) + 1;
-          state.permanent = [400,401,402,403].includes(error.status) || error.code === 'alchemy_unconfigured';
+          state.permanent = (error.code === 'alchemy_upstream' && [400,401,402,403,404].includes(error.status)) || error.code === 'alchemy_unconfigured';
           state.cooldown = now() + Math.max(error.retryAfterMs || 0, state.failures >= 3 ? 1800000 : Math.min(3600000, 300000 * 2 ** (state.failures - 1)));
         } else {
           state.failures = 0;
@@ -61,7 +63,6 @@ export function createAlchemyBudget(store, { now = Date.now, timeZone = 'Austral
         }
         return state;
       });
-      if (!error && result !== undefined) await store.setJSON(cacheKey(ticket.key), { result }, { onlyIfNew: true });
     }
   };
 }

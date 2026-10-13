@@ -1,3 +1,4 @@
+import { mountBlockAssistant } from '@/alchemy/block-assistant';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
 import { navigate } from '@/app/router';
@@ -478,6 +479,7 @@ export function renderUnitPage(
   planHost.className = 'unit-page__plan-editor';
 
   const planEditor = mountUnitPlanEditor(planHost, unit.blocks ?? [], {
+    unit,
     onSave: async (blocks, refresh = false) => {
       const saved = await patchUnit(unit.id, { blocks });
       unit.blocks = saved.blocks;
@@ -712,6 +714,7 @@ function mountUnitPlanEditor(
   host: HTMLElement,
   initialBlocks: Block[],
   options: {
+    unit: Unit;
     onSave: (blocks: Block[], refresh?: boolean) => Promise<void>;
     attachedOutcomes?: ReturnType<typeof publicOutcomesForPage>;
   }
@@ -724,6 +727,8 @@ function mountUnitPlanEditor(
   let saveChain = Promise.resolve();
   let revision = 0;
   let savedRevision = 0;
+  let assistant: ReturnType<typeof mountBlockAssistant> | null = null;
+  let lastSaveError: unknown = null;
 
   const root = document.createElement('div');
   root.className = 'unit-plan-editor lesson-builder lesson-builder--no-chat';
@@ -774,9 +779,11 @@ function mountUnitPlanEditor(
       if (!refresh && targetRevision <= savedRevision) return;
       try {
         await options.onSave(snapshot, refresh);
+        lastSaveError = null;
         savedRevision = Math.max(savedRevision, targetRevision);
         if (!destroyed) errorBanner.hidden = true;
       } catch (error: unknown) {
+        lastSaveError = error;
         if (!destroyed) {
           errorBanner.hidden = false;
           errorBanner.textContent = saveErrorMessage(error);
@@ -805,6 +812,17 @@ function mountUnitPlanEditor(
       nextId = nextBlockIdFactory('block_unit', blocks);
       revision += 1;
       scheduleSave();
+      assistant?.changed();
+    }
+  });
+
+  assistant = mountBlockAssistant({
+    host: root, kind: 'unit', id: options.unit.id,
+    getEntity: () => ({ ...options.unit, blocks }),
+    flush: async () => { await persistLatest(); if (lastSaveError) throw lastSaveError; },
+    apply: async (next) => {
+      blocks = next.blocks ?? []; revision += 1; canvas.update(blocks);
+      await persistLatest(true); if (lastSaveError) throw lastSaveError;
     }
   });
 
@@ -839,6 +857,7 @@ function mountUnitPlanEditor(
       canvas.update(blocks);
     },
     dispose: () => {
+      assistant?.dispose();
       if (saveTimer !== null) {
         clearTimeout(saveTimer);
         saveTimer = null;
