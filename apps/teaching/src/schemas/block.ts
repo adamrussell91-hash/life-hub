@@ -390,12 +390,22 @@ export const QuestionSetBlockSchema = z.object({
   ...blockTimestamps
 });
 
+export const FlashcardSourceSchema = z.object({
+  block_id: z.string().min(1),
+  annotation_id: z.string().min(1),
+  lesson_id: z.string().optional(),
+  kind: z.enum(['quote_to_technique', 'find_it', 'line_recall']),
+  source_hash: z.string().min(1)
+});
+
 export const FlashcardItemSchema = z.object({
   id: z.string().min(1),
   front: z.string(),
   back: z.string(),
   image_url: z.string().optional(),
-  image_alt: z.string().optional()
+  image_alt: z.string().optional(),
+  /** Teacher-only metadata; stripped from the student payload. */
+  source: FlashcardSourceSchema.optional()
 });
 
 export const FlashcardsBlockSchema = z.object({
@@ -693,7 +703,13 @@ export const AnnotationFamilyKeySchema = z.enum([
 ]);
 export type AnnotationFamilyKey = z.infer<typeof AnnotationFamilyKeySchema>;
 
-export const AnnotationLayerKindSchema = z.enum(['family', 'free', 'lens', 'teacher']);
+export const AnnotationLayerKindSchema = z.enum([
+  'family',
+  'free',
+  'lens',
+  'teacher',
+  'voice'
+]);
 export type AnnotationLayerKind = z.infer<typeof AnnotationLayerKindSchema>;
 
 /** Fixed palette token names — never free-typed hex in the editor. */
@@ -750,12 +766,16 @@ export const AnnotationQuoteSchema = z.object({
 });
 
 export const AnnotationAnchorSchema = z.object({
+  /** Required on every stop when the annotation is a thread. */
+  id: z.string().min(1).optional(),
   granularity: AnnotationGranularitySchema,
   stanza: z.string().min(1),
   line: z.string().optional(),
   start: z.number().int().min(0).optional(),
   end: z.number().int().min(0).optional(),
-  quote: AnnotationQuoteSchema
+  quote: AnnotationQuoteSchema,
+  /** Per-stop caption for thread step-through; sanitised on publish. */
+  note_html: z.string().optional()
 });
 
 export const AnnotationTechniqueRefSchema = z.object({
@@ -790,26 +810,156 @@ export const AnnotationAttachmentSchema = z.discriminatedUnion('kind', [
   })
 ]);
 
-export const AnnotationItemSchema = z.object({
+export const AnthologyTagSchema = z.object({
+  include: z.boolean(),
+  themes: z.array(z.string().trim().max(40)).max(8).default([]),
+  concepts: z.array(z.string().trim().max(40)).max(8).default([])
+});
+
+export const AnnotationThreadKindSchema = z.enum([
+  'motif',
+  'opposition',
+  'volta',
+  'echo',
+  'argument'
+]);
+
+export const AnnotationThreadSchema = z.object({
+  kind: AnnotationThreadKindSchema.optional(),
+  order: z.enum(['text', 'custom']).default('text'),
+  anchor_order: z.array(z.string().min(1)).optional()
+});
+
+export const AnnotationVoiceWordSchema = z.object({
+  w: z.string(),
+  start: z.number(),
+  end: z.number()
+});
+
+export const AnnotationVoiceClipSchema = z.object({
+  id: z.string().min(1),
+  start_s: z.number(),
+  end_s: z.number(),
+  word_range: z.tuple([z.number().int().min(0), z.number().int().min(0)]),
+  anchor: AnnotationAnchorSchema.optional(),
+  source: z.enum(['tap', 'quote', 'ai', 'manual']),
+  confidence: z.number().min(0).max(1),
+  approved: z.boolean(),
+  transcript_text: z.string()
+});
+
+export const AnnotationVoiceTrackSchema = z.object({
   id: z.string().min(1),
   layer_id: z.string().min(1),
-  sublayer_id: z.string().optional(),
-  anchor: AnnotationAnchorSchema,
-  technique: AnnotationTechniqueRefSchema.optional(),
-  body: z.object({
-    html: z.string(),
-    attachments: z.array(AnnotationAttachmentSchema).default([])
+  kind: z.enum(['reading', 'think_aloud', 'feedback']),
+  title: z.string().min(1),
+  audio: z.object({
+    media_id: z.string().optional(),
+    url: z.string().min(1),
+    duration_s: z.number().min(0),
+    mime: z.string().min(1)
   }),
-  created_at: IsoDateSchema,
-  updated_at: IsoDateSchema
+  transcript: z.object({
+    words: z.array(AnnotationVoiceWordSchema),
+    timing: z.enum(['word', 'segment', 'estimated'])
+  }),
+  taps: z
+    .array(
+      z.object({
+        t: z.number(),
+        anchor: AnnotationAnchorSchema
+      })
+    )
+    .optional(),
+  clips: z.array(AnnotationVoiceClipSchema).default([]),
+  status: z.enum(['draft', 'published']),
+  extras: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        kind: z.enum(['where_to_next', 'technique_tag', 'class_note']),
+        html: z.string(),
+        approved: z.boolean()
+      })
+    )
+    .optional()
 });
+
+export const AnnotationItemSchema = z
+  .object({
+    id: z.string().min(1),
+    layer_id: z.string().min(1),
+    sublayer_id: z.string().optional(),
+    anchor: AnnotationAnchorSchema,
+    /** Extra stops; present and non-empty => this annotation is a thread. Max 24. */
+    also_anchors: z.array(AnnotationAnchorSchema).max(24).optional(),
+    thread: AnnotationThreadSchema.optional(),
+    anthology: AnthologyTagSchema.optional(),
+    technique: AnnotationTechniqueRefSchema.optional(),
+    body: z.object({
+      html: z.string(),
+      attachments: z.array(AnnotationAttachmentSchema).default([])
+    }),
+    created_at: IsoDateSchema,
+    updated_at: IsoDateSchema
+  })
+  .superRefine((ann, ctx) => {
+    const extras = ann.also_anchors ?? [];
+    if (extras.length === 0) return;
+
+    const primaryId = ann.anchor.id;
+    if (!primaryId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Thread primary anchor needs an id',
+        path: ['anchor', 'id']
+      });
+    }
+
+    const ids = [primaryId, ...extras.map((a) => a.id)].filter(
+      (id): id is string => typeof id === 'string' && id.length > 0
+    );
+    const expectedCount = extras.length + (primaryId ? 1 : 0);
+    if (ids.length !== expectedCount) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Every thread stop needs an id',
+        path: ['also_anchors']
+      });
+    }
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Thread stop ids must be unique within the annotation',
+        path: ['also_anchors']
+      });
+    }
+
+    if (ann.thread?.order !== 'custom') return;
+    const order = ann.thread.anchor_order ?? [];
+    const idSet = new Set(ids);
+    const isPermutation =
+      order.length === ids.length &&
+      new Set(order).size === order.length &&
+      order.every((id) => idSet.has(id));
+    if (!isPermutation) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'anchor_order must be a permutation of thread stop ids',
+        path: ['thread', 'anchor_order']
+      });
+    }
+  });
 
 export const AnnotationBlockSettingsSchema = z.object({
   show_markers: z.boolean().default(true),
-  default_layer_id: z.string().optional()
+  default_layer_id: z.string().optional(),
+  /** Lines of context kept around each stop in thread focus. */
+  thread_context: z.union([z.literal(0), z.literal(1)]).optional()
 });
 
-export const AnnotationBlockSchema = z.object({
+/** Plain object — must stay ZodObject for discriminatedUnion leaf lists. */
+export const AnnotationBlockObjectSchema = z.object({
   id: z.string().min(1),
   type: z.literal('block'),
   block_type: z.literal('annotation'),
@@ -821,17 +971,53 @@ export const AnnotationBlockSchema = z.object({
     text: AnnotationTextSchema,
     layers: z.array(AnnotationLayerSchema).default([]),
     annotations: z.array(AnnotationItemSchema).default([]),
+    voice_tracks: z.array(AnnotationVoiceTrackSchema).optional(),
+    anthology: AnthologyTagSchema.optional(),
     settings: AnnotationBlockSettingsSchema.default({ show_markers: true })
   }),
   ...blockLayout,
   ...blockTimestamps
 });
 
-export type AnnotationBlock = z.infer<typeof AnnotationBlockSchema>;
+export function refineAnnotationVoiceTracks(
+  block: z.infer<typeof AnnotationBlockObjectSchema>,
+  ctx: z.RefinementCtx
+): void {
+  const voiceLayerIds = new Set(
+    block.content.layers.filter((layer) => layer.kind === 'voice').map((layer) => layer.id)
+  );
+  const teacherLayerIds = new Set(
+    block.content.layers.filter((layer) => layer.kind === 'teacher').map((layer) => layer.id)
+  );
+  for (const [index, track] of (block.content.voice_tracks ?? []).entries()) {
+    if (!voiceLayerIds.has(track.layer_id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'voice_track.layer_id must point at a voice layer',
+        path: ['content', 'voice_tracks', index, 'layer_id']
+      });
+    }
+    if (teacherLayerIds.has(track.layer_id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'voice_track cannot sit on a teacher layer',
+        path: ['content', 'voice_tracks', index, 'layer_id']
+      });
+    }
+  }
+}
+
+export const AnnotationBlockSchema =
+  AnnotationBlockObjectSchema.superRefine(refineAnnotationVoiceTracks);
+
+export type AnnotationBlock = z.infer<typeof AnnotationBlockObjectSchema>;
 export type AnnotationItem = z.infer<typeof AnnotationItemSchema>;
 export type AnnotationLayer = z.infer<typeof AnnotationLayerSchema>;
 export type AnnotationAnchor = z.infer<typeof AnnotationAnchorSchema>;
 export type AnnotationAttachment = z.infer<typeof AnnotationAttachmentSchema>;
+export type AnnotationThread = z.infer<typeof AnnotationThreadSchema>;
+export type AnnotationVoiceTrack = z.infer<typeof AnnotationVoiceTrackSchema>;
+export type AnthologyTag = z.infer<typeof AnthologyTagSchema>;
 
 const leafBlockSchemas = [
   RichTextBlockSchema,
@@ -862,7 +1048,7 @@ const leafBlockSchemas = [
   ConceptMapBlockSchema,
   WhiteboardBlockSchema,
   OutcomesBlockSchema,
-  AnnotationBlockSchema
+  AnnotationBlockObjectSchema
 ] as const;
 
 export const SpacerBlockSchema = z.object({
@@ -1009,6 +1195,9 @@ export const BlockSchema = z.lazy(() =>
     .superRefine((block, ctx) => {
       if (block.block_type === 'section') {
         refineLinkedSection(block, ctx);
+      }
+      if (block.block_type === 'annotation') {
+        refineAnnotationVoiceTracks(block, ctx);
       }
     })
 );

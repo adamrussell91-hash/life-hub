@@ -40,13 +40,12 @@ function collectTeacherOnlyIds(blocks, out = new Set()) {
   return out;
 }
 
-/** Drop teacher layers / notes / attachments that must never reach students. */
+/** Drop teacher layers / notes / attachments / draft voice that must never reach students. */
 export function stripAnnotationTeacherContent(block, teacherOnlyIds = new Set()) {
   const layersIn = Array.isArray(block.content?.layers) ? block.content.layers : [];
   const teacherLayerIds = new Set(
     layersIn.filter(layer => layer?.kind === 'teacher').map(layer => layer.id)
   );
-  const layers = layersIn.filter(layer => layer?.kind !== 'teacher');
   const annotations = (Array.isArray(block.content?.annotations)
     ? block.content.annotations
     : []
@@ -61,12 +60,38 @@ export function stripAnnotationTeacherContent(block, teacherOnlyIds = new Set())
         )
       }
     }));
+
+  const voice_tracks = (Array.isArray(block.content?.voice_tracks)
+    ? block.content.voice_tracks
+    : []
+  )
+    .filter(track => track?.status === 'published')
+    .map(track => ({
+      ...track,
+      transcript: {
+        words: [],
+        timing: track.transcript?.timing ?? 'estimated'
+      },
+      clips: (Array.isArray(track.clips) ? track.clips : []).filter(clip => clip?.approved),
+      extras: Array.isArray(track.extras)
+        ? track.extras.filter(extra => extra?.approved)
+        : track.extras
+    }));
+
+  const voiceLayerIdsWithTracks = new Set(voice_tracks.map(track => track.layer_id));
+  const layers = layersIn.filter(layer => {
+    if (layer?.kind === 'teacher') return false;
+    if (layer?.kind === 'voice') return voiceLayerIdsWithTracks.has(layer.id);
+    return true;
+  });
+
   return {
     ...block,
     content: {
       ...block.content,
       layers,
-      annotations
+      annotations,
+      voice_tracks: voice_tracks.length > 0 ? voice_tracks : undefined
     }
   };
 }
@@ -111,6 +136,17 @@ function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
       if (block.block_type === 'annotation') {
         return stripAnnotationTeacherContent(block, teacherOnlyIds);
       }
+      if (block.block_type === 'flashcards') {
+        return {
+          ...block,
+          content: {
+            ...block.content,
+            cards: (Array.isArray(block.content?.cards) ? block.content.cards : []).map(
+              ({ source: _source, ...card }) => card
+            )
+          }
+        };
+      }
       return block;
     });
 }
@@ -140,20 +176,46 @@ export function sanitizeBlocksDeep(blocks) {
       };
     }
     if (block.block_type === 'annotation') {
+      const sanitizeAnchor = anchor => {
+        if (!anchor || typeof anchor !== 'object') return anchor;
+        return {
+          ...anchor,
+          note_html:
+            anchor.note_html != null
+              ? sanitizeRichTextHtml(anchor.note_html)
+              : anchor.note_html
+        };
+      };
       const annotations = Array.isArray(block.content?.annotations)
         ? block.content.annotations.map(ann => ({
             ...ann,
+            anchor: sanitizeAnchor(ann.anchor),
+            also_anchors: Array.isArray(ann.also_anchors)
+              ? ann.also_anchors.map(sanitizeAnchor)
+              : ann.also_anchors,
             body: {
               ...ann.body,
               html: sanitizeRichTextHtml(ann.body?.html)
             }
           }))
         : [];
+      const voice_tracks = Array.isArray(block.content?.voice_tracks)
+        ? block.content.voice_tracks.map(track => ({
+            ...track,
+            extras: Array.isArray(track.extras)
+              ? track.extras.map(extra => ({
+                  ...extra,
+                  html: sanitizeRichTextHtml(extra.html)
+                }))
+              : track.extras
+          }))
+        : block.content?.voice_tracks;
       return {
         ...block,
         content: {
           ...block.content,
-          annotations
+          annotations,
+          voice_tracks
         }
       };
     }
