@@ -48,7 +48,6 @@ import {
   type GraphNodeDatum,
 } from "./keywordGraph";
 import { searchCluster, selectionCluster } from "./graphFocus";
-import { createAdaptiveSlider } from "../../../../packages/design-kit/js/adaptive-slider.js";
 import { hubLabelVariants, placeHubLabels, readShowAllTheme, type ShowAllTheme } from "./showAllDraw";
 import { layoutShowAll } from "./showAllGraph";
 import { branchLoads, placeTopicAnchors } from "./showAllNeural";
@@ -248,7 +247,7 @@ export function mountForceGraph(
   function startMorph(settled: GraphNodeDatum[], duration: number) {
     // Fit to where the notes are going, before the plan rewinds them to where they are now.
     const target = !viewTouched || duration >= SHOW_ALL_MORPH_MS ? fitShowAll(settled) : null;
-    if (target) overviewK = target.k;
+    rememberOverview(target);
     const plan = planShowAllMorph(simNodes, settled);
     simNodes = plan.nodes;
     refreshLookups();
@@ -269,6 +268,13 @@ export function mountForceGraph(
   let loadsFor: GraphLinkDatum[] | null = null;
   /** The zoom the overview was fitted at; topic names wait until you zoom well past it. */
   let overviewK = 0;
+  /** Last successful overview camera — Fit uses this when a live refit has nothing to measure. */
+  let overviewView: ViewState | null = null;
+  function rememberOverview(fitted: ViewState | null) {
+    if (!fitted) return;
+    overviewK = fitted.k;
+    overviewView = fitted;
+  }
   let zoneLabelBoxes = new Map<string, { x0: number; y0: number; x1: number; y1: number }>();
   let theme: ShowAllTheme = readShowAllTheme();
   let relaxToken = 0;
@@ -353,7 +359,7 @@ export function mountForceGraph(
         y: height / 2 - (height / 2 - fitted.y) * 0.94,
       });
       camera = { from: { ...view }, to: fitted, start: performance.now(), duration: SHOW_ALL_REVEAL_MS };
-      overviewK = fitted.k;
+      rememberOverview(fitted);
     }
     canvas.style.opacity = "0";
     revealStart = performance.now();
@@ -1253,40 +1259,94 @@ export function mountForceGraph(
   }
 
   const dock: Dock | null = showAllMode ? createDock(host, chooseTool) : null;
-  // Logarithmic travel gives the slider equal control at overview and very close range.
+  // Atlas-style ± / Fit. Wheel and pinch stay the fine control; buttons step like shelf Atlas.
   const zoomMin = 0.04;
   const zoomMax = 24;
-  const zoomTravel = Math.log(zoomMax / zoomMin);
-  const zoomReadout = el("output", { class: "graph-zoom__value" });
-  const zoomControl = dock ? createAdaptiveSlider({
-    label: "Map zoom", min: 0, max: 100, step: 0.1,
-    value: Math.log(view.k / zoomMin) / zoomTravel * 100,
-    onChange: (value: number) => {
-      viewTouched = true;
-      camera = null;
-      if (tool === "walk") clearTool();
-      const next = zoomMin * Math.exp(value / 100 * zoomTravel);
-      const cx = width / 2;
-      const cy = topInset() + (height - topInset()) / 2;
-      view.x = cx - (cx - view.x) / view.k * next;
-      view.y = cy - (cy - view.y) / view.k * next;
-      view.k = next;
-      syncZoom();
-      scheduleDraw();
-    },
-  }) : null;
-  if (zoomControl && dock) {
-    zoomControl.input.setAttribute("aria-label", "Map zoom");
-    dock.body.prepend(el("div", { class: "graph-zoom" }, zoomControl.el, zoomReadout));
+  const ZOOM_STEP = 1.4;
+  // Same path as shelf mapChrome ICON.fit; stroke comes from .graph-zoom__btn svg CSS.
+  const FIT_ICON =
+    '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3"/><circle cx="8" cy="8" r="2"/></svg>';
+  const zoomRoot = dock
+    ? el("div", { class: "graph-zoom", role: "group", "aria-label": "Map zoom" })
+    : null;
+  const zoomReadout = zoomRoot ? el("output", { class: "graph-zoom__value" }) : null;
+  if (zoomRoot) {
+    const stack = el("div", { class: "graph-zoom__stack" });
+    for (const [zoom, label, html] of [
+      ["in", "Zoom in", "+"],
+      ["out", "Zoom out", "−"],
+    ] as const) {
+      const button = el("button", {
+        type: "button",
+        class: "graph-zoom__btn",
+        "data-zoom": zoom,
+        "aria-label": label,
+      });
+      button.innerHTML = html;
+      stack.append(button);
+    }
+    // Readout sits inside the stack so phone chrome cannot clip it off the dock.
+    stack.append(zoomReadout!);
+    const fitBtn = el("button", {
+      type: "button",
+      class: "graph-zoom__btn",
+      "data-zoom": "fit",
+      "aria-label": "Fit overview",
+    });
+    fitBtn.innerHTML = FIT_ICON;
+    stack.append(fitBtn);
+    zoomRoot.append(stack);
+    dock!.body.prepend(zoomRoot);
+    rememberOverview({ ...view });
+    stack.addEventListener("click", event => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-zoom]");
+      if (!button) return;
+      if (button.dataset.zoom === "fit") {
+        zoomFit();
+        return;
+      }
+      if (button.dataset.zoom === "in") zoomBy(ZOOM_STEP);
+      else if (button.dataset.zoom === "out") zoomBy(1 / ZOOM_STEP);
+    });
+  }
+
+  function zoomHome(): ViewState {
+    const homeK = overviewK || 0.16;
+    const cx = width / 2;
+    const cy = topInset() + (height - topInset()) / 2;
+    return {
+      k: homeK,
+      x: cx - ((cx - view.x) / view.k) * homeK,
+      y: cy - ((cy - view.y) / view.k) * homeK,
+    };
+  }
+
+  function zoomFit() {
+    viewTouched = true;
+    if (tool === "walk") clearTool();
+    moveCamera(fitShowAll() ?? overviewView ?? zoomHome(), 500);
+  }
+
+  function zoomBy(factor: number) {
+    viewTouched = true;
+    camera = null;
+    if (tool === "walk") clearTool();
+    const next = Math.min(zoomMax, Math.max(zoomMin, view.k * factor));
+    const cx = width / 2;
+    const cy = topInset() + (height - topInset()) / 2;
+    view.x = cx - ((cx - view.x) / view.k) * next;
+    view.y = cy - ((cy - view.y) / view.k) * next;
+    view.k = next;
+    syncZoom();
+    scheduleDraw();
   }
 
   function syncZoom() {
-    if (!zoomControl) return;
+    if (!zoomRoot || !zoomReadout) return;
     const ratio = view.k / (overviewK || 0.16);
     zoomReadout.textContent = `${ratio.toFixed(1)}×`;
-    zoomControl.input.dataset.scale = String(view.k);
-    zoomControl.input.setAttribute("aria-valuetext", `${ratio.toFixed(1)} times overview`);
-    zoomControl.setValue(Math.log(Math.max(zoomMin, view.k) / zoomMin) / zoomTravel * 100, { silent: true });
+    zoomRoot.dataset.scale = String(view.k);
+    zoomRoot.setAttribute("aria-valuetext", `${ratio.toFixed(1)} times overview`);
   }
 
   function placeDock() {
@@ -2310,7 +2370,6 @@ export function mountForceGraph(
   return attachGraphSearch(
     () => {
       disposed = true;
-      zoomControl?.destroy();
       window.cancelAnimationFrame(growRaf);
       window.clearTimeout(toolTimer);
       stopSignals();
