@@ -285,7 +285,10 @@ export function mountBlockCanvas(
     return {
       ...options.editorContext,
       media,
-      getLessonBlocks: () => blocks
+      getLessonBlocks: () => blocks,
+      setLessonBlocks: (next) => {
+        emit(next, true);
+      }
     };
   }
 
@@ -904,6 +907,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   const canvas = mountBlockCanvas(canvasHost, {
     blocks: lesson.blocks,
     media,
+    editorContext: { lessonId: lesson.id },
     onChange: (blocks) => {
       emitLesson({ ...lesson, blocks });
     },
