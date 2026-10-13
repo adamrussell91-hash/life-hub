@@ -23,7 +23,7 @@ function collectTeacherOnlyIds(blocks: Block[] | undefined, out: Set<string>): v
   }
 }
 
-/** Drop teacher layers / notes / attachments that must never reach students. */
+/** Drop teacher layers / notes / attachments / draft voice that must never reach students. */
 export function stripAnnotationTeacherContent(
   block: AnnotationBlock,
   teacherOnlyIds: Set<string>
@@ -31,7 +31,6 @@ export function stripAnnotationTeacherContent(
   const teacherLayerIds = new Set(
     block.content.layers.filter((layer) => layer.kind === 'teacher').map((layer) => layer.id)
   );
-  const layers = block.content.layers.filter((layer) => layer.kind !== 'teacher');
   const annotations = block.content.annotations
     .filter((ann) => !teacherLayerIds.has(ann.layer_id))
     .map((ann) => ({
@@ -43,12 +42,30 @@ export function stripAnnotationTeacherContent(
         )
       }
     }));
+
+  const voice_tracks = (block.content.voice_tracks ?? [])
+    .filter((track) => track.status === 'published')
+    .map((track) => ({
+      ...track,
+      transcript: { words: [] as typeof track.transcript.words, timing: track.transcript.timing },
+      clips: track.clips.filter((clip) => clip.approved),
+      extras: track.extras?.filter((extra) => extra.approved)
+    }));
+
+  const voiceLayerIdsWithTracks = new Set(voice_tracks.map((track) => track.layer_id));
+  const layers = block.content.layers.filter((layer) => {
+    if (layer.kind === 'teacher') return false;
+    if (layer.kind === 'voice') return voiceLayerIdsWithTracks.has(layer.id);
+    return true;
+  });
+
   return {
     ...block,
     content: {
       ...block.content,
       layers,
-      annotations
+      annotations,
+      voice_tracks: voice_tracks.length > 0 ? voice_tracks : undefined
     }
   };
 }
@@ -103,6 +120,15 @@ function filterBlocksForStudentInner(
       }
       if (block.block_type === 'annotation') {
         return stripAnnotationTeacherContent(block, teacherOnlyIds);
+      }
+      if (block.block_type === 'flashcards') {
+        return {
+          ...block,
+          content: {
+            ...block.content,
+            cards: block.content.cards.map(({ source: _source, ...card }) => card)
+          }
+        };
       }
       return block;
     });

@@ -44,6 +44,13 @@
           "kind": "teacher",
           "colour": "navy",
           "symbol": "T"
+        },
+        {
+          "id": "layer_voice",
+          "name": "Voice",
+          "kind": "voice",
+          "colour": "marine",
+          "symbol": "V"
         }
       ],
       "annotations": [
@@ -100,11 +107,162 @@
           },
           "created_at": "2026-10-13T00:00:00.000Z",
           "updated_at": "2026-10-13T00:00:00.000Z"
+        },
+        {
+          "id": "ann_thread",
+          "layer_id": "layer_structure",
+          "anchor": {
+            "id": "stop_a",
+            "granularity": "word",
+            "stanza": "stanza_1",
+            "line": "line_1",
+            "start": 0,
+            "end": 4,
+            "quote": {
+              "exact": "Bent"
+            },
+            "note_html": "<p>Thread stop A</p>"
+          },
+          "also_anchors": [
+            {
+              "id": "stop_b",
+              "granularity": "word",
+              "stanza": "stanza_1",
+              "line": "line_1",
+              "start": 13,
+              "end": 17,
+              "quote": {
+                "exact": "like"
+              },
+              "note_html": "<p>Thread stop B</p><script>alert(1)</script>"
+            }
+          ],
+          "thread": {
+            "order": "text"
+          },
+          "body": {
+            "html": "<p>Thread body</p>",
+            "attachments": []
+          },
+          "created_at": "2026-10-13T00:00:00.000Z",
+          "updated_at": "2026-10-13T00:00:00.000Z"
+        },
+        {
+          "id": "ann_teacher_thread",
+          "layer_id": "layer_teacher",
+          "anchor": {
+            "id": "tstop_a",
+            "granularity": "word",
+            "stanza": "stanza_1",
+            "line": "line_1",
+            "start": 0,
+            "end": 4,
+            "quote": {
+              "exact": "Bent"
+            },
+            "note_html": "<p>SECRET-TEACHER-NOTE thread on teacher layer</p>"
+          },
+          "also_anchors": [
+            {
+              "id": "tstop_b",
+              "granularity": "word",
+              "stanza": "stanza_1",
+              "line": "line_1",
+              "start": 13,
+              "end": 17,
+              "quote": {
+                "exact": "like"
+              },
+              "note_html": "<p>SECRET-TEACHER-NOTE second stop</p>"
+            }
+          ],
+          "thread": {
+            "order": "text"
+          },
+          "body": {
+            "html": "<p>SECRET-TEACHER-NOTE teacher thread body</p>",
+            "attachments": []
+          },
+          "created_at": "2026-10-13T00:00:00.000Z",
+          "updated_at": "2026-10-13T00:00:00.000Z"
+        }
+      ],
+      "voice_tracks": [
+        {
+          "id": "track_draft",
+          "layer_id": "layer_voice",
+          "kind": "reading",
+          "title": "Draft reading",
+          "audio": {
+            "url": "https://example.com/draft.mp3",
+            "duration_s": 12,
+            "mime": "audio/mpeg"
+          },
+          "transcript": {
+            "words": [
+              {
+                "w": "SECRET-TEACHER-NOTE",
+                "start": 0,
+                "end": 0.5
+              }
+            ],
+            "timing": "word"
+          },
+          "clips": [
+            {
+              "id": "clip_unapproved",
+              "start_s": 0,
+              "end_s": 1,
+              "word_range": [0, 0],
+              "source": "ai",
+              "confidence": 0.4,
+              "approved": false,
+              "transcript_text": "SECRET-TEACHER-NOTE unapproved clip"
+            }
+          ],
+          "status": "draft",
+          "extras": [
+            {
+              "id": "extra_1",
+              "kind": "class_note",
+              "html": "<p>SECRET-TEACHER-NOTE extra</p>",
+              "approved": false
+            }
+          ]
         }
       ],
       "settings": {
-        "show_markers": true
+        "show_markers": true,
+        "thread_context": 0
       }
+    }
+  },
+  "flashcards": {
+    "id": "block_flashcards_strip",
+    "type": "block",
+    "block_type": "flashcards",
+    "variant": "medium",
+    "visibility": "student_teacher",
+    "layout": {},
+    "print": {},
+    "settings": {},
+    "created_at": "2026-10-13T00:00:00.000Z",
+    "updated_at": "2026-10-13T00:00:00.000Z",
+    "schema_version": 1,
+    "content": {
+      "cards": [
+        {
+          "id": "card_1",
+          "front": "Bent",
+          "back": "Opening word",
+          "source": {
+            "block_id": "block_strip_annotation",
+            "annotation_id": "ann_student",
+            "kind": "quote_to_technique",
+            "source_hash": "SECRET-TEACHER-NOTE-hash"
+          }
+        }
+      ]
     }
   },
   "teacher_only_block": {

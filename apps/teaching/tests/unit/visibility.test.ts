@@ -15,6 +15,7 @@ const stripFixture = JSON.parse(
   teacher_layer_id: string;
   teacher_only_block_id: string;
   annotation: Block;
+  flashcards: Block;
   teacher_only_block: Block;
   ok_block: Block;
 };
@@ -114,6 +115,7 @@ describe('filterBlocksForStudent', () => {
     const out = sanitizeBlocksDeep(
       filterBlocksForStudent([
         structuredClone(stripFixture.annotation),
+        structuredClone(stripFixture.flashcards),
         structuredClone(stripFixture.teacher_only_block),
         structuredClone(stripFixture.ok_block)
       ])
@@ -123,11 +125,16 @@ describe('filterBlocksForStudent', () => {
     expect(ann?.block_type).toBe('annotation');
     if (ann?.block_type !== 'annotation') return;
     expect(ann.content.layers.map((l) => l.id)).toEqual(['layer_structure']);
-    expect(ann.content.annotations.map((a) => a.id)).toEqual(['ann_student']);
+    expect(ann.content.annotations.map((a) => a.id)).toEqual(['ann_student', 'ann_thread']);
     expect(ann.content.annotations[0]!.body.attachments).toEqual([
       { kind: 'block', block_id: 'block_ok_resource' },
       { kind: 'link', url: 'https://example.com', label: 'ok' }
     ]);
+    expect(ann.content.voice_tracks).toBeUndefined();
+    const cards = out.find((b) => b.block_type === 'flashcards');
+    expect(cards?.block_type).toBe('flashcards');
+    if (cards?.block_type !== 'flashcards') return;
+    expect(cards.content.cards[0]).not.toHaveProperty('source');
   });
 
   it('strips annotation teacher layers inside section, columns, and tabs', () => {
@@ -137,7 +144,12 @@ describe('filterBlocksForStudent', () => {
 
     const section = createBlock('section', 'sec_strip');
     if (section.block_type !== 'section') throw new Error('expected section');
-    section.content.blocks = [annotation, teacherOnly, ok] as typeof section.content.blocks;
+    section.content.blocks = [
+      annotation,
+      structuredClone(stripFixture.flashcards),
+      teacherOnly,
+      ok
+    ] as typeof section.content.blocks;
 
     const columns = createBlock('columns', 'cols_strip');
     if (columns.block_type !== 'columns') throw new Error('expected columns');

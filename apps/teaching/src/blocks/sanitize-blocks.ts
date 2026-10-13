@@ -1,10 +1,17 @@
 import { sanitizeRichTextHtml } from './sanitize';
 import { sanitizeSvgMarkup } from './sanitize-svg';
-import type { Block } from '../schemas/block';
+import type { AnnotationAnchor, Block } from '../schemas/block';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 type SectionBlock = Extract<Block, { block_type: 'section' }>;
 type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
+
+function sanitizeAnchorNoteHtml(anchor: AnnotationAnchor): AnnotationAnchor {
+  if (anchor.note_html == null) {
+    return { ...anchor, note_html: undefined };
+  }
+  return { ...anchor, note_html: sanitizeRichTextHtml(anchor.note_html) };
+}
 
 export function sanitizeBlocksDeep(blocks: Block[]): Block[] {
   return blocks.map((block) => {
@@ -21,10 +28,19 @@ export function sanitizeBlocksDeep(blocks: Block[]): Block[] {
           ...block.content,
           annotations: block.content.annotations.map((ann) => ({
             ...ann,
+            anchor: sanitizeAnchorNoteHtml(ann.anchor),
+            also_anchors: ann.also_anchors?.map(sanitizeAnchorNoteHtml),
             body: {
               ...ann.body,
               html: sanitizeRichTextHtml(ann.body.html)
             }
+          })),
+          voice_tracks: block.content.voice_tracks?.map((track) => ({
+            ...track,
+            extras: track.extras?.map((extra) => ({
+              ...extra,
+              html: sanitizeRichTextHtml(extra.html)
+            }))
           }))
         }
       };
