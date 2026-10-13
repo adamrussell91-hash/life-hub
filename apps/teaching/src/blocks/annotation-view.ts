@@ -12,6 +12,23 @@ import {
   type AnnotationMarker
 } from '@/blocks/annotation-layers';
 import {
+  resolveAnnotationKey,
+  stepThreadIndex
+} from '@/blocks/annotation-thread-keys';
+import {
+  buildArcSvg,
+  buildFoldButton,
+  buildStopPip,
+  buildThreadChip,
+  fillStepCaption,
+  foldRowsForThread,
+  isNarrowAnnotationViewport,
+  printThreadFootnoteLabel,
+  resolvedThreadStops,
+  visibleThreads
+} from '@/blocks/annotation-thread-view';
+import { threadsOf } from '@/blocks/annotation-thread';
+import {
   FAMILY_PALETTE,
   familyOfTechnique,
   loadLiteraryElements,
@@ -257,8 +274,7 @@ function openAnnotation(
   anchorEl.classList.add('is-open');
   anchorEl.setAttribute('aria-expanded', 'true');
 
-  const isNarrow = typeof window !== 'undefined' && window.matchMedia('(max-width: 720px)').matches;
-  if (isNarrow) {
+  if (isNarrowAnnotationViewport()) {
     const sheet = root.querySelector<HTMLElement>('.block-annotation__sheet');
     if (!sheet) return;
     sheet.hidden = false;
@@ -476,8 +492,21 @@ function buildInteractiveView(
   const stopLabels = document.createElement('div');
   stopLabels.className = 'block-annotation__stop-labels';
 
+  const threadStrip = document.createElement('div');
+  threadStrip.className = 'block-annotation__threads';
+  threadStrip.setAttribute('role', 'toolbar');
+  threadStrip.setAttribute('aria-label', 'Annotation threads');
+
+  const focusBar = document.createElement('div');
+  focusBar.className = 'block-annotation__focus-bar';
+  focusBar.hidden = true;
+
+  const stepBar = document.createElement('div');
+  stepBar.className = 'block-annotation__step-bar';
+  stepBar.hidden = true;
+
   sliderRow.append(slider, stopLabels);
-  controls.append(chips, sliderRow);
+  controls.append(chips, threadStrip, focusBar, stepBar, sliderRow);
 
   layout.append(textCol, panel);
   root.append(layout, controls);
@@ -495,10 +524,117 @@ function buildInteractiveView(
   });
   root.append(sheet);
 
+  function exitFocus(): void {
+    state = {
+      ...state,
+      focusThreadId: null,
+      expandedFolds: new Set(),
+      stepIndex: null
+    };
+  }
+
+  function enterFocus(threadId: string, stepIndex: number | null = null): void {
+    state = {
+      ...state,
+      focusThreadId: threadId,
+      expandedFolds: new Set(),
+      stepIndex,
+      openAnnotationId: null
+    };
+    closeAnnotationPanel(root);
+  }
+
+  function closeThreadSheet(sheetEl: HTMLElement): void {
+    sheetEl.hidden = true;
+    sheetEl.replaceChildren();
+    sheetEl.classList.remove('is-open');
+  }
+
+  function openThreadPicker(threads: AnnotationItem[]): void {
+    const sheetEl = root.querySelector<HTMLElement>('.block-annotation__sheet');
+    if (!sheetEl) return;
+    sheetEl.hidden = false;
+    sheetEl.classList.add('is-open');
+    sheetEl.replaceChildren();
+    const dialog = document.createElement('div');
+    dialog.className = 'block-annotation__sheet-dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-label', 'Threads');
+    const header = document.createElement('div');
+    header.className = 'block-annotation__sheet-header';
+    const title = document.createElement('h3');
+    title.className = 'block-annotation__sheet-title';
+    title.textContent = 'Threads';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'block-annotation__close';
+    close.textContent = 'Close';
+    close.addEventListener('click', () => closeThreadSheet(sheetEl));
+    header.append(title, close);
+    const body = document.createElement('div');
+    body.className = 'block-annotation__sheet-body';
+    for (const ann of threads) {
+      body.append(
+        buildThreadChip(
+          ann,
+          layerById(content.layers, ann.layer_id),
+          resolvedThreadStops(content, ann).length,
+          state.focusThreadId === ann.id,
+          () => {
+            enterFocus(ann.id);
+            closeThreadSheet(sheetEl);
+            paint();
+          }
+        )
+      );
+    }
+    dialog.append(header, body);
+    sheetEl.append(dialog);
+    close.focus();
+  }
+
+  function makeMenuItem(
+    label: string,
+    pressed: boolean,
+    onClick: () => void
+  ): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'block-annotation__thread-menu-item';
+    btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    btn.textContent = label;
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function makeStepBtn(
+    label: string,
+    disabled: boolean,
+    delta: -1 | 1,
+    stopCount: number
+  ): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'block-annotation__step-btn';
+    btn.textContent = label;
+    btn.disabled = disabled;
+    btn.addEventListener('click', () => {
+      state = {
+        ...state,
+        stepIndex: stepThreadIndex(state.stepIndex, stopCount, delta)
+      };
+      paint();
+    });
+    return btn;
+  }
+
   function paint(): void {
     const scrollTop = textCol.scrollTop;
     textCol.replaceChildren();
     chips.replaceChildren();
+    threadStrip.replaceChildren();
+    focusBar.replaceChildren();
+    stepBar.replaceChildren();
     stopLabels.replaceChildren();
 
     slider.max = String(stops.length);
@@ -551,6 +687,89 @@ function buildInteractiveView(
       }
     }
 
+    const threads = visibleThreads(content, mode, state);
+    root.classList.toggle('block-annotation--has-threads', threads.length > 0);
+    root.classList.toggle('block-annotation--focus', Boolean(state.focusThreadId));
+    const narrow = isNarrowAnnotationViewport();
+
+    threadStrip.hidden = threads.length === 0;
+    if (threads.length > 0) {
+      if (narrow) {
+        const pick = document.createElement('button');
+        pick.type = 'button';
+        pick.className = 'block-annotation__thread-pick';
+        pick.textContent = state.focusThreadId
+          ? 'Change thread'
+          : `Threads (${threads.length})`;
+        pick.addEventListener('click', () => openThreadPicker(threads));
+        threadStrip.append(pick);
+      } else {
+        for (const ann of threads) {
+          threadStrip.append(
+            buildThreadChip(
+              ann,
+              layerById(content.layers, ann.layer_id),
+              resolvedThreadStops(content, ann).length,
+              state.focusThreadId === ann.id,
+              () => {
+                if (state.focusThreadId === ann.id) exitFocus();
+                else enterFocus(ann.id);
+                paint();
+              }
+            )
+          );
+        }
+      }
+    }
+
+    const focusAnn = state.focusThreadId
+      ? content.annotations.find((a) => a.id === state.focusThreadId)
+      : undefined;
+    const focusStops = focusAnn ? resolvedThreadStops(content, focusAnn) : [];
+    const stepIndex = state.stepIndex;
+    const stepping = Boolean(focusAnn && stepIndex != null && focusStops.length > 0);
+
+    focusBar.hidden = !focusAnn;
+    stepBar.hidden = !stepping;
+    if (focusAnn) {
+      const showAll = document.createElement('button');
+      showAll.type = 'button';
+      showAll.className = 'block-annotation__show-all';
+      showAll.textContent = 'Show whole text';
+      showAll.addEventListener('click', () => {
+        exitFocus();
+        paint();
+      });
+
+      const menu = document.createElement('details');
+      menu.className = 'block-annotation__thread-menu';
+      const summary = document.createElement('summary');
+      summary.textContent = 'Thread';
+      menu.append(
+        summary,
+        makeMenuItem('±1 line of context', state.context === 1, () => {
+          state = { ...state, context: state.context === 1 ? 0 : 1 };
+          paint();
+        }),
+        makeMenuItem('Step through', stepIndex != null, () => {
+          state = { ...state, stepIndex: stepIndex == null ? 0 : null };
+          paint();
+        })
+      );
+      focusBar.append(showAll, menu);
+
+      if (stepping && stepIndex != null) {
+        const caption = document.createElement('div');
+        caption.className = 'block-annotation__step-caption';
+        fillStepCaption(caption, focusAnn, focusStops, stepIndex);
+        stepBar.append(
+          makeStepBtn('Previous', stepIndex <= 0, -1, focusStops.length),
+          caption,
+          makeStepBtn('Next', stepIndex >= focusStops.length - 1, 1, focusStops.length)
+        );
+      }
+    }
+
     const placed = placedFor(content, mode, state);
     const byLine = new Map<string, LineMark[]>();
     const lineBars = new Map<string, PlacedAnnotation[]>();
@@ -594,6 +813,14 @@ function buildInteractiveView(
     }
 
     function openPlaced(item: PlacedAnnotation, btn: HTMLButtonElement): void {
+      if (
+        (item.annotation.also_anchors?.length ?? 0) > 0 &&
+        state.focusThreadId !== item.annotation.id
+      ) {
+        enterFocus(item.annotation.id);
+        paint();
+        return;
+      }
       state = { ...state, openAnnotationId: item.annotation.id };
       openAnnotation(root, item.annotation, item.layer, btn, table);
     }
@@ -611,66 +838,176 @@ function buildInteractiveView(
       paint();
     }
 
-    for (const stanza of content.text.stanzas) {
-      const stanzaEl = document.createElement('div');
-      stanzaEl.className = 'block-annotation__stanza';
-      stanzaEl.dataset.stanzaId = stanza.id;
+    const poemHost = document.createElement('div');
+    poemHost.className = 'block-annotation__poem';
 
-      const gutter = document.createElement('div');
-      gutter.className = 'block-annotation__stanza-gutter';
-      for (const item of stanzaBars.get(stanza.id) ?? []) {
-        gutter.append(makeBarAnchor(item, 'stanza', (btn) => openPlaced(item, btn)));
+    if (!narrow && threads.length > 0) {
+      const arcs = buildArcSvg(
+        content,
+        threads,
+        (id) => layerById(content.layers, id),
+        state.focusThreadId
+      );
+      if (arcs) {
+        const arcsCol = document.createElement('div');
+        arcsCol.className = 'block-annotation__arcs-col';
+        arcsCol.append(arcs);
+        poemHost.append(arcsCol);
       }
-      stanzaEl.append(gutter);
-
-      const linesCol = document.createElement('div');
-      linesCol.className = 'block-annotation__lines';
-
-      for (const line of stanza.lines) {
-        const row = document.createElement('div');
-        row.className = 'block-annotation__line';
-        row.dataset.lineId = line.id;
-
-        const margin = document.createElement('div');
-        margin.className = 'block-annotation__line-margin';
-        for (const item of lineBars.get(line.id) ?? []) {
-          margin.append(makeBarAnchor(item, 'line', (btn) => openPlaced(item, btn)));
-        }
-        row.append(margin);
-
-        const textEl = document.createElement('p');
-        textEl.className = 'block-annotation__line-text';
-        const marks = byLine.get(`${stanza.id}:${line.id}`) ?? [];
-        if (marks.length === 0) {
-          textEl.textContent = line.text || '\u00a0';
-        } else {
-          textEl.append(renderLineText(line.text, marks, root, table));
-        }
-
-        const lineMarkers = markersByLine.get(`${stanza.id}:${line.id}`) ?? [];
-        if (lineMarkers.length > 0) {
-          const markerRow = document.createElement('span');
-          markerRow.className = 'block-annotation__markers';
-          for (const marker of lineMarkers) {
-            const dot = document.createElement('button');
-            dot.type = 'button';
-            dot.className = `block-annotation__marker block-annotation__marker--${marker.colour}`;
-            dot.title = marker.layerName;
-            dot.setAttribute('aria-label', `Hidden layer: ${marker.layerName}`);
-            dot.textContent = marker.symbol;
-            dot.addEventListener('click', () => revealMarkerLayer(marker));
-            markerRow.append(dot);
-          }
-          textEl.append(markerRow);
-        }
-
-        row.append(textEl);
-        linesCol.append(row);
-      }
-
-      stanzaEl.append(linesCol);
-      textCol.append(stanzaEl);
     }
+
+    const stanzasHost = document.createElement('div');
+    stanzasHost.className = 'block-annotation__stanzas';
+
+    const lineById = new Map<string, { stanzaId: string; text: string }>();
+    for (const stanza of content.text.stanzas) {
+      for (const line of stanza.lines) {
+        lineById.set(line.id, { stanzaId: stanza.id, text: line.text });
+      }
+    }
+
+    const pipsByLine = new Map<string, HTMLElement[]>();
+    if (narrow) {
+      for (const ann of threads) {
+        const layer = layerById(content.layers, ann.layer_id);
+        resolvedThreadStops(content, ann).forEach((stop, index) => {
+          if (!stop.resolved.lineId) return;
+          const pip = buildStopPip(index, layer?.colour, () => {
+            enterFocus(ann.id, index);
+            paint();
+          });
+          pushGrouped(pipsByLine, stop.resolved.lineId, pip);
+        });
+      }
+    }
+
+    function paintLineRow(lineId: string, stanzaId: string, lineText: string): HTMLElement {
+      const row = document.createElement('div');
+      row.className = 'block-annotation__line';
+      row.dataset.lineId = lineId;
+      if (
+        focusAnn &&
+        state.stepIndex != null &&
+        focusStops[state.stepIndex]?.resolved.lineId === lineId
+      ) {
+        row.classList.add('is-step');
+      }
+
+      const margin = document.createElement('div');
+      margin.className = 'block-annotation__line-margin';
+      for (const item of lineBars.get(lineId) ?? []) {
+        margin.append(makeBarAnchor(item, 'line', (btn) => openPlaced(item, btn)));
+      }
+      for (const pip of pipsByLine.get(lineId) ?? []) {
+        margin.append(pip);
+      }
+      row.append(margin);
+
+      const textEl = document.createElement('p');
+      textEl.className = 'block-annotation__line-text';
+      const marks = byLine.get(`${stanzaId}:${lineId}`) ?? [];
+      if (marks.length === 0) {
+        textEl.textContent = lineText || '\u00a0';
+      } else {
+        textEl.append(renderLineText(lineText, marks, root, table));
+      }
+
+      const lineMarkers = markersByLine.get(`${stanzaId}:${lineId}`) ?? [];
+      if (lineMarkers.length > 0) {
+        const markerRow = document.createElement('span');
+        markerRow.className = 'block-annotation__markers';
+        for (const marker of lineMarkers) {
+          const dot = document.createElement('button');
+          dot.type = 'button';
+          dot.className = `block-annotation__marker block-annotation__marker--${marker.colour}`;
+          dot.title = marker.layerName;
+          dot.setAttribute('aria-label', `Hidden layer: ${marker.layerName}`);
+          dot.textContent = marker.symbol;
+          dot.addEventListener('click', () => revealMarkerLayer(marker));
+          markerRow.append(dot);
+        }
+        textEl.append(markerRow);
+      }
+
+      row.append(textEl);
+      return row;
+    }
+
+    if (focusAnn) {
+      const rows = foldRowsForThread(content, focusAnn, state);
+      let currentStanzaId = '';
+      let stanzaEl: HTMLElement | null = null;
+      let linesCol: HTMLElement | null = null;
+      let gutter: HTMLElement | null = null;
+
+      const ensureStanza = (stanzaId: string) => {
+        if (stanzaEl && currentStanzaId === stanzaId) return;
+        stanzaEl = document.createElement('div');
+        stanzaEl.className = 'block-annotation__stanza';
+        stanzaEl.dataset.stanzaId = stanzaId;
+        gutter = document.createElement('div');
+        gutter.className = 'block-annotation__stanza-gutter';
+        for (const item of stanzaBars.get(stanzaId) ?? []) {
+          gutter.append(makeBarAnchor(item, 'stanza', (btn) => openPlaced(item, btn)));
+        }
+        stanzaEl.append(gutter);
+        linesCol = document.createElement('div');
+        linesCol.className = 'block-annotation__lines';
+        stanzaEl.append(linesCol);
+        stanzasHost.append(stanzaEl);
+        currentStanzaId = stanzaId;
+      };
+
+      for (const row of rows) {
+        if (row.kind === 'fold') {
+          ensureStanza(row.stanzaId);
+          const expanded = state.expandedFolds.has(row.id);
+          const foldRow = document.createElement('div');
+          foldRow.className = 'block-annotation__line block-annotation__line--fold';
+          foldRow.append(
+            buildFoldButton(row, expanded, () => {
+              const expandedFolds = new Set(state.expandedFolds);
+              if (expandedFolds.has(row.id)) expandedFolds.delete(row.id);
+              else expandedFolds.add(row.id);
+              state = { ...state, expandedFolds };
+              paint();
+            })
+          );
+          linesCol!.append(foldRow);
+          continue;
+        }
+        const meta = lineById.get(row.lineId);
+        if (!meta) continue;
+        ensureStanza(meta.stanzaId);
+        linesCol!.append(paintLineRow(row.lineId, meta.stanzaId, meta.text));
+      }
+    } else {
+      for (const stanza of content.text.stanzas) {
+        const stanzaEl = document.createElement('div');
+        stanzaEl.className = 'block-annotation__stanza';
+        stanzaEl.dataset.stanzaId = stanza.id;
+
+        const gutter = document.createElement('div');
+        gutter.className = 'block-annotation__stanza-gutter';
+        for (const item of stanzaBars.get(stanza.id) ?? []) {
+          gutter.append(makeBarAnchor(item, 'stanza', (btn) => openPlaced(item, btn)));
+        }
+        stanzaEl.append(gutter);
+
+        const linesCol = document.createElement('div');
+        linesCol.className = 'block-annotation__lines';
+
+        for (const line of stanza.lines) {
+          linesCol.append(paintLineRow(line.id, stanza.id, line.text));
+        }
+
+        stanzaEl.append(linesCol);
+        stanzasHost.append(stanzaEl);
+      }
+    }
+
+    poemHost.append(stanzasHost);
+    textCol.append(poemHost);
 
     if (content.annotations.length === 0) {
       const empty = document.createElement('p');
@@ -709,44 +1046,61 @@ function buildInteractiveView(
   });
 
   root.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') {
-      const open = root.querySelector<HTMLElement>('.block-annotation__anchor.is-open');
-      if (!open) return;
-      event.stopPropagation();
-      closeAnnotationPanel(root);
-      state = { ...state, openAnnotationId: null };
-      open.focus();
-      return;
-    }
-
-    if (isTextControl(event.target)) return;
-    const onSlider = event.target === slider;
     const blockFocused = event.target === root || root.contains(event.target as Node);
-    if (!onSlider && !blockFocused) return;
+    if (event.target !== slider && !blockFocused) return;
 
-    let next: AnnotationLayerState | null = null;
-    switch (event.key) {
-      case 'ArrowLeft':
-      case 'ArrowDown':
-        next = stepStop(state, stops, -1);
-        break;
-      case 'ArrowRight':
-      case 'ArrowUp':
-        next = stepStop(state, stops, 1);
-        break;
-      case 'Home':
-        next = { ...state, stop: 0 };
-        break;
-      case 'End':
-        next = { ...state, stop: stops.length };
-        break;
-      default:
-        return;
-    }
+    const action = resolveAnnotationKey({
+      key: event.key,
+      focusThreadId: state.focusThreadId,
+      sliderFocused: event.target === slider,
+      panelOpen: Boolean(root.querySelector('.block-annotation__anchor.is-open')),
+      isTextControl: isTextControl(event.target)
+    });
+    if (!action) return;
+
     event.preventDefault();
-    state = next;
-    paint();
-    slider.focus();
+    event.stopPropagation();
+
+    switch (action.type) {
+      case 'close_panel': {
+        const open = root.querySelector<HTMLElement>('.block-annotation__anchor.is-open');
+        closeAnnotationPanel(root);
+        state = { ...state, openAnnotationId: null };
+        open?.focus();
+        break;
+      }
+      case 'exit_focus':
+        exitFocus();
+        paint();
+        break;
+      case 'step_thread': {
+        const focusAnn = content.annotations.find((a) => a.id === state.focusThreadId);
+        if (!focusAnn) break;
+        const focusStops = resolvedThreadStops(content, focusAnn);
+        state = {
+          ...state,
+          stepIndex: stepThreadIndex(state.stepIndex, focusStops.length, action.delta)
+        };
+        root.dataset.stepIndex = String(state.stepIndex ?? '');
+        paint();
+        break;
+      }
+      case 'step_slider':
+        state = stepStop(state, stops, action.delta);
+        paint();
+        slider.focus();
+        break;
+      case 'slider_home':
+        state = { ...state, stop: 0 };
+        paint();
+        slider.focus();
+        break;
+      case 'slider_end':
+        state = { ...state, stop: stops.length };
+        paint();
+        slider.focus();
+        break;
+    }
   });
 
   paint();
@@ -779,10 +1133,20 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
   }
 
   const placed = placedFor(content, 'print');
+  const threadAnns = threadsOf({ content } as AnnotationBlock).filter((ann) =>
+    placed.some((item) => item.annotation.id === ann.id)
+  );
+  const nonThreadPlaced = placed.filter(
+    (item) => (item.annotation.also_anchors?.length ?? 0) === 0
+  );
   const footnoteById = new Map<string, number>();
-  placed.forEach((item, index) => {
-    footnoteById.set(item.annotation.id, index + 1);
-  });
+  let fn = 1;
+  for (const item of nonThreadPlaced) {
+    footnoteById.set(item.annotation.id, fn++);
+  }
+  for (const ann of threadAnns) {
+    footnoteById.set(ann.id, fn++);
+  }
 
   for (const stanza of content.text.stanzas) {
     const stanzaEl = document.createElement('div');
@@ -791,7 +1155,7 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
       const p = document.createElement('p');
       p.className = 'block-annotation__line-text';
       p.textContent = line.text || '\u00a0';
-      const marksOnLine = placed.filter(
+      const marksOnLine = nonThreadPlaced.filter(
         (item) =>
           item.resolved.lineId === line.id ||
           (item.resolved.granularity === 'stanza' && item.resolved.stanzaId === stanza.id)
@@ -804,15 +1168,27 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
         sup.textContent = String(n);
         p.append(sup);
       }
+      for (const ann of threadAnns) {
+        const onLine = resolvedThreadStops(content, ann).some(
+          (stop) => stop.resolved.lineId === line.id
+        );
+        if (!onLine) continue;
+        const n = footnoteById.get(ann.id);
+        if (n == null) continue;
+        const sup = document.createElement('sup');
+        sup.className = 'block-annotation__fn-ref';
+        sup.textContent = String(n);
+        p.append(sup);
+      }
       stanzaEl.append(p);
     }
     root.append(stanzaEl);
   }
 
-  if (placed.length > 0) {
+  if (nonThreadPlaced.length > 0 || threadAnns.length > 0) {
     const notes = document.createElement('ol');
     notes.className = 'block-annotation__footnotes';
-    for (const item of placed) {
+    for (const item of nonThreadPlaced) {
       const li = document.createElement('li');
       li.id = `annotation-fn-${item.annotation.id}`;
       const body = document.createElement('div');
@@ -821,6 +1197,19 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
       li.append(body);
       const attachments = attachmentsForPrint(item.annotation.body.attachments);
       if (attachments) li.append(attachments);
+      notes.append(li);
+    }
+    for (const ann of threadAnns) {
+      const li = document.createElement('li');
+      li.id = `annotation-fn-${ann.id}`;
+      const label = document.createElement('p');
+      label.className = 'block-annotation__thread-fn-label';
+      label.textContent = printThreadFootnoteLabel(content, ann);
+      li.append(label);
+      const body = document.createElement('div');
+      body.className = 'block-annotation__body';
+      body.innerHTML = sanitizeRichTextHtml(ann.body.html);
+      li.append(body);
       notes.append(li);
     }
     root.append(notes);

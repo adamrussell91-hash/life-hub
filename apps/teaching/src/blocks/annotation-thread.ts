@@ -202,6 +202,14 @@ export function foldRows(
     const flush = () => {
       if (hidden.length === 0) return;
       const id = `fold_${foldIndex++}`;
+      // Always emit the fold control (even when expanded) so aria-expanded can toggle.
+      rows.push({
+        kind: 'fold',
+        id,
+        count: hidden.length,
+        lineIds: [...hidden],
+        stanzaId: stanza.id
+      });
       if (options.expanded.has(id)) {
         for (const lineId of hidden) {
           rows.push({
@@ -211,14 +219,6 @@ export function foldRows(
             number: numbers.get(lineId) ?? 0
           });
         }
-      } else {
-        rows.push({
-          kind: 'fold',
-          id,
-          count: hidden.length,
-          lineIds: [...hidden],
-          stanzaId: stanza.id
-        });
       }
       hidden = [];
     };
