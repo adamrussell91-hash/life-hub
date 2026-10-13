@@ -9567,7 +9567,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 .block-annotation__chips {
   display: flex;
   flex-wrap: nowrap;
-  gap: var(--space-2);
+  gap: var(--space-2, 0.5rem);
   overflow-x: auto;
   max-width: 100%;
   padding-bottom: 0.15rem;
@@ -9612,7 +9612,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 .block-annotation__slider-row {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-2, 0.5rem);
   min-width: 0;
 }
 
@@ -9630,10 +9630,10 @@ body.is-lesson-builder-full-page .hub-utilities {
 .block-annotation__stop-labels {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  font-family: var(--font-ui);
-  font-size: var(--text-xs);
-  color: var(--muted);
+  gap: var(--space-2, 0.5rem);
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted, #6b7280);
 }
 
 .block-annotation__stop-label[data-active='true'] {
