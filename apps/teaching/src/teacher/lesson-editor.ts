@@ -1,3 +1,4 @@
+import { mountBlockAssistant } from '@/alchemy/block-assistant';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
 import { apiGet, apiPost, ApiClientError } from '@/api/client';
@@ -121,6 +122,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   let editSourceOpenSeq = 0;
   let aiPanel: AiPanelHandle | null = null;
   let alchemyLab: AlchemyLabHandle | null = null;
+  let blockAssistant: ReturnType<typeof mountBlockAssistant> | null = null;
   let page: LessonPageHandle | null = null;
   let palette: LessonPaletteHandle | null = null;
   let removeChromeKeys: (() => void) | null = null;
@@ -247,6 +249,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     function markDirty(): void {
       bumpDraftClock();
       saveController?.notifyChange();
+      blockAssistant?.changed();
     }
 
     function persistChrome(): void {
@@ -813,6 +816,20 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       getLesson: () => lesson
     });
 
+    blockAssistant = mountBlockAssistant({
+      host: builder, kind: 'lesson', id: lesson.id, getEntity: () => lesson,
+      unit: curriculum.units.find(unit => unit.id === lesson.unit_id),
+      flush: async () => {
+        await saveController?.flush();
+        if (saveController?.getState() === 'save_failed') throw new Error('Save your latest changes before asking Ann.');
+      },
+      apply: async (next) => {
+        assignLesson(next as Lesson); page?.update(lesson); markDirty();
+        await saveController?.saveNow({ checkpointReason: 'ai_accepted' });
+        if (saveController?.getState() === 'save_failed') throw new Error('The edit is on the page but could not be saved. Retry Save.');
+      }
+    });
+
     savePublishHandle = mountSavePublishControls({
       contextBar: refs.contextBar,
       controller: saveController,
@@ -992,6 +1009,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       publicLinkDispose = null;
       aiPanel?.dispose();
       aiPanel = null;
+      blockAssistant?.dispose();
+      blockAssistant = null;
       alchemyLab?.dispose();
       alchemyLab = null;
       savePublishHandle?.dispose();

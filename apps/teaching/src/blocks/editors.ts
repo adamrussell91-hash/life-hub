@@ -1,3 +1,4 @@
+import { createAlchemyButton } from '@/alchemy/block-button';
 import katex from 'katex';
 import { offerTimedUndo } from '../../design-kit/js/hub-feedback.js';
 import {
@@ -2548,7 +2549,7 @@ export function createOutcomesEditor(
   return editorShell(block, onChange, hint, getLatest);
 }
 
-export function createBlockEditor(
+function createBlockEditorFields(
   block: Block,
   onChange: BlockChangeHandler,
   getLatest?: () => Block,
@@ -2650,4 +2651,11 @@ export function createBlockEditor(
     case 'tabs':
       return createTabsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'tabs' }>, context);
   }
+}
+
+export function createBlockEditor(block: Block, onChange: BlockChangeHandler, getLatest?: () => Block, context: BlockEditorContext = {}): HTMLElement {
+  const editor = createBlockEditorFields(block, onChange, getLatest, context);
+  editor.classList.add('alchemy-editor-block');
+  editor.append(createAlchemyButton(block.id));
+  return editor;
 }
