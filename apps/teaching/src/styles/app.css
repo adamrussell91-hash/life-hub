@@ -9742,11 +9742,65 @@ body.is-lesson-builder-full-page .hub-utilities {
 /* Periodic Table technique UI (2b) */
 .block-editor__annotation-add-family,
 .block-editor__annotation-technique-btn,
-.block-editor__annotation-technique-clear {
+.block-editor__annotation-technique-clear,
+.block-editor__annotation-add-place {
   display: block;
   width: 100%;
   min-height: 2.75rem;
   margin-top: var(--space-2, 0.5rem);
+}
+
+/* Thread editor (3c) */
+.block-editor__annotation-thread {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+  min-width: 0;
+}
+
+.block-editor__annotation-add-place {
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper, #fff);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.block-editor__annotation-add-place:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.block-editor__annotation-thread-kind {
+  align-self: flex-start;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.block-editor__annotation-stops {
+  min-width: 0;
+}
+
+.block-editor__annotation-stop {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.block-editor__annotation-stop-note {
+  width: 100%;
+  min-height: 3.5rem;
+  resize: vertical;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.45;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper, #fff);
 }
 
 .block-annotation__element {
@@ -10129,4 +10183,141 @@ body.is-lesson-builder-full-page .hub-utilities {
     width: 100%;
     margin-bottom: var(--space-2);
   }
+}
+
+/* Anthology block */
+.block-anthology {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.block-anthology__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.block-anthology__views,
+.block-anthology__theme-pills {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.block-anthology__empty {
+  margin: 0;
+  color: var(--ink-muted, var(--shallow));
+}
+
+.block-anthology__text-card,
+.block-anthology__theme-text,
+.block-anthology__technique,
+.block-anthology__connection {
+  display: grid;
+  gap: var(--space-2);
+  padding-block: var(--space-3);
+  border-top: 1px solid var(--line, rgba(0, 0, 0, 0.08));
+}
+
+.block-anthology__text-title,
+.block-anthology__family,
+.block-anthology__technique-name,
+.block-anthology__connection-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.block-anthology__attribution,
+.block-anthology__fingerprint-words,
+.block-anthology__technique-def,
+.block-anthology__connection-texts,
+.block-anthology__meta {
+  margin: 0;
+  color: var(--ink-muted, var(--shallow));
+  font-size: var(--text-sm);
+}
+
+.block-anthology__fingerprint {
+  display: flex;
+  gap: var(--space-1);
+  max-height: 120px;
+}
+
+.block-anthology__fp-cell {
+  min-width: 1.5rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: var(--radius-sm, 4px);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--on-dark, #fff);
+  text-align: center;
+}
+
+.block-anthology__fp-cell--sand { background: var(--sand); }
+.block-anthology__fp-cell--mist { background: var(--mist); }
+.block-anthology__fp-cell--coral { background: var(--coral); }
+.block-anthology__fp-cell--shore { background: var(--shore); }
+.block-anthology__fp-cell--marine { background: var(--marine); }
+
+.block-anthology__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  max-height: 64px;
+}
+
+.block-anthology__item-link {
+  display: grid;
+  gap: 0.15rem;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.block-anthology__quote {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.block-anthology__unpublished {
+  font-size: var(--text-xs);
+  color: var(--ink-muted, var(--shallow));
+}
+
+.block-anthology__fold-bar,
+.block-anthology__fold-static {
+  margin: 0;
+  padding: var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted, var(--shallow));
+  text-align: left;
+  font: inherit;
+}
+
+.block-anthology__fold-line {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.block-anthology__make-cards {
+  justify-self: start;
+}
+
+.block-editor__annotation-anthology,
+.block-editor__flashcards-source {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.block-editor__annotation-anthology-themes,
+.block-editor__annotation-anthology-concepts {
+  width: 100%;
 }
