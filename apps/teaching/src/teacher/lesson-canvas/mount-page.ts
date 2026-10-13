@@ -282,7 +282,11 @@ export function mountBlockCanvas(
   }
 
   function editorCtx(): BlockEditorContext {
-    return { ...options.editorContext, media };
+    return {
+      ...options.editorContext,
+      media,
+      getLessonBlocks: () => blocks
+    };
   }
 
   function setHint(message: string): void {
