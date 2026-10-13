@@ -3,9 +3,9 @@
  * Synthetic history only. Open /grove-lookdev.html on the Tasks dev server.
  */
 import {
-  ACESFilmicToneMapping, BufferGeometry, Color, DirectionalLight, Float32BufferAttribute, Group, HemisphereLight,
+  BufferGeometry, Color, DirectionalLight, Float32BufferAttribute, Fog, Group, HemisphereLight,
   InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, MOUSE, Object3D, OrthographicCamera, PCFSoftShadowMap, Quaternion,
-  Raycaster, Scene, SRGBColorSpace, TOUCH, Vector2, Vector3, WebGLRenderer, DoubleSide
+  NeutralToneMapping, Raycaster, Scene, SRGBColorSpace, TOUCH, Vector2, Vector3, WebGLRenderer, DoubleSide
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
@@ -30,15 +30,17 @@ const planting = plant(cells, terrain, history, builtWeeks);
 const renderer = new WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 renderer.outputColorSpace = SRGBColorSpace;
-renderer.toneMapping = ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+// Neutral keeps Forest Island's saturated yellow-greens; ACES pushed them towards olive.
+renderer.toneMapping = NeutralToneMapping;
+renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = PCFSoftShadowMap;
 stage.append(renderer.domElement);
 
 const scene = new Scene();
-scene.add(new HemisphereLight('#e8f6ff', '#86a85a', 1.6));
-const sun = new DirectionalLight('#fff0d4', 2.9);
+// Soft sky above, warm grass bounce below, a low warm sun: bright diorama light, no black shade.
+scene.add(new HemisphereLight('#dff3ff', '#d8d6a6', 1.9));
+const sun = new DirectionalLight('#fff3d6', 2.6);
 sun.position.set(-70, 140, 60);
 sun.castShadow = true;
 sun.shadow.mapSize.set(4096, 4096);
@@ -46,12 +48,14 @@ Object.assign(sun.shadow.camera, { left: -130, right: 130, top: 130, bottom: -13
 sun.shadow.bias = -0.0006;
 sun.shadow.normalBias = 0.04;
 scene.add(sun, sun.target);
+// Light aerial haze: the far rim and cliff feet fade towards the sky, near edges stay crisp.
+scene.fog = new Fog('#d4eef2', 420, 1000);
 
 // ---------- Ground ----------
 const C = {
-  grass: new Color('#7fc24c'), grassLight: new Color('#a6d65c'), grassDeep: new Color('#5eaa3e'),
-  floor: new Color('#3f7d31'), meadow: new Color('#cddb84'), sand: new Color('#ecdcaa'),
-  path: new Color('#d4b27a'), cliff: new Color('#efe9da'), strata: new Color('#d8ccb2'), bed: new Color('#5fb9ac')
+  grass: new Color('#8ccf4a'), grassLight: new Color('#b6e15a'), grassDeep: new Color('#6cbd3e'),
+  floor: new Color('#58a336'), meadow: new Color('#d3e57e'), sand: new Color('#f1e3b0'),
+  path: new Color('#e0be82'), cliff: new Color('#f7f1e3'), strata: new Color('#e6d9bd'), bed: new Color('#5cc6b8')
 };
 const STEP = 1.5;
 function buildGround(): Mesh {
@@ -176,6 +180,48 @@ function buildWater(): Group {
 }
 scene.add(buildWater());
 
+// ---------- Foliage colour ----------
+// Quaternius leaves carry dark baked vertex colour (AO) and flat textures. At Year zoom that reads
+// near-black. Soften the AO, pull greens towards Forest Island yellow-green, and add a little fill
+// so crowns facing away from the sun stay light. Blossom and autumn reds keep their hue.
+const FOLIAGE_GLSL = `
+uniform float uLeafAO;
+uniform float uLeafFill;
+vec3 groveHsv(vec3 c) {
+  vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1e-10)), d / (q.x + 1e-10), q.x);
+}
+vec3 groveRgb(vec3 c) {
+  vec3 p = abs(fract(c.xxx + vec3(1.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+  return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
+}
+vec3 groveLeaf(vec3 linear) {
+  vec3 hsv = groveHsv(pow(max(linear, 0.0), vec3(1.0 / 2.2)));
+  float green = smoothstep(0.12, 0.17, hsv.x) * (1.0 - smoothstep(0.42, 0.5, hsv.x));
+  hsv.x = mix(hsv.x, mix(hsv.x, 0.27, 0.6), green);
+  hsv.y = mix(hsv.y, clamp(hsv.y, 0.66, 0.9), green);
+  hsv.z = mix(min(1.0, hsv.z * 1.12), clamp(0.34 + hsv.z * 0.6, 0.0, 0.82), green);
+  return pow(groveRgb(hsv), vec3(2.2));
+}
+`;
+function dress(mat: any): void {
+  if (!mat || mat.userData.dressed) return;
+  mat.userData.dressed = true;
+  if (!/lea[fv]/i.test(mat.name ?? '')) return;
+  mat.onBeforeCompile = (shader: any) => {
+    shader.uniforms.uLeafAO = { value: 0.35 };
+    shader.uniforms.uLeafFill = { value: 0.14 };
+    shader.fragmentShader = FOLIAGE_GLSL + shader.fragmentShader
+      .replace('#include <color_fragment>', '#ifdef USE_COLOR\n  diffuseColor.rgb *= mix(vec3(1.0), vColor.rgb, uLeafAO);\n#endif\ndiffuseColor.rgb = groveLeaf(diffuseColor.rgb);')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * uLeafFill;');
+  };
+  mat.customProgramCacheKey = () => 'grove-leaf';
+  mat.needsUpdate = true;
+}
+
 // ---------- Models, instanced ----------
 type Part = { geometry: BufferGeometry; material: unknown; matrix: Matrix4 };
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
@@ -194,9 +240,7 @@ function model(file: string) {
         const box = node.geometry.boundingBox.clone().applyMatrix4(node.matrixWorld);
         minY = Math.min(minY, box.min.y);
         maxY = Math.max(maxY, box.max.y);
-        for (const mat of Array.isArray(node.material) ? node.material : [node.material]) {
-          if (mat.color && !mat.userData.brightened) { mat.color.offsetHSL(0.015, 0.08, 0.1); mat.userData.brightened = true; }
-        }
+        for (const mat of Array.isArray(node.material) ? node.material : [node.material]) dress(mat);
         parts.push({ geometry: node.geometry, material: node.material, matrix: node.matrixWorld.clone() });
       });
       return { parts, height: Math.max(0.01, maxY - minY) };

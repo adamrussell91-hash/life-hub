@@ -34,15 +34,33 @@ Adam's verdict: a huge improvement on the live Grove. Working: jigsaw weeks, bor
 real models, terraced terrain, river with a fall over the cliff, lake, path, shadows, tap to
 expand, one-finger pan on phones, camera clamped to the map.
 
+## State after round two (Forest Island colour and atmosphere)
+
+Adam chose colour and atmosphere over denser stands. Changes, all in `main.ts` plus the page sky:
+
+- **Why the trees were near-black:** every Quaternius leaf mesh carries dark baked vertex colour
+  (COLOR_0, used as AO), and the leaf textures are flat colour. The old `offsetHSL` "brighten"
+  touched only the material tint, which is white, so it did nothing.
+- **Foliage shader (`dress`)** on any material named Leaf/Leaves: AO softened to 35%, greens pulled
+  towards a light yellow-green (hue about 97°), a 14% albedo fill so crowns turned from the sun stay
+  light. Cherry blossom and autumn reds keep their hue and get a small lift.
+- **Light:** Neutral tone mapping instead of ACES (ACES pushed greens to olive), exposure 1.05,
+  sky-blue hemisphere over a warm sand bounce (a green bounce tinted the cliffs), slightly
+  softer warm sun.
+- **Ground:** brighter lime grass, lighter forest floor, creamier cliffs and strata, warmer path.
+- **Atmosphere:** light linear haze (`Fog`, 420 to 1000) so the far rim and cliff feet fade
+  towards the sky; page sky is a clearer blue.
+
+Triangles and draw calls unchanged (3.9M, 103 calls).
+
 ## Known gaps, in order
 
 1. **Phone performance.** About 3.9M triangles for a full year. Needs distant-tree LOD before it
    goes live: `gltf-transform weld` then `simplify --ratio 0.1 --error 0.08` cut one tree from
    6,257 to 2,310 triangles; impostor cards are the next step if that is not enough.
-2. **Trees read too dark at Year zoom.** Shift leaf colours towards Forest Island yellow-greens.
-3. Waterfall sheet looks grey; no bridges where the path crosses the river; inner terraces faint.
-4. Open question for Adam: next round should favour Forest Island colour and atmosphere, or
-   denser Age of Empires stands?
+2. Waterfall sheet looks grey; no bridges where the path crosses the river; inner terraces faint.
+3. Expanded week mutes only the ground; trees in other weeks stay full colour.
+4. Next look round, if Adam wants it: denser Age of Empires stands.
 
 ## Live Grove problems found in the review (not yet fixed)
 
