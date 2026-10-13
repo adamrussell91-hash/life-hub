@@ -187,12 +187,149 @@ When the block points at a student's draft instead of a poem, the same anchors, 
 - **Exemplar first.** Before seeing feedback on their own work, students annotate an exemplar against the criteria, then reveal yours. **Research:** Sadler's evaluative judgement, comparative judgement.
 - **Comment bank** linked to Periodic Table elements, so "try anaphora here" opens the element.
 
+## Critical review (Adam, 2026-10-13)
+
+These verdicts govern. Numbers are the doc's idea numbers.
+
+| # | Idea | Verdict | Note |
+|---|---|---|---|
+| 1 | Commit before you reveal | **Keep** | Must work with no student accounts (see A) |
+| 2 | Hint ladder | Not yet reviewed | Works with no accounts as-is |
+| 3 | Periodic Table integration | Not yet reviewed | |
+| 4 | Reading lenses | **Open** | Adam asked for a fuller explanation (see D) |
+| 5 | Sound layer | **Cut**, except voice recording | Scansion, rhyme and performance overlays cut. Recording your own voice stays and grows into C |
+| 6 | Threads | **Keep, extended** | Add thread focus: fold the rest of the text away (see B) |
+| 7 | Ghost words and drafts | **Cut** | Too much effort to author |
+| 8 | Replayable think-aloud | **Keep** | Same engine as C |
+| 9 | Ballots | Not yet reviewed | |
+| 10 | Zoom levels | Not yet reviewed | |
+| 11 | Paragraph builder | **Maybe** | "Has promise" |
+| 12 | Notes → flashcards | **Keep** | |
+| 13 | Teacher layer + Ann | Not yet reviewed | |
+| 14 | Cross-poem threads | **Modify** | Too unit-specific. Becomes a general anthology (see E) |
+| 15 | Feedback mode | **Modify** | Adam rarely gives marks, so "hide the mark" is moot. Needs evidence the feedback was read (see F). Voice feedback (C) is the core |
+
+### A. Commit before you reveal, with no student accounts
+
+- **The lock and reveal need nothing.** The student taps a word or types a guess, the note opens, and the guess is kept in their browser only.
+- **The class heatmap needs one anonymous signal.** Each commit sends `{lesson, annotation, word position, class link}` with no name, like a no-login poll. Student class URLs (`/s/classes/*`) already exist, so taps can be grouped by class.
+- **Live lesson mode (optional).** The projector view fills in the heatmap as taps arrive (polling every few seconds is enough). You can also hold every student's reveal until you release it: their page checks a "released" flag. Still no accounts.
+- **What you give up without accounts:**
+  - who tapped what;
+  - stopping one student tapping twice (a random device id in browser storage softens this);
+  - any per-student history.
+
+  Accounts are only needed for per-student records.
+- **The same anonymous signal covers ballots (9) and hint-ladder rung counts (2).**
+
+### B. Thread focus (the accordion)
+
+Selecting a thread folds every line that isn't in it into a thin bar ("⋯ 4 lines"). The thread's lines then sit one after another, in poem order:
+
+- Line numbers stay.
+- The anchored words stay highlighted.
+- Tap a fold to open it.
+
+**Options:**
+- **±1 line of context:** shows one line either side of each thread line.
+- **Step through:** for the projector. The thread reveals one stop at a time, each with its note.
+- **Thread order:** for threads you built as an argument (e.g. how the light imagery dims) rather than in poem order.
+
+**Same mechanism elsewhere:**
+- prose paragraphs;
+- an anthology theme across poems (E);
+- the feedback view: "show only the paragraphs I commented on".
+
+Prior art is code folding and the "collapse unchanged lines" view in diffs.
+
+### C. Voice feedback that pins itself to the text (headline idea)
+
+Adam already gives feedback by recording himself reading a draft aloud and commenting as he goes. The block should take that recording and pin each part to the passage it is about.
+
+1. **Record** in the block, with the draft on screen. Optional: tap a paragraph while talking for a free, exact anchor. Tapping is cheaper and more reliable than AI.
+2. **Transcribe with timings.** The Knowledge hub already runs Whisper (`@cf/openai/whisper-large-v3-turbo` on Cloudflare Workers AI, `apps/knowledge/src/capture/live.ts`). Check that its output gives word or segment timestamps.
+3. **Match quotes, rule-based first.** Find transcript stretches that fuzzy-match the draft's words. This allows for misheard words and the student's own misspellings. When a quote appears twice, prefer the next occurrence after the previous pin, because you read top to bottom.
+4. **AI second pass**, only for what step 3 missed: paraphrased references ("your second paragraph", "the bit about the storm"). These anchor to a paragraph rather than to words.
+5. **Cut into clips.** Each clip runs from one quote to the next quote or topic change, and pins to its span. Anything left over becomes a general comment.
+6. **Teacher check before publishing.** A list of pins with a confidence level. Drag to fix, split or merge clips, then publish.
+7. **Student view:**
+   - a play button in the margin at each pinned span, with its transcript underneath (for skimming, searching and accessibility);
+   - **Play all**, which highlights the draft as your voice moves through it.
+8. **Extras you approve before students see them:**
+   - a three-point "where to next" drafted from what you said;
+   - Periodic Table tags for techniques you named;
+   - a class-wide note when the same issue comes up across many drafts.
+
+**One engine, two uses.** Pointed at a poem, this is the replayable think-aloud (8). You read the poem aloud and think, and the quotes you say become anchored annotations.
+
+**Risks:**
+- misheard quotes;
+- long recordings;
+- sending student work and your voice to an AI service. Check school policy, though Workers AI is already in use in Life Hub.
+
+### D. Reading lenses, explained
+
+A lens is a named layer of annotations that asks one question of the poem. Several lenses on the same line show that interpretation is a choice. Example from Owen's "Dulce et Decorum Est" (public domain):
+
+| Lens | The question it asks | On "Bent double, like old beggars under sacks" / "The old Lie" |
+|---|---|---|
+| Close reading | How does the language work? | The simile turns young soldiers into old beggars. The heavy stresses slow the line to a trudge |
+| Context | What was happening when it was written? | Written at Craiglockhart in 1917. An early draft was addressed to Jessie Pope, a pro-war poet, so "My friend" is sarcastic |
+| Gender | What does it say about masculinity? | The heroic-manhood myth: the men are "boys" and "children ardent for some desperate glory" |
+| Power and class | Who benefits, and who pays? | Those at home make the propaganda and the men in the mud die for it. "The old Lie" is ideology |
+| Trauma | What does the mind do with it? | "In all my dreams, before my helpless sight": recurring nightmare, shell shock |
+| Ecocritical | What happens to the land and air? | The air itself becomes the weapon. Mud and flares make the landscape an enemy |
+| Personal response | What did you feel? | The student's own layer |
+
+**How it works on screen:**
+- Lens chips sit across the top, one colour each.
+- With one chip on, only that lens's notes show.
+- With two on, you get the split view.
+- A line read by three or more lenses gets a small stack of coloured ticks in the margin. Those are the poem's hotspots.
+
+**Student tasks:**
+- "Which lens is this note?"
+- "Write the missing lens for this line."
+- Add a personal-response note.
+
+**Effort:** pick two or three lenses per poem, not all seven.
+
+**Why it matters:** Rosenblatt (meaning is made between reader and text) and Appleman's *Critical Encounters* (teaching lenses to adolescents). It matches the HSC's interest in perspectives and readings.
+
+### E. Anthology block (replaces cross-poem threads)
+
+A toggle on any annotation, or on a whole annotated text: **"Add to the unit anthology"**. Tags are theme and concept, plus Periodic Table techniques.
+
+On the unit page, an **Anthology** block gathers everything tagged. It could be a new source on the existing `collection` block (`unit_annotations`), next to `unit_lessons`. Views:
+
+- **By text:** a card per text with its technique fingerprint.
+- **By theme:** every note tagged "memory" across texts, folded using thread focus (B).
+- **By technique:** where enjambment appears across the anthology.
+- **Connections:** cross-text threads.
+
+Each item links back to its lesson. Flashcards (12) can draw a unit revision deck from it.
+
+It is not poetry-specific. It works for any unit with several texts: related texts, a novel and its film, Module A pairs.
+
+### F. Knowing the feedback was read (no marks needed)
+
+- **Who it is for.** Each draft's feedback lives at a private, unguessable link for that student. No account is needed, and the link itself identifies the student.
+- **Evidence, weakest to strongest:**
+  1. Opened.
+  2. Voice clips played (% of each clip heard).
+  3. Replied to each comment: "Got it", "Not sure" or "I disagree because…", or one line in their own words.
+  4. Revised: a resubmitted draft that changes the commented spans.
+- **What you see.** A class panel showing not opened, listened, responded and revised.
+- **What reveal does here.** It holds back the *next step*, not a mark. The feed-forward target unlocks once every comment has a reply. "Find it yourself" comments hide the exact spot behind a reveal.
+- **Caveat.** Opening and playing prove exposure, not reading. Replies and revisions are the real evidence, which is the "taking action" part of Carless & Boud's framework.
+
 ## Suggested order if this gets built
 
-1. **Core:** structured poem, word/line/stanza anchors, rich bodies, layers, hint ladder (2), Periodic Table tags with the shared JSON (3).
-2. **Students:** commit-before-reveal (1), ballots (9), retrieval cards (12). These need the student-state decision below.
-3. **Depth:** threads (6), sound layer (5), zoom (10), paragraph builder (11).
-4. **Feedback mode:** (15).
+1. **Core:** structured poem, word/line/stanza anchors, rich bodies, threads with thread focus (6 + B), Periodic Table tags and the shared JSON (3).
+2. **Voice:** voice recording with self-pinning clips (C). This covers both think-aloud (8) and voice feedback.
+3. **Students, no accounts:** commit before you reveal with the anonymous heatmap (1 + A), notes → flashcards (12).
+4. **Unit:** anthology block (E), reading lenses (4 + D) if kept.
+5. **Feedback mode:** private per-student links and response evidence (15 + F).
 
 ## Open questions
 
@@ -218,4 +355,5 @@ When the block points at a student's draft instead of a poem, the same anchors, 
 
 ## History
 
+- 2026-10-13: Added the Critical review with Adam's verdicts and sections A to F: no-account reveal, thread focus, self-pinning voice feedback, the reading lenses explained, the anthology block, and feedback read evidence. Cut ghost words and the sound overlays. Reordered the build.
 - 2026-10-13: Created. Fifteen ideas for a Teaching Hub annotation block (poetry first, feedback later), plus an anchor-model sketch and Periodic Table integration notes.
