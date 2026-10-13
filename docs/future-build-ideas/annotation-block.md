@@ -358,6 +358,7 @@ A slider along the bottom of the block. Each stop is a layer that Adam names and
 
 ## History
 
+- 2026-10-13: Build brief for steps 3–6 written: `apps/teaching/docs/superpowers/specs/2026-10-13-annotation-block-brief-steps-3-6.md`. It builds the anthology as a new `anthology` block, not a `unit_annotations` source on `collection`.
 - 2026-10-13: Build brief for steps 1–2 written: `apps/teaching/docs/superpowers/specs/2026-10-13-annotation-block-brief.md`.
 - 2026-10-13: Cut the paragraph builder (11) under the governing principle.
 - 2026-10-13: Second review. Set the governing principle (Adam's annotation tool, not a student activity block). Cut commit-before-reveal, ballots and read tracking. Replaced the hint ladder and zoom levels with the layer slider (G). Kept the Periodic Table integration, lenses as layers, and the teacher-only layer.
