@@ -27,12 +27,20 @@ export type ForestOptions = {
   today: Date;
   history: Done[];
   animals?: ForestAnimal[];
+  /** False for a still picture (Home's preview): no panning, zooming or picking. Default true. */
+  interactive?: boolean;
+  /** Open on this week straight away, without the camera move. */
+  week?: number;
+  /** Map units an opened week spans on screen (default 40 on a phone, 58 wider). */
+  weekSpan?: number;
   /** Pixels at the top of the stage covered by floating controls; an opened week centres below them. */
   topInset?: () => number;
   onChange?: (state: ForestState) => void;
   onPick?: (pick: ForestPick | null, x: number, y: number) => void;
 };
-export type ForestHandle = { expand(week: number): void; showYear(): void; dispose(): void; state(): ForestState };
+export type ForestHandle = { expand(week: number): void; showYear(): void; dispose(): void; state(): ForestState;
+  /** For check scripts: where each animal is, and a way to run their clock on (seconds, in 1/30 s steps). */
+  wildlife(): unknown[]; stepWildlife(seconds: number): void };
 
 const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -267,6 +275,7 @@ function buildBridges(): Mesh {
       cellIds.push(cell);
     }
   };
+  decks.length = 0;
   const near = (p: { x: number; z: number }) => terrain.riverDistance(p.x, p.z).d < terrain.RIVER_WIDTH + 1;
   const path = terrain.path;
   for (let i = 0; i < path.length; i += 1) {
@@ -293,6 +302,7 @@ function buildBridges(): Mesh {
     const crown = Math.max(water + 1.1, (ya + yb) / 2 + 0.7) - (ya + yb) / 2;
     const cell = owner(cells, mid.x, mid.z).cell;
     const at = (t: number) => ({ x: lerp(endA.x, endB.x, t), z: lerp(endA.z, endB.z, t), y: lerp(ya, yb, t) + crown * Math.sin(Math.PI * t) });
+    decks.push({ x: endA.x, z: endA.z, ux: along.x, uz: along.z, span, ya, yb, crown });
     const planks = Math.round(span / 0.85);
     for (let k = 0; k < planks; k += 1) {
       const p = at((k + 0.5) / planks);
@@ -325,7 +335,20 @@ function buildBridges(): Mesh {
   mesh.receiveShadow = true;
   return mesh;
 }
+const decks: { x: number; z: number; ux: number; uz: number; span: number; ya: number; yb: number; crown: number }[] = [];
 scene.add(buildBridges());
+/** Top of a bridge deck at (x, z), or null off the bridges. Animals cross the river on these. */
+function deckAt(x: number, z: number): number | null {
+  for (const d of decks) {
+    const dx = x - d.x, dz = z - d.z;
+    const along = dx * d.ux + dz * d.uz, across = Math.abs(-dx * d.uz + dz * d.ux);
+    if (along < 0 || along > d.span || across > 1.15) continue;
+    const t = along / d.span;
+    return lerp(d.ya, d.yb, t) + d.crown * Math.sin(Math.PI * t) + 0.1;
+  }
+  return null;
+}
+const surface = (x: number, z: number) => deckAt(x, z) ?? terrain.height(x, z);
 
 // ---------- Foliage colour ----------
 // Quaternius leaves carry dark baked vertex colour (AO) and flat textures. At Year zoom that reads
@@ -576,12 +599,13 @@ function announce(next: ForestState): void {
 function showYear(): void {
   announce({ year, week: null, trees: planting.trees.length, future: false, builtWeeks, animals: animals?.count ?? 0 });
   selection.value = -1;
+  animals?.focus(null);
   render();
 }
-function ease(toTarget: Vector3, toZoom: number): void {
+function ease(toTarget: Vector3, toZoom: number, instant = false): void {
   const fromTarget = controls.target.clone(), fromZoom = camera.zoom, offset = camera.position.clone().sub(controls.target);
   const start = performance.now();
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduce = instant || matchMedia('(prefers-reduced-motion: reduce)').matches;
   const step = (now: number) => {
     if (disposed) return;
     const f = reduce ? 1 : Math.min(1, (now - start) / 900);
@@ -595,21 +619,22 @@ function ease(toTarget: Vector3, toZoom: number): void {
     if (f < 1) requestAnimationFrame(step);
     else schedulePartition();
   };
-  requestAnimationFrame(step);
+  if (instant) step(start); else requestAnimationFrame(step);
 }
-function expand(cellIndex: number): void {
+function expand(cellIndex: number, instant = false): void {
   const cell = cells[cellIndex]!;
   if (!cell.week) return;
   const trees = planting.trees.filter((t) => t.week === cell.week);
   const [from, to] = weekRange(cell.week, year);
   announce({ year, week: cell.week, from, to, trees: trees.length, future: cell.week > builtWeeks, builtWeeks, animals: animals?.count ?? 0 });
   selection.value = cellIndex;
+  animals?.focus(cellIndex);
   const centre = trees.length ? trees.reduce((v, t) => v.add(new Vector3(t.x / trees.length, 0, t.z / trees.length)), new Vector3()) : new Vector3(cell.x, 0, cell.z);
   centre.lerp(new Vector3(cell.x, 0, cell.z), 0.5);
   centre.y = terrain.height(centre.x, centre.z) + 3; // middle of the stand, not the ground under it
   const w = stage.clientWidth, h = stage.clientHeight;
   // A phone shows the week across its width; a wider screen keeps some neighbours around it.
-  const span = w < 720 ? 40 : 58;
+  const span = options.weekSpan ?? (w < 720 ? 40 : 58);
   const zoom = Math.min(controls.maxZoom, (worldHalf * 2) / span, (worldHalf * 2 * (w / h)) / span);
   // Put the week in the middle of the space under the floating title. The frustum is offset upward
   // and three.js zooms about its middle, not about the target, so without this the week slid down
@@ -619,7 +644,7 @@ function expand(cellIndex: number): void {
   const mid = (camera.top + camera.bottom) / 2, half = (camera.top - camera.bottom) / (2 * zoom);
   const v = mid + half - (aim / h) * 2 * half; // view height that lands on the aim line
   const up = new Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-  ease(centre.sub(up.multiplyScalar(v)), zoom);
+  ease(centre.sub(up.multiplyScalar(v)), zoom, instant);
 }
 function backToYear(): void {
   showYear();
@@ -650,8 +675,12 @@ const onUp = (e: PointerEvent) => {
   const cell = owner(cells, hit.point.x, hit.point.z).cell;
   if (cell !== selection.value) expand(cell);
 };
-renderer.domElement.addEventListener('pointerdown', onDown);
-renderer.domElement.addEventListener('pointerup', onUp);
+const interactive = options.interactive !== false;
+controls.enabled = interactive;
+if (interactive) {
+  renderer.domElement.addEventListener('pointerdown', onDown);
+  renderer.domElement.addEventListener('pointerup', onUp);
+}
 
 // ---------- Go ----------
 const PHONE_ZOOM = 2.3;
@@ -667,6 +696,8 @@ if (stage.clientWidth < 720) {
 }
 let animals: Awaited<ReturnType<typeof createForestAnimals>> | null = null;
 showYear();
+const opening = options.week != null ? cells.find((c) => c.week === options.week) : undefined;
+if (opening) expand(opening.index, true);
 // Understorey trees (squeezed into crowded weeks) stand in the canopy's shade: they cast no shadow of
 // their own, which keeps them within the triangle budget.
 await Promise.all([
@@ -679,19 +710,28 @@ partition();
 stage.dataset.models = 'true';
 render();
 
+/** Top of a planted tree's crown: a ray straight down onto its drawn model. */
+const downward = new Raycaster();
+function treeTop(tree: Placed): number | null {
+  downward.set(new Vector3(tree.x, tree.y + tree.scale * 2 + 10, tree.z), new Vector3(0, -1, 0));
+  const meshes = pickTrees.filter((p) => p.mesh.visible && p.items().includes(tree)).map((p) => p.mesh);
+  const hit = downward.intersectObjects(meshes, false)[0];
+  return hit ? hit.point.y : null;
+}
+
 // ---------- Wildlife ----------
 // Earned animals roam their week's piece. They animate at up to 30 frames a second while the page is
 // visible; reduced motion keeps them standing still.
 if (options.animals?.length) {
   try {
-    animals = await createForestAnimals({ scene, terrain, cells, trees: planting.trees, year, animals: options.animals });
+    animals = await createForestAnimals({ scene, terrain, cells, trees: planting.trees, year, builtWeeks, animals: options.animals, surface, onDeck: (x, z) => deckAt(x, z) != null, treeTop });
   } catch (error) {
     console.warn('Grove wildlife unavailable', error);
   }
   if (disposed) { animals?.dispose(); return handle(); }
   if (animals) {
     stage.dataset.animals = String(animals.count);
-    if (selection.value < 0) showYear(); else announce({ ...current, animals: animals.count });
+    if (selection.value < 0) showYear(); else { animals.focus(selection.value); announce({ ...current, animals: animals.count }); }
     render();
   }
 }
@@ -716,6 +756,11 @@ function handle(): ForestHandle {
     expand: (week: number) => { const cell = cells.find((c) => c.week === week); if (cell) expand(cell.index); },
     showYear: backToYear,
     state: () => current,
+    wildlife: () => (animals?.report() ?? []).map((a) => {
+      const p = new Vector3(a.x, a.y, a.z).project(camera);
+      return { ...a, sx: ((p.x + 1) / 2) * stage.clientWidth, sy: ((1 - p.y) / 2) * stage.clientHeight };
+    }),
+    stepWildlife: (seconds: number) => { for (let t = 0; t < seconds && animals; t += 1 / 30) animals.update(1 / 30); render(); },
     dispose: () => {
       if (disposed) return;
       disposed = true;

@@ -23,6 +23,11 @@ describe('Grove route', () => {
     expect(forestRoute(new URLSearchParams('view=week&date=2025-10-01'), '2026-10-10')).toEqual({ year: 2025, week: null });
     expect(forestRoute(new URLSearchParams('year=2031&week=99'), '2026-10-10')).toEqual({ year: 2026, week: null });
   });
+
+  it('opens the current week for Home\'s week=this link', () => {
+    expect(forestRoute(new URLSearchParams('week=this'), '2026-10-10')).toEqual({ year: 2026, week: weekOfDay('2026-10-10', 2026) });
+    expect(forestRoute(new URLSearchParams('year=2025&week=this'), '2026-10-10')).toEqual({ year: 2025, week: null });
+  });
 });
 
 describe('Grove copy', () => {

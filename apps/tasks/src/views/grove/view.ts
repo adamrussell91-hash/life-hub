@@ -3,19 +3,15 @@
  * finished task is a tree; real milestones bring animals. Tap a week to step in, tap a tree or an
  * animal to see what it stands for. Task records are read-only here.
  */
-import { applyGroveHistory } from '@/domain/grove/private-history';
 import { isGroveHistoryId } from '@/domain/grove/private-history';
-import { groveCompletions } from '@/domain/grove/plan';
-import { groveBooks } from '@/domain/grove/books';
-import { groveTerms } from '@/domain/grove/calendar';
 import { SPECIES_LABEL } from '@/domain/grove/assets';
 import { taskPageHash } from '@/domain/cards';
 import { toHubDateKey } from '@/domain/queries';
 import { hashQuery } from '@/shell/shell';
-import { tasksApi } from '@/services/client-api';
 import { TASKS_CHANGED, TASKS_DELETED } from '@/services/task-cache';
 import { renderLoadError } from '@/views/feedback';
-import { forestAnimals, forestHistory } from './forest/data';
+import { loadForest } from './forest/load';
+import { weekOfDay } from './forest/history';
 import type { ForestHandle, ForestPick, ForestState } from './forest/scene';
 import './grove.css';
 
@@ -28,7 +24,8 @@ export function forestRoute(query: URLSearchParams, today: string): { year: numb
   const thisYear = Number(today.slice(0, 4));
   const rawYear = Number(query.get('year') ?? query.get('date')?.slice(0, 4));
   const year = Number.isInteger(rawYear) && rawYear >= 2000 && rawYear <= thisYear ? rawYear : thisYear;
-  const rawWeek = Number(query.get('week'));
+  // `week=this` (Home's preview links here) opens the current week.
+  const rawWeek = query.get('week') === 'this' && year === thisYear ? weekOfDay(today, year) : Number(query.get('week'));
   return { year, week: Number.isInteger(rawWeek) && rawWeek >= 1 && rawWeek <= 52 ? rawWeek : null };
 }
 
@@ -125,14 +122,10 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
   }
 
   async function grow(): Promise<void> {
-    let tasks, prefs, profile, books;
+    const now = new Date();
+    let history, animals;
     try {
-      [tasks, prefs, profile, books] = await Promise.all([
-        tasksApi.listTasks({ includeCachedOnly: false }),
-        tasksApi.getHubPrefs().catch(() => null),
-        tasksApi.getPlanningProfile().catch(() => null),
-        groveBooks().catch(() => [])
-      ]);
+      ({ history, animals } = await loadForest(route.year, now));
     } catch (err) {
       if (gen !== generation) return;
       veil.hidden = true;
@@ -140,11 +133,6 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
       return;
     }
     if (gen !== generation) return;
-    const now = new Date();
-    const inputs = applyGroveHistory({ history: prefs?.grove_history, tasks, terms: groveTerms({ hubPrefs: prefs, planningProfile: profile }), books, now });
-    const { completions } = groveCompletions(inputs.tasks);
-    const history = forestHistory(completions, route.year);
-    const animals = forestAnimals(completions, inputs.terms, inputs.books, route.year, toHubDateKey(now));
     const { mountForest } = await import('./forest/scene');
     if (gen !== generation) return;
     const previous = forest;
