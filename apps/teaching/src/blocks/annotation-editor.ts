@@ -3,6 +3,7 @@ import {
   orphans,
   type BuildAnchorSelection
 } from '@/blocks/annotation-anchor';
+import { studentStops } from '@/blocks/annotation-layers';
 import {
   parseAnnotationSource,
   serializeAnnotationSource
@@ -74,8 +75,9 @@ function isTextField(target: EventTarget | null): boolean {
 }
 
 /**
- * Slice 1b teacher editor: poem paste, select-to-annotate, layers / annotations /
- * attachments hub-lists, note panel with rich text. Technique picker is hidden until 2b.
+ * Teacher editor: poem paste, select-to-annotate, layers / annotations /
+ * attachments hub-lists, note panel with rich text, marker / default-layer settings.
+ * Technique picker is hidden until 2b.
  */
 export function createAnnotationEditorFields(
   block: AnnotationBlock,
@@ -121,6 +123,43 @@ export function createAnnotationEditorFields(
   const proseLabel = document.createElement('label');
   proseLabel.className = 'block-editor__annotation-prose-label';
   proseLabel.append(proseToggle, document.createTextNode(' Prose'));
+
+  const showMarkers = document.createElement('input');
+  showMarkers.type = 'checkbox';
+  showMarkers.className = 'block-editor__annotation-show-markers';
+  showMarkers.checked = block.content.settings.show_markers !== false;
+  showMarkers.setAttribute('aria-label', 'Show markers for hidden layers');
+
+  const showMarkersLabel = document.createElement('label');
+  showMarkersLabel.className = 'block-editor__annotation-show-markers-label';
+  showMarkersLabel.append(
+    showMarkers,
+    document.createTextNode(' Show markers for hidden layers')
+  );
+
+  const defaultLayer = document.createElement('select');
+  defaultLayer.className = 'block-editor__annotation-default-layer';
+  defaultLayer.setAttribute('aria-label', 'Student starting layer');
+
+  function paintDefaultLayerOptions(): void {
+    const current = defaultLayer.value || block.content.settings.default_layer_id || '';
+    const choices = studentStops(layers);
+    defaultLayer.replaceChildren();
+    const textOnly = document.createElement('option');
+    textOnly.value = '';
+    textOnly.textContent = 'Text only';
+    defaultLayer.append(textOnly);
+    for (const layer of choices) {
+      const opt = document.createElement('option');
+      opt.value = layer.id;
+      opt.textContent = layer.name;
+      defaultLayer.append(opt);
+    }
+    const stillValid = current === '' || choices.some((layer) => layer.id === current);
+    defaultLayer.value = stillValid ? current : '';
+  }
+
+  paintDefaultLayerOptions();
 
   const source = document.createElement('textarea');
   source.className = 'block-editor__annotation-source';
@@ -191,6 +230,7 @@ export function createAnnotationEditorFields(
     const text = currentText();
     const titleValue = title.value.trim();
     const attributionValue = attribution.value.trim();
+    const defaultLayerId = defaultLayer.value.trim();
     const next: AnnotationBlock = {
       ...latest,
       content: {
@@ -199,7 +239,11 @@ export function createAnnotationEditorFields(
         attribution: attributionValue.length > 0 ? attributionValue : undefined,
         text,
         layers,
-        annotations
+        annotations,
+        settings: {
+          show_markers: showMarkers.checked,
+          ...(defaultLayerId ? { default_layer_id: defaultLayerId } : {})
+        }
       }
     };
     onChange(next);
@@ -693,6 +737,7 @@ export function createAnnotationEditorFields(
       }),
       onChange: (next) => {
         layers = next;
+        paintDefaultLayerOptions();
         emitChange();
       },
       renderItem: (layer, ctx) => {
@@ -736,13 +781,29 @@ export function createAnnotationEditorFields(
           opt.selected = layer.kind === value;
           kind.append(opt);
         }
+        const symbol = document.createElement('input');
+        symbol.type = 'text';
+        symbol.className = 'block-editor__annotation-layer-symbol';
+        symbol.value = layer.symbol ?? '';
+        symbol.maxLength = 3;
+        symbol.placeholder = 'Symbol';
+        symbol.setAttribute('aria-label', 'Layer symbol');
+        symbol.hidden = layer.kind !== 'free';
+        symbol.addEventListener('input', () => {
+          ctx.update({
+            ...ctx.current,
+            symbol: symbol.value.trim() || undefined
+          });
+        });
         kind.addEventListener('change', () => {
-          ctx.update({ ...ctx.current, kind: kind.value as AnnotationLayerKind });
+          const nextKind = kind.value as AnnotationLayerKind;
+          symbol.hidden = nextKind !== 'free';
+          ctx.update({ ...ctx.current, kind: nextKind });
         });
 
         const wrap = document.createElement('div');
         wrap.className = 'block-editor__annotation-layer-fields';
-        wrap.append(name, colour, kind);
+        wrap.append(name, colour, kind, symbol);
         return wrap;
       }
     });
@@ -789,12 +850,14 @@ export function createAnnotationEditorFields(
               symbol: name.slice(0, 2)
             }
           ];
+          paintDefaultLayerOptions();
           emitChange();
         },
         true
       );
     }
 
+    paintDefaultLayerOptions();
     layersHost.append(layerList.el);
     layersHost.scrollTop = layerScroll;
 
@@ -879,6 +942,8 @@ export function createAnnotationEditorFields(
   attribution.addEventListener('input', emitChange);
   source.addEventListener('input', emitChange);
   proseToggle.addEventListener('change', emitChange);
+  showMarkers.addEventListener('change', emitChange);
+  defaultLayer.addEventListener('change', emitChange);
 
   paintSelectSurface();
   paintOrphans();
@@ -890,6 +955,8 @@ export function createAnnotationEditorFields(
     title,
     attribution,
     proseLabel,
+    showMarkersLabel,
+    defaultLayer,
     source,
     hint,
     placeStatus,
