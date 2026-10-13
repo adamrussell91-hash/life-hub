@@ -1,7 +1,31 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { filterBlocksForStudent } from '@/blocks/visibility';
 import { createBlock } from '@/blocks/create-block';
+import { sanitizeBlocksDeep } from '@/blocks/sanitize-blocks';
 import type { Block } from '@/schemas/block';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const stripFixture = JSON.parse(
+  readFileSync(join(__dirname, '../../fixtures/annotation-teacher-strip.json'), 'utf8')
+) as {
+  sentinel: string;
+  teacher_layer_id: string;
+  teacher_only_block_id: string;
+  annotation: Block;
+  teacher_only_block: Block;
+  ok_block: Block;
+};
+
+function assertTeacherNotesGone(blocks: Block[]): void {
+  const json = JSON.stringify(blocks);
+  expect(json).not.toContain(stripFixture.sentinel);
+  expect(json).not.toContain(stripFixture.teacher_layer_id);
+  expect(json).not.toContain('"kind":"teacher"');
+  expect(json).not.toContain(stripFixture.teacher_only_block_id);
+}
 
 describe('filterBlocksForStudent', () => {
   it('drops teacher_only blocks for students', () => {
@@ -84,5 +108,52 @@ describe('filterBlocksForStudent', () => {
     const t = out[0]!;
     if (t.block_type !== 'tabs') throw new Error('expected tabs');
     expect(t.content.tabs[0]!.blocks.map((b) => b.id)).toEqual(['vis']);
+  });
+
+  it('strips annotation teacher layers at top level', () => {
+    const out = sanitizeBlocksDeep(
+      filterBlocksForStudent([
+        structuredClone(stripFixture.annotation),
+        structuredClone(stripFixture.teacher_only_block),
+        structuredClone(stripFixture.ok_block)
+      ])
+    );
+    assertTeacherNotesGone(out);
+    const ann = out.find((b) => b.block_type === 'annotation');
+    expect(ann?.block_type).toBe('annotation');
+    if (ann?.block_type !== 'annotation') return;
+    expect(ann.content.layers.map((l) => l.id)).toEqual(['layer_structure']);
+    expect(ann.content.annotations.map((a) => a.id)).toEqual(['ann_student']);
+    expect(ann.content.annotations[0]!.body.attachments).toEqual([
+      { kind: 'block', block_id: 'block_ok_resource' },
+      { kind: 'link', url: 'https://example.com', label: 'ok' }
+    ]);
+  });
+
+  it('strips annotation teacher layers inside section, columns, and tabs', () => {
+    const annotation = structuredClone(stripFixture.annotation);
+    const teacherOnly = structuredClone(stripFixture.teacher_only_block);
+    const ok = structuredClone(stripFixture.ok_block);
+
+    const section = createBlock('section', 'sec_strip');
+    if (section.block_type !== 'section') throw new Error('expected section');
+    section.content.blocks = [annotation, teacherOnly, ok] as typeof section.content.blocks;
+
+    const columns = createBlock('columns', 'cols_strip');
+    if (columns.block_type !== 'columns') throw new Error('expected columns');
+    columns.content.columns[0]!.blocks = [
+      structuredClone(stripFixture.annotation),
+      structuredClone(stripFixture.teacher_only_block)
+    ] as (typeof columns.content.columns)[number]['blocks'];
+
+    const tabs = createBlock('tabs', 'tabs_strip');
+    if (tabs.block_type !== 'tabs') throw new Error('expected tabs');
+    tabs.content.tabs[0]!.blocks = [
+      structuredClone(stripFixture.annotation),
+      structuredClone(stripFixture.teacher_only_block)
+    ] as (typeof tabs.content.tabs)[number]['blocks'];
+
+    const out = sanitizeBlocksDeep(filterBlocksForStudent([section, columns, tabs]));
+    assertTeacherNotesGone(out);
   });
 });

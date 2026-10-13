@@ -1,0 +1,142 @@
+{
+  "sentinel": "SECRET-TEACHER-NOTE",
+  "teacher_layer_id": "layer_teacher",
+  "teacher_only_block_id": "block_secret_resource",
+  "annotation": {
+    "id": "block_strip_annotation",
+    "type": "block",
+    "block_type": "annotation",
+    "variant": "medium",
+    "visibility": "student_teacher",
+    "layout": {},
+    "print": {},
+    "settings": {},
+    "created_at": "2026-10-13T00:00:00.000Z",
+    "updated_at": "2026-10-13T00:00:00.000Z",
+    "schema_version": 1,
+    "content": {
+      "title": "Strip fixture",
+      "text": {
+        "kind": "verse",
+        "stanzas": [
+          {
+            "id": "stanza_1",
+            "lines": [
+              {
+                "id": "line_1",
+                "text": "Bent double, like old beggars under sacks,"
+              }
+            ]
+          }
+        ]
+      },
+      "layers": [
+        {
+          "id": "layer_structure",
+          "name": "Structure",
+          "kind": "free",
+          "colour": "wave",
+          "symbol": "St"
+        },
+        {
+          "id": "layer_teacher",
+          "name": "Teacher notes",
+          "kind": "teacher",
+          "colour": "navy",
+          "symbol": "T"
+        }
+      ],
+      "annotations": [
+        {
+          "id": "ann_student",
+          "layer_id": "layer_structure",
+          "anchor": {
+            "granularity": "word",
+            "stanza": "stanza_1",
+            "line": "line_1",
+            "start": 0,
+            "end": 4,
+            "quote": {
+              "exact": "Bent"
+            }
+          },
+          "body": {
+            "html": "<p>Student-visible note.</p>",
+            "attachments": [
+              {
+                "kind": "block",
+                "block_id": "block_secret_resource"
+              },
+              {
+                "kind": "block",
+                "block_id": "block_ok_resource"
+              },
+              {
+                "kind": "link",
+                "url": "https://example.com",
+                "label": "ok"
+              }
+            ]
+          },
+          "created_at": "2026-10-13T00:00:00.000Z",
+          "updated_at": "2026-10-13T00:00:00.000Z"
+        },
+        {
+          "id": "ann_teacher",
+          "layer_id": "layer_teacher",
+          "anchor": {
+            "granularity": "word",
+            "stanza": "stanza_1",
+            "line": "line_1",
+            "start": 13,
+            "end": 17,
+            "quote": {
+              "exact": "like"
+            }
+          },
+          "body": {
+            "html": "<p>SECRET-TEACHER-NOTE — pacing tip only.</p>",
+            "attachments": []
+          },
+          "created_at": "2026-10-13T00:00:00.000Z",
+          "updated_at": "2026-10-13T00:00:00.000Z"
+        }
+      ],
+      "settings": {
+        "show_markers": true
+      }
+    }
+  },
+  "teacher_only_block": {
+    "id": "block_secret_resource",
+    "type": "block",
+    "block_type": "rich_text",
+    "variant": "medium",
+    "visibility": "teacher_only",
+    "layout": {},
+    "print": {},
+    "settings": {},
+    "created_at": "2026-10-13T00:00:00.000Z",
+    "updated_at": "2026-10-13T00:00:00.000Z",
+    "schema_version": 1,
+    "content": {
+      "html": "<p>SECRET-TEACHER-NOTE resource</p>"
+    }
+  },
+  "ok_block": {
+    "id": "block_ok_resource",
+    "type": "block",
+    "block_type": "rich_text",
+    "variant": "medium",
+    "visibility": "student_teacher",
+    "layout": {},
+    "print": {},
+    "settings": {},
+    "created_at": "2026-10-13T00:00:00.000Z",
+    "updated_at": "2026-10-13T00:00:00.000Z",
+    "schema_version": 1,
+    "content": {
+      "html": "<p>Visible resource</p>"
+    }
+  }
+}

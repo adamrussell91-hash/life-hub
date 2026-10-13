@@ -1,10 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import {
   filterBlocksForStudent,
+  sanitizeBlocksDeep,
   sanitizeRichTextHtml
 } from '../../netlify/functions/_shared/teaching-student.mjs';
+
+const stripFixture = JSON.parse(
+  readFileSync(
+    new URL('../../apps/teaching/fixtures/annotation-teacher-strip.json', import.meta.url),
+    'utf8'
+  )
+);
+
+function assertTeacherNotesGone(blocks) {
+  const json = JSON.stringify(blocks);
+  assert.doesNotMatch(json, new RegExp(stripFixture.sentinel));
+  assert.doesNotMatch(json, new RegExp(stripFixture.teacher_layer_id));
+  assert.doesNotMatch(json, /"kind":"teacher"/);
+  assert.doesNotMatch(json, new RegExp(stripFixture.teacher_only_block_id));
+}
 
 test('student block filter drops teacher-only rows', () => {
   const kept = filterBlocksForStudent([
@@ -21,8 +38,75 @@ test('rich text sanitizer strips script and javascript hrefs', () => {
   assert.doesNotMatch(html, /javascript:/i);
 });
 
+test('filterBlocksForStudent strips annotation teacher layers (shared fixture)', () => {
+  const out = sanitizeBlocksDeep(
+    filterBlocksForStudent([
+      structuredClone(stripFixture.annotation),
+      structuredClone(stripFixture.teacher_only_block),
+      structuredClone(stripFixture.ok_block)
+    ])
+  );
+  assertTeacherNotesGone(out);
+  const ann = out.find(block => block.block_type === 'annotation');
+  assert.equal(ann.content.layers.map(layer => layer.id).join(','), 'layer_structure');
+  assert.equal(ann.content.annotations.map(row => row.id).join(','), 'ann_student');
+  assert.deepEqual(
+    ann.content.annotations[0].body.attachments.map(att => att.block_id || att.kind),
+    ['block_ok_resource', 'link']
+  );
+});
+
+test('filterBlocksForStudent strips annotation teacher layers inside section/columns/tabs', () => {
+  const section = {
+    id: 'sec_strip',
+    block_type: 'section',
+    visibility: 'student_teacher',
+    content: {
+      title: 'Sec',
+      blocks: [
+        structuredClone(stripFixture.annotation),
+        structuredClone(stripFixture.teacher_only_block),
+        structuredClone(stripFixture.ok_block)
+      ]
+    }
+  };
+  const columns = {
+    id: 'cols_strip',
+    block_type: 'columns',
+    visibility: 'student_teacher',
+    content: {
+      columns: [
+        {
+          id: 'col_1',
+          blocks: [
+            structuredClone(stripFixture.annotation),
+            structuredClone(stripFixture.teacher_only_block)
+          ]
+        }
+      ]
+    }
+  };
+  const tabs = {
+    id: 'tabs_strip',
+    block_type: 'tabs',
+    visibility: 'student_teacher',
+    content: {
+      tabs: [
+        {
+          id: 'tab_1',
+          title: 'One',
+          blocks: [
+            structuredClone(stripFixture.annotation),
+            structuredClone(stripFixture.teacher_only_block)
+          ]
+        }
+      ]
+    }
+  };
+  assertTeacherNotesGone(sanitizeBlocksDeep(filterBlocksForStudent([section, columns, tabs])));
+});
+
 test('sanitizeBlocksDeep cleans annotation body html', async () => {
-  const { sanitizeBlocksDeep } = await import('../../netlify/functions/_shared/teaching-student.mjs');
   const cleaned = sanitizeBlocksDeep([
     {
       id: 'a1',

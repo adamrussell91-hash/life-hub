@@ -2088,7 +2088,23 @@ export function renderAnnotationBlock(
   block: Extract<Block, { block_type: 'annotation' }>,
   mode: RenderMode
 ): HTMLElement {
-  return wrapBlock(buildAnnotationView(block, mode), block, mode);
+  // Defence in depth: student/print never draw teacher layers even if a leaky
+  // snapshot somehow still contains them (strip happens at publish).
+  const viewBlock =
+    mode === 'teacher'
+      ? block
+      : {
+          ...block,
+          content: {
+            ...block.content,
+            layers: block.content.layers.filter((layer) => layer.kind !== 'teacher'),
+            annotations: block.content.annotations.filter((ann) => {
+              const layer = block.content.layers.find((row) => row.id === ann.layer_id);
+              return layer?.kind !== 'teacher';
+            })
+          }
+        };
+  return wrapBlock(buildAnnotationView(viewBlock, mode), block, mode);
 }
 
 export function renderBlock(

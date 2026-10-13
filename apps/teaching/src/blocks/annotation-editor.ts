@@ -584,12 +584,30 @@ export function createAnnotationEditorFields(
       layerSelect.append(opt);
     }
     layerSelect.addEventListener('change', () => {
-      annotations = annotations.map((ann) =>
-        ann.id === selected.id
-          ? { ...ann, layer_id: layerSelect.value, updated_at: nowIso() }
-          : ann
-      );
-      emitChange();
+      void (async () => {
+        const previousLayer = layers.find((layer) => layer.id === selected.layer_id);
+        const nextLayerId = layerSelect.value;
+        if (previousLayer?.kind === 'teacher' && nextLayerId !== previousLayer.id) {
+          const confirmed = await askSelectCard({
+            title: 'Move off teacher notes?',
+            supporting: 'This note will no longer stay on the teacher-only layer.',
+            choices: [
+              { value: 'move', label: 'Move it' },
+              { value: 'keep', label: 'Keep on teacher notes' }
+            ]
+          });
+          if (confirmed !== 'move') {
+            layerSelect.value = selected.layer_id;
+            return;
+          }
+        }
+        annotations = annotations.map((ann) =>
+          ann.id === selected.id
+            ? { ...ann, layer_id: nextLayerId, updated_at: nowIso() }
+            : ann
+        );
+        emitChange();
+      })();
     });
     layerLabel.append(layerSelect);
 
@@ -856,10 +874,11 @@ export function createAnnotationEditorFields(
         const kind = document.createElement('select');
         kind.className = 'block-editor__annotation-layer-kind';
         kind.setAttribute('aria-label', 'Layer kind');
-        if (layer.kind === 'family') {
+        if (layer.kind === 'family' || layer.kind === 'teacher') {
           const opt = document.createElement('option');
-          opt.value = 'family';
-          opt.textContent = 'Periodic Table family';
+          opt.value = layer.kind;
+          opt.textContent =
+            layer.kind === 'family' ? 'Periodic Table family' : 'Teacher notes';
           opt.selected = true;
           kind.append(opt);
           kind.disabled = true;
