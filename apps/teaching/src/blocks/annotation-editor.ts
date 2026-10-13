@@ -67,6 +67,12 @@ const COLOUR_LABEL: Record<AnnotationColour, string> = {
   mist: 'Mist'
 };
 
+const LOCKED_LAYER_KIND_LABEL: Record<'family' | 'teacher' | 'voice', string> = {
+  family: 'Periodic Table family',
+  teacher: 'Teacher notes',
+  voice: 'Voice'
+};
+
 function nextId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
@@ -874,11 +880,14 @@ export function createAnnotationEditorFields(
         const kind = document.createElement('select');
         kind.className = 'block-editor__annotation-layer-kind';
         kind.setAttribute('aria-label', 'Layer kind');
-        if (layer.kind === 'family' || layer.kind === 'teacher') {
+        if (
+          layer.kind === 'family' ||
+          layer.kind === 'teacher' ||
+          layer.kind === 'voice'
+        ) {
           const opt = document.createElement('option');
           opt.value = layer.kind;
-          opt.textContent =
-            layer.kind === 'family' ? 'Periodic Table family' : 'Teacher notes';
+          opt.textContent = LOCKED_LAYER_KIND_LABEL[layer.kind];
           opt.selected = true;
           kind.append(opt);
           kind.disabled = true;

@@ -42,6 +42,7 @@ test('filterBlocksForStudent strips annotation teacher layers (shared fixture)',
   const out = sanitizeBlocksDeep(
     filterBlocksForStudent([
       structuredClone(stripFixture.annotation),
+      structuredClone(stripFixture.flashcards),
       structuredClone(stripFixture.teacher_only_block),
       structuredClone(stripFixture.ok_block)
     ])
@@ -49,11 +50,17 @@ test('filterBlocksForStudent strips annotation teacher layers (shared fixture)',
   assertTeacherNotesGone(out);
   const ann = out.find(block => block.block_type === 'annotation');
   assert.equal(ann.content.layers.map(layer => layer.id).join(','), 'layer_structure');
-  assert.equal(ann.content.annotations.map(row => row.id).join(','), 'ann_student');
+  assert.equal(
+    ann.content.annotations.map(row => row.id).join(','),
+    'ann_student,ann_thread'
+  );
   assert.deepEqual(
     ann.content.annotations[0].body.attachments.map(att => att.block_id || att.kind),
     ['block_ok_resource', 'link']
   );
+  assert.equal(ann.content.voice_tracks, undefined);
+  const cards = out.find(block => block.block_type === 'flashcards');
+  assert.equal(cards.content.cards[0].source, undefined);
 });
 
 test('filterBlocksForStudent strips annotation teacher layers inside section/columns/tabs', () => {
@@ -65,6 +72,7 @@ test('filterBlocksForStudent strips annotation teacher layers inside section/col
       title: 'Sec',
       blocks: [
         structuredClone(stripFixture.annotation),
+        structuredClone(stripFixture.flashcards),
         structuredClone(stripFixture.teacher_only_block),
         structuredClone(stripFixture.ok_block)
       ]
