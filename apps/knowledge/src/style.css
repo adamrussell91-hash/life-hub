@@ -6380,6 +6380,7 @@ body.is-universe-saver .universe-exits {
   flex-direction: column;
   align-items: center;
   gap: var(--space-1);
+  color: var(--ink, #13233a);
 }
 .graph-zoom__stack {
   display: flex;
@@ -6392,7 +6393,7 @@ body.is-universe-saver .universe-exits {
 .graph-zoom__btn {
   display: grid;
   place-items: center;
-  width: 2.75rem;
+  width: 2.75rem; /* 44px touch target */
   min-height: 2.75rem;
   margin: 0;
   padding: 0;
@@ -6400,44 +6401,39 @@ body.is-universe-saver .universe-exits {
   border-radius: 0;
   border-top: 1px solid var(--line);
   background: transparent;
-  color: var(--ink, #13233a);
+  color: inherit;
   font: 600 var(--text-md) / 1 Inter, ui-sans-serif, sans-serif;
   cursor: pointer;
   touch-action: manipulation;
 }
 .graph-zoom__btn:first-child { border-top: 0; }
 .graph-zoom__btn:hover,
-.graph-zoom__btn:focus-visible {
-  background: rgba(19, 35, 58, 0.06);
-}
-.graph-zoom__btn:focus-visible {
-  outline: 2px solid var(--wave);
-  outline-offset: -2px;
-}
+.graph-zoom__btn:focus-visible { background: rgba(19, 35, 58, 0.06); }
+.graph-zoom__btn:focus-visible { outline: 2px solid var(--wave); outline-offset: -2px; }
 .graph-zoom__btn svg {
   width: 16px;
   height: 16px;
   display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .graph-zoom__value {
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
-  color: inherit;
   opacity: 0.8;
 }
 .graph-wrap.is-neural .graph-zoom__stack,
 .graph-wrap.is-neural .neural-dock__reveal { background: #0b1019; color: #f4efe6; border-color: rgba(255,255,255,0.18); }
 .graph-wrap.is-neural .graph-zoom { color: #f4efe6; }
-.graph-wrap.is-neural .graph-zoom__btn {
-  color: #f4efe6;
-  border-top-color: rgba(255,255,255,0.14);
-}
+.graph-wrap.is-neural .graph-zoom__btn { border-top-color: rgba(255,255,255,0.14); }
 .graph-wrap.is-neural .graph-zoom__btn:hover,
-.graph-wrap.is-neural .graph-zoom__btn:focus-visible {
-  background: rgba(255,255,255,0.08);
-}
+.graph-wrap.is-neural .graph-zoom__btn:focus-visible { background: rgba(255,255,255,0.08); }
 @media (max-width: 720px) {
-  .neural-dock__row button, .neural-dock__panel button, .neural-dock__panel select { min-height: 44px; }
+  .neural-dock__row button, .neural-dock__panel button, .neural-dock__panel select,
+  .graph-zoom__btn { min-height: 44px; }
   .neural-dock__panel { padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px)); }
 }
 @media (prefers-reduced-motion: reduce) {

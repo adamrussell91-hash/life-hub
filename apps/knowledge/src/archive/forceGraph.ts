@@ -1256,36 +1256,42 @@ export function mountForceGraph(
   const zoomMin = 0.04;
   const zoomMax = 24;
   const ZOOM_STEP = 1.4;
+  // Same path as shelf mapChrome ICON.fit; stroke comes from .graph-zoom__btn svg CSS.
   const FIT_ICON =
-    '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+    '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3"/><circle cx="8" cy="8" r="2"/></svg>';
   const zoomRoot = dock
     ? el("div", { class: "graph-zoom", role: "group", "aria-label": "Map zoom" })
     : null;
   const zoomReadout = zoomRoot ? el("output", { class: "graph-zoom__value" }) : null;
-  if (zoomRoot && dock) {
+  if (zoomRoot) {
     const stack = el("div", { class: "graph-zoom__stack" });
-    const mk = (zoom: string, label: string, text: string) => {
-      const button = el("button", { type: "button", class: "graph-zoom__btn", "data-zoom": zoom, "aria-label": label });
-      button.innerHTML = text;
-      stack.appendChild(button);
-      return button;
-    };
-    mk("in", "Zoom in", "+");
-    mk("out", "Zoom out", "−");
-    mk("fit", "Fit overview", FIT_ICON);
+    for (const [zoom, label, html] of [
+      ["in", "Zoom in", "+"],
+      ["out", "Zoom out", "−"],
+      ["fit", "Fit overview", FIT_ICON],
+    ] as const) {
+      const button = el("button", {
+        type: "button",
+        class: "graph-zoom__btn",
+        "data-zoom": zoom,
+        "aria-label": label,
+      });
+      button.innerHTML = html;
+      stack.append(button);
+    }
     zoomRoot.append(stack, zoomReadout!);
-    dock.body.prepend(zoomRoot);
+    dock!.body.prepend(zoomRoot);
     stack.addEventListener("click", event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-zoom]");
       if (!button) return;
-      const action = button.dataset.zoom;
-      if (action === "fit") {
+      if (button.dataset.zoom === "fit") {
         viewTouched = true;
         if (tool === "walk") clearTool();
         moveCamera(fitShowAll(), 500);
         return;
       }
-      if (action === "in" || action === "out") zoomBy(action === "in" ? ZOOM_STEP : 1 / ZOOM_STEP);
+      if (button.dataset.zoom === "in") zoomBy(ZOOM_STEP);
+      else if (button.dataset.zoom === "out") zoomBy(1 / ZOOM_STEP);
     });
   }
 

@@ -172,15 +172,13 @@ describe("Show All strand drawing", () => {
     const stop = mountForceGraph(host, model(), {}, { variant: "showAll", search: "", excerptFor: () => "" });
     expect(host.querySelector('input[aria-label="Map zoom"]')).toBeNull();
     const zoomIn = host.querySelector<HTMLButtonElement>('[data-zoom="in"]');
+    const zoomOut = host.querySelector<HTMLButtonElement>('[data-zoom="out"]');
     const zoomFit = host.querySelector<HTMLButtonElement>('[data-zoom="fit"]');
     const zoomRoot = host.querySelector<HTMLElement>(".graph-zoom");
-    expect(zoomIn).not.toBeNull();
-    expect(zoomFit).not.toBeNull();
-    expect(zoomRoot).not.toBeNull();
+    expect(zoomIn && zoomOut && zoomFit && zoomRoot).toBeTruthy();
     for (let i = 0; i < 40; i += 1) zoomIn!.click();
     expect(Number(zoomRoot!.dataset.scale)).toBeGreaterThan(10);
-    zoomFit!.click();
-    expect(host.querySelector('[data-zoom="out"]')).not.toBeNull();
+    zoomFit!.click(); // starts moveCamera(fitShowAll()); scale settles on animation frames
     stop();
   });
   afterEach(() => {
