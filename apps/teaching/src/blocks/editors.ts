@@ -8,7 +8,12 @@ import {
 } from '../../design-kit/js/hub-list.js';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/ai/models';
 import { createAnnotationEditorFields } from '@/blocks/annotation-editor';
+import {
+  cardNeedsRefresh,
+  composeCardFromAnnotation
+} from '@/blocks/flashcard-from-annotation';
 import type { CollectionLink } from '@/blocks/collection-resolve';
+import { loadLiteraryElements } from '@/blocks/literary-elements';
 import { buildChartSvg, CHART_SERIES_COLOR_OPTIONS } from '@/blocks/chart-svg';
 import { mountGraphEditor } from '../../../../packages/graph-blocks';
 import {
@@ -55,6 +60,8 @@ export type BlockEditorContext = {
   media?: ReadonlyArray<Media>;
   /** Lesson (or page) blocks for annotation block-link attachments. */
   getLessonBlocks?: () => Block[];
+  setLessonBlocks?: (blocks: Block[]) => void;
+  lessonId?: string;
 };
 
 const VISIBILITY_OPTIONS = [
@@ -1783,12 +1790,14 @@ type FlashcardDraft = {
   back: string;
   image_url?: string;
   image_alt?: string;
+  source?: Extract<Block, { block_type: 'flashcards' }>['content']['cards'][number]['source'];
 };
 
 export function createFlashcardsEditor(
   block: Extract<Block, { block_type: 'flashcards' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'flashcards' }>>,
-  getLatest: () => Extract<Block, { block_type: 'flashcards' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'flashcards' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -1815,7 +1824,8 @@ export function createFlashcardsEditor(
           front: card.front,
           back: card.back,
           image_url: card.image_url?.trim() ? card.image_url : undefined,
-          image_alt: card.image_alt?.trim() ? card.image_alt : undefined
+          image_alt: card.image_alt?.trim() ? card.image_alt : undefined,
+          source: card.source
         }))
       }
     });
@@ -1833,7 +1843,7 @@ export function createFlashcardsEditor(
     minReason: 'A flashcard set needs at least one card.',
     maxReason: 'A flashcard set holds up to twenty cards.',
     create: () => ({ id: itemId(`${getLatest().id}_c`), front: '', back: '' }),
-    duplicate: (card) => ({ ...card, id: itemId(`${getLatest().id}_c`) }),
+    duplicate: (card) => ({ ...card, id: itemId(`${getLatest().id}_c`), source: undefined }),
     onChange: (next) => {
       cards = next;
       emitChange();
@@ -1841,7 +1851,7 @@ export function createFlashcardsEditor(
     renderItem: (card, ctx) => {
       const n = ctx.index + 1;
       const patch = (partial: Partial<FlashcardDraft>) => ctx.update({ ...ctx.current, ...partial });
-      return fragmentOf(
+      const nodes: Node[] = [
         fieldPair(
           editorField('block-editor__flashcards-front', card.front, 'Front', `Flashcard ${n} front`, (value) => patch({ front: value })),
           editorField('block-editor__flashcards-back', card.back, 'Back', `Flashcard ${n} back`, (value) => patch({ back: value }))
@@ -1850,7 +1860,64 @@ export function createFlashcardsEditor(
           editorField('block-editor__flashcards-image-url', card.image_url ?? '', 'Image link (optional)', `Flashcard ${n} image URL`, (value) => patch({ image_url: value }), 'url'),
           editorField('block-editor__flashcards-image-alt', card.image_alt ?? '', 'Image alt (required if image set)', `Flashcard ${n} image alt`, (value) => patch({ image_alt: value }))
         )
-      );
+      ];
+      if (card.source) {
+        const sourceRow = document.createElement('div');
+        sourceRow.className = 'block-editor__flashcards-source';
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'btn btn--ghost block-editor__flashcards-from-note';
+        link.textContent = 'From a note';
+        link.addEventListener('click', () => {
+          const hint = fields.querySelector('.block-editor__flashcards-source-hint');
+          if (hint) {
+            hint.textContent = `Source note: ${card.source!.annotation_id}`;
+          } else {
+            const p = document.createElement('p');
+            p.className = 'block-editor__hint block-editor__flashcards-source-hint';
+            p.textContent = `Source note: ${card.source!.annotation_id}`;
+            fields.append(p);
+          }
+        });
+        sourceRow.append(link);
+        const lessonBlocks = context.getLessonBlocks?.() ?? [];
+        const annBlock = findAnnotationBlockForCards(lessonBlocks, card.source.block_id);
+        const ann = annBlock?.content.annotations.find((row) => row.id === card.source!.annotation_id);
+        const status = cardNeedsRefresh(
+          { id: card.id, front: card.front, back: card.back, source: card.source },
+          ann
+        );
+        if (status === 'changed') {
+          const refresh = document.createElement('button');
+          refresh.type = 'button';
+          refresh.className = 'btn btn--secondary';
+          refresh.textContent = 'Note changed. Refresh card';
+          refresh.addEventListener('click', () => {
+            void (async () => {
+              if (!card.source || !annBlock || !ann) return;
+              const table = await loadLiteraryElements();
+              const next = composeCardFromAnnotation({
+                annotation: ann,
+                block: annBlock,
+                lessonId: card.source.lesson_id ?? context.lessonId ?? '',
+                kind: card.source.kind,
+                table,
+                cardId: card.id
+              });
+              if (!next) return;
+              patch({ front: next.front, back: next.back, source: next.source });
+            })();
+          });
+          sourceRow.append(refresh);
+        } else if (status === 'removed') {
+          const gone = document.createElement('span');
+          gone.className = 'block-editor__hint';
+          gone.textContent = 'Note removed';
+          sourceRow.append(gone);
+        }
+        nodes.push(sourceRow);
+      }
+      return fragmentOf(...nodes);
     }
   });
   list.el.classList.add('block-editor__flashcards-items');
@@ -1859,6 +1926,30 @@ export function createFlashcardsEditor(
 
   fields.append(shuffleLabel, list.el);
   return editorShell(block, onChange, fields, getLatest);
+}
+
+function findAnnotationBlockForCards(
+  blocks: Block[],
+  blockId: string
+): Extract<Block, { block_type: 'annotation' }> | null {
+  for (const block of blocks) {
+    if (block.id === blockId && block.block_type === 'annotation') return block;
+    if (block.block_type === 'section') {
+      const hit = findAnnotationBlockForCards(block.content.blocks as Block[], blockId);
+      if (hit) return hit;
+    } else if (block.block_type === 'columns') {
+      for (const col of block.content.columns) {
+        const hit = findAnnotationBlockForCards(col.blocks as Block[], blockId);
+        if (hit) return hit;
+      }
+    } else if (block.block_type === 'tabs') {
+      for (const panel of block.content.tabs) {
+        const hit = findAnnotationBlockForCards(panel.blocks as Block[], blockId);
+        if (hit) return hit;
+      }
+    }
+  }
+  return null;
 }
 
 export function createClozeEditor(
@@ -2479,6 +2570,59 @@ export function createWhiteboardEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+export function createAnthologyEditor(
+  block: Extract<Block, { block_type: 'anthology' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'anthology' }>>,
+  getLatest: () => Extract<Block, { block_type: 'anthology' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.className = 'block-editor__anthology-title';
+  title.value = block.content.title ?? '';
+  title.placeholder = 'Title (optional)';
+  title.setAttribute('aria-label', 'Anthology title');
+
+  const view = document.createElement('select');
+  view.className = 'block-editor__anthology-view';
+  view.setAttribute('aria-label', 'Default view');
+  for (const [value, label] of [
+    ['text', 'By text'],
+    ['theme', 'By theme'],
+    ['technique', 'By technique'],
+    ['connections', 'Connections']
+  ] as const) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    opt.selected = (block.content.default_view ?? 'text') === value;
+    view.append(opt);
+  }
+
+  const hint = document.createElement('p');
+  hint.className = 'block-editor__hint';
+  hint.textContent =
+    'Gathers notes tagged Add to unit anthology from published lessons in this unit.';
+
+  const emitChange = () => {
+    onChange({
+      ...getLatest(),
+      content: {
+        title: title.value.trim() || undefined,
+        default_view: view.value as 'text' | 'theme' | 'technique' | 'connections'
+      }
+    });
+  };
+
+  title.addEventListener('input', emitChange);
+  view.addEventListener('change', emitChange);
+
+  fields.append(title, view, hint);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
 export function createCollectionEditor(
   block: Extract<Block, { block_type: 'collection' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'collection' }>>,
@@ -2559,7 +2703,9 @@ export function createAnnotationEditor(
   context: BlockEditorContext = {}
 ): HTMLElement {
   const fields = createAnnotationEditorFields(block, onChange, getLatest, {
-    getLessonBlocks: context.getLessonBlocks
+    getLessonBlocks: context.getLessonBlocks,
+    setLessonBlocks: context.setLessonBlocks,
+    lessonId: context.lessonId
   });
   return editorShell(block, onChange, fields, getLatest);
 }
@@ -2633,6 +2779,12 @@ function createBlockEditorFields(
         latest as () => Extract<Block, { block_type: 'collection' }>,
         context
       );
+    case 'anthology':
+      return createAnthologyEditor(
+        block,
+        onChange,
+        latest as () => Extract<Block, { block_type: 'anthology' }>
+      );
     case 'outcomes':
       return createOutcomesEditor(
         block,
@@ -2640,7 +2792,12 @@ function createBlockEditorFields(
         latest as () => Extract<Block, { block_type: 'outcomes' }>
       );
     case 'flashcards':
-      return createFlashcardsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'flashcards' }>);
+      return createFlashcardsEditor(
+        block,
+        onChange,
+        latest as () => Extract<Block, { block_type: 'flashcards' }>,
+        context
+      );
     case 'cloze':
       return createClozeEditor(block, onChange, latest as () => Extract<Block, { block_type: 'cloze' }>);
     case 'self_check':

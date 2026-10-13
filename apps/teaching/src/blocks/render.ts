@@ -4,6 +4,8 @@ import { getApiBaseUrl } from '@/api/config';
 import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
 import { renderGraphView } from '../../../../packages/graph-blocks';
 import { mountHubWhiteboard } from '@/blocks/whiteboard-runtime';
+import type { AnthologyData } from '@/blocks/anthology-collect';
+import { buildAnthologyView } from '@/blocks/anthology-view';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildHtmlAppSrcdoc } from '@/blocks/html-app-srcdoc';
 import { buildAnnotationView } from '@/blocks/annotation-view';
@@ -35,6 +37,12 @@ export type RenderMode = 'teacher' | 'student' | 'print';
 export type RenderContext = {
   lessonId?: string;
   attachedOutcomes?: PublicOutcome[];
+  anthology?: AnthologyData;
+  openNoteId?: string;
+  onMakeAnthologyCards?: (request: {
+    items: AnthologyData['items'];
+    view: 'text' | 'theme' | 'technique' | 'connections';
+  }) => void;
 };
 
 const HEADING_TAG = {
@@ -2086,7 +2094,8 @@ export function renderConceptMapBlock(
 
 export function renderAnnotationBlock(
   block: Extract<Block, { block_type: 'annotation' }>,
-  mode: RenderMode
+  mode: RenderMode,
+  ctx: RenderContext = {}
 ): HTMLElement {
   // Defence in depth: student/print never draw teacher layers even if a leaky
   // snapshot somehow still contains them (strip happens at publish).
@@ -2104,7 +2113,30 @@ export function renderAnnotationBlock(
             })
           }
         };
-  return wrapBlock(buildAnnotationView(viewBlock, mode), block, mode);
+  return wrapBlock(
+    buildAnnotationView(viewBlock, mode, { openNoteId: ctx.openNoteId }),
+    block,
+    mode
+  );
+}
+
+export function renderAnthologyBlock(
+  block: Extract<Block, { block_type: 'anthology' }>,
+  mode: RenderMode,
+  ctx: RenderContext = {}
+): HTMLElement {
+  const data = ctx.anthology ?? { items: [], texts: [] };
+  return wrapBlock(
+    buildAnthologyView(block, {
+      data,
+      mode,
+      defaultView: block.content.default_view,
+      title: block.content.title,
+      onMakeCards: mode === 'teacher' ? ctx.onMakeAnthologyCards : undefined
+    }),
+    block,
+    mode
+  );
 }
 
 export function renderBlock(
@@ -2162,6 +2194,8 @@ export function renderBlock(
       return renderCardStackBlock(block, mode);
     case 'collection':
       return renderCollectionBlock(block, mode);
+    case 'anthology':
+      return renderAnthologyBlock(block, mode, ctx);
     case 'outcomes':
       return renderOutcomesBlock(block, mode, ctx);
     case 'spacer':
@@ -2185,7 +2219,7 @@ export function renderBlock(
     case 'whiteboard':
       return renderWhiteboardBlock(block, mode);
     case 'annotation':
-      return renderAnnotationBlock(block, mode);
+      return renderAnnotationBlock(block, mode, ctx);
     }
   } catch {
     const fallback = document.createElement('p');

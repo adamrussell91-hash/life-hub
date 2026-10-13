@@ -435,7 +435,8 @@ function makeBarAnchor(
 
 function buildInteractiveView(
   content: AnnotationContent,
-  mode: RenderMode
+  mode: RenderMode,
+  openNoteId?: string
 ): HTMLElement {
   const root = document.createElement('div');
   root.className = 'block-annotation';
@@ -444,6 +445,17 @@ function buildInteractiveView(
 
   const stops = stopsForMode(content.layers, mode);
   let state = createLayerState(content.layers, content.settings, mode);
+  if (openNoteId) {
+    const target = content.annotations.find((ann) => ann.id === openNoteId);
+    if (target) {
+      const layerIdx = stops.findIndex((layer) => layer.id === target.layer_id);
+      state = {
+        ...state,
+        openAnnotationId: openNoteId,
+        stop: layerIdx >= 0 ? layerIdx + 1 : state.stop
+      };
+    }
+  }
   let table: LiteraryElementsTable | null = null;
   const needsTable = content.annotations.some((ann) => ann.technique?.id);
 
@@ -1105,6 +1117,13 @@ function buildInteractiveView(
 
   paint();
 
+  if (openNoteId && state.openAnnotationId === openNoteId) {
+    const openBtn = root.querySelector<HTMLElement>(
+      `[data-annotation-id="${openNoteId}"]`
+    );
+    openBtn?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+
   if (needsTable) {
     void loadLiteraryElements().then((loaded) => {
       table = loaded;
@@ -1218,11 +1237,16 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
   return root;
 }
 
+export type BuildAnnotationViewOptions = {
+  openNoteId?: string;
+};
+
 /** Shared layout for teacher / student / print — differs only by mode flags (V8). */
 export function buildAnnotationView(
   block: AnnotationBlock,
-  mode: RenderMode
+  mode: RenderMode,
+  options: BuildAnnotationViewOptions = {}
 ): HTMLElement {
   if (mode === 'print') return buildPrintView(block.content);
-  return buildInteractiveView(block.content, mode);
+  return buildInteractiveView(block.content, mode, options.openNoteId);
 }

@@ -353,6 +353,7 @@ describe('blockRegistry', () => {
     expect(Object.keys(blockRegistry).sort()).toEqual([
       'accordion',
       'annotation',
+      'anthology',
       'attachment',
       'audio',
       'callout',

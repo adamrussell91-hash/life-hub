@@ -40,6 +40,7 @@ export const NEW_BLOCK_TYPES = [
   'card_stack',
   'tabs',
   'collection',
+  'anthology',
   'outcomes',
   'annotation'
 ] as const;
@@ -81,6 +82,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   card_stack: 'Card stack',
   tabs: 'Tabs',
   collection: 'Collection',
+  anthology: 'Anthology',
   outcomes: 'Outcomes',
   annotation: 'Annotation'
 };
@@ -149,15 +151,42 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Layout',
-    types: ['section', 'columns', 'divider', 'spacer', 'accordion', 'tabs', 'card_stack', 'collection']
+    types: [
+      'section',
+      'columns',
+      'divider',
+      'spacer',
+      'accordion',
+      'tabs',
+      'card_stack',
+      'collection',
+      'anthology'
+    ]
   }
 ];
+
+const PAGE_ONLY_TYPES = new Set(['collection', 'anthology']);
+const HOMEPAGE_EXCLUDED = new Set([
+  'flashcards',
+  'cloze',
+  'self_check',
+  'outcomes',
+  'annotation',
+  'anthology'
+]);
 
 // Preserve homepage block availability even when a block changes category.
 export const HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
+  types: group.types.filter((type) => !HOMEPAGE_EXCLUDED.has(type))
+})).filter((group) => group.types.length > 0);
+
+/** Unit plan: homepage set plus anthology. */
+export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
+  ...group,
   types: group.types.filter(
-    (type) => !['flashcards', 'cloze', 'self_check', 'outcomes', 'annotation'].includes(type)
+    (type) =>
+      !['flashcards', 'cloze', 'self_check', 'outcomes', 'annotation'].includes(type)
   )
 })).filter((group) => group.types.length > 0);
 
@@ -165,7 +194,7 @@ export const LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) =>
   group.label === 'Layout'
     ? {
         ...group,
-        types: group.types.filter((t) => t !== 'collection')
+        types: group.types.filter((t) => !PAGE_ONLY_TYPES.has(t))
       }
     : group
 );
@@ -178,17 +207,17 @@ export const COLUMN_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
     t !== 'timeline' &&
     t !== 'card_stack' &&
     t !== 'tabs' &&
-    t !== 'collection'
+    !PAGE_ONLY_TYPES.has(t)
 );
 
 /** Block types allowed inside a section */
 export const SECTION_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
-  (t) => t !== 'section' && t !== 'collection'
+  (t) => t !== 'section' && !PAGE_ONLY_TYPES.has(t)
 );
 
 /** Block types allowed inside a tabs panel */
 export const TAB_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
-  (t) => t !== 'tabs' && t !== 'section' && t !== 'collection'
+  (t) => t !== 'tabs' && t !== 'section' && !PAGE_ONLY_TYPES.has(t)
 );
 
 function nowIso(): string {
@@ -532,6 +561,13 @@ export function createBlock(type: NewBlockType, id: string): Block {
         block_type: 'collection',
         variant: 'medium',
         content: { source: 'unit_lessons', title: '' }
+      };
+    case 'anthology':
+      return {
+        ...shared,
+        block_type: 'anthology',
+        variant: 'medium',
+        content: { title: '', default_view: 'text' }
       };
     case 'outcomes':
       return {
