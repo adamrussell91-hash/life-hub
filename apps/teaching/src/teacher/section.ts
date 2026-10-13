@@ -9,6 +9,7 @@ export type TeacherSection =
   | 'lessons'
   | 'resources'
   | 'templates'
+  | 'feedback'
   | 'trash';
 
 export function sectionFromRoute(match: RouteMatch): TeacherSection | null {
@@ -35,6 +36,8 @@ export function sectionFromRoute(match: RouteMatch): TeacherSection | null {
       return 'resources';
     case 'teacher-templates':
       return 'templates';
+    case 'teacher-feedback':
+      return 'feedback';
     case 'teacher-trash':
       return 'trash';
     default:

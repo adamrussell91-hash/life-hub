@@ -5,6 +5,7 @@ import {
   listKnowledgePages,
   putKnowledgeContent
 } from './knowledge-data.mjs';
+import { knowledgeKernelFetch, knowledgeKernelSecret } from './knowledge-kernel.mjs';
 import { loadKnowledgePrompt } from './knowledge-prompts.mjs';
 import { tidyPageDirect } from './knowledge-tidy.mjs';
 import {
@@ -12,12 +13,133 @@ import {
   aiJobsInboxKey,
   defaultGetContentStore,
   getJSON,
+  mediaFileKey,
   setJSON
 } from './teaching-blobs.mjs';
 
 export const STALE_WORKING_JOB_MS = 10 * 60 * 1000;
 export const MIDNIGHT_TIDY_LIMIT = 20;
 export const TIDY_STATE_FILE = '_tidy/state.json';
+export const ANNOTATION_VOICE_TRANSCRIBE_KIND = 'annotation_voice_transcribe';
+export const MAX_VOICE_TRANSCRIBE_ATTEMPTS = 2;
+
+function arrayBufferToBase64(buffer) {
+  return Buffer.from(buffer).toString('base64');
+}
+
+export async function processAnnotationVoiceTranscribeJobs({
+  store,
+  env,
+  fetchImpl = fetch,
+  nowIso,
+  knowledgeFetch = knowledgeKernelFetch,
+  limit = 3
+} = {}) {
+  if (!store || !knowledgeKernelSecret(env)) return { processed: [], errors: [] };
+  const inbox = (await getJSON(store, aiJobsInboxKey())) ?? { jobs: [] };
+  const queued = (inbox.jobs ?? [])
+    .filter(row => row?.kind === ANNOTATION_VOICE_TRANSCRIBE_KIND && row?.status === 'working')
+    .slice(0, Math.max(0, limit));
+  const processed = [];
+  const errors = [];
+
+  for (const row of queued) {
+    const job = row?.id ? (await getJSON(store, aiJobKey(row.id))) ?? row : row;
+    if (!job?.id || job.kind !== ANNOTATION_VOICE_TRANSCRIBE_KIND || job.status !== 'working') continue;
+    if (job.phase && job.phase !== 'queued' && job.phase !== 'transcribing') continue;
+    const attempts = Number(job.attempts) || 0;
+    if (attempts >= MAX_VOICE_TRANSCRIBE_ATTEMPTS) {
+      const next = {
+        ...job,
+        status: 'error',
+        phase: 'failed',
+        error: 'Transcription failed after retries',
+        updated_at: nowIso()
+      };
+      await setJSON(store, aiJobKey(job.id), next);
+      await writeJobInbox(store, next);
+      errors.push({ id: job.id, message: next.error });
+      continue;
+    }
+
+    const mediaId = typeof job.media_id === 'string' ? job.media_id : '';
+    if (!mediaId) {
+      const next = {
+        ...job,
+        status: 'error',
+        phase: 'failed',
+        error: 'media_id is required',
+        updated_at: nowIso()
+      };
+      await setJSON(store, aiJobKey(job.id), next);
+      await writeJobInbox(store, next);
+      errors.push({ id: job.id, message: next.error });
+      continue;
+    }
+
+    const working = {
+      ...job,
+      phase: 'transcribing',
+      attempts: attempts + 1,
+      updated_at: nowIso()
+    };
+    await setJSON(store, aiJobKey(job.id), working);
+    await writeJobInbox(store, working);
+
+    try {
+      const file = await store.getWithMetadata?.(mediaFileKey(mediaId), { type: 'arrayBuffer' });
+      const bytes = file?.data;
+      if (!bytes) throw new Error('Audio file not found');
+      const audio = arrayBufferToBase64(bytes);
+      const response = await knowledgeFetch('/transcribe', {
+        env,
+        fetchImpl,
+        method: 'POST',
+        body: { audio },
+        timeoutMs: 26_000
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(
+          typeof payload?.error === 'string' ? payload.error : `Transcribe failed (${response.status})`
+        );
+      }
+      const done = {
+        ...working,
+        status: 'done',
+        phase: 'ready',
+        result: { whisper: payload },
+        updated_at: nowIso()
+      };
+      await setJSON(store, aiJobKey(job.id), done);
+      await writeJobInbox(store, done);
+      processed.push(job.id);
+    } catch (error) {
+      const message = error?.message || 'Transcription failed';
+      const failedAttempts = Number(working.attempts) || 1;
+      const next =
+        failedAttempts >= MAX_VOICE_TRANSCRIBE_ATTEMPTS
+          ? {
+              ...working,
+              status: 'error',
+              phase: 'failed',
+              error: message,
+              updated_at: nowIso()
+            }
+          : {
+              ...working,
+              phase: 'queued',
+              error: message,
+              updated_at: nowIso()
+            };
+      await setJSON(store, aiJobKey(job.id), next);
+      await writeJobInbox(store, next);
+      errors.push({ id: job.id, message });
+    }
+  }
+
+  return { processed, errors };
+}
 
 export function isScheduledTickRequest(request) {
   const event = (
@@ -143,11 +265,23 @@ export async function runScheduledJobsTick(deps = {}) {
   const env = deps.env ?? {};
   const nowIso = deps.nowIso ?? (() => new Date().toISOString());
   const nowMs = deps.nowMs ?? Date.parse(nowIso());
-  const result = { expired: [], tidy: { ids: [], errors: [] } };
+  const result = {
+    expired: [],
+    voice_transcribe: { processed: [], errors: [] },
+    tidy: { ids: [], errors: [] }
+  };
   try {
     const store = deps.store ?? await (deps.getContentStore ?? defaultGetContentStore)(env);
     if (store) {
       result.expired = await expireStaleWorkingJobs({ store, nowIso, nowMs });
+      result.voice_transcribe = await processAnnotationVoiceTranscribeJobs({
+        store,
+        env,
+        fetchImpl: deps.fetchImpl,
+        nowIso,
+        knowledgeFetch: deps.knowledgeFetch,
+        limit: deps.voiceTranscribeLimit
+      });
     }
   } catch {
     // Teaching store unbound — midnight tidy can still run.

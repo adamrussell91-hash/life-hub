@@ -1,14 +1,27 @@
 import { mountBlockAssistant } from '@/alchemy/block-assistant';
-import { askTextCard } from '@/teacher/confirm-dialog';
+import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
 import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
 import { navigate } from '@/app/router';
 import { applyCreatedEntity, replaceCurriculum } from '@/app/curriculum-state';
 import { withCreatedEntity } from '@/curriculum/with-created-entity';
 import { DEFAULT_PEDAGOGICAL_MODE } from '@/curriculum/pedagogical-mode';
 import { postLesson } from '@/teacher/create/api';
+import {
+  collectAnthology,
+  type AnthologyData,
+  type AnthologySnapshot
+} from '@/blocks/anthology-collect';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
+import { createBlock } from '@/blocks/create-block';
+import {
+  chunkItems,
+  composeQuoteToTechniqueCards,
+  findAnnotationInBlocks,
+  FLASHCARDS_CAP
+} from '@/blocks/flashcard-from-annotation';
+import { filterBlocksForStudent } from '@/blocks/visibility';
 import { isActiveLibraryStatus } from '@/curriculum/with-entity-status';
-import type { Block } from '@/schemas';
+import type { Block, Lesson } from '@/schemas';
 import { resolveCoverUrl } from '@/schemas';
 import { mountCreateControl } from '@/teacher/create/control';
 import type { EntityCreatedHandler } from '@/teacher/create/types';
@@ -17,7 +30,7 @@ import { createUnitTemplate } from '@/teacher/template-api';
 import { mountHistoryPanel, type HistoryPanelHandle } from '@/teacher/history-panel';
 import type { Subject, Unit, Year } from '@/schemas';
 import { patchUnit } from '@/teacher/unit-api';
-import { ApiClientError } from '@/api/client';
+import { apiGet, apiPut, ApiClientError } from '@/api/client';
 import { renderPageHeader } from '@/teacher/page-header';
 import { downloadPortableExport } from '@/teacher/export-api';
 import { gradientForEntityId, renderEntityBanner } from '@/teacher/entity-banner';
@@ -31,7 +44,7 @@ import {
 } from '@/teacher/lesson-canvas/mount-page';
 import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { mountLessonPalette } from '@/teacher/lesson-canvas/mount-palette';
-import { homepagePaletteFamilies } from '@/teacher/lesson-canvas/palette-catalog';
+import { unitPaletteFamilies } from '@/teacher/lesson-canvas/palette-catalog';
 import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
 import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
 import { mountTagAnythingSection } from '@/teacher/entity-tagger';
@@ -480,6 +493,7 @@ export function renderUnitPage(
 
   const planEditor = mountUnitPlanEditor(planHost, unit.blocks ?? [], {
     unit,
+    curriculum,
     onSave: async (blocks, refresh = false) => {
       const saved = await patchUnit(unit.id, { blocks });
       unit.blocks = saved.blocks;
@@ -715,6 +729,7 @@ function mountUnitPlanEditor(
   initialBlocks: Block[],
   options: {
     unit: Unit;
+    curriculum: CurriculumResponse;
     onSave: (blocks: Block[], refresh?: boolean) => Promise<void>;
     attachedOutcomes?: ReturnType<typeof publicOutcomesForPage>;
   }
@@ -729,6 +744,8 @@ function mountUnitPlanEditor(
   let savedRevision = 0;
   let assistant: ReturnType<typeof mountBlockAssistant> | null = null;
   let lastSaveError: unknown = null;
+  let anthologyData: AnthologyData = { items: [], texts: [] };
+  let anthologySnapshots: AnthologySnapshot[] = [];
 
   const root = document.createElement('div');
   root.className = 'unit-plan-editor lesson-builder lesson-builder--no-chat';
@@ -802,11 +819,96 @@ function mountUnitPlanEditor(
     }, 400);
   }
 
+  async function refreshAnthology(): Promise<void> {
+    const snapshots: AnthologySnapshot[] = [];
+    await Promise.all(
+      options.unit.lesson_ids.map(async (lessonId) => {
+        try {
+          const lesson = await apiGet<Lesson>(`/api/lessons/${lessonId}`);
+          const summary = options.curriculum.lessons.find((row) => row.id === lessonId);
+          snapshots.push({
+            lesson_id: lessonId,
+            lesson_title: lesson.title,
+            published: summary?.published === true,
+            blocks: filterBlocksForStudent(lesson.blocks ?? [])
+          });
+        } catch {
+          // Preview stays empty for lessons that fail to load.
+        }
+      })
+    );
+    if (destroyed) return;
+    anthologySnapshots = snapshots;
+    anthologyData = collectAnthology(snapshots, {
+      includeUnpublished: true,
+      lessonOrder: options.unit.lesson_ids
+    });
+    canvas.update(blocks);
+  }
+
+  async function makeCardsFromAnthology(request: {
+    items: AnthologyData['items'];
+  }): Promise<void> {
+    const withTechnique = request.items.filter((item) => item.technique_id);
+    if (withTechnique.length === 0) {
+      window.alert('No technique-tagged notes in this view.');
+      return;
+    }
+    const choices = options.unit.lesson_ids.map((lessonId) => {
+      const summary = options.curriculum.lessons.find((row) => row.id === lessonId);
+      return { value: lessonId, label: summary?.title ?? lessonId };
+    });
+    if (choices.length === 0) {
+      window.alert('Add a lesson to this unit first.');
+      return;
+    }
+    const lessonId = await askSelectCard({
+      title: 'Add flashcards to lesson',
+      choices
+    });
+    if (!lessonId) return;
+
+    const cards = await composeQuoteToTechniqueCards(
+      withTechnique,
+      (item) => {
+        const snapshot = anthologySnapshots.find((row) => row.lesson_id === item.lesson_id);
+        if (!snapshot) return null;
+        return findAnnotationInBlocks(snapshot.blocks, item.block_id, item.annotation_id);
+      },
+      () => nextId()
+    );
+    if (cards.length === 0) {
+      window.alert('Could not compose cards from this view.');
+      return;
+    }
+
+    const chunks = chunkItems(cards, FLASHCARDS_CAP);
+    const lesson = await apiGet<Lesson>(`/api/lessons/${lessonId}`);
+    const nextBlocks = [...(lesson.blocks ?? [])];
+    for (const chunk of chunks) {
+      const fresh = createBlock('flashcards', nextId());
+      if (fresh.block_type !== 'flashcards') continue;
+      fresh.content.cards = chunk;
+      nextBlocks.push(fresh);
+    }
+    await apiPut(`/api/lessons/${lessonId}`, { ...lesson, blocks: nextBlocks });
+    window.alert(
+      `Made ${chunks.length} flashcards block${chunks.length === 1 ? '' : 's'} (${cards.length} cards).`
+    );
+  }
+
   const canvas: BlockCanvasHandle = mountBlockCanvas(canvasHost, {
     blocks,
     allowCollectionAtRoot: true,
     idFactory: () => nextId(),
-    renderPreview: (block) => renderBlock(block, 'teacher', { attachedOutcomes }),
+    renderPreview: (block) =>
+      renderBlock(block, 'teacher', {
+        attachedOutcomes,
+        anthology: anthologyData,
+        onMakeAnthologyCards: (request) => {
+          void makeCardsFromAnthology(request);
+        }
+      }),
     onChange: (next) => {
       blocks = next;
       nextId = nextBlockIdFactory('block_unit', blocks);
@@ -815,6 +917,8 @@ function mountUnitPlanEditor(
       assistant?.changed();
     }
   });
+
+  void refreshAnthology();
 
   assistant = mountBlockAssistant({
     host: root, kind: 'unit', id: options.unit.id,
@@ -827,7 +931,7 @@ function mountUnitPlanEditor(
   });
 
   const palette = mountLessonPalette(railHost, {
-    families: homepagePaletteFamilies(),
+    families: unitPaletteFamilies(),
     onInsert: (payload) => {
       if (payload.kind !== 'block') return;
       canvas.insertType(payload.type);

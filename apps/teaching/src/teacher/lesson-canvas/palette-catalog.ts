@@ -1,6 +1,7 @@
 import {
   HOMEPAGE_BLOCK_GROUPS,
   LESSON_BLOCK_GROUPS,
+  UNIT_PLAN_BLOCK_GROUPS,
   INSERT_MENU_LABEL,
   expandGroupTypesForMenu,
   type InsertMenuValue
@@ -49,6 +50,10 @@ function familiesFromGroups(
 
 export function homepagePaletteFamilies(): PaletteFamily[] {
   return familiesFromGroups(HOMEPAGE_BLOCK_GROUPS);
+}
+
+export function unitPaletteFamilies(): PaletteFamily[] {
+  return familiesFromGroups(UNIT_PLAN_BLOCK_GROUPS);
 }
 
 export function lessonPaletteFamilies(

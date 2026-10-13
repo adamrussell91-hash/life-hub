@@ -32,6 +32,7 @@ import { renderUnitsIndex, renderUnitPage } from '@/teacher/sections/units';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
 import { renderTemplatesPage } from '@/teacher/sections/templates';
 import { renderTrashSection } from '@/teacher/sections/trash';
+import { renderFeedbackSection } from '@/teacher/sections/feedback';
 import { fetchContentSearch } from '@/teacher/search/api';
 import { resolveTodayClassId } from '@/teacher/search/actions';
 import { openSearchPanel } from '@/teacher/search/panel';
@@ -48,6 +49,10 @@ import {
   mountStudentClassView,
   type StudentClassViewHandle
 } from '@/student/class-view';
+import {
+  mountStudentFeedbackView,
+  type StudentFeedbackViewHandle
+} from '@/student/feedback-view';
 import {
   applyCreatedEntity,
   applyCreatedMedia,
@@ -98,6 +103,9 @@ let studentUnitViewHandle: StudentUnitViewHandle | null = null;
 // The student class view mounted for the current public route, if any.
 let studentClassViewHandle: StudentClassViewHandle | null = null;
 
+// The student feedback view mounted for the current public route, if any.
+let studentFeedbackViewHandle: StudentFeedbackViewHandle | null = null;
+
 // Home dashboard handle (clock interval + create control), if mounted.
 let homeHandle: { dispose: () => void } | null = null;
 let chatHandle: { dispose: () => void } | null = null;
@@ -112,6 +120,7 @@ let classPageHandle: { dispose?: () => void } | null = null;
 let unitsIndexHandle: { dispose?: () => void } | null = null;
 let lessonsIndexHandle: { dispose?: () => void } | null = null;
 let trashSectionHandle: { dispose?: () => void } | null = null;
+let feedbackSectionHandle: { dispose?: () => void } | null = null;
 let unitPageHandle: { dispose?: () => void } | null = null;
 /**
  * Flushes any pending/in-flight autosave for the current lesson editor and
@@ -145,6 +154,17 @@ function teardownStudentClassView(): void {
   if (!studentClassViewHandle) return;
   studentClassViewHandle.dispose();
   studentClassViewHandle = null;
+}
+
+function teardownStudentFeedbackView(): void {
+  if (!studentFeedbackViewHandle) return;
+  studentFeedbackViewHandle.dispose();
+  studentFeedbackViewHandle = null;
+}
+
+function teardownFeedbackSection(): void {
+  feedbackSectionHandle?.dispose?.();
+  feedbackSectionHandle = null;
 }
 
 function teardownTeacherCalendar(): void {
@@ -688,6 +708,26 @@ function renderTeacherTrashRoute(token: number): void {
   });
 }
 
+function renderTeacherFeedbackRoute(token: number): void {
+  const refs = mountTeacherShell();
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'feedback', undefined, () => {
+    teardownFeedbackSection();
+    feedbackSectionHandle = renderFeedbackSection(refs.canvas);
+  });
+}
+
+function renderStudentFeedbackRoute(feedbackToken: string, token: number): void {
+  teardownStudentFeedbackView();
+  studentFeedbackViewHandle = mountStudentFeedbackView({
+    root: appRoot,
+    token: feedbackToken,
+    isStale: () => token !== renderToken
+  });
+}
+
 function renderTeacherScopeSequencesRoute(token: number): void {
   const refs = mountTeacherShell();
   renderRailStatus(refs.railNav, 'Loading curriculum…');
@@ -930,6 +970,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'teacher-templates':
       renderTeacherTemplatesRoute(token);
       break;
+    case 'teacher-feedback':
+      renderTeacherFeedbackRoute(token);
+      break;
     case 'teacher-trash':
       renderTeacherTrashRoute(token);
       break;
@@ -963,6 +1006,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'student-class':
       renderStudentClassRoute(match.params.classId, token);
       break;
+    case 'student-feedback':
+      renderStudentFeedbackRoute(match.params.token, token);
+      break;
     case 'not-found':
       renderNotFoundRoute(token);
       break;
@@ -994,10 +1040,12 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   teardownUnitsIndex();
   teardownLessonsIndex();
   teardownTrashSection();
+  teardownFeedbackSection();
   teardownUnitPage();
   teardownStudentLessonView();
   teardownStudentUnitView();
   teardownStudentClassView();
+  teardownStudentFeedbackView();
 
   if (isClassSiteHost() && !isClassSiteStudentRoute(match.name)) {
     renderClassSiteDeadEnd(appRoot);

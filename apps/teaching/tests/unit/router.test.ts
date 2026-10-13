@@ -59,6 +59,21 @@ describe('router match', () => {
     });
   });
 
+  it('matches teacher feedback and public student feedback token', () => {
+    expect(match('/feedback')).toEqual({
+      name: 'teacher-feedback',
+      params: {},
+      requiresAuth: true,
+      path: '/feedback'
+    });
+    expect(match('/s/feedback/tok_abc')).toEqual({
+      name: 'student-feedback',
+      params: { token: 'tok_abc' },
+      requiresAuth: false,
+      path: '/s/feedback/tok_abc'
+    });
+  });
+
   it('matches public student unit view', () => {
     expect(match('/s/units/unit_aotfw')).toEqual({
       name: 'student-unit',

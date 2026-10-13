@@ -37,6 +37,7 @@ export const BlockTypeSchema = z.enum([
   'card_stack',
   'tabs',
   'collection',
+  'anthology',
   'outcomes',
   'annotation'
 ]);
@@ -683,6 +684,28 @@ export const CollectionBlockSchema = z.object({
   ...blockTimestamps
 });
 
+export const AnthologyViewSchema = z.enum(['text', 'theme', 'technique', 'connections']);
+
+/** Plain object — must stay ZodObject for discriminatedUnion leaf lists. */
+export const AnthologyBlockObjectSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('anthology'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().optional(),
+    default_view: AnthologyViewSchema.default('text')
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export type AnthologyBlock = z.infer<typeof AnthologyBlockObjectSchema>;
+export type AnthologyView = z.infer<typeof AnthologyViewSchema>;
+/** Alias kept for docs / imports that name the leaf schema without Object. */
+export const AnthologyBlockSchema = AnthologyBlockObjectSchema;
+
 export const OutcomesBlockSchema = z.object({
   id: z.string().min(1),
   type: z.literal('block'),
@@ -1048,7 +1071,8 @@ const leafBlockSchemas = [
   ConceptMapBlockSchema,
   WhiteboardBlockSchema,
   OutcomesBlockSchema,
-  AnnotationBlockObjectSchema
+  AnnotationBlockObjectSchema,
+  AnthologyBlockObjectSchema
 ] as const;
 
 export const SpacerBlockSchema = z.object({

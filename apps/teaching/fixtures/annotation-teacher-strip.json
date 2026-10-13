@@ -229,6 +229,69 @@
               "approved": false
             }
           ]
+        },
+        {
+          "id": "track_published",
+          "layer_id": "layer_voice",
+          "kind": "think_aloud",
+          "title": "Published think aloud",
+          "audio": {
+            "url": "https://example.com/published.mp3",
+            "duration_s": 8,
+            "mime": "audio/mpeg"
+          },
+          "transcript": {
+            "words": [
+              {
+                "w": "SECRET-TEACHER-NOTE",
+                "start": 0,
+                "end": 0.4
+              },
+              {
+                "w": "word-timing",
+                "start": 0.4,
+                "end": 0.8
+              }
+            ],
+            "timing": "word"
+          },
+          "clips": [
+            {
+              "id": "clip_approved",
+              "start_s": 0,
+              "end_s": 4,
+              "word_range": [0, 1],
+              "source": "quote",
+              "confidence": 0.9,
+              "approved": true,
+              "transcript_text": "Bent double like old beggars"
+            },
+            {
+              "id": "clip_published_unapproved",
+              "start_s": 4,
+              "end_s": 8,
+              "word_range": [1, 2],
+              "source": "ai",
+              "confidence": 0.3,
+              "approved": false,
+              "transcript_text": "SECRET-TEACHER-NOTE published unapproved"
+            }
+          ],
+          "status": "published",
+          "extras": [
+            {
+              "id": "extra_ok",
+              "kind": "where_to_next",
+              "html": "<p>Try tightening the opening.</p>",
+              "approved": true
+            },
+            {
+              "id": "extra_hidden",
+              "kind": "class_note",
+              "html": "<p>SECRET-TEACHER-NOTE published extra</p>",
+              "approved": false
+            }
+          ]
         }
       ],
       "settings": {

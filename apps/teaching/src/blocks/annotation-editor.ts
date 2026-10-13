@@ -8,12 +8,21 @@ import {
   parseAnnotationSource,
   serializeAnnotationSource
 } from '@/blocks/annotation-text';
+import { threadStops } from '@/blocks/annotation-thread';
 import {
   applyTechniqueTag,
   createFamilyLayerFromTable
 } from '@/blocks/annotation-technique';
 import { askTechniquePicker } from '@/blocks/annotation-technique-picker';
 import { blockTypeLabel } from '@/blocks/block-meta';
+import { createBlock } from '@/blocks/create-block';
+import {
+  cardKindsForAnnotation,
+  composeCardFromAnnotation,
+  FLASHCARDS_CAP,
+  listFlashcardTargets,
+  type FlashcardKind
+} from '@/blocks/flashcard-from-annotation';
 import {
   loadLiteraryElements,
   lookupTechnique
@@ -25,16 +34,28 @@ import { parseStartTime, parseVideoInput } from '@/blocks/video-url';
 import { visitBlocks } from '@/blocks/walk-blocks';
 import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
 import {
+  mountVoiceRecorder,
+  type VoiceRecorderHandle
+} from '@/blocks/voice-recorder';
+import {
+  mountVoiceReview,
+  type VoiceReviewHandle
+} from '@/blocks/voice-review';
+import {
   HUB_LIST_ICONS,
   createHubList
 } from '../../design-kit/js/hub-list.js';
+import { applyHubPillsThumb } from '../../design-kit/js/hub-motion.js';
 import type {
+  AnnotationAnchor,
   AnnotationAttachment,
   AnnotationColour,
   AnnotationFamilyKey,
   AnnotationItem,
   AnnotationLayer,
   AnnotationLayerKind,
+  AnnotationThread,
+  AnnotationVoiceTrack,
   Block
 } from '@/schemas/block';
 
@@ -43,7 +64,17 @@ type OnChange = (block: AnnotationBlock) => void;
 
 export type AnnotationEditorContext = {
   getLessonBlocks?: () => Block[];
+  setLessonBlocks?: (blocks: Block[]) => void;
+  lessonId?: string;
 };
+
+function parseTagInput(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
 
 const COLOURS: AnnotationColour[] = [
   'wave',
@@ -73,12 +104,98 @@ const LOCKED_LAYER_KIND_LABEL: Record<'family' | 'teacher' | 'voice', string> = 
   voice: 'Voice'
 };
 
+type ThreadKind = NonNullable<AnnotationThread['kind']>;
+
+const THREAD_KINDS: Array<{ value: ThreadKind; label: string }> = [
+  { value: 'motif', label: 'Motif' },
+  { value: 'opposition', label: 'Opposition' },
+  { value: 'volta', label: 'Volta' },
+  { value: 'echo', label: 'Echo' },
+  { value: 'argument', label: 'Argument' }
+];
+
+type StopRow = {
+  id: string;
+  isPrimary: boolean;
+  anchor: AnnotationAnchor;
+};
+
+type ReanchorStop = {
+  annotationId: string;
+  stopId: string;
+  isPrimary: boolean;
+};
+
 function nextId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function cloneAnnotation(ann: AnnotationItem): AnnotationItem {
+  return {
+    ...ann,
+    anchor: { ...ann.anchor, quote: { ...ann.anchor.quote } },
+    also_anchors: ann.also_anchors?.map((anchor) => ({
+      ...anchor,
+      quote: { ...anchor.quote }
+    })),
+    thread: ann.thread
+      ? {
+          ...ann.thread,
+          anchor_order: ann.thread.anchor_order
+            ? [...ann.thread.anchor_order]
+            : undefined
+        }
+      : undefined,
+    body: { html: ann.body.html, attachments: [...ann.body.attachments] }
+  };
+}
+
+function ensureAnchorId(anchor: AnnotationAnchor, fallbackId: string): AnnotationAnchor {
+  if (anchor.id) return anchor;
+  return { ...anchor, id: fallbackId };
+}
+
+function stopRowsOf(ann: AnnotationItem): StopRow[] {
+  const primaryId = ann.anchor.id ?? `${ann.id}:primary`;
+  const primary: StopRow = {
+    id: primaryId,
+    isPrimary: true,
+    anchor: ensureAnchorId(ann.anchor, primaryId)
+  };
+  const extras = (ann.also_anchors ?? []).map((anchor, index) => {
+    const id = anchor.id ?? `${ann.id}:also_${index}`;
+    return {
+      id,
+      isPrimary: false,
+      anchor: ensureAnchorId(anchor, id)
+    };
+  });
+  const order = ann.thread?.order ?? 'text';
+  if (order === 'custom' && ann.thread?.anchor_order?.length) {
+    const byId = new Map([primary, ...extras].map((row) => [row.id, row]));
+    const ordered: StopRow[] = [];
+    const seen = new Set<string>();
+    for (const id of ann.thread.anchor_order) {
+      const row = byId.get(id);
+      if (!row || seen.has(row.id)) continue;
+      ordered.push(row);
+      seen.add(row.id);
+    }
+    for (const row of [primary, ...extras]) {
+      if (!seen.has(row.id)) ordered.push(row);
+    }
+    return ordered;
+  }
+  return [primary, ...extras];
+}
+
+function clearThreadFields(ann: AnnotationItem): AnnotationItem {
+  const { also_anchors: _also, thread: _thread, ...rest } = ann;
+  return { ...rest, updated_at: nowIso() };
 }
 
 function isTextField(target: EventTarget | null): boolean {
@@ -93,7 +210,7 @@ function isTextField(target: EventTarget | null): boolean {
 /**
  * Teacher editor: poem paste, select-to-annotate, layers / annotations /
  * attachments hub-lists, note panel with rich text, marker / default-layer settings.
- * Technique picker is hidden until 2b.
+ * Thread stops (3c) use the kit list builder beside the poem.
  */
 export function createAnnotationEditorFields(
   block: AnnotationBlock,
@@ -108,13 +225,35 @@ export function createAnnotationEditorFields(
     ...layer,
     sublayers: layer.sublayers?.map((s) => ({ ...s }))
   }));
-  let annotations: AnnotationItem[] = block.content.annotations.map((ann) => ({
-    ...ann,
-    body: { html: ann.body.html, attachments: [...ann.body.attachments] }
+  let annotations: AnnotationItem[] = block.content.annotations.map(cloneAnnotation);
+  let voiceTracks: AnnotationVoiceTrack[] = (block.content.voice_tracks ?? []).map((track) => ({
+    ...track,
+    audio: { ...track.audio },
+    transcript: {
+      timing: track.transcript.timing,
+      words: track.transcript.words.map((w) => ({ ...w }))
+    },
+    taps: track.taps?.map((tap) => ({
+      t: tap.t,
+      anchor: { ...tap.anchor, quote: { ...tap.anchor.quote } }
+    })),
+    clips: track.clips.map((clip) => ({
+      ...clip,
+      word_range: [clip.word_range[0], clip.word_range[1]] as [number, number],
+      anchor: clip.anchor
+        ? { ...clip.anchor, quote: { ...clip.anchor.quote } }
+        : undefined
+    })),
+    extras: track.extras?.map((extra) => ({ ...extra }))
   }));
   let selectedAnnotationId: string | null = annotations[0]?.id ?? null;
   let reanchorId: string | null = null;
+  let reanchorStop: ReanchorStop | null = null;
+  let addingStopForId: string | null = null;
   let placeHint = '';
+  let voiceRecorder: VoiceRecorderHandle | null = null;
+  let voiceReview: VoiceReviewHandle | null = null;
+  let reviewingTrackId: string | null = null;
 
   const title = document.createElement('input');
   title.type = 'text';
@@ -152,6 +291,39 @@ export function createAnnotationEditorFields(
     showMarkers,
     document.createTextNode(' Show markers for hidden layers')
   );
+
+  let blockAnthology = {
+    include: block.content.anthology?.include === true,
+    themes: [...(block.content.anthology?.themes ?? [])],
+    concepts: [...(block.content.anthology?.concepts ?? [])]
+  };
+
+  const blockAnthologyToggle = document.createElement('input');
+  blockAnthologyToggle.type = 'checkbox';
+  blockAnthologyToggle.className = 'block-editor__annotation-anthology-block';
+  blockAnthologyToggle.checked = blockAnthology.include;
+  blockAnthologyToggle.setAttribute('aria-label', 'Add whole text to unit anthology');
+
+  const blockAnthologyLabel = document.createElement('label');
+  blockAnthologyLabel.className = 'block-editor__annotation-anthology-block-label';
+  blockAnthologyLabel.append(
+    blockAnthologyToggle,
+    document.createTextNode(' Add whole text to unit anthology')
+  );
+
+  const blockThemes = document.createElement('input');
+  blockThemes.type = 'text';
+  blockThemes.className = 'block-editor__annotation-anthology-themes';
+  blockThemes.value = blockAnthology.themes.join(', ');
+  blockThemes.placeholder = 'Themes (comma-separated)';
+  blockThemes.setAttribute('aria-label', 'Block anthology themes');
+
+  const blockConcepts = document.createElement('input');
+  blockConcepts.type = 'text';
+  blockConcepts.className = 'block-editor__annotation-anthology-concepts';
+  blockConcepts.value = blockAnthology.concepts.join(', ');
+  blockConcepts.placeholder = 'Concepts (comma-separated)';
+  blockConcepts.setAttribute('aria-label', 'Block anthology concepts');
 
   const defaultLayer = document.createElement('select');
   defaultLayer.className = 'block-editor__annotation-default-layer';
@@ -205,12 +377,20 @@ export function createAnnotationEditorFields(
   notePanel.hidden = true;
   notePanel.setAttribute('aria-label', 'Annotation editor');
 
+  const voicePanel = document.createElement('aside');
+  voicePanel.className = 'block-editor__annotation-voice-panel';
+  voicePanel.hidden = true;
+  voicePanel.setAttribute('aria-label', 'Voice tools');
+
   const orphansHost = document.createElement('div');
   orphansHost.className = 'block-editor__annotation-orphans';
   orphansHost.setAttribute('aria-live', 'polite');
 
   const layersHost = document.createElement('div');
   layersHost.className = 'block-editor__annotation-layers';
+
+  const voiceTracksHost = document.createElement('div');
+  voiceTracksHost.className = 'block-editor__annotation-voice-tracks';
 
   const annotationsHost = document.createElement('div');
   annotationsHost.className = 'block-editor__annotation-annotations';
@@ -247,6 +427,14 @@ export function createAnnotationEditorFields(
     const titleValue = title.value.trim();
     const attributionValue = attribution.value.trim();
     const defaultLayerId = defaultLayer.value.trim();
+    const anthology = blockAnthologyPayload();
+    blockAnthology = {
+      include: anthology?.include === true,
+      themes: [...(anthology?.themes ?? [])],
+      concepts: [...(anthology?.concepts ?? [])]
+    };
+    blockThemes.value = blockAnthology.themes.join(', ');
+    blockConcepts.value = blockAnthology.concepts.join(', ');
     const next: AnnotationBlock = {
       ...latest,
       content: {
@@ -256,6 +444,8 @@ export function createAnnotationEditorFields(
         text,
         layers,
         annotations,
+        voice_tracks: voiceTracks.length > 0 ? voiceTracks : undefined,
+        anthology,
         settings: {
           show_markers: showMarkers.checked,
           ...(defaultLayerId ? { default_layer_id: defaultLayerId } : {})
@@ -268,6 +458,219 @@ export function createAnnotationEditorFields(
     paintOrphans();
     paintNotePanel();
     remountLists();
+    paintVoiceTracks();
+  }
+
+  function voiceLayer(): AnnotationLayer | undefined {
+    return layers.find((layer) => layer.kind === 'voice');
+  }
+
+  function closeVoiceTools(): void {
+    voiceRecorder?.dispose();
+    voiceRecorder = null;
+    voiceReview?.dispose();
+    voiceReview = null;
+    reviewingTrackId = null;
+    voicePanel.replaceChildren();
+    voicePanel.hidden = true;
+  }
+
+  function openVoiceRecorder(): void {
+    const layer = voiceLayer();
+    if (!layer) {
+      placeHint = 'Add a Voice layer before recording.';
+      placeStatus.textContent = placeHint;
+      return;
+    }
+    closeVoiceTools();
+    selectedAnnotationId = null;
+    notePanel.hidden = true;
+    voiceRecorder = mountVoiceRecorder({
+      layerId: layer.id,
+      lessonId: context.lessonId,
+      onTrackReady: (track) => {
+        voiceTracks = [...voiceTracks.filter((row) => row.id !== track.id), track];
+        emitChange();
+        openVoiceReview(track.id);
+      },
+      onCancel: () => {
+        closeVoiceTools();
+        paintVoiceTracks();
+      }
+    });
+    voicePanel.replaceChildren(voiceRecorder.el);
+    voicePanel.hidden = false;
+    placeHint = 'Recording: tap the poem to pin while you speak.';
+    placeStatus.textContent = placeHint;
+  }
+
+  function openVoiceReview(trackId: string): void {
+    const track = voiceTracks.find((row) => row.id === trackId);
+    if (!track) return;
+    voiceRecorder?.dispose();
+    voiceRecorder = null;
+    voiceReview?.dispose();
+    reviewingTrackId = trackId;
+    selectedAnnotationId = null;
+    notePanel.hidden = true;
+    voiceReview = mountVoiceReview({
+      track,
+      text: currentText(),
+      onChange: (next) => {
+        voiceTracks = voiceTracks.map((row) => (row.id === next.id ? next : row));
+        // Avoid full remount loops while typing review actions — patch quietly.
+        const latest = getLatest();
+        onChange({
+          ...latest,
+          content: {
+            ...latest.content,
+            voice_tracks: voiceTracks.length > 0 ? voiceTracks : undefined
+          }
+        });
+        paintVoiceTracks();
+      },
+      onClose: () => {
+        closeVoiceTools();
+        paintVoiceTracks();
+      }
+    });
+    voicePanel.replaceChildren(voiceReview.el);
+    voicePanel.hidden = false;
+  }
+
+  function paintVoiceTracks(): void {
+    voiceTracksHost.replaceChildren();
+    const layer = voiceLayer();
+    if (!layer) return;
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'block-editor__annotation-voice-toolbar';
+    const label = document.createElement('h3');
+    label.className = 'block-editor__annotation-section-title';
+    label.textContent = 'Voice';
+    const recordBtn = document.createElement('button');
+    recordBtn.type = 'button';
+    recordBtn.className = 'btn btn--primary';
+    recordBtn.textContent = 'Record';
+    recordBtn.addEventListener('click', () => openVoiceRecorder());
+    toolbar.append(label, recordBtn);
+    voiceTracksHost.append(toolbar);
+
+    if (voiceTracks.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'block-editor__hint';
+      empty.textContent = 'No recordings yet. Record opens beside the text.';
+      voiceTracksHost.append(empty);
+      return;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'block-editor__annotation-voice-track-list';
+    for (const track of voiceTracks) {
+      const li = document.createElement('li');
+      const meta = document.createElement('span');
+      meta.textContent = `${track.title} · ${track.status} · ${track.kind.replace('_', ' ')}`;
+      const reviewBtn = document.createElement('button');
+      reviewBtn.type = 'button';
+      reviewBtn.className = 'btn btn--secondary';
+      reviewBtn.textContent = 'Review';
+      reviewBtn.addEventListener('click', () => openVoiceReview(track.id));
+      li.append(meta, reviewBtn);
+      list.append(li);
+    }
+    voiceTracksHost.append(list);
+  }
+
+  async function makeCardFromAnnotation(ann: AnnotationItem): Promise<void> {
+    const layer = layers.find((row) => row.id === ann.layer_id);
+    if (layer?.kind === 'teacher') return;
+    const kinds = cardKindsForAnnotation(ann);
+    if (kinds.length === 0) return;
+
+    const kindLabels: Record<FlashcardKind, string> = {
+      quote_to_technique: 'Quote → technique',
+      find_it: 'Find it',
+      line_recall: 'Line recall'
+    };
+    const kind = (await askSelectCard({
+      title: 'Make card',
+      choices: kinds.map((value) => ({ value, label: kindLabels[value] }))
+    })) as FlashcardKind | null;
+    if (!kind) return;
+
+    let fadeLevel: 1 | 2 | undefined;
+    if (kind === 'line_recall') {
+      const level = await askSelectCard({
+        title: 'Fade level',
+        choices: [
+          { value: '1', label: 'First letters' },
+          { value: '2', label: 'First and last words only' }
+        ]
+      });
+      if (!level) return;
+      fadeLevel = level === '2' ? 2 : 1;
+    }
+
+    const lessonBlocks = context.getLessonBlocks?.() ?? [];
+    const targets = listFlashcardTargets(lessonBlocks);
+    const choices = [
+      ...targets.map((row) => ({ value: row.id, label: row.label })),
+      { value: '__new__', label: 'New flashcards block' }
+    ];
+    const targetId = await askSelectCard({ title: 'Add card to', choices });
+    if (!targetId) return;
+
+    const table = await loadLiteraryElements();
+    const cardId = nextId(`${getLatest().id}_card`);
+    const card = composeCardFromAnnotation({
+      annotation: ann,
+      block: {
+        ...getLatest(),
+        content: { ...getLatest().content, layers, annotations }
+      },
+      lessonId: context.lessonId ?? '',
+      kind,
+      fadeLevel,
+      table,
+      cardId
+    });
+    if (!card) {
+      placeHint = 'Could not make that card (technique may be missing).';
+      placeStatus.textContent = placeHint;
+      return;
+    }
+
+    let nextBlocks = [...lessonBlocks];
+    if (targetId === '__new__') {
+      const fresh = createBlock('flashcards', nextId('block_fc'));
+      if (fresh.block_type !== 'flashcards') return;
+      fresh.content.cards = [card];
+      nextBlocks = [...nextBlocks, fresh];
+    } else {
+      const target = targets.find((row) => row.id === targetId);
+      if (!target || target.full) {
+        placeHint = 'That flashcards block is full (20). Choose a new one.';
+        placeStatus.textContent = placeHint;
+        return;
+      }
+      nextBlocks = nextBlocks.map((b) => {
+        if (b.id !== targetId || b.block_type !== 'flashcards') return b;
+        if (b.content.cards.length >= FLASHCARDS_CAP) return b;
+        return {
+          ...b,
+          content: { ...b.content, cards: [...b.content.cards, card] }
+        };
+      });
+    }
+
+    if (context.setLessonBlocks) {
+      context.setLessonBlocks(nextBlocks);
+      placeHint = 'Card added.';
+      placeStatus.textContent = placeHint;
+    } else {
+      placeHint = 'Open this lesson in the builder to save the card.';
+      placeStatus.textContent = placeHint;
+    }
   }
 
   async function paintMissingTechniques(): Promise<void> {
@@ -291,39 +694,157 @@ export function createAnnotationEditorFields(
   }
 
   function paintOrphans(): void {
-    const current = {
+    const current: AnnotationBlock = {
       ...getLatest(),
       content: { ...getLatest().content, text: currentText(), layers, annotations }
     };
     const orphanList = orphans(current);
     orphansHost.replaceChildren();
     void paintMissingTechniques();
-    if (orphanList.length === 0) return;
+
+    type OrphanRow = {
+      key: string;
+      label: string;
+      onPick: () => void;
+    };
+    const rows: OrphanRow[] = orphanList.map((item) => {
+      const preview = htmlToPlainText(item.body.html).slice(0, 80);
+      return {
+        key: item.id,
+        label: preview
+          ? `"${item.anchor.quote.exact}" — ${preview}`
+          : `"${item.anchor.quote.exact}"`,
+        onPick: () => {
+          reanchorStop = null;
+          addingStopForId = null;
+          reanchorId = item.id;
+          selectedAnnotationId = item.id;
+          placeHint = 'Select the text this note should attach to.';
+          placeStatus.textContent = placeHint;
+          paintNotePanel();
+        }
+      };
+    });
+
+    for (const ann of annotations) {
+      if (!(ann.also_anchors?.length ?? 0)) continue;
+      const { orphans: stopOrphans } = threadStops(ann, current);
+      for (const orphan of stopOrphans) {
+        // Primary orphans already appear via orphans(); list extra stops only.
+        if (orphan.isPrimary) continue;
+        const stop = ann.also_anchors?.find((a) => a.id === orphan.anchorId);
+        const quote = stop?.quote.exact ?? orphan.anchorId;
+        rows.push({
+          key: `${ann.id}:${orphan.anchorId}`,
+          label: `"${quote}" — thread stop needs re-anchoring`,
+          onPick: () => {
+            reanchorId = null;
+            addingStopForId = null;
+            reanchorStop = {
+              annotationId: ann.id,
+              stopId: orphan.anchorId,
+              isPrimary: false
+            };
+            selectedAnnotationId = ann.id;
+            placeHint = 'Select the text this stop should attach to.';
+            placeStatus.textContent = placeHint;
+            paintNotePanel();
+          }
+        });
+      }
+    }
+
+    if (rows.length === 0) return;
     const heading = document.createElement('h4');
     heading.className = 'block-editor__annotation-orphans-title';
     heading.textContent = 'Needs re-anchoring';
     const list = document.createElement('ul');
     list.className = 'block-editor__annotation-orphans-list';
-    for (const item of orphanList) {
+    for (const row of rows) {
       const li = document.createElement('li');
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'block-editor__annotation-orphan';
-      const preview = htmlToPlainText(item.body.html).slice(0, 80);
-      btn.textContent = preview
-        ? `"${item.anchor.quote.exact}" — ${preview}`
-        : `"${item.anchor.quote.exact}"`;
-      btn.addEventListener('click', () => {
-        reanchorId = item.id;
-        selectedAnnotationId = item.id;
-        placeHint = 'Select the text this note should attach to.';
-        placeStatus.textContent = placeHint;
-        paintNotePanel();
-      });
+      btn.textContent = row.label;
+      btn.addEventListener('click', row.onPick);
       li.append(btn);
       list.append(li);
     }
     orphansHost.append(heading, list);
+  }
+
+  function blockAnthologyPayload(): AnnotationBlock['content']['anthology'] {
+    const themes = parseTagInput(blockThemes.value);
+    const concepts = parseTagInput(blockConcepts.value);
+    const include = blockAnthologyToggle.checked;
+    if (!include && themes.length === 0 && concepts.length === 0) return undefined;
+    return { include, themes, concepts };
+  }
+
+  function persistQuiet(): void {
+    const latest = getLatest();
+    const defaultLayerId = defaultLayer.value.trim();
+    onChange({
+      ...latest,
+      content: {
+        ...latest.content,
+        title: title.value.trim() || undefined,
+        attribution: attribution.value.trim() || undefined,
+        text: currentText(),
+        layers,
+        annotations,
+        anthology: blockAnthologyPayload(),
+        settings: {
+          show_markers: showMarkers.checked,
+          ...(defaultLayerId ? { default_layer_id: defaultLayerId } : {})
+        }
+      }
+    });
+  }
+
+  function beginAddStop(annotationId: string): void {
+    addingStopForId = annotationId;
+    reanchorId = null;
+    reanchorStop = null;
+    selectedAnnotationId = annotationId;
+    placeHint = 'Select another place for this thread.';
+    placeStatus.textContent = placeHint;
+    paintNotePanel();
+  }
+
+  function applyStopRows(annotationId: string, rows: StopRow[], custom: boolean): void {
+    annotations = annotations.map((ann) => {
+      if (ann.id !== annotationId) return ann;
+      if (rows.length === 0) return ann;
+      // Exactly one primary: prefer the flagged row, else the first.
+      const primaryIndex = Math.max(
+        0,
+        rows.findIndex((row) => row.isPrimary)
+      );
+      const primaryRow = rows[primaryIndex]!;
+      const alsoRows = rows.filter((_, index) => index !== primaryIndex);
+      if (alsoRows.length === 0) {
+        return clearThreadFields({
+          ...ann,
+          anchor: primaryRow.anchor
+        });
+      }
+      const ids = rows.map((row) => row.id);
+      const thread: AnnotationThread = {
+        ...(ann.thread ?? {}),
+        order: custom ? 'custom' : 'text'
+      };
+      if (custom) thread.anchor_order = ids;
+      else delete thread.anchor_order;
+      return {
+        ...ann,
+        anchor: ensureAnchorId(primaryRow.anchor, primaryRow.id),
+        also_anchors: alsoRows.map((row) => ensureAnchorId(row.anchor, row.id)),
+        thread,
+        updated_at: nowIso()
+      };
+    });
+    emitChange();
   }
 
   function applySelection(selection: BuildAnchorSelection): void {
@@ -334,11 +855,59 @@ export function createAnnotationEditorFields(
       placeStatus.textContent = placeHint;
       return;
     }
+
+    if (voiceRecorder?.isCapturing()) {
+      voiceRecorder.pushTap(anchor);
+      return;
+    }
+
     const stamp = nowIso();
+
+    if (reanchorStop) {
+      const target = reanchorStop;
+      annotations = annotations.map((ann) => {
+        if (ann.id !== target.annotationId) return ann;
+        if (target.isPrimary) {
+          return {
+            ...ann,
+            anchor: ensureAnchorId(
+              { ...anchor, note_html: ann.anchor.note_html },
+              ann.anchor.id ?? target.stopId
+            ),
+            updated_at: stamp
+          };
+        }
+        return {
+          ...ann,
+          also_anchors: (ann.also_anchors ?? []).map((row) =>
+            row.id === target.stopId
+              ? ensureAnchorId(
+                  { ...anchor, note_html: row.note_html, id: target.stopId },
+                  target.stopId
+                )
+              : row
+          ),
+          updated_at: stamp
+        };
+      });
+      selectedAnnotationId = target.annotationId;
+      reanchorStop = null;
+      placeHint = '';
+      emitChange();
+      return;
+    }
+
     if (reanchorId) {
       annotations = annotations.map((ann) =>
         ann.id === reanchorId
-          ? { ...ann, anchor, updated_at: stamp }
+          ? {
+              ...ann,
+              anchor: ensureAnchorId(
+                { ...anchor, note_html: ann.anchor.note_html },
+                ann.anchor.id ?? `${ann.id}:primary`
+              ),
+              updated_at: stamp
+            }
           : ann
       );
       selectedAnnotationId = reanchorId;
@@ -347,6 +916,43 @@ export function createAnnotationEditorFields(
       emitChange();
       return;
     }
+
+    if (addingStopForId) {
+      const targetId = addingStopForId;
+      annotations = annotations.map((ann) => {
+        if (ann.id !== targetId) return ann;
+        const primary = ensureAnchorId(ann.anchor, `${ann.id}:primary`);
+        const stopId = nextId(`${ann.id}_stop`);
+        const nextAlso = [...(ann.also_anchors ?? []), { ...anchor, id: stopId }];
+        return {
+          ...ann,
+          anchor: primary,
+          also_anchors: nextAlso,
+          thread: {
+            ...(ann.thread ?? {}),
+            order: ann.thread?.order ?? 'text',
+            ...(ann.thread?.order === 'custom'
+              ? {
+                  anchor_order: [
+                    ...(ann.thread.anchor_order ?? [
+                      primary.id!,
+                      ...nextAlso.slice(0, -1).map((row) => row.id!)
+                    ]),
+                    stopId
+                  ]
+                }
+              : {})
+          },
+          updated_at: stamp
+        };
+      });
+      selectedAnnotationId = targetId;
+      addingStopForId = null;
+      placeHint = '';
+      emitChange();
+      return;
+    }
+
     const layer = ensureLayer();
     const id = nextId(`${getLatest().id}_ann`);
     const item: AnnotationItem = {
@@ -634,26 +1240,57 @@ export function createAnnotationEditorFields(
             : ann
         );
         // Autosave without remounting the panel (I9, V7, I12).
-        const latest = getLatest();
-        const defaultLayerId = defaultLayer.value.trim();
-        onChange({
-          ...latest,
-          content: {
-            ...latest.content,
-            title: title.value.trim() || undefined,
-            attribution: attribution.value.trim() || undefined,
-            text: currentText(),
-            layers,
-            annotations,
-            settings: {
-              show_markers: showMarkers.checked,
-              ...(defaultLayerId ? { default_layer_id: defaultLayerId } : {})
-            }
-          }
-        });
+        persistQuiet();
       }
     });
     tipTap.host.classList.add('block-editor__annotation-body');
+
+    const anthologyHost = document.createElement('div');
+    anthologyHost.className = 'block-editor__annotation-anthology';
+    const includeToggle = document.createElement('input');
+    includeToggle.type = 'checkbox';
+    includeToggle.className = 'block-editor__annotation-anthology-include';
+    includeToggle.checked = selected.anthology?.include === true;
+    includeToggle.setAttribute('aria-label', 'Add to unit anthology');
+    const includeLabel = document.createElement('label');
+    includeLabel.className = 'block-editor__annotation-anthology-label';
+    includeLabel.append(includeToggle, document.createTextNode(' Add to unit anthology'));
+    const themesInput = document.createElement('input');
+    themesInput.type = 'text';
+    themesInput.className = 'block-editor__annotation-anthology-themes';
+    themesInput.value = (selected.anthology?.themes ?? []).join(', ');
+    themesInput.placeholder = 'Themes (comma-separated)';
+    themesInput.setAttribute('aria-label', 'Anthology themes');
+    const conceptsInput = document.createElement('input');
+    conceptsInput.type = 'text';
+    conceptsInput.className = 'block-editor__annotation-anthology-concepts';
+    conceptsInput.value = (selected.anthology?.concepts ?? []).join(', ');
+    conceptsInput.placeholder = 'Concepts (comma-separated)';
+    conceptsInput.setAttribute('aria-label', 'Anthology concepts');
+    const patchAnthology = () => {
+      const themes = parseTagInput(themesInput.value);
+      const concepts = parseTagInput(conceptsInput.value);
+      const include = includeToggle.checked;
+      themesInput.value = themes.join(', ');
+      conceptsInput.value = concepts.join(', ');
+      annotations = annotations.map((ann) =>
+        ann.id === selected.id
+          ? {
+              ...ann,
+              anthology:
+                include || themes.length > 0 || concepts.length > 0
+                  ? { include, themes, concepts }
+                  : undefined,
+              updated_at: nowIso()
+            }
+          : ann
+      );
+      emitChange();
+    };
+    includeToggle.addEventListener('change', patchAnthology);
+    themesInput.addEventListener('change', patchAnthology);
+    conceptsInput.addEventListener('change', patchAnthology);
+    anthologyHost.append(includeLabel, themesInput, conceptsInput);
 
     techniquePicker.replaceChildren();
     const techBtn = document.createElement('button');
@@ -806,7 +1443,183 @@ export function createAnnotationEditorFields(
       );
     }
 
-    notePanel.append(header, layerLabel, bodyLabel, tipTap.host, techniquePicker, attachmentsHost);
+    const threadHost = document.createElement('div');
+    threadHost.className = 'block-editor__annotation-thread';
+
+    const addPlace = document.createElement('button');
+    addPlace.type = 'button';
+    addPlace.className = 'block-editor__annotation-add-place';
+    addPlace.textContent =
+      addingStopForId === selected.id ? 'Selecting another place…' : 'Add another place';
+    addPlace.disabled = addingStopForId === selected.id;
+    addPlace.addEventListener('click', () => beginAddStop(selected.id));
+    threadHost.append(addPlace);
+
+    const isThread = (selected.also_anchors?.length ?? 0) > 0;
+    if (isThread) {
+      const kindLabel = document.createElement('p');
+      kindLabel.className = 'block-editor__hint';
+      kindLabel.textContent = 'Thread kind';
+
+      const kindPills = document.createElement('div');
+      kindPills.className = 'hub-pills block-editor__annotation-thread-kind';
+      kindPills.setAttribute('role', 'group');
+      kindPills.setAttribute('aria-label', 'Thread kind');
+      const activeKind = selected.thread?.kind;
+      for (const option of THREAD_KINDS) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'hub-pills__btn';
+        btn.textContent = option.label;
+        btn.setAttribute('aria-pressed', String(option.value === activeKind));
+        if (option.value === activeKind) btn.classList.add('is-active');
+        btn.addEventListener('click', () => {
+          annotations = annotations.map((ann) =>
+            ann.id === selected.id
+              ? {
+                  ...ann,
+                  thread: { ...(ann.thread ?? { order: 'text' }), kind: option.value },
+                  updated_at: nowIso()
+                }
+              : ann
+          );
+          emitChange();
+        });
+        kindPills.append(btn);
+      }
+      requestAnimationFrame(() => applyHubPillsThumb(kindPills));
+
+      const stopsHost = document.createElement('div');
+      stopsHost.className = 'block-editor__annotation-stops';
+      const rows = stopRowsOf(selected);
+      const stopList = createHubList<StopRow>({
+        items: rows,
+        noun: 'stop',
+        label: 'Thread stops',
+        getKey: (row) => row.id,
+        itemLabel: (row, index) =>
+          row.isPrimary ? `Primary · stop ${index + 1}` : `Stop ${index + 1}`,
+        describe: (row) => row.anchor.quote.exact.slice(0, 40) || 'Stop',
+        min: 1,
+        max: 25,
+        insertBetween: false,
+        create: () => {
+          beginAddStop(selected.id);
+          return null as unknown as StopRow;
+        },
+        read: () => {
+          const live = annotations.find((ann) => ann.id === selected.id);
+          return live ? stopRowsOf(live) : rows;
+        },
+        onChange: (next) => {
+          if (next.length <= 1) {
+            applyStopRows(selected.id, next, false);
+            return;
+          }
+          const prevIds = rows.map((row) => row.id);
+          const nextIds = next.map((row) => row.id);
+          const sameSet =
+            prevIds.length === nextIds.length &&
+            prevIds.every((id) => nextIds.includes(id));
+          const reordered = sameSet && prevIds.join() !== nextIds.join();
+          const keepCustom = selected.thread?.order === 'custom';
+          applyStopRows(
+            selected.id,
+            next,
+            reordered || (keepCustom && nextIds.length > 1)
+          );
+        },
+        extraMenuItems: () => {
+          if (selected.thread?.order !== 'custom') return [];
+          return [
+            {
+              label: 'Back to text order',
+              dataset: { listAction: 'text-order' },
+              onSelect: () => {
+                annotations = annotations.map((ann) => {
+                  if (ann.id !== selected.id || !ann.thread) return ann;
+                  const thread: AnnotationThread = {
+                    ...ann.thread,
+                    order: 'text'
+                  };
+                  delete thread.anchor_order;
+                  return { ...ann, thread, updated_at: nowIso() };
+                });
+                emitChange();
+              }
+            }
+          ];
+        },
+        renderItem: (row) => {
+          const wrap = document.createElement('div');
+          wrap.className = 'block-editor__annotation-stop';
+          const quote = document.createElement('p');
+          quote.className = 'block-editor__hint';
+          quote.textContent = `"${row.anchor.quote.exact}"${row.isPrimary ? ' · primary' : ''}`;
+          const note = document.createElement('textarea');
+          note.className = 'block-editor__annotation-stop-note';
+          note.rows = 2;
+          note.setAttribute('aria-label', 'Stop note');
+          note.placeholder = 'Optional stop note';
+          note.value = htmlToPlainText(row.anchor.note_html ?? '');
+          note.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') event.stopPropagation();
+          });
+          note.addEventListener('input', () => {
+            const noteHtml = note.value;
+            annotations = annotations.map((ann) => {
+              if (ann.id !== selected.id) return ann;
+              if (row.isPrimary) {
+                return {
+                  ...ann,
+                  anchor: { ...ann.anchor, note_html: noteHtml || undefined },
+                  updated_at: nowIso()
+                };
+              }
+              return {
+                ...ann,
+                also_anchors: (ann.also_anchors ?? []).map((anchor) =>
+                  anchor.id === row.id
+                    ? { ...anchor, note_html: noteHtml || undefined }
+                    : anchor
+                ),
+                updated_at: nowIso()
+              };
+            });
+            // Quiet save — remounting the panel would steal focus (I12 / V7).
+            persistQuiet();
+          });
+          wrap.append(quote, note);
+          return wrap;
+        }
+      });
+      stopList.el.classList.add('block-editor__annotation-stop-list');
+      const addStopBtn = stopList.el.querySelector<HTMLButtonElement>('.hub-list__add');
+      if (addStopBtn) {
+        addStopBtn.addEventListener(
+          'click',
+          (event) => {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            beginAddStop(selected.id);
+          },
+          true
+        );
+      }
+      stopsHost.append(stopList.el);
+      threadHost.append(kindLabel, kindPills, stopsHost);
+    }
+
+    notePanel.append(
+      header,
+      layerLabel,
+      bodyLabel,
+      tipTap.host,
+      anthologyHost,
+      techniquePicker,
+      threadHost,
+      attachmentsHost
+    );
     notePanel.scrollTop = panelScroll;
   }
 
@@ -892,17 +1705,29 @@ export function createAnnotationEditorFields(
           kind.append(opt);
           kind.disabled = true;
         } else {
-          for (const value of ['free', 'lens', 'teacher'] as const) {
+          for (const value of ['free', 'lens', 'teacher', 'voice'] as const) {
             if (
               value === 'teacher' &&
               layers.some((l) => l.kind === 'teacher' && l.id !== layer.id)
             ) {
               continue;
             }
+            if (
+              value === 'voice' &&
+              layers.some((l) => l.kind === 'voice' && l.id !== layer.id)
+            ) {
+              continue;
+            }
             const opt = document.createElement('option');
             opt.value = value;
             opt.textContent =
-              value === 'free' ? 'Free' : value === 'lens' ? 'Lens' : 'Teacher notes';
+              value === 'free'
+                ? 'Free'
+                : value === 'lens'
+                  ? 'Lens'
+                  : value === 'teacher'
+                    ? 'Teacher notes'
+                    : 'Voice';
             opt.selected = layer.kind === value;
             kind.append(opt);
           }
@@ -954,6 +1779,9 @@ export function createAnnotationEditorFields(
           ];
           if (!layers.some((l) => l.kind === 'teacher')) {
             kindChoices.push({ value: 'teacher', label: 'Teacher notes' });
+          }
+          if (!layers.some((l) => l.kind === 'voice')) {
+            kindChoices.push({ value: 'voice', label: 'Voice' });
           }
           const kind =
             (await askSelectCard({ title: 'Layer kind', choices: kindChoices })) ??
@@ -1074,6 +1902,39 @@ export function createAnnotationEditorFields(
         }
         emitChange();
       },
+      extraMenuItems: (ann, index) => {
+        const items: Array<{
+          label: string;
+          onSelect: () => void;
+        }> = [];
+        if (index === 0) {
+          items.push({
+            label: 'Include all my notes',
+            onSelect: () => {
+              annotations = annotations.map((row) => ({
+                ...row,
+                anthology: {
+                  include: true,
+                  themes: [...(row.anthology?.themes ?? [])],
+                  concepts: [...(row.anthology?.concepts ?? [])]
+                },
+                updated_at: nowIso()
+              }));
+              emitChange();
+            }
+          });
+        }
+        const layer = layers.find((row) => row.id === ann.layer_id);
+        if (layer?.kind !== 'teacher' && cardKindsForAnnotation(ann).length > 0) {
+          items.push({
+            label: 'Make card…',
+            onSelect: () => {
+              void makeCardFromAnnotation(ann);
+            }
+          });
+        }
+        return items;
+      },
       renderItem: (ann) => {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -1103,25 +1964,33 @@ export function createAnnotationEditorFields(
   source.addEventListener('input', emitChange);
   proseToggle.addEventListener('change', emitChange);
   showMarkers.addEventListener('change', emitChange);
+  blockAnthologyToggle.addEventListener('change', emitChange);
+  blockThemes.addEventListener('change', emitChange);
+  blockConcepts.addEventListener('change', emitChange);
   defaultLayer.addEventListener('change', emitChange);
 
   paintSelectSurface();
   paintOrphans();
   remountLists();
   paintNotePanel();
+  paintVoiceTracks();
 
-  workspace.append(selectSurface, notePanel);
+  workspace.append(selectSurface, notePanel, voicePanel);
   fields.append(
     title,
     attribution,
     proseLabel,
     showMarkersLabel,
+    blockAnthologyLabel,
+    blockThemes,
+    blockConcepts,
     defaultLayer,
     source,
     hint,
     placeStatus,
     workspace,
     layersHost,
+    voiceTracksHost,
     annotationsHost,
     orphansHost,
     missingTechniqueHost

@@ -78,6 +78,7 @@ import {
 import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
 import { toPublicOutcome } from '../src/curriculum/outcome-catalog';
 import { attachedOutcomeIds } from '../src/curriculum/outcome-ids';
+import { collectAnthology } from '../src/blocks/anthology-collect';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
 import { sanitizeBlocksDeep } from '../src/blocks/sanitize-blocks';
 import { isLinkedSection } from '../src/blocks/composition-link';
@@ -1137,11 +1138,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
 
     const matching: { lesson_id: string; title: string }[] = [];
+    const anthologySnapshots: Array<{
+      lesson_id: string;
+      lesson_title: string;
+      published: boolean;
+      blocks: import('../src/schemas/block').Block[];
+    }> = [];
     for (const key of store.listKeys('published/lessons/')) {
       const snapshot = store.getJSON<{
         lesson_id?: string;
         title?: string;
         unit_id?: string;
+        blocks?: import('../src/schemas/block').Block[];
       }>(key);
       if (
         snapshot &&
@@ -1154,6 +1162,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         matching.push({
           lesson_id: snapshot.lesson_id,
           title: snapshot.title
+        });
+        anthologySnapshots.push({
+          lesson_id: snapshot.lesson_id,
+          lesson_title: snapshot.title,
+          published: true,
+          blocks: Array.isArray(snapshot.blocks) ? snapshot.blocks : []
         });
       }
     }
@@ -1182,6 +1196,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const studentBlocks = sanitizeBlocksDeep(
       filterBlocksForStudent(unitParsed.success ? (unitParsed.data.blocks ?? []) : [])
     );
+    const anthology = collectAnthology(anthologySnapshots, {
+      lessonOrder: Array.isArray(unit.lesson_ids) ? unit.lesson_ids : []
+    });
 
     const ids = attachedOutcomeIds({ outcome_ids: unit.outcome_ids });
     const outcomes = ids
@@ -1197,6 +1214,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? { cover: unitParsed.data.cover }
         : {}),
       blocks: studentBlocks,
+      anthology,
       outcome_ids: ids,
       outcomes
     });

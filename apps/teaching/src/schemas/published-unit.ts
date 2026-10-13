@@ -7,12 +7,52 @@ export const PublishedUnitLessonSummarySchema = z.object({
   title: z.string().min(1)
 });
 
+export const PublishedAnthologyItemSchema = z.object({
+  lesson_id: z.string().min(1),
+  lesson_title: z.string().min(1),
+  block_id: z.string().min(1),
+  annotation_id: z.string().min(1),
+  quote: z.string(),
+  line_number: z.number().int().min(0),
+  layer_name: z.string(),
+  technique_id: z.string().optional(),
+  themes: z.array(z.string()),
+  concepts: z.array(z.string())
+});
+
+export const PublishedAnthologyTextSchema = z.object({
+  lesson_id: z.string().min(1),
+  block_id: z.string().min(1),
+  title: z.string().min(1),
+  attribution: z.string().optional(),
+  fingerprint: z.record(z.string(), z.number().int().min(0)),
+  text_included: z.boolean(),
+  poem: z
+    .object({
+      kind: z.enum(['verse', 'prose']),
+      stanzas: z.array(
+        z.object({
+          id: z.string().min(1),
+          lines: z.array(z.object({ id: z.string().min(1), text: z.string() }))
+        })
+      )
+    })
+    .optional(),
+  stop_lines: z.record(z.string(), z.string()).optional()
+});
+
+export const PublishedAnthologySchema = z.object({
+  items: z.array(PublishedAnthologyItemSchema),
+  texts: z.array(PublishedAnthologyTextSchema)
+});
+
 export const PublishedUnitSchema = z.object({
   unit_id: z.string().min(1),
   title: z.string().min(1),
   lessons: z.array(PublishedUnitLessonSummarySchema),
   cover: CoverSchema.optional(),
   blocks: z.array(BlockSchema).optional(),
+  anthology: PublishedAnthologySchema.optional(),
   outcome_ids: z.array(z.string().min(1)).max(24).optional()
 });
 

@@ -4,8 +4,10 @@ import { readdir, readFile } from 'node:fs/promises';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createAiJobsTickScheduledHandler } from '../../netlify/functions/ai-jobs-tick-scheduled.mjs';
 import {
+  ANNOTATION_VOICE_TRANSCRIBE_KIND,
   jobIsStale,
   isScheduledTickRequest,
+  processAnnotationVoiceTranscribeJobs,
   runScheduledJobsTick,
   selectMidnightTidyIds,
   STALE_WORKING_JOB_MS
@@ -37,10 +39,60 @@ function memoryStore(entries = {}) {
       map.set(key, value);
     },
     async set(key, value) {
-      map.set(key, typeof value === 'string' ? JSON.parse(value) : value);
+      map.set(key, value);
+    },
+    async getWithMetadata(key, options = {}) {
+      const value = map.get(key);
+      if (value == null) return null;
+      if (options.type === 'arrayBuffer') {
+        const data = value instanceof ArrayBuffer ? value : Buffer.from(String(value));
+        return { data, metadata: { contentType: 'audio/webm' } };
+      }
+      return { data: value, metadata: null };
     }
   };
 }
+
+test('processAnnotationVoiceTranscribeJobs calls kernel and stores whisper JSON', async () => {
+  const audio = Buffer.from('fake-audio');
+  const store = memoryStore({
+    'meta/ai_jobs_inbox': {
+      jobs: [
+        {
+          id: 'ai_job_voice',
+          kind: ANNOTATION_VOICE_TRANSCRIBE_KIND,
+          status: 'working',
+          created_at: '2026-10-13T00:00:00.000Z'
+        }
+      ]
+    },
+    'ai_jobs/ai_job_voice': {
+      id: 'ai_job_voice',
+      kind: ANNOTATION_VOICE_TRANSCRIBE_KIND,
+      status: 'working',
+      phase: 'queued',
+      media_id: 'media_1',
+      attempts: 0,
+      created_at: '2026-10-13T00:00:00.000Z'
+    },
+    'media_files/media_1': audio
+  });
+  const result = await processAnnotationVoiceTranscribeJobs({
+    store,
+    env: { ...env, RESEARCH_KERNEL_SHARED_SECRET: 'kernel' },
+    nowIso: () => '2026-10-13T00:01:00.000Z',
+    knowledgeFetch: async () =>
+      new Response(JSON.stringify({ text: 'alpha', words: [{ word: 'alpha', start: 0, end: 0.4 }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+  });
+  assert.deepEqual(result.processed, ['ai_job_voice']);
+  const job = await store.get('ai_jobs/ai_job_voice', { type: 'json' });
+  assert.equal(job.status, 'done');
+  assert.equal(job.phase, 'ready');
+  assert.equal(job.result.whisper.text, 'alpha');
+});
 
 test('working AI jobs go stale after ten minutes', () => {
   assert.equal(jobIsStale({ status: 'working', created_at: '2026-09-06T00:00:00.000Z' }, Date.parse('2026-09-06T00:09:00.000Z')), false);

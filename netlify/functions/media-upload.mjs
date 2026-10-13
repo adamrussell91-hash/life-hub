@@ -24,6 +24,9 @@ export const ALLOWED_MEDIA_MIME = new Set([
   'application/pdf',
   'audio/mpeg',
   'audio/wav',
+  'audio/webm',
+  'audio/mp4',
+  'audio/ogg',
   'application/zip',
   'text/plain'
 ]);
