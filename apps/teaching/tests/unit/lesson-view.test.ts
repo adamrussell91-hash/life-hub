@@ -103,7 +103,7 @@ describe('mountStudentLessonView', () => {
     document.body.replaceChildren();
   });
 
-  it('renders Back to unit linking to /s/units/{unit_id}', async () => {
+  it('does not expose unit navigation from a direct student lesson', async () => {
     vi.mocked(apiGet).mockResolvedValue({
       lesson_id: 'lesson_aotfw_008',
       title: 'Memory',
@@ -121,9 +121,10 @@ describe('mountStudentLessonView', () => {
       const link = root.querySelector(
         'a.student-surface__back'
       ) as HTMLAnchorElement | null;
-      expect(link).toBeTruthy();
-      expect(link?.textContent).toBe('Back to unit');
-      expect(link?.getAttribute('href')).toBe('https://class.adam-russell.com/s/units/unit_aotfw');
+      expect(root.textContent).toContain('Memory');
+      expect(link).toBeNull();
+      expect(root.querySelector('a[href*="/s/units/"]')).toBeNull();
+      expect(root.textContent).not.toContain('Back to unit');
     });
   });
 
@@ -141,20 +142,21 @@ describe('mountStudentLessonView', () => {
     expect(root.querySelector('a.student-surface__back')).toBeNull();
   });
 
-  it('bare mount still has only Back to unit and no footer nav', async () => {
+  it('bare mount has no unit link or footer nav', async () => {
     vi.mocked(apiGet).mockResolvedValue(publishedLesson());
     const root = document.createElement('div');
     document.body.append(root);
     mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
 
     await vi.waitFor(() => {
-      expect(root.querySelector('a.student-surface__back')?.textContent).toBe('Back to unit');
+      expect(root.textContent).toContain('Memory');
+      expect(root.querySelector('a.student-surface__back')).toBeNull();
     });
     expect(root.querySelector('.student-lesson__nav')).toBeNull();
     expect(root.querySelector('a.student-surface__back-class')).toBeNull();
   });
 
-  it('class-scoped mount shows Back to class, Back to unit, and footer neighbors', async () => {
+  it('class-scoped mount keeps class and neighbor navigation without a unit link', async () => {
     vi.stubGlobal('location', new URL('https://class.adam-russell.com/s/lessons/lesson_aotfw_008'));
     vi.mocked(apiGet).mockImplementation(async (path: string) => {
       if (path.includes('/published/classes/')) return publishedClass();
@@ -174,9 +176,9 @@ describe('mountStudentLessonView', () => {
       expect(root.querySelector('a.student-surface__back-class')?.getAttribute('href')).toBe(
         `https://class.adam-russell.com/s/classes/${CLASS_ID}`
       );
-      expect(root.querySelector('a.student-surface__back-unit')?.getAttribute('href')).toBe(
-        'https://class.adam-russell.com/s/units/unit_aotfw'
-      );
+      expect(root.querySelector('a.student-surface__back-unit')).toBeNull();
+      expect(root.querySelector('a[href*="/s/units/"]')).toBeNull();
+      expect(root.textContent).not.toContain('Back to unit');
     });
 
     const prev = root.querySelector('a.student-lesson__nav-prev') as HTMLAnchorElement;
