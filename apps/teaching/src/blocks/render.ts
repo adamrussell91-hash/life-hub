@@ -6,6 +6,7 @@ import { renderGraphView } from '../../../../packages/graph-blocks';
 import { mountHubWhiteboard } from '@/blocks/whiteboard-runtime';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildHtmlAppSrcdoc } from '@/blocks/html-app-srcdoc';
+import { buildAnnotationView } from '@/blocks/annotation-view';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
@@ -2082,6 +2083,14 @@ export function renderConceptMapBlock(
   return wrapBlock(root, block, mode);
 }
 
+
+export function renderAnnotationBlock(
+  block: Extract<Block, { block_type: 'annotation' }>,
+  mode: RenderMode
+): HTMLElement {
+  return wrapBlock(buildAnnotationView(block, mode), block, mode);
+}
+
 export function renderBlock(
   block: Block,
   mode: RenderMode,
@@ -2159,6 +2168,8 @@ export function renderBlock(
       return renderConceptMapBlock(block, mode);
     case 'whiteboard':
       return renderWhiteboardBlock(block, mode);
+    case 'annotation':
+      return renderAnnotationBlock(block, mode);
     }
   } catch {
     const fallback = document.createElement('p');

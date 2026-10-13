@@ -40,7 +40,8 @@ export const NEW_BLOCK_TYPES = [
   'card_stack',
   'tabs',
   'collection',
-  'outcomes'
+  'outcomes',
+  'annotation'
 ] as const;
 
 export type NewBlockType = (typeof NEW_BLOCK_TYPES)[number];
@@ -80,7 +81,8 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   card_stack: 'Card stack',
   tabs: 'Tabs',
   collection: 'Collection',
-  outcomes: 'Outcomes'
+  outcomes: 'Outcomes',
+  annotation: 'Annotation'
 };
 
 export const EMBED_INSERT_PRESETS = [
@@ -139,7 +141,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Learning',
-    types: ['question_set', 'flashcards', 'cloze', 'self_check']
+    types: ['question_set', 'flashcards', 'cloze', 'self_check', 'annotation']
   },
   {
     label: 'Visualisation',
@@ -155,7 +157,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
 export const HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
-    (type) => !['flashcards', 'cloze', 'self_check', 'outcomes'].includes(type)
+    (type) => !['flashcards', 'cloze', 'self_check', 'outcomes', 'annotation'].includes(type)
   )
 })).filter((group) => group.types.length > 0);
 
@@ -538,6 +540,21 @@ export function createBlock(type: NewBlockType, id: string): Block {
         variant: 'medium',
         content: {}
       };
+    case 'annotation':
+      return {
+        ...shared,
+        block_type: 'annotation',
+        variant: 'medium',
+        content: {
+          text: {
+            kind: 'verse',
+            stanzas: [{ id: `${id}_stanza_1`, lines: [{ id: `${id}_line_1`, text: '' }] }]
+          },
+          layers: [],
+          annotations: [],
+          settings: { show_markers: true }
+        }
+      };
   }
 }
 
@@ -654,6 +671,64 @@ export function cloneBlockWithNewIds(
         from: idMap.get(edge.from) ?? edge.from,
         to: idMap.get(edge.to) ?? edge.to
       }))
+    };
+  } else if (cloned.block_type === 'annotation') {
+    const stanzaMap = new Map<string, string>();
+    const lineMap = new Map<string, string>();
+    const layerMap = new Map<string, string>();
+    const sublayerMap = new Map<string, string>();
+    cloned.content = {
+      ...cloned.content,
+      text: {
+        ...cloned.content.text,
+        stanzas: cloned.content.text.stanzas.map((stanza) => {
+          const stanzaId = nextId();
+          stanzaMap.set(stanza.id, stanzaId);
+          return {
+            id: stanzaId,
+            lines: stanza.lines.map((line) => {
+              const lineId = nextId();
+              lineMap.set(line.id, lineId);
+              return { ...line, id: lineId };
+            })
+          };
+        })
+      },
+      layers: cloned.content.layers.map((layer) => {
+        const layerId = nextId();
+        layerMap.set(layer.id, layerId);
+        return {
+          ...layer,
+          id: layerId,
+          sublayers: layer.sublayers?.map((sub) => {
+            const subId = nextId();
+            sublayerMap.set(sub.id, subId);
+            return { ...sub, id: subId };
+          })
+        };
+      }),
+      annotations: cloned.content.annotations.map((ann) => ({
+        ...ann,
+        id: nextId(),
+        layer_id: layerMap.get(ann.layer_id) ?? ann.layer_id,
+        sublayer_id: ann.sublayer_id
+          ? (sublayerMap.get(ann.sublayer_id) ?? ann.sublayer_id)
+          : undefined,
+        anchor: {
+          ...ann.anchor,
+          stanza: stanzaMap.get(ann.anchor.stanza) ?? ann.anchor.stanza,
+          line: ann.anchor.line ? (lineMap.get(ann.anchor.line) ?? ann.anchor.line) : undefined
+        },
+        created_at: stamp,
+        updated_at: stamp
+      })),
+      settings: {
+        ...cloned.content.settings,
+        default_layer_id: cloned.content.settings.default_layer_id
+          ? (layerMap.get(cloned.content.settings.default_layer_id) ??
+            cloned.content.settings.default_layer_id)
+          : undefined
+      }
     };
   }
   return cloned;

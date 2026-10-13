@@ -352,9 +352,11 @@ describe('blockRegistry', () => {
   it('maps every block_type to render and editor helpers', () => {
     expect(Object.keys(blockRegistry).sort()).toEqual([
       'accordion',
+      'annotation',
       'attachment',
       'audio',
       'callout',
+      'card_stack',
       'chart',
       'cloze',
       'code',

@@ -80,6 +80,24 @@ export function sanitizeBlocksDeep(blocks) {
         content: { html: sanitizeRichTextHtml(block.content?.html) }
       };
     }
+    if (block.block_type === 'annotation') {
+      const annotations = Array.isArray(block.content?.annotations)
+        ? block.content.annotations.map(ann => ({
+            ...ann,
+            body: {
+              ...ann.body,
+              html: sanitizeRichTextHtml(ann.body?.html)
+            }
+          }))
+        : [];
+      return {
+        ...block,
+        content: {
+          ...block.content,
+          annotations
+        }
+      };
+    }
     if (block.block_type === 'section') {
       return {
         ...block,

@@ -14,6 +14,21 @@ export function sanitizeBlocksDeep(blocks: Block[]): Block[] {
         content: { html: sanitizeRichTextHtml(block.content.html) }
       };
     }
+    if (block.block_type === 'annotation') {
+      return {
+        ...block,
+        content: {
+          ...block.content,
+          annotations: block.content.annotations.map((ann) => ({
+            ...ann,
+            body: {
+              ...ann.body,
+              html: sanitizeRichTextHtml(ann.body.html)
+            }
+          }))
+        }
+      };
+    }
     if (block.block_type === 'diagram' && block.content.svg_markup != null) {
       return {
         ...block,
