@@ -9,6 +9,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const seedFixture = JSON.parse(
   readFileSync(join(__dirname, '../../fixtures/seed.json'), 'utf-8')
 ) as SeedData;
+const teacherStripFixture = JSON.parse(
+  readFileSync(join(__dirname, '../../fixtures/annotation-teacher-strip.json'), 'utf-8')
+) as {
+  sentinel: string;
+  teacher_layer_id: string;
+  teacher_only_block_id: string;
+  annotation: Record<string, unknown>;
+  teacher_only_block: Record<string, unknown>;
+  ok_block: Record<string, unknown>;
+};
 
 const PASSPHRASE = 'teaching-hub-local';
 const LESSON_ID = 'lesson_aotfw_008';
@@ -119,6 +129,49 @@ describe('publish flow', () => {
       await api.request('GET', `/api/published/lessons/${LESSON_ID}`)
     ).json();
     expect(republished.data.title).toBe('DRAFT ONLY TITLE');
+  });
+
+  it('W2: publish strips annotation teacher notes before published-lesson fetch', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+
+    const draftRes = await api.request('GET', `/api/lessons/${LESSON_ID}`, { cookie });
+    expect(draftRes.status).toBe(200);
+    const lesson = (await draftRes.json()).data;
+    lesson.blocks = [
+      structuredClone(teacherStripFixture.annotation),
+      structuredClone(teacherStripFixture.teacher_only_block),
+      structuredClone(teacherStripFixture.ok_block)
+    ];
+    lesson.title = 'Annotation teacher strip';
+
+    const putRes = await api.request('PUT', `/api/lessons/${LESSON_ID}`, {
+      cookie,
+      body: lesson
+    });
+    expect(putRes.status).toBe(200);
+
+    const publishRes = await api.request('POST', `/api/lessons/${LESSON_ID}/publish`, {
+      cookie
+    });
+    expect(publishRes.status).toBe(200);
+
+    const studentRes = await api.request('GET', `/api/published/lessons/${LESSON_ID}`);
+    expect(studentRes.status).toBe(200);
+    const studentBody = await studentRes.json();
+    const payload = JSON.stringify(studentBody.data);
+    expect(payload).not.toContain(teacherStripFixture.sentinel);
+    expect(payload).not.toContain(teacherStripFixture.teacher_layer_id);
+    expect(payload).not.toContain('"kind":"teacher"');
+    expect(payload).not.toContain(teacherStripFixture.teacher_only_block_id);
+
+    const annotation = studentBody.data.blocks.find(
+      (block: { block_type: string }) => block.block_type === 'annotation'
+    );
+    expect(annotation).toBeTruthy();
+    expect(annotation.content.layers.map((layer: { id: string }) => layer.id)).toEqual([
+      'layer_structure'
+    ]);
   });
 
   it('rejects an unauthenticated draft GET with 401', async () => {

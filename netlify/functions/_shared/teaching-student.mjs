@@ -21,7 +21,57 @@ export function toPublicOutcome(outcome) {
   };
 }
 
-export function filterBlocksForStudent(blocks) {
+function collectTeacherOnlyIds(blocks, out = new Set()) {
+  if (!Array.isArray(blocks)) return out;
+  for (const block of blocks) {
+    if (block?.visibility === 'teacher_only' && block.id) out.add(block.id);
+    if (block?.block_type === 'section') {
+      collectTeacherOnlyIds(block.content?.blocks, out);
+    } else if (block?.block_type === 'columns') {
+      for (const col of block.content?.columns ?? []) {
+        collectTeacherOnlyIds(col.blocks, out);
+      }
+    } else if (block?.block_type === 'tabs') {
+      for (const panel of block.content?.tabs ?? []) {
+        collectTeacherOnlyIds(panel.blocks, out);
+      }
+    }
+  }
+  return out;
+}
+
+/** Drop teacher layers / notes / attachments that must never reach students. */
+export function stripAnnotationTeacherContent(block, teacherOnlyIds = new Set()) {
+  const layersIn = Array.isArray(block.content?.layers) ? block.content.layers : [];
+  const teacherLayerIds = new Set(
+    layersIn.filter(layer => layer?.kind === 'teacher').map(layer => layer.id)
+  );
+  const layers = layersIn.filter(layer => layer?.kind !== 'teacher');
+  const annotations = (Array.isArray(block.content?.annotations)
+    ? block.content.annotations
+    : []
+  )
+    .filter(ann => !teacherLayerIds.has(ann?.layer_id))
+    .map(ann => ({
+      ...ann,
+      body: {
+        ...ann.body,
+        attachments: (Array.isArray(ann.body?.attachments) ? ann.body.attachments : []).filter(
+          att => !(att?.kind === 'block' && teacherOnlyIds.has(att.block_id))
+        )
+      }
+    }));
+  return {
+    ...block,
+    content: {
+      ...block.content,
+      layers,
+      annotations
+    }
+  };
+}
+
+function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
   if (!Array.isArray(blocks)) return [];
   return blocks
     .filter(block => block?.visibility === 'student_teacher')
@@ -31,7 +81,7 @@ export function filterBlocksForStudent(blocks) {
           ...block,
           content: {
             ...block.content,
-            blocks: filterBlocksForStudent(block.content?.blocks)
+            blocks: filterBlocksForStudentInner(block.content?.blocks, teacherOnlyIds)
           }
         };
       }
@@ -42,7 +92,7 @@ export function filterBlocksForStudent(blocks) {
             ...block.content,
             columns: (block.content?.columns ?? []).map(col => ({
               ...col,
-              blocks: filterBlocksForStudent(col.blocks)
+              blocks: filterBlocksForStudentInner(col.blocks, teacherOnlyIds)
             }))
           }
         };
@@ -53,13 +103,22 @@ export function filterBlocksForStudent(blocks) {
           content: {
             tabs: (block.content?.tabs ?? []).map(panel => ({
               ...panel,
-              blocks: filterBlocksForStudent(panel.blocks)
+              blocks: filterBlocksForStudentInner(panel.blocks, teacherOnlyIds)
             }))
           }
         };
       }
+      if (block.block_type === 'annotation') {
+        return stripAnnotationTeacherContent(block, teacherOnlyIds);
+      }
       return block;
     });
+}
+
+export function filterBlocksForStudent(blocks) {
+  if (!Array.isArray(blocks)) return [];
+  const teacherOnlyIds = collectTeacherOnlyIds(blocks);
+  return filterBlocksForStudentInner(blocks, teacherOnlyIds);
 }
 
 export function sanitizeRichTextHtml(html) {
