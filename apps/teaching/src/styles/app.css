@@ -9428,3 +9428,313 @@ body.is-lesson-builder-full-page .hub-utilities {
     padding: var(--space-3);
   }
 }
+
+/* Annotation editor (1b) */
+.block-editor__annotation-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
+  gap: var(--space-3);
+  align-items: start;
+  min-width: 0;
+}
+
+.block-editor__annotation-workspace:has(.block-editor__annotation-note[hidden]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.block-editor__annotation-select {
+  min-width: 0;
+  max-height: 28rem;
+  overflow: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper, #fff);
+}
+
+.block-editor__annotation-stanza {
+  display: grid;
+  grid-template-columns: 1.1rem minmax(0, 1fr);
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.block-editor__annotation-stanza-gutter,
+.block-editor__annotation-line-gutter {
+  min-width: 0.75rem;
+  min-height: 1.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--wave) 35%, transparent);
+  cursor: pointer;
+}
+
+.block-editor__annotation-stanza-gutter {
+  min-height: 2.5rem;
+  background: color-mix(in srgb, var(--sand) 45%, transparent);
+}
+
+.block-editor__annotation-line {
+  display: grid;
+  grid-template-columns: 0.75rem minmax(0, 1fr);
+  gap: var(--space-2);
+  margin-bottom: 0.15rem;
+}
+
+.block-editor__annotation-line-text {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.block-editor__annotation-note {
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper, #fff);
+}
+
+.block-editor__annotation-note[hidden] {
+  display: none;
+}
+
+.block-editor__annotation-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.block-editor__annotation-note-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.block-editor__annotation-note-close,
+.block-editor__annotation-open,
+.block-editor__annotation-orphan {
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper, #fff);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.block-editor__annotation-layer-pick,
+.block-editor__annotation-layer-fields {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.block-editor__annotation-body {
+  margin-bottom: var(--space-3);
+}
+
+.block-editor__annotation-orphan {
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .block-editor__annotation-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Annotation layer slider (2a) */
+.block-annotation__controls {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  min-width: 0;
+}
+
+.block-annotation__chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2, 0.5rem);
+  overflow-x: auto;
+  max-width: 100%;
+  padding-bottom: 0.15rem;
+}
+
+.block-annotation__chip {
+  flex: 0 0 auto;
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wave) 16%, var(--paper, #fff));
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.block-annotation__chip[aria-pressed='false'] {
+  opacity: 0.45;
+}
+
+.block-annotation__chip--teacher {
+  background: color-mix(in srgb, var(--navy, #1b2a4a) 18%, var(--paper, #fff));
+  border-style: dashed;
+}
+
+.block-annotation__chip--sub {
+  font-size: var(--text-xs);
+}
+
+.block-annotation__chip--sand {
+  background: color-mix(in srgb, var(--sand) 22%, var(--paper, #fff));
+}
+.block-annotation__chip--high-sea {
+  background: color-mix(in srgb, var(--high-sea) 18%, var(--paper, #fff));
+}
+.block-annotation__chip--shore {
+  background: color-mix(in srgb, var(--shore) 22%, var(--paper, #fff));
+}
+.block-annotation__chip--marine {
+  background: color-mix(in srgb, var(--marine) 18%, var(--paper, #fff));
+}
+.block-annotation__chip--navy {
+  background: color-mix(in srgb, var(--navy, #1b2a4a) 16%, var(--paper, #fff));
+}
+.block-annotation__chip--coral {
+  background: color-mix(in srgb, var(--coral, #c96b4a) 18%, var(--paper, #fff));
+}
+.block-annotation__chip--mist {
+  background: color-mix(in srgb, var(--mist, #9aa4b2) 22%, var(--paper, #fff));
+}
+
+.block-annotation__slider-row {
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+  min-width: 0;
+}
+
+.block-annotation__slider {
+  width: 100%;
+  min-height: 2.75rem;
+  accent-color: var(--wave);
+}
+
+.block-annotation__slider:focus-visible {
+  outline: 3px solid var(--focus-ring, var(--wave));
+  outline-offset: 2px;
+}
+
+.block-annotation__stop-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted, #6b7280);
+}
+
+.block-annotation__stop-label[data-active='true'] {
+  color: var(--ink, inherit);
+  font-weight: 600;
+}
+
+.block-annotation__stop-label--teacher {
+  font-style: italic;
+}
+
+.block-annotation__markers {
+  display: inline-flex;
+  gap: 0.2rem;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
+
+.block-annotation__marker {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper, #fff);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.block-annotation__marker--wave {
+  background: color-mix(in srgb, var(--wave) 22%, var(--paper, #fff));
+}
+.block-annotation__marker--sand {
+  background: color-mix(in srgb, var(--sand) 28%, var(--paper, #fff));
+}
+.block-annotation__marker--high-sea {
+  background: color-mix(in srgb, var(--high-sea) 22%, var(--paper, #fff));
+}
+.block-annotation__marker--shore {
+  background: color-mix(in srgb, var(--shore) 28%, var(--paper, #fff));
+}
+.block-annotation__marker--marine {
+  background: color-mix(in srgb, var(--marine) 22%, var(--paper, #fff));
+}
+.block-annotation__marker--navy {
+  background: color-mix(in srgb, var(--navy, #1b2a4a) 18%, var(--paper, #fff));
+}
+.block-annotation__marker--coral {
+  background: color-mix(in srgb, var(--coral, #c96b4a) 22%, var(--paper, #fff));
+}
+.block-annotation__marker--mist {
+  background: color-mix(in srgb, var(--mist, #9aa4b2) 28%, var(--paper, #fff));
+}
+
+.block-annotation:focus-visible {
+  outline: 3px solid var(--focus-ring, var(--wave));
+  outline-offset: 2px;
+}
+
+.block-editor__annotation-show-markers-label,
+.block-editor__annotation-default-layer {
+  display: block;
+  margin-block: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.block-editor__annotation-default-layer {
+  width: 100%;
+  min-height: 2.75rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .block-annotation__anchor--word,
+  .block-annotation__anchor--phrase {
+    transition: background-color 120ms ease;
+  }
+}
+
+@media (max-width: 720px) {
+  .block-annotation__controls {
+    width: 100%;
+  }
+
+  .block-annotation__chips {
+    flex-wrap: nowrap;
+  }
+}

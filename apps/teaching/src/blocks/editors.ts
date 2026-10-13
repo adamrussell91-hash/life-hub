@@ -53,6 +53,8 @@ export type BlockEditorContext = {
     block: Extract<Block, { block_type: 'collection' }>
   ) => { links: CollectionLink[]; emptyMessage?: string };
   media?: ReadonlyArray<Media>;
+  /** Lesson (or page) blocks for annotation block-link attachments. */
+  getLessonBlocks?: () => Block[];
 };
 
 const VISIBILITY_OPTIONS = [
@@ -2553,9 +2555,12 @@ export function createOutcomesEditor(
 export function createAnnotationEditor(
   block: Extract<Block, { block_type: 'annotation' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'annotation' }>>,
-  getLatest: () => Extract<Block, { block_type: 'annotation' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'annotation' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
-  const fields = createAnnotationEditorFields(block, onChange, getLatest);
+  const fields = createAnnotationEditorFields(block, onChange, getLatest, {
+    getLessonBlocks: context.getLessonBlocks
+  });
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -2664,7 +2669,8 @@ function createBlockEditorFields(
       return createAnnotationEditor(
         block,
         onChange,
-        latest as () => Extract<Block, { block_type: 'annotation' }>
+        latest as () => Extract<Block, { block_type: 'annotation' }>,
+        context
       );
   }
 }
