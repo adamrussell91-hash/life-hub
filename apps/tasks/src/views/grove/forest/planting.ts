@@ -5,7 +5,6 @@
  */
 import { CELL, type Cell, land, owner, type Terrain } from './map';
 import type { Done, Species } from './history';
-import { TODAY } from './history';
 import { fbm, rng } from './noise';
 
 export type Placed = { file: string; x: number; y: number; z: number; scale: number; rotation: number; id?: string; week?: number; cell?: number; understorey?: boolean };
@@ -17,13 +16,17 @@ const STAGED: Record<Species, number> = { life: 3, teaching: 3, health: 3, weddi
 // The lightest variant of each species (LOD triangles), for trees squeezed in under a crowded stand.
 const LIGHTEST: Record<Species, number> = { life: 1, teaching: 3, health: 1, wedding: 1, other: 1 };
 
-function treeFile(species: Species, completed: Date, pick: number | 'lightest'): { file: string; height: number } {
-  const days = (TODAY.getTime() - completed.getTime()) / 86400000;
+function treeFile(task: Done, today: Date, pick: number | 'lightest'): { file: string; height: number } {
+  const { species } = task;
+  const days = (today.getTime() - task.completed.getTime()) / 86400000;
   const stage = days < 4 ? 'sapling' : days < 12 ? 'young' : 'mature';
-  const variants = stage === 'mature' ? VARIANTS[species] : VARIANTS[species].slice(0, STAGED[species]);
-  const v = pick === 'lightest' ? LIGHTEST[species] : variants[pick % variants.length]!;
   const mature = species === 'life' ? 8.5 : species === 'wedding' ? 6.2 : 7.2;
   const height = stage === 'mature' ? mature : stage === 'young' ? mature * 0.72 : mature * 0.48;
+  // Work finished after its deadline grows as a gnarled tree, scaled by age like the rest. Only the two
+  // lighter gnarled meshes: the other three are about 3.6k triangles each even at LOD.
+  if (task.late) return { file: `models/trees/tree-late-${pick === 'lightest' || pick % 3 ? 3 : 5}-mature.glb`, height };
+  const variants = stage === 'mature' ? VARIANTS[species] : VARIANTS[species].slice(0, STAGED[species]);
+  const v = pick === 'lightest' ? LIGHTEST[species] : variants[pick % variants.length]!;
   return { file: `models/trees/tree-${species}-${v}-${stage}.glb`, height };
 }
 
@@ -53,7 +56,7 @@ class Spacing {
   }
 }
 
-export function plant(cells: Cell[], terrain: Terrain, history: Done[], builtWeeks: number): Planting {
+export function plant(cells: Cell[], terrain: Terrain, history: Done[], builtWeeks: number, today: Date): Planting {
   const random = rng(99);
   const spacing = new Spacing();
   const trees: Placed[] = [];
@@ -111,7 +114,7 @@ export function plant(cells: Cell[], terrain: Terrain, history: Done[], builtWee
     if (chosen.length < sorted.length) crowded.push({ cell, tasks: sorted.slice(chosen.length) });
     chosen.forEach((spot, i) => {
       const task = sorted[i]!;
-      const { file, height } = treeFile(task.species, task.completed, Math.floor(random() * 10));
+      const { file, height } = treeFile(task, today, Math.floor(random() * 10));
       trees.push({ file, x: spot.x, z: spot.z, y: terrain.height(spot.x, spot.z), scale: height * (0.86 + random() * 0.28), rotation: random() * Math.PI * 2, id: task.id, week: cell.week! });
       // Undergrowth hugs the trees.
       const bushes = random() < 0.65 ? 1 + Math.floor(random() * 2) : 0;
@@ -172,7 +175,7 @@ export function plant(cells: Cell[], terrain: Terrain, history: Done[], builtWee
     }
     placed.forEach((spot, i) => {
       const task = tasks[i]!;
-      const { file, height } = treeFile(task.species, task.completed, 'lightest');
+      const { file, height } = treeFile(task, today, 'lightest');
       // A little smaller than the canopy around it, so the squeeze reads as undergrowth, not a collision.
       trees.push({ file, x: spot.x, z: spot.z, y: terrain.height(spot.x, spot.z), scale: height * (0.68 + squeeze() * 0.14), rotation: squeeze() * Math.PI * 2, id: task.id, week: cell.week!, cell: cell.index, understorey: true });
     });

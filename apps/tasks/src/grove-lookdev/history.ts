@@ -1,8 +1,6 @@
 /** Synthetic finished-task history for the look prototype (same shape as real tasks). */
-import { rng } from './noise';
-
-export type Species = 'life' | 'teaching' | 'health' | 'wedding' | 'other';
-export type Done = { id: string; title: string; species: Species; completed: Date; week: number };
+import { rng } from '@/views/grove/forest/noise';
+import type { Done, Species } from '@/views/grove/forest/history';
 
 export const TODAY = new Date('2026-10-13T09:00:00+11:00');
 const WEEK_ONE = Date.UTC(2025, 11, 29); // Monday 29 December 2025
@@ -10,11 +8,6 @@ const WEEK_ONE = Date.UTC(2025, 11, 29); // Monday 29 December 2025
 export function weekOf(date: Date): number {
   const day = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
   return Math.floor((day - WEEK_ONE) / (7 * 86400000)) + 1;
-}
-
-export function weekRange(week: number): [Date, Date] {
-  const start = new Date(WEEK_ONE + (week - 1) * 7 * 86400000);
-  return [start, new Date(start.getTime() + 6 * 86400000)];
 }
 
 const TITLES: Record<Species, string[]> = {
