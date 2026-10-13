@@ -1275,7 +1275,6 @@ export function mountForceGraph(
     for (const [zoom, label, html] of [
       ["in", "Zoom in", "+"],
       ["out", "Zoom out", "−"],
-      ["fit", "Fit overview", FIT_ICON],
     ] as const) {
       const button = el("button", {
         type: "button",
@@ -1286,7 +1285,17 @@ export function mountForceGraph(
       button.innerHTML = html;
       stack.append(button);
     }
-    zoomRoot.append(stack, zoomReadout!);
+    // Readout sits inside the stack so phone chrome cannot clip it off the dock.
+    stack.append(zoomReadout!);
+    const fitBtn = el("button", {
+      type: "button",
+      class: "graph-zoom__btn",
+      "data-zoom": "fit",
+      "aria-label": "Fit overview",
+    });
+    fitBtn.innerHTML = FIT_ICON;
+    stack.append(fitBtn);
+    zoomRoot.append(stack);
     dock!.body.prepend(zoomRoot);
     rememberOverview({ ...view });
     stack.addEventListener("click", event => {
