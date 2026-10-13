@@ -236,11 +236,6 @@ export function mountStudentLessonView(
             href: `/s/classes/${classId}`,
             label: 'Back to class',
             className: 'student-surface__back-class'
-          },
-          {
-            href: `/s/units/${lesson.unit_id}`,
-            label: 'Back to unit',
-            className: 'student-surface__back-unit'
           }
         ]
       });
@@ -251,14 +246,7 @@ export function mountStudentLessonView(
     void apiGet<PublishedLesson>(`/api/published/lessons/${lessonId}`)
       .then((lesson) => {
         if (disposed || isStale()) return;
-        renderStudentChrome(header, {
-          links: [
-            {
-              href: `/s/units/${lesson.unit_id}`,
-              label: 'Back to unit'
-            }
-          ]
-        });
+        renderStudentChrome(header, {});
         renderPublishedLesson(content, lesson);
       })
       .catch((error: unknown) => {
