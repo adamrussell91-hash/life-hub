@@ -247,7 +247,7 @@ export function mountForceGraph(
   function startMorph(settled: GraphNodeDatum[], duration: number) {
     // Fit to where the notes are going, before the plan rewinds them to where they are now.
     const target = !viewTouched || duration >= SHOW_ALL_MORPH_MS ? fitShowAll(settled) : null;
-    if (target) overviewK = target.k;
+    rememberOverview(target);
     const plan = planShowAllMorph(simNodes, settled);
     simNodes = plan.nodes;
     refreshLookups();
@@ -268,6 +268,13 @@ export function mountForceGraph(
   let loadsFor: GraphLinkDatum[] | null = null;
   /** The zoom the overview was fitted at; topic names wait until you zoom well past it. */
   let overviewK = 0;
+  /** Last successful overview camera — Fit uses this when a live refit has nothing to measure. */
+  let overviewView: ViewState | null = null;
+  function rememberOverview(fitted: ViewState | null) {
+    if (!fitted) return;
+    overviewK = fitted.k;
+    overviewView = fitted;
+  }
   let zoneLabelBoxes = new Map<string, { x0: number; y0: number; x1: number; y1: number }>();
   let theme: ShowAllTheme = readShowAllTheme();
   let relaxToken = 0;
@@ -352,7 +359,7 @@ export function mountForceGraph(
         y: height / 2 - (height / 2 - fitted.y) * 0.94,
       });
       camera = { from: { ...view }, to: fitted, start: performance.now(), duration: SHOW_ALL_REVEAL_MS };
-      overviewK = fitted.k;
+      rememberOverview(fitted);
     }
     canvas.style.opacity = "0";
     revealStart = performance.now();
@@ -1287,7 +1294,7 @@ export function mountForceGraph(
       if (button.dataset.zoom === "fit") {
         viewTouched = true;
         if (tool === "walk") clearTool();
-        moveCamera(fitShowAll(), 500);
+        moveCamera(fitShowAll() ?? overviewView, 500);
         return;
       }
       if (button.dataset.zoom === "in") zoomBy(ZOOM_STEP);

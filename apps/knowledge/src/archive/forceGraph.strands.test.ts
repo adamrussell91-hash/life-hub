@@ -163,11 +163,21 @@ describe("Show All strand drawing", () => {
   });
 
   it("lets the zoom buttons inspect far closer than the old wheel limit", () => {
+    let now = 0;
     vi.stubGlobal("devicePixelRatio", 1);
-    vi.stubGlobal("requestAnimationFrame", () => 1);
+    vi.stubGlobal("performance", { now: () => now });
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      queueMicrotask(() => {
+        now += 600;
+        cb(now);
+      });
+      return 1;
+    });
     vi.stubGlobal("cancelAnimationFrame", vi.fn());
     installCanvas();
     const host = document.createElement("div");
+    Object.defineProperty(host, "clientWidth", { value: 1100 });
+    Object.defineProperty(host, "clientHeight", { value: 700 });
     document.body.append(host);
     const stop = mountForceGraph(host, model(), {}, { variant: "showAll", search: "", excerptFor: () => "" });
     expect(host.querySelector('input[aria-label="Map zoom"]')).toBeNull();
@@ -177,9 +187,13 @@ describe("Show All strand drawing", () => {
     const zoomRoot = host.querySelector<HTMLElement>(".graph-zoom");
     expect(zoomIn && zoomOut && zoomFit && zoomRoot).toBeTruthy();
     for (let i = 0; i < 40; i += 1) zoomIn!.click();
-    expect(Number(zoomRoot!.dataset.scale)).toBeGreaterThan(10);
-    zoomFit!.click(); // starts moveCamera(fitShowAll()); scale settles on animation frames
-    stop();
+    const zoomed = Number(zoomRoot!.dataset.scale);
+    expect(zoomed).toBeGreaterThan(10);
+    zoomFit!.click();
+    return Promise.resolve().then(() => {
+      expect(Number(zoomRoot!.dataset.scale)).toBeLessThan(zoomed);
+      stop();
+    });
   });
   afterEach(() => {
     resetShowAllTuning();
