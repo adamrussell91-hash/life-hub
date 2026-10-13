@@ -162,7 +162,7 @@ describe("Show All strand drawing", () => {
     stop();
   });
 
-  it("lets the zoom slider inspect far closer than the old wheel limit", () => {
+  it("lets the zoom buttons inspect far closer than the old wheel limit", () => {
     vi.stubGlobal("devicePixelRatio", 1);
     vi.stubGlobal("requestAnimationFrame", () => 1);
     vi.stubGlobal("cancelAnimationFrame", vi.fn());
@@ -170,11 +170,17 @@ describe("Show All strand drawing", () => {
     const host = document.createElement("div");
     document.body.append(host);
     const stop = mountForceGraph(host, model(), {}, { variant: "showAll", search: "", excerptFor: () => "" });
-    const input = host.querySelector<HTMLInputElement>('[aria-label="Map zoom"]');
-    expect(input).not.toBeNull();
-    input!.value = input!.max;
-    input!.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(Number(input!.dataset.scale)).toBeGreaterThan(10);
+    expect(host.querySelector('input[aria-label="Map zoom"]')).toBeNull();
+    const zoomIn = host.querySelector<HTMLButtonElement>('[data-zoom="in"]');
+    const zoomFit = host.querySelector<HTMLButtonElement>('[data-zoom="fit"]');
+    const zoomRoot = host.querySelector<HTMLElement>(".graph-zoom");
+    expect(zoomIn).not.toBeNull();
+    expect(zoomFit).not.toBeNull();
+    expect(zoomRoot).not.toBeNull();
+    for (let i = 0; i < 40; i += 1) zoomIn!.click();
+    expect(Number(zoomRoot!.dataset.scale)).toBeGreaterThan(10);
+    zoomFit!.click();
+    expect(host.querySelector('[data-zoom="out"]')).not.toBeNull();
     stop();
   });
   afterEach(() => {

@@ -6375,15 +6375,67 @@ body.is-universe-saver .universe-exits {
   opacity: 1; visibility: visible; translate: none; transition-delay: 0s;
 }
 .graph-zoom {
-  position: relative; pointer-events: auto; width: min(260px, 100%); padding: 10px 14px;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper, #fbf8f2);
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
 }
-.graph-zoom .hub-slider { padding: 0; border: 0; background: transparent; box-shadow: none; color: inherit; --hub-slider-thumb: var(--space-8); }
-.graph-zoom .hub-slider__value { display: none; }
-.graph-zoom .hub-slider__label { margin: 0 0 var(--space-2); align-self: flex-start; font-size: var(--text-sm); color: inherit; }
-.graph-zoom__value { position: absolute; right: 14px; top: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
-.graph-wrap.is-neural .graph-zoom,
+.graph-zoom__stack {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper, #fbf8f2);
+}
+.graph-zoom__btn {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  min-height: 2.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink, #13233a);
+  font: 600 var(--text-md) / 1 Inter, ui-sans-serif, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.graph-zoom__btn:first-child { border-top: 0; }
+.graph-zoom__btn:hover,
+.graph-zoom__btn:focus-visible {
+  background: rgba(19, 35, 58, 0.06);
+}
+.graph-zoom__btn:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: -2px;
+}
+.graph-zoom__btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+.graph-zoom__value {
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+  opacity: 0.8;
+}
+.graph-wrap.is-neural .graph-zoom__stack,
 .graph-wrap.is-neural .neural-dock__reveal { background: #0b1019; color: #f4efe6; border-color: rgba(255,255,255,0.18); }
+.graph-wrap.is-neural .graph-zoom { color: #f4efe6; }
+.graph-wrap.is-neural .graph-zoom__btn {
+  color: #f4efe6;
+  border-top-color: rgba(255,255,255,0.14);
+}
+.graph-wrap.is-neural .graph-zoom__btn:hover,
+.graph-wrap.is-neural .graph-zoom__btn:focus-visible {
+  background: rgba(255,255,255,0.08);
+}
 @media (max-width: 720px) {
   .neural-dock__row button, .neural-dock__panel button, .neural-dock__panel select { min-height: 44px; }
   .neural-dock__panel { padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px)); }

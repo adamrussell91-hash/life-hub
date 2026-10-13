@@ -48,7 +48,6 @@ import {
   type GraphNodeDatum,
 } from "./keywordGraph";
 import { searchCluster, selectionCluster } from "./graphFocus";
-import { createAdaptiveSlider } from "../../../../packages/design-kit/js/adaptive-slider.js";
 import { hubLabelVariants, placeHubLabels, readShowAllTheme, type ShowAllTheme } from "./showAllDraw";
 import { layoutShowAll } from "./showAllGraph";
 import { branchLoads, placeTopicAnchors } from "./showAllNeural";
@@ -1253,40 +1252,63 @@ export function mountForceGraph(
   }
 
   const dock: Dock | null = showAllMode ? createDock(host, chooseTool) : null;
-  // Logarithmic travel gives the slider equal control at overview and very close range.
+  // Atlas-style ± / Fit. Wheel and pinch stay the fine control; buttons step like shelf Atlas.
   const zoomMin = 0.04;
   const zoomMax = 24;
-  const zoomTravel = Math.log(zoomMax / zoomMin);
-  const zoomReadout = el("output", { class: "graph-zoom__value" });
-  const zoomControl = dock ? createAdaptiveSlider({
-    label: "Map zoom", min: 0, max: 100, step: 0.1,
-    value: Math.log(view.k / zoomMin) / zoomTravel * 100,
-    onChange: (value: number) => {
-      viewTouched = true;
-      camera = null;
-      if (tool === "walk") clearTool();
-      const next = zoomMin * Math.exp(value / 100 * zoomTravel);
-      const cx = width / 2;
-      const cy = topInset() + (height - topInset()) / 2;
-      view.x = cx - (cx - view.x) / view.k * next;
-      view.y = cy - (cy - view.y) / view.k * next;
-      view.k = next;
-      syncZoom();
-      scheduleDraw();
-    },
-  }) : null;
-  if (zoomControl && dock) {
-    zoomControl.input.setAttribute("aria-label", "Map zoom");
-    dock.body.prepend(el("div", { class: "graph-zoom" }, zoomControl.el, zoomReadout));
+  const ZOOM_STEP = 1.4;
+  const FIT_ICON =
+    '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+  const zoomRoot = dock
+    ? el("div", { class: "graph-zoom", role: "group", "aria-label": "Map zoom" })
+    : null;
+  const zoomReadout = zoomRoot ? el("output", { class: "graph-zoom__value" }) : null;
+  if (zoomRoot && dock) {
+    const stack = el("div", { class: "graph-zoom__stack" });
+    const mk = (zoom: string, label: string, text: string) => {
+      const button = el("button", { type: "button", class: "graph-zoom__btn", "data-zoom": zoom, "aria-label": label });
+      button.innerHTML = text;
+      stack.appendChild(button);
+      return button;
+    };
+    mk("in", "Zoom in", "+");
+    mk("out", "Zoom out", "−");
+    mk("fit", "Fit overview", FIT_ICON);
+    zoomRoot.append(stack, zoomReadout!);
+    dock.body.prepend(zoomRoot);
+    stack.addEventListener("click", event => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-zoom]");
+      if (!button) return;
+      const action = button.dataset.zoom;
+      if (action === "fit") {
+        viewTouched = true;
+        if (tool === "walk") clearTool();
+        moveCamera(fitShowAll(), 500);
+        return;
+      }
+      if (action === "in" || action === "out") zoomBy(action === "in" ? ZOOM_STEP : 1 / ZOOM_STEP);
+    });
+  }
+
+  function zoomBy(factor: number) {
+    viewTouched = true;
+    camera = null;
+    if (tool === "walk") clearTool();
+    const next = Math.min(zoomMax, Math.max(zoomMin, view.k * factor));
+    const cx = width / 2;
+    const cy = topInset() + (height - topInset()) / 2;
+    view.x = cx - ((cx - view.x) / view.k) * next;
+    view.y = cy - ((cy - view.y) / view.k) * next;
+    view.k = next;
+    syncZoom();
+    scheduleDraw();
   }
 
   function syncZoom() {
-    if (!zoomControl) return;
+    if (!zoomRoot || !zoomReadout) return;
     const ratio = view.k / (overviewK || 0.16);
     zoomReadout.textContent = `${ratio.toFixed(1)}×`;
-    zoomControl.input.dataset.scale = String(view.k);
-    zoomControl.input.setAttribute("aria-valuetext", `${ratio.toFixed(1)} times overview`);
-    zoomControl.setValue(Math.log(Math.max(zoomMin, view.k) / zoomMin) / zoomTravel * 100, { silent: true });
+    zoomRoot.dataset.scale = String(view.k);
+    zoomRoot.setAttribute("aria-valuetext", `${ratio.toFixed(1)} times overview`);
   }
 
   function placeDock() {
@@ -2310,7 +2332,6 @@ export function mountForceGraph(
   return attachGraphSearch(
     () => {
       disposed = true;
-      zoomControl?.destroy();
       window.cancelAnimationFrame(growRaf);
       window.clearTimeout(toolTimer);
       stopSignals();
