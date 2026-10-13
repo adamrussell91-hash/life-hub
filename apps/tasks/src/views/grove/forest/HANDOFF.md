@@ -4,11 +4,14 @@ Read this first. It replaces the long design conversation of 13 October 2026.
 
 ## What this is
 
-A standalone look prototype for Grove's Year view, served by the Tasks dev server at
-`/grove-lookdev.html`. Synthetic history only. Nothing in the live Grove uses it yet.
+**This is now the live Grove page** (`#/grove`, `views/grove/view.ts`). It started as a look
+prototype; `/grove-lookdev.html` still mounts the same scene on synthetic history for look rounds.
 
-Files: `map.ts` (layout, terrain, river, lake, path), `planting.ts` (trees and ground cover),
-`history.ts` (synthetic tasks), `main.ts` (renderer, camera, expanding week), `noise.ts`.
+Files (`apps/tasks/src/views/grove/forest/`): `scene.ts` (`mountForest()`: renderer, camera,
+expanding week, picking), `map.ts` (layout, terrain, river, lake, island, path), `planting.ts`
+(trees and ground cover), `animals.ts` (earned wildlife), `data.ts` (real completions and
+milestones to trees and animals), `history.ts` (types, week numbering), `noise.ts`. The prototype
+page is `apps/tasks/src/grove-lookdev/` (synthetic `history.ts`, thin `main.ts`).
 Screenshots: `node tools/grove-previews/lookdev-shots.mjs <out-dir>` with the dev server running.
 
 ## Decisions Adam has made
@@ -145,9 +148,31 @@ Triangles and draw calls unchanged (3.9M, 103 calls).
   Desktop expanded week is 2.4% over round four (more full-detail ground cover near week 23 after the
   scatter shift); every phone view and Year is under.
 
+## Round six: live
+
+- **Data:** the page reads finished tasks plus the private 2026 history (`grove_history` in hub
+  prefs, already imported: 41 weeks, 636 completions, matching the Notion "Grove 2026 — Weekly
+  Backfill Counts" page) through `applyGroveHistory`, then `forestHistory()` turns this year's
+  completions into trees. Backfilled history has no recorded deadlines, so it never grows gnarled;
+  real board tasks finished late do (gnarled variants 3 and 5 only: 1, 2 and 4 are 3.6k triangles).
+- **Animals:** `forestAnimals()` uses Codex's milestone rules (`domain/grove/wildlife.ts`) and
+  companions for the year. `animals.ts` gives each a loop: land animals on dry, gentle ground in the
+  week they were earned (or the nearest week with room), the mallard/otter on the lake, birds over
+  the canopy. Grove's roaming motion drives walk/rest/feed; up to 30 fps while visible, still under
+  reduced motion. The 20-model bundle is installed only by the Pages deploy; the dev server has the
+  three public models.
+- **Shadows** redraw only when the camera moves (animals cast none), so animation is cheap.
+- **UI:** the old Day/Week/Term/Year pills, arrows, Today, Import history, water quality, Pause
+  motion and framing buttons are gone. One glass title chip, a ‹ Year button inside a week,
+  tap a week to step in, tap a tree or animal for a card (a bottom sheet on phones). The forest
+  fills the window under the page title; the reminder strip hides on Grove only.
+  `#/grove?week=10` opens a week; `?year=2025` a past year.
+- **Budget with real data** (639 trees, 11 animals): Year about 1.45M triangles on desktop and
+  phone, phone expanded week 1.41M, desktop expanded week 2.7M.
+
 ## Known gaps, in order
 
-1. **Phone budget, if real devices still struggle:** the heaviest LOD trees are tree-late-1/2/4
+1. **Phone budget, if real devices still struggle (now 1.45M with real data):** the heaviest LOD trees are tree-late-1/2/4
    (about 3.6k triangles each); impostor cards for Year view are the next step. Untested on a
    real phone so far.
 2. The little falls between river tiers still read as white wedges up close; fine at Year zoom.
