@@ -9438,8 +9438,197 @@ body.is-lesson-builder-full-page .hub-utilities {
   min-width: 0;
 }
 
-.block-editor__annotation-workspace:has(.block-editor__annotation-note[hidden]) {
+.block-editor__annotation-workspace:has(.block-editor__annotation-note[hidden]):has(
+    .block-editor__annotation-voice-panel[hidden]
+  ) {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.block-editor__annotation-voice-panel {
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper, #fff);
+}
+
+.block-editor__annotation-voice-panel[hidden] {
+  display: none;
+}
+
+.block-editor__annotation-voice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.block-editor__annotation-voice-kinds,
+.block-editor__annotation-voice-actions,
+.block-editor__annotation-voice-clip-actions,
+.block-editor__annotation-voice-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.block-editor__annotation-voice-actions .btn,
+.block-editor__annotation-voice-clip-actions .btn,
+.block-editor__annotation-voice-toolbar .btn,
+.block-editor__annotation-voice-kinds .btn {
+  min-height: 44px;
+}
+
+.block-editor__annotation-voice-kind[aria-pressed='true'] {
+  outline: 2px solid var(--wave, #2f6fed);
+}
+
+.block-editor__annotation-voice-meter {
+  height: 0.5rem;
+  margin-top: var(--space-2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+  overflow: hidden;
+}
+
+.block-editor__annotation-voice-meter-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--wave, #2f6fed);
+}
+
+.block-editor__annotation-voice-elapsed {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.block-editor__annotation-voice-clips {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.block-editor__annotation-voice-clip {
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.block-editor__annotation-voice-clip-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.block-editor__annotation-voice-confidence {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--mist, #9aa4b2) 25%, var(--paper, #fff));
+}
+
+.block-editor__annotation-voice-confidence--high {
+  background: color-mix(in srgb, var(--shore, #5c8a7a) 28%, var(--paper, #fff));
+}
+
+.block-editor__annotation-voice-confidence--low {
+  background: color-mix(in srgb, var(--coral, #c96b4a) 28%, var(--paper, #fff));
+}
+
+.block-editor__annotation-voice-clip-text {
+  margin: var(--space-2) 0;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+}
+
+.block-editor__annotation-voice-track-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.block-editor__annotation-voice-track-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.block-editor__annotation-section-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.block-annotation__voice-play,
+.block-annotation__voice-play-all {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.block-annotation__voice-general {
+  margin-top: var(--space-3);
+}
+
+.block-annotation__voice-transcript {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+}
+
+.feedback-page {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.feedback-page__actions,
+.feedback-page__card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.feedback-page__actions .btn,
+.feedback-page__card-actions .btn {
+  min-height: 44px;
+}
+
+.feedback-page__list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.feedback-page__card {
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper, #fff);
+}
+
+.student-feedback {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 40rem;
+}
+
+.student-feedback__title {
+  margin: 0;
+  font-family: var(--font-display, var(--font-ui));
+}
+
+.student-feedback__audio {
+  width: 100%;
 }
 
 .block-editor__annotation-select {

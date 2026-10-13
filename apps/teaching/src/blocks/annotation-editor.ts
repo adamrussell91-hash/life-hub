@@ -34,6 +34,14 @@ import { parseStartTime, parseVideoInput } from '@/blocks/video-url';
 import { visitBlocks } from '@/blocks/walk-blocks';
 import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
 import {
+  mountVoiceRecorder,
+  type VoiceRecorderHandle
+} from '@/blocks/voice-recorder';
+import {
+  mountVoiceReview,
+  type VoiceReviewHandle
+} from '@/blocks/voice-review';
+import {
   HUB_LIST_ICONS,
   createHubList
 } from '../../design-kit/js/hub-list.js';
@@ -47,6 +55,7 @@ import type {
   AnnotationLayer,
   AnnotationLayerKind,
   AnnotationThread,
+  AnnotationVoiceTrack,
   Block
 } from '@/schemas/block';
 
@@ -217,11 +226,34 @@ export function createAnnotationEditorFields(
     sublayers: layer.sublayers?.map((s) => ({ ...s }))
   }));
   let annotations: AnnotationItem[] = block.content.annotations.map(cloneAnnotation);
+  let voiceTracks: AnnotationVoiceTrack[] = (block.content.voice_tracks ?? []).map((track) => ({
+    ...track,
+    audio: { ...track.audio },
+    transcript: {
+      timing: track.transcript.timing,
+      words: track.transcript.words.map((w) => ({ ...w }))
+    },
+    taps: track.taps?.map((tap) => ({
+      t: tap.t,
+      anchor: { ...tap.anchor, quote: { ...tap.anchor.quote } }
+    })),
+    clips: track.clips.map((clip) => ({
+      ...clip,
+      word_range: [clip.word_range[0], clip.word_range[1]] as [number, number],
+      anchor: clip.anchor
+        ? { ...clip.anchor, quote: { ...clip.anchor.quote } }
+        : undefined
+    })),
+    extras: track.extras?.map((extra) => ({ ...extra }))
+  }));
   let selectedAnnotationId: string | null = annotations[0]?.id ?? null;
   let reanchorId: string | null = null;
   let reanchorStop: ReanchorStop | null = null;
   let addingStopForId: string | null = null;
   let placeHint = '';
+  let voiceRecorder: VoiceRecorderHandle | null = null;
+  let voiceReview: VoiceReviewHandle | null = null;
+  let reviewingTrackId: string | null = null;
 
   const title = document.createElement('input');
   title.type = 'text';
@@ -345,12 +377,20 @@ export function createAnnotationEditorFields(
   notePanel.hidden = true;
   notePanel.setAttribute('aria-label', 'Annotation editor');
 
+  const voicePanel = document.createElement('aside');
+  voicePanel.className = 'block-editor__annotation-voice-panel';
+  voicePanel.hidden = true;
+  voicePanel.setAttribute('aria-label', 'Voice tools');
+
   const orphansHost = document.createElement('div');
   orphansHost.className = 'block-editor__annotation-orphans';
   orphansHost.setAttribute('aria-live', 'polite');
 
   const layersHost = document.createElement('div');
   layersHost.className = 'block-editor__annotation-layers';
+
+  const voiceTracksHost = document.createElement('div');
+  voiceTracksHost.className = 'block-editor__annotation-voice-tracks';
 
   const annotationsHost = document.createElement('div');
   annotationsHost.className = 'block-editor__annotation-annotations';
@@ -404,6 +444,7 @@ export function createAnnotationEditorFields(
         text,
         layers,
         annotations,
+        voice_tracks: voiceTracks.length > 0 ? voiceTracks : undefined,
         anthology,
         settings: {
           show_markers: showMarkers.checked,
@@ -417,6 +458,127 @@ export function createAnnotationEditorFields(
     paintOrphans();
     paintNotePanel();
     remountLists();
+    paintVoiceTracks();
+  }
+
+  function voiceLayer(): AnnotationLayer | undefined {
+    return layers.find((layer) => layer.kind === 'voice');
+  }
+
+  function closeVoiceTools(): void {
+    voiceRecorder?.dispose();
+    voiceRecorder = null;
+    voiceReview?.dispose();
+    voiceReview = null;
+    reviewingTrackId = null;
+    voicePanel.replaceChildren();
+    voicePanel.hidden = true;
+  }
+
+  function openVoiceRecorder(): void {
+    const layer = voiceLayer();
+    if (!layer) {
+      placeHint = 'Add a Voice layer before recording.';
+      placeStatus.textContent = placeHint;
+      return;
+    }
+    closeVoiceTools();
+    selectedAnnotationId = null;
+    notePanel.hidden = true;
+    voiceRecorder = mountVoiceRecorder({
+      layerId: layer.id,
+      lessonId: context.lessonId,
+      onTrackReady: (track) => {
+        voiceTracks = [...voiceTracks.filter((row) => row.id !== track.id), track];
+        emitChange();
+        openVoiceReview(track.id);
+      },
+      onCancel: () => {
+        closeVoiceTools();
+        paintVoiceTracks();
+      }
+    });
+    voicePanel.replaceChildren(voiceRecorder.el);
+    voicePanel.hidden = false;
+    placeHint = 'Recording: tap the poem to pin while you speak.';
+    placeStatus.textContent = placeHint;
+  }
+
+  function openVoiceReview(trackId: string): void {
+    const track = voiceTracks.find((row) => row.id === trackId);
+    if (!track) return;
+    voiceRecorder?.dispose();
+    voiceRecorder = null;
+    voiceReview?.dispose();
+    reviewingTrackId = trackId;
+    selectedAnnotationId = null;
+    notePanel.hidden = true;
+    voiceReview = mountVoiceReview({
+      track,
+      text: currentText(),
+      onChange: (next) => {
+        voiceTracks = voiceTracks.map((row) => (row.id === next.id ? next : row));
+        // Avoid full remount loops while typing review actions — patch quietly.
+        const latest = getLatest();
+        onChange({
+          ...latest,
+          content: {
+            ...latest.content,
+            voice_tracks: voiceTracks.length > 0 ? voiceTracks : undefined
+          }
+        });
+        paintVoiceTracks();
+      },
+      onClose: () => {
+        closeVoiceTools();
+        paintVoiceTracks();
+      }
+    });
+    voicePanel.replaceChildren(voiceReview.el);
+    voicePanel.hidden = false;
+  }
+
+  function paintVoiceTracks(): void {
+    voiceTracksHost.replaceChildren();
+    const layer = voiceLayer();
+    if (!layer) return;
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'block-editor__annotation-voice-toolbar';
+    const label = document.createElement('h3');
+    label.className = 'block-editor__annotation-section-title';
+    label.textContent = 'Voice';
+    const recordBtn = document.createElement('button');
+    recordBtn.type = 'button';
+    recordBtn.className = 'btn btn--primary';
+    recordBtn.textContent = 'Record';
+    recordBtn.addEventListener('click', () => openVoiceRecorder());
+    toolbar.append(label, recordBtn);
+    voiceTracksHost.append(toolbar);
+
+    if (voiceTracks.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'block-editor__hint';
+      empty.textContent = 'No recordings yet. Record opens beside the text.';
+      voiceTracksHost.append(empty);
+      return;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'block-editor__annotation-voice-track-list';
+    for (const track of voiceTracks) {
+      const li = document.createElement('li');
+      const meta = document.createElement('span');
+      meta.textContent = `${track.title} · ${track.status} · ${track.kind.replace('_', ' ')}`;
+      const reviewBtn = document.createElement('button');
+      reviewBtn.type = 'button';
+      reviewBtn.className = 'btn btn--secondary';
+      reviewBtn.textContent = 'Review';
+      reviewBtn.addEventListener('click', () => openVoiceReview(track.id));
+      li.append(meta, reviewBtn);
+      list.append(li);
+    }
+    voiceTracksHost.append(list);
   }
 
   async function makeCardFromAnnotation(ann: AnnotationItem): Promise<void> {
@@ -693,6 +855,12 @@ export function createAnnotationEditorFields(
       placeStatus.textContent = placeHint;
       return;
     }
+
+    if (voiceRecorder?.isCapturing()) {
+      voiceRecorder.pushTap(anchor);
+      return;
+    }
+
     const stamp = nowIso();
 
     if (reanchorStop) {
@@ -1805,8 +1973,9 @@ export function createAnnotationEditorFields(
   paintOrphans();
   remountLists();
   paintNotePanel();
+  paintVoiceTracks();
 
-  workspace.append(selectSurface, notePanel);
+  workspace.append(selectSurface, notePanel, voicePanel);
   fields.append(
     title,
     attribution,
@@ -1821,6 +1990,7 @@ export function createAnnotationEditorFields(
     placeStatus,
     workspace,
     layersHost,
+    voiceTracksHost,
     annotationsHost,
     orphansHost,
     missingTechniqueHost
