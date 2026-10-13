@@ -1288,18 +1288,34 @@ export function mountForceGraph(
     }
     zoomRoot.append(stack, zoomReadout!);
     dock!.body.prepend(zoomRoot);
+    rememberOverview({ ...view });
     stack.addEventListener("click", event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-zoom]");
       if (!button) return;
       if (button.dataset.zoom === "fit") {
-        viewTouched = true;
-        if (tool === "walk") clearTool();
-        moveCamera(fitShowAll() ?? overviewView, 500);
+        zoomFit();
         return;
       }
       if (button.dataset.zoom === "in") zoomBy(ZOOM_STEP);
       else if (button.dataset.zoom === "out") zoomBy(1 / ZOOM_STEP);
     });
+  }
+
+  function zoomHome(): ViewState {
+    const homeK = overviewK || 0.16;
+    const cx = width / 2;
+    const cy = topInset() + (height - topInset()) / 2;
+    return {
+      k: homeK,
+      x: cx - ((cx - view.x) / view.k) * homeK,
+      y: cy - ((cy - view.y) / view.k) * homeK,
+    };
+  }
+
+  function zoomFit() {
+    viewTouched = true;
+    if (tool === "walk") clearTool();
+    moveCamera(fitShowAll() ?? overviewView ?? zoomHome(), 500);
   }
 
   function zoomBy(factor: number) {
