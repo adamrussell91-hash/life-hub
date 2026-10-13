@@ -4,8 +4,8 @@
  */
 import {
   BufferGeometry, Color, DirectionalLight, Float32BufferAttribute, Fog, Group, HemisphereLight,
-  InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, MOUSE, Object3D, OrthographicCamera, PCFSoftShadowMap, Quaternion,
-  NeutralToneMapping, Raycaster, Scene, SRGBColorSpace, TOUCH, Vector2, Vector3, WebGLRenderer, DoubleSide
+  InstancedBufferAttribute, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, MOUSE, Object3D, OrthographicCamera, PCFSoftShadowMap, Quaternion,
+  NeutralToneMapping, BoxGeometry, IcosahedronGeometry, MeshBasicMaterial, Raycaster, Scene, SRGBColorSpace, TOUCH, Vector2, Vector3, WebGLRenderer, DoubleSide
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
@@ -55,7 +55,7 @@ scene.fog = new Fog('#d4eef2', 420, 1000);
 const C = {
   grass: new Color('#8ccf4a'), grassLight: new Color('#b6e15a'), grassDeep: new Color('#6cbd3e'),
   floor: new Color('#58a336'), meadow: new Color('#d3e57e'), sand: new Color('#f1e3b0'),
-  path: new Color('#e0be82'), cliff: new Color('#f7f1e3'), strata: new Color('#e6d9bd'), bed: new Color('#5cc6b8')
+  path: new Color('#e0be82'), cliff: new Color('#f7f1e3'), bank: new Color('#ead9a8'), strata: new Color('#e6d9bd'), bed: new Color('#5cc6b8')
 };
 const STEP = 1.5;
 function buildGround(): Mesh {
@@ -67,7 +67,7 @@ function buildGround(): Mesh {
   const H = (i: number, j: number) => heights[j * (nx + 1) + i]!;
   const colour = new Color();
   const tint = (x: number, z: number, y: number, slope: number) => {
-    if (slope > 1.25 || y < -2) {
+    if (slope > 1.6 || y < -2) {
       colour.copy(C.cliff).lerp(C.strata, (Math.sin(y * 1.7) * 0.5 + 0.5) * 0.6);
       return;
     }
@@ -77,6 +77,8 @@ function buildGround(): Mesh {
     const week = cells[own.cell]!.week;
     if (week == null || week > builtWeeks) colour.lerp(C.meadow, 0.4);
     colour.lerp(C.floor, planting.density(x, z) * 0.75);
+    // Terrace risers inside the map: a creamy earth bank, so each step reads as a little cliff.
+    if (slope > 0.35) colour.lerp(C.bank, smoothstep(0.35, 0.95, slope) * 0.85);
     const p = terrain.pathDistance(x, z);
     if (p < 1.6) colour.lerp(C.path, smoothstep(1.6, 0.6, p));
     const r = terrain.riverDistance(x, z);
@@ -91,6 +93,8 @@ function buildGround(): Mesh {
       const ys = tri.map(([a, b]) => H(a, b));
       if (ys.every((y) => y <= -8.9)) continue;
       const cx = tri.reduce((s, [a]) => s + vx(a), 0) / 3, cz = tri.reduce((s, [, b]) => s + vz(b), 0) / 3;
+      // Bed well inside the river or lake is hidden under opaque water: don't draw it.
+      if (Math.min(terrain.riverDistance(cx, cz).d - terrain.RIVER_WIDTH, terrain.lakeDistance(cx, cz)) < 0 && land(cx, cz) > 3) continue;
       const cy = ys.reduce((s, y) => s + y, 0) / 3;
       const slope = (Math.max(...ys) - Math.min(...ys)) / STEP;
       tint(cx, cz, cy, slope);
@@ -127,7 +131,7 @@ scene.add(ground);
 // ---------- Water: stepped river with little falls, and a still lake ----------
 function buildWater(): Group {
   const group = new Group();
-  const material = new MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.0, transparent: true, opacity: 0.93, side: DoubleSide });
+  const material = new MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.0, side: DoubleSide });
   const positions: number[] = [], colors: number[] = [];
   const deep = new Color('#2fb3c6'), foam = new Color('#f2fdff');
   const pts = terrain.river;
@@ -135,29 +139,66 @@ function buildWater(): Group {
   const first = pts.findIndex((p) => land(p.x, p.z) > 3);
   let last = first;
   while (last + 1 < pts.length && land(pts[last + 1]!.x, pts[last + 1]!.z) > 1.5) last += 1;
-  const fallPositions: number[] = [];
-  const ribbon = (a: { x: number; z: number }, b: { x: number; z: number }, ya: number, yb: number, into: number[], tint: boolean) => {
+  // Falls (the little steps and the big drop over the cliff) are unlit: a lit vertical sheet facing
+  // away from the sun read grey. Each runs from clear aqua at the lip to white foam at the foot.
+  const fallPositions: number[] = [], fallColors: number[] = [];
+  const lip = new Color('#7fe0ea'), white = new Color('#ffffff'), c = new Color();
+  const ribbon = (a: { x: number; z: number }, b: { x: number; z: number }, ya: number, yb: number) => {
     const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz) || 1;
     const nx = (-dz / len) * w, nz = (dx / len) * w;
     const quad = [[a.x - nx, ya, a.z - nz], [b.x - nx, yb, b.z - nz], [a.x + nx, ya, a.z + nz], [a.x + nx, ya, a.z + nz], [b.x - nx, yb, b.z - nz], [b.x + nx, yb, b.z + nz]];
+    const step = Math.abs(ya - yb) > 0.2;
     for (const [x, y, z] of quad) {
-      into.push(x!, y!, z!);
-      if (!tint) continue;
-      const step = Math.abs(ya - yb) > 0.2;
-      const c = step ? foam : deep.clone().lerp(foam, fbm(x! * 0.3, z! * 0.3, 4) * 0.25);
-      colors.push(c.r, c.g, c.b);
+      if (step) {
+        fallPositions.push(x!, y!, z!);
+        c.copy(lip).lerp(foam, y === ya ? 0.15 : 1);
+        fallColors.push(c.r, c.g, c.b);
+      } else {
+        positions.push(x!, y!, z!);
+        c.copy(deep).lerp(foam, fbm(x! * 0.3, z! * 0.3, 4) * 0.25);
+        colors.push(c.r, c.g, c.b);
+      }
     }
   };
-  for (let i = Math.max(0, first); i < last; i += 1) ribbon(pts[i]!, pts[i + 1]!, pts[i]!.level, pts[i + 1]!.level, positions, true);
-  // Spring at the top: a little pool. Fall at the bottom: over the cliff.
+  for (let i = Math.max(0, first); i < last; i += 1) ribbon(pts[i]!, pts[i + 1]!, pts[i]!.level, pts[i + 1]!.level);
+  // Spring at the top: a little pool. Fall at the bottom: a curved sheet over the cliff, streaked,
+  // widening a little as it drops, with a puff of spray at its foot.
   const end = pts[last]!, beyond = pts[Math.min(pts.length - 1, last + 2)]!;
-  const out = new Vector3(beyond.x - end.x, 0, beyond.z - end.z).normalize().multiplyScalar(1.2);
-  ribbon({ x: end.x, z: end.z }, { x: end.x + out.x, z: end.z + out.z }, end.level, end.level, positions, true);
-  ribbon({ x: end.x + out.x, z: end.z + out.z }, { x: end.x + out.x * 1.6, z: end.z + out.z * 1.6 }, end.level, -9, fallPositions, false);
+  const out = new Vector3(beyond.x - end.x, 0, beyond.z - end.z).normalize();
+  const side = new Vector3(-out.z, 0, out.x);
+  ribbon({ x: end.x, z: end.z }, { x: end.x + out.x * 1.2, z: end.z + out.z * 1.2 }, end.level, end.level);
+  const ROWS = 6, COLS = 4, drop = end.level + 9;
+  const at = (row: number, col: number): [number, number, number] => {
+    const t = row / ROWS, reach = 1.2 + 0.4 * t + 0.5 * Math.sqrt(t), spread = w * (1 + 0.15 * t) * (col / COLS * 2 - 1);
+    return [end.x + out.x * reach + side.x * spread, end.level - drop * t, end.z + out.z * reach + side.z * spread];
+  };
+  const tone = (row: number, col: number) => {
+    const t = row / ROWS, streak = col % 2 ? 0.18 : 0;
+    c.copy(lip).lerp(white, Math.min(1, Math.pow(t, 0.6) + streak));
+    fallColors.push(c.r, c.g, c.b);
+  };
+  for (let row = 0; row < ROWS; row += 1) for (let col = 0; col < COLS; col += 1) {
+    for (const [r, k] of [[row, col], [row + 1, col], [row, col + 1], [row, col + 1], [row + 1, col], [row + 1, col + 1]] as const) {
+      fallPositions.push(...at(r, k));
+      tone(r, k);
+    }
+  }
+  const spray = new IcosahedronGeometry(1, 0).getAttribute('position');
+  const foot = at(ROWS, COLS / 2);
+  for (let b = 0; b < 3; b += 1) {
+    const s = 1.8 + (b % 2) * 0.5, off = (b - 1) * w * 0.55;
+    for (let v = 0; v < spray.count; v += 1) {
+      fallPositions.push(foot[0] + side.x * off + spray.getX(v) * s, foot[1] + 0.6 + spray.getY(v) * s * 0.7, foot[2] + side.z * off + spray.getZ(v) * s);
+      c.copy(white).lerp(lip, 0.08 + (spray.getY(v) < 0 ? 0.12 : 0));
+      fallColors.push(c.r, c.g, c.b);
+    }
+  }
   const fallGeometry = new BufferGeometry();
   fallGeometry.setAttribute('position', new Float32BufferAttribute(fallPositions, 3));
-  fallGeometry.computeVertexNormals();
-  group.add(new Mesh(fallGeometry, new MeshStandardMaterial({ color: '#e6fbff', emissive: '#9fe6f2', emissiveIntensity: 0.45, transparent: true, opacity: 0.9, side: DoubleSide })));
+  fallGeometry.setAttribute('color', new Float32BufferAttribute(fallColors, 3));
+  const falls = new Mesh(fallGeometry, new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.96, side: DoubleSide }));
+  falls.renderOrder = 2;
+  group.add(falls);
   // Lake disc.
   const L = terrain.lake;
   for (let k = 0; k < 48; k += 1) {
@@ -179,6 +220,89 @@ function buildWater(): Group {
   return group;
 }
 scene.add(buildWater());
+
+// ---------- Bridges where the path crosses the river ----------
+// The only "bridge" in the model set is a stepping-stone slab at 3.5k triangles a stone, so these are
+// built here: a plank deck arched over the water with posts and a rail, a few hundred triangles each.
+// They share the ground material, so they mute with their week like everything else.
+function buildBridges(): Mesh {
+  const positions: number[] = [], colors: number[] = [], cellIds: number[] = [];
+  const deck = new Color('#c08a52'), rail = new Color('#946038');
+  const basis = new Matrix4(), place = new Matrix4(), along = new Vector3(), across = new Vector3(), upY = new Vector3(0, 1, 0);
+  const box = (x: number, y: number, z: number, sx: number, sy: number, sz: number, colour: Color, cell: number, ends = true) => {
+    // BoxGeometry faces run +x, -x, +y, -y, +z, -z (6 vertices each). The underside never shows, and
+    // planks and rails butt end to end, so their end faces can go too.
+    const g = new BoxGeometry(sx, sy, sz).toNonIndexed();
+    const keep = (v: number) => Math.floor(v / 6) !== 3 && (ends || Math.floor(v / 6) > 1);
+    g.applyMatrix4(place.copy(basis).setPosition(x, y, z));
+    const pos = g.getAttribute('position');
+    for (let v = 0; v < pos.count; v += 1) {
+      if (!keep(v)) continue;
+      positions.push(pos.getX(v), pos.getY(v), pos.getZ(v));
+      const shade = 0.92 + ((v * 7) % 5) * 0.03; // a little plank-to-plank variation
+      colors.push(colour.r * shade, colour.g * shade, colour.b * shade);
+      cellIds.push(cell);
+    }
+  };
+  const near = (p: { x: number; z: number }) => terrain.riverDistance(p.x, p.z).d < terrain.RIVER_WIDTH + 1;
+  const path = terrain.path;
+  for (let i = 0; i < path.length; i += 1) {
+    if (!near(path[i]!)) continue;
+    let j = i;
+    while (j + 1 < path.length && near(path[j + 1]!)) j += 1;
+    const a = path[Math.max(0, i - 1)]!, b = path[Math.min(path.length - 1, j + 1)]!;
+    i = j;
+    if (land(a.x, a.z) < 4 || land(b.x, b.z) < 4) continue;
+    // Centre on the water, run along the path, reach well onto both banks.
+    let mid = a, best = Infinity;
+    for (let k = 0; k <= 10; k += 1) {
+      const p = { x: lerp(a.x, b.x, k / 10), z: lerp(a.z, b.z, k / 10) };
+      const d = terrain.riverDistance(p.x, p.z).d;
+      if (d < best) { best = d; mid = p; }
+    }
+    along.set(b.x - a.x, 0, b.z - a.z).normalize();
+    across.crossVectors(along, upY).normalize();
+    basis.makeBasis(along, upY, across);
+    const span = Math.max(9, Math.hypot(b.x - a.x, b.z - a.z) + 1.5), half = span / 2;
+    const endA = { x: mid.x - along.x * half, z: mid.z - along.z * half }, endB = { x: mid.x + along.x * half, z: mid.z + along.z * half };
+    const ya = terrain.height(endA.x, endA.z) + 0.12, yb = terrain.height(endB.x, endB.z) + 0.12;
+    const water = terrain.riverDistance(mid.x, mid.z).level;
+    const crown = Math.max(water + 1.1, (ya + yb) / 2 + 0.7) - (ya + yb) / 2;
+    const cell = owner(cells, mid.x, mid.z).cell;
+    const at = (t: number) => ({ x: lerp(endA.x, endB.x, t), z: lerp(endA.z, endB.z, t), y: lerp(ya, yb, t) + crown * Math.sin(Math.PI * t) });
+    const planks = Math.round(span / 0.85);
+    for (let k = 0; k < planks; k += 1) {
+      const p = at((k + 0.5) / planks);
+      box(p.x, p.y, p.z, span / planks - 0.08, 0.2, 2.6, deck, cell, false);
+    }
+    // Posts and a rail on each side, between the banks.
+    for (const sideSign of [-1, 1]) {
+      const posts = 4;
+      let prev: { x: number; y: number; z: number } | null = null;
+      for (let k = 0; k < posts; k += 1) {
+        const t = 0.1 + (0.8 * k) / (posts - 1), p = at(t);
+        const px = p.x + across.x * 1.2 * sideSign, pz = p.z + across.z * 1.2 * sideSign;
+        box(px, p.y + 0.45, pz, 0.18, 0.9, 0.18, rail, cell);
+        const top = { x: px, y: p.y + 0.85, z: pz };
+        if (prev) {
+          const len = Math.hypot(top.x - prev.x, top.z - prev.z);
+          box((top.x + prev.x) / 2, (top.y + prev.y) / 2, (top.z + prev.z) / 2, len + 0.1, 0.12, 0.12, rail, cell, false);
+        }
+        prev = top;
+      }
+    }
+  }
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
+  geometry.setAttribute('aCell', new Float32BufferAttribute(cellIds, 1));
+  geometry.computeVertexNormals();
+  const mesh = new Mesh(geometry, ground.material);
+  mesh.castShadow = false; // keeps the shadow pass within round three's triangle budget
+  mesh.receiveShadow = true;
+  return mesh;
+}
+scene.add(buildBridges());
 
 // ---------- Foliage colour ----------
 // Quaternius leaves carry dark baked vertex colour (AO) and flat textures. At Year zoom that reads
@@ -210,15 +334,24 @@ vec3 groveLeaf(vec3 linear) {
 function dress(mat: any): void {
   if (!mat || mat.userData.dressed) return;
   mat.userData.dressed = true;
-  if (!/lea[fv]/i.test(mat.name ?? '')) return;
+  const leaf = /lea[fv]/i.test(mat.name ?? '');
+  // Every model material mutes instances outside the expanded week, like the ground does.
+  const mute = 'if (uSelected >= 0.0 && abs(vGroveCell - uSelected) > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.33))), 0.55) * 0.82;';
   mat.onBeforeCompile = (shader: any) => {
-    shader.uniforms.uLeafAO = { value: 0.35 };
-    shader.uniforms.uLeafFill = { value: 0.14 };
-    shader.fragmentShader = FOLIAGE_GLSL + shader.fragmentShader
-      .replace('#include <color_fragment>', '#ifdef USE_COLOR\n  diffuseColor.rgb *= mix(vec3(1.0), vColor.rgb, uLeafAO);\n#endif\ndiffuseColor.rgb = groveLeaf(diffuseColor.rgb);')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * uLeafFill;');
+    shader.uniforms.uSelected = selection;
+    shader.vertexShader = 'attribute float aCell;\nvarying float vGroveCell;\n' + shader.vertexShader
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroveCell = aCell;');
+    let frag: string = shader.fragmentShader;
+    if (leaf) {
+      shader.uniforms.uLeafAO = { value: 0.35 };
+      shader.uniforms.uLeafFill = { value: 0.14 };
+      frag = FOLIAGE_GLSL + frag
+        .replace('#include <color_fragment>', '#ifdef USE_COLOR\n  diffuseColor.rgb *= mix(vec3(1.0), vColor.rgb, uLeafAO);\n#endif\ndiffuseColor.rgb = groveLeaf(diffuseColor.rgb);\n' + mute)
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * uLeafFill;');
+    } else frag = frag.replace('#include <color_fragment>', '#include <color_fragment>\n' + mute);
+    shader.fragmentShader = 'uniform float uSelected;\nvarying float vGroveCell;\n' + frag;
   };
-  mat.customProgramCacheKey = () => 'grove-leaf';
+  mat.customProgramCacheKey = () => (leaf ? 'grove-leaf-mute' : 'grove-mute');
   mat.needsUpdate = true;
 }
 
@@ -267,7 +400,14 @@ async function instance(items: Placed[], shadows: boolean) {
     const slot: Slot = { list, full: [], lod: [], fullItems: [], lodItems: list, unit: 1 / full.height, fullParts: full.parts, lodParts: lod.parts };
     const make = (parts: Part[], into: InstancedMesh[], items: () => Placed[]) => {
       for (const part of parts) {
-        const mesh = new InstancedMesh(part.geometry, part.material as any, list.length);
+        // Own geometry shell (shared buffers) so each mesh carries its own per-instance cell index.
+        const geometry = new BufferGeometry();
+        geometry.index = part.geometry.index;
+        for (const name of Object.keys(part.geometry.attributes)) geometry.setAttribute(name, part.geometry.attributes[name]!);
+        geometry.groups = part.geometry.groups;
+        geometry.boundingBox = part.geometry.boundingBox;
+        geometry.setAttribute('aCell', new InstancedBufferAttribute(new Float32Array(list.length), 1));
+        const mesh = new InstancedMesh(geometry, part.material as any, list.length);
         mesh.castShadow = shadows;
         mesh.receiveShadow = !shadows; // tree crowns stay bright; ground cover sits in shade
         into.push(mesh);
@@ -284,7 +424,10 @@ async function instance(items: Placed[], shadows: boolean) {
 const m4 = new Matrix4(), q4 = new Quaternion(), p4 = new Vector3(), s4 = new Vector3(), up4 = new Vector3(0, 1, 0);
 function fill(slot: Slot): void {
   const write = (meshes: InstancedMesh[], parts: Part[], items: Placed[]) => meshes.forEach((mesh, k) => {
+    const aCell = mesh.geometry.getAttribute('aCell') as InstancedBufferAttribute;
     items.forEach((item, i) => {
+      item.cell ??= owner(cells, item.x, item.z).cell;
+      aCell.setX(i, item.cell);
       q4.setFromAxisAngle(up4, item.rotation);
       s4.setScalar(item.scale * slot.unit);
       p4.set(item.x, item.y - 0.05, item.z);
@@ -293,6 +436,7 @@ function fill(slot: Slot): void {
     mesh.count = items.length;
     mesh.visible = items.length > 0;
     mesh.instanceMatrix.needsUpdate = true;
+    aCell.needsUpdate = true;
     mesh.computeBoundingSphere();
   });
   write(slot.full, slot.fullParts, slot.fullItems);
@@ -430,11 +574,21 @@ function expand(cellIndex: number): void {
   selection.value = cellIndex;
   const centre = trees.length ? trees.reduce((v, t) => v.add(new Vector3(t.x / trees.length, 0, t.z / trees.length)), new Vector3()) : new Vector3(cell.x, 0, cell.z);
   centre.lerp(new Vector3(cell.x, 0, cell.z), 0.5);
-  centre.y = terrain.height(centre.x, centre.z);
-  const span = 58;
+  centre.y = terrain.height(centre.x, centre.z) + 3; // middle of the stand, not the ground under it
   const w = stage.clientWidth, h = stage.clientHeight;
-  const zoom = Math.min((worldHalf * 2) / span, (worldHalf * 2 * (w / h)) / span);
-  ease(centre, Math.min(controls.maxZoom, zoom));
+  // A phone shows the week across its width; a wider screen keeps some neighbours around it.
+  const span = w < 720 ? 40 : 58;
+  const zoom = Math.min(controls.maxZoom, (worldHalf * 2) / span, (worldHalf * 2 * (w / h)) / span);
+  // Put the week in the middle of the space under the title. The frustum is offset upward and
+  // three.js zooms about its middle, not about the target, so without this the week slid down the
+  // screen as it zoomed in (and the title covers the top of a phone screen).
+  const stageTop = stage.getBoundingClientRect().top;
+  const free = Math.max(0, title.getBoundingClientRect().bottom - stageTop + 8);
+  const aim = (free + h) / 2;
+  const mid = (camera.top + camera.bottom) / 2, half = (camera.top - camera.bottom) / (2 * zoom);
+  const v = mid + half - (aim / h) * 2 * half; // view height that lands on the aim line
+  const up = new Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+  ease(centre.sub(up.multiplyScalar(v)), zoom);
 }
 back.addEventListener('click', () => {
   showYear();
