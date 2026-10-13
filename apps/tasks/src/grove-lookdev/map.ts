@@ -77,6 +77,8 @@ export type Terrain = {
   riverDistance(x: number, z: number): { d: number; level: number };
   lake: { x: number; z: number; r: number; level: number };
   lakeDistance(x: number, z: number): number;
+  /** Cells whose clearing would sit under the lake get an island there, so the week has ground to grow on. */
+  islands: { cell: number; x: number; z: number; r: number }[];
   path: { x: number; z: number }[];
   pathDistance(x: number, z: number): number;
   RIVER_WIDTH: number;
@@ -150,10 +152,21 @@ export function buildTerrain(cells: Cell[], builtWeeks: number): Terrain {
   const lakeCentre = { x: -48, z: -38 };
   const lakeBase = natural(lakeCentre.x, lakeCentre.z);
   const lake = { ...lakeCentre, r: 13, level: lakeBase - 0.9 };
-  const lakeDistance = (x: number, z: number) => {
+  const openWater = (x: number, z: number) => {
     const a = Math.atan2(z - lake.z, x - lake.x);
     const r = lake.r * (0.82 + fbm(Math.cos(a) * 1.5 + 5, Math.sin(a) * 1.5, 13) * 0.4);
     return Math.hypot(x - lake.x, z - lake.z) - r;
+  };
+  // A week whose piece is almost all lake would have nowhere to plant: give its clearing an island.
+  const islands = cells.filter((c) => openWater(c.x, c.z) < -4).map((c) => ({ cell: c.index, x: c.x, z: c.z, r: 5 }));
+  const lakeDistance = (x: number, z: number) => {
+    let d = openWater(x, z);
+    for (const isle of islands) {
+      const a = Math.atan2(z - isle.z, x - isle.x);
+      const r = isle.r * (0.85 + fbm(Math.cos(a) + 9, Math.sin(a), 21) * 0.3);
+      d = Math.max(d, r - Math.hypot(x - isle.x, z - isle.z));
+    }
+    return d;
   };
 
   // A walking path through each finished week's clearing, in order.
@@ -177,5 +190,5 @@ export function buildTerrain(cells: Cell[], builtWeeks: number): Terrain {
     return h * smoothstep(-1, 3, m) + -9 * (1 - smoothstep(-1, 3, m));
   };
 
-  return { height, river, riverDistance, lake, lakeDistance, path, pathDistance, RIVER_WIDTH };
+  return { height, river, riverDistance, lake, lakeDistance, islands, path, pathDistance, RIVER_WIDTH };
 }
