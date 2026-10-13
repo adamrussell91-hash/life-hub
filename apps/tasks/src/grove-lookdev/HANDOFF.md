@@ -76,15 +76,56 @@ Triangles and draw calls unchanged (3.9M, 103 calls).
 - `body.dataset` now also exposes `zoom`, `px` (screen pixels per map unit) and `detailed`.
   The screenshot script drives frames after expanding, so the LOD swap is in the shot.
 
+## State after round four (water, bridges, terraces, muting, phone framing)
+
+- **Waterfall:** the cliff fall and the little river steps are now unlit (`MeshBasicMaterial`) with
+  vertex colour running from aqua at the lip to white foam at the foot. A lit vertical sheet facing
+  away from the sun was what read grey. The cliff fall is a curved, streaked sheet that widens as it
+  drops, with three low-poly spray puffs at its foot.
+- **Bridges:** `buildBridges()` in `main.ts` finds each place the path crosses the river and builds a
+  wooden plank bridge in code: an arched deck, four posts and a rail each side, bank to bank, along
+  the path. `models/ground/bridge-1.glb` is not a bridge: it is a round stepping-stone slab: 10.5k
+  triangles a stone, 3.5k even in its LOD copy. Bridges share the ground material, so they mute with their week.
+  Bank rocks are kept off the path so none sit on a deck.
+- **Inner terraces:** the terrain shape is unchanged. Risers inside the map are now tinted a creamy
+  earth bank (`C.bank`, slope 0.35 to 0.95), and the white cliff colour starts at slope 1.6 instead
+  of 1.25. A sharper terrace profile was tried. It made jagged white stripes across the path, and
+  pushed four trees out (442 to 438), so it was dropped.
+- **Muting:** every model material now gets one shader hook (`dress`). It applies the ground's mute
+  (55% towards grey, then 0.82) to any instance whose `aCell` is not the expanded week. `aCell` is a
+  per-instance attribute written in `fill()`; each instanced mesh has its own geometry shell so the
+  full and LOD meshes never share it. Trees, ground cover, rocks and bridges all mute.
+- **Phone framing:** three.js zooms an orthographic camera about the middle of its frustum, and this
+  frustum is offset upward (top 1.06, bottom 0.94). So the further it zoomed, the lower the week sat.
+  `expand` now aims the week's stand at the middle of the space under the title, and a phone fits the
+  week to a 40-unit span (58 on wider screens).
+- **Triangle budget:** at or below round three in every view. To pay for the bridges and falls, the
+  river and lake bed is no longer drawn where opaque water covers it (the water was 93% opaque; it is
+  now fully opaque). Bridges receive shadows but do not cast them.
+
+  | View | Round three | Round four |
+  |---|---|---|
+  | Desktop Year | 1,084,346 | 1,084,164 |
+  | Desktop expanded week 23 | 2,251,388 | 2,226,830 |
+  | Phone Year | 1,084,342 | 1,084,164 |
+  | Phone expanded week 23 | 1,055,144 | 1,054,550 |
+
+- The screenshot script now also takes `week23-390` (phone expanded week). `GROVE_ONLY=<shot>`
+  takes one shot.
+
 ## Known gaps, in order
 
 1. **Phone budget, if real devices still struggle:** the heaviest LOD trees are tree-late-1/2/4
    (about 3.6k triangles each); impostor cards for Year view are the next step. Untested on a
    real phone so far.
-2. Waterfall sheet looks grey; no bridges where the path crosses the river; inner terraces faint.
-3. Expanded week mutes only the ground; trees in other weeks stay full colour.
-4. On a phone the expanded week sits low on screen with a lot of sky above it.
-5. Next look round, if Adam wants it: denser Age of Empires stands.
+2. **Trees are capped by space, not by history.** The synthetic history has 518 finished tasks,
+   but only 442 trees are drawn. `plant()` stops placing trees once a week's piece has no clear spot
+   left (spacing down to 1.4), and silently drops the other 76. That breaks Grove's "nothing dies"
+   rule. Planting all 76 with touching crowns was tried in round four. It added about 200k
+   triangles in Year view (shadow pass included), so it needs its own round: smaller saplings for crowded weeks, a denser
+   AoE-style stand, or a count on the week label.
+3. The little falls between river tiers still read as white wedges up close; fine at Year zoom.
+4. Next look round, if Adam wants it: denser Age of Empires stands.
 
 ## Live Grove problems found in the review (not yet fixed)
 
