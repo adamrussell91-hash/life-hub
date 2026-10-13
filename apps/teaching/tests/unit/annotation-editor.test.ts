@@ -134,14 +134,17 @@ describe('annotation editor 1b', () => {
     expect(source).not.toMatch(/textContent = '↑'|textContent = 'Remove'/);
   });
 
-  it('keeps the technique picker hidden (not a disabled control)', () => {
+  it('shows a technique tag control in the note panel', () => {
     const mount = document.createElement('div');
     mount.append(createAnnotationEditor(dulceAnnotationFixture, () => undefined));
     mount.querySelector<HTMLButtonElement>('.block-editor__annotation-open')?.click();
     const picker = mount.querySelector<HTMLElement>(
       '.block-editor__annotation-technique'
     );
-    expect(picker?.hidden).toBe(true);
+    expect(picker?.hidden).toBe(false);
+    expect(
+      picker?.querySelector('.block-editor__annotation-technique-btn')
+    ).toBeTruthy();
     expect(picker?.querySelector('button[disabled]')).toBeNull();
   });
 });

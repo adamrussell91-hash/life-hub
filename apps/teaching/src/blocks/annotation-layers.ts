@@ -118,7 +118,8 @@ export function markersFor(
   stops: AnnotationLayer[],
   state: AnnotationLayerState,
   showMarkers: boolean,
-  resolve: (annotation: AnnotationItem) => AnchorResolveResult
+  resolve: (annotation: AnnotationItem) => AnchorResolveResult,
+  techniqueSymbol?: (annotation: AnnotationItem) => string | undefined
 ): AnnotationMarker[] {
   if (!showMarkers) return [];
 
@@ -137,12 +138,13 @@ export function markersFor(
     const layer = layerMap.get(annotation.layer_id);
     if (!layer) continue;
 
+    const techSym = techniqueSymbol?.(annotation);
     out.push({
       annotationId: annotation.id,
       layerId: layer.id,
       layerName: layer.name,
       colour: layer.colour,
-      symbol: layerSymbol(layer),
+      symbol: techSym?.trim() || layerSymbol(layer),
       stanzaId: resolved.stanzaId,
       lineId: resolved.lineId,
       start: resolved.start,

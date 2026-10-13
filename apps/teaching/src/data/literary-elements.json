@@ -1,0 +1,3922 @@
+{
+  "version": "widgets@7366b85a401d",
+  "source": "widgets@7366b85a401d",
+  "synced_at": "2026-10-13T10:10:49.989Z",
+  "families": [
+    {
+      "key": "Descriptive",
+      "name": "Descriptive",
+      "colour": "#ff7d5a"
+    },
+    {
+      "key": "Repetitive",
+      "name": "Repetitive",
+      "colour": "#36d39a"
+    },
+    {
+      "key": "Comparative",
+      "name": "Comparative",
+      "colour": "#a98bff"
+    },
+    {
+      "key": "Structural",
+      "name": "Structural",
+      "colour": "#f7b733"
+    },
+    {
+      "key": "Intertextual",
+      "name": "Intertextual & Metafictional",
+      "colour": "#28d2e8"
+    }
+  ],
+  "subgroups": [
+    {
+      "id": "descriptive-imagery",
+      "family": "Descriptive",
+      "name": "Imagery",
+      "definition": "Language that appeals to the senses"
+    },
+    {
+      "id": "descriptive-environment-and-agency",
+      "family": "Descriptive",
+      "name": "Environment & Agency",
+      "definition": "Ways texts make the nonhuman world active, relational, or emotionally responsive"
+    },
+    {
+      "id": "descriptive-diction",
+      "family": "Descriptive",
+      "name": "Diction",
+      "definition": "Choice and arrangement of words in writing"
+    },
+    {
+      "id": "descriptive-tone-and-mood",
+      "family": "Descriptive",
+      "name": "Tone & Mood",
+      "definition": "The emotional attitude of the narrator and atmosphere of the text"
+    },
+    {
+      "id": "repetitive-sound-and-rhyme",
+      "family": "Repetitive",
+      "name": "Sound & Rhyme",
+      "definition": "Repetition and arrangement of sounds, rhyme, and phonetic texture in language"
+    },
+    {
+      "id": "repetitive-metre-and-rhythm",
+      "family": "Repetitive",
+      "name": "Metre & Rhythm",
+      "definition": "Patterns of stress, syllable count, and metrical feet that give poetry its rhythmic pulse"
+    },
+    {
+      "id": "repetitive-lexical",
+      "family": "Repetitive",
+      "name": "Lexical",
+      "definition": "Repetition of words, phrases, and word patterns"
+    },
+    {
+      "id": "repetitive-structural",
+      "family": "Repetitive",
+      "name": "Structural",
+      "definition": "Repetition of grammatical structures and syntactic patterns"
+    },
+    {
+      "id": "comparative-figurative",
+      "family": "Comparative",
+      "name": "Figurative",
+      "definition": "Language that deviates from literal meaning through comparison"
+    },
+    {
+      "id": "comparative-symbolic",
+      "family": "Comparative",
+      "name": "Symbolic",
+      "definition": "Use of symbols and symbolic patterns to create layers of meaning"
+    },
+    {
+      "id": "comparative-contrast",
+      "family": "Comparative",
+      "name": "Contrast",
+      "definition": "Techniques emphasizing difference and opposition"
+    },
+    {
+      "id": "structural-plot-and-structure",
+      "family": "Structural",
+      "name": "Plot & Structure",
+      "definition": "Techniques involving narrative ordering, plot construction, and temporal structure"
+    },
+    {
+      "id": "structural-tragic-mechanics",
+      "family": "Structural",
+      "name": "Tragic Mechanics",
+      "definition": "Classical dramatic and tragic structures governing downfall, recognition, and catharsis"
+    },
+    {
+      "id": "structural-syntactic",
+      "family": "Structural",
+      "name": "Syntactic",
+      "definition": "Techniques involving sentence structure and grammatical ordering"
+    },
+    {
+      "id": "structural-point-of-view",
+      "family": "Structural",
+      "name": "Point of View",
+      "definition": "Techniques involving narrator's perspective and narrative distance"
+    },
+    {
+      "id": "structural-rhetorical",
+      "family": "Structural",
+      "name": "Rhetorical",
+      "definition": "Techniques of argument, persuasion, and rhetorical effect"
+    },
+    {
+      "id": "structural-dramatic",
+      "family": "Structural",
+      "name": "Dramatic",
+      "definition": "Theatrical and dramatic conventions of performance and stage craft"
+    },
+    {
+      "id": "structural-form",
+      "family": "Structural",
+      "name": "Form",
+      "definition": "Theatrical forms and genres"
+    },
+    {
+      "id": "structural-wordplay",
+      "family": "Structural",
+      "name": "Wordplay",
+      "definition": "Techniques involving manipulation of words for comic or rhetorical effect"
+    },
+    {
+      "id": "intertextual-intertextual",
+      "family": "Intertextual",
+      "name": "Intertextual",
+      "definition": "Techniques referencing, incorporating, or dialoguing with other texts"
+    },
+    {
+      "id": "intertextual-metafictional",
+      "family": "Intertextual",
+      "name": "Metafictional",
+      "definition": "Techniques involving self-awareness and self-referentiality of narrative"
+    }
+  ],
+  "techniques": [
+    {
+      "id": "visual-imagery",
+      "symbol": "Vi",
+      "name": "Visual Imagery",
+      "subgroup": "descriptive-imagery",
+      "definition": "Language appealing to the sense of sight",
+      "effect": "Helps reader visualize scenes and characters",
+      "example": "The scarlet dress hung like a flag in the wind",
+      "related": [
+        "auditory-imagery",
+        "metaphor"
+      ]
+    },
+    {
+      "id": "auditory-imagery",
+      "symbol": "Au",
+      "name": "Auditory Imagery",
+      "subgroup": "descriptive-imagery",
+      "definition": "Language that evokes sounds",
+      "effect": "Intensifies emotional or sensory impact through sound",
+      "example": "The whisper of leaves in autumn wind",
+      "related": [
+        "visual-imagery",
+        "onomatopoeia"
+      ]
+    },
+    {
+      "id": "olfactory-imagery",
+      "symbol": "Ol",
+      "name": "Olfactory Imagery",
+      "subgroup": "descriptive-imagery",
+      "definition": "Language describing smells",
+      "effect": "Triggers strong emotional and memory responses",
+      "example": "The acrid smell of smoke filled the room",
+      "related": [
+        "gustatory-imagery",
+        "sensory-accumulation"
+      ]
+    },
+    {
+      "id": "gustatory-imagery",
+      "symbol": "Gu",
+      "name": "Gustatory Imagery",
+      "subgroup": "descriptive-imagery",
+      "definition": "Language describing taste",
+      "effect": "Creates intimate, visceral sensory experience",
+      "example": "The bitter pill of truth dissolved on his tongue",
+      "related": [
+        "olfactory-imagery",
+        "metaphor"
+      ]
+    },
+    {
+      "id": "tactile-imagery",
+      "symbol": "Ta",
+      "name": "Tactile Imagery",
+      "subgroup": "descriptive-imagery",
+      "definition": "Language describing texture and physical sensation",
+      "effect": "Engages reader through sense of touch",
+      "example": "The rough bark scraped her palms raw",
+      "related": [
+        "kinaesthetic-imagery",
+        "pathetic-fallacy"
+      ]
+    },
+    {
+      "id": "kinaesthetic-imagery",
+      "symbol": "Ki",
+      "name": "Kinaesthetic Imagery",
+      "subgroup": "descriptive-imagery",
+      "definition": "Language describing movement and physical sensation",
+      "effect": "Conveys bodily experience and motion",
+      "example": "Her limbs grew heavy; she sank into the chair",
+      "related": [
+        "tactile-imagery",
+        "stream-of-consciousness"
+      ]
+    },
+    {
+      "id": "synaesthesia",
+      "symbol": "Sy",
+      "name": "Synaesthesia",
+      "subgroup": "descriptive-imagery",
+      "definition": "Mixing sensory perceptions (e.g., hearing colors)",
+      "effect": "Creates striking, surreal effects and fresh perspectives",
+      "example": "The music was deep blue and resonant",
+      "related": [
+        "visual-imagery",
+        "metaphor"
+      ]
+    },
+    {
+      "id": "pathetic-fallacy",
+      "symbol": "Pa",
+      "name": "Pathetic Fallacy",
+      "subgroup": "descriptive-imagery",
+      "definition": "Attributing human emotions to nature or objects",
+      "effect": "Reflects character's inner state through external world",
+      "example": "The grey sky wept as she left",
+      "related": [
+        "personification",
+        "visual-imagery"
+      ]
+    },
+    {
+      "id": "ekphrasis",
+      "symbol": "Ek",
+      "name": "Ekphrasis",
+      "subgroup": "descriptive-imagery",
+      "definition": "Detailed, vivid description of a visual artwork or scene",
+      "effect": "Creates intensity and draws reader into moment",
+      "example": "The marble statue's eyes seemed to follow her",
+      "related": [
+        "visual-imagery",
+        "metaphor"
+      ]
+    },
+    {
+      "id": "sensory-accumulation",
+      "symbol": "Se",
+      "name": "Sensory Accumulation",
+      "subgroup": "descriptive-imagery",
+      "definition": "Layering multiple sensory details in close proximity",
+      "effect": "Overwhelms reader with immersive sensory experience",
+      "example": "The hot sand, sharp cry of gulls, salt spray, blinding sun",
+      "related": [
+        "visual-imagery",
+        "auditory-imagery"
+      ]
+    },
+    {
+      "id": "hypotyposis",
+      "symbol": "Hy",
+      "name": "Hypotyposis",
+      "subgroup": "descriptive-imagery",
+      "definition": "A strikingly vivid description of a scene or event, designed to create the impression that it is occurring before the reader's eyes in real time.",
+      "effect": "Generates immediate, visceral engagement; collapses narrative distance so that the reader witnesses rather than reads, producing emotional and sensory immediacy.",
+      "example": "Homer's battle descriptions in the Iliad, where violence is rendered with such physical precision it seems to unfold in the present moment.",
+      "related": [
+        "enargia",
+        "ekphrasis",
+        "visual-imagery",
+        "sensory-accumulation",
+        "pathetic-fallacy"
+      ]
+    },
+    {
+      "id": "enargia",
+      "symbol": "En",
+      "name": "Enargia",
+      "subgroup": "descriptive-imagery",
+      "definition": "Vivid, detailed description that renders a scene or object so clearly it seems to exist before the reader's eyes.",
+      "effect": "Creates sensory immediacy and immersion; collapses the distance between reader and text so that description functions almost as presence.",
+      "example": "Keats's 'To Autumn' describing the season's sights and textures with near-tactile vividness across every stanza.",
+      "related": [
+        "ekphrasis",
+        "sensory-accumulation",
+        "visual-imagery",
+        "hypotyposis",
+        "pathetic-fallacy"
+      ]
+    },
+    {
+      "id": "organic-imagery",
+      "symbol": "Or",
+      "name": "Organic Imagery",
+      "subgroup": "descriptive-imagery",
+      "definition": "Imagery that conveys internal physical sensations such as hunger, fatigue, fear or nausea.",
+      "effect": "Grounds emotion in visceral bodily experience.",
+      "example": "a hollow ache spread through her chest",
+      "related": []
+    },
+    {
+      "id": "animism",
+      "symbol": "An",
+      "name": "Animism",
+      "subgroup": "descriptive-environment-and-agency",
+      "definition": "Representation of nonhuman beings, places, objects or forces as agentic, animate or relational participants rather than inert background",
+      "effect": "Distributes agency beyond human characters and foregrounds reciprocal relationships between people and the nonhuman world",
+      "example": "The river is treated as an ancestor whose memory and choices shape the community",
+      "related": [
+        "personification",
+        "anthropomorphism",
+        "pathetic-fallacy",
+        "sympathetic-landscape"
+      ]
+    },
+    {
+      "id": "sympathetic-landscape",
+      "symbol": "Sm",
+      "name": "Sympathetic Landscape",
+      "subgroup": "descriptive-environment-and-agency",
+      "definition": "Landscape whose physical qualities correspond with a character's or text's emotional condition without necessarily giving nature human feelings",
+      "effect": "Makes setting a visual accompaniment to emotion and binds interior state to external scene",
+      "example": "After the funeral, bare fields and drained winter light echo the mourner's desolation",
+      "related": [
+        "pathetic-fallacy",
+        "objective-correlative",
+        "visual-imagery",
+        "animism"
+      ]
+    },
+    {
+      "id": "connotation",
+      "symbol": "Co",
+      "name": "Connotation",
+      "subgroup": "descriptive-diction",
+      "definition": "Implied or associated meaning beyond literal definition",
+      "effect": "Adds layers of meaning and emotional resonance",
+      "example": "Home (warmth, safety) vs. house (neutral)",
+      "related": [
+        "denotation",
+        "loaded-language"
+      ]
+    },
+    {
+      "id": "denotation",
+      "symbol": "De",
+      "name": "Denotation",
+      "subgroup": "descriptive-diction",
+      "definition": "Literal, dictionary definition of a word",
+      "effect": "Establishes precise, objective meaning",
+      "example": "Rose: a prickly flowering plant; also romantic symbol",
+      "related": [
+        "connotation",
+        "abstract-diction"
+      ]
+    },
+    {
+      "id": "archaism",
+      "symbol": "Ar",
+      "name": "Archaism",
+      "subgroup": "descriptive-diction",
+      "definition": "Use of outdated or archaic words",
+      "effect": "Creates historical atmosphere or formal tone",
+      "example": "Thou, thee, hath, forsooth in Shakespeare",
+      "related": [
+        "neologism",
+        "register-shift"
+      ]
+    },
+    {
+      "id": "neologism",
+      "symbol": "Ne",
+      "name": "Neologism",
+      "subgroup": "descriptive-diction",
+      "definition": "Newly created or recently adopted words",
+      "effect": "Signals modernity or innovation",
+      "example": "Selfie, cryptocurrency, binge-watch",
+      "related": [
+        "archaism",
+        "jargon"
+      ]
+    },
+    {
+      "id": "colloquialism",
+      "symbol": "Cl",
+      "name": "Colloquialism",
+      "subgroup": "descriptive-diction",
+      "definition": "Informal, conversational language",
+      "effect": "Creates intimacy and realistic dialogue",
+      "example": "Gonna, wanna, ain't in everyday speech",
+      "related": [
+        "jargon",
+        "register-shift"
+      ]
+    },
+    {
+      "id": "jargon",
+      "symbol": "Ja",
+      "name": "Jargon",
+      "subgroup": "descriptive-diction",
+      "definition": "Specialized terminology of a profession or group",
+      "effect": "Establishes expertise and insider perspective",
+      "example": "Binary, algorithm in programming; tort, statute in law",
+      "related": [
+        "colloquialism",
+        "slang"
+      ]
+    },
+    {
+      "id": "slang",
+      "symbol": "Sl",
+      "name": "Slang",
+      "subgroup": "descriptive-diction",
+      "definition": "Very informal, often group-specific language",
+      "effect": "Creates authenticity and generation/subculture specificity",
+      "example": "Lit, flex, salty in contemporary usage",
+      "related": [
+        "colloquialism",
+        "jargon"
+      ]
+    },
+    {
+      "id": "euphemism",
+      "symbol": "Eu",
+      "name": "Euphemism",
+      "subgroup": "descriptive-diction",
+      "definition": "Mild or indirect term substituted for something harsh",
+      "effect": "Softens blow of uncomfortable truth",
+      "example": "Passed away instead of died; let go instead of fired",
+      "related": [
+        "dysphemism",
+        "loaded-language"
+      ]
+    },
+    {
+      "id": "dysphemism",
+      "symbol": "Dy",
+      "name": "Dysphemism",
+      "subgroup": "descriptive-diction",
+      "definition": "Harsh or crude term substituted for neutral one",
+      "effect": "Emphasizes negative aspects",
+      "example": "Croak instead of die; pig instead of police officer",
+      "related": [
+        "euphemism",
+        "loaded-language"
+      ]
+    },
+    {
+      "id": "register-shift",
+      "symbol": "Re",
+      "name": "Register Shift",
+      "subgroup": "descriptive-diction",
+      "definition": "Abrupt change from one level of formality to another",
+      "effect": "Creates jarring effect or comic contrast",
+      "example": "Formal opening followed by slang",
+      "related": [
+        "colloquialism",
+        "archaism"
+      ]
+    },
+    {
+      "id": "abstract-diction",
+      "symbol": "Ab",
+      "name": "Abstract Diction",
+      "subgroup": "descriptive-diction",
+      "definition": "Use of general, intangible concepts rather than concrete details",
+      "effect": "Emphasizes ideas and themes over specifics",
+      "example": "Justice, love, freedom vs. the judge, her embrace, the border",
+      "related": [
+        "concrete-diction",
+        "nominalization"
+      ]
+    },
+    {
+      "id": "concrete-diction",
+      "symbol": "Cn",
+      "name": "Concrete Diction",
+      "subgroup": "descriptive-diction",
+      "definition": "Use of specific, tangible, sensory words",
+      "effect": "Creates vivid, immediate imagery and clarity",
+      "example": "Oak tree instead of vegetation; bitter cold instead of cold",
+      "related": [
+        "abstract-diction",
+        "visual-imagery"
+      ]
+    },
+    {
+      "id": "latinate-diction",
+      "symbol": "La",
+      "name": "Latinate Diction",
+      "subgroup": "descriptive-diction",
+      "definition": "Use of words derived from Latin or Romance languages",
+      "effect": "Creates formal, elevated, or sophisticated tone",
+      "example": "Commence, facilitate, ameliorate",
+      "related": [
+        "anglo-saxon-diction"
+      ]
+    },
+    {
+      "id": "anglo-saxon-diction",
+      "symbol": "Ag",
+      "name": "Anglo-Saxon Diction",
+      "subgroup": "descriptive-diction",
+      "definition": "Use of words from Old English and Germanic roots",
+      "effect": "Creates simple, direct, or earthy tone",
+      "example": "Begin, help, improve, quick",
+      "related": [
+        "latinate-diction",
+        "colloquialism"
+      ]
+    },
+    {
+      "id": "loaded-language",
+      "symbol": "Lo",
+      "name": "Loaded Language",
+      "subgroup": "descriptive-diction",
+      "definition": "Words chosen for emotional impact beyond denotation",
+      "effect": "Manipulates reader's emotions and attitudes",
+      "example": "Freedom fighter vs. terrorist; slender vs. skeletal",
+      "related": [
+        "connotation",
+        "dysphemism"
+      ]
+    },
+    {
+      "id": "nominalization",
+      "symbol": "No",
+      "name": "Nominalization",
+      "subgroup": "descriptive-diction",
+      "definition": "Converting a verb or adjective into a noun",
+      "effect": "Creates abstraction or formality",
+      "example": "Destroy → destruction; happy → happiness",
+      "related": [
+        "abstract-diction",
+        "verbing"
+      ]
+    },
+    {
+      "id": "verbing",
+      "symbol": "Ve",
+      "name": "Verbing",
+      "subgroup": "descriptive-diction",
+      "definition": "Using a noun as a verb (verbifying)",
+      "effect": "Creates energy and directness",
+      "example": "Google it, text me, access the database",
+      "related": [
+        "nominalization",
+        "neologism"
+      ]
+    },
+    {
+      "id": "idiolect",
+      "symbol": "Id",
+      "name": "Idiolect",
+      "subgroup": "descriptive-diction",
+      "definition": "The unique, individually distinctive vocabulary, grammar and speech patterns belonging to a specific character or speaker.",
+      "effect": "Individualises character through language alone; can signal class, education, culture or psychology without authorial commentary.",
+      "example": "Holden Caulfield's repetitive colloquialisms in The Catcher in the Rye, or Shakespeare's gravediggers whose malapropisms mark them as working-class outsiders.",
+      "related": [
+        "register-shift",
+        "colloquialism",
+        "anglo-saxon-diction",
+        "jargon",
+        "slang"
+      ]
+    },
+    {
+      "id": "polysemy",
+      "symbol": "Po",
+      "name": "Polysemy",
+      "subgroup": "descriptive-diction",
+      "definition": "The property of a single word or phrase carrying multiple related or distinct meanings simultaneously within a text.",
+      "effect": "Generates deliberate ambiguity and semantic richness; invites multiple readings and rewards the close reader with layered interpretive possibilities.",
+      "example": "The word 'heart' operating as organ, seat of emotion and moral courage simultaneously within a single poetic line.",
+      "related": [
+        "ambivalence",
+        "double-entendre",
+        "connotation",
+        "denotation",
+        "pun"
+      ]
+    },
+    {
+      "id": "irony",
+      "symbol": "Ir",
+      "name": "Irony",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Expression of meaning using language that signifies the opposite",
+      "effect": "Creates humor, social commentary, or reveals contradiction",
+      "example": "Saying 'Oh, great!' when something is terrible",
+      "related": [
+        "sarcasm",
+        "verbal-irony"
+      ]
+    },
+    {
+      "id": "sarcasm",
+      "symbol": "Sa",
+      "name": "Sarcasm",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Sharp, bitter taunt or ironic utterance",
+      "effect": "Creates mockery and often reveals contempt",
+      "example": "Oh, you're so smart—you failed the test",
+      "related": [
+        "irony",
+        "cynicism"
+      ]
+    },
+    {
+      "id": "cynicism",
+      "symbol": "Cy",
+      "name": "Cynicism",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Belief that people are motivated by self-interest",
+      "effect": "Creates dark, pessimistic tone and detachment",
+      "example": "Everyone's got an agenda; no one acts from kindness",
+      "related": [
+        "sarcasm",
+        "detachment"
+      ]
+    },
+    {
+      "id": "melancholy",
+      "symbol": "Me",
+      "name": "Melancholy",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Deep, persistent sadness or pensiveness",
+      "effect": "Creates introspective, sorrowful atmosphere",
+      "example": "The fading light as day turns to dusk",
+      "related": [
+        "wistfulness",
+        "elegy"
+      ]
+    },
+    {
+      "id": "wistfulness",
+      "symbol": "Wi",
+      "name": "Wistfulness",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Yearning sadness or nostalgic longing",
+      "effect": "Evokes bittersweet remembrance of past",
+      "example": "Remembering childhood summers, now forever gone",
+      "related": [
+        "melancholy"
+      ]
+    },
+    {
+      "id": "reverence",
+      "symbol": "Rv",
+      "name": "Reverence",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Deep respect, awe, or veneration",
+      "effect": "Creates solemn, dignified, sacred atmosphere",
+      "example": "The cathedral's hushed tones and dim light",
+      "related": [
+        "detachment",
+        "lyric-intensity"
+      ]
+    },
+    {
+      "id": "detachment",
+      "symbol": "Dt",
+      "name": "Detachment",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Emotional distance or objective observation without judgment",
+      "effect": "Creates scientific or ironic perspective",
+      "example": "He described the disaster with clinical precision",
+      "related": [
+        "cynicism",
+        "understatement"
+      ]
+    },
+    {
+      "id": "urgency",
+      "symbol": "Ur",
+      "name": "Urgency",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Sense of pressing importance or necessity",
+      "effect": "Creates tension and compels reader action",
+      "example": "Short sentences, exclamation, present tense in action",
+      "related": [
+        "ambivalence",
+        "lyric-intensity"
+      ]
+    },
+    {
+      "id": "ambivalence",
+      "symbol": "Am",
+      "name": "Ambivalence",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Simultaneous presence of contradictory feelings",
+      "effect": "Creates complexity and internal conflict",
+      "example": "Love and hatred for the same person simultaneously",
+      "related": [
+        "wistfulness",
+        "irony"
+      ]
+    },
+    {
+      "id": "elegy",
+      "symbol": "El",
+      "name": "Elegy",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Mournful or contemplative poem; expresses sorrow",
+      "effect": "Creates atmosphere of loss and reflection",
+      "example": "Formal mourning of the dead or passing of beauty",
+      "related": [
+        "melancholy",
+        "reverence"
+      ]
+    },
+    {
+      "id": "sardonic-tone",
+      "symbol": "Sr",
+      "name": "Sardonic Tone",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Mocking, scornful, with dark humor",
+      "effect": "Creates bitter critique with humor",
+      "example": "His earnest advice was met with sardonic laughter",
+      "related": [
+        "sarcasm",
+        "cynicism"
+      ]
+    },
+    {
+      "id": "lyric-intensity",
+      "symbol": "Ly",
+      "name": "Lyric Intensity",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Heightened emotional expression with poetic force",
+      "effect": "Creates passionate, deeply personal atmosphere",
+      "example": "Overwhelming love, fear, or wonder expressed lyrically",
+      "related": [
+        "urgency",
+        "reverence"
+      ]
+    },
+    {
+      "id": "understatement",
+      "symbol": "Un",
+      "name": "Understatement",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Representing something as less important than it is",
+      "effect": "Creates humor or unexpected effect through contrast",
+      "example": "A nuclear explosion was 'rather loud'",
+      "related": [
+        "detachment",
+        "litotes"
+      ]
+    },
+    {
+      "id": "hyperbole",
+      "symbol": "Hp",
+      "name": "Hyperbole",
+      "subgroup": "descriptive-tone-and-mood",
+      "definition": "Extreme exaggeration for effect",
+      "effect": "Creates humor, emphasis, or surrealism",
+      "example": "I've told you a million times; I'm dying of hunger",
+      "related": [
+        "understatement"
+      ]
+    },
+    {
+      "id": "alliteration",
+      "symbol": "Al",
+      "name": "Alliteration",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Repetition of initial consonant sounds in nearby words",
+      "effect": "Creates musicality and emphasizes phrases",
+      "example": "The silken, seductive snake slithered softly",
+      "related": [
+        "assonance",
+        "consonance"
+      ]
+    },
+    {
+      "id": "assonance",
+      "symbol": "As",
+      "name": "Assonance",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Repetition of vowel sounds within or near each other",
+      "effect": "Creates internal harmony and flow",
+      "example": "The rain in Spain falls mainly on the plain",
+      "related": [
+        "alliteration",
+        "consonance"
+      ]
+    },
+    {
+      "id": "consonance",
+      "symbol": "Cs",
+      "name": "Consonance",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Repetition of consonant sounds within or near each other",
+      "effect": "Creates texture and rhythmic cohesion",
+      "example": "The click and crack of broken sticks",
+      "related": [
+        "alliteration",
+        "assonance"
+      ]
+    },
+    {
+      "id": "sibilance",
+      "symbol": "Si",
+      "name": "Sibilance",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Repetition of s, z, sh, ch sounds",
+      "effect": "Creates hissing, whispered, or menacing effect",
+      "example": "The seashell's soft, subtle susurration",
+      "related": [
+        "alliteration",
+        "onomatopoeia"
+      ]
+    },
+    {
+      "id": "onomatopoeia",
+      "symbol": "On",
+      "name": "Onomatopoeia",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Word that imitates the sound it represents",
+      "effect": "Creates immediacy and auditory vividness",
+      "example": "Buzz, hiss, crack, bang, meow",
+      "related": [
+        "sibilance",
+        "cacophony"
+      ]
+    },
+    {
+      "id": "rhyme",
+      "symbol": "Rh",
+      "name": "Rhyme",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Repetition of terminal sounds in nearby words",
+      "effect": "Creates closure, musicality, and predictability",
+      "example": "Cat/hat, moon/June in poetry",
+      "related": [
+        "internal-rhyme",
+        "slant-rhyme"
+      ]
+    },
+    {
+      "id": "internal-rhyme",
+      "symbol": "In",
+      "name": "Internal Rhyme",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Rhyming words within the same line or clause",
+      "effect": "Creates compressed musicality and patterning",
+      "example": "I held it as I held my breath, as still as stone",
+      "related": [
+        "rhyme",
+        "anaphora"
+      ]
+    },
+    {
+      "id": "slant-rhyme",
+      "symbol": "Sn",
+      "name": "Slant Rhyme",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Words with similar but not identical sounds",
+      "effect": "Creates modern, imperfect musicality",
+      "example": "Home/come, reason/prison",
+      "related": [
+        "rhyme",
+        "eye-rhyme"
+      ]
+    },
+    {
+      "id": "eye-rhyme",
+      "symbol": "Ey",
+      "name": "Eye Rhyme",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Words spelled similarly but pronounced differently",
+      "effect": "Creates visual rather than auditory rhyme",
+      "example": "Love/move, through/though",
+      "related": [
+        "rhyme",
+        "slant-rhyme"
+      ]
+    },
+    {
+      "id": "cacophony",
+      "symbol": "Ca",
+      "name": "Cacophony",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Harsh, discordant combination of sounds",
+      "effect": "Creates jarring, ugly, or disturbing effect",
+      "example": "The grotesque crunch and screech of metal",
+      "related": [
+        "euphony",
+        "sibilance"
+      ]
+    },
+    {
+      "id": "euphony",
+      "symbol": "Ep",
+      "name": "Euphony",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Pleasing, harmonious combination of sounds",
+      "effect": "Creates smooth, beautiful, mellifluous effect",
+      "example": "Murmuring of innumerable bees; sweet silver sound",
+      "related": [
+        "cacophony",
+        "assonance"
+      ]
+    },
+    {
+      "id": "plosive-sounds",
+      "symbol": "Pl",
+      "name": "Plosive Sounds",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Hard consonants that stop the airflow",
+      "effect": "Creates percussive, emphatic effect",
+      "example": "Pick and pack the packed picnic basket",
+      "related": [
+        "fricative-sounds",
+        "consonance"
+      ]
+    },
+    {
+      "id": "fricative-sounds",
+      "symbol": "Fr",
+      "name": "Fricative Sounds",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Consonants produced by friction",
+      "effect": "Creates hissing, sizzling, or flowing effect",
+      "example": "Soft and soothing; fierce and hissing",
+      "related": [
+        "plosive-sounds",
+        "sibilance"
+      ]
+    },
+    {
+      "id": "sigmatism",
+      "symbol": "Sg",
+      "name": "Sigmatism",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "The deliberate or excessive repetition of the 's' sound, often distinguished from general sibilance by its concentration and sustained sinuous quality.",
+      "effect": "Creates a hissing, serpentine or whispering acoustic texture; associated with menace, seduction, secrecy or the insidious.",
+      "example": "\"The slow, sinuous, soundless serpent slid silently across the stones.\"",
+      "related": [
+        "sibilance",
+        "consonance",
+        "alliteration",
+        "cacophony",
+        "euphony"
+      ]
+    },
+    {
+      "id": "cross-rhyme",
+      "symbol": "Cr",
+      "name": "Cross Rhyme",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Rhyme between the end of one line and a word within another line.",
+      "effect": "Weaves sound across lines for subtle cohesion.",
+      "example": "An end word chiming with a mid-line word in the following line",
+      "related": []
+    },
+    {
+      "id": "half-rhyme",
+      "symbol": "Ha",
+      "name": "Half-Rhyme",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "An approximate rhyme in which sounds are similar but not identical, also called para-rhyme.",
+      "effect": "Creates dissonance or unease against the resolution of full rhyme.",
+      "example": "Wilfred Owen's escaped and scooped",
+      "related": []
+    },
+    {
+      "id": "feminine-rhyme",
+      "symbol": "Fe",
+      "name": "Feminine Rhyme",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "A rhyme on a stressed syllable followed by one or more unstressed syllables.",
+      "effect": "Softens the close with a falling, gentler echo.",
+      "example": "motion and ocean",
+      "related": []
+    },
+    {
+      "id": "masculine-rhyme",
+      "symbol": "Ma",
+      "name": "Masculine Rhyme",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "A rhyme on a single stressed final syllable.",
+      "effect": "Produces a firm, decisive chime.",
+      "example": "delight and night",
+      "related": []
+    },
+    {
+      "id": "end-rhyme",
+      "symbol": "Ed",
+      "name": "End Rhyme",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "Rhyme occurring at the ends of lines.",
+      "effect": "Marks line boundaries and binds the stanza musically.",
+      "example": "cat and hat falling at line ends",
+      "related": []
+    },
+    {
+      "id": "rhyme-scheme",
+      "symbol": "Ry",
+      "name": "Rhyme Scheme",
+      "subgroup": "repetitive-sound-and-rhyme",
+      "definition": "The ordered pattern of rhymes at the ends of lines, conventionally noted with letters.",
+      "effect": "Structures the poem's sound and signals its form.",
+      "example": "ABAB CDCD in a ballad stanza",
+      "related": []
+    },
+    {
+      "id": "rhythm",
+      "symbol": "Rt",
+      "name": "Rhythm",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "Pattern of stressed and unstressed syllables in language",
+      "effect": "Creates pace and musicality",
+      "example": "The iambic heartbeat of a poem's meter",
+      "related": [
+        "metre",
+        "free-verse"
+      ]
+    },
+    {
+      "id": "metre",
+      "symbol": "Mt",
+      "name": "Metre",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "Regular pattern of stressed and unstressed syllables",
+      "effect": "Creates formal structure and predictable musicality",
+      "example": "Iambic pentameter: da-DUM, da-DUM, da-DUM",
+      "related": [
+        "rhythm",
+        "iambic-pentameter"
+      ]
+    },
+    {
+      "id": "iambic-pentameter",
+      "symbol": "Ia",
+      "name": "Iambic Pentameter",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "Five iambs per line; common in English poetry",
+      "effect": "Creates formal, traditional elegance",
+      "example": "Shall I compare thee to a summer's day?",
+      "related": [
+        "metre",
+        "enjambment"
+      ]
+    },
+    {
+      "id": "free-verse",
+      "symbol": "Fv",
+      "name": "Free Verse",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "Poetry without regular meter or rhyme scheme",
+      "effect": "Allows natural speech rhythms and flexibility",
+      "example": "Much modern and contemporary poetry",
+      "related": [
+        "rhythm",
+        "enjambment"
+      ]
+    },
+    {
+      "id": "cadence",
+      "symbol": "Cd",
+      "name": "Cadence",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "The rhythmic rise and fall and modulation of the voice across a line or phrase.",
+      "effect": "Shapes the musical contour and emotional pacing of speech.",
+      "example": "The falling cadence at the close of a sentence",
+      "related": [
+        "rhythm",
+        "metre"
+      ]
+    },
+    {
+      "id": "iamb",
+      "symbol": "Im",
+      "name": "Iamb",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "A metrical foot of one unstressed syllable followed by one stressed syllable.",
+      "effect": "Produces the rising rhythm closest to natural English speech.",
+      "example": "a-BOVE, be-LOW",
+      "related": [
+        "foot",
+        "metre",
+        "iambic-pentameter"
+      ]
+    },
+    {
+      "id": "trochee",
+      "symbol": "Tr",
+      "name": "Trochee",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "A metrical foot of one stressed syllable followed by one unstressed syllable.",
+      "effect": "Creates a falling, emphatic or insistent rhythm.",
+      "example": "GAR-den, TI-ger",
+      "related": [
+        "foot",
+        "metre",
+        "iamb"
+      ]
+    },
+    {
+      "id": "foot",
+      "symbol": "Fo",
+      "name": "Foot",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "The basic metrical unit of a line, made up of a pattern of stressed and unstressed syllables.",
+      "effect": "Establishes the rhythmic pulse on which metre is built.",
+      "example": "The iamb in a-BOVE",
+      "related": [
+        "metre",
+        "iamb",
+        "spondee"
+      ]
+    },
+    {
+      "id": "spondee",
+      "symbol": "Sp",
+      "name": "Spondee",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "A metrical foot of two stressed syllables.",
+      "effect": "Slows the line and adds weight or emphasis.",
+      "example": "HEART-BREAK",
+      "related": []
+    },
+    {
+      "id": "pyrrhic",
+      "symbol": "Py",
+      "name": "Pyrrhic",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "A metrical foot of two unstressed syllables.",
+      "effect": "Lightens the line and quickens its movement.",
+      "example": "The unstressed pair in to a",
+      "related": []
+    },
+    {
+      "id": "anapaest",
+      "symbol": "Aa",
+      "name": "Anapaest",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "A metrical foot of two unstressed syllables followed by one stressed syllable.",
+      "effect": "Produces a brisk, rolling, often comic rhythm.",
+      "example": "in-ter-VENE",
+      "related": []
+    },
+    {
+      "id": "dactyl",
+      "symbol": "Da",
+      "name": "Dactyl",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "A metrical foot of one stressed syllable followed by two unstressed syllables.",
+      "effect": "Gives a galloping, tumbling momentum.",
+      "example": "MER-ri-ly",
+      "related": []
+    },
+    {
+      "id": "syllabic-verse",
+      "symbol": "Sv",
+      "name": "Syllabic Verse",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "Verse whose metre counts the number of syllables per line regardless of stress.",
+      "effect": "Imposes shape through count rather than rhythm.",
+      "example": "The syllabic poems of Marianne Moore",
+      "related": []
+    },
+    {
+      "id": "accentual-verse",
+      "symbol": "Ac",
+      "name": "Accentual Verse",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "Verse whose metre counts only the number of stressed syllables per line.",
+      "effect": "Roots rhythm in stress rather than syllable count, as in Old English verse.",
+      "example": "The four-stress lines of Beowulf",
+      "related": []
+    },
+    {
+      "id": "sprung-rhythm",
+      "symbol": "Su",
+      "name": "Sprung Rhythm",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "A metre based on counting stressed syllables, with a variable number of unstressed syllables per foot.",
+      "effect": "Mimics natural speech with energetic, irregular force.",
+      "example": "Gerard Manley Hopkins, The Windhover",
+      "related": []
+    },
+    {
+      "id": "anacrusis",
+      "symbol": "Ana",
+      "name": "Anacrusis",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "One or more unstressed syllables at the start of a line before the regular metre begins.",
+      "effect": "Provides a rhythmic upbeat into the line.",
+      "example": "An introductory unstressed syllable before a trochaic line",
+      "related": []
+    },
+    {
+      "id": "catalexis",
+      "symbol": "Ct",
+      "name": "Catalexis",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "The omission of one or more unstressed syllables at the end of a line.",
+      "effect": "Truncates the metre for abruptness or emphasis.",
+      "example": "A catalectic trochaic line dropping its final unstressed beat",
+      "related": []
+    },
+    {
+      "id": "tetrameter",
+      "symbol": "Te",
+      "name": "Tetrameter",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "A line of four metrical feet.",
+      "effect": "Offers a brisk, song-like measure shorter than the pentameter.",
+      "example": "The tetrameter of much hymn and ballad verse",
+      "related": []
+    },
+    {
+      "id": "trimeter",
+      "symbol": "Ti",
+      "name": "Trimeter",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "A line of three metrical feet.",
+      "effect": "Creates a short, light or clipped measure.",
+      "example": "The three-foot lines alternating in ballad metre",
+      "related": []
+    },
+    {
+      "id": "scansion",
+      "symbol": "Sc",
+      "name": "Scansion",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "The analysis of a line's metrical pattern of stresses and feet.",
+      "effect": "Reveals the rhythmic structure underlying the verse.",
+      "example": "Marking x / x / across a line to show its iambs",
+      "related": []
+    },
+    {
+      "id": "hexameter-alexandrine",
+      "symbol": "He",
+      "name": "Hexameter (Alexandrine)",
+      "subgroup": "repetitive-metre-and-rhythm",
+      "definition": "A line of six metrical feet; the iambic hexameter in English is called an alexandrine.",
+      "effect": "Lengthens and slows the line for grandeur or closure.",
+      "example": "The final line of a Spenserian stanza",
+      "related": []
+    },
+    {
+      "id": "anaphora",
+      "symbol": "Ap",
+      "name": "Anaphora",
+      "subgroup": "repetitive-lexical",
+      "definition": "Repetition of words at the beginning of successive clauses",
+      "effect": "Creates emphasis, rhythm, and emotional power",
+      "example": "We shall fight, we shall prevail, we shall endure",
+      "related": [
+        "epistrophe",
+        "symploce"
+      ]
+    },
+    {
+      "id": "epistrophe",
+      "symbol": "Ei",
+      "name": "Epistrophe",
+      "subgroup": "repetitive-lexical",
+      "definition": "Repetition of words at the end of successive clauses",
+      "effect": "Creates strong closure and reinforcement",
+      "example": "When will you learn? When will you see? When will you grow?",
+      "related": [
+        "anaphora",
+        "symploce"
+      ]
+    },
+    {
+      "id": "symploce",
+      "symbol": "Sym",
+      "name": "Symploce",
+      "subgroup": "repetitive-lexical",
+      "definition": "Combination of anaphora and epistrophe",
+      "effect": "Creates complex rhythmic and emphatic patterns",
+      "example": "All for one, one for all; each for all, all for each",
+      "related": [
+        "anaphora",
+        "epistrophe"
+      ]
+    },
+    {
+      "id": "epizeuxis",
+      "symbol": "Ez",
+      "name": "Epizeuxis",
+      "subgroup": "repetitive-lexical",
+      "definition": "Repetition of a word with no intervening words",
+      "effect": "Creates intense emphasis and immediacy",
+      "example": "No, no, NO! Never, never again!",
+      "related": [
+        "diacope",
+        "refrain"
+      ]
+    },
+    {
+      "id": "diacope",
+      "symbol": "Di",
+      "name": "Diacope",
+      "subgroup": "repetitive-lexical",
+      "definition": "Repetition of words with intervening words",
+      "effect": "Creates emphasis with slight variation",
+      "example": "Never ever, again and again, far, far away",
+      "related": [
+        "epizeuxis",
+        "anadiplosis"
+      ]
+    },
+    {
+      "id": "antanaclasis",
+      "symbol": "At",
+      "name": "Antanaclasis",
+      "subgroup": "repetitive-lexical",
+      "definition": "Repetition of a word with different meanings",
+      "effect": "Creates wordplay and philosophical complexity",
+      "example": "Live to work vs. work to live; light the light",
+      "related": [
+        "polyptoton",
+        "antithesis"
+      ]
+    },
+    {
+      "id": "polyptoton",
+      "symbol": "Pol",
+      "name": "Polyptoton",
+      "subgroup": "repetitive-lexical",
+      "definition": "Repetition of words with the same root in different forms",
+      "effect": "Creates cohesion and explores word relationships",
+      "example": "I love the lovingness of those who love life",
+      "related": [
+        "antanaclasis",
+        "conduplicatio"
+      ]
+    },
+    {
+      "id": "leitmotif",
+      "symbol": "Le",
+      "name": "Leitmotif",
+      "subgroup": "repetitive-lexical",
+      "definition": "Recurring word, phrase, or pattern representing a theme",
+      "effect": "Reinforces central idea and creates textual unity",
+      "example": "The repeated word 'home' in stories about belonging",
+      "related": [
+        "symbol",
+        "refrain"
+      ]
+    },
+    {
+      "id": "refrain",
+      "symbol": "Rf",
+      "name": "Refrain",
+      "subgroup": "repetitive-lexical",
+      "definition": "Line or phrase repeated at intervals throughout a text",
+      "effect": "Creates musicality and emphasizes message",
+      "example": "The chorus of a song; repeated stanza in poetry",
+      "related": [
+        "leitmotif",
+        "anadiplosis"
+      ]
+    },
+    {
+      "id": "anadiplosis",
+      "symbol": "Ad",
+      "name": "Anadiplosis",
+      "subgroup": "repetitive-lexical",
+      "definition": "End of one clause repeated at the beginning of the next",
+      "effect": "Creates flowing connection between ideas",
+      "example": "Strong leaders lead; leaders lead nations",
+      "related": [
+        "epanalepsis",
+        "diacope"
+      ]
+    },
+    {
+      "id": "epanalepsis",
+      "symbol": "Ea",
+      "name": "Epanalepsis",
+      "subgroup": "repetitive-lexical",
+      "definition": "Repetition of word(s) at the beginning and end of a clause",
+      "effect": "Creates circular structure and emphasis",
+      "example": "Rage against the dying of the light; I came, I saw, I conquered",
+      "related": [
+        "anadiplosis",
+        "conduplicatio"
+      ]
+    },
+    {
+      "id": "conduplicatio",
+      "symbol": "Con",
+      "name": "Conduplicatio",
+      "subgroup": "repetitive-lexical",
+      "definition": "Repetition of words in close succession for emphasis",
+      "effect": "Creates intense emotional and rhythmic power",
+      "example": "Cowards die many times before their deaths",
+      "related": [
+        "polyptoton",
+        "epanalepsis"
+      ]
+    },
+    {
+      "id": "antimetabole",
+      "symbol": "Ai",
+      "name": "Antimetabole",
+      "subgroup": "repetitive-lexical",
+      "definition": "The repetition of words or phrases in reverse order, often to create a paradoxical or rhetorically forceful structure.",
+      "effect": "Produces memorability and rhetorical punch; can reverse, complicate or deepen the logic of a statement.",
+      "example": "\"Ask not what your country can do for you — ask what you can do for your country.\" (JFK)",
+      "related": [
+        "chiasmus",
+        "anaphora",
+        "parallelism"
+      ]
+    },
+    {
+      "id": "parallelism",
+      "symbol": "Pr",
+      "name": "Parallelism",
+      "subgroup": "repetitive-structural",
+      "definition": "Repetition of grammatical structures in successive phrases",
+      "effect": "Creates balance, emphasis, and satisfying rhythm",
+      "example": "I came, I saw, I conquered",
+      "related": [
+        "tricolon",
+        "antithesis-structural"
+      ]
+    },
+    {
+      "id": "tricolon",
+      "symbol": "Tc",
+      "name": "Tricolon",
+      "subgroup": "repetitive-structural",
+      "definition": "Series of three parallel items or clauses",
+      "effect": "Creates completion and emphasis through triple rhythm",
+      "example": "Life, liberty, and the pursuit of happiness",
+      "related": [
+        "parallelism",
+        "isocolon"
+      ]
+    },
+    {
+      "id": "antithesis-structural",
+      "symbol": "Ant",
+      "name": "Antithesis (Structural)",
+      "subgroup": "repetitive-structural",
+      "definition": "Juxtaposition of parallel structures with opposing ideas",
+      "effect": "Creates dramatic contrast through syntax",
+      "example": "To err is human; to forgive, divine",
+      "related": [
+        "parallelism",
+        "juxtaposition"
+      ]
+    },
+    {
+      "id": "chiasmus",
+      "symbol": "Ch",
+      "name": "Chiasmus",
+      "subgroup": "repetitive-structural",
+      "definition": "Reversal of grammatical structures in successive phrases",
+      "effect": "Creates elegant symmetry and memorable phrasing",
+      "example": "Ask not what your country can do for you; ask what you can do for your country",
+      "related": [
+        "parallelism",
+        "antithesis-structural"
+      ]
+    },
+    {
+      "id": "isocolon",
+      "symbol": "Is",
+      "name": "Isocolon",
+      "subgroup": "repetitive-structural",
+      "definition": "Series of grammatically parallel clauses of equal length",
+      "effect": "Creates mathematical balance and rhythm",
+      "example": "Veni, vidi, vici (I came, I saw, I conquered)",
+      "related": [
+        "tricolon",
+        "parallelism"
+      ]
+    },
+    {
+      "id": "accumulation",
+      "symbol": "Acc",
+      "name": "Accumulation",
+      "subgroup": "repetitive-structural",
+      "definition": "Piling up of ideas, phrases, or clauses without conjunctions",
+      "effect": "Creates overwhelming effect through quantity",
+      "example": "The sun, the moon, the stars, the sea, the sky stretched endlessly",
+      "related": [
+        "cataloguing",
+        "gradatio"
+      ]
+    },
+    {
+      "id": "cataloguing",
+      "symbol": "Cat",
+      "name": "Cataloguing",
+      "subgroup": "repetitive-structural",
+      "definition": "Listing items in succession",
+      "effect": "Creates inventory of details or ideas",
+      "example": "Red, orange, yellow, green, blue, indigo, violet",
+      "related": [
+        "accumulation",
+        "asyndeton"
+      ]
+    },
+    {
+      "id": "incremental-repetition",
+      "symbol": "Ic",
+      "name": "Incremental Repetition",
+      "subgroup": "repetitive-structural",
+      "definition": "Repeating a phrase with added elements each time",
+      "effect": "Creates building intensity and expansion",
+      "example": "I love her, I love her deeply, I love her with all my soul",
+      "related": [
+        "accumulation",
+        "amplification"
+      ]
+    },
+    {
+      "id": "amplification",
+      "symbol": "Amp",
+      "name": "Amplification",
+      "subgroup": "repetitive-structural",
+      "definition": "Expanding on an idea with additional details",
+      "effect": "Creates emphasis through elaboration",
+      "example": "He was tall—six foot two, broad-shouldered, imposing",
+      "related": [
+        "incremental-repetition",
+        "accumulation"
+      ]
+    },
+    {
+      "id": "gradatio",
+      "symbol": "Gr",
+      "name": "Gradatio",
+      "subgroup": "repetitive-structural",
+      "definition": "Series of words arranged in ascending order of intensity",
+      "effect": "Creates building emotional or logical force",
+      "example": "From good to great, from great to magnificent",
+      "related": [
+        "accumulation",
+        "incremental-repetition"
+      ]
+    },
+    {
+      "id": "auxesis",
+      "symbol": "Ax",
+      "name": "Auxesis",
+      "subgroup": "repetitive-structural",
+      "definition": "The arrangement of words, phrases or clauses in order of increasing importance, intensity or weight, so that each term exceeds the last.",
+      "effect": "Builds momentum and rhetorical climax through progressive elevation; the final term carries the greatest emotional and argumentative weight.",
+      "example": "\"I came with sorrow, with shame, with despair.\" / \"He was a soldier, a leader, a legend.\"",
+      "related": [
+        "gradatio",
+        "accumulation",
+        "tricolon",
+        "amplification"
+      ]
+    },
+    {
+      "id": "congeries",
+      "symbol": "Cg",
+      "name": "Congeries",
+      "subgroup": "repetitive-structural",
+      "definition": "The heaping up of synonymous or closely related words, phrases or clauses to create cumulative rhetorical force.",
+      "effect": "Overwhelms the reader with weight and mass; creates intensity through sheer accumulation rather than through precision or contrast.",
+      "example": "\"A bloody, barbarous, merciless, inhuman, savage, unrelenting act.\"",
+      "related": [
+        "accumulation",
+        "amplification",
+        "cataloguing",
+        "enumeratio",
+        "polysyndeton"
+      ]
+    },
+    {
+      "id": "simile",
+      "symbol": "Sim",
+      "name": "Simile",
+      "subgroup": "comparative-figurative",
+      "definition": "Direct comparison of two unlike things using 'like' or 'as'",
+      "effect": "Creates concrete understanding through familiar comparison",
+      "example": "The snow was like a blanket covering the earth",
+      "related": [
+        "metaphor",
+        "analogy"
+      ]
+    },
+    {
+      "id": "metaphor",
+      "symbol": "Met",
+      "name": "Metaphor",
+      "subgroup": "comparative-figurative",
+      "definition": "Implied comparison without 'like' or 'as'",
+      "effect": "Suggests deeper connection than simile",
+      "example": "Time is money; life is a journey; love is war",
+      "related": [
+        "simile",
+        "extended-metaphor"
+      ]
+    },
+    {
+      "id": "extended-metaphor",
+      "symbol": "Ex",
+      "name": "Extended Metaphor",
+      "subgroup": "comparative-figurative",
+      "definition": "Metaphor sustained throughout a work or long passage",
+      "effect": "Creates unified symbolic framework",
+      "example": "An entire poem where life is a stage with acts",
+      "related": [
+        "metaphor",
+        "conceit"
+      ]
+    },
+    {
+      "id": "conceit",
+      "symbol": "Cc",
+      "name": "Conceit",
+      "subgroup": "comparative-figurative",
+      "definition": "Extended, elaborate metaphor; often intellectual or surprising",
+      "effect": "Creates ingenious or witty comparison",
+      "example": "Donne comparing lovers' souls to a compass",
+      "related": [
+        "extended-metaphor",
+        "metaphor"
+      ]
+    },
+    {
+      "id": "personification",
+      "symbol": "Pe",
+      "name": "Personification",
+      "subgroup": "comparative-figurative",
+      "definition": "Attributing human qualities to non-human things",
+      "effect": "Creates intimacy and emotional connection",
+      "example": "The wind whispered secrets; the car refused to start",
+      "related": [
+        "apostrophe",
+        "anthropomorphism"
+      ]
+    },
+    {
+      "id": "anthropomorphism",
+      "symbol": "Ah",
+      "name": "Anthropomorphism",
+      "subgroup": "comparative-figurative",
+      "definition": "Giving animals or objects human characteristics",
+      "effect": "Creates accessibility and emotional engagement",
+      "example": "The brave little toaster; the clever fox outsmarted them",
+      "related": [
+        "personification",
+        "transferred-epithet"
+      ]
+    },
+    {
+      "id": "zoomorphism",
+      "symbol": "Zo",
+      "name": "Zoomorphism",
+      "subgroup": "comparative-figurative",
+      "definition": "Representing a human being through animal form, traits, behaviour, mental states or imagery",
+      "effect": "Recasts human identity through animal comparison and can expose, reinforce or destabilise the boundary between human and animal",
+      "example": "He prowled the corridor, shoulders hunched, teeth bared",
+      "related": [
+        "anthropomorphism",
+        "metaphor",
+        "animal-symbolism"
+      ]
+    },
+    {
+      "id": "apostrophe",
+      "symbol": "Ao",
+      "name": "Apostrophe",
+      "subgroup": "comparative-figurative",
+      "definition": "Directly addressing someone absent or something non-human",
+      "effect": "Creates intimacy or dramatic intensity",
+      "example": "O death, where is thy sting? Oh, foolish pride!",
+      "related": [
+        "personification",
+        "rhetorical-question"
+      ]
+    },
+    {
+      "id": "metonymy",
+      "symbol": "Mo",
+      "name": "Metonymy",
+      "subgroup": "comparative-figurative",
+      "definition": "Substituting the name of something with that of something associated",
+      "effect": "Creates conciseness and interesting associations",
+      "example": "The White House announced...; Hollywood loves violence",
+      "related": [
+        "synecdoche",
+        "metaphor"
+      ]
+    },
+    {
+      "id": "synecdoche",
+      "symbol": "Syn",
+      "name": "Synecdoche",
+      "subgroup": "comparative-figurative",
+      "definition": "Part stands for whole, or whole stands for part",
+      "effect": "Creates compressed reference and interesting perspectives",
+      "example": "All hands on deck; lend a hand",
+      "related": [
+        "metonymy",
+        "metaphor"
+      ]
+    },
+    {
+      "id": "allegory",
+      "symbol": "Ae",
+      "name": "Allegory",
+      "subgroup": "comparative-figurative",
+      "definition": "Extended narrative where characters/events represent abstract concepts",
+      "effect": "Creates layered meaning and moral instruction",
+      "example": "The Pilgrim's Progress; Animal Farm",
+      "related": [
+        "extended-metaphor",
+        "symbol"
+      ]
+    },
+    {
+      "id": "analogy",
+      "symbol": "Aal",
+      "name": "Analogy",
+      "subgroup": "comparative-figurative",
+      "definition": "Extended comparison highlighting similarities",
+      "effect": "Creates understanding of unfamiliar through familiar",
+      "example": "How cells work in a body is like workers in a factory",
+      "related": [
+        "simile",
+        "metaphor"
+      ]
+    },
+    {
+      "id": "transferred-epithet",
+      "symbol": "Tn",
+      "name": "Transferred Epithet",
+      "subgroup": "comparative-figurative",
+      "definition": "Applying an adjective to the wrong noun",
+      "effect": "Creates surprising image and compressed meaning",
+      "example": "A sleepless night (night doesn't sleep); restless sleep",
+      "related": [
+        "personification",
+        "metaphor"
+      ]
+    },
+    {
+      "id": "dead-metaphor",
+      "symbol": "Dd",
+      "name": "Dead Metaphor",
+      "subgroup": "comparative-figurative",
+      "definition": "Metaphor that has become so common it's treated as literal",
+      "effect": "Shows how language evolves and metaphors fade",
+      "example": "Light a fire; grasp an idea; run a business",
+      "related": [
+        "metaphor"
+      ]
+    },
+    {
+      "id": "mixed-metaphor",
+      "symbol": "Mi",
+      "name": "Mixed Metaphor",
+      "subgroup": "comparative-figurative",
+      "definition": "Combining two or more incompatible metaphors",
+      "effect": "Usually considered a flaw; creates confusion",
+      "example": "The ball is in your court and the chips are down",
+      "related": [
+        "metaphor",
+        "oxymoron"
+      ]
+    },
+    {
+      "id": "vehicle-and-tenor",
+      "symbol": "Vh",
+      "name": "Vehicle & Tenor",
+      "subgroup": "comparative-figurative",
+      "definition": "Tenor is what's being compared; vehicle is what it's compared to",
+      "effect": "Understanding this distinction clarifies metaphor mechanics",
+      "example": "In 'love is a rose': love is tenor, rose is vehicle",
+      "related": [
+        "metaphor",
+        "simile"
+      ]
+    },
+    {
+      "id": "hypocatastasis",
+      "symbol": "Ho",
+      "name": "Hypocatastasis",
+      "subgroup": "comparative-figurative",
+      "definition": "A metaphor that is hinted at rather than directly stated",
+      "effect": "Creates subtlety and requires reader interpretation",
+      "example": "He's such a snake suggests treachery without stating it",
+      "related": [
+        "metaphor"
+      ]
+    },
+    {
+      "id": "merism",
+      "symbol": "Mr",
+      "name": "Merism",
+      "subgroup": "comparative-figurative",
+      "definition": "A figure in which a whole is referred to by naming two contrasting or complementary parts.",
+      "effect": "Creates a sense of totality or universality through economical paired opposites; rhetorically satisfying and inclusive.",
+      "example": "\"Searched high and low.\" / \"Young and old gathered.\" / \"The good and the wicked shall face the same end.\"",
+      "related": [
+        "synecdoche",
+        "antithesis",
+        "binary-opposition"
+      ]
+    },
+    {
+      "id": "adynaton",
+      "symbol": "Ay",
+      "name": "Adynaton",
+      "subgroup": "comparative-figurative",
+      "definition": "A form of hyperbole that asserts an impossibility to emphasise a point.",
+      "effect": "Creates comic or emphatic force by anchoring an idea to something that could never occur, amplifying the speaker's conviction through the absurd.",
+      "example": "\"I'll believe it when pigs fly.\" / \"Sooner would the sea give up her dead.\"",
+      "related": [
+        "hyperbole",
+        "irony"
+      ]
+    },
+    {
+      "id": "antonomasia",
+      "symbol": "Ato",
+      "name": "Antonomasia",
+      "subgroup": "comparative-figurative",
+      "definition": "The substitution of an epithet or title for a proper name, or a proper name for a general idea.",
+      "effect": "Compresses character or reputation into a label.",
+      "example": "the Bard for Shakespeare",
+      "related": []
+    },
+    {
+      "id": "epithet",
+      "symbol": "Et",
+      "name": "Epithet",
+      "subgroup": "comparative-figurative",
+      "definition": "A descriptive word or phrase regularly attached to a name to characterise it.",
+      "effect": "Fixes a defining quality, often formulaic in epic.",
+      "example": "Homer's rosy-fingered dawn",
+      "related": []
+    },
+    {
+      "id": "kenning",
+      "symbol": "Ke",
+      "name": "Kenning",
+      "subgroup": "comparative-figurative",
+      "definition": "A compound metaphorical phrase substituted for a noun, as in Old Norse and Old English verse.",
+      "effect": "Renames the familiar in vivid, riddling figurative terms.",
+      "example": "whale-road for the sea",
+      "related": []
+    },
+    {
+      "id": "periphrasis",
+      "symbol": "Pi",
+      "name": "Periphrasis",
+      "subgroup": "comparative-figurative",
+      "definition": "The use of an elaborate roundabout phrase instead of a direct word.",
+      "effect": "Heightens, dignifies or evades through indirection.",
+      "example": "the briny deep for the sea",
+      "related": []
+    },
+    {
+      "id": "symbol",
+      "symbol": "Sb",
+      "name": "Symbol",
+      "subgroup": "comparative-symbolic",
+      "definition": "Object, person, or action representing something abstract",
+      "effect": "Creates layers of meaning beyond literal reference",
+      "example": "The ring in LOTR symbolizes power, corruption, and desire",
+      "related": [
+        "motif",
+        "metaphor"
+      ]
+    },
+    {
+      "id": "motif",
+      "symbol": "Mot",
+      "name": "Motif",
+      "subgroup": "comparative-symbolic",
+      "definition": "Recurring pattern, image, or theme throughout a work",
+      "effect": "Creates unity and reinforces central concerns",
+      "example": "The repeated motif of windows in a story about perspective",
+      "related": [
+        "leitmotif",
+        "symbol"
+      ]
+    },
+    {
+      "id": "archetype",
+      "symbol": "Arc",
+      "name": "Archetype",
+      "subgroup": "comparative-symbolic",
+      "definition": "Universal symbol or character type recognized across cultures",
+      "effect": "Creates instant resonance and deep psychological connection",
+      "example": "The Hero, the Shadow, the Wise Mentor",
+      "related": [
+        "symbol",
+        "mythological-allusion"
+      ]
+    },
+    {
+      "id": "colour-symbolism",
+      "symbol": "Col",
+      "name": "Colour Symbolism",
+      "subgroup": "comparative-symbolic",
+      "definition": "Colors assigned particular meanings in specific contexts",
+      "effect": "Creates atmosphere and communicates symbolically",
+      "example": "Red for passion/danger, white for purity, black for evil",
+      "related": [
+        "symbol",
+        "visual-imagery"
+      ]
+    },
+    {
+      "id": "object-symbolism",
+      "symbol": "Ob",
+      "name": "Object Symbolism",
+      "subgroup": "comparative-symbolic",
+      "definition": "Objects representing abstract ideas or themes",
+      "effect": "Creates concrete focus for abstract concepts",
+      "example": "Mirrors symbolizing self-reflection; cages symbolizing entrapment",
+      "related": [
+        "symbol",
+        "metaphor"
+      ]
+    },
+    {
+      "id": "objective-correlative",
+      "symbol": "Oj",
+      "name": "Objective Correlative",
+      "subgroup": "comparative-symbolic",
+      "definition": "A set of objects, a situation or a chain of events arranged to evoke a particular emotion through external sensory facts",
+      "effect": "Externalises emotion into concrete circumstance so feeling is evoked rather than directly stated",
+      "example": "An untouched cup cooling beside a second empty chair conveys bereavement without naming grief",
+      "related": [
+        "symbol",
+        "pathetic-fallacy",
+        "sympathetic-landscape",
+        "visual-imagery"
+      ]
+    },
+    {
+      "id": "animal-symbolism",
+      "symbol": "Ani",
+      "name": "Animal Symbolism",
+      "subgroup": "comparative-symbolic",
+      "definition": "Animals carrying particular meanings based on cultural knowledge",
+      "effect": "Creates instant association and meaning",
+      "example": "Owls = wisdom, foxes = cunning, ravens = death",
+      "related": [
+        "archetype"
+      ]
+    },
+    {
+      "id": "mythological-allusion",
+      "symbol": "My",
+      "name": "Mythological Allusion",
+      "subgroup": "comparative-symbolic",
+      "definition": "Reference to myths or classical stories",
+      "effect": "Adds depth by invoking familiar cultural narratives",
+      "example": "Calling someone a Trojan horse or referring to Pandora's box",
+      "related": [
+        "archetype",
+        "allusion"
+      ]
+    },
+    {
+      "id": "biblical-allusion",
+      "symbol": "Bi",
+      "name": "Biblical Allusion",
+      "subgroup": "comparative-symbolic",
+      "definition": "Reference to biblical stories, characters, or concepts",
+      "effect": "Creates moral or spiritual resonance in secular texts",
+      "example": "Garden of Eden representing paradise; Judas representing betrayal",
+      "related": [
+        "archetype",
+        "allusion"
+      ]
+    },
+    {
+      "id": "literary-allusion",
+      "symbol": "Li",
+      "name": "Literary Allusion",
+      "subgroup": "comparative-symbolic",
+      "definition": "Reference to other literary works or characters",
+      "effect": "Creates intertextual dialogue and layers of meaning",
+      "example": "Referring to Gatsby when describing an eccentric wealthy person",
+      "related": [
+        "allusion"
+      ]
+    },
+    {
+      "id": "cultural-allusion",
+      "symbol": "Cu",
+      "name": "Cultural Allusion",
+      "subgroup": "comparative-symbolic",
+      "definition": "Reference to cultural events, figures, or artifacts",
+      "effect": "Creates contemporary relevance and cultural commentary",
+      "example": "References to September 11th or iconic speeches",
+      "related": [
+        "literary-allusion",
+        "allusion"
+      ]
+    },
+    {
+      "id": "emblem",
+      "symbol": "Em",
+      "name": "Emblem",
+      "subgroup": "comparative-symbolic",
+      "definition": "Visual representation of an abstract quality or concept",
+      "effect": "Creates iconic recognition and symbolic power",
+      "example": "A crown emblematizes royalty; a skull emblematizes death",
+      "related": [
+        "symbol",
+        "iconography"
+      ]
+    },
+    {
+      "id": "iconography",
+      "symbol": "Io",
+      "name": "Iconography",
+      "subgroup": "comparative-symbolic",
+      "definition": "System of symbols and their meanings within a text or culture",
+      "effect": "Creates recognizable visual language",
+      "example": "In medieval art, specific colors and objects carry consistent meanings",
+      "related": [
+        "symbol",
+        "archetype"
+      ]
+    },
+    {
+      "id": "antithesis",
+      "symbol": "Ati",
+      "name": "Antithesis",
+      "subgroup": "comparative-contrast",
+      "definition": "Placing contrasting ideas in parallel grammatical structures",
+      "effect": "Creates dramatic opposition and makes both ideas memorable",
+      "example": "It was the best of times, it was the worst of times",
+      "related": [
+        "juxtaposition",
+        "parallelism"
+      ]
+    },
+    {
+      "id": "juxtaposition",
+      "symbol": "Ju",
+      "name": "Juxtaposition",
+      "subgroup": "comparative-contrast",
+      "definition": "Placing contrasting elements side by side without connectives",
+      "effect": "Creates tension and forces comparison",
+      "example": "The palace next to the slum; the wedding and the funeral",
+      "related": [
+        "antithesis"
+      ]
+    },
+    {
+      "id": "oxymoron",
+      "symbol": "Ox",
+      "name": "Oxymoron",
+      "subgroup": "comparative-contrast",
+      "definition": "Combining contradictory or incongruous terms",
+      "effect": "Creates paradoxical effect and forces reconsideration",
+      "example": "Bittersweet, deafening silence, living death",
+      "related": [
+        "paradox",
+        "antithesis"
+      ]
+    },
+    {
+      "id": "paradox",
+      "symbol": "Par",
+      "name": "Paradox",
+      "subgroup": "comparative-contrast",
+      "definition": "Statement that seems contradictory but may be true",
+      "effect": "Creates philosophical tension and requires interpretation",
+      "example": "Less is more; to find yourself, you must lose yourself",
+      "related": [
+        "oxymoron",
+        "irony"
+      ]
+    },
+    {
+      "id": "foil",
+      "symbol": "Fi",
+      "name": "Foil",
+      "subgroup": "comparative-contrast",
+      "definition": "Character, plot point, or idea that contrasts with another",
+      "effect": "Highlights qualities through opposition",
+      "example": "Enobarbus is a foil to Antony, highlighting different values",
+      "related": [
+        "juxtaposition"
+      ]
+    },
+    {
+      "id": "situational-irony",
+      "symbol": "St",
+      "name": "Situational Irony",
+      "subgroup": "comparative-contrast",
+      "definition": "When reality contradicts expectation in events",
+      "effect": "Creates humor, pathos, or philosophical tension",
+      "example": "A fire station burning down; a marriage counselor's divorce",
+      "related": [
+        "verbal-irony",
+        "dramatic-irony"
+      ]
+    },
+    {
+      "id": "dramatic-irony",
+      "symbol": "Dr",
+      "name": "Dramatic Irony",
+      "subgroup": "comparative-contrast",
+      "definition": "Audience/reader knows something character doesn't",
+      "effect": "Creates tension and emotional investment",
+      "example": "In Oedipus Rex, we know he's the killer he's seeking",
+      "related": [
+        "verbal-irony",
+        "foreshadowing"
+      ]
+    },
+    {
+      "id": "verbal-irony",
+      "symbol": "Vr",
+      "name": "Verbal Irony",
+      "subgroup": "comparative-contrast",
+      "definition": "Saying one thing but meaning the opposite",
+      "effect": "Creates humor, sarcasm, or critique",
+      "example": "Saying 'Oh great!' when something is terrible",
+      "related": [
+        "sarcasm",
+        "situational-irony"
+      ]
+    },
+    {
+      "id": "bathos",
+      "symbol": "Ba",
+      "name": "Bathos",
+      "subgroup": "comparative-contrast",
+      "definition": "Abrupt descent from elevated to trivial or comic",
+      "effect": "Creates humor through anticlimax",
+      "example": "The hero charges into battle, then trips over a rock",
+      "related": [
+        "anticlimax"
+      ]
+    },
+    {
+      "id": "anticlimax",
+      "symbol": "Anti",
+      "name": "Anticlimax",
+      "subgroup": "comparative-contrast",
+      "definition": "Deflating conclusion that disappoints after buildup",
+      "effect": "Creates humor or undermines expectations",
+      "example": "After a dramatic opening, the villain monologues pointlessly",
+      "related": [
+        "bathos"
+      ]
+    },
+    {
+      "id": "binary-opposition",
+      "symbol": "Bn",
+      "name": "Binary Opposition",
+      "subgroup": "comparative-contrast",
+      "definition": "Division of concepts into opposing pairs",
+      "effect": "Creates fundamental structure for understanding",
+      "example": "Nature/Culture, Self/Other, Nature/Nurture",
+      "related": [
+        "antithesis",
+        "paradox"
+      ]
+    },
+    {
+      "id": "chiaroscuro",
+      "symbol": "Ci",
+      "name": "Chiaroscuro",
+      "subgroup": "comparative-contrast",
+      "definition": "Contrast of light and dark, often used symbolically",
+      "effect": "Creates drama, mood, and symbolic meaning",
+      "example": "Dark shadows surrounding a figure in spotlit relief",
+      "related": [
+        "visual-imagery"
+      ]
+    },
+    {
+      "id": "in-medias-res",
+      "symbol": "Ime",
+      "name": "In Medias Res",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Beginning a narrative in the middle of action",
+      "effect": "Creates immediate engagement and requires exposition later",
+      "example": "The Odyssey begins with Odysseus already at sea",
+      "related": [
+        "flashback-analepsis",
+        "exposition"
+      ]
+    },
+    {
+      "id": "flashback-analepsis",
+      "symbol": "Fl",
+      "name": "Flashback (Analepsis)",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Interruption to show earlier events",
+      "effect": "Provides context and expands temporal scope",
+      "example": "Remembering childhood while in present situation",
+      "related": [
+        "in-medias-res",
+        "flash-forward-prolepsis"
+      ]
+    },
+    {
+      "id": "flash-forward-prolepsis",
+      "symbol": "Fa",
+      "name": "Flash-Forward (Prolepsis)",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Interruption showing future events",
+      "effect": "Creates suspense or foreshadows outcomes",
+      "example": "A glimpse of the ending before we reach it",
+      "related": [
+        "flashback-analepsis",
+        "foreshadowing"
+      ]
+    },
+    {
+      "id": "frame-narrative",
+      "symbol": "Fm",
+      "name": "Frame Narrative",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Story within a story; outer frame provides context",
+      "effect": "Creates nested narratives and multiple perspectives",
+      "example": "Stories told by characters in The Canterbury Tales",
+      "related": [
+        "mise-en-abyme"
+      ]
+    },
+    {
+      "id": "non-linear-narrative",
+      "symbol": "Nn",
+      "name": "Non-Linear Narrative",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Events presented out of chronological order",
+      "effect": "Creates complexity and requires active reader engagement",
+      "example": "Pulp Fiction jumps between timelines",
+      "related": [
+        "in-medias-res",
+        "circular-narrative"
+      ]
+    },
+    {
+      "id": "circular-narrative",
+      "symbol": "Cir",
+      "name": "Circular Narrative",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Ending returns to or echoes the beginning",
+      "effect": "Creates completion and philosophical resonance",
+      "example": "Story that begins and ends with the same image",
+      "related": [
+        "frame-narrative"
+      ]
+    },
+    {
+      "id": "foreshadowing",
+      "symbol": "For",
+      "name": "Foreshadowing",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Hints of future events or outcomes",
+      "effect": "Creates suspense and invites rereading for discovery",
+      "example": "A character's comment that becomes prophetic later",
+      "related": [
+        "flash-forward-prolepsis",
+        "dramatic-irony"
+      ]
+    },
+    {
+      "id": "chekhov-s-gun",
+      "symbol": "Ce",
+      "name": "Chekhov's Gun",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Principle that introduced elements must be significant later",
+      "effect": "Creates causality and meaningful detail",
+      "example": "If a gun is mentioned, it must fire by the end",
+      "related": [
+        "foreshadowing"
+      ]
+    },
+    {
+      "id": "red-herring",
+      "symbol": "Rd",
+      "name": "Red Herring",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Misleading clue that diverts attention from truth",
+      "effect": "Creates misdirection and surprise",
+      "example": "Detective fiction plants false evidence to mislead reader",
+      "related": [
+        "foreshadowing"
+      ]
+    },
+    {
+      "id": "cliffhanger",
+      "symbol": "Cf",
+      "name": "Cliffhanger",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Abrupt ending on unresolved tension",
+      "effect": "Creates urgency to continue reading or watching",
+      "example": "End of episode leaves character in danger",
+      "related": [
+        "dramatic-irony"
+      ]
+    },
+    {
+      "id": "denouement",
+      "symbol": "Dn",
+      "name": "Denouement",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Resolution of plot after climax",
+      "effect": "Provides closure and reveals consequences",
+      "example": "After the climax, events settle and resolve",
+      "related": [
+        "rising-action",
+        "falling-action"
+      ]
+    },
+    {
+      "id": "rising-action",
+      "symbol": "Ri",
+      "name": "Rising Action",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Events building toward climax",
+      "effect": "Creates tension and emotional investment",
+      "example": "Complications and escalations leading to climax",
+      "related": [
+        "exposition"
+      ]
+    },
+    {
+      "id": "falling-action",
+      "symbol": "Fal",
+      "name": "Falling Action",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Events after climax leading to resolution",
+      "effect": "Shows consequences and moves toward denouement",
+      "example": "After the turning point, events move toward ending",
+      "related": [
+        "denouement"
+      ]
+    },
+    {
+      "id": "deus-ex-machina",
+      "symbol": "Du",
+      "name": "Deus Ex Machina",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Unexpected resolution by intervention of outside force",
+      "effect": "Creates artificial resolution",
+      "example": "A god appears to solve the otherwise unsolvable problem",
+      "related": [
+        "denouement"
+      ]
+    },
+    {
+      "id": "ellipsis-narrative",
+      "symbol": "Ell",
+      "name": "Ellipsis (Narrative)",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Omission of events or time periods",
+      "effect": "Allows focus on important moments",
+      "example": "Skipping over uneventful weeks in a narrative",
+      "related": [
+        "non-linear-narrative"
+      ]
+    },
+    {
+      "id": "subplot",
+      "symbol": "Sub",
+      "name": "Subplot",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Secondary plot running parallel to main plot",
+      "effect": "Creates complexity and thematic resonance",
+      "example": "Love story subplot in an adventure narrative",
+      "related": []
+    },
+    {
+      "id": "parallel-narrative",
+      "symbol": "Pn",
+      "name": "Parallel Narrative",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "Two or more narratives progressing simultaneously",
+      "effect": "Creates connection and comparison between stories",
+      "example": "Two characters' stories told side by side",
+      "related": [
+        "frame-narrative",
+        "non-linear-narrative"
+      ]
+    },
+    {
+      "id": "bildungsroman",
+      "symbol": "Bl",
+      "name": "Bildungsroman",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "A novel tracing the psychological and moral growth of its protagonist from youth to maturity.",
+      "effect": "Frames narrative as a process of formation and coming of age.",
+      "example": "Charles Dickens, Great Expectations",
+      "related": []
+    },
+    {
+      "id": "epiphany",
+      "symbol": "Epi",
+      "name": "Epiphany",
+      "subgroup": "structural-plot-and-structure",
+      "definition": "A sudden moment of insight or revelation experienced by a character.",
+      "effect": "Crystallises meaning and marks a turning point.",
+      "example": "The closing realisation in Joyce's The Dead",
+      "related": []
+    },
+    {
+      "id": "anagnorisis",
+      "symbol": "Aag",
+      "name": "Anagnorisis",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "Moment of recognition or self-discovery by protagonist",
+      "effect": "Creates turning point in understanding",
+      "example": "Oedipus discovering he is the cause of the plague",
+      "related": [
+        "peripeteia"
+      ]
+    },
+    {
+      "id": "peripeteia",
+      "symbol": "Per",
+      "name": "Peripeteia",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "Sudden reversal of fortune or circumstances",
+      "effect": "Creates dramatic turn in plot",
+      "example": "Expected ally reveals they're the villain",
+      "related": [
+        "anagnorisis"
+      ]
+    },
+    {
+      "id": "hamartia",
+      "symbol": "Hm",
+      "name": "Hamartia",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "Fatal flaw in protagonist leading to downfall",
+      "effect": "Explains tragedy as consequence of character defect",
+      "example": "Macbeth's ambition leads to his destruction",
+      "related": []
+    },
+    {
+      "id": "hubris",
+      "symbol": "Hu",
+      "name": "Hubris",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "Excessive pride or self-confidence that leads a tragic protagonist to defy the gods or moral order.",
+      "effect": "Marks the overreach that precipitates downfall, inviting both awe and warning.",
+      "example": "Creon's hubris in Sophocles' Antigone brings ruin upon his house.",
+      "related": []
+    },
+    {
+      "id": "nemesis",
+      "symbol": "Nm",
+      "name": "Nemesis",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "The agent or force of retribution that punishes hubris and restores moral balance.",
+      "effect": "Delivers inevitable comeuppance, satisfying the audience's sense of justice.",
+      "example": "In Greek tragedy, the downfall that follows overweening pride enacts nemesis.",
+      "related": []
+    },
+    {
+      "id": "catharsis",
+      "symbol": "Cth",
+      "name": "Catharsis",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "The purging or purification of the emotions of pity and fear through tragic drama.",
+      "effect": "Leaves the audience emotionally cleansed and renewed after vicarious suffering.",
+      "example": "Aristotle cites the audience's response to tragedies like Oedipus Rex as cathartic.",
+      "related": []
+    },
+    {
+      "id": "catastrophe",
+      "symbol": "Cta",
+      "name": "Catastrophe",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "The final tragic resolution in which the protagonist's fortunes collapse.",
+      "effect": "Completes the tragic arc, releasing accumulated tension into downfall and closure.",
+      "example": "The deaths that conclude Hamlet form the play's catastrophe.",
+      "related": []
+    },
+    {
+      "id": "comic-relief",
+      "symbol": "Cm",
+      "name": "Comic Relief",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "A humorous scene or character introduced into a serious work to ease tension.",
+      "effect": "Provides momentary release, heightening the surrounding gravity by contrast.",
+      "example": "The drunken Porter in Macbeth offers comic relief after Duncan's murder.",
+      "related": []
+    },
+    {
+      "id": "dialogism",
+      "symbol": "Dl",
+      "name": "Dialogism",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "The coexistence of multiple competing voices, perspectives or ideologies within a single text, none fully privileged over the others (theorised by Mikhail Bakhtin).",
+      "effect": "Creates ideological complexity and resists a single authoritative reading; the text becomes a site of ongoing debate rather than resolved meaning.",
+      "example": "The competing voices of characters, narrator and implied author in a polyphonic novel such as Dostoevsky's The Brothers Karamazov.",
+      "related": [
+        "free-indirect-discourse",
+        "intertextuality-implicit",
+        "narrative-self-consciousness",
+        "unreliable-narrator"
+      ]
+    },
+    {
+      "id": "diegesis",
+      "symbol": "Dg",
+      "name": "Diegesis",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "The mode of narration in which events are told or summarised by a narrator, rather than enacted or shown in scene.",
+      "effect": "Creates narrative distance; positions the reader as recipient of reported experience rather than direct witness, shaping how much interpretive authority the narrator holds.",
+      "example": "\"He spent three years at sea, barely surviving.\" (summary-telling vs. a dramatised scene of those years)",
+      "related": [
+        "mimesis",
+        "ellipsis-narrative",
+        "exposition",
+        "frame-narrative"
+      ]
+    },
+    {
+      "id": "dramatic-question",
+      "symbol": "Dm",
+      "name": "Dramatic Question",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "The central question of suspense that a play raises and the audience waits to see resolved.",
+      "effect": "Sustains engagement by focusing anticipation on a single outcome.",
+      "example": "\"Will Hamlet avenge his father?\" is the dramatic question driving the play.",
+      "related": []
+    },
+    {
+      "id": "mimesis",
+      "symbol": "Mm",
+      "name": "Mimesis",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "The representation or imitation of the real world in art, central to classical theories of drama.",
+      "effect": "Grounds dramatic illusion in recognisable reality, enabling audience belief and emotion.",
+      "example": "Aristotle's Poetics defines tragedy as the mimesis of an action that is serious and complete.",
+      "related": []
+    },
+    {
+      "id": "subtext",
+      "symbol": "Sbt",
+      "name": "Subtext",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "The implicit meaning beneath the literal dialogue, conveying unspoken thought or feeling.",
+      "effect": "Creates depth and tension by letting characters mean more than they say.",
+      "example": "The strained politeness of Chekhov's characters carries grief and longing as subtext.",
+      "related": []
+    },
+    {
+      "id": "exposition",
+      "symbol": "Eo",
+      "name": "Exposition",
+      "subgroup": "structural-tragic-mechanics",
+      "definition": "The conveying of background information necessary to understand the dramatic situation.",
+      "effect": "Orients the audience by establishing setting, character and prior events.",
+      "example": "The opening dialogue of many plays delivers exposition about who and where the characters are.",
+      "related": []
+    },
+    {
+      "id": "syndeton",
+      "symbol": "Sd",
+      "name": "Syndeton",
+      "subgroup": "structural-syntactic",
+      "definition": "Joining phrases or clauses with conjunctions",
+      "effect": "Creates connection and accumulation",
+      "example": "And we were hungry and tired and afraid",
+      "related": [
+        "asyndeton",
+        "polysyndeton"
+      ]
+    },
+    {
+      "id": "asyndeton",
+      "symbol": "Asy",
+      "name": "Asyndeton",
+      "subgroup": "structural-syntactic",
+      "definition": "Omitting conjunctions between phrases or clauses",
+      "effect": "Creates speed, emphasis, or fragmentation",
+      "example": "We were hungry, tired, afraid, desperate",
+      "related": [
+        "syndeton",
+        "polysyndeton"
+      ]
+    },
+    {
+      "id": "polysyndeton",
+      "symbol": "Ply",
+      "name": "Polysyndeton",
+      "subgroup": "structural-syntactic",
+      "definition": "Excessive use of conjunctions between phrases or clauses",
+      "effect": "Creates rhythmic accumulation or overwhelming effect",
+      "example": "And we were hungry and tired and afraid and losing hope",
+      "related": [
+        "asyndeton",
+        "syndeton"
+      ]
+    },
+    {
+      "id": "parataxis",
+      "symbol": "Pra",
+      "name": "Parataxis",
+      "subgroup": "structural-syntactic",
+      "definition": "Placing grammatical units side by side without connectives",
+      "effect": "Creates equality and can feel abrupt",
+      "example": "I came, I saw, I conquered",
+      "related": [
+        "hypotaxis",
+        "asyndeton"
+      ]
+    },
+    {
+      "id": "hypotaxis",
+      "symbol": "Hyp",
+      "name": "Hypotaxis",
+      "subgroup": "structural-syntactic",
+      "definition": "Using subordinate clauses to show relationships",
+      "effect": "Creates hierarchy and complex relationships",
+      "example": "When I arrived, since I was tired, although it was late",
+      "related": [
+        "parataxis"
+      ]
+    },
+    {
+      "id": "periodic-sentence",
+      "symbol": "Ps",
+      "name": "Periodic Sentence",
+      "subgroup": "structural-syntactic",
+      "definition": "Main clause postponed until end after subordinate clauses",
+      "effect": "Creates suspense and emphasis through delayed resolution",
+      "example": "Although we tried, though we failed, still we persevered",
+      "related": [
+        "loose-sentence"
+      ]
+    },
+    {
+      "id": "loose-sentence",
+      "symbol": "Ls",
+      "name": "Loose Sentence",
+      "subgroup": "structural-syntactic",
+      "definition": "Main clause stated first, followed by elaborations",
+      "effect": "Creates directness and adds information gradually",
+      "example": "We persevered, though we tried, despite our failures",
+      "related": [
+        "periodic-sentence"
+      ]
+    },
+    {
+      "id": "rhetorical-question",
+      "symbol": "Rq",
+      "name": "Rhetorical Question",
+      "subgroup": "structural-syntactic",
+      "definition": "Question posed not for answer but for effect",
+      "effect": "Creates emphasis and engages reader",
+      "example": "Who could deny the beauty of the sunset?",
+      "related": [
+        "apostrophe"
+      ]
+    },
+    {
+      "id": "sentence-fragment",
+      "symbol": "Sf",
+      "name": "Sentence Fragment",
+      "subgroup": "structural-syntactic",
+      "definition": "Incomplete sentence used intentionally for effect",
+      "effect": "Creates emphasis, mimics speech",
+      "example": "Not a complete thought. Just fragments. Sharp. Direct.",
+      "related": [
+        "asyndeton"
+      ]
+    },
+    {
+      "id": "run-on-sentence",
+      "symbol": "Ru",
+      "name": "Run-On Sentence",
+      "subgroup": "structural-syntactic",
+      "definition": "Independent clauses improperly joined",
+      "effect": "Can create breathless or manic effect",
+      "example": "She ran through the door and down the hall and into his arms",
+      "related": [
+        "syndeton"
+      ]
+    },
+    {
+      "id": "anastrophe",
+      "symbol": "Aas",
+      "name": "Anastrophe",
+      "subgroup": "structural-syntactic",
+      "definition": "Inversion of normal word order",
+      "effect": "Creates emphasis or archaic effect",
+      "example": "Strong was his conviction; backward he walked",
+      "related": [
+        "hyperbaton"
+      ]
+    },
+    {
+      "id": "parenthesis",
+      "symbol": "Pre",
+      "name": "Parenthesis",
+      "subgroup": "structural-syntactic",
+      "definition": "Insertion of a phrase or clause as interruption",
+      "effect": "Allows interjection and creates aside effect",
+      "example": "The truth—hard as it is to admit—was obvious",
+      "related": [
+        "apposition"
+      ]
+    },
+    {
+      "id": "apposition",
+      "symbol": "App",
+      "name": "Apposition",
+      "subgroup": "structural-syntactic",
+      "definition": "Placement of noun or noun phrase beside another as explanation",
+      "effect": "Creates definition through juxtaposition",
+      "example": "My brother, the doctor, explained the procedure",
+      "related": [
+        "parenthesis"
+      ]
+    },
+    {
+      "id": "ellipsis-grammatical",
+      "symbol": "Eli",
+      "name": "Ellipsis (Grammatical)",
+      "subgroup": "structural-syntactic",
+      "definition": "Omission of words understood from context",
+      "effect": "Creates conciseness and emphasis",
+      "example": "Some laughed; others cried",
+      "related": [
+        "asyndeton"
+      ]
+    },
+    {
+      "id": "caesura",
+      "symbol": "Cae",
+      "name": "Caesura",
+      "subgroup": "structural-syntactic",
+      "definition": "Pause or break in metrical line",
+      "effect": "Creates rhythm and allows emphasis in poetry",
+      "example": "The day breaks || silence grows",
+      "related": [
+        "enjambment"
+      ]
+    },
+    {
+      "id": "enjambment",
+      "symbol": "Ej",
+      "name": "Enjambment",
+      "subgroup": "structural-syntactic",
+      "definition": "Line breaks that continue grammatical phrase to next line",
+      "effect": "Creates flow across line breaks",
+      "example": "The day breaks / silently",
+      "related": [
+        "end-stopping"
+      ]
+    },
+    {
+      "id": "end-stopping",
+      "symbol": "Es",
+      "name": "End-Stopping",
+      "subgroup": "structural-syntactic",
+      "definition": "Grammatical pause coinciding with line ending",
+      "effect": "Creates completion and allows rest",
+      "example": "The day breaks. / Silence grows.",
+      "related": [
+        "enjambment",
+        "caesura"
+      ]
+    },
+    {
+      "id": "brachylogy",
+      "symbol": "Br",
+      "name": "Brachylogy",
+      "subgroup": "structural-syntactic",
+      "definition": "Extreme compression of expression, deliberately omitting words that the reader must infer to complete the meaning.",
+      "effect": "Creates intensity, speed and tautness; demands active interpretive participation from the reader and can produce an effect of controlled urgency.",
+      "example": "\"If possible, come.\" / \"Gone.\" / \"Ready?\" / \"Three men dead, the rest in flight.\"",
+      "related": [
+        "ellipsis-grammatical",
+        "asyndeton",
+        "sentence-fragment"
+      ]
+    },
+    {
+      "id": "enallage",
+      "symbol": "Ena",
+      "name": "Enallage",
+      "subgroup": "structural-syntactic",
+      "definition": "The deliberate substitution of one grammatical form for another — tense, number, person or case — for rhetorical or characterisation effect.",
+      "effect": "Can signal dialect, psychological state or defamiliarisation; draws conscious attention to the act of speaking and the social encoding of grammar.",
+      "example": "\"I seen what you done.\" (past tense substitution for characterisation) / The royal 'we' substituted for 'I'.",
+      "related": [
+        "idiolect",
+        "colloquialism",
+        "register-shift",
+        "verbing"
+      ]
+    },
+    {
+      "id": "anacoluthon",
+      "symbol": "Aac",
+      "name": "Anacoluthon",
+      "subgroup": "structural-syntactic",
+      "definition": "A grammatical construction in which the expected syntactic sequence is abandoned mid-sentence, leaving it technically incomplete.",
+      "effect": "Mimics psychological disruption, emotional overwhelm or a fractured mind; creates authenticity in characterisation.",
+      "example": "\"If you — but never mind.\" / \"The king — he was very angry.\"",
+      "related": [
+        "ellipsis-grammatical",
+        "stream-of-consciousness"
+      ]
+    },
+    {
+      "id": "hysteron-proteron",
+      "symbol": "Hs",
+      "name": "Hysteron Proteron",
+      "subgroup": "structural-syntactic",
+      "definition": "A figure in which the natural or temporal order of events or ideas is deliberately inverted.",
+      "effect": "Creates urgency, disorientation or dark comedy by presenting result before cause; can suggest emotional priority over logical sequence.",
+      "example": "\"Put on your shoes and socks.\" / \"I die! I faint! I fail!\" (Shelley, Prometheus Unbound)",
+      "related": [
+        "anastrophe",
+        "in-medias-res",
+        "flash-forward-prolepsis"
+      ]
+    },
+    {
+      "id": "tautology",
+      "symbol": "Tu",
+      "name": "Tautology",
+      "subgroup": "structural-syntactic",
+      "definition": "The needless repetition of an idea in different words.",
+      "effect": "Reinforces a point or exposes empty redundancy.",
+      "example": "a free gift",
+      "related": []
+    },
+    {
+      "id": "pleonasm",
+      "symbol": "Ple",
+      "name": "Pleonasm",
+      "subgroup": "structural-syntactic",
+      "definition": "The use of more words than necessary to express a meaning.",
+      "effect": "Adds emphasis or, unintentionally, redundancy.",
+      "example": "I saw it with my own eyes",
+      "related": []
+    },
+    {
+      "id": "first-person-narrator",
+      "symbol": "Fs",
+      "name": "First-Person Narrator",
+      "subgroup": "structural-point-of-view",
+      "definition": "Story told from perspective of 'I'",
+      "effect": "Creates intimacy and direct reader connection",
+      "example": "I walked through the door and found the truth",
+      "related": [
+        "second-person-address",
+        "interior-monologue"
+      ]
+    },
+    {
+      "id": "second-person-address",
+      "symbol": "So",
+      "name": "Second-Person Address",
+      "subgroup": "structural-point-of-view",
+      "definition": "Story told to 'you'; addresses reader directly",
+      "effect": "Creates immediate engagement and implicates reader",
+      "example": "You enter the room. You see the body. You freeze.",
+      "related": [
+        "first-person-narrator"
+      ]
+    },
+    {
+      "id": "third-person-omniscient",
+      "symbol": "Th",
+      "name": "Third-Person Omniscient",
+      "subgroup": "structural-point-of-view",
+      "definition": "Narrator knows all thoughts, feelings, and events",
+      "effect": "Creates detachment and comprehensive perspective",
+      "example": "Traditional omniscient narration in Victorian novels",
+      "related": [
+        "third-person-limited"
+      ]
+    },
+    {
+      "id": "third-person-limited",
+      "symbol": "Tl",
+      "name": "Third-Person Limited",
+      "subgroup": "structural-point-of-view",
+      "definition": "Third person but from one character's perspective",
+      "effect": "Creates objectivity with limited knowledge",
+      "example": "He saw the truth but didn't understand it",
+      "related": [
+        "third-person-omniscient"
+      ]
+    },
+    {
+      "id": "unreliable-narrator",
+      "symbol": "Ue",
+      "name": "Unreliable Narrator",
+      "subgroup": "structural-point-of-view",
+      "definition": "Narrator whose account cannot be fully trusted",
+      "effect": "Creates uncertainty and requires active interpretation",
+      "example": "An insane narrator whose perspective is skewed",
+      "related": [
+        "naive-narrator",
+        "dramatic-irony"
+      ]
+    },
+    {
+      "id": "stream-of-consciousness",
+      "symbol": "Str",
+      "name": "Stream of Consciousness",
+      "subgroup": "structural-point-of-view",
+      "definition": "Direct representation of character's mental processes",
+      "effect": "Creates immediacy and psychological depth",
+      "example": "Molly Bloom's long, unpunctuated internal monologue",
+      "related": [
+        "interior-monologue",
+        "free-indirect-discourse"
+      ]
+    },
+    {
+      "id": "interior-monologue",
+      "symbol": "It",
+      "name": "Interior Monologue",
+      "subgroup": "structural-point-of-view",
+      "definition": "Character's unspoken thoughts represented",
+      "effect": "Creates access to internal mental life",
+      "example": "His thoughts raced: did she know? Could she understand?",
+      "related": [
+        "stream-of-consciousness"
+      ]
+    },
+    {
+      "id": "free-indirect-discourse",
+      "symbol": "Fre",
+      "name": "Free Indirect Discourse",
+      "subgroup": "structural-point-of-view",
+      "definition": "Third-person narration with character's voice and perspective",
+      "effect": "Creates intimacy without first-person commitment",
+      "example": "He wondered if she understood. But how could she?",
+      "related": [
+        "stream-of-consciousness"
+      ]
+    },
+    {
+      "id": "epistolary-mode",
+      "symbol": "Eis",
+      "name": "Epistolary Mode",
+      "subgroup": "structural-point-of-view",
+      "definition": "Narrative told through letters, emails, or documents",
+      "effect": "Creates authenticity and varied perspectives",
+      "example": "The novel told entirely through exchanged letters",
+      "related": [
+        "frame-narrative"
+      ]
+    },
+    {
+      "id": "dramatic-monologue",
+      "symbol": "Dra",
+      "name": "Dramatic Monologue",
+      "subgroup": "structural-point-of-view",
+      "definition": "Character speaks directly to listener, revealing self",
+      "effect": "Creates character development and psychological insight",
+      "example": "Browning's Duke speaking to a visitor",
+      "related": [
+        "interior-monologue"
+      ]
+    },
+    {
+      "id": "collective-narrator",
+      "symbol": "Cll",
+      "name": "Collective Narrator",
+      "subgroup": "structural-point-of-view",
+      "definition": "Multiple characters speaking as 'we' or unified voice",
+      "effect": "Creates community perspective and shared experience",
+      "example": "Townspeople speaking collectively about an event",
+      "related": [
+        "first-person-narrator"
+      ]
+    },
+    {
+      "id": "naive-narrator",
+      "symbol": "Na",
+      "name": "Naive Narrator",
+      "subgroup": "structural-point-of-view",
+      "definition": "Narrator lacks understanding of what they describe",
+      "effect": "Creates irony as reader understands more than narrator",
+      "example": "A child narrator unaware of adults' dark intentions",
+      "related": [
+        "unreliable-narrator",
+        "dramatic-irony"
+      ]
+    },
+    {
+      "id": "ethos",
+      "symbol": "Eh",
+      "name": "Ethos",
+      "subgroup": "structural-rhetorical",
+      "definition": "Appeal to credibility and authority of the speaker",
+      "effect": "Establishes trustworthiness and expertise",
+      "example": "A doctor speaking about medicine has ethos",
+      "related": [
+        "pathos",
+        "logos"
+      ]
+    },
+    {
+      "id": "pathos",
+      "symbol": "Pt",
+      "name": "Pathos",
+      "subgroup": "structural-rhetorical",
+      "definition": "Appeal to emotion and sympathy of the audience",
+      "effect": "Engages reader emotionally and motivates response",
+      "example": "A story about a child's suffering appeals to pathos",
+      "related": [
+        "logos"
+      ]
+    },
+    {
+      "id": "logos",
+      "symbol": "Lg",
+      "name": "Logos",
+      "subgroup": "structural-rhetorical",
+      "definition": "Appeal to logic and reason",
+      "effect": "Uses evidence and rational argument to persuade",
+      "example": "Statistical evidence presented in logical sequence",
+      "related": [
+        "ethos"
+      ]
+    },
+    {
+      "id": "kairos",
+      "symbol": "Ka",
+      "name": "Kairos",
+      "subgroup": "structural-rhetorical",
+      "definition": "Persuasion through timing and cultural moment",
+      "effect": "Leverages opportune moment for maximum impact",
+      "example": "An ad released during a cultural event it references",
+      "related": [
+        "ethos"
+      ]
+    },
+    {
+      "id": "antistrophe",
+      "symbol": "A2",
+      "name": "Antistrophe",
+      "subgroup": "structural-rhetorical",
+      "definition": "Rhetorical device turning opponent's words back against them",
+      "effect": "Creates clever refutation through reversal",
+      "example": "Your own argument proves my point, not yours",
+      "related": []
+    },
+    {
+      "id": "hendiadys",
+      "symbol": "Hn",
+      "name": "Hendiadys",
+      "subgroup": "structural-rhetorical",
+      "definition": "Expressing a single idea through two words or phrases",
+      "effect": "Creates emphasis and semantic richness",
+      "example": "Nice and warm; safe and sound",
+      "related": []
+    },
+    {
+      "id": "litotes",
+      "symbol": "Lt",
+      "name": "Litotes",
+      "subgroup": "structural-rhetorical",
+      "definition": "Understatement expressed through negative construction",
+      "effect": "Creates ironic emphasis through minimization",
+      "example": "That's not bad (meaning it's good); no small matter",
+      "related": [
+        "meiosis",
+        "understatement"
+      ]
+    },
+    {
+      "id": "meiosis",
+      "symbol": "Mei",
+      "name": "Meiosis",
+      "subgroup": "structural-rhetorical",
+      "definition": "Deliberate representation of something as less important",
+      "effect": "Creates irony and humor through minimization",
+      "example": "The Black Death was merely a bit problematic",
+      "related": [
+        "litotes",
+        "understatement"
+      ]
+    },
+    {
+      "id": "apophasis",
+      "symbol": "Apo",
+      "name": "Apophasis",
+      "subgroup": "structural-rhetorical",
+      "definition": "Mentioning something by denying it explicitly",
+      "effect": "Actually draws attention to what's ostensibly denied",
+      "example": "I won't even mention his terrible record",
+      "related": []
+    },
+    {
+      "id": "procatalepsis",
+      "symbol": "Pc",
+      "name": "Procatalepsis",
+      "subgroup": "structural-rhetorical",
+      "definition": "Anticipating and answering objections before they're raised",
+      "effect": "Strengthens argument by addressing counterarguments",
+      "example": "You might argue costs are prohibitive; however, benefits...",
+      "related": []
+    },
+    {
+      "id": "enthymeme",
+      "symbol": "Ent",
+      "name": "Enthymeme",
+      "subgroup": "structural-rhetorical",
+      "definition": "Rhetorical syllogism with premise implied rather than stated",
+      "effect": "Uses shared understanding to persuade efficiently",
+      "example": "All humans are mortal; therefore, Socrates is mortal",
+      "related": []
+    },
+    {
+      "id": "anecdote",
+      "symbol": "Ane",
+      "name": "Anecdote",
+      "subgroup": "structural-rhetorical",
+      "definition": "Brief story illustrating a point or providing evidence",
+      "effect": "Creates vivid, memorable example and human interest",
+      "example": "A personal story told to support a broader claim",
+      "related": [
+        "exemplum"
+      ]
+    },
+    {
+      "id": "exemplum",
+      "symbol": "Ee",
+      "name": "Exemplum",
+      "subgroup": "structural-rhetorical",
+      "definition": "Specific example used to illustrate general principle",
+      "effect": "Provides concrete evidence for abstract claim",
+      "example": "George Washington's honesty exemplifying integrity",
+      "related": [
+        "anecdote"
+      ]
+    },
+    {
+      "id": "enumeratio",
+      "symbol": "Enu",
+      "name": "Enumeratio",
+      "subgroup": "structural-rhetorical",
+      "definition": "Detailed listing of items, points, or arguments",
+      "effect": "Creates comprehensive coverage and accumulative effect",
+      "example": "Point one, point two, point three...",
+      "related": [
+        "accumulation",
+        "cataloguing"
+      ]
+    },
+    {
+      "id": "hyperbaton",
+      "symbol": "Hpe",
+      "name": "Hyperbaton",
+      "subgroup": "structural-rhetorical",
+      "definition": "Inversion of normal word order for rhetorical effect",
+      "effect": "Creates emphasis and unusual phrasing",
+      "example": "Angry was he; strong the opposition grew",
+      "related": [
+        "anastrophe"
+      ]
+    },
+    {
+      "id": "zeugma",
+      "symbol": "Ze",
+      "name": "Zeugma",
+      "subgroup": "structural-rhetorical",
+      "definition": "Word used in two different senses within one phrase",
+      "effect": "Creates wit and surprising connection",
+      "example": "Lost both her patience and her keys",
+      "related": [
+        "syllepsis"
+      ]
+    },
+    {
+      "id": "syllepsis",
+      "symbol": "Syl",
+      "name": "Syllepsis",
+      "subgroup": "structural-rhetorical",
+      "definition": "Word understood in different ways in successive clauses",
+      "effect": "Creates wordplay and surprising connections",
+      "example": "Wore an old coat and a smile",
+      "related": [
+        "zeugma",
+        "pun"
+      ]
+    },
+    {
+      "id": "distinctio",
+      "symbol": "Ds",
+      "name": "Distinctio",
+      "subgroup": "structural-rhetorical",
+      "definition": "The explicit clarification or distinguishing between multiple possible meanings of a term just used, to prevent ambiguity.",
+      "effect": "Controls semantic slippage; signals precision and intellectual rigour in the speaker while anticipating counterargument or misreading.",
+      "example": "\"I speak of love — not infatuation, not desire, but love in its most deliberate and reasoned form.\"",
+      "related": [
+        "polysemy",
+        "connotation",
+        "denotation",
+        "apophasis",
+        "apposition"
+      ]
+    },
+    {
+      "id": "epanorthosis",
+      "symbol": "Epa",
+      "name": "Epanorthosis",
+      "subgroup": "structural-rhetorical",
+      "definition": "The immediate correction, retraction or sharpening of a word or phrase just used, often to intensify or reframe its meaning.",
+      "effect": "Creates an impression of spontaneous rigour and precision; can amplify, qualify or complicate the original statement.",
+      "example": "\"He was brave — no, reckless.\" / \"A good man, nay, a great one.\" / \"I loved her — I worshipped her.\"",
+      "related": [
+        "amplification",
+        "antithesis"
+      ]
+    },
+    {
+      "id": "hypophora",
+      "symbol": "Hpo",
+      "name": "Hypophora",
+      "subgroup": "structural-rhetorical",
+      "definition": "A figure in which a speaker raises a question and immediately provides the answer, rather than leaving it open.",
+      "effect": "Controls the direction of argument; creates a sense of dialogue and guided reasoning while keeping the speaker in command of meaning.",
+      "example": "\"What should we do? We should act now.\" / \"Was Caesar ambitious? He was.\" (Shakespeare, Julius Caesar)",
+      "related": [
+        "rhetorical-question",
+        "procatalepsis",
+        "ethos",
+        "logos"
+      ]
+    },
+    {
+      "id": "aphorism",
+      "symbol": "Aph",
+      "name": "Aphorism",
+      "subgroup": "structural-rhetorical",
+      "definition": "A concise statement of a general truth or principle.",
+      "effect": "Distils wisdom into quotable, authoritative form.",
+      "example": "The unexamined life is not worth living",
+      "related": []
+    },
+    {
+      "id": "epigram",
+      "symbol": "Eg",
+      "name": "Epigram",
+      "subgroup": "structural-rhetorical",
+      "definition": "A brief, pointed and often witty statement.",
+      "effect": "Lands a memorable thought with concision and bite.",
+      "example": "Oscar Wilde: I can resist everything except temptation",
+      "related": []
+    },
+    {
+      "id": "parabasis",
+      "symbol": "Pb",
+      "name": "Parabasis",
+      "subgroup": "structural-dramatic",
+      "definition": "A moment in which the chorus or a character steps fully out of the dramatic fiction to address the audience directly, often on behalf of the playwright.",
+      "effect": "Shatters theatrical illusion and implicates the audience in the drama's concerns; creates a meta-theatrical commentary on the events or issues being staged.",
+      "example": "In Greek Old Comedy, the parabasis saw the chorus abandon their dramatic role to address Athenian citizens on political and social matters.",
+      "related": [
+        "breaking-the-fourth-wall",
+        "aside",
+        "metatheatre",
+        "alienation-effect-verfremdungseffekt",
+        "chorus"
+      ]
+    },
+    {
+      "id": "dumb-show",
+      "symbol": "Db",
+      "name": "Dumb Show",
+      "subgroup": "structural-dramatic",
+      "definition": "A passage of mimed action without speech, used to represent or foreshadow events.",
+      "effect": "Conveys narrative visually and can foreshadow the main plot in symbolic form.",
+      "example": "The dumb show before the play within Hamlet mimes the murder of the king.",
+      "related": []
+    },
+    {
+      "id": "tableau",
+      "symbol": "Tb",
+      "name": "Tableau",
+      "subgroup": "structural-dramatic",
+      "definition": "A moment in which actors freeze in a striking arrangement, presenting a silent picture on stage.",
+      "effect": "Arrests the action to emphasise a dramatic image or emotional climax.",
+      "example": "Nineteenth century melodrama often ended acts on a tableau, holding a frozen pose as the curtain fell.",
+      "related": []
+    },
+    {
+      "id": "dramatis-personae",
+      "symbol": "Dp",
+      "name": "Dramatis Personae",
+      "subgroup": "structural-dramatic",
+      "definition": "The list of characters in a play, conventionally placed at the start of the text.",
+      "effect": "Orients the reader and signals relationships, status and roles before the action begins.",
+      "example": "The dramatis personae of Hamlet identifies Claudius as \"King of Denmark\".",
+      "related": []
+    },
+    {
+      "id": "stage-directions",
+      "symbol": "Sta",
+      "name": "Stage Directions",
+      "subgroup": "structural-dramatic",
+      "definition": "Instructions in a play's text specifying setting, movement, action or delivery.",
+      "effect": "Guides staging and shapes the reader's mental performance, sometimes carrying authorial voice.",
+      "example": "The famous direction \"Exit, pursued by a bear\" in Shakespeare's The Winter's Tale.",
+      "related": []
+    },
+    {
+      "id": "five-act-structure",
+      "symbol": "Fiv",
+      "name": "Five Act Structure",
+      "subgroup": "structural-dramatic",
+      "definition": "A dramatic structure dividing a play into five acts: exposition, rising action, climax, falling action and catastrophe or resolution.",
+      "effect": "Shapes pacing and the rise and fall of tension across a recognisable arc.",
+      "example": "Shakespeare's tragedies, such as Macbeth, follow the five act pattern later codified by Freytag.",
+      "related": [
+        "rising-action"
+      ]
+    },
+    {
+      "id": "three-unities",
+      "symbol": "Thr",
+      "name": "Three Unities",
+      "subgroup": "structural-dramatic",
+      "definition": "The neoclassical principles of unity of action, time and place that govern dramatic structure.",
+      "effect": "Concentrates the drama for intensity and verisimilitude by limiting its scope and duration.",
+      "example": "Racine's Phèdre observes the unities, unfolding in one place within a single day.",
+      "related": []
+    },
+    {
+      "id": "exodos",
+      "symbol": "Exo",
+      "name": "Exodos",
+      "subgroup": "structural-dramatic",
+      "definition": "The final scene or departure song after the last stasimon, concluding a Greek tragedy.",
+      "effect": "Resolves the action and marks the chorus's exit, delivering closing reflection.",
+      "example": "The exodos of Oedipus Rex shows the blinded Oedipus led away from Thebes.",
+      "related": []
+    },
+    {
+      "id": "episode",
+      "symbol": "Epis",
+      "name": "Episode",
+      "subgroup": "structural-dramatic",
+      "definition": "A section of spoken dramatic action between choral odes in Greek tragedy.",
+      "effect": "Advances the plot and develops character between the chorus's lyric interludes.",
+      "example": "The episodes of Euripides' Medea stage Medea's encounters with Creon, Jason and Aegeus.",
+      "related": []
+    },
+    {
+      "id": "stasimon",
+      "symbol": "Ss",
+      "name": "Stasimon",
+      "subgroup": "structural-dramatic",
+      "definition": "A choral ode performed while the chorus stands in the orchestra, between the episodes of a Greek tragedy.",
+      "effect": "Reflects on the action, voicing communal judgement and lyric meditation.",
+      "example": "The famous \"Ode to Man\" stasimon in Sophocles' Antigone.",
+      "related": []
+    },
+    {
+      "id": "parodos",
+      "symbol": "Pro",
+      "name": "Parodos",
+      "subgroup": "structural-dramatic",
+      "definition": "The first ode sung by the chorus as it enters, in Greek tragedy.",
+      "effect": "Introduces the chorus and its perspective, establishing communal mood and context.",
+      "example": "The parodos of Aeschylus' Agamemnon recalls the omens at Aulis.",
+      "related": []
+    },
+    {
+      "id": "epilogue",
+      "symbol": "Eil",
+      "name": "Epilogue",
+      "subgroup": "structural-dramatic",
+      "definition": "A concluding section spoken after the main action, offering closure, comment or address to the audience.",
+      "effect": "Rounds off the drama, draws a moral or appeals for applause and goodwill.",
+      "example": "Prospero's epilogue in Shakespeare's The Tempest asks the audience to set him free with their applause.",
+      "related": []
+    },
+    {
+      "id": "prologue",
+      "symbol": "Prol",
+      "name": "Prologue",
+      "subgroup": "structural-dramatic",
+      "definition": "An introductory section spoken before the main action, setting context or framing the play.",
+      "effect": "Orients the audience, establishes tone and may foreshadow events.",
+      "example": "The Chorus's prologue in Shakespeare's Romeo and Juliet announces the \"star-crossed lovers\".",
+      "related": []
+    },
+    {
+      "id": "chorus",
+      "symbol": "Cho",
+      "name": "Chorus",
+      "subgroup": "structural-dramatic",
+      "definition": "A group of performers who comment collectively on the dramatic action, often representing the voice of the community.",
+      "effect": "Provides exposition, moral framing and emotional amplification, mediating between stage and audience.",
+      "example": "In Sophocles' Antigone, the Theban elders form a chorus that reflects on fate and the limits of human power.",
+      "related": []
+    },
+    {
+      "id": "stichomythia",
+      "symbol": "Sti",
+      "name": "Stichomythia",
+      "subgroup": "structural-dramatic",
+      "definition": "Rapid dialogue in which characters exchange single alternating lines, often in heated argument.",
+      "effect": "Heightens tension and pace, dramatising conflict through verbal duelling.",
+      "example": "The clipped line-by-line exchanges between Oedipus and Tiresias in Sophocles' Oedipus Rex.",
+      "related": []
+    },
+    {
+      "id": "soliloquy",
+      "symbol": "Sol",
+      "name": "Soliloquy",
+      "subgroup": "structural-dramatic",
+      "definition": "An extended speech in which a character, alone on stage, voices their inner thoughts aloud for the audience.",
+      "effect": "Grants direct access to a character's psychology and moral struggle, building intimacy and dramatic irony.",
+      "example": "Hamlet's \"To be, or not to be\" soliloquy lays bare his contemplation of mortality and inaction.",
+      "related": []
+    },
+    {
+      "id": "set-speech",
+      "symbol": "Set",
+      "name": "Set Speech",
+      "subgroup": "structural-dramatic",
+      "definition": "A formal, self-contained speech of some length delivered by a single character within a play.",
+      "effect": "Allows sustained rhetoric, argument or emotion, often marking a dramatic high point.",
+      "example": "Mark Antony's \"Friends, Romans, countrymen\" oration in Shakespeare's Julius Caesar.",
+      "related": []
+    },
+    {
+      "id": "aside",
+      "symbol": "Asi",
+      "name": "Aside",
+      "subgroup": "structural-dramatic",
+      "definition": "A short remark spoken by a character to the audience or to themselves, conventionally unheard by the other characters on stage.",
+      "effect": "Creates intimacy and dramatic irony by giving the audience access to a character's private thoughts while others remain unaware.",
+      "example": "In Shakespeare's Hamlet, Hamlet's \"A little more than kin, and less than kind\" is delivered aside, signalling his contempt for Claudius.",
+      "related": []
+    },
+    {
+      "id": "problem-play",
+      "symbol": "Pp",
+      "name": "Problem Play",
+      "subgroup": "structural-form",
+      "definition": "A drama that stages a contemporary social problem for debate, often without tidy resolution.",
+      "effect": "Provokes reflection and discomfort, using the stage as a forum for argument.",
+      "example": "Ibsen's A Doll's House confronts marriage and gender roles, leaving its questions open.",
+      "related": []
+    },
+    {
+      "id": "well-made-play",
+      "symbol": "We",
+      "name": "Well-Made Play",
+      "subgroup": "structural-form",
+      "definition": "A tightly plotted genre built on careful exposition, causal logic and a climactic obligatory scene.",
+      "effect": "Delivers satisfying mechanical suspense through neat construction and reversal.",
+      "example": "The plays of Eugène Scribe epitomise the well-made play's clockwork plotting.",
+      "related": []
+    },
+    {
+      "id": "closet-drama",
+      "symbol": "Clo",
+      "name": "Closet Drama",
+      "subgroup": "structural-form",
+      "definition": "A play written to be read rather than performed on stage.",
+      "effect": "Foregrounds language and idea over spectacle, inviting private, reflective reading.",
+      "example": "Milton's Samson Agonistes was conceived as a closet drama.",
+      "related": []
+    },
+    {
+      "id": "mystery-play",
+      "symbol": "Ms",
+      "name": "Mystery Play",
+      "subgroup": "structural-form",
+      "definition": "A medieval religious drama dramatising biblical episodes, often staged in cycles by craft guilds.",
+      "effect": "Communicates scripture vividly to a lay audience through communal performance.",
+      "example": "The York Mystery Plays dramatise events from Creation to the Last Judgement.",
+      "related": []
+    },
+    {
+      "id": "morality-play",
+      "symbol": "Mp",
+      "name": "Morality Play",
+      "subgroup": "structural-form",
+      "definition": "A late medieval allegorical drama in which personified virtues and vices contend for the human soul.",
+      "effect": "Instructs morally, dramatising spiritual choice through allegory.",
+      "example": "Everyman stages the title figure's reckoning as abstractions like Good Deeds accompany him.",
+      "related": []
+    },
+    {
+      "id": "masque",
+      "symbol": "Mq",
+      "name": "Masque",
+      "subgroup": "structural-form",
+      "definition": "A courtly dramatic entertainment combining poetry, music, dance and elaborate spectacle.",
+      "effect": "Celebrates and flatters its noble audience through allegory and visual splendour.",
+      "example": "Ben Jonson's masques, designed with Inigo Jones, staged allegories for the Jacobean court.",
+      "related": []
+    },
+    {
+      "id": "melodrama",
+      "symbol": "Ml",
+      "name": "Melodrama",
+      "subgroup": "structural-form",
+      "definition": "A sensational dramatic genre with heightened emotion, clear moral oppositions and musical underscoring.",
+      "effect": "Amplifies feeling and suspense, polarising virtue and villainy for strong audience response.",
+      "example": "Nineteenth century stage melodramas pit pure heroines against scheming villains.",
+      "related": []
+    },
+    {
+      "id": "farce",
+      "symbol": "Fc",
+      "name": "Farce",
+      "subgroup": "structural-form",
+      "definition": "A broad comic genre relying on improbable situations, physical humour and exaggerated character.",
+      "effect": "Provokes laughter through absurdity, mistaken identity and rapid action.",
+      "example": "The mistaken identities of Oscar Wilde's The Importance of Being Earnest verge on farce.",
+      "related": []
+    },
+    {
+      "id": "tragicomedy",
+      "symbol": "Tg",
+      "name": "Tragicomedy",
+      "subgroup": "structural-form",
+      "definition": "A genre blending tragic and comic elements, often with a grave threat that resolves happily.",
+      "effect": "Complicates tone, mixing pathos with humour to mirror life's ambivalence.",
+      "example": "Shakespeare's The Winter's Tale moves from near-tragedy to comic reconciliation.",
+      "related": []
+    },
+    {
+      "id": "tragedy",
+      "symbol": "Tra",
+      "name": "Tragedy",
+      "subgroup": "structural-form",
+      "definition": "A dramatic genre depicting the downfall of a protagonist through fate, flaw or circumstance.",
+      "effect": "Evokes pity and fear, moving the audience toward catharsis.",
+      "example": "Sophocles' Oedipus Rex traces the king's ruin through his own investigation.",
+      "related": [
+        "catharsis"
+      ]
+    },
+    {
+      "id": "comedy",
+      "symbol": "Com",
+      "name": "Comedy",
+      "subgroup": "structural-form",
+      "definition": "A dramatic genre with a light or satirical tone that typically ends happily, often in marriage or reconciliation.",
+      "effect": "Amuses and reassures, resolving conflict and affirming social order.",
+      "example": "Shakespeare's A Midsummer Night's Dream ends with multiple marriages and harmony restored.",
+      "related": []
+    },
+    {
+      "id": "portmanteau",
+      "symbol": "Por",
+      "name": "Portmanteau",
+      "subgroup": "structural-wordplay",
+      "definition": "A word blending the sounds and meanings of two others.",
+      "effect": "Coins compact, inventive new terms.",
+      "example": "brunch from breakfast and lunch",
+      "related": []
+    },
+    {
+      "id": "spoonerism",
+      "symbol": "Spo",
+      "name": "Spoonerism",
+      "subgroup": "structural-wordplay",
+      "definition": "The transposition of initial sounds between two or more words.",
+      "effect": "Creates accidental or deliberate comic slips.",
+      "example": "a blushing crow for a crushing blow",
+      "related": []
+    },
+    {
+      "id": "malapropism",
+      "symbol": "Mal",
+      "name": "Malapropism",
+      "subgroup": "structural-wordplay",
+      "definition": "The mistaken use of a word in place of a similar-sounding one, to comic effect.",
+      "effect": "Produces unintended humour and characterises the speaker.",
+      "example": "Mrs Malaprop: a allegory on the banks of the Nile",
+      "related": []
+    },
+    {
+      "id": "double-entendre",
+      "symbol": "Do",
+      "name": "Double Entendre",
+      "subgroup": "structural-wordplay",
+      "definition": "A phrase open to two interpretations, one of which is often risque.",
+      "effect": "Smuggles a second, usually suggestive, meaning beneath the surface.",
+      "example": "A line that reads innocently and bawdily at once",
+      "related": []
+    },
+    {
+      "id": "pun",
+      "symbol": "Pu",
+      "name": "Pun",
+      "subgroup": "structural-wordplay",
+      "definition": "A play on words exploiting multiple meanings or similar sounds, also called paronomasia.",
+      "effect": "Generates humour, wit or layered meaning.",
+      "example": "Time flies like an arrow; fruit flies like a banana",
+      "related": []
+    },
+    {
+      "id": "allusion",
+      "symbol": "All",
+      "name": "Allusion",
+      "subgroup": "intertextual-intertextual",
+      "definition": "Indirect reference to another work, person, or event",
+      "effect": "Enriches meaning through connection to external reference",
+      "example": "Calling an ambitious man an Icarus or Macbeth",
+      "related": [
+        "quotation"
+      ]
+    },
+    {
+      "id": "quotation",
+      "symbol": "Qu",
+      "name": "Quotation",
+      "subgroup": "intertextual-intertextual",
+      "definition": "Direct reproduction of words from another source",
+      "effect": "Provides authority or creates deliberate echo",
+      "example": "Citing a famous line from another work verbatim",
+      "related": [
+        "allusion"
+      ]
+    },
+    {
+      "id": "epigraph",
+      "symbol": "Eig",
+      "name": "Epigraph",
+      "subgroup": "intertextual-intertextual",
+      "definition": "Quotation placed at beginning of work or section",
+      "effect": "Sets tone and provides thematic context",
+      "example": "A poem beginning with a relevant Shakespeare quote",
+      "related": [
+        "quotation"
+      ]
+    },
+    {
+      "id": "parody",
+      "symbol": "Pd",
+      "name": "Parody",
+      "subgroup": "intertextual-intertextual",
+      "definition": "Humorous imitation of a style or work",
+      "effect": "Creates humor through exaggeration of recognizable features",
+      "example": "Scary Movie parodying horror film conventions",
+      "related": [
+        "pastiche"
+      ]
+    },
+    {
+      "id": "pastiche",
+      "symbol": "Pas",
+      "name": "Pastiche",
+      "subgroup": "intertextual-intertextual",
+      "definition": "Imitation of style, often respectful or admiring",
+      "effect": "Honors original while creating new work",
+      "example": "A painting in the style of Monet",
+      "related": [
+        "parody",
+        "homage"
+      ]
+    },
+    {
+      "id": "homage",
+      "symbol": "Hom",
+      "name": "Homage",
+      "subgroup": "intertextual-intertextual",
+      "definition": "Work created as tribute to another work or artist",
+      "effect": "Shows respect and creates intentional echo",
+      "example": "A novel dedicated to and influenced by a predecessor",
+      "related": [
+        "pastiche"
+      ]
+    },
+    {
+      "id": "adaptation",
+      "symbol": "Ada",
+      "name": "Adaptation",
+      "subgroup": "intertextual-intertextual",
+      "definition": "Rewriting of work in new medium or context",
+      "effect": "Translates story to new form while maintaining core",
+      "example": "Stage adaptation of a novel; film adaptation of a play",
+      "related": []
+    },
+    {
+      "id": "palimpsest",
+      "symbol": "Pal",
+      "name": "Palimpsest",
+      "subgroup": "intertextual-intertextual",
+      "definition": "Text written over earlier text, or later text reusing earlier",
+      "effect": "Creates layered meaning and historical echo",
+      "example": "Medieval manuscripts with previous text underneath",
+      "related": []
+    },
+    {
+      "id": "intertextuality-explicit",
+      "symbol": "Ie",
+      "name": "Intertextuality (Explicit)",
+      "subgroup": "intertextual-intertextual",
+      "definition": "Clear, named references to other texts",
+      "effect": "Deliberately invokes connection reader can identify",
+      "example": "Title borrowed from another work",
+      "related": [
+        "intertextuality-implicit",
+        "allusion"
+      ]
+    },
+    {
+      "id": "intertextuality-implicit",
+      "symbol": "Int",
+      "name": "Intertextuality (Implicit)",
+      "subgroup": "intertextual-intertextual",
+      "definition": "Subtle echoes and parallels without explicit naming",
+      "effect": "Requires reader recognition; creates discovery",
+      "example": "Plot structure echoing earlier work without acknowledgment",
+      "related": [
+        "intertextuality-explicit"
+      ]
+    },
+    {
+      "id": "hypotext-hypertext",
+      "symbol": "Hh",
+      "name": "Hypotext / Hypertext",
+      "subgroup": "intertextual-intertextual",
+      "definition": "Hypotext is source text; hypertext is derived text",
+      "effect": "Hypotext influences or is transformed by hypertext",
+      "example": "Odyssey (hypotext) → Joyce's Ulysses (hypertext)",
+      "related": []
+    },
+    {
+      "id": "breaking-the-fourth-wall",
+      "symbol": "Be",
+      "name": "Breaking the Fourth Wall",
+      "subgroup": "intertextual-metafictional",
+      "definition": "Character or narrator acknowledges audience or fictional nature",
+      "effect": "Creates direct connection with reader; disrupts illusion",
+      "example": "Character looks at camera; narrator addresses reader directly",
+      "related": [
+        "metafiction",
+        "self-referentiality"
+      ]
+    },
+    {
+      "id": "self-referentiality",
+      "symbol": "Sel",
+      "name": "Self-Referentiality",
+      "subgroup": "intertextual-metafictional",
+      "definition": "Work referring to itself, its creation, or its status as fiction",
+      "effect": "Creates philosophical paradox and self-awareness",
+      "example": "Novel discussing its own genre and conventions",
+      "related": [
+        "metafiction"
+      ]
+    },
+    {
+      "id": "metafiction",
+      "symbol": "Mta",
+      "name": "Metafiction",
+      "subgroup": "intertextual-metafictional",
+      "definition": "Fiction that reflects on its own nature and conventions",
+      "effect": "Creates commentary on narrative and meaning-making",
+      "example": "A novel about writing a novel; a film about filmmaking",
+      "related": [
+        "breaking-the-fourth-wall"
+      ]
+    },
+    {
+      "id": "postmodern-fragmentation",
+      "symbol": "Pf",
+      "name": "Postmodern Fragmentation",
+      "subgroup": "intertextual-metafictional",
+      "definition": "Disruptive, fragmented narrative structure",
+      "effect": "Challenges coherence and linear meaning",
+      "example": "Non-sequiturs, missing pages, disrupted chronology",
+      "related": [
+        "non-linear-narrative"
+      ]
+    },
+    {
+      "id": "unreliable-text",
+      "symbol": "Ut",
+      "name": "Unreliable Text",
+      "subgroup": "intertextual-metafictional",
+      "definition": "Text itself seems flawed, inconsistent, or deliberately misleading",
+      "effect": "Implicates reader in unreliability and interpretation",
+      "example": "Contradictory versions of events; missing pages",
+      "related": [
+        "unreliable-narrator",
+        "metafiction"
+      ]
+    },
+    {
+      "id": "mise-en-abyme",
+      "symbol": "Mis",
+      "name": "Mise en Abyme",
+      "subgroup": "intertextual-metafictional",
+      "definition": "Text containing representation of itself; story within story",
+      "effect": "Creates infinite regression and philosophical reflection",
+      "example": "A painting depicting the painter painting the painting",
+      "related": [
+        "frame-narrative"
+      ]
+    },
+    {
+      "id": "author-intrusion",
+      "symbol": "Aut",
+      "name": "Author Intrusion",
+      "subgroup": "intertextual-metafictional",
+      "definition": "Author's voice breaking into narrative explicitly",
+      "effect": "Disrupts fiction and creates author presence",
+      "example": "Author commenting on character or plot directly",
+      "related": [
+        "metafiction"
+      ]
+    },
+    {
+      "id": "narrative-self-consciousness",
+      "symbol": "Nr",
+      "name": "Narrative Self-Consciousness",
+      "subgroup": "intertextual-metafictional",
+      "definition": "Narrator aware of being in narrative and commenting on it",
+      "effect": "Creates philosophical reflection on storytelling",
+      "example": "Narrator discussing their own narrative strategies",
+      "related": [
+        "self-referentiality",
+        "metafiction"
+      ]
+    },
+    {
+      "id": "epic-theatre",
+      "symbol": "Ec",
+      "name": "Epic Theatre",
+      "subgroup": "intertextual-metafictional",
+      "definition": "Brecht's theory of theatre that favours episodic narrative and critical distance over emotional illusion.",
+      "effect": "Engages the audience's reason rather than empathy, framing drama as social analysis.",
+      "example": "Brecht's The Caucasian Chalk Circle uses a narrator and episodic structure characteristic of epic theatre.",
+      "related": []
+    },
+    {
+      "id": "alienation-effect-verfremdungseffekt",
+      "symbol": "Ali",
+      "name": "Alienation Effect (Verfremdungseffekt)",
+      "subgroup": "intertextual-metafictional",
+      "definition": "Brecht's technique of distancing the audience to prevent emotional immersion and prompt critical thought.",
+      "effect": "Keeps spectators aware they are watching a constructed argument, encouraging political reflection.",
+      "example": "Brecht's Mother Courage uses placards, songs and direct address to alienate the audience.",
+      "related": []
+    },
+    {
+      "id": "play-within-a-play",
+      "symbol": "Pw",
+      "name": "Play within a Play",
+      "subgroup": "intertextual-metafictional",
+      "definition": "A dramatic performance staged inside the main play, watched by its characters.",
+      "effect": "Mirrors or comments on the framing action, layering reality and illusion.",
+      "example": "\"The Mousetrap\" staged in Hamlet is a play within a play that traps Claudius's conscience.",
+      "related": []
+    },
+    {
+      "id": "metatheatre",
+      "symbol": "Meta",
+      "name": "Metatheatre",
+      "subgroup": "intertextual-metafictional",
+      "definition": "Drama that draws attention to its own theatricality, acknowledging that it is a play.",
+      "effect": "Breaks illusion to provoke reflection on art, role-playing and reality.",
+      "example": "The players and the staged murder in Hamlet make the play self-consciously theatrical.",
+      "related": []
+    },
+    {
+      "id": "metalepsis",
+      "symbol": "M2",
+      "name": "Metalepsis",
+      "subgroup": "intertextual-metafictional",
+      "definition": "The transgression of narrative levels, as when a narrator enters the story or addresses its making.",
+      "effect": "Ruptures the fictional frame to unsettle or amuse.",
+      "example": "A character who knows they are being written",
+      "related": []
+    }
+  ]
+}

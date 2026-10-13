@@ -8,7 +8,16 @@ import {
   parseAnnotationSource,
   serializeAnnotationSource
 } from '@/blocks/annotation-text';
+import {
+  applyTechniqueTag,
+  createFamilyLayerFromTable
+} from '@/blocks/annotation-technique';
+import { askTechniquePicker } from '@/blocks/annotation-technique-picker';
 import { blockTypeLabel } from '@/blocks/block-meta';
+import {
+  loadLiteraryElements,
+  lookupTechnique
+} from '@/blocks/literary-elements';
 import { mountRichTextTiptap } from '@/blocks/rich-text-tiptap';
 import { htmlToPlainText } from '@/blocks/search-text';
 import { isHttpUrl } from '@/blocks/url-safety';
@@ -22,6 +31,7 @@ import {
 import type {
   AnnotationAttachment,
   AnnotationColour,
+  AnnotationFamilyKey,
   AnnotationItem,
   AnnotationLayer,
   AnnotationLayerKind,
@@ -199,12 +209,12 @@ export function createAnnotationEditorFields(
   const annotationsHost = document.createElement('div');
   annotationsHost.className = 'block-editor__annotation-annotations';
 
-  // Technique picker reserved for 2b — hidden, not disabled (P4).
   const techniquePicker = document.createElement('div');
   techniquePicker.className = 'block-editor__annotation-technique';
-  techniquePicker.hidden = true;
-  techniquePicker.setAttribute('aria-hidden', 'true');
-  techniquePicker.textContent = 'Technique picker';
+
+  const missingTechniqueHost = document.createElement('div');
+  missingTechniqueHost.className = 'block-editor__annotation-missing-techniques';
+  missingTechniqueHost.setAttribute('aria-live', 'polite');
 
   let tipTap: ReturnType<typeof mountRichTextTiptap> | null = null;
 
@@ -254,6 +264,26 @@ export function createAnnotationEditorFields(
     remountLists();
   }
 
+  async function paintMissingTechniques(): Promise<void> {
+    missingTechniqueHost.replaceChildren();
+    const tagged = annotations.filter((ann) => ann.technique?.id);
+    if (tagged.length === 0) return;
+    const table = await loadLiteraryElements();
+    const missing = tagged.filter((ann) => !lookupTechnique(table, ann.technique!.id));
+    if (missing.length === 0) return;
+    const heading = document.createElement('h4');
+    heading.className = 'block-editor__annotation-orphans-title';
+    heading.textContent = 'Needs attention';
+    const list = document.createElement('ul');
+    list.className = 'block-editor__annotation-orphans-list';
+    for (const item of missing) {
+      const li = document.createElement('li');
+      li.textContent = `Unknown technique id: ${item.technique!.id}`;
+      list.append(li);
+    }
+    missingTechniqueHost.append(heading, list);
+  }
+
   function paintOrphans(): void {
     const current = {
       ...getLatest(),
@@ -261,6 +291,7 @@ export function createAnnotationEditorFields(
     };
     const orphanList = orphans(current);
     orphansHost.replaceChildren();
+    void paintMissingTechniques();
     if (orphanList.length === 0) return;
     const heading = document.createElement('h4');
     heading.className = 'block-editor__annotation-orphans-title';
@@ -580,6 +611,7 @@ export function createAnnotationEditorFields(
         );
         // Autosave without remounting the panel (I9, V7, I12).
         const latest = getLatest();
+        const defaultLayerId = defaultLayer.value.trim();
         onChange({
           ...latest,
           content: {
@@ -588,12 +620,69 @@ export function createAnnotationEditorFields(
             attribution: attribution.value.trim() || undefined,
             text: currentText(),
             layers,
-            annotations
+            annotations,
+            settings: {
+              show_markers: showMarkers.checked,
+              ...(defaultLayerId ? { default_layer_id: defaultLayerId } : {})
+            }
           }
         });
       }
     });
     tipTap.host.classList.add('block-editor__annotation-body');
+
+    techniquePicker.replaceChildren();
+    const techBtn = document.createElement('button');
+    techBtn.type = 'button';
+    techBtn.className = 'block-editor__annotation-technique-btn';
+    techBtn.textContent = selected.technique?.id
+      ? `Technique: ${selected.technique.id}`
+      : 'Tag technique';
+    techBtn.addEventListener('click', async () => {
+      const techniqueId = await askTechniquePicker({
+        initialQuery: selected.technique?.id ?? ''
+      });
+      if (!techniqueId) return;
+      const table = await loadLiteraryElements();
+      const currentLayer = layers.find((layer) => layer.id === selected.layer_id);
+      const keepLayer =
+        currentLayer?.kind === 'free' ||
+        currentLayer?.kind === 'lens' ||
+        currentLayer?.kind === 'teacher';
+      const result = applyTechniqueTag({
+        table,
+        techniqueId,
+        annotation: selected,
+        layers,
+        blockId: getLatest().id,
+        keepLayer,
+        now: nowIso()
+      });
+      if (!result) return;
+      layers = result.layers;
+      annotations = annotations.map((ann) =>
+        ann.id === selected.id ? result.annotation : ann
+      );
+      paintDefaultLayerOptions();
+      emitChange();
+    });
+    if (selected.technique?.id) {
+      const clear = document.createElement('button');
+      clear.type = 'button';
+      clear.className = 'block-editor__annotation-technique-clear';
+      clear.textContent = 'Clear technique';
+      clear.addEventListener('click', () => {
+        annotations = annotations.map((ann) =>
+          ann.id === selected.id
+            ? { ...ann, technique: undefined, updated_at: nowIso() }
+            : ann
+        );
+        emitChange();
+      });
+      techniquePicker.append(techBtn, clear);
+    } else {
+      techniquePicker.append(techBtn);
+    }
 
     const attachmentsHost = document.createElement('div');
     attachmentsHost.className = 'block-editor__annotation-attachments';
@@ -767,19 +856,28 @@ export function createAnnotationEditorFields(
         const kind = document.createElement('select');
         kind.className = 'block-editor__annotation-layer-kind';
         kind.setAttribute('aria-label', 'Layer kind');
-        for (const value of ['free', 'lens', 'teacher'] as const) {
-          if (
-            value === 'teacher' &&
-            layers.some((l) => l.kind === 'teacher' && l.id !== layer.id)
-          ) {
-            continue;
-          }
+        if (layer.kind === 'family') {
           const opt = document.createElement('option');
-          opt.value = value;
-          opt.textContent =
-            value === 'free' ? 'Free' : value === 'lens' ? 'Lens' : 'Teacher notes';
-          opt.selected = layer.kind === value;
+          opt.value = 'family';
+          opt.textContent = 'Periodic Table family';
+          opt.selected = true;
           kind.append(opt);
+          kind.disabled = true;
+        } else {
+          for (const value of ['free', 'lens', 'teacher'] as const) {
+            if (
+              value === 'teacher' &&
+              layers.some((l) => l.kind === 'teacher' && l.id !== layer.id)
+            ) {
+              continue;
+            }
+            const opt = document.createElement('option');
+            opt.value = value;
+            opt.textContent =
+              value === 'free' ? 'Free' : value === 'lens' ? 'Lens' : 'Teacher notes';
+            opt.selected = layer.kind === value;
+            kind.append(opt);
+          }
         }
         const symbol = document.createElement('input');
         symbol.type = 'text';
@@ -859,6 +957,40 @@ export function createAnnotationEditorFields(
 
     paintDefaultLayerOptions();
     layersHost.append(layerList.el);
+
+    const addFamilyBtn = document.createElement('button');
+    addFamilyBtn.type = 'button';
+    addFamilyBtn.className = 'block-editor__annotation-add-family';
+    addFamilyBtn.textContent = 'Add from the Periodic Table';
+    addFamilyBtn.addEventListener('click', async () => {
+      const table = await loadLiteraryElements();
+      const available = table.families.filter(
+        (fam) => !layers.some((layer) => layer.kind === 'family' && layer.family === fam.key)
+      );
+      if (available.length === 0) {
+        placeHint = 'All Periodic Table families are already on this block.';
+        placeStatus.textContent = placeHint;
+        return;
+      }
+      const familyKey = (await askSelectCard({
+        title: 'Periodic Table family',
+        choices: available.map((fam) => ({ value: fam.key, label: fam.name }))
+      })) as AnnotationFamilyKey | null;
+      if (!familyKey) return;
+      const layer = createFamilyLayerFromTable({
+        table,
+        familyKey,
+        blockId: getLatest().id
+      });
+      const teacherIdx = layers.findIndex((row) => row.kind === 'teacher');
+      layers =
+        teacherIdx >= 0
+          ? [...layers.slice(0, teacherIdx), layer, ...layers.slice(teacherIdx)]
+          : [...layers, layer];
+      paintDefaultLayerOptions();
+      emitChange();
+    });
+    layersHost.append(addFamilyBtn);
     layersHost.scrollTop = layerScroll;
 
     const annList = createHubList<AnnotationItem>({
@@ -963,7 +1095,8 @@ export function createAnnotationEditorFields(
     workspace,
     layersHost,
     annotationsHost,
-    orphansHost
+    orphansHost,
+    missingTechniqueHost
   );
 
   fields.addEventListener(
