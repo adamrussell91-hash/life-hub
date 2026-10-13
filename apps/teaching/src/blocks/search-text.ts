@@ -55,6 +55,13 @@ function extractBlock(block: Block, parts: string[]): void {
       push(parts, c.title);
       push(parts, c.text);
       break;
+    case 'annotation':
+      push(parts, c.title);
+      push(parts, c.attribution);
+      walkStrings(c.text, parts);
+      walkStrings(c.annotations, parts);
+      walkStrings(c.layers, parts);
+      break;
     case 'image':
     case 'video':
     case 'audio':

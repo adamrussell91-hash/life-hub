@@ -47,6 +47,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   tabs: 'Switch between labelled panels of content.',
   collection: 'Curate a set of related items students browse together.',
   outcomes: 'Show the outcomes tagged on this page as a readable list.',
+  annotation: 'Annotate a poem or passage with revealable teacher notes.',
   'embed:google_maps': 'Embed an interactive Google Map at a location.',
   'embed:google_slides': 'Embed a Google Slides presentation inline.',
   'embed:google_docs': 'Embed a Google Document for reading in place.',

@@ -1,5 +1,6 @@
 import {
   createAccordionEditor,
+  createAnnotationEditor,
   createAttachmentEditor,
   createAudioEditor,
   createBlockEditor,
@@ -42,6 +43,7 @@ import {
 } from '@/blocks/layout-editors';
 import {
   renderAccordionBlock,
+  renderAnnotationBlock,
   renderAttachmentBlock,
   renderAudioBlock,
   renderBlock,
@@ -232,11 +234,16 @@ export const blockRegistry: {
   whiteboard: {
     render: renderWhiteboardBlock,
     createEditor: createWhiteboardEditor
+  },
+  annotation: {
+    render: renderAnnotationBlock,
+    createEditor: createAnnotationEditor
   }
 };
 
 export {
   createAccordionEditor,
+  createAnnotationEditor,
   createAttachmentEditor,
   createAudioEditor,
   createBlockEditor,
@@ -272,6 +279,7 @@ export {
   createVideoEditor,
   createWhiteboardEditor,
   renderAccordionBlock,
+  renderAnnotationBlock,
   renderAttachmentBlock,
   renderAudioBlock,
   renderBlock,
