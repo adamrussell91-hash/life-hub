@@ -3,8 +3,60 @@ import type { Block } from '@/schemas/block';
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 type SectionBlock = Extract<Block, { block_type: 'section' }>;
 type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
+type AnnotationBlock = Extract<Block, { block_type: 'annotation' }>;
 
-export function filterBlocksForStudent(blocks: Block[]): Block[] {
+function collectTeacherOnlyIds(blocks: Block[] | undefined, out: Set<string>): void {
+  if (!Array.isArray(blocks)) return;
+  for (const block of blocks) {
+    if (block.visibility === 'teacher_only') out.add(block.id);
+    if (block.block_type === 'section') {
+      collectTeacherOnlyIds(block.content.blocks as Block[], out);
+    } else if (block.block_type === 'columns') {
+      for (const col of block.content.columns) {
+        collectTeacherOnlyIds(col.blocks as Block[], out);
+      }
+    } else if (block.block_type === 'tabs') {
+      for (const panel of block.content.tabs) {
+        collectTeacherOnlyIds(panel.blocks as Block[], out);
+      }
+    }
+  }
+}
+
+/** Drop teacher layers / notes / attachments that must never reach students. */
+export function stripAnnotationTeacherContent(
+  block: AnnotationBlock,
+  teacherOnlyIds: Set<string>
+): AnnotationBlock {
+  const teacherLayerIds = new Set(
+    block.content.layers.filter((layer) => layer.kind === 'teacher').map((layer) => layer.id)
+  );
+  const layers = block.content.layers.filter((layer) => layer.kind !== 'teacher');
+  const annotations = block.content.annotations
+    .filter((ann) => !teacherLayerIds.has(ann.layer_id))
+    .map((ann) => ({
+      ...ann,
+      body: {
+        ...ann.body,
+        attachments: ann.body.attachments.filter(
+          (att) => !(att.kind === 'block' && teacherOnlyIds.has(att.block_id))
+        )
+      }
+    }));
+  return {
+    ...block,
+    content: {
+      ...block.content,
+      layers,
+      annotations
+    }
+  };
+}
+
+function filterBlocksForStudentInner(
+  blocks: Block[],
+  teacherOnlyIds: Set<string>
+): Block[] {
   return blocks
     .filter((block) => block.visibility === 'student_teacher')
     .map((block) => {
@@ -13,7 +65,10 @@ export function filterBlocksForStudent(blocks: Block[]): Block[] {
           ...block,
           content: {
             ...block.content,
-            blocks: filterBlocksForStudent(block.content.blocks) as SectionBlock['content']['blocks']
+            blocks: filterBlocksForStudentInner(
+              block.content.blocks as Block[],
+              teacherOnlyIds
+            ) as SectionBlock['content']['blocks']
           }
         };
       }
@@ -24,7 +79,10 @@ export function filterBlocksForStudent(blocks: Block[]): Block[] {
             ...block.content,
             columns: block.content.columns.map((col) => ({
               ...col,
-              blocks: filterBlocksForStudent(col.blocks) as ColumnsBlock['content']['columns'][number]['blocks']
+              blocks: filterBlocksForStudentInner(
+                col.blocks as Block[],
+                teacherOnlyIds
+              ) as ColumnsBlock['content']['columns'][number]['blocks']
             }))
           }
         };
@@ -35,11 +93,23 @@ export function filterBlocksForStudent(blocks: Block[]): Block[] {
           content: {
             tabs: block.content.tabs.map((panel) => ({
               ...panel,
-              blocks: filterBlocksForStudent(panel.blocks) as TabsBlock['content']['tabs'][number]['blocks']
+              blocks: filterBlocksForStudentInner(
+                panel.blocks as Block[],
+                teacherOnlyIds
+              ) as TabsBlock['content']['tabs'][number]['blocks']
             }))
           }
         };
       }
+      if (block.block_type === 'annotation') {
+        return stripAnnotationTeacherContent(block, teacherOnlyIds);
+      }
       return block;
     });
+}
+
+export function filterBlocksForStudent(blocks: Block[]): Block[] {
+  const teacherOnlyIds = new Set<string>();
+  collectTeacherOnlyIds(blocks, teacherOnlyIds);
+  return filterBlocksForStudentInner(blocks, teacherOnlyIds);
 }
