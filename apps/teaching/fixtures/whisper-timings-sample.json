@@ -1,0 +1,65 @@
+{
+  "sample_with_words": {
+    "text": "alpha bravo charlie delta",
+    "word_count": 4,
+    "vtt": "WEBVTT\n\n00:00.000 --> 00:02.000\nalpha bravo charlie delta\n",
+    "words": [
+      { "word": "alpha", "start": 0.0, "end": 0.4 },
+      { "word": "bravo", "start": 0.4, "end": 0.9 },
+      { "word": "charlie", "start": 0.9, "end": 1.5 },
+      { "word": "delta", "start": 1.5, "end": 2.0 }
+    ],
+    "segments": [
+      {
+        "start": 0.0,
+        "end": 2.0,
+        "text": " alpha bravo charlie delta",
+        "temperature": 0.0,
+        "avg_logprob": -0.2,
+        "compression_ratio": 1.1,
+        "no_speech_prob": 0.01,
+        "words": [
+          { "word": "alpha", "start": 0.0, "end": 0.4 },
+          { "word": "bravo", "start": 0.4, "end": 0.9 },
+          { "word": "charlie", "start": 0.9, "end": 1.5 },
+          { "word": "delta", "start": 1.5, "end": 2.0 }
+        ]
+      }
+    ],
+    "transcription_info": {
+      "language": "en",
+      "language_probability": 0.99,
+      "duration": 2.0
+    }
+  },
+  "sample_segments_only": {
+    "text": "echo foxtrot golf hotel",
+    "word_count": 4,
+    "vtt": "WEBVTT\n\n00:00.000 --> 00:03.000\necho foxtrot golf hotel\n",
+    "segments": [
+      {
+        "start": 0.0,
+        "end": 1.5,
+        "text": " echo foxtrot",
+        "temperature": 0.0,
+        "avg_logprob": -0.25,
+        "compression_ratio": 1.05,
+        "no_speech_prob": 0.02
+      },
+      {
+        "start": 1.5,
+        "end": 3.0,
+        "text": " golf hotel",
+        "temperature": 0.0,
+        "avg_logprob": -0.22,
+        "compression_ratio": 1.08,
+        "no_speech_prob": 0.015
+      }
+    ],
+    "transcription_info": {
+      "language": "en",
+      "language_probability": 0.98,
+      "duration": 3.0
+    }
+  }
+}

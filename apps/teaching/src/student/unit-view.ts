@@ -46,7 +46,12 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
     plan.className = 'student-panel student-unit__plan';
     plan.dataset.unitSection = 'plan';
     for (const block of planBlocks) {
-      plan.append(renderBlock(block, 'student', { attachedOutcomes: publishedOutcomes }));
+      plan.append(
+        renderBlock(block, 'student', {
+          attachedOutcomes: publishedOutcomes,
+          anthology: unit.anthology
+        })
+      );
     }
     content.append(plan);
   }

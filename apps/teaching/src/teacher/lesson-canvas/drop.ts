@@ -23,7 +23,8 @@ export type DropRootMode = 'lesson' | 'page';
 
 export type DropOptions = { rootMode?: DropRootMode };
 
-const LESSON_ROOT_CHILD_TYPES = NEW_BLOCK_TYPES.filter((t) => t !== 'collection');
+const PAGE_ONLY = new Set(['collection', 'anthology']);
+const LESSON_ROOT_CHILD_TYPES = NEW_BLOCK_TYPES.filter((t) => !PAGE_ONLY.has(t));
 const PAGE_ROOT_CHILD_TYPES = NEW_BLOCK_TYPES;
 
 function allowedTypesFor(parent: DropParent, rootMode: DropRootMode): readonly NewBlockType[] {
@@ -40,8 +41,10 @@ function allowedTypesFor(parent: DropParent, rootMode: DropRootMode): readonly N
 }
 
 function rejectReason(parent: DropParent, type: NewBlockType, rootMode: DropRootMode): string {
-  if (parent.kind === 'root' && type === 'collection' && rootMode !== 'page') {
-    return 'Collection cannot be added to a lesson page.';
+  if (parent.kind === 'root' && PAGE_ONLY.has(type) && rootMode !== 'page') {
+    return type === 'anthology'
+      ? 'Anthology cannot be added to a lesson page.'
+      : 'Collection cannot be added to a lesson page.';
   }
   if (parent.kind === 'column' && type === 'columns') {
     return 'Columns cannot be nested inside columns.';

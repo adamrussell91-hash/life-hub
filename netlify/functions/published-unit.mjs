@@ -14,6 +14,7 @@ import {
   readPublishedId,
   unitKey
 } from './_shared/teaching-blobs.mjs';
+import { collectAnthology } from './_shared/teaching-anthology.mjs';
 import {
   attachedOutcomeIds,
   filterBlocksForStudent,
@@ -49,12 +50,19 @@ export function createPublishedUnitHandler(deps = {}) {
     const { blobs } = await store.list({ prefix: PUBLISHED_LESSON_PREFIX });
     const snapshots = await Promise.all(blobs.map(blob => getJSON(store, blob.key)));
     const matching = [];
+    const anthologySnapshots = [];
     for (const snapshot of snapshots) {
       if (!snapshot || snapshot.unit_id !== id) continue;
       if (!snapshot.lesson_id || !snapshot.title) continue;
       const draft = await getJSON(store, draftLessonKey(snapshot.lesson_id));
       if (!draft || isDeletedRecord(draft)) continue;
       matching.push({ lesson_id: snapshot.lesson_id, title: snapshot.title });
+      anthologySnapshots.push({
+        lesson_id: snapshot.lesson_id,
+        lesson_title: snapshot.title,
+        published: true,
+        blocks: Array.isArray(snapshot.blocks) ? snapshot.blocks : []
+      });
     }
 
     const lessons = orderLessonsByUnitIds(unit.lesson_ids ?? [], matching);
@@ -78,6 +86,9 @@ export function createPublishedUnitHandler(deps = {}) {
       }
     }
     const studentBlocks = sanitizeBlocksDeep(resolvedBlocks);
+    const anthology = collectAnthology(anthologySnapshots, {
+      lessonOrder: unit.lesson_ids ?? []
+    });
     const ids = attachedOutcomeIds({ outcome_ids: unit.outcome_ids });
     const outcomes = [];
     for (const outcomeId of ids) {
@@ -91,6 +102,7 @@ export function createPublishedUnitHandler(deps = {}) {
       lessons,
       ...(unit.cover ? { cover: unit.cover } : {}),
       blocks: studentBlocks,
+      anthology,
       outcome_ids: ids,
       outcomes
     }), request, env);

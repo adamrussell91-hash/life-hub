@@ -1,6 +1,7 @@
 import {
   createAccordionEditor,
   createAnnotationEditor,
+  createAnthologyEditor,
   createAttachmentEditor,
   createAudioEditor,
   createBlockEditor,
@@ -8,6 +9,7 @@ import {
   createChartEditor,
   createClozeEditor,
   createCodeEditor,
+  createAnthologyEditor,
   createCollectionEditor,
   createConceptMapEditor,
   createDefinitionEditor,
@@ -51,6 +53,7 @@ import {
   renderChartBlock,
   renderClozeBlock,
   renderCodeBlock,
+  renderAnthologyBlock,
   renderCollectionBlock,
   renderColumnsBlock,
   renderConceptMapBlock,
@@ -195,6 +198,10 @@ export const blockRegistry: {
     render: renderCollectionBlock,
     createEditor: createCollectionEditor
   },
+  anthology: {
+    render: (block, mode) => renderAnthologyBlock(block, mode, {}),
+    createEditor: createAnthologyEditor
+  },
   outcomes: {
     render: renderOutcomesBlock,
     createEditor: createOutcomesEditor
@@ -244,6 +251,7 @@ export const blockRegistry: {
 export {
   createAccordionEditor,
   createAnnotationEditor,
+  createAnthologyEditor,
   createAttachmentEditor,
   createAudioEditor,
   createBlockEditor,

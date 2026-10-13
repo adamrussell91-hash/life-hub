@@ -93,17 +93,36 @@ function renderPublishedLesson(
     mountPublicOutcomeChips(content, publishedOutcomes);
   }
 
+  const openNoteId = readNoteHash();
   const blocks = document.createElement('div');
   blocks.className = 'lesson-blocks';
   for (const block of lesson.blocks) {
     blocks.append(
       renderBlock(block, 'student', {
         lessonId: lesson.lesson_id,
-        attachedOutcomes: publishedOutcomes
+        attachedOutcomes: publishedOutcomes,
+        openNoteId
       })
     );
   }
   content.append(blocks);
+
+  if (openNoteId && typeof history !== 'undefined' && history.replaceState) {
+    const url = new URL(window.location.href);
+    url.hash = '';
+    history.replaceState(null, '', `${url.pathname}${url.search}`);
+  }
+}
+
+/** `#note=<annotationId>` from anthology / deep links. */
+function readNoteHash(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const raw = window.location.hash.startsWith('#')
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  if (!raw.startsWith('note=')) return undefined;
+  const id = decodeURIComponent(raw.slice('note='.length)).trim();
+  return id || undefined;
 }
 
 function renderLessonNav(

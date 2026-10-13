@@ -20,7 +20,8 @@ import {
   type PodcastSeries,
 } from "../../src/podcast/schema";
 import { handleCaptureRequest } from "../../src/capture/http";
-import { liveExtract } from "../../src/capture/live";
+import { liveExtract, WHISPER_MODEL } from "../../src/capture/live";
+import { handleTranscribeRequest } from "../../src/capture/transcribeHttp";
 import { handleChatWriteRequest } from "../../src/chat/writeHttp";
 import { handleResearchRequest } from "../../src/research/http";
 import { runQuickKernel } from "../../src/research/kernel";
@@ -179,6 +180,20 @@ export default {
         secret: env.RESEARCH_KERNEL_SHARED_SECRET,
         allowedOrigin: env.TEACHING_HUB_ORIGIN ?? "*",
         extract: liveExtract(env),
+      });
+    }
+    if (path.endsWith("/transcribe")) {
+      return handleTranscribeRequest(request, {
+        secret: env.RESEARCH_KERNEL_SHARED_SECRET,
+        allowedOrigin: env.TEACHING_HUB_ORIGIN ?? "*",
+        runWhisper: async audioBase64 => {
+          if (!env.AI) throw new Error("Transcription is unavailable");
+          return env.AI.run(WHISPER_MODEL, {
+            audio: audioBase64,
+            task: "transcribe",
+            language: "en",
+          });
+        },
       });
     }
     if (pathname.includes("/podcast")) {

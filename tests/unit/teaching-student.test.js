@@ -49,7 +49,7 @@ test('filterBlocksForStudent strips annotation teacher layers (shared fixture)',
   );
   assertTeacherNotesGone(out);
   const ann = out.find(block => block.block_type === 'annotation');
-  assert.equal(ann.content.layers.map(layer => layer.id).join(','), 'layer_structure');
+  assert.equal(ann.content.layers.map(layer => layer.id).join(','), 'layer_structure,layer_voice');
   assert.equal(
     ann.content.annotations.map(row => row.id).join(','),
     'ann_student,ann_thread'
@@ -58,7 +58,17 @@ test('filterBlocksForStudent strips annotation teacher layers (shared fixture)',
     ann.content.annotations[0].body.attachments.map(att => att.block_id || att.kind),
     ['block_ok_resource', 'link']
   );
-  assert.equal(ann.content.voice_tracks, undefined);
+  assert.equal(ann.content.voice_tracks.length, 1);
+  assert.equal(ann.content.voice_tracks[0].id, 'track_published');
+  assert.deepEqual(ann.content.voice_tracks[0].transcript.words, []);
+  assert.deepEqual(
+    ann.content.voice_tracks[0].clips.map(clip => clip.id),
+    ['clip_approved']
+  );
+  assert.deepEqual(
+    ann.content.voice_tracks[0].extras.map(extra => extra.id),
+    ['extra_ok']
+  );
   const cards = out.find(block => block.block_type === 'flashcards');
   assert.equal(cards.content.cards[0].source, undefined);
 });

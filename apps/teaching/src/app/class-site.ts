@@ -6,7 +6,8 @@ const STUDENT_ROUTES = new Set([
   'student-lesson',
   'student-unit',
   'student-class',
-  'student-class-lesson'
+  'student-class-lesson',
+  'student-feedback'
 ]);
 
 export function isClassSiteHost(
