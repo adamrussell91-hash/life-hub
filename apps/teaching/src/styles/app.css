@@ -9738,3 +9738,158 @@ body.is-lesson-builder-full-page .hub-utilities {
     flex-wrap: nowrap;
   }
 }
+
+/* Periodic Table technique UI (2b) */
+.block-editor__annotation-add-family,
+.block-editor__annotation-technique-btn,
+.block-editor__annotation-technique-clear {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  margin-top: var(--space-2, 0.5rem);
+}
+
+.block-annotation__element {
+  margin: 0 0 var(--space-2, 0.5rem);
+  border: 1px solid var(--line, #d7d2c8);
+  border-radius: var(--radius-md, 0.75rem);
+  padding: var(--space-2, 0.5rem);
+  background: color-mix(in srgb, var(--wave) 8%, var(--paper, #fff));
+}
+
+.block-annotation__element-summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2, 0.5rem);
+  cursor: pointer;
+  list-style: none;
+}
+
+.block-annotation__element-summary::-webkit-details-marker {
+  display: none;
+}
+
+.block-annotation__element-symbol {
+  flex: 0 0 auto;
+  min-width: 2.25rem;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-weight: 700;
+  font-size: var(--text-lg, 1.125rem);
+  white-space: nowrap;
+}
+
+.block-annotation__element-name {
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.block-annotation__element-body {
+  margin-top: var(--space-2, 0.5rem);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.block-annotation__element-example {
+  font-style: italic;
+  color: var(--muted, #6b7280);
+}
+
+.annotation-technique-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  align-items: end;
+  background: color-mix(in srgb, #000 35%, transparent);
+}
+
+.annotation-technique-sheet {
+  width: 100%;
+  max-height: min(90vh, 40rem);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-3, 0.75rem);
+  padding-bottom: calc(var(--space-3, 0.75rem) + env(safe-area-inset-bottom, 0px));
+  border-radius: var(--radius-md, 0.75rem) var(--radius-md, 0.75rem) 0 0;
+  background: var(--paper, #fff);
+  box-sizing: border-box;
+}
+
+.annotation-technique-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 0.5rem);
+}
+
+.annotation-technique-sheet__title {
+  margin: 0;
+  font-size: var(--text-lg, 1.125rem);
+}
+
+.annotation-technique-sheet__search {
+  width: 100%;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+}
+
+.annotation-technique-sheet__list {
+  overflow: auto;
+  min-height: 0;
+}
+
+.annotation-technique-sheet__family,
+.annotation-technique-sheet__subgroup {
+  margin: var(--space-2, 0.5rem) 0 var(--space-1, 0.25rem);
+  font-family: var(--font-ui, system-ui, sans-serif);
+}
+
+.annotation-technique-sheet__family {
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.annotation-technique-sheet__subgroup {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted, #6b7280);
+  font-weight: 500;
+}
+
+.annotation-technique-sheet__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 var(--space-2, 0.5rem);
+  border: 0;
+  border-bottom: 1px solid var(--line, #d7d2c8);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.annotation-technique-sheet__symbol {
+  flex: 0 0 auto;
+  min-width: 2.25rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.annotation-technique-sheet__empty {
+  margin: var(--space-3, 0.75rem) 0;
+  color: var(--muted, #6b7280);
+}
+
+@media (min-width: 721px) {
+  .annotation-technique-sheet-overlay {
+    align-items: center;
+    justify-items: center;
+  }
+
+  .annotation-technique-sheet {
+    width: min(36rem, calc(100vw - 2rem));
+    border-radius: var(--radius-md, 0.75rem);
+    padding-bottom: var(--space-3, 0.75rem);
+  }
+}
