@@ -54,12 +54,17 @@ describe('annotation render + sanitise', () => {
   });
 
   it('student view hides teacher-layer annotations', () => {
-    const el = renderAnnotationBlock(dulceAnnotationFixture, 'student');
+    const fixture = structuredClone(dulceAnnotationFixture);
+    // Open past Text only so student layers are revealed.
+    fixture.content.settings.default_layer_id = 'layer_imagery';
+    const el = renderAnnotationBlock(fixture, 'student');
     const ids = [...el.querySelectorAll<HTMLElement>('[data-annotation-id]')].map(
       (node) => node.dataset.annotationId
     );
     expect(ids).not.toContain('ann_teacher');
     expect(ids).toContain('ann_word');
+    expect(el.querySelector('.block-annotation__slider')).toBeTruthy();
+    expect(el.textContent).not.toContain('Teacher notes');
   });
 
   it('print view uses footnotes and never a side panel', () => {
@@ -102,5 +107,54 @@ describe('annotation render + sanitise', () => {
     source.value = 'One line\n\nTwo stanza';
     source.dispatchEvent(new Event('input'));
     expect(changes.length).toBeGreaterThan(0);
+  });
+
+  it('editor persists show_markers and default_layer_id', () => {
+    const changes: Array<ReturnType<typeof BlockSchema.parse>> = [];
+    const editor = createAnnotationEditor(dulceAnnotationFixture, (block) => {
+      changes.push(block);
+    });
+    const markers = editor.querySelector<HTMLInputElement>(
+      '.block-editor__annotation-show-markers'
+    )!;
+    const defaultLayer = editor.querySelector<HTMLSelectElement>(
+      '.block-editor__annotation-default-layer'
+    )!;
+    markers.checked = false;
+    markers.dispatchEvent(new Event('change'));
+    defaultLayer.value = 'layer_structure';
+    defaultLayer.dispatchEvent(new Event('change'));
+    const last = changes.at(-1);
+    expect(last?.block_type).toBe('annotation');
+    if (last?.block_type !== 'annotation') return;
+    expect(last.content.settings.show_markers).toBe(false);
+    expect(last.content.settings.default_layer_id).toBe('layer_structure');
+  });
+
+  it('slider and chips drive markers without moving the stop on chip toggle', () => {
+    const fixture = structuredClone(dulceAnnotationFixture);
+    fixture.content.settings.show_markers = true;
+    const el = renderAnnotationBlock(fixture, 'student');
+    const slider = el.querySelector<HTMLInputElement>('.block-annotation__slider')!;
+    expect(slider.value).toBe('0');
+    expect(el.querySelectorAll('.block-annotation__marker').length).toBeGreaterThan(0);
+
+    slider.value = '2';
+    slider.dispatchEvent(new Event('input'));
+    expect(el.querySelectorAll('[data-annotation-id]').length).toBeGreaterThan(0);
+    const chips = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip')];
+    expect(chips.length).toBe(2);
+    chips[0]!.click();
+    expect(slider.value).toBe('2');
+    const after = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip')];
+    expect(after[0]!.getAttribute('aria-pressed')).toBe('false');
+    expect(el.querySelectorAll('.block-annotation__marker').length).toBeGreaterThan(0);
+  });
+
+  it('show_markers false removes marker buttons', () => {
+    const fixture = structuredClone(dulceAnnotationFixture);
+    fixture.content.settings.show_markers = false;
+    const el = renderAnnotationBlock(fixture, 'student');
+    expect(el.querySelectorAll('.block-annotation__marker')).toHaveLength(0);
   });
 });
