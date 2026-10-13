@@ -55,9 +55,10 @@ function findLine(
 function wordBounds(text: string, start: number, end: number): boolean {
   if (start < 0 || end > text.length || start >= end) return false;
   const slice = text.slice(start, end);
-  if (!/^\S+$/.test(slice)) return false;
-  const beforeOk = start === 0 || /\s/.test(text[start - 1]!);
-  const afterOk = end === text.length || /\s/.test(text[end]!);
+  // A word is a single run of letters/marks/numbers (no spaces or punctuation).
+  if (!/^[\p{L}\p{N}'’]+$/u.test(slice)) return false;
+  const beforeOk = start === 0 || /[^\p{L}\p{N}'’]/u.test(text[start - 1]!);
+  const afterOk = end === text.length || /[^\p{L}\p{N}'’]/u.test(text[end]!);
   return beforeOk && afterOk;
 }
 
