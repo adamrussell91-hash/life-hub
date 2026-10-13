@@ -15,7 +15,7 @@ async function shot(name, width, height, week) {
   const page = await browser.newPage({ viewport: { width, height } });
   page.on('pageerror', (e) => console.log(name, 'error', e.message));
   await page.goto(`${base}/grove-lookdev.html`);
-  await page.waitForFunction(() => document.body.dataset.models === 'true', null, { timeout: 300000 });
+  await page.waitForFunction(() => document.querySelector("#stage")?.dataset.models === "true", null, { timeout: 300000 });
   if (week) {
     await page.evaluate((w) => window.groveExpand(w), week);
     // Headless Chromium only runs frames when asked: drive the ease and the LOD swap that follows it.
@@ -23,7 +23,7 @@ async function shot(name, width, height, week) {
   }
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${out}/${name}.png`, timeout: 300000 });
-  const stats = await page.evaluate(() => `${document.body.dataset.triangles} triangles, ${document.body.dataset.calls} draw calls, ${document.body.dataset.detailed} at full detail`);
+  const stats = await page.evaluate(() => `${document.querySelector("#stage").dataset.triangles} triangles, ${document.querySelector("#stage").dataset.calls} draw calls, ${document.querySelector("#stage").dataset.detailed} at full detail, ${document.querySelector("#stage").dataset.trees} trees, ${document.querySelector("#stage").dataset.dropped} dropped`);
   console.log(name, stats);
   await page.close();
 }

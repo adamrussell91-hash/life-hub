@@ -4,11 +4,14 @@ Read this first. It replaces the long design conversation of 13 October 2026.
 
 ## What this is
 
-A standalone look prototype for Grove's Year view, served by the Tasks dev server at
-`/grove-lookdev.html`. Synthetic history only. Nothing in the live Grove uses it yet.
+**This is now the live Grove page** (`#/grove`, `views/grove/view.ts`). It started as a look
+prototype; `/grove-lookdev.html` still mounts the same scene on synthetic history for look rounds.
 
-Files: `map.ts` (layout, terrain, river, lake, path), `planting.ts` (trees and ground cover),
-`history.ts` (synthetic tasks), `main.ts` (renderer, camera, expanding week), `noise.ts`.
+Files (`apps/tasks/src/views/grove/forest/`): `scene.ts` (`mountForest()`: renderer, camera,
+expanding week, picking), `map.ts` (layout, terrain, river, lake, island, path), `planting.ts`
+(trees and ground cover), `animals.ts` (earned wildlife), `data.ts` (real completions and
+milestones to trees and animals), `history.ts` (types, week numbering), `noise.ts`. The prototype
+page is `apps/tasks/src/grove-lookdev/` (synthetic `history.ts`, thin `main.ts`).
 Screenshots: `node tools/grove-previews/lookdev-shots.mjs <out-dir>` with the dev server running.
 
 ## Decisions Adam has made
@@ -113,18 +116,69 @@ Triangles and draw calls unchanged (3.9M, 103 calls).
 - The screenshot script now also takes `week23-390` (phone expanded week). `GROVE_ONLY=<shot>`
   takes one shot.
 
+## State after round five (nothing dies)
+
+- **Every finished task has a tree:** 518 of 518 (was 442). `plant()` used to stop once a week's
+  piece had no clear spot left and silently drop the rest. Eleven weeks were short; week 21's piece
+  is almost all lake, with room for 1 of its 11 trees.
+- **Understorey:** after the stands are planted (unchanged: all 442 keep their exact spots), the
+  leftover tasks of a crowded week go in from a dense grid over its piece with its own random stream:
+  first between the stand's trees (gap 1.3 to 1.1), then the clearing edge, closer to the path and
+  water, and steeper banks (gap down to 0.8). A last resort takes the dry spot furthest from any tree,
+  so the rule holds by construction. Understorey trees are the species' lightest variant at about
+  three quarters height, keep their real growth stage, cast no shadow and always draw at LOD.
+- **Island:** a cell whose clearing would sit 4+ units inside the lake gets a small wooded island
+  there (`terrain.islands`, radius about 5, folded into `lakeDistance`). Today that is week 21. The
+  clearing rule is waived on an island. The extra dry land shifts the grass and flower scatter
+  (random, same density); trees do not move.
+- **Guard:** `main.ts` counts tasks without a tree and logs a console error; `body.dataset.dropped`
+  and `trees` are printed by the screenshot script.
+- **Paying for it:** the bush LODs were heavier than most trees (bush-4 LOD 1,438 triangles, 411
+  bushes = 362k in Year). Re-simplified bush-1, 2 and 4 LODs (`--ratio 0.4 --error 0.15` for 1 and 2,
+  `--ratio 0.1 --error 0.15` for 4: 408, 345 and 846 triangles). Same silhouettes at the sizes they
+  draw; material names, COLOR_0 and heights kept.
+
+  | View | Round four (442 trees) | Round five (518 trees) |
+  |---|---|---|
+  | Desktop Year | 1,084,164 | 1,063,231 |
+  | Desktop expanded week 23 | 2,226,830 | 2,281,131 |
+  | Phone Year | 1,084,164 | 1,063,231 |
+  | Phone expanded week 23 | 1,054,550 | 1,032,533 |
+
+  Desktop expanded week is 2.4% over round four (more full-detail ground cover near week 23 after the
+  scatter shift); every phone view and Year is under.
+
+## Round six: live
+
+- **Data:** the page reads finished tasks plus the private 2026 history (`grove_history` in hub
+  prefs, already imported: 41 weeks, 636 completions, matching the Notion "Grove 2026 — Weekly
+  Backfill Counts" page) through `applyGroveHistory`, then `forestHistory()` turns this year's
+  completions into trees. Backfilled history has no recorded deadlines, so it never grows gnarled;
+  real board tasks finished late do (gnarled variants 3 and 5 only: 1, 2 and 4 are 3.6k triangles).
+- **Animals:** `forestAnimals()` uses Codex's milestone rules (`domain/grove/wildlife.ts`) and
+  companions for the year. `animals.ts` gives each a loop: land animals on dry, gentle ground in the
+  week they were earned (or the nearest week with room), the mallard/otter on the lake, birds over
+  the canopy. Grove's roaming motion drives walk/rest/feed; up to 30 fps while visible, still under
+  reduced motion. The 20-model bundle is installed only by the Pages deploy; the dev server has the
+  three public models.
+- **Shadows** redraw only when the camera moves (animals cast none), so animation is cheap.
+- **UI:** the old Day/Week/Term/Year pills, arrows, Today, Import history, water quality, Pause
+  motion and framing buttons are gone. One glass title chip, a ‹ Year button inside a week,
+  tap a week to step in, tap a tree or animal for a card (a bottom sheet on phones). The forest
+  fills the window under the page title; the reminder strip hides on Grove only.
+  `#/grove?week=10` opens a week; `?year=2025` a past year.
+- **Budget with real data** (639 trees, 11 animals): Year about 1.45M triangles on desktop and
+  phone, phone expanded week 1.41M, desktop expanded week 2.7M.
+
 ## Known gaps, in order
 
-1. **Phone budget, if real devices still struggle:** the heaviest LOD trees are tree-late-1/2/4
+1. **Phone budget, if real devices still struggle (now 1.45M with real data):** the heaviest LOD trees are tree-late-1/2/4
    (about 3.6k triangles each); impostor cards for Year view are the next step. Untested on a
    real phone so far.
-2. **Trees are capped by space, not by history.** The synthetic history has 518 finished tasks,
-   but only 442 trees are drawn. `plant()` stops placing trees once a week's piece has no clear spot
-   left (spacing down to 1.4), and silently drops the other 76. That breaks Grove's "nothing dies"
-   rule. Planting all 76 with touching crowns was tried in round four. It added about 200k
-   triangles in Year view (shadow pass included), so it needs its own round: smaller saplings for crowded weeks, a denser
-   AoE-style stand, or a count on the week label.
-3. The little falls between river tiers still read as white wedges up close; fine at Year zoom.
+2. The little falls between river tiers still read as white wedges up close; fine at Year zoom.
+3. The path runs through week 21's clearing, so it crosses the lake to the island under the water
+   (it did before the island too). `buildBridges()` only bridges the river; a lake causeway or two
+   short bridges would finish it.
 4. Next look round, if Adam wants it: denser Age of Empires stands.
 
 ## Live Grove problems found in the review (not yet fixed)
