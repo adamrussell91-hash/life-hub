@@ -50,7 +50,11 @@ describe('annotation layers (pure)', () => {
     const state = {
       stop: 0,
       suppressed: new Set<string>(),
-      openAnnotationId: null
+      openAnnotationId: null,
+      focusThreadId: null,
+      context: 0 as const,
+      expandedFolds: new Set<string>(),
+      stepIndex: null
     };
     const resolve = (ann: (typeof annotations)[number]) => resolveAnnotation(text, ann);
     const markers = markersFor(annotations, layers, stops, state, true, resolve);
@@ -67,7 +71,11 @@ describe('annotation layers (pure)', () => {
     const active = activeLayerIds(stops, {
       stop: stops.length,
       suppressed: new Set<string>(),
-      openAnnotationId: null
+      openAnnotationId: null,
+      focusThreadId: null,
+      context: 0,
+      expandedFolds: new Set(),
+      stepIndex: null
     });
     expect(active.has('layer_teacher')).toBe(false);
     expect(

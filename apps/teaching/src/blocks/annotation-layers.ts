@@ -11,6 +11,14 @@ export type AnnotationLayerState = {
   /** Layer or sub-layer ids currently toggled off (hidden despite being revealed). */
   suppressed: Set<string>;
   openAnnotationId: string | null;
+  /** Thread focus (3b). Resets on load — never persisted. */
+  focusThreadId: string | null;
+  /** ± lines of context kept around each stop in fold view. */
+  context: 0 | 1;
+  /** Fold bar ids currently expanded. */
+  expandedFolds: Set<string>;
+  /** Step-through index when active; null = focus without step captions. */
+  stepIndex: number | null;
 };
 
 export type AnnotationMarker = {
@@ -66,7 +74,12 @@ export function createLayerState(
   return {
     stop: clampStop(stop, stops.length),
     suppressed: new Set(),
-    openAnnotationId: null
+    openAnnotationId: null,
+    // Thread focus fields reset on every load — never persisted (slice 3b).
+    focusThreadId: null,
+    context: settings.thread_context === 1 ? 1 : 0,
+    expandedFolds: new Set(),
+    stepIndex: null
   };
 }
 
