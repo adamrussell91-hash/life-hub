@@ -250,31 +250,81 @@ function model(file: string) {
   return job;
 }
 
-const pickTrees: { mesh: InstancedMesh; items: Placed[] }[] = [];
-async function instance(items: Placed[], normalise: boolean, shadows: boolean) {
+// Each model gets two instanced meshes: full detail and a simplified LOD copy (models/lod/...).
+// Only instances on screen when trees are drawn large use full detail; Year view is all LOD. That keeps a full
+// year within a phone's budget while an expanded week still shows the real models.
+type Slot = { list: Placed[]; full: InstancedMesh[]; lod: InstancedMesh[]; fullItems: Placed[]; lodItems: Placed[]; unit: number; fullParts: Part[]; lodParts: Part[] };
+const slots: Slot[] = [];
+const pickTrees: { mesh: InstancedMesh; items: () => Placed[] }[] = [];
+const lodFile = (file: string) => file.replace(/^models\//, 'models/lod/');
+async function instance(items: Placed[], shadows: boolean) {
   const byFile = new Map<string, Placed[]>();
   for (const item of items) byFile.set(item.file, [...(byFile.get(item.file) ?? []), item]);
-  const m = new Matrix4(), q = new Quaternion(), p = new Vector3(), s = new Vector3(), up = new Vector3(0, 1, 0);
   await Promise.all([...byFile].map(async ([file, list]) => {
-    let loaded;
-    try { loaded = await model(file); } catch { console.warn('missing', file); return; }
-    const unit = normalise ? 1 / loaded.height : 1;
-    for (const part of loaded.parts) {
-      const mesh = new InstancedMesh(part.geometry, part.material as any, list.length);
-      list.forEach((item, i) => {
-        q.setFromAxisAngle(up, item.rotation);
-        s.setScalar(item.scale * unit);
-        p.set(item.x, item.y - 0.05, item.z);
-        mesh.setMatrixAt(i, m.compose(p, q, s).multiply(part.matrix));
-      });
-      mesh.castShadow = shadows;
-      mesh.receiveShadow = !normalise || !shadows; // tree crowns stay bright; ground cover sits in shade
-      mesh.instanceMatrix.needsUpdate = true;
-      mesh.computeBoundingSphere();
-      scene.add(mesh);
-      if (normalise) pickTrees.push({ mesh, items: list });
-    }
+    let full, lod;
+    try { full = await model(file); } catch { console.warn('missing', file); return; }
+    try { lod = await model(lodFile(file)); } catch { console.warn('missing LOD', file); lod = full; }
+    const slot: Slot = { list, full: [], lod: [], fullItems: [], lodItems: list, unit: 1 / full.height, fullParts: full.parts, lodParts: lod.parts };
+    const make = (parts: Part[], into: InstancedMesh[], items: () => Placed[]) => {
+      for (const part of parts) {
+        const mesh = new InstancedMesh(part.geometry, part.material as any, list.length);
+        mesh.castShadow = shadows;
+        mesh.receiveShadow = !shadows; // tree crowns stay bright; ground cover sits in shade
+        into.push(mesh);
+        scene.add(mesh);
+        pickTrees.push({ mesh, items });
+      }
+    };
+    make(full.parts, slot.full, () => slot.fullItems);
+    make(lod.parts, slot.lod, () => slot.lodItems);
+    slots.push(slot);
+    fill(slot);
   }));
+}
+const m4 = new Matrix4(), q4 = new Quaternion(), p4 = new Vector3(), s4 = new Vector3(), up4 = new Vector3(0, 1, 0);
+function fill(slot: Slot): void {
+  const write = (meshes: InstancedMesh[], parts: Part[], items: Placed[]) => meshes.forEach((mesh, k) => {
+    items.forEach((item, i) => {
+      q4.setFromAxisAngle(up4, item.rotation);
+      s4.setScalar(item.scale * slot.unit);
+      p4.set(item.x, item.y - 0.05, item.z);
+      mesh.setMatrixAt(i, m4.compose(p4, q4, s4).multiply(parts[k]!.matrix));
+    });
+    mesh.count = items.length;
+    mesh.visible = items.length > 0;
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  });
+  write(slot.full, slot.fullParts, slot.fullItems);
+  write(slot.lod, slot.lodParts, slot.lodItems);
+}
+// Full detail once a map unit is 10+ screen pixels (desktop expanded week is about 15; Year is
+// about 6 on desktop, 4 on a phone, and a phone's expanded week about 7, where LOD reads the same).
+const DETAIL_PX = 10;
+const pxPerUnit = () => (stage.clientHeight * camera.zoom) / (camera.top - camera.bottom);
+const ndc = new Vector3();
+function partition(): void {
+  const close = pxPerUnit() >= DETAIL_PX;
+  for (const slot of slots) {
+    const full: Placed[] = [], lod: Placed[] = [];
+    for (const item of slot.list) {
+      let near = false;
+      if (close) {
+        ndc.set(item.x, item.y, item.z).project(camera);
+        near = Math.abs(ndc.x) < 1.15 && ndc.y > -1.15 && ndc.y < 1.4;
+      }
+      (near ? full : lod).push(item);
+    }
+    if (full.length === slot.fullItems.length && full.every((v, i) => v === slot.fullItems[i])) continue;
+    slot.fullItems = full;
+    slot.lodItems = lod;
+    fill(slot);
+  }
+}
+let partitionTimer = 0;
+function schedulePartition(): void {
+  clearTimeout(partitionTimer);
+  partitionTimer = window.setTimeout(() => { partition(); render(); }, 120);
 }
 
 // ---------- Camera ----------
@@ -330,12 +380,16 @@ function render(): void {
     document.body.dataset.ready = 'true';
     document.body.dataset.triangles = String(renderer.info.render.triangles);
     document.body.dataset.calls = String(renderer.info.render.calls);
+    document.body.dataset.zoom = camera.zoom.toFixed(2);
+    document.body.dataset.px = pxPerUnit().toFixed(2);
+    document.body.dataset.detailed = String(slots.reduce((n, s) => n + s.fullItems.length, 0));
   });
 }
 controls.addEventListener('change', () => {
   const t = controls.target;
   const cx = Math.max(-BOUNDS.halfW + 10, Math.min(BOUNDS.halfW - 10, t.x)), cz = Math.max(-BOUNDS.halfD + 10, Math.min(BOUNDS.halfD - 10, t.z));
   if (cx !== t.x || cz !== t.z) { camera.position.x += cx - t.x; camera.position.z += cz - t.z; t.x = cx; t.z = cz; }
+  schedulePartition();
   render();
 });
 
@@ -361,6 +415,7 @@ function ease(toTarget: Vector3, toZoom: number): void {
     controls.update();
     render();
     if (f < 1) requestAnimationFrame(step);
+    else schedulePartition();
   };
   requestAnimationFrame(step);
 }
@@ -393,11 +448,11 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return;
   const r = renderer.domElement.getBoundingClientRect();
   raycaster.setFromCamera(new Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
-  const hit = raycaster.intersectObjects([ground, ...pickTrees.map((p) => p.mesh)], false)[0];
+  const hit = raycaster.intersectObjects([ground, ...pickTrees.filter((p) => p.mesh.visible).map((p) => p.mesh)], false)[0];
   if (!hit) return;
   const tree = pickTrees.find((p) => p.mesh === hit.object);
   if (tree && hit.instanceId != null && selection.value >= 0) {
-    const item = tree.items[hit.instanceId]!;
+    const item = tree.items()[hit.instanceId]!;
     const task = history.find((d) => d.id === item.id);
     if (task) status.textContent = `${task.title} · finished ${fmt(task.completed)}`;
     return;
@@ -420,7 +475,8 @@ if (stage.clientWidth < 720) {
   controls.update();
 }
 status.textContent = 'Planting…';
-await Promise.all([instance(planting.trees, true, true), instance(planting.ground, true, false)]);
+await Promise.all([instance(planting.trees, true), instance(planting.ground, false)]);
+partition();
 status.textContent = '';
 document.body.dataset.models = 'true';
 render();

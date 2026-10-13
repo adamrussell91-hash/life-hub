@@ -53,14 +53,38 @@ Adam chose colour and atmosphere over denser stands. Changes, all in `main.ts` p
 
 Triangles and draw calls unchanged (3.9M, 103 calls).
 
+## State after round three (phone performance)
+
+- **LOD models** in `apps/life/assets/grove/models/lod/{trees,ground}/`, same file names as the
+  originals. Made with `gltf-transform weld`, `simplify --ratio 0.1 --error 0.08`, `meshopt`.
+  Seven files collapsed badly at that setting and use `--ratio 0.2 --error 0.04`: tree-late-1/2/4,
+  tree-life-2 (all stages), mushroom-2. Ground models under 300 triangles are copied unchanged.
+  Material names, COLOR_0 and heights are preserved (checked per file). Tree source triangles
+  344k to 69k across the set; the folder is about 4.7 MB.
+- **Switching** in `main.ts`: each model has a full and an LOD instanced mesh. An instance uses full
+  detail only when it is on screen and a map unit is at least 10 screen pixels (`DETAIL_PX`). The
+  split is recomputed 120 ms after the camera settles. A missing LOD file falls back to full.
+- **Result** (triangles per frame, shadow pass included):
+
+  | View | Before | After |
+  |---|---|---|
+  | Desktop Year | 3.9M | 1.08M |
+  | Desktop expanded week | 3.8M | 2.25M (on-screen trees full) |
+  | Phone Year | 3.9M | 1.08M |
+  | Phone expanded week | 3.8M | 1.06M (all LOD, reads the same at that size) |
+
+- `body.dataset` now also exposes `zoom`, `px` (screen pixels per map unit) and `detailed`.
+  The screenshot script drives frames after expanding, so the LOD swap is in the shot.
+
 ## Known gaps, in order
 
-1. **Phone performance.** About 3.9M triangles for a full year. Needs distant-tree LOD before it
-   goes live: `gltf-transform weld` then `simplify --ratio 0.1 --error 0.08` cut one tree from
-   6,257 to 2,310 triangles; impostor cards are the next step if that is not enough.
+1. **Phone budget, if real devices still struggle:** the heaviest LOD trees are tree-late-1/2/4
+   (about 3.6k triangles each); impostor cards for Year view are the next step. Untested on a
+   real phone so far.
 2. Waterfall sheet looks grey; no bridges where the path crosses the river; inner terraces faint.
 3. Expanded week mutes only the ground; trees in other weeks stay full colour.
-4. Next look round, if Adam wants it: denser Age of Empires stands.
+4. On a phone the expanded week sits low on screen with a lot of sky above it.
+5. Next look round, if Adam wants it: denser Age of Empires stands.
 
 ## Live Grove problems found in the review (not yet fixed)
 
