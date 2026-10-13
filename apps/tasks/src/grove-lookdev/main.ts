@@ -25,6 +25,11 @@ const builtWeeks = weekOf(TODAY);
 const cells = buildCells();
 const terrain = buildTerrain(cells, builtWeeks);
 const planting = plant(cells, terrain, history, builtWeeks);
+// Nothing dies: every finished task this year must have its tree.
+const planted = new Set(planting.trees.map((t) => t.id));
+const dropped = history.filter((d) => d.week >= 1 && d.week <= 52 && !planted.has(d.id)).length;
+if (dropped) console.error(`Grove: ${dropped} finished tasks have no tree`);
+document.body.dataset.dropped = String(dropped);
 
 // ---------- Renderer, light ----------
 const renderer = new WebGLRenderer({ antialias: true, alpha: true });
@@ -453,7 +458,8 @@ function partition(): void {
     const full: Placed[] = [], lod: Placed[] = [];
     for (const item of slot.list) {
       let near = false;
-      if (close) {
+      // Understorey trees stay on LOD: small, in the canopy's shade, and full detail would cost 100k+ triangles.
+      if (close && !item.understorey) {
         ndc.set(item.x, item.y, item.z).project(camera);
         near = Math.abs(ndc.x) < 1.15 && ndc.y > -1.15 && ndc.y < 1.4;
       }
@@ -522,6 +528,7 @@ function render(): void {
     sun.position.copy(controls.target).add(new Vector3(-70, 140, 60));
     renderer.render(scene, camera);
     document.body.dataset.ready = 'true';
+    document.body.dataset.trees = String(planting.trees.length);
     document.body.dataset.triangles = String(renderer.info.render.triangles);
     document.body.dataset.calls = String(renderer.info.render.calls);
     document.body.dataset.zoom = camera.zoom.toFixed(2);
@@ -629,7 +636,13 @@ if (stage.clientWidth < 720) {
   controls.update();
 }
 status.textContent = 'Planting…';
-await Promise.all([instance(planting.trees, true), instance(planting.ground, false)]);
+// Understorey trees (squeezed into crowded weeks) stand in the canopy's shade: they cast no shadow of
+// their own, which keeps them within the triangle budget.
+await Promise.all([
+  instance(planting.trees.filter((t) => !t.understorey), true),
+  instance(planting.trees.filter((t) => t.understorey), false),
+  instance(planting.ground, false)
+]);
 partition();
 status.textContent = '';
 document.body.dataset.models = 'true';

@@ -23,7 +23,7 @@ async function shot(name, width, height, week) {
   }
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${out}/${name}.png`, timeout: 300000 });
-  const stats = await page.evaluate(() => `${document.body.dataset.triangles} triangles, ${document.body.dataset.calls} draw calls, ${document.body.dataset.detailed} at full detail`);
+  const stats = await page.evaluate(() => `${document.body.dataset.triangles} triangles, ${document.body.dataset.calls} draw calls, ${document.body.dataset.detailed} at full detail, ${document.body.dataset.trees} trees, ${document.body.dataset.dropped} dropped`);
   console.log(name, stats);
   await page.close();
 }
