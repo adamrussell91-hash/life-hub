@@ -8,7 +8,7 @@ import type { Done, Species } from './history';
 import { TODAY } from './history';
 import { fbm, rng } from './noise';
 
-export type Placed = { file: string; x: number; y: number; z: number; scale: number; rotation: number; id?: string; week?: number };
+export type Placed = { file: string; x: number; y: number; z: number; scale: number; rotation: number; id?: string; week?: number; cell?: number };
 export type Planting = { trees: Placed[]; ground: Placed[]; density: (x: number, z: number) => number };
 
 const VARIANTS: Record<Species, number[]> = { life: [1, 2, 3, 4, 5], teaching: [1, 2, 3], health: [1, 2, 3, 1, 2, 3, 4], wedding: [1, 2, 3, 4, 5], other: [1, 2] };
@@ -137,7 +137,8 @@ export function plant(cells: Cell[], terrain: Terrain, history: Done[], builtWee
     const h = terrain.height(x, z);
     const steep = Math.abs(terrain.height(x + 1.2, z) - h) + Math.abs(terrain.height(x, z + 1.2) - h) > 1.2;
     if (!(steep || (r.d > terrain.RIVER_WIDTH && r.d < terrain.RIVER_WIDTH + 2.5)) || random() < 0.4) continue;
-    ground.push({ file: `models/ground/rock-${1 + Math.floor(random() * 5)}.glb`, x, z, y: h - 0.2, scale: 0.6 + random() * 1.4, rotation: random() * 6.28 });
+    const rock = { file: `models/ground/rock-${1 + Math.floor(random() * 5)}.glb`, x, z, y: h - 0.2, scale: 0.6 + random() * 1.4, rotation: random() * 6.28 };
+    if (terrain.pathDistance(x, z) > 2) ground.push(rock); // off the path and its bridges
   }
   // Reeds and lily pads on still water.
   for (let i = 0; i < 70; i += 1) {
