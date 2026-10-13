@@ -7,6 +7,7 @@ import {
   createHubMenuButton
 } from '../../design-kit/js/hub-list.js';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/ai/models';
+import { createAnnotationEditorFields } from '@/blocks/annotation-editor';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildChartSvg, CHART_SERIES_COLOR_OPTIONS } from '@/blocks/chart-svg';
 import { mountGraphEditor } from '../../../../packages/graph-blocks';
@@ -2549,6 +2550,15 @@ export function createOutcomesEditor(
   return editorShell(block, onChange, hint, getLatest);
 }
 
+export function createAnnotationEditor(
+  block: Extract<Block, { block_type: 'annotation' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'annotation' }>>,
+  getLatest: () => Extract<Block, { block_type: 'annotation' }> = () => block
+): HTMLElement {
+  const fields = createAnnotationEditorFields(block, onChange, getLatest);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
 function createBlockEditorFields(
   block: Block,
   onChange: BlockChangeHandler,
@@ -2650,6 +2660,12 @@ function createBlockEditorFields(
       return createColumnsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'columns' }>, context);
     case 'tabs':
       return createTabsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'tabs' }>, context);
+    case 'annotation':
+      return createAnnotationEditor(
+        block,
+        onChange,
+        latest as () => Extract<Block, { block_type: 'annotation' }>
+      );
   }
 }
 

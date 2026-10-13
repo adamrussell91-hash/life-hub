@@ -37,7 +37,8 @@ export const BlockTypeSchema = z.enum([
   'card_stack',
   'tabs',
   'collection',
-  'outcomes'
+  'outcomes',
+  'annotation'
 ]);
 
 export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33', 'custom']);
@@ -683,6 +684,155 @@ export const OutcomesBlockSchema = z.object({
   ...blockTimestamps
 });
 
+export const AnnotationFamilyKeySchema = z.enum([
+  'Descriptive',
+  'Repetitive',
+  'Comparative',
+  'Structural',
+  'Intertextual'
+]);
+export type AnnotationFamilyKey = z.infer<typeof AnnotationFamilyKeySchema>;
+
+export const AnnotationLayerKindSchema = z.enum(['family', 'free', 'lens', 'teacher']);
+export type AnnotationLayerKind = z.infer<typeof AnnotationLayerKindSchema>;
+
+/** Fixed palette token names — never free-typed hex in the editor. */
+export const AnnotationColourSchema = z.enum([
+  'wave',
+  'high-sea',
+  'sand',
+  'shore',
+  'marine',
+  'navy',
+  'coral',
+  'mist'
+]);
+export type AnnotationColour = z.infer<typeof AnnotationColourSchema>;
+
+export const AnnotationGranularitySchema = z.enum(['word', 'phrase', 'line', 'stanza']);
+export type AnnotationGranularity = z.infer<typeof AnnotationGranularitySchema>;
+
+export const AnnotationLineSchema = z.object({
+  id: z.string().min(1),
+  text: z.string()
+});
+
+export const AnnotationStanzaSchema = z.object({
+  id: z.string().min(1),
+  lines: z.array(AnnotationLineSchema).min(1)
+});
+
+export const AnnotationTextSchema = z.object({
+  kind: z.enum(['verse', 'prose']),
+  stanzas: z.array(AnnotationStanzaSchema).min(1)
+});
+
+export const AnnotationSublayerSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  subgroup: z.string().optional()
+});
+
+export const AnnotationLayerSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  kind: AnnotationLayerKindSchema,
+  family: AnnotationFamilyKeySchema.optional(),
+  colour: AnnotationColourSchema,
+  symbol: z.string().optional(),
+  sublayers: z.array(AnnotationSublayerSchema).optional()
+});
+
+export const AnnotationQuoteSchema = z.object({
+  exact: z.string().min(1),
+  prefix: z.string().optional(),
+  suffix: z.string().optional()
+});
+
+export const AnnotationAnchorSchema = z.object({
+  granularity: AnnotationGranularitySchema,
+  stanza: z.string().min(1),
+  line: z.string().optional(),
+  start: z.number().int().min(0).optional(),
+  end: z.number().int().min(0).optional(),
+  quote: AnnotationQuoteSchema
+});
+
+export const AnnotationTechniqueRefSchema = z.object({
+  id: z.string().min(1),
+  table_version: z.string().min(1)
+});
+
+export const AnnotationAttachmentSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('link'),
+    url: z.string(),
+    label: z.string().optional()
+  }),
+  z.object({
+    kind: z.literal('video'),
+    url: z.string(),
+    start_seconds: z.number().int().min(0).optional()
+  }),
+  z.object({
+    kind: z.literal('audio'),
+    url: z.string(),
+    title: z.string().optional()
+  }),
+  z.object({
+    kind: z.literal('image'),
+    url: z.string(),
+    alt_text: z.string()
+  }),
+  z.object({
+    kind: z.literal('block'),
+    block_id: z.string().min(1)
+  })
+]);
+
+export const AnnotationItemSchema = z.object({
+  id: z.string().min(1),
+  layer_id: z.string().min(1),
+  sublayer_id: z.string().optional(),
+  anchor: AnnotationAnchorSchema,
+  technique: AnnotationTechniqueRefSchema.optional(),
+  body: z.object({
+    html: z.string(),
+    attachments: z.array(AnnotationAttachmentSchema).default([])
+  }),
+  created_at: IsoDateSchema,
+  updated_at: IsoDateSchema
+});
+
+export const AnnotationBlockSettingsSchema = z.object({
+  show_markers: z.boolean().default(true),
+  default_layer_id: z.string().optional()
+});
+
+export const AnnotationBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('annotation'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().optional(),
+    attribution: z.string().optional(),
+    text: AnnotationTextSchema,
+    layers: z.array(AnnotationLayerSchema).default([]),
+    annotations: z.array(AnnotationItemSchema).default([]),
+    settings: AnnotationBlockSettingsSchema.default({ show_markers: true })
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export type AnnotationBlock = z.infer<typeof AnnotationBlockSchema>;
+export type AnnotationItem = z.infer<typeof AnnotationItemSchema>;
+export type AnnotationLayer = z.infer<typeof AnnotationLayerSchema>;
+export type AnnotationAnchor = z.infer<typeof AnnotationAnchorSchema>;
+export type AnnotationAttachment = z.infer<typeof AnnotationAttachmentSchema>;
+
 const leafBlockSchemas = [
   RichTextBlockSchema,
   HeadingBlockSchema,
@@ -711,7 +861,8 @@ const leafBlockSchemas = [
   MindMapBlockSchema,
   ConceptMapBlockSchema,
   WhiteboardBlockSchema,
-  OutcomesBlockSchema
+  OutcomesBlockSchema,
+  AnnotationBlockSchema
 ] as const;
 
 export const SpacerBlockSchema = z.object({
