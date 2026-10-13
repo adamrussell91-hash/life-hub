@@ -17,11 +17,12 @@ async function shot(name, width, height, week) {
   await page.waitForFunction(() => document.body.dataset.models === 'true', null, { timeout: 300000 });
   if (week) {
     await page.evaluate((w) => window.groveExpand(w), week);
-    await page.waitForTimeout(1200);
+    // Headless Chromium only runs frames when asked: drive the ease and the LOD swap that follows it.
+    for (let i = 0; i < 6; i += 1) { await page.screenshot({ path: `${out}/${name}.png` }); await page.waitForTimeout(300); }
   }
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${out}/${name}.png`, timeout: 300000 });
-  const stats = await page.evaluate(() => `${document.body.dataset.triangles} triangles, ${document.body.dataset.calls} draw calls`);
+  const stats = await page.evaluate(() => `${document.body.dataset.triangles} triangles, ${document.body.dataset.calls} draw calls, ${document.body.dataset.detailed} at full detail`);
   console.log(name, stats);
   await page.close();
 }
