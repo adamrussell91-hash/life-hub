@@ -5,22 +5,28 @@
  */
 import { CELL, type Cell, land, owner, type Terrain } from './map';
 import type { Done, Species } from './history';
-import { TODAY } from './history';
 import { fbm, rng } from './noise';
 
-export type Placed = { file: string; x: number; y: number; z: number; scale: number; rotation: number; id?: string; week?: number; cell?: number };
+export type Placed = { file: string; x: number; y: number; z: number; scale: number; rotation: number; id?: string; week?: number; cell?: number; understorey?: boolean };
 export type Planting = { trees: Placed[]; ground: Placed[]; density: (x: number, z: number) => number };
 
 const VARIANTS: Record<Species, number[]> = { life: [1, 2, 3, 4, 5], teaching: [1, 2, 3], health: [1, 2, 3, 1, 2, 3, 4], wedding: [1, 2, 3, 4, 5], other: [1, 2] };
 const STAGED: Record<Species, number> = { life: 3, teaching: 3, health: 3, wedding: 2, other: 2 }; // variants with sapling/young models
 
-function treeFile(species: Species, completed: Date, pick: number): { file: string; height: number } {
-  const days = (TODAY.getTime() - completed.getTime()) / 86400000;
+// The lightest variant of each species (LOD triangles), for trees squeezed in under a crowded stand.
+const LIGHTEST: Record<Species, number> = { life: 1, teaching: 3, health: 1, wedding: 1, other: 1 };
+
+function treeFile(task: Done, today: Date, pick: number | 'lightest'): { file: string; height: number } {
+  const { species } = task;
+  const days = (today.getTime() - task.completed.getTime()) / 86400000;
   const stage = days < 4 ? 'sapling' : days < 12 ? 'young' : 'mature';
-  const variants = stage === 'mature' ? VARIANTS[species] : VARIANTS[species].slice(0, STAGED[species]);
-  const v = variants[pick % variants.length]!;
   const mature = species === 'life' ? 8.5 : species === 'wedding' ? 6.2 : 7.2;
   const height = stage === 'mature' ? mature : stage === 'young' ? mature * 0.72 : mature * 0.48;
+  // Work finished after its deadline grows as a gnarled tree, scaled by age like the rest. Only the two
+  // lighter gnarled meshes: the other three are about 3.6k triangles each even at LOD.
+  if (task.late) return { file: `models/trees/tree-late-${pick === 'lightest' || pick % 3 ? 3 : 5}-mature.glb`, height };
+  const variants = stage === 'mature' ? VARIANTS[species] : VARIANTS[species].slice(0, STAGED[species]);
+  const v = pick === 'lightest' ? LIGHTEST[species] : variants[pick % variants.length]!;
   return { file: `models/trees/tree-${species}-${v}-${stage}.glb`, height };
 }
 
@@ -33,6 +39,15 @@ class Spacing {
     }
     return true;
   }
+  /** Distance to the nearest tree in the 3×3 neighbourhood (Infinity if none within 4 units). */
+  nearest(x: number, z: number): number {
+    const gx = Math.floor(x / 4), gz = Math.floor(z / 4);
+    let best = Infinity;
+    for (let i = -1; i <= 1; i += 1) for (let j = -1; j <= 1; j += 1) {
+      for (const p of this.grid.get(`${gx + i},${gz + j}`) ?? []) best = Math.min(best, Math.hypot(p.x - x, p.z - z));
+    }
+    return best;
+  }
   add(x: number, z: number, r: number): void {
     const key = `${Math.floor(x / 4)},${Math.floor(z / 4)}`;
     const list = this.grid.get(key) ?? [];
@@ -41,20 +56,21 @@ class Spacing {
   }
 }
 
-export function plant(cells: Cell[], terrain: Terrain, history: Done[], builtWeeks: number): Planting {
+export function plant(cells: Cell[], terrain: Terrain, history: Done[], builtWeeks: number, today: Date): Planting {
   const random = rng(99);
   const spacing = new Spacing();
   const trees: Placed[] = [];
   const ground: Placed[] = [];
-  const dryAndFlat = (x: number, z: number, margin = 1.4) => {
+  const dryAndFlat = (x: number, z: number, margin = 1.4, steep = 0.55) => {
     if (land(x, z) < 4) return false;
     const r = terrain.riverDistance(x, z);
     if (r.d < terrain.RIVER_WIDTH + margin) return false;
     if (terrain.lakeDistance(x, z) < margin) return false;
     const h = terrain.height(x, z);
     const slope = Math.max(Math.abs(terrain.height(x + 0.7, z) - h), Math.abs(terrain.height(x, z + 0.7) - h));
-    return slope < 0.55;
+    return slope < steep;
   };
+  const crowded: { cell: Cell; tasks: Done[] }[] = [];
 
   const byWeek = new Map<number, Done[]>();
   for (const done of history) {
@@ -95,9 +111,10 @@ export function plant(cells: Cell[], terrain: Terrain, history: Done[], builtWee
     // Species grow in their own patches: sort spots around the piece, tasks by species.
     chosen.sort((a, b) => Math.atan2(a.z - cell.z, a.x - cell.x) - Math.atan2(b.z - cell.z, b.x - cell.x));
     const sorted = [...tasks].sort((a, b) => a.species.localeCompare(b.species) || a.completed.getTime() - b.completed.getTime());
+    if (chosen.length < sorted.length) crowded.push({ cell, tasks: sorted.slice(chosen.length) });
     chosen.forEach((spot, i) => {
       const task = sorted[i]!;
-      const { file, height } = treeFile(task.species, task.completed, Math.floor(random() * 10));
+      const { file, height } = treeFile(task, today, Math.floor(random() * 10));
       trees.push({ file, x: spot.x, z: spot.z, y: terrain.height(spot.x, spot.z), scale: height * (0.86 + random() * 0.28), rotation: random() * Math.PI * 2, id: task.id, week: cell.week! });
       // Undergrowth hugs the trees.
       const bushes = random() < 0.65 ? 1 + Math.floor(random() * 2) : 0;
@@ -111,6 +128,56 @@ export function plant(cells: Cell[], terrain: Terrain, history: Done[], builtWee
         const mx = spot.x + (random() - 0.5) * 2, mz = spot.z + (random() - 0.5) * 2;
         ground.push({ file: `models/ground/mushroom-${1 + Math.floor(random() * 3)}.glb`, x: mx, z: mz, y: terrain.height(mx, mz), scale: 0.35 + random() * 0.25, rotation: random() * 6.28 });
       }
+    });
+  }
+
+  // Nothing dies: every finished task gets a tree, however crowded its week. A piece that is mostly
+  // lake, river or cliff runs out of open ground, so the rest go in as an understorey squeezed between
+  // the stand's trees, then into the clearing's edge and onto steeper banks. Its own random stream,
+  // so every tree placed above keeps its spot.
+  const squeeze = rng(512);
+  for (const { cell, tasks } of crowded) {
+    // On an island the whole island is the week's ground: the clearing rule would leave no room.
+    const isle = terrain.islands.some((i) => i.cell === cell.index);
+    const tiers = [
+      { clearing: 5.5, path: 2.2, water: 1.4, steep: 0.55, gaps: [1.3, 1.1] },
+      { clearing: 3.2, path: 1.6, water: 0.7, steep: 0.9, gaps: [1.2, 1.0, 0.8] }
+    ];
+    const spots: { x: number; z: number }[] = [];
+    // Dense jittered grid over the piece (the stands above sample it sparsely).
+    for (let x = cell.x - CELL * 1.1; x < cell.x + CELL * 1.1; x += 0.6) for (let z = cell.z - CELL * 1.1; z < cell.z + CELL * 1.1; z += 0.6) {
+      const sx = x + (squeeze() - 0.5) * 0.5, sz = z + (squeeze() - 0.5) * 0.5;
+      if (owner(cells, sx, sz).cell === cell.index && land(sx, sz) >= 4) spots.push({ x: sx, z: sz });
+    }
+    const order = spots.map((s) => ({ ...s, key: squeeze() }));
+    const placed: { x: number; z: number }[] = [];
+    for (const tier of tiers) for (const gap of tier.gaps) {
+      if (placed.length >= tasks.length) break;
+      const open = order.filter((s) => (isle || Math.hypot(s.x - cell.x, s.z - cell.z) >= tier.clearing)
+        && terrain.pathDistance(s.x, s.z) >= tier.path && dryAndFlat(s.x, s.z, tier.water, tier.steep))
+        .sort((a, b) => a.key - b.key);
+      for (const s of open) {
+        if (placed.length >= tasks.length) break;
+        if (spacing.nearest(s.x, s.z) < gap) continue;
+        spacing.add(s.x, s.z, gap);
+        placed.push(s);
+      }
+    }
+    // Last resort, so the rule holds even for a piece that is nearly all water: the dry spot of the
+    // piece furthest from any tree, repeated until every task has one.
+    while (placed.length < tasks.length) {
+      const dry = order.filter((s) => terrain.lakeDistance(s.x, s.z) > 0.3 && terrain.riverDistance(s.x, s.z).d > terrain.RIVER_WIDTH + 0.3);
+      const pool = dry.length ? dry : order.length ? order : [{ x: cell.x, z: cell.z, key: 0 }];
+      let best = pool[0]!, room = -1;
+      for (const s of pool) { const d = spacing.nearest(s.x, s.z); if (d > room) { room = d; best = s; } }
+      spacing.add(best.x, best.z, 0.6);
+      placed.push(best);
+    }
+    placed.forEach((spot, i) => {
+      const task = tasks[i]!;
+      const { file, height } = treeFile(task, today, 'lightest');
+      // A little smaller than the canopy around it, so the squeeze reads as undergrowth, not a collision.
+      trees.push({ file, x: spot.x, z: spot.z, y: terrain.height(spot.x, spot.z), scale: height * (0.68 + squeeze() * 0.14), rotation: squeeze() * Math.PI * 2, id: task.id, week: cell.week!, cell: cell.index, understorey: true });
     });
   }
 
