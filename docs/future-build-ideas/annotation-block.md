@@ -205,7 +205,7 @@ These verdicts govern. Numbers are the doc's idea numbers.
 | 8 | Replayable think-aloud | **Keep** | Same engine as C |
 | 9 | Ballots | **Cut** | A student activity. The block is Adam's annotation tool, not an activity block |
 | 10 | Zoom levels | **Fold into G** | Stanza-summary and whole-poem layers on the slider do the same job |
-| 11 | Paragraph builder | **Maybe** | "Has promise" |
+| 11 | Paragraph builder | **Cut** | A student activity, so it falls under the governing principle |
 | 12 | Notes → flashcards | **Keep** | |
 | 13 | Teacher layer + Ann | **Keep the teacher layer, drop Ann** | A private layer Adam reads while teaching. Ann's loop relied on student data, which no longer exists |
 | 14 | Cross-poem threads | **Modify** | Too unit-specific. Becomes a general anthology (see E) |
@@ -358,6 +358,7 @@ A slider along the bottom of the block. Each stop is a layer that Adam names and
 
 ## History
 
+- 2026-10-13: Cut the paragraph builder (11) under the governing principle.
 - 2026-10-13: Second review. Set the governing principle (Adam's annotation tool, not a student activity block). Cut commit-before-reveal, ballots and read tracking. Replaced the hint ladder and zoom levels with the layer slider (G). Kept the Periodic Table integration, lenses as layers, and the teacher-only layer.
 - 2026-10-13: Added the Critical review with Adam's verdicts and sections A to F: no-account reveal, thread focus, self-pinning voice feedback, the reading lenses explained, the anthology block, and feedback read evidence. Cut ghost words and the sound overlays. Reordered the build.
 - 2026-10-13: Created. Fifteen ideas for a Teaching Hub annotation block (poetry first, feedback later), plus an anchor-model sketch and Periodic Table integration notes.
