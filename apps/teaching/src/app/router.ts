@@ -14,11 +14,13 @@ export type RouteName =
   | 'teacher-lesson'
   | 'teacher-resources'
   | 'teacher-templates'
+  | 'teacher-feedback'
   | 'teacher-trash'
   | 'student-lesson'
   | 'student-unit'
   | 'student-class'
   | 'student-class-lesson'
+  | 'student-feedback'
   | 'sign-in'
   | 'not-found';
 
@@ -36,11 +38,13 @@ export type RouteParams = {
   'teacher-lesson': { lessonId: string };
   'teacher-resources': Record<string, never>;
   'teacher-templates': Record<string, never>;
+  'teacher-feedback': Record<string, never>;
   'teacher-trash': Record<string, never>;
   'student-lesson': { lessonId: string };
   'student-unit': { unitId: string };
   'student-class': { classId: string };
   'student-class-lesson': { classId: string; lessonId: string };
+  'student-feedback': { token: string };
   'sign-in': Record<string, never>;
   'not-found': Record<string, never>;
 };
@@ -92,6 +96,16 @@ export function match(pathname: string): RouteMatch | null {
       params: {},
       requiresAuth: false,
       path: '/sign-in'
+    };
+  }
+
+  const studentFeedback = path.match(/^\/s\/feedback\/([^/]+)$/);
+  if (studentFeedback) {
+    return {
+      name: 'student-feedback',
+      params: { token: decodeURIComponent(studentFeedback[1]) },
+      requiresAuth: false,
+      path
     };
   }
 
@@ -195,6 +209,15 @@ export function match(pathname: string): RouteMatch | null {
   if (path === '/templates') {
     return {
       name: 'teacher-templates',
+      params: {},
+      requiresAuth: true,
+      path
+    };
+  }
+
+  if (path === '/feedback') {
+    return {
+      name: 'teacher-feedback',
       params: {},
       requiresAuth: true,
       path

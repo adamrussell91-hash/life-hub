@@ -69,6 +69,14 @@ const SECTIONS: NavEntry[] = [
     glyph: ['M3 7h18v4H3zM5 11v8h14v-8M10 14h4']
   },
   {
+    id: 'feedback',
+    label: 'Feedback',
+    path: '/feedback',
+    glyph: [
+      'M4 5h16v10H8l-4 4V5z'
+    ]
+  },
+  {
     id: 'trash',
     label: 'Trash',
     path: '/trash',
