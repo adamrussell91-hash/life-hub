@@ -39,11 +39,13 @@ import {
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { parseVideoInput, parseStartTime, videoEmbedSrc } from '@/blocks/video-url';
+import { activeClipAt } from '@/blocks/voice-playback';
 import type {
   AnnotationAttachment,
   AnnotationBlock,
   AnnotationItem,
-  AnnotationLayer
+  AnnotationLayer,
+  AnnotationVoiceTrack
 } from '@/schemas/block';
 
 type RenderMode = 'teacher' | 'student' | 'print';
@@ -54,6 +56,20 @@ type PlacedAnnotation = {
   resolved: ResolvedAnchor;
   layer?: AnnotationLayer;
 };
+
+type PublishedVoiceClip = AnnotationVoiceTrack['clips'][number] & {
+  track: AnnotationVoiceTrack;
+};
+
+function publishedVoiceTracks(content: AnnotationContent): AnnotationVoiceTrack[] {
+  return (content.voice_tracks ?? []).filter((track) => track.status === 'published');
+}
+
+function approvedClips(track: AnnotationVoiceTrack): PublishedVoiceClip[] {
+  return track.clips
+    .filter((clip) => clip.approved)
+    .map((clip) => ({ ...clip, track }));
+}
 
 function layerById(layers: AnnotationLayer[], id: string): AnnotationLayer | undefined {
   return layers.find((layer) => layer.id === id);
@@ -536,6 +552,104 @@ function buildInteractiveView(
   });
   root.append(sheet);
 
+  const voiceAudio = document.createElement('audio');
+  voiceAudio.preload = 'metadata';
+  voiceAudio.hidden = true;
+  root.append(voiceAudio);
+
+  let voiceRaf = 0;
+  let voiceHighlightId: string | null = null;
+  let voicePlayAll = false;
+  let voicePlayAllClips: Array<{ id: string; start_s: number; end_s: number }> = [];
+
+  function stopVoiceRaf(): void {
+    if (voiceRaf) {
+      cancelAnimationFrame(voiceRaf);
+      voiceRaf = 0;
+    }
+  }
+
+  function clearVoiceHighlight(): void {
+    root.querySelectorAll('.block-annotation__line.is-voice-active').forEach((node) => {
+      node.classList.remove('is-voice-active');
+    });
+    voiceHighlightId = null;
+  }
+
+  function highlightVoiceClip(clipId: string | null): void {
+    if (clipId === voiceHighlightId) return;
+    clearVoiceHighlight();
+    voiceHighlightId = clipId;
+    if (!clipId) return;
+    root
+      .querySelectorAll(`[data-voice-clip-id="${clipId}"]`)
+      .forEach((node) => node.closest('.block-annotation__line')?.classList.add('is-voice-active'));
+  }
+
+  function tickVoicePlayback(): void {
+    if (voiceAudio.paused || voiceAudio.ended) {
+      stopVoiceRaf();
+      if (voiceAudio.ended) {
+        voicePlayAll = false;
+        clearVoiceHighlight();
+      }
+      return;
+    }
+    if (voicePlayAll && voicePlayAllClips.length > 0) {
+      const active = activeClipAt(voicePlayAllClips, voiceAudio.currentTime);
+      highlightVoiceClip(active?.id ?? null);
+    }
+    voiceRaf = requestAnimationFrame(tickVoicePlayback);
+  }
+
+  function startVoiceRaf(): void {
+    stopVoiceRaf();
+    voiceRaf = requestAnimationFrame(tickVoicePlayback);
+  }
+
+  function playVoiceClip(clip: PublishedVoiceClip): void {
+    voicePlayAll = false;
+    voicePlayAllClips = [];
+    if (voiceAudio.src !== clip.track.audio.url) {
+      voiceAudio.src = clip.track.audio.url;
+    }
+    const onMeta = () => {
+      voiceAudio.currentTime = Math.max(0, clip.start_s);
+      void voiceAudio.play().then(() => startVoiceRaf()).catch(() => stopVoiceRaf());
+      highlightVoiceClip(clip.id);
+      const endAt = clip.end_s;
+      const onTime = () => {
+        if (voiceAudio.currentTime >= endAt - 0.02) {
+          voiceAudio.pause();
+          voiceAudio.removeEventListener('timeupdate', onTime);
+          stopVoiceRaf();
+          clearVoiceHighlight();
+        }
+      };
+      voiceAudio.addEventListener('timeupdate', onTime);
+    };
+    if (voiceAudio.readyState >= 1) onMeta();
+    else voiceAudio.addEventListener('loadedmetadata', onMeta, { once: true });
+  }
+
+  function playAllVoice(track: AnnotationVoiceTrack): void {
+    const clips = approvedClips(track);
+    if (clips.length === 0) return;
+    voicePlayAll = true;
+    voicePlayAllClips = clips.map((clip) => ({
+      id: clip.id,
+      start_s: clip.start_s,
+      end_s: clip.end_s
+    }));
+    if (voiceAudio.src !== track.audio.url) voiceAudio.src = track.audio.url;
+    const start = () => {
+      voiceAudio.currentTime = 0;
+      void voiceAudio.play().then(() => startVoiceRaf()).catch(() => stopVoiceRaf());
+    };
+    if (voiceAudio.readyState >= 1) start();
+    else voiceAudio.addEventListener('loadedmetadata', start, { once: true });
+  }
+
   function exitFocus(): void {
     state = {
       ...state,
@@ -893,6 +1007,14 @@ function buildInteractiveView(
       }
     }
 
+    const voiceClips = publishedVoiceTracks(content).flatMap(approvedClips);
+    const voiceByLine = new Map<string, PublishedVoiceClip[]>();
+    const generalVoice = voiceClips.filter((clip) => !clip.anchor);
+    for (const clip of voiceClips) {
+      if (!clip.anchor?.line) continue;
+      pushGrouped(voiceByLine, clip.anchor.line, clip);
+    }
+
     function paintLineRow(lineId: string, stanzaId: string, lineText: string): HTMLElement {
       const row = document.createElement('div');
       row.className = 'block-annotation__line';
@@ -912,6 +1034,29 @@ function buildInteractiveView(
       }
       for (const pip of pipsByLine.get(lineId) ?? []) {
         margin.append(pip);
+      }
+      for (const clip of voiceByLine.get(lineId) ?? []) {
+        const play = document.createElement('button');
+        play.type = 'button';
+        play.className = 'block-annotation__voice-play';
+        play.dataset.voiceClipId = clip.id;
+        play.setAttribute('aria-label', `Play voice clip: ${clip.transcript_text.slice(0, 40) || clip.id}`);
+        play.textContent = '▶';
+        play.addEventListener('click', () => playVoiceClip(clip));
+        margin.append(play);
+
+        if (clip.transcript_text.trim()) {
+          const details = document.createElement('details');
+          details.className = 'block-annotation__voice-transcript';
+          const summary = document.createElement('summary');
+          summary.textContent = 'Transcript';
+          const body = document.createElement('p');
+          body.textContent = clip.transcript_text;
+          details.append(summary, body);
+          // Attach beside text after textEl is created below.
+          row.dataset.hasVoiceTranscript = '1';
+          (row as HTMLElement & { __voiceDetails?: HTMLElement }).__voiceDetails = details;
+        }
       }
       row.append(margin);
 
@@ -942,6 +1087,11 @@ function buildInteractiveView(
       }
 
       row.append(textEl);
+      const voiceDetails = (row as HTMLElement & { __voiceDetails?: HTMLElement }).__voiceDetails;
+      if (voiceDetails) {
+        delete (row as HTMLElement & { __voiceDetails?: HTMLElement }).__voiceDetails;
+        textEl.append(voiceDetails);
+      }
       return row;
     }
 
@@ -1021,7 +1171,46 @@ function buildInteractiveView(
     poemHost.append(stanzasHost);
     textCol.append(poemHost);
 
-    if (content.annotations.length === 0) {
+    const publishedTracks = publishedVoiceTracks(content);
+    if (publishedTracks.length > 0) {
+      const voiceBar = document.createElement('div');
+      voiceBar.className = 'block-annotation__voice-bar';
+      for (const track of publishedTracks) {
+        const playAll = document.createElement('button');
+        playAll.type = 'button';
+        playAll.className = 'btn btn--secondary block-annotation__voice-play-all';
+        playAll.textContent = `Play all · ${track.title}`;
+        playAll.addEventListener('click', () => playAllVoice(track));
+        voiceBar.append(playAll);
+      }
+      textCol.append(voiceBar);
+    }
+
+    if (generalVoice.length > 0) {
+      const general = document.createElement('section');
+      general.className = 'block-annotation__voice-general';
+      const generalTitle = document.createElement('h4');
+      generalTitle.textContent = 'General comments';
+      general.append(generalTitle);
+      const generalList = document.createElement('ul');
+      for (const clip of generalVoice) {
+        const li = document.createElement('li');
+        const play = document.createElement('button');
+        play.type = 'button';
+        play.className = 'btn btn--secondary block-annotation__voice-play';
+        play.dataset.voiceClipId = clip.id;
+        play.textContent = 'Play';
+        play.addEventListener('click', () => playVoiceClip(clip));
+        const text = document.createElement('p');
+        text.textContent = clip.transcript_text || clip.track.title;
+        li.append(play, text);
+        generalList.append(li);
+      }
+      general.append(generalList);
+      textCol.append(general);
+    }
+
+    if (content.annotations.length === 0 && publishedTracks.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'block-annotation__empty';
       empty.textContent =
@@ -1158,6 +1347,7 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
   const nonThreadPlaced = placed.filter(
     (item) => (item.annotation.also_anchors?.length ?? 0) === 0
   );
+  const voiceClips = publishedVoiceTracks(content).flatMap(approvedClips);
   const footnoteById = new Map<string, number>();
   let fn = 1;
   for (const item of nonThreadPlaced) {
@@ -1165,6 +1355,9 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
   }
   for (const ann of threadAnns) {
     footnoteById.set(ann.id, fn++);
+  }
+  for (const clip of voiceClips) {
+    footnoteById.set(`voice:${clip.track.id}:${clip.id}`, fn++);
   }
 
   for (const stanza of content.text.stanzas) {
@@ -1199,12 +1392,21 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
         sup.textContent = String(n);
         p.append(sup);
       }
+      for (const clip of voiceClips) {
+        if (clip.anchor?.line !== line.id) continue;
+        const n = footnoteById.get(`voice:${clip.track.id}:${clip.id}`);
+        if (n == null) continue;
+        const sup = document.createElement('sup');
+        sup.className = 'block-annotation__fn-ref';
+        sup.textContent = String(n);
+        p.append(sup);
+      }
       stanzaEl.append(p);
     }
     root.append(stanzaEl);
   }
 
-  if (nonThreadPlaced.length > 0 || threadAnns.length > 0) {
+  if (nonThreadPlaced.length > 0 || threadAnns.length > 0 || voiceClips.length > 0) {
     const notes = document.createElement('ol');
     notes.className = 'block-annotation__footnotes';
     for (const item of nonThreadPlaced) {
@@ -1229,6 +1431,19 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
       body.className = 'block-annotation__body';
       body.innerHTML = sanitizeRichTextHtml(ann.body.html);
       li.append(body);
+      notes.append(li);
+    }
+    for (const clip of voiceClips) {
+      const li = document.createElement('li');
+      li.id = `annotation-fn-voice-${clip.id}`;
+      const label = document.createElement('p');
+      label.className = 'block-annotation__thread-fn-label';
+      label.textContent = clip.anchor
+        ? `Voice · ${clip.track.title}`
+        : `Voice · ${clip.track.title} (general)`;
+      const body = document.createElement('p');
+      body.textContent = clip.transcript_text || '(no transcript)';
+      li.append(label, body);
       notes.append(li);
     }
     root.append(notes);

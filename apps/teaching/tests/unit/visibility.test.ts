@@ -124,13 +124,18 @@ describe('filterBlocksForStudent', () => {
     const ann = out.find((b) => b.block_type === 'annotation');
     expect(ann?.block_type).toBe('annotation');
     if (ann?.block_type !== 'annotation') return;
-    expect(ann.content.layers.map((l) => l.id)).toEqual(['layer_structure']);
+    expect(ann.content.layers.map((l) => l.id)).toEqual(['layer_structure', 'layer_voice']);
     expect(ann.content.annotations.map((a) => a.id)).toEqual(['ann_student', 'ann_thread']);
     expect(ann.content.annotations[0]!.body.attachments).toEqual([
       { kind: 'block', block_id: 'block_ok_resource' },
       { kind: 'link', url: 'https://example.com', label: 'ok' }
     ]);
-    expect(ann.content.voice_tracks).toBeUndefined();
+    expect(ann.content.voice_tracks).toHaveLength(1);
+    const track = ann.content.voice_tracks![0]!;
+    expect(track.id).toBe('track_published');
+    expect(track.transcript.words).toEqual([]);
+    expect(track.clips.map((c) => c.id)).toEqual(['clip_approved']);
+    expect(track.extras?.map((e) => e.id)).toEqual(['extra_ok']);
     const cards = out.find((b) => b.block_type === 'flashcards');
     expect(cards?.block_type).toBe('flashcards');
     if (cards?.block_type !== 'flashcards') return;
