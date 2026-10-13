@@ -752,7 +752,7 @@ function buildInteractiveView(
           paint();
         }),
         makeMenuItem('Step through', stepIndex != null, () => {
-          state = { ...state, stepIndex: stepIndex == null ? 0 : null };
+          state = { ...state, stepIndex: state.stepIndex == null ? 0 : null };
           paint();
         })
       );
