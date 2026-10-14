@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES } from '@/blocks/create-block';
 import { createBlockEditor } from '@/blocks/editors';
-import { renderBlock } from '@/blocks/render';
+import { renderBlock, splitTimelineWhen } from '@/blocks/render';
 import { blockRegistry } from '@/blocks/registry';
 
 const timestamps = {
@@ -286,6 +286,34 @@ describe('timeline render', () => {
     expect(blockRegistry.timeline).toBeDefined();
     expect(renderBlock(createBlock('timeline', 't'), 'student').dataset.blockType).toBe(
       'timeline'
+    );
+  });
+});
+
+describe('splitTimelineWhen', () => {
+  it('splits time and year ranges', () => {
+    expect(splitTimelineWhen('9:23AM-9:40AM')).toEqual({ start: '9:23AM', end: '9:40AM' });
+    expect(splitTimelineWhen('12:45PM – 1:23PM')).toEqual({ start: '12:45PM', end: '1:23PM' });
+    expect(splitTimelineWhen('1914 to 1918')).toEqual({ start: '1914', end: '1918' });
+  });
+
+  it('keeps single values, ISO dates and word ranges whole', () => {
+    expect(splitTimelineWhen('8:30AM')).toEqual({ start: '8:30AM' });
+    expect(splitTimelineWhen('11:30 ONWARDS')).toEqual({ start: '11:30 ONWARDS' });
+    expect(splitTimelineWhen('2026-10-13')).toEqual({ start: '2026-10-13' });
+    expect(splitTimelineWhen('Early-modern era')).toEqual({ start: 'Early-modern era' });
+  });
+
+  it('renders a range as start and end on the rail', () => {
+    const block = createBlock('timeline', 'tl1');
+    if (block.block_type !== 'timeline') throw new Error('expected timeline');
+    block.content.events = [{ id: 'e1', when: '9:50AM-10AM', label: 'Safety Briefing', description: '' }];
+    const el = renderBlock(block, 'student');
+    expect(el.querySelector('.block-timeline__start')?.textContent).toBe('9:50AM');
+    expect(el.querySelector('.block-timeline__end')?.textContent).toBe('– 10AM');
+    expect(el.querySelector('.block-timeline__node')?.getAttribute('aria-hidden')).toBe('true');
+    expect(el.querySelector('.block-timeline__card .block-timeline__label')?.textContent).toBe(
+      'Safety Briefing'
     );
   });
 });
