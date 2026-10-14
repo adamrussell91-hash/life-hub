@@ -1614,6 +1614,8 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         description: input.description ?? '',
         registration_link: input.registration_link ?? null,
         registration_window: input.registration_window ?? '',
+        starts_on: input.starts_on ?? null,
+        ends_on: input.ends_on ?? null,
         not_available_nsw: input.not_available_nsw ?? false,
         not_available_reason: input.not_available_reason ?? '',
         created_at: stamp,
