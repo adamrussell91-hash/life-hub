@@ -317,3 +317,55 @@ describe('splitTimelineWhen', () => {
     );
   });
 });
+
+describe('timeline layouts', () => {
+  function threeEvents(layout?: 'rail' | 'alternate' | 'horizontal') {
+    const block = createBlock('timeline', 'tl1');
+    if (block.block_type !== 'timeline') throw new Error('expected timeline');
+    block.content.events = ['a', 'b', 'c'].map((id) => ({ id, when: '1', label: id, description: '' }));
+    if (layout) block.content.layout = layout;
+    return block;
+  }
+
+  it('defaults old blocks with no layout to the vertical rail', () => {
+    const parsed = BlockSchema.parse(threeEvents());
+    if (parsed.block_type !== 'timeline') throw new Error('expected timeline');
+    expect(parsed.content.layout).toBeUndefined();
+    expect(renderBlock(parsed, 'student').querySelector('.block-timeline--rail')).toBeTruthy();
+  });
+
+  it('rejects an unknown layout', () => {
+    expect(() =>
+      BlockSchema.parse({ ...threeEvents(), content: { ...threeEvents().content, layout: 'zigzag' } })
+    ).toThrow();
+  });
+
+  it('either side staggers each event over two rows', () => {
+    const el = renderBlock(threeEvents('alternate'), 'student');
+    expect(el.querySelector('.block-timeline--alternate')).toBeTruthy();
+    const rows = [...el.querySelectorAll<HTMLElement>('.block-timeline__event')].map((li) => li.style.gridRow);
+    expect(rows).toEqual(['1 / span 2', '2 / span 2', '3 / span 2']);
+  });
+
+  it('horizontal strip is keyboard scrollable', () => {
+    const list = renderBlock(threeEvents('horizontal'), 'student').querySelector(
+      '.block-timeline--horizontal'
+    ) as HTMLOListElement;
+    expect(list.tabIndex).toBe(0);
+    expect(list.getAttribute('aria-label')).toContain('sideways');
+  });
+
+  it('editor layout choice saves the layout', () => {
+    let latest: Block = threeEvents();
+    const editor = createBlockEditor(latest, (next) => {
+      latest = next;
+    });
+    const select = editor.querySelector('[aria-label="Timeline layout"]') as HTMLSelectElement;
+    expect(select.value).toBe('rail');
+    select.value = 'alternate';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    if (latest.block_type !== 'timeline') throw new Error('expected timeline');
+    expect(latest.content.layout).toBe('alternate');
+    expect(latest.content.events).toHaveLength(3);
+  });
+});

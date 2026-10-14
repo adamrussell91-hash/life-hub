@@ -851,12 +851,20 @@ export function renderTimelineBlock(
   block: Extract<Block, { block_type: 'timeline' }>,
   mode: RenderMode
 ): HTMLElement {
+  const layout = block.content.layout ?? 'rail';
   const list = document.createElement('ol');
-  list.className = 'block-timeline';
+  list.className = `block-timeline block-timeline--${layout}`;
+  if (layout === 'horizontal') {
+    // The strip scrolls on its own; make it reachable by keyboard.
+    list.tabIndex = 0;
+    list.setAttribute('aria-label', 'Timeline, scrolls sideways');
+  }
 
-  for (const event of block.content.events) {
+  block.content.events.forEach((event, index) => {
     const item = document.createElement('li');
     item.className = 'block-timeline__event';
+    // Either side: each card spans two rows, offset by one, so neighbours overlap by half.
+    if (layout === 'alternate') item.style.gridRow = `${index + 1} / span 2`;
 
     const when = document.createElement('p');
     when.className = 'block-timeline__when';
@@ -914,7 +922,7 @@ export function renderTimelineBlock(
 
     item.append(when, node, card);
     list.append(item);
-  }
+  });
 
   return wrapBlock(list, block, mode);
 }

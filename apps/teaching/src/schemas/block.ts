@@ -618,6 +618,9 @@ export const TimelineEventSchema = z.object({
   link_label: z.string().optional()
 });
 
+export const TimelineLayoutSchema = z.enum(['rail', 'alternate', 'horizontal']);
+export type TimelineLayout = z.infer<typeof TimelineLayoutSchema>;
+
 export const TimelineBlockSchema = z.object({
   id: z.string().min(1),
   type: z.literal('block'),
@@ -625,6 +628,7 @@ export const TimelineBlockSchema = z.object({
   variant: z.string().default('medium'),
   visibility: VisibilitySchema,
   content: z.object({
+    layout: TimelineLayoutSchema.optional(),
     events: z.array(TimelineEventSchema).min(1).max(12)
   }),
   ...blockLayout,
