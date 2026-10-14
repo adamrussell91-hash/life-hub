@@ -3,7 +3,7 @@
  * Open /grove-lookdev.html on the Tasks dev server. The real Grove page mounts the same scene.
  */
 import { mountForest } from '@/views/grove/forest/scene';
-import { syntheticHistory, TODAY } from './history';
+import { syntheticAnimals, syntheticHistory, TODAY } from './history';
 
 const stage = document.getElementById('stage')!;
 const title = document.getElementById('title')!;
@@ -15,6 +15,7 @@ const forest = await mountForest(stage, {
   year: 2026,
   today: TODAY,
   history: syntheticHistory(),
+  animals: syntheticAnimals(),
   topInset: () => title.getBoundingClientRect().bottom - stage.getBoundingClientRect().top + 8,
   onChange: (s) => {
     back.hidden = s.week == null;
@@ -27,4 +28,5 @@ const forest = await mountForest(stage, {
 back.addEventListener('click', () => forest.showYear());
 (window as any).groveExpand = (week: number) => forest.expand(week);
 (window as any).groveYear = () => forest.showYear();
+(window as any).groveForest = forest;
 document.body.dataset.models = 'true';

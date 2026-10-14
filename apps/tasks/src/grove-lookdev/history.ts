@@ -1,6 +1,7 @@
 /** Synthetic finished-task history for the look prototype (same shape as real tasks). */
 import { rng } from '@/views/grove/forest/noise';
 import type { Done, Species } from '@/views/grove/forest/history';
+import type { ForestAnimal } from '@/views/grove/forest/animals';
 
 export const TODAY = new Date('2026-10-13T09:00:00+11:00');
 const WEEK_ONE = Date.UTC(2025, 11, 29); // Monday 29 December 2025
@@ -36,4 +37,22 @@ export function syntheticHistory(): Done[] {
     }
   }
   return out;
+}
+
+/**
+ * One of every catalogue animal, two to a week from week 2, so look rounds can judge sizes and gaits
+ * side by side. Models missing from the dev server's catalogue are skipped by the forest.
+ */
+export function syntheticAnimals(): ForestAnimal[] {
+  const models: [string, ForestAnimal['species'], boolean?][] = [
+    ['animal-deer-doe', 'deer'], ['animal-forest-boar', 'deer'], ['animal-forest-bear', 'deer'], ['animal-forest-moose', 'deer'],
+    ['animal-fox', 'fox'], ['animal-forest-wolf', 'fox'], ['animal-deer-stag', 'deer'], ['animal-forest-stag', 'deer'],
+    ['animal-forest-deer', 'deer'], ['animal-forest-fox', 'fox'], ['animal-rabbit-hare', 'hare'], ['animal-forest-rabbit', 'hare'],
+    ['animal-raccoon', 'squirrel'], ['animal-skunk', 'squirrel'], ['animal-squirrel', 'squirrel'], ['animal-chipmunk', 'squirrel'],
+    ['animal-bird-robin', 'robin'], ['animal-owl', 'owl'], ['animal-duck-mallard', 'mallard', true], ['animal-river-otter', 'mallard', true]
+  ];
+  return models.map(([model, species, swimming], i) => {
+    const day = new Date(Date.UTC(2026, 0, 5 + Math.floor(i / 2) * 7 + 2)).toISOString().slice(0, 10);
+    return { model, species, name: model.replace(/^animal-/, ''), earnedOn: day, reason: 'Look round', baby: model === 'animal-deer-doe' || model === 'animal-rabbit-hare', swimming: !!swimming };
+  });
 }

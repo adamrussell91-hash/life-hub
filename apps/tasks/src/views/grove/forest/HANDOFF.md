@@ -170,6 +170,36 @@ Triangles and draw calls unchanged (3.9M, 103 calls).
 - **Budget with real data** (639 trees, 11 animals): Year about 1.45M triangles on desktop and
   phone, phone expanded week 1.41M, desktop expanded week 2.7M.
 
+## Round seven: animals that walk, and Home's preview
+
+- **Home preview** (`/tasks/grove.html`, `grove-embed/main.ts`) now mounts this forest, opened on the
+  current week (`week` option, no camera move) with `interactive: false`. The old annual renderer is no
+  longer on Home. The frame links to `#/grove?week=this`; "Open the forest" opens Year.
+- **Sizes** (`gait.ts` `HEIGHT`): every animal has a standing height in map units, drawn against the
+  others (moose 3.3, stag 2.8, doe 2.1, bear 1.85, wolf 1.45, boar 1.0, fox 0.9, owl 0.85, robin 0.38).
+  Scale = height / the model's own measured height. The old code scaled each model's native size by
+  1.8, so the boar (a 1.07 m model) drew as tall as the bear, and the owl and robin at 2.2 and 1.1.
+- **Speeds** (`gait.ts` `STRIDE`): measured from each walk clip's planted feet (doe 0.88 model units a
+  second). Ground speed = stride × scale × clip speed, and the clip speed follows the ground speed, so
+  feet never slide. The old fixed speeds were 3.6× (boar) to 4.6× (wolf) faster than the legs.
+- **Turning** (`createWalker`): eases off from a stop, brakes for bends ahead (corner speed from the
+  turn rate, braking distance included), stands and turns on the spot past about 35°, and turns no
+  faster than its body allows (0.8 rad/s for a moose, 2.6 for small animals). Measured over 2 minutes
+  of every model: body heading stays within about 30° of the direction of travel.
+- **Paths** (`trails.ts`): a 1-unit walk grid over dry, gentle, built ground clear of trunks, plus the
+  bridge decks (`deckAt` in `scene.ts`; animals walk on the deck, not the riverbed). A* (gently
+  preferring the path), then straightened, rounded, de-zigzagged.
+  - Year view: every animal is out, wandering up to eight neighbouring built weeks and home again.
+  - Week view: only the animals that week earned, on a loop inside their own week.
+- **Owl:** its model has no flight cycle (the `fly` clip barely moves), so it perches on the crown top
+  of its week's tallest tree (a ray onto the drawn tree) and stays: idle, preening, turning to look.
+- **Robin:** hops; legs of 9+ units are flown with the flap clip in an arc.
+- `/grove-lookdev.html` now has one of every catalogue animal (two a week from week 2) for size and gait
+  rounds. The dev server has the three public models; with the 20-model bundle unpacked into the
+  git-ignored `apps/life/assets/grove/project-only/` (plus its `manifest.json`) all 20 appear.
+- Check-script hooks: `handle.wildlife()` (positions, screen points, clip, speed) and
+  `handle.stepWildlife(seconds)` (headless software GL runs about 1.5 frames a second).
+
 ## Known gaps, in order
 
 1. **Phone budget, if real devices still struggle (now 1.45M with real data):** the heaviest LOD trees are tree-late-1/2/4
@@ -189,7 +219,8 @@ Triangles and draw calls unchanged (3.9M, 103 calls).
 - Key swatches in `grove.css` do not match far-tree colours in the renderer.
 - `scripts/check-grove.mjs` looks for "Pause wildlife"; the button says "Pause motion", so its
   pause and reduced-motion checks never run.
-- `views/grove/scene.ts`, `ground.ts`, `animals.ts` are dead apart from type imports.
+- `views/grove/scene.ts`, `ground.ts`, `animals.ts` are dead apart from type imports. The annual renderer
+  (`annual-scene.ts`) is no longer on Home either; `scripts/check-grove*.mjs` still drive the old page.
 
 ## Working rhythm that kept costs down
 
