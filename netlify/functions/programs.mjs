@@ -6,6 +6,10 @@ function asStringArray(value) {
   return Array.isArray(value) ? value.filter(item => typeof item === 'string') : [];
 }
 
+function isoDate(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
 export function createProgramsHandler(deps = {}) {
   return createTasksCollectionHandler({
     prefix: 'programs/',
@@ -18,6 +22,9 @@ export function createProgramsHandler(deps = {}) {
       if (!name) {
         return { error: { code: 'validation_error', message: 'name is required' } };
       }
+      const startsOn = isoDate(body.starts_on);
+      const endsOn = isoDate(body.ends_on);
+      const dated = startsOn && endsOn && endsOn >= startsOn;
       return {
         record: {
           schema_version: 1,
@@ -36,6 +43,8 @@ export function createProgramsHandler(deps = {}) {
           description: typeof body.description === 'string' ? body.description : '',
           registration_link: typeof body.registration_link === 'string' ? body.registration_link : null,
           registration_window: typeof body.registration_window === 'string' ? body.registration_window : '',
+          starts_on: dated ? startsOn : null,
+          ends_on: dated ? endsOn : null,
           not_available_nsw: body.not_available_nsw === true,
           not_available_reason: typeof body.not_available_reason === 'string' ? body.not_available_reason : '',
           created_at: timestamp,
