@@ -99,6 +99,13 @@ const nullableText = z
   .optional()
   .transform((value) => (value ? value : null));
 
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .nullable()
+  .optional()
+  .transform((value) => value ?? null);
+
 const text = z
   .string()
   .optional()
@@ -131,6 +138,16 @@ export const ProgramSchema = z.object({
   registration_window: text,
   not_available_nsw: z.boolean().default(false),
   not_available_reason: text,
+  /**
+   * When it happens this cycle. Both set: it runs from start to end (a pill on a line).
+   * starts_on only: it happens that day. ends_on only: it is due that day, start unknown.
+   */
+  starts_on: isoDate,
+  ends_on: isoDate,
+  /** Page the dates came from, so they can be checked again next year. */
+  dates_source_url: nullableText,
+  /** When someone last confirmed the dates against that page. */
+  dates_checked_on: isoDate,
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -155,7 +172,11 @@ export const ProgramCreateSchema = ProgramSchema.omit({
   registration_link: true,
   registration_window: true,
   not_available_nsw: true,
-  not_available_reason: true
+  not_available_reason: true,
+  starts_on: true,
+  ends_on: true,
+  dates_source_url: true,
+  dates_checked_on: true
 }).extend({
   name: z.string().trim().min(1)
 });

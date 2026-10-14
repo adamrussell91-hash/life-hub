@@ -1,4 +1,5 @@
 import { createTasksCollectionHandler } from './_shared/tasks-collection.mjs';
+import { pickProgramDates, withCatalogueDates } from './_shared/catalogue-dates.mjs';
 
 export const config = { path: '/api/programs' };
 
@@ -13,6 +14,7 @@ export function createProgramsHandler(deps = {}) {
     listKey: 'programs',
     idPrefix: 'prog',
     notFound: 'Program not found',
+    onRead: record => withCatalogueDates(record),
     create(body, id, timestamp) {
       const name = typeof body.name === 'string' ? body.name.trim() : '';
       if (!name) {
@@ -38,6 +40,7 @@ export function createProgramsHandler(deps = {}) {
           registration_window: typeof body.registration_window === 'string' ? body.registration_window : '',
           not_available_nsw: body.not_available_nsw === true,
           not_available_reason: typeof body.not_available_reason === 'string' ? body.not_available_reason : '',
+          ...pickProgramDates(body),
           created_at: timestamp,
           updated_at: timestamp
         }

@@ -11,6 +11,7 @@ import {
 } from '@/schemas/program';
 import { tasksApi } from '@/services/client-api';
 import {
+  programDatesLabel,
   queryPrograms,
   uniqueSorted,
   type ProgramFilters,
@@ -346,6 +347,7 @@ function renderDetail(
     propertyRow('Organiser', program.organiser),
     propertyRow('Location', program.location),
     propertyRow('Month', program.month),
+    propertyRow('Dates', programDatesLabel(program)),
     propertyRow('Age group', program.age_groups.join(', ')),
     propertyRow('Subjects', program.subjects.join(', ')),
     propertyRow('Level', program.competition_level),
@@ -473,6 +475,8 @@ function renderAddForm(
   const cost = createHubField({ ariaLabel: 'Cost' });
   const registrationWindow = createHubField({ ariaLabel: 'Registration window' });
   const link = createHubField({ type: 'url', ariaLabel: 'Registration link' });
+  const startsOn = createHubField({ type: 'date', ariaLabel: 'Starts' });
+  const endsOn = createHubField({ type: 'date', ariaLabel: 'Ends or due' });
   const description = createHubTextarea({
     ariaLabel: 'Description',
     className: 'task-editor__notes'
@@ -494,6 +498,8 @@ function renderAddForm(
     field('Name', name.el),
     type.el,
     month.el,
+    field('Starts', startsOn.el),
+    field('Ends or due', endsOn.el),
     level.el,
     length.el,
     costBasis.el,
@@ -547,7 +553,9 @@ function renderAddForm(
       registration_link: link.input.value.trim() || null,
       registration_window: registrationWindow.input.value.trim(),
       not_available_nsw: nsw.checked,
-      not_available_reason: reason.input.value.trim()
+      not_available_reason: reason.input.value.trim(),
+      starts_on: startsOn.input.value || null,
+      ends_on: endsOn.input.value || null
     };
     const kind = draft.types?.[0];
     showConfirmWrite(
