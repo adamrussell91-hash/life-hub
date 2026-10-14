@@ -151,9 +151,11 @@ export function createWalker(route: Route, ground: Gait, options: {
     const brake = gait.accel * 2.5, window = 0.8;
     let limit = Infinity;
     for (let s = 0; s <= 7; s += 0.5) {
-      // The nearest stretch is measured from where the body faces now, so once it has turned on
-      // the spot at a corner it can walk on.
-      const before = s === 0 ? yaw : route.heading(d + s, window / 2), after = route.heading(d + s + window, window / 2);
+      // The nearest stretch is measured from where the body faces now to the way on it turns to
+      // face, so once it has turned on the spot at a corner it can walk on. (Measuring to a point
+      // further along left a corner between the two that it could never face: it froze mid-leg,
+      // and a bird hung flapping in the air.)
+      const before = s === 0 ? yaw : route.heading(d + s, window / 2), after = s === 0 ? wayOn() : route.heading(d + s + window, window / 2);
       const bend = Math.abs(wrapAngle(after - before));
       const corner = bend > 0.6 ? 0 : bend < 1e-3 ? Infinity : (gait.turn * window) / bend;
       limit = Math.min(limit, Math.sqrt(corner * corner + 2 * brake * s));

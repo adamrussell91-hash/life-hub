@@ -53,7 +53,7 @@ async function start(root: HTMLElement): Promise<void> {
     if (current !== revision) { stage.remove(); return; }
     const [from, to] = weekRange(week, year);
     caption.textContent = weekLine({ week, from, to, trees: data.history.filter((d) => d.week === week).length });
-    const mounted = await mountForest(stage, { year, today: now, history: data.history, animals: data.animals, interactive: false, week, weekSpan: 30 });
+    const mounted = await mountForest(stage, { year, today: now, history: data.history, animals: data.animals, interactive: false, week, weekSpan: 22 });
     if (current !== revision) { mounted.dispose(); stage.remove(); return; }
     const previous = handle;
     handle = mounted;

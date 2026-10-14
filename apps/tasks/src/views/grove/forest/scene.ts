@@ -37,8 +37,17 @@ export type ForestOptions = {
   topInset?: () => number;
   onChange?: (state: ForestState) => void;
   onPick?: (pick: ForestPick | null, x: number, y: number) => void;
+  /** The camera started or stopped following an animal (stops when the map is dragged away). */
+  onFollow?: (animal: ForestAnimal | null) => void;
 };
+export type ForestAnimalEntry = { key: number; animal: ForestAnimal; young: boolean; visible: boolean };
 export type ForestHandle = { expand(week: number): void; showYear(): void; dispose(): void; state(): ForestState;
+  /** Turn the view about its centre (radians; positive turns the island clockwise). */
+  rotate(by: number): void;
+  /** The animals out in the forest, for the animal tray. */
+  animals(): ForestAnimalEntry[];
+  /** Keep an animal in the middle of the view as it moves; null stops. */
+  follow(key: number | null): void;
   /** For check scripts: where each animal is, and a way to run their clock on (seconds, in 1/30 s steps). */
   wildlife(): unknown[]; stepWildlife(seconds: number): void };
 
@@ -88,14 +97,20 @@ const C = {
   floor: new Color('#58a336'), meadow: new Color('#d3e57e'), sand: new Color('#f1e3b0'),
   path: new Color('#e0be82'), cliff: new Color('#f7f1e3'), bank: new Color('#ead9a8'), strata: new Color('#e6d9bd'), bed: new Color('#5cc6b8')
 };
-const STEP = 1.5;
+// Grid vertices are nudged off their lattice, so shores, path edges and week borders come out as
+// irregular facets rather than straight saw-tooth runs along the grid.
+const STEP = 1.2;
+const jitter = (i: number, j: number, k: number) => { const s = Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453; return s - Math.floor(s) - 0.5; };
 function buildGround(): Mesh {
   const positions: number[] = [], colors: number[] = [], weeks: number[] = [];
   const nx = Math.ceil((BOUNDS.halfW * 2) / STEP), nz = Math.ceil((BOUNDS.halfD * 2) / STEP);
-  const vx = (i: number) => -BOUNDS.halfW + i * STEP, vz = (j: number) => -BOUNDS.halfD + j * STEP;
-  const heights: number[] = [];
-  for (let j = 0; j <= nz; j += 1) for (let i = 0; i <= nx; i += 1) heights.push(terrain.height(vx(i), vz(j)));
-  const H = (i: number, j: number) => heights[j * (nx + 1) + i]!;
+  const xs: number[] = [], zs: number[] = [], heights: number[] = [];
+  for (let j = 0; j <= nz; j += 1) for (let i = 0; i <= nx; i += 1) {
+    const x = -BOUNDS.halfW + i * STEP + (i > 0 && i < nx ? jitter(i, j, 1) * STEP * 0.7 : 0);
+    const z = -BOUNDS.halfD + j * STEP + (j > 0 && j < nz ? jitter(i, j, 2) * STEP * 0.7 : 0);
+    xs.push(x); zs.push(z); heights.push(terrain.height(x, z));
+  }
+  const at = (i: number, j: number) => j * (nx + 1) + i;
   const colour = new Color();
   const tint = (x: number, z: number, y: number, slope: number) => {
     if (slope > 1.6 || y < -2) {
@@ -110,28 +125,33 @@ function buildGround(): Mesh {
     colour.lerp(C.floor, planting.density(x, z) * 0.75);
     // Terrace risers inside the map: a creamy earth bank, so each step reads as a little cliff.
     if (slope > 0.35) colour.lerp(C.bank, smoothstep(0.35, 0.95, slope) * 0.85);
-    const p = terrain.pathDistance(x, z);
+    // Path and sand edges wander a little, as worn ground and beaches do.
+    const p = terrain.pathDistance(x, z) + (fbm(x * 0.21, z * 0.21, 15) - 0.5) * 1.4;
     if (p < 1.6) colour.lerp(C.path, smoothstep(1.6, 0.6, p));
     const r = terrain.riverDistance(x, z);
     const shore = Math.min(r.d - terrain.RIVER_WIDTH, terrain.lakeDistance(x, z));
-    if (shore < 2.2) colour.lerp(C.sand, smoothstep(2.2, 0.4, shore));
+    const beach = shore + (fbm(x * 0.17, z * 0.17, 19) - 0.5) * 2.2;
+    if (beach < 2.2) colour.lerp(C.sand, smoothstep(2.2, 0.4, beach));
     if (shore < 0) colour.copy(C.bed);
   };
   for (let j = 0; j < nz; j += 1) for (let i = 0; i < nx; i += 1) {
-    const quad = [[i, j], [i, j + 1], [i + 1, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]] as const;
+    // Alternate the diagonal, so no long straight seam runs across the map.
+    const quad = (i + j) % 2
+      ? [[i, j], [i, j + 1], [i + 1, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]] as const
+      : [[i, j], [i, j + 1], [i + 1, j + 1], [i, j], [i + 1, j + 1], [i + 1, j]] as const;
     for (let t = 0; t < 2; t += 1) {
-      const tri = quad.slice(t * 3, t * 3 + 3);
-      const ys = tri.map(([a, b]) => H(a, b));
+      const tri = quad.slice(t * 3, t * 3 + 3).map(([a, b]) => at(a, b));
+      const ys = tri.map((k) => heights[k]!);
       if (ys.every((y) => y <= -8.9)) continue;
-      const cx = tri.reduce((s, [a]) => s + vx(a), 0) / 3, cz = tri.reduce((s, [, b]) => s + vz(b), 0) / 3;
+      const cx = tri.reduce((s, k) => s + xs[k]!, 0) / 3, cz = tri.reduce((s, k) => s + zs[k]!, 0) / 3;
       // Bed well inside the river or lake is hidden under opaque water: don't draw it.
       if (Math.min(terrain.riverDistance(cx, cz).d - terrain.RIVER_WIDTH, terrain.lakeDistance(cx, cz)) < 0 && land(cx, cz) > 3) continue;
       const cy = ys.reduce((s, y) => s + y, 0) / 3;
       const slope = (Math.max(...ys) - Math.min(...ys)) / STEP;
       tint(cx, cz, cy, slope);
       const week = cells[owner(cells, cx, cz).cell]!.index;
-      tri.forEach(([a, b], k) => {
-        positions.push(vx(a), ys[k]!, vz(b));
+      tri.forEach((k, v) => {
+        positions.push(xs[k]!, ys[v]!, zs[k]!);
         colors.push(colour.r, colour.g, colour.b);
         weeks.push(week);
       });
@@ -166,7 +186,8 @@ function buildWater(): Group {
   const positions: number[] = [], colors: number[] = [];
   const deep = new Color('#2fb3c6'), foam = new Color('#f2fdff');
   const pts = terrain.river;
-  const w = terrain.RIVER_WIDTH + 0.6;
+  // Wide enough to tuck under the meandering bank (map.ts), so the bank, not the ribbon, draws the shore.
+  const w = terrain.RIVER_WIDTH + 1.8;
   const first = pts.findIndex((p) => land(p.x, p.z) > 3);
   let last = first;
   while (last + 1 < pts.length && land(pts[last + 1]!.x, pts[last + 1]!.z) > 1.5) last += 1;
@@ -174,10 +195,16 @@ function buildWater(): Group {
   // away from the sun read grey. Each runs from clear aqua at the lip to white foam at the foot.
   const fallPositions: number[] = [], fallColors: number[] = [];
   const lip = new Color('#7fe0ea'), white = new Color('#ffffff'), c = new Color();
-  const ribbon = (a: { x: number; z: number }, b: { x: number; z: number }, ya: number, yb: number) => {
-    const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz) || 1;
-    const nx = (-dz / len) * w, nz = (dx / len) * w;
-    const quad = [[a.x - nx, ya, a.z - nz], [b.x - nx, yb, b.z - nz], [a.x + nx, ya, a.z + nz], [a.x + nx, ya, a.z + nz], [b.x - nx, yb, b.z - nz], [b.x + nx, yb, b.z + nz]];
+  type Side = { x: number; z: number };
+  const sideOf = (from: { x: number; z: number }, to: { x: number; z: number }): Side => {
+    const dx = to.x - from.x, dz = to.z - from.z, len = Math.hypot(dx, dz) || 1;
+    return { x: (-dz / len) * w, z: (dx / len) * w };
+  };
+  // Each point's sideways reach follows the river's direction through it, so neighbouring segments
+  // share their edges: no slivers of sky open on the outside of a bend.
+  const sideAt = (i: number) => sideOf(pts[Math.max(0, i - 1)]!, pts[Math.min(pts.length - 1, i + 1)]!);
+  const ribbon = (a: { x: number; z: number }, b: { x: number; z: number }, ya: number, yb: number, sa = sideOf(a, b), sb = sa) => {
+    const quad = [[a.x - sa.x, ya, a.z - sa.z], [b.x - sb.x, yb, b.z - sb.z], [a.x + sa.x, ya, a.z + sa.z], [a.x + sa.x, ya, a.z + sa.z], [b.x - sb.x, yb, b.z - sb.z], [b.x + sb.x, yb, b.z + sb.z]];
     const step = Math.abs(ya - yb) > 0.2;
     for (const [x, y, z] of quad) {
       if (step) {
@@ -191,7 +218,7 @@ function buildWater(): Group {
       }
     }
   };
-  for (let i = Math.max(0, first); i < last; i += 1) ribbon(pts[i]!, pts[i + 1]!, pts[i]!.level, pts[i + 1]!.level);
+  for (let i = Math.max(0, first); i < last; i += 1) ribbon(pts[i]!, pts[i + 1]!, pts[i]!.level, pts[i + 1]!.level, sideAt(i), sideAt(i + 1));
   // Spring at the top: a little pool. Fall at the bottom: a curved sheet over the cliff, streaked,
   // widening a little as it drops, with a puff of spray at its foot.
   const end = pts[last]!, beyond = pts[Math.min(pts.length - 1, last + 2)]!;
@@ -566,8 +593,12 @@ renderer.shadowMap.autoUpdate = false;
 let frame = 0;
 function draw(): void {
   if (disposed) return;
-  sun.target.position.copy(controls.target);
-  sun.position.copy(controls.target).add(new Vector3(-70, 140, 60));
+  // The sun follows the view only when the shadow map is redrawn with it; frames that just track a
+  // moving animal leave both alone (the shadow camera covers the whole island either way).
+  if (renderer.shadowMap.needsUpdate) {
+    sun.target.position.copy(controls.target);
+    sun.position.copy(controls.target).add(new Vector3(-70, 140, 60));
+  }
   renderer.render(scene, camera);
   stage.dataset.ready = 'true';
   stage.dataset.trees = String(planting.trees.length);
@@ -582,8 +613,14 @@ function render(): void {
   if (frame || disposed) return;
   frame = requestAnimationFrame(() => { frame = 0; draw(); });
 }
+let following: number | null = null, dragging = false;
+const followAt = new Vector3();
+controls.addEventListener('start', () => { dragging = true; });
+controls.addEventListener('end', () => { dragging = false; });
 controls.addEventListener('change', () => {
   const t = controls.target;
+  // Panning away from a followed animal lets it go; zooming and turning keep it in view.
+  if (following != null && dragging && t.distanceTo(followAt) > 0.05) stopFollowing();
   const cx = Math.max(-BOUNDS.halfW + 10, Math.min(BOUNDS.halfW - 10, t.x)), cz = Math.max(-BOUNDS.halfD + 10, Math.min(BOUNDS.halfD - 10, t.z));
   if (cx !== t.x || cz !== t.z) { camera.position.x += cx - t.x; camera.position.z += cz - t.z; t.x = cx; t.z = cz; }
   schedulePartition();
@@ -624,6 +661,7 @@ function ease(toTarget: Vector3, toZoom: number, instant = false): void {
 function expand(cellIndex: number, instant = false): void {
   const cell = cells[cellIndex]!;
   if (!cell.week) return;
+  stopFollowing();
   const trees = planting.trees.filter((t) => t.week === cell.week);
   const [from, to] = weekRange(cell.week, year);
   announce({ year, week: cell.week, from, to, trees: trees.length, future: cell.week > builtWeeks, builtWeeks, animals: animals?.count ?? 0 });
@@ -659,7 +697,7 @@ const onUp = (e: PointerEvent) => {
   const r = renderer.domElement.getBoundingClientRect();
   raycaster.setFromCamera(new Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
   const beast = animals?.pick(raycaster);
-  if (beast && selection.value >= 0) { options.onPick?.({ kind: 'animal', animal: beast }, e.clientX, e.clientY); return; }
+  if (beast) { options.onPick?.({ kind: 'animal', animal: beast }, e.clientX, e.clientY); return; }
   const hit = raycaster.intersectObjects([ground, ...pickTrees.filter((p) => p.mesh.visible).map((p) => p.mesh)], false)[0];
   if (!hit) return;
   const tree = pickTrees.find((p) => p.mesh === hit.object);
@@ -745,17 +783,87 @@ function tick(now: number): void {
   const delta = Math.min(0.1, (now - last) / 1000);
   last = now;
   animals.update(delta);
-  if (!frame) draw();
+  if (following != null) {
+    trackFollowed(1 - Math.exp(-delta * 4));
+    followPartition += delta;
+    if (followPartition > 0.8) { followPartition = 0; partition(); }
+  } else if (!frame) draw();
 }
 if (animals && !still.matches) loop = requestAnimationFrame(tick);
 const onMotion = () => { if (!still.matches && !loop && animals) { last = performance.now(); loop = requestAnimationFrame(tick); } };
 still.addEventListener('change', onMotion);
 
+// ---------- Turning the view ----------
+const turnAxis = new Vector3(0, 1, 0);
+function rotate(by: number): void {
+  const offset = camera.position.clone().sub(controls.target);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const start = performance.now();
+  let done = 0;
+  const step = (now: number) => {
+    if (disposed) return;
+    const f = reduce ? 1 : Math.min(1, (now - start) / 450);
+    const t = 1 - Math.pow(1 - f, 3);
+    camera.position.copy(controls.target).add(offset.clone().applyAxisAngle(turnAxis, -by * t));
+    camera.lookAt(controls.target);
+    done = t;
+    controls.update();
+    render();
+    if (done < 1) requestAnimationFrame(step);
+    else schedulePartition();
+  };
+  requestAnimationFrame(step);
+}
+
+// ---------- Following an animal ----------
+let followZoom = 1, followPartition = 0;
+function stopFollowing(): void {
+  if (following == null) return;
+  following = null;
+  controls.zoomToCursor = true;
+  schedulePartition();
+  render();
+  options.onFollow?.(null);
+}
+function follow(key: number | null): void {
+  if (key == null || !animals) { stopFollowing(); return; }
+  const entry = animals.list().find((a) => a.key === key);
+  if (!entry) return;
+  // A week view shows only its own animals: step back out to the year so this one is out.
+  if (!entry.visible) showYear();
+  following = key;
+  // Close enough to see legs move: about 28 screen pixels a map unit (or as close as the map allows).
+  followZoom = Math.min(controls.maxZoom, Math.max(camera.zoom, (28 * (camera.top - camera.bottom)) / (stage.clientHeight || 1)));
+  // Zooming about the cursor would pull the view off the animal.
+  controls.zoomToCursor = false;
+  options.onFollow?.(entry.animal);
+  if (still.matches || !loop) trackFollowed(1);
+}
+/** Move the view towards the followed animal; `blend` 1 lands on it. */
+function trackFollowed(blend: number): void {
+  if (following == null || !animals) return;
+  const p = animals.position(following);
+  if (!p) { stopFollowing(); return; }
+  const t = controls.target, before = t.clone();
+  t.lerp(new Vector3(p.x, p.y, p.z), blend);
+  camera.position.add(t.clone().sub(before));
+  followAt.copy(t);
+  if (Math.abs(camera.zoom - followZoom) > 0.001) {
+    camera.zoom = lerp(camera.zoom, followZoom, blend);
+    camera.updateProjectionMatrix();
+  }
+  if (blend >= 1) { renderer.shadowMap.needsUpdate = true; partition(); }
+  draw();
+}
+
 function handle(): ForestHandle {
   return {
     expand: (week: number) => { const cell = cells.find((c) => c.week === week); if (cell) expand(cell.index); },
-    showYear: backToYear,
+    showYear: () => { stopFollowing(); backToYear(); },
     state: () => current,
+    rotate,
+    animals: () => (animals?.list() ?? []).map(({ key, animal, young, visible }) => ({ key, animal, young, visible })),
+    follow,
     wildlife: () => (animals?.report() ?? []).map((a) => {
       const p = new Vector3(a.x, a.y, a.z).project(camera);
       return { ...a, sx: ((p.x + 1) / 2) * stage.clientWidth, sy: ((1 - p.y) / 2) * stage.clientHeight };
