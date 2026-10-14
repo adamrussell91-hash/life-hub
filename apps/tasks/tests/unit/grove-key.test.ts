@@ -2,31 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { animalGlyph, groveKey } from '@/views/grove/forest/key';
-import { COMPANION_MODELS } from '@/domain/grove/companions';
-import { WILDLIFE_MODEL, WILDLIFE_REASON, type WildlifeSpecies } from '@/domain/grove/wildlife';
+import { FOREST_WILDLIFE } from '@/domain/grove/forest-wildlife';
 
 const section = (title: string) => groveKey().find((s) => s.title === title)!;
 
 describe('Grove key', () => {
-  it('says how every earned animal is won, in the words the forest uses', () => {
-    const animals = section('Animals').entries;
-    const species = Object.keys(WILDLIFE_REASON) as WildlifeSpecies[];
-    expect(animals).toHaveLength(species.length);
-    for (const s of species) expect(animals.some((e) => e.meaning.startsWith(WILDLIFE_REASON[s]))).toBe(true);
-    expect(animals.find((e) => e.name === 'Hare')!.meaning).toMatch(/young one/);
-    expect(animals.find((e) => e.name === 'Fox')!.meaning).not.toMatch(/young one/);
+  const animals = () => ['Small animals', 'Medium animals', 'Large animals'].flatMap((t) => section(t).entries);
+
+  it('lists every animal with the milestone that brings it, in the words the forest uses', () => {
+    expect(animals()).toHaveLength(FOREST_WILDLIFE.length);
+    for (const rule of FOREST_WILDLIFE) expect(animals().find((e) => e.name === rule.name)!.meaning.startsWith(rule.reason)).toBe(true);
+    expect(animals().find((e) => e.name === 'Hare')!.meaning).toBe('A day with five finished tasks: one for every 4. Earn two and a young one follows the first.');
+    expect(animals().find((e) => e.name === 'Raccoon')!.meaning).toBe('A completed competition brings one.');
+    expect(animals().find((e) => e.name === 'Fox')!.meaning).not.toMatch(/young one/);
   });
 
-  it('names every visitor and the animal that brings it', () => {
-    const visitors = section('Visitors').entries;
-    const models = Object.values(COMPANION_MODELS).flat();
-    expect(visitors.map((v) => v.name).join(' ')).toContain('Bear, Boar or Wolf');
-    expect(visitors.find((v) => v.name === 'Otter')!.meaning).toBe('Can visit once you have a Mallard.');
-    expect(models.every((m) => animalGlyph(m) !== '🐾')).toBe(true);
+  it('gives every animal a picture, and no section names a visitor or companion', () => {
+    expect(FOREST_WILDLIFE.every((r) => animalGlyph(r.model) !== '🐾')).toBe(true);
+    expect(groveKey().map((s) => s.title).join(' ')).not.toMatch(/Visitors|Companions/);
   });
 
   it('gives every animal model a picture', () => {
-    for (const model of Object.values(WILDLIFE_MODEL)) expect(animalGlyph(model)).not.toBe('🐾');
     expect(animalGlyph('animal-unknown', 'owl')).toBe('🦉');
   });
 

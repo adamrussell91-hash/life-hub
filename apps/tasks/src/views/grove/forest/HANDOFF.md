@@ -200,6 +200,26 @@ Triangles and draw calls unchanged (3.9M, 103 calls).
 - Check-script hooks: `handle.wildlife()` (positions, screen points, clip, speed) and
   `handle.stepWildlife(seconds)` (headless software GL runs about 1.5 frames a second).
 
+## Round eight: every animal independent, and it comes again
+
+- **Rules** (`FOREST_WILDLIFE` in `domain/grove/forest-wildlife.ts`): each of the 20 models has its own
+  milestone and `every` (one animal per `every` qualifying events). No companions or visitors: nothing
+  arrives with or follows anything else (young hares and does still follow their parent). Adam's mapping:
+  small: hare every 4th five-task day, rabbit 15 Life, robin 10 Health, chipmunk 15 Wedding, squirrel 75
+  Teaching, skunk 25 other-area tasks; medium: owl every 2nd book, mallard every 3rd 20-task week, otter
+  each 30-task week, fox each ended term, forest fox each holiday with work in it, raccoon each competition,
+  doe every 8th full week, deer every 10th competition; large: moose each project, forest stag every 10th
+  project, bear each excursion, boar every 5th excursion, wolf 50 Life, stag 250 tasks of any kind.
+- **Projects, competitions, excursions** (`forestEvents`): completed Tasks-hub projects, dated by when they
+  were last saved (closing saves them). An excursion linked to a catalogue entry typed Competition is a
+  competition. History years may list `projects`, `competitions` and `excursions` dates (repeats allowed);
+  history owns the days its weeks cover and the hub adds anything after.
+- **History import** is back, at the bottom of the key panel ("Your history"). It replaces the whole file.
+- **Count with real data** (2026 history plus Adam's 8 competitions, 3 projects, 3 excursions, 14 Oct):
+  60 animals and 2 young. `MAX_FOREST_ANIMALS` is 64: over it, the latest repeats of the most numerous
+  animal go first and every animal's first stays. Not yet measured on a phone at this count.
+- The older annual renderer still uses `wildlifeMilestones` and `companions.ts`, unchanged.
+
 ## Known gaps, in order
 
 1. **Phone budget, if real devices still struggle (now 1.45M with real data):** the heaviest LOD trees are tree-late-1/2/4

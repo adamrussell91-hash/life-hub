@@ -1,11 +1,10 @@
 /**
  * The forest's key: what each tree, animal and piece of land stands for, and how animals are earned.
- * Built from the same rules that grow the forest (wildlife.ts, companions.ts, planting.ts), so the key
+ * Built from the same rules that grow the forest (forest-wildlife.ts, planting.ts), so the key
  * cannot drift from what is drawn.
  */
-import { COMPANION_MODELS } from '@/domain/grove/companions';
-import { WILDLIFE_REASON, type WildlifeSpecies } from '@/domain/grove/wildlife';
-import { ANIMAL_NAME, modelName } from './data';
+import { FOREST_WILDLIFE, hasYoung, type ForestWildlifeRule } from '@/domain/grove/forest-wildlife';
+import type { WildlifeSpecies } from '@/domain/grove/wildlife';
 
 export type KeyEntry = { name: string; meaning: string; glyph?: string; preview?: string };
 export type KeySection = { title: string; lede?: string; entries: KeyEntry[] };
@@ -24,21 +23,13 @@ export function animalGlyph(model: string, species?: WildlifeSpecies): string {
   return GLYPH[model] ?? (species ? SPECIES_GLYPH[species] : '🐾');
 }
 
-const ORDER: WildlifeSpecies[] = ['hare', 'robin', 'squirrel', 'deer', 'mallard', 'fox', 'owl'];
-const BABIES = new Set<WildlifeSpecies>(['hare', 'deer']);
-const list = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`);
 const preview = (name: string) => `previews/${name}.png`;
+const meaning = (rule: ForestWildlifeRule) =>
+  `${rule.reason}${rule.every === 1 ? ' brings one' : `: one for every ${rule.every}`}.${hasYoung(rule.model) ? ' Earn two and a young one follows the first.' : ''}`;
+const animalsOf = (size: ForestWildlifeRule['size']): KeyEntry[] =>
+  FOREST_WILDLIFE.filter((r) => r.size === size).map((rule) => ({ name: rule.name, glyph: animalGlyph(rule.model, rule.habit), meaning: meaning(rule) }));
 
 export function groveKey(): KeySection[] {
-  const animals: KeyEntry[] = ORDER.map((species) => ({
-    name: ANIMAL_NAME[species],
-    glyph: SPECIES_GLYPH[species],
-    meaning: `${WILDLIFE_REASON[species]}.${BABIES.has(species) ? ' Earn it again and a young one follows.' : ''}`
-  }));
-  const visitors: KeyEntry[] = ORDER.filter((s) => COMPANION_MODELS[s]?.length).map((species) => {
-    const models = COMPANION_MODELS[species]!;
-    return { name: list(models.map(modelName)), glyph: animalGlyph(models[0]!), meaning: `Can visit once you have a ${ANIMAL_NAME[species]}.` };
-  });
   return [
     {
       title: 'Trees',
@@ -53,8 +44,9 @@ export function groveKey(): KeySection[] {
         { name: 'Sapling, young, grown', meaning: 'A tree is a sapling for its first 4 days, young until day 12, then fully grown.', preview: preview('tree-life-1-sapling') }
       ]
     },
-    { title: 'Animals', lede: 'Real milestones bring animals. Each lives in the week it was earned.', entries: animals },
-    { title: 'Visitors', lede: 'Each day two visitors come, chosen from the animals you have earned.', entries: visitors },
+    { title: 'Small animals', lede: 'Every animal has its own milestone and comes again each time you repeat it. Each lives in the week it was earned.', entries: animalsOf('small') },
+    { title: 'Medium animals', entries: animalsOf('medium') },
+    { title: 'Large animals', entries: animalsOf('large') },
     {
       title: 'The island',
       entries: [

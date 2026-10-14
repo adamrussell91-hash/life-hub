@@ -10,8 +10,9 @@ import { toHubDateKey } from '@/domain/queries';
 import { hashQuery } from '@/shell/shell';
 import { TASKS_CHANGED, TASKS_DELETED } from '@/services/task-cache';
 import { renderLoadError } from '@/views/feedback';
-import { WILDLIFE_MODEL } from '@/domain/grove/wildlife';
+import { tasksApi } from '@/services/client-api';
 import { groveAssetUrl } from './asset-url';
+import { createGroveHistoryImport } from './history-import';
 import { loadForest } from './forest/load';
 import { weekOfDay } from './forest/history';
 import { animalGlyph, groveKey } from './forest/key';
@@ -60,8 +61,6 @@ function iconButton(className: string, label: string, icon: string): HTMLButtonE
   return button;
 }
 
-/** Earned in its own right, or one of the day's visitors that came with an earned animal. */
-const isVisitor = (animal: ForestAnimal) => animal.model !== WILDLIFE_MODEL[animal.species];
 const animalLabel = (animal: ForestAnimal, young: boolean) => `${animal.name}${young ? ' and young' : ''}`;
 
 export async function renderGroveView(canvas: HTMLElement): Promise<void> {
@@ -154,7 +153,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
       button.title = `Follow the ${label.toLowerCase()}`;
       const text = el('span', 'grove-tray__text');
       const week = weekOfDay(entry.animal.earnedOn, route.year);
-      text.append(el('strong', '', label), el('small', '', isVisitor(entry.animal) ? 'Visiting today' : `Week ${week} · ${entry.animal.reason}`));
+      text.append(el('strong', '', label), el('small', '', `Week ${week} · ${entry.animal.reason}`));
       button.append(el('span', 'grove-tray__glyph', animalGlyph(entry.animal.model, entry.animal.species)), text);
       button.addEventListener('click', () => {
         closeCard();
@@ -209,6 +208,13 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
       block.append(list);
       body.append(block);
     }
+    const history = el('section', 'grove-key__section');
+    history.append(
+      el('h3', 'grove-key__heading', 'Your history'),
+      el('p', 'grove-key__lede', 'Weeks before the Tasks hub, books, projects, competitions and excursions come from your private history file. Importing a file replaces the saved one.'),
+      createGroveHistoryImport(tasksApi.updateHubPrefs, () => void renderGroveView(canvas), () => gen === generation)
+    );
+    body.append(history);
     keyPanel.replaceChildren(head, body);
   }
   function setKey(open: boolean): void {
