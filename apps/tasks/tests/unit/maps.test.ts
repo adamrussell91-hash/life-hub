@@ -667,3 +667,75 @@ describe('strand extents', () => {
     }
   });
 });
+
+describe('screenshot regressions (Expression gallery, Reasoning olympiad)', () => {
+  function comp(id: string, label: string, attach: MapTick['attach'], startsOn: string): MapTick {
+    return {
+      id,
+      label,
+      attach,
+      stroke: 'solid',
+      connects_to: null,
+      starts_on: startsOn,
+      ends_on: null,
+      link: null,
+      planning: 'planned',
+      all_year: false
+    };
+  }
+
+  function program(id: string, lineId: string, label: string, startsOn: string, endsOn: string, track: string): MapStation {
+    return { ...datedProgram(id, label, startsOn, endsOn, { tracks: [track] }), line_id: lineId };
+  }
+
+  it('puts a first-year-line program competition on the outside, joined to its program, without bending neighbours', () => {
+    const base = mindWorks2026Map();
+    const map = {
+      ...base,
+      stations: [
+        program('st_y8', 'line_expression', 'StudioGAT Year 8', '2026-01-27', '2026-07-10', 'junior'),
+        program('st_y7', 'line_expression', 'StudioGAT Year 7', '2026-07-27', '2026-12-10', 'junior')
+      ],
+      ticks: [
+        comp('tk_gallery', 'StudioGAT Gallery (Year 8)', { kind: 'station', station_id: 'st_y8', side: 'right', offset: 0.5 }, '2026-07-23')
+      ]
+    };
+    const layout = layoutMap(map);
+    const tracks = layout.draw.tracks.filter((track) => track.lineId === 'line_expression');
+    for (const track of tracks.slice(1)) {
+      const xs = track.pieces.flat().map((point) => point.x);
+      expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(0.5);
+    }
+    const stop = layout.draw.stops.find((item) => item.tickId === 'tk_gallery')!;
+    expect(stop.anchor).toBe('end');
+    expect(stop.dots[0]!.x).toBeLessThan(tracks[0]!.top.x);
+    // A short branch runs from the Year 8 pill to the stop.
+    const y8 = layout.stations.find((station) => station.id === 'st_y8')!;
+    const branch = layout.draw.branches.find((item) => item.lineId === 'line_expression' && !item.dotted)!;
+    expect(branch).toBeTruthy();
+    expect(branch.points[0]!.y).toBeGreaterThanOrEqual(y8.y);
+    expect(branch.points[0]!.y).toBeLessThanOrEqual(y8.y + y8.h);
+    expect(Math.max(...branch.points.map((point) => point.y))).toBeGreaterThanOrEqual(stop.y);
+  });
+
+  it('keeps a tall name clear of a program pill that starts just below its stop', () => {
+    const base = mindWorks2026Map();
+    const map = {
+      ...base,
+      stations: [program('st_tft', 'line_reasoning', 'Teachers for Tomorrow', '2026-07-20', '2026-12-10', 'senior')],
+      ticks: [
+        comp(
+          'tk_ipo',
+          'International Psychology Olympiad Global',
+          { kind: 'line', line_id: 'line_reasoning', y: 200, tracks: ['senior'] },
+          '2026-07-11'
+        )
+      ]
+    };
+    const layout = layoutMap(map);
+    const stop = layout.draw.stops.find((item) => item.tickId === 'tk_ipo')!;
+    const pill = layout.stations.find((station) => station.id === 'st_tft')!.bodies[0]!;
+    expect(stop.labelY - 12 + stop.h).toBeGreaterThan(pill.y);
+    expect(stop.labelX).toBeGreaterThanOrEqual(pill.x + pill.w / 2 + 8);
+  });
+});
