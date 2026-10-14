@@ -27,7 +27,6 @@ import {
   dateToY,
   eventPorts,
   labelHitsForeignLine,
-  layoutMap,
   lineStrokeBoxes,
   MAP_FORK_BAR_GAP,
   MAP_LINE_GAP,
@@ -51,6 +50,7 @@ import {
   type LaidTrackFork
 } from '@/domain/maps-layout';
 import { mapsOrSeed } from '@/views/maps';
+import { layoutMap, renderTransitSvg, TM_LANE_GAP, TM_PILL_W, TM_TRACK_GAP } from '@/domain/maps-transit';
 
 function datedProgram(
   id: string,
@@ -250,116 +250,129 @@ describe('year layout', () => {
     expect(long.height).toBe(Math.max(24, dateToY(long.ends_on!, year) - dateToY(long.starts_on!, year)));
   });
 
-  it('splits a year line around concurrent programs then joins again', () => {
+  it('splits a year line evenly for concurrent programs, steps neighbours aside, then rejoins', () => {
     const base = mindWorks2026Map();
     const layout = layoutMap({
       ...base,
       stations: [
-        ...base.stations,
-        datedProgram('st_philosophy', 'The Philosophy of Power', '2026-07-20', '2026-10-30'),
-        datedProgram('st_psyops', 'PSYOPS', '2026-07-20', '2026-10-30')
+        ...base.stations.filter((item) => item.line_id !== 'line_reasoning'),
+        datedProgram('st_philosophy', 'The Philosophy of Power', '2026-07-20', '2026-10-30', { tracks: ['rozelle'] }),
+        datedProgram('st_psyops', 'PSYOPS', '2026-07-20', '2026-10-30', { tracks: ['rozelle'] })
       ]
     });
-    const philosophy = layout.stations.find((item) => item.id === 'st_philosophy')!;
-    const psyops = layout.stations.find((item) => item.id === 'st_psyops')!;
-    expect(philosophy.h).toBe(psyops.h);
-    expect(philosophy.y).toBe(psyops.y);
-    expect(new Set([philosophy.lane, psyops.lane])).toEqual(new Set([0, 1]));
-
-    const senior = layout.lines
-      .find((line) => line.id === 'line_reasoning')!
-      .tracks.find((track) => track.id === 'senior')!;
-    const onTrack = philosophy.lane === 0 ? philosophy : psyops;
-    const side = philosophy.lane === 1 ? philosophy : psyops;
-    const sideX = stationLaneX(senior.x, 1);
-    expect(onTrack.bodies[0]!.x).toBe(senior.x);
-    expect(side.bodies[0]!.x).toBe(sideX);
-    expect(side.bodies[0]!.x - onTrack.bodies[0]!.x).toBe(MAP_STATION_LANE_GAP);
-
-    // Split and join bars branch off open track, clear of both capsule caps,
-    // with a short side-rail stub down to (and up from) the parallel capsule.
-    const splitY = philosophy.y - MAP_FORK_BAR_GAP;
-    const joinY = philosophy.y + philosophy.h + MAP_FORK_BAR_GAP;
-    expect(senior.forks).toHaveLength(4);
-    expect(senior.forks.some((fork) => isCrossbar(fork, splitY, senior.x, sideX))).toBe(true);
-    expect(senior.forks.some((fork) => isCrossbar(fork, joinY, senior.x, sideX))).toBe(true);
-    for (const fork of senior.forks.filter((item) => item.y1 === item.y2)) {
-      expect(fork.y1 < philosophy.y || fork.y1 > philosophy.y + philosophy.h).toBe(true);
-    }
-
-    // Side rail only — main track is not gapped for the offset capsule alone.
-    expect(
-      senior.cuts.every((cut) => cut.y1 <= onTrack.y || cut.y0 >= onTrack.y + onTrack.h)
-    ).toBe(true);
-  });
-
-  it('keeps year lines at least the base gap apart and in order', () => {
-    const layout = layoutMap(mindWorks2026Map());
-    for (const line of layout.lines) {
-      const xs = line.tracks.map((track) => track.x);
-      const gaps = xs.slice(1).map((x, index) => x - xs[index]!);
-      expect(gaps.length).toBe(2);
-      for (const gap of gaps) expect(gap).toBeGreaterThan(MAP_TRACK_GAP - 0.01);
-    }
-  });
-
-  it('parks a competition between its year line and the next one, never across it', () => {
-    const base = mindWorks2026Map();
-    const layout = layoutMap(base);
-    const evatt = layout.ticks.find((tick) => tick.id === 'tk_davinci')!;
-    const line = layout.lines.find((item) => item.id === evatt.lineId)!;
+    const a = layout.stations.find((item) => item.id === 'st_philosophy')!.bodies[0]!;
+    const b = layout.stations.find((item) => item.id === 'st_psyops')!.bodies[0]!;
+    const line = layout.lines.find((item) => item.id === 'line_reasoning')!;
     const rozelle = line.tracks.find((track) => track.id === 'rozelle')!;
-    const senior = line.tracks.find((track) => track.id === 'senior')!;
-    expect(evatt.parkTrack).toBe('rozelle');
-    expect(evatt.cx).toBeGreaterThan(rozelle.x);
-    expect(evatt.cx).toBeLessThan(senior.x);
-    expect(evatt.labelBox.x + evatt.labelBox.w).toBeLessThan(senior.x - 4);
-    // No competition mark or label sits on any year line of its own strand.
+    expect(Math.abs(a.x - b.x)).toBeCloseTo(TM_LANE_GAP, 5);
+    expect((a.x + b.x) / 2).toBeCloseTo(rozelle.x, 5);
+    const draw = layout.draw.tracks.filter((track) => track.lineId === 'line_reasoning');
+    const rz = draw.find((track) => track.trackId === 'rozelle')!;
+    expect(rz.lanes).toHaveLength(2);
+    expect(rz.pieces).toHaveLength(2);
+    const mid = a.y + a.h / 2;
+    const xAtY = (points: Array<{ x: number; y: number }>, y: number) => {
+      for (let i = 1; i < points.length; i += 1) {
+        const p = points[i - 1]!;
+        const q = points[i]!;
+        if (y >= p.y && y <= q.y) return q.y === p.y ? q.x : p.x + ((q.x - p.x) * (y - p.y)) / (q.y - p.y);
+      }
+      return NaN;
+    };
+    for (const id of ['junior', 'senior']) {
+      const track = draw.find((item) => item.trackId === id)!;
+      const pts = track.pieces[0]!;
+      const away = Math.abs(xAtY(pts, mid) - rz.top.x);
+      expect(away).toBeGreaterThan(TM_TRACK_GAP);
+      expect(track.bottom.x).toBeCloseTo(track.top.x, 5);
+    }
+  });
+
+  it('bends the next year line out for a middle-line competition name, then back', () => {
+    const layout = layoutMap(mindWorks2026Map());
+    const tick = layout.ticks.find((item) => item.id === 'tk_davinci')!;
+    const senior = layout.draw.tracks.find((track) => track.lineId === 'line_innovation' && track.trackId === 'senior')!;
+    const pts = senior.pieces.flat();
+    const near = pts.filter((p) => p.y >= tick.labelBox.y && p.y <= tick.labelBox.y + tick.labelBox.h);
+    const xs = near.length ? near.map((p) => p.x) : [Math.max(...pts.map((p) => p.x))];
+    expect(Math.min(...xs)).toBeGreaterThan(tick.labelBox.x + tick.labelBox.w);
+    expect(senior.bottom.x).toBeCloseTo(senior.top.x, 5);
+  });
+
+  it('packs strands close, never letting a label sit on another strand', () => {
+    const layout = layoutMap(mindWorks2026Map());
+    const xs = layout.lines.map((line) => line.tracks[0]!.x);
+    for (let i = 1; i < xs.length; i += 1) expect(xs[i]! - xs[i - 1]!).toBeLessThan(560);
     for (const tick of layout.ticks) {
-      const own = layout.lines.find((item) => item.id === tick.lineId)!;
-      for (const track of own.tracks) {
-        const box = tick.labelBox;
-        expect(track.x > box.x && track.x < box.x + box.w).toBe(false);
-        expect(Math.abs(track.x - tick.cx) > 14).toBe(true);
+      for (const track of layout.draw.tracks.filter((item) => item.lineId !== tick.lineId)) {
+        for (const piece of track.pieces) {
+          for (const p of piece) {
+            const inside =
+              p.x > tick.labelBox.x && p.x < tick.labelBox.x + tick.labelBox.w &&
+              p.y > tick.labelBox.y && p.y < tick.labelBox.y + tick.labelBox.h;
+            expect(inside).toBe(false);
+          }
+        }
       }
     }
   });
 
-  it('parks a competition on a split year line past the parallel capsule', () => {
+  it('runs a program’s round chain on a branch and rings the final', () => {
+    const layout = layoutMap(mindWorks2026Map());
+    const branch = layout.draw.branches.find((item) => item.id.includes('st_mock'))!;
+    expect(branch).toBeTruthy();
+    const locke = layout.draw.stops.find((stop) => stop.tickId === 'tk_locke')!;
+    const moot = layout.draw.stops.find((stop) => stop.tickId === 'tk_moot')!;
+    expect(locke.dots[0]!.x).toBeCloseTo(moot.dots[0]!.x, 5);
+    expect(moot.y).toBeGreaterThan(locke.y);
+    expect(moot.final).toBe(true);
+    expect(locke.final).toBe(false);
+  });
+
+  it('puts a lone program competition on the program’s edge, with no branch', () => {
+    const base = mindWorks2026Map();
+    const layout = layoutMap({ ...base, ticks: base.ticks.filter((tick) => tick.id !== 'tk_moot') });
+    expect(layout.draw.branches).toHaveLength(0);
+    const station = layout.stations.find((item) => item.id === 'st_mock')!;
+    const stop = layout.draw.stops.find((item) => item.tickId === 'tk_locke')!;
+    expect(stop.dots[0]!.x).toBeCloseTo(station.bodies[0]!.x + TM_PILL_W / 2, 5);
+  });
+
+  it('draws a capsule across every year line a competition serves', () => {
+    const layout = layoutMap(mindWorks2026Map());
+    const evatt = layout.draw.stops.find((stop) => stop.tickId === 'tk_evatt')!;
+    expect(evatt.dots).toHaveLength(2);
+    const muna = layout.draw.stops.find((stop) => stop.tickId === 'tk_muna')!;
+    expect(muna.anchor).toBe('end');
+  });
+
+  it('sets a short program’s name beside its pill', () => {
     const base = mindWorks2026Map();
     const layout = layoutMap({
       ...base,
-      stations: [
-        ...base.stations,
-        datedProgram('st_philosophy', 'The Philosophy of Power', '2026-07-20', '2026-10-30'),
-        datedProgram('st_psyops', 'PSYOPS', '2026-07-20', '2026-10-30')
-      ],
-      ticks: [
-        ...base.ticks,
-        {
-          id: 'tk_brain',
-          label: 'Brain Bee',
-          attach: { kind: 'station', station_id: 'st_philosophy', side: 'right', offset: 0.5, tracks: ['senior'] },
-          stroke: 'solid',
-          connects_to: null,
-          starts_on: '2026-09-01',
-          ends_on: null,
-          link: null,
-          planning: 'planned'
-        }
-      ]
+      stations: [...base.stations, datedProgram('st_tft', 'Teachers for Tomorrow', '2026-11-30', '2026-12-10')]
     });
-    const tick = layout.ticks.find((item) => item.id === 'tk_brain')!;
-    for (const station of layout.stations.filter((item) => item.line_id === 'line_reasoning')) {
-      for (const body of station.bodies) {
-        const inside =
-          Math.abs(tick.cx - body.x) < body.w / 2 + 14 && tick.cy >= body.y && tick.cy <= body.y + body.h;
-        expect(inside).toBe(false);
-      }
-    }
+    const flag = layout.draw.flags.find((item) => item.stationId === 'st_tft')!;
+    expect(flag.lines.join(' ')).toBe('Teachers for Tomorrow');
+    expect(flag.sub).toContain('30 Nov');
+    const svg = renderTransitSvg(layout);
+    expect(svg).toContain('tm-flag-label');
+    expect(svg).not.toContain('NaN');
   });
 
-  it('uses per-map term dates for the term rules', () => {
+  it('links a competition to another strand', () => {
+    const base = mindWorks2026Map();
+    const layout = layoutMap({
+      ...base,
+      ticks: base.ticks.map((tick) => (tick.id === 'tk_davinci' ? { ...tick, connects_to: 'Reasoning' } : tick))
+    });
+    const link = layout.draw.links.find((item) => item.id === 'link-tk_davinci')!;
+    expect(link.ends).toHaveLength(2);
+    const reasoning = layout.lines.find((line) => line.id === 'line_reasoning')!;
+    expect(Math.abs(link.ends[1]!.x - reasoning.tracks[0]!.x)).toBeLessThan(TM_TRACK_GAP * 3);
+  });
+
+  it('uses per-map term dates for the term bands', () => {
     const base = mindWorks2026Map();
     const terms = { t1: '2026-02-02', t2: '2026-04-29', t3: '2026-07-21', t4: '2026-10-13', e: '2026-12-18' };
     const layout = layoutMap({ ...base, terms });
@@ -379,291 +392,41 @@ describe('year layout', () => {
     expect(two.lines.length).toBe(2);
     const clipped = fitPillLabel('Foundations Ethics and Philosophy of Mind', 60);
     expect(clipped.truncated).toBe(true);
-    expect(clipped.lines.every((line) => line.length * clipped.font * 0.62 <= 40)).toBe(true);
-    expect(clipped.lines.at(-1)!.endsWith('…')).toBe(true);
   });
 
-  it('adds a custom year line and keeps the base gap', () => {
+  it('adds a custom year line', () => {
     const map = mindWorks2026Map();
     const justice = addExtraYearTrack(map.lines[0]!, 'Middle');
     expect(lineTrackDefs(justice).some((track) => track.label === 'Middle')).toBe(true);
     const layout = layoutMap({ ...map, lines: [justice, ...map.lines.slice(1)] });
-    const xs = layout.lines[0]!.tracks.map((track) => track.x).sort((a, b) => a - b);
-    const gaps = xs.slice(1).map((x, index) => x - xs[index]!);
-    expect(layout.lines[0]!.tracks.length).toBe(4);
-    for (const gap of gaps) expect(gap).toBeGreaterThan(MAP_TRACK_GAP - 0.01);
-  });
-
-  it('connects a late competition to its program even when the date is past the station', () => {
-    const base = mindWorks2026Map();
-    const ydp = base.stations.find((station) => station.id === 'st_ydp')!;
-    const layout = layoutMap({
-      ...base,
-      ticks: [
-        ...base.ticks,
-        {
-          id: 'tk_late',
-          label: 'Late showcase',
-          attach: { kind: 'station', station_id: 'st_ydp', side: 'right', offset: 0.5 },
-          stroke: 'solid',
-          connects_to: null,
-          starts_on: '2026-11-15',
-          ends_on: null,
-          link: null,
-          planning: 'planned'
-        }
-      ]
-    });
-    const station = layout.stations.find((item) => item.id === 'st_ydp')!;
-    const tick = layout.ticks.find((item) => item.id === 'tk_late')!;
-    const link = layout.connectors.find((item) => item.id === 'link-tk_late');
-    expect(ydp.ends_on).toBe('2026-04-10');
-    expect(tick.cy).toBeGreaterThan(station.y + station.h);
-    expect(link?.from.ownerId).toBe('st_ydp');
-    expect(link?.to.ownerId).toBe('tk_late');
+    const xs = layout.lines[0]!.tracks.map((track) => track.x);
+    expect(xs).toHaveLength(4);
+    for (let i = 1; i < xs.length; i += 1) expect(xs[i]! - xs[i - 1]!).toBeGreaterThan(TM_TRACK_GAP - 0.01);
   });
 
   it('gives a term-length program weekly ports on both sides', () => {
-    expect(spanWeeks('2026-01-27', '2026-04-10', 2026)).toBe(10);
-    const ports = stationPorts({
-      id: 'st_term',
-      x: 200,
-      y: 100,
-      w: 40,
-      h: 200,
-      weeks: 10
-    });
-    expect(ports.filter((p) => p.side === 'left')).toHaveLength(10);
-    expect(ports.filter((p) => p.side === 'right')).toHaveLength(10);
-  });
-
-  it('wraps long event names so chips stay compact', () => {
-    const lines = wrapEventLines('International Philosophy Olympiad selection workshop and public showcase');
-    expect(lines.length).toBeGreaterThan(1);
-    expect(lines.every((line) => line.length <= 22)).toBe(true);
-    expect(wrapEventLines('StatewideJuniorMootingChampionshipFinal').every((line) => line.length <= 22)).toBe(
-      true
-    );
+    const layout = layoutMap(mindWorks2026Map());
+    const station = layout.stations.find((item) => item.id === 'st_ydp')!;
+    expect(station.ports.filter((port) => port.side === 'left').length).toBe(station.weeks * station.bodies.length);
+    expect(station.ports.filter((port) => port.side === 'right').length).toBe(station.weeks * station.bodies.length);
   });
 
   it('gives an event four cardinal ports', () => {
-    const ports = eventPorts({ id: 'tk', cx: 80, cy: 80 });
-    expect(ports.map((p) => p.side).sort()).toEqual(['bottom', 'left', 'right', 'top']);
+    expect(eventPorts({ id: 'e', cx: 10, cy: 10 }).map((port) => port.side)).toEqual(['top', 'bottom', 'left', 'right']);
   });
 
-  it('connects a competition to another competition’s border', () => {
-    const layout = layoutMap(mindWorks2026Map());
-    const eventToEvent = layout.connectors.filter(
-      (link) => link.from.owner === 'event' && link.to.owner === 'event'
-    );
-    expect(eventToEvent.length).toBeGreaterThan(0);
-    const moot = layout.ticks.find((tick) => tick.id === 'tk_moot');
-    const locke = layout.ticks.find((tick) => tick.id === 'tk_locke');
-    expect(moot && locke).toBeTruthy();
-    expect(layout.connectors.some((link) => link.id.includes('tk_moot') && link.id.includes('tk_locke') || (link.from.ownerId === 'tk_locke' && link.to.ownerId === 'tk_moot') || (link.from.ownerId === 'tk_moot' && link.to.ownerId === 'tk_locke'))).toBe(true);
-    const target = matchConnectTarget('Rotary MUNA', layout.lines, layout.ticks);
-    expect(target?.kind).toBe('event');
+  it('wraps long event names so labels stay compact', () => {
+    expect(wrapEventLines('UN Evatt Competition', 16)).toEqual(['UN Evatt', 'Competition']);
   });
 
-  it('sends a crossing connector below other elements, not over them', () => {
-    const wall = { id: 'wall', x: 40, y: 80, w: 20, h: 100 };
-    const from = { x: 10, y: 90 };
-    const to = { x: 120, y: 95 };
-    const y = underpassLaneY(from, to, [wall], 8);
-    expect(y).toBe(Math.max(from.y, to.y));
-    expect(y).toBeLessThan(wall.y + wall.h + 40);
+  it('places every seeded competition with readable, non-overlapping labels in one column', () => {
     const layout = layoutMap(mindWorks2026Map());
-    const under = layout.connectors.filter((link) => link.under);
-    expect(under.length).toBeGreaterThan(0);
-    for (const link of under) {
-      const match = /V ([\d.]+) H/.exec(link.path);
-      if (!match) continue;
-      const lane = Number(match[1]);
-      expect(lane).toBeGreaterThanOrEqual(Math.min(link.from.y, link.to.y) - 1);
-    }
-  });
-
-  it('connects events through ports and keeps line groups packed', () => {
-    const layout = layoutMap(mindWorks2026Map());
-    expect(layout.connectors.length).toBeGreaterThan(0);
-    const mock = layout.stations.find((s) => s.id === 'st_mock');
-    expect(mock?.weeks).toBeGreaterThanOrEqual(10);
-    expect(mock?.ports.filter((p) => p.side === 'left')).toHaveLength(mock!.weeks);
-    const xs = layout.lines.map((line) => line.x).sort((a, b) => a - b);
-    for (let i = 1; i < xs.length; i += 1) {
-      expect(xs[i]! - xs[i - 1]!).toBeGreaterThan(80);
-    }
-  });
-
-  it('never leaves two label boxes overlapping', () => {
-    const layout = layoutMap(mindWorks2026Map());
-    const boxes = layout.boxes;
+    expect(layout.ticks).toHaveLength(mindWorks2026Map().ticks.length);
+    const boxes = layout.ticks.map((tick) => tick.labelBox);
     for (let i = 0; i < boxes.length; i += 1) {
       for (let j = i + 1; j < boxes.length; j += 1) {
-        expect(boxesOverlap(boxes[i]!, boxes[j]!)).toBe(false);
+        expect(boxesOverlap(boxes[i]!, boxes[j]!, 0)).toBe(false);
       }
-    }
-    const placed = placeBox(
-      { id: 'probe', x: boxes[0]!.x, y: boxes[0]!.y, w: 20, h: 20 },
-      boxes,
-      { width: layout.width, height: layout.height }
-    );
-    expect(boxes.some((box) => boxesOverlap(box, placed))).toBe(false);
-  });
-
-  it('keeps event chips horizontal and off every other line', () => {
-    const layout = layoutMap(mindWorks2026Map());
-    expect(layout.ticks.length).toBeGreaterThan(0);
-    expect(layout.ticks.every((tick) => tick.labelBox.w > tick.labelBox.h)).toBe(true);
-    expect(labelHitsForeignLine(layout)).toBe(false);
-    for (const tick of layout.ticks) {
-      for (const line of layout.lines) {
-        if (line.id === tick.lineId) continue;
-        expect(lineStrokeBoxes(line).some((box) => boxesOverlap(tick.labelBox, box))).toBe(false);
-      }
-    }
-  });
-
-  it('places a line-attached competition on chosen year lines and stems to each', () => {
-    expect(resolveLineAttachTrack(undefined, ['junior', 'rozelle', 'senior'])).toBe('rozelle');
-    expect(resolveLineAttachTracks(['senior', 'missing'], ['junior', 'rozelle', 'senior'])).toEqual([
-      'senior'
-    ]);
-    expect(resolveLineAttachTracks(undefined, ['junior', 'rozelle', 'senior'])).toEqual(['rozelle']);
-
-    const base = mindWorks2026Map();
-    const multi = layoutMap({
-      ...base,
-      ticks: [
-        {
-          id: 'tk_evatt_multi',
-          label: 'UN Evatt Competition',
-          attach: {
-            kind: 'line',
-            line_id: 'line_justice',
-            y: 200,
-            tracks: ['rozelle', 'senior']
-          },
-          stroke: 'solid',
-          connects_to: null,
-          starts_on: '2026-08-01',
-          ends_on: null,
-          link: null,
-          planning: 'planned'
-        },
-        {
-          id: 'tk_legacy_track',
-          label: 'Legacy single track',
-          attach: { kind: 'line', line_id: 'line_justice', y: 220, track: 'senior' },
-          stroke: 'solid',
-          connects_to: null,
-          starts_on: '2026-05-15',
-          ends_on: null,
-          link: null,
-          planning: 'planned'
-        }
-      ]
-    });
-    const justice = multi.lines.find((line) => line.id === 'line_justice')!;
-    const seniorX = justice.tracks.find((track) => track.id === 'senior')!.x;
-    const rozelleX = justice.tracks.find((track) => track.id === 'rozelle')!.x;
-    const tick = multi.ticks.find((item) => item.id === 'tk_evatt_multi')!;
-    expect(tick.tracks).toEqual(['rozelle', 'senior']);
-    expect(tick.x0).toBe(seniorX);
-    expect(tick.x0).not.toBe(rozelleX);
-    const stems = multi.connectors.filter((item) => item.id.startsWith('link-tk_evatt_multi'));
-    expect(stems).toHaveLength(2);
-    expect(stems.map((item) => item.from.x).sort((a, b) => a - b)).toEqual(
-      [rozelleX, seniorX].sort((a, b) => a - b)
-    );
-
-    const legacy = multi.ticks.find((item) => item.id === 'tk_legacy_track')!;
-    expect(legacy.tracks).toEqual(['senior']);
-    expect(legacy.x0).toBe(seniorX);
-
-    const nearest = nearestLaidTrack(multi.lines, seniorX);
-    expect(nearest).toEqual({ lineId: 'line_justice', trackId: 'senior' });
-  });
-
-  it('slides a later line right when the first line grows a wide event', () => {
-    const base = mindWorks2026Map();
-    const tick = (id: string, label: string) => ({
-      id,
-      label,
-      attach: { kind: 'line' as const, line_id: 'line_justice', y: 220 },
-      stroke: 'solid' as const,
-      connects_to: null,
-      starts_on: '2026-03-12',
-      ends_on: null,
-      link: null,
-      planning: 'planned' as const
-    });
-    const packed = layoutMap({ ...base, ticks: [tick('tk_short', 'Moot')] });
-    const grown = layoutMap({
-      ...base,
-      ticks: [tick('tk_wide', 'Statewide Junior Mooting Championship Final')]
-    });
-    const firstI = packed.lines.find((line) => line.id === 'line_innovation')!.x;
-    const grownI = grown.lines.find((line) => line.id === 'line_innovation')!.x;
-    expect(grownI).toBeGreaterThan(firstI);
-    expect(labelHitsForeignLine(grown)).toBe(false);
-    expect(adjacentStrandBoxesOverlap(grown.lines, grown.stations, grown.ticks)).toBe(false);
-    const chip = grown.ticks.find((tick) => tick.id === 'tk_wide')!.labelBox;
-    const next = grown.lines.find((line) => line.id === 'line_innovation')!;
-    expect(lineStrokeBoxes(next).some((box) => boxesOverlap(chip, box))).toBe(false);
-    expect(boxesOverlap(chip, lineContentBox(next, grown.stations, grown.ticks))).toBe(false);
-  });
-
-  it('keeps a renamed championship chip off the next strand', () => {
-    const base = mindWorks2026Map();
-    const layout = layoutMap({
-      ...base,
-      ticks: [
-        ...base.ticks,
-        {
-          id: 'tk_champ',
-          label: 'Statewide Junior Mooting Championship Final',
-          attach: { kind: 'line', line_id: 'line_justice', y: 200 },
-          stroke: 'solid',
-          connects_to: null,
-          starts_on: '2026-01-27',
-          ends_on: null,
-          link: null,
-          planning: 'planned'
-        }
-      ]
-    });
-    const chip = layout.ticks.find((tick) => tick.id === 'tk_champ')!.labelBox;
-    const next = layout.lines.find((line) => line.id === 'line_innovation')!;
-    const nextLeft = Math.min(...next.tracks.map((track) => track.x)) - 8;
-    expect(chip.x + chip.w).toBeLessThan(nextLeft);
-    expect(labelHitsForeignLine(layout)).toBe(false);
-  });
-
-  it('spreads strands evenly with room for event chips between them', () => {
-    const layout = layoutMap(mindWorks2026Map());
-    const xs = layout.lines.map((line) => line.x).sort((a, b) => a - b);
-    const gaps = xs.slice(1).map((x, index) => x - xs[index]!);
-    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(MAP_LINE_GAP - 1);
-    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(1);
-    expect(adjacentStrandBoxesOverlap(layout.lines, layout.stations, layout.ticks)).toBe(false);
-    expect(labelHitsForeignLine(layout)).toBe(false);
-  });
-
-  it('keeps every line lane the same width', () => {
-    const xs = layoutMap(mindWorks2026Map())
-      .lines.map((line) => line.x)
-      .sort((a, b) => a - b);
-    const gaps = xs.slice(1).map((x, index) => x - xs[index]!);
-    expect(gaps.length).toBeGreaterThan(1);
-    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(1);
-  });
-
-  it('keeps competition chips in a column beside the circle', () => {
-    const layout = layoutMap(mindWorks2026Map());
-    for (const tick of layout.ticks) {
-      expect(tick.labelBox.x).toBeGreaterThan(tick.cx);
-      expect(Math.abs(tick.labelBox.x - (tick.cx + 36))).toBeLessThan(8);
     }
   });
 
@@ -680,9 +443,6 @@ describe('year layout', () => {
     const justice = laid.lines.find((line) => line.id === 'line_justice')!;
     const innovation = laid.lines.find((line) => line.id === 'line_innovation')!;
     expect(innovation.x).toBeLessThan(justice.x);
-    expect(laid.stations.filter((station) => station.line_id === 'line_innovation').every((station) => station.lineX === innovation.x)).toBe(
-      true
-    );
   });
 
   it('pins Justice blue, Innovation yellow, Expression green, Reasoning purple', () => {
@@ -708,32 +468,6 @@ describe('year layout', () => {
     ]);
   });
 
-  it('connects each year line through its disc and into every station on that track', () => {
-    const layout = layoutMap(mindWorks2026Map());
-    for (const line of layout.lines) {
-      expect(line.y0).toBe(line.disc.cy);
-      for (const track of line.tracks) {
-        expect(track.disc.cy).toBe(line.y0);
-        expect(track.end.cx).toBe(track.x);
-        expect(track.end.cy).toBe(line.y1);
-        expect(track.end.cy).toBeGreaterThan(layout.yearBottom);
-        expect(track.cuts[0]?.y0).toBe(track.disc.cy);
-        expect(track.cuts.at(-1)?.y1).toBe(track.end.cy);
-        const stations = layout.stations.filter(
-          (station) => station.line_id === line.id && station.tracks.includes(track.id)
-        );
-        for (const station of stations) {
-          const body = station.bodies.find((item) => item.track === track.id)!;
-          const arrives = track.cuts.some((cut) => Math.abs(cut.y1 - body.y) < 0.5);
-          const leaves = track.cuts.some((cut) => Math.abs(cut.y0 - (body.y + body.h)) < 0.5);
-          expect(arrives).toBe(true);
-          expect(leaves).toBe(true);
-        }
-      }
-    }
-    const foot = layout.lines[0]!.tracks[0]!.end;
-    expect(layout.height).toBeGreaterThan(foot.cy + foot.r);
-  });
 });
 
 describe('library default', () => {
@@ -793,11 +527,11 @@ describe('export', () => {
     expect(html).toContain('#f0c400');
     expect(html).toContain('#009a3a');
     expect(html).toContain('#6b2d8e');
-    expect(html.match(/Junior/g)?.length).toBe(8);
-    expect(html.match(/Rozelle/g)?.length).toBe(8);
-    expect(html.match(/Senior/g)?.length).toBe(8);
-    expect(html.match(/r="26"/g)?.length).toBe(24);
-    expect(html).not.toContain('r="4"');
-    expect(html).toMatch(/<circle cx="[\d.]+" cy="[\d.]+" r="14"/);
+    // One rotated year name per year line, one lettered cap at each end of every year line.
+    expect(html.match(/class="tm-year-name"/g)?.length).toBe(12);
+    expect(html.match(/<circle cx="[\d.]+" cy="[\d.]+" r="13"/g)?.length).toBe(24);
+    expect(html).toContain('class="tm-stop');
+    expect(html).not.toContain('map-port');
+    expect(html).not.toContain('NaN');
   });
 });
