@@ -34,7 +34,8 @@ import {
   type Block,
   type CardStackTint,
   type ChartSeriesColor,
-  type EmbedProvider
+  type EmbedProvider,
+  type TimelineLayout
 } from '@/schemas/block';
 import type { Media } from '@/schemas/media';
 import { openDrivePicker } from '@/teacher/drive-picker';
@@ -1664,12 +1665,14 @@ export function createTimelineEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
+  let layout: TimelineLayout = block.content.layout ?? 'rail';
   let events: TimelineEventDraft[] = block.content.events.map((event) => ({ ...event }));
 
   const emitChange = () => {
     onChange({
       ...getLatest(),
       content: {
+        layout,
         events: events.map((event) => ({
           id: event.id,
           when: event.when,
@@ -1723,7 +1726,27 @@ export function createTimelineEditor(
   });
   list.el.classList.add('block-editor__timeline-items');
 
-  fields.append(list.el);
+  const layoutSelect = createChoice({
+    key: 'Layout',
+    value: layout,
+    options: [
+      { value: 'rail', label: 'Vertical' },
+      { value: 'alternate', label: 'Either side' },
+      { value: 'horizontal', label: 'Horizontal' }
+    ],
+    className: 'block-editor__timeline-layout',
+    ariaLabel: 'Timeline layout',
+    onChange: (value) => {
+      layout = value as TimelineLayout;
+      emitChange();
+    }
+  });
+
+  const settings = document.createElement('div');
+  settings.className = 'block-editor__inline-settings';
+  settings.append(layoutSelect.el);
+
+  fields.append(settings, list.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
