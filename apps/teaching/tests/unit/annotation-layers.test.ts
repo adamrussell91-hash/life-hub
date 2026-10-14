@@ -60,9 +60,8 @@ describe('annotation layers (pure)', () => {
     const markers = markersFor(annotations, layers, stops, state, true, resolve);
     expect(markers.length).toBeGreaterThan(0);
     expect(markers.every((m) => m.layerId !== 'layer_teacher')).toBe(true);
-    expect(markers.every((m) => m.symbol.length > 0 && m.layerName.length > 0)).toBe(
-      true
-    );
+    // Untagged notes draw a plain dot (empty symbol); every marker names its layer.
+    expect(markers.every((m) => m.layerName.length > 0)).toBe(true);
     expect(markersFor(annotations, layers, stops, state, false, resolve)).toEqual([]);
   });
 

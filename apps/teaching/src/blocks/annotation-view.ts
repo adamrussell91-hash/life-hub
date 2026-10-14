@@ -1,4 +1,12 @@
-import { resolveAnnotation, type ResolvedAnchor } from '@/blocks/annotation-anchor';
+import {
+  resolveAnnotation,
+  type AnnotationLineModel,
+  type ResolvedAnchor
+} from '@/blocks/annotation-anchor';
+import {
+  applyLineLayout,
+  renderFormattedLine
+} from '@/blocks/annotation-line-format';
 import {
   activeLayerIds,
   createLayerState,
@@ -29,7 +37,6 @@ import {
 } from '@/blocks/annotation-thread-view';
 import { threadsOf } from '@/blocks/annotation-thread';
 import {
-  FAMILY_PALETTE,
   familyOfTechnique,
   loadLiteraryElements,
   lookupTechnique,
@@ -218,63 +225,102 @@ function closeAnnotationPanel(root: HTMLElement): void {
   });
 }
 
-function renderElementTile(
+/**
+ * Technique card styled after the Periodic Table of Literary Elements detail
+ * pane: element badge, name, family + subgroup chips, then Definition /
+ * Effect / Example sections in the family colour.
+ */
+export function renderElementCard(
   technique: LiteraryTechnique,
-  familyColourToken: string
+  table: LiteraryElementsTable
 ): HTMLElement {
-  const details = document.createElement('details');
-  details.className = `block-annotation__element block-annotation__element--${familyColourToken}`;
+  const family = familyOfTechnique(table, technique);
+  const subgroup = table.subgroups.find((row) => row.id === technique.subgroup);
+  const card = document.createElement('section');
+  card.className = 'block-annotation__element';
+  card.dataset.techniqueId = technique.id;
+  if (family) {
+    card.dataset.family = family.key;
+    card.style.setProperty('--c', family.colour);
+  }
+  card.setAttribute('aria-label', `Technique: ${technique.name}`);
 
-  const summary = document.createElement('summary');
-  summary.className = 'block-annotation__element-summary';
+  const head = document.createElement('div');
+  head.className = 'block-annotation__element-head';
+  const badge = document.createElement('span');
+  badge.className = 'block-annotation__element-badge';
+  badge.setAttribute('aria-hidden', 'true');
   const sym = document.createElement('span');
   sym.className = 'block-annotation__element-symbol';
   sym.textContent = technique.symbol;
-  const name = document.createElement('span');
+  badge.append(sym);
+
+  const titleWrap = document.createElement('div');
+  titleWrap.className = 'block-annotation__element-titles';
+  const name = document.createElement('p');
   name.className = 'block-annotation__element-name';
   name.textContent = technique.name;
-  summary.append(sym, name);
+  const crumbs = document.createElement('div');
+  crumbs.className = 'block-annotation__element-crumbs';
+  if (family) {
+    const fam = document.createElement('span');
+    fam.className = 'block-annotation__element-chip block-annotation__element-chip--family';
+    fam.textContent = family.name;
+    crumbs.append(fam);
+  }
+  if (subgroup) {
+    const sub = document.createElement('span');
+    sub.className = 'block-annotation__element-chip';
+    sub.textContent = subgroup.name;
+    crumbs.append(sub);
+  }
+  titleWrap.append(name, crumbs);
+  head.append(badge, titleWrap);
+  card.append(head);
 
-  const body = document.createElement('div');
-  body.className = 'block-annotation__element-body';
-  const def = document.createElement('p');
-  def.textContent = technique.definition;
-  const effect = document.createElement('p');
-  effect.textContent = technique.effect;
-  const example = document.createElement('p');
-  example.className = 'block-annotation__element-example';
-  example.textContent = technique.example;
-  body.append(def, effect, example);
-
-  details.append(summary, body);
-  return details;
+  const sections: Array<[string, string, boolean]> = [
+    ['Definition', technique.definition, false],
+    ['Effect', technique.effect, false],
+    ['Example', technique.example, true]
+  ];
+  for (const [label, value, isExample] of sections) {
+    if (!value?.trim()) continue;
+    const sec = document.createElement('div');
+    sec.className = 'block-annotation__element-sec';
+    const h = document.createElement('h4');
+    h.textContent = label;
+    const p = document.createElement('p');
+    if (isExample) p.className = 'block-annotation__element-example';
+    p.textContent = value;
+    sec.append(h, p);
+    card.append(sec);
+  }
+  return card;
 }
 
 function fillBody(
   host: HTMLElement,
   annotation: AnnotationItem,
   layer: AnnotationLayer | undefined,
-  table: LiteraryElementsTable | null
+  table: LiteraryElementsTable | null,
+  showLayer: boolean
 ): void {
   host.replaceChildren();
-  if (layer) {
+  if (layer && showLayer) {
     const chip = document.createElement('p');
     chip.className = `block-annotation__layer-chip block-annotation__layer-chip--${layer.colour}`;
     chip.textContent = layer.name;
     host.append(chip);
   }
-  if (annotation.technique?.id && table) {
-    const technique = lookupTechnique(table, annotation.technique.id);
-    if (technique) {
-      const family = familyOfTechnique(table, technique);
-      const colour = family ? FAMILY_PALETTE[family.key] : layer?.colour ?? 'wave';
-      host.append(renderElementTile(technique, colour));
-    }
-  }
+  // The teacher's own words first, then the Periodic Table card.
   const body = document.createElement('div');
   body.className = 'block-annotation__body';
   body.innerHTML = sanitizeRichTextHtml(annotation.body.html);
   host.append(body);
+  if (annotation.technique?.id && table) {
+    const technique = lookupTechnique(table, annotation.technique.id);
+    if (technique) host.append(renderElementCard(technique, table));
+  }
   const attachments = renderAttachmentList(annotation.body.attachments);
   if (attachments) host.append(attachments);
 }
@@ -287,6 +333,7 @@ function openAnnotation(
   table: LiteraryElementsTable | null
 ): void {
   closeAnnotationPanel(root);
+  const showLayer = root.dataset.layerCount !== '1';
   anchorEl.classList.add('is-open');
   anchorEl.setAttribute('aria-expanded', 'true');
 
@@ -298,12 +345,12 @@ function openAnnotation(
     const dialog = document.createElement('div');
     dialog.className = 'block-annotation__sheet-dialog';
     dialog.setAttribute('role', 'dialog');
-    dialog.setAttribute('aria-label', 'Annotation');
+    dialog.setAttribute('aria-label', 'Note');
     const header = document.createElement('div');
     header.className = 'block-annotation__sheet-header';
     const title = document.createElement('h3');
     title.className = 'block-annotation__sheet-title';
-    title.textContent = 'Annotation';
+    title.textContent = 'Note';
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'block-annotation__close';
@@ -315,7 +362,7 @@ function openAnnotation(
     header.append(title, close);
     const body = document.createElement('div');
     body.className = 'block-annotation__sheet-body';
-    fillBody(body, annotation, layer, table);
+    fillBody(body, annotation, layer, table, showLayer);
     dialog.append(header, body);
     sheet.append(dialog);
     close.focus();
@@ -329,7 +376,7 @@ function openAnnotation(
   header.className = 'block-annotation__panel-header';
   const title = document.createElement('h3');
   title.className = 'block-annotation__panel-title';
-  title.textContent = 'Annotation';
+  title.textContent = 'Note';
   const close = document.createElement('button');
   close.type = 'button';
   close.className = 'block-annotation__close';
@@ -341,13 +388,12 @@ function openAnnotation(
   header.append(title, close);
   const body = document.createElement('div');
   body.className = 'block-annotation__panel-body';
-  fillBody(body, annotation, layer, table);
+  fillBody(body, annotation, layer, table, showLayer);
   panel.append(header, body);
   close.focus();
 }
 
 function wrapSpan(
-  text: string,
   className: string,
   annotation: AnnotationItem,
   layer: AnnotationLayer | undefined,
@@ -363,7 +409,6 @@ function wrapSpan(
     'aria-label',
     layer ? `Annotation: ${layer.name}` : 'Annotation'
   );
-  btn.textContent = text;
   btn.addEventListener('click', () =>
     openAnnotation(root, annotation, layer, btn, table)
   );
@@ -377,39 +422,30 @@ type LineMark = {
 };
 
 function renderLineText(
-  lineText: string,
+  line: AnnotationLineModel,
   marks: LineMark[],
   root: HTMLElement,
   table: LiteraryElementsTable | null
 ): DocumentFragment {
-  const frag = document.createDocumentFragment();
-  const sorted = [...marks].sort((a, b) => a.start - b.start || b.end - a.end);
-  let cursor = 0;
-  for (const mark of sorted) {
-    if (mark.start < cursor) continue;
-    if (mark.start > cursor) {
-      frag.append(document.createTextNode(lineText.slice(cursor, mark.start)));
-    }
-    const slice = lineText.slice(mark.start, mark.end);
-    const gran = mark.placed.resolved.granularity;
-    const grainClass = gran === 'word' ? 'word' : 'phrase';
-    const className = `block-annotation__anchor block-annotation__anchor--${grainClass}`;
-    frag.append(
-      wrapSpan(
-        slice,
-        className,
-        mark.placed.annotation,
-        mark.placed.layer,
-        root,
-        table
-      )
-    );
-    cursor = mark.end;
-  }
-  if (cursor < lineText.length) {
-    frag.append(document.createTextNode(lineText.slice(cursor)));
-  }
-  return frag;
+  return renderFormattedLine(
+    line,
+    marks.map((mark) => {
+      const grainClass = mark.placed.resolved.granularity === 'word' ? 'word' : 'phrase';
+      const colour = mark.placed.layer?.colour ?? 'wave';
+      return {
+        start: mark.start,
+        end: mark.end,
+        wrap: () =>
+          wrapSpan(
+            `block-annotation__anchor block-annotation__anchor--${grainClass} block-annotation__anchor--${colour}`,
+            mark.placed.annotation,
+            mark.placed.layer,
+            root,
+            table
+          )
+      };
+    })
+  );
 }
 
 function isTextControl(target: EventTarget | null): boolean {
@@ -460,6 +496,7 @@ function buildInteractiveView(
   root.tabIndex = 0;
 
   const stops = stopsForMode(content.layers, mode);
+  root.dataset.layerCount = String(stops.length);
   let state = createLayerState(content.layers, content.settings, mode);
   if (openNoteId) {
     const target = content.annotations.find((ann) => ann.id === openNoteId);
@@ -533,11 +570,26 @@ function buildInteractiveView(
   stepBar.className = 'block-annotation__step-bar';
   stepBar.hidden = true;
 
+  const reveal = document.createElement('button');
+  reveal.type = 'button';
+  reveal.className = 'btn btn--secondary block-annotation__reveal';
+  reveal.hidden = true;
+  reveal.addEventListener('click', () => {
+    const only = stops[0];
+    if (!only) return;
+    const shown = state.stop >= 1 && !state.suppressed.has(only.id);
+    const suppressed = new Set(state.suppressed);
+    suppressed.delete(only.id);
+    state = { ...state, stop: shown ? 0 : 1, suppressed };
+    paint();
+  });
+
   sliderRow.append(slider, stopLabels);
-  controls.append(chips, threadStrip, focusBar, stepBar, sliderRow);
+  controls.append(reveal, chips, threadStrip, focusBar, stepBar, sliderRow);
 
   layout.append(textCol, panel);
-  root.append(layout, controls);
+  // Reveal controls sit above the text so a long poem never hides them.
+  root.append(controls, layout);
 
   const sheet = document.createElement('div');
   sheet.className = 'block-annotation__sheet';
@@ -766,6 +818,20 @@ function buildInteractiveView(
     slider.max = String(stops.length);
     slider.value = String(state.stop);
 
+    // One layer: a single Show / Hide button says more than a two-stop slider.
+    const singleStop = stops.length === 1;
+    sliderRow.hidden = singleStop || stops.length === 0;
+    reveal.hidden = !singleStop;
+    if (singleStop) {
+      const only = stops[0]!;
+      const shown = state.stop >= 1 && !state.suppressed.has(only.id);
+      const count = content.annotations.filter((ann) => ann.layer_id === only.id).length;
+      reveal.setAttribute('aria-pressed', shown ? 'true' : 'false');
+      reveal.textContent = shown
+        ? `Hide ${only.name.toLowerCase()}`
+        : `Show ${only.name.toLowerCase()}${count > 0 ? ` (${count})` : ''}`;
+    }
+
     const zero = document.createElement('span');
     zero.className = 'block-annotation__stop-label';
     zero.textContent = 'Text only';
@@ -780,15 +846,15 @@ function buildInteractiveView(
       stopLabels.append(label);
     });
 
-    for (const layer of revealedLayers(stops, state.stop)) {
+    for (const layer of singleStop ? [] : revealedLayers(stops, state.stop)) {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = `block-annotation__chip block-annotation__chip--${layer.colour}`;
       if (layer.kind === 'teacher') chip.classList.add('block-annotation__chip--teacher');
       const pressed = !state.suppressed.has(layer.id);
       chip.setAttribute('aria-pressed', pressed ? 'true' : 'false');
-      chip.title = layer.name;
-      chip.textContent = layer.name;
+      chip.title = pressed ? `Hide ${layer.name}` : `Show ${layer.name}`;
+      chip.textContent = pressed ? `✓ ${layer.name}` : layer.name;
       chip.addEventListener('click', () => {
         state = toggleSuppressed(state, layer.id);
         paint();
@@ -985,10 +1051,10 @@ function buildInteractiveView(
     const stanzasHost = document.createElement('div');
     stanzasHost.className = 'block-annotation__stanzas';
 
-    const lineById = new Map<string, { stanzaId: string; text: string }>();
+    const lineById = new Map<string, { stanzaId: string; line: AnnotationLineModel }>();
     for (const stanza of content.text.stanzas) {
       for (const line of stanza.lines) {
-        lineById.set(line.id, { stanzaId: stanza.id, text: line.text });
+        lineById.set(line.id, { stanzaId: stanza.id, line });
       }
     }
 
@@ -1015,7 +1081,8 @@ function buildInteractiveView(
       pushGrouped(voiceByLine, clip.anchor.line, clip);
     }
 
-    function paintLineRow(lineId: string, stanzaId: string, lineText: string): HTMLElement {
+    function paintLineRow(line: AnnotationLineModel, stanzaId: string): HTMLElement {
+      const lineId = line.id;
       const row = document.createElement('div');
       row.className = 'block-annotation__line';
       row.dataset.lineId = lineId;
@@ -1063,11 +1130,8 @@ function buildInteractiveView(
       const textEl = document.createElement('p');
       textEl.className = 'block-annotation__line-text';
       const marks = byLine.get(`${stanzaId}:${lineId}`) ?? [];
-      if (marks.length === 0) {
-        textEl.textContent = lineText || '\u00a0';
-      } else {
-        textEl.append(renderLineText(lineText, marks, root, table));
-      }
+      textEl.append(renderLineText(line, marks, root, table));
+      applyLineLayout(textEl, line);
 
       const lineMarkers = markersByLine.get(`${stanzaId}:${lineId}`) ?? [];
       if (lineMarkers.length > 0) {
@@ -1077,8 +1141,9 @@ function buildInteractiveView(
           const dot = document.createElement('button');
           dot.type = 'button';
           dot.className = `block-annotation__marker block-annotation__marker--${marker.colour}`;
-          dot.title = marker.layerName;
-          dot.setAttribute('aria-label', `Hidden layer: ${marker.layerName}`);
+          if (!marker.symbol) dot.classList.add('block-annotation__marker--dot');
+          dot.title = `Hidden note (${marker.layerName}). Click to show.`;
+          dot.setAttribute('aria-label', `Show hidden note: ${marker.layerName}`);
           dot.textContent = marker.symbol;
           dot.addEventListener('click', () => revealMarkerLayer(marker));
           markerRow.append(dot);
@@ -1141,7 +1206,7 @@ function buildInteractiveView(
         const meta = lineById.get(row.lineId);
         if (!meta) continue;
         ensureStanza(meta.stanzaId);
-        linesCol!.append(paintLineRow(row.lineId, meta.stanzaId, meta.text));
+        linesCol!.append(paintLineRow(meta.line, meta.stanzaId));
       }
     } else {
       for (const stanza of content.text.stanzas) {
@@ -1160,7 +1225,7 @@ function buildInteractiveView(
         linesCol.className = 'block-annotation__lines';
 
         for (const line of stanza.lines) {
-          linesCol.append(paintLineRow(line.id, stanza.id, line.text));
+          linesCol.append(paintLineRow(line, stanza.id));
         }
 
         stanzaEl.append(linesCol);
@@ -1366,7 +1431,8 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
     for (const line of stanza.lines) {
       const p = document.createElement('p');
       p.className = 'block-annotation__line-text';
-      p.textContent = line.text || '\u00a0';
+      p.append(renderFormattedLine(line));
+      applyLineLayout(p, line);
       const marksOnLine = nonThreadPlaced.filter(
         (item) =>
           item.resolved.lineId === line.id ||

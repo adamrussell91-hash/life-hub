@@ -118,12 +118,6 @@ export function isAnnotationActive(
   return true;
 }
 
-export function layerSymbol(layer: AnnotationLayer): string {
-  if (layer.symbol?.trim()) return layer.symbol.trim().slice(0, 3);
-  if (layer.kind === 'teacher') return 'T';
-  return layer.name.trim().slice(0, 2) || '•';
-}
-
 /** Markers for annotations on the slider path that are not currently drawn. */
 export function markersFor(
   annotations: AnnotationItem[],
@@ -145,6 +139,10 @@ export function markersFor(
     if (!stopIds.has(annotation.layer_id)) continue;
     // Skip annotations already shown as anchors / bars.
     if (isAnnotationActive(annotation, activeIds, state.suppressed)) continue;
+    // A layer (or sub-layer) the reader switched off stays quiet: markers only
+    // hint at layers the slider has not reached yet.
+    if (state.suppressed.has(annotation.layer_id)) continue;
+    if (annotation.sublayer_id && state.suppressed.has(annotation.sublayer_id)) continue;
 
     const resolved = resolve(annotation);
     if (resolved.status !== 'ok') continue;
@@ -157,7 +155,8 @@ export function markersFor(
       layerId: layer.id,
       layerName: layer.name,
       colour: layer.colour,
-      symbol: techSym?.trim() || layerSymbol(layer),
+      // Technique symbol (e.g. "Vi") when tagged; otherwise a plain dot.
+      symbol: techSym?.trim() ?? '',
       stanzaId: resolved.stanzaId,
       lineId: resolved.lineId,
       start: resolved.start,

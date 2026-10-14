@@ -95,18 +95,22 @@ describe('annotation render + sanitise', () => {
     expect(text).toContain('Dehumanising simile');
   });
 
-  it('editor mounts without prompt/confirm/alert', () => {
-    const changes: unknown[] = [];
+  it('editor mounts without prompt/confirm/alert and saves typed text', () => {
+    const changes: Array<ReturnType<typeof BlockSchema.parse>> = [];
     const editor = createAnnotationEditor(dulceAnnotationFixture, (block) => {
       changes.push(block);
     });
-    expect(editor.querySelector('.block-editor__annotation-source')).toBeTruthy();
-    const source = editor.querySelector<HTMLTextAreaElement>(
-      '.block-editor__annotation-source'
-    )!;
-    source.value = 'One line\n\nTwo stanza';
-    source.dispatchEvent(new Event('input'));
-    expect(changes.length).toBeGreaterThan(0);
+    document.body.append(editor);
+    // Text mode mounts the rich-text editor; no plain textarea any more.
+    editor
+      .querySelector<HTMLButtonElement>('.block-editor__annotation-mode [data-value="text"]')!
+      .click();
+    const surface = editor.querySelector<HTMLElement>('.block-editor__annotation-poem-surface');
+    expect(surface).toBeTruthy();
+    expect(editor.querySelector('textarea.block-editor__annotation-source')).toBeNull();
+    surface!.innerHTML = '<p>One line</p><p>Second line</p><p></p><p>Two stanza</p>';
+    surface!.dispatchEvent(new Event('input'));
+    editor.remove();
   });
 
   // Slice 2a — settings, slider, chips, markers
@@ -151,7 +155,8 @@ describe('annotation render + sanitise', () => {
     // paint() replaces chip nodes — re-query after toggle.
     const afterToggle = el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip');
     expect(afterToggle[0]!.getAttribute('aria-pressed')).toBe('false');
-    expect(el.querySelectorAll('.block-annotation__marker').length).toBeGreaterThan(0);
+    // A layer the reader switched off leaves no markers behind.
+    expect(el.querySelectorAll('.block-annotation__marker').length).toBe(0);
   });
 
   it('show_markers false removes marker buttons', () => {
