@@ -197,10 +197,23 @@
   width: auto;
   flex: none;
 }
+.food-import-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
 .food-import-list,
 .food-cooking {
   display: grid;
   gap: var(--space-2);
+}
+.food-import-list {
+  max-height: min(40dvh, 22rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  padding-right: var(--space-1);
 }
 .food-menu-text {
   white-space: pre-wrap;
