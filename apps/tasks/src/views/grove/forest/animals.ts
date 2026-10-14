@@ -381,6 +381,17 @@ export async function createForestAnimals(input: {
         actor.mixer.update(delta);
       }
     },
+    /** Every animal out in the forest (young ones walk with their parent, so they are not listed). */
+    list(): { key: number; animal: ForestAnimal; young: boolean; home: number; visible: boolean }[] {
+      return actors.flatMap((a, key) => (a.parent ? [] : [{ key, animal: a.animal, young: actors.some((b) => b.parent === a), home: a.home, visible: a.object.visible }]));
+    },
+    /** Where an animal stands now, at about its middle; null if there is no such animal. */
+    position(key: number): { x: number; y: number; z: number } | null {
+      const a = actors[key];
+      if (!a) return null;
+      const p = a.object.position;
+      return { x: p.x, y: p.y + (HEIGHT[a.asset.id] ?? 1) * 0.5, z: p.z };
+    },
     /** Where each animal is and what it is doing (for check scripts). */
     report() {
       return actors.map((a) => ({

@@ -26,8 +26,8 @@ export function forestHistory(completions: readonly GroveCompletion[], year: num
   }));
 }
 
-const NAME: Record<WildlifeSpecies, string> = { hare: 'Hare', deer: 'Doe', fox: 'Fox', squirrel: 'Squirrel', robin: 'Robin', mallard: 'Mallard', owl: 'Owl' };
-const modelName = (id: string) => id.replace(/^animal-(forest-|bird-|duck-|river-|rabbit-)?/, '').replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
+export const ANIMAL_NAME: Record<WildlifeSpecies, string> = { hare: 'Hare', deer: 'Doe', fox: 'Fox', squirrel: 'Squirrel', robin: 'Robin', mallard: 'Mallard', owl: 'Owl' };
+export const modelName = (id: string) => id.replace(/^animal-(forest-|bird-|duck-|river-|rabbit-)?/, '').replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
 /** Animals earned this year, through `through` (YYYY-MM-DD): each milestone's animal plus Grove's companions. */
 export function forestAnimals(completions: readonly GroveCompletion[], terms: readonly GroveTerm[], books: readonly GroveBookInput[], year: number, through: string): ForestAnimal[] {
@@ -35,7 +35,7 @@ export function forestAnimals(completions: readonly GroveCompletion[], terms: re
   const own = completions.filter((c) => c.dayKey.startsWith(prefix));
   const last = through < `${year}-12-31` ? through : `${year}-12-31`;
   const earned = wildlifeMilestones(own, terms.filter((t) => t.starts_on.startsWith(prefix)), last, books.filter((b) => b.completed_on?.startsWith(prefix)));
-  const parents: ForestAnimal[] = earned.map((m) => ({ model: WILDLIFE_MODEL[m.species], species: m.species, name: NAME[m.species], earnedOn: m.earnedOn, reason: m.reason, baby: m.baby, swimming: m.species === 'mallard' }));
+  const parents: ForestAnimal[] = earned.map((m) => ({ model: WILDLIFE_MODEL[m.species], species: m.species, name: ANIMAL_NAME[m.species], earnedOn: m.earnedOn, reason: m.reason, baby: m.baby, swimming: m.species === 'mallard' }));
   const companions: ForestAnimal[] = companionEncounters(earned, last).map((e) => ({ model: e.id, species: e.species, name: modelName(e.id), earnedOn: e.earnedOn, reason: e.reason, baby: false, swimming: e.swimming }));
   return [...parents, ...companions];
 }

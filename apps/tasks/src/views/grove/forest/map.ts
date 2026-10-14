@@ -146,7 +146,8 @@ export function buildTerrain(cells: Cell[], builtWeeks: number): Terrain {
   const riverDistance = (x: number, z: number) => {
     const { d, i, t } = distanceToPolyline(river, x, z);
     const a = river[i]!, b = river[Math.min(i + 1, river.length - 1)]!;
-    return { d, level: t < 0.5 ? a.level : b.level };
+    // The banks wander in and out (about a unit either way), so the river is not a canal of even width.
+    return { d: d + (fbm(x * 0.11 + 17, z * 0.11 - 9, 41) - 0.5) * 2.4, level: t < 0.5 ? a.level : b.level };
   };
 
   const lakeCentre = { x: -48, z: -38 };
