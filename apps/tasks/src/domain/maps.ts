@@ -1,7 +1,7 @@
 import type { MapStation, Point, TickAttach, TransitMap } from '@/schemas/map';
 import type { SchoolYearTerms } from '@/domain/hub-prefs';
-import { layoutMap, MAP_CAP_LABEL_GAP, MAP_CAP_PILL_H, MAP_LEFT, normalizeLineColors, wrapEventLines } from '@/domain/maps-layout';
-import { swatch } from '@/domain/maps-colors';
+import { normalizeLineColors } from '@/domain/maps-layout';
+import { layoutMap, transitSvgDocument } from '@/domain/maps-transit';
 import { mindWorks2026Map } from '@/domain/maps-seed';
 
 export function isOrthogonalPath(points: Point[]): boolean {
@@ -124,83 +124,8 @@ function escapeHtml(value: string): string {
     .replaceAll('"', '&quot;');
 }
 
-function exportTrackStroke(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  stroke: string
-): string {
-  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="8" stroke-linecap="round"/>`;
-}
-
 function renderExportSvg(map: TransitMap, years?: readonly SchoolYearTerms[] | null): string {
-  const layout = layoutMap(map, years);
-  const parts: string[] = [];
-  for (const term of layout.terms) {
-    parts.push(
-      `<line x1="${MAP_LEFT}" y1="${term.y}" x2="${layout.width - 24}" y2="${term.y}" stroke="#6b7788" stroke-width="1.5" stroke-dasharray="6 5"/>`,
-      `<circle cx="36" cy="${term.y}" r="14" fill="#6b7788"/>`,
-      `<text x="36" y="${term.y + 4}" text-anchor="middle" font-size="11" fill="#fbf8f2" font-weight="600">${term.label}</text>`
-    );
-  }
-  for (const line of layout.lines) {
-    const tone = swatch(line.color);
-    for (const track of line.tracks) {
-      for (const cut of track.cuts) {
-        parts.push(exportTrackStroke(track.x, cut.y0, track.x, cut.y1, tone.stroke));
-      }
-      for (const fork of track.forks) {
-        parts.push(exportTrackStroke(fork.x1, fork.y1, fork.x2, fork.y2, tone.stroke));
-      }
-      for (const cap of [
-        { disc: track.disc, place: 'above' as const },
-        { disc: track.end, place: 'below' as const }
-      ]) {
-        const labelY =
-          cap.place === 'above'
-            ? cap.disc.cy - cap.disc.r - MAP_CAP_LABEL_GAP
-            : cap.disc.cy + cap.disc.r + MAP_CAP_LABEL_GAP;
-        const pillW = Math.max(56, track.label.length * 9 + 20);
-        parts.push(
-          `<rect x="${cap.disc.cx - pillW / 2}" y="${labelY - MAP_CAP_PILL_H / 2}" width="${pillW}" height="${MAP_CAP_PILL_H}" rx="${MAP_CAP_PILL_H / 2}" fill="#fbf8f2" stroke="${tone.stroke}" stroke-width="2"/>`,
-          `<text x="${cap.disc.cx}" y="${labelY + 5}" text-anchor="middle" font-size="15" fill="${tone.stroke}" font-weight="600">${escapeHtml(track.label)}</text>`,
-          `<circle cx="${cap.disc.cx}" cy="${cap.disc.cy}" r="${cap.disc.r}" fill="${tone.disc}"/>`,
-          `<text x="${cap.disc.cx}" y="${cap.disc.cy + 5}" text-anchor="middle" font-size="16" fill="${tone.letter}" font-weight="700">${escapeHtml(line.letter)}</text>`
-        );
-      }
-    }
-  }
-  for (const connector of layout.connectors) {
-    const color = swatch(connector.color).stroke;
-    const opacity = connector.under ? ' stroke-opacity="0.9"' : '';
-    parts.push(
-      `<path d="${connector.path}" fill="none" stroke="${color}" stroke-width="3"${connector.dash ? ' stroke-dasharray="5 4"' : ''}${opacity}/>`
-    );
-  }
-  for (const station of layout.stations) {
-    const tone = swatch(station.color);
-    for (const body of station.bodies) {
-      parts.push(
-        `<rect x="${body.x - body.w / 2}" y="${body.y}" width="${body.w}" height="${body.h}" rx="${body.w / 2}" fill="${tone.fill}" stroke="${tone.stroke}" stroke-width="3.5"/>`,
-        `<text transform="rotate(-90 ${body.x} ${body.y + body.h / 2})" x="${body.x}" y="${body.y + body.h / 2}" text-anchor="middle" dominant-baseline="middle" font-size="18" fill="${tone.stroke}" font-weight="600">${escapeHtml(station.label)}</text>`
-      );
-    }
-  }
-  for (const tick of layout.ticks) {
-    const color = swatch(tick.color).stroke;
-    parts.push(
-      `<circle cx="${tick.cx}" cy="${tick.cy}" r="14" fill="#fbf8f2" stroke="${color}" stroke-width="3.5"/>`,
-      `<rect x="${tick.labelBox.x}" y="${tick.labelBox.y}" width="${tick.labelBox.w}" height="${tick.labelBox.h}" rx="8" fill="#fbf8f2"/>`,
-      `<text x="${tick.labelBox.x + tick.labelBox.w / 2}" y="${tick.labelBox.y + tick.labelBox.h / 2}" text-anchor="middle" dominant-baseline="middle" font-size="16" fill="${color}" font-weight="600">${wrapEventLines(tick.label)
-        .map((line, index, all) => {
-          const y = tick.labelBox.y + tick.labelBox.h / 2 - ((all.length - 1) * 22) / 2 + index * 22;
-          return `<tspan x="${tick.labelBox.x + tick.labelBox.w / 2}" y="${y}">${escapeHtml(line)}</tspan>`;
-        })
-        .join('')}</text>`
-    );
-  }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${layout.width} ${layout.height}" width="100%" height="100%">${parts.join('')}</svg>`;
+  return transitSvgDocument(layoutMap(map, years));
 }
 
 export function exportMapHtml(map: TransitMap, years?: readonly SchoolYearTerms[] | null): string {
