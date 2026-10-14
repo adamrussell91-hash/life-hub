@@ -19,7 +19,7 @@ import { mindWorks2026Map } from '@/domain/maps-seed';
 import {
   addExtraYearTrack,
   adjacentStrandBoxesOverlap,
-  evenTrackX,
+  fitPillLabel,
   lineContentBox,
   lineTrackDefs,
   applyDateSpanToStation,
@@ -29,8 +29,12 @@ import {
   labelHitsForeignLine,
   layoutMap,
   lineStrokeBoxes,
+  MAP_FORK_BAR_GAP,
   MAP_LINE_GAP,
   MAP_STATION_LANE_GAP,
+  MAP_TRACK_GAP,
+  mapTerms,
+  termMarksInOrder,
   matchConnectTarget,
   moveLine,
   nearestLaidTrack,
@@ -272,12 +276,16 @@ describe('year layout', () => {
     expect(side.bodies[0]!.x).toBe(sideX);
     expect(side.bodies[0]!.x - onTrack.bodies[0]!.x).toBe(MAP_STATION_LANE_GAP);
 
-    // Equal spans: capsules are the rails — only the split and join bars are drawn.
-    expect(senior.forks).toHaveLength(2);
-    expect(senior.forks.some((fork) => isCrossbar(fork, philosophy.y, senior.x, sideX))).toBe(true);
-    expect(
-      senior.forks.some((fork) => isCrossbar(fork, philosophy.y + philosophy.h, senior.x, sideX))
-    ).toBe(true);
+    // Split and join bars branch off open track, clear of both capsule caps,
+    // with a short side-rail stub down to (and up from) the parallel capsule.
+    const splitY = philosophy.y - MAP_FORK_BAR_GAP;
+    const joinY = philosophy.y + philosophy.h + MAP_FORK_BAR_GAP;
+    expect(senior.forks).toHaveLength(4);
+    expect(senior.forks.some((fork) => isCrossbar(fork, splitY, senior.x, sideX))).toBe(true);
+    expect(senior.forks.some((fork) => isCrossbar(fork, joinY, senior.x, sideX))).toBe(true);
+    for (const fork of senior.forks.filter((item) => item.y1 === item.y2)) {
+      expect(fork.y1 < philosophy.y || fork.y1 > philosophy.y + philosophy.h).toBe(true);
+    }
 
     // Side rail only — main track is not gapped for the offset capsule alone.
     expect(
@@ -285,18 +293,97 @@ describe('year layout', () => {
     ).toBe(true);
   });
 
-  it('spaces year lines evenly within each strand', () => {
+  it('keeps year lines at least the base gap apart and in order', () => {
     const layout = layoutMap(mindWorks2026Map());
     for (const line of layout.lines) {
-      const xs = line.tracks.map((track) => track.x).sort((a, b) => a - b);
+      const xs = line.tracks.map((track) => track.x);
       const gaps = xs.slice(1).map((x, index) => x - xs[index]!);
       expect(gaps.length).toBe(2);
-      expect(gaps[0]).toBeCloseTo(gaps[1]!, 5);
-      expect(gaps[0]).toBeCloseTo(evenTrackX(0, 1, 3) - evenTrackX(0, 0, 3), 5);
+      for (const gap of gaps) expect(gap).toBeGreaterThan(MAP_TRACK_GAP - 0.01);
     }
   });
 
-  it('adds a custom year line and keeps even spacing', () => {
+  it('parks a competition between its year line and the next one, never across it', () => {
+    const base = mindWorks2026Map();
+    const layout = layoutMap(base);
+    const evatt = layout.ticks.find((tick) => tick.id === 'tk_davinci')!;
+    const line = layout.lines.find((item) => item.id === evatt.lineId)!;
+    const rozelle = line.tracks.find((track) => track.id === 'rozelle')!;
+    const senior = line.tracks.find((track) => track.id === 'senior')!;
+    expect(evatt.parkTrack).toBe('rozelle');
+    expect(evatt.cx).toBeGreaterThan(rozelle.x);
+    expect(evatt.cx).toBeLessThan(senior.x);
+    expect(evatt.labelBox.x + evatt.labelBox.w).toBeLessThan(senior.x - 4);
+    // No competition mark or label sits on any year line of its own strand.
+    for (const tick of layout.ticks) {
+      const own = layout.lines.find((item) => item.id === tick.lineId)!;
+      for (const track of own.tracks) {
+        const box = tick.labelBox;
+        expect(track.x > box.x && track.x < box.x + box.w).toBe(false);
+        expect(Math.abs(track.x - tick.cx) > 14).toBe(true);
+      }
+    }
+  });
+
+  it('parks a competition on a split year line past the parallel capsule', () => {
+    const base = mindWorks2026Map();
+    const layout = layoutMap({
+      ...base,
+      stations: [
+        ...base.stations,
+        datedProgram('st_philosophy', 'The Philosophy of Power', '2026-07-20', '2026-10-30'),
+        datedProgram('st_psyops', 'PSYOPS', '2026-07-20', '2026-10-30')
+      ],
+      ticks: [
+        ...base.ticks,
+        {
+          id: 'tk_brain',
+          label: 'Brain Bee',
+          attach: { kind: 'station', station_id: 'st_philosophy', side: 'right', offset: 0.5, tracks: ['senior'] },
+          stroke: 'solid',
+          connects_to: null,
+          starts_on: '2026-09-01',
+          ends_on: null,
+          link: null,
+          planning: 'planned'
+        }
+      ]
+    });
+    const tick = layout.ticks.find((item) => item.id === 'tk_brain')!;
+    for (const station of layout.stations.filter((item) => item.line_id === 'line_reasoning')) {
+      for (const body of station.bodies) {
+        const inside =
+          Math.abs(tick.cx - body.x) < body.w / 2 + 14 && tick.cy >= body.y && tick.cy <= body.y + body.h;
+        expect(inside).toBe(false);
+      }
+    }
+  });
+
+  it('uses per-map term dates for the term rules', () => {
+    const base = mindWorks2026Map();
+    const terms = { t1: '2026-02-02', t2: '2026-04-29', t3: '2026-07-21', t4: '2026-10-13', e: '2026-12-18' };
+    const layout = layoutMap({ ...base, terms });
+    expect(layout.terms.map((term) => term.date)).toEqual([terms.t1, terms.t2, terms.t3, terms.t4, terms.e]);
+    expect(layout.terms[0]!.y).toBeCloseTo(dateToY(terms.t1, 2026), 5);
+    expect(mapTerms({ year: 2026, terms: null })).toEqual(schoolTerms(2026));
+    expect(TransitMapSchema.parse({ ...base, terms }).terms).toEqual(terms);
+    expect(TransitMapSchema.parse({ ...base, terms: undefined }).terms).toBeNull();
+    expect(termMarksInOrder(terms)).toBe(true);
+    expect(termMarksInOrder({ ...terms, t3: '2026-04-01' })).toBe(false);
+  });
+
+  it('fits long program names inside short capsules', () => {
+    expect(fitPillLabel('PSYOPS', 300)).toEqual({ lines: ['PSYOPS'], font: 18, truncated: false });
+    const two = fitPillLabel('Future Solutions Lab', 150);
+    expect(two.truncated).toBe(false);
+    expect(two.lines.length).toBe(2);
+    const clipped = fitPillLabel('Foundations Ethics and Philosophy of Mind', 60);
+    expect(clipped.truncated).toBe(true);
+    expect(clipped.lines.every((line) => line.length * clipped.font * 0.62 <= 40)).toBe(true);
+    expect(clipped.lines.at(-1)!.endsWith('…')).toBe(true);
+  });
+
+  it('adds a custom year line and keeps the base gap', () => {
     const map = mindWorks2026Map();
     const justice = addExtraYearTrack(map.lines[0]!, 'Middle');
     expect(lineTrackDefs(justice).some((track) => track.label === 'Middle')).toBe(true);
@@ -304,7 +391,7 @@ describe('year layout', () => {
     const xs = layout.lines[0]!.tracks.map((track) => track.x).sort((a, b) => a - b);
     const gaps = xs.slice(1).map((x, index) => x - xs[index]!);
     expect(layout.lines[0]!.tracks.length).toBe(4);
-    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(1);
+    for (const gap of gaps) expect(gap).toBeGreaterThan(MAP_TRACK_GAP - 0.01);
   });
 
   it('connects a late competition to its program even when the date is past the station', () => {

@@ -1,4 +1,4 @@
-import type { MapColorToken, MapLine, MapStation, MapTick, Point, TransitMap, YearTrack } from '@/schemas/map';
+import type { MapColorToken, MapLine, MapStation, MapTerms, MapTick, Point, TransitMap, YearTrack } from '@/schemas/map';
 import type { SchoolYearTerms } from '@/domain/hub-prefs';
 import { parseDue, toDateKey } from '@/domain/queries';
 
@@ -33,6 +33,10 @@ export const MAP_DISC_LIFT = 48;
 /** Pill centre sits this far outside the disc edge, at both caps. */
 export const MAP_CAP_LABEL_GAP = 36;
 export const MAP_CAP_PILL_H = 24;
+/** Split and join bars sit this far outside a fork cluster so they never sit on a capsule cap. */
+export const MAP_FORK_BAR_GAP = 28;
+/** Clear space between a competition label and the next year line. */
+const TRACK_SIDE_PAD = 24;
 
 export const YEAR_TRACKS: YearTrack[] = ['junior', 'rozelle', 'senior'];
 export const YEAR_TRACK_LABELS: Record<YearTrack, string> = {
@@ -156,6 +160,8 @@ export type LaidTick = {
   labelBox: LabelBox;
   labelSide: PortSide;
   ports: ConnectorPort[];
+  /** Year line this competition parks beside; its gap to the next year line widens to fit. */
+  parkTrack: string | null;
 };
 
 export type MapCanvasLayout = {
@@ -194,6 +200,21 @@ function termMarksFrom(terms: SchoolYearTerms['terms']): TermMarks | null {
   const end = by.get(4)?.ends_on;
   if (!t1 || !t2 || !t3 || !t4 || !end) return null;
   return { t1, t2, t3, t4, e: end };
+}
+
+/** Term marks for one map: its own saved terms win, then Settings, then the fallback. */
+export function mapTerms(
+  map: { year: number | null; terms?: MapTerms | null },
+  years?: readonly SchoolYearTerms[] | null
+): TermMarks {
+  if (map.terms) return { ...map.terms };
+  return schoolTerms(map.year ?? new Date().getFullYear(), years);
+}
+
+/** Term marks must run in calendar order (T1 < T2 < T3 < T4 < year end). */
+export function termMarksInOrder(terms: TermMarks): boolean {
+  const order = [terms.t1, terms.t2, terms.t3, terms.t4, terms.e];
+  return order.every((date, index) => index === 0 || order[index - 1]! < date);
 }
 
 /**
@@ -247,10 +268,77 @@ export function estimateVerticalLabel(text: string, fontSize = 12): { w: number;
   return { w: fontSize + 6, h: Math.max(fontSize, text.length * fontSize * 0.72) };
 }
 
+export type PillLabelFit = {
+  lines: string[];
+  font: number;
+  /** True when the full name did not fit and the drawn text ends with an ellipsis. */
+  truncated: boolean;
+};
+
+/** Average glyph advance for the semibold map face, as a share of the font size. */
+const PILL_GLYPH = 0.62;
+const PILL_FONTS = [MAP_STATION_FONT, 16, 14];
+const PILL_TWO_LINE_FONT = 14;
+const PILL_MIN_FONT = 13;
+
+function pillTextLength(text: string, font: number): number {
+  return text.length * font * PILL_GLYPH;
+}
+
+function splitInTwo(text: string): [string, string] | null {
+  const words = text.trim().split(/\s+/);
+  if (words.length < 2) return null;
+  let best: [string, string] | null = null;
+  let bestLongest = Infinity;
+  for (let cut = 1; cut < words.length; cut += 1) {
+    const a = words.slice(0, cut).join(' ');
+    const b = words.slice(cut).join(' ');
+    const longest = Math.max(a.length, b.length);
+    if (longest < bestLongest) {
+      best = [a, b];
+      bestLongest = longest;
+    }
+  }
+  return best;
+}
+
+function clipToLength(text: string, font: number, room: number): string {
+  if (pillTextLength(text, font) <= room) return text;
+  const chars = Math.max(1, Math.floor(room / (font * PILL_GLYPH)) - 1);
+  return `${text.slice(0, chars).trimEnd()}…`;
+}
+
+/**
+ * Fit a program name inside its capsule (vertical text along `length` map units):
+ * full size, then smaller, then two columns, then an ellipsis (the full name lives in a tooltip).
+ */
+export function fitPillLabel(text: string, length: number): PillLabelFit {
+  const label = text.trim() || text;
+  const room = Math.max(0, length - 20);
+  for (const font of PILL_FONTS) {
+    if (pillTextLength(label, font) <= room) return { lines: [label], font, truncated: false };
+  }
+  const halves = splitInTwo(label);
+  if (halves && halves.every((half) => pillTextLength(half, PILL_TWO_LINE_FONT) <= room)) {
+    return { lines: halves, font: PILL_TWO_LINE_FONT, truncated: false };
+  }
+  if (halves && room >= PILL_MIN_FONT * 4) {
+    const first = clipToLength(halves[0], PILL_TWO_LINE_FONT, room);
+    if (first === halves[0]) {
+      return {
+        lines: [first, clipToLength(halves[1], PILL_TWO_LINE_FONT, room)],
+        font: PILL_TWO_LINE_FONT,
+        truncated: true
+      };
+    }
+  }
+  return { lines: [clipToLength(label, PILL_MIN_FONT, room)], font: PILL_MIN_FONT, truncated: true };
+}
+
 export function estimateHorizontalLabel(text: string, fontSize = 12): { w: number; h: number } {
   const lines = wrapEventLines(text);
   const longest = lines.reduce((max, line) => Math.max(max, line.length), 1);
-  return { w: Math.max(fontSize, longest * fontSize * 0.8), h: lines.length * (fontSize + 6) + 2 };
+  return { w: Math.max(fontSize, longest * fontSize * 0.64), h: lines.length * (fontSize + 6) + 2 };
 }
 
 export function wrapEventLines(text: string, maxChars = 22): string[] {
@@ -994,21 +1082,43 @@ function finishTick(
     tracks,
     labelBox: { id: `tk-${tick.id}`, x: 0, y: 0, w: 10, h: 10 },
     labelSide,
-    ports: []
+    ports: [],
+    parkTrack: null
   };
   laid.labelBox = labelForSide(laid, labelSide);
   laid.ports = eventPorts(laid);
   return laid;
 }
 
-function strandParkX(line: LaidLine, fromX: number, side: 'left' | 'right'): number {
-  const xs = line.tracks.map((track) => track.x);
-  if (side === 'right') {
-    const outer = Math.max(fromX, ...xs) + MAP_STATION_W / 2;
-    return outer + MAP_EVENT_STEM;
+/** Highest parallel-program lane on a year line around `y` (0 when the line is single). */
+function laneReachAt(stations: LaidStation[], lineId: string, trackId: string, y: number): number {
+  let reach = 0;
+  for (const cluster of overlapClusters(trackBodies(stations, lineId, trackId))) {
+    if (y < cluster.y0 - MAP_FORK_BAR_GAP || y > cluster.y1 + MAP_FORK_BAR_GAP) continue;
+    reach = Math.max(reach, ...cluster.lanes.map((body) => body.lane));
   }
-  const outer = Math.min(fromX, ...xs) - MAP_STATION_W / 2;
-  return outer - MAP_EVENT_STEM;
+  return reach;
+}
+
+/**
+ * Where a competition's mark sits: just beside its own year line, past any parallel
+ * program rails at that date — never across a sibling year line (the gap widens instead).
+ */
+function trackParkX(
+  stations: LaidStation[],
+  lineId: string,
+  trackId: string,
+  trackX: number,
+  fromX: number,
+  y: number,
+  side: 'left' | 'right'
+): number {
+  if (side === 'left') {
+    return Math.min(fromX, trackX - MAP_STATION_W / 2) - MAP_EVENT_STEM;
+  }
+  const reach = laneReachAt(stations, lineId, trackId, y);
+  const outer = Math.max(fromX, stationLaneX(trackX, reach) + MAP_STATION_W / 2);
+  return outer + MAP_EVENT_STEM;
 }
 
 function placeTick(
@@ -1028,7 +1138,7 @@ function placeTick(
     const side = attach.side;
     if (side === 'top' || side === 'bottom') {
       const dir = side === 'bottom' ? 1 : -1;
-      return finishTick(
+      const laid = finishTick(
         tick,
         host.lineId,
         host.color,
@@ -1038,9 +1148,11 @@ function placeTick(
         port.y + dir * MAP_EVENT_STEM,
         host.labelSide
       );
+      laid.parkTrack = host.parkTrack;
+      return laid;
     }
     const dir = side === 'left' ? -1 : 1;
-    return finishTick(
+    const laid = finishTick(
       tick,
       host.lineId,
       host.color,
@@ -1050,6 +1162,8 @@ function placeTick(
       port.y,
       side
     );
+    laid.parkTrack = host.parkTrack;
+    return laid;
   }
   if (attach.kind === 'line') {
     const line = lines.find((item) => item.id === attach.line_id);
@@ -1063,17 +1177,19 @@ function placeTick(
     const track = laidTracks[laidTracks.length - 1] ?? laidTracks[0] ?? line.tracks[0];
     const x = track?.x ?? line.x;
     const y0 = tick.starts_on ? dateToY(tick.starts_on, year) : remapLegacyY(attach.y);
-    return finishTick(
+    const laid = finishTick(
       tick,
       line.id,
       line.color,
       x,
       y0,
-      strandParkX(line, x, 'right'),
+      track ? trackParkX(stations, line.id, track.id, x, x, y0, 'right') : x + MAP_STATION_W / 2 + MAP_EVENT_STEM,
       y0,
       'right',
       trackIds
     );
+    laid.parkTrack = track?.id ?? null;
+    return laid;
   }
   const station = stations.find((item) => item.id === attach.station_id);
   const line = lines.find((item) => item.id === station?.line_id);
@@ -1096,17 +1212,13 @@ function placeTick(
   const dir = attach.side === 'left' ? -1 : 1;
   const x0 = port?.x ?? (body ? body.x + dir * (body.w / 2) : station.x + dir * (station.w / 2));
   const y0 = port?.y ?? Math.min(station.y + station.h, Math.max(station.y, dateY));
-  return finishTick(
-    tick,
-    line.id,
-    line.color,
-    x0,
-    y0,
-    attach.side === 'left' ? strandParkX(line, x0, 'left') : strandParkX(line, x0, 'right'),
-    dateY,
-    attach.side,
-    trackIds
-  );
+  const hostTrack = line.tracks.find((item) => item.id === body?.track) ?? null;
+  const parkX = hostTrack
+    ? trackParkX(stations, line.id, hostTrack.id, hostTrack.x, x0, dateY, attach.side)
+    : x0 + dir * MAP_EVENT_STEM;
+  const laid = finishTick(tick, line.id, line.color, x0, y0, parkX, dateY, attach.side, trackIds);
+  laid.parkTrack = hostTrack?.id ?? null;
+  return laid;
 }
 
 function sharesTrack(a: LaidStation, b: LaidStation): boolean {
@@ -1217,23 +1329,109 @@ function forkSegment(x1: number, y1: number, x2: number, y2: number): LaidTrackF
   return { x1, y1, x2, y2 };
 }
 
-/** Circuit-style split bar → side rail (gapped for capsules) → join bar. */
-function circuitForks(trackX: number, cluster: ForkCluster): LaidTrackFork[] {
+/**
+ * Circuit-style split bar → side rail (gapped for capsules) → join bar.
+ * Bars sit outside the cluster so they branch off open track, never across a capsule cap.
+ */
+function circuitForks(
+  trackX: number,
+  cluster: ForkCluster,
+  bounds: { y0: number; y1: number }
+): LaidTrackFork[] {
   const maxLane = Math.max(0, ...cluster.lanes.map((body) => body.lane));
   if (maxLane < 1) return [];
+  const splitY = Math.max(bounds.y0, cluster.y0 - MAP_FORK_BAR_GAP);
+  const joinY = Math.min(bounds.y1, cluster.y1 + MAP_FORK_BAR_GAP);
   const forks: LaidTrackFork[] = [];
   for (let lane = 1; lane <= maxLane; lane += 1) {
     const sideX = stationLaneX(trackX, lane);
     const sideBlocks = cluster.lanes
       .filter((body) => body.lane === lane)
       .map(({ y0, y1 }) => ({ y0, y1 }));
-    forks.push(forkSegment(trackX, cluster.y0, sideX, cluster.y0));
-    for (const seg of cutVertical(cluster.y0, cluster.y1, sideBlocks)) {
+    forks.push(forkSegment(trackX, splitY, sideX, splitY));
+    for (const seg of cutVertical(splitY, joinY, sideBlocks)) {
       forks.push(forkSegment(sideX, seg.y0, sideX, seg.y1));
     }
-    forks.push(forkSegment(trackX, cluster.y1, sideX, cluster.y1));
+    forks.push(forkSegment(trackX, joinY, sideX, joinY));
   }
   return forks;
+}
+
+function capPillHalf(label: string): number {
+  return Math.max(56, label.length * 9 + 20) / 2;
+}
+
+/**
+ * Space year lines like a transit map: each gap is wide enough for the parallel
+ * programs and competitions that sit beside the left-hand line, so nothing parks across
+ * a sibling year line. The middle line keeps its x; the others move out from it.
+ */
+function spreadTracks(lines: LaidLine[], stations: LaidStation[], ticks: LaidTick[]): void {
+  for (const line of lines) {
+    const count = line.tracks.length;
+    if (count < 2) continue;
+    const right = line.tracks.map((track) => Math.max(MAP_STATION_W / 2, capPillHalf(track.label)));
+    const left = line.tracks.map((track) => Math.max(MAP_STATION_W / 2, capPillHalf(track.label)));
+    const indexOf = new Map(line.tracks.map((track, index) => [track.id, index]));
+    for (const station of stations) {
+      if (station.line_id !== line.id) continue;
+      for (const body of station.bodies) {
+        const index = indexOf.get(body.track);
+        if (index === undefined) continue;
+        const trackX = line.tracks[index]!.x;
+        right[index] = Math.max(right[index]!, body.x + body.w / 2 - trackX);
+        left[index] = Math.max(left[index]!, trackX - (body.x - body.w / 2));
+      }
+    }
+    for (const tick of ticks) {
+      if (tick.lineId !== line.id || !tick.parkTrack) continue;
+      const index = indexOf.get(tick.parkTrack);
+      if (index === undefined) continue;
+      const trackX = line.tracks[index]!.x;
+      const x0 = Math.min(tick.cx - MAP_TICK_R, tick.labelBox.x);
+      const x1 = Math.max(tick.cx + MAP_TICK_R, tick.labelBox.x + tick.labelBox.w);
+      right[index] = Math.max(right[index]!, x1 - trackX);
+      left[index] = Math.max(left[index]!, trackX - x0);
+    }
+    const offsets = [0];
+    for (let i = 1; i < count; i += 1) {
+      const gap = Math.max(MAP_TRACK_GAP, right[i - 1]! + left[i]! + TRACK_SIDE_PAD);
+      offsets.push(offsets[i - 1]! + gap);
+    }
+    const centerIndex = Math.floor((count - 1) / 2);
+    const centerX = line.tracks[centerIndex]!.x;
+    const shifts = new Map<string, number>();
+    line.tracks.forEach((track, index) => {
+      const dx = centerX + offsets[index]! - offsets[centerIndex]! - track.x;
+      shifts.set(track.id, dx);
+      if (!dx) return;
+      track.x += dx;
+      track.disc.cx += dx;
+      track.end.cx += dx;
+    });
+    for (const station of stations) {
+      if (station.line_id !== line.id) continue;
+      let moved = false;
+      for (const body of station.bodies) {
+        const dx = shifts.get(body.track) ?? 0;
+        if (!dx) continue;
+        body.x += dx;
+        moved = true;
+      }
+      if (!moved) continue;
+      station.x = station.bodies[station.bodies.length - 1]?.x ?? station.x;
+      station.ports = stationPorts(station);
+    }
+    for (const tick of ticks) {
+      if (tick.lineId !== line.id || !tick.parkTrack) continue;
+      const dx = shifts.get(tick.parkTrack) ?? 0;
+      if (!dx) continue;
+      tick.x0 += dx;
+      tick.cx += dx;
+      tick.labelBox.x += dx;
+      for (const port of tick.ports) port.x += dx;
+    }
+  }
 }
 
 function applyTrackCuts(lines: LaidLine[], stations: LaidStation[]): void {
@@ -1243,7 +1441,8 @@ function applyTrackCuts(lines: LaidLine[], stations: LaidStation[]): void {
       // Main rail only gaps for the on-track (lane 0) capsules.
       const mainBlocks = onTrack.filter((body) => body.lane === 0).map(({ y0, y1 }) => ({ y0, y1 }));
       track.cuts = cutVertical(line.y0, line.y1, mainBlocks);
-      track.forks = overlapClusters(onTrack).flatMap((cluster) => circuitForks(track.x, cluster));
+      const bounds = { y0: track.disc.cy + track.disc.r, y1: track.end.cy - track.end.r };
+      track.forks = overlapClusters(onTrack).flatMap((cluster) => circuitForks(track.x, cluster, bounds));
     }
   }
 }
@@ -1252,7 +1451,7 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
   const year = map.year ?? new Date().getFullYear();
   const yearTop = MAP_YEAR_TOP;
   const yearBottom = MAP_YEAR_BOTTOM;
-  const termsRaw = schoolTerms(year, years);
+  const termsRaw = mapTerms({ year, terms: map.terms }, years);
   const terms: TermBand[] = [
     { id: 'T1', label: 'T1', date: termsRaw.t1, y: dateToY(termsRaw.t1, year) },
     { id: 'T2', label: 'T2', date: termsRaw.t2, y: dateToY(termsRaw.t2, year) },
@@ -1356,6 +1555,7 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
     pending.splice(0, pending.length, ...leftover);
   }
   separateEventMarks(ticks);
+  spreadTracks(lines, stations, ticks);
 
   packLines(lines, stations, ticks);
 

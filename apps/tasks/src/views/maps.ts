@@ -19,10 +19,14 @@ import {
   applyDateSpanToStation,
   applyDateToTickAttach,
   dateToY,
+  fitPillLabel,
   layoutMap,
+  mapTerms,
+  termMarksInOrder,
   lineTrackDefs,
   MAP_CAP_LABEL_GAP,
   MAP_CAP_PILL_H,
+  MAP_STATION_FONT,
   LINE_COLORS,
   lineColorsNeedWriteback,
   moveLine,
@@ -33,11 +37,11 @@ import {
   normalizeLineColors,
   orthogonalPath,
   resolveLineAttachTracks,
-  schoolTerms,
   wrapEventLines,
   yearLinePoints,
   yToDate,
-  type MapCanvasLayout
+  type MapCanvasLayout,
+  type TermMarks
 } from '@/domain/maps-layout';
 import { discCss, fillCss, letterCss, strokeCss } from '@/domain/maps-colors';
 import { createHubField, createHubFilter } from '@/views/hub-kit';
@@ -273,6 +277,26 @@ function verticalText(
   return text;
 }
 
+/** Program name inside its capsule: shrinks, then wraps to two columns, then ends in an ellipsis. */
+function appendPillLabel(
+  parent: SVGElement,
+  body: { x: number; y: number; h: number },
+  label: string,
+  fill: string
+): void {
+  const fit = fitPillLabel(label, body.h);
+  const step = fit.font + 2;
+  const cy = body.y + body.h / 2;
+  fit.lines.forEach((line, index) => {
+    // Rotated -90°, the first line reads on the left.
+    const x = body.x + (index - (fit.lines.length - 1) / 2) * step;
+    const text = verticalText(x, cy, line, 'map-station__label', fill);
+    if (fit.font !== MAP_STATION_FONT) text.style.fontSize = `${fit.font}px`;
+    if (fit.truncated) text.setAttribute('data-truncated', '');
+    parent.append(text);
+  });
+}
+
 function horizontalText(
   x: number,
   y: number,
@@ -389,9 +413,13 @@ function ownerLineId(layout: MapCanvasLayout, ownerId: string, owner: string): s
 
 const DRAG_THRESHOLD = 4;
 
+/** Selection id for the map's term-dates panel (never a real item id). */
+const TERMS_SELECTION = '__terms__';
+
 type MapHit =
   | JoinPick
   | { kind: 'station-resize'; id: string; edge: 'top' | 'bottom' }
+  | { kind: 'terms'; id: string }
   | null;
 
 function letterFill(color: MapColorToken): string {
@@ -496,7 +524,13 @@ function renderMapSvg(
         class: 'map-term__rule'
       })
     );
-    const disc = svgEl('g', { class: 'map-term' });
+    const disc = svgEl('g', {
+      class: `map-term${editMode ? ' is-editable' : ''}${selectedId === TERMS_SELECTION ? ' is-selected' : ''}`,
+      'data-term': term.id
+    });
+    const tip = svgEl('title', {});
+    tip.textContent = `${term.id === 'E' ? 'Year ends' : `Term ${term.id.slice(1)} starts`} ${formatDisplayDate(term.date)}`;
+    disc.append(tip);
     disc.append(
       svgEl('circle', {
         cx: '36',
@@ -609,8 +643,11 @@ function renderMapSvg(
             })
           );
         }
-        g.append(verticalText(body.x, body.y + body.h / 2, station.label, 'map-station__label', stationColor));
+        appendPillLabel(g, body, station.label, stationColor);
       }
+      const tip = svgEl('title', {});
+      tip.textContent = station.label;
+      g.prepend(tip);
       if (showPorts) {
         for (const port of station.ports) {
           g.append(portDot(port.x, port.y, port.id, stationColor));
@@ -715,6 +752,9 @@ function hitMap(
       if (port.owner === 'station') return { kind: 'station', id: port.ownerId };
       return { kind: 'line', id: port.ownerId };
     }
+  }
+  if (editMode && layout.terms.some((term) => Math.hypot(x - 36, y - term.y) <= 22)) {
+    return { kind: 'terms', id: TERMS_SELECTION };
   }
   for (const tick of layout.ticks) {
     if (Math.hypot(x - tick.cx, y - tick.cy) <= 20) return { kind: 'event', id: tick.id };
@@ -834,7 +874,7 @@ function resizeStationDates(
 }
 
 function joinPick(hit: MapHit): JoinPick | null {
-  if (!hit || hit.kind === 'station-resize') return null;
+  if (!hit || hit.kind === 'station-resize' || hit.kind === 'terms') return null;
   return hit;
 }
 
@@ -972,7 +1012,7 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     canvas.classList.toggle('map-page--fullscreen', fullscreen);
     setMapFullscreenChrome(fullscreen);
     const year = current.year ?? yearNow;
-    const terms = schoolTerms(year, termYears);
+    const terms = mapTerms(current, termYears);
     const layout = layoutMap(current, termYears);
     // Remount wipes scroll hosts; keep the page (and side panels) where they were.
     const scrollHost = canvas.closest('.hub-canvas');
@@ -1029,6 +1069,10 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         onAddLine: () => addLineNow(),
         onAddProgram: () => addStationNow(),
         onAddCompetition: () => addEventNow(),
+        onEditTerms: () => {
+          selectedId = selectedId === TERMS_SELECTION ? null : TERMS_SELECTION;
+          paint();
+        },
         onJoin: () => {
           joining = !joining;
           toast = joining ? 'Drag from one item to another to join them. Ports show only in this mode.' : '';
@@ -1473,8 +1517,9 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     paint();
   }
 
-  function buildInspector(year: number, terms: ReturnType<typeof schoolTerms>): HTMLElement | null {
+  function buildInspector(year: number, terms: TermMarks): HTMLElement | null {
     if (!selectedId) return null;
+    if (selectedId === TERMS_SELECTION) return mode === 'edit' ? buildTermsInspector(year, terms) : null;
     const line = current.lines.find((item) => item.id === selectedId);
     if (line) return mode === 'edit' ? buildLineInspector(line) : null;
     const { station, tick } = liveItem(selectedId);
@@ -1552,7 +1597,61 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     });
   }
 
-  function buildItemInspector(id: string, year: number, terms: ReturnType<typeof schoolTerms>): HTMLElement | null {
+  /** Per-map term dates: the grey term rules follow these, not the Settings defaults. */
+  function buildTermsInspector(year: number, terms: TermMarks): HTMLElement {
+    const fields: Array<{ key: keyof TermMarks; label: string }> = [
+      { key: 't1', label: 'Term 1 starts' },
+      { key: 't2', label: 'Term 2 starts' },
+      { key: 't3', label: 'Term 3 starts' },
+      { key: 't4', label: 'Term 4 starts' },
+      { key: 'e', label: 'Year ends' }
+    ];
+    const error = el('p', 'map-inspector__hint map-inspector__error');
+    error.hidden = true;
+    error.setAttribute('role', 'alert');
+    const inputs = fields.map((field) => ({ ...field, control: dateInput(terms[field.key], field.label) }));
+    const apply = () => {
+      const next = Object.fromEntries(inputs.map((item) => [item.key, item.control.input.value])) as TermMarks;
+      if (inputs.some((item) => !item.control.input.value) || !termMarksInOrder(next)) {
+        error.textContent = 'Each date must be after the one above it.';
+        error.hidden = false;
+        return;
+      }
+      error.hidden = true;
+      current.terms = next;
+      paint();
+      void persist();
+    };
+    const body: HTMLElement[] = [];
+    for (const item of inputs) {
+      item.control.input.addEventListener('change', apply);
+      body.push(inspectorField(item.label, item.control.el));
+    }
+    body.push(error);
+    const note = current.terms
+      ? `These dates are saved on this map only.`
+      : `Showing the ${year} dates from Settings. Change any date to save them on this map.`;
+    body.push(el('p', 'map-inspector__hint', note));
+    if (current.terms) {
+      const actions = el('div', 'map-inspector__actions');
+      actions.append(
+        inspectorButton('Use Settings dates', 'btn--ghost', () => {
+          current.terms = null;
+          paint();
+          void persist();
+        })
+      );
+      body.push(actions);
+    }
+    return createMapInspector({
+      eyebrow: 'Terms',
+      title: `Term dates ${year}`,
+      onClose: closeInspector,
+      body
+    });
+  }
+
+  function buildItemInspector(id: string, year: number, terms: TermMarks): HTMLElement | null {
     const initial = liveItem(id);
     const initialItem = initial.station ?? initial.tick;
     if (!initialItem) return null;
@@ -1805,7 +1904,7 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
 
   function addStationNow(): void {
     const year = current.year ?? yearNow;
-    const terms = schoolTerms(year, termYears);
+    const terms = mapTerms({ year, terms: current.terms }, termYears);
     if (!current.lines.length) {
       toast = 'Add a line first.';
       paint();
@@ -1834,7 +1933,7 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
 
   function addEventNow(): void {
     const year = current.year ?? yearNow;
-    const terms = schoolTerms(year, termYears);
+    const terms = mapTerms({ year, terms: current.terms }, termYears);
     if (!current.lines.length) {
       toast = 'Add a line first.';
       paint();
@@ -1927,6 +2026,7 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
       const saved = await tasksApi.updateMap(target.id, {
         title: target.title,
         year: target.year,
+        terms: target.terms ?? null,
         lines: target.lines,
         stations: target.stations,
         ticks: target.ticks
