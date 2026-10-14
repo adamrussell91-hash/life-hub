@@ -4326,11 +4326,15 @@ a.home-class-tile:hover {
 }
 
 /* Timeline: vertical rail. Each row is [when] [node + segment] [card];
-   under 36rem of block width the when moves above the card. */
+   under 36rem of block width the when moves above the card.
+   The wrapper is the size container: an element can't query itself. */
+.block[data-block-type='timeline'] {
+  container-type: inline-size;
+}
+
 .block-timeline {
   --tl-node: 0.875rem;
   --tl-node-y: calc(var(--text-sm) * var(--leading-snug) / 2);
-  container-type: inline-size;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -4485,10 +4489,148 @@ a.home-class-tile:hover {
   }
 }
 
+/* Either side: centre spine, cards alternate and overlap by half a step.
+   Under 40rem of block width it falls back to the rail above. */
+@container (min-width: 40rem) {
+  .block-timeline--alternate {
+    --tl-node-y: calc(var(--text-sm) * var(--leading-snug) / 2);
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--space-6) minmax(0, 1fr);
+    row-gap: var(--space-3);
+  }
+
+  /* One spine for the whole list instead of per-event segments. */
+  .block-timeline--alternate::before {
+    content: '';
+    position: absolute;
+    top: var(--tl-node-y);
+    bottom: var(--space-8);
+    left: calc(50% - 1px);
+    width: 2px;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--wave) 30%, transparent) 85%,
+      transparent
+    );
+  }
+
+  .block-timeline--alternate .block-timeline__event {
+    padding-bottom: 0;
+    column-gap: var(--space-3);
+    row-gap: var(--space-1);
+  }
+
+  .block-timeline--alternate .block-timeline__event::before {
+    content: none;
+  }
+
+  .block-timeline--alternate .block-timeline__when {
+    padding-top: 0;
+  }
+
+  .block-timeline--alternate .block-timeline__event:nth-child(odd) {
+    grid-column: 1 / 3;
+    grid-template-columns: minmax(0, 1fr) var(--space-6);
+    grid-template-areas:
+      'when node'
+      'card .';
+  }
+
+  .block-timeline--alternate .block-timeline__event:nth-child(odd) .block-timeline__when {
+    flex-direction: row;
+    justify-content: flex-end;
+    text-align: right;
+  }
+
+  .block-timeline--alternate .block-timeline__event:nth-child(even) {
+    grid-column: 2 / 4;
+    grid-template-columns: var(--space-6) minmax(0, 1fr);
+    grid-template-areas:
+      'node when'
+      '. card';
+  }
+
+  .block-timeline--alternate .block-timeline__event:nth-child(even) .block-timeline__when {
+    flex-direction: row;
+    align-items: baseline;
+    text-align: left;
+  }
+
+  .block-timeline--alternate .block-timeline__end {
+    font-size: var(--text-sm);
+  }
+}
+
+/* Horizontal: one strip that scrolls sideways, never wraps. */
+.block-timeline--horizontal {
+  --tl-node-y: calc(var(--tl-node) / 2);
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  padding-bottom: var(--space-3);
+  border-radius: var(--radius-xs);
+}
+
+.block-timeline--horizontal:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 4px;
+}
+
+.block-timeline--horizontal .block-timeline__event {
+  flex: 0 0 15rem;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas:
+    'node'
+    'when'
+    'card';
+  row-gap: var(--space-2);
+  padding: 0 var(--space-4) 0 0;
+  scroll-snap-align: start;
+}
+
+.block-timeline--horizontal .block-timeline__event:last-child {
+  padding-right: 0;
+}
+
+/* Segment from this node to the next node along the strip. */
+.block-timeline--horizontal .block-timeline__event:not(:last-child)::before {
+  top: calc(var(--tl-node-y) - 1px);
+  bottom: auto;
+  left: calc(var(--tl-node) / 2);
+  right: calc(-1 * var(--tl-node) / 2);
+  width: auto;
+  height: 2px;
+}
+
+.block-timeline--horizontal .block-timeline__node {
+  justify-self: start;
+  margin-top: 0;
+}
+
+.block-timeline--horizontal .block-timeline__when {
+  flex-direction: row;
+  align-items: baseline;
+  text-align: left;
+  padding-top: 0;
+}
+
+.block-timeline--horizontal .block-timeline__end {
+  font-size: var(--text-sm);
+}
+
 @media print {
   .block-timeline__card {
     box-shadow: none;
     background: none;
+  }
+
+  .block-timeline--horizontal {
+    flex-wrap: wrap;
+    overflow: visible;
+    row-gap: var(--space-4);
   }
 
   .block-timeline__node {
