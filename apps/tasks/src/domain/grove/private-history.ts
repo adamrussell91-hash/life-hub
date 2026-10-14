@@ -10,13 +10,19 @@ const PREFIX='grove-history:v1:';
 export const isGroveHistoryId=(id:string)=>id.startsWith(PREFIX);
 const domainFor=(area:string)=>['teaching','gifted','halt'].includes(area)?'teaching':['life','health','wedding'].includes(area)?area:'other';
 /** Completed inputs for Grove only. Never persist these through the task API. */
-export function applyGroveHistory(input:{history?:unknown;tasks:readonly GroveTaskInput[];terms:readonly GroveTerm[];books:readonly GroveBookInput[];now:Date}):{tasks:GroveTaskInput[];terms:GroveTerm[];books:GroveBookInput[]} {
- const history=parseGroveHistory(input.history);const tasks=[...input.tasks];const books=[...input.books];let terms=[...input.terms];if(!history)return {tasks,terms,books};
+/** Finished projects, competitions and excursions from history, with the last day each year's history covers. */
+export type GroveHistoryEvents={projects:string[];competitions:string[];excursions:string[];covered:Record<'projects'|'competitions'|'excursions',string|null>};
+export function applyGroveHistory(input:{history?:unknown;tasks:readonly GroveTaskInput[];terms:readonly GroveTerm[];books:readonly GroveBookInput[];now:Date}):{tasks:GroveTaskInput[];terms:GroveTerm[];books:GroveBookInput[];events:GroveHistoryEvents} {
+ const history=parseGroveHistory(input.history);const tasks=[...input.tasks];const books=[...input.books];let terms=[...input.terms];
+ const events:GroveHistoryEvents={projects:[],competitions:[],excursions:[],covered:{projects:null,competitions:null,excursions:null}};
+ if(!history)return {tasks,terms,books,events};
  const today=toHubDateKey(input.now);const live=[...new Map(groveCompletions(input.tasks).completions.filter(c=>c.completedMs<=input.now.getTime()).map(c=>[c.id,c])).values()];const bookDates=new Set(books.map(b=>b.completed_on));
  for(const year of history.years){
   let historyIndex=0;
   if(year.terms?.length){terms=terms.filter(t=>!t.starts_on.startsWith(year.year+'-'));terms.push(...year.terms);}
   for(const day of year.books??[])if(day<=today&&!bookDates.has(day)){books.push({label:'Finished book',completed_on:day});bookDates.add(day);}
+  const last=year.weeks.at(-1)?.ends_on??`${year.year}-12-31`;
+  for(const kind of ['projects','competitions','excursions'] as const)if(year[kind]){events[kind].push(...year[kind]!.filter(d=>d<=today));const was=events.covered[kind];if(!was||last>was)events.covered[kind]=last;}
   for(const week of year.weeks){if(week.starts_on>today)continue;
    const baseline=new Map<string,number>();for(const [area,count] of Object.entries(week.counts)){const d=domainFor(area);baseline.set(d,(baseline.get(d)??0)+count);}
    const days=Array.from({length:daysBetween(week.starts_on,week.ends_on)+1},(_,i)=>addDays(week.starts_on,i)).filter(d=>d<=today);
@@ -26,5 +32,5 @@ export function applyGroveHistory(input:{history?:unknown;tasks:readonly GroveTa
    }
   }
  }
- terms.sort((a,b)=>a.starts_on.localeCompare(b.starts_on));return {tasks,terms,books};
+ terms.sort((a,b)=>a.starts_on.localeCompare(b.starts_on));return {tasks,terms,books,events};
 }
