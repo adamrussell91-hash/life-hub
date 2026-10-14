@@ -659,3 +659,15 @@
     transition: none;
   }
 }
+
+.grove-history-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.grove-history-status {
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+}

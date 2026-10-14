@@ -80,7 +80,7 @@ describe('Grove forest data', () => {
 
   it('brings the animals real milestones earned this year', () => {
     const tasks = Array.from({ length: 5 }, (_, i) => done(`d${i}`, `2026-02-13T0${i}:00:00Z`));
-    const animals = forestAnimals(groveCompletions(tasks).completions, [], [{ completed_on: '2026-01-11' }], 2026, '2026-10-10');
-    expect(animals.filter((a) => a.species === 'hare' || a.species === 'owl').map((a) => [a.name, a.earnedOn])).toEqual([['Hare', '2026-02-13'], ['Owl', '2026-01-11'], ['Skunk', '2026-02-13']]); // the skunk is the hare's companion
+    const animals = forestAnimals(groveCompletions(tasks).completions, [], [{ completed_on: '2026-01-11' }, { completed_on: '2026-03-02' }], 2026, '2026-10-10');
+    expect(animals.map((a) => [a.name, a.earnedOn])).toEqual([['Owl', '2026-03-02']]); // one five-task day is 1 of the 4 a hare needs; every 2nd book brings an owl
   });
 });
