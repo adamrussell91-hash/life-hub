@@ -10,7 +10,9 @@ import { toHubDateKey } from '@/domain/queries';
 import { hashQuery } from '@/shell/shell';
 import { TASKS_CHANGED, TASKS_DELETED } from '@/services/task-cache';
 import { renderLoadError } from '@/views/feedback';
+import { tasksApi } from '@/services/client-api';
 import { groveAssetUrl } from './asset-url';
+import { createGroveHistoryImport } from './history-import';
 import { loadForest } from './forest/load';
 import { weekOfDay } from './forest/history';
 import { animalGlyph, groveKey } from './forest/key';
@@ -206,6 +208,13 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
       block.append(list);
       body.append(block);
     }
+    const history = el('section', 'grove-key__section');
+    history.append(
+      el('h3', 'grove-key__heading', 'Your history'),
+      el('p', 'grove-key__lede', 'Weeks before the Tasks hub, books, projects, competitions and excursions come from your private history file. Importing a file replaces the saved one.'),
+      createGroveHistoryImport(tasksApi.updateHubPrefs, () => void renderGroveView(canvas), () => gen === generation)
+    );
+    body.append(history);
     keyPanel.replaceChildren(head, body);
   }
   function setKey(open: boolean): void {

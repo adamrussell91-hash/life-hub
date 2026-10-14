@@ -1,6 +1,6 @@
 /**
  * Earned wildlife in the forest. Which animals exist comes from real milestones
- * (domain/grove/wildlife.ts and companions.ts); this decides where each one lives and how it moves.
+ * (domain/grove/forest-wildlife.ts); this decides where each one lives and how it moves.
  *
  * - Year view: every animal is out, and land animals wander the whole built island on trails found
  *   over walkable ground (bridges included), visiting other weeks and coming home.
@@ -26,14 +26,13 @@ import { buildWalkGrid, closedTour, findRoute, roundLoop, type Point, type WalkG
 export type ForestAnimal = {
   /** Catalogue model id, e.g. animal-deer-doe. */
   model: string;
+  /** Habitat: robins fly, owls perch, swimmers keep to the lake. */
   species: WildlifeSpecies;
   name: string;
   earnedOn: string;
   reason: string;
   baby: boolean;
   swimming: boolean;
-  /** Came with an earned animal rather than earned in its own right. */
-  companion?: boolean;
 };
 
 // three ships without type declarations here; clips and actions stay loosely typed.
