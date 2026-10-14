@@ -5,7 +5,8 @@ body {
 }
 
 body.grove-embed {
-  background: linear-gradient(180deg, #dcecf4 0%, #eef5f0 70%, #f4f1e8 100%);
+  /* The forest's sky, so the preview matches the Grove page. */
+  background: linear-gradient(180deg, #a6dbf2 0%, #cbeaf2 45%, #eaf5ec 80%, #f5f2e2 100%);
   font-family: Inter, system-ui, sans-serif;
   overflow: hidden;
 }
@@ -22,6 +23,8 @@ body.grove-embed {
 
 .grove-embed__stage canvas {
   display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .grove-embed__caption {
