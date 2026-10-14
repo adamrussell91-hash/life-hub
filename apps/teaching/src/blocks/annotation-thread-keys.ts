@@ -1,21 +1,17 @@
 /**
  * Pure key resolution for annotation interactive view (slice 3b).
- * One handler, one mode flag: thread focus vs layer slider.
+ * Arrow keys step a focused thread. Layer visibility is the tick chips.
  */
 
 export type AnnotationKeyAction =
   | { type: 'close_panel' }
   | { type: 'exit_focus' }
-  | { type: 'step_thread'; delta: -1 | 1 }
-  | { type: 'step_slider'; delta: -1 | 1 }
-  | { type: 'slider_home' }
-  | { type: 'slider_end' };
+  | { type: 'step_thread'; delta: -1 | 1 };
 
 export type AnnotationKeyInput = {
   key: string;
   /** Thread focus active. */
   focusThreadId: string | null;
-  sliderFocused: boolean;
   panelOpen: boolean;
   isTextControl: boolean;
 };
@@ -30,19 +26,15 @@ export function resolveAnnotationKey(input: AnnotationKeyInput): AnnotationKeyAc
     return null;
   }
 
-  const threadMode = Boolean(input.focusThreadId) && !input.sliderFocused;
+  if (!input.focusThreadId) return null;
 
   switch (input.key) {
     case 'ArrowLeft':
     case 'ArrowDown':
-      return threadMode ? { type: 'step_thread', delta: -1 } : { type: 'step_slider', delta: -1 };
+      return { type: 'step_thread', delta: -1 };
     case 'ArrowRight':
     case 'ArrowUp':
-      return threadMode ? { type: 'step_thread', delta: 1 } : { type: 'step_slider', delta: 1 };
-    case 'Home':
-      return threadMode ? null : { type: 'slider_home' };
-    case 'End':
-      return threadMode ? null : { type: 'slider_end' };
+      return { type: 'step_thread', delta: 1 };
     default:
       return null;
   }

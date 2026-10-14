@@ -11,7 +11,6 @@ describe('resolveAnnotationKey', () => {
       resolveAnnotationKey({
         key: 'ArrowRight',
         focusThreadId: 't1',
-        sliderFocused: false,
         panelOpen: false,
         isTextControl: true
       })
@@ -23,7 +22,6 @@ describe('resolveAnnotationKey', () => {
       resolveAnnotationKey({
         key: 'Escape',
         focusThreadId: 't1',
-        sliderFocused: false,
         panelOpen: true,
         isTextControl: false
       })
@@ -32,19 +30,17 @@ describe('resolveAnnotationKey', () => {
       resolveAnnotationKey({
         key: 'Escape',
         focusThreadId: 't1',
-        sliderFocused: false,
         panelOpen: false,
         isTextControl: false
       })
     ).toEqual({ type: 'exit_focus' });
   });
 
-  it('arrows step the thread while focused unless the slider is focused', () => {
+  it('arrows step the thread while focused', () => {
     expect(
       resolveAnnotationKey({
         key: 'ArrowRight',
         focusThreadId: 't1',
-        sliderFocused: false,
         panelOpen: false,
         isTextControl: false
       })
@@ -53,62 +49,29 @@ describe('resolveAnnotationKey', () => {
       resolveAnnotationKey({
         key: 'ArrowLeft',
         focusThreadId: 't1',
-        sliderFocused: false,
         panelOpen: false,
         isTextControl: false
       })
     ).toEqual({ type: 'step_thread', delta: -1 });
-    expect(
-      resolveAnnotationKey({
-        key: 'ArrowRight',
-        focusThreadId: 't1',
-        sliderFocused: true,
-        panelOpen: false,
-        isTextControl: false
-      })
-    ).toEqual({ type: 'step_slider', delta: 1 });
   });
 
-  it('arrows step the layer slider when not in thread focus', () => {
+  it('arrows do nothing when layer ticks own visibility', () => {
     expect(
       resolveAnnotationKey({
         key: 'ArrowUp',
         focusThreadId: null,
-        sliderFocused: false,
-        panelOpen: false,
-        isTextControl: false
-      })
-    ).toEqual({ type: 'step_slider', delta: 1 });
-    expect(
-      resolveAnnotationKey({
-        key: 'Home',
-        focusThreadId: null,
-        sliderFocused: false,
-        panelOpen: false,
-        isTextControl: false
-      })
-    ).toEqual({ type: 'slider_home' });
-  });
-
-  it('Home/End do not move the slider while thread focus owns the keys', () => {
-    expect(
-      resolveAnnotationKey({
-        key: 'Home',
-        focusThreadId: 't1',
-        sliderFocused: false,
         panelOpen: false,
         isTextControl: false
       })
     ).toBeNull();
     expect(
       resolveAnnotationKey({
-        key: 'End',
-        focusThreadId: 't1',
-        sliderFocused: true,
+        key: 'Home',
+        focusThreadId: null,
         panelOpen: false,
         isTextControl: false
       })
-    ).toEqual({ type: 'slider_end' });
+    ).toBeNull();
   });
 });
 

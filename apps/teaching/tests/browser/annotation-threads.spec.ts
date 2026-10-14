@@ -23,7 +23,7 @@ test('thread focus folds, survives stop change, and adapts 1440↔390', async ({
   await expect(folds.first()).toHaveAttribute('aria-expanded', 'true');
   const foldId = await folds.first().getAttribute('data-fold-id');
 
-  await page.locator('.block-annotation__slider').fill('1');
+  await page.locator('.block-annotation__chip', { hasText: 'Structure' }).click();
   await expect(page.locator(`[data-fold-id="${foldId}"]`)).toHaveAttribute(
     'aria-expanded',
     'true'

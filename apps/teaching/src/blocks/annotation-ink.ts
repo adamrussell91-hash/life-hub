@@ -71,9 +71,10 @@ export type InkMark = {
   kind: 'word' | 'phrase' | 'line' | 'stanza';
   colour: AnnotationColour;
   el: HTMLElement;
-  /** Short handwritten margin label (fineliner only); omitted = no label. */
+  /** Handwritten margin note (fineliner, wide only); omitted = no note. */
   label?: string;
-  onOpen: () => void;
+  /** Set only when the margin text is not the whole note (technique, attachment). */
+  onOpen?: () => void;
 };
 
 function rel(rect: DOMRect, base: DOMRect): InkRect {
@@ -164,21 +165,25 @@ export function drawAnnotationInk(
   }
 
   if (options.style === 'fineliner' && base.width >= MARGIN_LABEL_MIN_WIDTH && labels.length > 0) {
-    const buttons = labels.map(({ mark }) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `block-annotation__margin-note block-annotation__ink--${mark.colour}`;
-      btn.dataset.annotationId = mark.annotationId;
-      btn.textContent = mark.label!;
-      btn.title = mark.label!;
-      btn.setAttribute('aria-label', `Open note: ${mark.label}`);
-      btn.addEventListener('click', mark.onOpen);
-      if (!reduced && options.animateIds?.has(mark.annotationId)) btn.classList.add('is-drawing');
-      host.append(btn);
-      return btn;
+    const notes = labels.map(({ mark }) => {
+      const opens = Boolean(mark.onOpen);
+      const note = document.createElement(opens ? 'button' : 'span');
+      note.className = `block-annotation__margin-note block-annotation__ink--${mark.colour}`;
+      note.dataset.annotationId = mark.annotationId;
+      note.textContent = mark.label!;
+      if (opens) {
+        const btn = note as HTMLButtonElement;
+        btn.type = 'button';
+        btn.title = mark.label!;
+        btn.setAttribute('aria-label', `Open note: ${mark.label}`);
+        btn.addEventListener('click', mark.onOpen!);
+      }
+      if (!reduced && options.animateIds?.has(mark.annotationId)) note.classList.add('is-drawing');
+      host.append(note);
+      return note;
     });
     const tops = stackLabels(
-      labels.map((row, i) => ({ y: row.y, h: buttons[i]!.offsetHeight || 22 }))
+      labels.map((row, i) => ({ y: row.y, h: notes[i]!.offsetHeight || 22 }))
     );
     // Labels sit a short gap after the longest line, not at the far edge.
     let textRight = 0;
@@ -189,18 +194,32 @@ export function drawAnnotationInk(
         textRight = Math.max(textRight, r.right - base.left);
       }
     });
-    const labelWidth = buttons[0]?.offsetWidth || 208;
+    const labelWidth = notes[0]?.offsetWidth || 208;
     const left = Math.max(0, Math.min(textRight + 40, base.width - labelWidth));
-    buttons.forEach((btn, i) => {
-      btn.style.top = `${tops[i]}px`;
-      btn.style.left = `${left}px`;
-      btn.style.right = 'auto';
+    notes.forEach((note, i) => {
+      note.style.top = `${tops[i]}px`;
+      note.style.left = `${left}px`;
+      note.style.right = 'auto';
       const lead = document.createElementNS(SVG_NS, 'path');
       const y = snap(tops[i]! + 11);
       lead.setAttribute('d', `M${snap(left - 18)} ${y} H${snap(left - 6)}`);
       lead.setAttribute('class', `block-annotation__ink-lead block-annotation__ink--${labels[i]!.mark.colour}`);
       svg.append(lead);
     });
+    const lowest = Math.max(...notes.map((note, i) => tops[i]! + note.offsetHeight));
+    fitMarginNotes(host, lowest);
+  } else {
+    fitMarginNotes(host, 0);
   }
   return drawn;
+}
+
+/** Notes are absolute, so a wrapped note must lengthen the poem or it falls into the next row. */
+function fitMarginNotes(host: HTMLElement, lowest: number): void {
+  const stanzas = host.querySelector('.block-annotation__stanzas');
+  const top = host.getBoundingClientRect().top;
+  const contentBottom = stanzas ? stanzas.getBoundingClientRect().bottom - top : 0;
+  const extra = Math.ceil(lowest - contentBottom);
+  const next = extra > 0 ? `${extra + 8}px` : '';
+  if (host.style.paddingBottom !== next) host.style.paddingBottom = next;
 }
