@@ -47,17 +47,31 @@ have a month, year levels and a subject.
     for Adam to approve, the same way the catalogue was filled.
   - Until an entry has dates, it draws as a stop mid-month labelled "long term, dates TBC". It never
     gets an invented length.
-- **Subject → line mapping (draft, Adam to correct).** Nothing in the code maps subjects to lines yet:
+- **Subject → line mapping.** A subject can sit on more than one line. Nothing in the code maps
+  subjects to lines yet. Adam set Economics (I + R), Business (I), Leadership (J + R), Classics (R) and
+  Languages (E). The second lines on the rest are a re-scan of which subjects the catalogue tags
+  together, still for Adam to confirm:
 
-  | Line | Subjects |
-  | --- | --- |
-  | J Justice | Legal, Debating, Public Speaking, Humanities, History, Geography, Leadership |
-  | I Innovation | STEM, Science, Engineering, Mathematics, Coding, Computing, Robotics, Website Design, Game Development, Physics, Chemistry, Biology, Astronomy, Business |
-  | E Expression | English, Creative Writing, Essay Writing, Arts, Film, Drama, Music, Languages, Classics |
-  | R Reasoning | Psychology, Philosophy, Neuroscience, Economics |
+  | Subject | Lines | Why the second line |
+  | --- | --- | --- |
+  | Legal, History | J | |
+  | Debating | J + R | argument and reasoning |
+  | Public Speaking | J + E | tagged with Debating 14×, also communication |
+  | Humanities | J + E | tagged with Debating 22×, English 11× |
+  | Geography | J + I | tagged with Science |
+  | Leadership | J + R | Adam |
+  | STEM, Science, Engineering, Coding, Computing, Robotics, Physics, Chemistry, Biology, Astronomy, Business | I | |
+  | Mathematics | I + R | logic and olympiads |
+  | Economics | I + R | Adam |
+  | Website Design, Game Development | I + E | design |
+  | English, Creative Writing, Arts, Film, Drama, Music, Languages | E | |
+  | Essay Writing | E + R | tagged with Psychology 7×, Philosophy 6× |
+  | Classics | R + E | Adam set R; tagged with Languages 9× |
+  | Psychology, Philosophy | R | |
+  | Neuroscience | R + I | tagged with Science 5× |
 
-  An entry whose chosen subjects fall on two lines (e.g. Psychology + Debating) is a shared stop, and
-  those two lines join there.
+  An entry is on every line its chosen subjects reach. On two of the student's lines, it's an
+  interchange: a capsule bridging those lines on its date.
 - **Year eligibility:** use the linked entry's `age_groups` when it has them. Otherwise use the year line
   the item sits on (via the mapping above).
 
@@ -65,14 +79,18 @@ have a month, year levels and a subject.
 
 1. Take every catalogue entry the student's year can enter, in at least one chosen subject. Entries on
    the MindWorks map use the map's dates. Others use the catalogue's dates, once it has them.
-2. Lay out one lane per line the chosen subjects fall on. Time runs down on a real date scale, with
-   term bands from the map's term dates.
-3. Anything with a start and an end is a pill as long as it runs. A single date is a stop. Concurrent
-   pills on one lane step onto parallel tracks.
-4. An entry shared by several lanes pulls those lanes together for its dates (one capsule), then
-   they split.
-5. Names stack down the right-hand side. A name that had to move down keeps a dotted leader to its stop.
-   A busy line gets a taller year so names stay near their dates.
+2. Lay it out like the MindWorks map. Time runs down on a real date scale, with term bands from the
+   map's term dates. The lines sit close together and never cross. The first line's names sit on its
+   left, and every other line's names on its right.
+3. Anything with a start and an end is a pill as long as it runs. A single date is a stop. Pills that
+   overlap on one line split it evenly into parallel tracks, which rejoin after.
+4. An entry on two of the student's lines is an interchange capsule bridging them on its date (a pill
+   on each line if it runs for weeks). Its name goes beside whichever of its lines has room at that
+   date. Names hop over a capsule that crosses their column.
+5. A name that had to move down keeps a dotted leader to its stop. A busy line gets a taller year so
+   names stay near their dates.
+6. Phone: two name columns don't fit, so the lines sit together on the left and names share one
+   column on the right.
 
 ## Animation
 
