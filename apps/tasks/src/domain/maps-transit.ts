@@ -44,8 +44,11 @@ export const TM_LANE_GAP = 44;
 export const TM_PILL_W = 30;
 export const TM_LINE_W = 9;
 export const TM_BRANCH_W = 7;
-export const TM_STOP_R = 6.5;
-export const TM_FINAL_R = 9;
+/** Stops are clearly wider than the line (9), so they read as circles, not beads on the line. */
+export const TM_STOP_R = 8.5;
+export const TM_FINAL_R = 11;
+const STOP_RING_W = 2.2;
+const CAPSULE_R = TM_STOP_R + 4.5;
 export const TM_LABEL_FONT = 17;
 export const TM_SUB_FONT = 13;
 const LABEL_LINE_H = 20;
@@ -525,10 +528,41 @@ function laneReach(clusters: Cluster[], track: number, y: number, side: 'left' |
   void side;
 }
 
-/** Distance from a year line to where a label beside it starts. */
-function labelReach(clusters: Cluster[], track: number, y: number, dot: number): number {
+/**
+ * Distance from a year line to where a label beside it starts. `pills` is how far any program
+ * pill on that line reaches toward the label's side over the label's full height (see pillReach).
+ */
+function labelReach(clusters: Cluster[], track: number, y: number, dot: number, pills = 0): number {
   const reach = laneReach(clusters, track, y, 'right');
-  return Math.max(dot + LABEL_DX, reach ? reach + TM_PILL_W / 2 + 10 : LABEL_DX);
+  return Math.max(dot + LABEL_DX, reach ? reach + TM_PILL_W / 2 + 10 : LABEL_DX, pills ? pills + 10 : 0);
+}
+
+/**
+ * How far program pills on `track` reach to one side between y0 and y1. A label is several lines
+ * tall, so a pill that starts just below its stop can still sit under the label's lower lines.
+ */
+function pillReach(
+  stations: LocalStation[],
+  clusters: Cluster[],
+  track: number,
+  side: 'left' | 'right',
+  y0: number,
+  y1: number
+): number {
+  let reach = 0;
+  for (const station of stations) {
+    if (![...station.trackIndex.values()].includes(track)) continue;
+    if (!overlap({ y0, y1 }, { y0: station.y, y1: station.y + station.h })) continue;
+    const off = laneOffset(clusters, station.id, track);
+    reach = Math.max(reach, (side === 'right' ? off : -off) + TM_PILL_W / 2);
+  }
+  return reach;
+}
+
+/** Vertical span a stop's label covers (name lines plus date). */
+function labelSpan(stop: { labelY: number; label: { h: number } }): { y0: number; y1: number } {
+  const y0 = stop.labelY - LABEL_LINE_H / 2 - 2;
+  return { y0, y1: y0 + stop.label.h + 4 };
 }
 
 function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: number, allStations: LocalStation[]): StrandPiece {
@@ -560,9 +594,11 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
       const pick = attach.side === 'left' ? wanted[0] : wanted[wanted.length - 1];
       const trackId = pick ?? station.tracks[0]!;
       const track = Math.max(0, ids.indexOf(trackId));
-      // On a split line, a program's competitions leave from its outer side.
+      // On a split line, a program's competitions leave from its outer side. On the strand's
+      // first or last year line they take the outside too, so their names never push a neighbour.
       const laneOff = laneOffset(clusters, station.id, track);
-      const side: 'left' | 'right' = laneOff > 0 ? 'right' : laneOff < 0 ? 'left' : attach.side;
+      const outer: 'left' | 'right' | null = count > 1 && track === 0 ? 'left' : track === count - 1 ? 'right' : null;
+      const side: 'left' | 'right' = laneOff > 0 ? 'right' : laneOff < 0 ? 'left' : (outer ?? attach.side);
       const key = `${station.id}:${side}:${trackId}`;
       let branch = branchMap.get(key);
       if (!branch) {
@@ -631,10 +667,13 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
     stops.push({ tick, tracks: tracks.length ? tracks : [0], y, side, branch: null, final: false, label, sub, labelY: y, dotX: [] });
   }
 
-  // A program with one competition needs no branch: the stop sits on the program's edge.
+  // A program with one competition inside its dates needs no branch: the stop sits on the
+  // program's edge. One dated before or after the program keeps a short branch back to it.
   for (const [key, branch] of [...branchMap.entries()]) {
     if (branch.stops.length > 1 || branch.allYear) continue;
     const stop = branch.stops[0]!;
+    const host = stations.find((item) => item.id === branch.stationId);
+    if (host && (stop.y < host.y || stop.y > host.y + host.h)) continue;
     stop.branch = null;
     stop.onEdge = true;
     stop.dotX = [branch.edgeDX];
@@ -730,7 +769,9 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
       const edge = branch.side === 'left' ? Math.min(...stop.tracks) : Math.max(...stop.tracks);
       if (edge !== branch.track) continue;
       const dot = Math.abs(stop.dotX[stop.tracks.indexOf(edge)] ?? 0);
-      reach = Math.max(reach, labelReach(clusters, edge, stop.y, dot) + stop.label.w + 28);
+      const labelBand = labelSpan(stop);
+      const pills = pillReach(stations, clusters, edge, stop.side, labelBand.y0, labelBand.y1);
+      reach = Math.max(reach, labelReach(clusters, edge, stop.y, dot, pills) + stop.label.w + 28);
     }
     for (const other of branchMap.values()) {
       if (other === branch || other.allYear || other.side !== branch.side || other.track !== branch.track) continue;
@@ -814,7 +855,9 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
     const track = right ? Math.max(...stop.tracks) : Math.min(...stop.tracks);
     if (right ? track >= count - 1 : track <= 0) continue;
     const dot = Math.abs(stop.dotX[stop.tracks.indexOf(track)] ?? 0);
-    const reach = labelReach(clusters, track, stop.y, dot) + stop.label.w;
+    const span = labelSpan(stop);
+    const pills = pillReach(stations, clusters, track, stop.side, span.y0, span.y1);
+    const reach = labelReach(clusters, track, stop.y, dot, pills) + stop.label.w;
     const amount = reach + SIDE_PAD + TM_PILL_W / 2 - TM_TRACK_GAP;
     const top = Math.min(stop.y - 12, stop.labelY - LABEL_LINE_H / 2) - 4;
     const bottom = Math.max(stop.y + 12, stop.labelY - LABEL_LINE_H / 2 + stop.label.h) + 4;
@@ -997,7 +1040,9 @@ function placeStrand(piece: StrandPiece): PlacedStrand {
       dots = stop.tracks.map((track, i) => ({ x: tx(track, stop.y) + (stop.dotX[i] ?? 0), y: stop.y }));
       const track = stop.side === 'left' ? Math.min(...stop.tracks) : Math.max(...stop.tracks);
       const dot = Math.abs(stop.dotX[stop.tracks.indexOf(track)] ?? 0);
-      const reach = labelReach(clusters, track, stop.y, dot);
+      const span = labelSpan(stop);
+      const pills = pillReach(piece.stations, clusters, track, stop.side, span.y0, span.y1);
+      const reach = labelReach(clusters, track, stop.y, dot, pills);
       labelX = tx(track, stop.y) + (stop.side === 'left' ? -reach : reach);
     }
     const anchor: 'start' | 'end' = stop.side === 'left' ? 'end' : 'start';
@@ -1406,17 +1451,17 @@ export function renderTransitSvg(layout: TransitLayout, options: TransitRenderOp
         const x0 = Math.min(...xs);
         const x1 = Math.max(...xs);
         parts.push(
-          `<rect class="tm-capsule map-tick__mark" x="${x0 - 11}" y="${stop.y - 11}" width="${x1 - x0 + 22}" height="22" rx="11" fill="#dcdcd8" stroke="${STOP_RING}" stroke-width="1.8"/>`
+          `<rect class="tm-capsule map-tick__mark" x="${x0 - CAPSULE_R}" y="${stop.y - CAPSULE_R}" width="${x1 - x0 + CAPSULE_R * 2}" height="${CAPSULE_R * 2}" rx="${CAPSULE_R}" fill="#dcdcd8" stroke="${STOP_RING}" stroke-width="${STOP_RING_W}"/>`
         );
         for (const dot of stop.dots) {
-          parts.push(`<circle class="tm-stop" cx="${dot.x}" cy="${dot.y}" r="${TM_STOP_R}" fill="#fff" stroke="${STOP_RING}" stroke-width="1.8"/>`);
+          parts.push(`<circle class="tm-stop" cx="${dot.x}" cy="${dot.y}" r="${TM_STOP_R}" fill="#fff" stroke="${STOP_RING}" stroke-width="${STOP_RING_W}"/>`);
         }
       } else {
         const dot = stop.dots[0]!;
         parts.push(
           stop.final
             ? `<circle class="tm-final map-tick__mark" cx="${dot.x}" cy="${dot.y}" r="${TM_FINAL_R}" fill="#fff" stroke="${INK}" stroke-width="3.5"/>`
-            : `<circle class="tm-stop map-tick__mark" cx="${dot.x}" cy="${dot.y}" r="${TM_STOP_R}" fill="#fff" stroke="${STOP_RING}" stroke-width="1.8"/>`
+            : `<circle class="tm-stop map-tick__mark" cx="${dot.x}" cy="${dot.y}" r="${TM_STOP_R}" fill="#fff" stroke="${STOP_RING}" stroke-width="${STOP_RING_W}"/>`
         );
       }
       const weight = stop.final ? 700 : 500;
