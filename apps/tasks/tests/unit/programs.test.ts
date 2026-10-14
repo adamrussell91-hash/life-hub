@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import * as keys from '@/storage/keys';
 import { createTasksStore, seedIfEmpty, type KvAdapter } from '@/services/store';
 import { ProgramSchema } from '@/schemas/program';
-import { catalogPrograms } from '@/domain/programs-seed';
-import { queryPrograms, searchPrograms } from '@/domain/programs';
+import { catalogPrograms, withCatalogueDates } from '@/domain/programs-seed';
+import { programDatesLabel, queryPrograms, searchPrograms } from '@/domain/programs';
 import { loadSeed } from './seed-fixture';
 
 function memoryKv(): KvAdapter {
@@ -205,5 +205,35 @@ describe('program store', () => {
     const store = createTasksStore(kv, keys);
     const listed = await store.listPrograms();
     expect(listed.length).toBe(290);
+  });
+});
+
+describe('catalogue dates', () => {
+  it('only uses real dates, with the end never before the start', () => {
+    const iso = /^\d{4}-\d{2}-\d{2}$/;
+    const dated = catalogPrograms().filter((program) => program.starts_on || program.ends_on);
+    expect(dated.length).toBeGreaterThanOrEqual(30);
+    for (const program of dated) {
+      if (program.starts_on) expect(program.starts_on, program.name).toMatch(iso);
+      if (program.ends_on) expect(program.ends_on, program.name).toMatch(iso);
+      if (program.starts_on && program.ends_on) expect(program.ends_on >= program.starts_on, program.name).toBe(true);
+      if (program.dates_source_url) expect(program.dates_source_url, program.name).toMatch(/^https?:\/\//);
+    }
+  });
+
+  it('gives a stored program the catalogue dates until dates are saved on it', () => {
+    const fromStore = { id: 'prog_international-business-olympiad-ibo', name: 'IBO' };
+    expect(withCatalogueDates(fromStore)).toMatchObject({ starts_on: '2026-07-25', ends_on: '2026-08-14' });
+    const cleared = { ...fromStore, starts_on: null, ends_on: null };
+    expect(withCatalogueDates(cleared)).toBe(cleared);
+    const unknown = { id: 'prog_not-in-catalogue', name: 'Local' };
+    expect(withCatalogueDates(unknown)).toBe(unknown);
+  });
+
+  it('labels a run, a single day, and a due date', () => {
+    expect(programDatesLabel({ starts_on: '2026-07-25', ends_on: '2026-08-14' })).toBe('25 Jul 2026 – 14 Aug 2026');
+    expect(programDatesLabel({ starts_on: '2026-04-04', ends_on: null })).toBe('4 Apr 2026');
+    expect(programDatesLabel({ starts_on: null, ends_on: '2026-05-10' })).toBe('Due 10 May 2026');
+    expect(programDatesLabel({ starts_on: null, ends_on: null })).toBeNull();
   });
 });

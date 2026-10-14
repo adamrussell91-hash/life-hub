@@ -356,3 +356,39 @@ test('tasks POST keeps parent_goal_id, steps and tags', async () => {
   assert.equal(orphan.kind, 'task');
   assert.equal(orphan.parent_goal_id, null);
 });
+
+test('stored catalogue programs pick up catalogue dates until dates are saved on the record', async () => {
+  const seeded = {
+    schema_version: 1,
+    id: 'prog_international-business-olympiad-ibo',
+    name: 'International Business Olympiad (IBO)',
+    created_at: '2026-06-16T13:00:00.000Z',
+    updated_at: '2026-06-16T13:00:00.000Z'
+  };
+  const cleared = {
+    ...seeded,
+    id: 'prog_think-essay-prize-royal-institute-of-philosophy',
+    name: 'Think Essay Prize',
+    starts_on: null,
+    ends_on: null
+  };
+  const store = memoryStore({ [`programs/${seeded.id}`]: seeded, [`programs/${cleared.id}`]: cleared });
+  const deps = { env, now: () => Date.parse('2026-08-01T01:00:00Z'), getContentStore: async () => store };
+
+  const listed = (await (await createProgramsHandler(deps)(request({ url: 'https://api.adam-russell.com/api/programs' }))).json()).data.programs;
+  const ibo = listed.find(item => item.id === seeded.id);
+  assert.equal(ibo.starts_on, '2026-07-25');
+  assert.equal(ibo.ends_on, '2026-08-14');
+  const think = listed.find(item => item.id === cleared.id);
+  assert.equal(think.ends_on, null);
+
+  const created = (await (await createProgramsHandler(deps)(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/programs',
+    body: { name: 'Winter School', starts_on: '2026-07-06', ends_on: '2026-07-10', dates_source_url: ' https://example.org ', dates_checked_on: 'soon' }
+  }))).json()).data;
+  assert.equal(created.starts_on, '2026-07-06');
+  assert.equal(created.ends_on, '2026-07-10');
+  assert.equal(created.dates_source_url, 'https://example.org');
+  assert.equal(created.dates_checked_on, null);
+});
