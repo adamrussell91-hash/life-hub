@@ -10,7 +10,6 @@ import { toHubDateKey } from '@/domain/queries';
 import { hashQuery } from '@/shell/shell';
 import { TASKS_CHANGED, TASKS_DELETED } from '@/services/task-cache';
 import { renderLoadError } from '@/views/feedback';
-import { WILDLIFE_MODEL } from '@/domain/grove/wildlife';
 import { groveAssetUrl } from './asset-url';
 import { loadForest } from './forest/load';
 import { weekOfDay } from './forest/history';
@@ -60,8 +59,6 @@ function iconButton(className: string, label: string, icon: string): HTMLButtonE
   return button;
 }
 
-/** Earned in its own right, or one of the day's visitors that came with an earned animal. */
-const isVisitor = (animal: ForestAnimal) => animal.model !== WILDLIFE_MODEL[animal.species];
 const animalLabel = (animal: ForestAnimal, young: boolean) => `${animal.name}${young ? ' and young' : ''}`;
 
 export async function renderGroveView(canvas: HTMLElement): Promise<void> {
@@ -154,7 +151,7 @@ export async function renderGroveView(canvas: HTMLElement): Promise<void> {
       button.title = `Follow the ${label.toLowerCase()}`;
       const text = el('span', 'grove-tray__text');
       const week = weekOfDay(entry.animal.earnedOn, route.year);
-      text.append(el('strong', '', label), el('small', '', isVisitor(entry.animal) ? 'Visiting today' : `Week ${week} · ${entry.animal.reason}`));
+      text.append(el('strong', '', label), el('small', '', `Week ${week} · ${entry.animal.reason}`));
       button.append(el('span', 'grove-tray__glyph', animalGlyph(entry.animal.model, entry.animal.species)), text);
       button.addEventListener('click', () => {
         closeCard();

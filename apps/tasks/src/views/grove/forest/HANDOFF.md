@@ -200,6 +200,22 @@ Triangles and draw calls unchanged (3.9M, 103 calls).
 - Check-script hooks: `handle.wildlife()` (positions, screen points, clip, speed) and
   `handle.stepWildlife(seconds)` (headless software GL runs about 1.5 frames a second).
 
+## Round eight: animals that come again, companions that stay
+
+- **Repeats** (`WILDLIFE_REPEAT` in `domain/grove/wildlife.ts`): a milestone brings an animal every time its
+  step comes round, not once. Hare every 10th five-task day; doe every 8th full week; fox every ended term;
+  squirrel at 25 Teaching, then every 150 more; robin at 10 Life/Health, then every 30 more; mallard every
+  3rd twenty-task week; owl every 3rd book. Repeats take turns through `WILDLIFE_MODELS` (hare and forest
+  rabbit; doe, forest deer and forest stag; fox and forest fox), so every bought model gets used.
+- **Companions stay** (`companionResidents`): all nine join for good with the first of their animal and
+  live in its week. They no longer rotate in two a day. The key's Visitors section is now Companions.
+- **Count with real data** (the 2026 history, 14 Oct): 21 earned animals (three of each species), 9
+  companions and 2 young: 32 drawn, all 20 models used.
+- **Cap** (`MAX_FOREST_ANIMALS` = 40 in `data.ts`, young ones included): over it, the latest repeats of the
+  most numerous species go first; first arrivals and companions always stay. Each animal is its own
+  skinned, animated model, so the cap is about phone frame time, not triangles (about 2k to 3.7k each).
+- `wildlifeMilestones` still returns first arrivals only, for the older annual renderer and plan.
+
 ## Known gaps, in order
 
 1. **Phone budget, if real devices still struggle (now 1.45M with real data):** the heaviest LOD trees are tree-late-1/2/4
