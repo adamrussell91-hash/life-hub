@@ -50,6 +50,11 @@ export type TermBand = {
   label: string;
   date: string;
   y: number;
+  /** When the term ends (saved, or the next term start when no end is saved). Year end has none. */
+  end?: string;
+  endY?: number;
+  /** True when the end date was saved, so the gap after it is a holiday. */
+  hasEnd?: boolean;
 };
 
 export type LabelBox = {
@@ -175,17 +180,33 @@ export type MapCanvasLayout = {
   boxes: LabelBox[];
 };
 
-const KNOWN_TERMS: Record<number, { t1: string; t2: string; t3: string; t4: string; e: string }> = {
+export type TermMarks = {
+  t1: string;
+  t2: string;
+  t3: string;
+  t4: string;
+  e: string;
+  t1_end?: string;
+  t2_end?: string;
+  t3_end?: string;
+  t4_end?: string;
+};
+
+export const TERM_END_KEYS = ['t1_end', 't2_end', 't3_end', 't4_end'] as const;
+
+const KNOWN_TERMS: Record<number, TermMarks> = {
   2026: {
     t1: '2026-01-27',
     t2: '2026-04-27',
     t3: '2026-07-20',
     t4: '2026-10-12',
-    e: '2026-12-31'
+    e: '2026-12-31',
+    t1_end: '2026-04-10',
+    t2_end: '2026-07-03',
+    t3_end: '2026-09-25',
+    t4_end: '2026-12-17'
   }
 };
-
-export type TermMarks = { t1: string; t2: string; t3: string; t4: string; e: string };
 
 function termMarksFrom(terms: SchoolYearTerms['terms']): TermMarks | null {
   const by = new Map(terms.map((term) => [term.term, term]));
@@ -195,7 +216,12 @@ function termMarksFrom(terms: SchoolYearTerms['terms']): TermMarks | null {
   const t4 = by.get(4)?.starts_on;
   const end = by.get(4)?.ends_on;
   if (!t1 || !t2 || !t3 || !t4 || !end) return null;
-  return { t1, t2, t3, t4, e: end };
+  const marks: TermMarks = { t1, t2, t3, t4, e: end };
+  TERM_END_KEYS.forEach((key, index) => {
+    const ends = by.get((index + 1) as 1 | 2 | 3 | 4)?.ends_on;
+    if (ends) marks[key] = ends;
+  });
+  return marks;
 }
 
 /** Term marks for one map: its own saved terms win, then Settings, then the fallback. */
@@ -207,10 +233,34 @@ export function mapTerms(
   return schoolTerms(map.year ?? new Date().getFullYear(), years);
 }
 
-/** Term marks must run in calendar order (T1 < T2 < T3 < T4 < year end). */
+/**
+ * Term marks must run in calendar order: each term starts before it ends, ends before the
+ * next term starts, and T4 ends no later than the year end. Missing term ends are skipped.
+ */
 export function termMarksInOrder(terms: TermMarks): boolean {
-  const order = [terms.t1, terms.t2, terms.t3, terms.t4, terms.e];
-  return order.every((date, index) => index === 0 || order[index - 1]! < date);
+  const order = [
+    terms.t1,
+    terms.t1_end,
+    terms.t2,
+    terms.t2_end,
+    terms.t3,
+    terms.t3_end,
+    terms.t4,
+    terms.t4_end
+  ].filter((date): date is string => Boolean(date));
+  const ordered = order.every((date, index) => index === 0 || order[index - 1]! < date);
+  return ordered && order[order.length - 1]! <= terms.e && terms.t4 < terms.e;
+}
+
+/** Each term's shaded span: start to its end, or to the next term start when no end is saved. */
+export function termSpans(terms: TermMarks): Array<{ id: 'T1' | 'T2' | 'T3' | 'T4'; start: string; end: string; hasEnd: boolean }> {
+  const starts = [terms.t1, terms.t2, terms.t3, terms.t4];
+  return starts.map((start, index) => {
+    const saved = terms[TERM_END_KEYS[index]!];
+    const next = starts[index + 1] ?? terms.e;
+    const end = saved && saved > start && saved <= next ? saved : next;
+    return { id: `T${index + 1}` as 'T1' | 'T2' | 'T3' | 'T4', start, end, hasEnd: end === saved };
+  });
 }
 
 /**
