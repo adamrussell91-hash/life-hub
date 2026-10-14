@@ -4,8 +4,8 @@ A teacher picks a student's year level and interests. Tasks builds that student'
 drawing it top to bottom like a train line. Publish saves a snapshot to a public link a student or
 parent can open without the passphrase. Tapping a stop opens a departure-board style card.
 
-Mockup: [`mockup.html`](mockup.html). Open it in a browser. It runs on 50 real catalogue entries
-(sample, not the full 290).
+Mockup: [`mockup.html`](mockup.html). Open it in a browser. It runs on the 204 catalogue entries that
+have a month, year levels and a subject.
 
 ## Decisions (Adam, 14 Oct 2026)
 
@@ -13,6 +13,14 @@ Mockup: [`mockup.html`](mockup.html). Open it in a browser. It runs on 50 real c
 - **Snapshot, not live.** A link sent to a parent never changes under them. Republish to update.
 - **One combined line.** Each chosen interest is its own coloured lane. Lanes **join** at a stop that
   belongs to more than one chosen interest (an interchange capsule), then split again.
+- **Calendar aligned, like the full network map.** Time runs down the page on a real date scale, and
+  term bands show the holidays as gaps. A 10-week program is a 10-week pill. Programs running at the
+  same time on one line sit on parallel tracks.
+- **Catalogue entries not on the map are included**, drawn with a dashed outline and tagged "Not on
+  map". A builder option turns them off.
+- **Interests are catalogue subjects**, not the four lines. Each subject belongs to one line (mapping
+  below), so the student's lines are whichever lines their chosen subjects fall on.
+- **The public page carries MindWorks branding.**
 - **Cards look like Sydney Trains signage, not hub cards.** References: platform departure boards, the
   Arncliffe boarding-position poster, the network key.
 
@@ -31,19 +39,40 @@ Mockup: [`mockup.html`](mockup.html). Open it in a browser. It runs on 50 real c
   - Fix: add an optional `program_id` to map stations and ticks.
   - The item editor gets a "Catalogue entry" picker that suggests the closest name match.
   - Unlinked items still show, with only the map's own name and dates.
-- **Gap 2: interests.** Interests are the map's strands (Justice, Innovation, Expression, Reasoning),
-  not catalogue subjects. The mockup maps subjects to strands only to have sample data.
+- **Gap 2: no start or end dates in the catalogue.** It only has `month` and `competition_length`
+  (Single Day / Long Term / Year Long / Recurring).
+  - Calendar alignment needs `starts_on` / `ends_on` on catalogue entries.
+  - Many dates are already written in `registration_window` or `description` (e.g. "Held 21 to 22
+    November", "Rounds run late July to mid-August"). A one-off extraction pass can propose dates
+    for Adam to approve, the same way the catalogue was filled.
+  - Until an entry has dates, it draws as a stop mid-month labelled "long term, dates TBC". It never
+    gets an invented length.
+- **Subject → line mapping (draft, Adam to correct).** Nothing in the code maps subjects to lines yet:
+
+  | Line | Subjects |
+  | --- | --- |
+  | J Justice | Legal, Debating, Public Speaking, Humanities, History, Geography, Leadership |
+  | I Innovation | STEM, Science, Engineering, Mathematics, Coding, Computing, Robotics, Website Design, Game Development, Physics, Chemistry, Biology, Astronomy, Business |
+  | E Expression | English, Creative Writing, Essay Writing, Arts, Film, Drama, Music, Languages, Classics |
+  | R Reasoning | Psychology, Philosophy, Neuroscience, Economics |
+
+  An entry whose chosen subjects fall on two lines (e.g. Psychology + Debating) is a shared stop, and
+  those two lines join there.
 - **Year eligibility:** use the linked entry's `age_groups` when it has them. Otherwise use the year line
   the item sits on (via the mapping above).
 
 ## How a line is built
 
-1. Take the year's map (the curated MindWorks map, not the whole catalogue).
-2. Keep items on the chosen strands that the student's year can enter.
-3. Order by date. Group under term headers using the map's term dates (start and end, so holidays show).
-4. Lay out one lane per chosen strand. A stop shared by several chosen strands pulls those lanes together
-   into a capsule.
-5. Programs (year long or long term) draw as a pill on their lane. Competitions draw as stops.
+1. Take every catalogue entry the student's year can enter, in at least one chosen subject. Entries on
+   the MindWorks map use the map's dates. Others use the catalogue's dates, once it has them.
+2. Lay out one lane per line the chosen subjects fall on. Time runs down on a real date scale, with
+   term bands from the map's term dates.
+3. Anything with a start and an end is a pill as long as it runs. A single date is a stop. Concurrent
+   pills on one lane step onto parallel tracks.
+4. An entry shared by several lanes pulls those lanes together for its dates (one capsule), then
+   they split.
+5. Names stack down the right-hand side. A name that had to move down keeps a dotted leader to its stop.
+   A busy line gets a taller year so names stay near their dates.
 
 ## Animation
 
@@ -80,6 +109,8 @@ The same card style should replace the plain map item card in the hub, so both m
 
 ## Slices
 
+0. **Catalogue dates.** Add `starts_on` / `ends_on` to the catalogue schema, and a reviewed extraction
+   pass from `registration_window` and `description`.
 1. **Link the map to the catalogue.** Add `program_id` and the picker with a suggested match. Linked cards
    show catalogue details in the hub.
 2. **Builder in Tasks.** A Maps menu item "Personal line". It has year, interests and name fields, and
@@ -90,6 +121,4 @@ The same card style should replace the plain map item card in the hub, so both m
 
 ## Open questions
 
-- Should the builder also offer catalogue entries that aren't on the map yet, shown as "not on the
-  MindWorks map"? Or only what's on the map?
-- Should the published page carry MindWorks branding (the orange bar in the mockup) or stay neutral?
+- Confirm or correct the subject → line mapping above.
