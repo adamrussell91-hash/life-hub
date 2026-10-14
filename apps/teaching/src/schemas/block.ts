@@ -991,7 +991,9 @@ export const AnnotationBlockSettingsSchema = z.object({
   show_markers: z.boolean().default(true),
   default_layer_id: z.string().optional(),
   /** Lines of context kept around each stop in thread focus. */
-  thread_context: z.union([z.literal(0), z.literal(1)]).optional()
+  thread_context: z.union([z.literal(0), z.literal(1)]).optional(),
+  /** How notes are drawn on the text. Absent = fineliner. */
+  ink_style: z.enum(['fineliner', 'highlighter']).optional()
 });
 
 /** Plain object — must stay ZodObject for discriminatedUnion leaf lists. */

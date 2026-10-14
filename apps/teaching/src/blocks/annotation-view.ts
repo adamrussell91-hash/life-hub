@@ -4,9 +4,15 @@ import {
   type ResolvedAnchor
 } from '@/blocks/annotation-anchor';
 import {
+  drawAnnotationInk,
+  MARGIN_LABEL_MIN_WIDTH,
+  type InkMark
+} from '@/blocks/annotation-ink';
+import {
   applyLineLayout,
   renderFormattedLine
 } from '@/blocks/annotation-line-format';
+import { htmlToPlainText } from '@/blocks/search-text';
 import {
   activeLayerIds,
   createLayerState,
@@ -806,6 +812,44 @@ function buildInteractiveView(
     return btn;
   }
 
+  const inkStyle = content.settings.ink_style ?? 'fineliner';
+  root.classList.add('block-annotation--ink', `block-annotation--ink-${inkStyle}`);
+  let inkedIds = new Set<string>();
+  let inkFrame = 0;
+  let inkHost: HTMLElement | null = null;
+  let inkMarks: InkMark[] = [];
+  const inkResize =
+    typeof ResizeObserver === 'function'
+      ? new ResizeObserver(() => scheduleInk(false))
+      : null;
+
+  function scheduleInk(animate: boolean): void {
+    if (inkFrame) cancelAnimationFrame(inkFrame);
+    inkFrame = requestAnimationFrame(() => {
+      inkFrame = 0;
+      if (!inkHost || !inkHost.isConnected) return;
+      const wantsMargin =
+        inkStyle === 'fineliner' &&
+        inkMarks.some((mark) => mark.label) &&
+        inkHost.getBoundingClientRect().width >= MARGIN_LABEL_MIN_WIDTH;
+      inkHost.classList.toggle('block-annotation__poem--margin', wantsMargin);
+      const fresh = new Set(
+        inkMarks.map((mark) => mark.annotationId).filter((id) => animate && !inkedIds.has(id))
+      );
+      inkedIds = drawAnnotationInk(inkHost, inkMarks, { style: inkStyle, animateIds: fresh });
+    });
+  }
+
+  function marginLabel(ann: AnnotationItem): string | undefined {
+    if (ann.technique?.id && table) {
+      const technique = lookupTechnique(table, ann.technique.id);
+      if (technique) return technique.name;
+    }
+    const text = htmlToPlainText(ann.body.html).trim().split(/(?<=[.!?])\s/)[0] ?? '';
+    if (!text) return undefined;
+    return text.length > 42 ? `${text.slice(0, 40).trimEnd()}…` : text;
+  }
+
   function paint(): void {
     const scrollTop = textCol.scrollTop;
     textCol.replaceChildren();
@@ -1032,6 +1076,9 @@ function buildInteractiveView(
 
     const poemHost = document.createElement('div');
     poemHost.className = 'block-annotation__poem';
+    inkResize?.disconnect();
+    inkHost = poemHost;
+    inkResize?.observe(poemHost);
 
     if (!narrow && threads.length > 0) {
       const arcs = buildArcSvg(
@@ -1286,6 +1333,34 @@ function buildInteractiveView(
     }
 
     textCol.scrollTop = scrollTop;
+
+    // Ink over every visible anchor; labels only for word / phrase / line notes.
+    const placedById = new Map(placed.map((item) => [item.annotation.id, item]));
+    inkMarks = [];
+    poemHost
+      .querySelectorAll<HTMLButtonElement>('.block-annotation__anchor[data-annotation-id]')
+      .forEach((btn) => {
+        const item = placedById.get(btn.dataset.annotationId ?? '');
+        if (!item) return;
+        const kind = btn.classList.contains('block-annotation__anchor--stanza')
+          ? 'stanza'
+          : btn.classList.contains('block-annotation__anchor--line')
+            ? 'line'
+            : item.resolved.granularity === 'word'
+              ? 'word'
+              : 'phrase';
+        const isThread = (item.annotation.also_anchors?.length ?? 0) > 0;
+        const first = inkMarks.every((mark) => mark.annotationId !== item.annotation.id);
+        inkMarks.push({
+          annotationId: item.annotation.id,
+          kind,
+          colour: item.layer?.colour ?? 'wave',
+          el: btn,
+          label: first && !isThread && kind !== 'stanza' ? marginLabel(item.annotation) : undefined,
+          onOpen: () => btn.click()
+        });
+      });
+    scheduleInk(true);
 
     if (state.openAnnotationId) {
       const openBtn = root.querySelector<HTMLElement>(
