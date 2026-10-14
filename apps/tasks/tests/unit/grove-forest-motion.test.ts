@@ -64,6 +64,33 @@ describe('Forest animal gait', () => {
     const moving = samples.filter((s) => s.moving);
     expect(Math.min(...moving.slice(30).map((s) => s.v))).toBeLessThan(gait.cruise * 0.5);
   });
+
+  it('never stands frozen mid-leg at a sharp corner, on foot or in flight', () => {
+    // Grid-step trails: right angles and a doubling back, the corners that used to pin an animal in place.
+    const zigzag = routeOf([{ x: 0, z: 0 }, { x: 4, z: 0 }, { x: 4, z: 3 }, { x: 7, z: 3 }, { x: 7, z: -2 }, { x: 2, z: -2 }, { x: 2.3, z: -1.2 }, { x: -1, z: -1 }]);
+    const cases: [string, number, boolean][] = [['animal-deer-doe', 1.555, false], ['animal-forest-wolf', 1, false], ['animal-bird-robin', 0.3, true]];
+    for (const [model, native, bird] of cases) {
+      const scale = drawnScale(model, native);
+      for (let seed = 1; seed <= 6; seed += 1) {
+        const walker = createWalker(zigzag, gaitFor(model, scale, 'land'), {
+          random: rng(seed), rests: ['idle'], start: seed * 1.7, minLeg: 3, maxLeg: 12,
+          flyOver: bird ? 3 : undefined, flight: bird ? { legs: 3, cruise: 3, turn: 3, accel: 2.5, reach: 0.3 } : undefined
+        });
+        let frozen = 0, worst = 0, flew = 0, last = walker.distance();
+        for (let i = 0; i < 30 * 600; i += 1) {
+          walker.advance(1 / 30);
+          if (walker.flying()) flew += 1;
+          frozen = walker.moving() && walker.distance() - last < 1e-6 ? frozen + 1 : 0;
+          worst = Math.max(worst, frozen);
+          last = walker.distance();
+        }
+        // Turning on the spot at a corner takes a few seconds at most; never a standstill mid-leg.
+        expect(worst / 30, `${model} seed ${seed}`).toBeLessThan(8);
+        expect(walker.distance(), `${model} seed ${seed}`).toBeGreaterThan(seed * 1.7 + zigzag.total);
+        if (bird) expect(flew).toBeGreaterThan(0);
+      }
+    }
+  });
 });
 
 describe('Forest trails', () => {
