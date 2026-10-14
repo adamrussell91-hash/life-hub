@@ -1385,11 +1385,15 @@ export function createFoodJournalView({
           missing = 0;
         for (const v of chosen) {
           for (const ref of v.import_media || []) {
-            const file = files.find(
-              (f) =>
-                f.name === ref.filename ||
-                f.name.replace(/\.[^.]+$/, "") === ref.identifier,
-            );
+            const stem = (name) => name.replace(/\.[^.]+$/, "");
+            const file = files.find((f) => {
+              const base = stem(f.name);
+              return (
+                (ref.filename && f.name === ref.filename) ||
+                (ref.identifier && base === ref.identifier) ||
+                (ref.md5 && (base === ref.md5 || f.name === `${ref.md5}.jpg` || f.name === `${ref.md5}.jpeg`))
+              );
+            });
             if (file) {
               v.dishes[0].photos.push(
                 await api.upload(await compressPhoto(file)),
