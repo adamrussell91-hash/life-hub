@@ -5028,6 +5028,19 @@ html.is-map-fullscreen .map-page .map-preview {
   fill: var(--muted);
 }
 
+.map-term.is-editable {
+  cursor: pointer;
+}
+
+.map-term.is-editable .map-term__disc,
+.map-term.is-selected .map-term__disc {
+  fill: var(--ink);
+}
+
+.map-inspector__error {
+  color: var(--danger, #b42318);
+}
+
 .map-term__label {
   fill: var(--paper);
   font-size: 14px;

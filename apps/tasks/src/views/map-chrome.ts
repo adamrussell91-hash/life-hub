@@ -92,6 +92,7 @@ export type MapToolbarHandlers = {
   onAddCompetition: () => void;
   onJoin: () => void;
   onRenameMap?: (title: string) => void;
+  onEditTerms?: () => void;
 };
 
 function toolbarButton(label: string, className: string, onClick: () => void): HTMLButtonElement {
@@ -145,6 +146,9 @@ function createMapEditBar(options: {
     toolbarButton('+ Line', 'btn btn--ghost', options.handlers.onAddLine),
     toolbarButton('+ Program', 'btn btn--ghost', options.handlers.onAddProgram),
     toolbarButton('+ Competition', 'btn btn--ghost', options.handlers.onAddCompetition),
+    ...(options.handlers.onEditTerms
+      ? [toolbarButton('Terms', 'btn btn--ghost map-editbar__terms', options.handlers.onEditTerms)]
+      : []),
     join,
     toolbarButton('Done', 'btn btn--primary map-editbar__done', () => options.handlers.onMode('view'))
   );

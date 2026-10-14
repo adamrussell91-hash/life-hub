@@ -115,11 +115,23 @@ export const TickSchema = z.object({
   planning: MapPlanningSchema.default('planned')
 });
 
+const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+/** Per-map term starts (T1–T4) and year end; overrides Settings term dates for this map. */
+export const MapTermsSchema = z.object({
+  t1: IsoDateSchema,
+  t2: IsoDateSchema,
+  t3: IsoDateSchema,
+  t4: IsoDateSchema,
+  e: IsoDateSchema
+});
+
 export const TransitMapSchema = z.object({
   schema_version: schemaVersion,
   id: z.string().min(1),
   title: z.string().min(1),
   year: z.number().int().nullable().default(null),
+  terms: MapTermsSchema.nullable().default(null),
   lines: z.array(LineSchema).default([]),
   stations: z.array(StationSchema).default([]),
   ticks: z.array(TickSchema).default([]),
@@ -134,6 +146,7 @@ export const TransitMapCreateSchema = TransitMapSchema.omit({
   updated_at: true
 }).partial({
   year: true,
+  terms: true,
   lines: true,
   stations: true,
   ticks: true
@@ -153,5 +166,6 @@ export type MapLine = z.infer<typeof LineSchema>;
 export type MapStation = z.infer<typeof StationSchema>;
 export type TickAttach = z.infer<typeof TickAttachSchema>;
 export type MapTick = z.infer<typeof TickSchema>;
+export type MapTerms = z.infer<typeof MapTermsSchema>;
 export type TransitMap = z.infer<typeof TransitMapSchema>;
 export type MapLink = z.infer<typeof MapLinkSchema>;

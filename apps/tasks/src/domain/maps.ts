@@ -233,7 +233,7 @@ export function emptyMapDraft(title = 'Untitled map'): Omit<
   TransitMap,
   'schema_version' | 'id' | 'created_at' | 'updated_at'
 > {
-  return { title, year: null, lines: [], stations: [], ticks: [] };
+  return { title, year: null, terms: null, lines: [], stations: [], ticks: [] };
 }
 
 export { lineX } from '@/domain/maps-layout';
