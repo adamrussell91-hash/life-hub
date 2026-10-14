@@ -156,6 +156,31 @@ test('programs and maps use the Life session and share the Tasks store', async (
   const program = (await createdProgram.json()).data;
   assert.match(program.id, /^prog_/);
   assert.equal(program.name, 'ICPC');
+  assert.equal(program.starts_on, null);
+  assert.equal(program.ends_on, null);
+
+  const dated = await createProgramsHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/programs',
+      body: { name: 'Econthon', starts_on: '2026-11-21', ends_on: '2026-11-22' }
+    })
+  );
+  assert.equal(dated.status, 201);
+  const datedProgram = (await dated.json()).data;
+  assert.equal(datedProgram.starts_on, '2026-11-21');
+  assert.equal(datedProgram.ends_on, '2026-11-22');
+
+  const inverted = await createProgramsHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/programs',
+      body: { name: 'Inverted', starts_on: '2026-12-06', ends_on: '2026-12-05' }
+    })
+  );
+  const invertedProgram = (await inverted.json()).data;
+  assert.equal(invertedProgram.starts_on, null);
+  assert.equal(invertedProgram.ends_on, null);
 
   const listedPrograms = await createProgramsHandler(deps)(
     request({ url: 'https://api.adam-russell.com/api/programs' })
