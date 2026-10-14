@@ -106,8 +106,10 @@ const COLOUR_LABEL: Record<AnnotationColour, string> = {
   mist: 'Mist'
 };
 
-const LOCKED_LAYER_KIND_LABEL: Record<'family' | 'teacher' | 'voice', string> = {
+const LAYER_KIND_LABEL: Record<AnnotationLayerKind, string> = {
   family: 'Periodic Table family',
+  free: 'Free',
+  lens: 'Lens',
   teacher: 'Teacher notes',
   voice: 'Voice'
 };
@@ -1013,6 +1015,86 @@ export function createAnnotationEditorFields(
         if (layer) opt.textContent = layer.name;
       }
     }
+  }
+
+  function kindChoicesFor(layer: AnnotationLayer): AnnotationLayerKind[] {
+    const choices: AnnotationLayerKind[] = [];
+    if (layer.kind === 'family') choices.push('family');
+    choices.push('free', 'lens');
+    if (!layers.some((row) => row.kind === 'teacher' && row.id !== layer.id)) {
+      choices.push('teacher');
+    }
+    if (!layers.some((row) => row.kind === 'voice' && row.id !== layer.id)) {
+      choices.push('voice');
+    }
+    return choices;
+  }
+
+  /** Kind stays editable. Leaving teacher, voice, or a Periodic Table layer asks first when that would expose notes, drop recordings, or remove subgroups. */
+  async function commitLayerKind(layerId: string, nextKind: AnnotationLayerKind): Promise<boolean> {
+    const layer = layers.find((row) => row.id === layerId);
+    if (!layer || layer.kind === nextKind) return false;
+
+    if (layer.kind === 'teacher' && annotations.some((ann) => ann.layer_id === layer.id)) {
+      const confirmed = await askSelectCard({
+        title: 'Change teacher notes?',
+        supporting: 'Notes on this layer will show to students.',
+        choices: [
+          { value: 'change', label: 'Change it' },
+          { value: 'keep', label: 'Keep teacher notes' }
+        ]
+      });
+      if (confirmed !== 'change') return false;
+    }
+
+    if (layer.kind === 'voice' && voiceTracks.some((track) => track.layer_id === layer.id)) {
+      const confirmed = await askSelectCard({
+        title: 'Change this voice layer?',
+        supporting: 'Recordings on this layer will be removed.',
+        choices: [
+          { value: 'change', label: 'Change it' },
+          { value: 'keep', label: 'Keep voice' }
+        ]
+      });
+      if (confirmed !== 'change') return false;
+      voiceTracks = voiceTracks.filter((track) => track.layer_id !== layer.id);
+      if (reviewingTrackId && !voiceTracks.some((track) => track.id === reviewingTrackId)) {
+        closeVoiceTools();
+      }
+    }
+
+    if (layer.kind === 'family' && (layer.sublayers?.length ?? 0) > 0) {
+      const confirmed = await askSelectCard({
+        title: 'Change this Periodic Table layer?',
+        supporting: 'Its subgroups will be removed.',
+        choices: [
+          { value: 'change', label: 'Change it' },
+          { value: 'keep', label: 'Keep this layer' }
+        ]
+      });
+      if (confirmed !== 'change') return false;
+    }
+
+    if (layer.kind === 'family') {
+      annotations = annotations.map((ann) => {
+        if (ann.layer_id !== layer.id || !ann.sublayer_id) return ann;
+        const { sublayer_id: _drop, ...rest } = ann;
+        return { ...rest, updated_at: nowIso() };
+      });
+    }
+
+    layers = layers.map((row) => {
+      if (row.id !== layer.id) return row;
+      const next: AnnotationLayer = { ...row, kind: nextKind };
+      if (layer.kind === 'family') {
+        delete next.family;
+        delete next.sublayers;
+      }
+      return next;
+    });
+    paintDefaultLayerOptions();
+    emitChange();
+    return true;
   }
 
   function beginAddStop(annotationId: string): void {
@@ -2101,48 +2183,18 @@ export function createAnnotationEditorFields(
         const kind = document.createElement('select');
         kind.className = 'block-editor__annotation-layer-kind';
         kind.setAttribute('aria-label', 'Layer kind');
-        if (
-          layer.kind === 'family' ||
-          layer.kind === 'teacher' ||
-          layer.kind === 'voice'
-        ) {
+        for (const value of kindChoicesFor(layer)) {
           const opt = document.createElement('option');
-          opt.value = layer.kind;
-          opt.textContent = LOCKED_LAYER_KIND_LABEL[layer.kind];
-          opt.selected = true;
+          opt.value = value;
+          opt.textContent = LAYER_KIND_LABEL[value];
           kind.append(opt);
-          kind.disabled = true;
-        } else {
-          for (const value of ['free', 'lens', 'teacher', 'voice'] as const) {
-            if (
-              value === 'teacher' &&
-              layers.some((l) => l.kind === 'teacher' && l.id !== layer.id)
-            ) {
-              continue;
-            }
-            if (
-              value === 'voice' &&
-              layers.some((l) => l.kind === 'voice' && l.id !== layer.id)
-            ) {
-              continue;
-            }
-            const opt = document.createElement('option');
-            opt.value = value;
-            opt.textContent =
-              value === 'free'
-                ? 'Free'
-                : value === 'lens'
-                  ? 'Lens'
-                  : value === 'teacher'
-                    ? 'Teacher notes'
-                    : 'Voice';
-            opt.selected = layer.kind === value;
-            kind.append(opt);
-          }
         }
+        kind.value = layer.kind;
         kind.addEventListener('change', () => {
           const nextKind = kind.value as AnnotationLayerKind;
-          ctx.update({ ...ctx.current, kind: nextKind });
+          void commitLayerKind(layer.id, nextKind).then((applied) => {
+            if (!applied && kind.isConnected) kind.value = layer.kind;
+          });
         });
 
         const wrap = document.createElement('div');
@@ -2167,14 +2219,14 @@ export function createAnnotationEditorFields(
           });
           if (!name) return;
           const kindChoices: Array<{ value: string; label: string }> = [
-            { value: 'free', label: 'Free' },
-            { value: 'lens', label: 'Lens' }
+            { value: 'free', label: LAYER_KIND_LABEL.free },
+            { value: 'lens', label: LAYER_KIND_LABEL.lens }
           ];
           if (!layers.some((l) => l.kind === 'teacher')) {
-            kindChoices.push({ value: 'teacher', label: 'Teacher notes' });
+            kindChoices.push({ value: 'teacher', label: LAYER_KIND_LABEL.teacher });
           }
           if (!layers.some((l) => l.kind === 'voice')) {
-            kindChoices.push({ value: 'voice', label: 'Voice' });
+            kindChoices.push({ value: 'voice', label: LAYER_KIND_LABEL.voice });
           }
           const kind =
             (await askSelectCard({ title: 'Layer kind', choices: kindChoices })) ??
