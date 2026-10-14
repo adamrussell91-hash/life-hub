@@ -835,32 +835,70 @@ export function renderColumnsBlock(
   return wrapBlock(grid, block, mode);
 }
 
+const TIMELINE_ISO_DATE = /^\d{4}-\d{2}(-\d{2})?$/;
+const TIMELINE_RANGE = /^(.+?)\s*(?:[-\u2013\u2014]|\bto\b)\s*(.+)$/i;
+
+/** Split "9:23AM-9:40AM" or "1914 to 1918" into start/end; plain values stay whole. */
+export function splitTimelineWhen(when: string): { start: string; end?: string } {
+  const text = when.trim();
+  if (!text || TIMELINE_ISO_DATE.test(text)) return { start: text };
+  const match = TIMELINE_RANGE.exec(text);
+  if (!match || !/\d/.test(match[1]) || !/\d/.test(match[2])) return { start: text };
+  return { start: match[1].trim(), end: match[2].trim() };
+}
+
 export function renderTimelineBlock(
   block: Extract<Block, { block_type: 'timeline' }>,
   mode: RenderMode
 ): HTMLElement {
+  const layout = block.content.layout ?? 'rail';
   const list = document.createElement('ol');
-  list.className = 'block-timeline';
+  list.className = `block-timeline block-timeline--${layout}`;
+  if (layout === 'horizontal') {
+    // The strip scrolls on its own; make it reachable by keyboard.
+    list.tabIndex = 0;
+    list.setAttribute('aria-label', 'Timeline, scrolls sideways');
+  }
 
-  for (const event of block.content.events) {
+  block.content.events.forEach((event, index) => {
     const item = document.createElement('li');
     item.className = 'block-timeline__event';
+    // Either side: each card spans two rows, offset by one, so neighbours overlap by half.
+    if (layout === 'alternate') item.style.gridRow = `${index + 1} / span 2`;
 
     const when = document.createElement('p');
     when.className = 'block-timeline__when';
-    when.textContent = event.when;
+    const { start, end } = splitTimelineWhen(event.when);
+    if (end) {
+      const startEl = document.createElement('span');
+      startEl.className = 'block-timeline__start';
+      startEl.textContent = start;
+      const endEl = document.createElement('span');
+      endEl.className = 'block-timeline__end';
+      endEl.textContent = `\u2013 ${end}`;
+      when.append(startEl, endEl);
+    } else {
+      when.textContent = event.when.trim();
+      if (!when.textContent) when.classList.add('block-timeline__when--empty');
+    }
+
+    const node = document.createElement('span');
+    node.className = 'block-timeline__node';
+    node.setAttribute('aria-hidden', 'true');
+
+    const card = document.createElement('div');
+    card.className = 'block-timeline__card';
 
     const label = document.createElement('h3');
     label.className = 'block-timeline__label';
     label.textContent = event.label;
-
-    item.append(when, label);
+    card.append(label);
 
     if (event.description.trim()) {
       const description = document.createElement('p');
       description.className = 'block-timeline__description';
       description.textContent = event.description;
-      item.append(description);
+      card.append(description);
     }
 
     if (event.image_url?.trim()) {
@@ -868,7 +906,8 @@ export function renderTimelineBlock(
       img.className = 'block-timeline__image';
       img.src = event.image_url.trim();
       img.alt = event.image_alt ?? '';
-      item.append(img);
+      img.loading = 'lazy';
+      card.append(img);
     }
 
     if (event.link_url?.trim()) {
@@ -878,11 +917,12 @@ export function renderTimelineBlock(
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.textContent = event.link_label?.trim() || 'Open link';
-      item.append(link);
+      card.append(link);
     }
 
+    item.append(when, node, card);
     list.append(item);
-  }
+  });
 
   return wrapBlock(list, block, mode);
 }
