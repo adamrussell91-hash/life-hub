@@ -278,18 +278,18 @@ describe('annotation view', () => {
     return block;
   }
 
-  it('one layer: a Show / Hide notes button, no N bubbles when hidden', () => {
+  it('one layer: a tick shows and hides the notes', () => {
     const el = renderAnnotationBlock(withOneLayerOfNotes(), 'teacher');
-    const reveal = el.querySelector<HTMLButtonElement>('.block-annotation__reveal')!;
-    expect(reveal.hidden).toBe(false);
-    expect(reveal.textContent).toBe('Hide notes');
-    expect(el.querySelector<HTMLElement>('.block-annotation__slider-row')!.hidden).toBe(true);
+    const chip = () => el.querySelector<HTMLButtonElement>('.block-annotation__chip')!;
+    expect(chip().textContent).toBe('✓ Notes');
+    expect(chip().getAttribute('aria-pressed')).toBe('true');
+    expect(el.querySelector('.block-annotation__slider')).toBeNull();
     expect(el.querySelectorAll('.block-annotation__anchor')).toHaveLength(3);
 
-    reveal.click();
-    expect(reveal.textContent).toBe('Show notes (3)');
+    chip().click();
+    expect(chip().textContent).toBe('Notes');
+    expect(chip().getAttribute('aria-pressed')).toBe('false');
     expect(el.querySelectorAll('.block-annotation__anchor')).toHaveLength(0);
-    // Markers are dots, never the layer's letter.
     const markers = [...el.querySelectorAll('.block-annotation__marker')];
     expect(markers.every((m) => m.textContent === '')).toBe(true);
   });
