@@ -136,6 +136,28 @@ test("Day One review preserves complete prose and source ids, skips duplicates a
   assert.equal(result.visits[0].notes, "# Noodles\nLoved lunch");
   assert.equal(result.visits[0].import_media[0].filename, "a.jpeg");
   assert.equal(
+    importDayOne(
+      {
+        entries: [
+          {
+            uuid: "photo-md5",
+            creationDate: "2026-01-13T12:00:00Z",
+            text: "With md5",
+            photos: [
+              {
+                identifier: "ABC",
+                md5: "deadbeef",
+                type: "jpeg",
+              },
+            ],
+          },
+        ],
+      },
+      emptyJournal(),
+    ).visits[0].import_media[0].md5,
+    "deadbeef",
+  );
+  assert.equal(
     importDayOne(payload, {
       ...emptyJournal(),
       reserved_source_ids: ["dayone:123"],
