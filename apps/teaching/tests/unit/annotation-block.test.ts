@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BlockSchema } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, NEW_BLOCK_TYPES, BLOCK_GROUPS } from '@/blocks/create-block';
 import { blockRegistry } from '@/blocks/registry';
 import { renderAnnotationBlock } from '@/blocks/render';
+import { marginNoteText } from '@/blocks/annotation-view';
 import { createAnnotationEditor } from '@/blocks/editors';
 import { sanitizeBlocksDeep } from '@/blocks/sanitize-blocks';
 import { blocksToSearchText } from '@/blocks/search-text';
@@ -63,7 +64,11 @@ describe('annotation render + sanitise', () => {
     );
     expect(ids).not.toContain('ann_teacher');
     expect(ids).toContain('ann_word');
-    expect(el.querySelector('.block-annotation__slider')).toBeTruthy();
+    expect(el.querySelector('.block-annotation__slider')).toBeNull();
+    expect([...el.querySelectorAll('.block-annotation__chip')].map((chip) => chip.textContent)).toEqual([
+      '✓ Structure',
+      '✓ Imagery'
+    ]);
     expect(el.textContent).not.toContain('Teacher notes');
   });
 
@@ -136,27 +141,23 @@ describe('annotation render + sanitise', () => {
     expect(last.content.settings.default_layer_id).toBe('layer_structure');
   });
 
-  it('slider and chips drive markers without moving the stop on chip toggle', () => {
+  it('layer ticks show and hide one layer without a slider', () => {
     const fixture = structuredClone(dulceAnnotationFixture);
     fixture.content.settings.show_markers = true;
     const el = renderAnnotationBlock(fixture, 'student');
-    const slider = el.querySelector<HTMLInputElement>('.block-annotation__slider')!;
-    expect(slider.value).toBe('0');
-    expect(el.querySelectorAll('.block-annotation__marker').length).toBeGreaterThan(0);
+    expect(el.querySelector('.block-annotation__slider')).toBeNull();
+    const chips = () => [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip')];
+    expect(chips().map((chip) => chip.textContent)).toEqual(['Structure', 'Imagery']);
+    expect(el.querySelectorAll('.block-annotation__anchor')).toHaveLength(0);
 
-    slider.value = '2';
-    slider.dispatchEvent(new Event('input'));
+    chips()[0]!.click();
+    expect(chips()[0]!.getAttribute('aria-pressed')).toBe('true');
+    expect(chips()[1]!.getAttribute('aria-pressed')).toBe('false');
     expect(el.querySelectorAll('[data-annotation-id]').length).toBeGreaterThan(0);
 
-    const chips = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip')];
-    expect(chips).toHaveLength(2);
-    chips[0]!.click();
-    expect(slider.value).toBe('2');
-    // paint() replaces chip nodes — re-query after toggle.
-    const afterToggle = el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip');
-    expect(afterToggle[0]!.getAttribute('aria-pressed')).toBe('false');
-    // A layer the reader switched off leaves no markers behind.
-    expect(el.querySelectorAll('.block-annotation__marker').length).toBe(0);
+    chips()[0]!.click();
+    expect(chips()[0]!.getAttribute('aria-pressed')).toBe('false');
+    expect(el.querySelectorAll('.block-annotation__anchor')).toHaveLength(0);
   });
 
   it('show_markers false removes marker buttons', () => {
@@ -164,5 +165,52 @@ describe('annotation render + sanitise', () => {
     fixture.content.settings.show_markers = false;
     const el = renderAnnotationBlock(fixture, 'student');
     expect(el.querySelectorAll('.block-annotation__marker')).toHaveLength(0);
+  });
+
+  it('writes the whole plain note into the margin, not a clipped preview', () => {
+    const sentence = 'Fleeting and insubstantial (ephemeral butterfly).';
+    expect(marginNoteText(`<p>${sentence}</p>`)).toBe(sentence);
+    expect(marginNoteText('<p>ignored</p>', 'Visual Imagery')).toBe('Visual Imagery');
+  });
+
+  it('a plain note does not open a second window', () => {
+    const el = renderAnnotationBlock(dulceAnnotationFixture, 'teacher');
+    const word = el.querySelector<HTMLElement>('[data-annotation-id="ann_word"]')!;
+    expect(word.tagName).toBe('SPAN');
+    word.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(el.querySelector<HTMLElement>('.block-annotation__panel')!.hidden).toBe(true);
+    expect(el.querySelector<HTMLElement>('.block-annotation__sheet')!.hidden).toBe(true);
+  });
+
+  it('a stanza note, which has no handwriting, still opens inside the block', () => {
+    const el = renderAnnotationBlock(dulceAnnotationFixture, 'teacher');
+    el.querySelector<HTMLButtonElement>('.block-annotation__anchor--stanza')!.click();
+    const panel = el.querySelector<HTMLElement>('.block-annotation__panel')!;
+    expect(panel.hidden).toBe(false);
+    expect(panel.textContent).toContain('Opening quatrain');
+  });
+
+  it('phone reads a plain note from the sheet, because the handwriting is hidden', () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => {
+      const narrow = query.includes('max-width: 720px');
+      return {
+        matches: narrow,
+        media: query,
+        onchange: null,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        dispatchEvent: () => false
+      } as MediaQueryList;
+    });
+    const el = renderAnnotationBlock(dulceAnnotationFixture, 'teacher');
+    const word = el.querySelector<HTMLButtonElement>('[data-annotation-id="ann_word"]')!;
+    expect(word.tagName).toBe('BUTTON');
+    word.click();
+    const sheet = el.querySelector<HTMLElement>('.block-annotation__sheet')!;
+    expect(sheet.hidden).toBe(false);
+    expect(sheet.textContent).toContain('Heavy verb');
+    vi.restoreAllMocks();
   });
 });

@@ -18,8 +18,6 @@ import {
   createLayerState,
   isAnnotationActive,
   markersFor,
-  revealedLayers,
-  stepStop,
   stopsForMode,
   toggleSuppressed,
   type AnnotationLayerState,
@@ -86,6 +84,14 @@ function approvedClips(track: AnnotationVoiceTrack): PublishedVoiceClip[] {
 
 function layerById(layers: AnnotationLayer[], id: string): AnnotationLayer | undefined {
   return layers.find((layer) => layer.id === id);
+}
+
+/** Handwritten margin copy: the whole note, not a clipped preview of it. */
+export function marginNoteText(html: string, techniqueName?: string): string | undefined {
+  const name = techniqueName?.trim();
+  if (name) return name;
+  const text = htmlToPlainText(html).trim();
+  return text || undefined;
 }
 
 function placedFor(
@@ -399,13 +405,18 @@ function openAnnotation(
   close.focus();
 }
 
-function wrapSpan(
+function wrapAnchor(
   className: string,
   annotation: AnnotationItem,
   layer: AnnotationLayer | undefined,
-  root: HTMLElement,
-  table: LiteraryElementsTable | null
-): HTMLButtonElement {
+  onOpen: ((btn: HTMLButtonElement) => void) | null
+): HTMLElement {
+  if (!onOpen) {
+    const span = document.createElement('span');
+    span.className = className;
+    span.dataset.annotationId = annotation.id;
+    return span;
+  }
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = className;
@@ -415,9 +426,7 @@ function wrapSpan(
     'aria-label',
     layer ? `Annotation: ${layer.name}` : 'Annotation'
   );
-  btn.addEventListener('click', () =>
-    openAnnotation(root, annotation, layer, btn, table)
-  );
+  btn.addEventListener('click', () => onOpen(btn));
   return btn;
 }
 
@@ -430,8 +439,8 @@ type LineMark = {
 function renderLineText(
   line: AnnotationLineModel,
   marks: LineMark[],
-  root: HTMLElement,
-  table: LiteraryElementsTable | null
+  opens: (item: PlacedAnnotation) => boolean,
+  onOpen: (item: PlacedAnnotation, btn: HTMLButtonElement) => void
 ): DocumentFragment {
   return renderFormattedLine(
     line,
@@ -442,12 +451,11 @@ function renderLineText(
         start: mark.start,
         end: mark.end,
         wrap: () =>
-          wrapSpan(
+          wrapAnchor(
             `block-annotation__anchor block-annotation__anchor--${grainClass} block-annotation__anchor--${colour}`,
             mark.placed.annotation,
             mark.placed.layer,
-            root,
-            table
+            opens(mark.placed) ? (btn) => onOpen(mark.placed, btn) : null
           )
       };
     })
@@ -479,11 +487,18 @@ function barAnchorLabel(kind: 'line' | 'stanza', layer?: AnnotationLayer): strin
 function makeBarAnchor(
   item: PlacedAnnotation,
   kind: 'line' | 'stanza',
-  onOpen: (btn: HTMLButtonElement) => void
-): HTMLButtonElement {
+  onOpen: ((btn: HTMLButtonElement) => void) | null
+): HTMLElement {
+  const className = `block-annotation__anchor block-annotation__anchor--${kind}`;
+  if (!onOpen) {
+    const span = document.createElement('span');
+    span.className = className;
+    span.dataset.annotationId = item.annotation.id;
+    return span;
+  }
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = `block-annotation__anchor block-annotation__anchor--${kind}`;
+  btn.className = className;
   btn.dataset.annotationId = item.annotation.id;
   btn.setAttribute('aria-expanded', 'false');
   btn.setAttribute('aria-label', barAnchorLabel(kind, item.layer));
@@ -507,12 +522,9 @@ function buildInteractiveView(
   if (openNoteId) {
     const target = content.annotations.find((ann) => ann.id === openNoteId);
     if (target) {
-      const layerIdx = stops.findIndex((layer) => layer.id === target.layer_id);
-      state = {
-        ...state,
-        openAnnotationId: openNoteId,
-        stop: layerIdx >= 0 ? layerIdx + 1 : state.stop
-      };
+      const suppressed = new Set(state.suppressed);
+      suppressed.delete(target.layer_id);
+      state = { ...state, openAnnotationId: openNoteId, suppressed };
     }
   }
   let table: LiteraryElementsTable | null = null;
@@ -550,19 +562,6 @@ function buildInteractiveView(
   chips.setAttribute('role', 'toolbar');
   chips.setAttribute('aria-label', 'Annotation layers');
 
-  const sliderRow = document.createElement('div');
-  sliderRow.className = 'block-annotation__slider-row';
-
-  const slider = document.createElement('input');
-  slider.type = 'range';
-  slider.className = 'block-annotation__slider';
-  slider.min = '0';
-  slider.step = '1';
-  slider.setAttribute('aria-label', 'Reveal annotation layers');
-
-  const stopLabels = document.createElement('div');
-  stopLabels.className = 'block-annotation__stop-labels';
-
   const threadStrip = document.createElement('div');
   threadStrip.className = 'block-annotation__threads';
   threadStrip.setAttribute('role', 'toolbar');
@@ -576,22 +575,7 @@ function buildInteractiveView(
   stepBar.className = 'block-annotation__step-bar';
   stepBar.hidden = true;
 
-  const reveal = document.createElement('button');
-  reveal.type = 'button';
-  reveal.className = 'btn btn--secondary block-annotation__reveal';
-  reveal.hidden = true;
-  reveal.addEventListener('click', () => {
-    const only = stops[0];
-    if (!only) return;
-    const shown = state.stop >= 1 && !state.suppressed.has(only.id);
-    const suppressed = new Set(state.suppressed);
-    suppressed.delete(only.id);
-    state = { ...state, stop: shown ? 0 : 1, suppressed };
-    paint();
-  });
-
-  sliderRow.append(slider, stopLabels);
-  controls.append(reveal, chips, threadStrip, focusBar, stepBar, sliderRow);
+  controls.append(chips, threadStrip, focusBar, stepBar);
 
   layout.append(textCol, panel);
   // Reveal controls sit above the text so a long poem never hides them.
@@ -843,11 +827,23 @@ function buildInteractiveView(
   function marginLabel(ann: AnnotationItem): string | undefined {
     if (ann.technique?.id && table) {
       const technique = lookupTechnique(table, ann.technique.id);
-      if (technique) return technique.name;
+      if (technique) return marginNoteText(ann.body.html, technique.name);
     }
-    const text = htmlToPlainText(ann.body.html).trim().split(/(?<=[.!?])\s/)[0] ?? '';
-    if (!text) return undefined;
-    return text.length > 42 ? `${text.slice(0, 40).trimEnd()}…` : text;
+    return marginNoteText(ann.body.html);
+  }
+
+  /** The side window only earns its place when the handwriting cannot carry the note. */
+  function readerNeeded(ann: AnnotationItem): boolean {
+    if ((ann.also_anchors?.length ?? 0) > 0) return false;
+    if (ann.technique?.id) return true;
+    if ((ann.body.attachments?.length ?? 0) > 0) return true;
+    if (inkStyle !== 'fineliner') return true;
+    if (isNarrowAnnotationViewport()) return true;
+    const width = inkHost?.getBoundingClientRect().width ?? 0;
+    if (width > 0 && width < MARGIN_LABEL_MIN_WIDTH) return true;
+    const resolved = resolveAnnotation(content.text, ann);
+    if (resolved.status !== 'ok' || resolved.granularity === 'stanza') return true;
+    return !marginNoteText(ann.body.html);
   }
 
   function paint(): void {
@@ -857,40 +853,10 @@ function buildInteractiveView(
     threadStrip.replaceChildren();
     focusBar.replaceChildren();
     stepBar.replaceChildren();
-    stopLabels.replaceChildren();
 
-    slider.max = String(stops.length);
-    slider.value = String(state.stop);
+    chips.hidden = stops.length === 0;
 
-    // One layer: a single Show / Hide button says more than a two-stop slider.
-    const singleStop = stops.length === 1;
-    sliderRow.hidden = singleStop || stops.length === 0;
-    reveal.hidden = !singleStop;
-    if (singleStop) {
-      const only = stops[0]!;
-      const shown = state.stop >= 1 && !state.suppressed.has(only.id);
-      const count = content.annotations.filter((ann) => ann.layer_id === only.id).length;
-      reveal.setAttribute('aria-pressed', shown ? 'true' : 'false');
-      reveal.textContent = shown
-        ? `Hide ${only.name.toLowerCase()}`
-        : `Show ${only.name.toLowerCase()}${count > 0 ? ` (${count})` : ''}`;
-    }
-
-    const zero = document.createElement('span');
-    zero.className = 'block-annotation__stop-label';
-    zero.textContent = 'Text only';
-    zero.dataset.active = state.stop === 0 ? 'true' : 'false';
-    stopLabels.append(zero);
-    stops.forEach((layer, index) => {
-      const label = document.createElement('span');
-      label.className = 'block-annotation__stop-label';
-      if (layer.kind === 'teacher') label.classList.add('block-annotation__stop-label--teacher');
-      label.textContent = layer.name;
-      label.dataset.active = state.stop === index + 1 ? 'true' : 'false';
-      stopLabels.append(label);
-    });
-
-    for (const layer of singleStop ? [] : revealedLayers(stops, state.stop)) {
+    for (const layer of stops) {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = `block-annotation__chip block-annotation__chip--${layer.colour}`;
@@ -1057,20 +1023,16 @@ function buildInteractiveView(
         paint();
         return;
       }
+      if (!readerNeeded(item.annotation)) return;
       state = { ...state, openAnnotationId: item.annotation.id };
       openAnnotation(root, item.annotation, item.layer, btn, table);
     }
 
     function revealMarkerLayer(marker: AnnotationMarker): void {
-      const idx = stops.findIndex((layer) => layer.id === marker.layerId);
-      if (idx < 0) return;
+      if (!stops.some((layer) => layer.id === marker.layerId)) return;
       const suppressed = new Set(state.suppressed);
       suppressed.delete(marker.layerId);
-      state = {
-        ...state,
-        stop: Math.max(state.stop, idx + 1),
-        suppressed
-      };
+      state = { ...state, suppressed };
       paint();
     }
 
@@ -1144,7 +1106,13 @@ function buildInteractiveView(
       const margin = document.createElement('div');
       margin.className = 'block-annotation__line-margin';
       for (const item of lineBars.get(lineId) ?? []) {
-        margin.append(makeBarAnchor(item, 'line', (btn) => openPlaced(item, btn)));
+        margin.append(
+          makeBarAnchor(
+            item,
+            'line',
+            readerNeeded(item.annotation) ? (btn) => openPlaced(item, btn) : null
+          )
+        );
       }
       for (const pip of pipsByLine.get(lineId) ?? []) {
         margin.append(pip);
@@ -1177,7 +1145,9 @@ function buildInteractiveView(
       const textEl = document.createElement('p');
       textEl.className = 'block-annotation__line-text';
       const marks = byLine.get(`${stanzaId}:${lineId}`) ?? [];
-      textEl.append(renderLineText(line, marks, root, table));
+      textEl.append(
+        renderLineText(line, marks, (item) => readerNeeded(item.annotation), openPlaced)
+      );
       applyLineLayout(textEl, line);
 
       const lineMarkers = markersByLine.get(`${stanzaId}:${lineId}`) ?? [];
@@ -1357,7 +1327,7 @@ function buildInteractiveView(
           colour: item.layer?.colour ?? 'wave',
           el: btn,
           label: first && !isThread && kind !== 'stanza' ? marginLabel(item.annotation) : undefined,
-          onOpen: () => btn.click()
+          onOpen: readerNeeded(item.annotation) ? () => btn.click() : undefined
         });
       });
     scheduleInk(true);
@@ -1366,34 +1336,25 @@ function buildInteractiveView(
       const openBtn = root.querySelector<HTMLElement>(
         `[data-annotation-id="${state.openAnnotationId}"]`
       );
-      if (openBtn) {
-        const ann = content.annotations.find((a) => a.id === state.openAnnotationId);
-        if (ann) {
-          openAnnotation(
-            root,
-            ann,
-            layerById(content.layers, ann.layer_id),
-            openBtn,
-            table
-          );
-        }
+      const ann = content.annotations.find((a) => a.id === state.openAnnotationId);
+      if (openBtn && ann && readerNeeded(ann)) {
+        openAnnotation(
+          root,
+          ann,
+          layerById(content.layers, ann.layer_id),
+          openBtn,
+          table
+        );
       }
     }
   }
 
-  slider.addEventListener('input', () => {
-    state = { ...state, stop: Number(slider.value) };
-    paint();
-  });
-
   root.addEventListener('keydown', (event) => {
-    const blockFocused = event.target === root || root.contains(event.target as Node);
-    if (event.target !== slider && !blockFocused) return;
+    if (!root.contains(event.target as Node)) return;
 
     const action = resolveAnnotationKey({
       key: event.key,
       focusThreadId: state.focusThreadId,
-      sliderFocused: event.target === slider,
       panelOpen: Boolean(root.querySelector('.block-annotation__anchor.is-open')),
       isTextControl: isTextControl(event.target)
     });
@@ -1426,21 +1387,6 @@ function buildInteractiveView(
         paint();
         break;
       }
-      case 'step_slider':
-        state = stepStop(state, stops, action.delta);
-        paint();
-        slider.focus();
-        break;
-      case 'slider_home':
-        state = { ...state, stop: 0 };
-        paint();
-        slider.focus();
-        break;
-      case 'slider_end':
-        state = { ...state, stop: stops.length };
-        paint();
-        slider.focus();
-        break;
     }
   });
 

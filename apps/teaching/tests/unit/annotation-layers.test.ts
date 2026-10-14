@@ -85,4 +85,22 @@ describe('annotation layers (pure)', () => {
       ).stop
     ).toBe(2);
   });
+
+  it('layers after the student default start unticked', () => {
+    const extra = [
+      ...layers,
+      { id: 'layer_later', name: 'Later', kind: 'free' as const, colour: 'sand' as const }
+    ];
+    const state = createLayerState(
+      extra,
+      { show_markers: true, default_layer_id: 'layer_imagery' },
+      'student'
+    );
+    const stops = studentStops(extra);
+    const active = activeLayerIds(stops, state);
+    expect(active.has('layer_structure')).toBe(true);
+    expect(active.has('layer_imagery')).toBe(true);
+    expect(active.has('layer_later')).toBe(false);
+    expect(state.stop).toBe(stops.length);
+  });
 });
