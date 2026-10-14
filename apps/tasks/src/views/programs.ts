@@ -10,6 +10,7 @@ import {
   PROGRAM_TYPES
 } from '@/schemas/program';
 import { tasksApi } from '@/services/client-api';
+import { formatDisplayDateRange } from '../../design-kit/js/format-display-date.js';
 import {
   queryPrograms,
   uniqueSorted,
@@ -346,6 +347,7 @@ function renderDetail(
     propertyRow('Organiser', program.organiser),
     propertyRow('Location', program.location),
     propertyRow('Month', program.month),
+    propertyRow('Runs', program.starts_on ? formatDisplayDateRange(program.starts_on, program.ends_on) : null),
     propertyRow('Age group', program.age_groups.join(', ')),
     propertyRow('Subjects', program.subjects.join(', ')),
     propertyRow('Level', program.competition_level),

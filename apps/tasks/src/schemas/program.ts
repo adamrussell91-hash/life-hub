@@ -104,7 +104,7 @@ const text = z
   .optional()
   .transform((value) => value?.trim() ?? '');
 
-export const ProgramSchema = z.object({
+const ProgramObject = z.object({
   schema_version: schemaVersion,
   id: z.string().min(1),
   name: z.string().trim().min(1),
@@ -129,13 +129,35 @@ export const ProgramSchema = z.object({
       return value;
     }),
   registration_window: text,
+  /** When this runs. Null when the catalogue text does not state a date. */
+  starts_on: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional()
+    .default(null),
+  ends_on: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional()
+    .default(null),
   not_available_nsw: z.boolean().default(false),
   not_available_reason: text,
   created_at: z.string(),
   updated_at: z.string()
 });
 
-export const ProgramCreateSchema = ProgramSchema.omit({
+export const ProgramSchema = ProgramObject.superRefine((program, ctx) => {
+  const start = program.starts_on;
+  const end = program.ends_on;
+  if (!start && !end) return;
+  if (!start || !end || end < start) {
+    ctx.addIssue({ code: 'custom', message: 'ends_on is before starts_on', path: ['ends_on'] });
+  }
+});
+
+export const ProgramCreateSchema = ProgramObject.omit({
   schema_version: true,
   id: true,
   created_at: true,
@@ -154,6 +176,8 @@ export const ProgramCreateSchema = ProgramSchema.omit({
   description: true,
   registration_link: true,
   registration_window: true,
+  starts_on: true,
+  ends_on: true,
   not_available_nsw: true,
   not_available_reason: true
 }).extend({
