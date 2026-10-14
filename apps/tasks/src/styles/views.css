@@ -5151,6 +5151,68 @@ html.is-map-fullscreen .map-page .map-preview {
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--wave) 55%, transparent));
 }
 
+/* Transit map (Sydney rail style). Line colours come from the map palette in markup. */
+.tm-term-band {
+  fill: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+.tm-term-band--alt {
+  fill: color-mix(in srgb, var(--ink) 2%, transparent);
+}
+
+.tm-term-rule {
+  stroke: color-mix(in srgb, var(--ink) 12%, transparent);
+  stroke-width: 1;
+}
+
+.tm-term-label {
+  fill: color-mix(in srgb, var(--ink) 24%, transparent);
+}
+
+.tm-term-date,
+.tm-stop-sub,
+.tm-year-name {
+  fill: var(--muted);
+}
+
+.tm-header-name,
+.tm-stop-label {
+  fill: var(--ink);
+}
+
+/* A soft halo keeps names readable where a dashed link passes behind them. */
+.tm-stop-label,
+.tm-stop-sub,
+.tm-flag-label {
+  paint-order: stroke;
+  stroke: var(--cotton);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.tm-stop-label,
+.tm-stop-sub,
+.tm-year-name,
+.tm-header-name,
+.tm-pill-label,
+.tm-term-label,
+.tm-term-date {
+  pointer-events: none;
+}
+
+.map-station.is-selected .tm-pill {
+  stroke-width: 4.5;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--wave) 45%, transparent));
+}
+
+.map-tick.is-selected .tm-stop-label {
+  font-weight: var(--weight-bold);
+}
+
+.map-stage.is-edit .tm-header {
+  cursor: grab;
+}
+
 .map-connector-preview {
   pointer-events: none;
 }
