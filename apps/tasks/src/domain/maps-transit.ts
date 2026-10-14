@@ -18,6 +18,7 @@ import {
   fitPillLabel,
   lineTrackDefs,
   mapTerms,
+  termSpans,
   MAP_YEAR_BOTTOM,
   MAP_YEAR_TOP,
   matchConnectTarget,
@@ -56,6 +57,8 @@ const SPLIT_PAD = 14;
 const MAX_RAMP = 64;
 const MIN_RAMP = 18;
 const CORNER_R = 16;
+/** Corner radius where an open-all-year spur leaves and rejoins its year line. */
+const ALL_YEAR_RAMP = 28;
 /** Strands never sit closer than this (track to track), so each still reads as its own bundle. */
 const STRAND_MIN_GAP = 96;
 const STRAND_PAD = 28;
@@ -100,7 +103,15 @@ export type TransitFlagDraw = {
   anchor: 'start' | 'end';
 };
 
-export type TransitBranchDraw = { id: string; lineId: string; color: MapColorToken; points: Point[] };
+export type TransitBranchDraw = {
+  id: string;
+  lineId: string;
+  color: MapColorToken;
+  points: Point[];
+  /** Open-all-year spur: drawn dotted, with a small caption at its top. */
+  dotted?: boolean;
+  caption?: { x: number; y: number; text: string; anchor: 'start' | 'end' };
+};
 
 export type TransitTrackDraw = {
   lineId: string;
@@ -132,6 +143,8 @@ export type TransitDraw = {
   flags: TransitFlagDraw[];
   links: TransitLinkDraw[];
   capY: { top: number; bottom: number };
+  /** Horizontal extent of each strand (header, lines, pills and names), for framing one strand. */
+  strands: Array<{ lineId: string; x0: number; x1: number }>;
 };
 
 export type TransitLayout = MapCanvasLayout & { draw: TransitDraw };
@@ -330,14 +343,19 @@ type LocalStop = {
 
 type LocalBranch = {
   id: string;
-  stationId: string;
+  /** Host program; null for an open-all-year spur off the year line itself. */
+  stationId: string | null;
   track: number;
   side: 'left' | 'right';
   stops: LocalStop[];
   originY: number;
+  /** The y whose track x the branch x is measured from. */
+  refY: number;
   /** Offsets from the track line. */
   edgeDX: number;
   branchDX: number;
+  /** Open all year: leaves the year line near the year start and rejoins after its last stop. */
+  allYear?: { rejoinY: number };
 };
 
 type Cluster = { track: number; y0: number; y1: number; offsets: Map<string, number>; ys: number; ye: number; half: number };
@@ -558,6 +576,7 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
           side,
           stops: [],
           originY: 0,
+          refY: station.y + station.h / 2,
           edgeDX,
           branchDX: edgeDX + dir * BRANCH_OUT
         };
@@ -584,12 +603,37 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
     const picked = resolveLineAttachTracks(attachTracksOf(rootAttach ?? undefined), ids);
     const tracks = picked.map((id) => ids.indexOf(id)).filter((index) => index >= 0).sort((a, b) => a - b);
     const side: 'left' | 'right' = count > 1 && tracks.length === 1 && tracks[0] === 0 ? 'left' : 'right';
+    if (rootAttach && root.all_year) {
+      // Open all year: the competition and its rounds run on a dotted spur beside the year line.
+      const track = side === 'left' ? (tracks[0] ?? 0) : (tracks[tracks.length - 1] ?? 0);
+      const key = `allyear:${root.id}`;
+      let branch = branchMap.get(key);
+      if (!branch) {
+        branch = {
+          id: `branch-${key}`,
+          stationId: null,
+          track,
+          side,
+          stops: [],
+          originY: 0,
+          refY: 0,
+          edgeDX: 0,
+          branchDX: 0,
+          allYear: { rejoinY: 0 }
+        };
+        branchMap.set(key, branch);
+      }
+      const stop: LocalStop = { tick, tracks: [track], y, side, branch: branch.id, final: false, label, sub, labelY: y, dotX: [] };
+      branch.stops.push(stop);
+      stops.push(stop);
+      continue;
+    }
     stops.push({ tick, tracks: tracks.length ? tracks : [0], y, side, branch: null, final: false, label, sub, labelY: y, dotX: [] });
   }
 
   // A program with one competition needs no branch: the stop sits on the program's edge.
   for (const [key, branch] of [...branchMap.entries()]) {
-    if (branch.stops.length > 1) continue;
+    if (branch.stops.length > 1 || branch.allYear) continue;
     const stop = branch.stops[0]!;
     stop.branch = null;
     stop.onEdge = true;
@@ -628,8 +672,18 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
   for (const branch of branchMap.values()) {
     branch.stops.sort((a, b) => a.y - b.y);
     if (branch.stops.length > 1) branch.stops[branch.stops.length - 1]!.final = true;
-    const station = stations.find((item) => item.id === branch.stationId)!;
     const first = branch.stops[0]!.y;
+    if (branch.allYear) {
+      const last = branch.stops[branch.stops.length - 1]!;
+      branch.originY = Math.max(yTop + TM_CAP_R + ALL_YEAR_RAMP, Math.min(MAP_YEAR_TOP, first - ALL_YEAR_RAMP - 24));
+      branch.refY = branch.originY;
+      branch.allYear.rejoinY = Math.min(
+        MAP_YEAR_BOTTOM,
+        Math.max(last.labelY - LABEL_LINE_H / 2 + last.label.h + 16, last.y + ALL_YEAR_RAMP + 16)
+      );
+      continue;
+    }
+    const station = stations.find((item) => item.id === branch.stationId)!;
     branch.originY = Math.min(station.y + station.h - 14, Math.max(station.y + 14, first - 24));
   }
   const chains = new Map<string, LocalStop[]>();
@@ -665,12 +719,38 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
     });
   }
 
+  // An open-all-year spur runs outside every name, pill and round branch on its side of the line.
+  for (const branch of branchMap.values()) {
+    if (!branch.allYear) continue;
+    const span = { y0: branch.originY, y1: branch.allYear.rejoinY };
+    const dir = branch.side === 'left' ? -1 : 1;
+    let reach = BRANCH_OUT + TM_PILL_W / 2;
+    for (const stop of stops) {
+      if (stop.branch || stop.side !== branch.side || stop.y < span.y0 || stop.y > span.y1) continue;
+      const edge = branch.side === 'left' ? Math.min(...stop.tracks) : Math.max(...stop.tracks);
+      if (edge !== branch.track) continue;
+      const dot = Math.abs(stop.dotX[stop.tracks.indexOf(edge)] ?? 0);
+      reach = Math.max(reach, labelReach(clusters, edge, stop.y, dot) + stop.label.w + 28);
+    }
+    for (const other of branchMap.values()) {
+      if (other === branch || other.allYear || other.side !== branch.side || other.track !== branch.track) continue;
+      reach = Math.max(reach, Math.abs(other.branchDX) + LABEL_DX + Math.max(...other.stops.map((stop) => stop.label.w)) + 28);
+    }
+    for (const cluster of clusters) {
+      if (cluster.track === branch.track && overlap({ y0: cluster.ys, y1: cluster.ye }, span)) {
+        reach = Math.max(reach, cluster.half + TM_PILL_W / 2 + BRANCH_OUT);
+      }
+    }
+    branch.branchDX = dir * reach;
+    for (const stop of branch.stops) stop.dotX = [branch.branchDX];
+  }
+
   // A year-line stop whose name would land on a round branch beside the same line flips to the free side.
   for (const stop of stops) {
     if (stop.branch || stop.onEdge || stop.side !== 'right' || !stop.tick) continue;
     const track = Math.max(...stop.tracks);
     const blocked = [...branchMap.values()].some((branch) => {
-      if (branch.side !== 'right' || branch.track !== track) return false;
+      if (branch.allYear || branch.side !== 'right' || branch.track !== track) return false;
       const last = branch.stops[branch.stops.length - 1]!;
       return stop.y + stop.label.h >= branch.originY - 20 && stop.y - 20 <= last.y + last.label.h;
     });
@@ -721,7 +801,7 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
   for (const branch of branchMap.values()) {
     const last = branch.stops[branch.stops.length - 1]!;
     const y0 = Math.min(branch.originY, branch.stops[0]!.y) - 10;
-    const y1 = Math.max(last.y, last.labelY + last.label.h) + 10;
+    const y1 = Math.max(last.y, last.labelY + last.label.h, branch.allYear?.rejoinY ?? 0) + 10;
     occupancy[branch.track]!.push({ y0, y1 });
     const reach = Math.max(...branch.stops.map((stop) => stop.label.w)) + Math.abs(branch.branchDX) + LABEL_DX;
     const amount = reach + SIDE_PAD + TM_PILL_W / 2 - TM_TRACK_GAP;
@@ -844,8 +924,45 @@ function placeStrand(piece: StrandPiece): PlacedStrand {
 
   const branches: TransitBranchDraw[] = [];
   for (const branch of piece.branches) {
+    if (branch.allYear) {
+      const dir = branch.side === 'left' ? -1 : 1;
+      const y0 = branch.originY;
+      const y1 = branch.allYear.rejoinY;
+      const bx = tx(branch.track, branch.refY) + branch.branchDX;
+      // Leave the year line sideways, run down beside it, and come back the same way.
+      const x0 = tx(branch.track, y0);
+      const x1 = tx(branch.track, y1);
+      const points: Point[] = [
+        { x: x0, y: y0 - ALL_YEAR_RAMP },
+        { x: x0, y: y0 },
+        { x: bx, y: y0 },
+        { x: bx, y: y1 },
+        { x: x1, y: y1 },
+        { x: x1, y: y1 + ALL_YEAR_RAMP }
+      ];
+      const text = `${defs[branch.track]?.label ?? ''} · open all year`;
+      const captionX = bx + dir * 14;
+      const anchor: 'start' | 'end' = dir > 0 ? 'start' : 'end';
+      const captionW = tmTextWidth(text, TM_SUB_FONT);
+      branches.push({
+        id: branch.id,
+        lineId: line.id,
+        color: line.color,
+        points,
+        dotted: true,
+        caption: { x: captionX, y: y0 + 4, text, anchor }
+      });
+      boxPoints(points, TM_BRANCH_W / 2 + 4);
+      boxes.push({
+        x0: anchor === 'start' ? captionX : captionX - captionW,
+        x1: anchor === 'start' ? captionX + captionW : captionX,
+        y0: y0 - 10,
+        y1: y0 + 10
+      });
+      continue;
+    }
     const station = piece.stations.find((item) => item.id === branch.stationId)!;
-    const trackX = tx(branch.track, station.y + station.h / 2);
+    const trackX = tx(branch.track, branch.refY);
     const edgeX = trackX + branch.edgeDX;
     const bx = trackX + branch.branchDX;
     const dir = branch.side === 'left' ? -1 : 1;
@@ -873,8 +990,7 @@ function placeStrand(piece: StrandPiece): PlacedStrand {
     let labelX: number;
     if (stop.branch) {
       const branch = piece.branches.find((item) => item.id === stop.branch)!;
-      const station = piece.stations.find((item) => item.id === branch.stationId)!;
-      const x = tx(branch.track, station.y + station.h / 2) + branch.branchDX;
+      const x = tx(branch.track, branch.refY) + branch.branchDX;
       dots = [{ x, y: stop.y }];
       labelX = x + (branch.side === 'left' ? -LABEL_DX : LABEL_DX);
     } else {
@@ -941,7 +1057,10 @@ function shiftPlaced(placed: PlacedStrand, dx: number): void {
     move(track.bottom);
   }
   placed.trackLines.forEach((part) => part.forEach(move));
-  placed.branches.forEach((branch) => branch.points.forEach(move));
+  placed.branches.forEach((branch) => {
+    branch.points.forEach(move);
+    if (branch.caption) branch.caption.x += dx;
+  });
   for (const stop of placed.stops) {
     stop.dots.forEach(move);
     stop.labelX += dx;
@@ -976,10 +1095,15 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
   const year = map.year ?? new Date().getFullYear();
   const termsRaw = mapTerms({ year, terms: map.terms }, years);
   const terms: TermBand[] = [
-    { id: 'T1', label: 'T1', date: termsRaw.t1, y: dateToY(termsRaw.t1, year) },
-    { id: 'T2', label: 'T2', date: termsRaw.t2, y: dateToY(termsRaw.t2, year) },
-    { id: 'T3', label: 'T3', date: termsRaw.t3, y: dateToY(termsRaw.t3, year) },
-    { id: 'T4', label: 'T4', date: termsRaw.t4, y: dateToY(termsRaw.t4, year) },
+    ...termSpans(termsRaw).map((span) => ({
+      id: span.id,
+      label: span.id,
+      date: span.start,
+      y: dateToY(span.start, year),
+      end: span.end,
+      endY: dateToY(span.end, year),
+      hasEnd: span.hasEnd
+    })),
     { id: 'E', label: 'E', date: termsRaw.e, y: dateToY(termsRaw.e, year) }
   ];
 
@@ -1109,7 +1233,12 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
       stops,
       flags: placedStrands.flatMap((placed) => placed.flags),
       links,
-      capY: { top: capTop, bottom: capBottom }
+      capY: { top: capTop, bottom: capBottom },
+      strands: placedStrands.map((placed) => ({
+        lineId: placed.piece.line.id,
+        x0: Math.min(...placed.boxes.map((box) => box.x0)),
+        x1: Math.max(...placed.boxes.map((box) => box.x1))
+      }))
     }
   };
 }
@@ -1152,21 +1281,25 @@ export function renderTransitSvg(layout: TransitLayout, options: TransitRenderOp
   const parts: string[] = [];
   const { draw } = layout;
 
-  // Terms: alternating bands from each term start to the next, labelled in the gutter.
+  // Terms: shaded bands from each term start to its end; the paper gaps between are holidays.
+  // A term with no saved end runs to the next term start, alternating shade so terms still read.
   parts.push('<g class="tm-terms">');
-  for (let i = 0; i < layout.terms.length - 1; i += 1) {
-    const term = layout.terms[i]!;
-    const next = layout.terms[i + 1]!;
-    const shade = i % 2 === 0 ? 'tm-term-band' : 'tm-term-band tm-term-band--alt';
-    parts.push(`<rect class="${shade}" x="0" y="${term.y}" width="${layout.width}" height="${Math.max(0, next.y - term.y)}"/>`);
-  }
+  layout.terms.forEach((term, i) => {
+    if (term.endY === undefined) return;
+    const shade = term.hasEnd || i % 2 === 0 ? 'tm-term-band' : 'tm-term-band tm-term-band--alt';
+    parts.push(`<rect class="${shade}" x="0" y="${term.y}" width="${layout.width}" height="${Math.max(0, term.endY - term.y)}"/>`);
+  });
   for (const term of layout.terms) {
     parts.push(`<line class="tm-term-rule" x1="0" y1="${term.y}" x2="${layout.width}" y2="${term.y}"/>`);
-    const title = term.id === 'E' ? 'Year ends' : `Term ${term.id.slice(1)} starts`;
+    if (term.hasEnd && term.endY !== undefined) {
+      parts.push(`<line class="tm-term-rule" x1="0" y1="${term.endY}" x2="${layout.width}" y2="${term.endY}"/>`);
+    }
+    const range = term.hasEnd && term.end ? `${formatTermDate(term.date)} – ${formatTermDate(term.end)}` : formatTermDate(term.date);
+    const title = term.id === 'E' ? 'Year ends' : term.hasEnd ? `Term ${term.id.slice(1)}` : `Term ${term.id.slice(1)} starts`;
     parts.push(
-      `<g class="map-term${editMode ? ' is-editable' : ''}${termsSelected ? ' is-selected' : ''}" data-term="${term.id}"><title>${title} ${esc(formatTermDate(term.date))}</title>` +
+      `<g class="map-term${editMode ? ' is-editable' : ''}${termsSelected ? ' is-selected' : ''}" data-term="${term.id}"><title>${title} ${esc(range)}</title>` +
         `<text class="tm-term-label" x="24" y="${term.y + 30}" font-size="28" font-weight="700">${term.id === 'E' ? 'End' : term.id}</text>` +
-        `<text class="tm-term-date" x="25" y="${term.y + 50}" font-size="13">${esc(formatTermDate(term.date))}</text></g>`
+        `<text class="tm-term-date" x="25" y="${term.y + 50}" font-size="13">${esc(range)}</text></g>`
     );
   }
   parts.push('</g>');
@@ -1204,9 +1337,15 @@ export function renderTransitSvg(layout: TransitLayout, options: TransitRenderOp
       }
     }
     for (const branch of branches) {
+      const dots = branch.dotted ? ` stroke-dasharray="0.1 ${TM_BRANCH_W * 1.9}"` : '';
       parts.push(
-        `<path class="tm-branch" data-branch="${esc(branch.id)}" d="${roundedPath(branch.points, 14)}" fill="none" stroke="${strokeColor}" stroke-width="${TM_BRANCH_W}" stroke-linecap="round" stroke-linejoin="round"/>`
+        `<path class="tm-branch${branch.dotted ? ' tm-branch--all-year' : ''}" data-branch="${esc(branch.id)}" d="${roundedPath(branch.points, branch.dotted ? ALL_YEAR_RAMP : 14)}" fill="none" stroke="${strokeColor}" stroke-width="${TM_BRANCH_W}"${dots} stroke-linecap="round" stroke-linejoin="round"/>`
       );
+      if (branch.caption) {
+        parts.push(
+          `<text class="tm-stop-sub tm-branch-caption" x="${branch.caption.x}" y="${branch.caption.y}" text-anchor="${branch.caption.anchor}" font-size="${TM_SUB_FONT - 1}" font-style="italic">${esc(branch.caption.text)}</text>`
+        );
+      }
     }
     for (const track of tracks) {
       const nameY = track.top.y - TM_CAP_R - 8;
