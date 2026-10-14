@@ -1,5 +1,6 @@
 import { sanitizeRichTextHtml } from './sanitize';
 import { sanitizeSvgMarkup } from './sanitize-svg';
+import { sanitizeAnnotationLineHtml } from './annotation-line-format';
 import type { AnnotationAnchor, Block } from '../schemas/block';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
@@ -26,6 +27,18 @@ export function sanitizeBlocksDeep(blocks: Block[]): Block[] {
         ...block,
         content: {
           ...block.content,
+          text: {
+            ...block.content.text,
+            stanzas: block.content.text.stanzas.map((stanza) => ({
+              ...stanza,
+              lines: stanza.lines.map((line) => {
+                if (line.html == null) return line;
+                const html = sanitizeAnnotationLineHtml(line.html);
+                const { html: _drop, ...rest } = line;
+                return html ? { ...rest, html } : rest;
+              })
+            }))
+          },
           annotations: block.content.annotations.map((ann) => ({
             ...ann,
             anchor: sanitizeAnchorNoteHtml(ann.anchor),

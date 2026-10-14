@@ -755,9 +755,18 @@ export type AnnotationColour = z.infer<typeof AnnotationColourSchema>;
 export const AnnotationGranularitySchema = z.enum(['word', 'phrase', 'line', 'stanza']);
 export type AnnotationGranularity = z.infer<typeof AnnotationGranularitySchema>;
 
+export const AnnotationLineAlignSchema = z.enum(['left', 'center', 'right']);
+export type AnnotationLineAlign = z.infer<typeof AnnotationLineAlignSchema>;
+
 export const AnnotationLineSchema = z.object({
   id: z.string().min(1),
-  text: z.string()
+  /** Plain text. Anchor offsets always index into this, never into `html`. */
+  text: z.string(),
+  /** Inline formatting only (strong / em / u) over exactly `text`. */
+  html: z.string().optional(),
+  align: AnnotationLineAlignSchema.optional(),
+  /** Indent steps (poetry layout); 0 or absent = flush. */
+  indent: z.number().int().min(0).max(8).optional()
 });
 
 export const AnnotationStanzaSchema = z.object({

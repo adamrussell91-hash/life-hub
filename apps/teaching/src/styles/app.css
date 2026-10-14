@@ -9320,7 +9320,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 .block-annotation {
   display: grid;
   gap: var(--space-3);
-  max-width: 56rem;
+  /* Fill the column like every other block (L1); the text column caps itself. */
   min-width: 0;
   padding: var(--space-4);
   border: 1px solid var(--line);
@@ -9344,7 +9344,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 .block-annotation__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 26rem);
   gap: var(--space-4);
   align-items: start;
   min-width: 0;
@@ -9634,7 +9634,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 /* Annotation editor (1b) */
 .block-editor__annotation-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem);
   gap: var(--space-3);
   align-items: start;
   min-width: 0;
@@ -9835,7 +9835,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 .block-editor__annotation-select {
   min-width: 0;
-  max-height: 28rem;
+  max-height: 40rem;
   overflow: auto;
   padding: var(--space-3);
   border: 1px solid var(--line);
@@ -9951,8 +9951,21 @@ body.is-lesson-builder-full-page .hub-utilities {
 .block-annotation__controls {
   display: grid;
   gap: var(--space-2);
-  margin-top: var(--space-3);
   min-width: 0;
+}
+
+.block-annotation__controls:not(:has(> :not([hidden]))) {
+  display: none;
+}
+
+.block-annotation__slider-row[hidden],
+.block-annotation__reveal[hidden] {
+  display: none;
+}
+
+.block-annotation__reveal {
+  justify-self: start;
+  min-height: 2.75rem;
 }
 
 .block-annotation__chips {
@@ -10194,48 +10207,444 @@ body.is-lesson-builder-full-page .hub-utilities {
   background: var(--paper, #fff);
 }
 
+/* Technique card: mirrors the Periodic Table of Literary Elements detail pane. */
 .block-annotation__element {
-  margin: 0 0 var(--space-2, 0.5rem);
-  border: 1px solid var(--line, #d7d2c8);
-  border-radius: var(--radius-md, 0.75rem);
-  padding: var(--space-2, 0.5rem);
-  background: color-mix(in srgb, var(--wave) 8%, var(--paper, #fff));
+  --c: var(--wave);
+  position: relative;
+  display: grid;
+  gap: var(--space-3, 0.75rem);
+  margin: var(--space-3, 0.75rem) 0;
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem) var(--space-4, 1rem);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--c) 30%, var(--line, #d7d2c8));
+  border-radius: var(--radius-lg, 1rem);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 9%, #fff), #fff 70%);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--c) 14%, transparent);
+  color: #1b1c22;
 }
 
-.block-annotation__element-summary {
+.block-annotation__element-head {
   display: flex;
-  align-items: baseline;
-  gap: var(--space-2, 0.5rem);
-  cursor: pointer;
-  list-style: none;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  min-width: 0;
 }
 
-.block-annotation__element-summary::-webkit-details-marker {
-  display: none;
+.block-annotation__element-badge {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 4rem;
+  height: 4rem;
+  border: 1.5px solid var(--c);
+  border-radius: 14px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 20%, #fff), #fff);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--c) 30%, transparent);
 }
 
 .block-annotation__element-symbol {
-  flex: 0 0 auto;
-  min-width: 2.25rem;
-  font-family: var(--font-ui, system-ui, sans-serif);
-  font-weight: 700;
-  font-size: var(--text-lg, 1.125rem);
-  white-space: nowrap;
+  font-family: 'Newsreader', Georgia, var(--font-display, serif);
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1;
+  color: color-mix(in srgb, var(--c) 72%, #15161c);
+}
+
+.block-annotation__element-titles {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
 }
 
 .block-annotation__element-name {
+  margin: 0;
+  font-family: 'Newsreader', Georgia, var(--font-display, serif);
+  font-size: var(--text-lg, 1.25rem);
+  font-weight: 500;
+  line-height: 1.1;
+  color: #15161c;
+}
+
+.block-annotation__element-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.block-annotation__element-chip {
+  max-width: 100%;
+  padding: 0.25rem 0.6rem;
+  overflow: hidden;
+  border: 1px solid var(--line, #d7d2c8);
+  border-radius: 8px;
+  background: #fff;
+  color: #54576a;
   font-family: var(--font-ui, system-ui, sans-serif);
-  font-size: var(--text-sm, 0.875rem);
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.block-annotation__element-body {
-  margin-top: var(--space-2, 0.5rem);
-  font-size: var(--text-sm, 0.875rem);
+.block-annotation__element-chip--family {
+  border-color: var(--c);
+  background: var(--c);
+  color: #fff;
 }
 
-.block-annotation__element-example {
+.block-annotation__element-sec h4 {
+  margin: 0 0 0.35rem;
+  color: #878a9a;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-2xs, 0.6875rem);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.block-annotation__element-sec p {
+  margin: 0;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-sm, 0.9375rem);
+  line-height: 1.55;
+}
+
+.block-annotation__element-sec .block-annotation__element-example {
+  padding-left: 0.85rem;
+  border-left: 3px solid var(--c);
+  color: #33343d;
+  font-family: 'Newsreader', Georgia, var(--font-display, serif);
+  font-size: var(--text-base, 1rem);
   font-style: italic;
-  color: var(--muted, #6b7280);
+}
+
+/* Note highlights: underline in the note's layer colour. */
+.block-annotation__anchor--sand { text-decoration-color: var(--sand); }
+.block-annotation__anchor--high-sea { text-decoration-color: var(--high-sea); }
+.block-annotation__anchor--shore { text-decoration-color: var(--shore); }
+.block-annotation__anchor--marine { text-decoration-color: var(--marine); }
+.block-annotation__anchor--navy { text-decoration-color: var(--navy, #1b2a4a); }
+.block-annotation__anchor--coral { text-decoration-color: var(--coral, #c96b4a); }
+.block-annotation__anchor--mist { text-decoration-color: var(--mist, #9aa4b2); }
+
+.block-annotation__marker--dot {
+  min-width: 0.6rem;
+  width: 0.6rem;
+  min-height: 0.6rem;
+  height: 0.6rem;
+  padding: 0;
+  border-color: color-mix(in srgb, var(--ink, #1b1c22) 25%, transparent);
+  vertical-align: 0.15em;
+}
+
+.block-annotation__line-text u,
+.block-editor__annotation-line-text u {
+  text-decoration-color: currentColor;
+}
+
+/* Annotation editor: text / annotate workflow */
+.block-editor__annotation-intro {
+  margin: 0;
+}
+
+.block-editor__annotation-head {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.block-editor__annotation-head input {
+  min-width: 0;
+  min-height: 2.75rem;
+}
+
+.block-editor__annotation-mode-row,
+.block-editor__annotation-text-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.block-editor__annotation-mode,
+.block-editor__annotation-kind {
+  align-self: flex-start;
+}
+
+.block-editor__annotation-text-pane,
+.block-editor__annotation-annotate-pane {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.block-editor__annotation-text-pane[hidden],
+.block-editor__annotation-annotate-pane[hidden] {
+  display: none;
+}
+
+.block-editor__annotation-poem {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.block-editor__annotation-poem-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper, #fff);
+}
+
+.block-editor__annotation-poem-btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 0.5rem);
+  background: transparent;
+  color: var(--ink, inherit);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.block-editor__annotation-poem-btn svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.block-editor__annotation-poem-btn:hover {
+  background: color-mix(in srgb, var(--wave) 10%, transparent);
+}
+
+.block-editor__annotation-poem-btn.is-active {
+  border-color: color-mix(in srgb, var(--wave) 45%, var(--line));
+  background: color-mix(in srgb, var(--wave) 18%, var(--paper, #fff));
+}
+
+.block-editor__annotation-poem-btn.is-bold { font-weight: 700; }
+.block-editor__annotation-poem-btn.is-italic { font-style: italic; font-family: var(--font-body); }
+.block-editor__annotation-poem-btn.is-underline { text-decoration: underline; }
+
+.block-editor__annotation-poem-sep {
+  width: 1px;
+  height: 1.5rem;
+  margin: 0 0.25rem;
+  background: var(--line);
+}
+
+.block-editor__annotation-poem-surface {
+  min-height: 14rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper, #fff);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  outline: none;
+}
+
+.block-editor__annotation-poem-surface:focus-visible {
+  outline: 3px solid var(--focus-ring, var(--wave));
+  outline-offset: 2px;
+}
+
+.block-editor__annotation-poem-surface p {
+  min-height: 1.55em;
+  margin: 0;
+}
+
+.block-editor__annotation-poem-surface p[data-indent='1'] { padding-inline-start: 2em; }
+.block-editor__annotation-poem-surface p[data-indent='2'] { padding-inline-start: 4em; }
+.block-editor__annotation-poem-surface p[data-indent='3'] { padding-inline-start: 6em; }
+.block-editor__annotation-poem-surface p[data-indent='4'] { padding-inline-start: 8em; }
+.block-editor__annotation-poem-surface p[data-indent='5'] { padding-inline-start: 10em; }
+.block-editor__annotation-poem-surface p[data-indent='6'] { padding-inline-start: 12em; }
+.block-editor__annotation-poem-surface p[data-indent='7'] { padding-inline-start: 14em; }
+.block-editor__annotation-poem-surface p[data-indent='8'] { padding-inline-start: 16em; }
+
+.block-editor__annotation-select-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.block-editor__annotation-add-note {
+  position: absolute;
+  z-index: 3;
+  min-height: 2.75rem;
+  box-shadow: var(--elev-2, 0 6px 18px rgba(20, 22, 45, 0.18));
+}
+
+.block-editor__annotation-add-note[hidden] {
+  display: none;
+}
+
+.block-editor__annotation-select-empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.block-editor__annotation-hl {
+  padding: 0;
+  border-radius: 0.15em;
+  background: color-mix(in srgb, var(--wave) 22%, transparent);
+  color: inherit;
+  cursor: pointer;
+  box-shadow: inset 0 -2px 0 var(--wave);
+}
+
+.block-editor__annotation-hl--sand { background: color-mix(in srgb, var(--sand) 30%, transparent); box-shadow: inset 0 -2px 0 var(--sand); }
+.block-editor__annotation-hl--high-sea { background: color-mix(in srgb, var(--high-sea) 22%, transparent); box-shadow: inset 0 -2px 0 var(--high-sea); }
+.block-editor__annotation-hl--shore { background: color-mix(in srgb, var(--shore) 30%, transparent); box-shadow: inset 0 -2px 0 var(--shore); }
+.block-editor__annotation-hl--marine { background: color-mix(in srgb, var(--marine) 22%, transparent); box-shadow: inset 0 -2px 0 var(--marine); }
+.block-editor__annotation-hl--navy { background: color-mix(in srgb, var(--navy, #1b2a4a) 16%, transparent); box-shadow: inset 0 -2px 0 var(--navy, #1b2a4a); }
+.block-editor__annotation-hl--coral { background: color-mix(in srgb, var(--coral, #c96b4a) 22%, transparent); box-shadow: inset 0 -2px 0 var(--coral, #c96b4a); }
+.block-editor__annotation-hl--mist { background: color-mix(in srgb, var(--mist, #9aa4b2) 30%, transparent); box-shadow: inset 0 -2px 0 var(--mist, #9aa4b2); }
+
+.block-editor__annotation-hl.is-selected {
+  outline: 2px solid var(--wave);
+  outline-offset: 1px;
+}
+
+.block-editor__annotation-stanza-gutter:hover,
+.block-editor__annotation-line-gutter:hover,
+.block-editor__annotation-stanza-gutter:focus-visible,
+.block-editor__annotation-line-gutter:focus-visible {
+  background: color-mix(in srgb, var(--wave) 70%, transparent);
+}
+
+.block-editor__annotation-stanza-gutter.has-note,
+.block-editor__annotation-line-gutter.has-note {
+  background: var(--high-sea);
+}
+
+.block-editor__annotation-note-quote {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--wave);
+  background: color-mix(in srgb, var(--wave) 7%, transparent);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-style: italic;
+  white-space: pre-line;
+}
+
+.block-editor__annotation-field-label {
+  margin: 0 0 var(--space-1, 0.25rem);
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.block-editor__annotation-technique {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.block-editor__annotation-layer-pick[hidden] {
+  display: none;
+}
+
+.block-editor__annotation-open {
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+}
+
+.block-editor__annotation-open.is-selected {
+  border-color: var(--wave);
+  background: color-mix(in srgb, var(--wave) 8%, var(--paper, #fff));
+}
+
+.block-editor__annotation-open-quote {
+  overflow: hidden;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-style: italic;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.block-editor__annotation-open-body {
+  color: var(--ink, inherit);
+  font-size: var(--text-sm);
+}
+
+.block-editor__annotation-open-body.is-empty {
+  color: var(--muted);
+}
+
+.block-editor__annotation-notes {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.block-editor__annotation-details {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper, #fff);
+}
+
+.block-editor__annotation-details > summary,
+.block-editor__annotation-anthology-details > summary {
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.block-editor__annotation-anthology-details {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.block-editor__annotation-default-layer-label {
+  display: grid;
+  gap: var(--space-1, 0.25rem);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 720px) {
+  .block-editor__annotation-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .block-editor__annotation-head input,
+  .block-editor__annotation-poem-surface {
+    font-size: max(16px, var(--text-base));
+  }
+
+  .block-editor__annotation-poem-surface {
+    padding: var(--space-3);
+  }
 }
 
 .annotation-technique-sheet-overlay {
