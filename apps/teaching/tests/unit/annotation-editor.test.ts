@@ -134,6 +134,116 @@ describe('annotation editor 1b', () => {
     expect(source).not.toMatch(/textContent = '↑'|textContent = 'Remove'/);
   });
 
+  it('keeps the layer name field while typing (no save remount)', () => {
+    const block = structuredClone(dulceAnnotationFixture);
+    let latest: Block = block;
+    const mount = document.createElement('div');
+    document.body.append(mount);
+    mount.append(
+      createAnnotationEditor(
+        block,
+        (next) => {
+          latest = next;
+        },
+        () => latest as Extract<Block, { block_type: 'annotation' }>
+      )
+    );
+
+    const name = [...mount.querySelectorAll<HTMLInputElement>(
+      '.block-editor__annotation-layer-name'
+    )].find((input) => input.value === 'Structure');
+    expect(name).toBeTruthy();
+    const noteBody = mount.querySelector('.block-editor__annotation-body');
+    const layerSelect = mount.querySelector<HTMLSelectElement>(
+      'select[aria-label="Annotation layer"]'
+    );
+    expect(noteBody).toBeTruthy();
+    expect(layerSelect).toBeTruthy();
+
+    name!.focus();
+    const type = (value: string) => {
+      name!.value = value;
+      name!.setSelectionRange(value.length, value.length);
+      name!.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    type('Structurex');
+    type('Structurexy');
+
+    expect(name!.isConnected).toBe(true);
+    expect(document.activeElement).toBe(name);
+    expect(name!.selectionStart).toBe('Structurexy'.length);
+    expect(mount.querySelector('.block-editor__annotation-body')).toBe(noteBody);
+    expect(mount.querySelector('select[aria-label="Annotation layer"]')).toBe(layerSelect);
+    expect(
+      [...layerSelect!.options].find((opt) => opt.value === 'layer_structure')?.textContent
+    ).toBe('Structurexy');
+    expect(name!.closest('.hub-list__row')?.querySelector('.hub-list__label')?.textContent).toBe(
+      'Structurexy'
+    );
+    expect(latest.block_type).toBe('annotation');
+    if (latest.block_type !== 'annotation') return;
+    expect(latest.content.layers.find((layer) => layer.id === 'layer_structure')?.name).toBe(
+      'Structurexy'
+    );
+    // Colour still commits and is allowed to repaint; the rename must already have stuck.
+    const colour = name!.closest('.hub-list__row')?.querySelector<HTMLSelectElement>(
+      'select[aria-label="Layer colour"]'
+    );
+    expect(colour).toBeTruthy();
+    colour!.value = 'marine';
+    colour!.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(latest.block_type).toBe('annotation');
+    if (latest.block_type !== 'annotation') return;
+    const renamed = latest.content.layers.find((layer) => layer.id === 'layer_structure');
+    expect(renamed?.name).toBe('Structurexy');
+    expect(renamed?.colour).toBe('marine');
+    const startOn = mount.querySelector<HTMLSelectElement>(
+      '.block-editor__annotation-default-layer'
+    );
+    expect(
+      [...(startOn?.options ?? [])].find((opt) => opt.value === 'layer_structure')?.textContent
+    ).toBe('Structurexy');
+    mount.remove();
+  });
+
+  it('editing the annotation title does not rebuild the layer fields', () => {
+    const block = structuredClone(dulceAnnotationFixture);
+    let latest: Block = block;
+    const mount = document.createElement('div');
+    document.body.append(mount);
+    mount.append(
+      createAnnotationEditor(
+        block,
+        (next) => {
+          latest = next;
+        },
+        () => latest as Extract<Block, { block_type: 'annotation' }>
+      )
+    );
+    const title = mount.querySelector<HTMLInputElement>('.block-editor__annotation-title');
+    const attribution = mount.querySelector<HTMLInputElement>(
+      '.block-editor__annotation-attribution'
+    );
+    const name = mount.querySelector<HTMLInputElement>('.block-editor__annotation-layer-name');
+    expect(title).toBeTruthy();
+    expect(attribution).toBeTruthy();
+    expect(name).toBeTruthy();
+    title!.focus();
+    title!.value = 'Dulce revised';
+    title!.setSelectionRange(title!.value.length, title!.value.length);
+    title!.dispatchEvent(new Event('input', { bubbles: true }));
+    attribution!.value = 'Owen';
+    attribution!.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(title!.isConnected).toBe(true);
+    expect(document.activeElement).toBe(title);
+    expect(mount.querySelector('.block-editor__annotation-layer-name')).toBe(name);
+    expect(latest.block_type).toBe('annotation');
+    if (latest.block_type !== 'annotation') return;
+    expect(latest.content.title).toBe('Dulce revised');
+    expect(latest.content.attribution).toBe('Owen');
+    mount.remove();
+  });
+
   it('shows a technique tag control in the note panel', () => {
     const mount = document.createElement('div');
     mount.append(createAnnotationEditor(dulceAnnotationFixture, () => undefined));

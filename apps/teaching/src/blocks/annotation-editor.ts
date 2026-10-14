@@ -966,6 +966,55 @@ export function createAnnotationEditorFields(
     });
   }
 
+  /** Everything except the name. A rename can save without rebuilding the editor. */
+  function sameLayerStructure(a: AnnotationLayer, b: AnnotationLayer): boolean {
+    if (
+      a.id !== b.id ||
+      a.kind !== b.kind ||
+      a.colour !== b.colour ||
+      a.family !== b.family ||
+      a.symbol !== b.symbol
+    ) {
+      return false;
+    }
+    const aSubs = a.sublayers ?? [];
+    const bSubs = b.sublayers ?? [];
+    if (aSubs.length !== bSubs.length) return false;
+    return aSubs.every(
+      (sub, index) =>
+        sub.id === bSubs[index]!.id &&
+        sub.name === bSubs[index]!.name &&
+        sub.subgroup === bSubs[index]!.subgroup
+    );
+  }
+
+  function layerEditNeedsRepaint(prev: AnnotationLayer[], next: AnnotationLayer[]): boolean {
+    if (prev.length !== next.length) return true;
+    return prev.some((layer, index) => !sameLayerStructure(layer, next[index]!));
+  }
+
+  /** Row titles and layer pickers show the name. Update them without rebuilding the editor. */
+  function syncLayerNamesInPlace(): void {
+    for (const row of layersHost.querySelectorAll<HTMLElement>(
+      '.block-editor__annotation-layer-list .hub-list__row'
+    )) {
+      const layer = layers.find((item) => item.id === row.dataset.key);
+      const label = row.querySelector('.hub-list__label');
+      if (layer && label) label.textContent = layer.name;
+    }
+    const selects = [
+      defaultLayer,
+      notePanel.querySelector<HTMLSelectElement>('select[aria-label="Annotation layer"]')
+    ];
+    for (const select of selects) {
+      if (!select) continue;
+      for (const opt of select.options) {
+        const layer = layers.find((item) => item.id === opt.value);
+        if (layer) opt.textContent = layer.name;
+      }
+    }
+  }
+
   function beginAddStop(annotationId: string): void {
     addingStopForId = annotationId;
     reanchorId = null;
@@ -2014,7 +2063,14 @@ export function createAnnotationEditorFields(
         name: `${layer.name} copy`
       }),
       onChange: (next) => {
+        const repaint = layerEditNeedsRepaint(layers, next);
         layers = next;
+        if (!repaint) {
+          // A rename must not rebuild the list or the open note (I12 / V7).
+          syncLayerNamesInPlace();
+          persistQuiet();
+          return;
+        }
         paintDefaultLayerOptions();
         emitChange();
       },
@@ -2272,8 +2328,9 @@ export function createAnnotationEditorFields(
     void HUB_LIST_ICONS;
   }
 
-  title.addEventListener('input', emitChange);
-  attribution.addEventListener('input', emitChange);
+  // Title and attribution are typed. A full repaint would drop the caret and reload the layers list.
+  title.addEventListener('input', () => persistQuiet());
+  attribution.addEventListener('input', () => persistQuiet());
   showMarkers.addEventListener('change', emitChange);
   blockAnthologyToggle.addEventListener('change', emitChange);
   blockThemes.addEventListener('change', emitChange);
