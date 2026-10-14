@@ -1,189 +1,194 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1960" height="1130" viewBox="0 0 1960 1130" font-family="Inter, Helvetica, Arial, sans-serif">
-<rect width="1960" height="1130" fill="#faf7f2"/>
-<rect x="20" y="186" width="1610" height="186" fill="#f0eae0" rx="6"/>
-<text x="34" y="208" font-size="18" font-weight="700" fill="#1d1d1f">T1</text>
-<text x="34" y="226" font-size="11" fill="#8a8580">27 Jan</text>
-<text x="34" y="364" font-size="11" fill="#8a8580">to 10 Apr</text>
-<rect x="20" y="416" width="1610" height="170" fill="#f0eae0" rx="6"/>
-<text x="34" y="438" font-size="18" font-weight="700" fill="#1d1d1f">T2</text>
-<text x="34" y="456" font-size="11" fill="#8a8580">27 Apr</text>
-<text x="34" y="578" font-size="11" fill="#8a8580">to 03 Jul</text>
-<rect x="20" y="630" width="1610" height="170" fill="#f0eae0" rx="6"/>
-<text x="34" y="652" font-size="18" font-weight="700" fill="#1d1d1f">T3</text>
-<text x="34" y="670" font-size="11" fill="#8a8580">20 Jul</text>
-<text x="34" y="792" font-size="11" fill="#8a8580">to 25 Sep</text>
-<rect x="20" y="844" width="1610" height="168" fill="#f0eae0" rx="6"/>
-<text x="34" y="866" font-size="18" font-weight="700" fill="#1d1d1f">T4</text>
-<text x="34" y="884" font-size="11" fill="#8a8580">12 Oct</text>
-<text x="34" y="1004" font-size="11" fill="#8a8580">to 17 Dec</text>
-<text x="34" y="398" font-size="10" fill="#8a8580" font-style="italic">holidays</text>
-<text x="34" y="612" font-size="10" fill="#8a8580" font-style="italic">holidays</text>
-<text x="34" y="826" font-size="10" fill="#8a8580" font-style="italic">holidays</text>
-<rect x="295.0" y="34" width="82" height="30" rx="7" fill="#1f5fbf"/>
-<text x="336" y="54" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">J  Justice</text>
-<text x="300" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#8a8580">Jr</text>
-<text x="336" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#8a8580">Rz</text>
-<text x="372" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#8a8580">Sr</text>
-<path d="M 300 104 L 300 1050" fill="none" stroke="#1f5fbf" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<path d="M 336 104 L 336 1050" fill="none" stroke="#1f5fbf" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<path d="M 372 104 L 372 1050" fill="none" stroke="#1f5fbf" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<rect x="287" y="186" width="26" height="186" rx="13" fill="#dbe7fb" stroke="#1f5fbf" stroke-width="3"/>
-<text x="300" y="279.0" transform="rotate(-90 300 279.0)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#1f5fbf">Young Diplomats</text>
-<rect x="287" y="416" width="26" height="170" rx="13" fill="#dbe7fb" stroke="#1f5fbf" stroke-width="3"/>
-<text x="300" y="501.0" transform="rotate(-90 300 501.0)" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="#1f5fbf">Diplomacy &amp; Advocacy</text>
-<line x1="300" y1="393" x2="286" y2="393" stroke="#1f5fbf" stroke-width="5" stroke-linecap="butt"/>
-<text x="280" y="397.0" text-anchor="end" font-size="13" font-weight="600" fill="#1d1d1f">Rotary MUNA</text>
-<text x="280" y="412.0" text-anchor="end" font-size="10.5" fill="#8a8580">18 Apr</text>
-<rect x="326" y="497" width="56" height="16" rx="8" fill="#fff" stroke="#1d1d1f" stroke-width="3"/>
-<text x="392" y="501.5" text-anchor="start" font-size="13" font-weight="600" fill="#1d1d1f">UN Evatt</text>
-<text x="392" y="516.5" text-anchor="start" font-size="13" font-weight="600" fill="#1d1d1f">Competition</text>
-<text x="392" y="531.5" text-anchor="start" font-size="10.5" fill="#8a8580">1 Jun · Rz + Sr</text>
-<rect x="359" y="630" width="26" height="259" rx="13" fill="#dbe7fb" stroke="#1f5fbf" stroke-width="3"/>
-<text x="372" y="759.5" transform="rotate(-90 372 759.5)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#1f5fbf">Mock Trial</text>
-<path d="M 385 640 L 416 640 L 430 654 L 430 943" fill="none" stroke="#1f5fbf" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
-<line x1="430" y1="654" x2="444" y2="654" stroke="#1f5fbf" stroke-width="5" stroke-linecap="butt"/>
-<text x="452" y="658" font-size="13" font-weight="600" fill="#1d1d1f">Round 1 <tspan font-size="10.5" font-weight="400" fill="#8a8580">1 Aug</tspan></text>
-<line x1="430" y1="703" x2="444" y2="703" stroke="#1f5fbf" stroke-width="5" stroke-linecap="butt"/>
-<text x="452" y="707" font-size="13" font-weight="600" fill="#1d1d1f">Round 2 <tspan font-size="10.5" font-weight="400" fill="#8a8580">18 Aug</tspan></text>
-<line x1="430" y1="762" x2="444" y2="762" stroke="#1f5fbf" stroke-width="5" stroke-linecap="butt"/>
-<text x="452" y="766" font-size="13" font-weight="600" fill="#1d1d1f">Round 3 <tspan font-size="10.5" font-weight="400" fill="#8a8580">10 Sep</tspan></text>
-<line x1="430" y1="869" x2="444" y2="869" stroke="#1f5fbf" stroke-width="5" stroke-linecap="butt"/>
-<text x="452" y="873" font-size="13" font-weight="600" fill="#1d1d1f">Regional final <tspan font-size="10.5" font-weight="400" fill="#8a8580">22 Oct</tspan></text>
-<circle cx="430" cy="943" r="9" fill="#fff" stroke="#1d1d1f" stroke-width="3"/>
-<text x="452" y="947" font-size="13" font-weight="600" fill="#1d1d1f">State final <tspan font-size="10.5" font-weight="400" fill="#8a8580">20 Nov</tspan></text>
-<circle cx="560" cy="762" r="11" fill="#d7263d"/><text x="560" y="766" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">1</text>
-<circle cx="500" cy="479" r="11" fill="#d7263d"/><text x="500" y="483" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">2</text>
-<rect x="683.0" y="34" width="106" height="30" rx="7" fill="#e3a700"/>
-<text x="736" y="54" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">I  Innovation</text>
-<text x="700" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#8a8580">Jr</text>
-<text x="736" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#8a8580">Rz</text>
-<text x="772" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#8a8580">Sr</text>
-<path d="M 700 104 L 700 1050" fill="none" stroke="#e3a700" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<path d="M 736 104 L 736 1050" fill="none" stroke="#e3a700" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<path d="M 772 104 L 772 319 L 872 419 L 872 519 L 772 619 L 772 1050" fill="none" stroke="#e3a700" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<rect x="687" y="186" width="26" height="400" rx="13" fill="#fdf1c7" stroke="#e3a700" stroke-width="3"/>
-<text x="700" y="386.0" transform="rotate(-90 700 386.0)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#e3a700">Young Creators Lab</text>
-<line x1="736" y1="479" x2="750" y2="479" stroke="#e3a700" stroke-width="5" stroke-linecap="butt"/>
-<text x="756" y="475.5" text-anchor="start" font-size="13" font-weight="600" fill="#1d1d1f">da Vinci</text>
-<text x="756" y="490.5" text-anchor="start" font-size="13" font-weight="600" fill="#1d1d1f">Decathlon</text>
-<text x="756" y="505.5" text-anchor="start" font-size="10.5" fill="#8a8580">22 May</text>
-<circle cx="900" cy="479" r="11" fill="#d7263d"/><text x="900" y="483" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">3</text>
-<rect x="690" y="695" width="56" height="16" rx="8" fill="#fff" stroke="#1d1d1f" stroke-width="3"/>
-<text x="684" y="699.5" text-anchor="end" font-size="13" font-weight="600" fill="#1d1d1f">Tournament</text>
-<text x="684" y="714.5" text-anchor="end" font-size="13" font-weight="600" fill="#1d1d1f">of Minds</text>
-<text x="684" y="729.5" text-anchor="end" font-size="10.5" fill="#8a8580">Jr + Rz · 18 Aug</text>
-<rect x="759" y="630" width="26" height="382" rx="13" fill="#fdf1c7" stroke="#e3a700" stroke-width="3"/>
-<text x="772" y="821.0" transform="rotate(-90 772 821.0)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#e3a700">Future Solutions Lab</text>
-<rect x="943.0" y="34" width="106" height="30" rx="7" fill="#2e9e4f"/>
-<text x="996" y="54" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">E  Expression</text>
-<text x="960" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#8a8580">Jr</text>
-<text x="996" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#8a8580">Rz</text>
-<text x="1032" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#8a8580">Sr</text>
-<path d="M 960 104 L 960 1050" fill="none" stroke="#2e9e4f" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<path d="M 996 104 L 996 1050" fill="none" stroke="#2e9e4f" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<path d="M 1032 104 L 1032 1050" fill="none" stroke="#2e9e4f" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<rect x="947" y="186" width="26" height="826" rx="13" fill="#d6f0dd" stroke="#2e9e4f" stroke-width="3"/>
-<text x="960" y="599.0" transform="rotate(-90 960 599.0)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#2e9e4f">StudioGAT · all year</text>
-<line x1="1032" y1="354" x2="1046" y2="354" stroke="#2e9e4f" stroke-width="5" stroke-linecap="butt"/>
-<circle cx="1056" cy="354" r="9" fill="#2e9e4f"/><text x="1056" y="358" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">1</text>
-<text x="1072" y="358.0" text-anchor="start" font-size="13" font-weight="600" fill="#1d1d1f">Gallery entry</text>
-<text x="1072" y="373.0" text-anchor="start" font-size="10.5" fill="#8a8580">window 1 · 03 Apr</text>
-<line x1="1032" y1="568" x2="1046" y2="568" stroke="#2e9e4f" stroke-width="5" stroke-linecap="butt"/>
-<circle cx="1056" cy="568" r="9" fill="#2e9e4f"/><text x="1056" y="572" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">2</text>
-<text x="1072" y="572.0" text-anchor="start" font-size="13" font-weight="600" fill="#1d1d1f">Gallery entry</text>
-<text x="1072" y="587.0" text-anchor="start" font-size="10.5" fill="#8a8580">window 2 · 26 Jun</text>
-<line x1="1032" y1="782" x2="1046" y2="782" stroke="#2e9e4f" stroke-width="5" stroke-linecap="butt"/>
-<circle cx="1056" cy="782" r="9" fill="#2e9e4f"/><text x="1056" y="786" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">3</text>
-<text x="1072" y="786.0" text-anchor="start" font-size="13" font-weight="600" fill="#1d1d1f">Gallery entry</text>
-<text x="1072" y="801.0" text-anchor="start" font-size="10.5" fill="#8a8580">window 3 · 18 Sep</text>
-<circle cx="1150" cy="538" r="11" fill="#d7263d"/><text x="1150" y="542" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">4</text>
-<path d="M 1180 202 L 1180 816" fill="none" stroke="#2e9e4f" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="10 7"/>
-<text x="1180" y="192" text-anchor="middle" font-size="11" font-weight="700" fill="#2e9e4f">rolling</text>
-<line x1="1180" y1="202" x2="1194" y2="202" stroke="#2e9e4f" stroke-width="5" stroke-linecap="butt"/>
-<text x="1200" y="206.0" text-anchor="start" font-size="13" font-weight="600" fill="#1d1d1f">Essay Prize opens</text>
-<text x="1200" y="221.0" text-anchor="start" font-size="10.5" fill="#8a8580">2 Feb</text>
-<circle cx="1180" cy="579" r="9" fill="#fff" stroke="#1d1d1f" stroke-width="3"/>
-<text x="1200" y="583.0" text-anchor="start" font-size="13" font-weight="600" fill="#1d1d1f">Deadline</text>
-<text x="1200" y="598.0" text-anchor="start" font-size="10.5" fill="#8a8580">30 Jun</text>
-<line x1="1180" y1="816" x2="1194" y2="816" stroke="#2e9e4f" stroke-width="5" stroke-linecap="butt"/>
-<text x="1200" y="820.0" text-anchor="start" font-size="13" font-weight="600" fill="#1d1d1f">Results</text>
-<text x="1200" y="835.0" text-anchor="start" font-size="10.5" fill="#8a8580">1 Oct</text>
-<circle cx="1215" cy="398" r="11" fill="#d7263d"/><text x="1215" y="402" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">5</text>
-<rect x="1317.0" y="34" width="98" height="30" rx="7" fill="#6a2c91"/>
-<text x="1366" y="54" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">R  Reasoning</text>
-<text x="1330" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#8a8580">Jr</text>
-<text x="1366" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#8a8580">Rz</text>
-<text x="1402" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#8a8580">Sr</text>
-<path d="M 1330 104 L 1330 582 L 1306 606 L 1306 913 L 1330 937 L 1330 1050" fill="none" stroke="#6a2c91" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<path d="M 1402 104 L 1402 582 L 1426 606 L 1426 913 L 1402 937 L 1402 1050" fill="none" stroke="#6a2c91" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<path d="M 1366 104 L 1366 600 L 1342 624 L 1342 895 L 1366 919 L 1366 1050" fill="none" stroke="#6a2c91" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<path d="M 1366 600 L 1390 624 L 1390 895 L 1366 919" fill="none" stroke="#6a2c91" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<rect x="1329" y="630" width="26" height="259" rx="13" fill="#ebdcf5" stroke="#6a2c91" stroke-width="3"/>
-<text x="1342" y="759.5" transform="rotate(-90 1342 759.5)" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="#6a2c91">The Philosophy of Power</text>
-<rect x="1377" y="630" width="26" height="259" rx="13" fill="#ebdcf5" stroke="#6a2c91" stroke-width="3"/>
-<text x="1390" y="759.5" transform="rotate(-90 1390 759.5)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#6a2c91">PSYOPS</text>
-<circle cx="1366" cy="560" r="11" fill="#d7263d"/><text x="1366" y="564" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">6</text>
-<rect x="1317" y="186" width="26" height="400" rx="13" fill="#ebdcf5" stroke="#6a2c91" stroke-width="3"/>
-<text x="1330" y="386.0" transform="rotate(-90 1330 386.0)" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="#6a2c91">Foundations Psychology</text>
-<line x1="1402" y1="461" x2="1416" y2="461" stroke="#6a2c91" stroke-width="5" stroke-linecap="butt"/>
-<text x="1422" y="465.0" text-anchor="start" font-size="13" font-weight="600" fill="#1d1d1f">Brain Bee</text>
-<text x="1422" y="480.0" text-anchor="start" font-size="10.5" fill="#8a8580">15 May</text>
-<rect x="1389" y="915" width="26" height="36" rx="13" fill="#ebdcf5" stroke="#6a2c91" stroke-width="3"/>
-<line x1="1416" y1="933.0" x2="1436" y2="933.0" stroke="#6a2c91" stroke-width="2"/>
-<rect x="1436" y="919.0" width="164" height="28" rx="14" fill="#ebdcf5" stroke="#6a2c91" stroke-width="2"/>
-<text x="1518" y="937.0" text-anchor="middle" font-size="12" font-weight="700" fill="#6a2c91">Teachers for Tomorrow</text>
-<circle cx="1500" cy="889" r="11" fill="#d7263d"/><text x="1500" y="893" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">7</text>
-<line x1="1032" y1="875" x2="1306" y2="875" stroke="#1d1d1f" stroke-width="3"/>
-<circle cx="1032" cy="875" r="9" fill="#fff" stroke="#1d1d1f" stroke-width="3"/>
-<circle cx="1306" cy="875" r="9" fill="#fff" stroke="#1d1d1f" stroke-width="3"/>
-<rect x="1100" y="845" width="130" height="22" rx="4" fill="#faf7f2"/>
-<text x="1165" y="860.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1d1d1f">Ethics Olympiad</text>
-<circle cx="1250" cy="897" r="11" fill="#d7263d"/><text x="1250" y="901" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">8</text>
-<rect x="1646" y="20" width="294" height="1090" rx="12" fill="#fff" stroke="#e4ddd2"/>
-<text x="1660" y="56" font-size="20" font-weight="800" fill="#1d1d1f">MindWorks 2026</text>
-<text x="1660" y="76" font-size="12" fill="#8a8580">Time runs down. Each strand = 3 year lines.</text>
-<circle cx="1671" cy="112" r="11" fill="#d7263d"/><text x="1671" y="116" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">1</text>
-<text x="1690" y="117" font-size="14" font-weight="700" fill="#1d1d1f">Rounds → finals</text>
-<text x="1690" y="136" font-size="12" fill="#55504a">A branch off the program;</text>
-<text x="1690" y="152" font-size="12" fill="#55504a">each round is a stop, the final</text>
-<text x="1690" y="168" font-size="12" fill="#55504a">is a ringed stop.</text>
-<circle cx="1671" cy="208" r="11" fill="#d7263d"/><text x="1671" y="212" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">2</text>
-<text x="1690" y="213" font-size="14" font-weight="700" fill="#1d1d1f">Several year lines</text>
-<text x="1690" y="232" font-size="12" fill="#55504a">White bar across the lines it</text>
-<text x="1690" y="248" font-size="12" fill="#55504a">serves (like an interchange).</text>
-<circle cx="1671" cy="304" r="11" fill="#d7263d"/><text x="1671" y="308" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">3</text>
-<text x="1690" y="309" font-size="14" font-weight="700" fill="#1d1d1f">Middle-line stop</text>
-<text x="1690" y="328" font-size="12" fill="#55504a">The next line bends out to make</text>
-<text x="1690" y="344" font-size="12" fill="#55504a">room, then bends back.</text>
-<text x="1690" y="360" font-size="12" fill="#55504a">Gaps only widen where needed.</text>
-<circle cx="1671" cy="400" r="11" fill="#d7263d"/><text x="1671" y="404" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">4</text>
-<text x="1690" y="405" font-size="14" font-weight="700" fill="#1d1d1f">Several entry windows</text>
-<text x="1690" y="424" font-size="12" fill="#55504a">One stop per window, numbered,</text>
-<text x="1690" y="440" font-size="12" fill="#55504a">same name.</text>
-<circle cx="1671" cy="496" r="11" fill="#d7263d"/><text x="1671" y="500" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">5</text>
-<text x="1690" y="501" font-size="14" font-weight="700" fill="#1d1d1f">Open all year</text>
-<text x="1690" y="520" font-size="12" fill="#55504a">Thin dashed line beside the strand;</text>
-<text x="1690" y="536" font-size="12" fill="#55504a">stops for opens / due / results.</text>
-<circle cx="1671" cy="592" r="11" fill="#d7263d"/><text x="1671" y="596" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">6</text>
-<text x="1690" y="597" font-size="14" font-weight="700" fill="#1d1d1f">Programs side by side</text>
-<text x="1690" y="616" font-size="12" fill="#55504a">The line splits evenly into two,</text>
-<text x="1690" y="632" font-size="12" fill="#55504a">other lines step aside, then rejoin.</text>
-<circle cx="1671" cy="688" r="11" fill="#d7263d"/><text x="1671" y="692" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">7</text>
-<text x="1690" y="693" font-size="14" font-weight="700" fill="#1d1d1f">Name too long for the pill</text>
-<text x="1690" y="712" font-size="12" fill="#55504a">Pill stays true to its dates;</text>
-<text x="1690" y="728" font-size="12" fill="#55504a">the name goes in a flag beside it.</text>
-<circle cx="1671" cy="784" r="11" fill="#d7263d"/><text x="1671" y="788" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">8</text>
-<text x="1690" y="789" font-size="14" font-weight="700" fill="#1d1d1f">Across strands</text>
-<text x="1690" y="808" font-size="12" fill="#55504a">Two ringed stops joined by a black</text>
-<text x="1690" y="824" font-size="12" fill="#55504a">transfer link.</text>
-<text x="1660" y="886" font-size="13" font-weight="800" fill="#1d1d1f">Key</text>
-<path d="M 1664 910 L 1700 910" fill="none" stroke="#1f5fbf" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<text x="1714" y="914" font-size="12" fill="#1d1d1f">Year line</text>
-<rect x="1664" y="927" width="36" height="18" rx="9" fill="#dbe7fb" stroke="#1f5fbf" stroke-width="3"/>
-<text x="1714" y="940" font-size="12" fill="#1d1d1f">Program (length = dates)</text>
-<path d="M 1682 952 L 1682 972" fill="none" stroke="#1f5fbf" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-<line x1="1682" y1="962" x2="1696" y2="962" stroke="#1f5fbf" stroke-width="5" stroke-linecap="butt"/>
-<text x="1714" y="966" font-size="12" fill="#1d1d1f">Competition stop</text>
-<circle cx="1682" cy="988" r="8" fill="#fff" stroke="#1d1d1f" stroke-width="3"/>
-<text x="1714" y="992" font-size="12" fill="#1d1d1f">Final / deadline</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1960" height="1400" viewBox="0 0 1960 1400" font-family="'Public Sans','Helvetica Neue',Arial,sans-serif">
+<rect width="1960" height="1400" fill="#f3f3f1"/>
+<text x="40" y="70" font-size="46" font-weight="700" fill="#2b2b2b" letter-spacing="-1">MindWorks 2026</text>
+<text x="42" y="100" font-size="16" fill="#7d7d7d">Programs and competitions by strand and year line. Time runs down the page.</text>
+<rect x="20" y="266" width="1920" height="186" fill="#e9e9e5"/>
+<text x="40" y="300" font-size="30" font-weight="700" fill="#c9c9c3">T1</text>
+<text x="42" y="320" font-size="12" fill="#7d7d7d">27 Jan – 10 Apr</text>
+<rect x="20" y="496" width="1920" height="170" fill="#e9e9e5"/>
+<text x="40" y="530" font-size="30" font-weight="700" fill="#c9c9c3">T2</text>
+<text x="42" y="550" font-size="12" fill="#7d7d7d">27 Apr – 3 Jul</text>
+<rect x="20" y="710" width="1920" height="170" fill="#e9e9e5"/>
+<text x="40" y="744" font-size="30" font-weight="700" fill="#c9c9c3">T3</text>
+<text x="42" y="764" font-size="12" fill="#7d7d7d">20 Jul – 25 Sep</text>
+<rect x="20" y="924" width="1920" height="168" fill="#e9e9e5"/>
+<text x="40" y="958" font-size="30" font-weight="700" fill="#c9c9c3">T4</text>
+<text x="42" y="978" font-size="12" fill="#7d7d7d">12 Oct – 17 Dec</text>
+<rect x="306.5" y="112" width="32" height="32" rx="5" fill="#1d63c4"/>
+<text x="322.5" y="136" text-anchor="middle" font-size="22" font-weight="800" fill="#fff">J</text>
+<rect x="340.5" y="115" width="81" height="26" rx="3" fill="#1d63c4"/>
+<text x="381.0" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">Justice</text>
+<text x="330" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#7d7d7d" transform="rotate(-45 330 204)">Junior</text>
+<text x="364" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#7d7d7d" transform="rotate(-45 364 204)">Rozelle</text>
+<text x="398" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#7d7d7d" transform="rotate(-45 398 204)">Senior</text>
+<path d="M 330 218 L 330 1115" fill="none" stroke="#1d63c4" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<path d="M 364 218 L 364 1115" fill="none" stroke="#1d63c4" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<path d="M 398 218 L 398 1115" fill="none" stroke="#1d63c4" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<rect x="318" y="266" width="24" height="186" rx="12" fill="#1d63c4"/>
+<text x="330" y="359.0" transform="rotate(-90 330 359.0)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#fff">Young Diplomats</text>
+<rect x="318" y="496" width="24" height="170" rx="12" fill="#1d63c4"/>
+<text x="330" y="581.0" transform="rotate(-90 330 581.0)" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="#fff">Diplomacy &amp; Advocacy</text>
+<circle cx="330" cy="473" r="4.6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="314" y="478" text-anchor="end" font-size="14" font-weight="400" fill="#2b2b2b">Rotary MUNA</text>
+<text x="314" y="493" text-anchor="end" font-size="11" fill="#7d7d7d">18 Apr</text>
+<rect x="355" y="576" width="52" height="18" rx="9" fill="#d9d9d6" stroke="#9a9a9a" stroke-width="1.6"/>
+<circle cx="364" cy="585" r="5" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<circle cx="398" cy="585" r="5" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="416" y="590" text-anchor="start" font-size="14" font-weight="400" fill="#2b2b2b">UN Evatt</text>
+<text x="416" y="605" text-anchor="start" font-size="11" fill="#7d7d7d">1 Jun</text>
+<rect x="386" y="710" width="24" height="259" rx="12" fill="#1d63c4"/>
+<text x="398" y="839.5" transform="rotate(-90 398 839.5)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#fff">Mock Trial</text>
+<path d="M 398 718 L 411.0 718.0 Q 424 718 433.2 727.2 L 435.0 729.0 Q 446 740 446.0 755.6 L 446 1023" fill="none" stroke="#1d63c4" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<circle cx="446" cy="740" r="4.6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="464" y="745" font-size="14" font-weight="400" fill="#2b2b2b">Round 1 <tspan font-size="11" font-weight="400" fill="#7d7d7d">1 Aug</tspan></text>
+<circle cx="446" cy="783" r="4.6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="464" y="788" font-size="14" font-weight="400" fill="#2b2b2b">Round 2 <tspan font-size="11" font-weight="400" fill="#7d7d7d">18 Aug</tspan></text>
+<circle cx="446" cy="842" r="4.6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="464" y="847" font-size="14" font-weight="400" fill="#2b2b2b">Round 3 <tspan font-size="11" font-weight="400" fill="#7d7d7d">10 Sep</tspan></text>
+<circle cx="446" cy="949" r="6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="464" y="954" font-size="14" font-weight="700" fill="#2b2b2b">Regional Final <tspan font-size="11" font-weight="400" fill="#7d7d7d">22 Oct</tspan></text>
+<circle cx="446" cy="1023" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<text x="464" y="1028" font-size="14" font-weight="700" fill="#2b2b2b">State Final <tspan font-size="11" font-weight="400" fill="#7d7d7d">20 Nov</tspan></text>
+<circle cx="330" cy="218" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="330" cy="1115" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="364" cy="218" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="364" cy="1115" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="398" cy="218" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="398" cy="1115" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<rect x="703.0" y="112" width="32" height="32" rx="5" fill="#f19a1b"/>
+<text x="719.0" y="136" text-anchor="middle" font-size="22" font-weight="800" fill="#fff">I</text>
+<rect x="737.0" y="115" width="108" height="26" rx="3" fill="#f19a1b"/>
+<text x="791.0" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">Innovation</text>
+<text x="740" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#7d7d7d" transform="rotate(-45 740 204)">Junior</text>
+<text x="774" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#7d7d7d" transform="rotate(-45 774 204)">Rozelle</text>
+<text x="808" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#7d7d7d" transform="rotate(-45 808 204)">Senior</text>
+<path d="M 740 218 L 740 1115" fill="none" stroke="#f19a1b" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<path d="M 774 218 L 774 1115" fill="none" stroke="#f19a1b" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<path d="M 808 218 L 808.0 383.0 Q 808 399 819.3 410.3 L 896.7 487.7 Q 908 499 908.0 515.0 L 908.0 583.0 Q 908 599 896.7 610.3 L 819.3 687.7 Q 808 699 808.0 715.0 L 808 1115" fill="none" stroke="#f19a1b" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<rect x="728" y="266" width="24" height="400" rx="12" fill="#f19a1b"/>
+<text x="740" y="466.0" transform="rotate(-90 740 466.0)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#fff">Young Creators Lab</text>
+<circle cx="774" cy="559" r="4.6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="792" y="556" text-anchor="start" font-size="14" font-weight="400" fill="#2b2b2b">da Vinci</text>
+<text x="792" y="572" text-anchor="start" font-size="14" font-weight="400" fill="#2b2b2b">Decathlon</text>
+<text x="792" y="587" text-anchor="start" font-size="11" fill="#7d7d7d">22 May</text>
+<rect x="731" y="774" width="52" height="18" rx="9" fill="#d9d9d6" stroke="#9a9a9a" stroke-width="1.6"/>
+<circle cx="740" cy="783" r="5" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<circle cx="774" cy="783" r="5" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="722" y="780" text-anchor="end" font-size="14" font-weight="400" fill="#2b2b2b">Tournament</text>
+<text x="722" y="796" text-anchor="end" font-size="14" font-weight="400" fill="#2b2b2b">of Minds</text>
+<text x="722" y="811" text-anchor="end" font-size="11" fill="#7d7d7d">18 Aug</text>
+<rect x="796" y="710" width="24" height="382" rx="12" fill="#f19a1b"/>
+<text x="808" y="901.0" transform="rotate(-90 808 901.0)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#fff">Future Solutions Lab</text>
+<circle cx="740" cy="218" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="740" cy="1115" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="774" cy="218" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="774" cy="1115" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="808" cy="218" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="808" cy="1115" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<rect x="973.0" y="112" width="32" height="32" rx="5" fill="#1a9b48"/>
+<text x="989.0" y="136" text-anchor="middle" font-size="22" font-weight="800" fill="#fff">E</text>
+<rect x="1007.0" y="115" width="108" height="26" rx="3" fill="#1a9b48"/>
+<text x="1061.0" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">Expression</text>
+<text x="1010" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#7d7d7d" transform="rotate(-45 1010 204)">Junior</text>
+<text x="1044" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#7d7d7d" transform="rotate(-45 1044 204)">Rozelle</text>
+<text x="1078" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#7d7d7d" transform="rotate(-45 1078 204)">Senior</text>
+<path d="M 1010 218 L 1010 1115" fill="none" stroke="#1a9b48" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<path d="M 1044 218 L 1044 1115" fill="none" stroke="#1a9b48" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<path d="M 1078 218 L 1078 1115" fill="none" stroke="#1a9b48" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<rect x="998" y="266" width="24" height="826" rx="12" fill="#1a9b48"/>
+<text x="1010" y="679.0" transform="rotate(-90 1010 679.0)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#fff">StudioGAT · all year</text>
+<circle cx="1078" cy="434" r="4.6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="1096" y="439" text-anchor="start" font-size="14" font-weight="400" fill="#2b2b2b">Gallery entry 1</text>
+<text x="1096" y="454" text-anchor="start" font-size="11" fill="#7d7d7d">3 Apr</text>
+<circle cx="1078" cy="648" r="4.6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="1096" y="653" text-anchor="start" font-size="14" font-weight="400" fill="#2b2b2b">Gallery entry 2</text>
+<text x="1096" y="668" text-anchor="start" font-size="11" fill="#7d7d7d">26 Jun</text>
+<circle cx="1078" cy="862" r="4.6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="1096" y="867" text-anchor="start" font-size="14" font-weight="400" fill="#2b2b2b">Gallery entry 3</text>
+<text x="1096" y="882" text-anchor="start" font-size="11" fill="#7d7d7d">18 Sep</text>
+<path d="M 1232 248 L 1232 913" fill="none" stroke="#1a9b48" stroke-width="5" stroke-linecap="round" opacity="1" stroke-dasharray="2 9"/>
+<circle cx="1232" cy="282" r="4.6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="1250" y="287" text-anchor="start" font-size="14" font-weight="400" fill="#2b2b2b">Essay Prize opens</text>
+<text x="1250" y="302" text-anchor="start" font-size="11" fill="#7d7d7d">2 Feb</text>
+<circle cx="1232" cy="659" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<text x="1250" y="664" text-anchor="start" font-size="14" font-weight="700" fill="#2b2b2b">Essay Prize due</text>
+<text x="1250" y="679" text-anchor="start" font-size="11" fill="#7d7d7d">30 Jun</text>
+<circle cx="1232" cy="896" r="4.6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="1250" y="901" text-anchor="start" font-size="14" font-weight="400" fill="#2b2b2b">Results</text>
+<text x="1250" y="916" text-anchor="start" font-size="11" fill="#7d7d7d">1 Oct</text>
+<text x="1232" y="238" text-anchor="middle" font-size="11" font-style="italic" fill="#7d7d7d">open all year</text>
+<circle cx="1010" cy="218" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="1010" cy="1115" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="1044" cy="218" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="1044" cy="1115" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="1078" cy="218" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="1078" cy="1115" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<rect x="1427.5" y="112" width="32" height="32" rx="5" fill="#a3238e"/>
+<text x="1443.5" y="136" text-anchor="middle" font-size="22" font-weight="800" fill="#fff">R</text>
+<rect x="1461.5" y="115" width="99" height="26" rx="3" fill="#a3238e"/>
+<text x="1511.0" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">Reasoning</text>
+<text x="1460" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#7d7d7d" transform="rotate(-45 1460 204)">Junior</text>
+<text x="1494" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#7d7d7d" transform="rotate(-45 1494 204)">Rozelle</text>
+<text x="1528" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#7d7d7d" transform="rotate(-45 1528 204)">Senior</text>
+<path d="M 1460 218 L 1460.0 634.0 Q 1460 650 1448.7 661.3 L 1445.3 664.7 Q 1434 676 1434.0 692.0 L 1434.0 987.0 Q 1434 1003 1445.3 1014.3 L 1448.7 1017.7 Q 1460 1029 1460.0 1045.0 L 1460 1115" fill="none" stroke="#a3238e" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<path d="M 1528 218 L 1528.0 634.0 Q 1528 650 1539.3 661.3 L 1542.7 664.7 Q 1554 676 1554.0 692.0 L 1554.0 987.0 Q 1554 1003 1542.7 1014.3 L 1539.3 1017.7 Q 1528 1029 1528.0 1045.0 L 1528 1115" fill="none" stroke="#a3238e" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<path d="M 1494 218 L 1494.0 650.0 Q 1494 666 1482.7 677.3 L 1479.3 680.7 Q 1468 692 1468.0 708.0 L 1468.0 971.0 Q 1468 987 1479.3 998.3 L 1482.7 1001.7 Q 1494 1013 1494.0 1029.0 L 1494 1115" fill="none" stroke="#a3238e" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<path d="M 1494 666 L 1508.7 680.7 Q 1520 692 1520.0 708.0 L 1520.0 971.0 Q 1520 987 1508.7 998.3 L 1494 1013" fill="none" stroke="#a3238e" stroke-width="7" stroke-linecap="round" opacity="1"/>
+<rect x="1456" y="710" width="24" height="259" rx="12" fill="#a3238e"/>
+<text x="1468" y="839.5" transform="rotate(-90 1468 839.5)" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="#fff">The Philosophy of Power</text>
+<rect x="1508" y="710" width="24" height="259" rx="12" fill="#a3238e"/>
+<text x="1520" y="839.5" transform="rotate(-90 1520 839.5)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#fff">PSYOPS</text>
+<rect x="1448" y="266" width="24" height="400" rx="12" fill="#a3238e"/>
+<text x="1460" y="466.0" transform="rotate(-90 1460 466.0)" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="#fff">Foundations Psychology</text>
+<circle cx="1528" cy="541" r="4.6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="1546" y="546" text-anchor="start" font-size="14" font-weight="400" fill="#2b2b2b">Brain Bee</text>
+<text x="1546" y="561" text-anchor="start" font-size="11" fill="#7d7d7d">15 May</text>
+<rect x="1516" y="995" width="24" height="36" rx="12" fill="#a3238e"/>
+<rect x="1548" y="1000.0" width="176" height="26" rx="3" fill="#a3238e"/>
+<path d="M 1541 1013.0 L 1549 1007.0 L 1549 1019.0 Z" fill="#a3238e"/>
+<text x="1636" y="1018.0" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Teachers for Tomorrow</text>
+<circle cx="1460" cy="218" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="1460" cy="1115" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="1494" cy="218" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="1494" cy="1115" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="1528" cy="218" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<circle cx="1528" cy="1115" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<line x1="1078" y1="975" x2="1460" y2="975" stroke="#d9d9d6" stroke-width="10" stroke-linecap="round"/>
+<line x1="1078" y1="975" x2="1460" y2="975" stroke="#9a9a9a" stroke-width="1.6" stroke-dasharray="0"/>
+<rect x="1069" y="966" width="18" height="18" rx="9" fill="#d9d9d6" stroke="#9a9a9a" stroke-width="1.6"/>
+<circle cx="1078" cy="975" r="5" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<rect x="1451" y="966" width="18" height="18" rx="9" fill="#d9d9d6" stroke="#9a9a9a" stroke-width="1.6"/>
+<circle cx="1460" cy="975" r="5" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="1270" y="964" text-anchor="middle" font-size="14" font-weight="700" fill="#2b2b2b">Ethics Olympiad</text>
+<text x="1270" y="997" text-anchor="middle" font-size="11" fill="#7d7d7d">1 Nov · Expression + Reasoning</text>
+<line x1="40" y1="1160" x2="1920" y2="1160" stroke="#d6d6d2"/>
+<rect x="40" y="1180" width="40" height="40" rx="6" fill="#1d63c4"/><text x="60" y="1209" text-anchor="middle" font-size="26" font-weight="800" fill="#fff">J</text>
+<text x="92" y="1196" font-size="13" font-style="italic" fill="#1d63c4">Justice Line</text>
+<text x="92" y="1213" font-size="12" font-weight="700" fill="#2b2b2b">Junior · Rozelle · Senior</text>
+<rect x="290" y="1180" width="40" height="40" rx="6" fill="#f19a1b"/><text x="310" y="1209" text-anchor="middle" font-size="26" font-weight="800" fill="#fff">I</text>
+<text x="342" y="1196" font-size="13" font-style="italic" fill="#f19a1b">Innovation Line</text>
+<text x="342" y="1213" font-size="12" font-weight="700" fill="#2b2b2b">Junior · Rozelle · Senior</text>
+<rect x="540" y="1180" width="40" height="40" rx="6" fill="#1a9b48"/><text x="560" y="1209" text-anchor="middle" font-size="26" font-weight="800" fill="#fff">E</text>
+<text x="592" y="1196" font-size="13" font-style="italic" fill="#1a9b48">Expression Line</text>
+<text x="592" y="1213" font-size="12" font-weight="700" fill="#2b2b2b">Junior · Rozelle · Senior</text>
+<rect x="790" y="1180" width="40" height="40" rx="6" fill="#a3238e"/><text x="810" y="1209" text-anchor="middle" font-size="26" font-weight="800" fill="#fff">R</text>
+<text x="842" y="1196" font-size="13" font-style="italic" fill="#a3238e">Reasoning Line</text>
+<text x="842" y="1213" font-size="12" font-weight="700" fill="#2b2b2b">Junior · Rozelle · Senior</text>
+<path d="M 1080 1200 L 1600 1200" fill="none" stroke="#555" stroke-width="6" stroke-linecap="round" opacity="1"/>
+<circle cx="1140" cy="1200" r="4.6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="1140" y="1229" text-anchor="middle" font-size="12" font-weight="400" fill="#2b2b2b">Stop</text>
+<rect x="1231" y="1191" width="44" height="18" rx="9" fill="#d9d9d6" stroke="#9a9a9a" stroke-width="1.6"/>
+<circle cx="1240" cy="1200" r="5" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<circle cx="1266" cy="1200" r="5" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="1253" y="1229" text-anchor="middle" font-size="12" font-weight="400" fill="#2b2b2b">Interchange</text>
+<rect x="1338" y="1189" width="60" height="22" rx="11" fill="#555"/>
+<text x="1368" y="1229" text-anchor="middle" font-size="12" font-weight="400" fill="#2b2b2b">Program</text>
+<circle cx="1460" cy="1200" r="6" fill="#fff" stroke="#9a9a9a" stroke-width="1.6"/>
+<text x="1460" y="1229" text-anchor="middle" font-size="12" font-weight="400" fill="#2b2b2b">Final</text>
+<circle cx="1550" cy="1200" r="7.5" fill="#fff" stroke="#2b2b2b" stroke-width="3"/>
+<text x="1550" y="1229" text-anchor="middle" font-size="12" font-weight="400" fill="#2b2b2b">End of line / deadline</text>
+<path d="M 1640 1200 L 1720 1200" fill="none" stroke="#555" stroke-width="5" stroke-linecap="round" opacity="1" stroke-dasharray="2 9"/>
+<text x="1680" y="1229" text-anchor="middle" font-size="12" font-weight="400" fill="#2b2b2b">Open all year</text>
+<text x="40" y="1270" font-size="13" fill="#7d7d7d">Shaded bands are school terms; the gaps are holidays. A line bends out to make room for a stop’s name and bends back after it. Programs that overlap on one year line split it into parallel tracks.</text>
+<text x="40" y="1292" font-size="13" fill="#7d7d7d">Round chains run on a branch off their program and end at a ringed final. A program too short for its name shows the name in a tag beside it.</text>
 </svg>
