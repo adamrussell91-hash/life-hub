@@ -305,10 +305,133 @@ describe('annotation thread editor 3c', () => {
     kind!.value = 'voice';
     kind!.dispatchEvent(new Event('change', { bubbles: true }));
     expect(getLatest().content.layers.some((layer) => layer.kind === 'voice')).toBe(true);
-    const locked = [
+    const voiceKind = [
       ...mount.querySelectorAll<HTMLSelectElement>('.block-editor__annotation-layer-kind')
     ].find((select) => select.value === 'voice');
-    expect(locked?.disabled).toBe(true);
+    expect(voiceKind?.disabled).toBe(false);
+    expect([...voiceKind!.options].map((opt) => opt.value)).toContain('free');
+    voiceKind!.value = 'free';
+    voiceKind!.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(getLatest().content.layers.some((layer) => layer.kind === 'voice')).toBe(false);
+    mount.remove();
+  });
+
+  async function answerKindCard(choice: 'change' | 'keep'): Promise<void> {
+    const card = document.querySelector<HTMLFormElement>('.confirm-card');
+    expect(card).toBeTruthy();
+    if (choice === 'keep') {
+      card!.querySelector<HTMLButtonElement>('button[type="button"]')?.click();
+      return;
+    }
+    const select = card!.querySelector<HTMLSelectElement>('select');
+    expect(select).toBeTruthy();
+    select!.value = 'change';
+    select!.dispatchEvent(new Event('change', { bubbles: true }));
+    card!.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+  }
+
+  it('can change a teacher-notes layer after confirming notes will show to students', async () => {
+    const { mount, getLatest } = mountEditor(dulceAnnotationFixture);
+    const teacher = [...mount.querySelectorAll<HTMLSelectElement>(
+      '.block-editor__annotation-layer-kind'
+    )].find((select) => select.value === 'teacher');
+    expect(teacher?.disabled).toBe(false);
+    expect([...teacher!.options].map((opt) => opt.value)).toEqual(
+      expect.arrayContaining(['free', 'lens', 'teacher', 'voice'])
+    );
+    const freeKind = [...mount.querySelectorAll<HTMLSelectElement>(
+      '.block-editor__annotation-layer-kind'
+    )].find((select) => select.value === 'free');
+    expect([...freeKind!.options].map((opt) => opt.value)).not.toContain('teacher');
+
+    teacher!.value = 'free';
+    teacher!.dispatchEvent(new Event('change', { bubbles: true }));
+    await answerKindCard('keep');
+    expect(getLatest().content.layers.find((layer) => layer.id === 'layer_teacher')?.kind).toBe(
+      'teacher'
+    );
+    await vi.waitFor(() => {
+      expect(teacher!.value).toBe('teacher');
+    });
+
+    teacher!.value = 'lens';
+    teacher!.dispatchEvent(new Event('change', { bubbles: true }));
+    await answerKindCard('change');
+    const changed = getLatest().content.layers.find((layer) => layer.id === 'layer_teacher');
+    expect(changed?.kind).toBe('lens');
+    expect(getLatest().content.annotations.some((ann) => ann.layer_id === 'layer_teacher')).toBe(
+      true
+    );
+    mount.remove();
+  });
+
+  it('drops voice recordings only after the kind change is confirmed', async () => {
+    const block = structuredClone(dulceAnnotationFixture);
+    const voiceLayer = block.content.layers[0]!;
+    voiceLayer.kind = 'voice';
+    block.content.voice_tracks = [
+      {
+        id: 'track_1',
+        layer_id: voiceLayer.id,
+        kind: 'reading',
+        title: 'Reading',
+        audio: { url: 'https://example.com/a.webm', duration_s: 1, mime: 'audio/webm' },
+        transcript: { words: [], timing: 'estimated' },
+        clips: [],
+        status: 'draft'
+      }
+    ];
+    const { mount, getLatest } = mountEditor(block);
+    const voice = [...mount.querySelectorAll<HTMLSelectElement>(
+      '.block-editor__annotation-layer-kind'
+    )].find((select) => select.value === 'voice');
+    expect(voice?.disabled).toBe(false);
+    voice!.value = 'free';
+    voice!.dispatchEvent(new Event('change', { bubbles: true }));
+    await answerKindCard('keep');
+    expect(getLatest().content.voice_tracks).toHaveLength(1);
+    await vi.waitFor(() => expect(voice!.value).toBe('voice'));
+
+    voice!.value = 'free';
+    voice!.dispatchEvent(new Event('change', { bubbles: true }));
+    await answerKindCard('change');
+    expect(getLatest().content.layers.find((layer) => layer.id === voiceLayer.id)?.kind).toBe(
+      'free'
+    );
+    expect(getLatest().content.voice_tracks).toBeUndefined();
+    mount.remove();
+  });
+
+  it('can change a Periodic Table layer and drops its subgroups', async () => {
+    const block = structuredClone(dulceAnnotationFixture);
+    block.content.layers.push({
+      id: 'layer_family',
+      name: 'Comparative',
+      kind: 'family',
+      family: 'Comparative',
+      colour: 'coral',
+      sublayers: [{ id: 'sub_fig', name: 'Figurative', subgroup: 'figurative' }]
+    });
+    block.content.annotations[0] = {
+      ...block.content.annotations[0]!,
+      layer_id: 'layer_family',
+      sublayer_id: 'sub_fig'
+    };
+    const { mount, getLatest } = mountEditor(block);
+    const family = [...mount.querySelectorAll<HTMLSelectElement>(
+      '.block-editor__annotation-layer-kind'
+    )].find((select) => select.value === 'family');
+    expect(family?.disabled).toBe(false);
+    family!.value = 'free';
+    family!.dispatchEvent(new Event('change', { bubbles: true }));
+    await answerKindCard('change');
+    const layer = getLatest().content.layers.find((row) => row.id === 'layer_family');
+    expect(layer?.kind).toBe('free');
+    expect(layer?.family).toBeUndefined();
+    expect(layer?.sublayers).toBeUndefined();
+    expect(
+      getLatest().content.annotations.find((ann) => ann.layer_id === 'layer_family')?.sublayer_id
+    ).toBeUndefined();
     mount.remove();
   });
 
