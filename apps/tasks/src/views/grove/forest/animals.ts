@@ -32,6 +32,8 @@ export type ForestAnimal = {
   reason: string;
   baby: boolean;
   swimming: boolean;
+  /** Came with an earned animal rather than earned in its own right. */
+  companion?: boolean;
 };
 
 // three ships without type declarations here; clips and actions stay loosely typed.

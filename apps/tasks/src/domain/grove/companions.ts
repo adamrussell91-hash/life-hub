@@ -13,6 +13,12 @@ export function companionEncounters(earned: readonly WildlifeMilestone[], day: s
     const start = positiveModulo(dateIndex(day), candidates.length);
     return [candidates[start]!, ...(candidates.length > 1 ? [candidates[positiveModulo(start + 1, candidates.length)]!] : [])];
 }
+/** Forest companions stay for good: each arrives with the first of its animal and lives in that week. */
+export function companionResidents(earned: readonly WildlifeMilestone[]) {
+    const first = new Map<WildlifeSpecies, WildlifeMilestone>();
+    for (const m of earned) if (!first.has(m.species) || m.earnedOn < first.get(m.species)!.earnedOn) first.set(m.species, m);
+    return [...first.values()].flatMap(m => (COMPANION_MODELS[m.species] ?? []).map(id => ({ id, species: id === 'animal-raccoon' ? 'squirrel' as const : m.species, parent: m.species, swimming: id === 'animal-river-otter', earnedOn: m.earnedOn })));
+}
 export function annualEncounters(plan: AnnualGrovePlan, focusKey?: string): (RoamingEncounter & {
     companion: boolean;
 })[] {

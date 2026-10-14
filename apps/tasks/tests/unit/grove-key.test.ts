@@ -17,11 +17,18 @@ describe('Grove key', () => {
     expect(animals.find((e) => e.name === 'Fox')!.meaning).not.toMatch(/young one/);
   });
 
-  it('names every visitor and the animal that brings it', () => {
-    const visitors = section('Visitors').entries;
+  it('says how often each animal comes again', () => {
+    const animals = section('Animals').entries;
+    expect(animals.find((e) => e.name === 'Hare')!.meaning).toContain('Another comes every 10th such day.');
+    expect(animals.find((e) => e.name === 'Squirrel')!.meaning).toContain('Another comes with every 150 more.');
+    expect(animals.find((e) => e.name === 'Fox')!.meaning).toContain('Another comes every term.');
+  });
+
+  it('names every companion and the animal it stays with', () => {
+    const companions = section('Companions').entries;
     const models = Object.values(COMPANION_MODELS).flat();
-    expect(visitors.map((v) => v.name).join(' ')).toContain('Bear, Boar or Wolf');
-    expect(visitors.find((v) => v.name === 'Otter')!.meaning).toBe('Can visit once you have a Mallard.');
+    expect(companions.map((v) => v.name).join(' ')).toContain('Bear, Boar and Wolf');
+    expect(companions.find((v) => v.name === 'Otter')!.meaning).toBe('Joins you for good with your first Mallard.');
     expect(models.every((m) => animalGlyph(m) !== '🐾')).toBe(true);
   });
 

@@ -2,8 +2,8 @@
 import type { GroveCompletion } from '@/domain/grove/plan';
 import { isGroveHistoryId } from '@/domain/grove/private-history';
 import type { GroveTerm } from '@/domain/grove/calendar';
-import { companionEncounters } from '@/domain/grove/companions';
-import { WILDLIFE_MODEL, wildlifeMilestones, type GroveBookInput, type WildlifeSpecies } from '@/domain/grove/wildlife';
+import { companionResidents } from '@/domain/grove/companions';
+import { wildlifeArrivals, type GroveBookInput, type WildlifeArrival, type WildlifeSpecies } from '@/domain/grove/wildlife';
 import { weekOfDay, type Done, type Species } from './history';
 import type { ForestAnimal } from './animals';
 
@@ -29,13 +29,39 @@ export function forestHistory(completions: readonly GroveCompletion[], year: num
 export const ANIMAL_NAME: Record<WildlifeSpecies, string> = { hare: 'Hare', deer: 'Doe', fox: 'Fox', squirrel: 'Squirrel', robin: 'Robin', mallard: 'Mallard', owl: 'Owl' };
 export const modelName = (id: string) => id.replace(/^animal-(forest-|bird-|duck-|river-|rabbit-)?/, '').replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
-/** Animals earned this year, through `through` (YYYY-MM-DD): each milestone's animal plus Grove's companions. */
+/**
+ * Most animals the forest draws at once, young ones included. Each is its own skinned, animated model
+ * (trees are batched, animals are not), so this keeps a phone near its frame budget.
+ */
+export const MAX_FOREST_ANIMALS = 40;
+
+/** Over the cap, the latest repeats of the most numerous species go first; first arrivals and companions stay. */
+function capArrivals(arrivals: WildlifeArrival[], room: number): WildlifeArrival[] {
+  const kept = [...arrivals];
+  const size = () => kept.reduce((n, a) => n + (a.baby ? 2 : 1), 0);
+  while (size() > room) {
+    const counts = new Map<WildlifeSpecies, number>();
+    for (const a of kept) counts.set(a.species, (counts.get(a.species) ?? 0) + 1);
+    const repeats = kept.filter((a) => a.ordinal > 0);
+    if (!repeats.length) break;
+    const most = Math.max(...repeats.map((a) => counts.get(a.species)!));
+    const drop = repeats.filter((a) => counts.get(a.species) === most).sort((a, b) => b.earnedOn.localeCompare(a.earnedOn) || b.ordinal - a.ordinal)[0]!;
+    kept.splice(kept.indexOf(drop), 1);
+  }
+  return kept;
+}
+
+/**
+ * Animals earned this year, through `through` (YYYY-MM-DD). A milestone brings an animal every time
+ * its repeat step comes round (WILDLIFE_REPEAT), and each animal's companions join it for good.
+ */
 export function forestAnimals(completions: readonly GroveCompletion[], terms: readonly GroveTerm[], books: readonly GroveBookInput[], year: number, through: string): ForestAnimal[] {
   const prefix = `${year}-`;
   const own = completions.filter((c) => c.dayKey.startsWith(prefix));
   const last = through < `${year}-12-31` ? through : `${year}-12-31`;
-  const earned = wildlifeMilestones(own, terms.filter((t) => t.starts_on.startsWith(prefix)), last, books.filter((b) => b.completed_on?.startsWith(prefix)));
-  const parents: ForestAnimal[] = earned.map((m) => ({ model: WILDLIFE_MODEL[m.species], species: m.species, name: ANIMAL_NAME[m.species], earnedOn: m.earnedOn, reason: m.reason, baby: m.baby, swimming: m.species === 'mallard' }));
-  const companions: ForestAnimal[] = companionEncounters(earned, last).map((e) => ({ model: e.id, species: e.species, name: modelName(e.id), earnedOn: e.earnedOn, reason: e.reason, baby: false, swimming: e.swimming }));
+  const arrivals = wildlifeArrivals(own, terms.filter((t) => t.starts_on.startsWith(prefix)), last, books.filter((b) => b.completed_on?.startsWith(prefix)));
+  const residents = companionResidents(arrivals);
+  const parents: ForestAnimal[] = capArrivals(arrivals, MAX_FOREST_ANIMALS - residents.length).map((m) => ({ model: m.model, species: m.species, name: m.ordinal === 0 ? ANIMAL_NAME[m.species] : modelName(m.model), earnedOn: m.earnedOn, reason: m.reason, baby: m.baby, swimming: m.species === 'mallard' }));
+  const companions: ForestAnimal[] = residents.map((e) => ({ model: e.id, species: e.species, name: modelName(e.id), earnedOn: e.earnedOn, reason: `Came with your ${ANIMAL_NAME[e.parent].toLowerCase()}`, baby: false, swimming: e.swimming, companion: true }));
   return [...parents, ...companions];
 }

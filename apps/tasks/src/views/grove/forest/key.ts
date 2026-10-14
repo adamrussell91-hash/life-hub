@@ -4,7 +4,7 @@
  * cannot drift from what is drawn.
  */
 import { COMPANION_MODELS } from '@/domain/grove/companions';
-import { WILDLIFE_REASON, type WildlifeSpecies } from '@/domain/grove/wildlife';
+import { WILDLIFE_REASON, WILDLIFE_REPEAT, type WildlifeSpecies } from '@/domain/grove/wildlife';
 import { ANIMAL_NAME, modelName } from './data';
 
 export type KeyEntry = { name: string; meaning: string; glyph?: string; preview?: string };
@@ -26,18 +26,26 @@ export function animalGlyph(model: string, species?: WildlifeSpecies): string {
 
 const ORDER: WildlifeSpecies[] = ['hare', 'robin', 'squirrel', 'deer', 'mallard', 'fox', 'owl'];
 const BABIES = new Set<WildlifeSpecies>(['hare', 'deer']);
-const list = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`);
+const list = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
 const preview = (name: string) => `previews/${name}.png`;
+const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`;
+/** What brings the next one, in the key's words, from the same steps the forest counts. */
+const UNIT: Record<WildlifeSpecies, string> = { hare: 'such day', deer: 'such week', fox: 'term', squirrel: 'Teaching task', robin: 'Life or Health task', mallard: 'such week', owl: 'book' };
+function repeatText(species: WildlifeSpecies): string {
+  const { first, every } = WILDLIFE_REPEAT[species];
+  if (first > 1) return `Another comes with every ${every} more.`;
+  return every === 1 ? `Another comes every ${UNIT[species]}.` : `Another comes every ${ordinal(every)} ${UNIT[species]}.`;
+}
 
 export function groveKey(): KeySection[] {
   const animals: KeyEntry[] = ORDER.map((species) => ({
     name: ANIMAL_NAME[species],
     glyph: SPECIES_GLYPH[species],
-    meaning: `${WILDLIFE_REASON[species]}.${BABIES.has(species) ? ' Earn it again and a young one follows.' : ''}`
+    meaning: `${WILDLIFE_REASON[species]}. ${repeatText(species)}${BABIES.has(species) ? ' Earn it twice and a young one follows the first.' : ''}`
   }));
-  const visitors: KeyEntry[] = ORDER.filter((s) => COMPANION_MODELS[s]?.length).map((species) => {
+  const companions: KeyEntry[] = ORDER.filter((s) => COMPANION_MODELS[s]?.length).map((species) => {
     const models = COMPANION_MODELS[species]!;
-    return { name: list(models.map(modelName)), glyph: animalGlyph(models[0]!), meaning: `Can visit once you have a ${ANIMAL_NAME[species]}.` };
+    return { name: list(models.map(modelName)), glyph: animalGlyph(models[0]!), meaning: `${models.length > 1 ? 'Join' : 'Joins'} you for good with your first ${ANIMAL_NAME[species]}.` };
   });
   return [
     {
@@ -53,8 +61,8 @@ export function groveKey(): KeySection[] {
         { name: 'Sapling, young, grown', meaning: 'A tree is a sapling for its first 4 days, young until day 12, then fully grown.', preview: preview('tree-life-1-sapling') }
       ]
     },
-    { title: 'Animals', lede: 'Real milestones bring animals. Each lives in the week it was earned.', entries: animals },
-    { title: 'Visitors', lede: 'Each day two visitors come, chosen from the animals you have earned.', entries: visitors },
+    { title: 'Animals', lede: 'Real milestones bring animals, and keep bringing them as you repeat them. Each lives in the week it was earned.', entries: animals },
+    { title: 'Companions', lede: 'Each first animal brings companions, and they stay.', entries: companions },
     {
       title: 'The island',
       entries: [
