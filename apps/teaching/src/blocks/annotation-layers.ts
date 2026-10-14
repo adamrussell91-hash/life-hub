@@ -63,17 +63,20 @@ export function createLayerState(
   mode: 'teacher' | 'student' | 'print'
 ): AnnotationLayerState {
   const stops = stopsForMode(layers, mode);
-  let stop = 0;
+  // Ticks are the visibility control. Layers up to the student default start
+  // ticked; anything after that starts unticked. Teachers start with every tick on.
+  let revealed = 0;
   if (mode === 'teacher') {
-    // Teachers see every stop on open so notes are editable immediately.
-    stop = stops.length;
-  } else if (mode === 'student' && settings.default_layer_id) {
+    revealed = stops.length;
+  } else if (settings.default_layer_id) {
     const idx = stops.findIndex((layer) => layer.id === settings.default_layer_id);
-    if (idx >= 0) stop = idx + 1;
+    if (idx >= 0) revealed = idx + 1;
   }
+  const suppressed = new Set<string>();
+  for (const layer of stops.slice(revealed)) suppressed.add(layer.id);
   return {
-    stop: clampStop(stop, stops.length),
-    suppressed: new Set(),
+    stop: stops.length,
+    suppressed,
     openAnnotationId: null,
     // Thread focus fields reset on every load — never persisted (slice 3b).
     focusThreadId: null,
@@ -164,17 +167,6 @@ export function markersFor(
     });
   }
   return out;
-}
-
-export function stepStop(
-  state: AnnotationLayerState,
-  stops: AnnotationLayer[],
-  delta: number
-): AnnotationLayerState {
-  return {
-    ...state,
-    stop: clampStop(state.stop + delta, stops.length)
-  };
 }
 
 export function toggleSuppressed(

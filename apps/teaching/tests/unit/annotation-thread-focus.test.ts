@@ -48,7 +48,7 @@ describe('annotation thread focus (3b)', () => {
     el.remove();
   });
 
-  it('keeps expanded folds across a layer slider change (V7)', () => {
+  it('keeps expanded folds across a layer tick (V7)', () => {
     mockViewport(1440);
     const fixture = structuredClone(threadFocusFixture);
     const el = renderAnnotationBlock(fixture, 'student');
@@ -62,9 +62,10 @@ describe('annotation thread focus (3b)', () => {
       el.querySelector(`[data-fold-id="${foldId}"]`)?.getAttribute('aria-expanded')
     ).toBe('true');
 
-    const slider = el.querySelector<HTMLInputElement>('.block-annotation__slider')!;
-    slider.value = '1';
-    slider.dispatchEvent(new Event('input'));
+    const structure = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip')].find(
+      (chip) => (chip.textContent || '').includes('Structure')
+    )!;
+    structure.click();
 
     expect(
       el.querySelector(`[data-fold-id="${foldId}"]`)?.getAttribute('aria-expanded')

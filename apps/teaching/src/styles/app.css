@@ -9344,14 +9344,11 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 .block-annotation__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(16rem, 26rem);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
   min-width: 0;
-}
-
-.block-annotation__layout:has(.block-annotation__panel[hidden]) {
-  grid-template-columns: minmax(0, 1fr);
+  position: relative;
 }
 
 .block-annotation__text {
@@ -9459,6 +9456,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 .block-annotation__panel {
   position: relative;
   min-width: 0;
+  width: 100%;
   padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -9958,16 +9956,6 @@ body.is-lesson-builder-full-page .hub-utilities {
   display: none;
 }
 
-.block-annotation__slider-row[hidden],
-.block-annotation__reveal[hidden] {
-  display: none;
-}
-
-.block-annotation__reveal {
-  justify-self: start;
-  min-height: 2.75rem;
-}
-
 .block-annotation__chips {
   display: flex;
   flex-wrap: nowrap;
@@ -9995,6 +9983,11 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 .block-annotation__chip[aria-pressed='false'] {
   opacity: 0.45;
+}
+
+.block-annotation__chip:focus-visible {
+  outline: 3px solid var(--focus-ring, var(--wave));
+  outline-offset: 2px;
 }
 
 .block-annotation__chip--teacher {
@@ -10026,41 +10019,6 @@ body.is-lesson-builder-full-page .hub-utilities {
 }
 .block-annotation__chip--mist {
   background: color-mix(in srgb, var(--mist, #9aa4b2) 22%, var(--paper, #fff));
-}
-
-.block-annotation__slider-row {
-  display: grid;
-  gap: var(--space-2, 0.5rem);
-  min-width: 0;
-}
-
-.block-annotation__slider {
-  width: 100%;
-  min-height: 2.75rem;
-  accent-color: var(--wave);
-}
-
-.block-annotation__slider:focus-visible {
-  outline: 3px solid var(--focus-ring, var(--wave));
-  outline-offset: 2px;
-}
-
-.block-annotation__stop-labels {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2, 0.5rem);
-  font-family: var(--font-ui, system-ui, sans-serif);
-  font-size: var(--text-xs, 0.75rem);
-  color: var(--muted, #6b7280);
-}
-
-.block-annotation__stop-label[data-active='true'] {
-  color: var(--ink, inherit);
-  font-weight: 600;
-}
-
-.block-annotation__stop-label--teacher {
-  font-style: italic;
 }
 
 .block-annotation__markers {
@@ -10139,7 +10097,8 @@ body.is-lesson-builder-full-page .hub-utilities {
   }
 
   .block-annotation__chips {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+    overflow: visible;
   }
 }
 
@@ -11309,10 +11268,9 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 .block-annotation__margin-note {
   position: absolute;
-  right: 0;
   z-index: 2;
   width: 13rem;
-  max-width: 13rem;
+  max-width: min(13rem, 100%);
   padding: 0;
   border: 0;
   background: none;
@@ -11320,11 +11278,13 @@ body.is-lesson-builder-full-page .hub-utilities {
   font-family: var(--font-hand);
   font-size: 1.2rem;
   font-weight: 600;
-  line-height: 1.1;
+  line-height: 1.15;
   text-align: left;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+button.block-annotation__margin-note {
   cursor: pointer;
 }
 
