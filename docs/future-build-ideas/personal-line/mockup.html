@@ -1,0 +1,499 @@
+<title>Personal Line Builder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a station-poster column. Builder strip on top, then the line board: a narrow track
+   gutter on the left (lanes drawn in SVG), station rows to its right, term headers between. */
+:root {
+  --paper: #f6f4ef;
+  --board: #ffffff;
+  --ink: #13233a;
+  --muted: #5d6878;
+  --rule: #dcd8cf;
+  --hush: #ecebe6;
+  --night: #1d2633;
+  --t-orange: #f26f21;
+  --go: #2f9e44;
+  --j: #0057b8; --j-fill: #d4e6ff;
+  --i: #e0b400; --i-fill: #fff3b0; --i-ink: #13233a;
+  --e: #009a3a; --e-fill: #c8f0d2;
+  --r: #6b2d8e; --r-fill: #edd6fa;
+  --stop: #ffffff;
+  --display: "Barlow Semi Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --body: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #0f141b; --board: #161d27; --ink: #eef2f7; --muted: #9aa6b6; --rule: #2a3442; --hush: #1c2430;
+  --night: #0a0e13; --j: #4a90e8; --j-fill: #17304f; --i: #f0c400; --i-fill: #3d3410; --e: #22b85a; --e-fill: #133524;
+  --r: #a56bd0; --r-fill: #2f1f3d; --stop: #f4f6f8; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #0f141b; --board: #161d27; --ink: #eef2f7; --muted: #9aa6b6; --rule: #2a3442; --hush: #1c2430;
+  --night: #0a0e13; --j: #4a90e8; --j-fill: #17304f; --i: #f0c400; --i-fill: #3d3410; --e: #22b85a; --e-fill: #133524;
+  --r: #a56bd0; --r-fill: #2f1f3d; --stop: #f4f6f8; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 920px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 64px; display: grid; gap: 18px; }
+.mock { font-size: 12px; color: var(--muted); letter-spacing: .02em; }
+.mock b { color: var(--t-orange); text-transform: uppercase; letter-spacing: .08em; }
+
+/* ---------- builder */
+.builder { background: var(--board); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 14px; }
+.builder h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1; text-wrap: balance; }
+.field { display: grid; gap: 8px; }
+.field > span { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip input { position: absolute; opacity: 0; pointer-events: none; }
+.chip label { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border: 2px solid var(--rule); border-radius: 999px; cursor: pointer; font-weight: 600; user-select: none; }
+.chip input:checked + label { border-color: var(--ink); background: var(--ink); color: var(--board); }
+.chip input:focus-visible + label { outline: 3px solid var(--t-orange); outline-offset: 2px; }
+.chip .rd { width: 24px; height: 24px; font-size: 14px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn { font: 600 15px var(--body); min-height: 42px; padding: 0 18px; border-radius: 8px; border: 2px solid var(--ink); background: var(--board); color: var(--ink); cursor: pointer; }
+.btn--go { background: var(--t-orange); border-color: var(--t-orange); color: #fff; }
+.btn:focus-visible { outline: 3px solid var(--t-orange); outline-offset: 2px; }
+.toast { font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 10px 12px; border-radius: 8px; background: var(--hush); }
+.toast code { font: 600 13px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+
+/* ---------- roundels */
+.rd { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; font: 700 16px/1 var(--display); color: #fff; flex: none; }
+.rd--J { background: var(--j); } .rd--I { background: var(--i); color: var(--i-ink); } .rd--E { background: var(--e); } .rd--R { background: var(--r); }
+.rd--sm { width: 20px; height: 20px; font-size: 12px; border-radius: 4px; }
+
+/* ---------- line board (Arncliffe poster) */
+.board { background: var(--board); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.board__top { background: var(--t-orange); color: #fff; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; }
+.board__top strong { font: 700 26px/1.05 var(--display); }
+.board__top .tee { width: 40px; height: 40px; border-radius: 50%; border: 3px solid #fff; display: grid; place-items: center; font: 700 22px var(--display); flex: none; }
+.board__bar { background: var(--night); color: #fff; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 16px; }
+.board__bar h2 { margin: 0; font: 600 24px/1.1 var(--display); text-wrap: balance; }
+.board__bar .stamp { margin-left: auto; font-size: 12px; opacity: .8; }
+.line { position: relative; padding: 14px 16px 26px 0; }
+.line svg.tracks { position: absolute; left: 0; top: 0; width: var(--gutter); height: 100%; overflow: visible; pointer-events: none; }
+.row { position: relative; display: grid; grid-template-columns: var(--gutter) minmax(0, 1fr) auto; align-items: center; column-gap: 12px; min-height: 64px; }
+.term { display: grid; grid-template-columns: var(--gutter) minmax(0,1fr); column-gap: 12px; padding-block: 12px 4px; }
+.term span { grid-column: 2; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 8px; }
+.stopbtn { grid-column: 2 / 4; display: grid; grid-template-columns: minmax(0,1fr) auto; column-gap: 12px; align-items: center; text-align: left; font: inherit; color: inherit; background: none; border: 0; padding: 8px 10px; margin-left: -10px; border-radius: 8px; cursor: pointer; }
+.stopbtn:hover { background: var(--hush); }
+.stopbtn:focus-visible { outline: 3px solid var(--t-orange); outline-offset: 0; }
+.stopname { font: 600 22px/1.12 var(--display); min-width: 0; overflow-wrap: anywhere; }
+.row.is-shared .stopname { font-weight: 700; }
+.badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; align-items: center; }
+.kind { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-left: 4px; }
+.when { text-align: right; font-variant-numeric: tabular-nums; }
+.when b { display: block; font: 700 20px/1 var(--display); }
+.when small { color: var(--muted); font-size: 12px; }
+.row, .term { transition: none; }
+.is-pending { opacity: 0; transform: translateY(6px); }
+.is-arrived { opacity: 1; transform: none; transition: opacity .35s ease, transform .35s ease; }
+.empty { padding: 28px 16px; color: var(--muted); }
+
+/* ---------- departure-board card */
+.scrim { position: fixed; inset: 0; background: rgb(10 14 19 / .55); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.card { width: min(560px, 100%); max-height: calc(100% - 8px); overflow: auto; background: var(--board); border-radius: 12px; border: 6px solid var(--night); box-shadow: 0 18px 50px rgb(0 0 0 / .35); }
+.card__head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 14px; color: #fff; font: 600 18px var(--display); }
+.card__head .now { font-size: 14px; opacity: .9; } .card__head .now b { font-size: 20px; margin-left: 6px; }
+.card__body { padding: 14px 16px 18px; display: grid; gap: 14px; }
+.card__title { display: flex; gap: 12px; align-items: flex-start; }
+.card__title .rds { display: grid; gap: 4px; }
+.card__title .rd { width: 40px; height: 40px; font-size: 24px; border-radius: 8px; }
+.card__title h3 { margin: 0; font: 700 30px/1.02 var(--display); text-wrap: balance; }
+.card__title p { margin: 4px 0 0; color: var(--muted); }
+.cars { display: grid; gap: 6px; }
+.cars__label { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.cars__row { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 4px; }
+.car { height: 34px; display: grid; place-items: center; font: 700 15px var(--display); background: var(--hush); color: var(--muted); clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+.car:first-child { clip-path: polygon(14% 0, 100% 0, 100% 100%, 0 100%); }
+.car:last-child { clip-path: polygon(0 0, 86% 0, 100% 100%, 0 100%); }
+.car.is-in { background: var(--car-fill); color: var(--ink); }
+.car.is-you { background: var(--go); color: #fff; }
+.split { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: end; border-top: 1px solid var(--rule); padding-top: 12px; }
+.split .k { font-size: 12px; color: var(--muted); }
+.split .v { font: 700 22px/1.1 var(--display); }
+.split .big { text-align: right; }
+.split .big .v { font-size: 34px; color: var(--accent); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { background: var(--night); color: #fff; font: 600 13px var(--body); padding: 3px 8px; border-radius: 3px; }
+.card p.desc { margin: 0; max-width: 65ch; }
+.meta { font-size: 13px; color: var(--muted); }
+.next { border-top: 1px solid var(--rule); padding-top: 10px; display: grid; gap: 6px; }
+.next h4 { margin: 0; font: 600 16px var(--display); color: var(--muted); }
+.next button { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 10px; align-items: center; text-align: left; font: inherit; color: inherit; background: none; border: 0; padding: 6px 0; cursor: pointer; border-radius: 6px; }
+.next button span:nth-child(2) { font: 600 18px/1.1 var(--display); }
+.next button:focus-visible { outline: 3px solid var(--t-orange); }
+.card__foot { display: flex; flex-wrap: wrap; gap: 10px; }
+.card__foot a { text-decoration: none; display: inline-flex; align-items: center; }
+.close { background: none; border: 0; color: #fff; font: 600 15px var(--body); cursor: pointer; min-height: 32px; padding: 0 6px; }
+.close:focus-visible { outline: 3px solid #fff; }
+
+@media (max-width: 520px) {
+  .board__top strong { font-size: 22px; }
+  .stopname { font-size: 19px; }
+  .when b { font-size: 17px; }
+  .scrim { place-items: end center; padding: 0; }
+  .card { border-radius: 14px 14px 0 0; border-width: 5px 0 0; max-height: 88%; }
+}
+@media (prefers-reduced-motion: reduce) { .is-pending { opacity: 1; transform: none; } }
+</style>
+<div class="wrap">
+  <p class="mock"><b>Mockup</b> · real entries from the Programs catalogue · Publish saves nothing yet</p>
+
+  <form class="builder" id="builder" aria-labelledby="builder-title">
+    <h1 id="builder-title">Build a personal line</h1>
+    <div class="field">
+      <span id="year-label">Year level</span>
+      <div class="chips" role="radiogroup" aria-labelledby="year-label" id="years"></div>
+    </div>
+    <div class="field">
+      <span id="int-label">Interests</span>
+      <div class="chips" role="group" aria-labelledby="int-label" id="strands"></div>
+    </div>
+    <div class="field">
+      <label for="student" style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">First name (optional)</label>
+      <input id="student" type="text" value="Mia" maxlength="24" autocomplete="off" style="font:500 16px var(--body);min-height:42px;padding:0 12px;border:2px solid var(--rule);border-radius:8px;background:var(--board);color:var(--ink);max-width:280px">
+    </div>
+    <div class="actions">
+      <button class="btn btn--go" type="submit">Build line</button>
+      <button class="btn" type="button" id="publish">Publish</button>
+    </div>
+    <div class="toast" id="toast" hidden></div>
+  </form>
+
+  <section class="board" aria-labelledby="line-title">
+    <div class="board__top"><strong>MindWorks Pathways</strong><span class="tee" aria-hidden="true">M</span></div>
+    <div class="board__bar">
+      <span id="line-rds" class="badges" style="margin:0"></span>
+      <h2 id="line-title">Your line</h2>
+      <span class="stamp" id="stamp">2026 · not yet published</span>
+    </div>
+    <div class="line" id="line"></div>
+  </section>
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="card-title" id="card"></div>
+</div>
+<script>
+const DATA = [{"id": "prog_mock-mediation", "name": "Mock Mediation", "strands": ["J"], "month": 2, "years": [9, 10], "types": ["Competition"], "length": "Long Term", "level": "High Ability", "cost": "AUD 120 per team of 6", "basis": "Per team", "window": "Register before the competition season opens", "organiser": "Law Society of NSW", "location": "Various NSW venues", "desc": "Mediation competition in which teams of students role-play mediators and disputing parties to resolve a simulated conflict, developing negotiation, communication and problem-solving skills.", "link": "https://lawsociety.eventsair.com/2025-mock-law---school-registration/mock-law-registration/Site/Register"}, {"id": "prog_mock-trial", "name": "Mock Trial", "strands": ["J"], "month": 2, "years": [9, 10, 11, 12], "types": ["Competition"], "length": "Year Long", "level": "High Ability", "cost": "AUD 150 per team of 6", "basis": "Per team", "window": "Register before the competition season opens", "organiser": "Law Society of NSW", "location": "Regional courts and venues", "desc": "Simulated court competition in which students role-play barristers and witnesses to argue a case, developing legal reasoning, public speaking and critical thinking.", "link": "TBA"}, {"id": "prog_un-youth-evatt-model-un", "name": "UN Youth Evatt Model UN", "strands": ["J"], "month": 4, "years": [9, 10, 11, 12], "types": ["Competition"], "length": "Year Long", "level": "High Ability", "cost": "Set by state division (see registration page)", "basis": "Per team", "window": "Preliminary rounds run May to July", "organiser": "UN Youth Australia", "location": "Various venues / at school", "desc": "UN Security Council simulation run by UN Youth, in which pairs of delegates represent member states across preliminary debates, with semi-finals, finals and National Finals for top teams.", "link": "UN Youth Evatt program page"}, {"id": "prog_sydney-philosothon", "name": "Sydney Philosothon", "strands": ["J", "R"], "month": 6, "years": [7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Single Day", "level": "All Abilities", "cost": "AUD 220 per team", "basis": "Per team", "window": "Register ahead of the late-July evening event", "organiser": "Sydney Philosothon (hosted at Newington College)", "location": "Newington College, Stanmore NSW", "desc": "Inter-school philosophy competition run annually since 2009. Teams of four (two junior, two senior) take part in three facilitated Communities of Inquiry, assessed by trained teachers and philosophers, with stimulus material provided in advance.", "link": "Humanitix event page"}, {"id": "prog_national-history-challenge", "name": "National History Challenge", "strands": ["J"], "month": 7, "years": [7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Free", "basis": "Free", "window": "Entries usually close late August", "organiser": "History Teachers' Association of Australia", "location": "In-school / submitted online. State and national judging conducted remotely.", "desc": "Free national research-based history competition with an annual theme. Students present on a historical topic in their choice of format \u2014 essay, documentary, exhibit, performance or website \u2014 with state and national prizes.", "link": "https://historychallenge.org.au/"}, {"id": "prog_young-justice-program-law-society-of-nsw", "name": "Young Justice Program (Law Society of NSW)", "strands": ["J"], "month": 7, "years": [9, 10], "types": ["Program"], "length": "Single Day", "level": "Beginners", "cost": "Free", "basis": "Free", "window": "Schools nominate students ahead of the August event", "organiser": "Law Society of NSW", "location": "Rotates annually across NSW (2024: Campbelltown, WSU; 2025: Wollongong)", "desc": "Annual one-day program run by the Law Society of NSW where students explore law and justice with leading legal professionals, including the Chief Justice of NSW. Rotates between metropolitan and regional NSW locations each year.", "link": "https://www.lawsociety.com.au/Legal-Communities/High-School-Students/Young-Justice"}, {"id": "prog_free-thinkers-forum", "name": "Free-Thinkers Forum", "strands": ["J", "R"], "month": 8, "years": [9, 10], "types": ["Event"], "length": "Single Day", "level": "High Ability", "cost": "$20 per student", "basis": "Per student", "window": "Book by end of Term 2. Student names, speech topic, teacher details and dietary requirements due Week 3, Term 3.", "organiser": "Rosebank College", "location": "Rosebank College, Rive Dock", "desc": "Philosophy and critical-thinking forum hosted at Rosebank College. Each school sends up to 10 students (1 speaker, 1 adjudicator, remainder as judges and discussion participants). Speeches are judged on originality, engagement and cogency rather than oration. Community of inquiry discussions follow each group of three speeches. Day concludes with a whole-group ethical dilemma. Limited to 9 schools.", "link": null}, {"id": "prog_un-youth-voice-public-speaking", "name": "UN Youth Voice Public Speaking", "strands": ["J"], "month": 9, "years": [7, 8, 9, 10], "types": ["Competition"], "length": "Year Long", "level": "All Abilities", "cost": "Set by state division (see registration page)", "basis": "Per student", "window": "State calendars vary; rounds run through the year", "organiser": "UN Youth Australia", "location": "Australia wide", "desc": "Public speaking competition run by UN Youth focusing on civics and problem solving. Students pitch a solution to a global or local issue and answer questions, progressing through regional, state and national rounds.", "link": "UN Youth Voice program page"}, {"id": "prog_dmun-debate-forum", "name": "DMUN Debate Forum", "strands": ["J"], "month": 0, "years": [7, 8, 9, 10, 11, 12], "types": ["Event"], "length": "Single Day", "level": "All Abilities", "cost": "Free", "basis": "Free", "window": "Registrations close shortly before the late-January event", "organiser": "DMUN Foundation", "location": "Online", "desc": "Online debate competition run by the DMUN Foundation in Asian Parliamentary and British Parliamentary formats. A large global event (around 2,000 delegates) with cash prizes for top performers.", "link": "https://mymun.com/conferences/dmun-debate-forum-2026"}, {"id": "prog_informed-civics-competition-rule-of-law-education-centre", "name": "Informed Civics Competition (Rule of Law Education Centre)", "strands": ["J"], "month": 1, "years": [7, 8, 9, 10], "types": ["Competition"], "length": "Long Term", "level": "Beginners", "cost": "Free", "basis": "Free", "window": "Submissions usually due around February", "organiser": "Rule of Law Education Centre", "location": "In-school (submissions sent to the Rule of Law Education Centre)", "desc": "National civics competition run by the Rule of Law Education Centre. Students in Years 7\u201310 work in pairs to research a civic topic using provided fact sheets, then design an original playing card representing that concept. Judged with prizes awarded by a member of parliament.", "link": "https://www.ruleoflaw.org.au/programs-overview-competition"}, {"id": "prog_dmunln-dmun-model-league-of-nations", "name": "DMUNLN (DMUN Model League of Nations)", "strands": ["J"], "month": 3, "years": [7, 8, 9, 10, 11, 12], "types": ["Event"], "length": "Single Day", "level": "Multiple Levels", "cost": "Free", "basis": "Free", "window": "Registrations close shortly before the April event", "organiser": "DMUN Foundation", "location": "Online", "desc": "Online Model UN simulating the interwar League of Nations, run by the DMUN Foundation. Delegates debate across nine committees covering peacekeeping, refugees, disarmament, economics, labour, intellectual cooperation and colonial mandates. Around 1,800 delegates expected.", "link": "https://mymun.com/conferences/dmunln-2026"}, {"id": "prog_dmun-meu-dmun-model-european-union", "name": "DMUN MEU: DMUN Model European Union", "strands": ["J"], "month": 5, "years": [10, 11, 12], "types": ["Event"], "length": "Single Day", "level": "Beginners", "cost": "Free", "basis": "Free", "window": "Registrations close shortly before the June event", "organiser": "DMUN Foundation", "location": "Online", "desc": "Online Model European Union simulation run by the DMUN Foundation. A two-day conference across three chambers (European Parliament, European Commission, European Central Bank) focused on consensus building and negotiation among the 27 member states.", "link": "https://mymun.com/conferences/list"}, {"id": "prog_leadership-for-change-prize", "name": "Leadership for Change Prize", "strands": ["J"], "month": 10, "years": [5, 6, 7, 8, 9, 10, 11], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Free", "basis": "Free", "window": "Entries usually close mid November; winners announced early December", "organiser": "The Economist Educational Foundation (in partnership with Rolex)", "location": "Online (international)", "desc": "Global media literacy competition from The Economist Educational Foundation in partnership with Rolex that caps the Leadership for Change curriculum. Students pitch their own Project for Change to improve media literacy in their school or community. Three winning pitches receive funding of up to 1,000 pounds plus mentorship to bring their ideas to life.", "link": "https://talk.economistfoundation.org/prizes/leadership-prize-2026/"}, {"id": "prog_dmun-championship", "name": "DMUN Championship", "strands": ["J"], "month": 11, "years": [7, 8, 9, 10, 11, 12], "types": ["Event"], "length": "Single Day", "level": "Multiple Levels", "cost": "Free", "basis": "Free", "window": "Registrations close shortly before the early-December event", "organiser": "DMUN Foundation", "location": "Online", "desc": "Flagship year-end online conference of the DMUN circuit (around 500 delegates). Committees span Asian Parliamentary Debate, UNFCCC, ICJ, UNEP, Lok Sabha, European Parliament, a Historical Crisis Committee and the Council of the Arab League.", "link": "https://mymun.com/conferences/dmun-championship-2026"}, {"id": "prog_apa-topss-competition", "name": "APA TOPSS Competition", "strands": ["E", "R"], "month": 2, "years": [9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "High Ability", "cost": "Free", "basis": "Free", "window": "Entries usually due around March", "organiser": "American Psychological Association (TOPSS)", "location": "Online", "desc": "Annual video competition run by the American Psychological Association's Teachers of Psychology in Secondary Schools (TOPSS). Students create a short video applying psychological science to a set annual topic. Open to international high school students; up to five entries per school, no team submissions.", "link": "https://www.apa.org/ed/precollege/topss/student-competition"}, {"id": "prog_improv-theatre-sydney-holiday-program", "name": "Improv Theatre Sydney Holiday Program", "strands": ["E"], "month": 0, "years": [7, 8, 9], "types": ["Program"], "length": "Long Term", "level": "Multiple Levels", "cost": "$350 summer program; $110 spring day", "basis": "Per student", "window": "January summer program and October spring workshop", "organiser": "Improv Theatre Sydney", "location": "Redfern, Sydney", "desc": "Holiday improvisation program covering long form improvisation, character work, narrative and stagecraft, culminating in a short family showcase.", "link": "https://improvtheatresydney.com.au"}, {"id": "prog_what-matters-writing-competition-whitlam-institute", "name": "What Matters? Writing Competition (Whitlam Institute)", "strands": ["E"], "month": 1, "years": [5, 6, 7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Free", "basis": "Free", "window": "Entries usually open early in the year", "organiser": "Whitlam Institute, Western Sydney University", "location": "Online (national)", "desc": "National writing competition run by the Whitlam Institute inviting students in Years 5\u201312 to share what matters to them in 600 words or less. Entries may be fiction, non-fiction, persuasive writing, poetry or prose. Both a creative writing exercise and a civics activity.", "link": "https://www.whitlam.org/what-matters-writing-competition-enter-now"}, {"id": "prog_scribo-latin-writing-contest", "name": "SCRIBO Latin Writing Contest", "strands": ["E"], "month": 3, "years": [7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "USD 20 per school + USD 7.50\u20138.50 per student", "basis": "Per student", "window": "Usually 1 September \u2013 15 March", "organiser": "Excellence Through Classics (American Classical League)", "location": "At school (online submission)", "desc": "Latin composition contest run by Excellence Through Classics (a committee of the American Classical League). Students write in Latin in response to an annual theme. A writing contest rather than a timed multiple-choice exam, composed and submitted online.", "link": "https://www.etclassics.org/Contests-Exams/Scribo-Writing-Contest"}, {"id": "prog_city-lights-art-challenge", "name": "City Lights Art Challenge", "strands": ["E"], "month": 4, "years": [7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Entry fee (first image often free)", "basis": "Per entry", "window": "Entries usually due late May", "organiser": "Ten Moir Gallery", "location": "Online", "desc": "International art and photography competition themed around city lights at night \u2014 neon, streetlights, high-rise windows and motion in the dark. Hosted by Ten Moir Gallery; open to artists and photographers worldwide.", "link": "https://studentcompetitions.com/competitions/city-lights-art-challenge-2026-free-entry-early-bird"}, {"id": "prog_abstract-art-competition", "name": "Abstract Art Competition", "strands": ["E"], "month": 5, "years": [7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Entry fee \u2014 see website", "basis": "Per entry", "window": "Entries usually due early June", "organiser": "Contemporary Art Room Gallery", "location": "Online", "desc": "International online abstract art competition open to artists worldwide, hosted by Contemporary Art Room Gallery.", "link": "https://studentcompetitions.com/competitions/abstract-art-competition"}, {"id": "prog_anthology-short-story-competition", "name": "Anthology Short Story Competition", "strands": ["E"], "month": 6, "years": [9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Entry fee \u2014 see website", "basis": "Per entry", "window": "Entries usually due early July", "organiser": "Anthology Magazine", "location": "Online", "desc": "Open international short story competition for original, previously unpublished stories in English, hosted by Anthology Magazine. Winning story is published in the magazine.", "link": "https://studentcompetitions.com/competitions/anthology-short-story-competition-2026"}, {"id": "prog_faw-tasmania-beatrice-clarke-award-for-young-poets", "name": "FAW Tasmania Beatrice Clarke Award for Young Poets", "strands": ["E"], "month": 7, "years": [3, 4, 5, 6, 7, 8, 9], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "$5 per entry", "basis": "Per entry", "window": "Closes 31 August", "organiser": "Fellowship of Australian Writers Tasmania", "location": "Online (national)", "desc": "A poetry award for poets aged 14 and under, submitting a poem of up to 40 lines on any theme.", "link": "https://fawtas.org.au/competitions/"}, {"id": "prog_future-snack-design", "name": "Future Snack Design", "strands": ["E"], "month": 8, "years": [10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Free", "basis": "Free", "window": "Entries usually due mid-September", "organiser": "Desall", "location": "Online (Global)", "desc": "Open design challenge for an innovative snack concept aimed at a young consumer audience, hosted by Desall with a leading food and beverage company. Open globally.", "link": "https://studentcompetitions.com/competitions/future-snack-design"}, {"id": "prog_brainways-quest-tutorials-sydney", "name": "BRAINways Quest Tutorials (Sydney)", "strands": ["I", "E", "R"], "month": 9, "years": [3, 4, 5, 6, 7], "types": ["Program"], "length": "Single Day", "level": "High Ability", "cost": "$99 per day; $196 for two days (2026 Sydney pricing)", "basis": "Per student", "window": "Enrolments opened 10 August 2026 and close 1 October 2026, or earlier once places fill", "organiser": "BRAINways Education", "location": "Sydney (university campus venue advised prior to the program)", "desc": "Single day tutorial program run by BRAINways Education for high potential primary and early secondary students in Sydney. Students are nominated by their school, then parents enrol online. Topics for this round are The Mathematics of Games, The Chemistry in a Prescription: The Science of Pain, and What is Art? The Philosophy of Beauty.", "link": "https://registration.brainways.com.au/quest-sydney/"}, {"id": "prog_anthology-travel-writing-competition", "name": "Anthology Travel Writing Competition", "strands": ["E"], "month": 10, "years": [9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Entry fee \u2014 see website", "basis": "Per entry", "window": "Entries usually due end of November", "organiser": "Anthology Magazine", "location": "Online (Global)", "desc": "Open international travel writing competition for original, previously unpublished articles in English, hosted by Anthology Magazine. Winning piece is published in the magazine.", "link": "https://studentcompetitions.com/competitions/anthology-travel-writing-competition-2026"}, {"id": "prog_international-academic-marathon-artithon", "name": "International Academic Marathon: Artithon", "strands": ["E"], "month": 11, "years": [7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Single Day", "level": "All Abilities", "cost": "Free", "basis": "Free", "window": "Closes 21 November 2026. Held 5 to 6 December 2026.", "organiser": "International Academic Marathon (EAE International)", "location": "Online", "desc": "Arts round of the International Academic Marathon, a free online team relay.", "link": "https://www.academic-marathon.org"}, {"id": "prog_da-vinci-decathlon", "name": "da Vinci Decathlon", "strands": ["I"], "month": 5, "years": [5, 6, 7, 8, 9, 10, 11], "types": ["Competition"], "length": "Single Day", "level": "High Ability", "cost": "Set by each host school; nationals fee published separately", "basis": "Per team", "window": "Regionals in Term 2; register via host school beforehand", "organiser": "Knox Grammar School (da Vinci Decathlon)", "location": "Regional host schools; national finals at Knox Grammar", "desc": "Academic gala for teams of eight competing across ten disciplines (engineering, mathematics and chess, code breaking, art and poetry, science, English, ideation, creative producers, cartography and legacy). Regional rounds lead to national finals at Knox Grammar.", "link": "http://davincidecathlon.com/ events section"}, {"id": "prog_tournament-of-minds-tom", "name": "Tournament of Minds TOM", "strands": ["I"], "month": 5, "years": [3, 4, 5, 6, 7, 8, 9, 10], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Approx. AUD 300 per school + AUD 50 per team", "basis": "Per team", "window": "Register before Term 3 regional rounds", "organiser": "Tournament of Minds", "location": "At school plus regional competition day", "desc": "Team problem-solving program in which teams of 5\u20137 students work on a long-term challenge over six weeks, then present their solution plus tackle a spontaneous challenge. Regional rounds lead to state and international finals.", "link": "http://tournamentofminds.com.au/"}, {"id": "prog_seamo-southeast-asian-mathematical-olympiad", "name": "SEAMO (Southeast Asian Mathematical Olympiad)", "strands": ["I"], "month": 0, "years": [7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Single Day", "level": "Multiple Levels", "cost": "~SGD 12 (about AUD 14) per student; optional SEAMO X package extra", "basis": "Per student", "window": "Register via a partner provider before the January contest", "organiser": "SEAMO (via approved providers e.g. EduVision Australia)", "location": "Online via partner providers (SEAMO X final in Bali)", "desc": "International mathematics olympiad (founded 2016) engaging 50,000+ students across 15+ countries, with paper levels for Grades 1\u201312. The top performers are invited to the SEAMO X international round. All participants receive a personalised performance report.", "link": "https://seamo-official.org/"}, {"id": "prog_ansto-think-science", "name": "ANSTO Think Science", "strands": ["I"], "month": 1, "years": [3, 4, 5, 6, 7, 8, 9, 10], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Free", "basis": "Free", "window": "Registrations usually open around February", "organiser": "Australian Nuclear Science and Technology Organisation (ANSTO)", "location": "At school", "desc": "Nationwide science competition run by ANSTO. Students work in teams to design and conduct a scientific investigation, then submit their findings in video form.", "link": "https://www.ansto.gov.au/education/think-science"}, {"id": "prog_computational-and-algorithmic-thinking-cat", "name": "Computational and Algorithmic Thinking CAT", "strands": ["I"], "month": 2, "years": [5, 6, 7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Single Day", "level": "All Abilities", "cost": "AUD 10 per student", "basis": "Per student", "window": "Register via AMT before the March competition window", "organiser": "Australian Maths Trust (AMT)", "location": "At school", "desc": "National and international problem-solving competition run by the Australian Maths Trust focusing on computational and algorithmic thinking. No coding required.", "link": "https://www.amt.edu.au/cat"}, {"id": "prog_bond-university-year-12-extension-program", "name": "Bond University Year 12 Extension Program", "strands": ["I"], "month": 3, "years": [12], "types": ["Program"], "length": "Single Day", "level": "High Ability", "cost": "Free", "basis": "Free", "window": "Usually opens early in the year; runs around April", "organiser": "Bond University", "location": "Bond University, Gold Coast QLD", "desc": "Free two-day curriculum enrichment workshop at Bond University (Gold Coast) for Year 12 students, in either a Business or Maths stream. Small-group access to academics and current students, with part-fee scholarships for top performers.", "link": null}, {"id": "prog_apsmo-maths-games-junior-years-5-6", "name": "APSMO \u2013 Maths Games (Junior, Years 5 & 6)", "strands": ["I"], "month": 4, "years": [5, 6], "types": ["Program"], "length": "Year Long", "level": "All Abilities", "cost": "Per-team registration via APSMO (see website for current fees)", "basis": "Per team", "window": "Register before Term 2; papers run May to September", "organiser": "APSMO", "location": "At school", "desc": "Four non-competitive contest papers aligned to the Maths Olympiad schedule, for mainstream and mixed-ability classes in Years 5\u20136. Resource Kits with sample questions and solutions precede each paper.", "link": "https://www.apsmo.edu.au/"}, {"id": "prog_eureka", "name": "Eureka", "strands": ["I"], "month": 6, "years": [3, 4, 5, 6], "types": ["Competition"], "length": "Single Day", "level": "All Abilities", "cost": "Per-student entry fee (see organiser)", "basis": "Per student", "window": "Register before the competition window", "organiser": "Eureka (primary enrichment competition)", "location": "At school", "desc": "Primary enrichment competition spanning English, science, mathematics and humanities, with Lower Primary (Years 1\u20133) and Upper Primary (Years 4\u20136) divisions.", "link": null}, {"id": "prog_amoc-senior-contest", "name": "AMOC Senior Contest", "strands": ["I"], "month": 7, "years": [10, 11], "types": ["Competition"], "length": "Single Day", "level": "High Ability", "cost": "Invitational \u2014 no public entry fee", "basis": "Free", "window": "By invitation, based on prior AMT results", "organiser": "Australian Mathematical Olympiad Committee (AMT)", "location": "At school (Australia wide). Invitational.", "desc": "Invitational senior maths contest run by the Australian Mathematical Olympiad Committee under the AMT. Around 100 students (mostly Year 11) sit five problems over four hours covering geometry, number theory, algebra and combinatorics. A key step on the pathway to APMO, EGMO and IMO teams.", "link": "https://amt.edu.au/olympiad-programs"}, {"id": "prog_australian-intermediate-mathematics-olympiad-aimo", "name": "Australian Intermediate Mathematics Olympiad (AIMO)", "strands": ["I"], "month": 8, "years": [7, 8, 9, 10], "types": ["Competition"], "length": "Single Day", "level": "High Ability", "cost": "AUD 25.90 per student", "basis": "Per student", "window": "Entries usually close early September; sat mid-September", "organiser": "Australian Maths Trust (AMT)", "location": "At school (school-supervised, paper printed by teacher; solutions submitted digitally)", "desc": "Highly challenging four-hour olympiad-style mathematics paper run by the AMT, pitched at Year 10 level but suited to talented Years 7\u20139 students. Ten questions including written proofs; feeds the AMT olympiad pathway.", "link": "https://amt.edu.au/aimo"}, {"id": "prog_g-a-t-e-w-a-y-s", "name": "G.A.T.E.W.A.Y.S", "strands": ["I"], "month": 9, "years": [3, 4, 5, 6], "types": ["Competition"], "length": "Single Day", "level": "High Ability", "cost": "Team registration set by GATEWAYS (school based)", "basis": "Per team", "window": "Schools register ahead of Term 4 event days", "organiser": "GATEWAYS Education", "location": "Host primary schools across Australia (state based venues; held in Term 4)", "desc": "National team competition for high-ability primary students run by GATEWAYS Education (operating since 1994). Teams rotate through four scenario-based rounds with different academic focuses, structured so no single student can complete a round alone.", "link": "https://www.gateways.edu.au/the-challenge"}, {"id": "prog_micro-living-architecture-competition", "name": "Micro Living Architecture Competition", "strands": ["I", "E"], "month": 11, "years": [10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Entry fee \u2014 see website", "basis": "Per entry", "window": "Entries usually due early December", "organiser": "Volume Zero", "location": "Online (Global)", "desc": "International architecture ideas competition exploring micro living and compact dwelling design, hosted by Volume Zero. Open globally with a USD 10,000 prize pool.", "link": "https://studentcompetitions.com/competitions/call-for-ideas-micro-living-2026-architecture-competition"}, {"id": "prog_australian-economics-olympiad-aeo", "name": "Australian Economics Olympiad (AEO)", "strands": ["R"], "month": 4, "years": [9, 10, 11, 12], "types": ["Competition"], "length": "Single Day", "level": "High Ability", "cost": "AUD 25 per student", "basis": "Per student", "window": "Register before the May sitting", "organiser": "Consortium for Inclusive Economics Education (CIEE), UNSW Sydney", "location": "At school (teacher invigilated)", "desc": "National economics enrichment competition for high school students run by the Consortium for Inclusive Economics Education at UNSW Sydney. Tests mastery of economics, problem solving and economic reasoning. Top performers form the Australian team for the international olympiads.", "link": "https://aeo.org.au/"}, {"id": "prog_cambridge-re-think-essay-competition-ccir", "name": "Cambridge Re:Think Essay Competition (CCIR)", "strands": ["R"], "month": 4, "years": [6, 7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "High Ability", "cost": "Free", "basis": "Free", "window": "Entries usually due around 10 May", "organiser": "Cambridge Centre for International Research (CCIR)", "location": "Online", "desc": "International essay competition run by the Cambridge Centre for International Research for students aged 11\u201318, split into Junior and Senior divisions. Essays of 1,000\u20132,000 words on prompts spanning humanities, sciences and social sciences. Award ceremony at King's College, Cambridge.", "link": "https://cambridge-research.org/essay-competition/"}, {"id": "prog_australasian-philosothon-online-hybrid", "name": "Australasian Philosothon (Online / Hybrid)", "strands": ["R"], "month": 7, "years": [7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Single Day", "level": "All Abilities", "cost": "AUD 490 per team (AUD 445 NZ/Singapore)", "basis": "Per team", "window": "Register ahead of the late-August event", "organiser": "Australasian Association of Philosophy (AAP)", "location": "Online/Hybrid", "desc": "The Australasian final of the Philosothon movement, assessed by university philosophers. Teams of one student per year level (Years 8\u201312) take part in Communities of Inquiry, judged on philosophical inquiry, clarity and reasoning. Runs online or hybrid.", "link": "https://www.aap.org.au/event-6702265"}, {"id": "prog_the-ethics-centre-young-writers-competition", "name": "The Ethics Centre Young Writers' Competition", "strands": ["R"], "month": 8, "years": [7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Free", "basis": "Free", "window": "Closes 8 September", "organiser": "The Ethics Centre", "location": "Online (national)", "desc": "An essay competition of up to 800 words responding to set ethical questions, with categories for ages 13 to 17 and 18 to 29.", "link": "https://ethics.org.au/connect/young-writers-competition/"}, {"id": "prog_international-academic-marathon-psychothon", "name": "International Academic Marathon: Psychothon", "strands": ["R"], "month": 9, "years": [7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Single Day", "level": "All Abilities", "cost": "Free", "basis": "Free", "window": "Closes 19 September 2026. Held 3 to 4 October 2026.", "organiser": "International Academic Marathon (EAE International)", "location": "Online", "desc": "Psychology round of the International Academic Marathon, a free online team relay.", "link": "https://www.academic-marathon.org"}, {"id": "prog_international-bipolar-foundation-teen-change-maker-essay", "name": "International Bipolar Foundation Teen Change-Maker Essay Contest", "strands": ["R"], "month": 0, "years": [7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "Free", "basis": "Free", "window": "Usually opens mid-year, closes early January", "organiser": "International Bipolar Foundation (IBPF)", "location": "Online", "desc": "Annual mental health essay contest for high school students aged 13\u201319 worldwide, run by the International Bipolar Foundation. Essays of 500\u20131,000 words on mental health awareness, school programs and reducing stigma.", "link": "https://ibpf.org/learn/programs/high-school-essay-contest/"}, {"id": "prog_british-psychology-olympiad-bpo", "name": "British Psychology Olympiad (BPO)", "strands": ["R"], "month": 1, "years": [9, 10, 11, 12], "types": ["Competition"], "length": "Year Long", "level": "High Ability", "cost": "Registration fee \u2014 see website", "basis": "Per student", "window": "Register before the February first round", "organiser": "Minds Underground", "location": "Online", "desc": "Three-round psychology olympiad organised by Minds Underground and officially recommended by the University of Oxford. Open internationally to Years 9\u201312. Australian students select their equivalent UK year group on registration.", "link": "https://www.mindsunderground.com/british-psychology-olympiad"}, {"id": "prog_australian-and-new-zealand-brain-bee-challenge-abbc", "name": "Australian and New Zealand Brain Bee Challenge ABBC", "strands": ["R"], "month": 2, "years": [10], "types": ["Competition"], "length": "Year Long", "level": "High Ability", "cost": "Free", "basis": "Free", "window": "Register before the Round 1 window (around March)", "organiser": "Australian and New Zealand Brain Bee Challenge", "location": "Online (Round 1); university hosts for regional finals", "desc": "Neuroscience competition for Year 10 students across three rounds. Round 1 sat online via Education Perfect; regional finals in person; national final online. National finalists may have travel and accommodation supported.", "link": "Education Perfect event page or through EP school portal"}, {"id": "prog_casecatalyst-virtual-case-competition", "name": "CaseCatalyst Virtual Case Competition", "strands": ["R"], "month": 3, "years": [9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "All Abilities", "cost": "See competition page", "basis": "TBC", "window": "Entries usually close around April", "organiser": "CaseCatalyst", "location": "Online", "desc": "Global virtual business case competition for high school students run by CaseCatalyst. Teams of 3\u20134 solve real-world challenges faced by early-stage startups in developing and emerging economies, finishing with a live Pitch Day before founders and judges.", "link": "https://studentcompetitions.com/competitions/casecatalyst-2026-virtual-case-competition-for-high-school-students"}, {"id": "prog_immerse-education-essay-competition", "name": "Immerse Education Essay Competition", "strands": ["R"], "month": 5, "years": [8, 9, 10, 11, 12], "types": ["Competition"], "length": "Long Term", "level": "High Ability", "cost": "Free", "basis": "Free", "window": "Two annual cycles; major deadlines around January and mid-year", "organiser": "Immerse Education", "location": "Online (international)", "desc": "Highly selective international essay competition run by Immerse Education for students aged 13\u201318. A 500-word essay on a pre-released subject-specific question, judged by experts, with scholarships to Immerse programmes at Cambridge and Oxford for winners.", "link": "https://www.immerse.education/essay-competition/"}, {"id": "prog_dmun-innova-2026-the-dmun-foundation-innovation-forum", "name": "DMUN INNOVA 2026: The DMUN Foundation Innovation Forum", "strands": ["J", "R"], "month": 6, "years": [9, 10, 11, 12], "types": ["Event"], "length": null, "level": "All Abilities", "cost": "Free", "basis": "Free", "window": "Chairs: 1 Apr to 5 Jul 2026. Delegates: 5 Apr to 12 Jul 2026. Observers: 14 Aug 2025 to 11 Jul 2026.", "organiser": "The DMUN Foundation", "location": "Online", "desc": "Online innovation forum run by the DMUN Foundation, held 11 to 12 July 2026 with around 500 delegates from university and school students. Delegates explore creative problem solving, diplomacy and global cooperation, designing solutions for challenges in technology, governance, economics and society. Theme: Innovating for Inclusive and Sustainable Development. Enquiries: enquiries@dmun.org", "link": "https://mymun.com/dmun"}, {"id": "prog_international-academic-marathon-econthon", "name": "International Academic Marathon: Econthon", "strands": ["R"], "month": 10, "years": [7, 8, 9, 10, 11, 12], "types": ["Competition"], "length": "Single Day", "level": "All Abilities", "cost": "Free", "basis": "Free", "window": "Closes 7 November 2026. Held 21 to 22 November 2026.", "organiser": "International Academic Marathon (EAE International)", "location": "Online", "desc": "Economics round of the International Academic Marathon, a free online team relay.", "link": "https://www.academic-marathon.org"}];
+const STRANDS = {
+  J: { name: 'Justice', color: 'var(--j)', fill: 'var(--j-fill)' },
+  I: { name: 'Innovation', color: 'var(--i)', fill: 'var(--i-fill)' },
+  E: { name: 'Expression', color: 'var(--e)', fill: 'var(--e-fill)' },
+  R: { name: 'Reasoning', color: 'var(--r)', fill: 'var(--r-fill)' }
+};
+const ORDER = ['J', 'I', 'E', 'R'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const TERMS = [
+  { label: 'Summer holidays', months: [0] },
+  { label: 'Term 1', months: [1, 2] },
+  { label: 'Term 2', months: [3, 4, 5] },
+  { label: 'Term 3', months: [6, 7, 8] },
+  { label: 'Term 4', months: [9, 10, 11] }
+];
+const YEAR_LINE = (y) => (y <= 8 ? 'Junior' : y === 9 ? 'Rozelle' : 'Senior');
+const LANE0 = 22, LANE_GAP = 26, PACK = 11;
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const svgNS = 'http://www.w3.org/2000/svg';
+
+const state = { year: 9, strands: new Set(['J', 'R']) };
+let rows = [];
+let anims = [];
+
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+function rd(k, small) { const s = el('span', `rd rd--${k}${small ? ' rd--sm' : ''}`, k); s.setAttribute('aria-hidden', 'true'); return s; }
+function isLong(item) { return item.length === 'Year Long' || (item.types.includes('Program') && item.length === 'Long Term'); }
+
+// ---------- builder controls
+for (let y = 7; y <= 12; y += 1) {
+  const c = el('span', 'chip');
+  c.innerHTML = `<input type="radio" name="year" id="y${y}" value="${y}"${y === state.year ? ' checked' : ''}><label for="y${y}">Year ${y}</label>`;
+  $('years').append(c);
+}
+for (const k of ORDER) {
+  const c = el('span', 'chip');
+  c.innerHTML = `<input type="checkbox" id="s${k}" value="${k}"${state.strands.has(k) ? ' checked' : ''}><label for="s${k}"></label>`;
+  const lab = c.querySelector('label');
+  lab.append(rd(k), document.createTextNode(STRANDS[k].name));
+  $('strands').append(c);
+}
+$('builder').addEventListener('submit', (e) => {
+  e.preventDefault();
+  state.year = Number(document.querySelector('input[name=year]:checked').value);
+  state.strands = new Set(ORDER.filter((k) => $(`s${k}`).checked));
+  $('toast').hidden = true;
+  $('stamp').textContent = '2026 · not yet published';
+  build(true);
+});
+$('publish').addEventListener('click', () => {
+  const slug = `${state.year}-${[...state.strands].join('').toLowerCase()}-${Math.random().toString(36).slice(2, 6)}`;
+  const t = $('toast');
+  t.hidden = false;
+  t.innerHTML = '';
+  t.append(el('strong', '', 'Published.'), el('span', '', 'Snapshot of this line, 14 Oct 2026:'), el('code', '', `life-hub.adam-russell.com/line/${slug}`));
+  $('stamp').textContent = 'Snapshot · 14 Oct 2026';
+});
+
+// ---------- line
+function pick() {
+  const chosen = ORDER.filter((k) => state.strands.has(k));
+  return DATA
+    .filter((it) => it.years.includes(state.year))
+    .map((it) => ({ ...it, on: it.strands.filter((k) => state.strands.has(k)) }))
+    .filter((it) => it.on.length)
+    .sort((a, b) => a.month - b.month || b.on.length - a.on.length || a.name.localeCompare(b.name))
+    .map((it) => ({ ...it, on: chosen.filter((k) => it.on.includes(k)) }));
+}
+
+function build(animate) {
+  anims.forEach((a) => a.cancel());
+  anims = [];
+  const chosen = ORDER.filter((k) => state.strands.has(k));
+  const name = $('student').value.trim();
+  $('line-title').textContent = `${name ? `${name}’s line` : 'Your line'} · Year ${state.year} · ${YEAR_LINE(state.year)}`;
+  const rdsHost = $('line-rds');
+  rdsHost.innerHTML = '';
+  chosen.forEach((k) => rdsHost.append(rd(k)));
+  const line = $('line');
+  line.innerHTML = '';
+  line.style.setProperty('--gutter', `${LANE0 * 2 + (chosen.length - 1) * LANE_GAP}px`);
+  const items = pick();
+  if (!chosen.length || !items.length) {
+    line.append(el('p', 'empty', chosen.length ? `Nothing in the catalogue for Year ${state.year} on these lines yet.` : 'Pick at least one interest to build a line.'));
+    return;
+  }
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class', 'tracks');
+  svg.setAttribute('aria-hidden', 'true');
+  line.append(svg);
+  rows = [];
+  for (const term of TERMS) {
+    const inTerm = items.filter((it) => term.months.includes(it.month));
+    if (!inTerm.length) continue;
+    const head = el('div', 'term');
+    head.append(el('span', '', term.label));
+    line.append(head);
+    rows.push({ node: head, item: null });
+    for (const it of inTerm) {
+      const row = el('div', `row${it.on.length > 1 ? ' is-shared' : ''}`);
+      const btn = el('button', 'stopbtn');
+      btn.type = 'button';
+      const left = el('span', '');
+      left.append(el('span', 'stopname', it.name));
+      const badges = el('span', 'badges');
+      it.on.forEach((k) => badges.append(rd(k, true)));
+      badges.append(el('span', 'kind', isLong(it) ? 'Program' : it.types[0] || 'Competition'));
+      left.append(badges);
+      const when = el('span', 'when');
+      when.append(el('b', '', MONTHS[it.month]), el('small', '', it.length || ''));
+      btn.append(left, when);
+      btn.addEventListener('click', () => openCard(it));
+      row.append(btn);
+      line.append(row);
+      rows.push({ node: row, item: it });
+    }
+  }
+  draw(svg, chosen, animate && !reduce);
+}
+
+function laneXs(chosen, it) {
+  const base = chosen.map((_, i) => LANE0 + i * LANE_GAP);
+  if (!it || it.on.length < 2) return base;
+  const idx = it.on.map((k) => chosen.indexOf(k));
+  const lo = Math.min(...idx), hi = Math.max(...idx);
+  const centre = (base[lo] + base[hi]) / 2;
+  const n = hi - lo + 1;
+  return base.map((x, i) => (i < lo || i > hi ? x : centre + (i - lo - (n - 1) / 2) * PACK));
+}
+
+function draw(svg, chosen, animate) {
+  svg.innerHTML = '';
+  const box = $('line').getBoundingClientRect();
+  const top = 6, bottom = box.height - 10;
+  svg.setAttribute('viewBox', `0 0 ${LANE0 * 2 + (chosen.length - 1) * LANE_GAP} ${box.height}`);
+  const stops = rows.filter((r) => r.item).map((r) => {
+    const b = r.node.getBoundingClientRect();
+    return { r, y: b.top - box.top + b.height / 2, xs: laneXs(chosen, r.item) };
+  });
+  const base = laneXs(chosen, null);
+  const D = Math.min(5200, 700 + stops.length * 260);
+  // Lanes: straight down, bending in to join at a shared stop and back out after it.
+  const paths = chosen.map((k, li) => {
+    let x = base[li];
+    let d = `M ${x} ${top}`;
+    let y = top;
+    for (const s of stops) {
+      const nx = s.xs[li];
+      if (Math.abs(nx - x) > 0.5) {
+        const y0 = Math.max(y, s.y - 30), y1 = s.y - 12;
+        d += ` L ${x} ${y0} C ${x} ${(y0 + y1) / 2} ${nx} ${(y0 + y1) / 2} ${nx} ${y1}`;
+        x = nx;
+      }
+      d += ` L ${x} ${s.y}`;
+      y = s.y;
+      if (Math.abs(base[li] - x) > 0.5) {
+        const y0 = s.y + 12, y1 = s.y + 30;
+        d += ` L ${x} ${y0} C ${x} ${(y0 + y1) / 2} ${base[li]} ${(y0 + y1) / 2} ${base[li]} ${y1}`;
+        x = base[li];
+        y = y1;
+      }
+    }
+    d += ` L ${x} ${bottom}`;
+    const p = document.createElementNS(svgNS, 'path');
+    p.setAttribute('d', d);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', STRANDS[k].color);
+    p.setAttribute('stroke-width', '8');
+    p.setAttribute('stroke-linecap', 'round');
+    svg.append(p);
+    return p;
+  });
+  // Stops on top of the lanes.
+  const marks = stops.map((s) => {
+    const g = document.createElementNS(svgNS, 'g');
+    const it = s.r.item;
+    if (it.on.length > 1) {
+      const xs = it.on.map((k) => s.xs[chosen.indexOf(k)]);
+      const x0 = Math.min(...xs) - 10, x1 = Math.max(...xs) + 10;
+      g.innerHTML = `<rect x="${x0}" y="${s.y - 10}" width="${x1 - x0}" height="20" rx="10" fill="var(--stop)" stroke="var(--ink)" stroke-width="3"/>`;
+    } else {
+      const k = it.on[0];
+      const x = s.xs[chosen.indexOf(k)];
+      g.innerHTML = isLong(it)
+        ? `<rect x="${x - 9}" y="${s.y - 20}" width="18" height="40" rx="9" fill="${STRANDS[k].fill}" stroke="${STRANDS[k].color}" stroke-width="3"/>`
+        : `<circle cx="${x}" cy="${s.y}" r="8" fill="var(--stop)" stroke="var(--muted)" stroke-width="2.5"/>`;
+    }
+    svg.append(g);
+    return { g, y: s.y };
+  });
+  if (!animate) return;
+  const span = bottom - top;
+  for (const p of paths) {
+    const len = p.getTotalLength();
+    p.style.strokeDasharray = `${len}`;
+    anims.push(p.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], { duration: D, easing: 'linear', fill: 'both' }));
+  }
+  const at = (y) => Math.max(0, ((y - top) / span) * D);
+  for (const m of marks) {
+    anims.push(m.g.animate([{ opacity: 0, transform: 'scale(.4)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 260, delay: at(m.y), fill: 'both', easing: 'cubic-bezier(.3,1.6,.5,1)' }));
+    m.g.style.transformBox = 'fill-box';
+    m.g.style.transformOrigin = 'center';
+  }
+  const lineBox = $('line').getBoundingClientRect();
+  for (const r of rows) {
+    const b = r.node.getBoundingClientRect();
+    const y = b.top - lineBox.top + b.height / 2;
+    anims.push(r.node.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 320, delay: Math.max(0, at(y) - 60), fill: 'both', easing: 'ease-out' }));
+  }
+}
+
+let resizeTimer = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const svg = document.querySelector('svg.tracks');
+    if (svg) draw(svg, ORDER.filter((k) => state.strands.has(k)), false);
+  }, 120);
+});
+
+// ---------- departure-board card
+let lastFocus = null;
+function openCard(it) {
+  lastFocus = document.activeElement;
+  const k = it.on[0];
+  const card = $('card');
+  card.innerHTML = '';
+  card.style.setProperty('--accent', STRANDS[k].color);
+  card.style.setProperty('--car-fill', STRANDS[k].fill);
+  const head = el('div', 'card__head');
+  head.style.background = STRANDS[k].color;
+  if (k === 'I') head.style.color = 'var(--i-ink)';
+  const type = isLong(it) ? 'Program' : it.types[0] || 'Competition';
+  const now = el('span', 'now', 'Runs');
+  now.append(el('b', '', MONTHS[it.month]));
+  const close = el('button', 'close', 'Close');
+  close.type = 'button';
+  if (k === 'I') close.style.color = 'var(--i-ink)';
+  close.addEventListener('click', closeCard);
+  const right = el('span', '');
+  right.style.display = 'flex'; right.style.gap = '12px'; right.style.alignItems = 'center';
+  right.append(now, close);
+  head.append(el('span', '', type), right);
+
+  const body = el('div', 'card__body');
+  const title = el('div', 'card__title');
+  const rds = el('span', 'rds');
+  it.on.forEach((s) => rds.append(rd(s)));
+  const tt = el('div', '');
+  const h = el('h3', '', it.name);
+  h.id = 'card-title';
+  tt.append(h, el('p', '', `via ${it.on.map((s) => STRANDS[s].name).join(' + ')}`));
+  title.append(rds, tt);
+
+  const cars = el('div', 'cars');
+  cars.append(el('span', 'cars__label', 'Year levels'));
+  const carRow = el('div', 'cars__row');
+  for (let y = 7; y <= 12; y += 1) {
+    const c = el('span', `car${it.years.includes(y) ? ' is-in' : ''}${y === state.year ? ' is-you' : ''}`, String(y));
+    c.title = y === state.year ? `Year ${y} (you)` : `Year ${y}${it.years.includes(y) ? '' : ' not eligible'}`;
+    carRow.append(c);
+  }
+  cars.append(carRow);
+
+  const split = el('div', 'split');
+  const l = el('div', '');
+  l.append(el('div', 'k', 'Entries'), el('div', 'v', it.window || 'See website'));
+  const r = el('div', 'big');
+  r.append(el('div', 'k', 'Cost'), el('div', 'v', it.basis === 'Free' ? 'Free' : (it.basis || 'TBC')));
+  split.append(l, r);
+
+  const tags = el('div', 'tags');
+  [it.length, it.level, it.basis && it.basis !== 'Free' ? it.cost : null].filter(Boolean).forEach((t) => tags.append(el('span', 'tag', t)));
+
+  const desc = el('p', 'desc', it.desc);
+  const meta = el('p', 'meta', [it.organiser, it.location].filter(Boolean).join(' · '));
+  meta.style.margin = '0';
+
+  const idx = rows.findIndex((row) => row.item && row.item.id === it.id);
+  const following = rows.slice(idx + 1).filter((row) => row.item).slice(0, 2);
+  const next = el('div', 'next');
+  if (following.length) {
+    next.append(el('h4', '', 'Next on your line'));
+    for (const f of following) {
+      const b = el('button', '');
+      b.type = 'button';
+      const badge = el('span', 'badges');
+      badge.style.margin = '0';
+      f.item.on.forEach((s) => badge.append(rd(s, true)));
+      const when = el('span', 'when');
+      when.append(el('b', '', MONTHS[f.item.month]));
+      b.append(badge, el('span', '', f.item.name), when);
+      b.addEventListener('click', () => openCard(f.item));
+      next.append(b);
+    }
+  }
+
+  const foot = el('div', 'card__foot');
+  if (it.link) {
+    const a = el('a', 'btn btn--go', 'Register');
+    a.href = it.link;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    foot.append(a);
+  }
+  body.append(title, cars, split, tags, desc, meta, next, foot);
+  card.append(head, body);
+  $('scrim').hidden = false;
+  close.focus();
+}
+function closeCard() {
+  $('scrim').hidden = true;
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+$('scrim').addEventListener('click', (e) => { if (e.target === $('scrim')) closeCard(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('scrim').hidden) closeCard(); });
+
+document.fonts && document.fonts.ready ? document.fonts.ready.then(() => build(true)) : build(true);
+</script>
