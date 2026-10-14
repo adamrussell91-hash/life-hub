@@ -356,6 +356,27 @@ export function createAnnotationEditorFields(
     }
   );
 
+  let inkStyle: 'fineliner' | 'highlighter' = block.content.settings.ink_style ?? 'fineliner';
+  const inkPills = makePills<'fineliner' | 'highlighter'>(
+    'How notes are drawn',
+    'block-editor__annotation-ink-style',
+    [
+      { value: 'fineliner', label: 'Fineliner + margin notes' },
+      { value: 'highlighter', label: 'Highlighter' }
+    ],
+    () => inkStyle,
+    (value) => {
+      if (value === inkStyle) return;
+      inkStyle = value;
+      emitChange();
+    }
+  );
+  const inkLabel = document.createElement('div');
+  inkLabel.className = 'block-editor__annotation-default-layer-label';
+  const inkLabelText = document.createElement('span');
+  inkLabelText.textContent = 'How notes are drawn';
+  inkLabel.append(inkLabelText, inkPills.el);
+
   const showMarkers = document.createElement('input');
   showMarkers.type = 'checkbox';
   showMarkers.className = 'block-editor__annotation-show-markers';
@@ -549,8 +570,10 @@ export function createAnnotationEditorFields(
         voice_tracks: voiceTracks.length > 0 ? voiceTracks : undefined,
         anthology,
         settings: {
+          ...latest.content.settings,
           show_markers: showMarkers.checked,
-          ...(defaultLayerId ? { default_layer_id: defaultLayerId } : {})
+          default_layer_id: defaultLayerId || undefined,
+          ink_style: inkStyle
         }
       }
     };
@@ -934,8 +957,10 @@ export function createAnnotationEditorFields(
         annotations,
         anthology: blockAnthologyPayload(),
         settings: {
+          ...latest.content.settings,
           show_markers: showMarkers.checked,
-          ...(defaultLayerId ? { default_layer_id: defaultLayerId } : {})
+          default_layer_id: defaultLayerId || undefined,
+          ink_style: inkStyle
         }
       }
     });
@@ -2297,6 +2322,7 @@ export function createAnnotationEditorFields(
   defaultLayerLabel.append(defaultLayer);
   settingsDetails.append(
     settingsSummary,
+    inkLabel,
     defaultLayerLabel,
     showMarkersLabel,
     blockAnthologyLabel,

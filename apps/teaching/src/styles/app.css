@@ -11226,3 +11226,150 @@ body.is-lesson-builder-full-page .hub-utilities {
   }
 }
 
+
+/* Annotation ink: ruled pen marks drawn over the poem (annotation-ink.ts). */
+.block-annotation--ink {
+  --ink-base: var(--ink, #1b1c22);
+  --font-hand: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
+}
+
+.block-annotation__poem {
+  position: relative;
+}
+
+.block-annotation__poem > .block-annotation__stanzas,
+.block-annotation__poem > .block-annotation__arcs-col {
+  position: relative;
+  z-index: 1;
+}
+
+.block-annotation__poem--margin {
+  padding-right: 15rem;
+}
+
+.block-annotation__ink {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.block-annotation__ink path {
+  fill: none;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+.block-annotation__ink-stroke {
+  stroke: var(--ink-c);
+  stroke-width: 1.5;
+}
+
+.block-annotation__ink-lead {
+  stroke: var(--ink-c);
+  stroke-width: 1.25;
+  opacity: 0.6;
+}
+
+.block-annotation__ink .block-annotation__ink-band {
+  fill: var(--ink-band);
+  stroke: none;
+}
+
+.block-annotation__ink--wave { --ink-c: color-mix(in srgb, var(--wave) 72%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--wave) 32%, transparent); }
+.block-annotation__ink--high-sea { --ink-c: color-mix(in srgb, var(--high-sea) 75%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--high-sea) 24%, transparent); }
+.block-annotation__ink--sand { --ink-c: color-mix(in srgb, var(--sand) 45%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--sand) 45%, transparent); }
+.block-annotation__ink--shore { --ink-c: color-mix(in srgb, var(--shore) 55%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--shore) 38%, transparent); }
+.block-annotation__ink--marine { --ink-c: color-mix(in srgb, var(--marine) 75%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--marine) 24%, transparent); }
+.block-annotation__ink--navy { --ink-c: color-mix(in srgb, var(--navy, #1b2a4a) 85%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--navy, #1b2a4a) 16%, transparent); }
+.block-annotation__ink--coral { --ink-c: color-mix(in srgb, var(--coral, #c96b4a) 80%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--coral, #c96b4a) 30%, transparent); }
+.block-annotation__ink--mist { --ink-c: color-mix(in srgb, var(--mist, #9aa4b2) 45%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--mist, #9aa4b2) 42%, transparent); }
+
+/* The ink replaces the old underline and coloured bars; anchors stay the click targets. */
+.block-annotation--ink .block-annotation__anchor--word,
+.block-annotation--ink .block-annotation__anchor--phrase {
+  text-decoration: none;
+}
+
+.block-annotation--ink .block-annotation__anchor--line,
+.block-annotation--ink .block-annotation__anchor--stanza {
+  width: 0.9rem;
+  background: transparent;
+}
+
+/* A whole-line bracket spans every row of a wrapped line. */
+.block-annotation--ink .block-annotation__anchor--line {
+  flex: 1 1 auto;
+}
+
+.block-annotation--ink .block-annotation__anchor.is-open {
+  background: color-mix(in srgb, var(--wave) 12%, transparent);
+}
+
+.block-annotation__margin-note {
+  position: absolute;
+  right: 0;
+  z-index: 2;
+  width: 13rem;
+  max-width: 13rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-c);
+  font-family: var(--font-hand);
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.block-annotation__margin-note:focus-visible {
+  outline: 2px solid var(--ink-c);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .block-annotation__ink-stroke.is-drawing {
+    stroke-dasharray: var(--ink-len);
+    stroke-dashoffset: var(--ink-len);
+    animation: annotation-ink-draw 480ms cubic-bezier(0.45, 0.05, 0.3, 1) var(--ink-delay, 0ms) forwards;
+  }
+
+  .block-annotation__ink-band.is-drawing {
+    clip-path: inset(0 100% 0 0);
+    animation: annotation-ink-band 420ms cubic-bezier(0.45, 0.05, 0.3, 1) var(--ink-delay, 0ms) forwards;
+  }
+
+  .block-annotation__margin-note.is-drawing {
+    animation: annotation-ink-fade 360ms ease-out both;
+  }
+}
+
+@keyframes annotation-ink-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes annotation-ink-band {
+  to { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes annotation-ink-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 720px) {
+  .block-annotation__poem--margin {
+    padding-right: 0;
+  }
+
+  .block-annotation__margin-note {
+    display: none;
+  }
+}
