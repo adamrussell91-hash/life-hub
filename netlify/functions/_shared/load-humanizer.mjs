@@ -2,12 +2,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findAgent } from './agent-directory.mjs';
+import { decodeBlob } from './decode-blob.mjs';
 
 const HUMANIZER_DIR = join(
   dirname(fileURLToPath(import.meta.url)),
   '../../../config/humanizer'
 );
-const VOICES_DIR = join(HUMANIZER_DIR, 'voices');
 
 export const HUMANIZER_UPSTREAM = {
   repository: 'https://github.com/blader/humanizer',
@@ -39,9 +39,23 @@ export function loadHumanizerIntegration({ readFileSyncImpl = readFileSync } = {
   return readOptional(join(HUMANIZER_DIR, 'integration.md'), readFileSyncImpl);
 }
 
-export function loadPersonalityWritingSample(slug, { readFileSyncImpl = readFileSync } = {}) {
-  if (!findAgent(slug)) return '';
-  return readOptional(join(VOICES_DIR, `${slug}.md`), readFileSyncImpl);
+// Synchronous prompt assembly must never read personal samples from public files.
+export function loadPersonalityWritingSample() {
+  return '';
+}
+
+// The caller supplies the authenticated private data client and its resolved tree.
+// Samples stay server side and are deliberately excluded from the browser manifest.
+export async function loadPrivatePersonalityWritingSample(slug, { client, tree = [] } = {}) {
+  if (!findAgent(slug) || !client) return '';
+  const path = `config/humanizer/voices/${slug}.md`;
+  const entry = tree.find(item => item.type === 'blob' && item.path === path);
+  if (!entry) return '';
+  try {
+    return (decodeBlob(await client.readBlob(entry.sha)) ?? '').trim();
+  } catch {
+    return '';
+  }
 }
 
 export function formatWritingSampleBlock(sample) {

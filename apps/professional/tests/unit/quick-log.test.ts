@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/api/people-directory', () => ({
   fetchPeopleDirectory: vi.fn(async () => ({
     people: [
-      { ref: 'shared:person:p_declan', display_name: 'Declan J.', initials: 'DJ', updated_at: '2026-10-14T01:00:00.000Z' },
-      { ref: 'shared:person:p_fletcher', display_name: 'Fletcher W.', initials: 'FW', updated_at: '2026-10-13T01:00:00.000Z' }
+      { ref: 'shared:person:p_alex', display_name: 'Alex J.', initials: 'DJ', updated_at: '2026-10-14T01:00:00.000Z' },
+      { ref: 'shared:person:p_taylor', display_name: 'Taylor W.', initials: 'FW', updated_at: '2026-10-13T01:00:00.000Z' }
     ],
     organisations: [],
     counts: { people: 2, organisations: 0 }
@@ -29,7 +29,7 @@ describe('quick log', () => {
     document.body.append(canvas);
     const navigate = vi.fn();
     await renderQuickLog(canvas, { now: () => new Date('2026-10-14T02:47:00.000Z'), navigate });
-    expect(canvas.querySelector('[data-person][aria-pressed="true"]')?.textContent).toContain('Declan J.');
+    expect(canvas.querySelector('[data-person][aria-pressed="true"]')?.textContent).toContain('Alex J.');
     expect(canvas.querySelector('[data-channel="in_person"]')?.getAttribute('aria-pressed')).toBe('true');
     const field = canvas.querySelector<HTMLTextAreaElement>('textarea')!;
     field.value = 'Essay plan fine. »me send quote bank by Thu';

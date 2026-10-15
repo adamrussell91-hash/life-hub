@@ -80,23 +80,17 @@ test('a genuine writing sample is placed after voice and outranks Humanizer styl
   assert.match(prompt, /use the em-dash as breathing room/);
 });
 
-test('checked-in writing samples enter after voice and stay distinct across Clare and Hammond', () => {
-  const clare = buildSystemPrompt({ slug: 'clare' });
-  const hammond = buildSystemPrompt({ slug: 'hammond' });
-  const clareSample = readFileSync(join(process.cwd(), 'config/humanizer/voices/clare.md'), 'utf8').trim();
-  const hammondSample = readFileSync(join(process.cwd(), 'config/humanizer/voices/hammond.md'), 'utf8').trim();
-  const clareVoiceAt = clare.indexOf('You ARE Clare DeMind');
-  const clareSampleAt = clare.indexOf(clareSample);
-  const hammondVoiceAt = hammond.indexOf('You ARE General Hammond');
-  const hammondSampleAt = hammond.indexOf(hammondSample);
-  assert.ok(clareSampleAt > clareVoiceAt);
-  assert.ok(hammondSampleAt > hammondVoiceAt);
-  assert.ok(clare.indexOf(HUMANIZER_LAYER_HEADING) > clareSampleAt);
-  assert.ok(hammond.indexOf(HUMANIZER_LAYER_HEADING) > hammondSampleAt);
+test('private samples are supplied explicitly and never loaded from public source', () => {
+  const clareSample = 'Synthetic task sample for testing.';
+  const hammondSample = 'Synthetic planning sample for testing.';
+  const clare = buildSystemPrompt({ slug: 'clare', writingSample: clareSample });
+  const hammond = buildSystemPrompt({ slug: 'hammond', writingSample: hammondSample });
+  assert.ok(clare.indexOf(clareSample) > clare.indexOf('You ARE Clare DeMind'));
+  assert.ok(hammond.indexOf(hammondSample) > hammond.indexOf('You ARE General Hammond'));
+  assert.ok(clare.indexOf(HUMANIZER_LAYER_HEADING) > clare.indexOf(clareSample));
   assert.ok(!clare.includes(hammondSample));
   assert.ok(!hammond.includes(clareSample));
-  assert.match(clare, /Approved writing sample/);
-  assert.match(hammond, /outranks Humanizer generic style defaults/);
+  assert.doesNotMatch(buildSystemPrompt({ slug: 'clare' }), /Approved writing sample/);
 });
 
 test('no writing-sample block is invented when the caller supplies an empty sample', () => {
@@ -144,7 +138,9 @@ test('chat runtime still streams in one model pass and does not import a Humaniz
   assert.match(capture, /streamWithAgentLogForce/);
   assert.doesNotMatch(capture, /humanize|loadHumanizerGuidance|second rewrite/i);
   assert.match(chat, /buildSystemPrompt/);
-  assert.doesNotMatch(chat, /humanize|loadHumanizerGuidance|second rewrite/i);
+  assert.match(chat, /writingSample = await loadPrivatePersonalityWritingSample/);
+  const withoutSampleReaderImport = chat.replace(/^import .*loadPrivatePersonalityWritingSample.*;$/m, '');
+  assert.doesNotMatch(withoutSampleReaderImport, /humanize|loadHumanizerGuidance|second rewrite/i);
   assert.match(persona, /loadHumanizerGuidance/);
   assert.doesNotMatch(persona, /fetch\(|streamMessage/);
 });

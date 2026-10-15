@@ -1,3 +1,5 @@
+> Storage rule, 15 October 2026: personal Central Node content belongs only in private `adamrussell91-hash/life-hub-data/central-node.md` on `main`. Personalised voice samples and SOURCES.md belong in that private repository under `config/humanizer/voices/`. References below to public personal seed copies or writing samples are superseded. The public Central Node is a structural template only. Use authenticated private reads and writes, never copy personal content into code, tests, docs, prompts, screenshots or public build assets.
+
 # Goals v2: finish it (build brief for Cursor)
 
 **Why this exists.** Goals redesign v1 shipped in #469 and #476, but it left out features, took out things Adam had before, and some parts only half worked. This brief builds **everything that is still missing, in one go**. It closes with a verified, deployed, screenshotted result and a progress ledger at 100%. Adam should never have to ask "what else was left out?"

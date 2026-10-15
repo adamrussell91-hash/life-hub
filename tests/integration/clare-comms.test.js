@@ -59,8 +59,8 @@ function send(handler, method, path, body) {
 }
 
 const context = {
-  title: 'Declan J. · essay feedback', kind: 'comm', when: 'Wed 14/10/26 11:50',
-  people: [{ ref: 'shared:person:p_declan', name: 'Declan J.', role: 'with' }], previous: [], open_promises: [], notes: 'x'
+  title: 'Alex J. · essay feedback', kind: 'comm', when: 'Wed 14/10/26 11:50',
+  people: [{ ref: 'shared:person:p_alex', name: 'Alex J.', role: 'with' }], previous: [], open_promises: [], notes: 'x'
 };
 
 function makeHandler(deps = {}) {
@@ -93,7 +93,7 @@ test('propose_next queues a book_comm ghost, never writes the comm', async () =>
   assert.equal(res.status, 200);
   assert.equal(queued[0].kind, 'book_comm');
   assert.equal(queued[0].agent, 'clare');
-  assert.deepEqual(queued[0].person_refs, ['shared:person:p_declan']);
+  assert.deepEqual(queued[0].person_refs, ['shared:person:p_alex']);
 });
 
 test('no API key is a clear 503', async () => {
