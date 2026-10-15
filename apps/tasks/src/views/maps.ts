@@ -38,6 +38,7 @@ import {
   type TermMarks
 } from '@/domain/maps-layout';
 import { layoutMap, renderTransitSvg, type TransitLayout } from '@/domain/maps-transit';
+import { swatch } from '@/domain/maps-colors';
 import { createHubField, createHubFilter } from '@/views/hub-kit';
 import { mapItemKindLabel } from '@/domain/maps-planning';
 import {
@@ -177,6 +178,49 @@ function readableZoom(svg: SVGSVGElement, layout: MapCanvasLayout): number {
   const fit = stageFit(svg, layout);
   if (!fit) return 1;
   return Math.min(MAP_MAX_ZOOM, Math.max(1, READABLE_SCALE / fit));
+}
+
+/**
+ * Map units actually on screen. The SVG slices (fills the stage and crops), so on a tall
+ * phone stage far less than the viewBox width shows; panning must clamp to this, not the viewBox.
+ */
+function visibleUnits(svg: SVGSVGElement, layout: MapCanvasLayout, zoom: number): { w: number; h: number } {
+  const rect = svg.getBoundingClientRect();
+  const fit = stageFit(svg, layout);
+  if (!fit) return { w: layout.width / zoom, h: layout.height / zoom };
+  const scale = fit * zoom;
+  return { w: rect.width / scale, h: rect.height / scale };
+}
+
+/** Stage at most this wide (px) opens on one whole strand instead of the left of the map. */
+const PHONE_STAGE_PX = 720;
+const STRAND_MARGIN = 20;
+/** On-screen px per map unit allowed when fitting a whole strand to a phone (labels ≥ ~10px). */
+const PHONE_MIN_SCALE = 0.58;
+const PHONE_MAX_SCALE = 1.1;
+
+type StrandExtent = { lineId: string; x0: number; x1: number };
+
+function isPhoneStage(svg: SVGSVGElement): boolean {
+  const width = svg.getBoundingClientRect().width;
+  return width > 0 && width <= PHONE_STAGE_PX;
+}
+
+/** Zoom that fits one whole strand across a narrow stage, kept within readable bounds. */
+function strandZoom(svg: SVGSVGElement, layout: MapCanvasLayout, strand: StrandExtent): number | null {
+  const rect = svg.getBoundingClientRect();
+  const fit = stageFit(svg, layout);
+  if (!fit || !rect.width) return null;
+  const scale = rect.width / (strand.x1 - strand.x0 + STRAND_MARGIN * 2);
+  const clamped = Math.min(PHONE_MAX_SCALE, Math.max(PHONE_MIN_SCALE, scale));
+  return Math.min(MAP_MAX_ZOOM, Math.max(0.5, clamped / fit));
+}
+
+/** Left edge of the camera that centres a strand, or starts at its left edge when it is wider than the view. */
+function strandCamX(svg: SVGSVGElement, layout: MapCanvasLayout, zoom: number, strand: StrandExtent): number {
+  const view = visibleUnits(svg, layout, zoom).w;
+  const width = strand.x1 - strand.x0;
+  return width + STRAND_MARGIN * 2 <= view ? (strand.x0 + strand.x1) / 2 - view / 2 : strand.x0 - STRAND_MARGIN;
 }
 
 function attachSelectValue(tick: MapTick): string {
@@ -613,8 +657,9 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
   const applyCamera = (svg: SVGSVGElement, layout: MapCanvasLayout) => {
     const vw = layout.width / zoom;
     const vh = layout.height / zoom;
-    camX = Math.min(Math.max(0, layout.width - vw), Math.max(0, camX));
-    camY = Math.min(Math.max(0, layout.height - vh), Math.max(0, camY));
+    const shown = visibleUnits(svg, layout, zoom);
+    camX = Math.min(Math.max(0, layout.width - shown.w), Math.max(0, camX));
+    camY = Math.min(Math.max(0, layout.height - shown.h), Math.max(0, camY));
     svg.setAttribute('viewBox', `${camX} ${camY} ${vw} ${vh}`);
   };
 
@@ -765,13 +810,49 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     inn.addEventListener('click', () => setZoomAt(zoom + 0.15));
     reset.title = 'Back to the readable starting view';
     reset.addEventListener('click', () => {
-      zoom = readableZoom(svg, layout);
-      camX = 0;
-      camY = 0;
+      startView();
       applyCamera(svg, layout);
     });
     zoomBar.append(out, reset, inn);
+
+    // Strand roundels: jump the view to a strand (on a phone only one strand fits at a time).
+    const strands = layout.draw.strands;
+    const strandBar = el('div', 'map-strands');
+    strandBar.setAttribute('role', 'group');
+    strandBar.setAttribute('aria-label', 'Go to strand');
+    for (const strand of strands) {
+      const line = findLine(current, strand.lineId);
+      if (!line) continue;
+      const tone = swatch(line.color);
+      const chip = el('button', 'map-strands__chip', line.letter);
+      chip.type = 'button';
+      chip.title = line.name;
+      chip.setAttribute('aria-label', `Go to ${line.name}`);
+      chip.style.setProperty('--strand-disc', tone.disc);
+      chip.style.setProperty('--strand-letter', tone.letter);
+      chip.addEventListener('click', () => {
+        camX = strandCamX(svg, layout, zoom, strand);
+        applyCamera(svg, layout);
+      });
+      strandBar.append(chip);
+    }
+    if (strands.length > 1) zoomBar.prepend(strandBar);
     toolbar.insertBefore(zoomBar, toolbar.querySelector('.map-editbar'));
+
+    /**
+     * Desktop opens readable from the left. A phone opens on the whole first strand, at one
+     * zoom that fits the widest strand, so text stays the same size as the chips move between them.
+     */
+    function startView(): void {
+      camX = 0;
+      camY = 0;
+      zoom = readableZoom(svg, layout);
+      const first = strands[0];
+      if (!first || !isPhoneStage(svg)) return;
+      const fits = strands.map((strand) => strandZoom(svg, layout, strand)).filter((value): value is number => value !== null);
+      if (fits.length) zoom = Math.min(...fits);
+      camX = strandCamX(svg, layout, zoom, first);
+    }
     stage.append(svg);
 
     const indexItems = buildMapIndexItems(current, layout);
@@ -1074,9 +1155,7 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     const fit = stageFit(svg, layout);
     if (zoomReadyFor !== current.id) {
       zoomReadyFor = current.id;
-      zoom = readableZoom(svg, layout);
-      camX = 0;
-      camY = 0;
+      startView();
     } else if (fit && lastFit && fit !== lastFit) {
       // The stage changed width (side panel opened or closed): keep text the same size on screen.
       zoom = Math.min(MAP_MAX_ZOOM, Math.max(0.5, (zoom * lastFit) / fit));
@@ -1238,23 +1317,29 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     });
   }
 
-  /** Per-map term dates: the grey term rules follow these, not the Settings defaults. */
+  /** Per-map term dates: the shaded term bands follow these, not the Settings defaults. */
   function buildTermsInspector(year: number, terms: TermMarks): HTMLElement {
-    const fields: Array<{ key: keyof TermMarks; label: string }> = [
+    const fields: Array<{ key: keyof TermMarks; label: string; optional?: boolean }> = [
       { key: 't1', label: 'Term 1 starts' },
+      { key: 't1_end', label: 'Term 1 ends', optional: true },
       { key: 't2', label: 'Term 2 starts' },
+      { key: 't2_end', label: 'Term 2 ends', optional: true },
       { key: 't3', label: 'Term 3 starts' },
+      { key: 't3_end', label: 'Term 3 ends', optional: true },
       { key: 't4', label: 'Term 4 starts' },
+      { key: 't4_end', label: 'Term 4 ends', optional: true },
       { key: 'e', label: 'Year ends' }
     ];
     const error = el('p', 'map-inspector__hint map-inspector__error');
     error.hidden = true;
     error.setAttribute('role', 'alert');
-    const inputs = fields.map((field) => ({ ...field, control: dateInput(terms[field.key], field.label) }));
+    const inputs = fields.map((field) => ({ ...field, control: dateInput(terms[field.key] ?? '', field.label) }));
     const apply = () => {
-      const next = Object.fromEntries(inputs.map((item) => [item.key, item.control.input.value])) as TermMarks;
-      if (inputs.some((item) => !item.control.input.value) || !termMarksInOrder(next)) {
-        error.textContent = 'Each date must be after the one above it.';
+      const next = Object.fromEntries(
+        inputs.filter((item) => item.control.input.value).map((item) => [item.key, item.control.input.value])
+      ) as TermMarks;
+      if (inputs.some((item) => !item.optional && !item.control.input.value) || !termMarksInOrder(next)) {
+        error.textContent = 'Each date must be after the one above it. Term ends can be left blank.';
         error.hidden = false;
         return;
       }
@@ -1264,14 +1349,25 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
       void persist();
     };
     const body: HTMLElement[] = [];
-    for (const item of inputs) {
-      item.control.input.addEventListener('change', apply);
-      body.push(inspectorField(item.label, item.control.el));
+    for (const item of inputs) item.control.input.addEventListener('change', apply);
+    // Each term's start and end share a row; the year end sits on its own.
+    for (let i = 0; i < inputs.length; i += 1) {
+      const item = inputs[i]!;
+      const pair = inputs[i + 1];
+      if (pair?.optional) {
+        const row = el('div', 'map-inspector__row');
+        row.append(inspectorField(item.label, item.control.el), inspectorField(pair.label, pair.control.el));
+        body.push(row);
+        i += 1;
+      } else {
+        body.push(inspectorField(item.label, item.control.el));
+      }
     }
     body.push(error);
     const note = current.terms
       ? `These dates are saved on this map only.`
       : `Showing the ${year} dates from Settings. Change any date to save them on this map.`;
+    body.push(el('p', 'map-inspector__hint', 'With term ends filled in, the holidays show as gaps between the bands.'));
     body.push(el('p', 'map-inspector__hint', note));
     if (current.terms) {
       const actions = el('div', 'map-inspector__actions');
@@ -1479,6 +1575,27 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
       }
 
       body.push(inspectorField('Also connect to', alsoPicker.root));
+
+      // Open all year only applies to a competition on a year line (rounds chained to it follow).
+      if (attach.kind === 'line') {
+        const allYear = el('label', 'map-tracks__item');
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = initial.tick.all_year;
+        allYear.append(box, document.createTextNode('Open all year'));
+        box.addEventListener('change', () => {
+          const tick = liveItem(id).tick;
+          if (!tick) return;
+          tick.all_year = box.checked;
+          paint();
+          void persist();
+        });
+        const row = el('div', 'map-tracks');
+        row.append(allYear);
+        body.push(
+          inspectorField('Runs', row, 'Draws this competition and the rounds chained to it on a dotted line beside the year line.')
+        );
+      }
     }
 
     const actions = el('div', 'map-inspector__actions');
@@ -1595,7 +1712,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
       starts_on: terms.t1,
       ends_on: null,
       link: null,
-      planning: 'planned'
+      planning: 'planned',
+      all_year: false
     };
     current.ticks.push(applyDateToTickAttach(draft, year));
     selectedId = draft.id;

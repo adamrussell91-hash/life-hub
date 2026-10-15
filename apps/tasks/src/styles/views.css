@@ -4947,6 +4947,41 @@ html.is-map-fullscreen .map-page .map-preview {
   margin-left: auto;
 }
 
+.map-strands {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-right: var(--space-2);
+}
+
+.map-strands__chip {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--strand-disc, var(--wave));
+  color: var(--strand-letter, var(--paper));
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.map-strands__chip:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .map-strands__chip {
+    width: 40px;
+    height: 40px;
+  }
+}
+
 .map-editbar {
   display: flex;
   flex-wrap: wrap;

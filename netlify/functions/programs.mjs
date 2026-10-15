@@ -1,13 +1,10 @@
 import { createTasksCollectionHandler } from './_shared/tasks-collection.mjs';
+import { pickProgramDates, withCatalogueDates } from './_shared/catalogue-dates.mjs';
 
 export const config = { path: '/api/programs' };
 
 function asStringArray(value) {
   return Array.isArray(value) ? value.filter(item => typeof item === 'string') : [];
-}
-
-function isoDate(value) {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 
 export function createProgramsHandler(deps = {}) {
@@ -17,14 +14,14 @@ export function createProgramsHandler(deps = {}) {
     listKey: 'programs',
     idPrefix: 'prog',
     notFound: 'Program not found',
+    onRead: record => withCatalogueDates(record),
     create(body, id, timestamp) {
       const name = typeof body.name === 'string' ? body.name.trim() : '';
       if (!name) {
         return { error: { code: 'validation_error', message: 'name is required' } };
       }
-      const startsOn = isoDate(body.starts_on);
-      const endsOn = isoDate(body.ends_on);
-      const dated = startsOn && endsOn && endsOn >= startsOn;
+      const picked = pickProgramDates(body);
+      const dated = picked.starts_on && picked.ends_on && picked.ends_on >= picked.starts_on;
       return {
         record: {
           schema_version: 1,
@@ -43,8 +40,10 @@ export function createProgramsHandler(deps = {}) {
           description: typeof body.description === 'string' ? body.description : '',
           registration_link: typeof body.registration_link === 'string' ? body.registration_link : null,
           registration_window: typeof body.registration_window === 'string' ? body.registration_window : '',
-          starts_on: dated ? startsOn : null,
-          ends_on: dated ? endsOn : null,
+          starts_on: dated ? picked.starts_on : null,
+          ends_on: dated ? picked.ends_on : null,
+          dates_source_url: picked.dates_source_url,
+          dates_checked_on: picked.dates_checked_on,
           not_available_nsw: body.not_available_nsw === true,
           not_available_reason: typeof body.not_available_reason === 'string' ? body.not_available_reason : '',
           created_at: timestamp,

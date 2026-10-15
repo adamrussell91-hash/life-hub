@@ -113,3 +113,18 @@ export function uniqueSorted(values: Iterable<string>): string[] {
 export function searchPrograms(programs: Program[], query: string): Program[] {
   return queryPrograms(programs, { query }, 'name');
 }
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function dayLabel(iso: string): string {
+  return `${Number(iso.slice(8, 10))} ${SHORT_MONTHS[Number(iso.slice(5, 7)) - 1] ?? ''} ${iso.slice(0, 4)}`;
+}
+
+/** "25 Jul 2026 – 14 Aug 2026", "4 Apr 2026", or "Due 10 May 2026"; null when no dates are set. */
+export function programDatesLabel(program: Pick<Program, 'starts_on' | 'ends_on'>): string | null {
+  const { starts_on: start, ends_on: end } = program;
+  if (start && end) return start === end ? dayLabel(start) : `${dayLabel(start)} – ${dayLabel(end)}`;
+  if (start) return dayLabel(start);
+  if (end) return `Due ${dayLabel(end)}`;
+  return null;
+}

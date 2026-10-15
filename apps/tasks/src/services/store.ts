@@ -44,7 +44,7 @@ import {
 } from '@/domain/recurrence';
 import { carryReminderForward } from '@/domain/reminders';
 import { mindWorks2026Map } from '@/domain/maps-seed';
-import { catalogPrograms } from '@/domain/programs-seed';
+import { catalogPrograms, withCatalogueDates } from '@/domain/programs-seed';
 import { buildExcursionPlan, excursionDatesFromAdminTask } from '@/domain/excursion';
 import { cloneDefaultComplianceModules } from '@/domain/excursion-modules';
 import { cloneDefaultFolderItems } from '@/domain/excursion-folder';
@@ -1575,7 +1575,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
 
     async listPrograms() {
       let programs = await listByIndex(kv, keys.programsIndexKey(), keys.programKey, (raw) =>
-        ProgramSchema.parse(raw)
+        ProgramSchema.parse(withCatalogueDates(raw))
       );
       if (programs.length === 0) {
         const seeded = catalogPrograms();
@@ -1593,7 +1593,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
     },
     async getProgram(id) {
       const raw = await kv.getJSON(keys.programKey(id));
-      return raw ? ProgramSchema.parse(raw) : null;
+      return raw ? ProgramSchema.parse(withCatalogueDates(raw)) : null;
     },
     async createProgram(input) {
       const stamp = nowIso();
@@ -1616,6 +1616,8 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         registration_window: input.registration_window ?? '',
         starts_on: input.starts_on ?? null,
         ends_on: input.ends_on ?? null,
+        dates_source_url: input.dates_source_url ?? null,
+        dates_checked_on: input.dates_checked_on ?? null,
         not_available_nsw: input.not_available_nsw ?? false,
         not_available_reason: input.not_available_reason ?? '',
         created_at: stamp,

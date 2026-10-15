@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import * as keys from '@/storage/keys';
 import { createTasksStore, seedIfEmpty, type KvAdapter } from '@/services/store';
 import type { SeedData } from '@/services/types';
-import { TransitMapSchema, type MapStation } from '@/schemas/map';
+import { TransitMapSchema, type MapStation, type MapTick } from '@/schemas/map';
 import {
   attachTick,
   capsuleOccupies,
@@ -34,6 +34,7 @@ import {
   MAP_TRACK_GAP,
   mapTerms,
   termMarksInOrder,
+  termSpans,
   matchConnectTarget,
   moveLine,
   nearestLaidTrack,
@@ -533,5 +534,208 @@ describe('export', () => {
     expect(html).toContain('class="tm-stop');
     expect(html).not.toContain('map-port');
     expect(html).not.toContain('NaN');
+  });
+});
+
+describe('term holidays', () => {
+  const starts = { t1: '2026-01-27', t2: '2026-04-27', t3: '2026-07-20', t4: '2026-10-12', e: '2026-12-31' };
+  const ends = { t1_end: '2026-04-10', t2_end: '2026-07-03', t3_end: '2026-09-25', t4_end: '2026-12-17' };
+
+  it('runs each band to its saved end, so holidays are gaps', () => {
+    const base = mindWorks2026Map();
+    const layout = layoutMap({ ...base, terms: { ...starts, ...ends } });
+    const t1 = layout.terms[0]!;
+    expect(t1.hasEnd).toBe(true);
+    expect(t1.endY).toBeCloseTo(dateToY(ends.t1_end, 2026), 5);
+    expect(t1.endY!).toBeLessThan(layout.terms[1]!.y);
+    const svg = renderTransitSvg(layout);
+    expect(svg).toContain('27 Jan – 10 Apr');
+    expect(svg).not.toContain('tm-term-band--alt');
+    expect(TransitMapSchema.parse({ ...base, terms: { ...starts, ...ends } }).terms).toEqual({ ...starts, ...ends });
+  });
+
+  it('falls back to the next term start when no end is saved', () => {
+    const spans = termSpans({ ...starts, t2_end: '2026-07-03' });
+    expect(spans[0]).toMatchObject({ end: starts.t2, hasEnd: false });
+    expect(spans[1]).toMatchObject({ end: '2026-07-03', hasEnd: true });
+    expect(spans[3]).toMatchObject({ end: starts.e, hasEnd: false });
+    // An end after the next start is ignored rather than overlapping bands.
+    expect(termSpans({ ...starts, t1_end: '2026-05-01' })[0]).toMatchObject({ end: starts.t2, hasEnd: false });
+  });
+
+  it('checks term ends sit inside their term', () => {
+    expect(termMarksInOrder({ ...starts, ...ends })).toBe(true);
+    expect(termMarksInOrder({ ...starts, t1_end: '2026-01-20' })).toBe(false);
+    expect(termMarksInOrder({ ...starts, t2_end: '2026-07-25' })).toBe(false);
+    expect(termMarksInOrder({ ...starts, t4_end: '2027-01-02' })).toBe(false);
+  });
+
+  it('takes term ends from Settings dates', () => {
+    const years = [
+      {
+        year: 2026,
+        terms: [
+          { term: 1 as const, starts_on: '2026-02-02', ends_on: '2026-04-02' },
+          { term: 2 as const, starts_on: '2026-04-22', ends_on: '2026-07-03' },
+          { term: 3 as const, starts_on: '2026-07-21', ends_on: '2026-09-25' },
+          { term: 4 as const, starts_on: '2026-10-13', ends_on: '2026-12-17' }
+        ]
+      }
+    ];
+    const marks = schoolTerms(2026, years);
+    expect(marks.t1_end).toBe('2026-04-02');
+    expect(marks.t4_end).toBe('2026-12-17');
+  });
+});
+
+describe('open all year', () => {
+  function chainTick(id: string, label: string, attach: MapTick['attach'], startsOn: string, extras: Partial<MapTick> = {}): MapTick {
+    return {
+      id,
+      label,
+      attach,
+      stroke: 'solid',
+      connects_to: null,
+      starts_on: startsOn,
+      ends_on: null,
+      link: null,
+      planning: 'planned',
+      all_year: false,
+      ...extras
+    };
+  }
+
+  function essayMap(allYear: boolean) {
+    const base = mindWorks2026Map();
+    return {
+      ...base,
+      stations: [],
+      ticks: [
+        chainTick('tk_open', 'Essay Prize opens', { kind: 'line', line_id: 'line_expression', y: 200, tracks: ['senior'] }, '2026-02-02', {
+          all_year: allYear
+        }),
+        chainTick('tk_due', 'Essay Prize due', { kind: 'event', event_id: 'tk_open', side: 'bottom' }, '2026-06-30'),
+        chainTick('tk_results', 'Results', { kind: 'event', event_id: 'tk_due', side: 'bottom' }, '2026-10-01'),
+        chainTick('tk_gallery', 'Gallery entry 1', { kind: 'line', line_id: 'line_expression', y: 200, tracks: ['senior'] }, '2026-04-03')
+      ]
+    };
+  }
+
+  it('defaults to off for older maps', () => {
+    const map = mindWorks2026Map();
+    expect(map.ticks.every((tick) => tick.all_year === false)).toBe(true);
+  });
+
+  it('draws the chain on a dotted spur outside the other names on that year line', () => {
+    const layout = layoutMap(essayMap(true));
+    const spur = layout.draw.branches.find((branch) => branch.dotted);
+    expect(spur).toBeTruthy();
+    expect(spur!.caption?.text).toBe('Senior · open all year');
+    const chain = layout.draw.stops.filter((stop) => stop.tickId !== 'tk_gallery');
+    const xs = chain.map((stop) => stop.dots[0]!.x);
+    expect(new Set(xs).size).toBe(1);
+    const gallery = layout.draw.stops.find((stop) => stop.tickId === 'tk_gallery')!;
+    expect(xs[0]!).toBeGreaterThan(gallery.labelX + gallery.w);
+    // Leaves the year line before the first stop and rejoins after the last.
+    const ys = spur!.points.map((point) => point.y);
+    expect(Math.min(...ys)).toBeLessThan(chain[0]!.y);
+    expect(Math.max(...ys)).toBeGreaterThan(Math.max(...chain.map((stop) => stop.y)));
+    const senior = layout.lines.find((line) => line.id === 'line_expression')!.tracks.at(-1)!;
+    expect(spur!.points[0]!.x).toBeCloseTo(senior.x, 5);
+    const svg = renderTransitSvg(layout);
+    expect(svg).toContain('tm-branch--all-year');
+    expect(svg).toContain('stroke-dasharray');
+    expect(svg).not.toContain('NaN');
+  });
+
+  it('keeps the chain on the year line when it is not open all year', () => {
+    const layout = layoutMap(essayMap(false));
+    expect(layout.draw.branches.some((branch) => branch.dotted)).toBe(false);
+  });
+});
+
+describe('strand extents', () => {
+  it('gives each strand its own left-to-right span for framing on a phone', () => {
+    const layout = layoutMap(mindWorks2026Map());
+    const strands = layout.draw.strands;
+    expect(strands.map((strand) => strand.lineId)).toEqual(layout.lines.map((line) => line.id));
+    for (const [i, strand] of strands.entries()) {
+      const line = layout.lines[i]!;
+      expect(strand.x0).toBeLessThan(Math.min(...line.tracks.map((track) => track.x)));
+      expect(strand.x1).toBeGreaterThan(Math.max(...line.tracks.map((track) => track.x)));
+      if (i > 0) expect(strand.x0).toBeGreaterThan(strands[i - 1]!.x0);
+    }
+  });
+});
+
+describe('screenshot regressions (Expression gallery, Reasoning olympiad)', () => {
+  function comp(id: string, label: string, attach: MapTick['attach'], startsOn: string): MapTick {
+    return {
+      id,
+      label,
+      attach,
+      stroke: 'solid',
+      connects_to: null,
+      starts_on: startsOn,
+      ends_on: null,
+      link: null,
+      planning: 'planned',
+      all_year: false
+    };
+  }
+
+  function program(id: string, lineId: string, label: string, startsOn: string, endsOn: string, track: string): MapStation {
+    return { ...datedProgram(id, label, startsOn, endsOn, { tracks: [track] }), line_id: lineId };
+  }
+
+  it('puts a first-year-line program competition on the outside, joined to its program, without bending neighbours', () => {
+    const base = mindWorks2026Map();
+    const map = {
+      ...base,
+      stations: [
+        program('st_y8', 'line_expression', 'StudioGAT Year 8', '2026-01-27', '2026-07-10', 'junior'),
+        program('st_y7', 'line_expression', 'StudioGAT Year 7', '2026-07-27', '2026-12-10', 'junior')
+      ],
+      ticks: [
+        comp('tk_gallery', 'StudioGAT Gallery (Year 8)', { kind: 'station', station_id: 'st_y8', side: 'right', offset: 0.5 }, '2026-07-23')
+      ]
+    };
+    const layout = layoutMap(map);
+    const tracks = layout.draw.tracks.filter((track) => track.lineId === 'line_expression');
+    for (const track of tracks.slice(1)) {
+      const xs = track.pieces.flat().map((point) => point.x);
+      expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(0.5);
+    }
+    const stop = layout.draw.stops.find((item) => item.tickId === 'tk_gallery')!;
+    expect(stop.anchor).toBe('end');
+    expect(stop.dots[0]!.x).toBeLessThan(tracks[0]!.top.x);
+    // A short branch runs from the Year 8 pill to the stop.
+    const y8 = layout.stations.find((station) => station.id === 'st_y8')!;
+    const branch = layout.draw.branches.find((item) => item.lineId === 'line_expression' && !item.dotted)!;
+    expect(branch).toBeTruthy();
+    expect(branch.points[0]!.y).toBeGreaterThanOrEqual(y8.y);
+    expect(branch.points[0]!.y).toBeLessThanOrEqual(y8.y + y8.h);
+    expect(Math.max(...branch.points.map((point) => point.y))).toBeGreaterThanOrEqual(stop.y);
+  });
+
+  it('keeps a tall name clear of a program pill that starts just below its stop', () => {
+    const base = mindWorks2026Map();
+    const map = {
+      ...base,
+      stations: [program('st_tft', 'line_reasoning', 'Teachers for Tomorrow', '2026-07-20', '2026-12-10', 'senior')],
+      ticks: [
+        comp(
+          'tk_ipo',
+          'International Psychology Olympiad Global',
+          { kind: 'line', line_id: 'line_reasoning', y: 200, tracks: ['senior'] },
+          '2026-07-11'
+        )
+      ]
+    };
+    const layout = layoutMap(map);
+    const stop = layout.draw.stops.find((item) => item.tickId === 'tk_ipo')!;
+    const pill = layout.stations.find((station) => station.id === 'st_tft')!.bodies[0]!;
+    expect(stop.labelY - 12 + stop.h).toBeGreaterThan(pill.y);
+    expect(stop.labelX).toBeGreaterThanOrEqual(pill.x + pill.w / 2 + 8);
   });
 });

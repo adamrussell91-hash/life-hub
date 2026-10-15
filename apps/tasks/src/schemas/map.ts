@@ -112,18 +112,27 @@ export const TickSchema = z.object({
   starts_on: z.string().nullable().default(null),
   ends_on: z.string().nullable().default(null),
   link: MapLinkSchema,
-  planning: MapPlanningSchema.default('planned')
+  planning: MapPlanningSchema.default('planned'),
+  /** Open all year: this competition and its rounds run on a dotted spur beside the year line. */
+  all_year: z.boolean().default(false)
 });
 
 const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-/** Per-map term starts (T1–T4) and year end; overrides Settings term dates for this map. */
+/**
+ * Per-map term starts (T1–T4) and year end; overrides Settings term dates for this map.
+ * Term ends are optional (older maps only saved starts); with them the holidays show as gaps.
+ */
 export const MapTermsSchema = z.object({
   t1: IsoDateSchema,
   t2: IsoDateSchema,
   t3: IsoDateSchema,
   t4: IsoDateSchema,
-  e: IsoDateSchema
+  e: IsoDateSchema,
+  t1_end: IsoDateSchema.optional(),
+  t2_end: IsoDateSchema.optional(),
+  t3_end: IsoDateSchema.optional(),
+  t4_end: IsoDateSchema.optional()
 });
 
 export const TransitMapSchema = z.object({
