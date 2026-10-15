@@ -25,17 +25,11 @@ test('seed central node contains no Notion references or Notion URLs', () => {
   assert.doesNotMatch(text, /app\.notion\.com/i);
 });
 
-test('seed About Me states the standing rules and does not name the invisible birth family', () => {
+test('public seed is a structural template without personal records', () => {
   const text = loadCentralNodeSeed();
-  const about = text.slice(text.indexOf('## 👤 About Me'), text.indexOf('## 🔴 Current Constraints'));
-  assert.match(about, /Redacted comes first every time/);
-  assert.match(about, /Gifted Education Teacher at Redacted' College/);
-  assert.match(about, /St Pius X High School/);
-  assert.match(about, /Do not recommend leaving or quitting a job unless he is explicitly talking about that/);
-  assert.match(about, /Korea honeymoon: 23 December 2026 to 10 January 2027/);
-  assert.match(about, /1 December 2026/);
-  assert.match(about, /background hum/);
-  assert.doesNotMatch(about, /\bShane\b|\bMichelle\b|\bKimberly\b/);
+  assert.match(text, /Public structural template only/);
+  assert.match(text, /adamrussell91-hash\/life-hub-data/);
+  assert.doesNotMatch(text, /Redacted|Redacted|Redacted|calprotectin|honeymoon|Redacted|Redacted/);
 });
 
 test('returns an empty string when the seed file cannot be read', () => {

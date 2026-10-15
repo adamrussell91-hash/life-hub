@@ -1,3 +1,5 @@
+> Public structural template only. Live personal context is exclusively in `adamrussell91-hash/life-hub-data`, path `central-node.md`, branch `main`. Read and update that private file through authenticated GitHub access. Never copy personal context into this repository. Missing private context means unavailable, not permission to reconstruct personal facts.
+
 # Purpose
 This page serves as the central coordination hub for all AI agents. Each agent should read this page before making decisions and update it with relevant information that other agents need to know.
 ---
@@ -29,154 +31,32 @@ This page serves as the central coordination hub for all AI agents. Each agent s
 - **Ann O'Tation (Teaching Agent):** Lesson diagnosis and classroom-ready repair. Reads Hammond→Ann before responding; writes Ann→Hammond (or Ann→[Agent]) when a lesson/load collision or teaching deadline hits a Life constraint.
 ---
 ## 👤 About Me
-*Standing personal context. Obey it. Redacted outranks every other tie-break, including health. Health outranks the degree and the HPGE review.*
-### Who this is for
-- East Ryde, Sydney: two years in, settled for now, no plans to leave.
-- Identities, in order: teacher, partner, scholar, friend. Grandson also matters. Do not treat him first as a patient.
-### Work
-- Current role: Gifted Education Teacher at Redacted' College, Milsons Point, from January 2025. Coordinates gifted education and teaches English. Highly Accomplished (HALT) accredited.
-- Accreditation mentor until the end of 2026 (temporary). NESA accreditation assessor on a casual contract, just renewed for two years.
-- 2026 load: Year 11 and Year 12 English Advanced. Year 12 graduates late September. The Year 11 class becomes Year 12 in Term 4. No extra class given, so one class from then.
-- MindWorks is his program: interest-based extracurriculars that train students for competitions. He designed it and runs it. Continuation is not approved.
-- Path: English teaching from 2012, including Kooringal High School in 2014; English/HSIE at Xavier High School, Albury (2015–2018); Senior Education Project Officer at All Areas Education, Newcastle (2018–2019); HSIE and Business Studies at St Joseph's High School, Aberdeen (2019); English, HSIE and Psychology at St Pius X High School, Adamstown (2020–2024), including Gifted Education Mentor, wellbeing leadership, acting Leader of Learning English, and curriculum/transition coordination; English at Catherine McAuley Catholic College, Medowie (August–December 2024).
-- Ongoing service: NESA HALT Assessor; AERO Panel of Educators, Teachers and Leaders; AITSL HALT Advisory Group; HALT Association NSW Professional Development Committee.
-- The HPGE career direction review is not a remembered stay/leave/expand/drop/apply decision. It is about where he wants to go next in high-potential gifted education. A good outcome is a clear, concrete direction. A bad outcome is more confusion and anxiety.
-- No job or sector is closed. He would seriously consider one if it came up. University lecturing is the least appealing: the pay is poor, and he does not want to teach a class on a screen.
-- Do not recommend leaving or quitting a job unless he is explicitly talking about that.
-- No realistic income, savings, or buffer number would change the current job. Only a lottery win would, and he treats that as very unlikely.
-- A 12-month win that counts is a promotion. Body-fat percentage is a biomarker, not this win.
-### Study
-- UNSW Master of Gifted Education is finished. Conferral 30 Sep 2026.
-- University of Wollongong Master of Leadership is still open: one literacy-elective assessment left in 2026, then the major research project in Semester 1 2027. Finish at the end of Semester 1 2027.
-- Clare and Hammond treat study as a background hum, never as a live deadline. He does not care about the remaining work.
-### Money
-- Only debt is the home loan with Redacted. No dependants. No support obligations.
-### Time
-- Real weekday, not the ideal: up 6:15, exhausted. At work by 8:15, about twenty minutes late. No lunch. Bell 3:10, leaves around 4:30, home 5:00–5:30, and feels guilty about that. A workout if he can. Usually does not walk the dog. Cooks if he can. Two episodes of reality TV. Aims to sleep at 10:30; actually around 11:30.
-- Time that is his: maybe one or two hours at night, and only if there is no marking or university work. Usually one weekend day.
-- Do not schedule over a class. 22:00–06:00 is sleep. Do not schedule into it.
-### People
-- Married Redacted Bubb 13 July 2026. Together about 14 years.
-- Household: dogs Leo and Maxxie; cats SJ and Hunter.
-- Redacted comes first every time. He is the only person whose time Adam is trying not to lose.
-- Do not coach him to leave the marriage.
-- Family who matter: Bob (paternal grandfather); Donna and Joe (maternal aunts); Joe's children Ruby and Fletcher; Fletcher's wife Taylor.
-- His birth father, that person's wife, and his half-sister are invisible. Do not name them. Do not mention them. Do not involve them. Do not suggest contact.
-- Friends are mostly in Newcastle. He texts, and he is bad at giving them time. They are busy too. The hole is time, not the absence of friends. What he needs and does not ask for: support, and someone to listen occasionally. Not judgment. Not instructions about his life.
-### Season
-- Life Hub succeeds if it cohesively builds the happiest, healthiest life possible, helps him hit his dreams, and helps him teach. It fails if the money and hours spent on it make him give up because it is too hard.
-- This season is comfortable, slow growth.
-- Protect capacity means stopping before he is so sick of work that he hates it.
-- A good night, the one that counts: dinner out, plus a show or a talk, and actually enjoying the dinner. At home: tea, television, books, and foot rubs from Redacted.
-- A good holiday is comforting adventure: see the world without feeling scared or in danger.
-- He travels on his own from 1 December 2026. Korea honeymoon: 23 December 2026 to 10 January 2027.
-- Dreams he already says out loud: write a book; study at Harvard, Cambridge, Oxford, or Yale.
+**About Me** is standing context. Read the private Central Node.
+
 ---
 ## 🔴 Current Constraints & Priorities
-*Active protocols and rules all agents must respect. Full medical history lives in Life Hub Medical Overview.*
-### Medical Status
-- **Redacted's Disease** (confirmed 20 Feb 2026): Mild ileal, inflammatory type. **Entocort 8-week course completed \~17 April 2026. Now ceased.** **Calprotectin 144–244 µg/g (HIGH, ref \<50)** — mucosal inflammation persists. **ACTIVE FLARE-UP CONFIRMED 19 June 2026 by dietician Mary-anne Chamoun.** Systemic inflammation controlled (CRP 2.4, ESR normal) but mucosal healing not achieved. Entocort suppressed symptoms without resolving underlying inflammation. **TPMT *1/*3A (intermediate metaboliser)** — if azathioprine or mercaptopurine is the next step, Adam will need a reduced starting dose (30 to 80 percent of standard) with close haematological monitoring. NUDT15 normal. Pre-immunosuppression screen (TB, VZV, ANCA, B12/folate) all clear. **Biologics commenced: Redacted (Redacted) IV induction infusion administered 2 July 2026 (prescribed by Dr Redacted), stepping up from Entocort after calprotectin showed persistent mucosal inflammation. Post infusion flu like symptoms (body aches, fatigue) largely settled by around day 5. Subcutaneous maintenance (90mg) dispensed, typically 8 weekly after induction.**
-- **Iron deficiency**: Functional iron deficiency **RESOLVED** and still consolidating. Iron infusion 6 Mar confirmed successful. Transferrin saturation 25% (19 May) then 29% (22 May), up from 15% Feb. Serum iron 17 (was 10 Feb). Ferritin 159 then 204 (was 43 Feb). Haemoglobin 151 then 149. All normal. **Maltofer remains not required.** No further iron supplementation indicated.
-- **Vitamin D**: 48 nmol/L (22 May 2026), mild deficiency. Slightly down from 58 nmol/L (Feb) despite 3000 IU daily since 6 Mar. Target 100 nmol/L. Redacted's malabsorption likely. **Dietitian directive (19 June): switch to 7,000 IU alternate-day dosing — no prescription required.** Also consult gastroenterologist for highest safe dose given IBD. Recheck after 3 to 4 months.
-- **Testosterone**: First baseline 23.7 nmol/L (22 May, ref 11.5 to 32.0). Mid-range. Full male hormone panel (free T, LH, FSH, SHBG, oestradiol, prolactin, DHEA-S) still pending if symptoms persist.
-- **Redacted**: L1 Z-score -1.9. Calcium 1000mg/day non-dairy. Weight-bearing/spine-loading exercise priority. Repeat DEXA in \~2 years.
-- **Liver (MAFLD)**: Gamma GT 131 (↓ from 162), ALT 42 (↓ from 50, borderline), AST 31 (normalised). Mediterranean diet + weight loss + Entocort effect. Continue current approach.
-- **Entocort treatment response**: CRP normal on both May draws (2.2 then 2.4, was 5.9 Dec 2025). ESR 15 then 10 (both normal). FBC normal twice. Albumin 45 to 48. Systemic inflammation resolved. **Calprotectin 144–244 — mucosal inflammation persists.** Clinical remission at the systemic level but NOT at the mucosal level.
-- **Mental health**: MHCP active (GAD, depression, suspected ADHD-related). Redacted (psychologist) + EP referrals confirmed. **18 May:** 4 additional psychology sessions with Redacted authorised by Dr McDonald (MHCP extension).
-- **RMR**: 1946 kcal/day (lower end of normal). Thyroid panel recommended.
-- **GI symptoms**: Significant abdominal bloating and gas over 6 weeks (reported 18 May to Dr McDonald). **Bioceuticals Multigest enzymes** trial commenced — take with food to aid digestion and reduce gut fermentation. **Nerva app** recommended for sympathetic nervous system regulation, may improve digestion.
-- **Post-budesonide eczema**: Eczema flare on eyes during taper. If recurs, use steroid cream to manage symptoms.
-- **Weight**: 88kg (weighed by Mary-anne Chamoun, dietician, 24 Mar 2026; confirmed 88kg 19 May 2026). **Body composition goal: 78–82kg at 8–10% body fat** (confirmed 11 Aug 2026). This is an active recomposition, not a maintenance hold — the earlier "~87-88kg, at range" framing is superseded. Brisket owns the nutrition lever, Chadwick the training stimulus.
-- **Dietician**: Mary-anne Chamoun (Prosper Nutrition, [maryanne@prospernutrition.com.au](mailto:maryanne@prospernutrition.com.au)). Replaces Caley Schneid as of 24 Mar 2026.
-### Iron Absorption Rules
-- No more Maltofer while iron infusion is in play until May blood test
-- Vitamin C at night
-- Iron-rich foods: red meat, chicken, leafy greens
-- Separate iron from calcium (do not take at same time)
-- No tea/coffee within 1 hour of iron-rich meals
-- Expect lower aerobic endurance while mucosal inflammation persists
-### Medication Timing
-- **Morning:** Redacted 50mg, Finasteride 1mg, Minoxidil 1mg, B vitamins x2, Zinc
-- **4pm:** Redacted 5mg *(often forgotten, needs reminder)*
-- **Night:** Catapres 100mcg, Magnesium 500mg, **Vitamin D3 7,000 IU (alternate days)**, Vitamin C 1000mg
-- ⚠️ No Vitamin C with morning Redacted (interferes with ADHD med absorption)
-- ⚠️ Zinc in morning with food, away from iron at night
-### Upcoming Appointments
-- **TBC:** Dr Redacted follow-up (biologics review)
-### Work
-- Year 12 English Advanced Module B teaching active
-- UNSW Master of Gifted Education is finished (conferral 30 Sep 2026). Wollongong Master of Leadership runs to the end of Semester 1 2027 and is a background hum, not a live deadline. Detail is in About Me.
-- MindWorks HPGE program coordination (reclassified as work, not a personal goal, 8 Apr)
-### School Bell Times
-- **Period 1:** 8\:30am-9\:23am
-- **Period 2:** 9\:23am-10\:16am
-- **Recess:** 10\:16am-10\:36am
-- **Pastoral:** 10\:36am-10\:51am
-- **Period 3:** 10\:51am-11\:44am
-- **Period 4:** 11\:50am-12\:43pm
-- **Lunch:** 12\:43pm-1\:24pm
-- **Period 5:** 1\:24pm-2\:17pm
-- **Period 6:** 2\:17pm-3\:10pm
-### Dietary
-- No seafood, no bananas, chicken breast only (no bone-in, no wings)
-- Protein: 120g daily (140g on post-workout recovery days)
-- Calories by day type: Movement 1,660 kcal / 30-min workout 1,900 kcal / 45-60 min workout 2,200 kcal (+200 kcal if post-workout recovery)
-- Fat: \<50g daily (**HARD CLINICAL RULE during active flare-up**. Avocado now flagged as potential trigger. Eating out is the single biggest fat risk.)
-- Calcium: 1000mg/day non-dairy
-- Sodium: \<2000mg/day
-- **ACTIVE FLARE-UP DIETARY RULES (19 June 2026 — dietician directive):**
-	- **Processed meats ELIMINATED:** No sausages, bacon, salami, cold meats. Nitrates damage bowel lining.
-	- **Refined sugars & ultra-processed foods ELIMINATED:** No lollies, iced teas, packaged snacks. Most protein bars/shakes banned (emulsifiers). Whole-food protein preferred.
-	- **Low-fibre diet (temporary):** White sourdough OK (fermented), white rice, well-cooked peeled vegetables, complex carbs. Avoid raw vegetables, high-fibre grains, skins, stalks.
-	- **Fermented foods priority:** Vaalia probiotic yogurt (lowest fat, 11g protein). Home fermentation: 1L water + 1.5 tbsp salt, leave out ≥1 week. Butyrate reduces gut inflammation.
-	- **Exercise during flare-up:** 20–30 min efficient sessions only. No long or high-volume training.
-- Gut-healing foods: garlic, ginger, kimchi, miso, bone broth, fermented vegetables
-- ⚠️ Rokeby Farms contains carrageenan (potential Redacted's irritant)
-- Preference: spicy, garlic-heavy, umami-rich
+Full medical history lives in Life Hub Medical Overview. Personal constraints are available only from the private data repository.
+
 ---
-## ⚡ Today's Status (Wednesday 9 September 2026)
-**Health:** Redacted maintenance era. Entocort course ceased. Flare-up dietary protocol still active until dietician clears it.
-**Nutrition:** No meals logged yet today.
-**Exercise:** No completed session yet today.
-**Mood:** —
-**Energy:** —
-**Flags:** Keep Central Node to short/long-term patterns — no day-by-day macro dumps, no unbooked TBC challenges.
+## ⚡ Today's Status
+No personal status in the public template.
+
 ---
-## 📅 This Week (8 – 14 September 2026)
-**Key Events:**
-- (empty — Hammond / Clare fill with weekly averages and key events only)
-**Weekly Averages:**
-- Pending live week.
+## 📅 This Week
+Read the private Central Node for current events.
+
 ---
-## 📊 This Month (September 2026)
-**Upcoming:**
-- **TBC:** Dr Redacted follow-up (biologics review) — only when booked.
-**Active Goals:**
-- Redacted's mucosal healing on Redacted (Critical)
-- Be fit, healthy and vital (High)
-- Lean athletic physique recomposition toward 78–82kg at 8–10% BF (High)
-- Build a life worth enjoying (High)
-- Complete Wollongong Master of Leadership (Medium)
-- Set up salary sacrifice (High)
-- HPGE career direction review scheduled 28 Sep (Term 3 holidays, post-wedding)
+## 📊 This Month
+**Upcoming:** Read the private Central Node for current goals.
+
 ---
 ## 📈 Long-Term Trends & Patterns
-*Synthesised patterns, risk factors and predicted trajectories. Medical facts live in Constraints. Do not restate ceased Entocort taper as current.*
-**Nutrition:**
-- Feast-or-famine on unstructured days remains the core pattern: Redacted suppresses weekday eating; weekends without it are the reliable 3-meal days and the highest fat/sodium risk.
-- Protein is solved on structured meal days and missed when eating out. Breakfast remains the weekday gap.
-- Adam hates batch cooking. Do not suggest it.
-**Exercise:**
-- AEKE K1 removed the venue barrier. Consistency now depends on short efficient sessions during flare rules (20–30 min), not motivation essays.
-- Right AC / left groin / right knee flags still shape programming; warmup before loading is mandatory.
-**Health Trajectory:**
-- Biologics (Redacted) are the active Redacted's path after Entocort failed to heal mucosa. Watch maintenance dosing, calprotectin trend, and flare dietary adherence.
-- Iron consolidated; Vitamin D still climbing on alternate-day 7,000 IU.
-**Work/Energy:**
-- Career review milestone sits at 28 Sep. Personal-life goal ("build a life worth enjoying") remains the centre of gravity.
+Read the private Central Node for personal patterns.
+
 ---
 ## 🤝 Cross-Agent Coordination
-*One-line directives only. Purge once actioned. Do not restate medical context from Constraints.*
+No pending directives in the public template.
+
 ---
 ## 📝 Recent Agent Actions
-*48-hour rolling window. One line per action. Purge entries older than 48 hours.*
+No personal actions in the public template.

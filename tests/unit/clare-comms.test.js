@@ -45,12 +45,12 @@ const fake = (reply) => {
 };
 
 const ctx = {
-  title: 'Declan J. · essay feedback',
+  title: 'Alex J. · essay feedback',
   kind: 'comm',
   when: 'Wed 14/10/26 11:50',
-  people: [{ ref: 'shared:person:p_declan', name: 'Declan J.', role: 'with' }, { ref: 'shared:person:p_denielle', name: 'Denielle J.', role: 'also concerned' }],
+  people: [{ ref: 'shared:person:p_alex', name: 'Alex J.', role: 'with' }, { ref: 'shared:person:p_morgan', name: 'Morgan J.', role: 'also concerned' }],
   previous: [{ when: '25/09/26', summary: 'Quote bank agreed.' }],
-  open_promises: [{ direction: 'you_owe', text: 'Email Denielle a summary', days_late: 3 }],
+  open_promises: [{ direction: 'you_owe', text: 'Email Morgan a summary', days_late: 3 }],
   notes: 'Redraft is tighter. Second quote is retold.'
 };
 
@@ -59,47 +59,47 @@ test('brief: at most 3 points with sources, and an optional owed line', async ()
     points: [
       { text: 'His redraft came in yesterday.', source: 'Canvas, 13/10' },
       { text: 'One target at a time works.', source: 'comm 2' },
-      { text: 'Denielle is waiting on you.', source: 'ledger' },
+      { text: 'Morgan is waiting on you.', source: 'ledger' },
       { text: 'extra', source: 'x' }
     ],
-    owed_line: 'Send Denielle the summary after this one.'
+    owed_line: 'Send Morgan the summary after this one.'
   });
   const brief = await generateBrief(ctx, { complete });
   assert.equal(brief.points.length, 3);
   assert.equal(brief.points[0].source, 'Canvas, 13/10');
-  assert.equal(brief.owed_line, 'Send Denielle the summary after this one.');
+  assert.equal(brief.owed_line, 'Send Morgan the summary after this one.');
   assert.match(calls[0].system, /Australian English/);
-  assert.match(calls[0].content[0].text, /Declan J\./);
+  assert.match(calls[0].content[0].text, /Alex J\./);
 });
 
 test('summary: summary text plus promises tied to people on the page; unknown owners dropped', async () => {
   const { complete } = fake({
     summary: 'Good progress.',
     promises: [
-      { owner: 'me', to: 'Denielle J.', text: 'Email Denielle the summary', due: '2026-10-14' },
-      { owner: 'Declan J.', text: 'Rewrite the fence paragraph', due: '2026-10-19' },
+      { owner: 'me', to: 'Morgan J.', text: 'Email Morgan the summary', due: '2026-10-14' },
+      { owner: 'Alex J.', text: 'Rewrite the fence paragraph', due: '2026-10-19' },
       { owner: 'Greg', text: 'Not on this page', due: null },
-      { owner: 'me', to: 'Declan J.', text: 'Mark it', due: 'soon' }
+      { owner: 'me', to: 'Alex J.', text: 'Mark it', due: 'soon' }
     ],
     numbers: [{ label: 'Maths quiz', value: '31/50' }]
   });
   const out = await generateSummary(ctx, { complete });
   assert.equal(out.summary, 'Good progress.');
   assert.deepEqual(out.promises, [
-    { direction: 'you_owe', person_ref: 'shared:person:p_denielle', text: 'Email Denielle the summary', due: '2026-10-14' },
-    { direction: 'they_owe', person_ref: 'shared:person:p_declan', text: 'Rewrite the fence paragraph', due: '2026-10-19' },
-    { direction: 'you_owe', person_ref: 'shared:person:p_declan', text: 'Mark it', due: null }
+    { direction: 'you_owe', person_ref: 'shared:person:p_morgan', text: 'Email Morgan the summary', due: '2026-10-14' },
+    { direction: 'they_owe', person_ref: 'shared:person:p_alex', text: 'Rewrite the fence paragraph', due: '2026-10-19' },
+    { direction: 'you_owe', person_ref: 'shared:person:p_alex', text: 'Mark it', due: null }
   ]);
   assert.deepEqual(out.numbers, [{ label: 'Maths quiz', value: '31/50' }]);
 });
 
 test('drafts: one per person on the page, never to strangers', async () => {
   const { complete } = fake({ drafts: [
-    { to: 'Denielle J.', subject: 'Declan update', body: 'Hi Denielle, …' },
+    { to: 'Morgan J.', subject: 'Alex update', body: 'Hi Morgan, …' },
     { to: 'Someone else', subject: 'x', body: 'y' }
   ] });
   const out = await generateDrafts({ ...ctx, summary: 'Good progress.' }, { complete });
-  assert.deepEqual(out.drafts, [{ person_ref: 'shared:person:p_denielle', to: 'Denielle J.', subject: 'Declan update', body: 'Hi Denielle, …' }]);
+  assert.deepEqual(out.drafts, [{ person_ref: 'shared:person:p_morgan', to: 'Morgan J.', subject: 'Alex update', body: 'Hi Morgan, …' }]);
 });
 
 test('handwriting sends the image as an image block and returns text', async () => {

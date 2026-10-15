@@ -1,3 +1,5 @@
+> Storage rule, 15 October 2026: personal Central Node content belongs only in private `adamrussell91-hash/life-hub-data/central-node.md` on `main`. Personalised voice samples and SOURCES.md belong in that private repository under `config/humanizer/voices/`. References below to public personal seed copies or writing samples are superseded. The public Central Node is a structural template only. Use authenticated private reads and writes, never copy personal content into code, tests, docs, prompts, screenshots or public build assets.
+
 # Cursor instructions — live CN Clare/Ann directory (point 1)
 
 Paste this whole file into a **new Cursor chat whose workspace is the `life-hub-data` repo**, not `life-hub`. That repo is private. The cloud agent that shipped the mailbox could not push it.
