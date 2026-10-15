@@ -1,0 +1,299 @@
+{
+  "sentinel": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+  "kept_block_ids": [
+    "tk_skill",
+    "sec",
+    "tk_tool",
+    "cols",
+    "tk_move",
+    "tabs",
+    "tk_refl"
+  ],
+  "dropped_block_ids": [
+    "tk_note",
+    "tk_note_stale"
+  ],
+  "blocks": [
+    {
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1,
+      "layout": {},
+      "print": {},
+      "settings": {},
+      "type": "block",
+      "variant": "medium",
+      "id": "tk_skill",
+      "block_type": "toolkit_skill",
+      "visibility": "student_teacher",
+      "content": {
+        "item": "skill:justify",
+        "label": "Justify",
+        "definition": "Support an argument or conclusion.",
+        "steps": [
+          {
+            "id": "s1",
+            "title": "Claim",
+            "prompt": "What do you think?"
+          }
+        ],
+        "checks": [],
+        "reveals": [],
+        "links": {
+          "tools": [],
+          "values": []
+        },
+        "show_links": true,
+        "show_test": true,
+        "context": "",
+        "teacher_note": {
+          "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+          "run": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "say": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "watch": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "extra_label": "",
+          "extra": [],
+          "time": "",
+          "source": "",
+          "edited": true
+        },
+        "teacher_jots": {
+          "": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+          "class_a": "TOOLKIT_TEACHER_SENTINEL_7f3a"
+        }
+      }
+    },
+    {
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1,
+      "layout": {},
+      "print": {},
+      "settings": {},
+      "type": "block",
+      "variant": "medium",
+      "id": "sec",
+      "block_type": "section",
+      "visibility": "student_teacher",
+      "content": {
+        "title": "Inquiry",
+        "blocks": [
+          {
+            "created_at": "2026-01-01T00:00:00.000Z",
+            "updated_at": "2026-01-01T00:00:00.000Z",
+            "schema_version": 1,
+            "layout": {},
+            "print": {},
+            "settings": {},
+            "type": "block",
+            "variant": "medium",
+            "id": "tk_tool",
+            "block_type": "toolkit_tool",
+            "visibility": "student_teacher",
+            "content": {
+              "item": "tool:distinction",
+              "label": "Distinction",
+              "definition": "d",
+              "frame": "fork",
+              "teacher_note": {
+                "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+                "run": [
+                  "TOOLKIT_TEACHER_SENTINEL_7f3a"
+                ],
+                "say": [
+                  "TOOLKIT_TEACHER_SENTINEL_7f3a"
+                ],
+                "watch": [
+                  "TOOLKIT_TEACHER_SENTINEL_7f3a"
+                ],
+                "extra_label": "",
+                "extra": [],
+                "time": "",
+                "source": "",
+                "edited": true
+              },
+              "teacher_jots": {
+                "class_a": "TOOLKIT_TEACHER_SENTINEL_7f3a"
+              }
+            }
+          },
+          {
+            "created_at": "2026-01-01T00:00:00.000Z",
+            "updated_at": "2026-01-01T00:00:00.000Z",
+            "schema_version": 1,
+            "layout": {},
+            "print": {},
+            "settings": {},
+            "type": "block",
+            "variant": "medium",
+            "id": "tk_note",
+            "block_type": "teacher_note",
+            "visibility": "teacher_only",
+            "content": {
+              "title": "Teacher note",
+              "html": "<p>TOOLKIT_TEACHER_SENTINEL_7f3a</p>"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1,
+      "layout": {},
+      "print": {},
+      "settings": {},
+      "type": "block",
+      "variant": "medium",
+      "id": "cols",
+      "block_type": "columns",
+      "visibility": "student_teacher",
+      "content": {
+        "preset": "50-50",
+        "columns": [
+          {
+            "width": 6,
+            "blocks": [
+              {
+                "created_at": "2026-01-01T00:00:00.000Z",
+                "updated_at": "2026-01-01T00:00:00.000Z",
+                "schema_version": 1,
+                "layout": {},
+                "print": {},
+                "settings": {},
+                "type": "block",
+                "variant": "medium",
+                "id": "tk_move",
+                "block_type": "thinking_move",
+                "visibility": "student_teacher",
+                "content": {
+                  "skill": "skill:justify",
+                  "tools": [
+                    "tool:reasons"
+                  ],
+                  "value": "value:relevance",
+                  "steps": [],
+                  "check": [],
+                  "teacher_note": {
+                    "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+                    "run": [
+                      "TOOLKIT_TEACHER_SENTINEL_7f3a"
+                    ],
+                    "say": [
+                      "TOOLKIT_TEACHER_SENTINEL_7f3a"
+                    ],
+                    "watch": [
+                      "TOOLKIT_TEACHER_SENTINEL_7f3a"
+                    ],
+                    "extra_label": "",
+                    "extra": [],
+                    "time": "",
+                    "source": "",
+                    "edited": true
+                  },
+                  "teacher_jots": {
+                    "": "TOOLKIT_TEACHER_SENTINEL_7f3a"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "width": 6,
+            "blocks": [
+              {
+                "created_at": "2026-01-01T00:00:00.000Z",
+                "updated_at": "2026-01-01T00:00:00.000Z",
+                "schema_version": 1,
+                "layout": {},
+                "print": {},
+                "settings": {},
+                "type": "block",
+                "variant": "medium",
+                "id": "tk_note_stale",
+                "block_type": "teacher_note",
+                "visibility": "student_teacher",
+                "content": {
+                  "title": "Teacher note",
+                  "html": "<p>TOOLKIT_TEACHER_SENTINEL_7f3a</p>"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1,
+      "layout": {},
+      "print": {},
+      "settings": {},
+      "type": "block",
+      "variant": "medium",
+      "id": "tabs",
+      "block_type": "tabs",
+      "visibility": "student_teacher",
+      "content": {
+        "tabs": [
+          {
+            "id": "t1",
+            "label": "A",
+            "blocks": [
+              {
+                "created_at": "2026-01-01T00:00:00.000Z",
+                "updated_at": "2026-01-01T00:00:00.000Z",
+                "schema_version": 1,
+                "layout": {},
+                "print": {},
+                "settings": {},
+                "type": "block",
+                "variant": "medium",
+                "id": "tk_refl",
+                "block_type": "thinking_reflection",
+                "visibility": "student_teacher",
+                "content": {
+                  "variant": "lesson",
+                  "concept": "",
+                  "teacher_note": {
+                    "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+                    "run": [
+                      "TOOLKIT_TEACHER_SENTINEL_7f3a"
+                    ],
+                    "say": [
+                      "TOOLKIT_TEACHER_SENTINEL_7f3a"
+                    ],
+                    "watch": [
+                      "TOOLKIT_TEACHER_SENTINEL_7f3a"
+                    ],
+                    "extra_label": "",
+                    "extra": [],
+                    "time": "",
+                    "source": "",
+                    "edited": true
+                  },
+                  "teacher_jots": {
+                    "": "TOOLKIT_TEACHER_SENTINEL_7f3a"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "id": "t2",
+            "label": "B",
+            "blocks": []
+          }
+        ]
+      }
+    }
+  ]
+}
