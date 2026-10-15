@@ -802,6 +802,8 @@ function buildInteractiveView(
   let inkFrame = 0;
   let inkHost: HTMLElement | null = null;
   let inkMarks: InkMark[] = [];
+  /** The margin note the reader picked: shown in full, its ink in front. */
+  let activeNoteId: string | null = null;
   const inkResize =
     typeof ResizeObserver === 'function'
       ? new ResizeObserver(() => scheduleInk(false))
@@ -820,8 +822,30 @@ function buildInteractiveView(
       const fresh = new Set(
         inkMarks.map((mark) => mark.annotationId).filter((id) => animate && !inkedIds.has(id))
       );
-      inkedIds = drawAnnotationInk(inkHost, inkMarks, { style: inkStyle, animateIds: fresh });
+      inkedIds = drawAnnotationInk(inkHost, inkMarks, {
+        style: inkStyle,
+        animateIds: fresh,
+        activeId: activeNoteId
+      });
+      syncActiveAnchors();
     });
+  }
+
+  function syncActiveAnchors(): void {
+    root
+      .querySelectorAll<HTMLElement>('.block-annotation__anchor[data-annotation-id]')
+      .forEach((el) => {
+        const on = el.dataset.annotationId === activeNoteId;
+        el.classList.toggle('is-active', on);
+        if (el.tagName === 'BUTTON' && !el.classList.contains('is-open')) {
+          el.setAttribute('aria-expanded', on ? 'true' : 'false');
+        }
+      });
+  }
+
+  function selectNote(id: string | null): void {
+    activeNoteId = id;
+    scheduleInk(false);
   }
 
   function marginLabel(ann: AnnotationItem): string | undefined {
@@ -1023,7 +1047,12 @@ function buildInteractiveView(
         paint();
         return;
       }
-      if (!readerNeeded(item.annotation)) return;
+      if (!readerNeeded(item.annotation)) {
+        // The margin carries the note: toggle it open, fold the rest away.
+        selectNote(activeNoteId === item.annotation.id ? null : item.annotation.id);
+        return;
+      }
+      selectNote(item.annotation.id);
       state = { ...state, openAnnotationId: item.annotation.id };
       openAnnotation(root, item.annotation, item.layer, btn, table);
     }
@@ -1110,7 +1139,7 @@ function buildInteractiveView(
           makeBarAnchor(
             item,
             'line',
-            readerNeeded(item.annotation) ? (btn) => openPlaced(item, btn) : null
+            (btn) => openPlaced(item, btn)
           )
         );
       }
@@ -1146,7 +1175,7 @@ function buildInteractiveView(
       textEl.className = 'block-annotation__line-text';
       const marks = byLine.get(`${stanzaId}:${lineId}`) ?? [];
       textEl.append(
-        renderLineText(line, marks, (item) => readerNeeded(item.annotation), openPlaced)
+        renderLineText(line, marks, () => true, openPlaced)
       );
       applyLineLayout(textEl, line);
 
@@ -1327,7 +1356,7 @@ function buildInteractiveView(
           colour: item.layer?.colour ?? 'wave',
           el: btn,
           label: first && !isThread && kind !== 'stanza' ? marginLabel(item.annotation) : undefined,
-          onOpen: readerNeeded(item.annotation) ? () => btn.click() : undefined
+          onOpen: () => btn.click()
         });
       });
     scheduleInk(true);
@@ -1351,6 +1380,19 @@ function buildInteractiveView(
 
   root.addEventListener('keydown', (event) => {
     if (!root.contains(event.target as Node)) return;
+
+    if (
+      event.key === 'Escape' &&
+      activeNoteId &&
+      !state.focusThreadId &&
+      !root.querySelector('.block-annotation__anchor.is-open') &&
+      !isTextControl(event.target)
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      selectNote(null);
+      return;
+    }
 
     const action = resolveAnnotationKey({
       key: event.key,

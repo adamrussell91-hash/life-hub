@@ -173,13 +173,21 @@ describe('annotation render + sanitise', () => {
     expect(marginNoteText('<p>ignored</p>', 'Visual Imagery')).toBe('Visual Imagery');
   });
 
-  it('a plain note does not open a second window', () => {
+  it('a plain note does not open a second window; clicking selects its margin note', async () => {
     const el = renderAnnotationBlock(dulceAnnotationFixture, 'teacher');
-    const word = el.querySelector<HTMLElement>('[data-annotation-id="ann_word"]')!;
-    expect(word.tagName).toBe('SPAN');
-    word.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document.body.append(el);
+    const word = el.querySelector<HTMLButtonElement>('[data-annotation-id="ann_word"]')!;
+    expect(word.tagName).toBe('BUTTON');
+    word.click();
     expect(el.querySelector<HTMLElement>('.block-annotation__panel')!.hidden).toBe(true);
     expect(el.querySelector<HTMLElement>('.block-annotation__sheet')!.hidden).toBe(true);
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    expect(word.classList.contains('is-active')).toBe(true);
+    expect(word.getAttribute('aria-expanded')).toBe('true');
+    word.click();
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    expect(word.classList.contains('is-active')).toBe(false);
+    el.remove();
   });
 
   it('a stanza note, which has no handwriting, still opens inside the block', () => {
