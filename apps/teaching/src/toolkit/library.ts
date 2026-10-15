@@ -85,6 +85,7 @@ export type LibraryItem = LibrarySkill | LibraryTool | LibraryValue;
 const H = 'Workshop handbook';
 const CAM = `Cam (2006), A Beginning Philosophy Toolkit, ${H} p9`;
 const NOTES = 'Notion workshop notes';
+const PHILOSOTHON = 'Sydney Philosothon 2026 marking guide and facilitator procedures (Centre for Critical Thinking and Ethics, Newington College), Notion';
 
 /** Handbook p10, handwritten under the skills column. */
 const SKILL_NOTE = 'Teach these more explicitly. (Handwritten note, framework p10.)';
@@ -364,9 +365,11 @@ function value(id: string, label: string, noun: string): LibraryValue {
         'How can we evaluate the quality of this thinking (clarity / relevance / precision …)? (p11)',
         'Were our contributions clear, relevant, precise, significant, coherent …? (p25)'
       ],
-      watch: [],
+      watch: [
+        'Assessors listen for contributions that demonstrate relevance, clarity, coherence, precision, significance, accuracy and depth. (Philosothon 2026 marking guide)'
+      ],
       time: '',
-      source: `Critical Thinking Framework at Newington College (2025), ${H} p10, p11, p25`
+      source: `Critical Thinking Framework at Newington College (2025), ${H} p10, p11, p25; ${PHILOSOTHON}`
     }
   };
 }

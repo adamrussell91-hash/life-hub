@@ -40,13 +40,14 @@ Every toolkit block except Thinking intentions carries a **Teacher note** (What 
 Every word in the library (`src/toolkit/library.ts`) and the block defaults (`src/toolkit/content.ts`) comes from one of two places:
 
 - the APS NSW *Introductory Workshop handbook* (2026), including Adam's handwritten notes on the scan;
-- the Notion page "Philosophical Community of Inquiry Workshop" (typed workshop notes).
+- the Notion page "Philosophical Community of Inquiry Workshop" (typed workshop notes);
+- the Notion page "Philosothon 2026 (Facilitator)": Britta Jensen's facilitator procedures and the 2026 Sydney Philosothon marking guide (Centre for Critical Thinking and Ethics, Newington College).
 
 Nothing is drafted, and nothing is taken from NESA, Paul & Elder, Ellerton's wider work or any other source. Where the sources say nothing, the field is left empty for the teacher to fill on the block. Do not fill gaps with outside wording.
 
 What the sources give:
 
-- **Definitions:** only Cam's eight tool definitions (p9): Question, Suggestion, Reasons, Distinction, Example, Counterexample, Generalisation, Criteria. Skills, values, and Analogy, Argument, Counterargument and Implication have no definition, so their cards show the name only. The framework page (p10) lists items without defining them.
+- **Definitions:** Adam's Notion was searched in full (PD pages, notebooks, lessons). Nothing there defines the skills or values. The only definitions are Cam's eight tool definitions (p9): Question, Suggestion, Reasons, Distinction, Example, Counterexample, Generalisation, Criteria. Skills, values, and Analogy, Argument, Counterargument and Implication have no definition, so their cards show the name only. The framework page (p10) lists items without defining them.
 - **Skill–tool pairings:** p9 "Tools in Use", the p9 margin notes (reasons → justifying, distinctions → comparing) and p11 (classify, then divide).
 - **Golden Tetrad:** p12.
 - **Classify steps:** the Notion notes (Classification and Division).
@@ -55,9 +56,9 @@ What the sources give:
 - **Question:** the p17 Pooh and Piglet converter pairs and the Notion closed/open notes.
 - **Question Quadrant:** p17–19, quoted.
 - **Features of a Concept:** p20–24, quoted.
-- **Reflection:** p4 and p25.
+- **Reflection:** p4 and p25, the Philosothon closing-reflection procedure, and the marking guide's ten marks of a strong participant.
 - **Community skills:** p12.
-- **Values:** the p10 handwritten "To judge quality of thinking" and "Use for tailored feedback", the p11 question and the p25 question.
+- **Values:** the p10 handwritten "To judge quality of thinking" and "Use for tailored feedback", the p11 question, the p25 question, and the Philosothon marking guide ("relevance, clarity, coherence, precision, significance, accuracy and depth").
 - **Teacher notes:** only these quotes and handwritten notes. There are no invented timings, stems or "I do / We do / You do" steps.
 
 Blocks inserted before this change keep the text they were created with (library text is copied in). Use "Reset to library version" on a section to replace it with the source-only text.
