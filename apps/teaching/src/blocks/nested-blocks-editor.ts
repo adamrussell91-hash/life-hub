@@ -11,6 +11,8 @@ import {
   openBlockPicker
 } from '@/blocks/block-meta';
 import type { Block } from '@/schemas/block';
+import { moveBlockTo, type DropParent } from '@/teacher/lesson-canvas/drop';
+import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import { HUB_LIST_ICONS, createHubList } from '../../design-kit/js/hub-list.js';
 
 const PALETTE_MIME = 'application/x-teaching-hub-block';
@@ -28,6 +30,12 @@ export interface NestedBlocksEditorOptions {
   empty?: { title: string; detail: string };
   /** Fresh blocks for Undo after the parent rebuilt this list. */
   read?: () => readonly Block[];
+  /**
+   * Where this list sits in the lesson tree. With it, blocks dragged by their
+   * grip from the page or another container move in, and this list's own
+   * blocks can be dragged out. Needs `context.getLessonBlocks` / `setLessonBlocks`.
+   */
+  moveParent?: () => DropParent | null;
   columnMove?: {
     columnCount: number;
     columnIndex: number;
@@ -132,13 +140,73 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     }
   }
 
-  // Blocks dragged in from the page palette land at the end of this list.
+  const canMoveAcross = () =>
+    Boolean(options.moveParent && options.context?.getLessonBlocks && options.context.setLessonBlocks);
+
+  function movingBlockId(event: DragEvent): string | null {
+    const raw = event.dataTransfer?.getData(PALETTE_MIME) ?? '';
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as { kind?: unknown; block_id?: unknown };
+      return parsed.kind === 'move' && typeof parsed.block_id === 'string' ? parsed.block_id : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Index among this list's own rows (not rows of lists nested inside them). */
+  function dropIndexFor(event: DragEvent): number {
+    const rows = Array.from(root.children).filter((el) => el.classList.contains('hub-list__row'));
+    const y = event.clientY;
+    if (typeof y !== 'number') return rows.length;
+    const at = rows.findIndex((row) => {
+      const rect = row.getBoundingClientRect();
+      return rect.height > 0 && y < rect.top + rect.height / 2;
+    });
+    return at < 0 ? rows.length : at;
+  }
+
+  function moveInto(blockId: string, index: number): void {
+    const parent = options.moveParent?.();
+    const lesson = options.context?.getLessonBlocks?.();
+    if (!parent || !lesson) return;
+    const result = moveBlockTo(lesson, blockId, parent, index);
+    if (!result.ok) {
+      showHubToast(result.message, { tone: 'danger' });
+      return;
+    }
+    options.context?.setLessonBlocks?.(result.blocks);
+  }
+
+  // Dragging one of this list's blocks also advertises it as a lesson move, so
+  // the page and other containers can take it. Capture phase: the list's own
+  // grip handler stops propagation, and its reorder drops still win inside it.
+  root.addEventListener(
+    'dragstart',
+    (event) => {
+      if (!canMoveAcross()) return;
+      const grip = (event.target as Element | null)?.closest?.('.hub-list__grip');
+      const row = grip?.closest('.hub-list__row') as HTMLElement | null;
+      if (!grip || !row || row.parentElement !== root || !row.dataset.key) return;
+      event.dataTransfer?.setData(PALETTE_MIME, JSON.stringify({ kind: 'move', block_id: row.dataset.key }));
+    },
+    true
+  );
+
+  // Palette blocks land at the end of this list; moved blocks land where dropped.
   root.addEventListener('dragover', (event) => {
     if (!carriesPalette(event)) return;
     event.preventDefault();
     event.stopPropagation();
   });
   root.addEventListener('drop', (event) => {
+    const moving = canMoveAcross() ? movingBlockId(event) : null;
+    if (moving) {
+      event.preventDefault();
+      event.stopPropagation();
+      moveInto(moving, dropIndexFor(event));
+      return;
+    }
     const type = paletteType(event);
     if (!type) return;
     event.preventDefault();
