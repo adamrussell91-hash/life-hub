@@ -8,6 +8,10 @@ import { renderEntityBanner } from '@/teacher/entity-banner';
 import { mountPublicOutcomeChips } from '@/outcomes/strip';
 import type { PublicOutcome } from '@/curriculum/outcome-catalog';
 import {
+  mountStudentClassExamples,
+  type StudentClassExamplesHandle
+} from '@/class-examples/student';
+import {
   fetchPublishedClass,
   type PublishedClass
 } from '@/student/published-class';
@@ -190,6 +194,11 @@ export function mountStudentLessonView(
 ): StudentLessonViewHandle {
   const { root, lessonId, classId, isStale = () => false } = options;
   let disposed = false;
+  let examples: StudentClassExamplesHandle | null = null;
+  const mountExamples = (content: HTMLElement) => {
+    examples?.dispose();
+    examples = mountStudentClassExamples(content, { lessonId, classId });
+  };
 
   root.replaceChildren();
   const { surface, header, content } = createStudentShell();
@@ -248,6 +257,7 @@ export function mountStudentLessonView(
       });
       renderPublishedLesson(content, lesson, { cls });
       renderLessonNav(content, classId, lessonId, cls);
+      mountExamples(content);
     });
   } else {
     void apiGet<PublishedLesson>(`/api/published/lessons/${lessonId}`)
@@ -255,6 +265,7 @@ export function mountStudentLessonView(
         if (disposed || isStale()) return;
         renderStudentChrome(header, {});
         renderPublishedLesson(content, lesson);
+        mountExamples(content);
       })
       .catch((error: unknown) => {
         if (disposed || isStale()) return;
@@ -265,6 +276,8 @@ export function mountStudentLessonView(
   return {
     dispose() {
       disposed = true;
+      examples?.dispose();
+      examples = null;
     }
   };
 }

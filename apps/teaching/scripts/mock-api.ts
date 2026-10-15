@@ -89,6 +89,9 @@ import {
 import { runContentSearch } from '../src/search/run-content-search';
 import { applyScheduleUnit } from '../src/schedule/schedule-unit';
 import { scheduleTimetable } from '../../../netlify/functions/_shared/teaching-timetable-write.mjs';
+import { createLessonExamplesHandler } from '../../../netlify/functions/lesson-examples.mjs';
+import { createPublishedExamplesHandler } from '../../../netlify/functions/published-examples.mjs';
+import { createPublishedExamplesWriteHandler } from '../../../netlify/functions/published-examples-write.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
@@ -3325,6 +3328,48 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return done;
   }
 
+  async function handleClassExamples(
+    method: string,
+    pathWithQuery: string,
+    cookie: string | null | undefined,
+    body: unknown
+  ): Promise<MockResponse> {
+    const blobStore = {
+      async get(key: string) {
+        return store.getJSON(key) ?? null;
+      },
+      async setJSON(key: string, value: unknown) {
+        store.setJSON(key, value);
+      },
+      async delete(key: string) {
+        store.delete(key);
+      },
+      async list({ prefix = '' }: { prefix?: string } = {}) {
+        return { blobs: store.listKeys(prefix).map((key) => ({ key })) };
+      }
+    };
+    const deps = {
+      env: { LIFE_HUB_PASSPHRASE_HASH: 'mock', SESSION_SECRET: 'mock-session-secret-0123456789abcdef' },
+      getContentStore: async () => blobStore,
+      verifySessionToken: () => ({ valid: getSession(cookie).authenticated })
+    };
+    const path = pathWithQuery.split('?')[0]!;
+    const handler = path.startsWith('/api/lessons/')
+      ? createLessonExamplesHandler(deps)
+      : /\/(unlock|submit)$/.test(path)
+        ? createPublishedExamplesWriteHandler(deps)
+        : createPublishedExamplesHandler(deps);
+    const response: Response = await handler(
+      new Request(`http://mock.local${pathWithQuery}`, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        ...(method === 'GET' ? {} : { body: JSON.stringify(body ?? {}) })
+      }),
+      {}
+    );
+    return jsonResponse(response.status, await response.json());
+  }
+
   async function handle(
     method: string,
     pathWithQuery: string,
@@ -3337,6 +3382,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const query = new URLSearchParams(search);
 
     if (method === 'POST' && path === '/api/auth') return handleAuth(body);
+    // Class examples run the real Functions against the mock store.
+    if (
+      /^\/api\/lessons\/[^/]+\/examples$/.test(path) ||
+      /^\/api\/published\/examples\/[^/]+(?:\/(?:unlock|submit))?$/.test(path)
+    ) {
+      return handleClassExamples(method, pathWithQuery, cookie, body);
+    }
+
     if (method === 'GET' && path === '/api/session') return handleSession(cookie);
     if (method === 'POST' && path === '/api/logout') return handleLogout();
     if (method === 'GET' && path === '/api/curriculum') return handleGetCurriculum(cookie);
