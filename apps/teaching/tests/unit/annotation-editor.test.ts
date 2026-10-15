@@ -312,3 +312,95 @@ describe('annotation editor 1b', () => {
     expect(picker?.querySelector('button[disabled]')).toBeNull();
   });
 });
+
+describe('several notes on one line or stanza', () => {
+  type AnnotationBlock = Extract<Block, { block_type: 'annotation' }>;
+
+  function mountEditor() {
+    let latest = structuredClone(dulceAnnotationFixture) as AnnotationBlock;
+    const mount = document.createElement('div');
+    document.body.append(mount);
+    const rebuild = () => {
+      mount.replaceChildren(
+        createAnnotationEditor(
+          latest,
+          (next) => {
+            latest = next as AnnotationBlock;
+            rebuild();
+          },
+          () => latest
+        )
+      );
+    };
+    rebuild();
+    return { mount, latest: () => latest };
+  }
+
+  const lineBar = (mount: HTMLElement, lineId: string) =>
+    mount.querySelector<HTMLButtonElement>(
+      `.block-editor__annotation-line[data-line-id="${lineId}"] .block-editor__annotation-line-gutter`
+    )!;
+  const menu = () => document.querySelector<HTMLElement>('.block-editor__annotation-bar-menu');
+
+  it('a noted line bar offers its notes and an add button per layer', () => {
+    const { mount } = mountEditor();
+    lineBar(mount, 'line_2').click();
+    const open = menu()!;
+    expect(open).toBeTruthy();
+    const items = open.querySelectorAll('.block-editor__annotation-bar-menu-item');
+    expect(items).toHaveLength(1);
+    expect(items[0]!.textContent).toContain('Structure');
+    expect(items[0]!.textContent).toContain('Compound physical detail');
+    const adds = Array.from(open.querySelectorAll('.block-editor__annotation-bar-menu-new')).map(
+      (btn) => btn.textContent
+    );
+    expect(adds).toEqual(['+ Structure', '+ Imagery', '+ Teacher notes']);
+    mount.remove();
+    document.querySelectorAll('.block-editor__annotation-bar-menu').forEach((m) => m.remove());
+  });
+
+  it('adds a second line note in the chosen layer', () => {
+    const { mount, latest } = mountEditor();
+    lineBar(mount, 'line_2').click();
+    Array.from(menu()!.querySelectorAll<HTMLButtonElement>('.block-editor__annotation-bar-menu-new'))
+      .find((btn) => btn.textContent === '+ Imagery')!
+      .click();
+    expect(menu()).toBeNull();
+    const onLine = latest().content.annotations.filter(
+      (ann) => ann.anchor.granularity === 'line' && ann.anchor.line === 'line_2'
+    );
+    expect(onLine.map((ann) => ann.layer_id)).toEqual(['layer_structure', 'layer_imagery']);
+    const bar = lineBar(mount, 'line_2');
+    expect(bar.dataset.noteCount).toBe('2');
+    expect(bar.getAttribute('aria-label')).toContain('2 notes');
+    mount.remove();
+  });
+
+  it('adds a second stanza note and still opens the first', () => {
+    const { mount, latest } = mountEditor();
+    const stanzaBar = () =>
+      mount.querySelector<HTMLButtonElement>('.block-editor__annotation-stanza-gutter')!;
+    stanzaBar().click();
+    Array.from(menu()!.querySelectorAll<HTMLButtonElement>('.block-editor__annotation-bar-menu-new'))
+      .find((btn) => btn.textContent === '+ Imagery')!
+      .click();
+    const stanzaNotes = latest().content.annotations.filter(
+      (ann) => ann.anchor.granularity === 'stanza'
+    );
+    expect(stanzaNotes).toHaveLength(2);
+    stanzaBar().click();
+    expect(menu()!.querySelectorAll('.block-editor__annotation-bar-menu-item')).toHaveLength(2);
+    menu()!.querySelector<HTMLButtonElement>('.block-editor__annotation-bar-menu-item')!.click();
+    expect(menu()).toBeNull();
+    mount.remove();
+  });
+
+  it('Escape closes the menu', () => {
+    const { mount } = mountEditor();
+    lineBar(mount, 'line_2').click();
+    menu()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(menu()).toBeNull();
+    mount.remove();
+  });
+});
+
