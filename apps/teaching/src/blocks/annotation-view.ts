@@ -28,15 +28,15 @@ import {
   stepThreadIndex
 } from '@/blocks/annotation-thread-keys';
 import {
-  buildArcSvg,
-  buildFoldButton,
   buildStopPip,
   buildThreadChip,
   fillStepCaption,
-  foldRowsForThread,
+  drawThreadLink,
   isNarrowAnnotationViewport,
+  placesLabel,
   printThreadFootnoteLabel,
   resolvedThreadStops,
+  threadLineIds,
   visibleThreads
 } from '@/blocks/annotation-thread-view';
 import { threadsOf } from '@/blocks/annotation-thread';
@@ -337,6 +337,20 @@ function fillBody(
   if (attachments) host.append(attachments);
 }
 
+/** Says what the note is attached to, so a reader can match it to the mark. */
+export function noteTitle(annotation: AnnotationItem, anchorEl: HTMLElement): string {
+  if (anchorEl.classList.contains('block-annotation__anchor--stanza')) {
+    return 'Note on this stanza';
+  }
+  if (anchorEl.classList.contains('block-annotation__anchor--line')) {
+    return 'Note on this line';
+  }
+  const quote = (anchorEl.textContent || annotation.anchor.quote?.exact || '').trim();
+  if (!quote) return 'Note';
+  const short = quote.length > 48 ? `${quote.slice(0, 47)}…` : quote;
+  return `Note on “${short}”`;
+}
+
 function openAnnotation(
   root: HTMLElement,
   annotation: AnnotationItem,
@@ -345,6 +359,7 @@ function openAnnotation(
   table: LiteraryElementsTable | null
 ): void {
   closeAnnotationPanel(root);
+  const heading = noteTitle(annotation, anchorEl);
   const showLayer = root.dataset.layerCount !== '1';
   anchorEl.classList.add('is-open');
   anchorEl.setAttribute('aria-expanded', 'true');
@@ -362,7 +377,7 @@ function openAnnotation(
     header.className = 'block-annotation__sheet-header';
     const title = document.createElement('h3');
     title.className = 'block-annotation__sheet-title';
-    title.textContent = 'Note';
+    title.textContent = heading;
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'block-annotation__close';
@@ -383,12 +398,16 @@ function openAnnotation(
 
   const panel = root.querySelector<HTMLElement>('.block-annotation__panel');
   if (!panel) return;
+  // Sit the note directly under the stanza it belongs to, not at the foot of the poem.
+  const stanza = anchorEl.closest('.block-annotation__stanza');
+  if (stanza) stanza.after(panel);
+  panel.className = `block-annotation__panel block-annotation__panel--${layer?.colour ?? 'wave'}`;
   panel.hidden = false;
   const header = document.createElement('div');
   header.className = 'block-annotation__panel-header';
   const title = document.createElement('h3');
   title.className = 'block-annotation__panel-title';
-  title.textContent = 'Note';
+  title.textContent = heading;
   const close = document.createElement('button');
   close.type = 'button';
   close.className = 'block-annotation__close';
@@ -402,7 +421,8 @@ function openAnnotation(
   body.className = 'block-annotation__panel-body';
   fillBody(body, annotation, layer, table, showLayer);
   panel.append(header, body);
-  close.focus();
+  close.focus({ preventScroll: true });
+  panel.scrollIntoView?.({ block: 'nearest' });
 }
 
 function wrapAnchor(
@@ -562,6 +582,14 @@ function buildInteractiveView(
   chips.setAttribute('role', 'toolbar');
   chips.setAttribute('aria-label', 'Annotation layers');
 
+  const markKey = document.createElement('p');
+  markKey.className = 'block-annotation__key';
+  markKey.hidden = true;
+
+  const threadIntro = document.createElement('p');
+  threadIntro.className = 'block-annotation__threads-intro';
+  threadIntro.hidden = true;
+
   const threadStrip = document.createElement('div');
   threadStrip.className = 'block-annotation__threads';
   threadStrip.setAttribute('role', 'toolbar');
@@ -571,11 +599,7 @@ function buildInteractiveView(
   focusBar.className = 'block-annotation__focus-bar';
   focusBar.hidden = true;
 
-  const stepBar = document.createElement('div');
-  stepBar.className = 'block-annotation__step-bar';
-  stepBar.hidden = true;
-
-  controls.append(chips, threadStrip, focusBar, stepBar);
+  controls.append(chips, markKey, threadIntro, threadStrip, focusBar);
 
   layout.append(textCol, panel);
   // Reveal controls sit above the text so a long poem never hides them.
@@ -761,20 +785,6 @@ function buildInteractiveView(
     close.focus();
   }
 
-  function makeMenuItem(
-    label: string,
-    pressed: boolean,
-    onClick: () => void
-  ): HTMLButtonElement {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'block-annotation__thread-menu-item';
-    btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
-    btn.textContent = label;
-    btn.addEventListener('click', onClick);
-    return btn;
-  }
-
   function makeStepBtn(
     label: string,
     disabled: boolean,
@@ -786,6 +796,7 @@ function buildInteractiveView(
     btn.className = 'block-annotation__step-btn';
     btn.textContent = label;
     btn.disabled = disabled;
+    btn.dataset.step = delta > 0 ? 'next' : 'previous';
     btn.addEventListener('click', () => {
       state = {
         ...state,
@@ -828,6 +839,13 @@ function buildInteractiveView(
         activeId: activeNoteId
       });
       syncActiveAnchors();
+      const followed = state.focusThreadId
+        ? content.annotations.find((a) => a.id === state.focusThreadId)
+        : undefined;
+      const linkHost = inkHost.querySelector<HTMLElement>('.block-annotation__stanzas');
+      if (linkHost && followed) {
+        drawThreadLink(linkHost, layerById(content.layers, followed.layer_id)?.colour);
+      }
     });
   }
 
@@ -870,13 +888,53 @@ function buildInteractiveView(
     return !marginNoteText(ann.body.html);
   }
 
+  /** Explains the mark shapes actually on screen: box, underline, bracket. */
+  function fillMarkKey(placed: PlacedAnnotation[]): void {
+    const kinds = new Set(placed.map((item) => item.resolved.granularity));
+    const entries: Array<[string, string, string]> = [];
+    if (kinds.has('word')) entries.push(['box', 'word', 'Box = one word']);
+    if (kinds.has('phrase')) {
+      entries.push([
+        inkStyle === 'highlighter' ? 'band' : 'underline',
+        'phrase',
+        inkStyle === 'highlighter' ? 'Highlight = a phrase' : 'Underline = a phrase'
+      ]);
+    }
+    if (kinds.has('line')) entries.push(['bracket', 'line', 'Bracket by a line = that whole line']);
+    if (kinds.has('stanza')) {
+      entries.push(['bracket-tall', 'stanza', 'Tall bracket = a whole stanza']);
+    }
+    markKey.hidden = entries.length === 0;
+    markKey.replaceChildren();
+    if (markKey.hidden) return;
+    const lead = document.createElement('span');
+    lead.className = 'block-annotation__key-lead';
+    lead.textContent = 'How to read the marks:';
+    markKey.append(lead);
+    for (const [shape, sample, label] of entries) {
+      const item = document.createElement('span');
+      item.className = 'block-annotation__key-item';
+      const swatch = document.createElement('span');
+      swatch.className = `block-annotation__key-swatch block-annotation__key-swatch--${shape}`;
+      swatch.setAttribute('aria-hidden', 'true');
+      swatch.textContent = shape.startsWith('bracket') ? '' : sample;
+      item.append(swatch, label);
+      markKey.append(item);
+    }
+    const tail = document.createElement('span');
+    tail.className = 'block-annotation__key-tail';
+    tail.textContent = 'Colour = which tick-box layer it belongs to. Click any mark to read its note.';
+    markKey.append(tail);
+  }
+
   function paint(): void {
     const scrollTop = textCol.scrollTop;
+    // The note panel may have been moved beside a stanza; park it before the rebuild.
+    if (panel.parentElement !== layout) layout.append(panel);
     textCol.replaceChildren();
     chips.replaceChildren();
     threadStrip.replaceChildren();
     focusBar.replaceChildren();
-    stepBar.replaceChildren();
 
     chips.hidden = stops.length === 0;
 
@@ -919,6 +977,15 @@ function buildInteractiveView(
     const narrow = isNarrowAnnotationViewport();
 
     threadStrip.hidden = threads.length === 0;
+    threadIntro.hidden = threads.length === 0 || Boolean(state.focusThreadId);
+    if (!threadIntro.hidden) {
+      const strong = document.createElement('strong');
+      strong.textContent = 'Threads';
+      threadIntro.replaceChildren(
+        strong,
+        ' follow one idea through several places in the text. Pick one to trace it.'
+      );
+    }
     if (threads.length > 0) {
       if (narrow) {
         const pick = document.createElement('button');
@@ -956,8 +1023,40 @@ function buildInteractiveView(
     const stepping = Boolean(focusAnn && stepIndex != null && focusStops.length > 0);
 
     focusBar.hidden = !focusAnn;
-    stepBar.hidden = !stepping;
     if (focusAnn) {
+      const focusLayer = layerById(content.layers, focusAnn.layer_id);
+      focusBar.className = `block-annotation__focus-bar block-annotation__focus-bar--${focusLayer?.colour ?? 'wave'}`;
+      focusBar.setAttribute('role', 'region');
+      focusBar.setAttribute('aria-label', 'Thread you are following');
+
+      const eyebrow = document.createElement('p');
+      eyebrow.className = 'block-annotation__focus-eyebrow';
+      eyebrow.textContent = focusLayer
+        ? `Following a thread · ${focusLayer.name} · ${placesLabel(focusStops.length)}`
+        : `Following a thread · ${placesLabel(focusStops.length)}`;
+
+      const body = document.createElement('div');
+      body.className = 'block-annotation__body block-annotation__focus-note';
+      body.innerHTML = sanitizeRichTextHtml(focusAnn.body.html);
+
+      const hint = document.createElement('p');
+      hint.className = 'block-annotation__focus-hint';
+      hint.textContent =
+        'The rest of the text is faded. The coloured line on the left joins each place, in order.';
+
+      const nav = document.createElement('div');
+      nav.className = 'block-annotation__focus-nav';
+      if (stepIndex != null) {
+        nav.append(makeStepBtn('Previous place', stepIndex <= 0, -1, focusStops.length));
+      }
+      nav.append(
+        makeStepBtn(
+          stepIndex == null ? 'Go through each place' : 'Next place',
+          stepIndex != null && stepIndex >= focusStops.length - 1,
+          1,
+          focusStops.length
+        )
+      );
       const showAll = document.createElement('button');
       showAll.type = 'button';
       showAll.className = 'block-annotation__show-all';
@@ -966,34 +1065,16 @@ function buildInteractiveView(
         exitFocus();
         paint();
       });
+      nav.append(showAll);
 
-      const menu = document.createElement('details');
-      menu.className = 'block-annotation__thread-menu';
-      const summary = document.createElement('summary');
-      summary.textContent = 'Thread';
-      menu.append(
-        summary,
-        makeMenuItem('±1 line of context', state.context === 1, () => {
-          state = { ...state, context: state.context === 1 ? 0 : 1 };
-          paint();
-        }),
-        makeMenuItem('Step through', stepIndex != null, () => {
-          state = { ...state, stepIndex: state.stepIndex == null ? 0 : null };
-          paint();
-        })
-      );
-      focusBar.append(showAll, menu);
-
+      focusBar.append(eyebrow, body, hint);
       if (stepping && stepIndex != null) {
         const caption = document.createElement('div');
         caption.className = 'block-annotation__step-caption';
         fillStepCaption(caption, focusAnn, focusStops, stepIndex);
-        stepBar.append(
-          makeStepBtn('Previous', stepIndex <= 0, -1, focusStops.length),
-          caption,
-          makeStepBtn('Next', stepIndex >= focusStops.length - 1, 1, focusStops.length)
-        );
+        focusBar.append(caption);
       }
+      focusBar.append(nav);
     }
 
     const placed = placedFor(content, mode, state);
@@ -1019,6 +1100,8 @@ function buildInteractiveView(
         placed: item
       });
     }
+
+    fillMarkKey(placed);
 
     // Bar columns widen to the busiest line / stanza so every row stays aligned.
     const most = (map: Map<string, PlacedAnnotation[]>) =>
@@ -1077,21 +1160,6 @@ function buildInteractiveView(
     inkHost = poemHost;
     inkResize?.observe(poemHost);
 
-    if (!narrow && threads.length > 0) {
-      const arcs = buildArcSvg(
-        content,
-        threads,
-        (id) => layerById(content.layers, id),
-        state.focusThreadId
-      );
-      if (arcs) {
-        const arcsCol = document.createElement('div');
-        arcsCol.className = 'block-annotation__arcs-col';
-        arcsCol.append(arcs);
-        poemHost.append(arcsCol);
-      }
-    }
-
     const stanzasHost = document.createElement('div');
     stanzasHost.className = 'block-annotation__stanzas';
 
@@ -1103,18 +1171,18 @@ function buildInteractiveView(
     }
 
     const pipsByLine = new Map<string, HTMLElement[]>();
-    if (narrow) {
-      for (const ann of threads) {
-        const layer = layerById(content.layers, ann.layer_id);
-        resolvedThreadStops(content, ann).forEach((stop, index) => {
-          if (!stop.resolved.lineId) return;
-          const pip = buildStopPip(index, layer?.colour, () => {
-            enterFocus(ann.id, index);
-            paint();
-          });
-          pushGrouped(pipsByLine, stop.resolved.lineId, pip);
+    // Numbered pips mark each place of the thread being followed (every thread on a phone).
+    const pipThreads = focusAnn ? [focusAnn] : narrow ? threads : [];
+    for (const ann of pipThreads) {
+      const layer = layerById(content.layers, ann.layer_id);
+      resolvedThreadStops(content, ann).forEach((stop, index) => {
+        if (!stop.resolved.lineId) return;
+        const pip = buildStopPip(index, layer?.colour, () => {
+          enterFocus(ann.id, index);
+          paint();
         });
-      }
+        pushGrouped(pipsByLine, stop.resolved.lineId, pip);
+      });
     }
 
     const voiceClips = publishedVoiceTracks(content).flatMap(approvedClips);
@@ -1125,11 +1193,14 @@ function buildInteractiveView(
       pushGrouped(voiceByLine, clip.anchor.line, clip);
     }
 
+    const threadLines = focusAnn ? threadLineIds(content, focusAnn) : null;
+
     function paintLineRow(line: AnnotationLineModel, stanzaId: string): HTMLElement {
       const lineId = line.id;
       const row = document.createElement('div');
       row.className = 'block-annotation__line';
       row.dataset.lineId = lineId;
+      if (threadLines && !threadLines.has(lineId)) row.classList.add('is-thread-faded');
       if (
         focusAnn &&
         state.stepIndex != null &&
@@ -1213,77 +1284,27 @@ function buildInteractiveView(
       return row;
     }
 
-    if (focusAnn) {
-      const rows = foldRowsForThread(content, focusAnn, state);
-      let currentStanzaId = '';
-      let stanzaEl: HTMLElement | null = null;
-      let linesCol: HTMLElement | null = null;
-      let gutter: HTMLElement | null = null;
+    for (const stanza of content.text.stanzas) {
+      const stanzaEl = document.createElement('div');
+      stanzaEl.className = 'block-annotation__stanza';
+      stanzaEl.dataset.stanzaId = stanza.id;
 
-      const ensureStanza = (stanzaId: string) => {
-        if (stanzaEl && currentStanzaId === stanzaId) return;
-        stanzaEl = document.createElement('div');
-        stanzaEl.className = 'block-annotation__stanza';
-        stanzaEl.dataset.stanzaId = stanzaId;
-        gutter = document.createElement('div');
-        gutter.className = 'block-annotation__stanza-gutter';
-        for (const item of stanzaBars.get(stanzaId) ?? []) {
-          gutter.append(makeBarAnchor(item, 'stanza', (btn) => openPlaced(item, btn)));
-        }
-        stanzaEl.append(gutter);
-        linesCol = document.createElement('div');
-        linesCol.className = 'block-annotation__lines';
-        stanzaEl.append(linesCol);
-        stanzasHost.append(stanzaEl);
-        currentStanzaId = stanzaId;
-      };
-
-      for (const row of rows) {
-        if (row.kind === 'fold') {
-          ensureStanza(row.stanzaId);
-          const expanded = state.expandedFolds.has(row.id);
-          const foldRow = document.createElement('div');
-          foldRow.className = 'block-annotation__line block-annotation__line--fold';
-          foldRow.append(
-            buildFoldButton(row, expanded, () => {
-              const expandedFolds = new Set(state.expandedFolds);
-              if (expandedFolds.has(row.id)) expandedFolds.delete(row.id);
-              else expandedFolds.add(row.id);
-              state = { ...state, expandedFolds };
-              paint();
-            })
-          );
-          linesCol!.append(foldRow);
-          continue;
-        }
-        const meta = lineById.get(row.lineId);
-        if (!meta) continue;
-        ensureStanza(meta.stanzaId);
-        linesCol!.append(paintLineRow(meta.line, meta.stanzaId));
+      const gutter = document.createElement('div');
+      gutter.className = 'block-annotation__stanza-gutter';
+      for (const item of stanzaBars.get(stanza.id) ?? []) {
+        gutter.append(makeBarAnchor(item, 'stanza', (btn) => openPlaced(item, btn)));
       }
-    } else {
-      for (const stanza of content.text.stanzas) {
-        const stanzaEl = document.createElement('div');
-        stanzaEl.className = 'block-annotation__stanza';
-        stanzaEl.dataset.stanzaId = stanza.id;
+      stanzaEl.append(gutter);
 
-        const gutter = document.createElement('div');
-        gutter.className = 'block-annotation__stanza-gutter';
-        for (const item of stanzaBars.get(stanza.id) ?? []) {
-          gutter.append(makeBarAnchor(item, 'stanza', (btn) => openPlaced(item, btn)));
-        }
-        stanzaEl.append(gutter);
+      const linesCol = document.createElement('div');
+      linesCol.className = 'block-annotation__lines';
 
-        const linesCol = document.createElement('div');
-        linesCol.className = 'block-annotation__lines';
-
-        for (const line of stanza.lines) {
-          linesCol.append(paintLineRow(line, stanza.id));
-        }
-
-        stanzaEl.append(linesCol);
-        stanzasHost.append(stanzaEl);
+      for (const line of stanza.lines) {
+        linesCol.append(paintLineRow(line, stanza.id));
       }
+
+      stanzaEl.append(linesCol);
+      stanzasHost.append(stanzaEl);
     }
 
     poemHost.append(stanzasHost);
@@ -1339,6 +1360,11 @@ function buildInteractiveView(
     }
 
     textCol.scrollTop = scrollTop;
+    if (stepping) {
+      root
+        .querySelector<HTMLElement>('.block-annotation__line.is-step')
+        ?.scrollIntoView?.({ block: 'nearest' });
+    }
 
     // Ink over every visible anchor; labels only for word / phrase / line notes.
     const placedById = new Map(placed.map((item) => [item.annotation.id, item]));
