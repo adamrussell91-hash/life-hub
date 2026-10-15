@@ -242,3 +242,31 @@ test('tasks calendar: Term tier bars; Term↔Year tween; Back/Forward', async ()
     await context.close();
   }
 });
+
+test('tasks calendar: All shows every chip the Tasks default hid (lessons, health, …)', async () => {
+  const { context, page, errors } = await openTasksCalendar();
+  try {
+    // Mark what the Tasks default (Tasks + Promises only) hides once the hub sources land.
+    await page.waitForFunction(
+      () => document.querySelectorAll('[data-part="tideline"] .cal-chip.is-class').length > 0,
+      null,
+      { timeout: 15000 }
+    );
+    const hiddenAtStart = await page.evaluate(() => {
+      const chips = [...document.querySelectorAll('[data-part="tideline"] .cal-chip')].filter((n) => n.hidden);
+      chips.forEach((n) => n.setAttribute('data-hidden-at-start', ''));
+      return chips.length;
+    });
+    assert.ok(hiddenAtStart > 0, 'seeded week has chips outside Tasks/Promises');
+    await page.locator('[data-part="sources"] button[data-filter="all"]').click();
+    await page.waitForTimeout(400);
+    const shown = await page.locator('[data-hidden-at-start]').evaluateAll((nodes) =>
+      nodes.map((node) => ({ cls: node.className, hidden: node.hidden, opacity: Number(getComputedStyle(node).opacity) }))
+    );
+    const invisible = shown.filter((row) => row.hidden || row.opacity < 0.3);
+    assert.deepEqual(invisible, [], 'chips stayed invisible after All');
+    assert.equal(errors.length, 0, errors.join('\n'));
+  } finally {
+    await context.close();
+  }
+});
