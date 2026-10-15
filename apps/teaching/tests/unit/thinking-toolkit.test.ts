@@ -413,6 +413,16 @@ describe('usable in a lesson', () => {
     }
   });
 
+  it('a skill shows its question above "What to do"', () => {
+    const block = createBlock('toolkit_skill', 'question_1');
+    if (block.block_type !== 'toolkit_skill') throw new Error('expected a skill');
+    block.content.context = 'Explain how the poem treats renewal.';
+    const el = renderBlock(block, 'student');
+    const question = el.querySelector('.tk-question')!;
+    expect(question.querySelector('.tk-question__text')?.textContent).toBe('Explain how the poem treats renewal.');
+    expect(question.compareDocumentPosition(el.querySelector('.tk-guide')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('the teacher note starts closed and opens on click', () => {
     const el = renderBlock(createBlock('toolkit_skill', 'closed_1'), 'teacher');
     const toggle = el.querySelector<HTMLButtonElement>('.tk-note__toggle')!;
