@@ -58,6 +58,63 @@ function selectLineText(
 }
 
 describe('annotation thread editor 3c', () => {
+  it('a thread place on a word that has its own note offers both notes', () => {
+    const block = structuredClone(dulceAnnotationFixture) as AnnotationBlock;
+    block.id = 'block_overlap_test';
+    // ann_phrase becomes a thread whose second place is "trudge", which ann_word also notes.
+    const phrase = block.content.annotations.find((a) => a.id === 'ann_phrase')!;
+    phrase.anchor = { ...phrase.anchor, id: 'p1' };
+    phrase.also_anchors = [
+      {
+        id: 'p2',
+        granularity: 'word',
+        stanza: 'stanza_1',
+        line: 'line_4',
+        start: 38,
+        end: 44,
+        quote: { exact: 'trudge', prefix: 'distant rest began to ', suffix: '.' }
+      }
+    ];
+    phrase.thread = { order: 'text', title: 'Broken bodies' };
+    const { mount } = mountEditor(block);
+
+    const marks = [...mount.querySelectorAll<HTMLElement>('.block-editor__annotation-hl')];
+    const trudge = marks.find((m) => m.textContent === 'trudge')!;
+    expect(trudge.dataset.annotationIds?.split(' ').sort()).toEqual(['ann_phrase', 'ann_word']);
+    expect(trudge.classList.contains('has-several')).toBe(true);
+
+    trudge.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    const menu = document.querySelector<HTMLElement>('.block-editor__annotation-bar-menu')!;
+    expect(menu).toBeTruthy();
+    expect(menu.textContent).toContain('Thread, 2 places');
+    const items = [...menu.querySelectorAll<HTMLButtonElement>('.block-editor__annotation-bar-menu-item')];
+    items.find((b) => (b.textContent ?? '').includes('Thread'))!.click();
+    expect(mount.querySelector('.block-editor__annotation-thread-title input')).toBeTruthy();
+    mount.remove();
+  });
+
+  it('lists only the notes of the layer being annotated, in the side panel', () => {
+    const block = structuredClone(dulceAnnotationFixture) as AnnotationBlock;
+    block.id = 'block_layer_list_test';
+    const { mount } = mountEditor(block);
+    const list = mount.querySelector<HTMLElement>('.block-editor__annotation-note-list')!;
+    expect(list.closest('.block-editor__annotation-workspace')).toBeTruthy();
+    const imageryCount = block.content.annotations.filter((a) => a.layer_id === 'layer_imagery').length;
+    expect(list.querySelectorAll('.block-editor__annotation-open').length).toBe(imageryCount);
+
+    const structure = [
+      ...mount.querySelectorAll<HTMLButtonElement>('.block-editor__annotation-active-layer-btn')
+    ].find((b) => (b.textContent ?? '').startsWith('Structure'))!;
+    structure.click();
+    const structureCount = block.content.annotations.filter(
+      (a) => a.layer_id === 'layer_structure'
+    ).length;
+    expect(
+      mount.querySelectorAll('.block-editor__annotation-note-list .block-editor__annotation-open').length
+    ).toBe(structureCount);
+    mount.remove();
+  });
+
   it('saves a thread title once the note links a second place', () => {
     const { mount, getLatest } = mountEditor(dulceAnnotationFixture);
     openFirstNote(mount);

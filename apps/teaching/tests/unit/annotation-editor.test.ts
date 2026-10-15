@@ -120,6 +120,9 @@ describe('annotation editor 1b', () => {
         () => latest as Extract<Block, { block_type: 'annotation' }>
       )
     );
+    // The side panel starts on the notes list; open the first note from it.
+    expect(mount.querySelector<HTMLElement>('.block-editor__annotation-note-list')?.hidden).toBe(false);
+    mount.querySelector<HTMLButtonElement>('.block-editor__annotation-open')!.click();
     const panel = mount.querySelector<HTMLElement>('.block-editor__annotation-note');
     const del = mount.querySelector<HTMLButtonElement>('.block-editor__annotation-note-delete');
     expect(panel?.hidden).toBe(false);
@@ -203,6 +206,7 @@ describe('annotation editor 1b', () => {
       )
     );
 
+    mount.querySelector<HTMLButtonElement>('.block-editor__annotation-open')!.click();
     const name = [...mount.querySelectorAll<HTMLInputElement>(
       '.block-editor__annotation-layer-name'
     )].find((input) => input.value === 'Structure');

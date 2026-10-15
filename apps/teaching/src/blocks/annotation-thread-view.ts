@@ -140,6 +140,36 @@ export function buildStopPip(
 }
 
 /**
+ * Wrap plain-text offsets [start, end) of a rendered line in highlight spans.
+ * Works across nested marks by wrapping each text-node piece on its own.
+ */
+export function highlightTextRange(
+  root: HTMLElement,
+  start: number,
+  end: number,
+  make: () => HTMLElement
+): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const pieces: Array<{ node: Text; from: number; to: number }> = [];
+  let offset = 0;
+  for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+    const len = node.data.length;
+    const from = Math.max(start, offset);
+    const to = Math.min(end, offset + len);
+    if (from < to) pieces.push({ node, from: from - offset, to: to - offset });
+    offset += len;
+    if (offset >= end) break;
+  }
+  for (const { node, from, to } of pieces) {
+    const target = from > 0 ? node.splitText(from) : node;
+    if (to - from < target.data.length) target.splitText(to - from);
+    const wrap = make();
+    target.replaceWith(wrap);
+    wrap.append(target);
+  }
+}
+
+/**
  * Join the numbered pips of the followed thread with one line in the layer
  * colour, measured from where the pips actually sit so it always lines up.
  */
