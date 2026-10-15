@@ -915,11 +915,10 @@ export function createThinkingMoveEditor(
         THINKING_MOVE_PRESETS.map(
           (preset): HubMenuItem => ({
             label: preset.label,
-            hint: moveSentence(preset.skill, preset.tools, preset.value),
+            hint: moveSentence(preset.skill, preset.tools, c.value),
             onSelect: () => {
               c.skill = preset.skill;
               c.tools = [...preset.tools];
-              c.value = preset.value;
               recompose();
             }
           })
