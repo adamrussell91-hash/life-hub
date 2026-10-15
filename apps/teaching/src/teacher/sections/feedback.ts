@@ -2,6 +2,7 @@
  * Teaching › Feedback — minimal private feedback docs (4f).
  */
 import { apiGet, apiPost, ApiClientError } from '@/api/client';
+import { studentSiteOrigin } from '@/app/class-site';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { renderPageHeader } from '@/teacher/page-header';
 
@@ -91,7 +92,7 @@ export function renderFeedbackSection(canvas: HTMLElement): { dispose: () => voi
               `/api/teaching/feedback/${item.id}/link`,
               {}
             );
-            const url = `${window.location.origin}${result.path}`;
+            const url = `${studentSiteOrigin()}${result.path}`;
             await navigator.clipboard?.writeText(url).catch(() => undefined);
             status.textContent = `Private link ready${navigator.clipboard ? ' (copied)' : ''}: ${url}`;
             await refresh();

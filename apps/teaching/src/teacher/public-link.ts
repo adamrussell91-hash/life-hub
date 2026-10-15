@@ -1,5 +1,5 @@
 import { withAppBase } from '@/app/base-path';
-import { CLASS_SITE_ORIGIN } from '@/app/class-site';
+import { CLASS_SITE_ORIGIN, studentSiteOrigin } from '@/app/class-site';
 
 /**
  * Shared student public-path helpers and a discreet Copy/Open control.
@@ -29,13 +29,14 @@ export function absolutePublicUrl(kind: PublicEntityKind, id: string): string {
 }
 
 /**
- * URL a signed-in teacher opens to see the student page. Same origin as the
- * teacher app, so preview works wherever the teacher already is — the shared
- * student host is only for links handed to students.
+ * URL a signed-in teacher opens to see the student page. The student host, so
+ * the address bar never shows an umbrella URL that could be copied to a class.
+ * Local dev keeps the dev origin.
  */
 export function teacherPreviewUrl(kind: PublicEntityKind, id: string): string {
-  const path = publicStudentPath(kind, id);
-  return typeof location === 'undefined' ? path : `${location.origin}${path}`;
+  const origin = studentSiteOrigin();
+  if (origin === CLASS_SITE_ORIGIN) return absolutePublicUrl(kind, id);
+  return `${origin}${publicStudentPath(kind, id)}`;
 }
 
 export interface PublicLinkControlOptions {
