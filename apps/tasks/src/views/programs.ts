@@ -10,8 +10,8 @@ import {
   PROGRAM_TYPES
 } from '@/schemas/program';
 import { tasksApi } from '@/services/client-api';
+import { formatDisplayDateRange } from '../../design-kit/js/format-display-date.js';
 import {
-  programDatesLabel,
   queryPrograms,
   uniqueSorted,
   type ProgramFilters,
@@ -347,7 +347,7 @@ function renderDetail(
     propertyRow('Organiser', program.organiser),
     propertyRow('Location', program.location),
     propertyRow('Month', program.month),
-    propertyRow('Dates', programDatesLabel(program)),
+    propertyRow('Runs', program.starts_on ? formatDisplayDateRange(program.starts_on, program.ends_on) : null),
     propertyRow('Age group', program.age_groups.join(', ')),
     propertyRow('Subjects', program.subjects.join(', ')),
     propertyRow('Level', program.competition_level),
@@ -476,7 +476,7 @@ function renderAddForm(
   const registrationWindow = createHubField({ ariaLabel: 'Registration window' });
   const link = createHubField({ type: 'url', ariaLabel: 'Registration link' });
   const startsOn = createHubField({ type: 'date', ariaLabel: 'Starts' });
-  const endsOn = createHubField({ type: 'date', ariaLabel: 'Ends or due' });
+  const endsOn = createHubField({ type: 'date', ariaLabel: 'Ends' });
   const description = createHubTextarea({
     ariaLabel: 'Description',
     className: 'task-editor__notes'
@@ -499,7 +499,7 @@ function renderAddForm(
     type.el,
     month.el,
     field('Starts', startsOn.el),
-    field('Ends or due', endsOn.el),
+    field('Ends', endsOn.el),
     level.el,
     length.el,
     costBasis.el,
@@ -537,6 +537,9 @@ function renderAddForm(
       return;
     }
     session.close();
+    const start = startsOn.input.value || null;
+    const end = endsOn.input.value || null;
+    const dated = Boolean(start && end && end >= start);
     const draft: Partial<Program> & { name: string } = {
       name: name.input.value.trim(),
       types: type.getValue() ? [type.getValue()] : [],
@@ -554,8 +557,8 @@ function renderAddForm(
       registration_window: registrationWindow.input.value.trim(),
       not_available_nsw: nsw.checked,
       not_available_reason: reason.input.value.trim(),
-      starts_on: startsOn.input.value || null,
-      ends_on: endsOn.input.value || null
+      starts_on: dated ? start : null,
+      ends_on: dated ? end : null
     };
     const kind = draft.types?.[0];
     showConfirmWrite(

@@ -143,6 +143,23 @@ test("Day One review preserves complete prose and source ids, skips duplicates a
     0,
   );
 });
+test("Day One bulk import keeps every available visit without requiring photos", () => {
+  const payload = {
+    entries: Array.from({ length: 5 }, (_, i) => ({
+      uuid: `bulk-${i}`,
+      creationDate: `2026-01-${String(i + 1).padStart(2, "0")}T12:00:00Z`,
+      text: `Meal ${i}\nNotes`,
+      photos: i % 2 ? [{ filename: `p${i}.jpg` }] : [],
+    })),
+  };
+  const { visits, skipped } = importDayOne(payload, emptyJournal());
+  assert.equal(visits.length, 5);
+  assert.equal(skipped.length, 0);
+  assert.ok(visits.every((v) => Array.isArray(v.dishes[0].photos)));
+  assert.ok(visits.every((v) => v.dishes[0].photos.length === 0));
+  const journal = { ...emptyJournal(), visits: [...visits] };
+  assert.equal(validateFoodJournal(journal).visits.length, 5);
+});
 test("capture fills blanks but preserves personal notes and ratings", () => {
   const j = fixture(),
     v = j.visits[0];

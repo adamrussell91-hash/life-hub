@@ -1275,15 +1275,50 @@ export function createFoodJournalView({
   function openImport(trigger) {
     const s = modal("Import past meals", trigger);
     let review = null;
-    const selected = new Set(),
-      list = el("div", "food-import-list");
+    const selected = new Set();
+    const summary = el("p", "food-meta");
+    const toolbar = el("div", "food-import-toolbar");
+    const list = el("div", "food-import-list");
+    const importBtn = el("button", "btn btn--primary", "Import");
+    importBtn.type = "button";
+    const paintSelection = () => {
+      const n = selected.size;
+      importBtn.textContent =
+        n === 0
+          ? "Import"
+          : `Import ${n} ${n === 1 ? "meal" : "meals"}`;
+      importBtn.disabled = !review || n === 0;
+      if (!review) {
+        summary.textContent = "";
+        return;
+      }
+      const photos = review.visits.reduce(
+        (count, v) => count + (v.import_media?.length || 0),
+        0,
+      );
+      summary.textContent = `${review.visits.length} food entries ready. ${review.skipped.length} skipped.${photos ? ` ${photos} photo references optional — skip them.` : ""} ${n} selected.`;
+    };
+    const setAll = (on) => {
+      selected.clear();
+      if (on && review) for (const v of review.visits) selected.add(v.id);
+      for (const c of list.querySelectorAll("input[type=checkbox]"))
+        c.checked = on;
+      paintSelection();
+      s.error.textContent = "";
+    };
+    toolbar.append(
+      button("Select all", () => setAll(true), "ghost"),
+      button("Select none", () => setAll(false), "ghost"),
+    );
     s.fields.append(
       el(
         "p",
         "",
-        "Choose a Day One JSON export. Select the entries containing food.",
+        "Choose a Day One JSON export. Everything is selected for you — one Import click. Photos are optional.",
       ),
       field("Day One JSON export", "", () => {}, { type: "file" }),
+      summary,
+      toolbar,
       list,
     );
     const input = s.fields.querySelector("input");
@@ -1296,81 +1331,95 @@ export function createFoodJournalView({
         review = importDayOne(JSON.parse(await file.text()), journal);
         selected.clear();
         list.replaceChildren();
-        list.append(
-          el(
-            "p",
-            "food-meta",
-            `${review.visits.length} entries available. ${review.skipped.length} skipped.`,
-          ),
-        );
         for (const v of review.visits) {
+          selected.add(v.id);
           const label = el("label", "food-check"),
             c = el("input", "hub-check");
           c.type = "checkbox";
-          c.addEventListener("change", () =>
-            c.checked ? selected.add(v.id) : selected.delete(v.id),
-          );
+          c.checked = true;
+          c.addEventListener("change", () => {
+            c.checked ? selected.add(v.id) : selected.delete(v.id);
+            paintSelection();
+          });
           label.append(
             c,
             el("span", "", `${formatDisplayDate(v.date)}. ${v.title}`),
           );
           list.append(label);
         }
-        s.error.textContent = "Select food entries before importing.";
+        paintSelection();
+        s.error.textContent = review.visits.length
+          ? ""
+          : "No new food entries in that file.";
       } catch (e) {
         review = null;
+        selected.clear();
+        list.replaceChildren();
+        paintSelection();
         s.error.textContent = e.message;
       }
     });
-    const media = field("Exported photo files", "", () => {}, { type: "file" });
+    const media = field(
+      "Optional photo files (skip for text-only import)",
+      "",
+      () => {},
+      { type: "file" },
+    );
     media.querySelector("input").multiple = true;
     media.querySelector("input").accept = "image/*";
     s.fields.append(media);
-    s.actions.append(
-      button("Cancel", s.close, "ghost"),
-      button(
-        "Import selected",
-        async (e) => {
-          if (!review || !selected.size) {
-            s.error.textContent = "Select at least one food entry.";
-            return;
-          }
-          e.currentTarget.disabled = true;
-          try {
-            const next = structuredClone(journal),
-              files = [...media.querySelector("input").files],
-              chosen = structuredClone(
-                review.visits.filter((v) => selected.has(v.id)),
-              );
-            let missing = [];
-            for (const v of chosen) {
-              for (const ref of v.import_media) {
-                const file = files.find(
-                  (f) =>
-                    f.name === ref.filename ||
-                    f.name.replace(/\.[^.]+$/, "") === ref.identifier,
-                );
-                if (file) {
-                  v.dishes[0].photos.push(
-                    await api.upload(await compressPhoto(file)),
-                  );
-                } else missing.push(ref.filename || ref.identifier);
-              }
-              next.visits.push(v);
-            }
-            await persist(next);
-            s.close();
-            status(
-              `${chosen.length} ${chosen.length === 1 ? "visit" : "visits"} imported.${missing.length ? ` ${missing.length} unmatched photos: ${missing.join(", ")}.` : ""}`,
+    importBtn.addEventListener("click", async (ev) => {
+      if (!review || !selected.size) {
+        s.error.textContent = "Select at least one food entry.";
+        return;
+      }
+      const target = ev.currentTarget;
+      target.disabled = true;
+      try {
+        const next = structuredClone(journal),
+          files = [...media.querySelector("input").files],
+          chosen = structuredClone(
+            review.visits.filter((v) => selected.has(v.id)),
+          );
+        let matched = 0,
+          missing = 0;
+        for (const v of chosen) {
+          for (const ref of v.import_media || []) {
+            const file = files.find(
+              (f) =>
+                f.name === ref.filename ||
+                f.name.replace(/\.[^.]+$/, "") === ref.identifier,
             );
-          } catch (err) {
-            s.error.textContent = err.message;
-            e.currentTarget.disabled = false;
+            if (file) {
+              v.dishes[0].photos.push(
+                await api.upload(await compressPhoto(file)),
+              );
+              matched += 1;
+            } else missing += 1;
           }
-        },
-        "primary",
-      ),
-    );
+          next.visits.push(v);
+        }
+        await persist(next);
+        s.close();
+        const photoNote = files.length
+          ? matched
+            ? ` ${matched} photos attached.${missing ? ` ${missing} unmatched.` : ""}`
+            : missing
+              ? ` ${missing} photo references left unmatched.`
+              : ""
+          : missing
+            ? ` ${missing} photo references skipped (text-only).`
+            : "";
+        status(
+          `${chosen.length} ${chosen.length === 1 ? "visit" : "visits"} imported.${photoNote}`,
+        );
+      } catch (err) {
+        s.error.textContent = err.message;
+        paintSelection();
+      }
+    });
+    paintSelection();
+    s.actions.append(button("Cancel", s.close, "ghost"), importBtn);
   }
   async function backup() {
     if (!loaded) {

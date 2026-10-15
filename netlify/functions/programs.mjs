@@ -20,6 +20,8 @@ export function createProgramsHandler(deps = {}) {
       if (!name) {
         return { error: { code: 'validation_error', message: 'name is required' } };
       }
+      const picked = pickProgramDates(body);
+      const dated = picked.starts_on && picked.ends_on && picked.ends_on >= picked.starts_on;
       return {
         record: {
           schema_version: 1,
@@ -38,9 +40,12 @@ export function createProgramsHandler(deps = {}) {
           description: typeof body.description === 'string' ? body.description : '',
           registration_link: typeof body.registration_link === 'string' ? body.registration_link : null,
           registration_window: typeof body.registration_window === 'string' ? body.registration_window : '',
+          starts_on: dated ? picked.starts_on : null,
+          ends_on: dated ? picked.ends_on : null,
+          dates_source_url: picked.dates_source_url,
+          dates_checked_on: picked.dates_checked_on,
           not_available_nsw: body.not_available_nsw === true,
           not_available_reason: typeof body.not_available_reason === 'string' ? body.not_available_reason : '',
-          ...pickProgramDates(body),
           created_at: timestamp,
           updated_at: timestamp
         }
