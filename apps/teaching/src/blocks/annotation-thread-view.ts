@@ -21,6 +21,8 @@ export function asAnnotationBlock(content: AnnotationContent): AnnotationBlock {
 }
 
 export function threadShortTitle(annotation: AnnotationItem): string {
+  const title = annotation.thread?.title?.trim();
+  if (title) return title;
   if (annotation.thread?.kind) {
     const label =
       annotation.thread.kind.charAt(0).toUpperCase() + annotation.thread.kind.slice(1);
@@ -88,7 +90,7 @@ export function buildThreadChip(
 ): HTMLButtonElement {
   const chip = document.createElement('button');
   chip.type = 'button';
-  chip.className = `block-annotation__thread-chip block-annotation__chip--${layer?.colour ?? 'wave'}`;
+  chip.className = `block-annotation__thread-chip block-annotation__thread-chip--${layer?.colour ?? 'wave'}`;
   if (focused) chip.classList.add('is-focused');
   chip.dataset.threadId = annotation.id;
   chip.setAttribute('aria-pressed', focused ? 'true' : 'false');
@@ -96,13 +98,28 @@ export function buildThreadChip(
   chip.title = focused
     ? 'Stop following this thread'
     : `Follow this thread through ${placesLabel(stopCount)} in the text`;
+  // A small joined-dots glyph: reads as "linked places", not as a layer toggle.
+  const glyph = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  glyph.setAttribute('class', 'block-annotation__thread-glyph');
+  glyph.setAttribute('viewBox', '0 0 12 20');
+  glyph.setAttribute('aria-hidden', 'true');
+  for (const [tag, attrs] of [
+    ['path', { d: 'M6 3 V17' }],
+    ['circle', { cx: '6', cy: '3', r: '2.4' }],
+    ['circle', { cx: '6', cy: '10', r: '2.4' }],
+    ['circle', { cx: '6', cy: '17', r: '2.4' }]
+  ] as const) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    glyph.append(el);
+  }
   const name = document.createElement('span');
   name.className = 'block-annotation__thread-chip-name';
   name.textContent = short;
   const count = document.createElement('span');
   count.className = 'block-annotation__thread-chip-count';
   count.textContent = placesLabel(stopCount);
-  chip.append(name, count);
+  chip.append(glyph, name, count);
   chip.addEventListener('click', onSelect);
   return chip;
 }

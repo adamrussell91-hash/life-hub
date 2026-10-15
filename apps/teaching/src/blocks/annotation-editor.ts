@@ -2100,6 +2100,30 @@ export function createAnnotationEditorFields(
 
     const isThread = (selected.also_anchors?.length ?? 0) > 0;
     if (isThread) {
+      const titleLabel = document.createElement('label');
+      titleLabel.className = 'block-editor__annotation-thread-title';
+      const titleText = document.createElement('span');
+      titleText.className = 'block-editor__hint';
+      titleText.textContent = 'Thread title: what links these places? Students see this on the thread button.';
+      const titleInput = document.createElement('input');
+      titleInput.type = 'text';
+      titleInput.maxLength = 80;
+      titleInput.placeholder = 'e.g. Clinical, cold words';
+      titleInput.value = selected.thread?.title ?? '';
+      titleInput.addEventListener('change', () => {
+        const title = titleInput.value.trim();
+        annotations = annotations.map((ann) => {
+          if (ann.id !== selected.id) return ann;
+          const thread: AnnotationThread = { ...(ann.thread ?? { order: 'text' }) };
+          if (title) thread.title = title;
+          else delete thread.title;
+          return { ...ann, thread, updated_at: nowIso() };
+        });
+        emitChange();
+      });
+      titleLabel.append(titleText, titleInput);
+      threadHost.append(titleLabel);
+
       const kindLabel = document.createElement('p');
       kindLabel.className = 'block-editor__hint';
       kindLabel.textContent = 'Thread kind';

@@ -58,6 +58,31 @@ function selectLineText(
 }
 
 describe('annotation thread editor 3c', () => {
+  it('saves a thread title once the note links a second place', () => {
+    const { mount, getLatest } = mountEditor(dulceAnnotationFixture);
+    openFirstNote(mount);
+    expect(mount.querySelector('.block-editor__annotation-thread-title')).toBeNull();
+    mount.querySelector<HTMLButtonElement>('.block-editor__annotation-add-place')?.click();
+    const lineEl = mount.querySelector<HTMLElement>('.block-editor__annotation-line-text')!;
+    const start = (lineEl.textContent ?? '').indexOf('Bent');
+    selectLineText(mount, lineEl.dataset.lineId!, start, start + 'Bent'.length);
+
+    const input = mount.querySelector<HTMLInputElement>(
+      '.block-editor__annotation-thread-title input'
+    )!;
+    expect(input).toBeTruthy();
+    input.value = '  Broken bodies  ';
+    input.dispatchEvent(new Event('change'));
+    expect(getLatest().content.annotations[0]!.thread?.title).toBe('Broken bodies');
+
+    const again = mount.querySelector<HTMLInputElement>(
+      '.block-editor__annotation-thread-title input'
+    )!;
+    again.value = '';
+    again.dispatchEvent(new Event('change'));
+    expect(getLatest().content.annotations[0]!.thread?.title).toBeUndefined();
+  });
+
   it('adds also_anchors from Add another place + text selection', () => {
     const { mount, getLatest } = mountEditor(dulceAnnotationFixture);
     openFirstNote(mount);
