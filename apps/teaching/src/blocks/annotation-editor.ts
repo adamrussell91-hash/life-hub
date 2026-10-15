@@ -49,8 +49,10 @@ import {
   mountVoiceReview,
   type VoiceReviewHandle
 } from '@/blocks/voice-review';
+import { offerTimedUndo } from '../../design-kit/js/hub-feedback.js';
 import {
   HUB_LIST_ICONS,
+  bindHoldToConfirm,
   createHubList
 } from '../../design-kit/js/hub-list.js';
 import { applyHubPillsThumb } from '../../design-kit/js/hub-motion.js';
@@ -1625,6 +1627,53 @@ export function createAnnotationEditorFields(
         : granularity === 'line'
           ? 'Note on this line'
           : 'Note on';
+    const actions = document.createElement('div');
+    actions.className = 'block-editor__annotation-note-actions';
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className =
+      'hub-action-menu__item hub-action-menu__item--danger hub-action-menu__item--hold block-editor__annotation-note-delete';
+    remove.setAttribute('aria-label', 'Delete note. Press and hold to confirm');
+    const removeIcon = document.createElement('span');
+    removeIcon.className = 'hub-action-menu__icon';
+    removeIcon.innerHTML = HUB_LIST_ICONS.trash;
+    const removeLabel = document.createElement('span');
+    removeLabel.className = 'hub-action-menu__label';
+    removeLabel.textContent = 'Delete note';
+    const removeHint = document.createElement('span');
+    removeHint.className = 'hub-action-menu__hint';
+    removeHint.textContent = 'Hold';
+    remove.append(removeIcon, removeLabel, removeHint);
+    const noteId = selected.id;
+    bindHoldToConfirm(remove, {
+      onConfirm: () => {
+        const index = annotations.findIndex((ann) => ann.id === noteId);
+        if (index < 0) return;
+        const gone = annotations[index]!;
+        annotations = annotations.filter((ann) => ann.id !== noteId);
+        if (selectedAnnotationId === noteId) selectedAnnotationId = null;
+        emitChange();
+        const quote = gone.anchor.quote.exact.split('\n')[0]?.slice(0, 40) || 'Note';
+        offerTimedUndo({
+          message: `${quote} deleted`,
+          onUndo: () => {
+            const at = Math.min(index, annotations.length);
+            annotations = [...annotations.slice(0, at), gone, ...annotations.slice(at)];
+            selectedAnnotationId = gone.id;
+            emitChange();
+          }
+        });
+        annotationsHost
+          .querySelector<HTMLButtonElement>('.block-editor__annotation-ann-list .hub-list__add')
+          ?.focus();
+      },
+      onEarlyRelease: () => {
+        removeHint.textContent = 'Keep holding';
+        remove.classList.add('is-nudged');
+      }
+    });
+
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'block-editor__annotation-note-close';
@@ -1634,7 +1683,8 @@ export function createAnnotationEditorFields(
       paintNotePanel();
       paintSelectSurface();
     });
-    header.append(heading, close);
+    actions.append(remove, close);
+    header.append(heading, actions);
 
     const quote = document.createElement('blockquote');
     quote.className = 'block-editor__annotation-note-quote';
@@ -2377,7 +2427,6 @@ export function createAnnotationEditorFields(
     annotationsHost.append(annList.el);
     annotationsHost.scrollTop = annScroll;
 
-    void HUB_LIST_ICONS;
   }
 
   // Title and attribution are typed. A full repaint would drop the caret and reload the layers list.

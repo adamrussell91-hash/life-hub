@@ -9897,15 +9897,48 @@ body.is-lesson-builder-full-page .hub-utilities {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
 }
 
 .block-editor__annotation-note-title {
   margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   font-weight: 600;
+}
+
+.block-editor__annotation-note-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.block-editor__annotation-note-actions .hub-action-menu__item.block-editor__annotation-note-delete {
+  width: auto;
+  flex: 0 0 auto;
+  min-height: 2.75rem;
+  white-space: nowrap;
+  grid-template-columns: var(--space-5) auto auto;
+}
+
+@media (max-width: 720px) {
+  .block-editor__annotation-note-actions {
+    flex: 1 0 100%;
+    margin-left: 0;
+  }
+
+  .block-editor__annotation-note-actions .hub-action-menu__item.block-editor__annotation-note-delete,
+  .block-editor__annotation-note-actions .block-editor__annotation-note-close {
+    flex: 1 1 0;
+    min-height: 2.75rem;
+  }
 }
 
 .block-editor__annotation-note-close,
