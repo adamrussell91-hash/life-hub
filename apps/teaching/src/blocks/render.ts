@@ -31,6 +31,7 @@ import type { PublicOutcome } from '@/curriculum/outcome-catalog';
 import { openHubMediaViewer } from '../../design-kit/js/hub-media-viewer.js';
 import { createHubAudioPlayer } from '../../design-kit/js/hub-audio-player.js';
 import { mountHubImageAnnotator } from '../../design-kit/js/hub-image-annotate.js';
+import { renderToolkitContent } from '@/toolkit/render';
 import 'photoswipe/dist/photoswipe.css';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
@@ -39,6 +40,8 @@ export type RenderContext = {
   attachedOutcomes?: PublicOutcome[];
   anthology?: AnthologyData;
   openNoteId?: string;
+  /** Every block on the page, for blocks that read the whole lesson (Thinking reflection). */
+  pageBlocks?: Block[];
   onMakeAnthologyCards?: (request: {
     items: AnthologyData['items'];
     view: 'text' | 'theme' | 'technique' | 'connections';
@@ -60,7 +63,7 @@ export const CALLOUT_STYLE_CLASS = {
   scaffold: 'callout--sand',
   example: 'callout--shore',
   remember: 'callout--shore',
-  teacher: 'callout--wave'
+  teacher: 'callout--teacher'
 } as const;
 
 function wrapBlock(content: HTMLElement, block: Block, mode: RenderMode): HTMLElement {
@@ -2260,6 +2263,16 @@ export function renderBlock(
       return renderWhiteboardBlock(block, mode);
     case 'annotation':
       return renderAnnotationBlock(block, mode, ctx);
+    case 'toolkit_skill':
+    case 'toolkit_tool':
+    case 'toolkit_value':
+    case 'thinking_move':
+    case 'question_quadrant':
+    case 'concept_features':
+    case 'thinking_intentions':
+    case 'thinking_reflection':
+    case 'teacher_note':
+      return wrapBlock(renderToolkitContent(block, mode, ctx)!, block, mode);
     }
   } catch {
     const fallback = document.createElement('p');

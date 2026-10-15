@@ -96,11 +96,28 @@ export function stripAnnotationTeacherContent(block, teacherOnlyIds = new Set())
   };
 }
 
+// Thinking Toolkit blocks carry a teacher note and per-class notes; strip both.
+// Keep in step with apps/teaching/src/blocks/visibility.ts.
+const TOOLKIT_TEACHER_FIELD_TYPES = new Set([
+  'toolkit_skill',
+  'toolkit_tool',
+  'toolkit_value',
+  'thinking_move',
+  'question_quadrant',
+  'concept_features',
+  'thinking_reflection'
+]);
+
 function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
   if (!Array.isArray(blocks)) return [];
   return blocks
-    .filter(block => block?.visibility === 'student_teacher')
+    // Teacher note blocks are always teacher-only, whatever visibility a draft carries.
+    .filter(block => block?.visibility === 'student_teacher' && block?.block_type !== 'teacher_note')
     .map(block => {
+      if (TOOLKIT_TEACHER_FIELD_TYPES.has(block.block_type)) {
+        const { teacher_note: _note, teacher_jots: _jots, ...content } = block.content ?? {};
+        return { ...block, content };
+      }
       if (block.block_type === 'section') {
         return {
           ...block,

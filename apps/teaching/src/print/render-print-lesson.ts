@@ -15,8 +15,9 @@ export function renderPrintLesson(lesson: Lesson): HTMLElement {
   const body = document.createElement('div');
   body.className = 'print-document__body';
 
-  for (const block of filterBlocksForStudent(lesson.blocks)) {
-    body.append(renderBlock(block, 'print', { lessonId: lesson.id }));
+  const studentBlocks = filterBlocksForStudent(lesson.blocks);
+  for (const block of studentBlocks) {
+    body.append(renderBlock(block, 'print', { lessonId: lesson.id, pageBlocks: studentBlocks }));
   }
 
   root.append(body);
