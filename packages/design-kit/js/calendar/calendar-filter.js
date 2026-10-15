@@ -252,6 +252,10 @@ export function applyItemVisibility(nodes, entries, state, motion = {}) {
     const visible = isItemVisible(item, state);
     node.hidden = !visible;
     node.classList.toggle('is-filter-hidden', !visible);
+    // The engine fades through --o and never touches inline opacity. Clear the
+    // inline fallback on show, or a chip hidden at first paint (Tasks default
+    // has Classes off) stays transparent after "All" turns it back on.
+    if (visible && node.style) node.style.opacity = '';
     if (motion.engine?.to && !motion.reducedMotion) {
       motion.engine.to(id, { opacity: visible ? 1 : 0 }, { duration: 160 });
     } else if (node.style) {
