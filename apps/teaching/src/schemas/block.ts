@@ -1,5 +1,16 @@
 import { z } from 'zod';
 import { IsoDateSchema } from './common';
+import {
+  ConceptFeaturesContentSchema,
+  QuestionQuadrantContentSchema,
+  TeacherNoteBlockContentSchema,
+  ThinkingIntentionsContentSchema,
+  ThinkingMoveContentSchema,
+  ThinkingReflectionContentSchema,
+  ToolkitSkillContentSchema,
+  ToolkitToolContentSchema,
+  ToolkitValueContentSchema
+} from './toolkit';
 
 export const VisibilitySchema = z.enum(['student_teacher', 'teacher_only']);
 export const BlockTypeSchema = z.enum([
@@ -39,7 +50,16 @@ export const BlockTypeSchema = z.enum([
   'collection',
   'anthology',
   'outcomes',
-  'annotation'
+  'annotation',
+  'toolkit_skill',
+  'toolkit_tool',
+  'toolkit_value',
+  'thinking_move',
+  'question_quadrant',
+  'concept_features',
+  'thinking_intentions',
+  'thinking_reflection',
+  'teacher_note'
 ]);
 
 export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33', 'custom']);
@@ -1057,6 +1077,52 @@ export type AnnotationThread = z.infer<typeof AnnotationThreadSchema>;
 export type AnnotationVoiceTrack = z.infer<typeof AnnotationVoiceTrackSchema>;
 export type AnthologyTag = z.infer<typeof AnthologyTagSchema>;
 
+function toolkitBlockSchema<T extends string, C extends z.ZodTypeAny>(blockType: T, content: C) {
+  return z.object({
+    id: z.string().min(1),
+    type: z.literal('block'),
+    block_type: z.literal(blockType),
+    variant: z.string().default('medium'),
+    visibility: VisibilitySchema,
+    content,
+    ...blockLayout,
+    ...blockTimestamps
+  });
+}
+
+export const ToolkitSkillBlockSchema = toolkitBlockSchema('toolkit_skill', ToolkitSkillContentSchema);
+export const ToolkitToolBlockSchema = toolkitBlockSchema('toolkit_tool', ToolkitToolContentSchema);
+export const ToolkitValueBlockSchema = toolkitBlockSchema('toolkit_value', ToolkitValueContentSchema);
+export const ThinkingMoveBlockSchema = toolkitBlockSchema('thinking_move', ThinkingMoveContentSchema);
+export const QuestionQuadrantBlockSchema = toolkitBlockSchema(
+  'question_quadrant',
+  QuestionQuadrantContentSchema
+);
+export const ConceptFeaturesBlockSchema = toolkitBlockSchema(
+  'concept_features',
+  ConceptFeaturesContentSchema
+);
+export const ThinkingIntentionsBlockSchema = toolkitBlockSchema(
+  'thinking_intentions',
+  ThinkingIntentionsContentSchema
+);
+export const ThinkingReflectionBlockSchema = toolkitBlockSchema(
+  'thinking_reflection',
+  ThinkingReflectionContentSchema
+);
+
+/** Always teacher-only: any stored visibility is read back as `teacher_only`. */
+export const TeacherNoteBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('teacher_note'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema.transform(() => 'teacher_only' as const),
+  content: TeacherNoteBlockContentSchema,
+  ...blockLayout,
+  ...blockTimestamps
+});
+
 const leafBlockSchemas = [
   RichTextBlockSchema,
   HeadingBlockSchema,
@@ -1087,7 +1153,16 @@ const leafBlockSchemas = [
   WhiteboardBlockSchema,
   OutcomesBlockSchema,
   AnnotationBlockObjectSchema,
-  AnthologyBlockObjectSchema
+  AnthologyBlockObjectSchema,
+  ToolkitSkillBlockSchema,
+  ToolkitToolBlockSchema,
+  ToolkitValueBlockSchema,
+  ThinkingMoveBlockSchema,
+  QuestionQuadrantBlockSchema,
+  ConceptFeaturesBlockSchema,
+  ThinkingIntentionsBlockSchema,
+  ThinkingReflectionBlockSchema,
+  TeacherNoteBlockSchema
 ] as const;
 
 export const SpacerBlockSchema = z.object({

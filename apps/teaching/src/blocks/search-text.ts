@@ -112,7 +112,21 @@ function extractBlock(block: Block, parts: string[]): void {
     }
     case 'spacer':
     case 'divider':
+    case 'teacher_note':
       break;
+    case 'toolkit_skill':
+    case 'toolkit_tool':
+    case 'toolkit_value':
+    case 'thinking_move':
+    case 'question_quadrant':
+    case 'concept_features':
+    case 'thinking_intentions':
+    case 'thinking_reflection': {
+      // Never index teacher notes or class notes; search can reach student pages.
+      const { teacher_note: _note, teacher_jots: _jots, ...studentContent } = c;
+      walkStrings(studentContent, parts);
+      break;
+    }
     default:
       walkStrings(c, parts);
   }

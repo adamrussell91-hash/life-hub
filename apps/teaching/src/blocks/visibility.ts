@@ -70,13 +70,39 @@ export function stripAnnotationTeacherContent(
   };
 }
 
+const TEACHER_FIELD_BLOCK_TYPES = new Set<string>([
+  'toolkit_skill',
+  'toolkit_tool',
+  'toolkit_value',
+  'thinking_move',
+  'question_quadrant',
+  'concept_features',
+  'thinking_reflection'
+]);
+
+/** Toolkit blocks carry a teacher note and class notes that never reach students. */
+function stripToolkitTeacherFields(block: Block): Block {
+  const { teacher_note: _note, teacher_jots: _jots, ...content } = block.content as Record<
+    string,
+    unknown
+  >;
+  return { ...block, content } as Block;
+}
+
 function filterBlocksForStudentInner(
   blocks: Block[],
   teacherOnlyIds: Set<string>
 ): Block[] {
   return blocks
-    .filter((block) => block.visibility === 'student_teacher')
+    // Teacher note blocks are teacher-only by schema; the type check guards stale drafts too.
+    .filter(
+      (block) =>
+        block.visibility === 'student_teacher' && (block.block_type as string) !== 'teacher_note'
+    )
     .map((block) => {
+      if (TEACHER_FIELD_BLOCK_TYPES.has(block.block_type)) {
+        return stripToolkitTeacherFields(block);
+      }
       if (block.block_type === 'section') {
         return {
           ...block,

@@ -1,5 +1,15 @@
 import { emptyColumnsForPreset } from '@/blocks/column-presets';
 import type { Block, EmbedProvider } from '@/schemas/block';
+import {
+  conceptContent,
+  intentionsContent,
+  moveContent,
+  quadrantContent,
+  reflectionContent,
+  skillContent,
+  toolContent,
+  valueContent
+} from '@/toolkit/content';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 type SectionBlock = Extract<Block, { block_type: 'section' }>;
@@ -42,7 +52,16 @@ export const NEW_BLOCK_TYPES = [
   'collection',
   'anthology',
   'outcomes',
-  'annotation'
+  'annotation',
+  'teacher_note',
+  'toolkit_skill',
+  'toolkit_tool',
+  'toolkit_value',
+  'thinking_move',
+  'question_quadrant',
+  'concept_features',
+  'thinking_intentions',
+  'thinking_reflection'
 ] as const;
 
 export type NewBlockType = (typeof NEW_BLOCK_TYPES)[number];
@@ -84,7 +103,16 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   collection: 'Collection',
   anthology: 'Anthology',
   outcomes: 'Outcomes',
-  annotation: 'Annotation'
+  annotation: 'Annotation',
+  teacher_note: 'Teacher note',
+  toolkit_skill: 'Toolkit skill',
+  toolkit_tool: 'Toolkit tool',
+  toolkit_value: 'Toolkit value',
+  thinking_move: 'Thinking move',
+  question_quadrant: 'Question Quadrant',
+  concept_features: 'Features of a Concept',
+  thinking_intentions: 'Thinking intentions',
+  thinking_reflection: 'Thinking reflection'
 };
 
 export const EMBED_INSERT_PRESETS = [
@@ -125,6 +153,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
       'rich_text',
       'heading',
       'callout',
+      'teacher_note',
       'quote',
       'table',
       'definition',
@@ -140,6 +169,19 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   {
     label: 'Teaching',
     types: ['outcomes']
+  },
+  {
+    label: 'Thinking Toolkit',
+    types: [
+      'thinking_intentions',
+      'toolkit_skill',
+      'toolkit_tool',
+      'toolkit_value',
+      'thinking_move',
+      'question_quadrant',
+      'concept_features',
+      'thinking_reflection'
+    ]
   },
   {
     label: 'Learning',
@@ -166,7 +208,20 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
 ];
 
 const PAGE_ONLY_TYPES = new Set(['collection', 'anthology']);
+const TOOLKIT_GROUP_TYPES = [
+  'thinking_intentions',
+  'toolkit_skill',
+  'toolkit_tool',
+  'toolkit_value',
+  'thinking_move',
+  'question_quadrant',
+  'concept_features',
+  'thinking_reflection'
+];
+
 const HOMEPAGE_EXCLUDED = new Set([
+  ...TOOLKIT_GROUP_TYPES,
+  'teacher_note',
   'flashcards',
   'cloze',
   'self_check',
@@ -186,7 +241,9 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
     (type) =>
-      !['flashcards', 'cloze', 'self_check', 'outcomes', 'annotation'].includes(type)
+      !['flashcards', 'cloze', 'self_check', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
+        type
+      )
   )
 })).filter((group) => group.types.length > 0);
 
@@ -259,6 +316,70 @@ export function createBlock(type: NewBlockType, id: string): Block {
   const shared = sharedBlockFields(id);
 
   switch (type) {
+    case 'teacher_note':
+      return {
+        ...shared,
+        visibility: 'teacher_only',
+        block_type: 'teacher_note',
+        variant: 'medium',
+        content: { title: 'Teacher note', html: '' }
+      };
+    case 'toolkit_skill':
+      return {
+        ...shared,
+        block_type: 'toolkit_skill',
+        variant: 'medium',
+        content: skillContent('skill:justify', id)
+      };
+    case 'toolkit_tool':
+      return {
+        ...shared,
+        block_type: 'toolkit_tool',
+        variant: 'medium',
+        content: toolContent('tool:distinction', id)
+      };
+    case 'toolkit_value':
+      return {
+        ...shared,
+        block_type: 'toolkit_value',
+        variant: 'medium',
+        content: valueContent('value:precision', id)
+      };
+    case 'thinking_move':
+      return {
+        ...shared,
+        block_type: 'thinking_move',
+        variant: 'medium',
+        content: moveContent('skill:justify', ['tool:reasons'], 'value:relevance', id)
+      };
+    case 'question_quadrant':
+      return {
+        ...shared,
+        block_type: 'question_quadrant',
+        variant: 'medium',
+        content: quadrantContent(id)
+      };
+    case 'concept_features':
+      return {
+        ...shared,
+        block_type: 'concept_features',
+        variant: 'medium',
+        content: conceptContent(id)
+      };
+    case 'thinking_intentions':
+      return {
+        ...shared,
+        block_type: 'thinking_intentions',
+        variant: 'medium',
+        content: intentionsContent()
+      };
+    case 'thinking_reflection':
+      return {
+        ...shared,
+        block_type: 'thinking_reflection',
+        variant: 'medium',
+        content: reflectionContent()
+      };
     case 'rich_text':
       return { ...shared, block_type: 'rich_text', variant: 'medium', content: { html: '' } };
     case 'heading':

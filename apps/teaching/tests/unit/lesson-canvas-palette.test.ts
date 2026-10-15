@@ -14,6 +14,7 @@ describe('lesson palette catalog', () => {
       'Basic',
       'Media',
       'Teaching',
+      'Thinking Toolkit',
       'Learning',
       'Visualisation',
       'Layout',

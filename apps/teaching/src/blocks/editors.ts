@@ -1,4 +1,15 @@
 import { createAlchemyButton } from '@/alchemy/block-button';
+import {
+  createConceptFeaturesEditor,
+  createQuestionQuadrantEditor,
+  createTeacherNoteBlockEditor,
+  createThinkingIntentionsEditor,
+  createThinkingMoveEditor,
+  createThinkingReflectionEditor,
+  createToolkitSkillEditor,
+  createToolkitToolEditor,
+  createToolkitValueEditor
+} from '@/toolkit/editors';
 import katex from 'katex';
 import { offerTimedUndo } from '../../design-kit/js/hub-feedback.js';
 import {
@@ -2852,6 +2863,40 @@ function createBlockEditorFields(
         latest as () => Extract<Block, { block_type: 'annotation' }>,
         context
       );
+    case 'toolkit_skill':
+      return createToolkitSkillEditor(block, onChange, latest as () => Extract<Block, { block_type: 'toolkit_skill' }>);
+    case 'toolkit_tool':
+      return createToolkitToolEditor(block, onChange, latest as () => Extract<Block, { block_type: 'toolkit_tool' }>);
+    case 'toolkit_value':
+      return createToolkitValueEditor(block, onChange, latest as () => Extract<Block, { block_type: 'toolkit_value' }>);
+    case 'thinking_move':
+      return createThinkingMoveEditor(block, onChange, latest as () => Extract<Block, { block_type: 'thinking_move' }>);
+    case 'question_quadrant':
+      return createQuestionQuadrantEditor(
+        block,
+        onChange,
+        latest as () => Extract<Block, { block_type: 'question_quadrant' }>
+      );
+    case 'concept_features':
+      return createConceptFeaturesEditor(
+        block,
+        onChange,
+        latest as () => Extract<Block, { block_type: 'concept_features' }>
+      );
+    case 'thinking_intentions':
+      return createThinkingIntentionsEditor(
+        block,
+        onChange,
+        latest as () => Extract<Block, { block_type: 'thinking_intentions' }>
+      );
+    case 'thinking_reflection':
+      return createThinkingReflectionEditor(
+        block,
+        onChange,
+        latest as () => Extract<Block, { block_type: 'thinking_reflection' }>
+      );
+    case 'teacher_note':
+      return createTeacherNoteBlockEditor(block, onChange, latest as () => Extract<Block, { block_type: 'teacher_note' }>);
   }
 }
 

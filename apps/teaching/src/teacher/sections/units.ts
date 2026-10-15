@@ -903,6 +903,7 @@ function mountUnitPlanEditor(
     idFactory: () => nextId(),
     renderPreview: (block) =>
       renderBlock(block, 'teacher', {
+        pageBlocks: blocks,
         attachedOutcomes,
         anthology: anthologyData,
         onMakeAnthologyCards: (request) => {
