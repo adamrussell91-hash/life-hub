@@ -7,7 +7,9 @@
  * - phrase  → a straight underline (fineliner) or a flat band (highlighter)
  * - line    → a square bracket in the line margin
  * - stanza  → a tall square bracket with a centre tick
- * - margin  → short handwritten labels in the right margin (fineliner, wide only)
+ * - margin  → short notes in the right margin (fineliner, wide only). When the
+ *             notes crowd each other they fold to one-line previews; the
+ *             selected note opens in full and the other marks fade back.
  */
 import type { AnnotationColour } from '@/schemas/block';
 
@@ -71,9 +73,9 @@ export type InkMark = {
   kind: 'word' | 'phrase' | 'line' | 'stanza';
   colour: AnnotationColour;
   el: HTMLElement;
-  /** Handwritten margin note (fineliner, wide only); omitted = no note. */
+  /** Margin note (fineliner, wide only); omitted = no note. */
   label?: string;
-  /** Set only when the margin text is not the whole note (technique, attachment). */
+  /** Clicking the margin note runs this (selects the note, or opens the reader). */
   onOpen?: () => void;
 };
 
@@ -84,6 +86,10 @@ function rel(rect: DOMRect, base: DOMRect): InkRect {
 /** Width below which margin labels fold away (phone, narrow columns). */
 export const MARGIN_LABEL_MIN_WIDTH = 640;
 
+/** Margin notes grow into free space beside the poem, between these widths. */
+const MARGIN_NOTE_MIN_WIDTH = 208;
+const MARGIN_NOTE_MAX_WIDTH = 320;
+
 /**
  * Draw ink for `marks` into `host` (position: relative). Returns the ids drawn
  * so the caller can animate only marks that are new since the last paint.
@@ -91,14 +97,16 @@ export const MARGIN_LABEL_MIN_WIDTH = 640;
 export function drawAnnotationInk(
   host: HTMLElement,
   marks: InkMark[],
-  options: { style: AnnotationInkStyle; animateIds?: Set<string> }
+  options: { style: AnnotationInkStyle; animateIds?: Set<string>; activeId?: string | null }
 ): Set<string> {
   host.querySelectorAll(':scope > .block-annotation__ink, :scope > .block-annotation__margin-note').forEach((el) =>
     el.remove()
   );
+  host.classList.remove('has-active-note');
   const drawn = new Set<string>();
   const base = host.getBoundingClientRect();
   if (base.width === 0 || marks.length === 0) return drawn;
+  const activeId = options.activeId ?? null;
 
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'block-annotation__ink');
@@ -117,6 +125,7 @@ export function drawAnnotationInk(
     path.setAttribute('d', d);
     path.setAttribute('class', `block-annotation__ink-${kind} block-annotation__ink--${mark.colour}`);
     path.dataset.annotationId = mark.annotationId;
+    if (mark.annotationId === activeId) path.classList.add('is-active');
     if (kind === 'band') svg.prepend(path);
     else svg.append(path);
     const animate = !reduced && options.animateIds?.has(mark.annotationId);
@@ -175,17 +184,15 @@ export function drawAnnotationInk(
         const btn = note as HTMLButtonElement;
         btn.type = 'button';
         btn.title = mark.label!;
-        btn.setAttribute('aria-label', `Open note: ${mark.label}`);
         btn.addEventListener('click', mark.onOpen!);
       }
+      if (mark.annotationId === activeId) note.classList.add('is-active');
       if (!reduced && options.animateIds?.has(mark.annotationId)) note.classList.add('is-drawing');
       host.append(note);
       return note;
     });
-    const tops = stackLabels(
-      labels.map((row, i) => ({ y: row.y, h: notes[i]!.offsetHeight || 22 }))
-    );
-    // Labels sit a short gap after the longest line, not at the far edge.
+    // Labels sit a short gap after the longest line, not at the far edge, and
+    // use the free width beside the poem so previews show more of each note.
     let textRight = 0;
     host.querySelectorAll<HTMLElement>('.block-annotation__line-text').forEach((line) => {
       const range = document.createRange();
@@ -194,16 +201,40 @@ export function drawAnnotationInk(
         textRight = Math.max(textRight, r.right - base.left);
       }
     });
-    const labelWidth = notes[0]?.offsetWidth || 208;
-    const left = Math.max(0, Math.min(textRight + 40, base.width - labelWidth));
+    const minWidth = MARGIN_NOTE_MIN_WIDTH;
+    const left = Math.max(0, Math.min(textRight + 40, base.width - minWidth));
+    const width = Math.max(minWidth, Math.min(MARGIN_NOTE_MAX_WIDTH, base.width - left - 8));
+    notes.forEach((note) => {
+      note.style.width = `${width}px`;
+      note.style.maxWidth = `${width}px`;
+    });
+    const stack = () =>
+      stackLabels(labels.map((row, i) => ({ y: row.y, h: notes[i]!.offsetHeight || 20 })));
+    let tops = stack();
+    // Crowded notes run together: fold all but the selected one to a single line.
+    const crowded = tops.some((top, i) => top > labels[i]!.y + 2);
+    if (crowded) {
+      notes.forEach((note) => {
+        if (!note.classList.contains('is-active')) note.classList.add('is-collapsed');
+      });
+      tops = stack();
+    }
+    notes.forEach((note) => {
+      if (note.tagName !== 'BUTTON') return;
+      const collapsed = note.classList.contains('is-collapsed');
+      note.setAttribute('aria-expanded', crowded ? String(!collapsed) : 'true');
+      note.setAttribute('aria-label', `${collapsed ? 'Show' : 'Note'}: ${note.textContent}`);
+    });
     notes.forEach((note, i) => {
       note.style.top = `${tops[i]}px`;
       note.style.left = `${left}px`;
       note.style.right = 'auto';
       const lead = document.createElementNS(SVG_NS, 'path');
-      const y = snap(tops[i]! + 11);
+      const y = snap(tops[i]! + 10);
       lead.setAttribute('d', `M${snap(left - 18)} ${y} H${snap(left - 6)}`);
       lead.setAttribute('class', `block-annotation__ink-lead block-annotation__ink--${labels[i]!.mark.colour}`);
+      lead.dataset.annotationId = labels[i]!.mark.annotationId;
+      if (labels[i]!.mark.annotationId === activeId) lead.classList.add('is-active');
       svg.append(lead);
     });
     const lowest = Math.max(...notes.map((note, i) => tops[i]! + note.offsetHeight));
@@ -211,6 +242,7 @@ export function drawAnnotationInk(
   } else {
     fitMarginNotes(host, 0);
   }
+  if (activeId && drawn.has(activeId)) host.classList.add('has-active-note');
   return drawn;
 }
 

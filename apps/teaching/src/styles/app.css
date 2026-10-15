@@ -11189,7 +11189,6 @@ body.is-lesson-builder-full-page .hub-utilities {
 /* Annotation ink: ruled pen marks drawn over the poem (annotation-ink.ts). */
 .block-annotation--ink {
   --ink-base: var(--ink, #1b1c22);
-  --font-hand: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
 }
 
 .block-annotation__poem {
@@ -11275,17 +11274,60 @@ body.is-lesson-builder-full-page .hub-utilities {
   border: 0;
   background: none;
   color: var(--ink-c);
-  font-family: var(--font-hand);
-  font-size: 1.2rem;
-  font-weight: 600;
-  line-height: 1.15;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
   text-align: left;
   white-space: normal;
   overflow-wrap: anywhere;
+  transition: opacity 160ms ease;
 }
 
 button.block-annotation__margin-note {
   cursor: pointer;
+}
+
+/* Crowded margin: every note but the selected one folds to a one-line preview. */
+.block-annotation__margin-note.is-collapsed {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+
+button.block-annotation__margin-note.is-collapsed:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.block-annotation__margin-note.is-active {
+  z-index: 3;
+  margin: -0.375rem -0.5rem;
+  padding: 0.375rem 0.5rem;
+  border-left: 3px solid var(--ink-c);
+  border-radius: 4px;
+  background: var(--paper, #fff);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.12);
+  color: var(--ink-base);
+}
+
+/* A selected note pushes everything else back so its marks are easy to follow. */
+.block-annotation__poem.has-active-note .block-annotation__margin-note:not(.is-active),
+.block-annotation__poem.has-active-note .block-annotation__ink path:not(.is-active) {
+  opacity: 0.3;
+}
+
+.block-annotation__poem.has-active-note .block-annotation__ink-stroke.is-active {
+  stroke-width: 2.5;
+}
+
+.block-annotation__poem.has-active-note .block-annotation__ink-lead.is-active {
+  opacity: 1;
+}
+
+.block-annotation--ink .block-annotation__anchor.is-active {
+  background: color-mix(in srgb, var(--wave) 14%, transparent);
 }
 
 .block-annotation__margin-note:focus-visible {
