@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { HUB_HOLD_MS } from '../../design-kit/js/hub-list.js';
+import { resetHubFeedbackForTests } from '../../design-kit/js/hub-feedback.js';
 import { clickMenuAction, holdDelete } from './helpers/hub-list';
 import { createAnnotationEditor } from '@/blocks/editors';
 import { buildAnchor } from '@/blocks/annotation-anchor';
@@ -99,6 +101,58 @@ describe('annotation editor 1b', () => {
       latest.block_type === 'annotation' && latest.content.annotations.length
     ).toBe(before);
     mount.remove();
+    vi.useRealTimers();
+  });
+
+  it('deletes the open note from the note panel by holding, and a click does not', () => {
+    vi.useFakeTimers();
+    resetHubFeedbackForTests();
+    const block = structuredClone(dulceAnnotationFixture);
+    let latest: Block = block;
+    const mount = document.createElement('div');
+    document.body.append(mount);
+    mount.append(
+      createAnnotationEditor(
+        block,
+        (next) => {
+          latest = next;
+        },
+        () => latest as Extract<Block, { block_type: 'annotation' }>
+      )
+    );
+    const panel = mount.querySelector<HTMLElement>('.block-editor__annotation-note');
+    const del = mount.querySelector<HTMLButtonElement>('.block-editor__annotation-note-delete');
+    expect(panel?.hidden).toBe(false);
+    expect(del?.textContent).toContain('Delete note');
+    const beforeIds =
+      latest.block_type === 'annotation' ? latest.content.annotations.map((ann) => ann.id) : [];
+    expect(beforeIds[0]).toBe('ann_word');
+
+    del!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+    del!.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0 }));
+    expect(latest.block_type === 'annotation' && latest.content.annotations.map((ann) => ann.id)).toEqual(
+      beforeIds
+    );
+    expect(panel?.hidden).toBe(false);
+    expect(del!.querySelector('.hub-action-menu__hint')?.textContent).toBe('Keep holding');
+
+    del!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+    vi.advanceTimersByTime(HUB_HOLD_MS + 20);
+    expect(latest.block_type === 'annotation' && latest.content.annotations.map((ann) => ann.id)).toEqual(
+      beforeIds.slice(1)
+    );
+    expect(mount.querySelector<HTMLElement>('.block-editor__annotation-note')?.hidden).toBe(true);
+    const undo = [...document.querySelectorAll('.hub-toast button')].find(
+      (btn) => btn.textContent === 'Undo'
+    ) as HTMLButtonElement | undefined;
+    expect(undo).toBeTruthy();
+    undo!.click();
+    expect(latest.block_type === 'annotation' && latest.content.annotations.map((ann) => ann.id)).toEqual(
+      beforeIds
+    );
+    expect(mount.querySelector<HTMLElement>('.block-editor__annotation-note')?.hidden).toBe(false);
+    mount.remove();
+    resetHubFeedbackForTests();
     vi.useRealTimers();
   });
 
