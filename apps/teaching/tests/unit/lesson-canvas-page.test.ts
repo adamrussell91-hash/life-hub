@@ -368,6 +368,59 @@ describe('mountLessonPage', () => {
     expect(next.blocks.map((b) => b.id)).toEqual(['cm1', 'h1', 'h2']);
   });
 
+  it('moves existing page blocks into a tab by dragging their grip onto the open tab', () => {
+    const lesson = makeLesson({
+      blocks: [createBlock('heading', 'h1'), createBlock('rich_text', 'r1'), createBlock('tabs', 'tabs1')]
+    });
+    const { onChange } = mount(lesson);
+    enterBlockEdit(host, '[data-block-id="tabs1"]');
+
+    for (const id of ['h1', 'r1']) {
+      const dt = startGripDrag(host.querySelector(`[data-block-id="${id}"] .lesson-page__grip`)!);
+      const panel = host.querySelector('[data-block-id="tabs1"] .block-editor__nested-list')!;
+      dispatchWithDt(panel, 'dragover', dt);
+      dispatchWithDt(panel, 'drop', dt);
+    }
+
+    const next = onChange.mock.calls.at(-1)?.[0] as Lesson;
+    expect(next.blocks.map((b) => b.id)).toEqual(['tabs1']);
+    const tabs = next.blocks[0] as Extract<Block, { block_type: 'tabs' }>;
+    expect(tabs.content.tabs[0]!.blocks.map((b) => b.id)).toEqual(['h1', 'r1']);
+    expect(host.querySelectorAll('[data-block-id="tabs1"] .hub-list__row')).toHaveLength(2);
+  });
+
+  it('moves a block out of a tab back onto the page by dragging its grip', () => {
+    const tabs = createBlock('tabs', 'tabs1') as Extract<Block, { block_type: 'tabs' }>;
+    tabs.content.tabs[0]!.blocks = [createBlock('heading', 'h1'), createBlock('rich_text', 'r1')] as never;
+    const { onChange } = mount(makeLesson({ blocks: [createBlock('heading', 'top'), tabs] }));
+    enterBlockEdit(host, '[data-block-id="tabs1"]');
+
+    const row = host.querySelector<HTMLElement>('[data-block-id="tabs1"] .hub-list__row[data-key="h1"]')!;
+    const dt = startGripDrag(row.querySelector('.hub-list__grip')!);
+    const gap = host.querySelector('.lesson-page__gap[data-index="0"]')!;
+    dispatchWithDt(gap, 'dragover', dt);
+    dispatchWithDt(gap, 'drop', dt);
+
+    const next = onChange.mock.calls.at(-1)?.[0] as Lesson;
+    expect(next.blocks.map((b) => b.id)).toEqual(['h1', 'top', 'tabs1']);
+    const after = next.blocks[2] as Extract<Block, { block_type: 'tabs' }>;
+    expect(after.content.tabs[0]!.blocks.map((b) => b.id)).toEqual(['r1']);
+  });
+
+  it('refuses to drop a block type the tab cannot hold', () => {
+    const { onChange } = mount(
+      makeLesson({ blocks: [createBlock('section', 's1'), createBlock('tabs', 'tabs1')] })
+    );
+    enterBlockEdit(host, '[data-block-id="tabs1"]');
+    onChange.mockClear();
+
+    const dt = startGripDrag(host.querySelector('[data-block-id="s1"] .lesson-page__grip')!);
+    const panel = host.querySelector('[data-block-id="tabs1"] .block-editor__nested-list')!;
+    dispatchWithDt(panel, 'drop', dt);
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('renders heavy blocks as published until Edit is chosen from the menu', () => {
     const { onSelect } = mount(
       makeLesson({ blocks: [createBlock('heading', 'h1'), createBlock('chart', 'ch1')] })
