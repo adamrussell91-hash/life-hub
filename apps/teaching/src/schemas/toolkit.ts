@@ -31,7 +31,7 @@ export const TkTeacherNoteSchema = z.object({
   edited: z.boolean().default(false)
 });
 
-/** Class notes keyed by class id; the empty key holds notes for every class. */
+/** Teacher's own notes. The empty key is the block's notes; other keys are older per-class notes. */
 export const TkJotsSchema = z.record(z.string()).default({});
 
 export const TkItemListSchema = z.array(z.string().min(1)).default([]);
@@ -41,6 +41,8 @@ export const ToolkitSkillContentSchema = z.object({
   label: z.string(),
   definition: z.string(),
   definition_source: z.string().default(''),
+  /** Student instruction shown at the top of the block. */
+  guide: z.string().default(''),
   context: z.string().default(''),
   steps: z.array(TkStepSchema).max(8),
   show_test: z.boolean().default(true),
@@ -70,6 +72,8 @@ export const ToolkitToolContentSchema = z.object({
   label: z.string(),
   definition: z.string(),
   definition_source: z.string().default(''),
+  /** Student instruction shown at the top of the block. */
+  guide: z.string().default(''),
   frame: ToolFrameSchema,
   sentence: z.string().default(''),
   steps: z.array(TkStepSchema).max(8).default([]),
@@ -106,6 +110,8 @@ export const ToolkitValueContentSchema = z.object({
   label: z.string(),
   definition: z.string(),
   definition_source: z.string().default(''),
+  /** Student instruction shown at the top of the block. */
+  guide: z.string().default(''),
   claim: z.string().default(''),
   options: z.array(z.object({ id: z.string().min(1), text: z.string() })).max(8).default([]),
   probes: z
@@ -132,6 +138,8 @@ export const ThinkingMoveContentSchema = z.object({
   tools: z.array(z.string().min(1)).min(1).max(5),
   value: z.string().min(1),
   community: z.string().default(''),
+  /** Student instruction shown at the top of the block. */
+  guide: z.string().default(''),
   stimulus: z.string().default(''),
   steps: z.array(ThinkingMoveStepSchema).max(5).default([]),
   check: z.array(z.string()).max(8).default([]),
@@ -145,6 +153,8 @@ export const ThinkingMoveContentSchema = z.object({
 export const QuadrantSchema = z.enum(['comprehension', 'research', 'speculation', 'inquiry']);
 
 export const QuestionQuadrantContentSchema = z.object({
+  /** Student instruction shown at the top of the block. */
+  guide: z.string().default(''),
   stimulus: z.string().default(''),
   procedure: z.enum(['sort', 'create']).default('sort'),
   questions: z
@@ -162,6 +172,8 @@ export const QuestionQuadrantContentSchema = z.object({
 export const ConceptGameKindSchema = z.enum(['kind_sort', 'degree_line', 'word_sort']);
 
 export const ConceptFeaturesContentSchema = z.object({
+  /** Student instruction shown at the top of the block. */
+  guide: z.string().default(''),
   concepts: z
     .array(
       z.object({
@@ -202,6 +214,8 @@ export const ThinkingIntentionsContentSchema = z.object({
 
 export const ThinkingReflectionContentSchema = z.object({
   variant: z.enum(['lesson', 'unit']).default('lesson'),
+  /** Student instruction shown at the top of the block. */
+  guide: z.string().default(''),
   concept: z.string().default(''),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()

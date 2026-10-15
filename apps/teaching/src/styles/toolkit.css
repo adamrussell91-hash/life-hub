@@ -43,6 +43,36 @@
   object-fit: contain;
 }
 
+/* Student instruction ------------------------------------------------------- */
+
+.tk-guide {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--marine);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: color-mix(in srgb, var(--wave) 8%, #fff);
+  font-family: var(--font-ui);
+  line-height: 1.5;
+  color: var(--ink);
+  max-width: var(--measure);
+}
+
+.tk-guide__label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--marine);
+}
+
+.tk-empty {
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+}
+
 /* Item card: coloured like the physical Newington deck ---------------------- */
 
 .tk-card {
@@ -603,12 +633,29 @@
 
 .tk-criteria {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: var(--space-1) var(--space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--font-ui);
 }
 
-.tk-criteria .block-definition__definition {
-  margin: 0;
+.tk-criteria__row {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.tk-criteria__row dt {
+  font-weight: var(--weight-bold);
+  color: var(--navy);
+}
+
+.tk-criteria__row dd {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--ink);
 }
 
 .tk-grid {
@@ -720,9 +767,27 @@
   color: var(--muted);
 }
 
-.tk-intent__thinking {
+.tk-described {
   display: grid;
   gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tk-described__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--space-2);
+  font-family: var(--font-ui);
+  line-height: 1.5;
+}
+
+.tk-described__text {
+  flex: 1 1 14rem;
+  min-width: 0;
+  color: var(--ink);
 }
 
 .tk-reflect__box {
@@ -742,7 +807,7 @@
 .tk-note {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   border: 1px dashed color-mix(in srgb, var(--high-sea) 45%, transparent);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--high-sea) 6%, #fff);
@@ -782,15 +847,40 @@
 }
 
 .tk-note__toggle {
-  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 2rem;
-  padding: 2px 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--weight-bold);
+  color: var(--navy);
+  cursor: pointer;
+}
+
+.tk-note__toggle::before {
+  content: '▸';
+  font-size: 0.8em;
+  color: var(--high-sea-ink);
+  transition: transform 0.15s ease;
+}
+
+.tk-note__toggle[aria-expanded='true']::before {
+  transform: rotate(90deg);
+}
+
+.tk-note__toggle:focus-visible {
+  outline: 3px solid rgba(55, 111, 183, 0.35);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .tk-note__body {
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .tk-note--standalone .tk-note__body {
@@ -801,11 +891,8 @@
   min-width: 0;
 }
 
-.tk-note__section:first-child,
 .tk-note__section--wide,
-.tk-note__jots,
-.tk-note__meta,
-.tk-note__section:has(.tk-note__jots) {
+.tk-note__body > .tk-note__hint {
   grid-column: 1 / -1;
 }
 
@@ -819,8 +906,7 @@
 }
 
 .tk-note__text,
-.tk-note__hint,
-.tk-note__meta {
+.tk-note__hint {
   margin: 0;
   line-height: 1.5;
 }
@@ -829,8 +915,7 @@
   margin-top: var(--space-1);
 }
 
-.tk-note__hint,
-.tk-note__meta {
+.tk-note__hint {
   font-size: var(--text-sm);
   color: var(--muted);
 }
@@ -850,6 +935,12 @@
 .tk-note__say {
   white-space: normal;
   cursor: default;
+}
+
+.tk-note__jots {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: #fff;
 }
 
 .tk-note__jot + .tk-note__jot {
@@ -911,12 +1002,52 @@
 
 .tk-ed__section {
   display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.tk-ed__section + .tk-ed__section,
+.tk-ed__section + .tk-ed__more,
+.tk-ed__more + .tk-ed__section {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.tk-ed__more {
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: #fff;
+}
+
+.tk-ed__more + .tk-ed__more {
+  margin-top: calc(var(--space-2) * -1);
+}
+
+.tk-ed__more-title {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--navy);
+  cursor: pointer;
+}
+
+.tk-ed__more-body {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--space-3) var(--space-3);
   min-width: 0;
+}
+
+.tk-ed__row {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+
+.tk-ed__ends > * {
+  flex: 1 1 8rem;
 }
 
 .tk-ed__heading {
@@ -954,7 +1085,7 @@
   resize: vertical;
 }
 
-.tk-ed__jot {
+.tk-ed__jot .tk-ed__input {
   border-color: color-mix(in srgb, var(--high-sea) 45%, transparent);
 }
 
@@ -988,8 +1119,24 @@
 
 .tk-ed__item,
 .tk-ed__reset,
-.tk-ed__presets {
+.tk-ed__action {
   justify-self: start;
+}
+
+.tk-ed__item {
+  font-weight: var(--weight-bold);
+}
+
+.tk-ed__item--tool {
+  color: #fff;
+  background: var(--depth);
+  border-color: var(--depth);
+}
+
+.tk-ed__item--value {
+  color: var(--depth);
+  background: var(--high-sea);
+  border-color: var(--high-sea);
 }
 
 .tk-ed__list {
@@ -1031,8 +1178,7 @@
 /* Phone ---------------------------------------------------------------------- */
 
 @media (max-width: 720px) {
-  .tk-ed__input,
-  .tk-ed__jot {
+  .tk-ed__input {
     font-size: 16px;
   }
 }
@@ -1041,8 +1187,13 @@
   .tk-links,
   .tk-note__body,
   .tk-fork__sides,
-  .tk-intent__row {
+  .tk-intent__row,
+  .tk-criteria {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tk-intent__row {
+    gap: 4px;
   }
 
   .tk-values {
@@ -1072,10 +1223,6 @@
   }
 
   .tk-game__columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .tk-criteria {
     grid-template-columns: minmax(0, 1fr);
   }
 

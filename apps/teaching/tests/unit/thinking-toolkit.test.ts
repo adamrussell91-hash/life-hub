@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { BlockSchema, type Block } from '@/schemas/block';
-import { createBlock, BLOCK_GROUPS, HOMEPAGE_BLOCK_GROUPS } from '@/blocks/create-block';
+import { createBlock, BLOCK_GROUPS, HOMEPAGE_BLOCK_GROUPS, NEW_BLOCK_LABEL } from '@/blocks/create-block';
 import { renderBlock } from '@/blocks/render';
 import { createBlockEditor } from '@/blocks/editors';
 import { filterBlocksForStudent } from '@/blocks/visibility';
@@ -16,9 +16,10 @@ import {
   TOOLKIT_SKILLS,
   TOOLKIT_TOOLS,
   TOOLKIT_VALUES,
+  COMMUNITY_SKILL_DESCRIPTION,
   libraryItem
 } from '@/toolkit/library';
-import { moveBasis, moveSentence, syncMoveSteps } from '@/toolkit/content';
+import { cleanNote, moveBasis, moveSentence, syncMoveSteps } from '@/toolkit/content';
 import { collectLessonThinking } from '@/toolkit/render';
 import { setToolkitClasses } from '@/toolkit/class-context';
 import type { Lesson } from '@/schemas/lesson';
@@ -96,24 +97,53 @@ describe('Thinking Toolkit library', () => {
     expect(Object.keys(DISTINCTION_PAIR_BANK)).toEqual(['level1', 'level2', 'level3', 'maths', 'inquiry']);
   });
 
-  it('uses only the handbook and workshop notes: definitions only where Cam (p9) gives one', () => {
-    for (const item of [...TOOLKIT_SKILLS, ...TOOLKIT_VALUES]) {
-      expect(item.definition, item.id).toBe('');
-      expect(item.definition_source, item.id).toBe('');
+  it('gives every item a plain description and something students can use', () => {
+    for (const item of [...TOOLKIT_SKILLS, ...TOOLKIT_TOOLS, ...TOOLKIT_VALUES]) {
+      expect(item.definition.trim(), item.id).not.toBe('');
     }
-    const defined = TOOLKIT_TOOLS.filter((item) => item.definition).map((item) => item.label);
-    expect(defined).toEqual([
-      'Counterexample', 'Criteria', 'Distinction', 'Example', 'Generalisation', 'Question', 'Reasons', 'Suggestion'
-    ]);
-    for (const item of TOOLKIT_TOOLS.filter((tool) => tool.definition)) {
-      expect(item.definition_source, item.id).toMatch(/^Cam \(2006\)/);
+    for (const skill of TOOLKIT_SKILLS) expect(skill.steps.length, skill.id).toBeGreaterThan(0);
+    for (const tool of TOOLKIT_TOOLS) {
+      expect(tool.prompt.trim(), tool.id).not.toBe('');
+      expect(tool.sentence.trim(), tool.id).not.toBe('');
+    }
+    for (const value of TOOLKIT_VALUES) expect(value.probes.length, value.id).toBeGreaterThan(0);
+    for (const skill of COMMUNITY_SKILLS) expect(COMMUNITY_SKILL_DESCRIPTION[skill], skill).toBeTruthy();
+  });
+
+  it('shows no page references, source tags or outside frameworks', () => {
+    const citation = /\(p\d|Handwritten|Notion|Philosothon|handbook|Cam \(|NESA|Paul|Elder \(|UQ Critical/i;
+    const library = readFileSync(resolve(process.cwd(), 'src/toolkit/library.ts'), 'utf8');
+    expect(library).not.toMatch(citation);
+    for (const block of [...TOOLKIT_TYPES, 'teacher_note' as const].map((type, index) => createBlock(type, `src_${index}`))) {
+      expect(JSON.stringify(block.content), block.block_type).not.toMatch(citation);
+      const note = (block.content as { teacher_note?: { source: string; time: string } }).teacher_note;
+      if (note) {
+        expect(note.source).toBe('');
+        expect(note.time).toBe('');
+      }
     }
     for (const item of [...TOOLKIT_SKILLS, ...TOOLKIT_TOOLS, ...TOOLKIT_VALUES]) {
-      expect(item.note.source.trim(), item.id).not.toBe('');
-      expect(item.note.time, item.id).toBe('');
+      expect(JSON.stringify(item), item.id).not.toMatch(citation);
     }
-    const source = readFileSync(resolve(process.cwd(), 'src/toolkit/library.ts'), 'utf8');
-    expect(source).not.toMatch(/NESA|Paul|Elder \(|UQ Critical|draft wording/i);
+  });
+
+  it('strips source tags from notes saved by the first release', () => {
+    const old = {
+      what: 'Tools in Use (p9): "Justifying a claim using reasons".',
+      run: [],
+      say: ['What makes a good one?'],
+      watch: ['Teach these more explicitly. (Handwritten note, framework p10.)', 'Ask for counterexamples. (Notion workshop notes)'],
+      extra_label: 'Strong participants (Philosothon 2026 marking guide)',
+      extra: ['Allow others to speak.'],
+      time: '',
+      source: 'Workshop handbook p9',
+      edited: false
+    };
+    const clean = cleanNote(old);
+    expect(clean.what).toBe('');
+    expect(clean.watch).toEqual(['Ask for counterexamples.']);
+    expect(clean.extra_label).toBe('Strong participants');
+    expect(clean.source).toBe('');
   });
 });
 
@@ -219,7 +249,7 @@ describe('rendering', () => {
   });
 
   it('reveals are real buttons whose label and hidden state follow aria-expanded (V1, V11, I2)', () => {
-    const block = createBlock('concept_features', 'concept_1');
+    const block = createBlock('toolkit_tool', 'reveal_1');
     const el = renderBlock(block, 'student');
     const button = el.querySelector<HTMLButtonElement>('.tk-reveal__btn')!;
     expect(button.tagName).toBe('BUTTON');
@@ -323,22 +353,22 @@ describe('editors', () => {
     expect(editor.querySelector('.block-editor__visibility')).toBeNull();
   });
 
-  it('class notes are saved per class', () => {
-    setToolkitClasses([
-      { id: 'class_a', label: '7A' },
-      { id: 'class_b', label: '7B' }
-    ]);
+  it('keeps one My notes box per block, and still shows older per-class notes', () => {
+    setToolkitClasses([{ id: 'class_b', label: '7B' }]);
     let latest = createBlock('toolkit_skill', 'jot_1');
     const editor = createBlockEditor(latest, (next) => {
       latest = next;
     }, () => latest);
-    const classB = [...editor.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find((b) => b.textContent === '7B')!;
-    classB.click();
-    const jot = editor.querySelector<HTMLTextAreaElement>('.tk-ed__jot')!;
-    jot.value = 'Ran long with 7B';
+    expect(editor.querySelectorAll('.tk-ed__jot')).toHaveLength(1);
+    const jot = editor.querySelector<HTMLTextAreaElement>('.tk-ed__jot textarea')!;
+    jot.value = 'Ran long last time';
     jot.dispatchEvent(new Event('input'));
-    const jots = (latest.content as { teacher_jots?: Record<string, string> }).teacher_jots;
-    expect(jots).toEqual({ class_b: 'Ran long with 7B' });
+    expect((latest.content as { teacher_jots?: Record<string, string> }).teacher_jots).toEqual({ '': 'Ran long last time' });
+
+    const legacy = { ...latest, content: { ...latest.content, teacher_jots: { '': 'Mine', class_b: 'Old 7B note' } } } as Block;
+    const legacyEditor = createBlockEditor(legacy, () => {});
+    expect(legacyEditor.querySelectorAll('.tk-ed__jot')).toHaveLength(2);
+    expect(legacyEditor.textContent).toContain('My notes: 7B');
   });
 
   it('Thinking move keeps an edited note and offers a rebuild after the move changes', () => {
@@ -354,7 +384,7 @@ describe('editors', () => {
       }
     } as Block;
     const editor = createBlockEditor(edited, () => {});
-    expect(editor.textContent).toContain('Rebuild note from library');
+    expect(editor.textContent).toContain('Rebuild the note for this move');
     expect(editor.querySelector<HTMLTextAreaElement>('.tk-ed__field textarea')).not.toBeNull();
   });
 
@@ -364,6 +394,70 @@ describe('editors', () => {
     const next = syncMoveSteps(['tool:example', 'tool:reasons'], steps, 'move_s');
     expect(next.map((step) => step.tool)).toEqual(['tool:example', 'tool:reasons']);
     expect(next[1]!.prompt).toBe('Edited');
+  });
+});
+
+describe('usable in a lesson', () => {
+  it('names the picker items without a "Toolkit" prefix', () => {
+    expect(NEW_BLOCK_LABEL.toolkit_skill).toBe('Skill');
+    expect(NEW_BLOCK_LABEL.toolkit_tool).toBe('Tool');
+    expect(NEW_BLOCK_LABEL.toolkit_value).toBe('Value');
+    const text = renderBlock(createBlock('toolkit_skill', 'eyebrow_1'), 'student').textContent ?? '';
+    expect(text).not.toContain('Thinking Toolkit');
+  });
+
+  it('every student-facing block opens with a "What to do" line', () => {
+    for (const type of NOTE_TYPES) {
+      const el = renderBlock(createBlock(type, `guide_${type}`), 'student');
+      expect(el.querySelector('.tk-guide')?.textContent, type).toMatch(/^What to do\S/);
+    }
+  });
+
+  it('the teacher note starts closed and opens on click', () => {
+    const el = renderBlock(createBlock('toolkit_skill', 'closed_1'), 'teacher');
+    const toggle = el.querySelector<HTMLButtonElement>('.tk-note__toggle')!;
+    const body = el.querySelector<HTMLElement>('.tk-note__body')!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(body.hidden).toBe(true);
+    toggle.click();
+    expect(body.hidden).toBe(false);
+  });
+
+  it('Features of a Concept and Question Quadrant start empty, with an example to load', () => {
+    const concept = createBlock('concept_features', 'lean_1') as Extract<Block, { block_type: 'concept_features' }>;
+    expect(concept.content.concepts).toEqual([]);
+    expect(concept.content.game.cards).toEqual([]);
+    expect(concept.content.criteria).toEqual([]);
+    let latest: Block = concept;
+    const editor = createBlockEditor(concept, (next) => {
+      latest = next;
+    }, () => latest);
+    const load = [...editor.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.startsWith('Load the worked example'))!;
+    load.click();
+    expect((latest as typeof concept).content.concepts.length).toBeGreaterThan(0);
+
+    const quadrant = createBlock('question_quadrant', 'lean_2') as Extract<Block, { block_type: 'question_quadrant' }>;
+    expect(quadrant.content.stimulus).toBe('');
+    expect(quadrant.content.questions).toEqual([]);
+  });
+
+  it('Thinking intentions explains every skill, tool, value and community skill it lists', () => {
+    const base = createBlock('thinking_intentions', 'intent_1') as Extract<Block, { block_type: 'thinking_intentions' }>;
+    const block = {
+      ...base,
+      content: {
+        ...base.content,
+        skills: ['skill:justify'],
+        tools: ['tool:analogy'],
+        values: ['value:clarity'],
+        community: ['Actively listening']
+      }
+    } as Block;
+    const el = renderBlock(block, 'student');
+    const items = [...el.querySelectorAll('.tk-described__item')];
+    expect(items).toHaveLength(4);
+    for (const item of items) expect(item.querySelector('.tk-described__text')?.textContent?.trim()).toBeTruthy();
+    expect(el.textContent).not.toContain('★');
   });
 });
 

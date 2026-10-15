@@ -4,12 +4,13 @@ import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { visitBlocks } from '@/blocks/walk-blocks';
 import type { Block } from '@/schemas/block';
 import type { Quadrant, StressVerdict, TkTeacherNote } from '@/schemas/toolkit';
-import { classLabel, toolkitClasses } from '@/toolkit/class-context';
+import { classLabel } from '@/toolkit/class-context';
 import {
   CONCEPT_CRITERIA,
   QUADRANT_DEFINITION,
   QUADRANT_LABEL,
   QUADRANT_RESPOND,
+  cleanNote,
   moveSentence,
   type ConceptFeaturesBlock,
   type QuestionQuadrantBlock,
@@ -22,10 +23,12 @@ import {
   type ToolkitValueBlock
 } from '@/toolkit/content';
 import {
+  COMMUNITY_SKILL_DESCRIPTION,
   DISTINCTION_PAIR_BANK,
   TOOLKIT_VALUES,
   itemKind,
   itemLabel,
+  libraryItem,
   type ToolkitKind
 } from '@/toolkit/library';
 
@@ -94,8 +97,20 @@ function griffinIcon(className: string): HTMLImageElement {
 
 function eyebrow(kind: string): HTMLElement {
   const row = el('p', 'tk-eyebrow');
-  row.append(griffinIcon('tk-eyebrow__griffin'), el('span', undefined, `Thinking Toolkit · ${kind}`));
+  row.append(griffinIcon('tk-eyebrow__griffin'), el('span', undefined, kind));
   return row;
+}
+
+/** The student instruction at the top of a block. */
+function guideLine(text: string | undefined): HTMLElement | null {
+  if (!text?.trim()) return null;
+  const guide = el('p', 'tk-guide');
+  guide.append(el('span', 'tk-guide__label', 'What to do'), document.createTextNode(text.trim()));
+  return guide;
+}
+
+function teacherHint(mode: TkRenderMode, text: string): HTMLElement | null {
+  return mode === 'teacher' ? el('p', 'tk-note__hint tk-empty', text) : null;
 }
 
 function itemCard(kind: ToolkitKind, label: string, definition: string): HTMLElement {
@@ -215,7 +230,7 @@ const NOTE_OPEN_KEY = 'teaching-hub.tk-note-open';
 
 function noteOpenState(blockId: string): boolean {
   const saved = loadActivityState<Record<string, boolean>>(NOTE_OPEN_KEY);
-  return saved?.[blockId] !== false;
+  return saved?.[blockId] === true;
 }
 
 function saveNoteOpen(blockId: string, open: boolean): void {
@@ -228,27 +243,46 @@ function notePill(): HTMLElement {
   return el('span', 'tk-note__pill', 'Only you see this');
 }
 
-/** Teacher view only. Students never receive these fields (filterBlocksForStudent). */
+/**
+ * Teacher view only, collapsed by default. Students never receive these
+ * fields (filterBlocksForStudent).
+ */
 function teacherNote(
   blockId: string,
-  note: TkTeacherNote | undefined,
-  jots: Record<string, string> | undefined,
-  extra?: { label: string; text: string }
+  rawNote: TkTeacherNote | undefined,
+  jots: Record<string, string> | undefined
 ): HTMLElement {
+  const note = rawNote ? cleanNote(rawNote) : undefined;
   const aside = el('aside', 'tk-note');
   aside.setAttribute('aria-label', 'Teacher note');
-  const head = el('div', 'tk-note__head');
-  head.append(el('p', 'tk-note__title', 'Teacher note'), notePill());
   const bodyId = nextDomId('tk-note');
-  const toggle = el('button', 'btn btn--ghost tk-note__toggle');
+  const toggle = el('button', 'tk-note__toggle');
   toggle.type = 'button';
   toggle.setAttribute('aria-controls', bodyId);
-  head.append(toggle);
+  const head = el('div', 'tk-note__head');
+  head.append(toggle, notePill());
   const body = el('div', 'tk-note__body');
   body.id = bodyId;
 
+  const mine = Object.entries(jots ?? {}).filter(([, text]) => text.trim());
+  if (mine.length) {
+    const box = el('div', 'tk-note__jots');
+    for (const [classId, text] of mine) {
+      const item = el('div', 'tk-note__jot');
+      if (classId) item.append(el('p', 'tk-note__jot-class', classLabel(classId)));
+      item.append(paragraphs(text, 'tk-note__text'));
+      box.append(item);
+    }
+    const section = noteSection('My notes', box);
+    section.classList.add('tk-note__section--wide');
+    body.append(section);
+  }
   if (note) {
-    if (note.what.trim()) body.append(noteSection('What it is', paragraphs(note.what, 'tk-note__text')));
+    if (note.what.trim()) {
+      const what = noteSection('About', paragraphs(note.what, 'tk-note__text'));
+      what.classList.add('tk-note__section--wide');
+      body.append(what);
+    }
     if (note.run.some((line) => line.trim())) {
       const run = noteSection('How to run it', noteList(note.run, true));
       run.classList.add('tk-note__section--wide');
@@ -257,38 +291,21 @@ function teacherNote(
     if (note.say.some((line) => line.trim())) {
       const chips = el('div', 'tk-note__chips');
       for (const line of note.say) if (line.trim()) chips.append(el('span', 'hub-list__chip tk-note__say', line));
-      body.append(noteSection('Say it', chips));
+      body.append(noteSection('Ask', chips));
     }
     if (note.watch.some((line) => line.trim())) body.append(noteSection('Watch for', noteList(note.watch, false)));
     if (note.extra_label.trim() && note.extra.some((line) => line.trim())) {
       body.append(noteSection(note.extra_label, noteList(note.extra, false)));
     }
   }
-  if (extra?.text.trim()) body.append(noteSection(extra.label, paragraphs(extra.text, 'tk-note__text')));
-  const meta = [note?.time, note?.source].filter((part) => part && part.trim()).join(' · ');
-  if (meta) body.append(el('p', 'tk-note__meta', meta));
-
-  const jotEntries = Object.entries(jots ?? {}).filter(([, text]) => text.trim());
-  const jotSection = el('div', 'tk-note__jots');
-  if (jotEntries.length === 0) {
-    jotSection.append(el('p', 'tk-note__hint', 'No class notes yet. Select the block to add some.'));
-  } else {
-    const showLabels = jotEntries.length > 1 || toolkitClasses().length > 1 || jotEntries[0]![0] !== '';
-    for (const [classId, text] of jotEntries) {
-      const item = el('div', 'tk-note__jot');
-      if (showLabels) item.append(el('p', 'tk-note__jot-class', classLabel(classId)));
-      item.append(paragraphs(text, 'tk-note__text'));
-      jotSection.append(item);
-    }
-  }
-  body.append(noteSection('My notes for this class', jotSection));
+  if (!body.childElementCount) body.append(el('p', 'tk-note__hint', 'Nothing here yet. Select the block to add your notes.'));
 
   let open = noteOpenState(blockId);
   function paint(): void {
     body.hidden = !open;
-    toggle.textContent = open ? 'Hide' : 'Show';
+    toggle.textContent = 'Teacher note';
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    toggle.setAttribute('aria-label', open ? 'Hide teacher note' : 'Show teacher note');
+    aside.classList.toggle('is-open', open);
   }
   toggle.addEventListener('click', () => {
     open = !open;
@@ -316,6 +333,7 @@ function renderSkill(block: ToolkitSkillBlock, mode: TkRenderMode, ctx: TkRender
   const c = block.content;
   const wrap = root(block.block_type);
   wrap.append(eyebrow('Skill'), itemCard('skill', c.label, c.definition));
+  appendIf(wrap, guideLine(c.guide));
   if (c.context.trim()) {
     const context = el('p', 'tk-context');
     context.append(el('span', 'tk-context__label', 'Question'), document.createTextNode(c.context));
@@ -323,7 +341,7 @@ function renderSkill(block: ToolkitSkillBlock, mode: TkRenderMode, ctx: TkRender
   }
   const steps = c.steps.map((step) => ({ title: step.title, prompt: step.prompt }));
   const list = stepList(steps);
-  if (c.show_test) {
+  if (c.show_test && c.checks.some((line) => line.trim())) {
     const li = el('li', 'block-question-set__question tk-step');
     const prompt = el('p', 'block-question-set__prompt');
     prompt.append(el('strong', 'tk-step__title', 'Check'));
@@ -336,7 +354,8 @@ function renderSkill(block: ToolkitSkillBlock, mode: TkRenderMode, ctx: TkRender
     }
     list.append(li);
   }
-  wrap.append(list);
+  if (list.childElementCount) wrap.append(list);
+  else appendIf(wrap, teacherHint(mode, 'No steps yet. Select the block to add some.'));
   for (const item of c.reveals) {
     appendIf(wrap, reveal({ ctx, mode, blockId: block.id, part: item.id, label: item.label, body: item.body }));
   }
@@ -434,6 +453,10 @@ function renderStress(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRender
   const c = block.content;
   const frag = el('div', 'tk-frame');
   if (c.sentence.trim()) frag.append(el('p', 'tk-sentence', c.sentence));
+  if (!c.statements.length) {
+    appendIf(frag, teacherHint(mode, 'No statements yet. Select the block to add some or load an example.'));
+    return frag;
+  }
   const list = el('ol', 'block-question-set__list');
   for (const statement of c.statements) {
     const li = el('li', 'block-question-set__question tk-stress__item');
@@ -484,6 +507,10 @@ function renderConverter(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRen
   const c = block.content;
   const frag = el('div', 'tk-frame');
   if (c.sentence.trim()) frag.append(el('p', 'tk-sentence', c.sentence));
+  if (!c.converters.length) {
+    appendIf(frag, teacherHint(mode, 'No questions yet. Select the block to add some or load an example.'));
+    return frag;
+  }
   const list = el('ol', 'block-question-set__list');
   for (const pair of c.converters) {
     const li = el('li', 'block-question-set__question');
@@ -523,6 +550,7 @@ function renderTool(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRenderCo
   const c = block.content;
   const wrap = root(block.block_type);
   wrap.append(eyebrow('Tool'), itemCard('tool', c.label, c.definition));
+  appendIf(wrap, guideLine(c.guide));
   if (c.frame === 'fork') wrap.append(renderFork(block, mode, ctx));
   else if (c.frame === 'stress') wrap.append(renderStress(block, mode, ctx));
   else if (c.frame === 'converter') wrap.append(renderConverter(block, mode, ctx));
@@ -563,6 +591,7 @@ function renderValue(block: ToolkitValueBlock, mode: TkRenderMode, ctx: TkRender
   const c = block.content;
   const wrap = root(block.block_type);
   wrap.append(eyebrow('Value'), itemCard('value', c.label, c.definition), valueRow(c.item));
+  appendIf(wrap, guideLine(c.guide));
   if (c.claim.trim() || c.options.length) {
     const claim = el('aside', 'callout callout--sand');
     claim.setAttribute('role', 'note');
@@ -634,6 +663,7 @@ function renderMove(block: ThinkingMoveBlock, mode: TkRenderMode, ctx: TkRenderC
   cards.setAttribute('aria-label', 'Skill, tools and value in order');
   for (const id of [c.skill, ...c.tools, c.value]) appendIf(cards, miniCard(id));
   wrap.append(cards);
+  appendIf(wrap, guideLine(c.guide));
   if (c.stimulus.trim()) {
     const stimulus = el('p', 'tk-context');
     stimulus.append(el('span', 'tk-context__label', 'Working on'), document.createTextNode(c.stimulus));
@@ -672,9 +702,7 @@ function renderMove(block: ThinkingMoveBlock, mode: TkRenderMode, ctx: TkRenderC
     together.append(el('p', 'callout__title', 'Together'), el('p', 'callout__body', c.community));
     wrap.append(together);
   }
-  if (mode === 'teacher') {
-    wrap.append(teacherNote(block.id, c.teacher_note, c.teacher_jots, { label: 'Why this pairing', text: c.why }));
-  }
+  if (mode === 'teacher') wrap.append(teacherNote(block.id, c.teacher_note, c.teacher_jots));
   return wrap;
 }
 
@@ -716,6 +744,7 @@ function renderQuadrant(block: QuestionQuadrantBlock, mode: TkRenderMode, ctx: T
   const c = block.content;
   const wrap = root(block.block_type);
   wrap.append(eyebrow('Question Quadrant'));
+  appendIf(wrap, guideLine(c.guide));
   if (c.stimulus.trim()) {
     const quote = el('blockquote', 'block-quote tk-stimulus');
     quote.append(paragraphs(c.stimulus));
@@ -856,12 +885,17 @@ function renderConcept(block: ConceptFeaturesBlock, mode: TkRenderMode, ctx: TkR
   const c = block.content;
   const wrap = root(block.block_type);
   wrap.append(eyebrow('Features of a Concept'));
-  const criteria = el('dl', 'block-definition tk-criteria');
+  appendIf(wrap, guideLine(c.guide));
+  const criteria = el('dl', 'tk-criteria');
   for (const key of CRITERIA_KEYS) {
-    criteria.append(el('dt', 'block-definition__term', CRITERIA_LABEL[key]), el('dd', 'block-definition__definition', CONCEPT_CRITERIA[key]));
+    const row = el('div', 'tk-criteria__row');
+    row.append(el('dt', undefined, CRITERIA_LABEL[key]), el('dd', undefined, CONCEPT_CRITERIA[key]));
+    criteria.append(row);
   }
   wrap.append(criteria);
   if (c.concepts.length) wrap.append(conceptGrid(block, mode, ctx));
+  const empty = !c.concepts.length && !c.analogy.stem.trim() && !c.game.cards.length && !c.criteria.some((line) => line.trim());
+  if (empty) appendIf(wrap, teacherHint(mode, 'Select the block to add your concepts, or load the worked example.'));
 
   if (c.analogy.stem.trim()) {
     const warm = el('div', 'tk-analogy');
@@ -920,7 +954,7 @@ function renderConcept(block: ConceptFeaturesBlock, mode: TkRenderMode, ctx: TkR
         mode,
         blockId: block.id,
         part: 'criteria',
-        label: 'Criteria we found',
+        label: 'Criteria',
         body: () => {
           const list = el('ol', 'tk-note__list');
           for (const line of criteriaFound) list.append(el('li', undefined, line));
@@ -941,46 +975,64 @@ function intentionRow(label: string, content: Node): HTMLElement {
   return row;
 }
 
+/** Items with their one-line description, so students know what each one means. */
+function describedList(rows: Array<{ label: string; kind: string; text: string }>): HTMLElement | null {
+  if (!rows.length) return null;
+  const list = el('ul', 'tk-described');
+  for (const row of rows) {
+    const li = el('li', 'tk-described__item');
+    li.append(el('span', `hub-list__chip tk-chip tk-chip--${row.kind}`, row.label));
+    if (row.text.trim()) li.append(el('span', 'tk-described__text', row.text));
+    list.append(li);
+  }
+  return list;
+}
+
+function libraryRows(ids: readonly string[]): Array<{ label: string; kind: string; text: string }> {
+  return ids.flatMap((id) => {
+    const item = libraryItem(id);
+    return item ? [{ label: item.label, kind: item.kind, text: item.definition }] : [];
+  });
+}
+
 function renderIntentions(block: ThinkingIntentionsBlock, mode: TkRenderMode): HTMLElement {
   const c = block.content;
   const wrap = root(block.block_type);
   wrap.append(eyebrow('Thinking intentions'));
   let filled = 0;
   if (c.content.trim()) {
-    wrap.append(intentionRow('Learning intention', paragraphs(c.content)));
+    wrap.append(intentionRow('We are learning', paragraphs(c.content)));
     filled += 1;
   }
-  const thinking = el('div', 'tk-intent__thinking');
-  const minis = el('ol', 'tk-minis');
-  for (const id of c.skills) appendIf(minis, miniCard(id));
-  if (minis.childElementCount) thinking.append(minis);
-  appendIf(
-    thinking,
-    linkChips([
-      ['Tools', c.tools],
-      ['Judged for', c.values]
-    ])
+  const thinking = [
+    ['We will think by', libraryRows(c.skills)],
+    ['Using', libraryRows(c.tools)],
+    ['Judged for', libraryRows(c.values)]
+  ] as const;
+  for (const [label, rows] of thinking) {
+    const list = describedList([...rows]);
+    if (!list) continue;
+    wrap.append(intentionRow(label, list));
+    filled += 1;
+  }
+  const community = describedList(
+    c.community
+      .filter((line) => line.trim())
+      .map((skill) => ({ label: skill, kind: 'community', text: COMMUNITY_SKILL_DESCRIPTION[skill] ?? '' }))
   );
-  if (thinking.childElementCount) {
-    wrap.append(intentionRow('Thinking intention', thinking));
-    filled += 1;
-  }
-  const community = c.community.filter((line) => line.trim());
-  if (community.length) {
-    const chips = el('div', 'tk-note__chips');
-    for (const skill of community) chips.append(el('span', 'hub-list__chip tk-chip tk-chip--community', skill));
-    wrap.append(intentionRow('Together', chips));
+  if (community) {
+    wrap.append(intentionRow('Working together by', community));
     filled += 1;
   }
   const success = c.success.filter((line) => line.trim());
   if (success.length) {
     const list = el('ul', 'tk-checks');
     for (const line of success) list.append(el('li', undefined, line));
-    wrap.append(intentionRow('Success criteria', list));
+    wrap.append(intentionRow('I can', list));
     filled += 1;
   }
   if (filled === 0 && mode === 'teacher') {
-    wrap.append(el('p', 'tk-note__hint', 'Select the block to set today\'s intentions.'));
+    wrap.append(el('p', 'tk-note__hint', "Select the block to set today's intentions."));
   }
   return wrap;
 }
@@ -1037,6 +1089,7 @@ function renderReflection(block: ThinkingReflectionBlock, mode: TkRenderMode, ct
   const c = block.content;
   const wrap = root(block.block_type);
   wrap.append(eyebrow('Thinking reflection'));
+  appendIf(wrap, guideLine(c.guide));
   const used = collectLessonThinking(ctx.pageBlocks);
   const concept = c.concept.trim() || 'the chosen concept';
 

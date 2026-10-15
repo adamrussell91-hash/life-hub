@@ -54,6 +54,45 @@ export function emptyNote(): TkTeacherNote {
   };
 }
 
+/** Student instructions each block starts with. The teacher edits them per lesson. */
+export const GUIDE = {
+  skill: 'Work through the steps in order. Write or say your answer to each one.',
+  fork: 'Pick a pair. Name the kind of thing both belong to, then what makes them different. Use the frame to write it as a sentence.',
+  converter: 'Read each closed question. Rewrite it as an open question, then compare yours with the example.',
+  stress: 'Read each statement. Decide whether it survives, fails or needs qualifying. Give a counterexample to back your verdict.',
+  steps: 'Work through the steps, then use the frame to say or write your answer.',
+  value: 'Use the question to check your own thinking, then a partner\'s.',
+  move: 'Work through each step in order. Finish by checking your answer.',
+  quadrant: 'For each question, ask: what do I need to do to respond? Then decide which part of the quadrant it belongs in.',
+  concept: 'Decide whether each concept is central, contestable and common. Be ready to give a reason.',
+  reflection: 'Answer each question in a sentence or two.'
+} as const;
+
+export function toolGuide(frame: 'fork' | 'steps' | 'converter' | 'stress'): string {
+  return GUIDE[frame];
+}
+
+const LEGACY_CITATION =
+  /\s*\((?:Handwritten[^)]*|Notion workshop notes|p\d+[^)]*|framework p\d+[^)]*|Philosothon[^)]*|Cam \d{4}[^)]*|Sydney Philosothon[^)]*)\)/g;
+const LEGACY_LINE = /^(?:Teach these (?:more explicitly|directly)\.?|Tools in Use\b|Handwritten note\b|Handbook p\d)/;
+
+/** Strip page references and source tags from notes written by the first release. */
+export function cleanNote(note: TkTeacherNote): TkTeacherNote {
+  const clean = (line: string) => line.replace(LEGACY_CITATION, '').trim();
+  const lines = (list: string[]) => list.map(clean).filter((line) => line && !LEGACY_LINE.test(line));
+  return {
+    ...note,
+    what: lines(note.what.split('\n')).join('\n'),
+    run: lines(note.run),
+    say: lines(note.say),
+    watch: lines(note.watch),
+    extra_label: clean(note.extra_label),
+    extra: lines(note.extra),
+    time: '',
+    source: ''
+  };
+}
+
 // ─── Skill ──────────────────────────────────────────────────────────────────
 
 export function skillContent(itemId: string, prefix: string): ToolkitSkillBlock['content'] {
@@ -62,7 +101,8 @@ export function skillContent(itemId: string, prefix: string): ToolkitSkillBlock[
     item: skill.id,
     label: skill.label,
     definition: skill.definition,
-    definition_source: skill.definition_source,
+    definition_source: '',
+    guide: GUIDE.skill,
     context: '',
     steps: skill.steps.map((step) => ({ id: tkId(`${prefix}_s`), ...step })),
     show_test: skill.checks.length > 0,
@@ -77,38 +117,55 @@ export function skillContent(itemId: string, prefix: string): ToolkitSkillBlock[
 
 // ─── Tool ───────────────────────────────────────────────────────────────────
 
-/** The sources give no worked example; the teacher fills the fork's reveal. */
 function toolWorked(_tool: LibraryTool) {
   return { kind: '', marker: '', a: '', b: '' };
 }
 
+/** Example rows a teacher can load into an empty tool block. */
+export function toolExample(
+  frame: 'fork' | 'steps' | 'converter' | 'stress',
+  prefix: string
+): Partial<ToolkitToolBlock['content']> {
+  if (frame === 'converter') {
+    return {
+      converters: [
+        { closed: 'Are Pooh and Piglet friends?', open: 'Why are Pooh and Piglet friends?' },
+        { closed: 'What does Piglet say to Pooh?', open: 'What does it mean to be "friends forever"?' }
+      ].map((pair) => ({ id: tkId(`${prefix}_c`), ...pair }))
+    };
+  }
+  if (frame === 'fork') {
+    return {
+      worked: { kind: 'Ways of travelling on foot', marker: 'How fast you go', a: 'to walk', b: 'to run' },
+      worked_note: 'Walking and running are both ways of travelling on foot; the difference is how fast you go.'
+    };
+  }
+  if (frame === 'stress') {
+    return {
+      statements: [
+        { text: 'All birds can fly.', verdict: 'fails' as const, reason: 'Penguins and emus are birds that cannot fly.' },
+        { text: 'Teenagers sleep in.', verdict: 'qualifies' as const, reason: 'Many do, but not all: "many teenagers sleep in on weekends".' }
+      ].map((row) => ({ id: tkId(`${prefix}_g`), ...row }))
+    };
+  }
+  return {};
+}
+
 export function toolContent(itemId: string, prefix: string): ToolkitToolBlock['content'] {
   const tool = libraryTool(itemId) ?? libraryTool('tool:distinction')!;
-  const converters =
-    tool.frame === 'converter'
-      ? [
-          { closed: 'What colours are used in the text?', open: 'Where are Pooh and Piglet going?' },
-          { closed: 'Are Pooh and Piglet friends?', open: 'Why are Pooh and Piglet friends?' },
-          {
-            closed: 'What does Piglet say to Pooh?',
-            open: 'What does it mean to be "friends forever"?'
-          }
-        ].map((pair) => ({ id: tkId(`${prefix}_c`), ...pair }))
-      : [];
-  // No stress-test statements in the sources; the teacher adds their own.
-  const statements: ToolkitToolBlock['content']['statements'] = [];
   return {
     item: tool.id,
     label: tool.label,
     definition: tool.definition,
-    definition_source: tool.definition_source,
+    definition_source: '',
+    guide: toolGuide(tool.frame),
     frame: tool.frame,
     sentence: tool.sentence,
     steps: tool.steps.map((step) => ({ id: tkId(`${prefix}_s`), ...step })),
     worked: toolWorked(tool),
     worked_note: '',
-    converters,
-    statements,
+    converters: [],
+    statements: [],
     pair_level: tool.frame === 'fork' ? 'level1' : 'none',
     reveals: tool.reveals.map((reveal) => ({ id: tkId(`${prefix}_r`), ...reveal })),
     links: { skills: [...tool.skills], tools: [...tool.pairs] },
@@ -126,7 +183,8 @@ export function valueContent(itemId: string, prefix: string): ToolkitValueBlock[
     item: value.id,
     label: value.label,
     definition: value.definition,
-    definition_source: value.definition_source,
+    definition_source: '',
+    guide: GUIDE.value,
     claim: value.claim,
     options: value.options.map((text) => ({ id: tkId(`${prefix}_o`), text })),
     probes: value.probes.map((probe) => ({ id: tkId(`${prefix}_p`), ...probe })),
@@ -190,53 +248,23 @@ export function moveNote(skillId: string, toolIds: readonly string[], valueId: s
   const skill = librarySkill(skillId);
   const value = libraryValue(valueId);
   const tools = toolIds.map((id) => libraryTool(id)).filter((tool): tool is LibraryTool => Boolean(tool));
-  const what = [
-    skill ? `${skill.label}: ${skill.note.what}` : '',
-    ...tools.map((tool) => `${tool.label}: ${tool.note.what}`),
-    value ? `${value.label}: ${value.note.what}` : ''
-  ]
-    .filter(Boolean)
+  const items = [skill, ...tools, value].filter((item): item is NonNullable<typeof item> => Boolean(item));
+  const what = items
+    .filter((item) => item.definition.trim())
+    .map((item) => `${item.label}: ${item.definition}`)
     .join('\n');
-  const run: string[] = [];
-  const say = [
-    ...(skill?.note.say.slice(0, 1) ?? []),
-    ...tools.flatMap((tool) => tool.note.say.slice(0, 1)),
-    ...(value?.note.say.slice(0, 1) ?? [])
-  ];
-  const watch = [
-    ...(skill?.note.watch.slice(0, 1) ?? []),
-    ...tools.flatMap((tool) => tool.note.watch.slice(0, 1))
-  ];
+  const unique = (lines: string[]) => [...new Set(lines.filter((line) => line.trim()))];
   return {
     what,
-    run,
-    say,
-    watch,
+    run: [],
+    say: unique(items.flatMap((item) => item.note.say.slice(0, 1))),
+    watch: unique(items.flatMap((item) => item.note.watch.slice(0, 1))),
     extra_label: '',
     extra: [],
     time: '',
-    source: 'Built from the library notes for this skill, tools and value',
+    source: '',
     edited: false
   };
-}
-
-/** The handbook p9 phrase when the pairing matches one listed there. */
-export function moveWhy(skillId: string, toolIds: readonly string[]): string {
-  const skill = librarySkill(skillId);
-  if (!skill) return '';
-  const pairs: Record<string, string> = {
-    'skill:justify|tool:reasons': 'Handbook p9: "Justifying a claim using reasons".',
-    'skill:explain|tool:distinction': 'Handbook p9: "Making distinctions to explain".',
-    'skill:classify|tool:distinction': 'Handbook p11: "1. Classify: determine the category both belong to. 2. Divide: then ask what makes them differ?"',
-    'skill:apply|tool:criteria': 'Handbook p9: "Formulating and applying criteria".',
-    'skill:evaluate|tool:argument': 'Handbook p9: "Constructing and evaluating arguments".',
-    'skill:compare|tool:distinction': 'Handbook p9, handwritten: distinctions → "comparing".'
-  };
-  for (const toolId of toolIds) {
-    const phrase = pairs[`${skillId}|${toolId}`];
-    if (phrase) return phrase;
-  }
-  return '';
 }
 
 export function moveContent(
@@ -250,11 +278,12 @@ export function moveContent(
     skill,
     tools,
     value,
+    guide: GUIDE.move,
     community: '',
     stimulus: '',
     steps: tools.map((toolId) => moveStepFor(toolId, prefix)),
     check: valueItem ? valueItem.probes.map((probe) => probe.question) : [],
-    why: moveWhy(skill, tools),
+    why: '',
     teacher_note: moveNote(skill, tools, value),
     note_basis: moveBasis(skill, tools, value),
     teacher_jots: {}
@@ -270,7 +299,6 @@ export const QUADRANT_LABEL = {
   inquiry: 'Inquiry'
 } as const;
 
-/** Handbook p18. */
 export const QUADRANT_DEFINITION = {
   comprehension: 'The answers can be found in the stimulus.',
   speculation: 'The answers require you to use your imagination because they are not found in the stimulus.',
@@ -304,24 +332,36 @@ const PROCEDURE_2 = [
 
 export function quadrantNote(procedure: 'sort' | 'create'): TkTeacherNote {
   return {
-    what: 'In order to assist you to tell which kind of question you have, it is useful to ask "What do I need to do to respond to this question?" (p18)',
+    what: 'To tell which kind of question you have, ask "What do I need to do to respond to this question?"',
     run: procedure === 'sort' ? [...PROCEDURE_1] : [...PROCEDURE_2],
     say: ['What do I need to do to respond to this question?'],
     watch: [
-      'Emphasise disagreement is OK. (Notion workshop notes)',
-      'Train them to shift closed to open. (Notion workshop notes)',
-      'This builds to inquiry questions. (Handwritten note, p17)',
-      'Inquiry: this is where depth lives. (Notion workshop notes)'
+      'Make it clear that disagreement is fine.',
+      'Train students to shift closed questions to open ones.',
+      'Inquiry questions are where the depth is. They build to the class inquiry question.'
     ],
     extra_label: '',
     extra: [],
     time: '',
-    source: 'Workshop handbook p17–19; adapted from Cam (2006) 20 Thinking Tools; Notion workshop notes',
+    source: '',
     edited: false
   };
 }
 
-export function quadrantContent(prefix: string): QuestionQuadrantBlock['content'] {
+export function quadrantContent(_prefix: string): QuestionQuadrantBlock['content'] {
+  return {
+    guide: GUIDE.quadrant,
+    stimulus: '',
+    procedure: 'sort',
+    questions: [],
+    converters: [],
+    teacher_note: quadrantNote('sort'),
+    teacher_jots: {}
+  };
+}
+
+/** The Pooh and Piglet example, loaded on request from the editor. */
+export function quadrantExample(prefix: string): Pick<QuestionQuadrantBlock['content'], 'stimulus' | 'questions' | 'converters'> {
   const questions: Array<[string, 'comprehension' | 'research' | 'speculation' | 'inquiry']> = [
     ['Is the season summer or winter?', 'comprehension'],
     ['Who is dressed more warmly, Pooh or Piglet?', 'comprehension'],
@@ -335,20 +375,16 @@ export function quadrantContent(prefix: string): QuestionQuadrantBlock['content'
   return {
     stimulus:
       "Pooh and Piglet can be seen trudging along a snowy track. The day is clear but the sun is low and it casts a yellowish-orange glow over the scene. Piglet is wrapped in woollens and a scarf, while Pooh has nothing on but an old short-sleeved top that is several sizes too small for him. Piglet says to Pooh touchingly, 'We'll be friends forever, won't we Pooh?' 'Even longer,' Pooh replies.",
-    procedure: 'sort',
     questions: questions.map(([text, quadrant]) => ({ id: tkId(`${prefix}_q`), text, quadrant })),
     converters: [
       { closed: 'Are Pooh and Piglet friends?', open: 'Why are Pooh and Piglet friends?' },
       { closed: 'What does Piglet say to Pooh?', open: 'What does it mean to be "friends forever"?' }
-    ].map((pair) => ({ id: tkId(`${prefix}_c`), ...pair })),
-    teacher_note: quadrantNote('sort'),
-    teacher_jots: {}
+    ].map((pair) => ({ id: tkId(`${prefix}_c`), ...pair }))
   };
 }
 
 // ─── Features of a Concept ──────────────────────────────────────────────────
 
-/** Handbook p20. */
 export const CONCEPT_CRITERIA = {
   central: 'The concept is important to use in how we live our lives and understand the world around us.',
   contestable: 'The concept will arouse argument and disagreements.',
@@ -388,6 +424,13 @@ const FREE_WORDS = [
   'liberated'
 ];
 
+/** Default column / line labels for each game, with no cards. */
+export function emptyConceptGame(kind: 'kind_sort' | 'degree_line' | 'word_sort'): ConceptFeaturesBlock['content']['game'] {
+  if (kind === 'degree_line') return { kind, left: 'Less', middle: '', right: 'More', cards: [] };
+  return { kind, left: 'Yes', middle: '?', right: 'No', cards: [] };
+}
+
+/** A worked example game (blame scenarios, or the free / not free words). */
 export function conceptGame(
   kind: 'kind_sort' | 'degree_line' | 'word_sort',
   prefix: string
@@ -436,7 +479,7 @@ const BLAME_PROCEDURE = [
 ];
 
 const DEGREE_PROCEDURE = [
-  'Stick a line of tape on the floor in the middle of the circle and label both ends. Be sure to clearly indicate differences of grade or degree and are not mistaken for opposing categories.',
+  'Stick a line of tape on the floor in the middle of the circle and label both ends. Make sure the ends read as degrees of one thing, not opposite categories.',
   'Circulate words or scenarios on cards for students to consider (or work two or three examples together, then pairs write their own).',
   'Students place their cards roughly where they think they belong along the line.',
   'Discuss the order and any reordering students suggest. Focus on students\' reasons, leading to criteria for the concept.'
@@ -444,34 +487,42 @@ const DEGREE_PROCEDURE = [
 
 export function conceptNote(kind: 'kind_sort' | 'degree_line' | 'word_sort'): TkTeacherNote {
   return {
-    what: [
-      'Simple concept games can be devised by having students work with simple vocabulary or various everyday scenarios in a conceptual framework. (p21)',
-      'This activity is used to explore concepts by helping students to make judgements in simple situations and put forth reasons in order to examine the criteria that are employed in applying them. (p21)'
-    ].join('\n'),
+    what: 'Concept games have students make judgements about simple words or everyday scenarios, then give reasons. The reasons show the criteria they use for the concept.',
     run:
       kind === 'degree_line'
         ? [...DEGREE_PROCEDURE]
         : kind === 'word_sort'
-          ? [
-              'Sort out the words below into those that belong with Free and those that go with Not free. If you aren\'t certain about a word, then place it under the question mark. (Cam 2020, p23)'
-            ]
+          ? ['Students sort the words into the two columns. If they are not sure about a word, it goes under the question mark.']
           : [...BLAME_PROCEDURE],
-    say: [],
+    say: ['Why did you put it there?', 'What would have to change for it to move?'],
     watch: [
-      'While it can be useful to devise a scenario or two where it is clear what we should say, exercising the full apparatus of judgment requires cases that are discussable: situations where students might differ and where careful examination of the circumstances and consideration of reasons is required. (p22)',
-      'Students may respond by saying that "it depends", and they may be right to do so. Ask what additional factors need to be taken into account, then why their decision depends on those factors. The response points toward their criteria for judgment. (p22)',
-      'Ask for counterexamples. (Notion workshop notes)',
-      'Concepts are: central, contestable, available to all. (Handwritten note, p21)'
+      'Use cases students might disagree about. Clear-cut cases do not exercise judgement.',
+      'Students may say "it depends", and they may be right. Ask what other factors matter, then why their decision depends on them. The answer points to their criteria.',
+      'Ask for counterexamples.',
+      'Concepts are central, contestable and common.'
     ],
     extra_label: '',
     extra: [],
     time: '',
-    source: 'Workshop handbook p20–24; Cam (2012, 2020); Notion workshop notes',
+    source: '',
     edited: false
   };
 }
 
-export function conceptContent(prefix: string): ConceptFeaturesBlock['content'] {
+export function conceptContent(_prefix: string): ConceptFeaturesBlock['content'] {
+  return {
+    guide: GUIDE.concept,
+    concepts: [],
+    analogy: { stem: '', example: '' },
+    game: emptyConceptGame('kind_sort'),
+    criteria: [],
+    teacher_note: conceptNote('kind_sort'),
+    teacher_jots: {}
+  };
+}
+
+/** The responsibility / blame example, loaded on request from the editor. */
+export function conceptExample(prefix: string): Pick<ConceptFeaturesBlock['content'], 'concepts' | 'analogy' | 'game' | 'criteria'> {
   const concepts: Array<[string, boolean, boolean, boolean]> = [
     ['Change', true, true, true],
     ['Responsibility', true, true, true],
@@ -487,18 +538,13 @@ export function conceptContent(prefix: string): ConceptFeaturesBlock['content'] 
       contestable,
       common
     })),
-    analogy: {
-      stem: 'Responsibility is like ___ because they both ___.',
-      example: ''
-    },
+    analogy: { stem: 'Responsibility is like ___ because they both ___.', example: '' },
     game: conceptGame('kind_sort', prefix),
     criteria: [
       'Whether the person is in control of the event',
       "Whether the person freely chooses to act (it's a decision and the person could have acted otherwise)",
       'How serious / important / significant the result or impact is'
-    ],
-    teacher_note: conceptNote('kind_sort'),
-    teacher_jots: {}
+    ]
   };
 }
 
@@ -506,20 +552,18 @@ export function conceptContent(prefix: string): ConceptFeaturesBlock['content'] 
 
 export function reflectionNote(): TkTeacherNote {
   return {
-    what: 'A closing activity normally involves either joint or individual student reflection on what was learnt in terms of the content of the lesson and/or its skill base. This may include such things as verbal or written responses to target questions, entries in reflection log books, or completion of student performance self evaluation sheets. Having students reflect upon their learning and evaluate their own progress should be seen as contributing to their ability to become responsible and self-directed learners. (p4)',
+    what: 'Students reflect on what they learnt (content) and how they thought and worked together (process). Reflecting on their own progress helps them become self-directed learners.',
     run: [
-      'With five minutes remaining, stop the discussion and move systematically around the circle so each student can make a final reflective comment. (Philosothon facilitator procedures)',
-      'Invite students to explain whether their view changed, summarise their position, identify remaining questions or evaluate where the discussion progressed well or poorly. (Philosothon facilitator procedures)'
+      'With five minutes left, stop the discussion and go around the circle so each student makes a final reflective comment.',
+      'Invite students to say whether their view changed, sum up their position, name a question they still have, or say where the discussion went well or poorly.'
     ],
-    say: [],
+    say: ['Did your view change? Why?'],
     watch: [
-      'Progress: increased tolerance of unanswered intellectual work. (Handwritten note, p4)',
-      'Questions get paired with suggestions. (Handwritten note, p4)',
-      'Questions that have answers are too binary. (Handwritten note, p4)',
-      'The "progress" is the quality of thinking, the way and tools of the discussion. (Handwritten note, p4)',
-      'Build in written reflection. (Notion workshop notes)'
+      'Progress means a growing tolerance of unanswered questions.',
+      'Progress is the quality of the thinking and the tools used, not reaching an answer.',
+      'Build in written reflection.'
     ],
-    extra_label: 'Strong participants (Philosothon 2026 marking guide)',
+    extra_label: 'What strong participants do',
     extra: [
       'Build on the ideas of others.',
       'Allow others to speak.',
@@ -533,13 +577,13 @@ export function reflectionNote(): TkTeacherNote {
       'Keep their contributions focused and concise.'
     ],
     time: '',
-    source: 'Workshop handbook p4, p25; Notion workshop notes; Sydney Philosothon 2026 marking guide and facilitator procedures (Centre for Critical Thinking and Ethics, Newington College)',
+    source: '',
     edited: false
   };
 }
 
 export function reflectionContent(): ThinkingReflectionBlock['content'] {
-  return { variant: 'lesson', concept: '', teacher_note: reflectionNote(), teacher_jots: {} };
+  return { guide: GUIDE.reflection, variant: 'lesson', concept: '', teacher_note: reflectionNote(), teacher_jots: {} };
 }
 
 export function intentionsContent(): ThinkingIntentionsBlock['content'] {
