@@ -1144,7 +1144,7 @@ export function createAnnotationEditorFields(
     emitChange();
   }
 
-  function applySelection(selection: BuildAnchorSelection): void {
+  function applySelection(selection: BuildAnchorSelection, layerId?: string): void {
     const text = currentText();
     const anchor = buildAnchor(text, selection);
     if (!anchor) {
@@ -1250,7 +1250,7 @@ export function createAnnotationEditorFields(
       return;
     }
 
-    const layer = ensureLayer();
+    const layer = (layerId && layers.find((row) => row.id === layerId)) || ensureLayer();
     const id = nextId(`${getLatest().id}_ann`);
     const item: AnnotationItem = {
       id,
@@ -1273,6 +1273,7 @@ export function createAnnotationEditorFields(
     const scrollTop = selectSurface.scrollTop;
     selectSurface.replaceChildren();
     clearPending();
+    closeBarMenu();
 
     if (!hasText()) {
       const empty = document.createElement('div');
@@ -1324,17 +1325,14 @@ export function createAnnotationEditorFields(
       const gutter = document.createElement('button');
       gutter.type = 'button';
       gutter.className = 'block-editor__annotation-stanza-gutter';
-      if (stanzaNotes.length > 0) gutter.classList.add('has-note');
-      const stanzaLabel =
-        stanzaNotes.length > 0 ? 'Open the note on this stanza' : 'Add a note to this whole stanza';
-      gutter.setAttribute('aria-label', stanzaLabel);
-      gutter.title = stanzaLabel;
+      paintBarNotes(gutter, stanzaNotes, 'stanza');
       gutter.addEventListener('click', () => {
+        const selection = { stanzaId: stanza.id, wholeStanza: true };
         if (stanzaNotes.length > 0 && !picking()) {
-          openNote(stanzaNotes[0]!.id);
+          openBarMenu(gutter, stanzaNotes, selection, 'stanza');
           return;
         }
-        applySelection({ stanzaId: stanza.id, wholeStanza: true });
+        applySelection(selection);
       });
       stanzaEl.append(gutter);
 
@@ -1350,21 +1348,14 @@ export function createAnnotationEditorFields(
         const margin = document.createElement('button');
         margin.type = 'button';
         margin.className = 'block-editor__annotation-line-gutter';
-        if (lineNotes.length > 0) margin.classList.add('has-note');
-        const lineLabel =
-          lineNotes.length > 0 ? 'Open the note on this line' : 'Add a note to this whole line';
-        margin.setAttribute('aria-label', lineLabel);
-        margin.title = lineLabel;
+        paintBarNotes(margin, lineNotes, 'line');
         margin.addEventListener('click', () => {
+          const selection = { stanzaId: stanza.id, lineId: line.id, wholeLine: true };
           if (lineNotes.length > 0 && !picking()) {
-            openNote(lineNotes[0]!.id);
+            openBarMenu(margin, lineNotes, selection, 'line');
             return;
           }
-          applySelection({
-            stanzaId: stanza.id,
-            lineId: line.id,
-            wholeLine: true
-          });
+          applySelection(selection);
         });
 
         const textEl = document.createElement('p');
@@ -1393,6 +1384,125 @@ export function createAnnotationEditorFields(
       selectSurface.append(stanzaEl);
     }
     selectSurface.scrollTop = scrollTop;
+  }
+
+  /** A noted bar shows one stripe per note, in that note's layer colour. */
+  function paintBarNotes(
+    bar: HTMLButtonElement,
+    notes: AnnotationItem[],
+    scope: 'line' | 'stanza'
+  ): void {
+    const where = scope === 'line' ? 'line' : 'stanza';
+    const label =
+      notes.length === 0
+        ? `Add a note to this whole ${where}`
+        : `${notes.length} ${notes.length === 1 ? 'note' : 'notes'} on this ${where}: open one or add another`;
+    bar.setAttribute('aria-label', label);
+    bar.title = label;
+    if (notes.length === 0) return;
+    bar.classList.add('has-note');
+    bar.setAttribute('aria-haspopup', 'menu');
+    bar.dataset.noteCount = String(notes.length);
+    const step = 100 / notes.length;
+    const stops = notes.map((ann, i) => {
+      const colour = layers.find((layer) => layer.id === ann.layer_id)?.colour ?? 'wave';
+      return `var(--${colour}) ${i * step}% ${(i + 1) * step}%`;
+    });
+    bar.style.background = `linear-gradient(to bottom, ${stops.join(', ')})`;
+  }
+
+  function closeBarMenu(): void {
+    document.querySelectorAll('.block-editor__annotation-bar-menu').forEach((menu) => menu.remove());
+    document.removeEventListener('pointerdown', onBarMenuOutside, true);
+    window.removeEventListener('scroll', closeBarMenu, { capture: true });
+  }
+
+  function onBarMenuOutside(event: Event): void {
+    const target = event.target as Node;
+    const menu = document.querySelector('.block-editor__annotation-bar-menu');
+    if (menu && !menu.contains(target)) closeBarMenu();
+  }
+
+  /** A line or stanza can carry several notes (grammar, sound, …): open one or add another. */
+  function openBarMenu(
+    bar: HTMLButtonElement,
+    notes: AnnotationItem[],
+    selection: BuildAnchorSelection,
+    scope: 'line' | 'stanza'
+  ): void {
+    closeBarMenu();
+    const menu = document.createElement('div');
+    menu.className = 'block-editor__annotation-bar-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', `Notes on this ${scope}`);
+
+    const heading = document.createElement('p');
+    heading.className = 'block-editor__annotation-bar-menu-heading';
+    heading.textContent = `Notes on this ${scope}`;
+    menu.append(heading);
+
+    for (const ann of notes) {
+      const layer = layers.find((row) => row.id === ann.layer_id);
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.setAttribute('role', 'menuitem');
+      item.className = `block-editor__annotation-bar-menu-item block-editor__annotation-bar-menu-item--${layer?.colour ?? 'wave'}`;
+      const name = document.createElement('span');
+      name.className = 'block-editor__annotation-bar-menu-layer';
+      name.textContent = layer?.name ?? 'Note';
+      const preview = document.createElement('span');
+      preview.className = 'block-editor__annotation-bar-menu-preview';
+      preview.textContent = htmlToPlainText(ann.body.html).trim() || 'Empty note';
+      item.append(name, preview);
+      item.addEventListener('click', () => {
+        closeBarMenu();
+        openNote(ann.id);
+      });
+      menu.append(item);
+    }
+
+    const addLabel = document.createElement('p');
+    addLabel.className = 'block-editor__annotation-bar-menu-heading';
+    addLabel.textContent = 'Add another note';
+    menu.append(addLabel);
+    const addRow = document.createElement('div');
+    addRow.className = 'block-editor__annotation-bar-menu-add';
+    const addable = layers.filter((layer) => layer.kind !== 'voice');
+    const targets: Array<AnnotationLayer | undefined> = addable.length > 0 ? addable : [undefined];
+    for (const layer of targets) {
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.setAttribute('role', 'menuitem');
+      add.className = `block-editor__annotation-bar-menu-new block-editor__annotation-bar-menu-new--${layer?.colour ?? 'wave'}`;
+      add.textContent = layer ? `+ ${layer.name}` : '+ Note';
+      add.setAttribute('aria-label', layer ? `Add a ${layer.name} note to this ${scope}` : `Add a note to this ${scope}`);
+      add.addEventListener('click', () => {
+        closeBarMenu();
+        applySelection(selection, layer?.id);
+      });
+      addRow.append(add);
+    }
+    menu.append(addRow);
+
+    menu.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeBarMenu();
+        bar.focus();
+      }
+    });
+
+    // Sit beside the bar; flip up when the bar is near the bottom of the window.
+    document.body.append(menu);
+    const rect = bar.getBoundingClientRect();
+    const menuHeight = menu.offsetHeight;
+    const below = rect.top + menuHeight + 8 <= window.innerHeight;
+    menu.style.left = `${Math.round(rect.right + 8)}px`;
+    menu.style.top = `${Math.round(below ? rect.top : Math.max(8, rect.bottom - menuHeight))}px`;
+    document.addEventListener('pointerdown', onBarMenuOutside, true);
+    window.addEventListener('scroll', closeBarMenu, { capture: true, once: true });
+    menu.querySelector<HTMLButtonElement>('button')?.focus();
   }
 
   function openNote(id: string): void {

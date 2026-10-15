@@ -1020,6 +1020,12 @@ function buildInteractiveView(
       });
     }
 
+    // Bar columns widen to the busiest line / stanza so every row stays aligned.
+    const most = (map: Map<string, PlacedAnnotation[]>) =>
+      Math.max(1, ...Array.from(map.values(), (list) => list.length));
+    root.style.setProperty('--line-bars', String(most(lineBars)));
+    root.style.setProperty('--stanza-bars', String(most(stanzaBars)));
+
     const markers = markersFor(
       content.annotations,
       content.layers,
@@ -1134,14 +1140,15 @@ function buildInteractiveView(
 
       const margin = document.createElement('div');
       margin.className = 'block-annotation__line-margin';
-      for (const item of lineBars.get(lineId) ?? []) {
-        margin.append(
-          makeBarAnchor(
-            item,
-            'line',
-            (btn) => openPlaced(item, btn)
-          )
-        );
+      const barsHere = lineBars.get(lineId) ?? [];
+      if (barsHere.length > 0) {
+        // Several whole-line notes (grammar, sound, …) sit side by side.
+        const bars = document.createElement('div');
+        bars.className = 'block-annotation__line-bars';
+        for (const item of barsHere) {
+          bars.append(makeBarAnchor(item, 'line', (btn) => openPlaced(item, btn)));
+        }
+        margin.append(bars);
       }
       for (const pip of pipsByLine.get(lineId) ?? []) {
         margin.append(pip);
