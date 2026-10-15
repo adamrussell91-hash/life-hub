@@ -1,67 +1,45 @@
 # Thinking Toolkit blocks
 
-Lesson blocks for the Newington College Critical Thinking Framework (Jensen, Howe, Timillero, Costantino, Van Arkkels, Marokakis & Parker, 2025) and the Philosophical Community of Inquiry approach. Source: APS NSW *Introductory Workshop handbook* (2026), scanned copy with handwritten notes.
+Lesson blocks for the Newington College Critical Thinking Framework and the Philosophical Community of Inquiry approach.
 
 ## The set
 
 | Block | Picker group | What it does |
 |---|---|---|
-| Thinking intentions | Thinking Toolkit | Content intention, thinking intention (1–2 skills, tools, values), community skills, success criteria (handbook p13) |
-| Toolkit skill | Thinking Toolkit | One of the 16 skills: item card, numbered steps, partner Test step, reveals, link chips |
-| Toolkit tool | Thinking Toolkit | One of the 12 tools, each with its own frame: distinction fork + pair bank, closed→open converter, generalisation stress test, or steps |
-| Toolkit value | Thinking Toolkit | One of the 9 values: nine-value row, claim or options, probe-question reveals, model, "In discussion, ask" |
-| Thinking move | Thinking Toolkit | One skill + 1–5 tools in order + one value, written as the handbook phrase ("Justifying using reasons, judged for relevance.") |
-| Question Quadrant | Thinking Toolkit | Quadrant, "What do I need to do to respond?", questions to sort, closed→open; Procedure 1 or 2 (p17–19) |
-| Features of a Concept | Thinking Toolkit | Central / contestable / common, concept grid, analogy warm-up, one concept game, criteria we found (p20–24) |
-| Thinking reflection | Thinking Toolkit | Progress and process boxes (p25); tool, value and community chips filled from the page |
+| Thinking intentions | Thinking Toolkit | We are learning / We will think by / Using / Judged for / Working together by / I can. Every item shows a one-line description for students |
+| Skill | Thinking Toolkit | One of the 16 skills: description, "What to do", three steps, optional partner check, related tools |
+| Tool | Thinking Toolkit | One of the 12 tools, each with a sentence frame and its own layout: distinction fork + word pairs, closed→open questions, statements to test, or steps |
+| Value | Thinking Toolkit | One of the 9 values: description, nine-value row, check question with a hint, optional claim to judge |
+| Thinking move | Thinking Toolkit | One skill + 1–5 tools in order + one value ("Justifying using reasons, judged for relevance."), one step per tool with a sentence frame, then a value check |
+| Question Quadrant | Thinking Toolkit | The quadrant, "What do I need to do to respond?", your stimulus and questions to sort. Starts empty; "Load the Pooh and Piglet example" fills it |
+| Features of a Concept | Thinking Toolkit | Central / contestable / common, your concept grid, an optional concept game. Starts empty; "Load the worked example (responsibility)" fills it |
+| Thinking reflection | Thinking Toolkit | Progress and process questions; tool, value and community chips fill in from the page |
 | Teacher note | Basic | Private rich-text note. Always teacher-only; no visibility picker |
 
-Every toolkit block except Thinking intentions carries a **Teacher note** (What it is, How to run it, Say it, Watch for, an item-specific section, time and source) and **My notes for this class**.
+## How a block is built
 
-## Decisions taken
-
-- **Only the Newington framework page (p10).** 16 skills, 12 tools, 9 values. Thought experiment, hypothesise and synthesise are not in the set. Thinking move presets are only the pairings printed in the handbook (p9, p11 and the p9 margin note); a preset sets the skill and tools, and the value stays the teacher's choice.
-- **Class notes are per class.** A lesson belongs to a unit and every class running that unit shares it, so notes are stored as `teacher_jots[classId]`; the empty key is "All classes". The editor shows a class picker for classes running the unit.
-- **Thinking move compact steps.** One numbered step per tool: the tool's one-line prompt, its sentence frame, and an example to reveal. A final check step lists the value's probe questions.
-- **Changing a move after editing its note.** Steps for tools still in the chain keep their edits. The note rebuilds automatically until you edit it; after that your note is kept and a "Rebuild note from library" button appears.
-- **Sort highlights persist per device**, the same as reveals.
-- **Teacher callout** now uses the same dashed orange frame as teacher notes. Every teacher-only block gets that frame in the teacher view, which fixes the old "teacher-only looks identical" gap.
-- **Library content is copied in.** Each section has "Reset to library version".
+- **What to do.** Every block except Thinking intentions opens with a student instruction (`guide`). It has a sensible default and is meant to be rewritten for the lesson.
+- **Editor layout.** The everyday fields sit at the top. Reveals, related items, reset buttons and rarely used fields sit under **More options**. The teacher note is folded away under **Teacher note**.
+- **My notes.** One notes box per block (`teacher_jots['']`). Notes saved per class by the first release still show, labelled with their class.
+- **Teacher note.** Collapsed by default in the teacher view. Sections: About, How to run it, Ask, Watch for (plus "What strong participants do" on the reflection). No page references or source tags; `cleanNote` strips them from blocks saved by the first release.
+- **Picker.** Items are named Skill, Tool and Value. The skill picker lists the Golden Tetrad (the core four) first; every option shows its description.
+- **Thinking move.** Changing the skill, tools or value keeps edited steps for tools still in the chain. The note rebuilds until you edit it; after that it is kept and "Rebuild the note for this move" appears.
+- **Sort highlights and reveals persist per device.**
 
 ## Where teacher content is removed
 
 - Client: `filterBlocksForStudent` (`src/blocks/visibility.ts`), used by print and the unit page.
 - Server: `filterBlocksForStudent` (`netlify/functions/_shared/teaching-student.mjs`), used by `lesson-publish` and `published-unit`.
 - Both drop `teacher_note` blocks (even a stale draft set to students) and remove `teacher_note` / `teacher_jots` from toolkit blocks. Shared fixture: `fixtures/toolkit-teacher-strip.json`.
-- Search (`search-text.ts`) never indexes teacher notes or class notes.
+- Search (`search-text.ts`) never indexes teacher notes or My notes.
 
-## Source rule
+## Wording
 
-Every word in the library (`src/toolkit/library.ts`) and the block defaults (`src/toolkit/content.ts`) comes from one of two places:
+Item names, the Golden Tetrad, community skills, Cam's eight tool definitions, the Question Quadrant, Features of a Concept, the distinction pair bank, the reflection questions and the procedures come from the Newington framework and the Philosophical Community of Inquiry workshop.
 
-- the APS NSW *Introductory Workshop handbook* (2026), including Adam's handwritten notes on the scan;
-- the Notion page "Philosophical Community of Inquiry Workshop" (typed workshop notes);
-- the Notion page "Philosothon 2026 (Facilitator)": Britta Jensen's facilitator procedures and the 2026 Sydney Philosothon marking guide (Centre for Critical Thinking and Ethics, Newington College).
+The workshop material names the 16 skills, the 9 values, and the Analogy, Argument, Counterargument and Implication tools without defining them. Their descriptions are plain classroom wording written for these blocks. The same goes for the skill steps, the tool sentence frames, the value check questions and the community-skill one-liners. They are defaults: edit them on the block, or change them here for every new block. No NESA, Paul & Elder or other outside framework wording is used.
 
-Nothing is drafted, and nothing is taken from NESA, Paul & Elder, Ellerton's wider work or any other source. Where the sources say nothing, the field is left empty for the teacher to fill on the block. Do not fill gaps with outside wording.
-
-What the sources give:
-
-- **Definitions:** Adam's Notion was searched in full (PD pages, notebooks, lessons). Nothing there defines the skills or values. The only definitions are Cam's eight tool definitions (p9): Question, Suggestion, Reasons, Distinction, Example, Counterexample, Generalisation, Criteria. Skills, values, and Analogy, Argument, Counterargument and Implication have no definition, so their cards show the name only. The framework page (p10) lists items without defining them.
-- **Skill–tool pairings:** p9 "Tools in Use", the p9 margin notes (reasons → justifying, distinctions → comparing) and p11 (classify, then divide).
-- **Golden Tetrad:** p12.
-- **Classify steps:** the Notion notes (Classification and Division).
-- **Analogy steps:** the Notion notes ("Is a leader more like a compass or a map?") and the p20 frame.
-- **Distinction:** the p11 procedure and pair bank.
-- **Question:** the p17 Pooh and Piglet converter pairs and the Notion closed/open notes.
-- **Question Quadrant:** p17–19, quoted.
-- **Features of a Concept:** p20–24, quoted.
-- **Reflection:** p4 and p25, the Philosothon closing-reflection procedure, and the marking guide's ten marks of a strong participant.
-- **Community skills:** p12.
-- **Values:** the p10 handwritten "To judge quality of thinking" and "Use for tailored feedback", the p11 question, the p25 question, and the Philosothon marking guide ("relevance, clarity, coherence, precision, significance, accuracy and depth").
-- **Teacher notes:** only these quotes and handwritten notes. There are no invented timings, stems or "I do / We do / You do" steps.
-
-Blocks inserted before this change keep the text they were created with (library text is copied in). Use "Reset to library version" on a section to replace it with the source-only text.
+Library text is copied into a block when it is inserted; each block can be reset to the current library text.
 
 ## Icons
 

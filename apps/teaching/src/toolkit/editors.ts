@@ -7,27 +7,28 @@ import {
 import { mountRichTextTiptap } from '@/blocks/rich-text-tiptap';
 import type { Block } from '@/schemas/block';
 import type { ConceptGameKind, PairLevel, Quadrant, StressVerdict, TkTeacherNote } from '@/schemas/toolkit';
+import { ALL_CLASSES_KEY, classLabel } from '@/toolkit/class-context';
 import {
-  ALL_CLASSES_KEY,
-  activeToolkitClass,
-  setActiveToolkitClass,
-  toolkitClasses
-} from '@/toolkit/class-context';
-import {
+  GUIDE,
   QUADRANT_LABEL,
   STEM_CELL_DEGREE_CARDS,
+  cleanNote,
+  conceptExample,
   conceptGame,
   conceptNote,
+  emptyConceptGame,
   libraryNoteFor,
   moveBasis,
   moveNote,
   moveSentence,
-  moveWhy,
+  quadrantExample,
   quadrantNote,
   skillContent,
   syncMoveSteps,
   tkId,
   toolContent,
+  toolExample,
+  toolGuide,
   valueContent,
   type ConceptFeaturesBlock,
   type QuestionQuadrantBlock,
@@ -41,6 +42,7 @@ import {
 } from '@/toolkit/content';
 import {
   COMMUNITY_SKILLS,
+  COMMUNITY_SKILL_DESCRIPTION,
   DISTINCTION_PAIR_BANK,
   THINKING_MOVE_PRESETS,
   TOOLKIT_SKILLS,
@@ -125,9 +127,34 @@ function pills<V extends string>(
 
 function section(title: string, ...nodes: Array<Node | null>): HTMLElement {
   const wrap = el('section', 'tk-ed__section');
-  wrap.append(el('h4', 'tk-ed__heading', title));
+  if (title) wrap.append(el('h4', 'tk-ed__heading', title));
   for (const node of nodes) if (node) wrap.append(node);
   return wrap;
+}
+
+/** Folded section for the settings most lessons never touch. */
+function more(title: string, ...nodes: Array<Node | null>): HTMLElement {
+  const wrap = el('details', 'tk-ed__more');
+  wrap.append(el('summary', 'tk-ed__more-title', title));
+  const body = el('div', 'tk-ed__more-body');
+  for (const node of nodes) if (node) body.append(node);
+  wrap.append(body);
+  return wrap;
+}
+
+function actionButton(label: string, onClick: () => void): HTMLButtonElement {
+  const button = el('button', 'btn btn--ghost tk-ed__action', label);
+  button.type = 'button';
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+/** The "What to do" line students see at the top of the block. */
+function guideField(content: { guide: string }, emit: () => void, fallback: string): HTMLElement {
+  return field('What to do (students see this)', content.guide, (value) => {
+    content.guide = value;
+    emit();
+  }, { multiline: true, rows: 2, placeholder: fallback });
 }
 
 function resetButton(label: string, onReset: () => void): HTMLButtonElement {
@@ -183,30 +210,27 @@ function stringList(options: {
 
 /** Searchable picker over the library (the 16 / 12 / 9 lists). */
 function pickItem(anchor: HTMLElement, kind: ToolkitKind, onPick: (id: string) => void): void {
-  const source = kind === 'skill' ? TOOLKIT_SKILLS : kind === 'tool' ? TOOLKIT_TOOLS : TOOLKIT_VALUES;
-  const groupLabel = kind === 'skill' ? 'Skills' : kind === 'tool' ? 'Tools' : 'Values';
-  openHubInsertPicker(anchor, {
-    placeholder: `Find a ${kind}`,
-    groups: [
-      {
-        label: groupLabel,
-        options: source.map((item) => ({
-          value: item.id,
-          label: item.kind === 'skill' && item.tetrad ? `${item.label} ★` : item.label,
-          description: item.definition
-        }))
-      }
-    ],
-    onPick
+  const option = (item: { id: string; label: string; definition: string }) => ({
+    value: item.id,
+    label: item.label,
+    description: item.definition
   });
+  const groups =
+    kind === 'skill'
+      ? [
+          { label: 'Golden Tetrad (the core four)', options: TOOLKIT_SKILLS.filter((item) => item.tetrad).map(option) },
+          { label: 'Other skills', options: TOOLKIT_SKILLS.filter((item) => !item.tetrad).map(option) }
+        ]
+      : [{ label: kind === 'tool' ? 'Tools' : 'Values', options: (kind === 'tool' ? TOOLKIT_TOOLS : TOOLKIT_VALUES).map(option) }];
+  openHubInsertPicker(anchor, { placeholder: `Find a ${kind}`, groups, onPick });
 }
 
 function itemButton(kind: ToolkitKind, current: string, onPick: (id: string) => void, ariaLabel: string): HTMLElement {
-  const button = el('button', `btn btn--ghost tk-ed__item tk-ed__item--${kind}`);
+  const button = el('button', `btn tk-ed__item tk-ed__item--${kind}`);
   button.type = 'button';
   button.setAttribute('aria-label', ariaLabel);
   const paint = (id: string) => {
-    button.textContent = itemLabel(id) || `Choose a ${kind}`;
+    button.textContent = itemLabel(id) ? `${itemLabel(id)} ▾` : `Choose a ${kind} ▾`;
   };
   paint(current);
   button.addEventListener('click', () => {
@@ -252,93 +276,63 @@ function itemList(options: {
   return wrap;
 }
 
-// ─── Teacher note + class notes ─────────────────────────────────────────────
+// ─── Teacher note + my notes ────────────────────────────────────────────────
 
 function noteEditor(
   note: TkTeacherNote,
   onChange: (note: TkTeacherNote) => void,
   onReset: (() => void) | null
 ): HTMLElement {
-  const draft: TkTeacherNote = structuredClone(note);
+  const draft: TkTeacherNote = cleanNote(note);
   const emit = () => {
     draft.edited = true;
     onChange(structuredClone(draft));
   };
-  const reset = onReset ? resetButton('Reset note to library version', onReset) : null;
-  return section(
-    'Teacher note',
-    el('p', 'tk-ed__hint', 'Only you see this. It is removed before students see the page or print it.'),
-    field('What it is', draft.what, (value) => {
+  const nodes: Array<Node | null> = [
+    field('About', draft.what, (value) => {
       draft.what = value;
       emit();
-    }, { multiline: true, rows: 3 }),
+    }, { multiline: true, rows: 2 }),
     stringList({ label: 'How to run it', noun: 'step', items: draft.run, multiline: true, onChange: (items) => {
       draft.run = items;
       emit();
     } }),
-    stringList({ label: 'Say it', noun: 'stem', items: draft.say, onChange: (items) => {
+    stringList({ label: 'Ask', noun: 'question', items: draft.say, onChange: (items) => {
       draft.say = items;
       emit();
     } }),
     stringList({ label: 'Watch for', noun: 'point', items: draft.watch, multiline: true, onChange: (items) => {
       draft.watch = items;
       emit();
-    } }),
-    field('Extra section heading', draft.extra_label, (value) => {
-      draft.extra_label = value;
-      emit();
-    }, { placeholder: 'e.g. What good looks like' }),
-    stringList({ label: 'Extra section', noun: 'line', items: draft.extra, multiline: true, onChange: (items) => {
-      draft.extra = items;
-      emit();
-    } }),
-    field('Time', draft.time, (value) => {
-      draft.time = value;
-      emit();
-    }),
-    field('Source', draft.source, (value) => {
-      draft.source = value;
-      emit();
-    }),
-    reset
-  );
-}
-
-function jotsEditor(jots: Record<string, string>, onChange: (jots: Record<string, string>) => void): HTMLElement {
-  const draft: Record<string, string> = { ...jots };
-  const classes = toolkitClasses();
-  let current = classes.some((row) => row.id === activeToolkitClass()) ? activeToolkitClass() : ALL_CLASSES_KEY;
-  const textarea = el('textarea', 'tk-ed__input tk-ed__jot');
-  textarea.rows = 4;
-  const paint = () => {
-    textarea.value = draft[current] ?? '';
-    const name = current === ALL_CLASSES_KEY ? 'every class' : (classes.find((row) => row.id === current)?.label ?? 'this class');
-    textarea.setAttribute('aria-label', `My notes for ${name}`);
-    textarea.placeholder = `Notes for ${name}`;
-  };
-  textarea.addEventListener('input', () => {
-    if (textarea.value.trim()) draft[current] = textarea.value;
-    else delete draft[current];
-    onChange({ ...draft });
-  });
-  const nodes: Node[] = [];
-  if (classes.length > 0) {
+    } })
+  ];
+  if (draft.extra_label.trim() || draft.extra.length) {
     nodes.push(
-      pills(
-        'Which class these notes are for',
-        [{ value: ALL_CLASSES_KEY, label: 'All classes' }, ...classes.map((row) => ({ value: row.id, label: row.label }))],
-        current,
-        (value) => {
-          current = value;
-          setActiveToolkitClass(value);
-          paint();
-        }
-      )
+      stringList({ label: draft.extra_label || 'More', noun: 'line', items: draft.extra, multiline: true, onChange: (items) => {
+        draft.extra = items;
+        emit();
+      } })
     );
   }
-  paint();
-  nodes.push(textarea);
-  return section('My notes for this class', ...nodes);
+  if (onReset) nodes.push(resetButton('Reset teacher note', onReset));
+  return more('Teacher note (only you see this)', ...nodes);
+}
+
+/** One notes box per block. Older per-class notes still show, under their class. */
+function jotsEditor(jots: Record<string, string>, onChange: (jots: Record<string, string>) => void): HTMLElement {
+  const draft: Record<string, string> = { ...jots };
+  const box = (key: string, label: string): HTMLElement =>
+    field(label, draft[key] ?? '', (value) => {
+      if (value.trim()) draft[key] = value;
+      else delete draft[key];
+      onChange({ ...draft });
+    }, { multiline: true, rows: 3, className: 'tk-ed__jot', placeholder: 'Reminders, tweaks, what worked last time …' });
+  const legacy = Object.keys(draft).filter((key) => key !== ALL_CLASSES_KEY);
+  return section(
+    '',
+    box(ALL_CLASSES_KEY, 'My notes (only you see this)'),
+    ...legacy.map((key) => box(key, `My notes: ${classLabel(key)}`))
+  );
 }
 
 // ─── Shells ─────────────────────────────────────────────────────────────────
@@ -360,19 +354,21 @@ function makeEditor<T extends Block>(
   block: T,
   onChange: Change<T>,
   getLatest: () => T,
-  build: (api: { content: T['content']; emit: () => void; rebuild: () => void }) => Node[]
+  build: (api: { content: T['content']; emit: () => void; rebuild: () => void }) => Array<Node | null>
 ): HTMLElement {
   const fields = el('div', 'block-editor__fields tk-ed__fields');
+  const nodes = (api: { content: T['content']; emit: () => void; rebuild: () => void }) =>
+    build(api).filter((node): node is Node => node !== null);
   const api = {
     content: structuredClone(block.content) as T['content'],
     emit: () => {
       onChange({ ...getLatest(), content: structuredClone(api.content) });
     },
     rebuild: () => {
-      fields.replaceChildren(...build(api));
+      fields.replaceChildren(...nodes(api));
     }
   };
-  fields.append(...build(api));
+  fields.append(...nodes(api));
   return shell(block, onChange, getLatest, fields);
 }
 
@@ -384,8 +380,13 @@ function noteNodes<T extends Block>(
     teacher_note?: TkTeacherNote;
     teacher_jots?: Record<string, string>;
   };
+  const nodes: Node[] = [
+    jotsEditor(content.teacher_jots ?? {}, (jots) => {
+      content.teacher_jots = jots;
+      api.emit();
+    })
+  ];
   const note = content.teacher_note ?? libraryNoteFor(getLatest()) ?? undefined;
-  const nodes: Node[] = [];
   if (note) {
     nodes.push(
       noteEditor(
@@ -404,12 +405,6 @@ function noteNodes<T extends Block>(
       )
     );
   }
-  nodes.push(
-    jotsEditor(content.teacher_jots ?? {}, (jots) => {
-      content.teacher_jots = jots;
-      api.emit();
-    })
-  );
   return nodes;
 }
 
@@ -485,37 +480,32 @@ function revealsList(
   return wrap;
 }
 
-function cardFields(
-  api: { content: { label: string; definition: string; definition_source?: string }; emit: () => void },
-  itemId: string,
-  rebuild: () => void
-): HTMLElement {
-  const item = libraryItem(itemId);
-  const source = api.content.definition_source || item?.definition_source || '';
-  return section(
-    'Card',
+/** Name + description fields under the item picker. */
+function cardFields(api: { content: { label: string; definition: string }; emit: () => void }): HTMLElement[] {
+  return [
     field('Name', api.content.label, (value) => {
       api.content.label = value;
       api.emit();
     }),
-    field('Definition', api.content.definition, (value) => {
+    field('What it means (students see this)', api.content.definition, (value) => {
       api.content.definition = value;
       api.emit();
-    }, { multiline: true, rows: 2 }),
-    source ? el('p', 'tk-ed__hint', `Definition source: ${source}`) : null,
-    item
-      ? resetButton('Reset card to library version', () => {
-          api.content.label = item.label;
-          api.content.definition = item.definition;
-          api.content.definition_source = item.definition_source;
-          api.emit();
-          rebuild();
-        })
-      : null
-  );
+    }, { multiline: true, rows: 2 })
+  ];
 }
 
-// ─── Toolkit skill ──────────────────────────────────────────────────────────
+function linksEditor(
+  rows: Array<{ label: string; kind: ToolkitKind; ids: string[]; max: number; onChange: (ids: string[]) => void }>,
+  show: boolean,
+  onShow: (show: boolean) => void
+): Node[] {
+  return [
+    checkbox('Show the related skills, tools and values', show, onShow),
+    ...rows.map((row) => itemList({ label: row.label, kind: row.kind, ids: row.ids, max: row.max, onChange: row.onChange }))
+  ];
+}
+
+// ─── Skill ──────────────────────────────────────────────────────────────────
 
 export function createToolkitSkillEditor(
   block: ToolkitSkillBlock,
@@ -524,34 +514,33 @@ export function createToolkitSkillEditor(
 ): HTMLElement {
   return makeEditor(block, onChange, getLatest, (api) => {
     const c = api.content;
-    const library = libraryItem(c.item);
     return [
       section(
-        'Skill',
+        '',
         itemButton('skill', c.item, (id) => {
           const fresh = skillContent(id, getLatest().id);
-          api.content = { ...fresh, context: c.context, teacher_jots: c.teacher_jots };
+          api.content = { ...fresh, guide: c.guide, context: c.context, teacher_jots: c.teacher_jots };
           api.emit();
           api.rebuild();
         }, 'Choose a skill'),
-        el('p', 'tk-ed__hint', '★ Golden Tetrad (Ellerton). Choosing a skill loads its library steps and note.')
-      ),
-      cardFields(api, c.item, api.rebuild),
-      section(
-        'Activity',
-        field('Context question (optional)', c.context, (value) => {
+        ...cardFields(api),
+        guideField(c, api.emit, GUIDE.skill),
+        field('Question or task for this lesson (optional)', c.context, (value) => {
           c.context = value;
           api.emit();
-        }, { placeholder: 'The inquiry question for this lesson' }),
+        }, { placeholder: 'e.g. Was Macbeth responsible for his downfall?' }),
         stepsList('Steps', c.steps, getLatest().id, (steps) => {
           c.steps = steps;
           api.emit();
-        }),
-        checkbox('Show the partner Test step', c.show_test, (checked) => {
+        })
+      ),
+      more(
+        'More options',
+        checkbox('Add a partner check step', c.show_test, (checked) => {
           c.show_test = checked;
           api.emit();
         }),
-        stringList({ label: 'Test checks', noun: 'check', items: c.checks, max: 8, onChange: (items) => {
+        stringList({ label: 'Check questions', noun: 'check', items: c.checks, max: 8, onChange: (items) => {
           c.checks = items;
           api.emit();
         } }),
@@ -559,45 +548,42 @@ export function createToolkitSkillEditor(
           c.reveals = reveals;
           api.emit();
         }),
-        library
-          ? resetButton('Reset activity to library version', () => {
-              const fresh = skillContent(c.item, getLatest().id);
-              c.steps = fresh.steps;
-              c.checks = fresh.checks;
-              c.reveals = fresh.reveals;
-              c.show_test = fresh.show_test;
+        ...linksEditor(
+          [
+            { label: 'Tools it uses', kind: 'tool', ids: c.links.tools, max: 5, onChange: (ids) => {
+              c.links = { ...c.links, tools: ids };
               api.emit();
-              api.rebuild();
-            })
-          : null
-      ),
-      section(
-        'Link chips',
-        checkbox('Show link chips', c.show_links, (checked) => {
-          c.show_links = checked;
+            } },
+            { label: 'Check it against', kind: 'value', ids: c.links.values, max: 3, onChange: (ids) => {
+              c.links = { ...c.links, values: ids };
+              api.emit();
+            } }
+          ],
+          c.show_links,
+          (checked) => {
+            c.show_links = checked;
+            api.emit();
+          }
+        ),
+        resetButton('Reset name, description and steps', () => {
+          const fresh = skillContent(c.item, getLatest().id);
+          api.content = { ...fresh, guide: c.guide, context: c.context, teacher_note: c.teacher_note, teacher_jots: c.teacher_jots };
           api.emit();
-        }),
-        itemList({ label: 'Tools it uses', kind: 'tool', ids: c.links.tools, max: 5, onChange: (ids) => {
-          c.links = { ...c.links, tools: ids };
-          api.emit();
-        } }),
-        itemList({ label: 'Check it against', kind: 'value', ids: c.links.values, max: 3, onChange: (ids) => {
-          c.links = { ...c.links, values: ids };
-          api.emit();
-        } })
+          api.rebuild();
+        })
       ),
       ...noteNodes(api, getLatest)
     ];
   });
 }
 
-// ─── Toolkit tool ───────────────────────────────────────────────────────────
+// ─── Tool ───────────────────────────────────────────────────────────────────
 
 const PAIR_LEVEL_OPTIONS: Array<{ value: PairLevel; label: string }> = [
   { value: 'none', label: 'None' },
-  { value: 'level1', label: 'Level 1' },
-  { value: 'level2', label: 'Level 2' },
-  { value: 'level3', label: 'Level 3' },
+  { value: 'level1', label: 'Concrete' },
+  { value: 'level2', label: 'Abstract' },
+  { value: 'level3', label: 'Harder' },
   { value: 'maths', label: 'Maths' },
   { value: 'inquiry', label: 'Inquiry' }
 ];
@@ -611,12 +597,20 @@ const VERDICT_OPTIONS: Array<{ value: StressVerdict; label: string }> = [
 function toolFrameNodes(
   api: { content: ToolkitToolBlock['content']; emit: () => void; rebuild: () => void },
   prefix: string
-): Node[] {
+): Array<Node | null> {
   const c = api.content;
   const sentence = field('Sentence frame', c.sentence, (value) => {
     c.sentence = value;
     api.emit();
-  }, { multiline: true, rows: 2 });
+  }, { placeholder: 'e.g. I think ___ because ___.' });
+  const loadExample = (label: string, empty: boolean) =>
+    empty
+      ? actionButton(label, () => {
+          Object.assign(c, toolExample(c.frame, prefix));
+          api.emit();
+          api.rebuild();
+        })
+      : null;
   if (c.frame === 'fork') {
     const worked = (part: 'kind' | 'marker' | 'a' | 'b', label: string) =>
       field(label, c.worked[part], (value) => {
@@ -624,31 +618,23 @@ function toolFrameNodes(
         api.emit();
       });
     return [
-      section(
-        'The fork',
-        sentence,
-        el('p', 'tk-ed__hint', 'Worked example: shown in the fork when students reveal it.'),
-        worked('kind', 'General kind'),
-        worked('marker', 'Marker of difference'),
-        worked('a', 'Side A'),
-        worked('b', 'Side B'),
-        field('Worked example sentence', c.worked_note, (value) => {
+      sentence,
+      el('span', 'tk-ed__label', 'Word pairs for students to try'),
+      pills('Word pairs', PAIR_LEVEL_OPTIONS, c.pair_level, (value) => {
+        c.pair_level = value;
+        api.emit();
+      }),
+      more(
+        'Worked example (students reveal it)',
+        loadExample('Load an example', !Object.values(c.worked).some((value) => value.trim())),
+        worked('a', 'First word'),
+        worked('b', 'Second word'),
+        worked('kind', 'Kind both belong to'),
+        worked('marker', 'What makes them differ'),
+        field('Sentence', c.worked_note, (value) => {
           c.worked_note = value;
           api.emit();
-        }, { multiline: true, rows: 2 }),
-        el('span', 'tk-ed__label', 'Pair bank (Kate Kennedy White)'),
-        pills('Pair bank level', PAIR_LEVEL_OPTIONS, c.pair_level, (value) => {
-          c.pair_level = value;
-          api.emit();
-        }),
-        el(
-          'p',
-          'tk-ed__hint',
-          'Levels: ' +
-            (Object.keys(DISTINCTION_PAIR_BANK) as Array<keyof typeof DISTINCTION_PAIR_BANK>)
-              .map((key) => DISTINCTION_PAIR_BANK[key].label)
-              .join(' · ')
-        )
+        }, { multiline: true, rows: 2 })
       )
     ];
   }
@@ -658,7 +644,7 @@ function toolFrameNodes(
     const list = createHubList<Pair>({
       items: rows,
       noun: 'question',
-      label: 'Closed to open',
+      label: 'Closed questions to open up',
       getKey: (row) => row.id,
       describe: (row, index) => row.closed.trim() || `Question ${index + 1}`,
       max: 10,
@@ -672,22 +658,22 @@ function toolFrameNodes(
         const frag = document.createDocumentFragment();
         frag.append(
           field('Closed question', row.closed, (value) => ctx.update({ ...ctx.current, closed: value })),
-          field('Open version (revealed)', row.open, (value) => ctx.update({ ...ctx.current, open: value }))
+          field('Open version (students reveal it)', row.open, (value) => ctx.update({ ...ctx.current, open: value }))
         );
         return frag;
       }
     });
-    return [section('Closed to open', list.el)];
+    return [sentence, el('span', 'tk-ed__label', 'Closed questions to open up'), list.el, loadExample('Load an example', rows.length === 0)];
   }
   if (c.frame === 'stress') {
     type Statement = ToolkitToolBlock['content']['statements'][number];
     let rows: Statement[] = c.statements.map((row) => ({ ...row }));
     const list = createHubList<Statement>({
       items: rows,
-      noun: 'generalisation',
-      label: 'Generalisations to test',
+      noun: 'statement',
+      label: 'Statements to test',
       getKey: (row) => row.id,
-      describe: (row, index) => row.text.trim() || `Generalisation ${index + 1}`,
+      describe: (row, index) => row.text.trim() || `Statement ${index + 1}`,
       max: 10,
       create: () => ({ id: tkId(`${prefix}_g`), text: '', verdict: 'qualifies', reason: '' }),
       onChange: (next) => {
@@ -698,9 +684,9 @@ function toolFrameNodes(
       renderItem: (row, ctx) => {
         const frag = document.createDocumentFragment();
         frag.append(
-          field('Generalisation', row.text, (value) => ctx.update({ ...ctx.current, text: value })),
-          pills('Our verdict', VERDICT_OPTIONS, row.verdict, (value) => ctx.update({ ...ctx.current, verdict: value })),
-          field('Reason or counterexample (revealed)', row.reason, (value) => ctx.update({ ...ctx.current, reason: value }), {
+          field('Statement', row.text, (value) => ctx.update({ ...ctx.current, text: value })),
+          pills('Answer', VERDICT_OPTIONS, row.verdict, (value) => ctx.update({ ...ctx.current, verdict: value })),
+          field('Reason or counterexample (students reveal it)', row.reason, (value) => ctx.update({ ...ctx.current, reason: value }), {
             multiline: true,
             rows: 2
           })
@@ -708,17 +694,14 @@ function toolFrameNodes(
         return frag;
       }
     });
-    return [section('Stress test', sentence, list.el)];
+    return [sentence, el('span', 'tk-ed__label', 'Statements to test'), list.el, loadExample('Load an example', rows.length === 0)];
   }
   return [
-    section(
-      'Frame',
-      stepsList('Steps', c.steps, prefix, (steps) => {
-        c.steps = steps;
-        api.emit();
-      }),
-      sentence
-    )
+    stepsList('Steps', c.steps, prefix, (steps) => {
+      c.steps = steps;
+      api.emit();
+    }),
+    sentence
   ];
 }
 
@@ -731,51 +714,54 @@ export function createToolkitToolEditor(
     const c = api.content;
     return [
       section(
-        'Tool',
+        '',
         itemButton('tool', c.item, (id) => {
           const fresh = toolContent(id, getLatest().id);
-          api.content = { ...fresh, teacher_jots: c.teacher_jots };
+          const keepGuide = c.guide.trim() && c.guide !== toolGuide(c.frame);
+          api.content = { ...fresh, guide: keepGuide ? c.guide : fresh.guide, teacher_jots: c.teacher_jots };
           api.emit();
           api.rebuild();
         }, 'Choose a tool'),
-        el('p', 'tk-ed__hint', 'Choosing a tool loads its frame, reveals and note.')
+        ...cardFields(api),
+        guideField(c, api.emit, toolGuide(c.frame)),
+        ...toolFrameNodes(api, getLatest().id)
       ),
-      cardFields(api, c.item, api.rebuild),
-      ...toolFrameNodes(api, getLatest().id),
-      section(
-        'Reveals',
+      more(
+        'More options',
         revealsList(c.reveals, getLatest().id, (reveals) => {
           c.reveals = reveals;
           api.emit();
         }),
-        resetButton('Reset frame and reveals to library version', () => {
+        ...linksEditor(
+          [
+            { label: 'Skills it helps with', kind: 'skill', ids: c.links.skills, max: 4, onChange: (ids) => {
+              c.links = { ...c.links, skills: ids };
+              api.emit();
+            } },
+            { label: 'Pairs well with', kind: 'tool', ids: c.links.tools, max: 4, onChange: (ids) => {
+              c.links = { ...c.links, tools: ids };
+              api.emit();
+            } }
+          ],
+          c.show_links,
+          (checked) => {
+            c.show_links = checked;
+            api.emit();
+          }
+        ),
+        resetButton('Reset name, description and frame', () => {
           const fresh = toolContent(c.item, getLatest().id);
-          api.content = { ...fresh, label: c.label, definition: c.definition, teacher_note: c.teacher_note, teacher_jots: c.teacher_jots };
+          api.content = { ...fresh, guide: c.guide, teacher_note: c.teacher_note, teacher_jots: c.teacher_jots };
           api.emit();
           api.rebuild();
         })
-      ),
-      section(
-        'Link chips',
-        checkbox('Show link chips', c.show_links, (checked) => {
-          c.show_links = checked;
-          api.emit();
-        }),
-        itemList({ label: 'Skills in play', kind: 'skill', ids: c.links.skills, max: 4, onChange: (ids) => {
-          c.links = { ...c.links, skills: ids };
-          api.emit();
-        } }),
-        itemList({ label: 'Pairs well with', kind: 'tool', ids: c.links.tools, max: 4, onChange: (ids) => {
-          c.links = { ...c.links, tools: ids };
-          api.emit();
-        } })
       ),
       ...noteNodes(api, getLatest)
     ];
   });
 }
 
-// ─── Toolkit value ──────────────────────────────────────────────────────────
+// ─── Value ──────────────────────────────────────────────────────────────────
 
 export function createToolkitValueEditor(
   block: ToolkitValueBlock,
@@ -790,10 +776,10 @@ export function createToolkitValueEditor(
     const optionList = createHubList<Option>({
       items: options,
       noun: 'option',
-      label: 'Options to judge',
+      label: 'Answers to compare',
       variant: 'compact',
       getKey: (row) => row.id,
-      describe: (row, index) => row.text.trim() || `Option ${index + 1}`,
+      describe: (row, index) => row.text.trim() || `Answer ${index + 1}`,
       max: 8,
       create: () => ({ id: tkId(`${prefix}_o`), text: '' }),
       onChange: (next) => {
@@ -805,7 +791,7 @@ export function createToolkitValueEditor(
         const input = el('textarea', 'tk-ed__input');
         input.rows = 2;
         input.value = row.text;
-        input.setAttribute('aria-label', `Option ${ctx.index + 1}`);
+        input.setAttribute('aria-label', `Answer ${ctx.index + 1}`);
         input.addEventListener('input', () => ctx.update({ ...ctx.current, text: input.value }));
         return input;
       }
@@ -814,10 +800,10 @@ export function createToolkitValueEditor(
     let probes: Probe[] = c.probes.map((row) => ({ ...row }));
     const probeList = createHubList<Probe>({
       items: probes,
-      noun: 'probe',
-      label: 'Probe questions',
+      noun: 'question',
+      label: 'Check questions',
       getKey: (row) => row.id,
-      describe: (row, index) => row.question.trim() || `Probe ${index + 1}`,
+      describe: (row, index) => row.question.trim() || `Question ${index + 1}`,
       max: 8,
       create: () => ({ id: tkId(`${prefix}_p`), question: '', asks: '' }),
       onChange: (next) => {
@@ -828,40 +814,41 @@ export function createToolkitValueEditor(
       renderItem: (row, ctx) => {
         const frag = document.createDocumentFragment();
         frag.append(
-          field('Question (the button)', row.question, (value) => ctx.update({ ...ctx.current, question: value })),
-          field('What it asks (revealed)', row.asks, (value) => ctx.update({ ...ctx.current, asks: value }))
+          field('Question', row.question, (value) => ctx.update({ ...ctx.current, question: value })),
+          field('Hint (students reveal it)', row.asks, (value) => ctx.update({ ...ctx.current, asks: value }))
         );
         return frag;
       }
     });
+    const optionWrap = el('div', 'tk-ed__list');
+    optionWrap.append(el('span', 'tk-ed__label', 'Answers to compare (optional)'), optionList.el);
+    const probeWrap = el('div', 'tk-ed__list');
+    probeWrap.append(el('span', 'tk-ed__label', 'Check questions'), probeList.el);
     return [
       section(
-        'Value',
+        '',
         itemButton('value', c.item, (id) => {
           const fresh = valueContent(id, prefix);
-          api.content = { ...fresh, teacher_jots: c.teacher_jots };
+          api.content = { ...fresh, guide: c.guide, claim: c.claim, options: c.options, teacher_jots: c.teacher_jots };
           api.emit();
           api.rebuild();
-        }, 'Choose a value')
-      ),
-      cardFields(api, c.item, api.rebuild),
-      section(
-        'Practice',
-        field('Claim, question or paragraph', c.claim, (value) => {
+        }, 'Choose a value'),
+        ...cardFields(api),
+        guideField(c, api.emit, GUIDE.value),
+        field('Claim, question or paragraph to judge (optional)', c.claim, (value) => {
           c.claim = value;
           api.emit();
         }, { multiline: true, rows: 3 }),
-        optionList.el,
-        probeList.el,
-        field('Instruction', c.instruction, (value) => {
-          c.instruction = value;
-          api.emit();
-        }, { multiline: true, rows: 2 }),
-        field('Model button says “Show …”', c.model.label, (value) => {
+        probeWrap
+      ),
+      more(
+        'More options',
+        optionWrap,
+        field('Model answer button', c.model.label, (value) => {
           c.model = { ...c.model, label: value };
           api.emit();
-        }),
-        field('Model (revealed)', c.model.body, (value) => {
+        }, { placeholder: 'A model answer' }),
+        field('Model answer (students reveal it)', c.model.body, (value) => {
           c.model = { ...c.model, body: value };
           api.emit();
         }, { multiline: true, rows: 3 }),
@@ -869,9 +856,9 @@ export function createToolkitValueEditor(
           c.discussion = value;
           api.emit();
         }),
-        resetButton('Reset practice to library version', () => {
+        resetButton('Reset name, description and questions', () => {
           const fresh = valueContent(c.item, prefix);
-          api.content = { ...fresh, label: c.label, definition: c.definition, teacher_note: c.teacher_note, teacher_jots: c.teacher_jots };
+          api.content = { ...fresh, guide: c.guide, claim: c.claim, options: c.options, teacher_note: c.teacher_note, teacher_jots: c.teacher_jots };
           api.emit();
           api.rebuild();
         })
@@ -892,12 +879,11 @@ export function createThinkingMoveEditor(
     const c = api.content;
     const prefix = getLatest().id;
 
-    /** Skill, tools or value changed: sync steps, checks, why, and the note unless edited. */
+    /** Skill, tools or value changed: sync steps and checks, and the note unless edited. */
     const recompose = () => {
       c.steps = syncMoveSteps(c.tools, c.steps, prefix);
       const value = libraryValue(c.value);
       c.check = value ? value.probes.map((probe) => probe.question) : c.check;
-      c.why = moveWhy(c.skill, c.tools);
       if (!c.teacher_note || !c.teacher_note.edited) {
         c.teacher_note = moveNote(c.skill, c.tools, c.value);
         c.note_basis = moveBasis(c.skill, c.tools, c.value);
@@ -906,10 +892,7 @@ export function createThinkingMoveEditor(
       api.rebuild();
     };
 
-    const presets = el('button', 'btn btn--ghost tk-ed__presets', 'Load a handbook pairing');
-    presets.type = 'button';
-    presets.setAttribute('aria-haspopup', 'menu');
-    presets.addEventListener('click', () => {
+    const presets = actionButton('Use a standard pairing', () => {
       openHubMenu(
         presets,
         THINKING_MOVE_PRESETS.map(
@@ -923,9 +906,10 @@ export function createThinkingMoveEditor(
             }
           })
         ),
-        { label: 'Handbook pairings' }
+        { label: 'Standard pairings' }
       );
     });
+    presets.setAttribute('aria-haspopup', 'menu');
 
     const stale =
       c.teacher_note?.edited && c.note_basis && c.note_basis !== moveBasis(c.skill, c.tools, c.value);
@@ -935,7 +919,7 @@ export function createThinkingMoveEditor(
           box.setAttribute('role', 'status');
           box.append(
             el('p', undefined, 'You changed the move after editing its teacher note. Your note is kept as you wrote it.'),
-            resetButton('Rebuild note from library', () => {
+            resetButton('Rebuild the note for this move', () => {
               c.teacher_note = moveNote(c.skill, c.tools, c.value);
               c.note_basis = moveBasis(c.skill, c.tools, c.value);
               api.emit();
@@ -947,42 +931,33 @@ export function createThinkingMoveEditor(
       : null;
 
     type Step = ThinkingMoveBlock['content']['steps'][number];
-    let steps: Step[] = c.steps.map((step) => ({ ...step }));
+    const steps: Step[] = c.steps.map((step) => ({ ...step }));
     const stepEditors = el('div', 'tk-ed__move-steps');
+    const setStep = (index: number, patch: Partial<Step>) => {
+      steps[index] = { ...steps[index]!, ...patch };
+      c.steps = steps.map((row) => ({ ...row }));
+      api.emit();
+    };
     steps.forEach((step, index) => {
       const box = el('div', 'tk-ed__move-step');
       box.append(
         el('p', 'tk-ed__label', `Step ${index + 1}: ${itemLabel(step.tool)}`),
-        field('Prompt', step.prompt, (value) => {
-          steps[index] = { ...steps[index]!, prompt: value };
-          c.steps = steps.map((row) => ({ ...row }));
-          api.emit();
-        }, { multiline: true, rows: 2 }),
-        field('Sentence frame', step.frame, (value) => {
-          steps[index] = { ...steps[index]!, frame: value };
-          c.steps = steps.map((row) => ({ ...row }));
-          api.emit();
-        }),
-        field('Example (revealed)', step.example, (value) => {
-          steps[index] = { ...steps[index]!, example: value };
-          c.steps = steps.map((row) => ({ ...row }));
-          api.emit();
-        }, { multiline: true, rows: 2 })
+        field('Instruction', step.prompt, (value) => setStep(index, { prompt: value }), { multiline: true, rows: 2 }),
+        field('Sentence frame', step.frame, (value) => setStep(index, { frame: value })),
+        field('Example (students reveal it, optional)', step.example, (value) => setStep(index, { example: value }), {
+          multiline: true,
+          rows: 2
+        })
       );
       stepEditors.append(box);
     });
 
-    const communityButton = el('button', 'btn btn--ghost tk-ed__item', c.community || 'Add a community skill');
+    const communityButton = el('button', 'btn tk-ed__item', c.community ? `${c.community} ▾` : 'Add a community skill ▾');
     communityButton.type = 'button';
     communityButton.addEventListener('click', () => {
       openHubInsertPicker(communityButton, {
         placeholder: 'Find a community skill',
-        groups: [
-          {
-            label: 'Community skills',
-            options: [{ value: '', label: 'None' }, ...COMMUNITY_SKILLS.map((skill) => ({ value: skill, label: skill }))]
-          }
-        ],
+        groups: [{ label: 'Community skills', options: [{ value: '', label: 'None' }, ...communityOptions()] }],
         onPick: (value) => {
           c.community = value;
           api.emit();
@@ -991,48 +966,49 @@ export function createThinkingMoveEditor(
       });
     });
 
+    const row = (label: string, control: HTMLElement) => {
+      const wrap = el('div', 'tk-ed__row');
+      wrap.append(el('span', 'tk-ed__label', label), control);
+      return wrap;
+    };
+
     return [
       section(
-        'The move',
+        '',
         el('p', 'tk-ed__sentence', moveSentence(c.skill, c.tools, c.value)),
         presets,
-        el('span', 'tk-ed__label', 'Skill'),
-        itemButton('skill', c.skill, (id) => {
+        row('Skill', itemButton('skill', c.skill, (id) => {
           c.skill = id;
           recompose();
-        }, 'Choose the skill'),
-        itemList({ label: 'Tools, in order (1 to 5)', kind: 'tool', ids: c.tools, min: 1, max: 5, onChange: (ids) => {
+        }, 'Choose the skill')),
+        itemList({ label: 'Tools, in order', kind: 'tool', ids: c.tools, min: 1, max: 5, onChange: (ids) => {
           if (ids.length === 0) return;
           c.tools = ids;
           recompose();
         } }),
-        el('span', 'tk-ed__label', 'Judged for'),
-        itemButton('value', c.value, (id) => {
+        row('Judged for', itemButton('value', c.value, (id) => {
           c.value = id;
           recompose();
-        }, 'Choose the value'),
-        el('span', 'tk-ed__label', 'Together (optional)'),
-        communityButton,
-        field('Claim, question or stimulus', c.stimulus, (value) => {
+        }, 'Choose the value')),
+        guideField(c, api.emit, GUIDE.move),
+        field('Claim, question or text to work on (optional)', c.stimulus, (value) => {
           c.stimulus = value;
           api.emit();
         }, { multiline: true, rows: 2 })
       ),
-      section('Steps', stepEditors, stringList({ label: 'Value check questions', noun: 'question', items: c.check, max: 8, onChange: (items) => {
+      section('Steps', stepEditors, stringList({ label: 'Final check questions', noun: 'question', items: c.check, max: 8, onChange: (items) => {
         c.check = items;
         api.emit();
       } })),
-      section(
-        'Why this pairing',
-        field('Shown in your teacher note', c.why, (value) => {
-          c.why = value;
-          api.emit();
-        }, { multiline: true, rows: 2 })
-      ),
-      ...(staleNotice ? [staleNotice] : []),
+      more('More options', row('Working together (optional)', communityButton)),
+      staleNotice,
       ...noteNodes(api, getLatest)
     ];
   });
+}
+
+function communityOptions(): Array<{ value: string; label: string; description: string }> {
+  return COMMUNITY_SKILLS.map((skill) => ({ value: skill, label: skill, description: COMMUNITY_SKILL_DESCRIPTION[skill] ?? '' }));
 }
 
 // ─── Question Quadrant ──────────────────────────────────────────────────────
@@ -1069,7 +1045,7 @@ export function createQuestionQuadrantEditor(
         const frag = document.createDocumentFragment();
         frag.append(
           field('Question', row.text, (value) => ctx.update({ ...ctx.current, text: value })),
-          pills('Where it goes', QUADRANT_OPTIONS, row.quadrant, (value) => ctx.update({ ...ctx.current, quadrant: value }))
+          pills('Answer', QUADRANT_OPTIONS, row.quadrant, (value) => ctx.update({ ...ctx.current, quadrant: value }))
         );
         return frag;
       }
@@ -1093,26 +1069,40 @@ export function createQuestionQuadrantEditor(
         const frag = document.createDocumentFragment();
         frag.append(
           field('Closed question', row.closed, (value) => ctx.update({ ...ctx.current, closed: value })),
-          field('Open version (revealed)', row.open, (value) => ctx.update({ ...ctx.current, open: value }))
+          field('Open version (students reveal it)', row.open, (value) => ctx.update({ ...ctx.current, open: value }))
         );
         return frag;
       }
     });
+    const empty = !c.stimulus.trim() && questions.length === 0 && pairs.length === 0;
     return [
       section(
-        'Stimulus',
-        field('Stimulus', c.stimulus, (value) => {
+        '',
+        guideField(c, api.emit, GUIDE.quadrant),
+        field('Stimulus (text, scenario or image description)', c.stimulus, (value) => {
           c.stimulus = value;
           api.emit();
-        }, { multiline: true, rows: 3 })
+        }, { multiline: true, rows: 3 }),
+        el('span', 'tk-ed__label', 'Questions to sort'),
+        questionList.el,
+        empty
+          ? actionButton('Load the Pooh and Piglet example', () => {
+              Object.assign(c, quadrantExample(prefix));
+              api.emit();
+              api.rebuild();
+            })
+          : null
       ),
-      section(
-        'Procedure',
+      more(
+        'More options',
+        el('span', 'tk-ed__label', 'Closed questions to open up'),
+        pairList.el,
+        el('span', 'tk-ed__label', 'How you will run it (sets the teacher note)'),
         pills(
-          'Procedure',
+          'How you will run it',
           [
-            { value: 'sort' as const, label: 'Procedure 1: sort given questions' },
-            { value: 'create' as const, label: 'Procedure 2: groups write and vote' }
+            { value: 'sort' as const, label: 'Students sort my questions' },
+            { value: 'create' as const, label: 'Groups write their own' }
           ],
           c.procedure,
           (value) => {
@@ -1121,11 +1111,8 @@ export function createQuestionQuadrantEditor(
             api.emit();
             api.rebuild();
           }
-        ),
-        el('p', 'tk-ed__hint', 'The procedure sets which steps load into your teacher note.')
+        )
       ),
-      section('Questions', questionList.el),
-      section('Closed to open', pairList.el),
       ...noteNodes(api, getLatest)
     ];
   });
@@ -1134,9 +1121,9 @@ export function createQuestionQuadrantEditor(
 // ─── Features of a Concept ──────────────────────────────────────────────────
 
 const GAME_OPTIONS: Array<{ value: ConceptGameKind; label: string }> = [
-  { value: 'kind_sort', label: 'Differences of kind (sort)' },
-  { value: 'degree_line', label: 'Differences of degree (line)' },
-  { value: 'word_sort', label: 'Word sort' }
+  { value: 'kind_sort', label: 'Sort into columns' },
+  { value: 'degree_line', label: 'Place along a line' },
+  { value: 'word_sort', label: 'Sort words' }
 ];
 
 export function createConceptFeaturesEditor(
@@ -1152,7 +1139,7 @@ export function createConceptFeaturesEditor(
     const conceptList = createHubList<Concept>({
       items: concepts,
       noun: 'concept',
-      label: 'Concept grid',
+      label: 'Concepts',
       getKey: (row) => row.id,
       describe: (row, index) => row.label.trim() || `Concept ${index + 1}`,
       max: 8,
@@ -1191,71 +1178,89 @@ export function createConceptFeaturesEditor(
       },
       renderItem: (row, ctx) => {
         const frag = document.createDocumentFragment();
-        frag.append(field('Card', row.text, (value) => ctx.update({ ...ctx.current, text: value }), { multiline: true, rows: 2 }));
+        frag.append(field(c.game.kind === 'word_sort' ? 'Word' : 'Scenario', row.text, (value) => ctx.update({ ...ctx.current, text: value }), { multiline: c.game.kind !== 'word_sort', rows: 2 }));
         if (c.game.kind !== 'word_sort') {
-          frag.append(field('Question to ask (revealed, optional)', row.prompt, (value) => ctx.update({ ...ctx.current, prompt: value })));
+          frag.append(field('Question to ask (students reveal it, optional)', row.prompt, (value) => ctx.update({ ...ctx.current, prompt: value })));
         }
         return frag;
       }
     });
-    const scienceSet =
-      c.game.kind === 'degree_line'
-        ? resetButton('Use the science set (Cam 2012)', () => {
-            c.game = {
-              ...c.game,
-              left: 'Less acceptable',
-              right: 'More acceptable',
-              cards: STEM_CELL_DEGREE_CARDS.map((text) => ({ id: tkId(`${prefix}_k`), text, prompt: '' }))
-            };
-            api.emit();
-            api.rebuild();
-          })
-        : null;
+    const line = c.game.kind === 'degree_line';
+    const empty = concepts.length === 0 && cards.length === 0 && !c.analogy.stem.trim() && c.criteria.length === 0;
+    const gameExample = cards.length === 0
+      ? actionButton(line ? 'Load example cards (stem cells)' : 'Load example cards', () => {
+          c.game = line
+            ? {
+                ...c.game,
+                left: 'Less acceptable',
+                right: 'More acceptable',
+                cards: STEM_CELL_DEGREE_CARDS.map((text) => ({ id: tkId(`${prefix}_k`), text, prompt: '' }))
+              }
+            : conceptGame(c.game.kind, prefix);
+          api.emit();
+          api.rebuild();
+        })
+      : null;
     return [
-      section('Concepts', conceptList.el),
       section(
-        'Analogy warm-up',
-        field('Frame', c.analogy.stem, (value) => {
-          c.analogy = { ...c.analogy, stem: value };
-          api.emit();
-        }),
-        field('Example (revealed)', c.analogy.example, (value) => {
-          c.analogy = { ...c.analogy, example: value };
-          api.emit();
-        }, { multiline: true, rows: 2 })
+        '',
+        empty
+          ? actionButton('Load the worked example (responsibility)', () => {
+              Object.assign(c, conceptExample(prefix));
+              api.emit();
+              api.rebuild();
+            })
+          : null,
+        guideField(c, api.emit, GUIDE.concept),
+        el('span', 'tk-ed__label', 'Concepts for the grid (tick the answers students reveal)'),
+        conceptList.el
       ),
       section(
-        'Concept game',
+        'Concept game (optional)',
         pills('Concept game', GAME_OPTIONS, c.game.kind, (value) => {
-          c.game = conceptGame(value, prefix);
+          const kept = c.game.cards;
+          c.game = { ...emptyConceptGame(value), cards: kept };
           if (!c.teacher_note || !c.teacher_note.edited) c.teacher_note = conceptNote(value);
           api.emit();
           api.rebuild();
         }),
-        field(c.game.kind === 'degree_line' ? 'Left end' : 'Left column', c.game.left, (value) => {
-          c.game = { ...c.game, left: value };
-          api.emit();
-        }),
-        c.game.kind === 'degree_line'
-          ? null
-          : field('Middle column', c.game.middle, (value) => {
-              c.game = { ...c.game, middle: value };
+        (() => {
+          const ends = el('div', 'tk-ed__inline tk-ed__ends');
+          ends.append(
+            field(line ? 'Left end' : 'Left column', c.game.left, (value) => {
+              c.game = { ...c.game, left: value };
               api.emit();
             }),
-        field(c.game.kind === 'degree_line' ? 'Right end' : 'Right column', c.game.right, (value) => {
-          c.game = { ...c.game, right: value };
-          api.emit();
-        }),
-        scienceSet,
-        cardList.el
+            line
+              ? el('span')
+              : field('Middle', c.game.middle, (value) => {
+                  c.game = { ...c.game, middle: value };
+                  api.emit();
+                }),
+            field(line ? 'Right end' : 'Right column', c.game.right, (value) => {
+              c.game = { ...c.game, right: value };
+              api.emit();
+            })
+          );
+          return ends;
+        })(),
+        cardList.el,
+        gameExample
       ),
-      section(
-        'Criteria we found',
-        stringList({ label: 'Criteria (revealed)', noun: 'criterion', items: c.criteria, max: 8, multiline: true, onChange: (items) => {
+      more(
+        'More options',
+        field('Analogy warm-up frame', c.analogy.stem, (value) => {
+          c.analogy = { ...c.analogy, stem: value };
+          api.emit();
+        }, { placeholder: 'e.g. Responsibility is like ___ because they both ___.' }),
+        field('Analogy example (students reveal it)', c.analogy.example, (value) => {
+          c.analogy = { ...c.analogy, example: value };
+          api.emit();
+        }, { multiline: true, rows: 2 }),
+        stringList({ label: 'Criteria (students reveal them at the end)', noun: 'criterion', items: c.criteria, max: 8, multiline: true, onChange: (items) => {
           c.criteria = items;
           api.emit();
-        } }),
-        el('p', 'tk-ed__hint', "After the lesson, replace these with your class's own criteria.")
+        } })
       ),
       ...noteNodes(api, getLatest)
     ];
@@ -1276,16 +1281,16 @@ export function createThinkingIntentionsEditor(
     const communityList = createHubList<Row>({
       items: community,
       noun: 'community skill',
-      label: 'Together: community skills (1 or 2)',
+      label: 'Working together',
       variant: 'compact',
       getKey: (row) => row.key,
       describe: (row) => row.value,
       max: 2,
-      maxReason: 'Teach one or two community skills per lesson (handbook p13).',
+      maxReason: 'Pick one or two per lesson.',
       pick: (anchor, done) =>
         openHubInsertPicker(anchor, {
           placeholder: 'Find a community skill',
-          groups: [{ label: 'Community skills', options: COMMUNITY_SKILLS.map((skill) => ({ value: skill, label: skill })) }],
+          groups: [{ label: 'Community skills', options: communityOptions() }],
           onPick: (value) => done({ key: tkId('cm'), value })
         }),
       onChange: (next) => {
@@ -1296,37 +1301,32 @@ export function createThinkingIntentionsEditor(
       renderItem: (row) => el('span', 'hub-list__chip tk-chip tk-chip--community', row.value)
     });
     const communityWrap = el('div', 'tk-ed__list');
-    communityWrap.append(el('span', 'tk-ed__label', 'Together: community skills (1 or 2)'), communityList.el);
+    communityWrap.append(el('span', 'tk-ed__label', 'Working together (1 or 2 community skills)'), communityList.el);
     return [
       section(
-        'Learning intention',
-        field('Content intention', c.content, (value) => {
+        '',
+        field('We are learning …', c.content, (value) => {
           c.content = value;
           api.emit();
-        }, { multiline: true, rows: 2 })
-      ),
-      section(
-        'Thinking intention',
-        itemList({ label: 'Skills (1 or 2)', kind: 'skill', ids: c.skills, max: 2, onChange: (ids) => {
+        }, { multiline: true, rows: 2, placeholder: 'e.g. how Shakespeare presents ambition in Macbeth' }),
+        itemList({ label: 'We will think by (1 or 2 skills)', kind: 'skill', ids: c.skills, max: 2, onChange: (ids) => {
           c.skills = ids;
           api.emit();
         } }),
-        itemList({ label: 'Tools', kind: 'tool', ids: c.tools, max: 6, onChange: (ids) => {
+        itemList({ label: 'Using (tools)', kind: 'tool', ids: c.tools, max: 6, onChange: (ids) => {
           c.tools = ids;
           api.emit();
         } }),
         itemList({ label: 'Judged for (values)', kind: 'value', ids: c.values, max: 4, onChange: (ids) => {
           c.values = ids;
           api.emit();
-        } })
-      ),
-      section('Collaborative intention', communityWrap),
-      section(
-        'Success criteria',
-        stringList({ label: 'Success criteria', noun: 'criterion', items: c.success, max: 6, onChange: (items) => {
+        } }),
+        communityWrap,
+        stringList({ label: 'Success criteria: I can …', noun: 'criterion', items: c.success, max: 6, onChange: (items) => {
           c.success = items;
           api.emit();
-        } })
+        } }),
+        el('p', 'tk-ed__hint', 'Students see each skill, tool, value and community skill with a one-line description.')
       )
     ];
   });
@@ -1343,7 +1343,7 @@ export function createThinkingReflectionEditor(
     const c = api.content;
     return [
       section(
-        'Reflection',
+        '',
         pills(
           'Reflection type',
           [
@@ -1356,15 +1356,12 @@ export function createThinkingReflectionEditor(
             api.emit();
           }
         ),
+        guideField(c, api.emit, GUIDE.reflection),
         field('Concept (optional)', c.concept, (value) => {
           c.concept = value;
           api.emit();
         }, { placeholder: 'e.g. responsibility' }),
-        el(
-          'p',
-          'tk-ed__hint',
-          "Tool, value and community chips fill in from this page's toolkit blocks and Thinking intentions."
-        )
+        el('p', 'tk-ed__hint', 'The tools, values and community skills used on this page fill in by themselves.')
       ),
       ...noteNodes(api, getLatest)
     ];
