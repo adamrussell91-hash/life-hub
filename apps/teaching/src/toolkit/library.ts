@@ -1,17 +1,11 @@
 /**
  * Thinking Toolkit library: the Newington College Critical Thinking Framework
- * (Jensen, Howe, Timillero, Costantino, Van Arkkels, Marokakis & Parker, 2025),
- * as printed in the APS NSW Introductory Workshop handbook (2026), page 10.
+ * (16 skills, 12 tools, 9 values).
  *
- * Only items on that framework page are listed: 16 skills, 12 tools, 9 values.
- * Inserting a toolkit block copies an item's text into the block; edits stay on
- * the block and each section can be reset to the text here.
- *
- * Source rule: every word here comes from the handbook (including Adam's
- * handwritten notes on the scan) or his Notion workshop notes ("Philosophical
- * Community of Inquiry Workshop"). Nothing is drafted or taken from elsewhere.
- * Where the sources give no definition, steps or examples, the field is empty
- * and the teacher fills it on the block.
+ * Inserting a block copies an item's text into the block. The teacher edits it
+ * to suit the lesson; each section can be reset to the text here. Every item
+ * has a plain description, steps or a sentence frame so a block is usable the
+ * moment it is inserted.
  */
 
 export type ToolkitKind = 'skill' | 'tool' | 'value';
@@ -40,7 +34,7 @@ type LibraryBase = {
 
 export type LibrarySkill = LibraryBase & {
   kind: 'skill';
-  /** Ellerton's Golden Tetrad (handbook p12). */
+  /** One of the four core skills (Golden Tetrad). */
   tetrad?: boolean;
   /** "-ing" form used in Thinking move sentences ("Justifying a claim using …"). */
   gerund: string;
@@ -82,125 +76,237 @@ export type LibraryValue = LibraryBase & {
 
 export type LibraryItem = LibrarySkill | LibraryTool | LibraryValue;
 
-const H = 'Workshop handbook';
-const CAM = `Cam (2006), A Beginning Philosophy Toolkit, ${H} p9`;
-const NOTES = 'Notion workshop notes';
-const PHILOSOTHON = 'Sydney Philosothon 2026 marking guide and facilitator procedures (Centre for Critical Thinking and Ethics, Newington College), Notion';
-
-/** Handbook p10, handwritten under the skills column. */
-const SKILL_NOTE = 'Teach these more explicitly. (Handwritten note, framework p10.)';
-/** Handbook p10, handwritten under the tools column. */
-const TOOL_NOTE = 'Teach these directly. (Handwritten note, framework p10.)';
-
 type SkillSource = {
   id: string;
   label: string;
   gerund: string;
+  definition: string;
+  steps: Array<[string, string]>;
   tetrad?: boolean;
-  /** p9 "Tools in Use" phrase(s) pairing this skill with a tool. */
-  pairings?: string[];
   tools?: string[];
-  steps?: LibraryStep[];
-  extraWhat?: string[];
-  source?: string;
+  values?: string[];
+  say?: string[];
+  watch?: string[];
 };
 
 function skill(src: SkillSource): LibrarySkill {
-  const what = [
-    ...(src.tetrad ? ["One of Peter Ellerton's Golden Tetrad of Cognitive Skills (p12)."] : []),
-    ...(src.pairings ?? []).map((phrase) => `Tools in Use (p9): "${phrase}".`),
-    ...(src.extraWhat ?? [])
-  ].join('\n');
   return {
     id: src.id,
     kind: 'skill',
     label: src.label,
     gerund: src.gerund,
     tetrad: src.tetrad,
-    definition: '',
+    definition: src.definition,
     definition_source: '',
-    steps: src.steps ?? [],
+    steps: src.steps.map(([title, prompt]) => ({ title, prompt })),
     checks: [],
     reveals: [],
     tools: src.tools ?? [],
-    values: [],
+    values: src.values ?? [],
     note: {
-      what,
+      what: '',
       run: [],
-      say: [],
-      watch: [SKILL_NOTE],
+      say: src.say ?? [],
+      watch: src.watch ?? [],
       time: '',
-      source: src.source ?? `Critical Thinking Framework at Newington College (2025), ${H} p10`
+      source: ''
     }
   };
 }
 
 const SKILLS: LibrarySkill[] = [
-  skill({ id: 'skill:apply', label: 'Apply', gerund: 'Applying', pairings: ['Formulating and applying criteria'], tools: ['tool:criteria'] }),
-  skill({ id: 'skill:assess', label: 'Assess', gerund: 'Assessing' }),
-  skill({ id: 'skill:analyse', label: 'Analyse', gerund: 'Analysing', tetrad: true }),
-  skill({ id: 'skill:calculate', label: 'Calculate', gerund: 'Calculating' }),
+  skill({
+    id: 'skill:apply',
+    label: 'Apply',
+    gerund: 'Applying',
+    definition: 'Use a rule, idea or set of criteria in a new situation.',
+    steps: [
+      ['Rule', 'Name the rule, idea or criteria you are using.'],
+      ['Case', 'Look closely at the new case.'],
+      ['Fit', 'Show how the rule fits the case, or where it does not.']
+    ],
+    tools: ['tool:criteria']
+  }),
+  skill({
+    id: 'skill:assess',
+    label: 'Assess',
+    gerund: 'Assessing',
+    definition: 'Make a judgement about how good, useful or true something is.',
+    steps: [
+      ['Measure', 'Decide what you are judging it against.'],
+      ['Weigh', 'List its strengths and weaknesses.'],
+      ['Judge', 'Give your judgement and the main reason for it.']
+    ],
+    tools: ['tool:criteria']
+  }),
+  skill({
+    id: 'skill:analyse',
+    label: 'Analyse',
+    gerund: 'Analysing',
+    tetrad: true,
+    definition: 'Break something into its parts and show how they connect.',
+    steps: [
+      ['Parts', 'Identify the parts.'],
+      ['Roles', 'Explain what each part does.'],
+      ['Links', 'Show how the parts connect to make the whole.']
+    ]
+  }),
+  skill({
+    id: 'skill:calculate',
+    label: 'Calculate',
+    gerund: 'Calculating',
+    definition: 'Work out an answer using numbers and a method.',
+    steps: [
+      ['Method', 'Choose the method.'],
+      ['Working', 'Show each step of your working.'],
+      ['Check', 'Check the answer makes sense.']
+    ]
+  }),
   skill({
     id: 'skill:classify',
     label: 'Classify',
     gerund: 'Classifying',
-    pairings: ['Classifying'],
-    tools: ['tool:distinction'],
+    definition: 'Sort things into groups by what they have in common.',
     steps: [
-      { title: 'Category', prompt: 'Identify a category.' },
-      { title: 'What belongs', prompt: 'Identify what makes something part of that category.' },
-      { title: 'Differences', prompt: 'Identify differences between categories.' }
+      ['Category', 'Identify a category.'],
+      ['What belongs', 'Identify what makes something part of that category.'],
+      ['Differences', 'Identify differences between categories.']
     ],
-    extraWhat: ['Classification and Division (p11): 1. Classify: determine the category both belong to. 2. Divide: then ask what makes them differ?'],
-    source: `${H} p9, p11; ${NOTES} (Classification and Division)`
+    tools: ['tool:distinction'],
+    say: ['What category do both belong to?', 'What makes them differ?']
   }),
   skill({
     id: 'skill:compare',
     label: 'Compare',
     gerund: 'Comparing',
-    tools: ['tool:distinction'],
-    extraWhat: ['Handwritten note (p9): distinctions → "comparing".'],
-    source: `${H} p9 (handwritten)`
+    definition: 'Show how two things are alike and how they differ.',
+    steps: [
+      ['Alike', 'Name what they have in common.'],
+      ['Different', 'Name how they differ.'],
+      ['Matters', 'Say which difference matters most, and why.']
+    ],
+    tools: ['tool:distinction']
   }),
-  skill({ id: 'skill:deduce', label: 'Deduce', gerund: 'Deducing', pairings: ['Making deductive / inductive inferences'] }),
-  skill({ id: 'skill:define', label: 'Define', gerund: 'Defining' }),
-  skill({ id: 'skill:describe', label: 'Describe', gerund: 'Describing' }),
+  skill({
+    id: 'skill:deduce',
+    label: 'Deduce',
+    gerund: 'Deducing',
+    definition: 'Reach a conclusion that must follow from what you already know.',
+    steps: [
+      ['Known', 'State what you know.'],
+      ['Follows', 'Show what must follow from it.'],
+      ['Conclusion', 'State your conclusion.']
+    ],
+    tools: ['tool:argument']
+  }),
+  skill({
+    id: 'skill:define',
+    label: 'Define',
+    gerund: 'Defining',
+    definition: 'Say exactly what a word or idea means.',
+    steps: [
+      ['Kind', 'Name the general kind of thing it is.'],
+      ['Difference', 'Say what makes it different from others of that kind.'],
+      ['Test', 'Test your definition with an example and a counterexample.']
+    ],
+    tools: ['tool:distinction', 'tool:example', 'tool:counterexample']
+  }),
+  skill({
+    id: 'skill:describe',
+    label: 'Describe',
+    gerund: 'Describing',
+    definition: 'Say what something is like: its features, or what happens.',
+    steps: [
+      ['Look', 'Look closely.'],
+      ['Features', 'Name the main features.'],
+      ['Order', 'Put them in a sensible order.']
+    ]
+  }),
   skill({
     id: 'skill:evaluate',
     label: 'Evaluate',
     gerund: 'Evaluating',
     tetrad: true,
-    pairings: ['Constructing and evaluating arguments'],
-    tools: ['tool:argument'],
-    extraWhat: ['Community skills (p12): "Helping to evaluate other\'s contributions".']
+    definition: 'Judge how strong or worthwhile an argument or idea is, using criteria.',
+    steps: [
+      ['Criteria', 'Set the criteria you will judge by.'],
+      ['Weigh', 'Weigh the strengths and weaknesses against them.'],
+      ['Judgement', 'Reach a judgement and justify it.']
+    ],
+    tools: ['tool:argument', 'tool:criteria']
   }),
-  skill({ id: 'skill:examine', label: 'Examine', gerund: 'Examining' }),
+  skill({
+    id: 'skill:examine',
+    label: 'Examine',
+    gerund: 'Examining',
+    definition: 'Look closely at something to find out what is going on.',
+    steps: [
+      ['Details', 'Look at the details.'],
+      ['Questions', 'Ask questions about what you notice.'],
+      ['Meaning', 'Say what the details show.']
+    ],
+    tools: ['tool:question']
+  }),
   skill({
     id: 'skill:explain',
     label: 'Explain',
     gerund: 'Explaining',
     tetrad: true,
-    pairings: ['Making distinctions to explain'],
-    tools: ['tool:distinction']
+    definition: 'Make clear how or why something is the way it is.',
+    steps: [
+      ['What', 'State what you are explaining.'],
+      ['Why', 'Give the cause or reason.'],
+      ['Link', 'Show how they connect: "… because … so …".']
+    ],
+    tools: ['tool:distinction', 'tool:reasons']
   }),
   skill({
     id: 'skill:identify',
     label: 'Identify',
     gerund: 'Identifying',
-    pairings: ['Identifying differences of kind / degree', 'Identifying premises / assumptions']
+    definition: 'Recognise and name something.',
+    steps: [
+      ['Target', 'Know what you are looking for.'],
+      ['Find', 'Find it.'],
+      ['Name', 'Name it and point to where it is.']
+    ]
   }),
-  skill({ id: 'skill:infer', label: 'Infer', gerund: 'Inferring', pairings: ['Making deductive / inductive inferences'] }),
+  skill({
+    id: 'skill:infer',
+    label: 'Infer',
+    gerund: 'Inferring',
+    definition: 'Work out what is likely from clues and evidence.',
+    steps: [
+      ['Clues', 'Find the clues.'],
+      ['Suggests', 'Ask what they suggest.'],
+      ['Inference', 'State your inference and the clue it rests on.']
+    ]
+  }),
   skill({
     id: 'skill:justify',
     label: 'Justify',
     gerund: 'Justifying',
     tetrad: true,
-    pairings: ['Justifying a claim using reasons'],
-    tools: ['tool:reasons'],
-    extraWhat: ['Handwritten note (p9): reasons → "justifying"; "Do we explicitly teach the how, why, nature of, i.e. justify?"'],
-    source: `${H} p9, p10, p12`
+    definition: 'Support a claim with good reasons and evidence.',
+    steps: [
+      ['Claim', 'State your claim.'],
+      ['Reasons', 'Give your reasons.'],
+      ['Evidence', 'Back each reason with evidence or an example.']
+    ],
+    tools: ['tool:reasons', 'tool:example'],
+    say: ['Why do you think that?', 'What is your reason?']
   }),
-  skill({ id: 'skill:summarise', label: 'Summarise', gerund: 'Summarising' })
+  skill({
+    id: 'skill:summarise',
+    label: 'Summarise',
+    gerund: 'Summarising',
+    definition: 'Give the main points briefly, in your own words.',
+    steps: [
+      ['Main idea', 'Find the main idea.'],
+      ['Key points', 'Pick the key supporting points.'],
+      ['Shorten', 'Write it briefly in your own words.']
+    ]
+  })
 ];
 
 // ─── Tools (12) ─────────────────────────────────────────────────────────────
@@ -208,18 +314,19 @@ const SKILLS: LibrarySkill[] = [
 type ToolSource = {
   id: string;
   label: string;
-  definition?: string;
+  definition: string;
+  /** One-line student instruction (compact step in a Thinking move). */
+  prompt: string;
+  sentence: string;
   frame?: ToolFrameKind;
-  sentence?: string;
-  steps?: LibraryStep[];
+  steps?: Array<[string, string]>;
   reveals?: LibraryReveal[];
   skills?: string[];
   pairs?: string[];
-  what?: string[];
+  what?: string;
   run?: string[];
   say?: string[];
   watch?: string[];
-  source?: string;
 };
 
 function tool(src: ToolSource): LibraryTool {
@@ -227,23 +334,23 @@ function tool(src: ToolSource): LibraryTool {
     id: src.id,
     kind: 'tool',
     label: src.label,
-    definition: src.definition ?? '',
-    definition_source: src.definition ? CAM : '',
+    definition: src.definition,
+    definition_source: '',
     frame: src.frame ?? 'steps',
-    prompt: src.definition ?? '',
-    sentence: src.sentence ?? '',
-    steps: src.steps ?? [],
+    prompt: src.prompt,
+    sentence: src.sentence,
+    steps: (src.steps ?? []).map(([title, prompt]) => ({ title, prompt })),
     example: '',
     reveals: src.reveals ?? [],
     skills: src.skills ?? [],
     pairs: src.pairs ?? [],
     note: {
-      what: (src.what ?? []).join('\n'),
+      what: src.what ?? '',
       run: src.run ?? [],
       say: src.say ?? [],
-      watch: [...(src.watch ?? []), TOOL_NOTE],
+      watch: src.watch ?? [],
       time: '',
-      source: src.source ?? (src.definition ? CAM : `Critical Thinking Framework at Newington College (2025), ${H} p10`)
+      source: ''
     }
   };
 }
@@ -252,138 +359,218 @@ const TOOLS: LibraryTool[] = [
   tool({
     id: 'tool:analogy',
     label: 'Analogy',
+    definition: 'Compare two things to show a likeness that helps explain one of them.',
+    prompt: 'Compare it to something else, then test the comparison.',
     sentence: '___ is like ___ because they both ___.',
     steps: [
-      { title: 'Similarities', prompt: 'Identify similarities.' },
-      { title: 'Differences', prompt: 'Identify differences.' },
-      { title: 'Justify', prompt: 'Justify reasoning.' },
-      { title: 'Implications', prompt: 'Consider implications.' }
+      ['Similarities', 'Identify similarities.'],
+      ['Differences', 'Identify differences.'],
+      ['Justify', 'Justify your reasoning.'],
+      ['Implications', 'Consider implications.']
     ],
-    what: ['Warm-up analogy task (p20): "Responsibility is like ___ because they both ___."', 'Workshop example: "Is a leader more like a compass or a map?"'],
-    watch: ['Good for Year 7. (Notion workshop notes)'],
-    source: `${H} p19 (handwritten), p20; ${NOTES} (Analogy Task)`
+    pairs: ['tool:distinction'],
+    say: ['Is a leader more like a compass or a map?'],
+    watch: ['Works well with Year 7.']
   }),
-  tool({ id: 'tool:argument', label: 'Argument', skills: ['skill:evaluate'], what: ['Tools in Use (p9): "Constructing and evaluating arguments"; "Identifying premises / assumptions".'], source: `${H} p9` }),
-  tool({ id: 'tool:counterargument', label: 'Counterargument' }),
+  tool({
+    id: 'tool:argument',
+    label: 'Argument',
+    definition: 'A claim supported by reasons (premises) that lead to a conclusion.',
+    prompt: 'Set out your reasons and the conclusion they lead to.',
+    sentence: 'Because ___ and ___, it follows that ___.',
+    steps: [
+      ['Conclusion', 'State the conclusion.'],
+      ['Premises', 'List the reasons that support it.'],
+      ['Assumptions', 'Name anything the argument takes for granted.']
+    ],
+    skills: ['skill:evaluate'],
+    pairs: ['tool:counterargument', 'tool:reasons']
+  }),
+  tool({
+    id: 'tool:counterargument',
+    label: 'Counterargument',
+    definition: 'An argument against a claim, which the claim then has to answer.',
+    prompt: 'Give the strongest argument against the claim, then answer it.',
+    sentence: 'Someone might argue ___, but ___.',
+    steps: [
+      ['Against', 'State the best argument against the claim.'],
+      ['Weigh', 'Say what is strong about it.'],
+      ['Reply', 'Answer it, or change the claim.']
+    ],
+    pairs: ['tool:argument']
+  }),
   tool({
     id: 'tool:counterexample',
     label: 'Counterexample',
     definition: 'Counterexamples provide a challenge to a general claim under consideration.',
-    pairs: ['tool:generalisation'],
-    what: ['Tools in Use (p9): "Using examples / counterexamples".'],
-    watch: ['Ask for counterexamples. (Notion workshop notes)']
+    prompt: 'Find a case that the general claim does not fit.',
+    sentence: 'That is not always true. For example, ___.',
+    frame: 'stress',
+    pairs: ['tool:generalisation', 'tool:example'],
+    say: ['Can you think of a counterexample?']
   }),
   tool({
     id: 'tool:criteria',
     label: 'Criteria',
-    definition: 'Principles or standards by which something may be decided or judged, e.g., what are the criteria for determining the best footballer? Can be established, used, & tested.',
-    skills: ['skill:apply'],
-    what: ['Tools in Use (p9): "Formulating and applying criteria".'],
+    definition:
+      'Principles or standards by which something may be decided or judged, e.g., what are the criteria for determining the best footballer? Can be established, used, & tested.',
+    prompt: 'Decide what something must have to count, then test each case against it.',
+    sentence: 'To count as ___, it must ___.',
+    steps: [
+      ['Set', 'List what something must have to count.'],
+      ['Use', 'Check the case against each criterion.'],
+      ['Test', 'Look for a case that meets the criteria but still seems wrong.']
+    ],
+    skills: ['skill:apply', 'skill:evaluate'],
     say: ['What makes a good one?'],
     watch: [
-      'Students may respond to a briefly described scenario by saying that "it depends", and they may be right to do so. Ask what additional factors need to be taken into account, then why their decision depends on those factors. The answer points toward their criteria for judgment. (p22)'
-    ],
-    source: `${CAM}; ${H} p22; ${NOTES}`
+      'Students may say "it depends", and they may be right. Ask what other factors matter, then why their decision depends on them. The answer points to their criteria.'
+    ]
   }),
   tool({
     id: 'tool:distinction',
     label: 'Distinction',
-    definition: 'Students make distinctions by identifying both the general kind they are dividing and the marker of difference among different things of that kind.',
+    definition:
+      'Students make distinctions by identifying both the general kind they are dividing and the marker of difference among different things of that kind.',
+    prompt: 'Name the kind both belong to, then what makes them differ.',
+    sentence: 'Both are ___, but ___ is ___ while ___ is ___.',
     frame: 'fork',
     skills: ['skill:explain', 'skill:classify', 'skill:compare'],
-    what: ['Distinction making: clarifying what the difference is in similar words (p11).'],
-    run: ['Classify: determine the category both belong to.', 'Divide: then ask what makes them differ?'],
-    watch: ['Use concrete examples, abstract concepts and subject-specific distinctions. Link to syllabus language. (Notion workshop notes)'],
-    source: `${CAM}; ${H} p11 (Kate Kennedy White); ${NOTES}`
+    what: 'Clarify the difference between two similar words or ideas.',
+    run: ['Classify: find the category both belong to.', 'Divide: ask what makes them differ.'],
+    watch: ['Mix concrete examples, abstract ideas and subject words. Link to your syllabus language.']
   }),
   tool({
     id: 'tool:example',
     label: 'Example',
     definition: 'Students give appropriate examples to illustrate or support what is said.',
+    prompt: 'Give an example that shows what you mean.',
+    sentence: 'For example, ___.',
     pairs: ['tool:counterexample'],
-    what: ['Tools in Use (p9): "Using examples / counterexamples".']
+    say: ['Can you give an example?']
   }),
   tool({
     id: 'tool:generalisation',
     label: 'Generalisation',
     definition: 'A generalisation is a broad statement or idea applied to a group of people or things.',
-    pairs: ['tool:counterexample']
+    prompt: 'Test the broad claim: does it hold for all, most, or only some cases?',
+    sentence: 'All / Most / Some ___ are ___.',
+    frame: 'stress',
+    pairs: ['tool:counterexample'],
+    say: ['Is that true of all of them, or only some?']
   }),
-  tool({ id: 'tool:implication', label: 'Implication', what: ['Intellectual inquiry process (p7): "Examining assumptions and implications".'], source: `${H} p7` }),
+  tool({
+    id: 'tool:implication',
+    label: 'Implication',
+    definition: 'What follows if an idea or claim is true.',
+    prompt: 'Ask what would follow if the claim were true.',
+    sentence: 'If that is true, then ___.',
+    steps: [
+      ['Suppose', 'Suppose the claim is true.'],
+      ['Follows', 'Work out what would follow.'],
+      ['Check', 'Ask whether you can accept that result.']
+    ],
+    say: ['If that were true, what would follow?']
+  }),
   tool({
     id: 'tool:question',
     label: 'Question',
-    definition: 'Students ask open questions as probes into problems and issues as well as to use questions to prompt the use of thinking tools during discussion.',
+    definition:
+      'Students ask open questions as probes into problems and issues as well as to use questions to prompt the use of thinking tools during discussion.',
+    prompt: 'Turn a closed question into an open one.',
+    sentence: 'I wonder why / how / whether ___?',
     frame: 'converter',
     reveals: [
       {
         label: 'Closed or open?',
-        body: 'Closed questions: one correct answer; answer found in the stimulus.\nOpen questions: multiple possible answers; require reasoning; invite discussion.'
+        body: 'Closed questions: one correct answer; the answer is found in the stimulus.\nOpen questions: many possible answers; need reasoning; invite discussion.'
       }
     ],
-    what: ['Tools in Use (p9): "Composing inquiry Questions".', 'Read the stimulus. Think of three closed and three open questions you could ask. (p17)'],
-    watch: ['Train them to shift closed to open. (Notion workshop notes)', 'This builds to inquiry questions. (Handwritten note, p17)'],
-    source: `${CAM}; ${H} p17; ${NOTES}`
+    pairs: ['tool:suggestion'],
+    watch: ['Train students to shift closed questions to open ones. This builds towards inquiry questions.']
   }),
   tool({
     id: 'tool:reasons',
     label: 'Reasons',
     definition: 'Students give reasons for what they say when that is appropriate and expect the same of others.',
+    prompt: 'Give a reason for what you say.',
+    sentence: 'I think ___ because ___.',
     skills: ['skill:justify'],
-    what: ['Tools in Use (p9): "Justifying a claim using reasons"; "Weighing reasons and evidence".', 'Handwritten note (p9): reasons → "justifying".']
+    pairs: ['tool:example'],
+    say: ['Why do you think that?', 'What is your reason?']
   }),
   tool({
     id: 'tool:suggestion',
     label: 'Suggestion',
     definition: 'Students put forward opinions, ideas, suppositions, tentative explanations for consideration by the group.',
+    prompt: 'Put forward an idea for the group to consider.',
+    sentence: 'What if ___?',
     pairs: ['tool:question'],
-    what: ['Tools in Use (p9): "Making or clarifying Suggestions".'],
-    watch: ['Questions get paired with suggestions. (Handwritten note, p4)']
+    watch: ['Pair questions with suggestions.']
   })
 ];
 
 // ─── Values (9) ─────────────────────────────────────────────────────────────
 
-function value(id: string, label: string, noun: string): LibraryValue {
+function value(
+  id: string,
+  label: string,
+  noun: string,
+  definition: string,
+  probes: Array<[string, string]>
+): LibraryValue {
   return {
     id,
     kind: 'value',
     label,
     noun,
-    definition: '',
+    definition,
     definition_source: '',
-    probes: [],
+    probes: probes.map(([question, asks]) => ({ question, asks })),
     claim: '',
     options: [],
     instruction: '',
     model: { label: '', body: '' },
     discussion: '',
     note: {
-      what: 'Critical thinking values: "How to judge it" (framework p10). Handwritten: "To judge quality of thinking"; "Use for tailored feedback".',
+      what: 'Values are how we judge the quality of thinking. Use them for targeted feedback.',
       run: [],
-      say: [
-        'How can we evaluate the quality of this thinking (clarity / relevance / precision …)? (p11)',
-        'Were our contributions clear, relevant, precise, significant, coherent …? (p25)'
-      ],
-      watch: [
-        'Assessors listen for contributions that demonstrate relevance, clarity, coherence, precision, significance, accuracy and depth. (Philosothon 2026 marking guide)'
-      ],
+      say: ['Was that contribution clear, relevant, precise …?'],
+      watch: [],
       time: '',
-      source: `Critical Thinking Framework at Newington College (2025), ${H} p10, p11, p25; ${PHILOSOTHON}`
+      source: ''
     }
   };
 }
 
 const VALUES: LibraryValue[] = [
-  value('value:clarity', 'Clarity', 'clarity'),
-  value('value:accuracy', 'Accuracy', 'accuracy'),
-  value('value:precision', 'Precision', 'precision'),
-  value('value:breadth', 'Breadth', 'breadth'),
-  value('value:depth', 'Depth', 'depth'),
-  value('value:relevance', 'Relevance', 'relevance'),
-  value('value:significance', 'Significance', 'significance'),
-  value('value:coherence', 'Coherence', 'coherence'),
-  value('value:cogency', 'Cogency', 'cogency')
+  value('value:clarity', 'Clarity', 'clarity', 'Easy to understand; the meaning is plain.', [
+    ['Could someone else understand exactly what I mean?', 'Say it another way, or give an example.']
+  ]),
+  value('value:accuracy', 'Accuracy', 'accuracy', 'True and free from errors.', [
+    ['Is it true? How could we check?', 'Point to the evidence or the source.']
+  ]),
+  value('value:precision', 'Precision', 'precision', 'Exact and specific, with enough detail.', [
+    ['Could I be more specific?', 'Swap vague words for exact ones: who, what, how much, when.']
+  ]),
+  value('value:breadth', 'Breadth', 'breadth', 'Takes in other points of view and the wider picture.', [
+    ['Is there another way to look at this?', 'Name a different point of view and what it would say.']
+  ]),
+  value('value:depth', 'Depth', 'depth', 'Deals with what makes the issue hard, not just the surface.', [
+    ['What makes this question difficult?', 'Name the complication and deal with it.']
+  ]),
+  value('value:relevance', 'Relevance', 'relevance', 'Connected to the question or issue.', [
+    ['How does this connect to the question?', 'Show the link, or leave the point out.']
+  ]),
+  value('value:significance', 'Significance', 'significance', 'Focused on what matters most.', [
+    ['Is this the most important point?', 'Rank your points and lead with the strongest.']
+  ]),
+  value('value:coherence', 'Coherence', 'coherence', 'The ideas fit together without contradicting each other.', [
+    ['Do my ideas fit together?', 'Check each point against the others for contradictions.']
+  ]),
+  value('value:cogency', 'Cogency', 'cogency', 'Convincing, because the reasons are strong and support the conclusion.', [
+    ['Would a fair-minded person be convinced?', 'Check that each reason is true and actually supports the conclusion.']
+  ])
 ];
 
 export const TOOLKIT_SKILLS: readonly LibrarySkill[] = SKILLS;
@@ -422,7 +609,7 @@ export function itemKind(id: string): ToolkitKind | undefined {
   return BY_ID.get(id)?.kind;
 }
 
-/** Community skills, word for word from the handbook p12. */
+/** Community skills: how students work together in a community of inquiry. */
 export const COMMUNITY_SKILLS: readonly string[] = [
   'Actively listening',
   'Taking your turn',
@@ -442,11 +629,29 @@ export const COMMUNITY_SKILLS: readonly string[] = [
   'Playing an assigned role in class discussion'
 ];
 
+/** One-line student description for each community skill. */
+export const COMMUNITY_SKILL_DESCRIPTION: Readonly<Record<string, string>> = {
+  'Actively listening': 'Listen closely enough to repeat back what was said.',
+  'Taking your turn': 'Speak when it is your turn, without talking over others.',
+  'Allowing others to have their say': 'Leave space so everyone gets a chance to speak.',
+  "Acknowledging others' contributions": 'Show you heard: "As ___ said …".',
+  "Building on others' contributions": 'Add to someone\'s idea: "Building on that …".',
+  "Inviting others' contributions": 'Ask someone else what they think.',
+  'Assisting others to make inquiry moves': 'Help someone give a reason, example or distinction.',
+  "Showing respect for others' viewpoints": 'Disagree with the idea, not the person.',
+  "Helping to evaluate others' contributions": 'Help the group judge how strong an idea is.',
+  'Engaging in dialogue (pair or group)': 'Talk with each other, not just to the teacher.',
+  'Exploring disagreement respectfully': 'Find out why you disagree, calmly.',
+  'Conceding mistakes': 'Say so when you got something wrong.',
+  'Acknowledging a change of mind': 'Say when your view changed, and why.',
+  'Asking procedural questions': 'Ask how the discussion should run: "Can we go back to …?"',
+  'Playing an assigned role in a small group': 'Do the job your group gave you.',
+  'Playing an assigned role in class discussion': 'Do the job you were given in the discussion.'
+};
+
 /**
- * Thinking move presets: skill + tool pairings printed on handbook p9 ("Tools in
- * Use"), p11 (classify, then divide) and the handwritten p9 margin note
- * (distinctions → comparing). A preset sets the skill and tools; the value is
- * the teacher's choice.
+ * Thinking move presets: the framework's standard skill + tool pairings. A
+ * preset sets the skill and tools; the value is the teacher's choice.
  */
 export const THINKING_MOVE_PRESETS: ReadonlyArray<{
   id: string;
@@ -493,13 +698,13 @@ export const THINKING_MOVE_PRESETS: ReadonlyArray<{
   {
     id: 'compare-distinction',
     label: 'Comparing with distinctions',
-    phrase: 'Distinctions: comparing (handwritten, p9)',
+    phrase: 'Comparing with distinctions',
     skill: 'skill:compare',
     tools: ['tool:distinction']
   }
 ];
 
-/** Distinction pair bank (Kate Kennedy White, handbook p11). */
+/** Distinction pair bank: word pairs to practise distinctions with. */
 export const DISTINCTION_PAIR_BANK: Record<
   'level1' | 'level2' | 'level3' | 'maths' | 'inquiry',
   { label: string; pairs: string[] }
@@ -605,4 +810,3 @@ export const DISTINCTION_PAIR_BANK: Record<
   }
 };
 
-export const HANDBOOK_SOURCE = H;
