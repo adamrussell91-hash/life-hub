@@ -22,11 +22,13 @@ import {
   listCommunicationIndexKeys,
   setJSON
 } from './professional-blobs.mjs';
+import { mapBounded } from './blobs-list.mjs';
 import { createFollowUpOperationRepository } from './follow-up-operation-repository.mjs';
 import { defaultGetUniversalLinkStore } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { equivalenceInput, generateLinkId } from './universal-link-schema.mjs';
 
+const LIST_BATCH_SIZE = 10;
 const FORBIDDEN_ACCESS_FIELDS = ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds'];
 const FORBIDDEN_RECORD_FIELDS = [
   'links',
@@ -273,20 +275,18 @@ export function createCommunicationRepository(deps = {}) {
           .filter((id) => isValidCommunicationId(id))
       )
     ];
-    const records = [];
-    for (const id of ids) {
-      const record = parseCommunicationRecord(
-        await getJSON(professionalStore, communicationKey(id))
-      );
-      if (record) records.push(record);
-    }
+    // Bounded batches, not one read at a time: a serial walk of several
+    // reads per communication pushed /api/schedule-projections past the
+    // calendar's 12s source timeout.
+    const records = (
+      await mapBounded(ids, LIST_BATCH_SIZE, async (id) =>
+        parseCommunicationRecord(await getJSON(professionalStore, communicationKey(id)))
+      )
+    ).filter(Boolean);
     records.sort(compareCommunicationsNewestFirst);
-    const projections = [];
-    for (const record of records) {
-      const journal = await loadOpenJournalForCommunication(record.id);
-      projections.push(await attachFollowUp(record, journal));
-    }
-    return projections;
+    return mapBounded(records, LIST_BATCH_SIZE, async (record) =>
+      attachFollowUp(record, await loadOpenJournalForCommunication(record.id))
+    );
   }
 
   async function createFollowUp(id, input = {}) {
