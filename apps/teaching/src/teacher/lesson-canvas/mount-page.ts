@@ -46,6 +46,7 @@ import {
 } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { CleanupFn } from '@atlaskit/pragmatic-drag-and-drop/types';
 import { isRootBlockDrag, rootBlockDrag } from '@/blocks/teaching-pragmatic-dnd';
+import { createTeacherClassExamples } from '@/class-examples/teacher';
 
 const DND_MIME = 'application/x-teaching-hub-block';
 
@@ -64,6 +65,8 @@ export type MountBlockCanvasOptions = {
   onDetachComposition?: (blockId: string) => void;
   onCompositionDrop?: (id: string) => void;
   renderLinkedPreview?: (compositionId: string) => HTMLElement;
+  /** Adds per-block extras (class examples) after each editable row is built. */
+  decorateRow?: (row: HTMLElement, block: Block) => void;
   /** Author canvases only. Student / published surfaces omit the ⋯ menu. */
   editable?: boolean;
 };
@@ -707,6 +710,7 @@ export function mountBlockCanvas(
       } else {
         row.append(preview(block));
       }
+      if (canEdit) options.decorateRow?.(row, block);
 
       list.append(row);
     });
@@ -911,7 +915,9 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   if (showPageMenu) root.append(chrome);
   root.append(coverHost, metaRow, canvasHost);
 
+  const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
   const canvas = mountBlockCanvas(canvasHost, {
+    decorateRow: classExamples.decorate,
     blocks: lesson.blocks,
     media,
     editorContext: { lessonId: lesson.id },
@@ -979,6 +985,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       canvas.revealPublishBlock(blockId, errorIds);
     },
     dispose() {
+      classExamples.dispose();
       canvas.dispose();
       strip?.dispose();
       titleEditor.dispose();
