@@ -4,7 +4,8 @@ import type { PublicExamples } from '@/class-examples/api';
 const api = vi.hoisted(() => ({
   fetchPublicExamples: vi.fn(),
   unlockExample: vi.fn(),
-  submitExample: vi.fn()
+  submitExample: vi.fn(),
+  fetchTeacherExamples: vi.fn()
 }));
 
 vi.mock('@/class-examples/api', async (importOriginal) => ({
@@ -185,5 +186,52 @@ describe('teacher default class', () => {
   it('a class the teacher chose earlier wins while it is still listed', () => {
     expect(pickDefaultContext(contexts, '2026-10-15', 'class_c')).toBe('class_c');
     expect(pickDefaultContext(contexts, '2026-10-15', 'class_gone')).toBe('class_b');
+  });
+});
+
+describe('teacher boxes on nested blocks', () => {
+  it('a block inside a section gets its own "+" and its boxes sit under it', async () => {
+    const { createTeacherClassExamples } = await import('@/class-examples/teacher');
+    api.fetchTeacherExamples.mockResolvedValue({
+      lesson_id: 'lesson_1',
+      context: 'direct',
+      max_wrong_codes: 10,
+      contexts: [{ id: 'direct', label: 'Lesson link', detail: '', dates: [] }],
+      slots: [
+        {
+          id: 's1',
+          block_id: 'inner_q',
+          label: 'Question 3',
+          created_at: '2026-10-15T00:00:00.000Z',
+          entry: { status: 'empty', shown: false, attempts: 0 }
+        }
+      ]
+    });
+    const section = {
+      id: 'outer',
+      block_type: 'section',
+      content: { blocks: [{ id: 'inner_q', block_type: 'rich_text', content: {} }] }
+    } as unknown as import('@/schemas/block').Block;
+    const row = document.createElement('div');
+    row.className = 'lesson-page__block';
+    row.innerHTML = `<div class="block" data-block-id="outer"><div class="block" data-block-id="inner_q">Q3</div></div>`;
+    document.body.append(row);
+
+    const handle = createTeacherClassExamples({ lessonId: 'lesson_1', today: () => '2026-10-15' });
+    handle.decorate(row, section);
+    await flush();
+    await flush();
+
+    const inner = row.querySelector<HTMLElement>('[data-block-id="inner_q"]')!;
+    expect(Array.from(inner.children).some((child) => child.classList.contains('cx-add'))).toBe(true);
+    const host = inner.nextElementSibling as HTMLElement;
+    expect(host.classList.contains('cx-teacher--nested')).toBe(true);
+    expect(host.hidden).toBe(false);
+    expect(host.querySelector('.cx-row__label')?.textContent).toBe('Question 3');
+    // The section's own panel stays empty: the box belongs to the inner block.
+    const rootHost = Array.from(row.children).find((child) => child.classList.contains('cx-teacher')) as HTMLElement;
+    expect(rootHost.hidden).toBe(true);
+    handle.dispose();
+    row.remove();
   });
 });
