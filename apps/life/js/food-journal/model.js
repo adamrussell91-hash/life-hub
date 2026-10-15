@@ -197,8 +197,10 @@ export function importDayOne(payload, journal) {
         },
       ],
       import_media: (entry.photos || []).map((p) => ({
-        identifier: String(p.identifier || p.md5 || ""),
+        identifier: String(p.identifier || ""),
+        md5: String(p.md5 || ""),
         filename: String(p.filename || ""),
+        type: String(p.type || ""),
       })),
     });
   }
