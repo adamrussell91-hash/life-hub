@@ -408,3 +408,36 @@ describe('several notes on one line or stanza', () => {
   });
 });
 
+
+describe('annotation editor voice recorder', () => {
+  it('opens the recorder beside the poem, even from Text mode', () => {
+    const block = structuredClone(dulceAnnotationFixture);
+    block.content.layers.push({ id: 'layer_voice', name: 'Voice', kind: 'voice', colour: 'wave' });
+    const mount = document.createElement('div');
+    document.body.append(mount);
+    mount.append(createAnnotationEditor(block, () => undefined, () => block));
+
+    Array.from(mount.querySelectorAll<HTMLButtonElement>('button'))
+      .find((btn) => btn.textContent === 'Text')!
+      .click();
+    const annotatePane = mount.querySelector<HTMLElement>('.block-editor__annotation-annotate-pane')!;
+    expect(annotatePane.hidden).toBe(true);
+
+    mount
+      .querySelector<HTMLButtonElement>('.block-editor__annotation-voice-toolbar .btn--primary')!
+      .click();
+
+    const voicePanel = mount.querySelector<HTMLElement>('.block-editor__annotation-voice-panel')!;
+    const listPanel = mount.querySelector<HTMLElement>('.block-editor__annotation-note-list')!;
+    expect(annotatePane.hidden).toBe(false);
+    expect(voicePanel.hidden).toBe(false);
+    expect(voicePanel.querySelector('.block-editor__annotation-voice-recorder')).toBeTruthy();
+    // The recorder takes the notes column beside the text rather than wrapping below it.
+    expect(listPanel.hidden).toBe(true);
+
+    voicePanel.querySelector<HTMLButtonElement>('.block-editor__annotation-voice-close')!.click();
+    expect(voicePanel.hidden).toBe(true);
+    expect(listPanel.hidden).toBe(false);
+    mount.remove();
+  });
+});
