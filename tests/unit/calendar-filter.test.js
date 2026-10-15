@@ -103,3 +103,28 @@ test('filterKeyForItem maps comms, promises and non-PD events', () => {
   // Old projections without event_type stay PD, as today.
   assert.equal(filterKeyForItem({ kind: 'professional', source: 'professional_event' }), 'pd');
 });
+
+test('a chip hidden at first paint shows again when the filter turns it back on', async () => {
+  const { applyItemVisibility } = await import('../../packages/design-kit/js/calendar/calendar-filter.js');
+  const { createMotion } = await import('../../packages/design-kit/js/hub-motion-engine.js');
+  let t = 0;
+  const frames = [];
+  const engine = createMotion({
+    apply: () => {},
+    reducedMotion: () => false,
+    clock: { now: () => t, request: (fn) => { frames.push(fn); return frames.length; }, cancel: () => {} }
+  });
+  const node = { hidden: false, style: { opacity: '' }, classList: { toggle() {} } };
+  const nodes = new Map([['chip:lesson', node]]);
+  const entries = [{ id: 'chip:lesson', item: { record: { type: 'scheduled_lesson' } } }];
+  // Mount places every chip at full opacity, then the Tasks default (no Classes) hides it.
+  engine.place('chip:lesson', { opacity: 1 });
+  applyItemVisibility(nodes, entries, defaultFilterForHub('tasks'), { reducedMotion: true, engine: null });
+  assert.equal(node.hidden, true);
+  // "All" replays through the engine.
+  applyItemVisibility(nodes, entries, defaultFilterForHub('life'), { reducedMotion: false, engine });
+  t = 1000;
+  while (frames.length) frames.shift()();
+  assert.equal(node.hidden, false);
+  assert.notEqual(node.style.opacity, '0', 'lesson stays transparent after All');
+});
