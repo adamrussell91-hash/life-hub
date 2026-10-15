@@ -6,9 +6,9 @@ import { applyProfessionalStep } from '../../netlify/functions/calendar-ghosts.m
 
 const ghost = {
   id: 'clare-book_comm-2026-10-21', agent: 'clare', kind: 'book_comm', date: '2026-10-21', time: '11:50', duration_min: 15,
-  title: 'Declan J. · feedback', channel: 'in_person', time_zone: 'Australia/Sydney', purpose_tag: 'feedback',
+  title: 'Alex J. · feedback', channel: 'in_person', time_zone: 'Australia/Sydney', purpose_tag: 'feedback',
   thread_ref: 'professional:thread:thread_00000000-0000-4000-8000-000000000001',
-  person_refs: ['shared:person:p_declan'], reason: 'Weekly, same slot.'
+  person_refs: ['shared:person:p_alex'], reason: 'Weekly, same slot.'
 };
 
 test('book_comm validates and plans one professional step plus a recent action', () => {
@@ -19,7 +19,7 @@ test('book_comm validates and plans one professional step plus a recent action',
   const step = plan.steps.find((item) => item.target === 'professional');
   assert.deepEqual(step, {
     target: 'professional', action: 'create_communication', date: '2026-10-21', time: '11:50', duration_min: 15,
-    time_zone: 'Australia/Sydney', title: 'Declan J. · feedback', channel: 'in_person', purpose_tag: 'feedback',
+    time_zone: 'Australia/Sydney', title: 'Alex J. · feedback', channel: 'in_person', purpose_tag: 'feedback',
     thread_ref: ghost.thread_ref, person_refs: ghost.person_refs
   });
   assert.match(plan.receipt, /Clare → Calendar/);
@@ -33,7 +33,7 @@ test('applyProfessionalStep turns wall time into UTC and links people and thread
   );
   assert.equal(created[0].scheduled_start, '2026-10-21T00:50:00.000Z');
   assert.equal(created[0].scheduled_end, '2026-10-21T01:05:00.000Z');
-  assert.deepEqual(created[0].links, [{ relationship_type: 'recipient', target_ref: 'shared:person:p_declan' }]);
+  assert.deepEqual(created[0].links, [{ relationship_type: 'recipient', target_ref: 'shared:person:p_alex' }]);
   assert.deepEqual(created[1], { source_ref: 'professional:communication:communication_x', target_ref: ghost.thread_ref, relationship_type: 'in_thread' });
 });
 

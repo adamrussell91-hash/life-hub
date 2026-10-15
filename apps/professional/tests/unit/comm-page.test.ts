@@ -22,9 +22,9 @@ vi.mock('@/api/communications', () => ({
   createCommunication: vi.fn(async () => ({ communication: { id: 'communication_sent' }, created: true }))
 }));
 vi.mock('@/api/clare-comms', () => ({
-  clareBrief: vi.fn(async () => ({ points: [{ text: 'His redraft came in yesterday.', source: 'Canvas, 13/10' }], owed_line: 'Send Denielle the summary after this one.' })),
-  clareSummary: vi.fn(async () => ({ summary: 'Good progress.', promises: [{ direction: 'they_owe', person_ref: 'shared:person:p_declan', text: 'Rewrite the fence paragraph', due: '2026-10-19' }], numbers: [] })),
-  clareDrafts: vi.fn(async () => ({ drafts: [{ person_ref: 'shared:person:p_denielle', to: 'Denielle J.', subject: 'Declan update', body: 'Hi Denielle,' }] })),
+  clareBrief: vi.fn(async () => ({ points: [{ text: 'His redraft came in yesterday.', source: 'Canvas, 13/10' }], owed_line: 'Send Morgan the summary after this one.' })),
+  clareSummary: vi.fn(async () => ({ summary: 'Good progress.', promises: [{ direction: 'they_owe', person_ref: 'shared:person:p_alex', text: 'Rewrite the fence paragraph', due: '2026-10-19' }], numbers: [] })),
+  clareDrafts: vi.fn(async () => ({ drafts: [{ person_ref: 'shared:person:p_morgan', to: 'Morgan J.', subject: 'Alex update', body: 'Hi Morgan,' }] })),
   clareProposeNext: vi.fn(async () => ({ date: '2026-10-21', time: '11:50', duration_min: 15, reason: 'Weekly.', ghost_id: 'g', queued: true })),
   clareHandwriting: vi.fn(async () => ({ text: 'quote → so what?' }))
 }));
@@ -153,7 +153,7 @@ describe('comm page', () => {
     const brief = canvas.querySelector('[data-part="clare-brief"]')!;
     expect(brief.textContent).toContain('His redraft came in yesterday.');
     expect(brief.textContent).toContain('Canvas, 13/10');
-    expect(brief.textContent).toContain('Send Denielle the summary after this one.');
+    expect(brief.textContent).toContain('Send Morgan the summary after this one.');
   });
 
   it('After: Summarise fills the summary and adds ticked promises to the ledger', async () => {
@@ -177,8 +177,8 @@ describe('comm page', () => {
     canvas.querySelector<HTMLButtonElement>('[data-part="mark-sent"]')!.click();
     await vi.advanceTimersByTimeAsync(0);
     expect(comms.createCommunication).toHaveBeenCalledWith(expect.objectContaining({
-      direction: 'outbound', channel: 'email', subject: 'Declan update',
-      links: [{ relationship_type: 'recipient', target_ref: 'shared:person:p_denielle' }]
+      direction: 'outbound', channel: 'email', subject: 'Alex update',
+      links: [{ relationship_type: 'recipient', target_ref: 'shared:person:p_morgan' }]
     }));
   });
 });
