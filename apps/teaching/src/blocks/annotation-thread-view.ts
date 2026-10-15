@@ -5,11 +5,9 @@ import {
   type AnnotationLayerState
 } from '@/blocks/annotation-layers';
 import {
-  foldRows,
   lineNumbers,
   threadStops,
   threadsOf,
-  type FoldRow,
   type ThreadStop
 } from '@/blocks/annotation-thread';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
@@ -60,13 +58,13 @@ export function resolvedThreadStops(
   return threadStops(annotation, asAnnotationBlock(content)).stops;
 }
 
-/** Line ids covered by a thread stop (stanza stops expand to every line). */
-function lineIdsForStops(
+/** Line ids covered by a thread's places (stanza places expand to every line). */
+export function threadLineIds(
   content: AnnotationContent,
-  stops: ThreadStop[]
+  annotation: AnnotationItem
 ): Set<string> {
   const lineIds = new Set<string>();
-  for (const stop of stops) {
+  for (const stop of resolvedThreadStops(content, annotation)) {
     if (stop.resolved.lineId) {
       lineIds.add(stop.resolved.lineId);
       continue;
@@ -75,18 +73,6 @@ function lineIdsForStops(
     for (const line of stanza?.lines ?? []) lineIds.add(line.id);
   }
   return lineIds;
-}
-
-export function foldRowsForThread(
-  content: AnnotationContent,
-  annotation: AnnotationItem,
-  state: AnnotationLayerState
-): FoldRow[] {
-  const stops = resolvedThreadStops(content, annotation);
-  return foldRows(content.text, lineIdsForStops(content, stops), {
-    context: state.context,
-    expanded: state.expandedFolds
-  });
 }
 
 export function isNarrowAnnotationViewport(): boolean {
@@ -121,28 +107,6 @@ export function buildThreadChip(
   return chip;
 }
 
-export function buildFoldButton(
-  fold: Extract<FoldRow, { kind: 'fold' }>,
-  expanded: boolean,
-  onToggle: () => void
-): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'block-annotation__fold';
-  btn.dataset.foldId = fold.id;
-  btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-  const label = expanded
-    ? `Hide ${fold.count} lines`
-    : `Show ${fold.count} hidden lines`;
-  btn.setAttribute('aria-label', label);
-  const lines = fold.count === 1 ? '1 line' : `${fold.count} lines`;
-  btn.textContent = expanded
-    ? `Hide ${lines} again`
-    : `⋯ ${lines} not part of this thread (show)`;
-  btn.addEventListener('click', onToggle);
-  return btn;
-}
-
 export function buildStopPip(
   stopIndex: number,
   colour: AnnotationLayer['colour'] | undefined,
@@ -156,6 +120,38 @@ export function buildStopPip(
   pip.title = `Place ${stopIndex + 1} in this thread`;
   pip.addEventListener('click', onClick);
   return pip;
+}
+
+/**
+ * Join the numbered pips of the followed thread with one line in the layer
+ * colour, measured from where the pips actually sit so it always lines up.
+ */
+export function drawThreadLink(
+  host: HTMLElement,
+  colour: AnnotationLayer['colour'] | undefined
+): void {
+  host.querySelector(':scope > .block-annotation__thread-link')?.remove();
+  const pips = [...host.querySelectorAll<HTMLElement>('.block-annotation__pip')];
+  if (pips.length < 2) return;
+  const base = host.getBoundingClientRect();
+  const points = pips
+    .map((pip) => pip.getBoundingClientRect())
+    .filter((r) => r.width > 0 && r.height > 0)
+    .map((r) => ({ x: r.left - base.left + r.width / 2, y: r.top - base.top + r.height / 2 }));
+  if (points.length < 2) return;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'block-annotation__thread-link');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('width', String(base.width));
+  svg.setAttribute('height', String(base.height));
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', points.map((p, i) => `${i ? 'L' : 'M'} ${p.x} ${p.y}`).join(' '));
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', `var(--${colour ?? 'wave'})`);
+  path.setAttribute('stroke-width', '2.5');
+  path.setAttribute('stroke-linecap', 'round');
+  svg.append(path);
+  host.prepend(svg);
 }
 
 export function fillStepCaption(

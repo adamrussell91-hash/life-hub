@@ -25,7 +25,7 @@ describe('annotation thread focus (3b)', () => {
     });
   }
 
-  it('shows a thread chip and folds non-stop lines on focus', () => {
+  it('fades lines outside the thread and numbers each place on focus', () => {
     mockViewport(1440);
     const fixture = structuredClone(threadFocusFixture);
     const el = renderAnnotationBlock(fixture, 'student');
@@ -36,16 +36,14 @@ describe('annotation thread focus (3b)', () => {
     chip!.click();
 
     expect(el.querySelector('.block-annotation__show-all')).toBeTruthy();
-    const folds = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__fold')];
-    expect(folds.length).toBeGreaterThan(0);
-    expect(folds.every((btn) => (btn.getAttribute('aria-label') || '').includes('hidden lines'))).toBe(
-      true
-    );
-    expect(el.querySelector('[data-line-id="line_1"]')).toBeTruthy();
-    expect(el.querySelector('[data-line-id="line_2"]')).toBeNull();
-    // No unexplained arc drawing; numbered pips mark each place instead.
-    expect(el.querySelector('.block-annotation__arcs')).toBeNull();
+    // The whole text stays; no fold bars.
+    expect(el.querySelector('.block-annotation__fold')).toBeNull();
+    expect(el.querySelector('[data-line-id="line_1"]')!.classList.contains('is-thread-faded')).toBe(false);
+    expect(el.querySelector('[data-line-id="line_2"]')!.classList.contains('is-thread-faded')).toBe(true);
     expect(el.querySelectorAll('.block-annotation__pip').length).toBe(5);
+
+    el.querySelector<HTMLButtonElement>('.block-annotation__show-all')!.click();
+    expect(el.querySelector('.is-thread-faded')).toBeNull();
 
     el.remove();
   });
@@ -75,29 +73,20 @@ describe('annotation thread focus (3b)', () => {
     el.remove();
   });
 
-  it('keeps expanded folds across a layer tick (V7)', () => {
+  it('stays on the thread across a layer tick (V7)', () => {
     mockViewport(1440);
     const fixture = structuredClone(threadFocusFixture);
     const el = renderAnnotationBlock(fixture, 'student');
     document.body.append(el);
 
     el.querySelector<HTMLButtonElement>('[data-thread-id="ann_motif"]')!.click();
-    const fold = el.querySelector<HTMLButtonElement>('.block-annotation__fold')!;
-    const foldId = fold.dataset.foldId!;
-    fold.click();
-    expect(
-      el.querySelector(`[data-fold-id="${foldId}"]`)?.getAttribute('aria-expanded')
-    ).toBe('true');
-
     const structure = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip')].find(
       (chip) => (chip.textContent || '').includes('Structure')
     )!;
     structure.click();
 
-    expect(
-      el.querySelector(`[data-fold-id="${foldId}"]`)?.getAttribute('aria-expanded')
-    ).toBe('true');
     expect(el.querySelector('.block-annotation__show-all')).toBeTruthy();
+    expect(el.querySelector('[data-line-id="line_2"]')!.classList.contains('is-thread-faded')).toBe(true);
 
     el.remove();
   });
@@ -143,7 +132,7 @@ describe('annotation thread focus (3b)', () => {
     el.remove();
   });
 
-  it('print lists thread footnotes without arcs or folds', () => {
+  it('print lists thread footnotes without folds', () => {
     const el = renderAnnotationBlock(threadFocusFixture, 'print');
     expect(el.querySelector('.block-annotation__arcs')).toBeNull();
     expect(el.querySelector('.block-annotation__fold')).toBeNull();

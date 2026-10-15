@@ -11061,23 +11061,35 @@ body.is-lesson-builder-full-page .hub-utilities {
   min-width: 0;
 }
 
-.block-annotation__fold {
-  width: 100%;
-  min-height: 2rem;
-  margin: 0;
-  padding: 0 var(--space-2);
-  border: 1px dashed var(--line);
-  border-radius: var(--radius-sm, 0.35rem);
-  background: color-mix(in srgb, var(--mist, #9aa4b2) 12%, var(--paper, #fff));
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  color: var(--muted);
-  cursor: pointer;
-  text-align: left;
+.block-annotation__thread-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  overflow: visible;
+  pointer-events: none;
 }
 
-.block-annotation .block-annotation__line.block-annotation__line--fold {
-  grid-template-columns: minmax(0, 1fr);
+.block-annotation__pip {
+  position: relative;
+  z-index: 1;
+}
+
+.block-annotation--focus .block-annotation__line.is-thread-faded {
+  opacity: 0.22;
+}
+
+/* Other notes' ink and margin labels step back while a thread is followed. */
+.block-annotation--focus .block-annotation__ink,
+.block-annotation--focus .block-annotation__margin-note,
+.block-annotation--focus .block-annotation__ink-lead {
+  opacity: 0.18;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .block-annotation__line {
+    transition: opacity 160ms ease;
+  }
 }
 
 .block-annotation__line.is-step .block-annotation__line-text {
@@ -11489,6 +11501,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   grid-template-columns: max(0.75rem, calc(var(--line-bars, 1) * 0.9rem + (var(--line-bars, 1) - 1) * 2px)) minmax(0, 1fr);
 }
 
+.block-annotation--ink.block-annotation--focus .block-annotation__line,
 .block-annotation--ink .block-annotation__line:has(> .block-annotation__line-margin .block-annotation__pip) {
   grid-template-columns: calc(var(--line-bars, 1) * 0.9rem + 1.85rem) minmax(0, 1fr);
 }

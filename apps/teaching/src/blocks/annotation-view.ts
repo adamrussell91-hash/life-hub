@@ -28,15 +28,15 @@ import {
   stepThreadIndex
 } from '@/blocks/annotation-thread-keys';
 import {
-  buildFoldButton,
   buildStopPip,
   buildThreadChip,
   fillStepCaption,
-  foldRowsForThread,
+  drawThreadLink,
   isNarrowAnnotationViewport,
   placesLabel,
   printThreadFootnoteLabel,
   resolvedThreadStops,
+  threadLineIds,
   visibleThreads
 } from '@/blocks/annotation-thread-view';
 import { threadsOf } from '@/blocks/annotation-thread';
@@ -839,6 +839,13 @@ function buildInteractiveView(
         activeId: activeNoteId
       });
       syncActiveAnchors();
+      const followed = state.focusThreadId
+        ? content.annotations.find((a) => a.id === state.focusThreadId)
+        : undefined;
+      const linkHost = inkHost.querySelector<HTMLElement>('.block-annotation__stanzas');
+      if (linkHost && followed) {
+        drawThreadLink(linkHost, layerById(content.layers, followed.layer_id)?.colour);
+      }
     });
   }
 
@@ -1035,7 +1042,7 @@ function buildInteractiveView(
       const hint = document.createElement('p');
       hint.className = 'block-annotation__focus-hint';
       hint.textContent =
-        'Only the lines this thread links are shown. The numbers in the margin mark each place, in order.';
+        'The rest of the text is faded. The coloured line on the left joins each place, in order.';
 
       const nav = document.createElement('div');
       nav.className = 'block-annotation__focus-nav';
@@ -1186,11 +1193,14 @@ function buildInteractiveView(
       pushGrouped(voiceByLine, clip.anchor.line, clip);
     }
 
+    const threadLines = focusAnn ? threadLineIds(content, focusAnn) : null;
+
     function paintLineRow(line: AnnotationLineModel, stanzaId: string): HTMLElement {
       const lineId = line.id;
       const row = document.createElement('div');
       row.className = 'block-annotation__line';
       row.dataset.lineId = lineId;
+      if (threadLines && !threadLines.has(lineId)) row.classList.add('is-thread-faded');
       if (
         focusAnn &&
         state.stepIndex != null &&
@@ -1274,77 +1284,27 @@ function buildInteractiveView(
       return row;
     }
 
-    if (focusAnn) {
-      const rows = foldRowsForThread(content, focusAnn, state);
-      let currentStanzaId = '';
-      let stanzaEl: HTMLElement | null = null;
-      let linesCol: HTMLElement | null = null;
-      let gutter: HTMLElement | null = null;
+    for (const stanza of content.text.stanzas) {
+      const stanzaEl = document.createElement('div');
+      stanzaEl.className = 'block-annotation__stanza';
+      stanzaEl.dataset.stanzaId = stanza.id;
 
-      const ensureStanza = (stanzaId: string) => {
-        if (stanzaEl && currentStanzaId === stanzaId) return;
-        stanzaEl = document.createElement('div');
-        stanzaEl.className = 'block-annotation__stanza';
-        stanzaEl.dataset.stanzaId = stanzaId;
-        gutter = document.createElement('div');
-        gutter.className = 'block-annotation__stanza-gutter';
-        for (const item of stanzaBars.get(stanzaId) ?? []) {
-          gutter.append(makeBarAnchor(item, 'stanza', (btn) => openPlaced(item, btn)));
-        }
-        stanzaEl.append(gutter);
-        linesCol = document.createElement('div');
-        linesCol.className = 'block-annotation__lines';
-        stanzaEl.append(linesCol);
-        stanzasHost.append(stanzaEl);
-        currentStanzaId = stanzaId;
-      };
-
-      for (const row of rows) {
-        if (row.kind === 'fold') {
-          ensureStanza(row.stanzaId);
-          const expanded = state.expandedFolds.has(row.id);
-          const foldRow = document.createElement('div');
-          foldRow.className = 'block-annotation__line block-annotation__line--fold';
-          foldRow.append(
-            buildFoldButton(row, expanded, () => {
-              const expandedFolds = new Set(state.expandedFolds);
-              if (expandedFolds.has(row.id)) expandedFolds.delete(row.id);
-              else expandedFolds.add(row.id);
-              state = { ...state, expandedFolds };
-              paint();
-            })
-          );
-          linesCol!.append(foldRow);
-          continue;
-        }
-        const meta = lineById.get(row.lineId);
-        if (!meta) continue;
-        ensureStanza(meta.stanzaId);
-        linesCol!.append(paintLineRow(meta.line, meta.stanzaId));
+      const gutter = document.createElement('div');
+      gutter.className = 'block-annotation__stanza-gutter';
+      for (const item of stanzaBars.get(stanza.id) ?? []) {
+        gutter.append(makeBarAnchor(item, 'stanza', (btn) => openPlaced(item, btn)));
       }
-    } else {
-      for (const stanza of content.text.stanzas) {
-        const stanzaEl = document.createElement('div');
-        stanzaEl.className = 'block-annotation__stanza';
-        stanzaEl.dataset.stanzaId = stanza.id;
+      stanzaEl.append(gutter);
 
-        const gutter = document.createElement('div');
-        gutter.className = 'block-annotation__stanza-gutter';
-        for (const item of stanzaBars.get(stanza.id) ?? []) {
-          gutter.append(makeBarAnchor(item, 'stanza', (btn) => openPlaced(item, btn)));
-        }
-        stanzaEl.append(gutter);
+      const linesCol = document.createElement('div');
+      linesCol.className = 'block-annotation__lines';
 
-        const linesCol = document.createElement('div');
-        linesCol.className = 'block-annotation__lines';
-
-        for (const line of stanza.lines) {
-          linesCol.append(paintLineRow(line, stanza.id));
-        }
-
-        stanzaEl.append(linesCol);
-        stanzasHost.append(stanzaEl);
+      for (const line of stanza.lines) {
+        linesCol.append(paintLineRow(line, stanza.id));
       }
+
+      stanzaEl.append(linesCol);
+      stanzasHost.append(stanzaEl);
     }
 
     poemHost.append(stanzasHost);
