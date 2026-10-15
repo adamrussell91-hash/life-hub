@@ -697,6 +697,16 @@ export function createAnnotationEditorFields(
     reviewingTrackId = null;
     voicePanel.replaceChildren();
     voicePanel.hidden = true;
+    listPanel.hidden = !notePanel.hidden;
+  }
+
+  /** Voice tools take the column beside the poem; the Record button sits further down, so bring them into view. */
+  function showVoicePanel(content: HTMLElement): void {
+    if (mode !== 'annotate') setMode('annotate');
+    voicePanel.replaceChildren(content);
+    voicePanel.hidden = false;
+    listPanel.hidden = true;
+    voicePanel.scrollIntoView?.({ block: 'nearest' });
   }
 
   function openVoiceRecorder(): void {
@@ -722,8 +732,7 @@ export function createAnnotationEditorFields(
         paintVoiceTracks();
       }
     });
-    voicePanel.replaceChildren(voiceRecorder.el);
-    voicePanel.hidden = false;
+    showVoicePanel(voiceRecorder.el);
     placeHint = 'Recording: tap the poem to pin while you speak.';
     placeStatus.textContent = placeHint;
   }
@@ -758,8 +767,7 @@ export function createAnnotationEditorFields(
         paintVoiceTracks();
       }
     });
-    voicePanel.replaceChildren(voiceReview.el);
-    voicePanel.hidden = false;
+    showVoicePanel(voiceReview.el);
   }
 
   function paintVoiceTracks(): void {
@@ -1642,6 +1650,19 @@ export function createAnnotationEditorFields(
     return { stanzaId, lineId, start: a, end: b };
   }
 
+  function wholeLineSelection(lineEl: HTMLElement): BuildAnchorSelection | null {
+    const { stanzaId, lineId } = lineEl.dataset;
+    if (!stanzaId || !lineId || !selectSurface.contains(lineEl)) return null;
+    const lineText =
+      currentText()
+        .stanzas.find((st) => st.id === stanzaId)
+        ?.lines.find((ln) => ln.id === lineId)?.text ?? '';
+    const start = lineText.length - lineText.trimStart().length;
+    const end = lineText.trimEnd().length;
+    if (start >= end) return null;
+    return { stanzaId, lineId, start, end };
+  }
+
   function placeAddNoteButton(): void {
     const sel = window.getSelection();
     const wrapRect = selectWrap.getBoundingClientRect();
@@ -1665,6 +1686,15 @@ export function createAnnotationEditorFields(
       placeHint = 'Highlight words within one line, or use the bar on the left for a whole line or stanza.';
       placeStatus.textContent = placeHint;
       clearPending();
+      return;
+    }
+    if (!picked && voiceRecorder?.isCapturing()) {
+      // While recording, a plain tap pins the whole line it lands on.
+      const lineEl = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+        '.block-editor__annotation-line-text'
+      );
+      const tapped = lineEl ? wholeLineSelection(lineEl) : null;
+      if (tapped) applySelection(tapped);
       return;
     }
     if (!picked) {
@@ -1818,7 +1848,7 @@ export function createAnnotationEditorFields(
 
     const selected = annotations.find((a) => a.id === selectedAnnotationId);
     rememberView();
-    listPanel.hidden = Boolean(selected);
+    listPanel.hidden = Boolean(selected) || !voicePanel.hidden;
     if (!selected) {
       notePanel.hidden = true;
       return;
