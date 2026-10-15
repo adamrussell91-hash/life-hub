@@ -25,7 +25,7 @@ describe('annotation thread focus (3b)', () => {
     });
   }
 
-  it('shows a thread chip and folds non-stop lines on focus', () => {
+  it('fades lines outside the thread and numbers each place on focus', () => {
     mockViewport(1440);
     const fixture = structuredClone(threadFocusFixture);
     const el = renderAnnotationBlock(fixture, 'student');
@@ -36,41 +36,57 @@ describe('annotation thread focus (3b)', () => {
     chip!.click();
 
     expect(el.querySelector('.block-annotation__show-all')).toBeTruthy();
-    const folds = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__fold')];
-    expect(folds.length).toBeGreaterThan(0);
-    expect(folds.every((btn) => (btn.getAttribute('aria-label') || '').includes('hidden lines'))).toBe(
-      true
-    );
-    expect(el.querySelector('[data-line-id="line_1"]')).toBeTruthy();
-    expect(el.querySelector('[data-line-id="line_2"]')).toBeNull();
-    expect(el.querySelector('.block-annotation__arcs')).toBeTruthy();
+    // The whole text stays; no fold bars.
+    expect(el.querySelector('.block-annotation__fold')).toBeNull();
+    expect(el.querySelector('[data-line-id="line_1"]')!.classList.contains('is-thread-faded')).toBe(false);
+    expect(el.querySelector('[data-line-id="line_2"]')!.classList.contains('is-thread-faded')).toBe(true);
+    expect(el.querySelectorAll('.block-annotation__pip').length).toBe(5);
+
+    el.querySelector<HTMLButtonElement>('.block-annotation__show-all')!.click();
+    expect(el.querySelector('.is-thread-faded')).toBeNull();
 
     el.remove();
   });
 
-  it('keeps expanded folds across a layer tick (V7)', () => {
+  it('explains threads and says what the followed thread is', () => {
+    mockViewport(1440);
+    const fixture = structuredClone(threadFocusFixture);
+    const el = renderAnnotationBlock(fixture, 'student');
+    document.body.append(el);
+
+    const intro = el.querySelector<HTMLElement>('.block-annotation__threads-intro')!;
+    expect(intro.hidden).toBe(false);
+    expect(intro.textContent).toContain('follow one idea through several places');
+    const chip = el.querySelector<HTMLButtonElement>('[data-thread-id="ann_motif"]')!;
+    expect(chip.textContent).toContain('5 places');
+
+    chip.click();
+    const card = el.querySelector<HTMLElement>('.block-annotation__focus-bar')!;
+    expect(card.hidden).toBe(false);
+    expect(card.textContent).toContain('Following a thread');
+    expect(card.textContent).toContain('5 places');
+    expect(card.textContent).toContain('Exhaustion motif');
+    expect(el.querySelector('.block-annotation__thread-menu')).toBeNull();
+    expect(el.textContent).not.toContain('line of context');
+    expect(el.querySelector<HTMLElement>('.block-annotation__threads-intro')!.hidden).toBe(true);
+
+    el.remove();
+  });
+
+  it('stays on the thread across a layer tick (V7)', () => {
     mockViewport(1440);
     const fixture = structuredClone(threadFocusFixture);
     const el = renderAnnotationBlock(fixture, 'student');
     document.body.append(el);
 
     el.querySelector<HTMLButtonElement>('[data-thread-id="ann_motif"]')!.click();
-    const fold = el.querySelector<HTMLButtonElement>('.block-annotation__fold')!;
-    const foldId = fold.dataset.foldId!;
-    fold.click();
-    expect(
-      el.querySelector(`[data-fold-id="${foldId}"]`)?.getAttribute('aria-expanded')
-    ).toBe('true');
-
     const structure = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip')].find(
       (chip) => (chip.textContent || '').includes('Structure')
     )!;
     structure.click();
 
-    expect(
-      el.querySelector(`[data-fold-id="${foldId}"]`)?.getAttribute('aria-expanded')
-    ).toBe('true');
     expect(el.querySelector('.block-annotation__show-all')).toBeTruthy();
+    expect(el.querySelector('[data-line-id="line_2"]')!.classList.contains('is-thread-faded')).toBe(true);
 
     el.remove();
   });
@@ -82,11 +98,8 @@ describe('annotation thread focus (3b)', () => {
     document.body.append(el);
 
     el.querySelector<HTMLButtonElement>('[data-thread-id="ann_motif"]')!.click();
-    const stepToggle = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__thread-menu-item')].find(
-      (btn) => btn.textContent === 'Step through'
-    )!;
-    stepToggle.click();
-    expect(el.textContent).toContain('Stop 1 of 5');
+    el.querySelector<HTMLButtonElement>('.block-annotation__step-btn[data-step="next"]')!.click();
+    expect(el.textContent).toContain('Place 1 of 5');
     expect(el.textContent).toContain('Opening posture');
 
     const block = el.querySelector<HTMLElement>('.block-annotation')!;
@@ -95,7 +108,7 @@ describe('annotation thread focus (3b)', () => {
       new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })
     );
     expect(block.dataset.stepIndex).toBe('1');
-    expect(el.textContent).toContain('Stop 2 of 5');
+    expect(el.textContent).toContain('Place 2 of 5');
     expect(el.textContent).toContain('Turning away from light');
 
     block.dispatchEvent(
@@ -119,7 +132,7 @@ describe('annotation thread focus (3b)', () => {
     el.remove();
   });
 
-  it('print lists thread footnotes without arcs or folds', () => {
+  it('print lists thread footnotes without folds', () => {
     const el = renderAnnotationBlock(threadFocusFixture, 'print');
     expect(el.querySelector('.block-annotation__arcs')).toBeNull();
     expect(el.querySelector('.block-annotation__fold')).toBeNull();
