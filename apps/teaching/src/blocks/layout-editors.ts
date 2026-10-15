@@ -99,6 +99,7 @@ export function createSectionEditor(
     empty: { title: 'This section is empty', detail: ' Add the first block to it.' },
     read: () => getLatest().content.blocks,
     idFactory: () => `${getLatest().id}_child`,
+    moveParent: () => ({ kind: 'section', id: getLatest().id }),
     onChange: (nextBlocks) => {
       onChange({
         ...getLatest(),
@@ -253,6 +254,7 @@ export function createColumnsEditor(
         label: `Blocks in column ${colIndex + 1}`,
         read: () => getLatest().content.columns[colIndex]?.blocks ?? [],
         idFactory: () => `${getLatest().id}_c${colIndex}`,
+        moveParent: () => ({ kind: 'column', id: getLatest().id, columnIndex: colIndex }),
         onChange: (nextBlocks) => {
           const latest = getLatest();
           const columns = latest.content.columns.map((c, i) =>
@@ -383,6 +385,11 @@ export function createTabsEditor(
         },
         read: () => getLatest().content.tabs.find((t) => t.id === tab.id)?.blocks ?? [],
         idFactory: () => `${tab.id}_b`,
+        moveParent: () => {
+          const latest = getLatest();
+          const tabIndex = latest.content.tabs.findIndex((t) => t.id === tab.id);
+          return tabIndex < 0 ? null : { kind: 'tab', id: latest.id, tabIndex };
+        },
         onChange: (next) => patchTab(tab.id, next)
       })
   });
