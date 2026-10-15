@@ -456,7 +456,7 @@ describe('renderHomeView', () => {
     const comm = {
       schema_version: 2, id: 'communication_00000000-0000-4000-8000-000000000030',
       direction: 'outbound', channel: 'in_person', occurred_at: '2026-10-13T21:40:00.000Z',
-      subject: 'Fletcher W. · session 8', summary: '', status: 'completed',
+      subject: 'Taylor W. · session 8', summary: '', status: 'completed',
       created_at: '2026-10-01T00:00:00.000Z', updated_at: '2026-10-01T00:00:00.000Z',
       scheduled_start: '2026-10-13T21:40:00.000Z', scheduled_end: '2026-10-13T22:10:00.000Z',
       time_zone: 'Australia/Sydney', purpose_tag: null, agenda: [], blocks: []
@@ -476,7 +476,7 @@ describe('renderHomeView', () => {
     const canvas = await renderHomeForTest();
     await new Promise((resolve) => setTimeout(resolve, 0));
     const card = canvas.querySelector('[data-part="walk-in"]')!;
-    expect(card.textContent).toContain('Fletcher W. · session 8');
+    expect(card.textContent).toContain('Taylor W. · session 8');
     expect(card.textContent).toContain('in 9 min');
     expect(card.querySelectorAll('li').length).toBe(3);
     expect(card.querySelector('a[data-part="walk-in-start"]')?.getAttribute('href')).toContain('#/communication/');
@@ -486,8 +486,8 @@ describe('renderHomeView', () => {
     globalThis.fetch = defaultFetchMock([
       { test: (url) => url.includes('/api/people/ledger'), respond: () => Response.json({ ok: true, data: { items: [
         {
-          id: 'ledger_00000000-0000-4000-8000-000000000040', person_ref: 'shared:person:p_denielle',
-          direction: 'you_owe', text: 'Email Denielle J.', task_ref: null, comm_ref: null, due: '2026-09-15',
+          id: 'ledger_00000000-0000-4000-8000-000000000040', person_ref: 'shared:person:p_morgan',
+          direction: 'you_owe', text: 'Email Morgan J.', task_ref: null, comm_ref: null, due: '2026-09-15',
           checked_in_ref: null, status: 'open', author: 'adam', created_at: '', updated_at: ''
         }
       ] } }) },
@@ -495,7 +495,7 @@ describe('renderHomeView', () => {
       { test: (url) => url.includes('/api/threads'), respond: () => Response.json({ ok: true, data: { threads: [] } }) }
     ]);
     const canvas = await renderHomeForTest();
-    expect(canvas.querySelector('[data-part="nudges"]')?.textContent).toContain('Email Denielle J. · 3 days late');
+    expect(canvas.querySelector('[data-part="nudges"]')?.textContent).toContain('Email Morgan J. · 3 days late');
   });
 
   it('keeps a single Log PD / Year / Accreditation set when two Home paints race', async () => {
@@ -532,22 +532,22 @@ describe('renderHomeView', () => {
     globalThis.fetch = defaultFetchMock([
       { test: (url) => url.includes('/api/people/ledger') && url.includes('due_from'), respond: () => Response.json({ ok: true, data: { items: [] } }) },
       { test: (url) => url.includes('/api/people/ledger') && url.includes('source_refs'), respond: () => Response.json({ ok: true, data: { items: [
-        { id: 'ledger_00000000-0000-4000-8000-000000000052', person_ref: 'shared:person:kathleen', direction: 'they_owe', text: 'Send the reading list', task_ref: null, comm_ref: memberRef, due: null, checked_in_ref: null, status: 'open', author: 'adam', created_at: '', updated_at: '' }
+        { id: 'ledger_00000000-0000-4000-8000-000000000052', person_ref: 'shared:person:jordan', direction: 'they_owe', text: 'Send the reading list', task_ref: null, comm_ref: memberRef, due: null, checked_in_ref: null, status: 'open', author: 'adam', created_at: '', updated_at: '' }
       ] } }) },
       { test: (url) => url.includes('/api/communications'), respond: () => Response.json({ ok: true, data: { communications: [] } }) },
       { test: (url) => url.includes('/api/threads') && !url.includes('?'), respond: () => Response.json({ ok: true, data: { threads: [
         {
           schema_version: 1, id: threadId, kind: 'general',
-          title: 'Kathleen E. · enrichment', purpose_tag: 'enrichment', goals: [], status: 'open',
+          title: 'Jordan E. · enrichment', purpose_tag: 'enrichment', goals: [], status: 'open',
           created_at: '2026-08-01T00:00:00.000Z', updated_at: '2026-08-29T02:00:00.000Z'
         }
       ] } }) },
       { test: (url) => url.includes('/api/universal-links') && url.includes(threadId), respond: () => Response.json({ ok: true, data: { outgoing: [], incoming: [
         { link: { id: 'm1', source_ref: memberRef, target_ref: `professional:thread:${threadId}`, relationship_type: 'in_thread', status: 'current', created_at: '2026-08-29T02:00:00.000Z' },
-          endpoint: { ref: memberRef, kind: 'communication', display_label: 'Kathleen E. · enrichment chat', href: null }, direction: 'incoming' }
+          endpoint: { ref: memberRef, kind: 'communication', display_label: 'Jordan E. · enrichment chat', href: null }, direction: 'incoming' }
       ] } }) }
     ]);
     const canvas = await renderHomeForTest();
-    expect(canvas.querySelector('[data-part="nudges"]')?.textContent).toContain('Kathleen E. · enrichment has been quiet for 20 days');
+    expect(canvas.querySelector('[data-part="nudges"]')?.textContent).toContain('Jordan E. · enrichment has been quiet for 20 days');
   });
 });

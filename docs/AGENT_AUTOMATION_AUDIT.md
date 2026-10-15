@@ -1,3 +1,5 @@
+> Storage rule, 15 October 2026: personal Central Node content belongs only in private `adamrussell91-hash/life-hub-data/central-node.md` on `main`. Personalised voice samples and SOURCES.md belong in that private repository under `config/humanizer/voices/`. References below to public personal seed copies or writing samples are superseded. The public Central Node is a structural template only. Use authenticated private reads and writes, never copy personal content into code, tests, docs, prompts, screenshots or public build assets.
+
 # Agent runtime + automation audit (27 Sep 2026)
 
 **Related:** Clare / Done-column retention / cost-aware PA — assumption tests **and detailed build plan** (Docs → Slice A → Slice B) in [`docs/CLARE-TASKS-PA-ASSUMPTIONS.md`](CLARE-TASKS-PA-ASSUMPTIONS.md). Claude Code entry: root `CLAUDE.md` → “Clare / Tasks PA assumptions audit”.

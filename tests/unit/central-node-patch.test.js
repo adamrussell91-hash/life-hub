@@ -131,7 +131,7 @@ test('apply upsert_field updates Flags', () => {
 });
 
 test('apply upsert_field on constraints replaces the matching bullet (5 Oct weight Confirm)', () => {
-  const live = readFileSync(new URL('../../central-node.md', import.meta.url), 'utf8');
+  const live = '## 🔴 Current Constraints & Priorities\n- **Weight**: synthetic baseline\n- **Weight-bearing/spine-loading**: synthetic rule\n';
   const text = '**Weight**: 88.6 kg, 20.4% body fat (5 Oct 2026, smart scale). Body composition goal: 78-82kg at 8-10% body fat.';
   const next = applyCentralNodePatch(live, {
     section: 'constraints',
@@ -140,7 +140,7 @@ test('apply upsert_field on constraints replaces the matching bullet (5 Oct weig
   });
   assert.ok(next, 'constraints upsert_field must apply');
   assert.ok(next.includes(`- ${text}`));
-  assert.ok(!next.includes('88kg (weighed by Mary-anne Chamoun'));
+  assert.ok(!next.includes('synthetic baseline'));
   // Lookalike bullets stay untouched.
   assert.match(next, /Weight-bearing\/spine-loading/);
   assert.equal(next.split('\n').length, live.split('\n').length);

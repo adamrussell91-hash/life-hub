@@ -43,6 +43,7 @@ import { decodeBlob } from './_shared/decode-blob.mjs';
 import { selectManifestEntries } from './_shared/repo-policy.mjs';
 import { routeAgent, findAgent, ROUTER_SLUG } from './_shared/agent-directory.mjs';
 import { buildSystemPrompt } from './_shared/persona.mjs';
+import { loadPrivatePersonalityWritingSample } from './_shared/load-humanizer.mjs';
 import { CENTRAL_NODE_UNAVAILABLE_MARKER, HUB_CONTEXT_UNAVAILABLE_MARKER } from '../../apps/life/js/core/context-integrity.js';
 import { loadHubAgentContext } from './_shared/hub-agent-context.mjs';
 import { normalizeProtocolId, protocolSteerBlock } from '../../apps/life/js/app/agent-protocols.js';
@@ -1822,7 +1823,9 @@ export function createChatHandler({
             centralNodeLog += '\nCreatine intake history unavailable: do not treat unavailable records as missed intake or invent a current level/ETA. Existing CN estimate may be stale; dose logging still works.';
           }
         }
+        const writingSample = await loadPrivatePersonalityWritingSample(slug, { client, tree: repoTree });
         const system = buildSystemPrompt({
+          writingSample,
           slug,
           today,
           now: nowInstant,
