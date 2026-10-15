@@ -17,7 +17,8 @@ test('thread focus folds, survives stop change, and adapts 1440↔390', async ({
 
   await expect(page.locator('[data-line-id="line_1"]')).toBeVisible();
   await expect(page.locator('[data-line-id="line_2"]')).toHaveCount(0);
-  await expect(page.locator('.block-annotation__arcs')).toBeVisible();
+  await expect(page.locator('.block-annotation__focus-bar')).toContainText('Following a thread');
+  await expect(page.locator('.block-annotation__pip').first()).toBeVisible();
 
   await folds.first().click();
   await expect(folds.first()).toHaveAttribute('aria-expanded', 'true');
@@ -41,6 +42,6 @@ test('thread focus folds, survives stop change, and adapts 1440↔390', async ({
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.reload();
   await page.locator('[data-thread-id="ann_motif"]').click();
-  await expect(page.locator('.block-annotation__arcs')).toBeVisible();
+  await expect(page.locator('.block-annotation__pip')).toHaveCount(5);
   await expect(page.locator('.block-annotation__fold').first()).toBeVisible();
 });
