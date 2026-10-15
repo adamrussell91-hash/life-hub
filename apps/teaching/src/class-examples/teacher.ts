@@ -1,5 +1,6 @@
 import { ApiClientError } from '@/api/client';
 import { askTextCard } from '@/teacher/confirm-dialog';
+import { findBlockById } from '@/blocks/find-block';
 import type { Block } from '@/schemas/block';
 import {
   DIRECT_CONTEXT,
@@ -516,21 +517,41 @@ export function createTeacherClassExamples(options: TeacherClassExamplesOptions)
     }
   }
 
+  function addButton(block: Block): HTMLButtonElement {
+    const add = button('cx-add', '', () => void addSlot(block));
+    add.setAttribute('aria-label', 'Add a class example under this block');
+    const icon = el('span', 'cx-add__icon');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = plusIcon();
+    add.append(icon, document.createTextNode('Class example'));
+    return add;
+  }
+
   void load();
 
   return {
     decorate(row: HTMLElement, block: Block) {
-      const add = button('cx-add', '', () => void addSlot(block));
-      add.setAttribute('aria-label', 'Add a class example under this block');
-      const icon = el('span', 'cx-add__icon');
-      icon.setAttribute('aria-hidden', 'true');
-      icon.innerHTML = plusIcon();
-      add.append(icon, document.createTextNode('Class example'));
       const host = el('div', 'cx-teacher');
       host.hidden = true;
-      row.append(host, add);
+      row.append(host, addButton(block));
       hosts.set(block.id, { host, block });
       paintHost(host, block);
+
+      // Blocks inside a section, columns or tabs are drawn in this row's
+      // preview; each gets its own "+" and its boxes sit right under it.
+      row.querySelectorAll<HTMLElement>('.block[data-block-id]').forEach((target) => {
+        const id = target.dataset.blockId;
+        if (!id || id === block.id || target.closest('.cx-teacher')) return;
+        const nested = findBlockById([block], id);
+        if (!nested) return;
+        target.classList.add('cx-nested-target');
+        target.append(addButton(nested));
+        const nestedHost = el('div', 'cx-teacher cx-teacher--nested');
+        nestedHost.hidden = true;
+        target.after(nestedHost);
+        hosts.set(id, { host: nestedHost, block: nested });
+        paintHost(nestedHost, nested);
+      });
     },
     dispose() {
       disposed = true;

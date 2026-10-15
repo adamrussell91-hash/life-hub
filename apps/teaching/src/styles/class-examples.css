@@ -4,7 +4,7 @@
 
 /* ── Teacher: hover "+" on a block row ─────────────────────────────────── */
 
-.lesson-page__block > .cx-add {
+:is(.lesson-page__block, .cx-nested-target) > .cx-add {
   position: absolute;
   left: var(--space-5);
   bottom: calc(-1 * var(--space-3));
@@ -33,23 +33,38 @@
   display: inline-grid;
 }
 
-.lesson-page__block > .cx-add svg {
+.cx-add svg {
   width: 0.85rem;
   height: 0.85rem;
 }
 
-.lesson-page__block:hover > .cx-add,
+.lesson-page__block:hover:not(:has(.cx-nested-target:hover)) > .cx-add,
 .lesson-page__block--selected > .cx-add,
-.lesson-page__block > .cx-add:focus-visible {
+.cx-nested-target:hover > .cx-add,
+.cx-add:focus-visible {
   opacity: 1;
 }
 
-.lesson-page__block > .cx-add:hover {
+.cx-add:hover {
   background: var(--pastel-blue);
 }
 
+/* A block inside a section, columns or tabs. */
+.cx-nested-target {
+  position: relative;
+}
+
+.cx-nested-target > .cx-add {
+  left: 0;
+  bottom: calc(-1 * var(--space-2));
+}
+
+.cx-teacher--nested {
+  margin-top: var(--space-2);
+}
+
 @media (hover: none) {
-  .lesson-page__block > .cx-add {
+  :is(.lesson-page__block, .cx-nested-target) > .cx-add {
     opacity: 0.55;
   }
 }
