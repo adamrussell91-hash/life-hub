@@ -507,7 +507,10 @@ export function conceptContent(prefix: string): ConceptFeaturesBlock['content'] 
 export function reflectionNote(): TkTeacherNote {
   return {
     what: 'A closing activity normally involves either joint or individual student reflection on what was learnt in terms of the content of the lesson and/or its skill base. This may include such things as verbal or written responses to target questions, entries in reflection log books, or completion of student performance self evaluation sheets. Having students reflect upon their learning and evaluate their own progress should be seen as contributing to their ability to become responsible and self-directed learners. (p4)',
-    run: [],
+    run: [
+      'With five minutes remaining, stop the discussion and move systematically around the circle so each student can make a final reflective comment. (Philosothon facilitator procedures)',
+      'Invite students to explain whether their view changed, summarise their position, identify remaining questions or evaluate where the discussion progressed well or poorly. (Philosothon facilitator procedures)'
+    ],
     say: [],
     watch: [
       'Progress: increased tolerance of unanswered intellectual work. (Handwritten note, p4)',
@@ -516,10 +519,21 @@ export function reflectionNote(): TkTeacherNote {
       'The "progress" is the quality of thinking, the way and tools of the discussion. (Handwritten note, p4)',
       'Build in written reflection. (Notion workshop notes)'
     ],
-    extra_label: '',
-    extra: [],
+    extra_label: 'Strong participants (Philosothon 2026 marking guide)',
+    extra: [
+      'Build on the ideas of others.',
+      'Allow others to speak.',
+      "Acknowledge others' positions.",
+      "Seek clarification and a better understanding of others' ideas.",
+      'Offer useful insights to the group.',
+      'Recognise problematic areas and offer solutions.',
+      'Identify key issues.',
+      'Make progress while working with uncertainty.',
+      'Avoid clichéd, formulaic or memorised interactions.',
+      'Keep their contributions focused and concise.'
+    ],
     time: '',
-    source: 'Workshop handbook p4, p25; Notion workshop notes',
+    source: 'Workshop handbook p4, p25; Notion workshop notes; Sydney Philosothon 2026 marking guide and facilitator procedures (Centre for Critical Thinking and Ethics, Newington College)',
     edited: false
   };
 }
