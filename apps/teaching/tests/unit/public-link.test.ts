@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   absolutePublicUrl,
   mountPublicLinkControl,
-  publicStudentPath
+  publicStudentPath,
+  teacherPreviewUrl
 } from '@/teacher/public-link';
 
 describe('public link helpers', () => {
@@ -13,6 +14,29 @@ describe('public link helpers', () => {
     expect(absolutePublicUrl('lesson', 'lesson_1')).toBe(
       'https://class.adam-russell.com/s/lessons/lesson_1'
     );
+  });
+
+  describe('teacherPreviewUrl', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('opens the student host from the LifeHub umbrella, never the umbrella URL', () => {
+      vi.stubGlobal('location', new URL('https://life-hub.adam-russell.com/teaching/lessons/lesson_1'));
+      expect(teacherPreviewUrl('lesson', 'lesson_1')).toBe(
+        'https://class.adam-russell.com/s/lessons/lesson_1'
+      );
+      expect(teacherPreviewUrl('class', 'class_1')).toBe(
+        'https://class.adam-russell.com/s/classes/class_1'
+      );
+    });
+
+    it('keeps the dev origin on localhost', () => {
+      vi.stubGlobal('location', new URL('http://localhost:5173/lessons/lesson_1'));
+      expect(teacherPreviewUrl('lesson', 'lesson_1')).toBe(
+        'http://localhost:5173/s/lessons/lesson_1'
+      );
+    });
   });
 });
 

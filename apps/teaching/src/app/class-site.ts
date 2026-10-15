@@ -2,6 +2,19 @@
 export const CLASS_SITE_HOST = 'class.adam-russell.com';
 export const CLASS_SITE_ORIGIN = `https://${CLASS_SITE_HOST}`;
 
+/**
+ * Origin for any page a student sees. The class site everywhere except local
+ * dev, where the class host would point at production instead of this build.
+ */
+export function studentSiteOrigin(
+  current: { hostname: string; origin: string } | undefined = typeof location !== 'undefined'
+    ? location
+    : undefined
+): string {
+  if (current && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(current.hostname)) return current.origin;
+  return CLASS_SITE_ORIGIN;
+}
+
 const STUDENT_ROUTES = new Set([
   'student-lesson',
   'student-unit',
