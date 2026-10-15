@@ -138,6 +138,43 @@ type ReanchorStop = {
   isPrimary: boolean;
 };
 
+/**
+ * The open note and active layer survive the editor being rebuilt after a save,
+ * so writing or linking a place never drops the teacher back to the list.
+ */
+const editorMemory = new Map<string, { selected: string | null; layer: string | null }>();
+
+type NoteSpan = { start: number; end: number; ann: AnnotationItem };
+
+/** Join spans that overlap into one clickable run carrying every note on it. */
+export function mergeOverlapping(
+  spans: NoteSpan[]
+): Array<{ start: number; end: number; anns: AnnotationItem[] }> {
+  const sorted = [...spans].sort((a, b) => a.start - b.start || b.end - a.end);
+  const groups: Array<{ start: number; end: number; anns: AnnotationItem[] }> = [];
+  for (const span of sorted) {
+    const last = groups[groups.length - 1];
+    if (last && span.start < last.end) {
+      last.end = Math.max(last.end, span.end);
+      if (!last.anns.some((ann) => ann.id === span.ann.id)) last.anns.push(span.ann);
+    } else {
+      groups.push({ start: span.start, end: span.end, anns: [span.ann] });
+    }
+  }
+  return groups;
+}
+
+/** Put an edited subset (reordered, removed, added) back into the full list. */
+export function mergeSubset<T>(all: T[], inSubset: (item: T) => boolean, next: T[]): T[] {
+  const queue = [...next];
+  const out: T[] = [];
+  for (const item of all) {
+    if (!inSubset(item)) out.push(item);
+    else if (queue.length > 0) out.push(queue.shift()!);
+  }
+  return [...out, ...queue];
+}
+
 function nextId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
@@ -258,7 +295,21 @@ export function createAnnotationEditorFields(
     })),
     extras: track.extras?.map((extra) => ({ ...extra }))
   }));
-  let selectedAnnotationId: string | null = annotations[0]?.id ?? null;
+  const remembered = editorMemory.get(block.id);
+  let selectedAnnotationId: string | null =
+    remembered?.selected && annotations.some((ann) => ann.id === remembered.selected)
+      ? remembered.selected
+      : null;
+  /** The layer the teacher is annotating in: new notes go here, the list shows it. */
+  let activeLayerId: string | null =
+    (remembered?.layer && layers.some((layer) => layer.id === remembered.layer)
+      ? remembered.layer
+      : null) ??
+    annotations[0]?.layer_id ??
+    layers.find((layer) => layer.kind !== 'voice')?.id ??
+    null;
+  const rememberView = () =>
+    editorMemory.set(block.id, { selected: selectedAnnotationId, layer: activeLayerId });
   let reanchorId: string | null = null;
   let reanchorStop: ReanchorStop | null = null;
   let addingStopForId: string | null = null;
@@ -499,6 +550,13 @@ export function createAnnotationEditorFields(
   notePanel.className = 'block-editor__annotation-note';
   notePanel.hidden = true;
   notePanel.setAttribute('aria-label', 'Annotation editor');
+
+  // One place for notes: the list of the active layer's notes, or the open note.
+  const listPanel = document.createElement('aside');
+  listPanel.className = 'block-editor__annotation-note-list';
+  listPanel.setAttribute('aria-label', 'Notes');
+  const layerPickHost = document.createElement('div');
+  layerPickHost.className = 'block-editor__annotation-active-layer';
 
   const voicePanel = document.createElement('aside');
   voicePanel.className = 'block-editor__annotation-voice-panel';
@@ -1250,7 +1308,11 @@ export function createAnnotationEditorFields(
       return;
     }
 
-    const layer = (layerId && layers.find((row) => row.id === layerId)) || ensureLayer();
+    const layer =
+      (layerId && layers.find((row) => row.id === layerId)) ||
+      (activeLayerId && layers.find((row) => row.id === activeLayerId)) ||
+      ensureLayer();
+    activeLayerId = layer.id;
     const id = nextId(`${getLatest().id}_ann`);
     const item: AnnotationItem = {
       id,
@@ -1303,13 +1365,20 @@ export function createAnnotationEditorFields(
       list.push(value);
       map.set(key, list);
     };
+    const pushOnce = (map: Map<string, AnnotationItem[]>, key: string, ann: AnnotationItem) => {
+      if (!(map.get(key) ?? []).some((row) => row.id === ann.id)) push(map, key, ann);
+    };
     for (const ann of annotations) {
-      const resolved = resolveAnnotation(text, ann);
-      if (resolved.status !== 'ok') continue;
-      if (resolved.granularity === 'stanza') push(notedStanzas, resolved.stanzaId, ann);
-      else if (resolved.granularity === 'line' && resolved.lineId) push(notedLines, resolved.lineId, ann);
-      else if (resolved.lineId && resolved.start != null && resolved.end != null) {
-        push(spansByLine, resolved.lineId, { start: resolved.start, end: resolved.end, ann });
+      // A thread's other places are clickable too, not only its first one.
+      for (const anchor of [ann.anchor, ...(ann.also_anchors ?? [])]) {
+        const resolved = resolveAnnotation(text, { ...ann, anchor, also_anchors: undefined });
+        if (resolved.status !== 'ok') continue;
+        if (resolved.granularity === 'stanza') pushOnce(notedStanzas, resolved.stanzaId, ann);
+        else if (resolved.granularity === 'line' && resolved.lineId) {
+          pushOnce(notedLines, resolved.lineId, ann);
+        } else if (resolved.lineId && resolved.start != null && resolved.end != null) {
+          push(spansByLine, resolved.lineId, { start: resolved.start, end: resolved.end, ann });
+        }
       }
     }
     const layerColour = (ann: AnnotationItem) =>
@@ -1362,15 +1431,25 @@ export function createAnnotationEditorFields(
         textEl.className = 'block-editor__annotation-line-text';
         textEl.dataset.stanzaId = stanza.id;
         textEl.dataset.lineId = line.id;
-        const spans: LineSpan[] = (spansByLine.get(line.id) ?? []).map((span) => ({
-          start: span.start,
-          end: span.end,
+        const spans: LineSpan[] = mergeOverlapping(spansByLine.get(line.id) ?? []).map((group) => ({
+          start: group.start,
+          end: group.end,
           wrap: () => {
+            const first = group.anns[0]!;
             const mark = document.createElement('mark');
-            mark.className = `block-editor__annotation-hl block-editor__annotation-hl--${layerColour(span.ann)}`;
-            if (span.ann.id === selectedAnnotationId) mark.classList.add('is-selected');
-            mark.dataset.annotationId = span.ann.id;
-            mark.title = 'Click to open this note';
+            mark.className = `block-editor__annotation-hl block-editor__annotation-hl--${layerColour(first)}`;
+            if (group.anns.some((ann) => ann.id === selectedAnnotationId)) {
+              mark.classList.add('is-selected');
+            }
+            mark.dataset.annotationId = first.id;
+            mark.dataset.annotationIds = group.anns.map((ann) => ann.id).join(' ');
+            if (group.anns.length > 1) {
+              mark.classList.add('has-several');
+              mark.dataset.noteCount = String(group.anns.length);
+              mark.title = `${group.anns.length} notes here: click to choose one`;
+            } else {
+              mark.title = 'Click to open this note';
+            }
             return mark;
           }
         }));
@@ -1425,10 +1504,10 @@ export function createAnnotationEditorFields(
 
   /** A line or stanza can carry several notes (grammar, sound, …): open one or add another. */
   function openBarMenu(
-    bar: HTMLButtonElement,
+    bar: HTMLElement,
     notes: AnnotationItem[],
-    selection: BuildAnchorSelection,
-    scope: 'line' | 'stanza'
+    selection: BuildAnchorSelection | null,
+    scope: 'line' | 'stanza' | 'words'
   ): void {
     closeBarMenu();
     const menu = document.createElement('div');
@@ -1438,7 +1517,7 @@ export function createAnnotationEditorFields(
 
     const heading = document.createElement('p');
     heading.className = 'block-editor__annotation-bar-menu-heading';
-    heading.textContent = `Notes on this ${scope}`;
+    heading.textContent = scope === 'words' ? 'Notes on these words' : `Notes on this ${scope}`;
     menu.append(heading);
 
     for (const ann of notes) {
@@ -1449,7 +1528,10 @@ export function createAnnotationEditorFields(
       item.className = `block-editor__annotation-bar-menu-item block-editor__annotation-bar-menu-item--${layer?.colour ?? 'wave'}`;
       const name = document.createElement('span');
       name.className = 'block-editor__annotation-bar-menu-layer';
-      name.textContent = layer?.name ?? 'Note';
+      const stops = ann.also_anchors?.length ?? 0;
+      name.textContent = stops > 0
+        ? `${layer?.name ?? 'Note'} · Thread, ${stops + 1} places`
+        : layer?.name ?? 'Note';
       const preview = document.createElement('span');
       preview.className = 'block-editor__annotation-bar-menu-preview';
       preview.textContent = htmlToPlainText(ann.body.html).trim() || 'Empty note';
@@ -1461,28 +1543,30 @@ export function createAnnotationEditorFields(
       menu.append(item);
     }
 
-    const addLabel = document.createElement('p');
-    addLabel.className = 'block-editor__annotation-bar-menu-heading';
-    addLabel.textContent = 'Add another note';
-    menu.append(addLabel);
-    const addRow = document.createElement('div');
-    addRow.className = 'block-editor__annotation-bar-menu-add';
-    const addable = layers.filter((layer) => layer.kind !== 'voice');
-    const targets: Array<AnnotationLayer | undefined> = addable.length > 0 ? addable : [undefined];
-    for (const layer of targets) {
-      const add = document.createElement('button');
-      add.type = 'button';
-      add.setAttribute('role', 'menuitem');
-      add.className = `block-editor__annotation-bar-menu-new block-editor__annotation-bar-menu-new--${layer?.colour ?? 'wave'}`;
-      add.textContent = layer ? `+ ${layer.name}` : '+ Note';
-      add.setAttribute('aria-label', layer ? `Add a ${layer.name} note to this ${scope}` : `Add a note to this ${scope}`);
-      add.addEventListener('click', () => {
-        closeBarMenu();
-        applySelection(selection, layer?.id);
-      });
-      addRow.append(add);
+    if (selection) {
+      const addRow = document.createElement('div');
+      const addLabel = document.createElement('p');
+      addLabel.className = 'block-editor__annotation-bar-menu-heading';
+      addLabel.textContent = 'Add another note';
+      menu.append(addLabel);
+      addRow.className = 'block-editor__annotation-bar-menu-add';
+      const addable = layers.filter((layer) => layer.kind !== 'voice');
+      const targets: Array<AnnotationLayer | undefined> = addable.length > 0 ? addable : [undefined];
+      for (const layer of targets) {
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.setAttribute('role', 'menuitem');
+        add.className = `block-editor__annotation-bar-menu-new block-editor__annotation-bar-menu-new--${layer?.colour ?? 'wave'}`;
+        add.textContent = layer ? `+ ${layer.name}` : '+ Note';
+        add.setAttribute('aria-label', layer ? `Add a ${layer.name} note to this ${scope}` : `Add a note to this ${scope}`);
+        add.addEventListener('click', () => {
+          closeBarMenu();
+          applySelection(selection, layer?.id);
+        });
+        addRow.append(add);
+      }
+      menu.append(addRow);
     }
-    menu.append(addRow);
 
     menu.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
@@ -1507,6 +1591,11 @@ export function createAnnotationEditorFields(
 
   function openNote(id: string): void {
     selectedAnnotationId = id;
+    const opened = annotations.find((ann) => ann.id === id);
+    if (opened && opened.layer_id !== activeLayerId) {
+      activeLayerId = opened.layer_id;
+      remountLists();
+    }
     clearPending();
     paintNotePanel();
     selectSurface
@@ -1583,7 +1672,15 @@ export function createAnnotationEditorFields(
       const hl = (event.target as HTMLElement | null)?.closest<HTMLElement>(
         '.block-editor__annotation-hl'
       );
-      if (hl?.dataset.annotationId) openNote(hl.dataset.annotationId);
+      const ids = (hl?.dataset.annotationIds ?? hl?.dataset.annotationId ?? '')
+        .split(' ')
+        .filter(Boolean);
+      if (ids.length > 1 && hl) {
+        const notes = ids
+          .map((id) => annotations.find((ann) => ann.id === id))
+          .filter((ann): ann is AnnotationItem => Boolean(ann));
+        openBarMenu(hl, notes, null, 'words');
+      } else if (ids[0]) openNote(ids[0]);
       else clearPending();
       return;
     }
@@ -1720,6 +1817,8 @@ export function createAnnotationEditorFields(
     notePanel.replaceChildren();
 
     const selected = annotations.find((a) => a.id === selectedAnnotationId);
+    rememberView();
+    listPanel.hidden = Boolean(selected);
     if (!selected) {
       notePanel.hidden = true;
       return;
@@ -1787,7 +1886,8 @@ export function createAnnotationEditorFields(
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'block-editor__annotation-note-close';
-    close.textContent = 'Close';
+    const closeLayer = layers.find((layer) => layer.id === activeLayerId);
+    close.textContent = closeLayer ? `← ${closeLayer.name} notes` : '← All notes';
     close.addEventListener('click', () => {
       selectedAnnotationId = null;
       paintNotePanel();
@@ -2100,6 +2200,30 @@ export function createAnnotationEditorFields(
 
     const isThread = (selected.also_anchors?.length ?? 0) > 0;
     if (isThread) {
+      const titleLabel = document.createElement('label');
+      titleLabel.className = 'block-editor__annotation-thread-title';
+      const titleText = document.createElement('span');
+      titleText.className = 'block-editor__hint';
+      titleText.textContent = 'Thread title: what links these places? Students see this on the thread button.';
+      const titleInput = document.createElement('input');
+      titleInput.type = 'text';
+      titleInput.maxLength = 80;
+      titleInput.placeholder = 'e.g. Clinical, cold words';
+      titleInput.value = selected.thread?.title ?? '';
+      titleInput.addEventListener('change', () => {
+        const title = titleInput.value.trim();
+        annotations = annotations.map((ann) => {
+          if (ann.id !== selected.id) return ann;
+          const thread: AnnotationThread = { ...(ann.thread ?? { order: 'text' }) };
+          if (title) thread.title = title;
+          else delete thread.title;
+          return { ...ann, thread, updated_at: nowIso() };
+        });
+        emitChange();
+      });
+      titleLabel.append(titleText, titleInput);
+      threadHost.append(titleLabel);
+
       const kindLabel = document.createElement('p');
       kindLabel.className = 'block-editor__hint';
       kindLabel.textContent = 'Thread kind';
@@ -2277,7 +2401,40 @@ export function createAnnotationEditorFields(
     event.stopPropagation();
     selectedAnnotationId = null;
     paintNotePanel();
+    paintSelectSurface();
   });
+
+  /** Which layer the teacher is annotating in; the list and new notes follow it. */
+  function paintActiveLayerPick(): void {
+    layerPickHost.replaceChildren();
+    const choices = layers.filter((layer) => layer.kind !== 'voice');
+    if (activeLayerId && !layers.some((layer) => layer.id === activeLayerId)) {
+      activeLayerId = choices[0]?.id ?? null;
+    }
+    if (choices.length < 2) return;
+    const label = document.createElement('p');
+    label.className = 'block-editor__annotation-section-title';
+    label.textContent = 'Annotating in';
+    const row = document.createElement('div');
+    row.className = 'block-editor__annotation-active-layer-row';
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', 'Annotating in');
+    for (const layer of choices) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `block-editor__annotation-active-layer-btn block-editor__annotation-active-layer-btn--${layer.colour}`;
+      const on = layer.id === activeLayerId;
+      btn.setAttribute('aria-pressed', String(on));
+      const count = annotations.filter((ann) => ann.layer_id === layer.id).length;
+      btn.textContent = `${layer.name} (${count})`;
+      btn.addEventListener('click', () => {
+        activeLayerId = layer.id;
+        remountLists();
+      });
+      row.append(btn);
+    }
+    layerPickHost.append(label, row);
+  }
 
   function remountLists(): void {
     const layerScroll = layersHost.scrollTop;
@@ -2453,8 +2610,11 @@ export function createAnnotationEditorFields(
     layersHost.append(addFamilyBtn);
     layersHost.scrollTop = layerScroll;
 
+    paintActiveLayerPick();
+    rememberView();
+    const inLayer = (ann: AnnotationItem) => !activeLayerId || ann.layer_id === activeLayerId;
     const annList = createHubList<AnnotationItem>({
-      items: annotations,
+      items: annotations.filter(inLayer),
       noun: 'note',
       label: 'Notes',
       getKey: (ann) => ann.id,
@@ -2472,7 +2632,7 @@ export function createAnnotationEditorFields(
         selectSurface.scrollIntoView({ block: 'nearest' });
       },
       onChange: (next) => {
-        annotations = next;
+        annotations = mergeSubset(annotations, inLayer, next);
         if (selectedAnnotationId && !annotations.some((a) => a.id === selectedAnnotationId)) {
           selectedAnnotationId = null;
         }
@@ -2518,7 +2678,11 @@ export function createAnnotationEditorFields(
         if (ann.id === selectedAnnotationId) btn.classList.add('is-selected');
         const quote = document.createElement('span');
         quote.className = 'block-editor__annotation-open-quote';
-        quote.textContent = `“${ann.anchor.quote.exact.split('\n')[0]}”`;
+        const places = (ann.also_anchors?.length ?? 0) + 1;
+        quote.textContent =
+          places > 1
+            ? `${ann.thread?.title?.trim() || 'Thread'} · ${places} places`
+            : `“${ann.anchor.quote.exact.split('\n')[0]}”`;
         const body = htmlToPlainText(ann.body.html).trim();
         const preview = document.createElement('span');
         preview.className = 'block-editor__annotation-open-body';
@@ -2534,6 +2698,12 @@ export function createAnnotationEditorFields(
       }
     });
     annList.el.classList.add('block-editor__annotation-ann-list');
+    if (activeLayerId && !annotations.some(inLayer)) {
+      const empty = document.createElement('p');
+      empty.className = 'block-editor__hint';
+      empty.textContent = 'No notes in this layer yet. Highlight words in the text, then choose Add note.';
+      annotationsHost.append(empty);
+    }
     annotationsHost.append(annList.el);
     annotationsHost.scrollTop = annScroll;
 
@@ -2562,15 +2732,9 @@ export function createAnnotationEditorFields(
   textHead.append(kindPills.el);
   textPane.append(textHead);
 
-  workspace.append(selectWrap, notePanel, voicePanel);
+  listPanel.append(layerPickHost, annotationsHost, orphansHost, missingTechniqueHost);
+  workspace.append(selectWrap, listPanel, notePanel, voicePanel);
   annotatePane.append(hint, placeStatus, workspace);
-
-  const notesSection = document.createElement('section');
-  notesSection.className = 'block-editor__annotation-notes';
-  const notesTitle = document.createElement('h3');
-  notesTitle.className = 'block-editor__annotation-section-title';
-  notesTitle.textContent = 'Notes';
-  notesSection.append(notesTitle, annotationsHost, orphansHost, missingTechniqueHost);
 
   const layersDetails = document.createElement('details');
   layersDetails.className = 'block-editor__annotation-details block-editor__annotation-layers-details';
@@ -2604,7 +2768,6 @@ export function createAnnotationEditorFields(
     modeRow,
     textPane,
     annotatePane,
-    notesSection,
     layersDetails,
     voiceTracksHost,
     settingsDetails
