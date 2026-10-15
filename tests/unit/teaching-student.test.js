@@ -173,3 +173,19 @@ test('public Teaching handlers call isPublicStudentApi and never the session coo
     assert.doesNotMatch(source, /readUmbrellaSessionCookie/, name);
   }
 });
+
+test('filterBlocksForStudent strips Thinking Toolkit teacher notes and class notes (shared fixture)', () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('../../apps/teaching/fixtures/toolkit-teacher-strip.json', import.meta.url),
+      'utf8'
+    )
+  );
+  const kept = filterBlocksForStudent(fixture.blocks);
+  const json = JSON.stringify(kept);
+  assert.doesNotMatch(json, new RegExp(fixture.sentinel));
+  assert.doesNotMatch(json, /"teacher_note"/);
+  assert.doesNotMatch(json, /"teacher_jots"/);
+  for (const id of fixture.kept_block_ids) assert.match(json, new RegExp(`"id":"${id}"`));
+  for (const id of fixture.dropped_block_ids) assert.doesNotMatch(json, new RegExp(`"id":"${id}"`));
+});

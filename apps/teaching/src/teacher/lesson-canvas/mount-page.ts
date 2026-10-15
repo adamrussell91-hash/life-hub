@@ -584,7 +584,14 @@ export function mountBlockCanvas(
     const spacer = document.createElement('span');
     spacer.className = 'lesson-page__toolbar-spacer';
 
-    const visibility = createVisibilitySelect(block, onBlockChange, latestBlock(block.id, block));
+    // A Teacher note block is always teacher-only, so it has no visibility choice.
+    const visibility =
+      block.block_type === 'teacher_note'
+        ? Object.assign(document.createElement('span'), {
+            className: 'tk-note__pill',
+            textContent: 'Only you see this'
+          })
+        : createVisibilitySelect(block, onBlockChange, latestBlock(block.id, block));
     bar.append(createBlockTypeLabel(block), visibility, spacer, done);
 
     if (block.block_type === 'section' && !isLinkedSection(block) && options.onSaveComposition) {
@@ -920,6 +927,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     renderLinkedPreview: options.renderLinkedPreview,
     renderPreview: (block) =>
       renderBlock(block, 'teacher', {
+        lessonId: lesson.id,
+        pageBlocks: lesson.blocks,
         attachedOutcomes: publicOutcomesForPage(lesson, options.outcomesCatalog ?? [])
       })
   });

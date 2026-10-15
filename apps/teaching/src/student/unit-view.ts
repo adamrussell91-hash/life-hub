@@ -48,6 +48,7 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
     for (const block of planBlocks) {
       plan.append(
         renderBlock(block, 'student', {
+          pageBlocks: planBlocks,
           attachedOutcomes: publishedOutcomes,
           anthology: unit.anthology
         })

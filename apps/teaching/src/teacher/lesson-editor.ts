@@ -1,3 +1,4 @@
+import { setToolkitClasses } from '@/toolkit/class-context';
 import { mountBlockAssistant } from '@/alchemy/block-assistant';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
@@ -704,6 +705,14 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         const klass = curriculum.classes.find(
           (row) =>
             row.current_unit_id === lesson.unit_id || row.active_unit_ids.includes(lesson.unit_id)
+        );
+        setToolkitClasses(
+          curriculum.classes
+            .filter(
+              (row) =>
+                row.current_unit_id === lesson.unit_id || row.active_unit_ids.includes(lesson.unit_id)
+            )
+            .map((row) => ({ id: row.id, label: row.display_name || row.code }))
         );
         const crumb = [klass?.code, unit?.title].filter(Boolean).join(' · ');
         const crumbEl = refs.contextBar.querySelector<HTMLElement>(

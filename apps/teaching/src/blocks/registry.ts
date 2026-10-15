@@ -85,6 +85,17 @@ import {
   type RenderMode
 } from '@/blocks/render';
 import type { Block } from '@/schemas/block';
+import {
+  createConceptFeaturesEditor,
+  createQuestionQuadrantEditor,
+  createTeacherNoteBlockEditor,
+  createThinkingIntentionsEditor,
+  createThinkingMoveEditor,
+  createThinkingReflectionEditor,
+  createToolkitSkillEditor,
+  createToolkitToolEditor,
+  createToolkitValueEditor
+} from '@/toolkit/editors';
 
 type BlockByType = {
   [K in Block['block_type']]: Extract<Block, { block_type: K }>;
@@ -245,7 +256,28 @@ export const blockRegistry: {
   annotation: {
     render: renderAnnotationBlock,
     createEditor: createAnnotationEditor
-  }
+  },
+  toolkit_skill: { render: (block, mode) => renderBlock(block, mode), createEditor: createToolkitSkillEditor },
+  toolkit_tool: { render: (block, mode) => renderBlock(block, mode), createEditor: createToolkitToolEditor },
+  toolkit_value: { render: (block, mode) => renderBlock(block, mode), createEditor: createToolkitValueEditor },
+  thinking_move: { render: (block, mode) => renderBlock(block, mode), createEditor: createThinkingMoveEditor },
+  question_quadrant: {
+    render: (block, mode) => renderBlock(block, mode),
+    createEditor: createQuestionQuadrantEditor
+  },
+  concept_features: {
+    render: (block, mode) => renderBlock(block, mode),
+    createEditor: createConceptFeaturesEditor
+  },
+  thinking_intentions: {
+    render: (block, mode) => renderBlock(block, mode),
+    createEditor: createThinkingIntentionsEditor
+  },
+  thinking_reflection: {
+    render: (block, mode) => renderBlock(block, mode),
+    createEditor: createThinkingReflectionEditor
+  },
+  teacher_note: { render: (block, mode) => renderBlock(block, mode), createEditor: createTeacherNoteBlockEditor }
 };
 
 export {

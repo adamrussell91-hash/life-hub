@@ -100,6 +100,7 @@ function renderPublishedLesson(
     blocks.append(
       renderBlock(block, 'student', {
         lessonId: lesson.lesson_id,
+        pageBlocks: lesson.blocks,
         attachedOutcomes: publishedOutcomes,
         openNoteId
       })
