@@ -99,6 +99,13 @@ const nullableText = z
   .optional()
   .transform((value) => (value ? value : null));
 
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .nullable()
+  .optional()
+  .transform((value) => value ?? null);
+
 const text = z
   .string()
   .optional()
@@ -142,6 +149,10 @@ const ProgramObject = z.object({
     .nullable()
     .optional()
     .default(null),
+  /** Page the dates came from, so they can be checked again next year. */
+  dates_source_url: nullableText,
+  /** When someone last confirmed the dates against that page. */
+  dates_checked_on: isoDate,
   not_available_nsw: z.boolean().default(false),
   not_available_reason: text,
   created_at: z.string(),
@@ -178,6 +189,8 @@ export const ProgramCreateSchema = ProgramObject.omit({
   registration_window: true,
   starts_on: true,
   ends_on: true,
+  dates_source_url: true,
+  dates_checked_on: true,
   not_available_nsw: true,
   not_available_reason: true
 }).extend({

@@ -1661,7 +1661,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://cambridge-research.org/essay-competition/",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -2387,7 +2389,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://mymun.com/dmun",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -2870,7 +2874,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://fawtas.org.au/competitions/",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -3681,7 +3687,9 @@
     "not_available_nsw": false,
     "not_available_reason": "Open to regional, rural and remote students aged 16 to 22 only",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.abc.net.au/heywire/competition",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -3753,7 +3761,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://fawnsw.org.au/writing-competitions/",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -4227,7 +4237,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://ino-global.com/essay-contest",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -4296,7 +4308,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.academic-marathon.org",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -4332,7 +4346,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.academic-marathon.org",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -4368,7 +4384,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.academic-marathon.org",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -4403,7 +4421,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.academic-marathon.org",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -4439,7 +4459,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.academic-marathon.org",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -4475,7 +4497,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.academic-marathon.org",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -4511,7 +4535,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.academic-marathon.org",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -4547,7 +4573,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.academic-marathon.org",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -4583,7 +4611,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.academic-marathon.org",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -4618,7 +4648,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.academic-marathon.org",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -4688,7 +4720,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.business-olympiad.org",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -6475,7 +6509,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.nextideamatters.com",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -6511,7 +6547,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.nextideamatters.com",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -6546,7 +6584,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.nextideamatters.com",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -6581,7 +6621,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.nextideamatters.com",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -6616,7 +6658,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.nextideamatters.com",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -6651,7 +6695,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.nextideamatters.com",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -6686,7 +6732,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.nextideamatters.com",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -6722,7 +6770,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.nextideamatters.com",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -6757,7 +6807,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.nextideamatters.com",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -6887,7 +6939,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.nillumbik.vic.gov.au/Explore/Arts-and-culture/Opportunities-for-artists/Nillumbik-Prize-for-Contemporary-Writing",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -8285,7 +8339,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://www.storyfest.com.au/novella-writing-competition",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -8428,7 +8484,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://ethics.org.au/connect/young-writers-competition/",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,
@@ -8626,7 +8684,9 @@
     "not_available_nsw": false,
     "not_available_reason": "",
     "created_at": "2026-06-16T13:00:00.000Z",
-    "updated_at": "2026-08-05T04:59:00.000Z"
+    "updated_at": "2026-08-05T04:59:00.000Z",
+    "dates_source_url": "https://royalinstitutephilosophy.org/news/think-essay-prize/",
+    "dates_checked_on": null
   },
   {
     "schema_version": 1,

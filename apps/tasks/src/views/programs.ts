@@ -475,6 +475,8 @@ function renderAddForm(
   const cost = createHubField({ ariaLabel: 'Cost' });
   const registrationWindow = createHubField({ ariaLabel: 'Registration window' });
   const link = createHubField({ type: 'url', ariaLabel: 'Registration link' });
+  const startsOn = createHubField({ type: 'date', ariaLabel: 'Starts' });
+  const endsOn = createHubField({ type: 'date', ariaLabel: 'Ends' });
   const description = createHubTextarea({
     ariaLabel: 'Description',
     className: 'task-editor__notes'
@@ -496,6 +498,8 @@ function renderAddForm(
     field('Name', name.el),
     type.el,
     month.el,
+    field('Starts', startsOn.el),
+    field('Ends', endsOn.el),
     level.el,
     length.el,
     costBasis.el,
@@ -533,6 +537,9 @@ function renderAddForm(
       return;
     }
     session.close();
+    const start = startsOn.input.value || null;
+    const end = endsOn.input.value || null;
+    const dated = Boolean(start && end && end >= start);
     const draft: Partial<Program> & { name: string } = {
       name: name.input.value.trim(),
       types: type.getValue() ? [type.getValue()] : [],
@@ -549,7 +556,9 @@ function renderAddForm(
       registration_link: link.input.value.trim() || null,
       registration_window: registrationWindow.input.value.trim(),
       not_available_nsw: nsw.checked,
-      not_available_reason: reason.input.value.trim()
+      not_available_reason: reason.input.value.trim(),
+      starts_on: dated ? start : null,
+      ends_on: dated ? end : null
     };
     const kind = draft.types?.[0];
     showConfirmWrite(
