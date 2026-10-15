@@ -94,6 +94,31 @@ describe('annotation thread focus (3b)', () => {
     el.remove();
   });
 
+  it('highlights only the linked words when thread places are words', () => {
+    mockViewport(1440);
+    const fixture = structuredClone(threadFocusFixture);
+    const motif = fixture.content.annotations.find((a) => a.id === 'ann_motif')!;
+    motif.anchor = {
+      id: 'stop_1',
+      granularity: 'word',
+      stanza: 'stanza_1',
+      line: 'line_1',
+      start: 5,
+      end: 11,
+      quote: { exact: 'double', prefix: 'Bent ', suffix: ', like' }
+    };
+    const el = renderAnnotationBlock(fixture, 'student');
+    document.body.append(el);
+    el.querySelector<HTMLButtonElement>('[data-thread-id="ann_motif"]')!.click();
+
+    const row = el.querySelector<HTMLElement>('[data-line-id="line_1"]')!;
+    expect(row.classList.contains('is-thread-partial')).toBe(true);
+    const words = [...row.querySelectorAll<HTMLElement>('.block-annotation__thread-word')];
+    expect(words.map((w) => w.textContent).join('')).toBe('double');
+    expect(words[0]!.dataset.stop).toBe('1');
+    el.remove();
+  });
+
   it('stays on the thread across a layer tick (V7)', () => {
     mockViewport(1440);
     const fixture = structuredClone(threadFocusFixture);

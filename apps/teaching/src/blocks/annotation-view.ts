@@ -36,6 +36,7 @@ import {
   placesLabel,
   printThreadFootnoteLabel,
   resolvedThreadStops,
+  highlightTextRange,
   threadLineIds,
   visibleThreads
 } from '@/blocks/annotation-thread-view';
@@ -1199,6 +1200,19 @@ function buildInteractiveView(
     }
 
     const threadLines = focusAnn ? threadLineIds(content, focusAnn) : null;
+    // Word and phrase places: only those words stay dark, numbered in order.
+    const threadWords = new Map<string, Array<{ start: number; end: number; n: number }>>();
+    focusStops.forEach((stop, index) => {
+      const { lineId, start, end, granularity } = stop.resolved;
+      if (!lineId || start == null || end == null) return;
+      if (granularity !== 'word' && granularity !== 'phrase') return;
+      pushGrouped(threadWords, lineId, { start, end, n: index + 1 });
+    });
+    const focusColour = focusAnn
+      ? (layerById(content.layers, focusAnn.layer_id)?.colour ?? 'wave')
+      : null;
+    if (focusColour) root.style.setProperty('--thread-c', `var(--${focusColour})`);
+    else root.style.removeProperty('--thread-c');
 
     function paintLineRow(line: AnnotationLineModel, stanzaId: string): HTMLElement {
       const lineId = line.id;
@@ -1261,6 +1275,21 @@ function buildInteractiveView(
         renderLineText(line, marks, () => true, openPlaced)
       );
       applyLineLayout(textEl, line);
+
+      const words = threadWords.get(lineId) ?? [];
+      if (words.length > 0) {
+        row.classList.add('is-thread-partial');
+        for (const word of words) {
+          let firstPiece = true;
+          highlightTextRange(textEl, word.start, word.end, () => {
+            const span = document.createElement('span');
+            span.className = 'block-annotation__thread-word';
+            if (firstPiece) span.dataset.stop = String(word.n);
+            firstPiece = false;
+            return span;
+          });
+        }
+      }
 
       const lineMarkers = markersByLine.get(`${stanzaId}:${lineId}`) ?? [];
       if (lineMarkers.length > 0) {
