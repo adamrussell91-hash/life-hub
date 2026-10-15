@@ -91,17 +91,29 @@ describe('Thinking Toolkit library', () => {
     }
     for (const preset of THINKING_MOVE_PRESETS) {
       expect(libraryItem(preset.skill)?.kind).toBe('skill');
-      expect(libraryItem(preset.value)?.kind).toBe('value');
       for (const id of preset.tools) expect(libraryItem(id)?.kind).toBe('tool');
     }
     expect(Object.keys(DISTINCTION_PAIR_BANK)).toEqual(['level1', 'level2', 'level3', 'maths', 'inquiry']);
   });
 
-  it('records a source for every definition and note', () => {
-    for (const item of [...TOOLKIT_SKILLS, ...TOOLKIT_TOOLS, ...TOOLKIT_VALUES]) {
-      expect(item.definition_source.trim(), item.id).not.toBe('');
-      expect(item.note.source.trim(), item.id).not.toBe('');
+  it('uses only the handbook and workshop notes: definitions only where Cam (p9) gives one', () => {
+    for (const item of [...TOOLKIT_SKILLS, ...TOOLKIT_VALUES]) {
+      expect(item.definition, item.id).toBe('');
+      expect(item.definition_source, item.id).toBe('');
     }
+    const defined = TOOLKIT_TOOLS.filter((item) => item.definition).map((item) => item.label);
+    expect(defined).toEqual([
+      'Counterexample', 'Criteria', 'Distinction', 'Example', 'Generalisation', 'Question', 'Reasons', 'Suggestion'
+    ]);
+    for (const item of TOOLKIT_TOOLS.filter((tool) => tool.definition)) {
+      expect(item.definition_source, item.id).toMatch(/^Cam \(2006\)/);
+    }
+    for (const item of [...TOOLKIT_SKILLS, ...TOOLKIT_TOOLS, ...TOOLKIT_VALUES]) {
+      expect(item.note.source.trim(), item.id).not.toBe('');
+      expect(item.note.time, item.id).toBe('');
+    }
+    const source = readFileSync(resolve(process.cwd(), 'src/toolkit/library.ts'), 'utf8');
+    expect(source).not.toMatch(/NESA|Paul|Elder \(|UQ Critical|draft wording/i);
   });
 });
 
@@ -207,7 +219,7 @@ describe('rendering', () => {
   });
 
   it('reveals are real buttons whose label and hidden state follow aria-expanded (V1, V11, I2)', () => {
-    const block = createBlock('toolkit_skill', 'skill_1');
+    const block = createBlock('concept_features', 'concept_1');
     const el = renderBlock(block, 'student');
     const button = el.querySelector<HTMLButtonElement>('.tk-reveal__btn')!;
     expect(button.tagName).toBe('BUTTON');
@@ -224,21 +236,31 @@ describe('rendering', () => {
   });
 
   it('the distinction fork fills when its worked example is revealed', () => {
-    const el = renderBlock(createBlock('toolkit_tool', 'tool_1'), 'student');
+    const base = createBlock('toolkit_tool', 'tool_1') as Extract<Block, { block_type: 'toolkit_tool' }>;
+    const withExample = {
+      ...base,
+      content: { ...base.content, worked: { kind: 'K', marker: 'M', a: 'A', b: 'B' }, worked_note: 'Note' }
+    } as Block;
+    const el = renderBlock(withExample, 'student');
     const kind = el.querySelector('.tk-fork__slot[data-part="kind"] .tk-fork__slot-value')!;
     expect(kind.textContent).toBe('');
     const worked = [...el.querySelectorAll<HTMLButtonElement>('.tk-reveal__btn')].find((b) =>
       b.textContent?.includes('worked example')
     )!;
     worked.click();
-    expect(kind.textContent).toBe('places of learning');
+    expect(kind.textContent).toBe('K');
   });
 
   it('stress-test verdicts toggle aria-pressed and persist per device', () => {
     const block = createBlock('toolkit_tool', 'tool_g');
     const generalisation = {
       ...block,
-      content: { ...(block.content as object), ...createToolContent('tool:generalisation') }
+      content: {
+        ...(block.content as object),
+        ...createToolContent('tool:generalisation'),
+        frame: 'stress',
+        statements: [{ id: 'g1', text: 'All swans are white.', verdict: 'fails', reason: 'R' }]
+      }
     } as Block;
     const el = renderBlock(generalisation, 'student', { lessonId: 'l1' });
     const pill = el.querySelector<HTMLButtonElement>('.tk-stress__pills [data-verdict="fails"]')!;
