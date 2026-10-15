@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickChatLessonId } from '@/teacher/chat';
+import { chatLessonOptions, pickChatLessonId } from '@/teacher/chat';
 import type { CurriculumResponse } from '@/teacher/nav';
 
 function curriculum(partial: Partial<CurriculumResponse> = {}): CurriculumResponse {
@@ -44,5 +44,24 @@ describe('pickChatLessonId', () => {
 
   it('returns null when the hub has no lessons', () => {
     expect(pickChatLessonId(curriculum(), '2026-08-12')).toBeNull();
+  });
+});
+
+describe('chatLessonOptions', () => {
+  const lesson = (id: string, title: string, status = 'active') =>
+    ({ id, title, status, slug: id, unit_id: 'u', sequence: 1, published: false, updated_at: '' });
+
+  it('lists live lessons by title so any lesson can be chosen', () => {
+    const options = chatLessonOptions(
+      curriculum({
+        lessons: [
+          lesson('b', 'The Remedy of Butterflies'),
+          lesson('a', 'Untitled lesson'),
+          lesson('t', 'Old', 'trashed')
+        ]
+      }),
+      'a'
+    );
+    expect(options.map((o) => o.id)).toEqual(['b', 'a']);
   });
 });

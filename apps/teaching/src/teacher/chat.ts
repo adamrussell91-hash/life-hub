@@ -17,6 +17,17 @@ export function pickChatLessonId(curriculum: CurriculumResponse, today = resolve
   return first?.id ?? null;
 }
 
+/** Live lessons for the chat picker, by title, always including the default. */
+export function chatLessonOptions(
+  curriculum: CurriculumResponse,
+  defaultId: string
+): Array<{ id: string; title: string }> {
+  return curriculum.lessons
+    .filter((lesson) => lesson.id === defaultId || (lesson.status !== 'trashed' && lesson.status !== 'archived'))
+    .map((lesson) => ({ id: lesson.id, title: lesson.title }))
+    .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+}
+
 export function renderTeacherChat(
   canvas: HTMLElement,
   curriculum: CurriculumResponse
@@ -42,40 +53,68 @@ export function renderTeacherChat(
     return { dispose() { root.replaceChildren(); } };
   }
 
+  const picker = document.createElement('label');
+  picker.className = 'teacher-chat__lesson';
+  const pickerLabel = document.createElement('span');
+  pickerLabel.className = 'create-modal__label';
+  pickerLabel.textContent = 'Lesson';
+  const select = document.createElement('select');
+  select.className = 'create-modal__select';
+  for (const lesson of chatLessonOptions(curriculum, lessonId)) {
+    const option = document.createElement('option');
+    option.value = lesson.id;
+    option.textContent = lesson.title?.trim() || 'Untitled lesson';
+    select.append(option);
+  }
+  select.value = lessonId;
+  const openLesson = document.createElement('button');
+  openLesson.type = 'button';
+  openLesson.className = 'btn';
+  openLesson.textContent = 'Open lesson';
+  openLesson.addEventListener('click', () => navigate(`/lessons/${select.value}`));
+  picker.append(pickerLabel, select);
+  const pickerRow = document.createElement('div');
+  pickerRow.className = 'teacher-chat__lesson-row';
+  pickerRow.append(picker, openLesson);
+
   const host = document.createElement('div');
   host.className = 'teacher-chat__panel';
   const status = document.createElement('p');
   status.className = 'metric-caption';
-  status.textContent = 'Loading chat…';
-  root.append(status, host);
+  root.append(pickerRow, status, host);
 
   let panel: AiPanelHandle | null = null;
   let cancelled = false;
+  let loadToken = 0;
 
-  void getLesson(lessonId)
-    .then((lesson) => {
-      if (cancelled) return;
-      const title = lesson.title?.trim() || 'Untitled lesson';
-      status.textContent = `Talking about ${title}. Open the lesson to apply edits.`;
-      panel = mountAiPanel(host, {
-        lessonId: lesson.id,
-        getSnapshotAt: () => lesson.updated_at || new Date().toISOString(),
-        onAcceptProposal: () => ({
-          ok: false,
-          message: 'Open the lesson to apply that change.'
-        })
+  function load(id: string): void {
+    const token = ++loadToken;
+    panel?.dispose();
+    panel = null;
+    host.replaceChildren();
+    status.textContent = 'Loading chat…';
+    void getLesson(id)
+      .then((lesson) => {
+        if (cancelled || token !== loadToken) return;
+        const title = lesson.title?.trim() || 'Untitled lesson';
+        status.textContent = `Talking about ${title}. To apply edits, open the lesson and use its chat panel.`;
+        panel = mountAiPanel(host, {
+          lessonId: lesson.id,
+          getSnapshotAt: () => lesson.updated_at || new Date().toISOString(),
+          onAcceptProposal: () => ({
+            ok: false,
+            message: 'Open the lesson to apply that change.'
+          })
+        });
+      })
+      .catch(() => {
+        if (cancelled || token !== loadToken) return;
+        status.textContent = 'Chat could not load that lesson. Pick another lesson above.';
       });
-    })
-    .catch(() => {
-      if (cancelled) return;
-      status.textContent = 'Chat could not load that lesson.';
-      const toLessons = document.createElement('button');
-      toLessons.type = 'button';
-      toLessons.className = 'btn btn--primary';
-      toLessons.textContent = 'Go to Lessons';
-      toLessons.addEventListener('click', () => navigate('/lessons'));
-      root.append(toLessons);
-    });
+  }
+
+  select.addEventListener('change', () => load(select.value));
+  load(lessonId);
 
   return {
     dispose() {
