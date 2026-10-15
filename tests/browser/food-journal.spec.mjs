@@ -410,9 +410,8 @@ for (const width of [390, 320])
         }),
       ),
     });
-    await page.locator(".food-import-list input").check();
     await page
-      .getByRole("button", { name: "Import selected", exact: true })
+      .getByRole("button", { name: "Import 1 meal", exact: true })
       .click();
     await page.locator(".food-sheet").waitFor({ state: "detached" });
     assert.equal(read().visits.length, 3);
