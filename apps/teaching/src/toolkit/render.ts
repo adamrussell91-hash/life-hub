@@ -326,7 +326,7 @@ function renderSkill(block: ToolkitSkillBlock, mode: TkRenderMode, ctx: TkRender
   if (c.show_test) {
     const li = el('li', 'block-question-set__question tk-step');
     const prompt = el('p', 'block-question-set__prompt');
-    prompt.append(el('strong', 'tk-step__title', 'Test'), document.createTextNode(' Swap books with a partner and check:'));
+    prompt.append(el('strong', 'tk-step__title', 'Check'));
     li.append(prompt);
     const checks = c.checks.filter((line) => line.trim());
     if (checks.length) {
@@ -483,7 +483,7 @@ function renderStress(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRender
 function renderConverter(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRenderContext): HTMLElement {
   const c = block.content;
   const frag = el('div', 'tk-frame');
-  if (c.sentence.trim()) frag.append(el('p', 'tk-sentence', 'Turn each closed question into an open one.'));
+  if (c.sentence.trim()) frag.append(el('p', 'tk-sentence', c.sentence));
   const list = el('ol', 'block-question-set__list');
   for (const pair of c.converters) {
     const li = el('li', 'block-question-set__question');
@@ -1066,8 +1066,12 @@ function renderReflection(block: ThinkingReflectionBlock, mode: TkRenderMode, ct
   if (c.variant === 'unit') {
     const unit = reflectionBox('End of unit', 'sand');
     unit.append(
-      el('p', 'tk-reflect__q', 'Think back to your original view (your first analogy or "… is" statement).'),
-      el('p', 'tk-reflect__q', `Choose one thing to elaborate on which helped you refine your understanding of ${concept}.`)
+      el('p', 'tk-reflect__q', "Think back to one's original view (original \"… is\" or analogy task)."),
+      el(
+        'p',
+        'tk-reflect__q',
+        `Choose one thing to elaborate on which helped you refine your understanding of ${c.concept.trim() || 'the concept'}.`
+      )
     );
     wrap.append(unit);
   }

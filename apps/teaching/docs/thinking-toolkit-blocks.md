@@ -20,7 +20,7 @@ Every toolkit block except Thinking intentions carries a **Teacher note** (What 
 
 ## Decisions taken
 
-- **Only the Newington framework page (p10).** 16 skills, 12 tools, 9 values. Thought experiment, hypothesise and synthesise are not in the set. Thinking move presets are only the p9 "Tools in Use" pairings whose skill and tools are on p10.
+- **Only the Newington framework page (p10).** 16 skills, 12 tools, 9 values. Thought experiment, hypothesise and synthesise are not in the set. Thinking move presets are only the pairings printed in the handbook (p9, p11 and the p9 margin note); a preset sets the skill and tools, and the value stays the teacher's choice.
 - **Class notes are per class.** A lesson belongs to a unit and every class running that unit shares it, so notes are stored as `teacher_jots[classId]`; the empty key is "All classes". The editor shows a class picker for classes running the unit.
 - **Thinking move compact steps.** One numbered step per tool: the tool's one-line prompt, its sentence frame, and an example to reveal. A final check step lists the value's probe questions.
 - **Changing a move after editing its note.** Steps for tools still in the chain keep their edits. The note rebuilds automatically until you edit it; after that your note is kept and a "Rebuild note from library" button appears.
@@ -35,14 +35,33 @@ Every toolkit block except Thinking intentions carries a **Teacher note** (What 
 - Both drop `teacher_note` blocks (even a stale draft set to students) and remove `teacher_note` / `teacher_jots` from toolkit blocks. Shared fixture: `fixtures/toolkit-teacher-strip.json`.
 - Search (`search-text.ts`) never indexes teacher notes or class notes.
 
-## Sources and drafts
+## Source rule
 
-Each item records `definition_source` and a note `source`, shown on the block.
+Every word in the library (`src/toolkit/library.ts`) and the block defaults (`src/toolkit/content.ts`) comes from one of two places:
 
-- **Skills:** NESA *Glossary of Key Words* wording. NESA's site could not be reached from the build environment, so check the definitions against the 2025 glossary. **Infer** is not in the glossary and is marked as a Teaching Hub draft.
-- **Tools:** Question, Suggestion, Reasons, Distinction, Example, Counterexample, Generalisation and Criteria are quoted from Cam (2006) on p9. Analogy, Argument, Counterargument and Implication are drafts.
-- **Values:** Teaching Hub wording after Paul & Elder (2001) and Ellerton (2015).
-- **Steps, examples and models:** drafts built on the handbook pairings where one exists; edit freely.
+- the APS NSW *Introductory Workshop handbook* (2026), including Adam's handwritten notes on the scan;
+- the Notion page "Philosophical Community of Inquiry Workshop" (typed workshop notes);
+- the Notion page "Philosothon 2026 (Facilitator)": Britta Jensen's facilitator procedures and the 2026 Sydney Philosothon marking guide (Centre for Critical Thinking and Ethics, Newington College).
+
+Nothing is drafted, and nothing is taken from NESA, Paul & Elder, Ellerton's wider work or any other source. Where the sources say nothing, the field is left empty for the teacher to fill on the block. Do not fill gaps with outside wording.
+
+What the sources give:
+
+- **Definitions:** Adam's Notion was searched in full (PD pages, notebooks, lessons). Nothing there defines the skills or values. The only definitions are Cam's eight tool definitions (p9): Question, Suggestion, Reasons, Distinction, Example, Counterexample, Generalisation, Criteria. Skills, values, and Analogy, Argument, Counterargument and Implication have no definition, so their cards show the name only. The framework page (p10) lists items without defining them.
+- **Skill–tool pairings:** p9 "Tools in Use", the p9 margin notes (reasons → justifying, distinctions → comparing) and p11 (classify, then divide).
+- **Golden Tetrad:** p12.
+- **Classify steps:** the Notion notes (Classification and Division).
+- **Analogy steps:** the Notion notes ("Is a leader more like a compass or a map?") and the p20 frame.
+- **Distinction:** the p11 procedure and pair bank.
+- **Question:** the p17 Pooh and Piglet converter pairs and the Notion closed/open notes.
+- **Question Quadrant:** p17–19, quoted.
+- **Features of a Concept:** p20–24, quoted.
+- **Reflection:** p4 and p25, the Philosothon closing-reflection procedure, and the marking guide's ten marks of a strong participant.
+- **Community skills:** p12.
+- **Values:** the p10 handwritten "To judge quality of thinking" and "Use for tailored feedback", the p11 question, the p25 question, and the Philosothon marking guide ("relevance, clarity, coherence, precision, significance, accuracy and depth").
+- **Teacher notes:** only these quotes and handwritten notes. There are no invented timings, stems or "I do / We do / You do" steps.
+
+Blocks inserted before this change keep the text they were created with (library text is copied in). Use "Reset to library version" on a section to replace it with the source-only text.
 
 ## Icons
 

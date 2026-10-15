@@ -77,14 +77,9 @@ export function skillContent(itemId: string, prefix: string): ToolkitSkillBlock[
 
 // ─── Tool ───────────────────────────────────────────────────────────────────
 
-function toolWorked(tool: LibraryTool) {
-  if (tool.frame !== 'fork') return { kind: '', marker: '', a: '', b: '' };
-  return {
-    kind: 'places of learning',
-    marker: 'sets work for students',
-    a: 'a school sets work',
-    b: 'a library does not'
-  };
+/** The sources give no worked example; the teacher fills the fork's reveal. */
+function toolWorked(_tool: LibraryTool) {
+  return { kind: '', marker: '', a: '', b: '' };
 }
 
 export function toolContent(itemId: string, prefix: string): ToolkitToolBlock['content'] {
@@ -100,26 +95,8 @@ export function toolContent(itemId: string, prefix: string): ToolkitToolBlock['c
           }
         ].map((pair) => ({ id: tkId(`${prefix}_c`), ...pair }))
       : [];
-  const statements =
-    tool.frame === 'stress'
-      ? [
-          {
-            text: 'Teenagers are always on their phones.',
-            verdict: 'qualifies' as const,
-            reason: 'Many teenagers use phones a lot, but not always. "Many teenagers, much of the time" survives.'
-          },
-          {
-            text: 'All metals are magnetic.',
-            verdict: 'fails' as const,
-            reason: 'Counterexample: copper and aluminium are not magnetic.'
-          },
-          {
-            text: 'Plants need light to grow well.',
-            verdict: 'survives' as const,
-            reason: 'Green plants make their food using light.'
-          }
-        ].map((statement) => ({ id: tkId(`${prefix}_g`), ...statement }))
-      : [];
+  // No stress-test statements in the sources; the teacher adds their own.
+  const statements: ToolkitToolBlock['content']['statements'] = [];
   return {
     item: tool.id,
     label: tool.label,
@@ -129,10 +106,7 @@ export function toolContent(itemId: string, prefix: string): ToolkitToolBlock['c
     sentence: tool.sentence,
     steps: tool.steps.map((step) => ({ id: tkId(`${prefix}_s`), ...step })),
     worked: toolWorked(tool),
-    worked_note:
-      tool.frame === 'fork'
-        ? 'A school and a library are both places of learning, but a school sets work and a library does not.'
-        : '',
+    worked_note: '',
     converters,
     statements,
     pair_level: tool.frame === 'fork' ? 'level1' : 'none',
@@ -223,11 +197,7 @@ export function moveNote(skillId: string, toolIds: readonly string[], valueId: s
   ]
     .filter(Boolean)
     .join('\n');
-  const run = [
-    'Read the move sentence aloud and hold up the cards in order.',
-    ...tools.map((tool, index) => `Step ${index + 1}, ${tool.label}: ${tool.prompt}`),
-    value ? `Check: ask the ${value.label.toLowerCase()} questions of each other's work.` : ''
-  ].filter(Boolean);
+  const run: string[] = [];
   const say = [
     ...(skill?.note.say.slice(0, 1) ?? []),
     ...tools.flatMap((tool) => tool.note.say.slice(0, 1)),
@@ -244,7 +214,7 @@ export function moveNote(skillId: string, toolIds: readonly string[], valueId: s
     watch,
     extra_label: '',
     extra: [],
-    time: `${10 + tools.length * 5} min`,
+    time: '',
     source: 'Built from the library notes for this skill, tools and value',
     edited: false
   };
@@ -253,24 +223,20 @@ export function moveNote(skillId: string, toolIds: readonly string[], valueId: s
 /** The handbook p9 phrase when the pairing matches one listed there. */
 export function moveWhy(skillId: string, toolIds: readonly string[]): string {
   const skill = librarySkill(skillId);
-  const tools = toolIds.map((id) => libraryTool(id)?.label).filter(Boolean);
   if (!skill) return '';
   const pairs: Record<string, string> = {
     'skill:justify|tool:reasons': 'Handbook p9: "Justifying a claim using reasons".',
     'skill:explain|tool:distinction': 'Handbook p9: "Making distinctions to explain".',
-    'skill:classify|tool:distinction': 'Handbook p9 and p11: classifying by making distinctions.',
+    'skill:classify|tool:distinction': 'Handbook p11: "1. Classify: determine the category both belong to. 2. Divide: then ask what makes them differ?"',
     'skill:apply|tool:criteria': 'Handbook p9: "Formulating and applying criteria".',
-    'skill:identify|tool:argument': 'Handbook p9: "Identifying premises / assumptions".',
     'skill:evaluate|tool:argument': 'Handbook p9: "Constructing and evaluating arguments".',
-    'skill:identify|tool:distinction': 'Handbook p9: "Identifying differences of kind / degree".'
+    'skill:compare|tool:distinction': 'Handbook p9, handwritten: distinctions → "comparing".'
   };
   for (const toolId of toolIds) {
     const phrase = pairs[`${skillId}|${toolId}`];
     if (phrase) return phrase;
   }
-  return tools.length
-    ? `${skill.label} needs ${tools.join(', ').toLowerCase()} to make the move visible.`
-    : '';
+  return '';
 }
 
 export function moveContent(
@@ -320,7 +286,7 @@ export const QUADRANT_RESPOND = {
 } as const;
 
 const PROCEDURE_1 = [
-  'Construct two questions for each of the four kinds in the Question Quadrant in relation to your stimulus material. Set them out in no particular order. Write each question separately on a strip of paper.',
+  'Construct two questions for each of the four kinds in the Question Quadrant in relation to your stimulus material. Set them out in no particular order and make sufficient copies to distribute to the class. Write each question separately on a strip of paper for you to use in conducting the activity.',
   'Lay the Question Quadrant out on the floor and explain it to the class.',
   'Divide the students into groups of four and give each group the list of questions, telling them to decide where each question belongs on the Question Quadrant.',
   'Take each question in turn and ask the class, or one or other group, where you should place your strip of paper. Ask students to justify their decision, as appropriate.',
@@ -329,26 +295,28 @@ const PROCEDURE_1 = [
 ];
 
 const PROCEDURE_2 = [
-  'Introduce a stimulus. Divide the class into small groups to construct one question of each kind: (a) a question with a right answer anyone who understood the material should know; (b) one they could not answer without looking it up; (c) one with at least two good answers that need no justifying; (d) one they could not answer without carefully thinking about various possibilities.',
+  'Introduce a stimulus, saying that you are going to divide them into small groups and have them construct one question of each of the following kinds: (a) a question to which there is a right answer and anyone who understood the material should know the answer; (b) a question related to the material that they couldn\'t answer correctly without going to some other source to look up the answer; (c) a question in some way related to the material to which you could give at least two good answers without needing to justify them; (d) a question that the material raises in your mind and which you could not satisfactorily answer without carefully thinking about various possibilities.',
   'Have the groups write out their questions on a strip of paper using markers.',
-  'When everyone is ready, groups take turns to place their questions on the Question Quadrant where they belong, explaining why if necessary.',
+  'When everyone is ready, have groups take turns to place their questions on the Question Quadrant where they belong, explaining why they did so if necessary.',
   'Take the time to discuss uncertainties or disagreements.',
   'End by voting on an inquiry question for subsequent discussion.'
 ];
 
 export function quadrantNote(procedure: 'sort' | 'create'): TkTeacherNote {
   return {
-    what: 'The Question Quadrant sorts questions by what it takes to answer them. Ask: "What do I need to do to respond to this question?" Inquiry questions are where depth lives.',
+    what: 'In order to assist you to tell which kind of question you have, it is useful to ask "What do I need to do to respond to this question?" (p18)',
     run: procedure === 'sort' ? [...PROCEDURE_1] : [...PROCEDURE_2],
-    say: ['What do I need to do to respond to this question?', 'Is that closed or open?', 'How could we open it up?'],
+    say: ['What do I need to do to respond to this question?'],
     watch: [
-      'Emphasise disagreement is OK: a question can sit between two quadrants.',
-      'Train them to shift closed to open; this builds to inquiry questions.'
+      'Emphasise disagreement is OK. (Notion workshop notes)',
+      'Train them to shift closed to open. (Notion workshop notes)',
+      'This builds to inquiry questions. (Handwritten note, p17)',
+      'Inquiry: this is where depth lives. (Notion workshop notes)'
     ],
     extra_label: '',
     extra: [],
-    time: '20–30 min',
-    source: 'APS NSW Introductory Workshop handbook (2026) p17–19; adapted from Cam (2006) 20 Thinking Tools',
+    time: '',
+    source: 'Workshop handbook p17–19; adapted from Cam (2006) 20 Thinking Tools; Notion workshop notes',
     edited: false
   };
 }
@@ -366,7 +334,7 @@ export function quadrantContent(prefix: string): QuestionQuadrantBlock['content'
   ];
   return {
     stimulus:
-      "Pooh and Piglet trudge along a snowy track. Piglet is wrapped in woollens and a scarf; Pooh has nothing on but an old short-sleeved top. Piglet says, 'We'll be friends forever, won't we Pooh?' 'Even longer,' Pooh replies.",
+      "Pooh and Piglet can be seen trudging along a snowy track. The day is clear but the sun is low and it casts a yellowish-orange glow over the scene. Piglet is wrapped in woollens and a scarf, while Pooh has nothing on but an old short-sleeved top that is several sizes too small for him. Piglet says to Pooh touchingly, 'We'll be friends forever, won't we Pooh?' 'Even longer,' Pooh replies.",
     procedure: 'sort',
     questions: questions.map(([text, quadrant]) => ({ id: tkId(`${prefix}_q`), text, quadrant })),
     converters: [
@@ -397,11 +365,6 @@ const BLAME_CARDS = [
   "Pete admitted that he shouldn't have left Tran to face the bullies alone, but it was the only way he could save himself. So was he to blame for deserting Tran?"
 ];
 
-const BLAME_PROMPTS = [
-  'Was it within their control?',
-  'Did they freely choose to act?',
-  'How serious was the result?'
-];
 
 const STEM_CELL_CARDS = [
   'Harvesting adult stem cells for medical purposes',
@@ -435,11 +398,7 @@ export function conceptGame(
       left: 'Less blameworthy',
       middle: '',
       right: 'More blameworthy',
-      cards: BLAME_CARDS.map((text, index) => ({
-        id: tkId(`${prefix}_k`),
-        text,
-        prompt: BLAME_PROMPTS[index % BLAME_PROMPTS.length]!
-      }))
+      cards: BLAME_CARDS.map((text) => ({ id: tkId(`${prefix}_k`), text, prompt: '' }))
     };
   }
   if (kind === 'word_sort') {
@@ -456,11 +415,7 @@ export function conceptGame(
     left: 'Blame',
     middle: '?',
     right: 'Not blame',
-    cards: BLAME_CARDS.map((text, index) => ({
-      id: tkId(`${prefix}_k`),
-      text,
-      prompt: BLAME_PROMPTS[index % BLAME_PROMPTS.length]!
-    }))
+    cards: BLAME_CARDS.map((text) => ({ id: tkId(`${prefix}_k`), text, prompt: '' }))
   };
 }
 
@@ -489,21 +444,29 @@ const DEGREE_PROCEDURE = [
 
 export function conceptNote(kind: 'kind_sort' | 'degree_line' | 'word_sort'): TkTeacherNote {
   return {
-    what: 'Concepts worth exploring are central, contestable and common. Concept games have students sort everyday cases so the criteria they are already using come into view.',
-    run: kind === 'degree_line' ? [...DEGREE_PROCEDURE] : kind === 'word_sort' ? [
-      'Sort the words into those that belong with Free and those that go with Not free. If unsure, place the word under the question mark.',
-      'Ask why each word went where it did.',
-      'Name the criteria the class used.'
-    ] : [...BLAME_PROCEDURE],
-    say: ['What makes you put it there?', 'It depends on what?', 'Can anyone find a counterexample?'],
+    what: [
+      'Simple concept games can be devised by having students work with simple vocabulary or various everyday scenarios in a conceptual framework. (p21)',
+      'This activity is used to explore concepts by helping students to make judgements in simple situations and put forth reasons in order to examine the criteria that are employed in applying them. (p21)'
+    ].join('\n'),
+    run:
+      kind === 'degree_line'
+        ? [...DEGREE_PROCEDURE]
+        : kind === 'word_sort'
+          ? [
+              'Sort out the words below into those that belong with Free and those that go with Not free. If you aren\'t certain about a word, then place it under the question mark. (Cam 2020, p23)'
+            ]
+          : [...BLAME_PROCEDURE],
+    say: [],
     watch: [
-      'Choose situations where students might differ: the full apparatus of judgement needs cases that are discussable.',
-      '"It depends" may be right. Ask what factors it depends on, then why. The answer points toward their criteria.'
+      'While it can be useful to devise a scenario or two where it is clear what we should say, exercising the full apparatus of judgment requires cases that are discussable: situations where students might differ and where careful examination of the circumstances and consideration of reasons is required. (p22)',
+      'Students may respond by saying that "it depends", and they may be right to do so. Ask what additional factors need to be taken into account, then why their decision depends on those factors. The response points toward their criteria for judgment. (p22)',
+      'Ask for counterexamples. (Notion workshop notes)',
+      'Concepts are: central, contestable, available to all. (Handwritten note, p21)'
     ],
-    extra_label: kind === 'degree_line' ? 'Remember' : '',
-    extra: kind === 'degree_line' ? ['Differences of degree are a line, not opposing categories.'] : [],
-    time: '30–45 min',
-    source: 'APS NSW Introductory Workshop handbook (2026) p20–24; Cam (2012, 2020)',
+    extra_label: '',
+    extra: [],
+    time: '',
+    source: 'Workshop handbook p20–24; Cam (2012, 2020); Notion workshop notes',
     edited: false
   };
 }
@@ -526,13 +489,13 @@ export function conceptContent(prefix: string): ConceptFeaturesBlock['content'] 
     })),
     analogy: {
       stem: 'Responsibility is like ___ because they both ___.',
-      example: 'Responsibility is like a backpack because they both get heavier the more you carry.'
+      example: ''
     },
     game: conceptGame('kind_sort', prefix),
     criteria: [
-      'Whether the person is in control of the event.',
-      'Whether the person freely chooses to act (they could have acted otherwise).',
-      'How serious or significant the result is.'
+      'Whether the person is in control of the event',
+      "Whether the person freely chooses to act (it's a decision and the person could have acted otherwise)",
+      'How serious / important / significant the result or impact is'
     ],
     teacher_note: conceptNote('kind_sort'),
     teacher_jots: {}
@@ -543,22 +506,34 @@ export function conceptContent(prefix: string): ConceptFeaturesBlock['content'] 
 
 export function reflectionNote(): TkTeacherNote {
   return {
-    what: 'The closing reflection looks back on progress (the thinking) and process (how we worked together). Read back the lesson\'s thinking and collaborative intentions.',
+    what: 'A closing activity normally involves either joint or individual student reflection on what was learnt in terms of the content of the lesson and/or its skill base. This may include such things as verbal or written responses to target questions, entries in reflection log books, or completion of student performance self evaluation sheets. Having students reflect upon their learning and evaluate their own progress should be seen as contributing to their ability to become responsible and self-directed learners. (p4)',
     run: [
-      'Return to the intentions set at the start.',
-      'Ask the progress questions; point to the tool and value chips.',
-      'Ask the process question; point to the community skills.',
-      'Students write one sentence for each box in their books.'
+      'With five minutes remaining, stop the discussion and move systematically around the circle so each student can make a final reflective comment. (Philosothon facilitator procedures)',
+      'Invite students to explain whether their view changed, summarise their position, identify remaining questions or evaluate where the discussion progressed well or poorly. (Philosothon facilitator procedures)'
     ],
-    say: ['What thinking tools did we use today?', 'Were our contributions clear, relevant, precise?'],
+    say: [],
     watch: [
-      'Progress markers: increased tolerance of unanswered intellectual work; questions get paired with suggestions.',
-      'Questions that have answers are too binary. The progress is the quality of thinking, the way and tools of the discussion.'
+      'Progress: increased tolerance of unanswered intellectual work. (Handwritten note, p4)',
+      'Questions get paired with suggestions. (Handwritten note, p4)',
+      'Questions that have answers are too binary. (Handwritten note, p4)',
+      'The "progress" is the quality of thinking, the way and tools of the discussion. (Handwritten note, p4)',
+      'Build in written reflection. (Notion workshop notes)'
     ],
-    extra_label: '',
-    extra: [],
-    time: '5–10 min',
-    source: 'APS NSW Introductory Workshop handbook (2026) p4, p25',
+    extra_label: 'Strong participants (Philosothon 2026 marking guide)',
+    extra: [
+      'Build on the ideas of others.',
+      'Allow others to speak.',
+      "Acknowledge others' positions.",
+      "Seek clarification and a better understanding of others' ideas.",
+      'Offer useful insights to the group.',
+      'Recognise problematic areas and offer solutions.',
+      'Identify key issues.',
+      'Make progress while working with uncertainty.',
+      'Avoid clichéd, formulaic or memorised interactions.',
+      'Keep their contributions focused and concise.'
+    ],
+    time: '',
+    source: 'Workshop handbook p4, p25; Notion workshop notes; Sydney Philosothon 2026 marking guide and facilitator procedures (Centre for Critical Thinking and Ethics, Newington College)',
     edited: false
   };
 }
