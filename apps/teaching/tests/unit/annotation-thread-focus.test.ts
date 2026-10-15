@@ -73,6 +73,27 @@ describe('annotation thread focus (3b)', () => {
     el.remove();
   });
 
+  it('shows the teacher thread title on the button and the card', () => {
+    mockViewport(1440);
+    const fixture = structuredClone(threadFocusFixture);
+    const motif = fixture.content.annotations.find((a) => a.id === 'ann_motif')!;
+    motif.thread = { ...(motif.thread ?? { order: 'text' }), title: 'Broken bodies' };
+    const el = renderAnnotationBlock(fixture, 'student');
+    document.body.append(el);
+
+    const chip = el.querySelector<HTMLButtonElement>('[data-thread-id="ann_motif"]')!;
+    expect(chip.textContent).toContain('Broken bodies');
+    // Not styled as a layer toggle.
+    expect(chip.classList.contains('block-annotation__chip')).toBe(false);
+    expect(chip.querySelector('.block-annotation__thread-glyph')).toBeTruthy();
+    chip.click();
+    const title = el.querySelector<HTMLElement>('.block-annotation__focus-title')!;
+    expect(title.hidden).toBe(false);
+    expect(title.textContent).toBe('Broken bodies');
+
+    el.remove();
+  });
+
   it('stays on the thread across a layer tick (V7)', () => {
     mockViewport(1440);
     const fixture = structuredClone(threadFocusFixture);

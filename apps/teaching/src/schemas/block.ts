@@ -881,6 +881,8 @@ export const AnnotationThreadKindSchema = z.enum([
 ]);
 
 export const AnnotationThreadSchema = z.object({
+  /** What links the places, in a few words; shown on the thread button. */
+  title: z.string().trim().max(80).optional(),
   kind: AnnotationThreadKindSchema.optional(),
   order: z.enum(['text', 'custom']).default('text'),
   anchor_order: z.array(z.string().min(1)).optional()

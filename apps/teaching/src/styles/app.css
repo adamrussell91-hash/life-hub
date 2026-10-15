@@ -10853,22 +10853,64 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 .block-annotation__thread-chip,
 .block-annotation__thread-pick {
+  --thread-c: var(--wave);
   flex: 0 0 auto;
   min-height: 2.75rem;
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-3) 0 var(--space-2);
   border: 1px solid var(--line);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--wave) 14%, var(--paper, #fff));
+  border-left: 4px solid var(--thread-c);
+  border-radius: var(--radius-sm, 0.35rem);
+  background: var(--paper, #fff);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   white-space: nowrap;
   cursor: pointer;
 }
 
+.block-annotation__thread-glyph {
+  flex: 0 0 auto;
+  width: 0.75rem;
+  height: 1.25rem;
+  fill: var(--thread-c);
+  stroke: var(--thread-c);
+  stroke-width: 1.5;
+}
+
+.block-annotation__thread-chip-name {
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .block-annotation__thread-chip.is-focused,
 .block-annotation__thread-chip[aria-pressed='true'] {
-  outline: 2px solid var(--wave);
-  outline-offset: 1px;
+  background: color-mix(in srgb, var(--thread-c) 12%, var(--paper, #fff));
+  border-color: var(--thread-c);
+}
+
+.block-annotation__thread-chip--wave { --thread-c: var(--wave); }
+.block-annotation__thread-chip--sand { --thread-c: var(--sand); }
+.block-annotation__thread-chip--high-sea { --thread-c: var(--high-sea); }
+.block-annotation__thread-chip--shore { --thread-c: var(--shore); }
+.block-annotation__thread-chip--marine { --thread-c: var(--marine); }
+.block-annotation__thread-chip--navy { --thread-c: var(--navy, #1b2a4a); }
+.block-annotation__thread-chip--coral { --thread-c: var(--coral, #c96b4a); }
+.block-annotation__thread-chip--mist { --thread-c: var(--mist, #9aa4b2); }
+
+.block-annotation__focus-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.block-annotation__focus-title[hidden] {
+  display: none;
+}
+
+.block-editor__annotation-thread-title {
+  display: grid;
+  gap: var(--space-1);
 }
 
 .block-annotation__focus-bar {

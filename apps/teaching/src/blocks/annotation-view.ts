@@ -1035,6 +1035,11 @@ function buildInteractiveView(
         ? `Following a thread · ${focusLayer.name} · ${placesLabel(focusStops.length)}`
         : `Following a thread · ${placesLabel(focusStops.length)}`;
 
+      const heading = document.createElement('p');
+      heading.className = 'block-annotation__focus-title';
+      heading.textContent = focusAnn.thread?.title?.trim() ?? '';
+      heading.hidden = !heading.textContent;
+
       const body = document.createElement('div');
       body.className = 'block-annotation__body block-annotation__focus-note';
       body.innerHTML = sanitizeRichTextHtml(focusAnn.body.html);
@@ -1067,7 +1072,7 @@ function buildInteractiveView(
       });
       nav.append(showAll);
 
-      focusBar.append(eyebrow, body, hint);
+      focusBar.append(eyebrow, heading, body, hint);
       if (stepping && stepIndex != null) {
         const caption = document.createElement('div');
         caption.className = 'block-annotation__step-caption';
