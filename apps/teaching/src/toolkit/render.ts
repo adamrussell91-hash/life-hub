@@ -333,12 +333,14 @@ function renderSkill(block: ToolkitSkillBlock, mode: TkRenderMode, ctx: TkRender
   const c = block.content;
   const wrap = root(block.block_type);
   wrap.append(eyebrow('Skill'), itemCard('skill', c.label, c.definition));
-  appendIf(wrap, guideLine(c.guide));
   if (c.context.trim()) {
-    const context = el('p', 'tk-context');
-    context.append(el('span', 'tk-context__label', 'Question'), document.createTextNode(c.context));
-    wrap.append(context);
+    const question = el('div', 'tk-question');
+    const text = el('div', 'tk-question__body');
+    text.append(el('span', 'tk-question__label', 'Question'), el('p', 'tk-question__text', c.context));
+    question.append(el('span', 'tk-question__mark', '?'), text);
+    wrap.append(question);
   }
+  appendIf(wrap, guideLine(c.guide));
   const steps = c.steps.map((step) => ({ title: step.title, prompt: step.prompt }));
   const list = stepList(steps);
   if (c.show_test && c.checks.some((line) => line.trim())) {
