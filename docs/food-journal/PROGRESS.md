@@ -9,7 +9,7 @@ The exact individual phase descriptions were unavailable in the prior chat retri
 - [x] Phase 3. EXIF before compression, HEIC lazy decoding, private R2 signing, photo batching, dish association including shared platter photos, venue suggestions, editable menu OCR text.
 - [x] Phase 4. Custom Menu search and shared meal/cuisine/indicator/rating filters, with Recipe and Restaurant after choosing a dish.
 - [x] Phase 5. Background recipe research, ten verified candidates, three shortlisted sources, explicit recipe review/save, existing cooking cards, editable ingredient/step lists and portions.
-- [x] Phase 6. Day One JSON review and selection, complete text and source identity, location/tags/date retention, photo matching and duplicate protection. Bulk path: default select-all, one Import click, photos optional; CLI `npm run import:dayone-food` for agent/offline text-only import.
+- [x] Phase 6. Day One JSON review and selection, complete text and source identity, location/tags/date retention, photo matching and duplicate protection. Bulk path: default select-all, one Import click, photos optional; CLI `npm run import:dayone-food` for agent/offline text-only import. Large photo exports: Mac CLI `npm run import:dayone-photos` — see `docs/food-journal/photo-import-cli.md`.
 - [x] Phase 7. Private photo backup/restore, source reservation after deletion, persisted visit drafts, failure/conflict recovery, sign out cleanup and service worker update.
 
 ## Visual review against specification
