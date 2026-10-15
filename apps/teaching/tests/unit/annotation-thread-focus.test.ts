@@ -43,7 +43,34 @@ describe('annotation thread focus (3b)', () => {
     );
     expect(el.querySelector('[data-line-id="line_1"]')).toBeTruthy();
     expect(el.querySelector('[data-line-id="line_2"]')).toBeNull();
-    expect(el.querySelector('.block-annotation__arcs')).toBeTruthy();
+    // No unexplained arc drawing; numbered pips mark each place instead.
+    expect(el.querySelector('.block-annotation__arcs')).toBeNull();
+    expect(el.querySelectorAll('.block-annotation__pip').length).toBe(5);
+
+    el.remove();
+  });
+
+  it('explains threads and says what the followed thread is', () => {
+    mockViewport(1440);
+    const fixture = structuredClone(threadFocusFixture);
+    const el = renderAnnotationBlock(fixture, 'student');
+    document.body.append(el);
+
+    const intro = el.querySelector<HTMLElement>('.block-annotation__threads-intro')!;
+    expect(intro.hidden).toBe(false);
+    expect(intro.textContent).toContain('follow one idea through several places');
+    const chip = el.querySelector<HTMLButtonElement>('[data-thread-id="ann_motif"]')!;
+    expect(chip.textContent).toContain('5 places');
+
+    chip.click();
+    const card = el.querySelector<HTMLElement>('.block-annotation__focus-bar')!;
+    expect(card.hidden).toBe(false);
+    expect(card.textContent).toContain('Following a thread');
+    expect(card.textContent).toContain('5 places');
+    expect(card.textContent).toContain('Exhaustion motif');
+    expect(el.querySelector('.block-annotation__thread-menu')).toBeNull();
+    expect(el.textContent).not.toContain('line of context');
+    expect(el.querySelector<HTMLElement>('.block-annotation__threads-intro')!.hidden).toBe(true);
 
     el.remove();
   });
@@ -82,11 +109,8 @@ describe('annotation thread focus (3b)', () => {
     document.body.append(el);
 
     el.querySelector<HTMLButtonElement>('[data-thread-id="ann_motif"]')!.click();
-    const stepToggle = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__thread-menu-item')].find(
-      (btn) => btn.textContent === 'Step through'
-    )!;
-    stepToggle.click();
-    expect(el.textContent).toContain('Stop 1 of 5');
+    el.querySelector<HTMLButtonElement>('.block-annotation__step-btn[data-step="next"]')!.click();
+    expect(el.textContent).toContain('Place 1 of 5');
     expect(el.textContent).toContain('Opening posture');
 
     const block = el.querySelector<HTMLElement>('.block-annotation')!;
@@ -95,7 +119,7 @@ describe('annotation thread focus (3b)', () => {
       new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })
     );
     expect(block.dataset.stepIndex).toBe('1');
-    expect(el.textContent).toContain('Stop 2 of 5');
+    expect(el.textContent).toContain('Place 2 of 5');
     expect(el.textContent).toContain('Turning away from light');
 
     block.dispatchEvent(

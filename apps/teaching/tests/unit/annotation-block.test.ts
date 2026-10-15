@@ -196,6 +196,17 @@ describe('annotation render + sanitise', () => {
     const panel = el.querySelector<HTMLElement>('.block-annotation__panel')!;
     expect(panel.hidden).toBe(false);
     expect(panel.textContent).toContain('Opening quatrain');
+    // The note sits right under its stanza and says what it is attached to.
+    expect(panel.previousElementSibling?.classList.contains('block-annotation__stanza')).toBe(true);
+    expect(panel.textContent).toContain('Note on this stanza');
+  });
+
+  it('a key explains what boxes, underlines and brackets mean', () => {
+    const el = renderAnnotationBlock(dulceAnnotationFixture, 'teacher');
+    const key = el.querySelector<HTMLElement>('.block-annotation__key')!;
+    expect(key.hidden).toBe(false);
+    expect(key.textContent).toContain('Box = one word');
+    expect(key.textContent).toContain('Tall bracket = a whole stanza');
   });
 
   it('phone reads a plain note from the sheet, because the handwriting is hidden', () => {

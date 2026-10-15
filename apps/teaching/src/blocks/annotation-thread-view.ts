@@ -5,12 +5,10 @@ import {
   type AnnotationLayerState
 } from '@/blocks/annotation-layers';
 import {
-  arcLanes,
   foldRows,
   lineNumbers,
   threadStops,
   threadsOf,
-  type ArcSpan,
   type FoldRow,
   type ThreadStop
 } from '@/blocks/annotation-thread';
@@ -35,7 +33,11 @@ export function threadShortTitle(annotation: AnnotationItem): string {
     .replace(/\s+/g, ' ')
     .trim();
   if (!plain) return 'Thread';
-  return plain.length > 28 ? `${plain.slice(0, 27)}…` : plain;
+  return plain.length > 40 ? `${plain.slice(0, 39)}…` : plain;
+}
+
+export function placesLabel(count: number): string {
+  return count === 1 ? '1 place' : `${count} places`;
 }
 
 /** Threads whose layer is currently revealed and not suppressed. */
@@ -75,17 +77,6 @@ function lineIdsForStops(
   return lineIds;
 }
 
-function lineNumberForStop(
-  content: AnnotationContent,
-  stop: ThreadStop,
-  numbers: Map<string, number>
-): number | undefined {
-  if (stop.resolved.lineId) return numbers.get(stop.resolved.lineId);
-  const stanza = content.text.stanzas.find((s) => s.id === stop.resolved.stanzaId);
-  const first = stanza?.lines[0]?.id;
-  return first ? numbers.get(first) : undefined;
-}
-
 export function foldRowsForThread(
   content: AnnotationContent,
   annotation: AnnotationItem,
@@ -96,25 +87,6 @@ export function foldRowsForThread(
     context: state.context,
     expanded: state.expandedFolds
   });
-}
-
-export function threadArcSpans(
-  content: AnnotationContent,
-  annotation: AnnotationItem
-): ArcSpan[] {
-  const numbers = lineNumbers(content.text);
-  const lineNums = resolvedThreadStops(content, annotation)
-    .map((stop) => lineNumberForStop(content, stop, numbers))
-    .filter((n): n is number => typeof n === 'number');
-  if (lineNums.length < 2) return [];
-  return [{ id: annotation.id, start: Math.min(...lineNums), end: Math.max(...lineNums) }];
-}
-
-export function lanesForVisibleThreads(
-  content: AnnotationContent,
-  threads: AnnotationItem[]
-): Map<string, number> {
-  return arcLanes(threads.flatMap((ann) => threadArcSpans(content, ann)));
 }
 
 export function isNarrowAnnotationViewport(): boolean {
@@ -135,8 +107,16 @@ export function buildThreadChip(
   chip.dataset.threadId = annotation.id;
   chip.setAttribute('aria-pressed', focused ? 'true' : 'false');
   const short = threadShortTitle(annotation);
-  chip.title = `${short} · ${stopCount} stops`;
-  chip.textContent = `${short} · ${stopCount}`;
+  chip.title = focused
+    ? 'Stop following this thread'
+    : `Follow this thread through ${placesLabel(stopCount)} in the text`;
+  const name = document.createElement('span');
+  name.className = 'block-annotation__thread-chip-name';
+  name.textContent = short;
+  const count = document.createElement('span');
+  count.className = 'block-annotation__thread-chip-count';
+  count.textContent = placesLabel(stopCount);
+  chip.append(name, count);
   chip.addEventListener('click', onSelect);
   return chip;
 }
@@ -155,83 +135,12 @@ export function buildFoldButton(
     ? `Hide ${fold.count} lines`
     : `Show ${fold.count} hidden lines`;
   btn.setAttribute('aria-label', label);
-  btn.textContent = expanded ? `▾ ${fold.count} lines` : `⋯ ${fold.count} lines`;
+  const lines = fold.count === 1 ? '1 line' : `${fold.count} lines`;
+  btn.textContent = expanded
+    ? `Hide ${lines} again`
+    : `⋯ ${lines} not part of this thread (show)`;
   btn.addEventListener('click', onToggle);
   return btn;
-}
-
-export function buildArcSvg(
-  content: AnnotationContent,
-  threads: AnnotationItem[],
-  layerById: (id: string) => AnnotationLayer | undefined,
-  focusedId: string | null
-): SVGSVGElement | null {
-  const numbers = lineNumbers(content.text);
-  const totalLines = [...numbers.values()].reduce((max, n) => Math.max(max, n), 0);
-  if (totalLines === 0 || threads.length === 0) return null;
-
-  const lanes = lanesForVisibleThreads(content, threads);
-  const laneCount = Math.max(1, new Set(lanes.values()).size);
-  const width = 12 + laneCount * 14;
-  const lineH = 1.55 * 16; // matches ~text-base line-height
-  const height = totalLines * lineH;
-
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'block-annotation__arcs');
-  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-  svg.setAttribute('width', String(width));
-  svg.setAttribute('aria-hidden', 'true');
-  svg.style.height = `${height}px`;
-
-  for (const ann of threads) {
-    const stops = resolvedThreadStops(content, ann);
-    if (stops.length === 0) continue;
-    const lane = lanes.get(ann.id) ?? 0;
-    const x = 8 + lane * 14;
-    const colourVar = `--${layerById(ann.layer_id)?.colour ?? 'wave'}`;
-    const focused = focusedId === ann.id;
-
-    const points = stops
-      .map((stop, index) => {
-        const num = lineNumberForStop(content, stop, numbers);
-        if (num == null) return null;
-        return { x, y: (num - 0.5) * lineH, index };
-      })
-      .filter((p): p is { x: number; y: number; index: number } => p != null);
-
-    for (let i = 0; i < points.length - 1; i += 1) {
-      const a = points[i]!;
-      const b = points[i + 1]!;
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute(
-        'd',
-        `M ${a.x} ${a.y} Q ${x + 10} ${(a.y + b.y) / 2} ${b.x} ${b.y}`
-      );
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', `var(${colourVar})`);
-      path.setAttribute('stroke-width', focused ? '2' : '1.25');
-      path.setAttribute('opacity', focused ? '0.95' : '0.55');
-      svg.append(path);
-    }
-
-    for (const point of points) {
-      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('cx', String(point.x));
-      circle.setAttribute('cy', String(point.y));
-      circle.setAttribute('r', focused ? '5' : '4');
-      circle.setAttribute('fill', `var(${colourVar})`);
-      svg.append(circle);
-      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      label.setAttribute('x', String(point.x));
-      label.setAttribute('y', String(point.y + 3));
-      label.setAttribute('text-anchor', 'middle');
-      label.setAttribute('class', 'block-annotation__arc-num');
-      label.textContent = String(point.index + 1);
-      svg.append(label);
-    }
-  }
-
-  return svg;
 }
 
 export function buildStopPip(
@@ -243,7 +152,8 @@ export function buildStopPip(
   pip.type = 'button';
   pip.className = `block-annotation__pip block-annotation__pip--${colour ?? 'wave'}`;
   pip.textContent = String(stopIndex + 1);
-  pip.setAttribute('aria-label', `Thread stop ${stopIndex + 1}`);
+  pip.setAttribute('aria-label', `Thread place ${stopIndex + 1}`);
+  pip.title = `Place ${stopIndex + 1} in this thread`;
   pip.addEventListener('click', onClick);
   return pip;
 }
@@ -259,14 +169,13 @@ export function fillStepCaption(
   if (!stop) return;
   const meta = document.createElement('p');
   meta.className = 'block-annotation__step-meta';
-  meta.textContent = `Stop ${stepIndex + 1} of ${stops.length}`;
+  meta.textContent = `Place ${stepIndex + 1} of ${stops.length}`;
   host.append(meta);
+  // The thread's main note is already on the card; only add what this place says.
+  const html = stop.note_html?.trim();
+  if (!html) return;
   const body = document.createElement('div');
   body.className = 'block-annotation__body';
-  const html =
-    stop.note_html?.trim() ||
-    (stop.isPrimary ? annotation.body.html : '') ||
-    annotation.body.html;
   body.innerHTML = sanitizeRichTextHtml(html);
   host.append(body);
 }
