@@ -51,7 +51,7 @@ import {
   type LaidTrackFork
 } from '@/domain/maps-layout';
 import { mapsOrSeed } from '@/views/maps';
-import { layoutMap, renderTransitSvg, TM_LANE_GAP, TM_PILL_W, TM_RAIL_OUT, TM_TRACK_GAP } from '@/domain/maps-transit';
+import { layoutMap, renderTransitSvg, TM_LANE_GAP, TM_PILL_W, TM_RAIL_OUT, TM_STOP_R, TM_TRACK_GAP } from '@/domain/maps-transit';
 
 function datedProgram(
   id: string,
@@ -801,6 +801,75 @@ describe('screenshot regressions (Expression gallery, Reasoning olympiad)', () =
     expect(a.platform!.y0).toBeLessThan(a.y);
     expect(a.platform!.y1).toBeGreaterThan(b.y);
     expect(renderTransitSvg(layout).match(/class="tm-platform"/g)).toHaveLength(1);
+  });
+
+  it('runs each concurrent program off the year line on its own rail, not off its neighbour’s', () => {
+    const base = mindWorks2026Map();
+    const map = {
+      ...base,
+      stations: [
+        program('st_pop', 'line_reasoning', 'The Philosophy of Power', '2026-03-02', '2026-04-24', 'senior'),
+        program('st_psy', 'line_reasoning', 'PSYOPS', '2026-03-02', '2026-04-24', 'senior')
+      ],
+      ticks: []
+    };
+    const layout = layoutMap(map);
+    const senior = layout.draw.tracks.find((track) => track.lineId === 'line_reasoning' && track.trackId === 'senior')!;
+    const lineX = senior.top.x;
+    const pill = layout.stations.find((station) => station.id === 'st_pop')!.bodies[0]!;
+    expect(pill.x - lineX).toBeCloseTo(TM_RAIL_OUT, 5);
+    const [inner, outer] = [...senior.lanes].sort((a, b) => a[1]!.x - b[1]!.x);
+    // Both rails leave the year line itself, the inner one later (closer to its pill) and rejoin earlier.
+    expect(inner![0]!.x).toBeCloseTo(lineX, 5);
+    expect(outer![0]!.x).toBeCloseTo(lineX, 5);
+    expect(inner![0]!.y).toBeGreaterThan(outer![0]!.y + 10);
+    expect(inner![inner!.length - 1]!.y).toBeLessThan(outer![outer!.length - 1]!.y - 10);
+    // The inner rail reaches its pill without a long stub hanging off the outer rail's bend.
+    expect(pill.y - inner![1]!.y).toBeLessThan(10);
+  });
+
+  it('keeps a same-week stop visible beside a cross-strand interchange, names apart', () => {
+    const base = mindWorks2026Map();
+    const at = { kind: 'line', line_id: 'line_reasoning', y: 200, tracks: ['senior'] } as const;
+    const map = {
+      ...base,
+      stations: [],
+      ticks: [
+        comp('tk_seo3', 'Senior Ethics Olympiad', at, '2026-05-27'),
+        comp('tk_ee3', 'Ethical Explorations', at, '2026-05-27'),
+        {
+          ...comp('tk_locke3', 'John Locke Essay Competition', { kind: 'line', line_id: 'line_justice', y: 200, tracks: ['senior'] }, '2026-05-31'),
+          also_lines: ['line_innovation', 'line_expression', 'line_reasoning']
+        }
+      ]
+    };
+    const layout = layoutMap(map);
+    const ee = layout.draw.stops.find((stop) => stop.tickId === 'tk_ee3')!;
+    const seo = layout.draw.stops.find((stop) => stop.tickId === 'tk_seo3')!;
+    const locke = layout.draw.stops.find((stop) => stop.tickId === 'tk_locke3')!;
+    // No interchange stop sits on the platform or on either event's dot.
+    for (const dot of locke.cross!.railDots) {
+      for (const other of [ee, seo]) {
+        if (Math.abs(other.dots[0]!.x - dot.x) > 1) continue;
+        expect(Math.abs(other.dots[0]!.y - dot.y)).toBeGreaterThan(TM_STOP_R * 2);
+        expect(dot.y < other.platform!.y0 || dot.y > other.platform!.y1).toBe(true);
+      }
+    }
+    // Ethical Explorations keeps its name beside its own dot.
+    expect(ee.labelY).toBeCloseTo(ee.y, 5);
+    // The interchange name sits clear of both event names.
+    const box = (stop: typeof ee) => {
+      const x0 = stop.anchor === 'start' ? stop.labelX : stop.labelX - stop.w;
+      const y0 = stop.labelY - 12;
+      return { x0, x1: x0 + stop.w, y0, y1: y0 + stop.h };
+    };
+    const lb = box(locke);
+    for (const other of [ee, seo]) {
+      const ob = box(other);
+      const apart = lb.x1 <= ob.x0 || ob.x1 <= lb.x0 || lb.y1 <= ob.y0 || ob.y1 <= lb.y0;
+      expect(apart).toBe(true);
+    }
+    expect(locke.dots[0]!.x).toBeGreaterThan(Math.max(box(ee).x1, box(seo).x1));
   });
 
   it('runs a program on a rail joined to its year line top and bottom, keeping line stops on the line', () => {
