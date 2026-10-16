@@ -101,7 +101,7 @@ Contested nodes: dashed outline and a speech-bubble badge; tap for the objection
 | Page | `apps/tasks/src/views/problem-solver/*.ts` | Session list, coach panel, canvas host, record. Nav entry in `apps/tasks/src/shell/shell.ts` Tools section. |
 | Link chips | Tasks task/project/goal views | A "Problem Solver" chip on linked items that opens the session. |
 
-The server must validate nodes with the same rules the client uses. The tool definitions and `machine.ts` are therefore written as plain JavaScript modules with JSDoc types (`machine.mjs`, `tools/*.mjs`), importable by Netlify functions and by the Vite apps, the same way `apps/life/js/core/constraints.js` is shared today. Renderers stay TypeScript.
+The server must validate nodes with the same rules the client uses. The tool definitions and state machine are therefore written as plain JavaScript modules with JSDoc types (`machine.mjs`, `tools/*.mjs`), importable by Netlify functions and by the Vite apps, the same way `apps/life/js/core/constraints.js` is shared today. Renderers stay TypeScript.
 
 ### Data model
 
