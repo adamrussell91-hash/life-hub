@@ -15,8 +15,10 @@ import {
   withCors
 } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
+import { isVoiceUploadId, MAX_VOICE_PARTS, voicePartKey } from './annotation-voice-part.mjs';
 import {
   aiJobKey,
+  deleteKey,
   mediaFileKey,
   mediaKey,
   newId,
@@ -34,6 +36,8 @@ export const config = { path: '/api/annotation/voice/transcribe' };
 
 export const ANNOTATION_VOICE_TRANSCRIBE_KIND = 'annotation_voice_transcribe';
 export const MAX_VOICE_TRANSCRIBE_BYTES = Math.min(MAX_MEDIA_BYTES, 8 * 1024 * 1024);
+/** Joined from parts: about two hours of speech at 64 kbps. */
+export const MAX_VOICE_ASSEMBLED_BYTES = 120 * 1024 * 1024;
 
 const VOICE_MIME = new Set(['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/mpeg', 'audio/wav']);
 
@@ -70,43 +74,74 @@ export function createAnnotationVoiceTranscribeHandler(deps = {}) {
       return withCors(methodNotAllowed('POST, OPTIONS'), request, env);
     }
 
+    const bad = (message) =>
+      withCors(errorResponse(400, 'validation_error', message, false), request, env);
+    const isJson = (request.headers.get('content-type') || '').includes('application/json');
+
+    // Long recordings arrive as parts (see annotation-voice-part.mjs) and are joined here.
     let form;
-    try {
-      form = await request.formData();
-    } catch {
-      return withCors(
-        errorResponse(400, 'validation_error', 'Request body must be multipart form data', false),
-        request,
-        env
-      );
-    }
-
-    const fileEntry = form.get('file');
-    if (!(fileEntry instanceof File)) {
-      return withCors(errorResponse(400, 'validation_error', 'file is required', false), request, env);
-    }
-
-    const mime = (fileEntry.type || '').trim();
-    if (!mime || !ALLOWED_MEDIA_MIME.has(mime) || !VOICE_MIME.has(mime)) {
-      return withCors(errorResponse(400, 'validation_error', 'File MIME type is not allowed', false), request, env);
-    }
-    if (fileEntry.size > MAX_VOICE_TRANSCRIBE_BYTES) {
-      return withCors(
-        errorResponse(
-          400,
-          'validation_error',
-          `File exceeds maximum size of ${MAX_VOICE_TRANSCRIBE_BYTES} bytes`,
-          false
-        ),
-        request,
-        env
-      );
+    let bytes;
+    let mime;
+    let fileName;
+    let partKeys = [];
+    if (isJson) {
+      const body = await request.json().catch(() => null);
+      const uploadId = body?.upload_id;
+      const parts = Number(body?.parts);
+      mime = String(body?.mime ?? '').split(';')[0].trim();
+      if (!isVoiceUploadId(uploadId)) return bad('upload_id is invalid');
+      if (!Number.isInteger(parts) || parts < 1 || parts > MAX_VOICE_PARTS) return bad('parts is invalid');
+      if (!mime || !ALLOWED_MEDIA_MIME.has(mime) || !VOICE_MIME.has(mime)) return bad('File MIME type is not allowed');
+      const chunks = [];
+      let total = 0;
+      for (let i = 0; i < parts; i += 1) {
+        const key = voicePartKey(uploadId, i);
+        // Each part was written by an earlier request: read it strongly.
+        const entry = await store.getWithMetadata?.(key, { type: 'arrayBuffer', consistency: 'strong' });
+        if (!entry?.data) {
+          return withCors(
+            errorResponse(409, 'missing_part', `Part ${i + 1} of ${parts} has not arrived. Send it again.`, true),
+            request,
+            env
+          );
+        }
+        total += entry.data.byteLength;
+        if (total > MAX_VOICE_ASSEMBLED_BYTES) return bad('Recording is too large');
+        chunks.push(new Uint8Array(entry.data));
+        partKeys.push(key);
+      }
+      const joined = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        joined.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      bytes = joined.buffer;
+      fileName = `${uploadId}`;
+      form = new Map(Object.entries(body ?? {}).map(([k, v]) => [k, v == null ? v : String(v)]));
+    } else {
+      try {
+        form = await request.formData();
+      } catch {
+        return bad('Request body must be multipart form data');
+      }
+      const fileEntry = form.get('file');
+      if (!(fileEntry instanceof File)) return bad('file is required');
+      mime = (fileEntry.type || '').trim();
+      if (!mime || !ALLOWED_MEDIA_MIME.has(mime) || !VOICE_MIME.has(mime)) {
+        return bad('File MIME type is not allowed');
+      }
+      if (fileEntry.size > MAX_VOICE_TRANSCRIBE_BYTES) {
+        return bad(`File exceeds maximum size of ${MAX_VOICE_TRANSCRIBE_BYTES} bytes`);
+      }
+      bytes = await fileEntry.arrayBuffer();
+      fileName = fileEntry.name.trim();
     }
 
     const titleField = form.get('title');
     const title = (typeof titleField === 'string' && titleField.trim()
       ? titleField.trim()
-      : fileEntry.name.trim()) || 'Voice recording';
+      : fileName) || 'Voice recording';
 
     const trackIdField = form.get('track_id');
     const track_id = typeof trackIdField === 'string' && trackIdField.trim()
@@ -121,7 +156,6 @@ export function createAnnotationVoiceTranscribeHandler(deps = {}) {
       ? Number(durationField)
       : undefined;
 
-    const bytes = await fileEntry.arrayBuffer();
     const mediaId = newId('media');
     const fileUrl = new URL(`/api/media/${mediaId}/file`, request.url).href;
     const timestamp = new Date().toISOString();
@@ -134,7 +168,7 @@ export function createAnnotationVoiceTranscribeHandler(deps = {}) {
       provider: 'direct',
       media_type: mediaTypeFromMime(mime),
       mime_type: mime,
-      file_name: fileEntry.name || undefined,
+      file_name: fileName || undefined,
       preview_url: fileUrl,
       download_url: fileUrl,
       sharing: 'public_link',
@@ -145,6 +179,9 @@ export function createAnnotationVoiceTranscribeHandler(deps = {}) {
 
     await setBytes(store, mediaFileKey(mediaId), bytes, mime);
     await setJSON(store, mediaKey(mediaId), record);
+    for (const key of partKeys) {
+      await deleteKey(store, key).catch(() => undefined);
+    }
 
     const jobId = newId('ai_job');
     const job = {

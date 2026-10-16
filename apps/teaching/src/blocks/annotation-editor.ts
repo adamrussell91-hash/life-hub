@@ -41,6 +41,7 @@ import { isHttpUrl } from '@/blocks/url-safety';
 import { parseStartTime, parseVideoInput } from '@/blocks/video-url';
 import { visitBlocks } from '@/blocks/walk-blocks';
 import { askConfirmCard, askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
+import { listVoiceDrafts } from '@/blocks/voice-draft-store';
 import {
   mountVoiceRecorder,
   type VoiceRecorderHandle
@@ -817,6 +818,20 @@ export function createAnnotationEditorFields(
     recordBtn.addEventListener('click', () => openVoiceRecorder());
     toolbar.append(label, recordBtn);
     voiceTracksHost.append(toolbar);
+
+    // A recording that never reached the block is still on this device: say so up front.
+    void listVoiceDrafts().then((drafts) => {
+      if (drafts.length === 0 || toolbar.querySelector('.block-editor__annotation-voice-unsaved')) return;
+      const unsaved = document.createElement('button');
+      unsaved.type = 'button';
+      unsaved.className = 'btn btn--secondary block-editor__annotation-voice-unsaved';
+      unsaved.textContent =
+        drafts.length === 1
+          ? '1 unsaved recording on this device: open to upload or download'
+          : `${drafts.length} unsaved recordings on this device: open to upload or download`;
+      unsaved.addEventListener('click', () => openVoiceRecorder());
+      toolbar.append(unsaved);
+    });
 
     if (voiceTracks.length === 0) {
       const empty = document.createElement('p');

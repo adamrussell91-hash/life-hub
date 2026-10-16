@@ -504,3 +504,30 @@ describe('annotation editor voice bar', () => {
     mount.remove();
   });
 });
+
+describe('annotation editor unsaved recordings', () => {
+  it('the Voice bar flags a recording that never reached the block', async () => {
+    const store = await import('@/blocks/voice-draft-store');
+    const backend = store.memoryBackend();
+    store.setVoiceDraftBackendForTests(backend);
+    await backend.putMeta({
+      id: 'voice_lost', title: 'Think aloud', kind: 'think_aloud', layer_id: 'l', mime: 'audio/mp4',
+      started_at: '2026-10-16T09:00:00.000Z', updated_at: '2026-10-16T09:00:00.000Z',
+      duration_s: 1549, taps: [], live_words: []
+    });
+    const block = structuredClone(dulceAnnotationFixture);
+    const mount = document.createElement('div');
+    document.body.append(mount);
+    mount.append(createAnnotationEditor(block, () => undefined, () => block));
+    const flag = await vi.waitFor(() => {
+      const el = mount.querySelector<HTMLButtonElement>('.block-editor__annotation-voice-unsaved');
+      if (!el) throw new Error('not yet');
+      return el;
+    });
+    expect(flag.textContent).toContain('1 unsaved recording');
+    flag.click();
+    expect(mount.querySelector('.block-editor__annotation-voice-recorder')).toBeTruthy();
+    store.setVoiceDraftBackendForTests(null);
+    mount.remove();
+  });
+});

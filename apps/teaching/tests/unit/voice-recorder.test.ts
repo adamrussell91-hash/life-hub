@@ -148,3 +148,108 @@ describe('voice recorder', () => {
     handle.dispose();
   });
 });
+
+describe('voice recorder never loses a recording', () => {
+  beforeEach(async () => {
+    const { memoryBackend, setVoiceDraftBackendForTests } = await import('@/blocks/voice-draft-store');
+    setVoiceDraftBackendForTests(memoryBackend());
+    vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+    vi.stubGlobal('AudioContext', undefined);
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: async () => ({ getTracks: () => [] }) }
+    });
+    pollAiJob.mockReset();
+    pollAiJob.mockResolvedValue({ status: 'error', error: 'busy' });
+  });
+
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    const { setVoiceDraftBackendForTests } = await import('@/blocks/voice-draft-store');
+    setVoiceDraftBackendForTests(null);
+    document.body.replaceChildren();
+  });
+
+  const okJob = () =>
+    new Response(
+      JSON.stringify({ ok: true, data: { id: 'ai_job_1', media: { id: 'media_1', mime_type: 'audio/webm' } } }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+
+  async function mount(onTrackReady = vi.fn()) {
+    const { mountVoiceRecorder } = await import('@/blocks/voice-recorder');
+    const handle = mountVoiceRecorder({ layerId: 'layer_voice', onTrackReady, onCancel: () => undefined, transcribeWaitMs: 50 });
+    document.body.append(handle.el);
+    return { handle, onTrackReady };
+  }
+
+  it('keeps the audio when the upload fails, then retries it', async () => {
+    let fail = true;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      if (fail) throw new TypeError('Load failed');
+      return okJob();
+    }));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { handle, onTrackReady } = await mount();
+    const [recordBtn, , stopBtn] = [...handle.el.querySelectorAll<HTMLButtonElement>('.block-editor__annotation-voice-actions button')];
+    recordBtn!.click();
+    await flush();
+    stopBtn!.click();
+    await vi.waitFor(() => expect(handle.el.querySelector<HTMLElement>('.block-editor__annotation-voice-rescue')!.hidden).toBe(false), { timeout: 10_000 });
+    vi.useRealTimers();
+    expect(handle.el.textContent).toContain('kept on this device');
+    expect(onTrackReady).not.toHaveBeenCalled();
+
+    const { listVoiceDrafts } = await import('@/blocks/voice-draft-store');
+    const drafts = await listVoiceDrafts();
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]!.last_error).toBe('Load failed');
+
+    fail = false;
+    handle.el.querySelector<HTMLButtonElement>('.block-editor__annotation-voice-rescue .btn--primary')!.click();
+    await vi.waitFor(() => expect(onTrackReady).toHaveBeenCalled());
+    await vi.waitFor(async () => expect(await listVoiceDrafts()).toHaveLength(0));
+    handle.dispose();
+  });
+
+  it('offers an unsaved recording back after a refresh, and uploads it', async () => {
+    const { voiceDraftBackend } = await import('@/blocks/voice-draft-store');
+    const backend = voiceDraftBackend();
+    await backend.putMeta({
+      id: 'voice_lost', title: 'Think aloud', kind: 'think_aloud', layer_id: 'layer_voice', mime: 'audio/mp4',
+      started_at: '2026-10-16T09:00:00.000Z', updated_at: '2026-10-16T09:25:00.000Z', duration_s: 1549,
+      taps: [{ t: 13, anchor: { stanza: 's1', quote: { exact: 'THE REMEDY OF BUTTERFLIES' } } as never }],
+      live_words: [{ w: 'nothing', start: 1, end: 1.4 }]
+    });
+    await backend.putChunk('voice_lost', 0, new Uint8Array([1, 2, 3]).buffer);
+    vi.stubGlobal('fetch', vi.fn(async () => okJob()));
+    const { handle, onTrackReady } = await mount();
+    await vi.waitFor(() => expect(handle.el.querySelector('[data-draft-id="voice_lost"]')).toBeTruthy());
+    expect(handle.el.querySelector('[data-draft-id="voice_lost"]')!.textContent).toContain('Think aloud · 25:49 · 1 pin');
+    handle.el.querySelector<HTMLButtonElement>('[data-draft-id="voice_lost"] .btn--primary')!.click();
+    await vi.waitFor(() => expect(onTrackReady).toHaveBeenCalled());
+    const track = onTrackReady.mock.calls[0]![0] as AnnotationVoiceTrack;
+    expect(track.id).toBe('voice_lost');
+    expect(track.taps).toHaveLength(1);
+    expect(track.transcript.words.map((w) => w.w)).toEqual(['nothing']);
+    handle.dispose();
+  });
+});
+
+describe('uploadVoiceRecording', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('sends long recordings in 4 MB parts, then joins them', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      calls.push(String(url).replace(/^.*\/api/, '/api'));
+      return new Response(JSON.stringify({ ok: true, data: { id: 'job', media: { id: 'm' } } }), { status: 200 });
+    }));
+    const { uploadVoiceRecording, VOICE_PART_BYTES } = await import('@/blocks/voice-recorder');
+    const blob = new Blob([new Uint8Array(VOICE_PART_BYTES * 2 + 10)], { type: 'audio/mp4' });
+    const progress: string[] = [];
+    await uploadVoiceRecording({ blob, mime: 'audio/mp4', title: 'T', trackId: 'voice_x', duration_s: 1500, onProgress: (a, b) => progress.push(`${a}/${b}`) });
+    expect(calls).toEqual(['/api/annotation/voice/part', '/api/annotation/voice/part', '/api/annotation/voice/part', '/api/annotation/voice/transcribe']);
+    expect(progress).toEqual(['1/3', '2/3', '3/3']);
+  });
+});
