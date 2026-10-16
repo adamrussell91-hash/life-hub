@@ -51,7 +51,7 @@ import {
   type LaidTrackFork
 } from '@/domain/maps-layout';
 import { mapsOrSeed } from '@/views/maps';
-import { layoutMap, renderTransitSvg, TM_LANE_GAP, TM_PILL_W, TM_TRACK_GAP } from '@/domain/maps-transit';
+import { layoutMap, renderTransitSvg, TM_LANE_GAP, TM_PILL_W, TM_RAIL_OUT, TM_TRACK_GAP } from '@/domain/maps-transit';
 
 function datedProgram(
   id: string,
@@ -251,7 +251,7 @@ describe('year layout', () => {
     expect(long.height).toBe(Math.max(24, dateToY(long.ends_on!, year) - dateToY(long.starts_on!, year)));
   });
 
-  it('splits a year line evenly for concurrent programs, steps neighbours aside, then rejoins', () => {
+  it('runs concurrent programs on parallel rails beside the year line, steps the neighbour aside, then rejoins', () => {
     const base = mindWorks2026Map();
     const layout = layoutMap({
       ...base,
@@ -266,11 +266,12 @@ describe('year layout', () => {
     const line = layout.lines.find((item) => item.id === 'line_reasoning')!;
     const rozelle = line.tracks.find((track) => track.id === 'rozelle')!;
     expect(Math.abs(a.x - b.x)).toBeCloseTo(TM_LANE_GAP, 5);
-    expect((a.x + b.x) / 2).toBeCloseTo(rozelle.x, 5);
+    expect(Math.min(a.x, b.x) - rozelle.x).toBeCloseTo(TM_RAIL_OUT, 5);
     const draw = layout.draw.tracks.filter((track) => track.lineId === 'line_reasoning');
     const rz = draw.find((track) => track.trackId === 'rozelle')!;
     expect(rz.lanes).toHaveLength(2);
-    expect(rz.pieces).toHaveLength(2);
+    // The year line itself runs straight past both programs.
+    expect(rz.pieces).toHaveLength(1);
     const mid = a.y + a.h / 2;
     const xAtY = (points: Array<{ x: number; y: number }>, y: number) => {
       for (let i = 1; i < points.length; i += 1) {
@@ -280,7 +281,7 @@ describe('year layout', () => {
       }
       return NaN;
     };
-    for (const id of ['junior', 'senior']) {
+    for (const id of ['senior']) {
       const track = draw.find((item) => item.trackId === id)!;
       const pts = track.pieces[0]!;
       const away = Math.abs(xAtY(pts, mid) - rz.top.x);
@@ -736,6 +737,49 @@ describe('screenshot regressions (Expression gallery, Reasoning olympiad)', () =
     const stop = layout.draw.stops.find((item) => item.tickId === 'tk_ipo')!;
     const pill = layout.stations.find((station) => station.id === 'st_tft')!.bodies[0]!;
     expect(stop.labelY - 12 + stop.h).toBeGreaterThan(pill.y);
-    expect(stop.labelX).toBeGreaterThanOrEqual(pill.x + pill.w / 2 + 8);
+    // The program's rail is on the right, so the name takes the free left side, beside its dot.
+    expect(stop.anchor).toBe('end');
+    expect(stop.labelX).toBeLessThan(stop.dots[0]!.x);
+    expect(stop.labelX).toBeLessThan(pill.x - pill.w / 2);
+  });
+
+  it('runs a program on a rail joined to its year line top and bottom, keeping line stops on the line', () => {
+    const base = mindWorks2026Map();
+    const map = {
+      ...base,
+      stations: [program('st_mock2', 'line_justice', 'Mock Trial', '2026-03-02', '2026-07-03', 'senior')],
+      ticks: [
+        comp('tk_evatt2', 'UN Evatt Competition', { kind: 'line', line_id: 'line_justice', y: 200, tracks: ['rozelle', 'senior'] }, '2026-05-04'),
+        comp('tk_muna2', 'Rotary MUNA', { kind: 'line', line_id: 'line_justice', y: 200, tracks: ['senior'] }, '2026-05-16'),
+        comp('tk_r1', 'Round 1', { kind: 'station', station_id: 'st_mock2', side: 'right', offset: 0.2 }, '2026-03-25'),
+        comp('tk_r2', 'Round 2', { kind: 'event', event_id: 'tk_r1', side: 'bottom' }, '2026-05-13')
+      ]
+    };
+    const layout = layoutMap(map);
+    const senior = layout.draw.tracks.find((track) => track.lineId === 'line_justice' && track.trackId === 'senior')!;
+    const pill = layout.stations.find((station) => station.id === 'st_mock2')!.bodies[0]!;
+    const lineX = senior.top.x;
+    expect(senior.pieces).toHaveLength(1);
+    expect(pill.x - lineX).toBeCloseTo(TM_RAIL_OUT, 5);
+    // The rail leaves the year line above the program and rejoins it below.
+    expect(senior.lanes).toHaveLength(1);
+    const rail = senior.lanes[0]!;
+    expect(rail[0]!.x).toBeCloseTo(lineX, 5);
+    expect(rail[0]!.y).toBeLessThan(pill.y);
+    expect(rail[rail.length - 1]!.x).toBeCloseTo(lineX, 5);
+    expect(rail[rail.length - 1]!.y).toBeGreaterThan(pill.y + pill.h);
+    // Both interchange dots sit on year lines, not on the program.
+    const evatt = layout.draw.stops.find((stop) => stop.tickId === 'tk_evatt2')!;
+    expect(Math.max(...evatt.dots.map((dot) => dot.x))).toBeCloseTo(lineX, 5);
+    // A line stop inside the program's dates stays on the line, its name on the same side as its dot.
+    const muna = layout.draw.stops.find((stop) => stop.tickId === 'tk_muna2')!;
+    expect(muna.dots[0]!.x).toBeCloseTo(lineX, 5);
+    expect(muna.anchor).toBe('end');
+    expect(muna.labelX).toBeLessThan(lineX);
+    // Rounds branch off the program's outer edge.
+    const branch = layout.draw.branches.find((item) => item.id.includes('st_mock2'))!;
+    expect(branch.points[0]!.x).toBeCloseTo(pill.x + TM_PILL_W / 2, 5);
+    const r1 = layout.draw.stops.find((stop) => stop.tickId === 'tk_r1')!;
+    expect(r1.dots[0]!.x).toBeGreaterThan(pill.x + TM_PILL_W / 2);
   });
 });
