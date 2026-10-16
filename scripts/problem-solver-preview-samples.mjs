@@ -32,5 +32,59 @@ export const SAMPLES = {
     node('impact', 'impact', 'Refunds cost about 3,000 a month and support time doubles.', 'Refunds and support load'),
     node('benefit', 'benefit', 'Customers keep ordering and the team stops firefighting.', 'Loyal customers'),
     node('statement', 'statement', 'One in four deliveries misses its promised window, costing roughly 3,000 a month in refunds and doubling support time. Fixing dispatch would keep customers ordering and free the team from firefighting.', 'Composed statement', { state: 'contested', objection: 'Check the 3,000 figure.' })
+  ]),
+  gap_basic: run('gap_basic', [
+    node('cur', 'current', 'Deliveries often miss the promised window.', 'Late deliveries'),
+    node('obj', 'objective', 'Nine in ten deliveries arrive inside the window.', 'On-time delivery', { state: 'contested', objection: 'Is nine in ten the right target?' }),
+    node('k1', 'known:1', 'Orders are batched once a day.', 'Daily batching'),
+    node('k2', 'known:2', 'Couriers are booked by hand.', 'Manual booking'),
+    node('d1', 'done:1', 'Customers are told a window at checkout.', 'Window promised'),
+    node('d2', 'done:2', 'Late parcels are refunded.', 'Refunds paid'),
+    node('d3', 'done:3', 'Support chases couriers by phone.', 'Phone chasing'),
+    node('d4', 'done:4', 'Addresses are retyped at dispatch.', 'Retyped addresses'),
+    node('mk1', 'must_know:1', 'Which routes cause most delays.', 'Slow routes'),
+    node('mk2', 'must_know:2', 'Courier capacity by hour.', 'Courier capacity'),
+    node('md1', 'must_do:1', 'Dispatch twice a day.', 'Twice-daily dispatch'),
+    node('a1', 'action:1', 'Pilot a second dispatch run.', 'Second dispatch'),
+    node('a2', 'action:2', 'Import addresses automatically.', 'Auto addresses'),
+    node('a3', 'action:3', 'Share live capacity with couriers.', 'Share capacity'),
+    node('a4', 'action:4', 'Review routes monthly.', 'Monthly review')
+  ]),
+  gap_radar: {
+    ...run('gap_radar', [
+      node('cur', 'current', 'Deliveries often miss the promised window.', 'Late deliveries'),
+      node('obj', 'objective', 'Dependable, predictable delivery.', 'Dependable delivery'),
+      node('x1', 'axis:1', 'Dispatch speed', 'Dispatch speed'),
+      node('x2', 'axis:2', 'Courier capacity', 'Courier capacity', { state: 'contested', objection: 'Overlaps with dispatch?' }),
+      node('x3', 'axis:3', 'Address accuracy', 'Address accuracy'),
+      node('x4', 'axis:4', 'Stock accuracy', 'Stock accuracy'),
+      node('x5', 'axis:5', 'Customer updates', 'Customer updates'),
+      node('x6', 'axis:6', 'Returns handling', 'Returns handling')
+    ]),
+    radar: { snapshots: [{ at: '2026-10-01T09:00:00Z', current: [4, 3, 6, 5, 2, 4], objective: [8, 8, 9, 8, 7, 8] }] }
+  },
+  'gap_radar:next': {
+    ...run('gap_radar', [
+      node('cur', 'current', 'Deliveries often miss the promised window.', 'Late deliveries'),
+      node('obj', 'objective', 'Dependable, predictable delivery.', 'Dependable delivery'),
+      node('x1', 'axis:1', 'Dispatch speed', 'Dispatch speed'),
+      node('x2', 'axis:2', 'Courier capacity', 'Courier capacity', { state: 'contested', objection: 'Overlaps with dispatch?' }),
+      node('x3', 'axis:3', 'Address accuracy', 'Address accuracy'),
+      node('x4', 'axis:4', 'Stock accuracy', 'Stock accuracy'),
+      node('x5', 'axis:5', 'Customer updates', 'Customer updates'),
+      node('x6', 'axis:6', 'Returns handling', 'Returns handling')
+    ]),
+    radar: {
+      snapshots: [
+        { at: '2026-10-01T09:00:00Z', current: [4, 3, 6, 5, 2, 4], objective: [8, 8, 9, 8, 7, 8] },
+        { at: '2026-11-01T09:00:00Z', current: [7, 6, 8, 6, 5, 5], objective: [8, 8, 9, 8, 7, 8] }
+      ]
+    }
+  },
+  smart: run('smart', [
+    node('problem', 'problem', 'One in four deliveries misses its window, costing about 3,000 a month.', 'Quarter of deliveries late'),
+    node('s', 's', 'Dispatch team, all warehouse orders, two runs a day.', 'Two daily runs'),
+    node('m', 'm', 'Late share falls from 25 to 10 percent.', 'Late share to 10%', { state: 'contested', objection: 'Which baseline month?' }),
+    node('a', 'a', 'Within current courier contracts and staffing.', 'Within contracts')
   ])
 };

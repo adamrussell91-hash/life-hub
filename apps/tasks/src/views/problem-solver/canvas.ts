@@ -1,6 +1,7 @@
 // apps/tasks/src/views/problem-solver/canvas.ts
 import { el } from '@/views/hub-kit';
 import { createFiveWhysView } from '../../../../../packages/problem-solver/render/five-whys';
+import { createGapBasicView } from '../../../../../packages/problem-solver/render/gap-basic';
 import { renderOutline } from '../../../../../packages/problem-solver/render/outline';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
 import type { PsSession, PsToolId, PsToolRun } from '../../../../../packages/problem-solver/types';
@@ -9,7 +10,8 @@ type View = { el: HTMLElement; update(run: PsToolRun): void };
 
 /** Tools that draw their own chart. Anything else falls back to the outline. */
 const RENDERERS: Partial<Record<PsToolId, () => View>> = {
-  five_whys: () => createFiveWhysView()
+  five_whys: () => createFiveWhysView(),
+  gap_basic: () => createGapBasicView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string]> = [
