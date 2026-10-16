@@ -30,7 +30,9 @@ export const LessonSchema = z.object({
   syllabus_outcomes: z.array(z.string().min(1).max(32)).max(24).optional(),
   outcome_ids: z.array(z.string().min(1).max(64)).max(24).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
-  pedagogical_mode: PedagogicalModeSchema.optional()
+  pedagogical_mode: PedagogicalModeSchema.optional(),
+  /** Hides the student feedback dot on every block of this lesson. */
+  feedback_off: z.boolean().optional()
 });
 
 export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
