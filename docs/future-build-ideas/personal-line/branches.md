@@ -187,11 +187,19 @@ Justice by place: Away 47, Online 40, At school 17 (entries can be in two). Run 
 - A line with nothing big enough to split stays one track.
 - Every track carries a **flag** naming it, at the top and again at each term start where the track is
   clear. Branches leave their line together at the top, then fan out.
+- **Every branch has its own names column**, so a line spreads sideways rather than down the page.
+- **Same-day platforms** (copied from the MindWorks map): stops on one branch on the same date share
+  one names block, names stacked, the date written once under the last.
+- **Spurs:** when a name would sit more than about two lines below its date, it moves to a spur that
+  forks sideways off its branch for those months, with its own names column (up to three spurs). Forks
+  leave and rejoin where the names columns they cross are clear.
+- An entry on two of the student's lines has a stop and a name on each (lighter on the second) instead
+  of one long capsule across the page.
+- **Phone:** no room for branches, so each line stays one track and names carry the format.
 - The builder has a **Split each line into branches** switch; a published line keeps the choice.
 - Thresholds are a first guess. Adam: "wait and see". Tune them on real students.
 
 ## Open questions
 
 - Thresholds (3 stops, 4 branches) after trying real students.
-- A busy line still stacks its names in one column (Innovation for a maths student): branches separate
-  the tracks, not the names. If that bothers, the next step is a names column per branch.
+- Width: three lines with four branches each is about 4,000px wide (Adam, 17 Oct: wider is fine).
