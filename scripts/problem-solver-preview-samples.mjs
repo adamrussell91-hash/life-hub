@@ -28,7 +28,7 @@ export const SAMPLES = {
     ]
   ),
   problem_statement: run('problem_statement', [
-    node('problem', 'problem', 'One in four deliveries misses its window.', 'One in four late'),
+    node('problem', 'problem', 'One in four deliveries misses its window.', 'Quarter late'),
     node('impact', 'impact', 'Refunds cost about 3,000 a month and support time doubles.', 'Refunds and support load'),
     node('benefit', 'benefit', 'Customers keep ordering and the team stops firefighting.', 'Loyal customers'),
     node('statement', 'statement', 'One in four deliveries misses its promised window, costing roughly 3,000 a month in refunds and doubling support time. Fixing dispatch would keep customers ordering and free the team from firefighting.', 'Composed statement', { state: 'contested', objection: 'Check the 3,000 figure.' })

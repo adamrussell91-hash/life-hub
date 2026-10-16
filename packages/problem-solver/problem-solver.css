@@ -294,6 +294,110 @@
   .ps-tree__shape { transition: none; }
 }
 
+/* Problem statement (toolkit p.59): a square of three flat blocks, tall red on the
+   left, blue over yellow on the right, with the composed statement beneath. */
+.ps-statement {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(100%, 420px);
+  margin-inline: auto;
+}
+
+.ps-statement__square {
+  display: grid;
+  grid-template: 'problem benefit' 1fr 'problem impact' 1fr / 1fr 1fr;
+  gap: 6px;
+  aspect-ratio: 1;
+}
+
+.ps-statement__block { min-width: 0; min-height: 0; }
+.ps-statement__block--problem { grid-area: problem; }
+.ps-statement__block--benefit { grid-area: benefit; }
+.ps-statement__block--impact { grid-area: impact; }
+
+.ps-statement__shape {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: filter 240ms var(--ps-ease);
+}
+
+.ps-statement__block--problem .ps-statement__shape { background: var(--ps-red); }
+.ps-statement__block--benefit .ps-statement__shape { background: var(--ps-blue); }
+.ps-statement__block--impact .ps-statement__shape { background: var(--ps-yellow); color: var(--ps-on-yellow); }
+.ps-statement__shape:hover,
+.ps-statement__shape[aria-expanded='true'] { filter: brightness(1.06); }
+.ps-statement__shape:focus-visible,
+.ps-statement__more:focus-visible { outline: 2px solid var(--wave); outline-offset: 3px; }
+
+.ps-statement__meta {
+  font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+
+.ps-statement__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  font: var(--weight-semibold) 17px / 1.25 var(--font-ui);
+  text-wrap: balance;
+}
+
+.ps-statement__block--problem .ps-statement__title { font-size: 20px; }
+
+.ps-statement__panel { display: flex; flex-direction: column; margin-top: -14px; }
+.ps-statement__panel .ps-details { width: 100%; }
+
+.ps-statement__composed {
+  padding: 16px 18px 12px;
+  border-top: 3px solid var(--ps-red);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--glass);
+}
+
+.ps-statement__head { display: flex; align-items: center; gap: var(--space-2); }
+.ps-statement__composed .ps-statement__meta { color: var(--muted); opacity: 1; }
+.ps-statement__composed .ps-objection { margin-top: 0; color: var(--muted); }
+.ps-statement__text { margin: 6px 0 0; color: var(--ink); font: var(--weight-regular) var(--text-base) / 1.55 var(--font-ui); }
+
+.ps-statement__more {
+  margin-top: 8px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: var(--weight-semibold) var(--text-xs) / 1.4 var(--font-ui);
+  cursor: pointer;
+}
+
+.ps-statement__more:hover { color: var(--ink); }
+.ps-statement__composed .ps-details__card { margin-top: 4px; background: transparent; box-shadow: none; padding: 4px 0 8px; }
+
+@media (max-width: 720px) {
+  .ps-statement { width: 100%; }
+  .ps-statement__shape { padding: 12px; }
+  .ps-statement__title { font-size: 15px; }
+  .ps-statement__block--problem .ps-statement__title { font-size: 17px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-statement__shape { transition: none; }
+}
+
 /* Outline (accessible alternative and fallback) */
 .ps-outline { margin: 0; padding-left: var(--space-5); color: var(--ink); }
 .ps-outline li { margin: var(--space-1) 0; }
