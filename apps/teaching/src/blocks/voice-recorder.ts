@@ -1,10 +1,20 @@
 /**
  * Annotation voice recorder (4b). DOM + MediaRecorder; no network helpers beyond upload.
  */
-import { askTextCard } from '@/teacher/confirm-dialog';
+import { askConfirmCard, askTextCard } from '@/teacher/confirm-dialog';
 import { getApiBaseUrl } from '@/api/config';
 import { pollAiJob } from '@/ai/jobs-client';
 import { createLiveCaptions } from '@/blocks/voice-live-captions';
+import {
+  audioExtension,
+  createDraftWriter,
+  downloadBlob,
+  listVoiceDrafts,
+  voiceDraftAudio,
+  voiceDraftBackend,
+  type VoiceDraftMeta
+} from '@/blocks/voice-draft-store';
+import type { VoiceWord } from '@/blocks/voice-transcript';
 import { parseWhisperTimings } from '@/blocks/voice-transcript';
 import type { AnnotationAnchor, AnnotationVoiceTrack } from '@/schemas/block';
 import type { VoiceTap } from '@/blocks/voice-match';
@@ -49,38 +59,100 @@ function pickMime(): string | undefined {
   return candidates.find((mime) => MediaRecorder.isTypeSupported(mime));
 }
 
-async function startTranscriptionJob(input: {
-  file: File;
+/** Netlify drops bodies over 6 MB before the function runs; stay well under. */
+export const VOICE_PART_BYTES = 4 * 1024 * 1024;
+
+type StartedJob = {
+  jobId: string;
+  media: { id: string; preview_url?: string; download_url?: string; mime_type?: string };
+};
+
+async function postJson<T>(path: string, init: RequestInit): Promise<T> {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+    credentials: 'include',
+    ...init,
+    headers: { Accept: 'application/json', ...(init.headers ?? {}) }
+  });
+  const body = (await response.json().catch(() => null)) as
+    | { ok?: boolean; data?: T; error?: { message?: string } }
+    | null;
+  if (!response.ok || !body?.ok || !body.data) {
+    throw new Error(body?.error?.message ?? `Upload failed (${response.status})`);
+  }
+  return body.data;
+}
+
+async function withRetry<T>(job: () => Promise<T>, tries = 3): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < tries; attempt += 1) {
+    try {
+      return await job();
+    } catch (error) {
+      lastError = error;
+      if (attempt < tries - 1) await new Promise((resolve) => setTimeout(resolve, 800 * 2 ** attempt));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Upload failed');
+}
+
+/**
+ * Upload in ≤4 MB parts, then ask the server to join them and queue
+ * transcription. Any length works; each part retries on its own.
+ */
+export async function uploadVoiceRecording(input: {
+  blob: Blob;
+  mime: string;
   title: string;
   trackId: string;
   lessonId?: string;
   duration_s: number;
-}): Promise<{ jobId: string; media: { id: string; preview_url?: string; download_url?: string; mime_type?: string } }> {
-  const form = new FormData();
-  form.append('file', input.file, input.file.name);
-  form.append('title', input.title);
-  form.append('track_id', input.trackId);
-  form.append('duration_s', String(input.duration_s));
-  if (input.lessonId) form.append('lesson_id', input.lessonId);
-
-  const response = await fetch(`${getApiBaseUrl()}/api/annotation/voice/transcribe`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { Accept: 'application/json' },
-    body: form
-  });
-  const body = (await response.json()) as {
-    ok?: boolean;
-    data?: {
-      id: string;
-      media: { id: string; preview_url?: string; download_url?: string; mime_type?: string };
-    };
-    error?: { message?: string };
-  };
-  if (!body.ok || !body.data) {
-    throw new Error(body.error?.message ?? `Transcription start failed (${response.status})`);
+  onProgress?: (sent: number, total: number) => void;
+}): Promise<StartedJob> {
+  const uploadId = `${input.trackId}_${Math.random().toString(36).slice(2, 8)}`;
+  const total = Math.max(1, Math.ceil(input.blob.size / VOICE_PART_BYTES));
+  for (let index = 0; index < total; index += 1) {
+    const part = input.blob.slice(index * VOICE_PART_BYTES, (index + 1) * VOICE_PART_BYTES);
+    await withRetry(() => {
+      const form = new FormData();
+      form.append('upload_id', uploadId);
+      form.append('index', String(index));
+      form.append('file', part, `part-${index}`);
+      return postJson('/api/annotation/voice/part', { method: 'POST', body: form });
+    });
+    input.onProgress?.(index + 1, total);
   }
-  return { jobId: body.data.id, media: body.data.media };
+  const data = await withRetry(() =>
+    postJson<{ id: string; media: StartedJob['media'] }>('/api/annotation/voice/transcribe', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        upload_id: uploadId,
+        parts: total,
+        mime: input.mime,
+        title: input.title,
+        track_id: input.trackId,
+        duration_s: input.duration_s,
+        ...(input.lessonId ? { lesson_id: input.lessonId } : {})
+      })
+    })
+  );
+  return { jobId: data.id, media: data.media };
+}
+
+function audioDuration(blob: Blob): Promise<number> {
+  return new Promise((resolve) => {
+    const audio = document.createElement('audio');
+    const url = URL.createObjectURL(blob);
+    const finish = (value: number) => {
+      URL.revokeObjectURL(url);
+      resolve(Number.isFinite(value) && value > 0 ? value : 0);
+    };
+    audio.preload = 'metadata';
+    audio.addEventListener('loadedmetadata', () => finish(audio.duration), { once: true });
+    audio.addEventListener('error', () => finish(0), { once: true });
+    window.setTimeout(() => finish(0), 8000);
+    audio.src = url;
+  });
 }
 
 /**
@@ -208,7 +280,34 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
   useLiveBtn.textContent = 'Use live captions now';
   useLiveBtn.hidden = true;
 
-  el.append(header, status, kindRow, meter, elapsedEl, actions, live, pinsWrap, useLiveBtn);
+  // When an upload fails the audio stays on this device; these get it out.
+  const rescue = document.createElement('div');
+  rescue.className = 'block-editor__annotation-voice-actions block-editor__annotation-voice-rescue';
+  rescue.hidden = true;
+  const retryBtn = document.createElement('button');
+  retryBtn.type = 'button';
+  retryBtn.className = 'btn btn--primary';
+  retryBtn.textContent = 'Try upload again';
+  const downloadBtn = document.createElement('button');
+  downloadBtn.type = 'button';
+  downloadBtn.className = 'btn btn--secondary';
+  downloadBtn.textContent = 'Download audio';
+  rescue.append(retryBtn, downloadBtn);
+
+  // Recordings that never made it into the block (failed upload, refresh, crash).
+  const recovered = document.createElement('div');
+  recovered.className = 'block-editor__annotation-voice-recovered';
+  recovered.hidden = true;
+
+  const importWrap = document.createElement('label');
+  importWrap.className = 'block-editor__annotation-voice-import';
+  const importInput = document.createElement('input');
+  importInput.type = 'file';
+  importInput.accept = 'audio/*';
+  importInput.className = 'block-editor__annotation-voice-import-input';
+  importWrap.append(document.createTextNode('Or add an audio file: '), importInput);
+
+  el.append(header, recovered, status, kindRow, meter, elapsedEl, actions, rescue, live, pinsWrap, useLiveBtn, importWrap);
 
   let disposed = false;
   let title = '';
@@ -226,6 +325,19 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
   let pauseStartedAt = 0;
   let elapsedTimer = 0;
   let skipWait = false;
+  let busyUploading = false;
+  let draft: ReturnType<typeof createDraftWriter> | null = null;
+  let draftFlushTimer = 0;
+  let currentTrackId = '';
+  let currentMime = '';
+  let lastFailed: { blob: Blob; meta: VoiceDraftMeta } | null = null;
+
+  const onBeforeUnload = (event: BeforeUnloadEvent) => {
+    if (!recording && !paused && !busyUploading) return;
+    event.preventDefault();
+    event.returnValue = '';
+  };
+  window.addEventListener('beforeunload', onBeforeUnload);
 
   const captions = createLiveCaptions({
     elapsedS: () => elapsedMs() / 1000,
@@ -265,6 +377,7 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
       remove.addEventListener('click', () => {
         taps.splice(index, 1);
         paintPins();
+        draft?.update({ taps: taps.map((row) => ({ ...row })) });
       });
       li.append(time, quote, remove);
       pinsList.append(li);
@@ -337,6 +450,7 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
     taps.push({ t, anchor: { ...anchor, quote: { ...anchor.quote } } });
     status.textContent = `Pinned at ${formatElapsed(elapsedMs())}.`;
     paintPins();
+    draft?.update({ taps: taps.map((tap) => ({ ...tap })) });
   }
 
   async function ensureTitle(): Promise<string | null> {
@@ -394,12 +508,40 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
       // Level meter is optional.
     }
 
-    mediaRecorder = new MediaRecorder(mediaStream, { mimeType: mime });
+    // 64 kbps is plenty for a voice and keeps a 30-minute take near 15 MB.
+    try {
+      mediaRecorder = new MediaRecorder(mediaStream, { mimeType: mime, audioBitsPerSecond: 64_000 });
+    } catch {
+      mediaRecorder = new MediaRecorder(mediaStream, { mimeType: mime });
+    }
+    currentTrackId = nextId('voice');
+    currentMime = mediaRecorder.mimeType || mime;
+    const stamp = new Date().toISOString();
+    draft = createDraftWriter({
+      id: currentTrackId,
+      title: title || 'Voice recording',
+      kind,
+      layer_id: options.layerId,
+      ...(options.lessonId ? { lesson_id: options.lessonId } : {}),
+      mime: currentMime,
+      started_at: stamp,
+      updated_at: stamp,
+      duration_s: 0,
+      taps: [],
+      live_words: []
+    });
+    draftFlushTimer = window.setInterval(() => {
+      draft?.update({ duration_s: elapsedMs() / 1000, live_words: captions.words() });
+      void draft?.flush();
+    }, 4000);
     mediaRecorder.addEventListener('dataavailable', (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
+      if (event.data.size > 0) {
+        chunks.push(event.data);
+        draft?.push(event.data);
+      }
     });
     mediaRecorder.addEventListener('stop', () => {
-      void finishRecording(mime);
+      void finishRecording(currentMime || mime);
     });
 
     mediaRecorder.start(250);
@@ -467,6 +609,14 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
   async function finishRecording(mime: string): Promise<void> {
     const duration_s = Math.max(0.1, accumulatedMs / 1000);
     const blob = new Blob(chunks, { type: mime.split(';')[0] || 'audio/webm' });
+    if (draftFlushTimer) {
+      window.clearInterval(draftFlushTimer);
+      draftFlushTimer = 0;
+    }
+    const writer = draft;
+    draft = null;
+    writer?.update({ duration_s, live_words: captions.words(), taps: taps.map((t) => ({ ...t })), finished: true });
+    await writer?.flush();
     cleanupStream();
     recordBtn.textContent = 'Record';
     pauseBtn.textContent = 'Pause';
@@ -474,95 +624,207 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
 
     if (blob.size === 0) {
       status.textContent = 'Nothing was recorded.';
+      await voiceDraftBackend().remove(currentTrackId).catch(() => undefined);
+      setBusy(false);
+      return;
+    }
+    if (writer?.failed) {
+      status.textContent = 'Could not keep a copy on this device, so download the audio if the upload fails.';
+    }
+    await processRecording({
+      blob,
+      meta: {
+        id: currentTrackId,
+        title: title || 'Voice recording',
+        kind,
+        layer_id: options.layerId,
+        ...(options.lessonId ? { lesson_id: options.lessonId } : {}),
+        mime,
+        started_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        duration_s,
+        taps: taps.map((t) => ({ ...t })),
+        live_words: captions.words(),
+        finished: true
+      }
+    });
+  }
+
+  /** Upload, transcribe, hand the track to the block, then drop the device copy. */
+  async function processRecording(input: { blob: Blob; meta: VoiceDraftMeta }): Promise<void> {
+    const { blob, meta } = input;
+    const duration_s = Math.max(0.1, meta.duration_s);
+    rescue.hidden = true;
+    lastFailed = null;
+    busyUploading = true;
+    setBusy(true);
+    status.textContent = 'Uploading…';
+
+    let started: Awaited<ReturnType<typeof uploadVoiceRecording>>;
+    try {
+      started = await uploadVoiceRecording({
+        blob,
+        mime: meta.mime,
+        title: meta.title,
+        trackId: meta.id,
+        lessonId: meta.lesson_id,
+        duration_s,
+        onProgress: (sent, total) => {
+          status.textContent = total > 1 ? `Uploading ${sent} of ${total}…` : 'Uploading…';
+        }
+      });
+    } catch (error) {
+      busyUploading = false;
+      lastFailed = { blob, meta };
+      const reason = error instanceof Error && error.message ? error.message : 'Upload failed.';
+      status.textContent = `Upload failed (${reason}). Your recording is kept on this device: try again, or download it.`;
+      void voiceDraftBackend()
+        .putMeta({ ...meta, last_error: reason, updated_at: new Date().toISOString() })
+        .catch(() => undefined);
+      rescue.hidden = false;
       setBusy(false);
       return;
     }
 
-    const trackId = nextId('voice');
-    const ext = mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'webm';
-    const file = new File([blob], `${trackId}.${ext}`, { type: blob.type });
-
-    status.textContent = 'Uploading…';
-    setBusy(true);
-
-    try {
-      const { jobId, media } = await startTranscriptionJob({
-        file,
-        title: title || 'Voice recording',
-        trackId,
-        lessonId: options.lessonId,
-        duration_s
-      });
-
-      const url = media.preview_url || media.download_url || `/api/media/${media.id}/file`;
-      let words: AnnotationVoiceTrack['transcript']['words'] = [];
-      let timing: AnnotationVoiceTrack['transcript']['timing'] = 'estimated';
-
-      const liveWords = captions.words();
-      if (liveWords.length > 0) {
-        useLiveBtn.hidden = false;
-        useLiveBtn.disabled = false;
+    const { jobId, media } = started;
+    const url = media.preview_url || media.download_url || `/api/media/${media.id}/file`;
+    let words: AnnotationVoiceTrack['transcript']['words'] = [];
+    let timing: AnnotationVoiceTrack['transcript']['timing'] = 'estimated';
+    const liveWords: VoiceWord[] = meta.live_words ?? [];
+    if (liveWords.length > 0) {
+      useLiveBtn.hidden = false;
+      useLiveBtn.disabled = false;
+    }
+    skipWait = false;
+    const waitStarted = Date.now();
+    const deadline = waitStarted + (options.transcribeWaitMs ?? 180_000);
+    let note = '';
+    while (Date.now() < deadline && !disposed && !skipWait) {
+      status.textContent = `Audio saved. Transcribing with Whisper… ${formatElapsed(Date.now() - waitStarted)}`;
+      let job: { status: string; result?: { whisper?: unknown }; error?: string };
+      try {
+        job = (await pollAiJob(jobId)) as typeof job;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        continue;
       }
-      const waitStarted = Date.now();
-      const deadline = waitStarted + (options.transcribeWaitMs ?? 180_000);
-      let note = '';
-      while (Date.now() < deadline && !disposed && !skipWait) {
-        status.textContent = `Transcribing with Whisper… ${formatElapsed(Date.now() - waitStarted)}`;
-        let job: { status: string; result?: { whisper?: unknown }; error?: string };
-        try {
-          job = (await pollAiJob(jobId)) as typeof job;
-        } catch {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          continue;
-        }
-        if (job.status === 'done') {
-          const parsed = parseWhisperTimings(job.result?.whisper, { duration_s });
-          words = parsed.words;
-          timing = parsed.timing;
-          break;
-        }
-        if (job.status === 'error') {
-          note = job.error?.trim() || 'Whisper could not transcribe this recording.';
-          break;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+      if (job.status === 'done') {
+        const parsed = parseWhisperTimings(job.result?.whisper, { duration_s });
+        words = parsed.words;
+        timing = parsed.timing;
+        break;
       }
-      useLiveBtn.hidden = true;
-
-      if (disposed) return;
-      if (words.length === 0 && liveWords.length > 0) {
-        words = liveWords;
-        timing = 'estimated';
-        note = note ? `${note} Using the live captions instead.` : 'Using the live captions.';
-      } else if (words.length === 0 && !note) {
-        note = 'Whisper is still working on this one.';
+      if (job.status === 'error') {
+        note = job.error?.trim() || 'Whisper could not transcribe this recording.';
+        break;
       }
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    useLiveBtn.hidden = true;
 
-      const track: AnnotationVoiceTrack = {
-        id: trackId,
-        layer_id: options.layerId,
-        kind,
-        title: title || 'Voice recording',
-        audio: {
-          media_id: media.id,
-          url,
-          duration_s,
-          mime: media.mime_type || blob.type || 'audio/webm'
-        },
-        transcript: { words, timing },
-        taps: taps.length > 0 ? taps : undefined,
-        clips: [],
-        status: 'draft'
-      };
+    if (words.length === 0 && liveWords.length > 0) {
+      words = liveWords;
+      timing = 'estimated';
+      note = note ? `${note} Using the live captions instead.` : 'Using the live captions.';
+    } else if (words.length === 0 && !note) {
+      note = 'Whisper is still working on this one.';
+    }
+
+    const track: AnnotationVoiceTrack = {
+      id: meta.id,
+      layer_id: options.layerId,
+      kind: meta.kind,
+      title: meta.title,
+      audio: {
+        media_id: media.id,
+        url,
+        duration_s,
+        mime: media.mime_type || blob.type || 'audio/webm'
+      },
+      transcript: { words, timing },
+      taps: meta.taps.length > 0 ? meta.taps : undefined,
+      clips: [],
+      status: 'draft'
+    };
+    busyUploading = false;
+    // The audio is on the server now; the device copy can go once the block has it.
+    options.onTrackReady(track);
+    await voiceDraftBackend().remove(meta.id).catch(() => undefined);
+    if (!disposed) {
       status.textContent =
         words.length > 0
           ? `${note ? `${note} ` : ''}Opening review…`
           : `${note ? `${note} ` : ''}Audio saved; your pins become the clips. Opening review…`;
-      options.onTrackReady(track);
-    } catch (error) {
-      status.textContent =
-        error instanceof Error ? error.message : 'Upload or transcription failed.';
-      setBusy(false);
+    }
+  }
+
+  function draftLabel(meta: VoiceDraftMeta): string {
+    const when = new Date(meta.started_at);
+    const day = Number.isNaN(when.getTime())
+      ? ''
+      : when.toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    const pins = meta.taps.length ? ` · ${meta.taps.length} pin${meta.taps.length === 1 ? '' : 's'}` : '';
+    return `${meta.title} · ${formatElapsed(meta.duration_s * 1000)}${pins}${day ? ` · ${day}` : ''}`;
+  }
+
+  async function paintRecovered(): Promise<void> {
+    const drafts = await listVoiceDrafts();
+    if (disposed) return;
+    recovered.replaceChildren();
+    const rows = drafts.filter((meta) => meta.id !== currentTrackId || (!recording && !paused && !busyUploading));
+    recovered.hidden = rows.length === 0;
+    if (rows.length === 0) return;
+    const head = document.createElement('p');
+    head.className = 'block-editor__annotation-voice-live-label';
+    head.textContent = rows.length === 1 ? 'Unsaved recording on this device' : 'Unsaved recordings on this device';
+    recovered.append(head);
+    for (const meta of rows) {
+      const row = document.createElement('div');
+      row.className = 'block-editor__annotation-voice-recovered-row';
+      row.dataset.draftId = meta.id;
+      const label = document.createElement('span');
+      label.className = 'block-editor__annotation-voice-recovered-label';
+      label.textContent = draftLabel(meta);
+      const upload = document.createElement('button');
+      upload.type = 'button';
+      upload.className = 'btn btn--primary';
+      upload.textContent = 'Upload';
+      upload.addEventListener('click', async () => {
+        const blob = await voiceDraftAudio(meta.id, meta.mime);
+        if (blob.size === 0) {
+          status.textContent = 'That recording has no audio on this device.';
+          return;
+        }
+        recovered.hidden = true;
+        const duration = meta.duration_s > 0 ? meta.duration_s : await audioDuration(blob);
+        await processRecording({ blob, meta: { ...meta, duration_s: duration } });
+        void paintRecovered();
+      });
+      const download = document.createElement('button');
+      download.type = 'button';
+      download.className = 'btn btn--secondary';
+      download.textContent = 'Download';
+      download.addEventListener('click', async () => {
+        const blob = await voiceDraftAudio(meta.id, meta.mime);
+        downloadBlob(blob, `${meta.title || 'recording'}.${audioExtension(meta.mime)}`);
+      });
+      const discard = document.createElement('button');
+      discard.type = 'button';
+      discard.className = 'btn btn--ghost block-editor__annotation-voice-delete';
+      discard.textContent = 'Discard';
+      discard.addEventListener('click', async () => {
+        const ok = await askConfirmCard({
+          title: 'Discard this recording?',
+          supporting: 'It was never uploaded, so this deletes the only copy.',
+          confirmLabel: 'Discard',
+          discardLabel: 'Keep it'
+        });
+        if (!ok) return;
+        await voiceDraftBackend().remove(meta.id).catch(() => undefined);
+        void paintRecovered();
+      });
+      row.append(label, upload, download, discard);
+      recovered.append(row);
     }
   }
 
@@ -570,6 +832,38 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
     void beginRecord();
   });
   pauseBtn.addEventListener('click', () => togglePause());
+  retryBtn.addEventListener('click', () => {
+    if (lastFailed) void processRecording(lastFailed);
+  });
+  downloadBtn.addEventListener('click', () => {
+    const blob = lastFailed?.blob ?? (chunks.length ? new Blob(chunks, { type: currentMime.split(';')[0] }) : null);
+    if (blob) downloadBlob(blob, `${title || 'recording'}.${audioExtension(currentMime || blob.type)}`);
+  });
+  importInput.addEventListener('change', async () => {
+    const file = importInput.files?.[0];
+    importInput.value = '';
+    if (!file || recording || paused || busyUploading) return;
+    const duration = await audioDuration(file);
+    const stamp = new Date().toISOString();
+    currentTrackId = nextId('voice');
+    await processRecording({
+      blob: file,
+      meta: {
+        id: currentTrackId,
+        title: file.name.replace(/\.[^.]+$/, '') || 'Voice recording',
+        kind,
+        layer_id: options.layerId,
+        ...(options.lessonId ? { lesson_id: options.lessonId } : {}),
+        mime: file.type || 'audio/mp4',
+        started_at: stamp,
+        updated_at: stamp,
+        duration_s: duration,
+        taps: [],
+        live_words: [],
+        finished: true
+      }
+    });
+  });
   useLiveBtn.addEventListener('click', () => {
     skipWait = true;
     useLiveBtn.disabled = true;
@@ -580,8 +874,13 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
       status.textContent = 'Stop the recording before closing.';
       return;
     }
+    if (busyUploading) {
+      status.textContent = 'Still uploading. Your recording is kept on this device if you close.';
+    }
     options.onCancel();
   });
+
+  void paintRecovered();
 
   return {
     el,
@@ -589,6 +888,9 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
     isCapturing: () => recording || paused,
     dispose: () => {
       disposed = true;
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      if (draftFlushTimer) window.clearInterval(draftFlushTimer);
+      void draft?.flush();
       if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         try {
           mediaRecorder.stop();
