@@ -273,12 +273,17 @@ describe('catalogue classification', () => {
   });
 
   it('classifies every catalogue entry, keeping Classics and Languages off Justice', () => {
-    // Left without a guess: a professional association, not a student activity.
-    const unclassified = new Set(['prog_world-council-for-gifted-and-talented-children-wcgtc']);
-    // History of Greece and Rome is the subject of these two exams.
+    // Left blank on purpose: a professional association, a family reference, and an awards directory.
+    const unclassified = new Set([
+      'prog_world-council-for-gifted-and-talented-children-wcgtc',
+      'prog_johns-hopkins-center-for-talented-youth-cty',
+      'prog_extracurricular-activity-excellence-eae-awards'
+    ]);
+    // History of Greece and Rome is the subject, including the school Toga Day.
     const classicsOnJustice = new Set([
       'prog_national-hellenic-civilization-exam-nhce',
-      'prog_national-roman-civilization-exam-nrce'
+      'prog_national-roman-civilization-exam-nrce',
+      'prog_toga-day-school-event'
     ]);
     const justiceSubjects = new Set([
       'Humanities',
