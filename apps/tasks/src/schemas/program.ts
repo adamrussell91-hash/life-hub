@@ -89,8 +89,31 @@ export const PROGRAM_SUBJECTS = [
   'Languages',
   'Music',
   'Philosophy',
-  'Leadership'
+  'Leadership',
+  'Civics'
 ] as const;
+
+/** What the student actually does. Splits a personal line into branches (Adam, 16 Oct 2026). */
+export const PROGRAM_FORMATS = [
+  'Exam',
+  'Written entry',
+  'Speaking',
+  'Simulation',
+  'Project',
+  'Creative work',
+  'Day event',
+  'Program'
+] as const;
+
+/** Who designed it: a school's own program, or an outside organiser's (even if sat at school). */
+export const PROGRAM_PROVIDERS = ['School', 'External'] as const;
+
+/** Where it happens. An entry can be in more than one place (sat at school, online). */
+export const PROGRAM_SETTINGS = ['At school', 'Online', 'Away'] as const;
+
+export const PROGRAM_ENTRIES = ['Individual', 'Team', 'Either'] as const;
+
+export const PROGRAM_ENTRY_ROUTES = ['School enters', 'Student applies', 'Selection'] as const;
 
 const nullableText = z
   .string()
@@ -114,6 +137,10 @@ const text = z
   .string()
   .optional()
   .transform((value) => value?.trim() ?? '');
+
+function oneOf<T extends readonly [string, ...string[]]>(values: T) {
+  return z.enum(values).nullable().optional().default(null);
+}
 
 const ProgramObject = z.object({
   schema_version: schemaVersion,
@@ -140,6 +167,12 @@ const ProgramObject = z.object({
       return value;
     }),
   registration_window: text,
+  /** Classification for branch lines. Null or empty until the entry is recatalogued. */
+  format: oneOf(PROGRAM_FORMATS),
+  provider: oneOf(PROGRAM_PROVIDERS),
+  settings: z.array(z.enum(PROGRAM_SETTINGS)).default([]),
+  entry: oneOf(PROGRAM_ENTRIES),
+  entry_route: oneOf(PROGRAM_ENTRY_ROUTES),
   /**
    * When this runs or is held (equal for one day), with `dates_precision` saying how sure that is.
    * A `month` or `part` run is a window, not a confirmed day. Null when nothing says when it runs.
@@ -201,6 +234,11 @@ export const ProgramCreateSchema = ProgramObject.omit({
   description: true,
   registration_link: true,
   registration_window: true,
+  format: true,
+  provider: true,
+  settings: true,
+  entry: true,
+  entry_route: true,
   starts_on: true,
   ends_on: true,
   dates_precision: true,

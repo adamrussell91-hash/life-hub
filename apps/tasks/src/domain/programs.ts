@@ -7,6 +7,7 @@ const LENGTH_RANK = new Map(PROGRAM_LENGTHS.map((length, index) => [length, inde
 export interface ProgramFilters {
   query?: string;
   type?: string;
+  format?: string;
   subject?: string;
   month?: string;
   age_group?: string;
@@ -34,7 +35,12 @@ function haystack(program: Program): string {
     program.month ?? '',
     program.competition_level ?? '',
     program.competition_length ?? '',
-    program.cost_basis ?? ''
+    program.cost_basis ?? '',
+    program.format ?? '',
+    program.provider ?? '',
+    program.settings.join(' '),
+    program.entry ?? '',
+    program.entry_route ?? ''
   ]
     .join(' ')
     .toLowerCase();
@@ -44,6 +50,7 @@ export function programMatches(program: Program, filters: ProgramFilters): boole
   const query = filters.query?.trim().toLowerCase() ?? '';
   if (query && !haystack(program).includes(query)) return false;
   if (filters.type && !program.types.includes(filters.type)) return false;
+  if (filters.format && program.format !== filters.format) return false;
   if (filters.subject && !program.subjects.includes(filters.subject)) return false;
   if (filters.month && program.month !== filters.month) return false;
   if (filters.age_group && !program.age_groups.includes(filters.age_group)) return false;

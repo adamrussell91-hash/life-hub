@@ -44,7 +44,7 @@ import {
 } from '@/domain/recurrence';
 import { carryReminderForward } from '@/domain/reminders';
 import { mindWorks2026Map } from '@/domain/maps-seed';
-import { catalogPrograms, withCatalogueDates } from '@/domain/programs-seed';
+import { catalogPrograms, withCatalogueClasses, withCatalogueDates } from '@/domain/programs-seed';
 import { buildExcursionPlan, excursionDatesFromAdminTask } from '@/domain/excursion';
 import { cloneDefaultComplianceModules } from '@/domain/excursion-modules';
 import { cloneDefaultFolderItems } from '@/domain/excursion-folder';
@@ -1575,7 +1575,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
 
     async listPrograms() {
       let programs = await listByIndex(kv, keys.programsIndexKey(), keys.programKey, (raw) =>
-        ProgramSchema.parse(withCatalogueDates(raw))
+        ProgramSchema.parse(withCatalogueClasses(withCatalogueDates(raw)))
       );
       if (programs.length === 0) {
         const seeded = catalogPrograms();
@@ -1593,7 +1593,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
     },
     async getProgram(id) {
       const raw = await kv.getJSON(keys.programKey(id));
-      return raw ? ProgramSchema.parse(withCatalogueDates(raw)) : null;
+      return raw ? ProgramSchema.parse(withCatalogueClasses(withCatalogueDates(raw))) : null;
     },
     async createProgram(input) {
       const stamp = nowIso();
@@ -1614,6 +1614,11 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         description: input.description ?? '',
         registration_link: input.registration_link ?? null,
         registration_window: input.registration_window ?? '',
+        format: input.format ?? null,
+        provider: input.provider ?? null,
+        settings: input.settings ?? [],
+        entry: input.entry ?? null,
+        entry_route: input.entry_route ?? null,
         starts_on: input.starts_on ?? null,
         ends_on: input.ends_on ?? null,
         dates_precision: input.dates_precision ?? (input.starts_on ? 'day' : null),

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as keys from '@/storage/keys';
 import { createTasksStore, seedIfEmpty, type KvAdapter } from '@/services/store';
 import { ProgramSchema } from '@/schemas/program';
-import { catalogPrograms, withCatalogueDates } from '@/domain/programs-seed';
+import { catalogPrograms, withCatalogueClasses, withCatalogueDates } from '@/domain/programs-seed';
 import { programDatesLabel, queryPrograms, searchPrograms } from '@/domain/programs';
 import { loadSeed } from './seed-fixture';
 
@@ -235,5 +235,43 @@ describe('catalogue dates', () => {
     expect(programDatesLabel({ starts_on: '2026-04-04', ends_on: null })).toBe('4 Apr 2026');
     expect(programDatesLabel({ starts_on: null, ends_on: '2026-05-10' })).toBe('Due 10 May 2026');
     expect(programDatesLabel({ starts_on: null, ends_on: null })).toBeNull();
+  });
+});
+
+describe('catalogue classification', () => {
+  it('defaults the branch fields to empty on an unclassified entry', () => {
+    const parsed = ProgramSchema.parse(catalogPrograms()[0]!);
+    expect(parsed).toMatchObject({ format: null, provider: null, settings: [], entry: null, entry_route: null });
+  });
+
+  it('keeps known values and rejects unknown ones', () => {
+    const base = catalogPrograms()[0]!;
+    const parsed = ProgramSchema.parse({
+      ...base,
+      format: 'Simulation',
+      provider: 'External',
+      settings: ['At school', 'Online'],
+      entry: 'Team',
+      entry_route: 'School enters'
+    });
+    expect(parsed.settings).toEqual(['At school', 'Online']);
+    expect(() => ProgramSchema.parse({ ...base, format: 'Mock legal' })).toThrow();
+    expect(() => ProgramSchema.parse({ ...base, settings: ['Home'] })).toThrow();
+  });
+
+  it('leaves a stored record alone when it is saved or the catalogue has no class for it', () => {
+    const saved = { id: catalogPrograms()[0]!.id, name: 'x', format: null };
+    expect(withCatalogueClasses(saved)).toBe(saved);
+    const unknown = { id: 'prog_not-in-catalogue', name: 'Local' };
+    expect(withCatalogueClasses(unknown)).toBe(unknown);
+  });
+
+  it('filters by format', () => {
+    const [a, b] = catalogPrograms();
+    const programs = [
+      { ...a!, format: 'Exam' as const },
+      { ...b!, format: 'Speaking' as const }
+    ];
+    expect(queryPrograms(programs, { format: 'Speaking' }, 'name').map((p) => p.id)).toEqual([b!.id]);
   });
 });
