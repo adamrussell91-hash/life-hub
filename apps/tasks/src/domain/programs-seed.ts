@@ -35,3 +35,28 @@ export function withCatalogueDates<T>(raw: T): T {
   const dates = typeof record.id === 'string' ? catalogueDates.get(record.id) : undefined;
   return dates ? ({ ...record, ...dates } as T) : raw;
 }
+
+const CLASS_KEYS = ['format', 'provider', 'settings', 'entry', 'entry_route', 'subjects'] as const;
+const catalogueClasses = new Map(
+  (catalog as Array<Partial<Program> & { id: string }>)
+    .filter((item) => item.format)
+    .map((item) => [item.id, Object.fromEntries(CLASS_KEYS.map((key) => [key, item[key] ?? null]))])
+);
+
+/**
+ * Stored programs were seeded before the catalogue was classified. A stored record with no
+ * `format` key takes the catalogue's classification, and its subjects with it (the recatalogue
+ * moves subjects between lines); once `format` is saved on the record, even as null, the record
+ * wins. Same rule as the Netlify programs function.
+ */
+export function withCatalogueClasses<T>(raw: T): T {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const record = raw as Record<string, unknown>;
+  if ('format' in record) return raw;
+  const classes = typeof record.id === 'string' ? catalogueClasses.get(record.id) : undefined;
+  if (!classes) return raw;
+  const next = { ...record, ...classes };
+  if (!Array.isArray(next.settings)) next.settings = [];
+  if (!Array.isArray(next.subjects)) next.subjects = record.subjects;
+  return next as T;
+}

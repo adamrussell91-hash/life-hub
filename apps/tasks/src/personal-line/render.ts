@@ -45,7 +45,7 @@ function sv(tag: string, attrs: Record<string, string | number> = {}): SVGElemen
   return node;
 }
 
-function roundel(line: LineKey, small = false): HTMLElement {
+export function roundel(line: LineKey, small = false): HTMLElement {
   const span = el('span', `pl-rd${small ? ' pl-rd--sm' : ''}`, line);
   span.style.background = LINES[line].color;
   span.style.color = LINES[line].ink;
@@ -54,7 +54,7 @@ function roundel(line: LineKey, small = false): HTMLElement {
 }
 
 let fontsRequested = false;
-function ensureFonts(): void {
+export function ensureFonts(): void {
   if (fontsRequested || typeof document === 'undefined') return;
   fontsRequested = true;
   if (document.querySelector('link[data-pl-fonts]')) return;
@@ -124,7 +124,13 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
   scroller.append(line);
   root.append(top, bar, scroller, buildUndated(snap), buildKey(snap));
   host.append(root);
-  const card = createCard(snap);
+  const card = createDepartureCard({
+    studentYear: snap.student_year,
+    following: (it) => {
+      const index = snap.items.findIndex((item) => item.id === it.id);
+      return index >= 0 ? snap.items.slice(index + 1, index + 3) : [];
+    }
+  });
   root.append(card.scrim);
 
   function build(animate: boolean): void {
@@ -522,8 +528,56 @@ function buildKey(snap: LineSnapshot): HTMLElement {
   return key;
 }
 
-/** The departure-board card for one stop. */
-function createCard(snap: LineSnapshot): { scrim: HTMLElement; open(it: LineItem, from?: HTMLElement): void; close(): void } {
+/** Colour for an entry none of whose subjects is on a line yet. */
+const OFF_LINE = { name: 'Not on a line', color: '#1d2633', fill: '#ecebe6', ink: '#ffffff' };
+
+const MONTH_LETTERS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+
+/** Where the entry sits in its calendar year: a pill for a run (striped when the dates are approx.), a diamond for a due date. */
+function yearStrip(it: LineItem): HTMLElement | null {
+  const on = it.run?.start ?? it.due?.on;
+  if (!on) return null;
+  const year = Number(on.slice(0, 4));
+  const pct = (iso: string, endOfDay = false) =>
+    Math.min(100, Math.max(0, ((doy(iso, year) + (endOfDay ? 1 : 0)) / 365) * 100));
+  const wrap = el('div', 'pl-year');
+  wrap.append(el('span', 'pl-cars__label', `${year}`));
+  const track = el('div', 'pl-year__track');
+  if (it.run) {
+    const mark = el('span', `pl-year__run${approx(it.run.precision) ? ' is-approx' : ''}`);
+    mark.style.left = `${pct(it.run.start)}%`;
+    mark.style.width = `${Math.max(1.6, pct(it.run.end, true) - pct(it.run.start))}%`;
+    mark.title = itemWhen(it);
+    track.append(mark);
+  } else if (it.due) {
+    const mark = el('span', 'pl-year__due');
+    mark.style.left = `${pct(it.due.on)}%`;
+    mark.title = itemWhen(it);
+    track.append(mark);
+  }
+  const months = el('div', 'pl-year__months');
+  MONTH_LETTERS.forEach((letter) => months.append(el('span', '', letter)));
+  wrap.append(track, months);
+  return wrap;
+}
+
+export type DepartureCardOptions = {
+  /** Lights this year's carriage green ("you"). */
+  studentYear?: number | null;
+  /** The next stops after this one, for "Next on your line". */
+  following?: (it: LineItem) => LineItem[];
+  nextTitle?: string;
+  /** Hub-only extras appended under the card body (links, actions). */
+  extras?: (it: LineItem, close: () => void) => HTMLElement[];
+};
+
+/** The departure-board card for one stop or catalogue entry. */
+export function createDepartureCard(options: DepartureCardOptions = {}): {
+  scrim: HTMLElement;
+  open(it: LineItem, from?: HTMLElement): void;
+  close(): void;
+} {
+  ensureFonts();
   const scrim = el('div', 'pl-scrim');
   scrim.hidden = true;
   const card = el('div', 'pl-card');
@@ -541,14 +595,19 @@ function createCard(snap: LineSnapshot): { scrim: HTMLElement; open(it: LineItem
   scrim.addEventListener('click', (event) => {
     if (event.target === scrim) close();
   });
-  document.addEventListener('keydown', (event) => {
+  const onKey = (event: KeyboardEvent) => {
+    if (!scrim.isConnected) {
+      document.removeEventListener('keydown', onKey);
+      return;
+    }
     if (event.key === 'Escape') close();
-  });
+  };
+  document.addEventListener('keydown', onKey);
 
   const open = (it: LineItem, from?: HTMLElement) => {
     lastFocus = from ?? (document.activeElement as HTMLElement | null);
-    const k = it.on[0]!;
-    const color = LINES[k];
+    const k = it.on[0];
+    const color = k ? LINES[k] : OFF_LINE;
     card.replaceChildren();
     card.style.setProperty('--pl-accent', color.color);
     card.style.setProperty('--pl-car', color.fill);
@@ -564,7 +623,7 @@ function createCard(snap: LineSnapshot): { scrim: HTMLElement; open(it: LineItem
     closeBtn.style.color = color.ink;
     closeBtn.addEventListener('click', close);
     right.append(runs, closeBtn);
-    head.append(el('span', '', it.type), right);
+    head.append(el('span', '', it.format ? `${it.type} · ${it.format}` : it.type), right);
 
     const body = el('div', 'pl-card__body');
     const titleRow = el('div', 'pl-card__title');
@@ -573,7 +632,8 @@ function createCard(snap: LineSnapshot): { scrim: HTMLElement; open(it: LineItem
     const text = el('div', '');
     const h = el('h3', '', it.name);
     h.id = 'pl-card-title';
-    text.append(h, el('p', '', `via ${it.matched.join(', ')}${weeks(it) > 1 ? ` · ${weeks(it)} weeks` : ''}`));
+    const via = it.on.length ? `via ${it.on.map((line) => LINES[line].name).join(' + ')}` : 'Not on a line yet';
+    text.append(h, el('p', '', `${via} · ${it.matched.join(', ')}${weeks(it) > 1 ? ` · ${weeks(it)} weeks` : ''}`));
     titleRow.append(badges, text);
     body.append(titleRow);
 
@@ -584,8 +644,9 @@ function createCard(snap: LineSnapshot): { scrim: HTMLElement; open(it: LineItem
     cars.append(el('span', 'pl-cars__label', 'Year levels'));
     const row = el('div', 'pl-cars__row');
     for (let y = 7; y <= 12; y += 1) {
-      const car = el('span', `pl-car${it.years.includes(y) ? ' is-in' : ''}${y === snap.student_year ? ' is-you' : ''}`, String(y));
-      car.title = y === snap.student_year ? `Year ${y} (you)` : `Year ${y}${it.years.includes(y) ? '' : ', not eligible'}`;
+      const you = y === options.studentYear;
+      const car = el('span', `pl-car${it.years.includes(y) ? ' is-in' : ''}${you ? ' is-you' : ''}`, String(y));
+      car.title = you ? `Year ${y} (you)` : `Year ${y}${it.years.includes(y) ? '' : ', not eligible'}`;
       row.append(car);
     }
     cars.append(row);
@@ -601,19 +662,29 @@ function createCard(snap: LineSnapshot): { scrim: HTMLElement; open(it: LineItem
     body.append(split);
 
     const tags = el('div', 'pl-tags');
-    [it.length, it.level, it.basis && it.basis !== 'Free' ? it.cost : null]
+    [
+      it.format,
+      it.length,
+      it.level,
+      it.entry,
+      ...(it.settings ?? []),
+      it.entry_route,
+      it.provider === 'School' ? 'School run' : null,
+      it.basis && it.basis !== 'Free' ? it.cost : null
+    ]
       .filter((value): value is string => Boolean(value))
       .forEach((value) => tags.append(el('span', 'pl-tag', value)));
     if (tags.childNodes.length) body.append(tags);
+    const strip = yearStrip(it);
+    if (strip) body.append(strip);
     if (it.description) body.append(el('p', 'pl-card__desc', it.description));
     const meta = [it.organiser, it.location].filter(Boolean).join(' · ');
     if (meta) body.append(el('p', 'pl-card__meta', meta));
 
-    const index = snap.items.findIndex((item) => item.id === it.id);
-    const following = index >= 0 ? snap.items.slice(index + 1, index + 3) : [];
+    const following = options.following?.(it) ?? [];
     if (following.length) {
       const next = el('div', 'pl-next');
-      next.append(el('h4', '', 'Next on your line'));
+      next.append(el('h4', '', options.nextTitle ?? 'Next on your line'));
       for (const f of following) {
         const b = el('button', '');
         b.type = 'button';
@@ -634,6 +705,7 @@ function createCard(snap: LineSnapshot): { scrim: HTMLElement; open(it: LineItem
       foot.append(a);
       body.append(foot);
     }
+    for (const extra of options.extras?.(it, close) ?? []) body.append(extra);
     card.append(head, body);
     scrim.hidden = false;
     closeBtn.focus();
