@@ -1,3 +1,4 @@
+import { refreshCalloutReferences } from '@/blocks/callout-reference';
 import { isLinkedSection } from '@/blocks/composition-link';
 import { offerTimedUndo } from '../../../design-kit/js/hub-feedback.js';
 import {
@@ -220,6 +221,11 @@ export function mountBlockCanvas(
   root.className = 'lesson-page lesson-page--blocks';
   host.append(root);
 
+  root.addEventListener('callout-reference-jump', event => {
+    event.stopPropagation();
+    select(null);
+  });
+
   function clearDnd(): void {
     for (const stop of dndCleanups) stop();
     dndCleanups = [];
@@ -269,6 +275,7 @@ export function mountBlockCanvas(
     blocks = replaceBlockInTree(blocks, updated);
     options.onChange(blocks);
     refreshPreview(updated.id);
+    refreshCalloutReferences(root, blocks, 'teacher');
   }
 
   function refreshPreview(blockId: string): void {
@@ -652,7 +659,7 @@ export function mountBlockCanvas(
   }
 
   function preview(block: Block): HTMLElement {
-    const el = options.renderPreview?.(block) ?? renderBlock(block, 'teacher');
+    const el = options.renderPreview?.(block) ?? renderBlock(block, 'teacher', { pageBlocks: blocks });
     if (block.block_type === 'tabs') {
       el.querySelectorAll('[role="tab"]').forEach((btn, index) => {
         btn.addEventListener('click', () => rememberTabsPanel(block.id, index));

@@ -1,3 +1,4 @@
+import { calloutIdentity, decorateCalloutReferences } from '@/blocks/callout-reference';
 import { FAILURE } from '@/app/failure';
 import katex from 'katex';
 import { getApiBaseUrl } from '@/api/config';
@@ -150,6 +151,10 @@ export function renderCalloutBlock(
   const styleClass = CALLOUT_STYLE_CLASS[block.content.style];
   callout.className = `callout ${styleClass}`;
   callout.setAttribute('role', 'note');
+  const head = document.createElement('div');
+  head.className = 'callout__head';
+  head.append(calloutIdentity(block.content.style));
+  callout.append(head);
 
   if (block.content.title) {
     const title = document.createElement('p');
@@ -732,6 +737,7 @@ export function renderQuestionSetBlock(
   for (const question of block.content.questions) {
     const li = document.createElement('li');
     li.className = 'block-question-set__question';
+    li.dataset.questionId = question.id;
 
     const prompt = document.createElement('p');
     prompt.className = 'block-question-set__prompt';
@@ -2182,7 +2188,7 @@ export function renderAnthologyBlock(
   );
 }
 
-export function renderBlock(
+function renderBlockContent(
   block: Block,
   mode: RenderMode,
   ctx: RenderContext = {}
@@ -2280,4 +2286,10 @@ export function renderBlock(
     fallback.textContent = FAILURE.unsupportedBlock;
     return wrapBlock(fallback, block, mode);
   }
+}
+
+export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
+  const wrapper = renderBlockContent(block, mode, ctx);
+  decorateCalloutReferences(wrapper, block, mode, ctx.pageBlocks ?? []);
+  return wrapper;
 }
