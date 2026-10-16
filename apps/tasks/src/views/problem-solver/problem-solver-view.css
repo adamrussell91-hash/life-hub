@@ -1,0 +1,36 @@
+/* apps/tasks/src/views/problem-solver/problem-solver-view.css */
+.ps-page { display: grid; gap: var(--space-6); max-width: 1180px; }
+.ps-start { display: grid; gap: var(--space-3); max-width: 640px; }
+.ps-start__status { color: var(--danger); min-height: 1em; margin: 0; }
+.ps-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.ps-list__item { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: baseline; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--glass); }
+.ps-list__link { color: var(--ink); font-weight: var(--weight-semibold); text-decoration: none; }
+.ps-list__meta, .ps-empty { color: var(--muted); font-size: var(--text-sm); }
+.ps-back { color: var(--muted); text-decoration: none; font-size: var(--text-sm); }
+.ps-session__title { margin: 0; font: var(--weight-semibold) var(--font-size-section) / 1.3 var(--font-display); }
+
+.ps-session__board { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr); gap: var(--space-6); align-items: start; }
+.ps-canvas { min-height: 360px; padding: var(--space-5); border-radius: var(--radius-lg); background: var(--paper); }
+.ps-canvas__title { margin: 0 0 var(--space-4); font-size: var(--text-md); }
+
+.ps-frame { display: grid; gap: var(--space-3); }
+.ps-frame__row { padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--line); transition: background 300ms var(--ps-ease); }
+.ps-frame__row.is-answered { background: var(--glass); box-shadow: none; }
+.ps-frame__q { margin: 0; font-weight: var(--weight-semibold); }
+.ps-frame__a { margin: var(--space-1) 0 0; color: var(--ink); min-height: 1.4em; }
+
+.ps-coach { display: flex; flex-direction: column; gap: var(--space-3); }
+.ps-coach__messages { max-height: 60vh; overflow-y: auto; }
+.ps-coach__skills { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-2); }
+.ps-coach__status { margin: 0; color: var(--muted); font-size: var(--text-sm); }
+.ps-coach__status--failed { color: var(--danger); display: flex; gap: var(--space-3); align-items: center; }
+.ps-coach__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ps-suggestion__title { margin: 0; font-weight: var(--weight-semibold); }
+.ps-suggestion__reason { margin: var(--space-1) 0 var(--space-3); color: var(--muted); }
+.ps-suggestion__actions { display: flex; gap: var(--space-2); }
+
+@media (max-width: 720px) {
+  .ps-session__board { grid-template-columns: minmax(0, 1fr); }
+  .ps-canvas { padding: var(--space-4); min-height: 0; }
+  .ps-coach__messages { max-height: none; }
+}
