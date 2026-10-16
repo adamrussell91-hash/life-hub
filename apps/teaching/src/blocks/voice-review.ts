@@ -19,6 +19,8 @@ export type MountVoiceReviewOptions = {
   text: AnnotationTextModel;
   onChange: (track: AnnotationVoiceTrack) => void;
   onClose: () => void;
+  /** Delete the whole recording (the editor confirms first). */
+  onDelete?: () => void;
 };
 
 function cloneTrack(track: AnnotationVoiceTrack): AnnotationVoiceTrack {
@@ -123,7 +125,18 @@ export function mountVoiceReview(options: MountVoiceReviewOptions): VoiceReviewH
   closeBtn.type = 'button';
   closeBtn.className = 'btn btn--ghost';
   closeBtn.textContent = 'Close';
-  header.append(heading, closeBtn);
+  const headerActions = document.createElement('div');
+  headerActions.className = 'block-editor__annotation-voice-header-actions';
+  if (options.onDelete) {
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn btn--ghost block-editor__annotation-voice-delete';
+    deleteBtn.textContent = 'Delete recording';
+    deleteBtn.addEventListener('click', () => options.onDelete?.());
+    headerActions.append(deleteBtn);
+  }
+  headerActions.append(closeBtn);
+  header.append(heading, headerActions);
 
   const warning = document.createElement('p');
   warning.className = 'block-editor__hint block-editor__annotation-voice-warning';
