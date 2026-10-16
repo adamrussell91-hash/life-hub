@@ -9758,6 +9758,89 @@ body.is-lesson-builder-full-page .hub-utilities {
   outline: 2px solid var(--wave, #2f6fed);
 }
 
+/* Live captions and pins while recording. */
+.block-editor__annotation-voice-live,
+.block-editor__annotation-voice-pins {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line, #d7d2c8);
+  border-radius: var(--radius-md, 10px);
+  background: var(--paper, #fff);
+}
+
+.block-editor__annotation-voice-live[hidden],
+.block-editor__annotation-voice-pins[hidden],
+.block-editor__annotation-voice-use-live[hidden] {
+  display: none;
+}
+
+.block-editor__annotation-voice-live-label {
+  margin: 0;
+  color: var(--ink-soft, #6b6e7e);
+  font-size: var(--text-2xs, 0.6875rem);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.block-editor__annotation-voice-live-text {
+  max-height: 9rem;
+  margin: 0;
+  overflow-y: auto;
+  font-size: var(--text-sm, 0.9375rem);
+  line-height: 1.5;
+}
+
+.block-editor__annotation-voice-live-interim {
+  color: var(--ink-soft, #6b6e7e);
+}
+
+.block-editor__annotation-voice-pin-list {
+  display: grid;
+  gap: 0.25rem;
+  max-height: 12rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.block-editor__annotation-voice-pin {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-sm, 0.9375rem);
+}
+
+.block-editor__annotation-voice-pin-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft, #6b6e7e);
+}
+
+.block-editor__annotation-voice-pin-quote {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.block-editor__annotation-line-text.is-voice-pinned {
+  animation: annotation-voice-pinned 1.2s ease-out;
+}
+
+@keyframes annotation-voice-pinned {
+  0% { background: color-mix(in srgb, var(--wave, #3a6fb0) 35%, transparent); }
+  100% { background: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block-editor__annotation-line-text.is-voice-pinned {
+    animation: none;
+    outline: 2px solid var(--wave, #3a6fb0);
+  }
+}
+
 .block-editor__annotation-voice-meter {
   height: 0.5rem;
   margin-top: var(--space-2);
@@ -10381,6 +10464,307 @@ body.is-lesson-builder-full-page .hub-utilities {
   font-family: 'Newsreader', Georgia, var(--font-display, serif);
   font-size: var(--text-base, 1rem);
   font-style: italic;
+}
+
+.block-annotation__element-chip--lang {
+  border-color: color-mix(in srgb, var(--c) 40%, var(--line, #d7d2c8));
+  color: color-mix(in srgb, var(--c) 60%, #33343d);
+}
+
+.block-annotation__element-hint {
+  margin: 0 0 0.5rem;
+  color: #6b6e7e;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-xs, 0.8125rem);
+}
+
+.block-annotation__element button {
+  cursor: pointer;
+}
+
+.block-annotation__element-back {
+  justify-self: start;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--line, #d7d2c8);
+  border-radius: 999px;
+  background: #fff;
+  color: #33343d;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-xs, 0.8125rem);
+  font-weight: 600;
+}
+
+/* Word origin: lineage pills joined by arrows, wrapping on narrow screens. */
+.block-annotation__element-lineage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.4rem;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.block-annotation__element-lineage-step {
+  position: relative;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--c) 35%, var(--line, #d7d2c8));
+  border-radius: 10px;
+  background: #fff;
+  font-family: var(--font-ui, system-ui, sans-serif);
+}
+
+.block-annotation__element-lineage-step + .block-annotation__element-lineage-step::before {
+  content: '→';
+  position: absolute;
+  top: 50%;
+  left: -1.1rem;
+  transform: translateY(-50%);
+  color: #878a9a;
+}
+
+.block-annotation__element-lineage-word {
+  font-family: 'Newsreader', Georgia, var(--font-display, serif);
+  font-size: var(--text-base, 1rem);
+  font-style: italic;
+  color: #15161c;
+}
+
+.block-annotation__element-lineage-lang {
+  color: color-mix(in srgb, var(--c) 70%, #33343d);
+  font-size: var(--text-2xs, 0.6875rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.block-annotation__element-lineage-meaning {
+  color: #54576a;
+  font-size: var(--text-xs, 0.8125rem);
+}
+
+/* Connections: mapped links as rows, related as chips. Each opens its card. */
+.block-annotation__element-rels {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.block-annotation__element-rel {
+  --ax: #878a9a;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line, #d7d2c8);
+  border-left: 4px solid var(--ax);
+  border-radius: 10px;
+  background: #fff;
+  color: #15161c;
+  text-align: left;
+}
+
+.block-annotation__element-rel[data-axis='gradient'] { --ax: #f7b733; }
+.block-annotation__element-rel[data-axis='subtype'] { --ax: #a98bff; }
+.block-annotation__element-rel[data-axis='mirror'] { --ax: #36d39a; }
+.block-annotation__element-rel[data-axis='cross'] { --ax: #ff7d7d; }
+.block-annotation__element-rel[data-axis='effect'] { --ax: #28d2e8; }
+
+.block-annotation__element-rel:hover,
+.block-annotation__element-relchip:hover,
+.block-annotation__element-spot:hover {
+  border-color: var(--c);
+}
+
+.block-annotation__element-rel-sym {
+  font-family: 'Newsreader', Georgia, var(--font-display, serif);
+  font-size: var(--text-base, 1rem);
+  font-weight: 600;
+  color: color-mix(in srgb, var(--c) 72%, #15161c);
+}
+
+.block-annotation__element-rel-info {
+  display: grid;
+  min-width: 0;
+}
+
+.block-annotation__element-rel-name {
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-sm, 0.9375rem);
+  font-weight: 600;
+}
+
+.block-annotation__element-rel-axis {
+  color: #6b6e7e;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-xs, 0.8125rem);
+}
+
+.block-annotation__element-rel-arrow {
+  color: #878a9a;
+  font-size: 1.25rem;
+}
+
+.block-annotation__element-relchips,
+.block-annotation__element-spots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.block-annotation__element-relchip,
+.block-annotation__element-spot {
+  min-height: 36px;
+  max-width: 100%;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--line, #d7d2c8);
+  border-radius: 999px;
+  background: #fff;
+  color: #33343d;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-xs, 0.8125rem);
+  font-weight: 600;
+  text-align: left;
+}
+
+.block-annotation__element-spot {
+  display: inline-grid;
+  gap: 0.05rem;
+  border-radius: 10px;
+}
+
+.block-annotation__element-spot-quote {
+  font-family: 'Newsreader', Georgia, var(--font-display, serif);
+  font-size: var(--text-sm, 0.9375rem);
+  font-style: italic;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.block-annotation__element-spot-tech {
+  color: color-mix(in srgb, var(--c) 70%, #33343d);
+  font-size: var(--text-2xs, 0.6875rem);
+}
+
+/* Practice: Check yourself / Try it. */
+.block-annotation__element-practice {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid color-mix(in srgb, var(--c) 25%, var(--line, #d7d2c8));
+}
+
+.block-annotation__element-tabs {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.block-annotation__element-tab {
+  min-height: 36px;
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--line, #d7d2c8);
+  border-radius: 999px;
+  background: #fff;
+  color: #54576a;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-xs, 0.8125rem);
+  font-weight: 700;
+}
+
+.block-annotation__element-tab[aria-selected='true'] {
+  border-color: color-mix(in srgb, var(--c) 55%, #15161c);
+  background: color-mix(in srgb, var(--c) 55%, #15161c);
+  color: #fff;
+}
+
+.block-annotation__element-quiz-def {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-sm, 0.9375rem);
+  line-height: 1.5;
+}
+
+.block-annotation__element-quiz-opts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.4rem;
+}
+
+.block-annotation__element-quiz-opt {
+  min-height: 44px;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--line, #d7d2c8);
+  border-radius: 10px;
+  background: #fff;
+  color: #15161c;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-sm, 0.9375rem);
+  text-align: left;
+}
+
+.block-annotation__element-quiz-opt:disabled { cursor: default; opacity: 0.75; }
+.block-annotation__element-quiz-opt.is-right { border-color: #1f9d6b; background: #e6f6ef; opacity: 1; }
+.block-annotation__element-quiz-opt.is-wrong { border-color: #c4473a; background: #fbe9e6; opacity: 1; }
+
+.block-annotation__element-quiz-fb {
+  min-height: 1.2em;
+  margin: 0.5rem 0 0;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-sm, 0.9375rem);
+  line-height: 1.5;
+}
+
+.block-annotation__element-quiz-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.block-annotation__element-quiz-score {
+  color: #6b6e7e;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-xs, 0.8125rem);
+}
+
+.block-annotation__element-quiz-next {
+  min-height: 36px;
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--c);
+  border-radius: 999px;
+  background: #fff;
+  color: #15161c;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-xs, 0.8125rem);
+  font-weight: 700;
+}
+
+.block-annotation__element-try-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line, #d7d2c8);
+  border-radius: 10px;
+  background: #fff;
+  color: #15161c;
+  font-family: 'Newsreader', Georgia, var(--font-display, serif);
+  font-size: var(--text-base, 1rem);
+  resize: vertical;
+}
+
+.block-annotation__element-try-checks {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-xs, 0.8125rem);
+  color: #33343d;
 }
 
 /* Note highlights: underline in the note's layer colour. */

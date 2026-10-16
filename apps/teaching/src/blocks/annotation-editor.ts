@@ -717,6 +717,8 @@ export function createAnnotationEditorFields(
       return;
     }
     closeVoiceTools();
+    clearPending();
+    window.getSelection()?.removeAllRanges();
     selectedAnnotationId = null;
     notePanel.hidden = true;
     voiceRecorder = mountVoiceRecorder({
@@ -1210,6 +1212,18 @@ export function createAnnotationEditorFields(
     emitChange();
   }
 
+  /** Visible proof that a tap while recording landed on this line. */
+  function flashPinnedLine(lineId: string): void {
+    const lineEl = selectSurface.querySelector<HTMLElement>(
+      `.block-editor__annotation-line-text[data-line-id="${CSS.escape(lineId)}"]`
+    );
+    if (!lineEl) return;
+    lineEl.classList.remove('is-voice-pinned');
+    void lineEl.offsetWidth;
+    lineEl.classList.add('is-voice-pinned');
+    window.setTimeout(() => lineEl.classList.remove('is-voice-pinned'), 1200);
+  }
+
   function applySelection(selection: BuildAnchorSelection, layerId?: string): void {
     const text = currentText();
     const anchor = buildAnchor(text, selection);
@@ -1221,6 +1235,8 @@ export function createAnnotationEditorFields(
 
     if (voiceRecorder?.isCapturing()) {
       voiceRecorder.pushTap(anchor);
+      clearPending();
+      flashPinnedLine(selection.lineId);
       return;
     }
 
@@ -2060,7 +2076,7 @@ export function createAnnotationEditorFields(
       const techniqueId = selected.technique.id;
       void loadLiteraryElements().then((table) => {
         const technique = lookupTechnique(table, techniqueId);
-        if (technique) techCardHost.replaceChildren(renderElementCard(technique, table));
+        if (technique) techCardHost.replaceChildren(renderElementCard(technique, table, { compact: true }));
       });
     }
     const techBtn = document.createElement('button');

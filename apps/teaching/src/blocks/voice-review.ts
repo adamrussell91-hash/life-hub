@@ -6,7 +6,7 @@
 import type { AnnotationAnchor, AnnotationTextModel, AnnotationVoiceTrack } from '@/schemas/block';
 import { buildAnchor } from '@/blocks/annotation-anchor';
 import { matchQuotes } from '@/blocks/voice-match';
-import { segmentClips, type SegmentClip } from '@/blocks/voice-segment';
+import { clipsFromTaps, segmentClips, type SegmentClip } from '@/blocks/voice-segment';
 import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
 
 export type VoiceReviewHandle = {
@@ -46,6 +46,9 @@ function cloneTrack(track: AnnotationVoiceTrack): AnnotationVoiceTrack {
 
 function clipsFromMatch(track: AnnotationVoiceTrack, text: AnnotationTextModel): SegmentClip[] {
   if (track.transcript.words.length === 0) {
+    if (track.clips.length === 0 && (track.taps?.length ?? 0) > 0) {
+      return clipsFromTaps({ taps: track.taps ?? [], duration: track.audio.duration_s });
+    }
     return track.clips.length > 0
       ? track.clips.map((clip) => ({ ...clip }))
       : [

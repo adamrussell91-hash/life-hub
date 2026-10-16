@@ -33,13 +33,21 @@ export async function processAnnotationVoiceTranscribeJobs({
   fetchImpl = fetch,
   nowIso,
   knowledgeFetch = knowledgeKernelFetch,
-  limit = 3
+  limit = 3,
+  /** Process just this job (the on-upload run) instead of scanning the inbox. */
+  jobId,
+  timeoutMs = 26_000
 } = {}) {
   if (!store || !knowledgeKernelSecret(env)) return { processed: [], errors: [] };
-  const inbox = (await getJSON(store, aiJobsInboxKey())) ?? { jobs: [] };
-  const queued = (inbox.jobs ?? [])
-    .filter(row => row?.kind === ANNOTATION_VOICE_TRANSCRIBE_KIND && row?.status === 'working')
-    .slice(0, Math.max(0, limit));
+  let queued;
+  if (jobId) {
+    queued = [{ id: jobId, kind: ANNOTATION_VOICE_TRANSCRIBE_KIND, status: 'working' }];
+  } else {
+    const inbox = (await getJSON(store, aiJobsInboxKey())) ?? { jobs: [] };
+    queued = (inbox.jobs ?? [])
+      .filter(row => row?.kind === ANNOTATION_VOICE_TRANSCRIBE_KIND && row?.status === 'working')
+      .slice(0, Math.max(0, limit));
+  }
   const processed = [];
   const errors = [];
 
@@ -96,7 +104,7 @@ export async function processAnnotationVoiceTranscribeJobs({
         fetchImpl,
         method: 'POST',
         body: { audio },
-        timeoutMs: 26_000
+        timeoutMs
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {

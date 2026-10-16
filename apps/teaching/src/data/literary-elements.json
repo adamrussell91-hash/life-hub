@@ -1,7 +1,7 @@
 {
   "version": "widgets@7366b85a401d",
   "source": "widgets@7366b85a401d",
-  "synced_at": "2026-10-13T10:10:49.989Z",
+  "synced_at": "2026-10-16T09:05:42.770Z",
   "families": [
     {
       "key": "Descriptive",
@@ -157,6 +157,390 @@
       "definition": "Techniques involving self-awareness and self-referentiality of narrative"
     }
   ],
+  "axes": [
+    {
+      "key": "gradient",
+      "label": "Specificity / Scope Gradient"
+    },
+    {
+      "key": "subtype",
+      "label": "Type / Subtype"
+    },
+    {
+      "key": "mirror",
+      "label": "Inversion / Mirror"
+    },
+    {
+      "key": "cross",
+      "label": "Cross-Family Link"
+    },
+    {
+      "key": "effect",
+      "label": "Shared Effect / Mode"
+    }
+  ],
+  "connections": [
+    {
+      "from": "mise-en-abyme",
+      "to": "frame-narrative",
+      "axis": "cross"
+    },
+    {
+      "from": "mise-en-abyme",
+      "to": "self-referentiality",
+      "axis": "subtype"
+    },
+    {
+      "from": "metafiction",
+      "to": "breaking-the-fourth-wall",
+      "axis": "subtype"
+    },
+    {
+      "from": "intertextuality-explicit",
+      "to": "intertextuality-implicit",
+      "axis": "gradient"
+    },
+    {
+      "from": "parody",
+      "to": "pastiche",
+      "axis": "mirror"
+    },
+    {
+      "from": "quotation",
+      "to": "epigraph",
+      "axis": "subtype"
+    },
+    {
+      "from": "allusion",
+      "to": "quotation",
+      "axis": "subtype"
+    },
+    {
+      "from": "zeugma",
+      "to": "syllepsis",
+      "axis": "gradient"
+    },
+    {
+      "from": "hyperbaton",
+      "to": "anastrophe",
+      "axis": "subtype"
+    },
+    {
+      "from": "understatement",
+      "to": "meiosis",
+      "axis": "subtype"
+    },
+    {
+      "from": "understatement",
+      "to": "litotes",
+      "axis": "subtype"
+    },
+    {
+      "from": "pathos",
+      "to": "logos",
+      "axis": "effect"
+    },
+    {
+      "from": "ethos",
+      "to": "pathos",
+      "axis": "effect"
+    },
+    {
+      "from": "unreliable-narrator",
+      "to": "naive-narrator",
+      "axis": "subtype"
+    },
+    {
+      "from": "dramatic-monologue",
+      "to": "interior-monologue",
+      "axis": "cross"
+    },
+    {
+      "from": "stream-of-consciousness",
+      "to": "interior-monologue",
+      "axis": "gradient"
+    },
+    {
+      "from": "free-indirect-discourse",
+      "to": "stream-of-consciousness",
+      "axis": "cross"
+    },
+    {
+      "from": "periodic-sentence",
+      "to": "loose-sentence",
+      "axis": "mirror"
+    },
+    {
+      "from": "parataxis",
+      "to": "hypotaxis",
+      "axis": "mirror"
+    },
+    {
+      "from": "asyndeton",
+      "to": "polysyndeton",
+      "axis": "mirror"
+    },
+    {
+      "from": "foreshadowing",
+      "to": "chekhov-s-gun",
+      "axis": "effect"
+    },
+    {
+      "from": "foreshadowing",
+      "to": "dramatic-irony",
+      "axis": "cross"
+    },
+    {
+      "from": "flashback-analepsis",
+      "to": "flash-forward-prolepsis",
+      "axis": "mirror"
+    },
+    {
+      "from": "binary-opposition",
+      "to": "antithesis",
+      "axis": "effect"
+    },
+    {
+      "from": "bathos",
+      "to": "anticlimax",
+      "axis": "effect"
+    },
+    {
+      "from": "gradatio",
+      "to": "anticlimax",
+      "axis": "mirror"
+    },
+    {
+      "from": "verbal-irony",
+      "to": "sarcasm",
+      "axis": "subtype"
+    },
+    {
+      "from": "verbal-irony",
+      "to": "dramatic-irony",
+      "axis": "cross"
+    },
+    {
+      "from": "verbal-irony",
+      "to": "situational-irony",
+      "axis": "cross"
+    },
+    {
+      "from": "antithesis",
+      "to": "juxtaposition",
+      "axis": "gradient"
+    },
+    {
+      "from": "antithesis",
+      "to": "oxymoron",
+      "axis": "gradient"
+    },
+    {
+      "from": "oxymoron",
+      "to": "paradox",
+      "axis": "gradient"
+    },
+    {
+      "from": "leitmotif",
+      "to": "motif",
+      "axis": "subtype"
+    },
+    {
+      "from": "symbol",
+      "to": "motif",
+      "axis": "cross"
+    },
+    {
+      "from": "leitmotif",
+      "to": "symbol",
+      "axis": "cross"
+    },
+    {
+      "from": "metaphor",
+      "to": "hypocatastasis",
+      "axis": "gradient"
+    },
+    {
+      "from": "personification",
+      "to": "transferred-epithet",
+      "axis": "subtype"
+    },
+    {
+      "from": "analogy",
+      "to": "metaphor",
+      "axis": "gradient"
+    },
+    {
+      "from": "extended-metaphor",
+      "to": "allegory",
+      "axis": "gradient"
+    },
+    {
+      "from": "metonymy",
+      "to": "synecdoche",
+      "axis": "subtype"
+    },
+    {
+      "from": "personification",
+      "to": "apostrophe",
+      "axis": "gradient"
+    },
+    {
+      "from": "personification",
+      "to": "anthropomorphism",
+      "axis": "gradient"
+    },
+    {
+      "from": "metaphor",
+      "to": "extended-metaphor",
+      "axis": "subtype"
+    },
+    {
+      "from": "extended-metaphor",
+      "to": "conceit",
+      "axis": "subtype"
+    },
+    {
+      "from": "metaphor",
+      "to": "simile",
+      "axis": "gradient"
+    },
+    {
+      "from": "personification",
+      "to": "pathetic-fallacy",
+      "axis": "subtype"
+    },
+    {
+      "from": "accumulation",
+      "to": "gradatio",
+      "axis": "subtype"
+    },
+    {
+      "from": "parallelism",
+      "to": "isocolon",
+      "axis": "subtype"
+    },
+    {
+      "from": "parallelism",
+      "to": "chiasmus",
+      "axis": "subtype"
+    },
+    {
+      "from": "parallelism",
+      "to": "tricolon",
+      "axis": "subtype"
+    },
+    {
+      "from": "antanaclasis",
+      "to": "polyptoton",
+      "axis": "effect"
+    },
+    {
+      "from": "epizeuxis",
+      "to": "diacope",
+      "axis": "gradient"
+    },
+    {
+      "from": "anaphora",
+      "to": "epistrophe",
+      "axis": "mirror"
+    },
+    {
+      "from": "anaphora",
+      "to": "symploce",
+      "axis": "subtype"
+    },
+    {
+      "from": "cacophony",
+      "to": "euphony",
+      "axis": "mirror"
+    },
+    {
+      "from": "rhyme",
+      "to": "slant-rhyme",
+      "axis": "gradient"
+    },
+    {
+      "from": "rhyme",
+      "to": "internal-rhyme",
+      "axis": "subtype"
+    },
+    {
+      "from": "alliteration",
+      "to": "sibilance",
+      "axis": "subtype"
+    },
+    {
+      "from": "alliteration",
+      "to": "consonance",
+      "axis": "gradient"
+    },
+    {
+      "from": "hyperbole",
+      "to": "understatement",
+      "axis": "mirror"
+    },
+    {
+      "from": "pathetic-fallacy",
+      "to": "visual-imagery",
+      "axis": "cross"
+    },
+    {
+      "from": "synaesthesia",
+      "to": "visual-imagery",
+      "axis": "cross"
+    },
+    {
+      "from": "anthropomorphism",
+      "to": "zoomorphism",
+      "axis": "mirror"
+    },
+    {
+      "from": "metaphor",
+      "to": "zoomorphism",
+      "axis": "effect"
+    },
+    {
+      "from": "personification",
+      "to": "animism",
+      "axis": "effect"
+    },
+    {
+      "from": "anthropomorphism",
+      "to": "animism",
+      "axis": "effect"
+    },
+    {
+      "from": "pathetic-fallacy",
+      "to": "animism",
+      "axis": "cross"
+    },
+    {
+      "from": "pathetic-fallacy",
+      "to": "sympathetic-landscape",
+      "axis": "gradient"
+    },
+    {
+      "from": "visual-imagery",
+      "to": "sympathetic-landscape",
+      "axis": "effect"
+    },
+    {
+      "from": "sympathetic-landscape",
+      "to": "objective-correlative",
+      "axis": "effect"
+    },
+    {
+      "from": "pathetic-fallacy",
+      "to": "objective-correlative",
+      "axis": "cross"
+    },
+    {
+      "from": "objective-correlative",
+      "to": "symbol",
+      "axis": "effect"
+    }
+  ],
   "techniques": [
     {
       "id": "visual-imagery",
@@ -166,6 +550,7 @@
       "definition": "Language appealing to the sense of sight",
       "effect": "Helps reader visualize scenes and characters",
       "example": "The scarlet dress hung like a flag in the wind",
+      "lang": "English",
       "related": [
         "auditory-imagery",
         "metaphor"
@@ -179,6 +564,7 @@
       "definition": "Language that evokes sounds",
       "effect": "Intensifies emotional or sensory impact through sound",
       "example": "The whisper of leaves in autumn wind",
+      "lang": "English",
       "related": [
         "visual-imagery",
         "onomatopoeia"
@@ -192,6 +578,7 @@
       "definition": "Language describing smells",
       "effect": "Triggers strong emotional and memory responses",
       "example": "The acrid smell of smoke filled the room",
+      "lang": "English",
       "related": [
         "gustatory-imagery",
         "sensory-accumulation"
@@ -205,6 +592,7 @@
       "definition": "Language describing taste",
       "effect": "Creates intimate, visceral sensory experience",
       "example": "The bitter pill of truth dissolved on his tongue",
+      "lang": "English",
       "related": [
         "olfactory-imagery",
         "metaphor"
@@ -218,6 +606,7 @@
       "definition": "Language describing texture and physical sensation",
       "effect": "Engages reader through sense of touch",
       "example": "The rough bark scraped her palms raw",
+      "lang": "English",
       "related": [
         "kinaesthetic-imagery",
         "pathetic-fallacy"
@@ -231,6 +620,7 @@
       "definition": "Language describing movement and physical sensation",
       "effect": "Conveys bodily experience and motion",
       "example": "Her limbs grew heavy; she sank into the chair",
+      "lang": "English",
       "related": [
         "tactile-imagery",
         "stream-of-consciousness"
@@ -244,6 +634,7 @@
       "definition": "Mixing sensory perceptions (e.g., hearing colors)",
       "effect": "Creates striking, surreal effects and fresh perspectives",
       "example": "The music was deep blue and resonant",
+      "lang": "Greek",
       "related": [
         "visual-imagery",
         "metaphor"
@@ -257,6 +648,7 @@
       "definition": "Attributing human emotions to nature or objects",
       "effect": "Reflects character's inner state through external world",
       "example": "The grey sky wept as she left",
+      "lang": "English",
       "related": [
         "personification",
         "visual-imagery"
@@ -270,6 +662,8 @@
       "definition": "Detailed, vivid description of a visual artwork or scene",
       "effect": "Creates intensity and draws reader into moment",
       "example": "The marble statue's eyes seemed to follow her",
+      "lang": "Greek",
+      "etymology": "Greek: ek- (out) + phrazein (to tell) — vivid description of a visual artwork",
       "related": [
         "visual-imagery",
         "metaphor"
@@ -283,6 +677,7 @@
       "definition": "Layering multiple sensory details in close proximity",
       "effect": "Overwhelms reader with immersive sensory experience",
       "example": "The hot sand, sharp cry of gulls, salt spray, blinding sun",
+      "lang": "Latin",
       "related": [
         "visual-imagery",
         "auditory-imagery"
@@ -296,6 +691,8 @@
       "definition": "A strikingly vivid description of a scene or event, designed to create the impression that it is occurring before the reader's eyes in real time.",
       "effect": "Generates immediate, visceral engagement; collapses narrative distance so that the reader witnesses rather than reads, producing emotional and sensory immediacy.",
       "example": "Homer's battle descriptions in the Iliad, where violence is rendered with such physical precision it seems to unfold in the present moment.",
+      "lang": "Greek",
+      "etymology": "From Greek hypotyposis, meaning 'sketch', 'outline' or 'vivid impression'.",
       "related": [
         "enargia",
         "ekphrasis",
@@ -312,6 +709,8 @@
       "definition": "Vivid, detailed description that renders a scene or object so clearly it seems to exist before the reader's eyes.",
       "effect": "Creates sensory immediacy and immersion; collapses the distance between reader and text so that description functions almost as presence.",
       "example": "Keats's 'To Autumn' describing the season's sights and textures with near-tactile vividness across every stanza.",
+      "lang": "Greek",
+      "etymology": "From Greek enargeia, meaning 'vividness' or 'brilliance'.",
       "related": [
         "ekphrasis",
         "sensory-accumulation",
@@ -328,6 +727,8 @@
       "definition": "Imagery that conveys internal physical sensations such as hunger, fatigue, fear or nausea.",
       "effect": "Grounds emotion in visceral bodily experience.",
       "example": "a hollow ache spread through her chest",
+      "lang": "Greek",
+      "etymology": "organic from Greek organikos, relating to an organ or instrument.",
       "related": []
     },
     {
@@ -338,6 +739,8 @@
       "definition": "Representation of nonhuman beings, places, objects or forces as agentic, animate or relational participants rather than inert background",
       "effect": "Distributes agency beyond human characters and foregrounds reciprocal relationships between people and the nonhuman world",
       "example": "The river is treated as an ancestor whose memory and choices shape the community",
+      "lang": "Latin",
+      "etymology": "From Latin anima, meaning breath, life or soul; the literary term is used here for representations of nonhuman agency and relational presence",
       "related": [
         "personification",
         "anthropomorphism",
@@ -353,6 +756,8 @@
       "definition": "Landscape whose physical qualities correspond with a character's or text's emotional condition without necessarily giving nature human feelings",
       "effect": "Makes setting a visual accompaniment to emotion and binds interior state to external scene",
       "example": "After the funeral, bare fields and drained winter light echo the mourner's desolation",
+      "lang": "English",
+      "etymology": "English critical phrase for landscape made emotionally correspondent with human feeling, described by Jean Hagstrum as a visual accompaniment to emotion",
       "related": [
         "pathetic-fallacy",
         "objective-correlative",
@@ -368,6 +773,7 @@
       "definition": "Implied or associated meaning beyond literal definition",
       "effect": "Adds layers of meaning and emotional resonance",
       "example": "Home (warmth, safety) vs. house (neutral)",
+      "lang": "Latin",
       "related": [
         "denotation",
         "loaded-language"
@@ -381,6 +787,7 @@
       "definition": "Literal, dictionary definition of a word",
       "effect": "Establishes precise, objective meaning",
       "example": "Rose: a prickly flowering plant; also romantic symbol",
+      "lang": "Latin",
       "related": [
         "connotation",
         "abstract-diction"
@@ -394,6 +801,7 @@
       "definition": "Use of outdated or archaic words",
       "effect": "Creates historical atmosphere or formal tone",
       "example": "Thou, thee, hath, forsooth in Shakespeare",
+      "lang": "Greek",
       "related": [
         "neologism",
         "register-shift"
@@ -407,6 +815,7 @@
       "definition": "Newly created or recently adopted words",
       "effect": "Signals modernity or innovation",
       "example": "Selfie, cryptocurrency, binge-watch",
+      "lang": "Greek",
       "related": [
         "archaism",
         "jargon"
@@ -420,6 +829,7 @@
       "definition": "Informal, conversational language",
       "effect": "Creates intimacy and realistic dialogue",
       "example": "Gonna, wanna, ain't in everyday speech",
+      "lang": "Latin",
       "related": [
         "jargon",
         "register-shift"
@@ -433,6 +843,7 @@
       "definition": "Specialized terminology of a profession or group",
       "effect": "Establishes expertise and insider perspective",
       "example": "Binary, algorithm in programming; tort, statute in law",
+      "lang": "French",
       "related": [
         "colloquialism",
         "slang"
@@ -446,6 +857,7 @@
       "definition": "Very informal, often group-specific language",
       "effect": "Creates authenticity and generation/subculture specificity",
       "example": "Lit, flex, salty in contemporary usage",
+      "lang": "Other",
       "related": [
         "colloquialism",
         "jargon"
@@ -459,6 +871,8 @@
       "definition": "Mild or indirect term substituted for something harsh",
       "effect": "Softens blow of uncomfortable truth",
       "example": "Passed away instead of died; let go instead of fired",
+      "lang": "Greek",
+      "etymology": "Greek euphēmismós: eu- (good) + phḗmē (speech) — 'good speaking'; softening harsh truths",
       "related": [
         "dysphemism",
         "loaded-language"
@@ -472,6 +886,7 @@
       "definition": "Harsh or crude term substituted for neutral one",
       "effect": "Emphasizes negative aspects",
       "example": "Croak instead of die; pig instead of police officer",
+      "lang": "Greek",
       "related": [
         "euphemism",
         "loaded-language"
@@ -485,6 +900,7 @@
       "definition": "Abrupt change from one level of formality to another",
       "effect": "Creates jarring effect or comic contrast",
       "example": "Formal opening followed by slang",
+      "lang": "Other",
       "related": [
         "colloquialism",
         "archaism"
@@ -498,6 +914,7 @@
       "definition": "Use of general, intangible concepts rather than concrete details",
       "effect": "Emphasizes ideas and themes over specifics",
       "example": "Justice, love, freedom vs. the judge, her embrace, the border",
+      "lang": "English",
       "related": [
         "concrete-diction",
         "nominalization"
@@ -511,6 +928,7 @@
       "definition": "Use of specific, tangible, sensory words",
       "effect": "Creates vivid, immediate imagery and clarity",
       "example": "Oak tree instead of vegetation; bitter cold instead of cold",
+      "lang": "English",
       "related": [
         "abstract-diction",
         "visual-imagery"
@@ -524,6 +942,7 @@
       "definition": "Use of words derived from Latin or Romance languages",
       "effect": "Creates formal, elevated, or sophisticated tone",
       "example": "Commence, facilitate, ameliorate",
+      "lang": "English",
       "related": [
         "anglo-saxon-diction"
       ]
@@ -536,6 +955,7 @@
       "definition": "Use of words from Old English and Germanic roots",
       "effect": "Creates simple, direct, or earthy tone",
       "example": "Begin, help, improve, quick",
+      "lang": "English",
       "related": [
         "latinate-diction",
         "colloquialism"
@@ -549,6 +969,7 @@
       "definition": "Words chosen for emotional impact beyond denotation",
       "effect": "Manipulates reader's emotions and attitudes",
       "example": "Freedom fighter vs. terrorist; slender vs. skeletal",
+      "lang": "Other",
       "related": [
         "connotation",
         "dysphemism"
@@ -562,6 +983,7 @@
       "definition": "Converting a verb or adjective into a noun",
       "effect": "Creates abstraction or formality",
       "example": "Destroy → destruction; happy → happiness",
+      "lang": "Latin",
       "related": [
         "abstract-diction",
         "verbing"
@@ -575,6 +997,7 @@
       "definition": "Using a noun as a verb (verbifying)",
       "effect": "Creates energy and directness",
       "example": "Google it, text me, access the database",
+      "lang": "Other",
       "related": [
         "nominalization",
         "neologism"
@@ -588,6 +1011,8 @@
       "definition": "The unique, individually distinctive vocabulary, grammar and speech patterns belonging to a specific character or speaker.",
       "effect": "Individualises character through language alone; can signal class, education, culture or psychology without authorial commentary.",
       "example": "Holden Caulfield's repetitive colloquialisms in The Catcher in the Rye, or Shakespeare's gravediggers whose malapropisms mark them as working-class outsiders.",
+      "lang": "Greek",
+      "etymology": "Modelled on 'dialect'; from Greek idios (one's own, personal) + lektos (chosen, spoken) from legein (to speak).",
       "related": [
         "register-shift",
         "colloquialism",
@@ -604,6 +1029,8 @@
       "definition": "The property of a single word or phrase carrying multiple related or distinct meanings simultaneously within a text.",
       "effect": "Generates deliberate ambiguity and semantic richness; invites multiple readings and rewards the close reader with layered interpretive possibilities.",
       "example": "The word 'heart' operating as organ, seat of emotion and moral courage simultaneously within a single poetic line.",
+      "lang": "Greek",
+      "etymology": "From Greek polysemos, meaning 'having many meanings'.",
       "related": [
         "ambivalence",
         "double-entendre",
@@ -620,6 +1047,8 @@
       "definition": "Expression of meaning using language that signifies the opposite",
       "effect": "Creates humor, social commentary, or reveals contradiction",
       "example": "Saying 'Oh, great!' when something is terrible",
+      "lang": "Greek",
+      "etymology": "Greek eirōneía: eirōn (dissembler) — one who says less than they mean",
       "related": [
         "sarcasm",
         "verbal-irony"
@@ -633,6 +1062,8 @@
       "definition": "Sharp, bitter taunt or ironic utterance",
       "effect": "Creates mockery and often reveals contempt",
       "example": "Oh, you're so smart—you failed the test",
+      "lang": "Greek",
+      "etymology": "Greek sarkazein: 'to tear flesh, gnash teeth' — cutting speech",
       "related": [
         "irony",
         "cynicism"
@@ -646,6 +1077,7 @@
       "definition": "Belief that people are motivated by self-interest",
       "effect": "Creates dark, pessimistic tone and detachment",
       "example": "Everyone's got an agenda; no one acts from kindness",
+      "lang": "Greek",
       "related": [
         "sarcasm",
         "detachment"
@@ -659,6 +1091,7 @@
       "definition": "Deep, persistent sadness or pensiveness",
       "effect": "Creates introspective, sorrowful atmosphere",
       "example": "The fading light as day turns to dusk",
+      "lang": "Greek",
       "related": [
         "wistfulness",
         "elegy"
@@ -672,6 +1105,7 @@
       "definition": "Yearning sadness or nostalgic longing",
       "effect": "Evokes bittersweet remembrance of past",
       "example": "Remembering childhood summers, now forever gone",
+      "lang": "Other",
       "related": [
         "melancholy"
       ]
@@ -684,6 +1118,7 @@
       "definition": "Deep respect, awe, or veneration",
       "effect": "Creates solemn, dignified, sacred atmosphere",
       "example": "The cathedral's hushed tones and dim light",
+      "lang": "Latin",
       "related": [
         "detachment",
         "lyric-intensity"
@@ -697,6 +1132,7 @@
       "definition": "Emotional distance or objective observation without judgment",
       "effect": "Creates scientific or ironic perspective",
       "example": "He described the disaster with clinical precision",
+      "lang": "Latin",
       "related": [
         "cynicism",
         "understatement"
@@ -710,6 +1146,7 @@
       "definition": "Sense of pressing importance or necessity",
       "effect": "Creates tension and compels reader action",
       "example": "Short sentences, exclamation, present tense in action",
+      "lang": "Other",
       "related": [
         "ambivalence",
         "lyric-intensity"
@@ -723,6 +1160,7 @@
       "definition": "Simultaneous presence of contradictory feelings",
       "effect": "Creates complexity and internal conflict",
       "example": "Love and hatred for the same person simultaneously",
+      "lang": "Other",
       "related": [
         "wistfulness",
         "irony"
@@ -736,6 +1174,7 @@
       "definition": "Mournful or contemplative poem; expresses sorrow",
       "effect": "Creates atmosphere of loss and reflection",
       "example": "Formal mourning of the dead or passing of beauty",
+      "lang": "Greek",
       "related": [
         "melancholy",
         "reverence"
@@ -749,6 +1188,7 @@
       "definition": "Mocking, scornful, with dark humor",
       "effect": "Creates bitter critique with humor",
       "example": "His earnest advice was met with sardonic laughter",
+      "lang": "Other",
       "related": [
         "sarcasm",
         "cynicism"
@@ -762,6 +1202,7 @@
       "definition": "Heightened emotional expression with poetic force",
       "effect": "Creates passionate, deeply personal atmosphere",
       "example": "Overwhelming love, fear, or wonder expressed lyrically",
+      "lang": "Latin",
       "related": [
         "urgency",
         "reverence"
@@ -775,6 +1216,7 @@
       "definition": "Representing something as less important than it is",
       "effect": "Creates humor or unexpected effect through contrast",
       "example": "A nuclear explosion was 'rather loud'",
+      "lang": "Latin",
       "related": [
         "detachment",
         "litotes"
@@ -788,6 +1230,35 @@
       "definition": "Extreme exaggeration for effect",
       "effect": "Creates humor, emphasis, or surrealism",
       "example": "I've told you a million times; I'm dying of hunger",
+      "lang": "Greek",
+      "etymology": "Greek hyperbolḗ: hyper- (over) + bállein (to throw) — 'throwing over'; exaggeration",
+      "lineage": [
+        {
+          "word": "bállein",
+          "lang": "Greek",
+          "meaning": "to throw"
+        },
+        {
+          "word": "bolḗ",
+          "lang": "Greek",
+          "meaning": "a throw"
+        },
+        {
+          "word": "hyperbolḗ",
+          "lang": "Greek",
+          "meaning": "throwing over"
+        },
+        {
+          "word": "hyperbole",
+          "lang": "Latin",
+          "meaning": "exaggeration"
+        },
+        {
+          "word": "hyperbole",
+          "lang": "English",
+          "meaning": "extreme exaggeration"
+        }
+      ],
       "related": [
         "understatement"
       ]
@@ -800,6 +1271,30 @@
       "definition": "Repetition of initial consonant sounds in nearby words",
       "effect": "Creates musicality and emphasizes phrases",
       "example": "The silken, seductive snake slithered softly",
+      "lang": "Latin",
+      "etymology": "Latin ad- (to) + littera (letter) — initial sounds repeated in adjacent words",
+      "lineage": [
+        {
+          "word": "littera",
+          "lang": "Latin",
+          "meaning": "letter"
+        },
+        {
+          "word": "ad-littera",
+          "lang": "Latin",
+          "meaning": "to the letter"
+        },
+        {
+          "word": "alliteratio",
+          "lang": "Latin",
+          "meaning": "repeated letters"
+        },
+        {
+          "word": "alliteration",
+          "lang": "English",
+          "meaning": "repeated initial sounds"
+        }
+      ],
       "related": [
         "assonance",
         "consonance"
@@ -813,6 +1308,7 @@
       "definition": "Repetition of vowel sounds within or near each other",
       "effect": "Creates internal harmony and flow",
       "example": "The rain in Spain falls mainly on the plain",
+      "lang": "Latin",
       "related": [
         "alliteration",
         "consonance"
@@ -826,6 +1322,7 @@
       "definition": "Repetition of consonant sounds within or near each other",
       "effect": "Creates texture and rhythmic cohesion",
       "example": "The click and crack of broken sticks",
+      "lang": "Latin",
       "related": [
         "alliteration",
         "assonance"
@@ -839,6 +1336,7 @@
       "definition": "Repetition of s, z, sh, ch sounds",
       "effect": "Creates hissing, whispered, or menacing effect",
       "example": "The seashell's soft, subtle susurration",
+      "lang": "Latin",
       "related": [
         "alliteration",
         "onomatopoeia"
@@ -852,6 +1350,8 @@
       "definition": "Word that imitates the sound it represents",
       "effect": "Creates immediacy and auditory vividness",
       "example": "Buzz, hiss, crack, bang, meow",
+      "lang": "Greek",
+      "etymology": "Greek: ónoma (name) + poieîn (to make) — 'name-making'; sound imitates meaning",
       "related": [
         "sibilance",
         "cacophony"
@@ -865,6 +1365,7 @@
       "definition": "Repetition of terminal sounds in nearby words",
       "effect": "Creates closure, musicality, and predictability",
       "example": "Cat/hat, moon/June in poetry",
+      "lang": "Other",
       "related": [
         "internal-rhyme",
         "slant-rhyme"
@@ -878,6 +1379,7 @@
       "definition": "Rhyming words within the same line or clause",
       "effect": "Creates compressed musicality and patterning",
       "example": "I held it as I held my breath, as still as stone",
+      "lang": "English",
       "related": [
         "rhyme",
         "anaphora"
@@ -891,6 +1393,7 @@
       "definition": "Words with similar but not identical sounds",
       "effect": "Creates modern, imperfect musicality",
       "example": "Home/come, reason/prison",
+      "lang": "English",
       "related": [
         "rhyme",
         "eye-rhyme"
@@ -904,6 +1407,7 @@
       "definition": "Words spelled similarly but pronounced differently",
       "effect": "Creates visual rather than auditory rhyme",
       "example": "Love/move, through/though",
+      "lang": "English",
       "related": [
         "rhyme",
         "slant-rhyme"
@@ -917,6 +1421,30 @@
       "definition": "Harsh, discordant combination of sounds",
       "effect": "Creates jarring, ugly, or disturbing effect",
       "example": "The grotesque crunch and screech of metal",
+      "lang": "Greek",
+      "etymology": "Greek kakophōnía: kakos (bad) + phōnḗ (sound) — harsh, discordant sound",
+      "lineage": [
+        {
+          "word": "phōnḗ",
+          "lang": "Greek",
+          "meaning": "sound, voice"
+        },
+        {
+          "word": "kakophōnía",
+          "lang": "Greek",
+          "meaning": "bad sound"
+        },
+        {
+          "word": "cacophonia",
+          "lang": "Latin",
+          "meaning": "harsh sound"
+        },
+        {
+          "word": "cacophony",
+          "lang": "English",
+          "meaning": "discordant sound"
+        }
+      ],
       "related": [
         "euphony",
         "sibilance"
@@ -930,6 +1458,30 @@
       "definition": "Pleasing, harmonious combination of sounds",
       "effect": "Creates smooth, beautiful, mellifluous effect",
       "example": "Murmuring of innumerable bees; sweet silver sound",
+      "lang": "Greek",
+      "etymology": "Greek euphōnía: eu- (good) + phōnḗ (sound) — 'good sound'; pleasing to the ear",
+      "lineage": [
+        {
+          "word": "phōnḗ",
+          "lang": "Greek",
+          "meaning": "sound, voice"
+        },
+        {
+          "word": "euphōnía",
+          "lang": "Greek",
+          "meaning": "good sound"
+        },
+        {
+          "word": "euphonia",
+          "lang": "Latin",
+          "meaning": "pleasing sound"
+        },
+        {
+          "word": "euphony",
+          "lang": "English",
+          "meaning": "harmonious sound"
+        }
+      ],
       "related": [
         "cacophony",
         "assonance"
@@ -943,6 +1495,7 @@
       "definition": "Hard consonants that stop the airflow",
       "effect": "Creates percussive, emphatic effect",
       "example": "Pick and pack the packed picnic basket",
+      "lang": "English",
       "related": [
         "fricative-sounds",
         "consonance"
@@ -956,6 +1509,7 @@
       "definition": "Consonants produced by friction",
       "effect": "Creates hissing, sizzling, or flowing effect",
       "example": "Soft and soothing; fierce and hissing",
+      "lang": "English",
       "related": [
         "plosive-sounds",
         "sibilance"
@@ -969,6 +1523,8 @@
       "definition": "The deliberate or excessive repetition of the 's' sound, often distinguished from general sibilance by its concentration and sustained sinuous quality.",
       "effect": "Creates a hissing, serpentine or whispering acoustic texture; associated with menace, seduction, secrecy or the insidious.",
       "example": "\"The slow, sinuous, soundless serpent slid silently across the stones.\"",
+      "lang": "Greek",
+      "etymology": "From Greek sigma (the name of the letter S) + -ismos (suffix denoting practice or condition).",
       "related": [
         "sibilance",
         "consonance",
@@ -985,6 +1541,8 @@
       "definition": "Rhyme between the end of one line and a word within another line.",
       "effect": "Weaves sound across lines for subtle cohesion.",
       "example": "An end word chiming with a mid-line word in the following line",
+      "lang": "English",
+      "etymology": "cross from Latin crux, plus rhyme.",
       "related": []
     },
     {
@@ -995,6 +1553,8 @@
       "definition": "An approximate rhyme in which sounds are similar but not identical, also called para-rhyme.",
       "effect": "Creates dissonance or unease against the resolution of full rhyme.",
       "example": "Wilfred Owen's escaped and scooped",
+      "lang": "Other",
+      "etymology": "half from Old English healf, plus rhyme.",
       "related": []
     },
     {
@@ -1005,6 +1565,8 @@
       "definition": "A rhyme on a stressed syllable followed by one or more unstressed syllables.",
       "effect": "Softens the close with a falling, gentler echo.",
       "example": "motion and ocean",
+      "lang": "French",
+      "etymology": "feminine via French from Latin femininus.",
       "related": []
     },
     {
@@ -1015,6 +1577,8 @@
       "definition": "A rhyme on a single stressed final syllable.",
       "effect": "Produces a firm, decisive chime.",
       "example": "delight and night",
+      "lang": "French",
+      "etymology": "masculine via French from Latin masculinus.",
       "related": []
     },
     {
@@ -1025,6 +1589,8 @@
       "definition": "Rhyme occurring at the ends of lines.",
       "effect": "Marks line boundaries and binds the stanza musically.",
       "example": "cat and hat falling at line ends",
+      "lang": "French",
+      "etymology": "From Old French rime, meaning verse or rhyme.",
       "related": []
     },
     {
@@ -1035,6 +1601,8 @@
       "definition": "The ordered pattern of rhymes at the ends of lines, conventionally noted with letters.",
       "effect": "Structures the poem's sound and signals its form.",
       "example": "ABAB CDCD in a ballad stanza",
+      "lang": "French",
+      "etymology": "rhyme from Old French rime; scheme from Greek skhema.",
       "related": []
     },
     {
@@ -1045,6 +1613,7 @@
       "definition": "Pattern of stressed and unstressed syllables in language",
       "effect": "Creates pace and musicality",
       "example": "The iambic heartbeat of a poem's meter",
+      "lang": "Greek",
       "related": [
         "metre",
         "free-verse"
@@ -1058,6 +1627,7 @@
       "definition": "Regular pattern of stressed and unstressed syllables",
       "effect": "Creates formal structure and predictable musicality",
       "example": "Iambic pentameter: da-DUM, da-DUM, da-DUM",
+      "lang": "Greek",
       "related": [
         "rhythm",
         "iambic-pentameter"
@@ -1071,6 +1641,7 @@
       "definition": "Five iambs per line; common in English poetry",
       "effect": "Creates formal, traditional elegance",
       "example": "Shall I compare thee to a summer's day?",
+      "lang": "Other",
       "related": [
         "metre",
         "enjambment"
@@ -1084,6 +1655,7 @@
       "definition": "Poetry without regular meter or rhyme scheme",
       "effect": "Allows natural speech rhythms and flexibility",
       "example": "Much modern and contemporary poetry",
+      "lang": "English",
       "related": [
         "rhythm",
         "enjambment"
@@ -1097,6 +1669,8 @@
       "definition": "The rhythmic rise and fall and modulation of the voice across a line or phrase.",
       "effect": "Shapes the musical contour and emotional pacing of speech.",
       "example": "The falling cadence at the close of a sentence",
+      "lang": "Latin",
+      "etymology": "From Latin cadere, meaning to fall, via Italian cadenza.",
       "related": [
         "rhythm",
         "metre"
@@ -1110,6 +1684,7 @@
       "definition": "A metrical foot of one unstressed syllable followed by one stressed syllable.",
       "effect": "Produces the rising rhythm closest to natural English speech.",
       "example": "a-BOVE, be-LOW",
+      "lang": "Greek",
       "related": [
         "foot",
         "metre",
@@ -1124,6 +1699,7 @@
       "definition": "A metrical foot of one stressed syllable followed by one unstressed syllable.",
       "effect": "Creates a falling, emphatic or insistent rhythm.",
       "example": "GAR-den, TI-ger",
+      "lang": "Greek",
       "related": [
         "foot",
         "metre",
@@ -1138,6 +1714,7 @@
       "definition": "The basic metrical unit of a line, made up of a pattern of stressed and unstressed syllables.",
       "effect": "Establishes the rhythmic pulse on which metre is built.",
       "example": "The iamb in a-BOVE",
+      "lang": "Other",
       "related": [
         "metre",
         "iamb",
@@ -1152,6 +1729,8 @@
       "definition": "A metrical foot of two stressed syllables.",
       "effect": "Slows the line and adds weight or emphasis.",
       "example": "HEART-BREAK",
+      "lang": "Greek",
+      "etymology": "From Greek spondeios, a metre used at libations.",
       "related": []
     },
     {
@@ -1162,6 +1741,8 @@
       "definition": "A metrical foot of two unstressed syllables.",
       "effect": "Lightens the line and quickens its movement.",
       "example": "The unstressed pair in to a",
+      "lang": "Greek",
+      "etymology": "From Greek pyrrhikhe, a war dance.",
       "related": []
     },
     {
@@ -1172,6 +1753,8 @@
       "definition": "A metrical foot of two unstressed syllables followed by one stressed syllable.",
       "effect": "Produces a brisk, rolling, often comic rhythm.",
       "example": "in-ter-VENE",
+      "lang": "Greek",
+      "etymology": "From Greek anapaistos, meaning struck back.",
       "related": []
     },
     {
@@ -1182,6 +1765,8 @@
       "definition": "A metrical foot of one stressed syllable followed by two unstressed syllables.",
       "effect": "Gives a galloping, tumbling momentum.",
       "example": "MER-ri-ly",
+      "lang": "Greek",
+      "etymology": "From Greek daktylos, meaning finger.",
       "related": []
     },
     {
@@ -1192,6 +1777,8 @@
       "definition": "Verse whose metre counts the number of syllables per line regardless of stress.",
       "effect": "Imposes shape through count rather than rhythm.",
       "example": "The syllabic poems of Marianne Moore",
+      "lang": "Greek",
+      "etymology": "syllabic from Greek syllabe, meaning a syllable.",
       "related": []
     },
     {
@@ -1202,6 +1789,8 @@
       "definition": "Verse whose metre counts only the number of stressed syllables per line.",
       "effect": "Roots rhythm in stress rather than syllable count, as in Old English verse.",
       "example": "The four-stress lines of Beowulf",
+      "lang": "Latin",
+      "etymology": "accentual from Latin accentus, meaning a tone added to speech.",
       "related": []
     },
     {
@@ -1212,6 +1801,8 @@
       "definition": "A metre based on counting stressed syllables, with a variable number of unstressed syllables per foot.",
       "effect": "Mimics natural speech with energetic, irregular force.",
       "example": "Gerard Manley Hopkins, The Windhover",
+      "lang": "Other",
+      "etymology": "Coined by Gerard Manley Hopkins from sprung plus rhythm.",
       "related": []
     },
     {
@@ -1222,6 +1813,8 @@
       "definition": "One or more unstressed syllables at the start of a line before the regular metre begins.",
       "effect": "Provides a rhythmic upbeat into the line.",
       "example": "An introductory unstressed syllable before a trochaic line",
+      "lang": "Greek",
+      "etymology": "From Greek anakrousis, meaning a pushing back.",
       "related": []
     },
     {
@@ -1232,6 +1825,8 @@
       "definition": "The omission of one or more unstressed syllables at the end of a line.",
       "effect": "Truncates the metre for abruptness or emphasis.",
       "example": "A catalectic trochaic line dropping its final unstressed beat",
+      "lang": "Greek",
+      "etymology": "From Greek katalexis, meaning a stopping.",
       "related": []
     },
     {
@@ -1242,6 +1837,8 @@
       "definition": "A line of four metrical feet.",
       "effect": "Offers a brisk, song-like measure shorter than the pentameter.",
       "example": "The tetrameter of much hymn and ballad verse",
+      "lang": "Greek",
+      "etymology": "From Greek tetra, four, plus metron, measure.",
       "related": []
     },
     {
@@ -1252,6 +1849,8 @@
       "definition": "A line of three metrical feet.",
       "effect": "Creates a short, light or clipped measure.",
       "example": "The three-foot lines alternating in ballad metre",
+      "lang": "Greek",
+      "etymology": "From Greek tri, three, plus metron, measure.",
       "related": []
     },
     {
@@ -1262,6 +1861,8 @@
       "definition": "The analysis of a line's metrical pattern of stresses and feet.",
       "effect": "Reveals the rhythmic structure underlying the verse.",
       "example": "Marking x / x / across a line to show its iambs",
+      "lang": "Latin",
+      "etymology": "From Latin scandere, meaning to climb.",
       "related": []
     },
     {
@@ -1272,6 +1873,8 @@
       "definition": "A line of six metrical feet; the iambic hexameter in English is called an alexandrine.",
       "effect": "Lengthens and slows the line for grandeur or closure.",
       "example": "The final line of a Spenserian stanza",
+      "lang": "Greek",
+      "etymology": "From Greek hex, six, plus metron; alexandrine from Old French poems on Alexander the Great.",
       "related": []
     },
     {
@@ -1282,6 +1885,35 @@
       "definition": "Repetition of words at the beginning of successive clauses",
       "effect": "Creates emphasis, rhythm, and emotional power",
       "example": "We shall fight, we shall prevail, we shall endure",
+      "lang": "Greek",
+      "etymology": "Greek anaphora: ana- (again) + phérein — 'carrying back'; repetition at line starts",
+      "lineage": [
+        {
+          "word": "phérein",
+          "lang": "Greek",
+          "meaning": "to carry, bear"
+        },
+        {
+          "word": "phorá",
+          "lang": "Greek",
+          "meaning": "a carrying, motion"
+        },
+        {
+          "word": "anaphorá",
+          "lang": "Greek",
+          "meaning": "carrying back (ana-)"
+        },
+        {
+          "word": "anaphora",
+          "lang": "Latin",
+          "meaning": "rhetorical repetition"
+        },
+        {
+          "word": "anaphora",
+          "lang": "English",
+          "meaning": "repetition at clause starts"
+        }
+      ],
       "related": [
         "epistrophe",
         "symploce"
@@ -1295,6 +1927,30 @@
       "definition": "Repetition of words at the end of successive clauses",
       "effect": "Creates strong closure and reinforcement",
       "example": "When will you learn? When will you see? When will you grow?",
+      "lang": "Greek",
+      "etymology": "Greek epistrophḗ: epi- (upon) + strephein (to turn) — 'turning upon' each line end",
+      "lineage": [
+        {
+          "word": "strephein",
+          "lang": "Greek",
+          "meaning": "to turn"
+        },
+        {
+          "word": "strophḗ",
+          "lang": "Greek",
+          "meaning": "a turning"
+        },
+        {
+          "word": "epistrophḗ",
+          "lang": "Greek",
+          "meaning": "turning upon"
+        },
+        {
+          "word": "epistrophe",
+          "lang": "English",
+          "meaning": "repetition at clause ends"
+        }
+      ],
       "related": [
         "anaphora",
         "symploce"
@@ -1308,6 +1964,8 @@
       "definition": "Combination of anaphora and epistrophe",
       "effect": "Creates complex rhythmic and emphatic patterns",
       "example": "All for one, one for all; each for all, all for each",
+      "lang": "Greek",
+      "etymology": "Greek symplokḗ: syn- (together) + plékein (to weave) — weaving anaphora and epistrophe",
       "related": [
         "anaphora",
         "epistrophe"
@@ -1321,6 +1979,8 @@
       "definition": "Repetition of a word with no intervening words",
       "effect": "Creates intense emphasis and immediacy",
       "example": "No, no, NO! Never, never again!",
+      "lang": "Greek",
+      "etymology": "Greek: epi- (upon) + zeûgma (yoke) — words yoked directly together",
       "related": [
         "diacope",
         "refrain"
@@ -1334,6 +1994,8 @@
       "definition": "Repetition of words with intervening words",
       "effect": "Creates emphasis with slight variation",
       "example": "Never ever, again and again, far, far away",
+      "lang": "Greek",
+      "etymology": "Greek diakopḗ: dia- (through) + koptein (to cut) — word repeated with an interruption",
       "related": [
         "epizeuxis",
         "anadiplosis"
@@ -1347,6 +2009,7 @@
       "definition": "Repetition of a word with different meanings",
       "effect": "Creates wordplay and philosophical complexity",
       "example": "Live to work vs. work to live; light the light",
+      "lang": "Greek",
       "related": [
         "polyptoton",
         "antithesis"
@@ -1360,6 +2023,7 @@
       "definition": "Repetition of words with the same root in different forms",
       "effect": "Creates cohesion and explores word relationships",
       "example": "I love the lovingness of those who love life",
+      "lang": "Greek",
       "related": [
         "antanaclasis",
         "conduplicatio"
@@ -1373,6 +2037,25 @@
       "definition": "Recurring word, phrase, or pattern representing a theme",
       "effect": "Reinforces central idea and creates textual unity",
       "example": "The repeated word 'home' in stories about belonging",
+      "lang": "German",
+      "etymology": "German: Leit- (leading) + Motiv (motif) — a recurring 'leading theme'",
+      "lineage": [
+        {
+          "word": "Motiv",
+          "lang": "German",
+          "meaning": "motif, motive"
+        },
+        {
+          "word": "Leitmotiv",
+          "lang": "German",
+          "meaning": "leading motif"
+        },
+        {
+          "word": "leitmotif",
+          "lang": "English",
+          "meaning": "recurring theme"
+        }
+      ],
       "related": [
         "symbol",
         "refrain"
@@ -1386,6 +2069,7 @@
       "definition": "Line or phrase repeated at intervals throughout a text",
       "effect": "Creates musicality and emphasizes message",
       "example": "The chorus of a song; repeated stanza in poetry",
+      "lang": "French",
       "related": [
         "leitmotif",
         "anadiplosis"
@@ -1399,6 +2083,7 @@
       "definition": "End of one clause repeated at the beginning of the next",
       "effect": "Creates flowing connection between ideas",
       "example": "Strong leaders lead; leaders lead nations",
+      "lang": "Greek",
       "related": [
         "epanalepsis",
         "diacope"
@@ -1412,6 +2097,7 @@
       "definition": "Repetition of word(s) at the beginning and end of a clause",
       "effect": "Creates circular structure and emphasis",
       "example": "Rage against the dying of the light; I came, I saw, I conquered",
+      "lang": "Greek",
       "related": [
         "anadiplosis",
         "conduplicatio"
@@ -1425,6 +2111,7 @@
       "definition": "Repetition of words in close succession for emphasis",
       "effect": "Creates intense emotional and rhythmic power",
       "example": "Cowards die many times before their deaths",
+      "lang": "Latin",
       "related": [
         "polyptoton",
         "epanalepsis"
@@ -1438,6 +2125,8 @@
       "definition": "The repetition of words or phrases in reverse order, often to create a paradoxical or rhetorically forceful structure.",
       "effect": "Produces memorability and rhetorical punch; can reverse, complicate or deepen the logic of a statement.",
       "example": "\"Ask not what your country can do for you — ask what you can do for your country.\" (JFK)",
+      "lang": "Greek",
+      "etymology": "From Greek anti (against, opposite) + metabole (change, turning).",
       "related": [
         "chiasmus",
         "anaphora",
@@ -1452,6 +2141,8 @@
       "definition": "Repetition of grammatical structures in successive phrases",
       "effect": "Creates balance, emphasis, and satisfying rhythm",
       "example": "I came, I saw, I conquered",
+      "lang": "Greek",
+      "etymology": "Greek parállēlos: para- (beside) + allēlos (one another) — beside one another",
       "related": [
         "tricolon",
         "antithesis-structural"
@@ -1465,6 +2156,7 @@
       "definition": "Series of three parallel items or clauses",
       "effect": "Creates completion and emphasis through triple rhythm",
       "example": "Life, liberty, and the pursuit of happiness",
+      "lang": "Greek",
       "related": [
         "parallelism",
         "isocolon"
@@ -1478,6 +2170,7 @@
       "definition": "Juxtaposition of parallel structures with opposing ideas",
       "effect": "Creates dramatic contrast through syntax",
       "example": "To err is human; to forgive, divine",
+      "lang": "Greek",
       "related": [
         "parallelism",
         "juxtaposition"
@@ -1491,6 +2184,30 @@
       "definition": "Reversal of grammatical structures in successive phrases",
       "effect": "Creates elegant symmetry and memorable phrasing",
       "example": "Ask not what your country can do for you; ask what you can do for your country",
+      "lang": "Greek",
+      "etymology": "Greek khiasmos, from letter chi (X) — crossing structure mirroring the X shape",
+      "lineage": [
+        {
+          "word": "chi (Χ)",
+          "lang": "Greek",
+          "meaning": "the letter X"
+        },
+        {
+          "word": "khiasmós",
+          "lang": "Greek",
+          "meaning": "a crossing"
+        },
+        {
+          "word": "chiasmus",
+          "lang": "Latin",
+          "meaning": "crosswise arrangement"
+        },
+        {
+          "word": "chiasmus",
+          "lang": "English",
+          "meaning": "mirrored structure"
+        }
+      ],
       "related": [
         "parallelism",
         "antithesis-structural"
@@ -1504,6 +2221,7 @@
       "definition": "Series of grammatically parallel clauses of equal length",
       "effect": "Creates mathematical balance and rhythm",
       "example": "Veni, vidi, vici (I came, I saw, I conquered)",
+      "lang": "Greek",
       "related": [
         "tricolon",
         "parallelism"
@@ -1517,6 +2235,7 @@
       "definition": "Piling up of ideas, phrases, or clauses without conjunctions",
       "effect": "Creates overwhelming effect through quantity",
       "example": "The sun, the moon, the stars, the sea, the sky stretched endlessly",
+      "lang": "Latin",
       "related": [
         "cataloguing",
         "gradatio"
@@ -1530,6 +2249,7 @@
       "definition": "Listing items in succession",
       "effect": "Creates inventory of details or ideas",
       "example": "Red, orange, yellow, green, blue, indigo, violet",
+      "lang": "Other",
       "related": [
         "accumulation",
         "asyndeton"
@@ -1543,6 +2263,7 @@
       "definition": "Repeating a phrase with added elements each time",
       "effect": "Creates building intensity and expansion",
       "example": "I love her, I love her deeply, I love her with all my soul",
+      "lang": "Latin",
       "related": [
         "accumulation",
         "amplification"
@@ -1556,6 +2277,7 @@
       "definition": "Expanding on an idea with additional details",
       "effect": "Creates emphasis through elaboration",
       "example": "He was tall—six foot two, broad-shouldered, imposing",
+      "lang": "Latin",
       "related": [
         "incremental-repetition",
         "accumulation"
@@ -1569,6 +2291,7 @@
       "definition": "Series of words arranged in ascending order of intensity",
       "effect": "Creates building emotional or logical force",
       "example": "From good to great, from great to magnificent",
+      "lang": "Latin",
       "related": [
         "accumulation",
         "incremental-repetition"
@@ -1582,6 +2305,8 @@
       "definition": "The arrangement of words, phrases or clauses in order of increasing importance, intensity or weight, so that each term exceeds the last.",
       "effect": "Builds momentum and rhetorical climax through progressive elevation; the final term carries the greatest emotional and argumentative weight.",
       "example": "\"I came with sorrow, with shame, with despair.\" / \"He was a soldier, a leader, a legend.\"",
+      "lang": "Greek",
+      "etymology": "From Greek auxesis, meaning 'growth' or 'increase'.",
       "related": [
         "gradatio",
         "accumulation",
@@ -1597,6 +2322,8 @@
       "definition": "The heaping up of synonymous or closely related words, phrases or clauses to create cumulative rhetorical force.",
       "effect": "Overwhelms the reader with weight and mass; creates intensity through sheer accumulation rather than through precision or contrast.",
       "example": "\"A bloody, barbarous, merciless, inhuman, savage, unrelenting act.\"",
+      "lang": "Latin",
+      "etymology": "From Latin congeries, meaning 'a heap' or 'a pile'.",
       "related": [
         "accumulation",
         "amplification",
@@ -1613,6 +2340,8 @@
       "definition": "Direct comparison of two unlike things using 'like' or 'as'",
       "effect": "Creates concrete understanding through familiar comparison",
       "example": "The snow was like a blanket covering the earth",
+      "lang": "Latin",
+      "etymology": "Latin similis: 'like, resembling' — an explicit comparison",
       "related": [
         "metaphor",
         "analogy"
@@ -1626,6 +2355,35 @@
       "definition": "Implied comparison without 'like' or 'as'",
       "effect": "Suggests deeper connection than simile",
       "example": "Time is money; life is a journey; love is war",
+      "lang": "Greek",
+      "etymology": "Greek metaphorá: meta- (across) + phérein (to carry) — 'carrying meaning across'",
+      "lineage": [
+        {
+          "word": "phérein",
+          "lang": "Greek",
+          "meaning": "to carry, bear"
+        },
+        {
+          "word": "phorá",
+          "lang": "Greek",
+          "meaning": "a carrying, motion"
+        },
+        {
+          "word": "metaphorá",
+          "lang": "Greek",
+          "meaning": "carrying across (meta-)"
+        },
+        {
+          "word": "metaphora",
+          "lang": "Latin",
+          "meaning": "Cicero's Latin term"
+        },
+        {
+          "word": "metaphor",
+          "lang": "English",
+          "meaning": "implied comparison"
+        }
+      ],
       "related": [
         "simile",
         "extended-metaphor"
@@ -1639,6 +2397,7 @@
       "definition": "Metaphor sustained throughout a work or long passage",
       "effect": "Creates unified symbolic framework",
       "example": "An entire poem where life is a stage with acts",
+      "lang": "English",
       "related": [
         "metaphor",
         "conceit"
@@ -1652,6 +2411,7 @@
       "definition": "Extended, elaborate metaphor; often intellectual or surprising",
       "effect": "Creates ingenious or witty comparison",
       "example": "Donne comparing lovers' souls to a compass",
+      "lang": "Latin",
       "related": [
         "extended-metaphor",
         "metaphor"
@@ -1665,6 +2425,30 @@
       "definition": "Attributing human qualities to non-human things",
       "effect": "Creates intimacy and emotional connection",
       "example": "The wind whispered secrets; the car refused to start",
+      "lang": "Latin",
+      "etymology": "Latin persona (mask) + facere (to make) — 'making a character' of an object",
+      "lineage": [
+        {
+          "word": "persona",
+          "lang": "Latin",
+          "meaning": "mask, character"
+        },
+        {
+          "word": "personificare",
+          "lang": "Latin",
+          "meaning": "to make a person of"
+        },
+        {
+          "word": "personnification",
+          "lang": "French",
+          "meaning": "embodiment"
+        },
+        {
+          "word": "personification",
+          "lang": "English",
+          "meaning": "human qualities given"
+        }
+      ],
       "related": [
         "apostrophe",
         "anthropomorphism"
@@ -1678,6 +2462,7 @@
       "definition": "Giving animals or objects human characteristics",
       "effect": "Creates accessibility and emotional engagement",
       "example": "The brave little toaster; the clever fox outsmarted them",
+      "lang": "Greek",
       "related": [
         "personification",
         "transferred-epithet"
@@ -1691,6 +2476,8 @@
       "definition": "Representing a human being through animal form, traits, behaviour, mental states or imagery",
       "effect": "Recasts human identity through animal comparison and can expose, reinforce or destabilise the boundary between human and animal",
       "example": "He prowled the corridor, shoulders hunched, teeth bared",
+      "lang": "Greek",
+      "etymology": "Greek zōon, animal, plus morphē, form; representation through animal form or qualities",
       "related": [
         "anthropomorphism",
         "metaphor",
@@ -1705,6 +2492,35 @@
       "definition": "Directly addressing someone absent or something non-human",
       "effect": "Creates intimacy or dramatic intensity",
       "example": "O death, where is thy sting? Oh, foolish pride!",
+      "lang": "Greek",
+      "etymology": "Greek apostrophḗ: apo- (away) + strephein (to turn) — 'turning away' to address the absent",
+      "lineage": [
+        {
+          "word": "strephein",
+          "lang": "Greek",
+          "meaning": "to turn"
+        },
+        {
+          "word": "strophḗ",
+          "lang": "Greek",
+          "meaning": "a turning"
+        },
+        {
+          "word": "apostrophḗ",
+          "lang": "Greek",
+          "meaning": "turning away"
+        },
+        {
+          "word": "apostrophe",
+          "lang": "Latin",
+          "meaning": "address to the absent"
+        },
+        {
+          "word": "apostrophe",
+          "lang": "English",
+          "meaning": "direct address"
+        }
+      ],
       "related": [
         "personification",
         "rhetorical-question"
@@ -1718,6 +2534,30 @@
       "definition": "Substituting the name of something with that of something associated",
       "effect": "Creates conciseness and interesting associations",
       "example": "The White House announced...; Hollywood loves violence",
+      "lang": "Greek",
+      "etymology": "Greek metōnymía: meta- (change) + ónyma (name) — 'change of name'",
+      "lineage": [
+        {
+          "word": "ónyma",
+          "lang": "Greek",
+          "meaning": "name"
+        },
+        {
+          "word": "metōnymía",
+          "lang": "Greek",
+          "meaning": "change of name"
+        },
+        {
+          "word": "metonymia",
+          "lang": "Latin",
+          "meaning": "substituted name"
+        },
+        {
+          "word": "metonymy",
+          "lang": "English",
+          "meaning": "associative substitution"
+        }
+      ],
       "related": [
         "synecdoche",
         "metaphor"
@@ -1731,6 +2571,35 @@
       "definition": "Part stands for whole, or whole stands for part",
       "effect": "Creates compressed reference and interesting perspectives",
       "example": "All hands on deck; lend a hand",
+      "lang": "Greek",
+      "etymology": "Greek synekdokhḗ: syn- (together) + ekdékhesthai (to receive) — part stands for whole",
+      "lineage": [
+        {
+          "word": "dékhesthai",
+          "lang": "Greek",
+          "meaning": "to receive"
+        },
+        {
+          "word": "ekdékhesthai",
+          "lang": "Greek",
+          "meaning": "to take from"
+        },
+        {
+          "word": "synekdokhḗ",
+          "lang": "Greek",
+          "meaning": "taking together"
+        },
+        {
+          "word": "synecdoche",
+          "lang": "Latin",
+          "meaning": "part for whole"
+        },
+        {
+          "word": "synecdoche",
+          "lang": "English",
+          "meaning": "part stands for whole"
+        }
+      ],
       "related": [
         "metonymy",
         "metaphor"
@@ -1744,6 +2613,8 @@
       "definition": "Extended narrative where characters/events represent abstract concepts",
       "effect": "Creates layered meaning and moral instruction",
       "example": "The Pilgrim's Progress; Animal Farm",
+      "lang": "Greek",
+      "etymology": "Greek allēgoría: allos (other) + agoreúein (to speak) — 'speaking otherwise'",
       "related": [
         "extended-metaphor",
         "symbol"
@@ -1757,6 +2628,7 @@
       "definition": "Extended comparison highlighting similarities",
       "effect": "Creates understanding of unfamiliar through familiar",
       "example": "How cells work in a body is like workers in a factory",
+      "lang": "Greek",
       "related": [
         "simile",
         "metaphor"
@@ -1770,6 +2642,7 @@
       "definition": "Applying an adjective to the wrong noun",
       "effect": "Creates surprising image and compressed meaning",
       "example": "A sleepless night (night doesn't sleep); restless sleep",
+      "lang": "English",
       "related": [
         "personification",
         "metaphor"
@@ -1783,6 +2656,7 @@
       "definition": "Metaphor that has become so common it's treated as literal",
       "effect": "Shows how language evolves and metaphors fade",
       "example": "Light a fire; grasp an idea; run a business",
+      "lang": "English",
       "related": [
         "metaphor"
       ]
@@ -1795,6 +2669,7 @@
       "definition": "Combining two or more incompatible metaphors",
       "effect": "Usually considered a flaw; creates confusion",
       "example": "The ball is in your court and the chips are down",
+      "lang": "English",
       "related": [
         "metaphor",
         "oxymoron"
@@ -1808,6 +2683,7 @@
       "definition": "Tenor is what's being compared; vehicle is what it's compared to",
       "effect": "Understanding this distinction clarifies metaphor mechanics",
       "example": "In 'love is a rose': love is tenor, rose is vehicle",
+      "lang": "Other",
       "related": [
         "metaphor",
         "simile"
@@ -1821,6 +2697,7 @@
       "definition": "A metaphor that is hinted at rather than directly stated",
       "effect": "Creates subtlety and requires reader interpretation",
       "example": "He's such a snake suggests treachery without stating it",
+      "lang": "Greek",
       "related": [
         "metaphor"
       ]
@@ -1833,6 +2710,8 @@
       "definition": "A figure in which a whole is referred to by naming two contrasting or complementary parts.",
       "effect": "Creates a sense of totality or universality through economical paired opposites; rhetorically satisfying and inclusive.",
       "example": "\"Searched high and low.\" / \"Young and old gathered.\" / \"The good and the wicked shall face the same end.\"",
+      "lang": "Greek",
+      "etymology": "From Greek merismos, meaning 'division' or 'partition'.",
       "related": [
         "synecdoche",
         "antithesis",
@@ -1847,6 +2726,8 @@
       "definition": "A form of hyperbole that asserts an impossibility to emphasise a point.",
       "effect": "Creates comic or emphatic force by anchoring an idea to something that could never occur, amplifying the speaker's conviction through the absurd.",
       "example": "\"I'll believe it when pigs fly.\" / \"Sooner would the sea give up her dead.\"",
+      "lang": "Greek",
+      "etymology": "From Greek adynaton, meaning 'impossible'.",
       "related": [
         "hyperbole",
         "irony"
@@ -1860,6 +2741,8 @@
       "definition": "The substitution of an epithet or title for a proper name, or a proper name for a general idea.",
       "effect": "Compresses character or reputation into a label.",
       "example": "the Bard for Shakespeare",
+      "lang": "Greek",
+      "etymology": "From Greek antonomazein, meaning to name differently.",
       "related": []
     },
     {
@@ -1870,6 +2753,8 @@
       "definition": "A descriptive word or phrase regularly attached to a name to characterise it.",
       "effect": "Fixes a defining quality, often formulaic in epic.",
       "example": "Homer's rosy-fingered dawn",
+      "lang": "Greek",
+      "etymology": "From Greek epitheton, meaning something added.",
       "related": []
     },
     {
@@ -1880,6 +2765,8 @@
       "definition": "A compound metaphorical phrase substituted for a noun, as in Old Norse and Old English verse.",
       "effect": "Renames the familiar in vivid, riddling figurative terms.",
       "example": "whale-road for the sea",
+      "lang": "Other",
+      "etymology": "From Old Norse kenning, from kenna, meaning to know or name.",
       "related": []
     },
     {
@@ -1890,6 +2777,8 @@
       "definition": "The use of an elaborate roundabout phrase instead of a direct word.",
       "effect": "Heightens, dignifies or evades through indirection.",
       "example": "the briny deep for the sea",
+      "lang": "Greek",
+      "etymology": "From Greek periphrasis, meaning a roundabout speaking.",
       "related": []
     },
     {
@@ -1900,6 +2789,30 @@
       "definition": "Object, person, or action representing something abstract",
       "effect": "Creates layers of meaning beyond literal reference",
       "example": "The ring in LOTR symbolizes power, corruption, and desire",
+      "lang": "Greek",
+      "etymology": "Greek sýmbolon: syn- (together) + bállein (to throw) — a token thrown together",
+      "lineage": [
+        {
+          "word": "bállein",
+          "lang": "Greek",
+          "meaning": "to throw"
+        },
+        {
+          "word": "sýmbolon",
+          "lang": "Greek",
+          "meaning": "token thrown together"
+        },
+        {
+          "word": "symbolum",
+          "lang": "Latin",
+          "meaning": "sign, token"
+        },
+        {
+          "word": "symbol",
+          "lang": "English",
+          "meaning": "representational sign"
+        }
+      ],
       "related": [
         "motif",
         "metaphor"
@@ -1913,6 +2826,8 @@
       "definition": "Recurring pattern, image, or theme throughout a work",
       "effect": "Creates unity and reinforces central concerns",
       "example": "The repeated motif of windows in a story about perspective",
+      "lang": "French",
+      "etymology": "Latin motivus (moving) via French — a recurring element that 'moves' through a work",
       "related": [
         "leitmotif",
         "symbol"
@@ -1926,6 +2841,7 @@
       "definition": "Universal symbol or character type recognized across cultures",
       "effect": "Creates instant resonance and deep psychological connection",
       "example": "The Hero, the Shadow, the Wise Mentor",
+      "lang": "Greek",
       "related": [
         "symbol",
         "mythological-allusion"
@@ -1939,6 +2855,7 @@
       "definition": "Colors assigned particular meanings in specific contexts",
       "effect": "Creates atmosphere and communicates symbolically",
       "example": "Red for passion/danger, white for purity, black for evil",
+      "lang": "English",
       "related": [
         "symbol",
         "visual-imagery"
@@ -1952,6 +2869,7 @@
       "definition": "Objects representing abstract ideas or themes",
       "effect": "Creates concrete focus for abstract concepts",
       "example": "Mirrors symbolizing self-reflection; cages symbolizing entrapment",
+      "lang": "English",
       "related": [
         "symbol",
         "metaphor"
@@ -1965,6 +2883,8 @@
       "definition": "A set of objects, a situation or a chain of events arranged to evoke a particular emotion through external sensory facts",
       "effect": "Externalises emotion into concrete circumstance so feeling is evoked rather than directly stated",
       "example": "An untouched cup cooling beside a second empty chair conveys bereavement without naming grief",
+      "lang": "English",
+      "etymology": "Critical phrase associated with T. S. Eliot's 1919 essay Hamlet and His Problems: external objects, situations or events correlate with and evoke emotion",
       "related": [
         "symbol",
         "pathetic-fallacy",
@@ -1980,6 +2900,7 @@
       "definition": "Animals carrying particular meanings based on cultural knowledge",
       "effect": "Creates instant association and meaning",
       "example": "Owls = wisdom, foxes = cunning, ravens = death",
+      "lang": "English",
       "related": [
         "archetype"
       ]
@@ -1992,6 +2913,7 @@
       "definition": "Reference to myths or classical stories",
       "effect": "Adds depth by invoking familiar cultural narratives",
       "example": "Calling someone a Trojan horse or referring to Pandora's box",
+      "lang": "English",
       "related": [
         "archetype",
         "allusion"
@@ -2005,6 +2927,7 @@
       "definition": "Reference to biblical stories, characters, or concepts",
       "effect": "Creates moral or spiritual resonance in secular texts",
       "example": "Garden of Eden representing paradise; Judas representing betrayal",
+      "lang": "English",
       "related": [
         "archetype",
         "allusion"
@@ -2018,6 +2941,7 @@
       "definition": "Reference to other literary works or characters",
       "effect": "Creates intertextual dialogue and layers of meaning",
       "example": "Referring to Gatsby when describing an eccentric wealthy person",
+      "lang": "English",
       "related": [
         "allusion"
       ]
@@ -2030,6 +2954,7 @@
       "definition": "Reference to cultural events, figures, or artifacts",
       "effect": "Creates contemporary relevance and cultural commentary",
       "example": "References to September 11th or iconic speeches",
+      "lang": "English",
       "related": [
         "literary-allusion",
         "allusion"
@@ -2043,6 +2968,7 @@
       "definition": "Visual representation of an abstract quality or concept",
       "effect": "Creates iconic recognition and symbolic power",
       "example": "A crown emblematizes royalty; a skull emblematizes death",
+      "lang": "Greek",
       "related": [
         "symbol",
         "iconography"
@@ -2056,6 +2982,7 @@
       "definition": "System of symbols and their meanings within a text or culture",
       "effect": "Creates recognizable visual language",
       "example": "In medieval art, specific colors and objects carry consistent meanings",
+      "lang": "Greek",
       "related": [
         "symbol",
         "archetype"
@@ -2069,6 +2996,35 @@
       "definition": "Placing contrasting ideas in parallel grammatical structures",
       "effect": "Creates dramatic opposition and makes both ideas memorable",
       "example": "It was the best of times, it was the worst of times",
+      "lang": "Greek",
+      "etymology": "Greek antíthesis: anti- (against) + títhēmi (to place) — 'placing against'",
+      "lineage": [
+        {
+          "word": "títhēmi",
+          "lang": "Greek",
+          "meaning": "to place, set"
+        },
+        {
+          "word": "thésis",
+          "lang": "Greek",
+          "meaning": "a placing"
+        },
+        {
+          "word": "antíthesis",
+          "lang": "Greek",
+          "meaning": "placing against"
+        },
+        {
+          "word": "antithesis",
+          "lang": "Latin",
+          "meaning": "rhetorical opposition"
+        },
+        {
+          "word": "antithesis",
+          "lang": "English",
+          "meaning": "balanced contrast"
+        }
+      ],
       "related": [
         "juxtaposition",
         "parallelism"
@@ -2082,6 +3038,7 @@
       "definition": "Placing contrasting elements side by side without connectives",
       "effect": "Creates tension and forces comparison",
       "example": "The palace next to the slum; the wedding and the funeral",
+      "lang": "Latin",
       "related": [
         "antithesis"
       ]
@@ -2094,6 +3051,8 @@
       "definition": "Combining contradictory or incongruous terms",
       "effect": "Creates paradoxical effect and forces reconsideration",
       "example": "Bittersweet, deafening silence, living death",
+      "lang": "Greek",
+      "etymology": "Greek oxýmōron: oxys (sharp) + mōros (foolish) — itself an oxymoron",
       "related": [
         "paradox",
         "antithesis"
@@ -2107,6 +3066,7 @@
       "definition": "Statement that seems contradictory but may be true",
       "effect": "Creates philosophical tension and requires interpretation",
       "example": "Less is more; to find yourself, you must lose yourself",
+      "lang": "Greek",
       "related": [
         "oxymoron",
         "irony"
@@ -2120,6 +3080,7 @@
       "definition": "Character, plot point, or idea that contrasts with another",
       "effect": "Highlights qualities through opposition",
       "example": "Enobarbus is a foil to Antony, highlighting different values",
+      "lang": "French",
       "related": [
         "juxtaposition"
       ]
@@ -2132,6 +3093,7 @@
       "definition": "When reality contradicts expectation in events",
       "effect": "Creates humor, pathos, or philosophical tension",
       "example": "A fire station burning down; a marriage counselor's divorce",
+      "lang": "Other",
       "related": [
         "verbal-irony",
         "dramatic-irony"
@@ -2145,6 +3107,7 @@
       "definition": "Audience/reader knows something character doesn't",
       "effect": "Creates tension and emotional investment",
       "example": "In Oedipus Rex, we know he's the killer he's seeking",
+      "lang": "Other",
       "related": [
         "verbal-irony",
         "foreshadowing"
@@ -2158,6 +3121,7 @@
       "definition": "Saying one thing but meaning the opposite",
       "effect": "Creates humor, sarcasm, or critique",
       "example": "Saying 'Oh great!' when something is terrible",
+      "lang": "Other",
       "related": [
         "sarcasm",
         "situational-irony"
@@ -2171,6 +3135,8 @@
       "definition": "Abrupt descent from elevated to trivial or comic",
       "effect": "Creates humor through anticlimax",
       "example": "The hero charges into battle, then trips over a rock",
+      "lang": "Greek",
+      "etymology": "Greek bathys: 'deep' — comic descent from elevated to trivial; anticlimax",
       "related": [
         "anticlimax"
       ]
@@ -2183,6 +3149,7 @@
       "definition": "Deflating conclusion that disappoints after buildup",
       "effect": "Creates humor or undermines expectations",
       "example": "After a dramatic opening, the villain monologues pointlessly",
+      "lang": "Greek",
       "related": [
         "bathos"
       ]
@@ -2195,6 +3162,7 @@
       "definition": "Division of concepts into opposing pairs",
       "effect": "Creates fundamental structure for understanding",
       "example": "Nature/Culture, Self/Other, Nature/Nurture",
+      "lang": "English",
       "related": [
         "antithesis",
         "paradox"
@@ -2208,6 +3176,7 @@
       "definition": "Contrast of light and dark, often used symbolically",
       "effect": "Creates drama, mood, and symbolic meaning",
       "example": "Dark shadows surrounding a figure in spotlit relief",
+      "lang": "French",
       "related": [
         "visual-imagery"
       ]
@@ -2220,6 +3189,7 @@
       "definition": "Beginning a narrative in the middle of action",
       "effect": "Creates immediate engagement and requires exposition later",
       "example": "The Odyssey begins with Odysseus already at sea",
+      "lang": "Latin",
       "related": [
         "flashback-analepsis",
         "exposition"
@@ -2233,6 +3203,7 @@
       "definition": "Interruption to show earlier events",
       "effect": "Provides context and expands temporal scope",
       "example": "Remembering childhood while in present situation",
+      "lang": "Greek",
       "related": [
         "in-medias-res",
         "flash-forward-prolepsis"
@@ -2246,6 +3217,7 @@
       "definition": "Interruption showing future events",
       "effect": "Creates suspense or foreshadows outcomes",
       "example": "A glimpse of the ending before we reach it",
+      "lang": "Greek",
       "related": [
         "flashback-analepsis",
         "foreshadowing"
@@ -2259,6 +3231,7 @@
       "definition": "Story within a story; outer frame provides context",
       "effect": "Creates nested narratives and multiple perspectives",
       "example": "Stories told by characters in The Canterbury Tales",
+      "lang": "English",
       "related": [
         "mise-en-abyme"
       ]
@@ -2271,6 +3244,7 @@
       "definition": "Events presented out of chronological order",
       "effect": "Creates complexity and requires active reader engagement",
       "example": "Pulp Fiction jumps between timelines",
+      "lang": "English",
       "related": [
         "in-medias-res",
         "circular-narrative"
@@ -2284,6 +3258,7 @@
       "definition": "Ending returns to or echoes the beginning",
       "effect": "Creates completion and philosophical resonance",
       "example": "Story that begins and ends with the same image",
+      "lang": "English",
       "related": [
         "frame-narrative"
       ]
@@ -2296,6 +3271,7 @@
       "definition": "Hints of future events or outcomes",
       "effect": "Creates suspense and invites rereading for discovery",
       "example": "A character's comment that becomes prophetic later",
+      "lang": "Other",
       "related": [
         "flash-forward-prolepsis",
         "dramatic-irony"
@@ -2309,6 +3285,7 @@
       "definition": "Principle that introduced elements must be significant later",
       "effect": "Creates causality and meaningful detail",
       "example": "If a gun is mentioned, it must fire by the end",
+      "lang": "Other",
       "related": [
         "foreshadowing"
       ]
@@ -2321,6 +3298,7 @@
       "definition": "Misleading clue that diverts attention from truth",
       "effect": "Creates misdirection and surprise",
       "example": "Detective fiction plants false evidence to mislead reader",
+      "lang": "Other",
       "related": [
         "foreshadowing"
       ]
@@ -2333,6 +3311,7 @@
       "definition": "Abrupt ending on unresolved tension",
       "effect": "Creates urgency to continue reading or watching",
       "example": "End of episode leaves character in danger",
+      "lang": "Other",
       "related": [
         "dramatic-irony"
       ]
@@ -2345,6 +3324,7 @@
       "definition": "Resolution of plot after climax",
       "effect": "Provides closure and reveals consequences",
       "example": "After the climax, events settle and resolve",
+      "lang": "French",
       "related": [
         "rising-action",
         "falling-action"
@@ -2358,6 +3338,7 @@
       "definition": "Events building toward climax",
       "effect": "Creates tension and emotional investment",
       "example": "Complications and escalations leading to climax",
+      "lang": "Latin",
       "related": [
         "exposition"
       ]
@@ -2370,6 +3351,7 @@
       "definition": "Events after climax leading to resolution",
       "effect": "Shows consequences and moves toward denouement",
       "example": "After the turning point, events move toward ending",
+      "lang": "Latin",
       "related": [
         "denouement"
       ]
@@ -2382,6 +3364,7 @@
       "definition": "Unexpected resolution by intervention of outside force",
       "effect": "Creates artificial resolution",
       "example": "A god appears to solve the otherwise unsolvable problem",
+      "lang": "Latin",
       "related": [
         "denouement"
       ]
@@ -2394,6 +3377,7 @@
       "definition": "Omission of events or time periods",
       "effect": "Allows focus on important moments",
       "example": "Skipping over uneventful weeks in a narrative",
+      "lang": "Greek",
       "related": [
         "non-linear-narrative"
       ]
@@ -2406,6 +3390,8 @@
       "definition": "Secondary plot running parallel to main plot",
       "effect": "Creates complexity and thematic resonance",
       "example": "Love story subplot in an adventure narrative",
+      "lang": "Other",
+      "etymology": "English compound of 'sub' (Latin, under) + 'plot' (a plan or ground plan, of obscure origin).",
       "related": []
     },
     {
@@ -2416,6 +3402,7 @@
       "definition": "Two or more narratives progressing simultaneously",
       "effect": "Creates connection and comparison between stories",
       "example": "Two characters' stories told side by side",
+      "lang": "English",
       "related": [
         "frame-narrative",
         "non-linear-narrative"
@@ -2429,6 +3416,8 @@
       "definition": "A novel tracing the psychological and moral growth of its protagonist from youth to maturity.",
       "effect": "Frames narrative as a process of formation and coming of age.",
       "example": "Charles Dickens, Great Expectations",
+      "lang": "German",
+      "etymology": "From German Bildung, meaning formation, plus Roman, meaning novel.",
       "related": []
     },
     {
@@ -2439,6 +3428,8 @@
       "definition": "A sudden moment of insight or revelation experienced by a character.",
       "effect": "Crystallises meaning and marks a turning point.",
       "example": "The closing realisation in Joyce's The Dead",
+      "lang": "Greek",
+      "etymology": "From Greek epiphaneia, meaning a manifestation or appearance.",
       "related": []
     },
     {
@@ -2449,6 +3440,7 @@
       "definition": "Moment of recognition or self-discovery by protagonist",
       "effect": "Creates turning point in understanding",
       "example": "Oedipus discovering he is the cause of the plague",
+      "lang": "Greek",
       "related": [
         "peripeteia"
       ]
@@ -2461,6 +3453,7 @@
       "definition": "Sudden reversal of fortune or circumstances",
       "effect": "Creates dramatic turn in plot",
       "example": "Expected ally reveals they're the villain",
+      "lang": "Greek",
       "related": [
         "anagnorisis"
       ]
@@ -2473,6 +3466,7 @@
       "definition": "Fatal flaw in protagonist leading to downfall",
       "effect": "Explains tragedy as consequence of character defect",
       "example": "Macbeth's ambition leads to his destruction",
+      "lang": "Greek",
       "related": []
     },
     {
@@ -2483,6 +3477,8 @@
       "definition": "Excessive pride or self-confidence that leads a tragic protagonist to defy the gods or moral order.",
       "effect": "Marks the overreach that precipitates downfall, inviting both awe and warning.",
       "example": "Creon's hubris in Sophocles' Antigone brings ruin upon his house.",
+      "lang": "Greek",
+      "etymology": "Greek 'hybris' (insolence, outrage, wanton violence).",
       "related": []
     },
     {
@@ -2493,6 +3489,8 @@
       "definition": "The agent or force of retribution that punishes hubris and restores moral balance.",
       "effect": "Delivers inevitable comeuppance, satisfying the audience's sense of justice.",
       "example": "In Greek tragedy, the downfall that follows overweening pride enacts nemesis.",
+      "lang": "Greek",
+      "etymology": "Greek 'nemesis' (retribution, indignation), from 'nemein' (to deal out, dispense).",
       "related": []
     },
     {
@@ -2503,6 +3501,8 @@
       "definition": "The purging or purification of the emotions of pity and fear through tragic drama.",
       "effect": "Leaves the audience emotionally cleansed and renewed after vicarious suffering.",
       "example": "Aristotle cites the audience's response to tragedies like Oedipus Rex as cathartic.",
+      "lang": "Greek",
+      "etymology": "Greek 'katharsis' (cleansing, purgation), from 'kathairein' (to purify).",
       "related": []
     },
     {
@@ -2513,6 +3513,8 @@
       "definition": "The final tragic resolution in which the protagonist's fortunes collapse.",
       "effect": "Completes the tragic arc, releasing accumulated tension into downfall and closure.",
       "example": "The deaths that conclude Hamlet form the play's catastrophe.",
+      "lang": "Greek",
+      "etymology": "Greek 'katastrophe' (an overturning), from 'kata' (down) + 'strephein' (to turn).",
       "related": []
     },
     {
@@ -2523,6 +3525,8 @@
       "definition": "A humorous scene or character introduced into a serious work to ease tension.",
       "effect": "Provides momentary release, heightening the surrounding gravity by contrast.",
       "example": "The drunken Porter in Macbeth offers comic relief after Duncan's murder.",
+      "lang": "Greek",
+      "etymology": "'comic' from Greek 'komikos' (of comedy) + 'relief' from Old French 'relever' (to raise).",
       "related": []
     },
     {
@@ -2533,6 +3537,8 @@
       "definition": "The coexistence of multiple competing voices, perspectives or ideologies within a single text, none fully privileged over the others (theorised by Mikhail Bakhtin).",
       "effect": "Creates ideological complexity and resists a single authoritative reading; the text becomes a site of ongoing debate rather than resolved meaning.",
       "example": "The competing voices of characters, narrator and implied author in a polyphonic novel such as Dostoevsky's The Brothers Karamazov.",
+      "lang": "Greek",
+      "etymology": "From Greek dialogos (dialogue, conversation) + -ismos; the concept was theorised and named by Mikhail Bakhtin in the 1930s.",
       "related": [
         "free-indirect-discourse",
         "intertextuality-implicit",
@@ -2548,6 +3554,8 @@
       "definition": "The mode of narration in which events are told or summarised by a narrator, rather than enacted or shown in scene.",
       "effect": "Creates narrative distance; positions the reader as recipient of reported experience rather than direct witness, shaping how much interpretive authority the narrator holds.",
       "example": "\"He spent three years at sea, barely surviving.\" (summary-telling vs. a dramatised scene of those years)",
+      "lang": "Greek",
+      "etymology": "From Greek diegesis, meaning 'narration' or 'recounting'.",
       "related": [
         "mimesis",
         "ellipsis-narrative",
@@ -2563,6 +3571,8 @@
       "definition": "The central question of suspense that a play raises and the audience waits to see resolved.",
       "effect": "Sustains engagement by focusing anticipation on a single outcome.",
       "example": "\"Will Hamlet avenge his father?\" is the dramatic question driving the play.",
+      "lang": "English",
+      "etymology": "'dramatic' from Greek 'drama' (action) + 'question' from Latin 'quaestio' (a seeking).",
       "related": []
     },
     {
@@ -2573,6 +3583,8 @@
       "definition": "The representation or imitation of the real world in art, central to classical theories of drama.",
       "effect": "Grounds dramatic illusion in recognisable reality, enabling audience belief and emotion.",
       "example": "Aristotle's Poetics defines tragedy as the mimesis of an action that is serious and complete.",
+      "lang": "Greek",
+      "etymology": "Greek 'mimesis' (imitation), from 'mimeisthai' (to imitate), from 'mimos' (mime).",
       "related": []
     },
     {
@@ -2583,6 +3595,8 @@
       "definition": "The implicit meaning beneath the literal dialogue, conveying unspoken thought or feeling.",
       "effect": "Creates depth and tension by letting characters mean more than they say.",
       "example": "The strained politeness of Chekhov's characters carries grief and longing as subtext.",
+      "lang": "Latin",
+      "etymology": "'sub' (Latin, under) + 'text' from Latin 'textus' (something woven).",
       "related": []
     },
     {
@@ -2593,6 +3607,8 @@
       "definition": "The conveying of background information necessary to understand the dramatic situation.",
       "effect": "Orients the audience by establishing setting, character and prior events.",
       "example": "The opening dialogue of many plays delivers exposition about who and where the characters are.",
+      "lang": "Latin",
+      "etymology": "Latin 'expositio' (a setting forth), from 'exponere' (to put out, explain).",
       "related": []
     },
     {
@@ -2603,6 +3619,7 @@
       "definition": "Joining phrases or clauses with conjunctions",
       "effect": "Creates connection and accumulation",
       "example": "And we were hungry and tired and afraid",
+      "lang": "Greek",
       "related": [
         "asyndeton",
         "polysyndeton"
@@ -2616,6 +3633,8 @@
       "definition": "Omitting conjunctions between phrases or clauses",
       "effect": "Creates speed, emphasis, or fragmentation",
       "example": "We were hungry, tired, afraid, desperate",
+      "lang": "Greek",
+      "etymology": "Greek: a- (without) + syndeton — 'without binding'; conjunctions omitted",
       "related": [
         "syndeton",
         "polysyndeton"
@@ -2629,6 +3648,8 @@
       "definition": "Excessive use of conjunctions between phrases or clauses",
       "effect": "Creates rhythmic accumulation or overwhelming effect",
       "example": "And we were hungry and tired and afraid and losing hope",
+      "lang": "Greek",
+      "etymology": "Greek: polys (many) + syndeton (bound with 'and') — 'many bindings'",
       "related": [
         "asyndeton",
         "syndeton"
@@ -2642,6 +3663,35 @@
       "definition": "Placing grammatical units side by side without connectives",
       "effect": "Creates equality and can feel abrupt",
       "example": "I came, I saw, I conquered",
+      "lang": "Greek",
+      "etymology": "Greek: para- (beside) + táxis (arrangement) — clauses placed side by side as equals",
+      "lineage": [
+        {
+          "word": "tassō",
+          "lang": "Greek",
+          "meaning": "to arrange, order"
+        },
+        {
+          "word": "táxis",
+          "lang": "Greek",
+          "meaning": "arrangement, order"
+        },
+        {
+          "word": "paratáxis",
+          "lang": "Greek",
+          "meaning": "beside-arrangement"
+        },
+        {
+          "word": "parataxis",
+          "lang": "Latin",
+          "meaning": "via Latin grammar"
+        },
+        {
+          "word": "parataxis",
+          "lang": "English",
+          "meaning": "co-ordinate clauses"
+        }
+      ],
       "related": [
         "hypotaxis",
         "asyndeton"
@@ -2655,6 +3705,35 @@
       "definition": "Using subordinate clauses to show relationships",
       "effect": "Creates hierarchy and complex relationships",
       "example": "When I arrived, since I was tired, although it was late",
+      "lang": "Greek",
+      "etymology": "Greek: hypo- (under) + táxis (arrangement) — subordinated, nested syntax",
+      "lineage": [
+        {
+          "word": "tassō",
+          "lang": "Greek",
+          "meaning": "to arrange, order"
+        },
+        {
+          "word": "táxis",
+          "lang": "Greek",
+          "meaning": "arrangement, order"
+        },
+        {
+          "word": "hypotáxis",
+          "lang": "Greek",
+          "meaning": "under-arrangement"
+        },
+        {
+          "word": "hypotaxis",
+          "lang": "Latin",
+          "meaning": "Priscian's grammar"
+        },
+        {
+          "word": "hypotaxis",
+          "lang": "English",
+          "meaning": "subordinate clause structure"
+        }
+      ],
       "related": [
         "parataxis"
       ]
@@ -2667,6 +3746,7 @@
       "definition": "Main clause postponed until end after subordinate clauses",
       "effect": "Creates suspense and emphasis through delayed resolution",
       "example": "Although we tried, though we failed, still we persevered",
+      "lang": "English",
       "related": [
         "loose-sentence"
       ]
@@ -2679,6 +3759,7 @@
       "definition": "Main clause stated first, followed by elaborations",
       "effect": "Creates directness and adds information gradually",
       "example": "We persevered, though we tried, despite our failures",
+      "lang": "English",
       "related": [
         "periodic-sentence"
       ]
@@ -2691,6 +3772,7 @@
       "definition": "Question posed not for answer but for effect",
       "effect": "Creates emphasis and engages reader",
       "example": "Who could deny the beauty of the sunset?",
+      "lang": "English",
       "related": [
         "apostrophe"
       ]
@@ -2703,6 +3785,7 @@
       "definition": "Incomplete sentence used intentionally for effect",
       "effect": "Creates emphasis, mimics speech",
       "example": "Not a complete thought. Just fragments. Sharp. Direct.",
+      "lang": "English",
       "related": [
         "asyndeton"
       ]
@@ -2715,6 +3798,7 @@
       "definition": "Independent clauses improperly joined",
       "effect": "Can create breathless or manic effect",
       "example": "She ran through the door and down the hall and into his arms",
+      "lang": "English",
       "related": [
         "syndeton"
       ]
@@ -2727,6 +3811,8 @@
       "definition": "Inversion of normal word order",
       "effect": "Creates emphasis or archaic effect",
       "example": "Strong was his conviction; backward he walked",
+      "lang": "Greek",
+      "etymology": "Greek anastrophḗ: ana- (back) + strephein (to turn) — inverted word order",
       "related": [
         "hyperbaton"
       ]
@@ -2739,6 +3825,7 @@
       "definition": "Insertion of a phrase or clause as interruption",
       "effect": "Allows interjection and creates aside effect",
       "example": "The truth—hard as it is to admit—was obvious",
+      "lang": "Greek",
       "related": [
         "apposition"
       ]
@@ -2751,6 +3838,7 @@
       "definition": "Placement of noun or noun phrase beside another as explanation",
       "effect": "Creates definition through juxtaposition",
       "example": "My brother, the doctor, explained the procedure",
+      "lang": "Latin",
       "related": [
         "parenthesis"
       ]
@@ -2763,6 +3851,7 @@
       "definition": "Omission of words understood from context",
       "effect": "Creates conciseness and emphasis",
       "example": "Some laughed; others cried",
+      "lang": "Greek",
       "related": [
         "asyndeton"
       ]
@@ -2775,6 +3864,7 @@
       "definition": "Pause or break in metrical line",
       "effect": "Creates rhythm and allows emphasis in poetry",
       "example": "The day breaks || silence grows",
+      "lang": "Latin",
       "related": [
         "enjambment"
       ]
@@ -2787,6 +3877,7 @@
       "definition": "Line breaks that continue grammatical phrase to next line",
       "effect": "Creates flow across line breaks",
       "example": "The day breaks / silently",
+      "lang": "French",
       "related": [
         "end-stopping"
       ]
@@ -2799,6 +3890,7 @@
       "definition": "Grammatical pause coinciding with line ending",
       "effect": "Creates completion and allows rest",
       "example": "The day breaks. / Silence grows.",
+      "lang": "Other",
       "related": [
         "enjambment",
         "caesura"
@@ -2812,6 +3904,8 @@
       "definition": "Extreme compression of expression, deliberately omitting words that the reader must infer to complete the meaning.",
       "effect": "Creates intensity, speed and tautness; demands active interpretive participation from the reader and can produce an effect of controlled urgency.",
       "example": "\"If possible, come.\" / \"Gone.\" / \"Ready?\" / \"Three men dead, the rest in flight.\"",
+      "lang": "Greek",
+      "etymology": "From Greek brachylogia, meaning 'brief speech'.",
       "related": [
         "ellipsis-grammatical",
         "asyndeton",
@@ -2826,6 +3920,8 @@
       "definition": "The deliberate substitution of one grammatical form for another — tense, number, person or case — for rhetorical or characterisation effect.",
       "effect": "Can signal dialect, psychological state or defamiliarisation; draws conscious attention to the act of speaking and the social encoding of grammar.",
       "example": "\"I seen what you done.\" (past tense substitution for characterisation) / The royal 'we' substituted for 'I'.",
+      "lang": "Greek",
+      "etymology": "From Greek enallage, meaning 'interchange' or 'exchange'.",
       "related": [
         "idiolect",
         "colloquialism",
@@ -2841,6 +3937,8 @@
       "definition": "A grammatical construction in which the expected syntactic sequence is abandoned mid-sentence, leaving it technically incomplete.",
       "effect": "Mimics psychological disruption, emotional overwhelm or a fractured mind; creates authenticity in characterisation.",
       "example": "\"If you — but never mind.\" / \"The king — he was very angry.\"",
+      "lang": "Greek",
+      "etymology": "From Greek anakolouthon, meaning 'not following'.",
       "related": [
         "ellipsis-grammatical",
         "stream-of-consciousness"
@@ -2854,6 +3952,8 @@
       "definition": "A figure in which the natural or temporal order of events or ideas is deliberately inverted.",
       "effect": "Creates urgency, disorientation or dark comedy by presenting result before cause; can suggest emotional priority over logical sequence.",
       "example": "\"Put on your shoes and socks.\" / \"I die! I faint! I fail!\" (Shelley, Prometheus Unbound)",
+      "lang": "Greek",
+      "etymology": "From Greek, literally 'the later earlier'.",
       "related": [
         "anastrophe",
         "in-medias-res",
@@ -2868,6 +3968,8 @@
       "definition": "The needless repetition of an idea in different words.",
       "effect": "Reinforces a point or exposes empty redundancy.",
       "example": "a free gift",
+      "lang": "Greek",
+      "etymology": "From Greek tautologia, meaning saying the same thing.",
       "related": []
     },
     {
@@ -2878,6 +3980,8 @@
       "definition": "The use of more words than necessary to express a meaning.",
       "effect": "Adds emphasis or, unintentionally, redundancy.",
       "example": "I saw it with my own eyes",
+      "lang": "Greek",
+      "etymology": "From Greek pleonasmos, meaning excess.",
       "related": []
     },
     {
@@ -2888,6 +3992,7 @@
       "definition": "Story told from perspective of 'I'",
       "effect": "Creates intimacy and direct reader connection",
       "example": "I walked through the door and found the truth",
+      "lang": "English",
       "related": [
         "second-person-address",
         "interior-monologue"
@@ -2901,6 +4006,7 @@
       "definition": "Story told to 'you'; addresses reader directly",
       "effect": "Creates immediate engagement and implicates reader",
       "example": "You enter the room. You see the body. You freeze.",
+      "lang": "English",
       "related": [
         "first-person-narrator"
       ]
@@ -2913,6 +4019,7 @@
       "definition": "Narrator knows all thoughts, feelings, and events",
       "effect": "Creates detachment and comprehensive perspective",
       "example": "Traditional omniscient narration in Victorian novels",
+      "lang": "Other",
       "related": [
         "third-person-limited"
       ]
@@ -2925,6 +4032,7 @@
       "definition": "Third person but from one character's perspective",
       "effect": "Creates objectivity with limited knowledge",
       "example": "He saw the truth but didn't understand it",
+      "lang": "Other",
       "related": [
         "third-person-omniscient"
       ]
@@ -2937,6 +4045,7 @@
       "definition": "Narrator whose account cannot be fully trusted",
       "effect": "Creates uncertainty and requires active interpretation",
       "example": "An insane narrator whose perspective is skewed",
+      "lang": "English",
       "related": [
         "naive-narrator",
         "dramatic-irony"
@@ -2950,6 +4059,7 @@
       "definition": "Direct representation of character's mental processes",
       "effect": "Creates immediacy and psychological depth",
       "example": "Molly Bloom's long, unpunctuated internal monologue",
+      "lang": "Other",
       "related": [
         "interior-monologue",
         "free-indirect-discourse"
@@ -2963,6 +4073,7 @@
       "definition": "Character's unspoken thoughts represented",
       "effect": "Creates access to internal mental life",
       "example": "His thoughts raced: did she know? Could she understand?",
+      "lang": "English",
       "related": [
         "stream-of-consciousness"
       ]
@@ -2975,6 +4086,7 @@
       "definition": "Third-person narration with character's voice and perspective",
       "effect": "Creates intimacy without first-person commitment",
       "example": "He wondered if she understood. But how could she?",
+      "lang": "English",
       "related": [
         "stream-of-consciousness"
       ]
@@ -2987,6 +4099,7 @@
       "definition": "Narrative told through letters, emails, or documents",
       "effect": "Creates authenticity and varied perspectives",
       "example": "The novel told entirely through exchanged letters",
+      "lang": "Other",
       "related": [
         "frame-narrative"
       ]
@@ -2999,6 +4112,7 @@
       "definition": "Character speaks directly to listener, revealing self",
       "effect": "Creates character development and psychological insight",
       "example": "Browning's Duke speaking to a visitor",
+      "lang": "English",
       "related": [
         "interior-monologue"
       ]
@@ -3011,6 +4125,7 @@
       "definition": "Multiple characters speaking as 'we' or unified voice",
       "effect": "Creates community perspective and shared experience",
       "example": "Townspeople speaking collectively about an event",
+      "lang": "English",
       "related": [
         "first-person-narrator"
       ]
@@ -3023,6 +4138,7 @@
       "definition": "Narrator lacks understanding of what they describe",
       "effect": "Creates irony as reader understands more than narrator",
       "example": "A child narrator unaware of adults' dark intentions",
+      "lang": "English",
       "related": [
         "unreliable-narrator",
         "dramatic-irony"
@@ -3036,6 +4152,8 @@
       "definition": "Appeal to credibility and authority of the speaker",
       "effect": "Establishes trustworthiness and expertise",
       "example": "A doctor speaking about medicine has ethos",
+      "lang": "Greek",
+      "etymology": "Greek ēthos: 'character, custom' — credibility-based persuasion",
       "related": [
         "pathos",
         "logos"
@@ -3049,6 +4167,8 @@
       "definition": "Appeal to emotion and sympathy of the audience",
       "effect": "Engages reader emotionally and motivates response",
       "example": "A story about a child's suffering appeals to pathos",
+      "lang": "Greek",
+      "etymology": "Greek páthos: 'suffering, feeling' — appeal that evokes pity or emotion",
       "related": [
         "logos"
       ]
@@ -3061,6 +4181,8 @@
       "definition": "Appeal to logic and reason",
       "effect": "Uses evidence and rational argument to persuade",
       "example": "Statistical evidence presented in logical sequence",
+      "lang": "Greek",
+      "etymology": "Greek lógos: 'word, reason' — persuasion through logical argument",
       "related": [
         "ethos"
       ]
@@ -3073,6 +4195,7 @@
       "definition": "Persuasion through timing and cultural moment",
       "effect": "Leverages opportune moment for maximum impact",
       "example": "An ad released during a cultural event it references",
+      "lang": "Greek",
       "related": [
         "ethos"
       ]
@@ -3085,6 +4208,7 @@
       "definition": "Rhetorical device turning opponent's words back against them",
       "effect": "Creates clever refutation through reversal",
       "example": "Your own argument proves my point, not yours",
+      "lang": "Greek",
       "related": []
     },
     {
@@ -3095,6 +4219,7 @@
       "definition": "Expressing a single idea through two words or phrases",
       "effect": "Creates emphasis and semantic richness",
       "example": "Nice and warm; safe and sound",
+      "lang": "Greek",
       "related": []
     },
     {
@@ -3105,6 +4230,8 @@
       "definition": "Understatement expressed through negative construction",
       "effect": "Creates ironic emphasis through minimization",
       "example": "That's not bad (meaning it's good); no small matter",
+      "lang": "Greek",
+      "etymology": "Greek litótēs: litos (plain, simple) — understatement via double negation",
       "related": [
         "meiosis",
         "understatement"
@@ -3118,6 +4245,7 @@
       "definition": "Deliberate representation of something as less important",
       "effect": "Creates irony and humor through minimization",
       "example": "The Black Death was merely a bit problematic",
+      "lang": "Greek",
       "related": [
         "litotes",
         "understatement"
@@ -3131,6 +4259,7 @@
       "definition": "Mentioning something by denying it explicitly",
       "effect": "Actually draws attention to what's ostensibly denied",
       "example": "I won't even mention his terrible record",
+      "lang": "Greek",
       "related": []
     },
     {
@@ -3141,6 +4270,7 @@
       "definition": "Anticipating and answering objections before they're raised",
       "effect": "Strengthens argument by addressing counterarguments",
       "example": "You might argue costs are prohibitive; however, benefits...",
+      "lang": "Greek",
       "related": []
     },
     {
@@ -3151,6 +4281,7 @@
       "definition": "Rhetorical syllogism with premise implied rather than stated",
       "effect": "Uses shared understanding to persuade efficiently",
       "example": "All humans are mortal; therefore, Socrates is mortal",
+      "lang": "Greek",
       "related": []
     },
     {
@@ -3161,6 +4292,7 @@
       "definition": "Brief story illustrating a point or providing evidence",
       "effect": "Creates vivid, memorable example and human interest",
       "example": "A personal story told to support a broader claim",
+      "lang": "Greek",
       "related": [
         "exemplum"
       ]
@@ -3173,6 +4305,7 @@
       "definition": "Specific example used to illustrate general principle",
       "effect": "Provides concrete evidence for abstract claim",
       "example": "George Washington's honesty exemplifying integrity",
+      "lang": "Latin",
       "related": [
         "anecdote"
       ]
@@ -3185,6 +4318,7 @@
       "definition": "Detailed listing of items, points, or arguments",
       "effect": "Creates comprehensive coverage and accumulative effect",
       "example": "Point one, point two, point three...",
+      "lang": "Latin",
       "related": [
         "accumulation",
         "cataloguing"
@@ -3198,6 +4332,7 @@
       "definition": "Inversion of normal word order for rhetorical effect",
       "effect": "Creates emphasis and unusual phrasing",
       "example": "Angry was he; strong the opposition grew",
+      "lang": "Greek",
       "related": [
         "anastrophe"
       ]
@@ -3210,6 +4345,8 @@
       "definition": "Word used in two different senses within one phrase",
       "effect": "Creates wit and surprising connection",
       "example": "Lost both her patience and her keys",
+      "lang": "Greek",
+      "etymology": "Greek zeûgma: 'yoke' — one word yoking two grammatically different elements",
       "related": [
         "syllepsis"
       ]
@@ -3222,6 +4359,7 @@
       "definition": "Word understood in different ways in successive clauses",
       "effect": "Creates wordplay and surprising connections",
       "example": "Wore an old coat and a smile",
+      "lang": "Greek",
       "related": [
         "zeugma",
         "pun"
@@ -3235,6 +4373,8 @@
       "definition": "The explicit clarification or distinguishing between multiple possible meanings of a term just used, to prevent ambiguity.",
       "effect": "Controls semantic slippage; signals precision and intellectual rigour in the speaker while anticipating counterargument or misreading.",
       "example": "\"I speak of love — not infatuation, not desire, but love in its most deliberate and reasoned form.\"",
+      "lang": "Latin",
+      "etymology": "From Latin distinctio, meaning 'separation' or 'distinction'.",
       "related": [
         "polysemy",
         "connotation",
@@ -3251,6 +4391,8 @@
       "definition": "The immediate correction, retraction or sharpening of a word or phrase just used, often to intensify or reframe its meaning.",
       "effect": "Creates an impression of spontaneous rigour and precision; can amplify, qualify or complicate the original statement.",
       "example": "\"He was brave — no, reckless.\" / \"A good man, nay, a great one.\" / \"I loved her — I worshipped her.\"",
+      "lang": "Greek",
+      "etymology": "From Greek epanorthosis, meaning 'setting upright again'.",
       "related": [
         "amplification",
         "antithesis"
@@ -3264,6 +4406,8 @@
       "definition": "A figure in which a speaker raises a question and immediately provides the answer, rather than leaving it open.",
       "effect": "Controls the direction of argument; creates a sense of dialogue and guided reasoning while keeping the speaker in command of meaning.",
       "example": "\"What should we do? We should act now.\" / \"Was Caesar ambitious? He was.\" (Shakespeare, Julius Caesar)",
+      "lang": "Greek",
+      "etymology": "From Greek hypophora, meaning 'a carrying under' or 'objection answered'.",
       "related": [
         "rhetorical-question",
         "procatalepsis",
@@ -3279,6 +4423,8 @@
       "definition": "A concise statement of a general truth or principle.",
       "effect": "Distils wisdom into quotable, authoritative form.",
       "example": "The unexamined life is not worth living",
+      "lang": "Greek",
+      "etymology": "From Greek aphorismos, meaning a definition or distinction.",
       "related": []
     },
     {
@@ -3289,6 +4435,8 @@
       "definition": "A brief, pointed and often witty statement.",
       "effect": "Lands a memorable thought with concision and bite.",
       "example": "Oscar Wilde: I can resist everything except temptation",
+      "lang": "Greek",
+      "etymology": "From Greek epigramma, meaning an inscription.",
       "related": []
     },
     {
@@ -3299,6 +4447,8 @@
       "definition": "A moment in which the chorus or a character steps fully out of the dramatic fiction to address the audience directly, often on behalf of the playwright.",
       "effect": "Shatters theatrical illusion and implicates the audience in the drama's concerns; creates a meta-theatrical commentary on the events or issues being staged.",
       "example": "In Greek Old Comedy, the parabasis saw the chorus abandon their dramatic role to address Athenian citizens on political and social matters.",
+      "lang": "Greek",
+      "etymology": "From Greek parabasis, meaning 'a stepping aside' or 'a going beside'.",
       "related": [
         "breaking-the-fourth-wall",
         "aside",
@@ -3315,6 +4465,8 @@
       "definition": "A passage of mimed action without speech, used to represent or foreshadow events.",
       "effect": "Conveys narrative visually and can foreshadow the main plot in symbolic form.",
       "example": "The dumb show before the play within Hamlet mimes the murder of the king.",
+      "lang": "Other",
+      "etymology": "English compound of 'dumb' (Old English 'dumb', mute) + 'show' (Old English 'sceawian', to look at).",
       "related": []
     },
     {
@@ -3325,6 +4477,8 @@
       "definition": "A moment in which actors freeze in a striking arrangement, presenting a silent picture on stage.",
       "effect": "Arrests the action to emphasise a dramatic image or emotional climax.",
       "example": "Nineteenth century melodrama often ended acts on a tableau, holding a frozen pose as the curtain fell.",
+      "lang": "French",
+      "etymology": "French 'tableau' (picture), diminutive of Old French 'table', from Latin 'tabula' (board).",
       "related": []
     },
     {
@@ -3335,6 +4489,8 @@
       "definition": "The list of characters in a play, conventionally placed at the start of the text.",
       "effect": "Orients the reader and signals relationships, status and roles before the action begins.",
       "example": "The dramatis personae of Hamlet identifies Claudius as \"King of Denmark\".",
+      "lang": "Latin",
+      "etymology": "Latin 'dramatis' (of the drama) + 'personae' (masks, characters), from 'persona' (mask).",
       "related": []
     },
     {
@@ -3345,6 +4501,8 @@
       "definition": "Instructions in a play's text specifying setting, movement, action or delivery.",
       "effect": "Guides staging and shapes the reader's mental performance, sometimes carrying authorial voice.",
       "example": "The famous direction \"Exit, pursued by a bear\" in Shakespeare's The Winter's Tale.",
+      "lang": "Other",
+      "etymology": "English compound; 'stage' from Old French 'estage' + 'direction' from Latin 'directio'.",
       "related": []
     },
     {
@@ -3355,6 +4513,8 @@
       "definition": "A dramatic structure dividing a play into five acts: exposition, rising action, climax, falling action and catastrophe or resolution.",
       "effect": "Shapes pacing and the rise and fall of tension across a recognisable arc.",
       "example": "Shakespeare's tragedies, such as Macbeth, follow the five act pattern later codified by Freytag.",
+      "lang": "Latin",
+      "etymology": "Latin 'actus' (a doing, performance), from 'agere' (to do, drive).",
       "related": [
         "rising-action"
       ]
@@ -3367,6 +4527,8 @@
       "definition": "The neoclassical principles of unity of action, time and place that govern dramatic structure.",
       "effect": "Concentrates the drama for intensity and verisimilitude by limiting its scope and duration.",
       "example": "Racine's Phèdre observes the unities, unfolding in one place within a single day.",
+      "lang": "Latin",
+      "etymology": "Latin 'unitas' (oneness), from 'unus' (one); the doctrine was derived from readings of Aristotle's Poetics.",
       "related": []
     },
     {
@@ -3377,6 +4539,8 @@
       "definition": "The final scene or departure song after the last stasimon, concluding a Greek tragedy.",
       "effect": "Resolves the action and marks the chorus's exit, delivering closing reflection.",
       "example": "The exodos of Oedipus Rex shows the blinded Oedipus led away from Thebes.",
+      "lang": "Greek",
+      "etymology": "Greek 'exodos' (a going out), from 'ex' (out) + 'hodos' (way).",
       "related": []
     },
     {
@@ -3387,6 +4551,8 @@
       "definition": "A section of spoken dramatic action between choral odes in Greek tragedy.",
       "effect": "Advances the plot and develops character between the chorus's lyric interludes.",
       "example": "The episodes of Euripides' Medea stage Medea's encounters with Creon, Jason and Aegeus.",
+      "lang": "Greek",
+      "etymology": "Greek 'epeisodion' (an addition), from 'epi' (upon) + 'eisodos' (entrance).",
       "related": []
     },
     {
@@ -3397,6 +4563,8 @@
       "definition": "A choral ode performed while the chorus stands in the orchestra, between the episodes of a Greek tragedy.",
       "effect": "Reflects on the action, voicing communal judgement and lyric meditation.",
       "example": "The famous \"Ode to Man\" stasimon in Sophocles' Antigone.",
+      "lang": "Greek",
+      "etymology": "Greek 'stasimon (melos)' (stationary song), from 'stasis' (standing).",
       "related": []
     },
     {
@@ -3407,6 +4575,8 @@
       "definition": "The first ode sung by the chorus as it enters, in Greek tragedy.",
       "effect": "Introduces the chorus and its perspective, establishing communal mood and context.",
       "example": "The parodos of Aeschylus' Agamemnon recalls the omens at Aulis.",
+      "lang": "Greek",
+      "etymology": "Greek 'par(a)' (beside) + 'hodos' (way, path) -> 'parodos', both the side entrance and the song sung on it.",
       "related": []
     },
     {
@@ -3417,6 +4587,8 @@
       "definition": "A concluding section spoken after the main action, offering closure, comment or address to the audience.",
       "effect": "Rounds off the drama, draws a moral or appeals for applause and goodwill.",
       "example": "Prospero's epilogue in Shakespeare's The Tempest asks the audience to set him free with their applause.",
+      "lang": "Greek",
+      "etymology": "Greek 'epi' (upon, in addition) + 'logos' (word) -> 'epilogos'.",
       "related": []
     },
     {
@@ -3427,6 +4599,8 @@
       "definition": "An introductory section spoken before the main action, setting context or framing the play.",
       "effect": "Orients the audience, establishes tone and may foreshadow events.",
       "example": "The Chorus's prologue in Shakespeare's Romeo and Juliet announces the \"star-crossed lovers\".",
+      "lang": "Greek",
+      "etymology": "Greek 'pro' (before) + 'logos' (word, speech) -> 'prologos'.",
       "related": []
     },
     {
@@ -3437,6 +4611,8 @@
       "definition": "A group of performers who comment collectively on the dramatic action, often representing the voice of the community.",
       "effect": "Provides exposition, moral framing and emotional amplification, mediating between stage and audience.",
       "example": "In Sophocles' Antigone, the Theban elders form a chorus that reflects on fate and the limits of human power.",
+      "lang": "Greek",
+      "etymology": "Greek 'khoros' (dance, band of dancers) -> Latin 'chorus'.",
       "related": []
     },
     {
@@ -3447,6 +4623,8 @@
       "definition": "Rapid dialogue in which characters exchange single alternating lines, often in heated argument.",
       "effect": "Heightens tension and pace, dramatising conflict through verbal duelling.",
       "example": "The clipped line-by-line exchanges between Oedipus and Tiresias in Sophocles' Oedipus Rex.",
+      "lang": "Greek",
+      "etymology": "Greek 'stikhos' (line, row) + 'mythos' (speech) -> 'stikhomythia'.",
       "related": []
     },
     {
@@ -3457,6 +4635,8 @@
       "definition": "An extended speech in which a character, alone on stage, voices their inner thoughts aloud for the audience.",
       "effect": "Grants direct access to a character's psychology and moral struggle, building intimacy and dramatic irony.",
       "example": "Hamlet's \"To be, or not to be\" soliloquy lays bare his contemplation of mortality and inaction.",
+      "lang": "Latin",
+      "etymology": "Latin 'solus' (alone) + 'loqui' (to speak) -> Late Latin 'soliloquium', a term coined by Augustine.",
       "related": []
     },
     {
@@ -3467,6 +4647,8 @@
       "definition": "A formal, self-contained speech of some length delivered by a single character within a play.",
       "effect": "Allows sustained rhetoric, argument or emotion, often marking a dramatic high point.",
       "example": "Mark Antony's \"Friends, Romans, countrymen\" oration in Shakespeare's Julius Caesar.",
+      "lang": "Other",
+      "etymology": "English compound of 'set' (fixed, prepared) + 'speech' (Old English 'spaec').",
       "related": []
     },
     {
@@ -3477,6 +4659,8 @@
       "definition": "A short remark spoken by a character to the audience or to themselves, conventionally unheard by the other characters on stage.",
       "effect": "Creates intimacy and dramatic irony by giving the audience access to a character's private thoughts while others remain unaware.",
       "example": "In Shakespeare's Hamlet, Hamlet's \"A little more than kin, and less than kind\" is delivered aside, signalling his contempt for Claudius.",
+      "lang": "Other",
+      "etymology": "From the phrase 'on side' -> Middle English 'asyde'; the theatrical sense is recorded from the early 18th century.",
       "related": []
     },
     {
@@ -3487,6 +4671,8 @@
       "definition": "A drama that stages a contemporary social problem for debate, often without tidy resolution.",
       "effect": "Provokes reflection and discomfort, using the stage as a forum for argument.",
       "example": "Ibsen's A Doll's House confronts marriage and gender roles, leaving its questions open.",
+      "lang": "Other",
+      "etymology": "English compound; 'problem' from Greek 'problema' (something put forward) + 'play' from Old English 'plega'.",
       "related": []
     },
     {
@@ -3497,6 +4683,8 @@
       "definition": "A tightly plotted genre built on careful exposition, causal logic and a climactic obligatory scene.",
       "effect": "Delivers satisfying mechanical suspense through neat construction and reversal.",
       "example": "The plays of Eugène Scribe epitomise the well-made play's clockwork plotting.",
+      "lang": "French",
+      "etymology": "Calque of French 'pièce bien faite' (well-made piece).",
       "related": []
     },
     {
@@ -3507,6 +4695,8 @@
       "definition": "A play written to be read rather than performed on stage.",
       "effect": "Foregrounds language and idea over spectacle, inviting private, reflective reading.",
       "example": "Milton's Samson Agonistes was conceived as a closet drama.",
+      "lang": "French",
+      "etymology": "'closet' from Old French 'closet' (small private room), diminutive of 'clos' (enclosed), from Latin 'clausum'.",
       "related": []
     },
     {
@@ -3517,6 +4707,8 @@
       "definition": "A medieval religious drama dramatising biblical episodes, often staged in cycles by craft guilds.",
       "effect": "Communicates scripture vividly to a lay audience through communal performance.",
       "example": "The York Mystery Plays dramatise events from Creation to the Last Judgement.",
+      "lang": "Latin",
+      "etymology": "From Latin 'ministerium' (service, craft) and 'mysterium' (religious truth), the two senses converging.",
       "related": []
     },
     {
@@ -3527,6 +4719,8 @@
       "definition": "A late medieval allegorical drama in which personified virtues and vices contend for the human soul.",
       "effect": "Instructs morally, dramatising spiritual choice through allegory.",
       "example": "Everyman stages the title figure's reckoning as abstractions like Good Deeds accompany him.",
+      "lang": "Latin",
+      "etymology": "Latin 'moralis' (relating to manners or character), from 'mos, moris' (custom).",
       "related": []
     },
     {
@@ -3537,6 +4731,8 @@
       "definition": "A courtly dramatic entertainment combining poetry, music, dance and elaborate spectacle.",
       "effect": "Celebrates and flatters its noble audience through allegory and visual splendour.",
       "example": "Ben Jonson's masques, designed with Inigo Jones, staged allegories for the Jacobean court.",
+      "lang": "French",
+      "etymology": "French 'masque' (mask), from Italian 'maschera', of uncertain earlier origin.",
       "related": []
     },
     {
@@ -3547,6 +4743,8 @@
       "definition": "A sensational dramatic genre with heightened emotion, clear moral oppositions and musical underscoring.",
       "effect": "Amplifies feeling and suspense, polarising virtue and villainy for strong audience response.",
       "example": "Nineteenth century stage melodramas pit pure heroines against scheming villains.",
+      "lang": "Greek",
+      "etymology": "Greek 'melos' (song, music) + 'drama' (action), via French 'mélodrame'.",
       "related": []
     },
     {
@@ -3557,6 +4755,8 @@
       "definition": "A broad comic genre relying on improbable situations, physical humour and exaggerated character.",
       "effect": "Provokes laughter through absurdity, mistaken identity and rapid action.",
       "example": "The mistaken identities of Oscar Wilde's The Importance of Being Earnest verge on farce.",
+      "lang": "French",
+      "etymology": "French 'farce' (stuffing), from Latin 'farcire' (to stuff); comic interludes were \"stuffed\" into plays.",
       "related": []
     },
     {
@@ -3567,6 +4767,8 @@
       "definition": "A genre blending tragic and comic elements, often with a grave threat that resolves happily.",
       "effect": "Complicates tone, mixing pathos with humour to mirror life's ambivalence.",
       "example": "Shakespeare's The Winter's Tale moves from near-tragedy to comic reconciliation.",
+      "lang": "Latin",
+      "etymology": "Latin 'tragicocomoedia', a blend coined by Plautus from tragedy and comedy.",
       "related": []
     },
     {
@@ -3577,6 +4779,8 @@
       "definition": "A dramatic genre depicting the downfall of a protagonist through fate, flaw or circumstance.",
       "effect": "Evokes pity and fear, moving the audience toward catharsis.",
       "example": "Sophocles' Oedipus Rex traces the king's ruin through his own investigation.",
+      "lang": "Greek",
+      "etymology": "Greek 'tragoidia', perhaps from 'tragos' (goat) + 'oide' (song).",
       "related": [
         "catharsis"
       ]
@@ -3589,6 +4793,8 @@
       "definition": "A dramatic genre with a light or satirical tone that typically ends happily, often in marriage or reconciliation.",
       "effect": "Amuses and reassures, resolving conflict and affirming social order.",
       "example": "Shakespeare's A Midsummer Night's Dream ends with multiple marriages and harmony restored.",
+      "lang": "Greek",
+      "etymology": "Greek 'komoidia', from 'komos' (revel) + 'oide' (song).",
       "related": []
     },
     {
@@ -3599,6 +4805,8 @@
       "definition": "A word blending the sounds and meanings of two others.",
       "effect": "Coins compact, inventive new terms.",
       "example": "brunch from breakfast and lunch",
+      "lang": "French",
+      "etymology": "From French portemanteau, a coat-carrier, repurposed by Lewis Carroll.",
       "related": []
     },
     {
@@ -3609,6 +4817,8 @@
       "definition": "The transposition of initial sounds between two or more words.",
       "effect": "Creates accidental or deliberate comic slips.",
       "example": "a blushing crow for a crushing blow",
+      "lang": "Latin",
+      "etymology": "Named after the Reverend William Spooner, noted for such slips.",
       "related": []
     },
     {
@@ -3619,6 +4829,8 @@
       "definition": "The mistaken use of a word in place of a similar-sounding one, to comic effect.",
       "effect": "Produces unintended humour and characterises the speaker.",
       "example": "Mrs Malaprop: a allegory on the banks of the Nile",
+      "lang": "French",
+      "etymology": "From French mal a propos, meaning inappropriate, via Sheridan's character Mrs Malaprop.",
       "related": []
     },
     {
@@ -3629,6 +4841,8 @@
       "definition": "A phrase open to two interpretations, one of which is often risque.",
       "effect": "Smuggles a second, usually suggestive, meaning beneath the surface.",
       "example": "A line that reads innocently and bawdily at once",
+      "lang": "French",
+      "etymology": "From French, meaning double meaning, in an archaic construction.",
       "related": []
     },
     {
@@ -3639,6 +4853,8 @@
       "definition": "A play on words exploiting multiple meanings or similar sounds, also called paronomasia.",
       "effect": "Generates humour, wit or layered meaning.",
       "example": "Time flies like an arrow; fruit flies like a banana",
+      "lang": "Other",
+      "etymology": "Origin uncertain, perhaps from Italian puntiglio, meaning a fine point.",
       "related": []
     },
     {
@@ -3649,6 +4865,30 @@
       "definition": "Indirect reference to another work, person, or event",
       "effect": "Enriches meaning through connection to external reference",
       "example": "Calling an ambitious man an Icarus or Macbeth",
+      "lang": "Latin",
+      "etymology": "Latin alludere: ad- (to) + ludere (to play) — 'playing toward' a reference",
+      "lineage": [
+        {
+          "word": "ludere",
+          "lang": "Latin",
+          "meaning": "to play"
+        },
+        {
+          "word": "alludere",
+          "lang": "Latin",
+          "meaning": "to play toward"
+        },
+        {
+          "word": "allusio",
+          "lang": "Latin",
+          "meaning": "a playing with"
+        },
+        {
+          "word": "allusion",
+          "lang": "English",
+          "meaning": "indirect reference"
+        }
+      ],
       "related": [
         "quotation"
       ]
@@ -3661,6 +4901,7 @@
       "definition": "Direct reproduction of words from another source",
       "effect": "Provides authority or creates deliberate echo",
       "example": "Citing a famous line from another work verbatim",
+      "lang": "Latin",
       "related": [
         "allusion"
       ]
@@ -3673,6 +4914,7 @@
       "definition": "Quotation placed at beginning of work or section",
       "effect": "Sets tone and provides thematic context",
       "example": "A poem beginning with a relevant Shakespeare quote",
+      "lang": "Greek",
       "related": [
         "quotation"
       ]
@@ -3685,6 +4927,7 @@
       "definition": "Humorous imitation of a style or work",
       "effect": "Creates humor through exaggeration of recognizable features",
       "example": "Scary Movie parodying horror film conventions",
+      "lang": "Greek",
       "related": [
         "pastiche"
       ]
@@ -3697,6 +4940,7 @@
       "definition": "Imitation of style, often respectful or admiring",
       "effect": "Honors original while creating new work",
       "example": "A painting in the style of Monet",
+      "lang": "French",
       "related": [
         "parody",
         "homage"
@@ -3710,6 +4954,7 @@
       "definition": "Work created as tribute to another work or artist",
       "effect": "Shows respect and creates intentional echo",
       "example": "A novel dedicated to and influenced by a predecessor",
+      "lang": "French",
       "related": [
         "pastiche"
       ]
@@ -3722,6 +4967,7 @@
       "definition": "Rewriting of work in new medium or context",
       "effect": "Translates story to new form while maintaining core",
       "example": "Stage adaptation of a novel; film adaptation of a play",
+      "lang": "Latin",
       "related": []
     },
     {
@@ -3732,6 +4978,7 @@
       "definition": "Text written over earlier text, or later text reusing earlier",
       "effect": "Creates layered meaning and historical echo",
       "example": "Medieval manuscripts with previous text underneath",
+      "lang": "Greek",
       "related": []
     },
     {
@@ -3742,6 +4989,8 @@
       "definition": "Clear, named references to other texts",
       "effect": "Deliberately invokes connection reader can identify",
       "example": "Title borrowed from another work",
+      "lang": "Latin",
+      "etymology": "Latin inter- (between) + textus (woven) — weaving meaning between texts",
       "related": [
         "intertextuality-implicit",
         "allusion"
@@ -3755,6 +5004,8 @@
       "definition": "Subtle echoes and parallels without explicit naming",
       "effect": "Requires reader recognition; creates discovery",
       "example": "Plot structure echoing earlier work without acknowledgment",
+      "lang": "Latin",
+      "etymology": "Latin inter- (between) + textus (woven) — weaving meaning between texts",
       "related": [
         "intertextuality-explicit"
       ]
@@ -3767,6 +5018,7 @@
       "definition": "Hypotext is source text; hypertext is derived text",
       "effect": "Hypotext influences or is transformed by hypertext",
       "example": "Odyssey (hypotext) → Joyce's Ulysses (hypertext)",
+      "lang": "Other",
       "related": []
     },
     {
@@ -3777,6 +5029,7 @@
       "definition": "Character or narrator acknowledges audience or fictional nature",
       "effect": "Creates direct connection with reader; disrupts illusion",
       "example": "Character looks at camera; narrator addresses reader directly",
+      "lang": "Other",
       "related": [
         "metafiction",
         "self-referentiality"
@@ -3790,6 +5043,7 @@
       "definition": "Work referring to itself, its creation, or its status as fiction",
       "effect": "Creates philosophical paradox and self-awareness",
       "example": "Novel discussing its own genre and conventions",
+      "lang": "Latin",
       "related": [
         "metafiction"
       ]
@@ -3802,6 +5056,7 @@
       "definition": "Fiction that reflects on its own nature and conventions",
       "effect": "Creates commentary on narrative and meaning-making",
       "example": "A novel about writing a novel; a film about filmmaking",
+      "lang": "Greek",
       "related": [
         "breaking-the-fourth-wall"
       ]
@@ -3814,6 +5069,7 @@
       "definition": "Disruptive, fragmented narrative structure",
       "effect": "Challenges coherence and linear meaning",
       "example": "Non-sequiturs, missing pages, disrupted chronology",
+      "lang": "Latin",
       "related": [
         "non-linear-narrative"
       ]
@@ -3826,6 +5082,7 @@
       "definition": "Text itself seems flawed, inconsistent, or deliberately misleading",
       "effect": "Implicates reader in unreliability and interpretation",
       "example": "Contradictory versions of events; missing pages",
+      "lang": "Other",
       "related": [
         "unreliable-narrator",
         "metafiction"
@@ -3839,6 +5096,25 @@
       "definition": "Text containing representation of itself; story within story",
       "effect": "Creates infinite regression and philosophical reflection",
       "example": "A painting depicting the painter painting the painting",
+      "lang": "French",
+      "etymology": "French: 'placed into the abyss' — infinite mirroring structure within a work",
+      "lineage": [
+        {
+          "word": "abyssus",
+          "lang": "Latin",
+          "meaning": "abyss, depth"
+        },
+        {
+          "word": "abîme",
+          "lang": "French",
+          "meaning": "abyss"
+        },
+        {
+          "word": "mise en abyme",
+          "lang": "French",
+          "meaning": "placed into the abyss"
+        }
+      ],
       "related": [
         "frame-narrative"
       ]
@@ -3851,6 +5127,7 @@
       "definition": "Author's voice breaking into narrative explicitly",
       "effect": "Disrupts fiction and creates author presence",
       "example": "Author commenting on character or plot directly",
+      "lang": "Other",
       "related": [
         "metafiction"
       ]
@@ -3863,6 +5140,7 @@
       "definition": "Narrator aware of being in narrative and commenting on it",
       "effect": "Creates philosophical reflection on storytelling",
       "example": "Narrator discussing their own narrative strategies",
+      "lang": "Other",
       "related": [
         "self-referentiality",
         "metafiction"
@@ -3876,6 +5154,8 @@
       "definition": "Brecht's theory of theatre that favours episodic narrative and critical distance over emotional illusion.",
       "effect": "Engages the audience's reason rather than empathy, framing drama as social analysis.",
       "example": "Brecht's The Caucasian Chalk Circle uses a narrator and episodic structure characteristic of epic theatre.",
+      "lang": "German",
+      "etymology": "Calque of German 'episches Theater'; 'epic' from Greek 'epos' (word, song), 'theatre' from Greek 'theatron'.",
       "related": []
     },
     {
@@ -3886,6 +5166,8 @@
       "definition": "Brecht's technique of distancing the audience to prevent emotional immersion and prompt critical thought.",
       "effect": "Keeps spectators aware they are watching a constructed argument, encouraging political reflection.",
       "example": "Brecht's Mother Courage uses placards, songs and direct address to alienate the audience.",
+      "lang": "German",
+      "etymology": "German 'Verfremdungseffekt', from 'verfremden' (to make strange) + 'Effekt' (effect).",
       "related": []
     },
     {
@@ -3896,6 +5178,8 @@
       "definition": "A dramatic performance staged inside the main play, watched by its characters.",
       "effect": "Mirrors or comments on the framing action, layering reality and illusion.",
       "example": "\"The Mousetrap\" staged in Hamlet is a play within a play that traps Claudius's conscience.",
+      "lang": "Other",
+      "etymology": "English descriptive phrase; 'play' from Old English 'plega' (game, sport, performance).",
       "related": []
     },
     {
@@ -3906,6 +5190,8 @@
       "definition": "Drama that draws attention to its own theatricality, acknowledging that it is a play.",
       "effect": "Breaks illusion to provoke reflection on art, role-playing and reality.",
       "example": "The players and the staged murder in Hamlet make the play self-consciously theatrical.",
+      "lang": "Greek",
+      "etymology": "Greek 'meta' (beyond, about) + 'theatron' (place for viewing), from 'theasthai' (to behold).",
       "related": []
     },
     {
@@ -3916,6 +5202,8 @@
       "definition": "The transgression of narrative levels, as when a narrator enters the story or addresses its making.",
       "effect": "Ruptures the fictional frame to unsettle or amuse.",
       "example": "A character who knows they are being written",
+      "lang": "Greek",
+      "etymology": "From Greek metalepsis, meaning a sharing or substitution.",
       "related": []
     }
   ]
