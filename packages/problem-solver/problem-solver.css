@@ -48,111 +48,150 @@
   opacity: 0.55;
 }
 
-/* 5 Whys (toolkit p.47): one rigid column of equal-width flat shapes with even
-   gaps, answers set beside them. Rows are fixed height; a tapped row opens. */
+/* 5 Whys (toolkit p.47): one centred column of equal-width flat shapes with
+   even gaps. Each shape carries a short title; clicking opens its details. */
 .ps-scope {
   --ps-red: #d4282c;
   --ps-yellow: #f0bc3c;
   --ps-blue: #2e5ba6;
+  --ps-on-yellow: #2a2210;
 }
 
 .ps-whys {
-  --ps-shape-w: 200px;
-  --ps-row-h: calc(var(--ps-shape-w) / 2);
-  display: grid;
-  gap: 10px;
-  max-width: 720px;
-}
-
-.ps-whys__row {
-  display: grid;
-  grid-template-columns: var(--ps-shape-w) minmax(0, 1fr);
-  column-gap: var(--space-6);
-  height: var(--ps-row-h);
+  --ps-shape-w: 300px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  outline: none;
+  gap: 10px;
 }
 
-.ps-whys__row:focus-visible .ps-whys__copy { box-shadow: 0 0 0 2px var(--wave); border-radius: var(--radius-sm); }
-
-.ps-whys__row.is-open { height: auto; min-height: var(--ps-row-h); align-items: start; }
+.ps-whys__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
 
 .ps-whys__shape {
+  position: relative;
   display: block;
-  width: 100%;
-  height: auto;
-  overflow: visible;
-  transform-origin: 50% 0;
+  width: min(100%, var(--ps-shape-w));
+  aspect-ratio: 2 / 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.ps-whys__row--problem .ps-whys__shape { transform-origin: 50% 100%; }
+.ps-whys__shape:focus-visible { outline: 2px solid var(--wave); outline-offset: 4px; border-radius: var(--radius-sm); }
+
+.ps-whys__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform-origin: 50% 0;
+  transition: filter 240ms var(--ps-ease);
+}
+
+.ps-whys__item--problem .ps-whys__svg { transform-origin: 50% 100%; }
+.ps-whys__shape:hover .ps-whys__svg,
+.ps-whys__item.is-open .ps-whys__svg { filter: brightness(1.04) saturate(1.05); }
 
 .ps-whys__problem { fill: var(--ps-red); }
 .ps-whys__why { fill: var(--ps-yellow); }
 .ps-whys__root { fill: var(--ps-blue); }
 
+/* Title block sits where the book puts its label: low in the problem,
+   in the wide top band of each triangle, high in the root. */
 .ps-whys__label {
-  fill: #fff;
-  font: var(--weight-semibold) 13px var(--font-ui);
+  position: absolute;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 64%;
+  transform: translateX(-50%);
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
 }
 
-.ps-whys__copy { min-width: 0; }
+.ps-whys__item--problem .ps-whys__label { bottom: 14%; }
+.ps-whys__item--why .ps-whys__label { top: 10%; width: 56%; color: var(--ps-on-yellow); }
+.ps-whys__item--root .ps-whys__label { top: 12%; }
 
 .ps-whys__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0 0 2px;
-  color: var(--muted);
-  font: var(--weight-semibold) var(--text-2xs) / 1.4 var(--font-ui);
+  font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
+  opacity: 0.78;
 }
 
-.ps-whys__text {
-  display: -webkit-box;
-  margin: 0;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  color: var(--ink);
-  font: var(--weight-regular) var(--text-base) / 1.4 var(--font-ui);
+.ps-whys__title {
+  font: var(--weight-semibold) 15px / 1.25 var(--font-ui);
 }
-
-.ps-whys__row--problem .ps-whys__text,
-.ps-whys__row--root .ps-whys__text { font-weight: var(--weight-semibold); }
-
-.ps-whys__note {
-  display: none;
-  margin: var(--space-1) 0 0;
-  color: var(--muted);
-  font: italic var(--weight-regular) var(--text-sm) / 1.4 var(--font-ui);
-}
-
-.ps-whys__row.is-open .ps-whys__text { display: block; -webkit-line-clamp: unset; }
-.ps-whys__row.is-open .ps-whys__note { display: block; }
 
 .ps-objection {
-  padding: 1px var(--space-2);
-  border: 0;
+  margin-top: 3px;
+  padding: 0 6px;
   border-radius: var(--radius-full);
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--ink);
-  font: inherit;
-  letter-spacing: inherit;
-  cursor: pointer;
+  box-shadow: inset 0 0 0 1px currentColor;
+  font: var(--weight-semibold) 9px / 1.6 var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.8;
 }
 
+/* Smooth open: grid rows animate from 0fr to 1fr, so height follows content. */
+.ps-whys__details {
+  display: grid;
+  grid-template-rows: 0fr;
+  width: min(100%, 520px);
+  transition: grid-template-rows 320ms var(--ps-ease), opacity 240ms var(--ps-ease);
+  opacity: 0;
+}
+
+.ps-whys__item.is-open .ps-whys__details { grid-template-rows: 1fr; opacity: 1; }
+.ps-whys__details-inner { min-height: 0; overflow: hidden; }
+
+.ps-whys__card {
+  margin-top: 10px;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--glass);
+  box-shadow: inset 0 3px 0 var(--ps-yellow);
+}
+
+.ps-whys__card--problem { box-shadow: inset 0 3px 0 var(--ps-red); }
+.ps-whys__card--root { box-shadow: inset 0 3px 0 var(--ps-blue); }
+
+.ps-whys__text {
+  margin: 0;
+  color: var(--ink);
+  font: var(--weight-regular) var(--text-base) / 1.5 var(--font-ui);
+}
+
+.ps-whys__skills { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-3); }
+
+.ps-whys__note {
+  margin: var(--space-3) 0 0;
+  color: var(--muted);
+  font: var(--weight-regular) var(--text-sm) / 1.45 var(--font-ui);
+}
+
+.ps-whys__note strong { color: var(--ink); font-weight: var(--weight-semibold); }
+
 @media (max-width: 720px) {
-  .ps-whys { --ps-shape-w: 128px; gap: 7px; }
-  .ps-whys__row { column-gap: var(--space-4); }
-  .ps-whys__label { font-size: 17px; }
-  .ps-whys__meta { display: none; }
-  .ps-whys__row.is-open .ps-whys__meta { display: flex; }
-  .ps-whys__text { font-size: var(--text-sm); }
+  .ps-whys { --ps-shape-w: 280px; gap: 8px; }
+  .ps-whys__title { font-size: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-whys__details, .ps-whys__svg { transition: none; }
 }
 
 /* Outline (accessible alternative and fallback) */

@@ -95,6 +95,7 @@ export function applyCoachTurn(session, turn, deps) {
         id: deps.newId(),
         slot: turn.node.slot,
         text: turn.node.text,
+        title: turn.node.title,
         state: 'accepted',
         skills: turn.skillsSeen,
         turnId: coachTurn.id
@@ -106,7 +107,7 @@ export function applyCoachTurn(session, turn, deps) {
       }
       next = { ...replaceRun(next, placed), pendingKeep: null };
     } else if (run && turn.node && turn.verdict === 'challenge') {
-      next = { ...next, pendingKeep: { slot: turn.node.slot, text: turn.node.text, objection: turn.message, skills: turn.skillsSeen, runId: run.id } };
+      next = { ...next, pendingKeep: { slot: turn.node.slot, text: turn.node.text, title: turn.node.title, objection: turn.message, skills: turn.skillsSeen, runId: run.id } };
     }
   }
 
@@ -123,7 +124,7 @@ export function keepAnyway(session, deps) {
   const run = activeRun(session);
   if (!keep || !run || run.id !== keep.runId) throw Object.assign(new Error('Nothing to keep.'), { status: 409, code: 'action_not_allowed' });
   if (!canPlace(run, keep.slot)) throw Object.assign(new Error('That answer no longer fits here.'), { status: 409, code: 'action_not_allowed' });
-  const placed = placeNode(run, { id: deps.newId(), slot: keep.slot, text: keep.text, state: 'contested', objection: keep.objection, skills: keep.skills, turnId: null });
+  const placed = placeNode(run, { id: deps.newId(), slot: keep.slot, text: keep.text, title: keep.title, state: 'contested', objection: keep.objection, skills: keep.skills, turnId: null });
   return touch({ ...replaceRun(session, placed), pendingKeep: null, turns: [...session.turns, userTurn('Keep it anyway.', deps)] }, deps);
 }
 
