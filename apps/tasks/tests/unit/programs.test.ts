@@ -31,7 +31,7 @@ describe('program schema', () => {
     expect(parsed.id).toBe('prog_abbmun-abbotsleigh-model-united-nations-conference');
     expect(parsed.name).toBe('ABBMUN (Abbotsleigh Model United Nations Conference)');
     expect(parsed.types).toContain('Event');
-    expect(parsed.subjects).toEqual(expect.arrayContaining(['Humanities', 'Debating']));
+    expect(parsed.subjects).toEqual(['Debating']);
     expect(parsed.month).toBe('March');
     expect(parsed.age_groups).toContain('Year 9');
     expect(parsed.competition_level).toBe('Beginners');
@@ -240,7 +240,13 @@ describe('catalogue dates', () => {
 
 describe('catalogue classification', () => {
   it('defaults the branch fields to empty on an unclassified entry', () => {
-    const parsed = ProgramSchema.parse(catalogPrograms()[0]!);
+    const first = { ...catalogPrograms()[0]! };
+    delete first.format;
+    delete first.provider;
+    delete first.settings;
+    delete first.entry;
+    delete first.entry_route;
+    const parsed = ProgramSchema.parse(first);
     expect(parsed).toMatchObject({ format: null, provider: null, settings: [], entry: null, entry_route: null });
   });
 
@@ -264,6 +270,46 @@ describe('catalogue classification', () => {
     expect(withCatalogueClasses(saved)).toBe(saved);
     const unknown = { id: 'prog_not-in-catalogue', name: 'Local' };
     expect(withCatalogueClasses(unknown)).toBe(unknown);
+  });
+
+  it('classifies every catalogue entry, keeping Classics and Languages off Justice', () => {
+    // Left blank on purpose: a professional association, a family reference, and an awards directory.
+    const unclassified = new Set([
+      'prog_world-council-for-gifted-and-talented-children-wcgtc',
+      'prog_johns-hopkins-center-for-talented-youth-cty',
+      'prog_extracurricular-activity-excellence-eae-awards'
+    ]);
+    // History of Greece and Rome is the subject, including the school Toga Day.
+    const classicsOnJustice = new Set([
+      'prog_national-hellenic-civilization-exam-nhce',
+      'prog_national-roman-civilization-exam-nrce',
+      'prog_toga-day-school-event'
+    ]);
+    const justiceSubjects = new Set([
+      'Humanities',
+      'History',
+      'Public Speaking',
+      'Legal',
+      'Debating',
+      'Geography',
+      'Leadership',
+      'Civics'
+    ]);
+    for (const program of catalogPrograms()) {
+      if (!unclassified.has(program.id)) {
+        expect(program.format, program.name).toBeTruthy();
+        expect(program.provider, program.name).toBeTruthy();
+        expect(program.settings.length, program.name).toBeGreaterThan(0);
+        expect(program.entry, program.name).toBeTruthy();
+        expect(program.entry_route, program.name).toBeTruthy();
+      }
+      const classical = program.subjects.includes('Classics') || program.subjects.includes('Languages');
+      if (!classical || classicsOnJustice.has(program.id)) continue;
+      expect(
+        program.subjects.filter((subject) => justiceSubjects.has(subject)),
+        program.name
+      ).toEqual([]);
+    }
   });
 
   it('filters by format', () => {

@@ -7,7 +7,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Debating"
     ],
     "month": "March",
@@ -26,6 +25,13 @@
     "description": "School-hosted one-day Model United Nations conference run annually by Abbotsleigh Senior School in Wahroonga. A low-cost introductory MUN experience building diplomacy, negotiation and public speaking skills.",
     "registration_link": "https://events.humanitix.com/2026-abbmun-abbotsleigh-model-united-nations-conference",
     "registration_window": "Usually closes mid-March",
+    "format": "Simulation",
+    "provider": "School",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -66,6 +72,13 @@
     "description": "International online abstract art competition open to artists worldwide, hosted by Contemporary Art Room Gallery.",
     "registration_link": "https://studentcompetitions.com/competitions/abstract-art-competition",
     "registration_window": "Entries usually due early June",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -101,6 +114,13 @@
     "description": "A 12 week online certificate program designed by AFS and the University of Pennsylvania. Teens explore global citizenship, social impact and design thinking and develop their own social impact project, finishing with an Advanced Certificate on Global Citizenship for Social Impact. Requires advanced written and spoken English.",
     "registration_link": "https://afs.org/international/changemaker/",
     "registration_window": "Monthly cohorts run year round; choose preferred dates after registering",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -122,7 +142,7 @@
     ],
     "subjects": [
       "Legal",
-      "Humanities"
+      "Civics"
     ],
     "month": "September",
     "age_groups": [
@@ -139,6 +159,13 @@
     "description": "Annual one-day human rights forum run by ALHR with the University of Newcastle and the Human Rights for NSW Alliance. Around 60 NSW students explore a human rights theme with legal professionals and advocates, producing a formal statement presented to decision-makers.",
     "registration_link": "https://alhr.org.au/news/events/",
     "registration_window": "Schools nominate students ahead of the September forum",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-09-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -175,6 +202,13 @@
     "description": "Invitational senior maths contest run by the Australian Mathematical Olympiad Committee under the AMT. Around 100 students (mostly Year 11) sit five problems over four hours covering geometry, number theory, algebra and combinatorics. A key step on the pathway to APMO, EGMO and IMO teams.",
     "registration_link": "https://amt.edu.au/olympiad-programs",
     "registration_window": "By invitation, based on prior AMT results",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -218,6 +252,13 @@
     "description": "Nationwide science competition run by ANSTO. Students work in teams to design and conduct a scientific investigation, then submit their findings in video form.",
     "registration_link": "https://www.ansto.gov.au/education/think-science",
     "registration_window": "Registrations usually open around February",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-02-01",
     "ends_on": "2026-02-28",
     "dates_precision": "month",
@@ -257,6 +298,13 @@
     "description": "Open international short story competition for original, previously unpublished stories in English, hosted by Anthology Magazine. Winning story is published in the magazine.",
     "registration_link": "https://studentcompetitions.com/competitions/anthology-short-story-competition-2026",
     "registration_window": "Entries usually due early July",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -296,6 +344,13 @@
     "description": "Open international travel writing competition for original, previously unpublished articles in English, hosted by Anthology Magazine. Winning piece is published in the magazine.",
     "registration_link": "https://studentcompetitions.com/competitions/anthology-travel-writing-competition-2026",
     "registration_window": "Entries usually due end of November",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -338,6 +393,13 @@
     "description": "Weekly hands-on STEM challenges run by ANU. A new challenge is released each Tuesday across science, technology, engineering and maths; students submit photos, answers or builds by Sunday, judged by ANU staff.",
     "registration_link": "https://science.anu.edu.au/engagement/community-outreach-stem-boxes/2026-stem-challenges",
     "registration_window": "Rolling weekly challenges; join any time during the season",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -377,6 +439,13 @@
     "description": "Annual video competition run by the American Psychological Association's Teachers of Psychology in Secondary Schools (TOPSS). Students create a short video applying psychological science to a set annual topic. Open to international high school students; up to five entries per school, no team submissions.",
     "registration_link": "https://www.apa.org/ed/precollege/topss/student-competition",
     "registration_window": "Entries usually due around March",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -413,6 +482,13 @@
     "description": "Collaborative problem-solving contest series for Years 3–4 from APSMO. Four contest papers per year sat at school, with Resource Kits, videos, activity sheets and worked solutions for teachers.",
     "registration_link": "https://www.apsmo.edu.au/",
     "registration_window": "Register before Term 2; papers run May to September",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -449,6 +525,13 @@
     "description": "Four non-competitive contest papers aligned to the Maths Olympiad schedule, for mainstream and mixed-ability classes in Years 5–6. Resource Kits with sample questions and solutions precede each paper.",
     "registration_link": "https://www.apsmo.edu.au/",
     "registration_window": "Register before Term 2; papers run May to September",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -485,6 +568,13 @@
     "description": "Prestigious APSMO Maths Olympiad for high-potential Years 5–6 students. Running since 1987, it develops problem-solving through a series of five olympiad-style contest papers.",
     "registration_link": "https://www.apsmo.edu.au/",
     "registration_window": "Register before Term 2; contests run May to September",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -526,6 +616,14 @@
     "description": "Online sharemarket simulation run twice yearly by the ASX. Students manage a virtual portfolio, buying and selling shares in ASX-listed companies over a ten-week window, individually or in syndicates of 2–4. Cash prizes at state and national level.",
     "registration_link": "https://www.asx.com.au/investors/investment-tools-and-resources/sharemarket-game",
     "registration_window": "Two game windows per year (~10 weeks each)",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Either",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -564,6 +662,13 @@
     "description": "Weekly term ensembles covering script analysis, character development, voice, movement and devising, finishing with an Open Studio performance.",
     "registration_link": "https://events.humanitix.com",
     "registration_window": "Weekly term ensembles; early bird discounts",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -602,6 +707,13 @@
     "description": "Five day holiday workshops such as Bad to the Bard and Transform AHHHH, covering script analysis, character development and devising, finishing with a family performance showcase.",
     "registration_link": "https://events.humanitix.com",
     "registration_window": "School holiday workshops across the year",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -642,6 +754,14 @@
     "description": "The Australasian final of the Philosothon movement, assessed by university philosophers. Teams of one student per year level (Years 8–12) take part in Communities of Inquiry, judged on philosophical inquiry, clarity and reasoning. Runs online or hybrid.",
     "registration_link": "https://www.aap.org.au/event-6702265",
     "registration_window": "Register ahead of the late-August event",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Online",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-08-21",
     "ends_on": "2026-08-31",
     "dates_precision": "part",
@@ -678,6 +798,14 @@
     "description": "Neuroscience competition for Year 10 students across three rounds. Round 1 sat online via Education Perfect; regional finals in person; national final online. National finalists may have travel and accommodation supported.",
     "registration_link": "Education Perfect event page or through EP school portal",
     "registration_window": "Register before the Round 1 window (around March)",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online",
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -715,6 +843,13 @@
     "description": "Annual paper-based competition for senior students assessing economic and business theory, run by a volunteer committee at the UNSW Business School. Around 15,000+ students from 900+ schools participate each year.",
     "registration_link": "https://www.aebsc.org/",
     "registration_window": "Register before the annual assessment date",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -754,6 +889,13 @@
     "description": "National economics enrichment competition for high school students run by the Consortium for Inclusive Economics Education at UNSW Sydney. Tests mastery of economics, problem solving and economic reasoning. Top performers form the Australian team for the international olympiads.",
     "registration_link": "https://aeo.org.au/",
     "registration_window": "Register before the May sitting",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -794,6 +936,13 @@
     "description": "National multiple-choice geography competition sat at school. All participants receive certificates; top performers earn distinctions. High-performing senior students may be selected for Geography's Big Week Out and the International Geography Olympiad team.",
     "registration_link": "http://geographycomp.org.au/",
     "registration_window": "Usually late January – early May",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-01-21",
     "ends_on": "2026-05-10",
     "dates_precision": "part",
@@ -832,6 +981,13 @@
     "description": "National multiple-choice history test for Years 7–10, with two papers (Years 7–8 and Years 9–10). State champions receive medallions and national champions receive leather portfolios.",
     "registration_link": "http://australianhistorycompetition.org.au/",
     "registration_window": "Registrations usually close around March",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -873,6 +1029,14 @@
     "description": "Three-hour programming contest run by the Australian Maths Trust in C, C++, Java or Python. The national entry point to the informatics olympiad pathway; high performers may be invited to AMT high-performance programs.",
     "registration_link": "https://www.amt.edu.au/aio",
     "registration_window": "Register via AMT before the late-August contest",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-08-21",
     "ends_on": "2026-08-31",
     "dates_precision": "part",
@@ -911,6 +1075,13 @@
     "description": "Highly challenging four-hour olympiad-style mathematics paper run by the AMT, pitched at Year 10 level but suited to talented Years 7–9 students. Ten questions including written proofs; feeds the AMT olympiad pathway.",
     "registration_link": "https://amt.edu.au/aimo",
     "registration_window": "Entries usually close early September; sat mid-September",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-09-11",
     "ends_on": "2026-09-20",
     "dates_precision": "part",
@@ -950,6 +1121,14 @@
     "description": "Australia's senior invitational maths olympiad pathway, structured as three competitions: AMO Summer (February, at school), AMO Winter and AMO Finals (AMT exam hubs). Around 200–250 students in Year 11 or below are invited, feeding the School of Excellence and IMO team selection.",
     "registration_link": "https://amt.edu.au/amo",
     "registration_window": "By invitation from AMOC State Directors",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -994,6 +1173,14 @@
     "description": "Australia's flagship school mathematics competition, administered by the Australian Maths Trust since 1978. A 30-question challenge sat online or on paper across five divisions from Middle Primary to Senior.",
     "registration_link": "https://www.amt.edu.au/amc",
     "registration_window": "Register via AMT before the early-August sitting",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-10",
     "dates_precision": "part",
@@ -1035,6 +1222,13 @@
     "description": "Australian essay competition on mental health awareness for students aged 13–18, with Junior (Years 7–8), Intermediate (Years 9–10) and Senior (Years 11–12) divisions. 800-word limit on an annual prompt.",
     "registration_link": "https://www.amhaec.org/enter",
     "registration_window": "Entries usually due mid-August",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -1075,6 +1269,13 @@
     "description": "The selection exams for the Australian Science Olympiads pathway, run by ASI in Biology, Chemistry, Physics and Earth & Environmental Science. High performers may be invited to the residential ASO Summer School and on to International Science Olympiad teams.",
     "registration_link": "https://asi.edu.au/program/australian-science-olympiads/",
     "registration_window": "Register before the late July–August exam window",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-07-21",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -1112,6 +1313,13 @@
     "description": "Invitation-only residential summer school run by Australian Science Innovations as part of the Australian Science Olympiads pathway. Students attend in one discipline (Biology, Chemistry, Earth & Environmental Science or Physics) and may be selected for International Science Olympiad teams.",
     "registration_link": "https://asi.edu.au/program/australian-science-olympiads/",
     "registration_window": "By invitation following the ASO Exams (sat August)",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": "2026-01-01",
     "ends_on": "2026-01-31",
     "dates_precision": "month",
@@ -1152,6 +1360,14 @@
     "description": "Teams (2–12 students) respond to an engineering Request For Tender over the school year. Qualifying proposals lead to a two-day national final at The University of Queensland, with the winning team representing Australia at the International Space Settlement Design Competition.",
     "registration_link": "https://www.ausspacedesign.org.au/",
     "registration_window": "Registrations run April to June; proposals due mid-year",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -1197,6 +1413,13 @@
     "description": "Australian STEM Video Game Challenge in which students design and develop a video game, combining creativity with technical and computational skills.",
     "registration_link": "avgc.com.au",
     "registration_window": "Register before the mid-year submission deadline",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Either",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -1238,6 +1461,13 @@
     "description": "An adventure fiction writing award run by the Wilbur and Niso Smith Foundation in the United Kingdom.",
     "registration_link": "https://www.wilbur-niso-smithfoundation.org",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -1283,6 +1513,14 @@
     "description": "International computational thinking challenge coordinated in Australia by the Australian Maths Trust. Fifteen short logic problems with no coding required, sat online individually or in teams of up to four. Divisions cover Years 3–12.",
     "registration_link": "https://amt.edu.au/bebras",
     "registration_window": "Register via AMT before the February–March challenge window",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Either",
+    "entry_route": "School enters",
     "starts_on": "2026-02-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -1324,6 +1562,13 @@
     "description": "A national short story competition with significant prize money, including youth categories.",
     "registration_link": "https://bestaustralianyarn.com.au",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -1365,6 +1610,13 @@
     "description": "A young writers' competition run by the Better Read Kids program.",
     "registration_link": "https://www.betterreadkids.com/2024-writing-competition",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -1404,6 +1656,14 @@
     "description": "A 50-minute online, mixed-format science competition run by Australian Science Innovations for Years 7–10. Tests scientific knowledge, critical thinking and problem solving across biology, chemistry, Earth & environmental science and physics. Now offered globally.",
     "registration_link": "https://asi.edu.au/program/big-science-competition/",
     "registration_window": "Register before the May testing window",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -1446,6 +1706,13 @@
     "description": "Eight-week mentored research program for student teams tackling real-world challenges in medicine and sustainability, working with expert mentors and presenting at a Symposium at the University of Sydney.",
     "registration_link": "https://lnkd.in/gv6PQMFd",
     "registration_window": "Registrations usually open May, close mid-July",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -1486,6 +1753,13 @@
     "description": "International black and white photography competition across five categories: Architecture, Street, Wildlife, Portrait and Landscape. Open to high school students through to professionals.",
     "registration_link": "https://studentcompetitions.com/competitions/black-and-white-photo-awards-2026",
     "registration_window": "Entries usually due mid-June",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -1527,6 +1801,14 @@
     "description": "Programming competition using visual block-based coding, designed for school students and teachers to learn programming concepts in an accessible, beginner-friendly format.",
     "registration_link": "https://groklearning.com/",
     "registration_window": "Register via Grok Academy before the event",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-02-01",
     "ends_on": "2026-02-28",
     "dates_precision": "month",
@@ -1564,6 +1846,14 @@
     "description": "National high school mooting competition hosted by Bond University, in which students argue appellate-style legal problems before judges, developing legal reasoning and advocacy.",
     "registration_link": null,
     "registration_window": "Register before the competition rounds",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -1600,6 +1890,14 @@
     "description": "Bond University's short-film competition for Year 11–12 students across Australia and internationally — 'Bond's answer to the Oscars'. Eight genre categories with films up to 10 minutes; the top prize is a full film and television scholarship.",
     "registration_link": "https://bond.edu.au/bufta",
     "registration_window": "Entries usually close early October; awards in November",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online",
+      "Away"
+    ],
+    "entry": "Either",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -1620,7 +1918,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Debating",
       "Public Speaking"
     ],
@@ -1640,6 +1937,13 @@
     "description": "High school Model United Nations conference hosted by Bond University, in which students debate global issues as UN delegates, developing diplomacy, negotiation and public speaking.",
     "registration_link": null,
     "registration_window": "Register before the conference",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -1676,6 +1980,13 @@
     "description": "Bond University program introducing senior students to research methods and statistics in psychology. Details are limited — confirm current offering, dates and cost with Bond University.",
     "registration_link": null,
     "registration_window": "Confirm dates with Bond University",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -1712,6 +2023,13 @@
     "description": "Free two-day curriculum enrichment workshop at Bond University (Gold Coast) for Year 12 students, in either a Business or Maths stream. Small-group access to academics and current students, with part-fee scholarships for top performers.",
     "registration_link": null,
     "registration_window": "Usually opens early in the year; runs around April",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
@@ -1753,6 +2071,13 @@
     "description": "Official 16-week online International Brain Bee and IYNA prep program working through the Brain Facts book — written exam prep, patient diagnosis, neuroanatomy and neurohistology — with expert mentorship and a final mock exam. About 3–4 hours per week.",
     "registration_link": "https://youthneuro.org/brain-bee",
     "registration_window": "Rolling enrolment across the 16-week season (roughly December to March)",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-12-01",
     "ends_on": "2027-03-31",
     "dates_precision": "month",
@@ -1790,6 +2115,13 @@
     "description": "Annual essay competition run by Brain, the international neurology journal published by Oxford Academic. Seeks enlightening, well-written essays for a general readership (not academic papers); winning essays are published in the journal's Essay section.",
     "registration_link": "https://academic.oup.com/brain/pages/brain-essay-competition",
     "registration_window": "Entries usually due around October",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -1833,6 +2165,13 @@
     "description": "Single day tutorial program run by BRAINways Education for high potential primary and early secondary students in Sydney. Students are nominated by their school, then parents enrol online. Topics for this round are The Mathematics of Games, The Chemistry in a Prescription: The Science of Pain, and What is Art? The Philosophy of Beauty.",
     "registration_link": "https://registration.brainways.com.au/quest-sydney/",
     "registration_window": "Enrolments opened 10 August 2026 and close 1 October 2026, or earlier once places fill",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -1871,6 +2210,13 @@
     "description": "Three-round psychology olympiad organised by Minds Underground and officially recommended by the University of Oxford. Open internationally to Years 9–12. Australian students select their equivalent UK year group on registration.",
     "registration_link": "https://www.mindsunderground.com/british-psychology-olympiad",
     "registration_window": "Register before the February first round",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-02-01",
     "ends_on": "2026-02-28",
     "dates_precision": "month",
@@ -1911,6 +2257,13 @@
     "description": "International textile design competition open to high school students and older, with an open theme. Hosted by the Busan Textile & Fashion Industries Association, with a substantial prize pool.",
     "registration_link": "https://studentcompetitions.com/competitions/2026-call-for-entries-the-30th-busan-international-textile-design-competition",
     "registration_window": "Entries usually due early October",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -1955,6 +2308,13 @@
     "description": "International essay competition run by the Cambridge Centre for International Research for students aged 11–18, split into Junior and Senior divisions. Essays of 1,000–2,000 words on prompts spanning humanities, sciences and social sciences. Award ceremony at King's College, Cambridge.",
     "registration_link": "https://cambridge-research.org/essay-competition/",
     "registration_window": "Entries usually due around 10 May",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -1978,8 +2338,7 @@
     ],
     "subjects": [
       "Classics",
-      "Languages",
-      "Public Speaking"
+      "Languages"
     ],
     "month": "August",
     "age_groups": [
@@ -1995,6 +2354,13 @@
     "description": "Annual Latin and Greek reading competition for Years 10–11 run by the Classical Association of NSW. Students perform classical texts aloud, judged on pronunciation and expression. The Year 10 Chorus trophy honours Professor Kevin Lee.",
     "registration_link": "https://classics.org.au/events/latin-and-greek-reading-competition",
     "registration_window": "Heats June–July; state finals August",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -2031,6 +2397,13 @@
     "description": "Annual Latin essay competition for Year 12 students run by the CLTA of NSW, established in 1998 in honour of classics teacher Carol Manners. Students respond to essay questions on their prescribed HSC and IB Latin texts; winning essays are published in the journal Classicum.",
     "registration_link": "https://www.cltainc.org/",
     "registration_window": "Submissions due around July",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-07-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -2070,6 +2443,13 @@
     "description": "Global virtual business case competition for high school students run by CaseCatalyst. Teams of 3–4 solve real-world challenges faced by early-stage startups in developing and emerging economies, finishing with a live Pitch Day before founders and judges.",
     "registration_link": "https://studentcompetitions.com/competitions/casecatalyst-2026-virtual-case-competition-for-high-school-students",
     "registration_window": "Entries usually close around April",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
@@ -2110,6 +2490,13 @@
     "description": "International art and photography competition themed around city lights at night — neon, streetlights, high-rise windows and motion in the dark. Hosted by Ten Moir Gallery; open to artists and photographers worldwide.",
     "registration_link": "https://studentcompetitions.com/competitions/city-lights-art-challenge-2026-free-entry-early-bird",
     "registration_window": "Entries usually due late May",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -2131,8 +2518,7 @@
     ],
     "subjects": [
       "Classics",
-      "Languages",
-      "Public Speaking"
+      "Languages"
     ],
     "month": "August",
     "age_groups": [
@@ -2147,6 +2533,13 @@
     "description": "Annual Latin reading competition for Year 9 students run by the CLTA of NSW. Students prepare and perform Latin passages aloud, judged on pronunciation, expression, phrasing and understanding. Complements the CANSW competition for Years 10–11.",
     "registration_link": "https://www.cltainc.org/",
     "registration_window": "Register through CLTA ahead of the August event",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -2183,6 +2576,13 @@
     "description": "Residential Latin and classics camp for Year 8 students run by the CLTA of NSW. Brings together Latin students from many NSW schools for several days of immersive classics activities, language work and social events.",
     "registration_link": "https://www.cltainc.org/",
     "registration_window": "Usually Term 3–4; dates circulated to CLTA member schools",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -2225,6 +2625,13 @@
     "description": "Online coding competition for school students across multiple levels, run by Grok Academy.",
     "registration_link": null,
     "registration_window": "Register via Grok Academy before the event",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -2265,6 +2672,13 @@
     "description": "International open call for photographers submitting works where colour plays a central role, hosted by Grid Photo Gallery.",
     "registration_link": "https://studentcompetitions.com/competitions/color-open-call-2026-grid-photo-gallery",
     "registration_window": "Entries usually due mid-June",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -2308,6 +2722,13 @@
     "description": "National and international problem-solving competition run by the Australian Maths Trust focusing on computational and algorithmic thinking. No coding required.",
     "registration_link": "https://www.amt.edu.au/cat",
     "registration_window": "Register via AMT before the March competition window",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -2349,6 +2770,13 @@
     "description": "Global innovation competition for students aged 13–18 working in teams of 2–5 to solve real-world problems across categories such as Aerospace & Aviation, Cyber-Technology & Security, Energy & Environment and Health & Nutrition.",
     "registration_link": "https://conradchallenge.org",
     "registration_window": "Register before the entry rounds (usually from August)",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -2386,6 +2814,13 @@
     "description": "Open design challenge to create a cordless lamp for off-grid contexts, hosted by Desall with a leading lighting company. Open to everyone worldwide.",
     "registration_link": "https://studentcompetitions.com/competitions/cordless-lamp-innovation-contest",
     "registration_window": "Entries usually due late June",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -2431,6 +2866,13 @@
     "description": "An original prose competition of up to 2000 words, open to Western Australian school students in Years 1 to 12.",
     "registration_link": "https://www.subiaco.wa.gov.au/see-do/things-to-see-do/community-awards/craig-silvey-award-for-young-writers",
     "registration_window": "Closes mid August",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -2473,6 +2915,13 @@
     "description": "Online competition testing students' cyber security skills and knowledge of digital safety, run by Grok Academy.",
     "registration_link": "https://groklearning.com/",
     "registration_window": "Register via Grok Academy before the event",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -2516,6 +2965,13 @@
     "description": "Academic gala for teams of eight competing across ten disciplines (engineering, mathematics and chess, code breaking, art and poetry, science, English, ideation, creative producers, cartography and legacy). Regional rounds lead to national finals at Knox Grammar.",
     "registration_link": "http://davincidecathlon.com/ events section",
     "registration_window": "Regionals in Term 2; register via host school beforehand",
+    "format": "Day event",
+    "provider": "School",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -2557,6 +3013,13 @@
     "description": "Online conference on the DMUN Discover MUN series simulating regional multilateral bodies: the African Union's Peace and Security Council and Commission, and the Council of the Arab League. Beginner-level committees on African and Middle Eastern crises.",
     "registration_link": "https://mymun.com/conferences/dmun-african-union-and-arab-league-2026",
     "registration_window": "Registrations close shortly before the late-September event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-09-21",
     "ends_on": "2026-09-30",
     "dates_precision": "part",
@@ -2577,7 +3040,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "History",
       "Debating"
     ],
@@ -2599,6 +3061,13 @@
     "description": "Online Model UN on the DMUN circuit themed Action, Mystery, History and Story. Delegates serve on war-council and crisis committees set across historical, present-day and speculative future scenarios. Free and open worldwide.",
     "registration_link": "https://mymun.com/conferences/dmundf-2025",
     "registration_window": "Registrations close shortly before the late-July event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-07-21",
     "ends_on": "2026-07-31",
     "dates_precision": "part",
@@ -2619,7 +3088,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "History",
       "Debating"
     ],
@@ -2641,6 +3109,13 @@
     "description": "Flagship year-end online conference of the DMUN circuit (around 500 delegates). Committees span Asian Parliamentary Debate, UNFCCC, ICJ, UNEP, Lok Sabha, European Parliament, a Historical Crisis Committee and the Council of the Arab League.",
     "registration_link": "https://mymun.com/conferences/dmun-championship-2026",
     "registration_window": "Registrations close shortly before the early-December event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-12-01",
     "ends_on": "2026-12-10",
     "dates_precision": "part",
@@ -2661,7 +3136,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Science",
       "Geography"
     ],
@@ -2683,6 +3157,13 @@
     "description": "Online conference on the DMUN circuit simulating the Conferences of the Parties (COPs) to three major UN environmental treaties: UNFCCC (climate), CBD (biodiversity) and UNCCD (desertification). Three beginner-level committees; around 500 delegates.",
     "registration_link": "https://mymun.com/conferences/dmun-conventions-2025",
     "registration_window": "Registrations close shortly before the September event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-09-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -2703,7 +3184,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "History",
       "Debating"
     ],
@@ -2725,6 +3205,13 @@
     "description": "Online crisis-format MUN on the DMUN circuit with fast-moving committees spanning historical, fictional and contemporary scenarios — from a Historical Crisis Committee and UNSC to zombie-apocalypse and AI-governance crises.",
     "registration_link": "https://mymun.com/conferences/dmun-crisis-2026",
     "registration_window": "Registrations close shortly before the late-October event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-21",
     "ends_on": "2026-10-31",
     "dates_precision": "part",
@@ -2745,7 +3232,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Debating"
     ],
     "month": "January",
@@ -2766,6 +3252,13 @@
     "description": "Online debate competition run by the DMUN Foundation in Asian Parliamentary and British Parliamentary formats. A large global event (around 2,000 delegates) with cash prizes for top performers.",
     "registration_link": "https://mymun.com/conferences/dmun-debate-forum-2026",
     "registration_window": "Registrations close shortly before the late-January event",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-01-21",
     "ends_on": "2026-01-31",
     "dates_precision": "part",
@@ -2789,7 +3282,6 @@
       "Debating",
       "Public Speaking",
       "Leadership",
-      "Humanities",
       "Economics"
     ],
     "month": "July",
@@ -2808,6 +3300,13 @@
     "description": "Online innovation forum run by the DMUN Foundation, held 11 to 12 July 2026 with around 500 delegates from university and school students. Delegates explore creative problem solving, diplomacy and global cooperation, designing solutions for challenges in technology, governance, economics and society. Theme: Innovating for Inclusive and Sustainable Development. Enquiries: enquiries@dmun.org",
     "registration_link": "https://mymun.com/dmun",
     "registration_window": "Chairs: 1 Apr to 5 Jul 2026. Delegates: 5 Apr to 12 Jul 2026. Observers: 14 Aug 2025 to 11 Jul 2026.",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-07-11",
     "ends_on": "2026-07-12",
     "dates_precision": "day",
@@ -2830,9 +3329,9 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Legal",
-      "Debating"
+      "Debating",
+      "Civics"
     ],
     "month": "June",
     "age_groups": [
@@ -2849,6 +3348,13 @@
     "description": "Online Model European Union simulation run by the DMUN Foundation. A two-day conference across three chambers (European Parliament, European Commission, European Central Bank) focused on consensus building and negotiation among the 27 member states.",
     "registration_link": "https://mymun.com/conferences/list",
     "registration_window": "Registrations close shortly before the June event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -2887,6 +3393,13 @@
     "description": "Online legal simulation conference on the DMUN circuit focusing on precision argumentation, judicial questioning and case-building under pressure. Three beginner-level committees: UN GA Sixth Committee, International Criminal Court and ITLOS.",
     "registration_link": "https://mymun.com/conferences/dmun-moot-court-2026",
     "registration_window": "Registrations close shortly before the late-August event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-08-21",
     "ends_on": "2026-08-31",
     "dates_precision": "part",
@@ -2907,7 +3420,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Debating",
       "Legal"
     ],
@@ -2926,6 +3438,13 @@
     "description": "Online traditional Model UN run by the DMUN Foundation as a training ground for new and experienced delegates. Two-day forum across eight committees under standard parliamentary procedure on current UN agendas. Over 800 delegates expected.",
     "registration_link": "https://mymun.com/conferences/list",
     "registration_window": "Registrations close shortly before the August event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -2946,7 +3465,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Business",
       "Debating",
       "Legal"
@@ -2969,6 +3487,13 @@
     "description": "Online conference on the DMUN circuit with innovation and policy-oriented committees — Startup Parliament, Student Court, Policy Lab Council, SDG Solutions Council, Mental Health Council and Social Media Parliament among them.",
     "registration_link": "https://mymun.com/conferences/dmun-pitch-2026",
     "registration_window": "Registrations close shortly before the mid-October event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-11",
     "ends_on": "2026-10-20",
     "dates_precision": "part",
@@ -2989,7 +3514,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "History",
       "Debating"
     ],
@@ -3011,6 +3535,13 @@
     "description": "Online Model UN simulating the interwar League of Nations, run by the DMUN Foundation. Delegates debate across nine committees covering peacekeeping, refugees, disarmament, economics, labour, intellectual cooperation and colonial mandates. Around 1,800 delegates expected.",
     "registration_link": "https://mymun.com/conferences/dmunln-2026",
     "registration_window": "Registrations close shortly before the April event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
@@ -3032,8 +3563,8 @@
     ],
     "subjects": [
       "Legal",
-      "Humanities",
-      "Debating"
+      "Debating",
+      "Civics"
     ],
     "month": "June",
     "age_groups": [
@@ -3050,6 +3581,13 @@
     "description": "Online Model Parliament and Congress simulation run by the DMUN Foundation. A two-day legislative simulation across three chambers (UK House of Commons, US Congress, India's Lok Sabha) where delegates debate, negotiate and draft legislation on live policy issues.",
     "registration_link": "https://mymun.com/conferences/list",
     "registration_window": "Registrations close shortly before the June event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -3095,6 +3633,14 @@
     "description": "Annual Australian poetry writing competition open to students from Kindergarten to Year 12 enrolled in Australian education settings, with an awards ceremony later in the year.",
     "registration_link": "https://www.dorotheamackellar.com.au",
     "registration_window": "Entries usually open March, close late June",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3133,6 +3679,13 @@
     "description": "Weekly term drama classes for young performers.",
     "registration_link": null,
     "registration_window": "Wednesdays during term",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3178,6 +3731,13 @@
     "description": "A creative writing competition run by Dymocks Tutoring.",
     "registration_link": "https://beyondwords.dymockstutoring.edu.au",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3216,6 +3776,13 @@
     "description": "Ethics and philosophy event for secondary students, exploring moral reasoning and ethical questions through discussion and structured activities. Hosted at Rosebank College.",
     "registration_link": null,
     "registration_window": "Register through the host school before the event",
+    "format": "Day event",
+    "provider": "School",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -3257,6 +3824,13 @@
     "description": "Primary enrichment competition spanning English, science, mathematics and humanities, with Lower Primary (Years 1–3) and Upper Primary (Years 4–6) divisions.",
     "registration_link": null,
     "registration_window": "Register before the competition window",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-07-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -3277,7 +3851,8 @@
       "Competition"
     ],
     "subjects": [
-      "Humanities"
+      "Classics",
+      "Languages"
     ],
     "month": "January",
     "age_groups": [
@@ -3297,6 +3872,14 @@
     "description": "Introductory Latin examination for Years 3–8, run by Excellence Through Classics (a committee of the American Classical League). Two levels with an annual theme, offered on paper or online via Lingco.",
     "registration_link": "https://class.lingco.io/goto/ele_2026",
     "registration_window": "Usually 1 November – 10 February",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2025-11-01",
     "ends_on": "2026-02-10",
     "dates_precision": "part",
@@ -3337,6 +3920,11 @@
     "description": "Umbrella entry for the full family of EAE award categories (27 in total), recognising extracurricular achievement. Open for nominations year round.",
     "registration_link": "https://awards.eae.international",
     "registration_window": "Open for nominations year round. Quarterly review cycles, alternating individual and team entries. Current submission window closes 15 November 2026.",
+    "format": null,
+    "provider": "External",
+    "settings": [],
+    "entry": null,
+    "entry_route": null,
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3379,6 +3967,13 @@
     "description": "A poetry award for poets aged 14 and under, submitting a poem of up to 40 lines on any theme.",
     "registration_link": "https://fawtas.org.au/competitions/",
     "registration_window": "Closes 31 August",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3423,6 +4018,14 @@
     "description": "Large-scale high school robotics competition in which teams build industrial-sized robots each season, competing in alliance-based matches at events with awards and judging. Supported in Australia by FIRST Australia.",
     "registration_link": "https://www.firstaustralia.org/first-robotics-competition",
     "registration_window": "Register before the build season",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3467,6 +4070,14 @@
     "description": "Team-based robotics program in which students design, build and program robots to compete in alliance-based games — a mid-scale step between FIRST LEGO League and FRC. Supported in Australia by FIRST Australia.",
     "registration_link": "https://www.firstaustralia.org/first-tech-challenge",
     "registration_window": "Register before the season begins",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3506,6 +4117,13 @@
     "description": "Philosophy and critical-thinking forum hosted at Rosebank College. Each school sends up to 10 students (1 speaker, 1 adjudicator, remainder as judges and discussion participants). Speeches are judged on originality, engagement and cogency rather than oration. Community of inquiry discussions follow each group of three speeches. Day concludes with a whole-group ethical dilemma. Limited to 9 schools.",
     "registration_link": null,
     "registration_window": "Book by end of Term 2. Student names, speech topic, teacher details and dietary requirements due Week 3, Term 3.",
+    "format": "Day event",
+    "provider": "School",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-09-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -3545,6 +4163,13 @@
     "description": "A monthly flash fiction challenge with a short writing window and a cash prize.",
     "registration_link": "https://www.writerscentre.com.au/furious-fiction/",
     "registration_window": "First weekend of every month",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3581,6 +4206,13 @@
     "description": "A selective online program bringing together high school students from around the world to collaborate with experienced student mentors from top universities. Handpicked fellows identify, brainstorm and solve significant global challenges together.",
     "registration_link": "https://www.learnwithleaders.com/certificate_programs/the-future-changemakers-program-by-harvard-student-agencies-cohort/",
     "registration_window": "Cohorts run periodically; apply via the website",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3627,6 +4259,13 @@
     "description": "International problem-solving program in which students research future-focused topics and apply a structured process. Strands include Global Issues, Community Projects and Scenario/Creative Writing, with an Australian affiliate and an international conference pathway.",
     "registration_link": "https://fpspi.org/",
     "registration_window": "Problem cycles run through the school year",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Either",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3665,6 +4304,13 @@
     "description": "Formal psychology competition on the Future PsychScholars platform, where high school and undergraduate students showcase psychological research and compete in a structured academic context, including submitting research papers.",
     "registration_link": "https://psych-scholars.com/w/competition",
     "registration_window": "See website for competition rounds",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3703,6 +4349,13 @@
     "description": "International psychology open challenge hosted on the Future PsychScholars platform — an accessible entry point offering structured challenges that build knowledge, research skills and competitive experience.",
     "registration_link": "https://psych-scholars.com/w/open-challenge",
     "registration_window": "Rolling challenges; see website for rounds",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3741,6 +4394,13 @@
     "description": "Open design challenge for an innovative snack concept aimed at a young consumer audience, hosted by Desall with a leading food and beverage company. Open globally.",
     "registration_link": "https://studentcompetitions.com/competitions/future-snack-design",
     "registration_window": "Entries usually due mid-September",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3782,6 +4442,13 @@
     "description": "National team competition for high-ability primary students run by GATEWAYS Education (operating since 1994). Teams rotate through four scenario-based rounds with different academic focuses, structured so no single student can complete a round alone.",
     "registration_link": "https://www.gateways.edu.au/the-challenge",
     "registration_window": "Schools register ahead of Term 4 event days",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -3824,6 +4491,13 @@
     "description": "Team challenge in which students brainstorm and create solutions addressing the UN Sustainable Development Goals, supported by workshops, global mentors and cross-cultural exchange.",
     "registration_link": "https://sdgschallenge.org",
     "registration_window": "Register before the challenge period opens",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
@@ -3865,6 +4539,13 @@
     "description": "Competition in which students worldwide investigate a community issue through field research and policy writing. Hosted by Build Learning, with cash prizes and a potential internship.",
     "registration_link": "https://studentcompetitions.com/competitions/global-impact-competition",
     "registration_window": "Entries usually due mid-June",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3908,6 +4589,13 @@
     "description": "Team competition within the Future Problem Solving program: teams of four apply a six-step creative problem-solving process to a global issue scenario. Junior (Years 4–6), Middle (Years 7–9) and Senior (Years 10–12) divisions.",
     "registration_link": null,
     "registration_window": "Register before the mid-year problem cycle",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-07-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -3949,6 +4637,13 @@
     "description": "International challenge for high school and university students interested in quantum physics, in a research-oriented but accessible format. Hosted by Edu.Harbour, with cash prizes in the senior category.",
     "registration_link": "https://studentcompetitions.com/competitions/global-quantum-mechanics-challenge-2026",
     "registration_window": "Entries usually due mid-June",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3987,6 +4682,13 @@
     "description": "Global call for innovative, not-yet-realised design concepts, hosted by the Taiwan Design Research Institute. Open to students, designers and companies worldwide.",
     "registration_link": "https://studentcompetitions.com/competitions/golden-pin-concept-design-award-2026",
     "registration_window": "Entries usually due mid-June",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4026,6 +4728,13 @@
     "description": "Business case competition for high school students run by the Global Research and Consulting Group. Teams solve real-world business problems, supported by skill-building workshops, with top teams recognised and the winners offered a GRC internship.",
     "registration_link": "https://lnkd.in/eAuan58D",
     "registration_window": "Usually late March – late April",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-03-21",
     "ends_on": "2026-04-30",
     "dates_precision": "part",
@@ -4069,6 +4778,13 @@
     "description": "Australia's largest gathering of young leaders, run annually by Halogen Australia for primary and secondary students. Students hear high-profile leaders, athletes and identities share insights from their leadership journeys. A leadership event rather than a judged competition.",
     "registration_link": "https://www.halogen.au/",
     "registration_window": "Book before the capital-city event dates",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -4090,7 +4806,6 @@
     ],
     "subjects": [
       "Essay Writing",
-      "Humanities",
       "Legal"
     ],
     "month": "Various",
@@ -4111,6 +4826,13 @@
     "description": "International academic writing contest run by the Harvard International Review for students in grades 7–12. Articles of 800–1,200 words on international affairs; finalists defend their work orally to Harvard IR judges. AI use strictly prohibited.",
     "registration_link": "https://hir.harvard.edu/contest/",
     "registration_window": "Three submission cycles per year",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4131,7 +4853,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Debating",
       "Public Speaking"
     ],
@@ -4151,6 +4872,13 @@
     "description": "Four-day international relations simulation bringing Harvard's flagship Model UN conference to the Oceania region. Delegates assume the roles of world leaders, debating global issues and drafting solutions. Run by Harvard College undergraduates in partnership with Crimson Education.",
     "registration_link": "https://www.hmunaustralia.org/application-process",
     "registration_window": "Apply before the May conference",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -4190,6 +4918,13 @@
     "description": "A fiction prize for the first 5000 words of a novel plus a pitch, run through the CYA Conference.",
     "registration_link": "https://www.cyaconference.com/entry/adultgenres",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4231,6 +4966,13 @@
     "description": "A picture book prize run as part of the CYA Conference.",
     "registration_link": "https://www.cyaconference.com/entry/hatchlings",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4273,6 +5015,14 @@
     "description": "Online mathematics quiz competition run across multiple terms, for teams of four or individual participants, focused on collaborative mathematical problem solving.",
     "registration_link": "havesumfun.net",
     "registration_window": "Multiple terms through the year; register before each round",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Either",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -4311,6 +5061,13 @@
     "description": "Entrepreneurship accelerator for Years 10–12 run by HEX, with the University of Sydney as School of Record. Students build innovation and startup skills with mentors from leading companies and earn a formal university-issued microcredential.",
     "registration_link": "https://www.startwithhex.com/program/hex-high-accelerator-program",
     "registration_window": "Multiple intakes per year",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4348,6 +5105,13 @@
     "description": "A storytelling competition for young people in regional, rural and remote Australia, with entries in text, video, audio or photos.",
     "registration_link": "https://www.abc.net.au/heywire/competition",
     "registration_window": "Closes 1 September",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4389,6 +5153,13 @@
     "description": "Global virtual business case competition (formerly the Tiger Global Case Competition). Teams of 2–4 act as executives solving a real-world business case under timed conditions, progressing through regional qualifiers and finals to a global final. No prior business experience required.",
     "registration_link": "https://www.casecomp.org/",
     "registration_window": "Register before the mid-year qualifiers",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-07-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -4434,6 +5205,13 @@
     "description": "A short story competition across primary and secondary categories, with stories up to 2500 words and prize money to $150.",
     "registration_link": "https://fawnsw.org.au/writing-competitions/",
     "registration_window": "Closes 31 August",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4476,6 +5254,13 @@
     "description": "Free global essay competition for high school students run by the Horizon Academic Research Program. Students respond to one of five themed prompts feeding into an annual central theme, in English and under 1,000 words. Top awards include cash prizes and scholarships to the Horizon program.",
     "registration_link": "https://horizoninspires.com/essay-prize/",
     "registration_window": "Entries usually close around early February",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4524,6 +5309,13 @@
     "description": "National academic competition suite covering Digital Technologies, Science, Spelling Bee, Writing, English and Mathematics. Students are assessed individually against year-level content, with certificates and medals for top performers.",
     "registration_link": "https://www.icasassessments.com",
     "registration_window": "Schools register before the August–September sitting windows",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-08-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -4565,6 +5357,13 @@
     "description": "International virtual neuroscience research-proposal competition run by IYNA, often in partnership with the Alzheimer's Association. Small teams design a research proposal on a yearly theme, supported by lectures and mentorship. High School and Undergraduate divisions.",
     "registration_link": "https://youthneuro.org/ideathon",
     "registration_window": "Usually runs around February–March",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-02-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -4606,6 +5405,14 @@
     "description": "Global synthetic biology competition in which teams design, build, test and present projects responding to real-world problems, culminating in the Grand Jamboree. Secondary school teams can compete subject to age requirements. Note: very substantial team fees.",
     "registration_link": "https://competition.igem.org/registration/fees",
     "registration_window": "Staged registration deadlines from February through mid-year",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4647,6 +5454,13 @@
     "description": "Primary enrichment competition spanning English, science, mathematics and humanities, with Lower Primary (Years 1–3) and Upper Primary (Years 4–6) divisions.",
     "registration_link": null,
     "registration_window": "Register before the competition window",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -4685,6 +5499,13 @@
     "description": "Five day holiday workshop in original performance creation, covering script writing, acting and design.",
     "registration_link": "https://imaginationtheatre.com.au",
     "registration_window": "Multiple holiday intakes across the year",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4723,6 +5544,13 @@
     "description": "Weekly term drama classes for young performers in the inner west.",
     "registration_link": "https://imaginationtheatre.com.au",
     "registration_window": "Weekly term classes",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4766,6 +5594,13 @@
     "description": "Highly selective international essay competition run by Immerse Education for students aged 13–18. A 500-word essay on a pre-released subject-specific question, judged by experts, with scholarships to Immerse programmes at Cambridge and Oxford for winners.",
     "registration_link": "https://www.immerse.education/essay-competition/",
     "registration_window": "Two annual cycles; major deadlines around January and mid-year",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -4804,6 +5639,13 @@
     "description": "Weekly after school improvisation classes covering fundamentals, yes and techniques and ensemble work.",
     "registration_link": "https://improvtheatresydney.com.au",
     "registration_window": "Mondays, Terms 2 to 4",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4841,6 +5683,13 @@
     "description": "Holiday improvisation program covering long form improvisation, character work, narrative and stagecraft, culminating in a short family showcase.",
     "registration_link": "https://improvtheatresydney.com.au",
     "registration_window": "January summer program and October spring workshop",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-01-01",
     "ends_on": "2026-01-31",
     "dates_precision": "month",
@@ -4883,6 +5732,13 @@
     "description": "A youth magazine publishing short stories, essays, memes, comics, fan fiction, poetry, graphic design and artwork from young people aged 13 to 19.",
     "registration_link": "https://indigoteen.org",
     "registration_window": "Rolling submissions",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4903,8 +5759,8 @@
       "Competition"
     ],
     "subjects": [
-      "Humanities",
-      "Legal"
+      "Legal",
+      "Civics"
     ],
     "month": "February",
     "age_groups": [
@@ -4922,6 +5778,13 @@
     "description": "National civics competition run by the Rule of Law Education Centre. Students in Years 7–10 work in pairs to research a civic topic using provided fact sheets, then design an original playing card representing that concept. Judged with prizes awarded by a member of parliament.",
     "registration_link": "https://www.ruleoflaw.org.au/programs-overview-competition",
     "registration_window": "Submissions usually due around February",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-02-01",
     "ends_on": "2026-02-28",
     "dates_precision": "month",
@@ -4960,6 +5823,14 @@
     "description": "University-level microcredential from UTS TD School delivered to secondary students (piloted with Year 10 cohorts). Focuses on innovating in complex systems and transdisciplinary practice, centred on sustainability and net-zero challenges, with on-campus project work at UTS.",
     "registration_link": null,
     "registration_window": "Arranged between UTS TD School and partner schools",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -5000,6 +5871,13 @@
     "description": "Global high school essay contest run by the International Neuroscience Olympiad (INO). NEXUS stands for Neurotechnology and Ethics Exchange for Universal Scholars. Students write a 500 to 1500 word essay in one of two tracks: Neurotechnology or Neuroethics. Note this is a separate contest from the IYNA-INS Neuroethics Essay Contest.",
     "registration_link": "https://ino-global.com/essay-contest",
     "registration_window": "Submissions due 24 June 2026 at 11:59pm EST",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -5043,6 +5921,13 @@
     "description": "A creative writing competition run by Insight Publications.",
     "registration_link": "https://www.insightpublications.com.au/2024-insight-creative-writing-competition/",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -5083,6 +5968,13 @@
     "description": "Arts round of the International Academic Marathon, a free online team relay.",
     "registration_link": "https://www.academic-marathon.org",
     "registration_window": "Closes 21 November 2026. Held 5 to 6 December 2026.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-12-05",
     "ends_on": "2026-12-06",
     "dates_precision": "day",
@@ -5126,6 +6018,13 @@
     "description": "Biology round of the International Academic Marathon, a free online team relay.",
     "registration_link": "https://www.academic-marathon.org",
     "registration_window": "Closes 4 July 2026. Held 18 to 19 July 2026.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-07-18",
     "ends_on": "2026-07-19",
     "dates_precision": "day",
@@ -5169,6 +6068,13 @@
     "description": "Chemistry round of the International Academic Marathon, a free online team relay.",
     "registration_link": "https://www.academic-marathon.org",
     "registration_window": "Closes 1 August 2026. Held 15 to 16 August 2026.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-08-15",
     "ends_on": "2026-08-16",
     "dates_precision": "day",
@@ -5211,6 +6117,13 @@
     "description": "Economics round of the International Academic Marathon, a free online team relay.",
     "registration_link": "https://www.academic-marathon.org",
     "registration_window": "Closes 7 November 2026. Held 21 to 22 November 2026.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-11-21",
     "ends_on": "2026-11-22",
     "dates_precision": "day",
@@ -5233,8 +6146,7 @@
       "Competition"
     ],
     "subjects": [
-      "Geography",
-      "Humanities"
+      "Geography"
     ],
     "month": "October",
     "age_groups": [
@@ -5254,6 +6166,13 @@
     "description": "Geography round of the International Academic Marathon, a free online team relay.",
     "registration_link": "https://www.academic-marathon.org",
     "registration_window": "Closes 26 September 2026. Held 10 to 11 October 2026.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-10",
     "ends_on": "2026-10-11",
     "dates_precision": "day",
@@ -5276,8 +6195,7 @@
       "Competition"
     ],
     "subjects": [
-      "History",
-      "Humanities"
+      "History"
     ],
     "month": "October",
     "age_groups": [
@@ -5297,6 +6215,13 @@
     "description": "History round of the International Academic Marathon, a free online team relay.",
     "registration_link": "https://www.academic-marathon.org",
     "registration_window": "Closes 10 October 2026. Held 24 to 25 October 2026.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-24",
     "ends_on": "2026-10-25",
     "dates_precision": "day",
@@ -5340,6 +6265,13 @@
     "description": "Computer science round of the International Academic Marathon, a free online team relay.",
     "registration_link": "https://www.academic-marathon.org",
     "registration_window": "Closes 5 September 2026. Held 19 to 20 September 2026.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-09-19",
     "ends_on": "2026-09-20",
     "dates_precision": "day",
@@ -5383,6 +6315,13 @@
     "description": "Literature round of the International Academic Marathon, a free online team relay.",
     "registration_link": "https://www.academic-marathon.org",
     "registration_window": "Closes 28 November 2026. Held 12 to 13 December 2026.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-12-12",
     "ends_on": "2026-12-13",
     "dates_precision": "day",
@@ -5426,6 +6365,13 @@
     "description": "Physics round of the International Academic Marathon, a free online team relay.",
     "registration_link": "https://www.academic-marathon.org",
     "registration_window": "Closed for 2026 (closed 21 March 2026). Was held 4 to 5 April 2026. Recurs annually.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-04-04",
     "ends_on": "2026-04-05",
     "dates_precision": "day",
@@ -5468,6 +6414,13 @@
     "description": "Psychology round of the International Academic Marathon, a free online team relay.",
     "registration_link": "https://www.academic-marathon.org",
     "registration_window": "Closes 19 September 2026. Held 3 to 4 October 2026.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-03",
     "ends_on": "2026-10-04",
     "dates_precision": "day",
@@ -5511,6 +6464,13 @@
     "description": "Annual mental health essay contest for high school students aged 13–19 worldwide, run by the International Bipolar Foundation. Essays of 500–1,000 words on mental health awareness, school programs and reducing stigma.",
     "registration_link": "https://ibpf.org/learn/programs/high-school-essay-contest/",
     "registration_window": "Usually opens mid-year, closes early January",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -5550,6 +6510,13 @@
     "description": "Global two round business olympiad for high school students.",
     "registration_link": "https://www.business-olympiad.org",
     "registration_window": "Closes 15 July 2026. Grand Test 25 July 2026. International final 8 to 14 August 2026.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-07-25",
     "ends_on": "2026-08-14",
     "dates_precision": "day",
@@ -5593,6 +6560,13 @@
     "description": "Global computer science competition for high school and university students that goes beyond the standard curriculum, with rounds available across all major regions including Oceania.",
     "registration_link": "https://studentcompetitions.com/competitions/international-computer-science-competition-2026",
     "registration_window": "Entries usually due early July",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -5632,6 +6606,13 @@
     "description": "Global multi round olympiad in environmental science and sustainability.",
     "registration_link": "https://www.env-olympiad.com",
     "registration_window": "Closes 29 July 2026. Grand Test and international final follow in the same cycle.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -5671,6 +6652,13 @@
     "description": "Global multi round finance and economics olympiad.",
     "registration_link": "https://www.finance-olympiad.org",
     "registration_window": "Closes 12 August 2026. Grand Test and international final follow in the same cycle.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -5710,6 +6698,13 @@
     "description": "International idea award for universal design (Design for All), hosted by the Korea Development Disabilities Policy Institute. Open to everyone globally.",
     "registration_link": "https://studentcompetitions.com/competitions/the-8th-international-idea-award-for-universal-designdesign-for-all",
     "registration_window": "Entries usually due late July",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -5750,6 +6745,14 @@
     "description": "Team-based mathematical modelling challenge where students choose a consecutive five-day window to solve a real-world modelling problem and submit a written report. Junior (Years 7–10) and Senior (Years 10–12) divisions.",
     "registration_link": "https://www.immchallenge.org.au/registration-and-rules",
     "registration_window": "Register before the February–March modelling window",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-02-01",
     "ends_on": "2026-02-28",
     "dates_precision": "month",
@@ -5791,6 +6794,13 @@
     "description": "Global neuroscience competition founded at UC Berkeley, open to students in grades 7–12 from 46+ countries. A rigorous knowledge exam plus the INO-NEXUS Essay Contest on neurotechnology and neuroethics. All entrants receive certificates.",
     "registration_link": "https://ino-global.com/",
     "registration_window": "Register directly via the INO website; essay deadline around May",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -5829,6 +6839,13 @@
     "description": "Global psychology olympiad open to high school students from 80+ countries, with three rounds: a 300-question Global Grand Test, a regional Team Round and a Final Presentation Round. No prior formal psychology study required; school advisor verifies enrolment.",
     "registration_link": "https://www.ipsyo.org/",
     "registration_window": "Register before the Global Grand Test (dates on website)",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Either",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -5871,6 +6888,13 @@
     "description": "Sydney's premier inter-school debating competition for independent schools: 32 boys' and girls' schools compete across seven Friday-evening preliminary rounds, then finals from Octo-finals to the Grand Final. Years 6–12.",
     "registration_link": "https://www.isdadebating.com/",
     "registration_window": "Season runs Friday evenings, Terms 1–2",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -5911,6 +6935,13 @@
     "description": "Annual essay contest run jointly by the International Youth Neuroscience Association and the International Neuroethics Society. Essays of up to 1,000 words on any neuroethics topic, open to high school students worldwide.",
     "registration_link": "https://neuroethicssociety.org/essay-contest/",
     "registration_window": "Entries usually due around July",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-07-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -5953,6 +6984,11 @@
     "description": "Johns Hopkins University's Center for Talented Youth: above-level testing, online courses and summer programs for academically advanced students worldwide. A reference resource for families seeking international-standard gifted programs.",
     "registration_link": "https://cty.jhu.edu/",
     "registration_window": "Eligibility testing year-round; program intakes per session",
+    "format": null,
+    "provider": "External",
+    "settings": [],
+    "entry": null,
+    "entry_route": null,
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -5989,6 +7025,14 @@
     "description": "Two-hour online exam for Years 9–10 covering physics, chemistry, biology and Earth & environmental science, run by Australian Science Innovations. Top students may progress to the JSO Spring School and the International Junior Science Olympiad.",
     "registration_link": "JSO page on ASI",
     "registration_window": "Register before the June exam window",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -6027,6 +7071,13 @@
     "description": "Public speaking competition run by The Arts Unit for NSW students aged 14 and under. Up to two contestants per school progress from local finals through regionals to a state final at NSW Parliament House.",
     "registration_link": "https://artsunit.nsw.edu.au/program/junior-secondary-speaking-award",
     "registration_window": "Local finals July–August; state final October",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-07-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -6067,6 +7118,13 @@
     "description": "Interdisciplinary conference for curious students aged 11–14 across Australia and New Zealand, with engaging discussions spanning philosophy, science and ethics.",
     "registration_link": "juniorthinkers.com.au",
     "registration_window": "Register ahead of the August conference",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -6111,6 +7169,14 @@
     "description": "The world's largest mathematics competition, coordinated in Australia by the Australian Maths Trust. Five divisions covering Years 3–12, sat online at school in late March.",
     "registration_link": "https://www.amt.edu.au/ksf",
     "registration_window": "Registrations close shortly before the late-March sitting window",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-03-21",
     "ends_on": "2026-03-31",
     "dates_precision": "part",
@@ -6150,6 +7216,13 @@
     "description": "Annual statewide team quiz for Years 7–10 Latin students, run by the Classical Languages Teachers Association of NSW in honour of Professor Kevin Lee. Tests Latin grammar and vocabulary, mythology and Roman culture in a lively team format.",
     "registration_link": "https://www.cltainc.org/kevin-lee-latin-quiz",
     "registration_window": "Register through CLTA before the June quiz night",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -6186,6 +7259,13 @@
     "description": "Prestigious program in which selected students represent the DMUN Foundation at real UN and intergovernmental conferences in New York and Geneva. Selection is competitive; participants are self-funded.",
     "registration_link": "https://mymun.com/conferences/khni-dmun-youth-representatives-i-2025",
     "registration_window": "Competitive application; separate application per conference",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -6224,6 +7304,13 @@
     "description": "Drama classes at multiple North Shore locations with free trial classes available.",
     "registration_link": null,
     "registration_window": "Ongoing classes at multiple locations",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -6262,6 +7349,13 @@
     "description": "International literature quiz known as 'the sport of reading'. Teams of four students aged 10–14 answer wide-ranging questions on children's and YA literature, progressing from regional heats to the National Final and World Final.",
     "registration_link": "https://www.kidslitquizaustralia.com.au/",
     "registration_window": "Register before regional heats",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -6302,6 +7396,13 @@
     "description": "International online art competition for representational and non-representational landscape art and photography, hosted by Artist Space Gallery. Open to artists and photographers worldwide.",
     "registration_link": "https://studentcompetitions.com/competitions/landscapes-art-competition",
     "registration_window": "Entries usually due early June",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -6344,6 +7445,14 @@
     "description": "A free six lesson media literacy curriculum from The Economist Educational Foundation in partnership with Rolex. Students build critical thinking, creative problem solving and news decoding skills then plan their own Project for Change. Fully resourced for classroom delivery and culminates in the Leadership for Change Prize.",
     "registration_link": "https://talk.economistfoundation.org/prizes/leadership-prize-2025/about-the-curriculum/",
     "registration_window": "Resources available from September; deliver flexibly across the term",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -6387,6 +7496,13 @@
     "description": "Global media literacy competition from The Economist Educational Foundation in partnership with Rolex that caps the Leadership for Change curriculum. Students pitch their own Project for Change to improve media literacy in their school or community. Three winning pitches receive funding of up to 1,000 pounds plus mentorship to bring their ideas to life.",
     "registration_link": "https://talk.economistfoundation.org/prizes/leadership-prize-2026/",
     "registration_window": "Entries usually close mid November; winners announced early December",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -6429,6 +7545,13 @@
     "description": "Free online live lessons taught by experienced Economist Educational Foundation teachers as part of the Leadership for Change programme. Students hear from a leader making a difference, take part in interactive activities and join discussions with peers from around the world. Two sittings are offered to suit different time zones.",
     "registration_link": "https://talk.economistfoundation.org/prizes/leadership-prize-2026/",
     "registration_window": "Register ahead of the October live lesson date",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -6470,6 +7593,13 @@
     "description": "Global virtual innovation and problem-solving competition for students aged 13–18, hosted with LSE Generate (the London School of Economics' entrepreneurship hub). Winners gain cash prizes and hands-on experience with LSE social-enterprise founders.",
     "registration_link": "https://studentcompetitions.com/competitions/lse-generate-global-innovation-challenge",
     "registration_window": "Entries usually due early August",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -6508,6 +7638,13 @@
     "description": "Winter holiday workshops including One Play in One Day, Mini Shakespeare, Musical Theatre and Stage Combat, covering acting, voice, storytelling and stagecraft.",
     "registration_link": "https://ellaslist.com.au",
     "registration_window": "Winter holiday program in July",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-07-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -6548,6 +7685,13 @@
     "description": "Mathematics problem-solving competition challenging students with non-routine problems that reward insight and reasoning.",
     "registration_link": null,
     "registration_window": "Register before the competition window",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -6590,6 +7734,13 @@
     "description": "Extended problem-solving program from the Australian Maths Trust for students in Years 3–10. Students work over several weeks on a small set of challenging, multi-step problems designed to develop mathematical reasoning.",
     "registration_link": null,
     "registration_window": "Register via AMT before the autumn problem period",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -6632,6 +7783,13 @@
     "description": "Extended enrichment program from the Australian Maths Trust for students in Years 3–10. A structured topic-based course with challenging problems, run over several months to build deeper mathematical thinking.",
     "registration_link": null,
     "registration_window": "Register via AMT before the enrichment period begins",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
@@ -6668,6 +7826,13 @@
     "description": "Non-competitive problem-solving contest series from APSMO for Years 7–8, aligned to the Maths Olympiad schedule. Mixed-ability friendly, with Resource Kits provided before each paper.",
     "registration_link": "https://www.apsmo.edu.au/",
     "registration_window": "Register before Term 2; papers run May to September",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -6704,6 +7869,13 @@
     "description": "Competitive APSMO Maths Olympiad for Years 7–8 (Senior Division). Five contest papers across the year developing higher-order problem-solving for able mathematicians.",
     "registration_link": "https://www.apsmo.edu.au/",
     "registration_window": "Register before Term 2; contests run May to September",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -6742,6 +7914,14 @@
     "description": "Free online primary mathematics competition run by Matific. A low-barrier, whole-cohort option with game-based maths activities, run over a competition week in August.",
     "registration_link": "https://www.matific.com/au/en-au/maths-olympiad/",
     "registration_window": "Registration usually mid-June to early August",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -6762,8 +7942,7 @@
       "Competition"
     ],
     "subjects": [
-      "Classics",
-      "Humanities"
+      "Classics"
     ],
     "month": "February",
     "age_groups": [
@@ -6781,6 +7960,14 @@
     "description": "International examination of Greco-Roman mythology for students in Years 9–12, founded in 1998 and administered by Excellence Through Classics (a committee of the American Classical League). Each year follows a set theme. Top winners are invited to the Medusa Creative Writing Contest.",
     "registration_link": "https://www.etclassics.org/Contests-Exams/Medusa-Mythology-Exam",
     "registration_window": "Registrations close in the weeks before the February–March window",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-02-01",
     "ends_on": "2026-02-28",
     "dates_precision": "month",
@@ -6817,6 +8004,13 @@
     "description": "NSW inter-school day of collaborative philosophical inquiry for Years 7–8, hosted at Newington College, focused on philosophy and critical thinking.",
     "registration_link": "Humanitix event page",
     "registration_window": "Register via Humanitix ahead of the August event",
+    "format": "Day event",
+    "provider": "School",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -6855,6 +8049,13 @@
     "description": "International architecture ideas competition exploring micro living and compact dwelling design, hosted by Volume Zero. Open globally with a USD 10,000 prize pool.",
     "registration_link": "https://studentcompetitions.com/competitions/call-for-ideas-micro-living-2026-architecture-competition",
     "registration_window": "Entries usually due early December",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -6896,6 +8097,13 @@
     "description": "Fast-paced two-day enrichment weekend for gifted and high-potential primary students. Students choose one of 33 courses pitched one to two years above year level, led by expert practitioners from schools and universities.",
     "registration_link": "https://mindquest.net.au",
     "registration_window": "Register ahead of the July weekend",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-07-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -6916,8 +8124,7 @@
       "Event"
     ],
     "subjects": [
-      "Philosophy",
-      "Humanities"
+      "Philosophy"
     ],
     "month": "September",
     "age_groups": [
@@ -6933,6 +8140,13 @@
     "description": "A one day philosophical community of inquiry event for Year 5 and Year 6 students from across NSW, run by the Centre for Critical Thinking and Ethics at Newington College.",
     "registration_link": "https://events.humanitix.com/minds-on-fire",
     "registration_window": "Closes 18 August 2026",
+    "format": "Day event",
+    "provider": "School",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-09-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -6971,6 +8185,13 @@
     "description": "Annual international psychology essay competition primarily for Year 12 students (younger entrants welcome). Essays of 1,000–1,500 words exploring human behaviour, the mind and psychological theory. Also serves as Round 3 of the British Psychology Olympiad.",
     "registration_link": "https://www.mindsunderground.com/psychology-competition",
     "registration_window": "Entries usually due in April",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
@@ -7008,6 +8229,13 @@
     "description": "Mediation competition in which teams of students role-play mediators and disputing parties to resolve a simulated conflict, developing negotiation, communication and problem-solving skills.",
     "registration_link": "https://lawsociety.eventsair.com/2025-mock-law---school-registration/mock-law-registration/Site/Register",
     "registration_window": "Register before the competition season opens",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -7048,6 +8276,13 @@
     "description": "Simulated court competition in which students role-play barristers and witnesses to argue a case, developing legal reasoning, public speaking and critical thinking.",
     "registration_link": "TBA",
     "registration_window": "Register before the competition season opens",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -7089,6 +8324,13 @@
     "description": "A young writers' award run by North Sydney Council through Stanton Library.",
     "registration_link": "https://www.northsydney.nsw.gov.au/library/nan-manefield-writers-award",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -7132,6 +8374,14 @@
     "description": "Global hackathon in which participants use NASA and partner open data to develop solutions to real-world challenges. Local events run worldwide; under-18s participate with guardian consent.",
     "registration_link": "https://www.spaceappschallenge.org/",
     "registration_window": "Register before the annual October hackathon weekend",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online",
+      "Away"
+    ],
+    "entry": "Either",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -7174,6 +8424,14 @@
     "description": "Online examination sponsored by the NJCL under the ACL, testing understanding of English words derived from Latin and Greek roots — prefixes, suffixes and derivatives — levelled to the student's stage of study.",
     "registration_link": "https://class.lingco.io/goto/ncee_2026",
     "registration_window": "Usually 1 September – 25 October",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-09-01",
     "ends_on": "2026-10-25",
     "dates_precision": "part",
@@ -7195,8 +8453,7 @@
     ],
     "subjects": [
       "Classics",
-      "Languages",
-      "Humanities"
+      "Languages"
     ],
     "month": "March",
     "age_groups": [
@@ -7214,6 +8471,14 @@
     "description": "International Ancient Greek examination co-sponsored by the American Classical League and the National Junior Classical League. Six exams across four Attic Greek levels and two Homeric Greek exams, assessing grammar, vocabulary, syntax and translation.",
     "registration_link": "https://www.aclclassics.org/Exams/National-Greek-Exam",
     "registration_window": "Registrations close before the March administration",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -7235,8 +8500,7 @@
     ],
     "subjects": [
       "Classics",
-      "History",
-      "Humanities"
+      "History"
     ],
     "month": "February",
     "age_groups": [
@@ -7256,6 +8520,14 @@
     "description": "Examination on the history and culture of ancient Greece, sponsored by the National Junior Classical League under the American Classical League. The Greek companion to the Roman Civilization Exam, delivered online via Lingco.",
     "registration_link": "https://www.njcl.org/Online-Exams",
     "registration_window": "Usually 1 November – 25 January",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2025-11-01",
     "ends_on": "2026-01-25",
     "dates_precision": "part",
@@ -7276,8 +8548,7 @@
       "Competition"
     ],
     "subjects": [
-      "History",
-      "Humanities"
+      "History"
     ],
     "month": "August",
     "age_groups": [
@@ -7297,6 +8568,14 @@
     "description": "Free national research-based history competition with an annual theme. Students present on a historical topic in their choice of format — essay, documentary, exhibit, performance or website — with state and national prizes.",
     "registration_link": "https://historychallenge.org.au/",
     "registration_window": "Entries usually close late August",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -7318,8 +8597,7 @@
     ],
     "subjects": [
       "Classics",
-      "Languages",
-      "Humanities"
+      "Languages"
     ],
     "month": "February",
     "age_groups": [
@@ -7339,6 +8617,14 @@
     "description": "International Latin examination sponsored by the American Classical League and National Junior Classical League, administered to Latin students in Years 7–12. Over 100,000 students from 50 US states and 26+ countries participate each year. Designed as reinforcement and recognition rather than head-to-head competition.",
     "registration_link": "https://www.nle.org/",
     "registration_window": "Registrations close before the February–March administration",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-02-01",
     "ends_on": "2026-02-28",
     "dates_precision": "month",
@@ -7360,8 +8646,7 @@
     ],
     "subjects": [
       "Classics",
-      "Languages",
-      "Humanities"
+      "Languages"
     ],
     "month": "February",
     "age_groups": [
@@ -7381,6 +8666,14 @@
     "description": "Examination of proficiency in Latin vocabulary (nouns, verbs, numbers, adverbs, prepositions and conjunctions), sponsored by the National Junior Classical League under the American Classical League. The exam sat matches the student's enrolled Latin level.",
     "registration_link": "https://class.lingco.io/goto/nlve_2026",
     "registration_window": "Usually 1 November – 25 January",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2025-11-01",
     "ends_on": "2026-01-25",
     "dates_precision": "part",
@@ -7401,8 +8694,7 @@
       "Competition"
     ],
     "subjects": [
-      "Classics",
-      "Humanities"
+      "Classics"
     ],
     "month": "February",
     "age_groups": [
@@ -7422,6 +8714,14 @@
     "description": "Junior companion to the Medusa Mythology Exam, testing knowledge of Greco-Roman mythology for students in Years 3–8. Run by Excellence Through Classics (a committee of the American Classical League), with an annual theme.",
     "registration_link": "https://class.lingco.io/goto/pme_2026",
     "registration_window": "Usually 1 September – 31 January",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2025-09-01",
     "ends_on": "2026-01-31",
     "dates_precision": "part",
@@ -7443,8 +8743,7 @@
     ],
     "subjects": [
       "Classics",
-      "History",
-      "Humanities"
+      "History"
     ],
     "month": "November",
     "age_groups": [
@@ -7465,6 +8764,14 @@
     "description": "Examination on the history and culture of ancient Rome (753 BC to Constantine), sponsored by the NJCL under the ACL. 50 multiple-choice questions, with awards grouped as Novice, Intermediate and Advanced.",
     "registration_link": "https://class.lingco.io/goto/nrce_2026",
     "registration_window": "Registrations close late October; sat November–December",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-11-01",
     "ends_on": "2026-12-31",
     "dates_precision": "month",
@@ -7486,7 +8793,7 @@
     ],
     "subjects": [
       "Legal",
-      "Humanities"
+      "Civics"
     ],
     "month": "March",
     "age_groups": [
@@ -7502,6 +8809,13 @@
     "description": "Annual three-day national civics event at the Museum of Australian Democracy, Canberra, for 120 selected senior students (Years 11–12). NSW sends 30 delegates chosen through the NSW Schools Constitutional Convention. Students debate constitutional issues and engage with federal MPs and the Governor-General.",
     "registration_link": "https://ncsonline.com.au/projects/national-schools-constitutional-convention",
     "registration_window": "NSW delegates selected via the NSW Schools Constitutional Convention",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -7523,9 +8837,9 @@
     ],
     "subjects": [
       "Legal",
-      "Humanities",
       "Debating",
-      "Public Speaking"
+      "Public Speaking",
+      "Civics"
     ],
     "month": "August",
     "age_groups": [
@@ -7541,6 +8855,13 @@
     "description": "Flagship national civics program: 150 students travel to Canberra for a five-day residential program at Australian Parliament House and the Museum of Australian Democracy, with simulated parliamentary debates and workshops with political leaders. Students represent federal electorates.",
     "registration_link": "https://nyp.houseofrepresentatives.gov.au/",
     "registration_window": "Applications open earlier in the year for the August program",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -7582,6 +8903,13 @@
     "description": "Free, fully online month-long Introduction to Neuroscience summer course run by IYNA. High-school students worldwide study undergraduate-level neuroscience via expert-led lectures, with beginner and advanced streams and an optional research capstone track.",
     "registration_link": "https://youthneuro.org/summer-program",
     "registration_window": "Applications usually open March, close mid-May",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -7619,6 +8947,13 @@
     "description": "Stage 5 philosophy and ethics summit co-organised with the Centre for Critical Thinking and Ethics at Newington College. Students engage in Socratic dialogue and collaborative inquiry on philosophical questions.",
     "registration_link": "https://events.humanitix.com/2025-socratic-summit<br>•",
     "registration_window": "Register via Humanitix ahead of the August event",
+    "format": "Day event",
+    "provider": "School",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -7660,6 +8995,13 @@
     "description": "Advocacy track of the Next Idea Matters project competition.",
     "registration_link": "https://www.nextideamatters.com",
     "registration_window": "Closes 31 July 2026. Final project submission 31 August 2026.",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -7703,6 +9045,13 @@
     "description": "Urban ecology track of the Next Idea Matters project competition.",
     "registration_link": "https://www.nextideamatters.com",
     "registration_window": "Closes 31 July 2026. Final project submission 31 August 2026.",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -7745,6 +9094,13 @@
     "description": "Public education track of the Next Idea Matters project competition.",
     "registration_link": "https://www.nextideamatters.com",
     "registration_window": "Closes 31 July 2026. Final project submission 31 August 2026.",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -7787,6 +9143,13 @@
     "description": "Invention track of the Next Idea Matters project competition.",
     "registration_link": "https://www.nextideamatters.com",
     "registration_window": "Closes 31 July 2026. Final project submission 31 August 2026.",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -7829,6 +9192,13 @@
     "description": "Social research track of the Next Idea Matters project competition.",
     "registration_link": "https://www.nextideamatters.com",
     "registration_window": "Closes 31 July 2026. Final project submission 31 August 2026.",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -7871,6 +9241,13 @@
     "description": "Research track of the Next Idea Matters project competition.",
     "registration_link": "https://www.nextideamatters.com",
     "registration_window": "Closes 31 July 2026. Final project submission 31 August 2026.",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -7913,6 +9290,13 @@
     "description": "Entrepreneurship track of the Next Idea Matters project competition.",
     "registration_link": "https://www.nextideamatters.com",
     "registration_window": "Closes 31 July 2026. Final project submission 31 August 2026.",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -7956,6 +9340,13 @@
     "description": "Responsible enterprise track of the Next Idea Matters project competition.",
     "registration_link": "https://www.nextideamatters.com",
     "registration_window": "Closes 31 July 2026. Final project submission 31 August 2026.",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -7998,6 +9389,13 @@
     "description": "Sustainability track of the Next Idea Matters project competition.",
     "registration_link": "https://www.nextideamatters.com",
     "registration_window": "Closes 31 July 2026. Final project submission 31 August 2026.",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8038,6 +9436,13 @@
     "description": "Intensive five day drama school for students in Years 7 to 10, covering improvisation, character development, devising and acting techniques.",
     "registration_link": "https://open.nida.edu.au",
     "registration_window": "Spring holiday intake; early bird discounts apply",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-09-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -8077,6 +9482,13 @@
     "description": "A NIDA Open screen acting course for students in Years 7 to 10, developing the technical craft of acting for camera, including working with television and film scripts, hitting marks and handling props.",
     "registration_link": "https://www.open.nida.edu.au/course/hitting-your-mark-screen-acting-grades-7-10/",
     "registration_window": "Offered in the school holidays. When no class is on sale, join the NIDA Open waitlist to be notified of new dates.",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -8115,6 +9527,13 @@
     "description": "A short, fast paced NIDA Open improvisation intensive for students in Years 7 to 10, focused on spontaneous performance, ensemble play and teamwork. Runs over two to three days in the school holidays.",
     "registration_link": "https://www.open.nida.edu.au/course/off-the-cuff-improvisation-grades-7-10/",
     "registration_window": "Offered in the school holidays. When no class is on sale, join the NIDA Open waitlist to be notified of new dates.",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -8156,6 +9575,13 @@
     "description": "A contemporary writing prize with a youth category for ages 11 to 21, accepting a short story up to 2500 words or a poem up to 60 lines on an annual theme.",
     "registration_link": "https://www.nillumbik.vic.gov.au/Explore/Arts-and-culture/Opportunities-for-artists/Nillumbik-Prize-for-Contemporary-Writing",
     "registration_window": "Closes 30 September",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8179,8 +9605,7 @@
     ],
     "subjects": [
       "Essay Writing",
-      "History",
-      "Humanities"
+      "History"
     ],
     "month": "TBA",
     "age_groups": [
@@ -8200,6 +9625,13 @@
     "description": "A history research essay competition run by the North Shore Historical Society.",
     "registration_link": "https://www.northsydney.nsw.gov.au/xfp/form/262",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8236,6 +9668,13 @@
     "description": "Audition based weekly ensemble for talented students in Years 7 and 8.",
     "registration_link": "https://artsunit.nsw.edu.au",
     "registration_window": "Auditions February to March; ensemble runs from April",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": "2026-02-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -8272,6 +9711,13 @@
     "description": "Residential drama camp for high potential students in Years 7 and 8, focusing on characterisation, script work, voice and movement.",
     "registration_link": "https://artsunit.nsw.edu.au",
     "registration_window": "Applications close March; camp runs late June to early July",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": "2026-06-21",
     "ends_on": "2026-07-10",
     "dates_precision": "part",
@@ -8293,8 +9739,8 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
-      "Legal"
+      "Legal",
+      "Civics"
     ],
     "month": "Various",
     "age_groups": [
@@ -8309,6 +9755,13 @@
     "description": "A civics and citizenship day for Year 12 student leaders run jointly by the Parliament of NSW and Government House. Students develop their knowledge of the system of government and parliamentary proceedings, meet their Member of Parliament and walk to Government House to meet the Governor of NSW.",
     "registration_link": "https://education.parliament.nsw.gov.au/students/secondary-schools-leadership-program/",
     "registration_window": "Schools book throughout the school year",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8330,7 +9783,7 @@
     ],
     "subjects": [
       "Legal",
-      "Humanities"
+      "Civics"
     ],
     "month": "November",
     "age_groups": [
@@ -8345,6 +9798,13 @@
     "description": "Annual civics convention at NSW Parliament House for around 100 Year 11 students. Workshops and discussion on the Australian Constitution; peers select 30 NSW delegates to the National Schools Constitutional Convention in Canberra.",
     "registration_link": "https://education.nsw.gov.au/teaching-and-learning/curriculum/civics-and-citizenship/national-schools-constitutional-convention",
     "registration_window": "Schools nominate students ahead of the November convention",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": "2026-11-01",
     "ends_on": "2026-11-30",
     "dates_precision": "month",
@@ -8366,7 +9826,7 @@
     ],
     "subjects": [
       "Legal",
-      "Humanities"
+      "Civics"
     ],
     "month": "Various",
     "age_groups": [
@@ -8386,6 +9846,13 @@
     "description": "Twelve-member advisory council that advises the NSW Government on issues relevant to young people. Members consult with youth and community groups, monitor legislation and run forums, supported by the NSW Advocate for Children and Young People.",
     "registration_link": "https://www.acyp.nsw.gov.au/get-involved/youth-advisory-council-yac",
     "registration_window": "Applications open annually for one-year terms",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8409,7 +9876,8 @@
       "Legal",
       "Debating",
       "Public Speaking",
-      "Leadership"
+      "Leadership",
+      "Civics"
     ],
     "month": "October",
     "age_groups": [
@@ -8426,6 +9894,13 @@
     "description": "Flagship youth leadership program run by Y NSW for over 20 years. Six months of training, camps and workshops culminate in students drafting Youth Bills and debating them during a Youth Sitting Week at NSW Parliament House.",
     "registration_link": "https://www.ymcansw.org.au/community-services/youth/youth-parliament/",
     "registration_window": "Applications open early in the year; sitting week around October",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -8464,6 +9939,13 @@
     "description": "Youth theatre classes on the Northern Beaches.",
     "registration_link": null,
     "registration_window": "Ongoing youth theatre classes",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8505,6 +9987,13 @@
     "description": "Two-category contest open to anyone interested in the ocean: short-form video and a goods idea contest (AI tools permitted). Individual entries only. Hosted by the Korea Marine Industry Association.",
     "registration_link": "https://studentcompetitions.com/competitions/2026-ocean-content-contest",
     "registration_window": "Entries usually due mid-June",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8553,6 +10042,14 @@
     "description": "Creative problem-solving program in which teams develop solutions to long-term open-ended problems and complete a spontaneous challenge at tournaments, blending design, making, performance and teamwork. Note: currently no active NSW association — check availability.",
     "registration_link": "https://odysseyofthemind.com/",
     "registration_window": "Register via local association before the season",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8589,6 +10086,13 @@
     "description": "Immersive multi day wilderness leadership expeditions for young people, grounded in global research. Activities such as hiking, paddling and solo reflection build resilience, communication, problem solving and teamwork. Open to individual students, parents seeking growth for their teen and school groups.",
     "registration_link": "https://www.outwardbound.org.au/leadership-programs/",
     "registration_window": "Courses run year round; book ready made adventures or a custom school experience via the website",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8631,6 +10135,14 @@
     "description": "Team-based contest for secondary students (teams of four) solving linguistics puzzles about real languages using logic and pattern recognition. No prior linguistics knowledge required. Round 1 online; top teams progress to Round 2 hosted in person at universities. Winning teams may represent Australia at the International Linguistics Olympiad.",
     "registration_link": "https://ozclo.org.au/",
     "registration_window": "Register before the Round 1 online contest",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -8669,6 +10181,13 @@
     "description": "Monthly online psychology assessment (Psychology Academic Readiness Assessment) from Future PsychScholars: two modules covering psychological fundamentals and research comprehension, webcam-proctored, with official transcripts for university applications.",
     "registration_link": "https://psych-scholars.com/w/para",
     "registration_window": "Monthly sittings; retakes permitted",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8707,6 +10226,13 @@
     "description": "Public speaking competition run by The Arts Unit for NSW students aged 15–18, running since 1978. Up to two contestants per school deliver a prepared and an impromptu speech; the state champion represents NSW at the national final.",
     "registration_link": "https://artsunit.nsw.edu.au/program/plain-english-speaking-award",
     "registration_window": "Local finals mid-year; state final later in the year",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8752,6 +10278,13 @@
     "description": "A nature poetry prize of up to 20 lines on an annual theme, with prizes including book packs, plants and garden tours across primary, secondary, First Nations, language and teacher categories.",
     "registration_link": "https://redroompoetry.org/projects/poem-forest/",
     "registration_window": "Closes late September",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8790,6 +10323,13 @@
     "description": "Teen acting and screen acting classes covering improvisation, voice, movement, script analysis and camera technique, with four performances each year.",
     "registration_link": "https://pointbreakdrama.com.au",
     "registration_window": "Term based classes",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8827,6 +10367,13 @@
     "description": "NSW-wide debating competition run by The Arts Unit for Years 11–12, open to government and non-government schools. All debates are one-hour preparation debates; zone and regional rounds lead to a state final at the University of Sydney Great Hall.",
     "registration_link": "https://artsunit.nsw.edu.au/program/premiers-debating-challenge-for-years-11-and-12",
     "registration_window": "Rounds run through the year; state final in August",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -8864,6 +10411,13 @@
     "description": "NSW-wide debating competition run by The Arts Unit for Years 7–8, open to government and non-government schools. All debates are one-hour preparation debates, with zone winners progressing through regional rounds to the state final.",
     "registration_link": "https://artsunit.nsw.edu.au/program/premiers-debating-challenge-for-years-7-and-8",
     "registration_window": "Rounds run through the year by zone",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8901,6 +10455,13 @@
     "description": "NSW-wide debating competition run by The Arts Unit for Years 9–10, open to government and non-government schools. All debates are one-hour preparation debates, progressing through zone, regional and state rounds.",
     "registration_link": "https://artsunit.nsw.edu.au/program/premiers-debating-challenge-for-years-9-and-10",
     "registration_window": "Rounds run through the year by zone",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -8941,6 +10502,15 @@
     "description": "Free national online spelling competition for Australian students in Years 3–8, with a dedicated Years 3–4 level. School-based online rounds lead to state and national finals.",
     "registration_link": "https://www.pmsspellingbee.com.au",
     "registration_window": "School round usually runs late July to August",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online",
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-07-21",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -8981,6 +10551,14 @@
     "description": "Free annual international online team mathematics competition for middle and high school students, run since 2003 and sponsored by AwesomeMath. Teams of up to six are given 90 minutes to solve 30 problems within a flexible ten-day window.",
     "registration_link": "https://purplecomet.org/",
     "registration_window": "Register before the ten-day April contest window",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
@@ -9022,6 +10600,14 @@
     "description": "Coding competition for school students to demonstrate Python programming skills, run by Grok Academy.",
     "registration_link": "https://groklearning.com/",
     "registration_window": "Register via Grok Academy before the event",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -9060,6 +10646,13 @@
     "description": "Open innovation challenge for a hospitality product improving the hotel guest experience, hosted by Radical Innovation. Open globally including Oceania.",
     "registration_link": "https://studentcompetitions.com/competitions/radical-innovation-hospitality-product",
     "registration_window": "Entries usually due early August",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9098,6 +10691,13 @@
     "description": "International call for garden design ideas for the Radicepura Garden Festival in Sicily, on an annual theme. Winning projects are physically realised at the Radicepura Horticultural Park.",
     "registration_link": "https://studentcompetitions.com/competitions/call-for-ideas-radicepura-garden-festival-vi-edition-gardens-of-hope-cultivating-coexistence",
     "registration_window": "Entries usually due late October",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9138,6 +10738,13 @@
     "description": "Statewide reading competition run by the Children's Book Council of Australia. Teams of 4–5 read a set book list together then compete in quiz rounds, with regional winners progressing to a State Final. Year 5/6, 7/8 and 9/10 divisions.",
     "registration_link": "https://readerscup.org.au/",
     "registration_window": "Register before regional rounds; books announced in advance",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9178,6 +10785,13 @@
     "description": "Online art exhibition and competition for artists worldwide interpreting the theme 'Reflections in Blue'. Hosted by Megalopolitan Art Gallery.",
     "registration_link": "https://studentcompetitions.com/competitions/reflections-in-blue-art-competition",
     "registration_window": "Entries usually due late May",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9218,6 +10832,14 @@
     "description": "The world's premier pre-university science and engineering fair. Students qualify through affiliated local, regional or national fairs, then compete internationally under Society for Science rules for substantial prizes and scholarships.",
     "registration_link": "https://www.societyforscience.org/isef/",
     "registration_window": "Qualify through affiliated local/regional/national fairs",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Either",
+    "entry_route": "Selection",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9266,6 +10888,14 @@
     "description": "Project-based robotics competition pathway with leagues including Rescue Line, Rescue Maze, OnStage and Soccer, across regional, state and national events, with qualification to international RoboCupJunior.",
     "registration_link": "https://enter.robocupjunior.org.au/",
     "registration_window": "Register per event; regional events lead to nationals",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9307,6 +10937,14 @@
     "description": "National public speaking competition run by Rostrum Australia. Junior (Years 7–9) and Senior (Years 10–12) divisions; contestants deliver a six-minute prepared original speech, progressing from school entry to state and national finals.",
     "registration_link": "https://www.rostrum.com.au/voy/new-south-wales/",
     "registration_window": "First round March; finals mid-year",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9341,6 +10979,13 @@
     "description": "Intensive week-long residential leadership program run by Rotary District 9685 for young people with leadership potential.",
     "registration_link": "https://www.d9685ryla.org.au/",
     "registration_window": "Nominations earlier in the year; held in January",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": "2026-01-01",
     "ends_on": "2026-01-31",
     "dates_precision": "month",
@@ -9378,6 +11023,13 @@
     "description": "Weekend residential enrichment camp run by Rotary for students aged roughly 14–16, building confidence, public speaking, teamwork and life skills.",
     "registration_link": "https://rotarydistrict9685.org.au/page/rypen",
     "registration_window": "Nominations via local Rotary clubs",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9421,6 +11073,13 @@
     "description": "National STEM competition run by Samsung in which students ideate solutions to real-world community problems, with major prize packages for winning schools. Emphasises innovation, critical thinking, collaboration and community responsibility.",
     "registration_link": "https://samsung.com",
     "registration_window": "Entries usually due mid-year",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -9441,7 +11100,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Debating",
       "Public Speaking"
     ],
@@ -9461,6 +11119,13 @@
     "description": "Student-run Model UN conference hosted by Sydney Boys High School, welcoming both first-time and experienced delegates from across Sydney for debate, diplomacy and problem solving on global issues.",
     "registration_link": "https://events.humanitix.com/host/sydney-boys-high-school-model-united-nations",
     "registration_window": "Register via Humanitix ahead of the December conference",
+    "format": "Simulation",
+    "provider": "School",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-12-01",
     "ends_on": "2026-12-31",
     "dates_precision": "month",
@@ -9499,6 +11164,13 @@
     "description": "Nationwide STEM outreach competition presented by the University of Newcastle with communities and sponsors. Run as Challenge Days for Years 9–10, with pathways to state and national finals.",
     "registration_link": "https://www.newcastle.edu.au/college/engineering-science-environment/education/science-and-engineering-challenge",
     "registration_window": "Schools book Challenge Days through the year",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9541,6 +11213,14 @@
     "description": "Latin composition contest run by Excellence Through Classics (a committee of the American Classical League). Students write in Latin in response to an annual theme. A writing contest rather than a timed multiple-choice exam, composed and submitted online.",
     "registration_link": "https://www.etclassics.org/Contests-Exams/Scribo-Writing-Contest",
     "registration_window": "Usually 1 September – 15 March",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2025-09-01",
     "ends_on": "2026-03-15",
     "dates_precision": "part",
@@ -9581,6 +11261,14 @@
     "description": "International mathematics olympiad (founded 2016) engaging 50,000+ students across 15+ countries, with paper levels for Grades 1–12. The top performers are invited to the SEAMO X international round. All participants receive a personalised performance report.",
     "registration_link": "https://seamo-official.org/",
     "registration_window": "Register via a partner provider before the January contest",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online",
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-01-01",
     "ends_on": "2026-01-31",
     "dates_precision": "month",
@@ -9620,6 +11308,13 @@
     "description": "A young writers' anthology and call out run by Short Australian Stories.",
     "registration_link": "https://shortaustralianstories.com.au",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9661,6 +11356,13 @@
     "description": "A short story competition on a spooky theme run by the KSP Writers' Centre.",
     "registration_link": "https://www.kspwriterscentre.com/spooky-story-competition",
     "registration_window": "Entries close mid March",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9702,6 +11404,13 @@
     "description": "International high school essay competition run by the Stanford Symbolic Systems Society, drawing on the intersection of computer science, psychology, cognition, mathematics, philosophy and linguistics. Winning essays are published in the society's journal, Machina.",
     "registration_link": "https://www.symsyssociety.org/essay-competition",
     "registration_window": "Entries usually due late January",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9747,6 +11456,14 @@
     "description": "The foremost student STEM competition, in which teams design and build miniature racing vehicles. More than 17,000 schools across 51 nations take part. Regional competitions lead to state and national finals.",
     "registration_link": null,
     "registration_window": "Register before the regional competition season",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-02-01",
     "ends_on": "2026-02-28",
     "dates_precision": "month",
@@ -9785,6 +11502,14 @@
     "description": "Free online story-writing event in which primary students write 100-word microstories on a set theme, published in a class ebook. Runs multiple times a year.",
     "registration_link": "https://www.storyathon.com/",
     "registration_window": "Runs several times a year; register before each event window",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9826,6 +11551,13 @@
     "description": "A novella competition for secondary students under 19, with entries between 8000 and 20000 words.",
     "registration_link": "https://www.storyfest.com.au/novella-writing-competition",
     "registration_window": "Closes 5 December",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9869,6 +11601,13 @@
     "description": "A poetry prize for secondary students with junior and senior categories, accepting poems up to 50 lines on any subject.",
     "registration_link": "https://www.storyfest.com.au/poetry-prize",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9912,6 +11651,14 @@
     "description": "Technology challenge in which teams design, build and test model submarines or ROV-style systems, exploring maritime engineering, hydrodynamics, electronics and coding. Managed in Australia by the REA Foundation.",
     "registration_link": "https://rea.org.au/programs/subs-in-schools/",
     "registration_window": "Register before the competition season",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -9953,6 +11700,13 @@
     "description": "Inter-school philosophy competition run annually since 2009. Teams of four (two junior, two senior) take part in three facilitated Communities of Inquiry, assessed by trained teachers and philosophers, with stimulus material provided in advance.",
     "registration_link": "Humanitix event page",
     "registration_window": "Register ahead of the late-July evening event",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-07-21",
     "ends_on": "2026-07-31",
     "dates_precision": "part",
@@ -9995,6 +11749,13 @@
     "description": "An essay competition of up to 800 words responding to set ethical questions, with categories for ages 13 to 17 and 18 to 29.",
     "registration_link": "https://ethics.org.au/connect/young-writers-competition/",
     "registration_window": "Closes 8 September",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10040,6 +11801,13 @@
     "description": "Online program run by the New York Academy of Sciences connecting students aged 13–17 in a global community to collaborate on virtual innovation challenges with STEM mentors.",
     "registration_link": "https://www.nyas.org/learning/high-school-research-programs/the-junior-academy/",
     "registration_window": "Applications open per intake (see NYAS)",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10061,8 +11829,7 @@
     ],
     "subjects": [
       "Essay Writing",
-      "History",
-      "Humanities"
+      "History"
     ],
     "month": "TBA",
     "age_groups": [
@@ -10078,6 +11845,13 @@
     "description": "A national history competition for Years 9 and 10 responding to an Anzac and First World War themed question.",
     "registration_link": "https://www.simpsonprize.org",
     "registration_window": "Usually closes November",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10117,6 +11891,13 @@
     "description": "Public speaking competition on global and UN-themed issues for Years 7–10, developing oratory, research and persuasive argument.",
     "registration_link": "currently broken",
     "registration_window": "Register before the competition rounds",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -10138,8 +11919,7 @@
     ],
     "subjects": [
       "Philosophy",
-      "History",
-      "Humanities"
+      "History"
     ],
     "month": null,
     "age_groups": [
@@ -10155,6 +11935,13 @@
     "description": "Summer school run by ACU's Western Civilisation Program, giving senior students a taste of great-books style study — philosophy, literature, art and history of the Western tradition. Confirm current intake details with ACU.",
     "registration_link": null,
     "registration_window": "Applications ahead of the summer school period",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10196,6 +11983,13 @@
     "description": "International team academic competition (teams of three) spanning debate, collaborative writing, a quiz (Scholar's Challenge) and the Scholar's Bowl, across a multi-subject curriculum. Regional rounds lead to a Global Round and the Tournament of Champions.",
     "registration_link": null,
     "registration_window": "Register before the regional round",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -10235,6 +12029,13 @@
     "description": "International philosophy essay competition for students aged 15–18, run by the Royal Institute of Philosophy. Six prompts each year (often including a philosophy-of-mind question). The winning essay is published in the journal Think.",
     "registration_link": "https://royalinstitutephilosophy.org/news/think-essay-prize/",
     "registration_window": "Entries usually due around 20 April",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10275,6 +12076,14 @@
     "description": "A workshop of eight one to two hour sessions for those aged 14 to 18, developing communication and leadership skills through practical experience. Presented during or after school or on weekends, coordinated by a sponsoring Toastmasters club or cooperating school. Related Gavel Clubs cater for younger students.",
     "registration_link": "https://www.toastmasters.org/education/youth-leadership-program",
     "registration_window": "Runs when a local club organises a program; contact a nearby Toastmasters club",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10314,6 +12123,13 @@
     "description": "Internal school classics event for Years 7–10. Students make their own togas and take part in classics-themed activities celebrating Roman life and culture — a hands-on, whole-cohort event rather than an external competition.",
     "registration_link": null,
     "registration_window": "Internal — organised by the classics faculty",
+    "format": "Day event",
+    "provider": "School",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -10356,6 +12172,14 @@
     "description": "Team problem-solving program in which teams of 5–7 students work on a long-term challenge over six weeks, then present their solution plus tackle a spontaneous challenge. Regional rounds lead to state and international finals.",
     "registration_link": "http://tournamentofminds.com.au/",
     "registration_window": "Register before Term 3 regional rounds",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -10394,6 +12218,13 @@
     "description": "Long-running international mathematical olympiad (founded 1980) prizing deep, proof-based problem solving — five hours per paper, with O-level (easier) and A-level (harder) papers in each of two annual rounds. Australian sittings hosted in major cities.",
     "registration_link": "https://www.turgor.ru/en/",
     "registration_window": "Two rounds per year (spring and autumn sittings)",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -10414,7 +12245,6 @@
       "Competition"
     ],
     "subjects": [
-      "Humanities",
       "Debating"
     ],
     "month": "May",
@@ -10433,6 +12263,14 @@
     "description": "UN Security Council simulation run by UN Youth, in which pairs of delegates represent member states across preliminary debates, with semi-finals, finals and National Finals for top teams.",
     "registration_link": "UN Youth Evatt program page",
     "registration_window": "Preliminary rounds run May to July",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -10454,7 +12292,6 @@
     ],
     "subjects": [
       "Public Speaking",
-      "Humanities",
       "Leadership"
     ],
     "month": "Various",
@@ -10471,6 +12308,13 @@
     "description": "NSW-exclusive two-day introductory summit for Years 7–8 run by UN Youth, focused on leadership, problem solving, communication and advocacy through interactive workshops — a skills-first alternative to Model UN debates.",
     "registration_link": "https://unyouth.org.au/program/junior-leadership-summit/",
     "registration_window": "Register ahead of the summit dates",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10492,7 +12336,6 @@
     ],
     "subjects": [
       "Debating",
-      "Humanities",
       "Public Speaking"
     ],
     "month": "July",
@@ -10511,6 +12354,14 @@
     "description": "Public speaking and diplomacy competition simulating international negotiations. Pairs represent a country's stance on an international issue and negotiate with an opposing pair toward a mutually beneficial outcome. Online preliminaries; finals in Sydney.",
     "registration_link": null,
     "registration_window": "Rounds run late July to mid-August",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-07-21",
     "ends_on": "2026-08-20",
     "dates_precision": "part",
@@ -10551,6 +12402,13 @@
     "description": "Overnight residential conference run by UN Youth NSW for Years 9–12, combining workshops, speaker panels, case studies, Interactive Problem Solving and Model UN debates around an annual theme.",
     "registration_link": "https://unyouth.org.au/program/state-territory-conference/",
     "registration_window": "Early-bird and regular windows close before the March conference",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -10590,6 +12448,13 @@
     "description": "One-day UN Youth events exploring complex topics in international affairs, law and global politics through workshops and Interactive Problem Solving simulations. Three themed summits run through the year.",
     "registration_link": "https://unyouth.org.au/program/summits/",
     "registration_window": "Three summits per year; register before each",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10610,8 +12475,7 @@
       "Competition"
     ],
     "subjects": [
-      "Public Speaking",
-      "Humanities"
+      "Public Speaking"
     ],
     "month": "October",
     "age_groups": [
@@ -10629,6 +12493,13 @@
     "description": "Public speaking competition run by UN Youth focusing on civics and problem solving. Students pitch a solution to a global or local issue and answer questions, progressing through regional, state and national rounds.",
     "registration_link": "UN Youth Voice program page",
     "registration_window": "State calendars vary; rounds run through the year",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -10669,6 +12540,13 @@
     "description": "In-school workshops run by UN Youth volunteers on global issues, public speaking and Model UN skills, arranged directly with schools throughout the year.",
     "registration_link": null,
     "registration_window": "Arranged with schools through the year",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10707,6 +12585,13 @@
     "description": "International architecture ideas competition from Volume Zero challenging entrants to rethink the DNA of our shared environments. Open globally with a USD 10,000 prize pool.",
     "registration_link": "https://studentcompetitions.com/competitions/call-for-ideas-unbox-2026-architecture-competition",
     "registration_window": "Entries usually due early December",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10747,6 +12632,13 @@
     "description": "Fast-paced, teamwork-centred maths competition run by the Melbourne University Mathematics and Statistics Society at the Parkville campus. Teams race through timed head-to-head problem rounds; winners are invited to the University Maths Olympics against university students.",
     "registration_link": "https://www.melbunimathsstats.org/mathsolympics/",
     "registration_window": "Register ahead of the August event (often Open Day)",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -10787,6 +12679,13 @@
     "description": "A science writing prize for students in Years 7 to 10, submitting a short essay on an annual theme.",
     "registration_link": "https://unsw.press/the-unsw-bragg-student-prize-for-science-writing/",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10807,7 +12706,6 @@
       "Program"
     ],
     "subjects": [
-      "Humanities",
       "Debating"
     ],
     "month": "Various",
@@ -10826,6 +12724,14 @@
     "description": "Two outreach programs from the UNSW UN Society: DiscoverMUN, an annual one-day on-campus MUN event for high schoolers, and MUNiS, where UNSW students visit schools to teach the UN and run MUN simulations. All skill levels welcome.",
     "registration_link": "https://outreach604.wixsite.com/my-site/projects",
     "registration_window": "DiscoverMUN annual; MUNiS ongoing by arrangement",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10866,6 +12772,13 @@
     "description": "Annual mathematics competition run since 1962 by the UNSW School of Mathematics and Statistics. A three-hour open-book exam designed to assess mathematical insight and ingenuity rather than routine technique. Junior (up to Year 10) and Senior (Years 11–12) divisions, for NSW and ACT students.",
     "registration_link": "https://www.unsw.edu.au/science/our-schools/maths/engage-with-us/high-school-students-and-teachers/unsw-school-mathematics-competition",
     "registration_window": "Entries usually close early May; sat in June",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -10904,6 +12817,14 @@
     "description": "University of Newcastle program for high-performing senior students, offering university-level study and enrichment while at school. Confirm current structure and intake details with UoN.",
     "registration_link": null,
     "registration_window": "Applications via school nomination (see UoN)",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Online",
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10942,6 +12863,13 @@
     "description": "A literary magazine publishing fiction, nonfiction, poetry and art from writers under 25, with editorial feedback.",
     "registration_link": "https://www.voiceworksmag.com.au/print",
     "registration_window": "Year round submissions",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -10985,6 +12913,13 @@
     "description": "Web design competition for school students to showcase web development and design skills, run by Grok Academy.",
     "registration_link": "https://groklearning.com/",
     "registration_window": "Register via Grok Academy before the event",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -11006,8 +12941,7 @@
     ],
     "subjects": [
       "Creative Writing",
-      "English",
-      "Humanities"
+      "English"
     ],
     "month": "February",
     "age_groups": [
@@ -11029,6 +12963,13 @@
     "description": "National writing competition run by the Whitlam Institute inviting students in Years 5–12 to share what matters to them in 600 words or less. Entries may be fiction, non-fiction, persuasive writing, poetry or prose. Both a creative writing exercise and a civics activity.",
     "registration_link": "https://www.whitlam.org/what-matters-writing-competition-enter-now",
     "registration_window": "Entries usually open early in the year",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-02-01",
     "ends_on": "2026-02-28",
     "dates_precision": "month",
@@ -11060,6 +13001,11 @@
     "description": "International advocacy and research organisation for gifted education, connecting educators, researchers and parents worldwide. Runs the biennial World Conference and publishes research — a professional reference resource rather than a student competition.",
     "registration_link": "https://world-gifted.org/",
     "registration_window": "Membership open year-round; biennial World Conference",
+    "format": null,
+    "provider": "External",
+    "settings": [],
+    "entry": null,
+    "entry_route": null,
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -11098,6 +13044,13 @@
     "description": "Global multi round economics competition for high school teams.",
     "registration_link": "https://www.worldeconcup.org",
     "registration_window": "Closed for 2026 (open registration closed 11 April 2026). Multi round, recurs annually.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -11136,6 +13089,13 @@
     "description": "Culminating world final round of the World Economics Cup for qualifying teams.",
     "registration_link": "https://www.worldeconcup.org",
     "registration_window": "Qualification required. Registration closes 1 October 2026.",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -11184,6 +13144,14 @@
     "description": "Global robotics competition with categories including RoboMission, RoboSports, Future Innovators and Future Engineers, for ages roughly 8–19. Entered via national organisers, with winners progressing to the international final.",
     "registration_link": "https://wro-association.org/competition/categories/",
     "registration_window": "Register via the national organiser before regional rounds",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -11228,6 +13196,13 @@
     "description": "Teams of 5–10 write and illustrate a complete book within a 12-hour period, including five random words. Books are donated to children in hospital and fundraising supports childhood cancer research.",
     "registration_link": "http://writeabookinaday.com/",
     "registration_window": "Choose any 12-hour day between June and September",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -11269,6 +13244,13 @@
     "description": "Monthly genre based writing competitions for writers aged 13 to 19, with peer and expert review and cash prizes.",
     "registration_link": "https://writetheworld.org",
     "registration_window": "Monthly competitions",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -11308,6 +13290,13 @@
     "description": "Annual NSW writing competition for students in Years 1–6 accessing NSW syllabuses, run by the NSW Department of Education. Suitable for NSW independent schools.",
     "registration_link": "https://education.nsw.gov.au/student-wellbeing/ask-sal/what-is-writeon",
     "registration_window": "Entries usually open late March, close mid-June",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -11350,6 +13339,13 @@
     "description": "International competition inviting students to develop innovative solutions to water-related challenges. An eight-week virtual hackathon with expert mentorship and masterclasses, focused on water conservation, purification and distribution.",
     "registration_link": "https://xylem.com",
     "registration_window": "Register before the virtual hackathon begins",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
@@ -11371,7 +13367,6 @@
     ],
     "subjects": [
       "Essay Writing",
-      "Humanities",
       "Legal"
     ],
     "month": "April",
@@ -11390,6 +13385,13 @@
     "description": "International essay competition for high school students run by the Yale Foreign Policy Initiative, focused on foreign policy, international security and global governance. Winning essays may be featured in Yale FPI publications.",
     "registration_link": "https://yalefpi.com/high-school-essay-contest",
     "registration_window": "Entries usually due around April",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
@@ -11411,7 +13413,6 @@
     ],
     "subjects": [
       "Essay Writing",
-      "Humanities",
       "Legal"
     ],
     "month": "June",
@@ -11431,6 +13432,13 @@
     "description": "International essay contest run by the Yale Review of International Studies exclusively for high school students. Essays under 1,500 words on an annual international-relations prompt.",
     "registration_link": "https://yris.yira.org/high-school-essay-contest/",
     "registration_window": "Entries usually due end of June",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -11452,7 +13460,6 @@
     ],
     "subjects": [
       "Essay Writing",
-      "Humanities",
       "Legal"
     ],
     "month": "December",
@@ -11472,6 +13479,13 @@
     "description": "International essay competition for students in grades 8–12 run by the Yale International Relations Association, on topics spanning international relations, global affairs and diplomacy. Top 50 finalists announced (10 per grade).",
     "registration_link": "https://www.learnwithleaders.com/competitions/the-yale-international-relations-essay-competition/",
     "registration_window": "Entries usually due mid-to-late December",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -11513,6 +13527,13 @@
     "description": "A one day leadership conference for secondary students run by a youth led not for profit, featuring keynote speakers and interactive facilitators. Tailored in school leadership programs are also available for whole year levels or student leadership teams.",
     "registration_link": "https://www.ylaaus.com/sylc",
     "registration_window": "Conferences run in Term 1 (February to March); schools book in advance via the website",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-02-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -11558,6 +13579,14 @@
     "description": "Project-based technology competition in which students (individuals or teams of up to four) create an ICT project of their choice and present it with a written report. Around $30,000 in cash prizes awarded annually, including a Best Use of AI category.",
     "registration_link": "http://yicta.edu.au/",
     "registration_window": "Submissions due ahead of Term 3–4 regional showcases",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online",
+      "Away"
+    ],
+    "entry": "Either",
+    "entry_route": "School enters",
     "starts_on": "2026-07-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -11579,7 +13608,7 @@
     ],
     "subjects": [
       "Legal",
-      "Humanities"
+      "Civics"
     ],
     "month": "August",
     "age_groups": [
@@ -11595,6 +13624,13 @@
     "description": "Annual one-day program run by the Law Society of NSW where students explore law and justice with leading legal professionals, including the Chief Justice of NSW. Rotates between metropolitan and regional NSW locations each year.",
     "registration_link": "https://www.lawsociety.com.au/Legal-Communities/High-School-Students/Young-Justice",
     "registration_window": "Schools nominate students ahead of the August event",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -11633,6 +13669,13 @@
     "description": "International essay competition for students aged 14 and under, run by Minds Underground. Two age categories (8–11 and 12–14) engaging with thought-provoking questions across science, humanities and creative expression.",
     "registration_link": "https://www.mindsunderground.com/young-minds-competition",
     "registration_window": "Entries usually due in April",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
