@@ -3,8 +3,9 @@
  *
  * Each strand (Justice, Innovation, …) is a tight bundle of year lines. Space is only
  * made where something needs it: a competition name on a middle year line bends the
- * next line out and back ("push"), concurrent programs split their line evenly into
- * parallel tracks, and round chains run on a branch off their program. Strands are
+ * next line out and back ("push"), programs run on a rail beside their line (joined to it top
+ * and bottom, the line itself running straight past), and round chains run on a branch off
+ * their program. Strands are
  * packed by their real shapes, so the gap between them is only as wide as the labels
  * that actually face each other.
  */
@@ -41,6 +42,8 @@ import { swatch } from '@/domain/maps-colors';
 export const TM_TRACK_GAP = 44;
 /** Distance between parallel tracks when concurrent programs split a year line. */
 export const TM_LANE_GAP = 44;
+/** Distance from a year line to the centre of the nearest program rail beside it. */
+export const TM_RAIL_OUT = 34;
 export const TM_PILL_W = 30;
 export const TM_LINE_W = 9;
 export const TM_BRANCH_W = 7;
@@ -56,7 +59,7 @@ const LABEL_DX = 16;
 const LABEL_WRAP = 16;
 const BRANCH_OUT = 34;
 const SIDE_PAD = 18;
-const SPLIT_PAD = 14;
+const RAIL_PAD = 6;
 const MAX_RAMP = 64;
 const MIN_RAMP = 18;
 const CORNER_R = 16;
@@ -121,7 +124,7 @@ export type TransitTrackDraw = {
   trackId: string;
   label: string;
   color: MapColorToken;
-  /** Main line pieces (rounded polylines); a split leaves a gap that `lanes` fill. */
+  /** Main line pieces (rounded polylines); `lanes` are the program rails beside the line. */
   pieces: Point[][];
   lanes: Point[][];
   top: Point;
@@ -361,7 +364,30 @@ type LocalBranch = {
   allYear?: { rejoinY: number };
 };
 
-type Cluster = { track: number; y0: number; y1: number; offsets: Map<string, number>; ys: number; ye: number; half: number };
+/**
+ * Programs overlapping in time on one year line. Each runs on its own rail on the `dir` side of
+ * the line; `half` is how far the farthest rail centre sits from the line.
+ */
+type Cluster = {
+  track: number;
+  y0: number;
+  y1: number;
+  offsets: Map<string, number>;
+  ys: number;
+  ye: number;
+  half: number;
+  dir: 1 | -1;
+};
+
+/** Height of the bend where a rail leaves or rejoins its year line (kept short so it fits by year end). */
+function railRamp(off: number): number {
+  return Math.max(MIN_RAMP, Math.round(Math.abs(off) * 0.6));
+}
+
+/** Side programs take on a year line: the outside on a strand's first line, else the right. */
+function railDir(track: number, trackCount: number): 1 | -1 {
+  return trackCount > 1 && track === 0 ? -1 : 1;
+}
 
 type StrandPiece = {
   line: TransitMap['lines'][number];
@@ -494,23 +520,23 @@ function buildClusters(stations: LocalStation[], trackCount: number): Cluster[] 
         groups.push(open);
       }
     }
+    const dir = railDir(track, trackCount);
     for (const group of groups) {
       const lanes = [...new Set(group.items.map((item) => item.lane))].sort((a, b) => a - b);
       const offsets = new Map<string, number>();
       for (const item of group.items) {
-        const index = lanes.indexOf(item.lane);
-        offsets.set(item.id, lanes.length > 1 ? (index - (lanes.length - 1) / 2) * TM_LANE_GAP : 0);
+        offsets.set(item.id, dir * (TM_RAIL_OUT + lanes.indexOf(item.lane) * TM_LANE_GAP));
       }
-      const half = lanes.length > 1 ? ((lanes.length - 1) / 2) * TM_LANE_GAP : 0;
-      const ramp = Math.max(MIN_RAMP, half);
+      const half = TM_RAIL_OUT + (lanes.length - 1) * TM_LANE_GAP;
       clusters.push({
         track,
         y0: group.y0,
         y1: group.y1,
         offsets,
         half,
-        ys: group.y0 - SPLIT_PAD - (half ? ramp : 0),
-        ye: group.y1 + SPLIT_PAD + (half ? ramp : 0)
+        dir,
+        ys: group.y0 - RAIL_PAD - railRamp(half),
+        ye: group.y1 + RAIL_PAD + railRamp(half)
       });
     }
   }
@@ -521,19 +547,29 @@ function laneOffset(clusters: Cluster[], stationId: string, track: number): numb
   return clusters.find((cluster) => cluster.track === track && cluster.offsets.has(stationId))?.offsets.get(stationId) ?? 0;
 }
 
-/** How far parallel tracks reach to one side of a year line at `y`. */
+function sideOf(dir: 1 | -1): 'left' | 'right' {
+  return dir > 0 ? 'right' : 'left';
+}
+
+/** How far program rails reach to one side of a year line at `y`. */
 function laneReach(clusters: Cluster[], track: number, y: number, side: 'left' | 'right'): number {
-  const hit = clusters.find((cluster) => cluster.track === track && y >= cluster.ys && y <= cluster.ye && cluster.half);
+  const hit = clusters.find((cluster) => cluster.track === track && y >= cluster.ys && y <= cluster.ye && sideOf(cluster.dir) === side);
   return hit ? hit.half : 0;
-  void side;
+}
+
+/** True when a program rail runs beside `track` on `side` anywhere between y0 and y1. */
+function railBeside(clusters: Cluster[], track: number, side: 'left' | 'right', y0: number, y1: number): boolean {
+  return clusters.some(
+    (cluster) => cluster.track === track && sideOf(cluster.dir) === side && overlap({ y0: cluster.ys, y1: cluster.ye }, { y0, y1 })
+  );
 }
 
 /**
  * Distance from a year line to where a label beside it starts. `pills` is how far any program
  * pill on that line reaches toward the label's side over the label's full height (see pillReach).
  */
-function labelReach(clusters: Cluster[], track: number, y: number, dot: number, pills = 0): number {
-  const reach = laneReach(clusters, track, y, 'right');
+function labelReach(clusters: Cluster[], track: number, y: number, side: 'left' | 'right', dot: number, pills = 0): number {
+  const reach = laneReach(clusters, track, y, side);
   return Math.max(dot + LABEL_DX, reach ? reach + TM_PILL_W / 2 + 10 : LABEL_DX, pills ? pills + 10 : 0);
 }
 
@@ -739,7 +775,7 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
     list[list.length - 1]!.final = true;
   }
 
-  // Stops on a year line that land inside a program sit on the program's edge.
+  // Stops on a year line stay on the line, even beside a program: the program runs on its own rail.
   for (const stop of stops) {
     if (stop.onEdge) continue;
     if (stop.branch) {
@@ -747,15 +783,7 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
       stop.dotX = [branch.branchDX];
       continue;
     }
-    stop.dotX = stop.tracks.map((track) => {
-      const inside = stations.find(
-        (station) =>
-          [...station.trackIndex.values()].includes(track) && stop.y > station.y && stop.y < station.y + station.h
-      );
-      if (!inside) return 0;
-      const off = laneOffset(clusters, inside.id, track);
-      return off + (stop.side === 'left' ? -1 : 1) * (TM_PILL_W / 2);
-    });
+    stop.dotX = stop.tracks.map(() => 0);
   }
 
   // An open-all-year spur runs outside every name, pill and round branch on its side of the line.
@@ -771,14 +799,14 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
       const dot = Math.abs(stop.dotX[stop.tracks.indexOf(edge)] ?? 0);
       const labelBand = labelSpan(stop);
       const pills = pillReach(stations, clusters, edge, stop.side, labelBand.y0, labelBand.y1);
-      reach = Math.max(reach, labelReach(clusters, edge, stop.y, dot, pills) + stop.label.w + 28);
+      reach = Math.max(reach, labelReach(clusters, edge, stop.y, stop.side, dot, pills) + stop.label.w + 28);
     }
     for (const other of branchMap.values()) {
       if (other === branch || other.allYear || other.side !== branch.side || other.track !== branch.track) continue;
       reach = Math.max(reach, Math.abs(other.branchDX) + LABEL_DX + Math.max(...other.stops.map((stop) => stop.label.w)) + 28);
     }
     for (const cluster of clusters) {
-      if (cluster.track === branch.track && overlap({ y0: cluster.ys, y1: cluster.ye }, span)) {
+      if (cluster.track === branch.track && sideOf(cluster.dir) === branch.side && overlap({ y0: cluster.ys, y1: cluster.ye }, span)) {
         reach = Math.max(reach, cluster.half + TM_PILL_W / 2 + BRANCH_OUT);
       }
     }
@@ -786,16 +814,21 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
     for (const stop of branch.stops) stop.dotX = [branch.branchDX];
   }
 
-  // A year-line stop whose name would land on a round branch beside the same line flips to the free side.
+  // A year-line stop whose name would land on a program rail or round branch beside the same line
+  // flips to the free side, so its name stays next to its dot.
   for (const stop of stops) {
-    if (stop.branch || stop.onEdge || stop.side !== 'right' || !stop.tick) continue;
-    const track = Math.max(...stop.tracks);
-    const blocked = [...branchMap.values()].some((branch) => {
-      if (branch.allYear || branch.side !== 'right' || branch.track !== track) return false;
-      const last = branch.stops[branch.stops.length - 1]!;
-      return stop.y + stop.label.h >= branch.originY - 20 && stop.y - 20 <= last.y + last.label.h;
-    });
-    if (blocked) stop.side = 'left';
+    if (stop.branch || stop.onEdge || !stop.tick) continue;
+    const blocked = (side: 'left' | 'right') => {
+      const track = side === 'right' ? Math.max(...stop.tracks) : Math.min(...stop.tracks);
+      if (railBeside(clusters, track, side, stop.y - LABEL_LINE_H, stop.y + stop.label.h)) return true;
+      return [...branchMap.values()].some((branch) => {
+        if (branch.allYear || branch.side !== side || branch.track !== track) return false;
+        const last = branch.stops[branch.stops.length - 1]!;
+        return stop.y + stop.label.h >= branch.originY - 20 && stop.y - 20 <= last.y + last.label.h;
+      });
+    };
+    const other = stop.side === 'right' ? 'left' : 'right';
+    if (blocked(stop.side) && !blocked(other)) stop.side = other;
   }
 
   // A stop with a link to another strand keeps its label above the link.
@@ -831,10 +864,9 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
   }
   for (const cluster of clusters) {
     occupancy[cluster.track]!.push({ y0: cluster.ys, y1: cluster.ye });
-    if (!cluster.half) continue;
     const amount = Math.max(0, cluster.half + TM_PILL_W + 12 - TM_TRACK_GAP);
-    if (cluster.track < count - 1) pushes.push({ gap: cluster.track, dir: 1, y0: cluster.ys, y1: cluster.ye, amount });
-    if (cluster.track > 0) pushes.push({ gap: cluster.track - 1, dir: -1, y0: cluster.ys, y1: cluster.ye, amount });
+    if (cluster.dir > 0 && cluster.track < count - 1) pushes.push({ gap: cluster.track, dir: 1, y0: cluster.ys, y1: cluster.ye, amount });
+    if (cluster.dir < 0 && cluster.track > 0) pushes.push({ gap: cluster.track - 1, dir: -1, y0: cluster.ys, y1: cluster.ye, amount });
   }
   for (const stop of stops) {
     for (const track of stop.tracks) occupancy[track]!.push({ y0: stop.y - 14, y1: stop.y + 14 });
@@ -857,7 +889,7 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
     const dot = Math.abs(stop.dotX[stop.tracks.indexOf(track)] ?? 0);
     const span = labelSpan(stop);
     const pills = pillReach(stations, clusters, track, stop.side, span.y0, span.y1);
-    const reach = labelReach(clusters, track, stop.y, dot, pills) + stop.label.w;
+    const reach = labelReach(clusters, track, stop.y, stop.side, dot, pills) + stop.label.w;
     const amount = reach + SIDE_PAD + TM_PILL_W / 2 - TM_TRACK_GAP;
     const top = Math.min(stop.y - 12, stop.labelY - LABEL_LINE_H / 2) - 4;
     const bottom = Math.max(stop.y + 12, stop.labelY - LABEL_LINE_H / 2 + stop.label.h) + 4;
@@ -911,33 +943,24 @@ function placeStrand(piece: StrandPiece): PlacedStrand {
 
   const tracks: TransitTrackDraw[] = defs.map((def, index) => {
     const full = trackLines[index]!;
-    const own = clusters.filter((cluster) => cluster.track === index && cluster.half).sort((a, b) => a.ys - b.ys);
-    const pieces: Point[][] = [];
+    const own = clusters.filter((cluster) => cluster.track === index).sort((a, b) => a.ys - b.ys);
+    // The year line runs straight past its programs; each program's rail leaves it above the
+    // program and rejoins it below.
+    const pieces: Point[][] = [slicePolyline(full, yTop, yBottom)];
     const lanes: Point[][] = [];
-    let cursor = yTop;
     for (const cluster of own) {
-      pieces.push(slicePolyline(full, cursor, cluster.ys));
       const x = tx(index, cluster.ys);
       const offsets = [...new Set(cluster.offsets.values())].sort((a, b) => a - b);
       for (const off of offsets) {
-        const r = Math.max(MIN_RAMP, Math.abs(off));
-        lanes.push(
-          off
-            ? [
-                { x, y: cluster.ys },
-                { x: x + off, y: cluster.ys + r },
-                { x: x + off, y: cluster.ye - r },
-                { x, y: cluster.ye }
-              ]
-            : [
-                { x, y: cluster.ys },
-                { x, y: cluster.ye }
-              ]
-        );
+        const r = railRamp(off);
+        lanes.push([
+          { x, y: cluster.ys },
+          { x: x + off, y: cluster.ys + r },
+          { x: x + off, y: cluster.ye - r },
+          { x, y: cluster.ye }
+        ]);
       }
-      cursor = cluster.ye;
     }
-    pieces.push(slicePolyline(full, cursor, yBottom));
     for (const part of [...pieces, ...lanes]) boxPoints(part, TM_LINE_W / 2 + 4);
     const top = { x: full[0]!.x, y: yTop };
     const bottom = { x: full[full.length - 1]!.x, y: yBottom };
@@ -1042,7 +1065,7 @@ function placeStrand(piece: StrandPiece): PlacedStrand {
       const dot = Math.abs(stop.dotX[stop.tracks.indexOf(track)] ?? 0);
       const span = labelSpan(stop);
       const pills = pillReach(piece.stations, clusters, track, stop.side, span.y0, span.y1);
-      const reach = labelReach(clusters, track, stop.y, dot, pills);
+      const reach = labelReach(clusters, track, stop.y, stop.side, dot, pills);
       labelX = tx(track, stop.y) + (stop.side === 'left' ? -reach : reach);
     }
     const anchor: 'start' | 'end' = stop.side === 'left' ? 'end' : 'start';
