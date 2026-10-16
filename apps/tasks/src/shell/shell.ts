@@ -62,6 +62,7 @@ export type HubViewId =
   | 'programs'
   | 'properties'
   | 'term-dates'
+  | 'problem-solver'
   | 'city'
   | 'grove';
 
@@ -118,6 +119,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Tools',
     items: [
       { id: 'maps', label: 'Maps', href: '#/maps' },
+      { id: 'problem-solver', label: 'Problem Solver', href: '#/problem-solver' },
       { id: 'line', label: 'Personal line', href: '#/line' },
       { id: 'search', label: 'Search', href: '#/search' },
       { id: 'properties', label: 'Properties', href: '#/properties' },
