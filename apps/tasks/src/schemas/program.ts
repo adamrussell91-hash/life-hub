@@ -106,6 +106,10 @@ const isoDate = z
   .optional()
   .transform((value) => value ?? null);
 
+/** How much to trust a date: stated day, "early / mid / late" a month, or the month only. */
+export const DatePrecisionSchema = z.enum(['day', 'part', 'month']);
+const precision = DatePrecisionSchema.nullable().optional().default(null);
+
 const text = z
   .string()
   .optional()
@@ -136,7 +140,10 @@ const ProgramObject = z.object({
       return value;
     }),
   registration_window: text,
-  /** When this runs. Null when the catalogue text does not state a date. */
+  /**
+   * When this runs or is held (equal for one day), with `dates_precision` saying how sure that is.
+   * A `month` or `part` run is a window, not a confirmed day. Null when nothing says when it runs.
+   */
   starts_on: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -149,6 +156,13 @@ const ProgramObject = z.object({
     .nullable()
     .optional()
     .default(null),
+  dates_precision: precision,
+  /** Submission deadline (essays, writing, art). */
+  due_on: isoDate,
+  due_precision: precision,
+  /** When registration or entry closes for something that runs later. */
+  entries_close_on: isoDate,
+  entries_close_precision: precision,
   /** Page the dates came from, so they can be checked again next year. */
   dates_source_url: nullableText,
   /** When someone last confirmed the dates against that page. */
@@ -189,6 +203,11 @@ export const ProgramCreateSchema = ProgramObject.omit({
   registration_window: true,
   starts_on: true,
   ends_on: true,
+  dates_precision: true,
+  due_on: true,
+  due_precision: true,
+  entries_close_on: true,
+  entries_close_precision: true,
   dates_source_url: true,
   dates_checked_on: true,
   not_available_nsw: true,
