@@ -1595,6 +1595,37 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         body.push(
           inspectorField('Runs', row, 'Draws this competition and the rounds chained to it on a dotted line beside the year line.')
         );
+
+        // The same competition on other strands' year lines: one interchange, a stop on each strand.
+        const hostId = attach.line_id;
+        const others = current.lines.filter((line) => line.id !== hostId);
+        if (others.length) {
+          const strands = el('div', 'map-tracks');
+          for (const line of others) {
+            const item = el('label', 'map-tracks__item');
+            const check = document.createElement('input');
+            check.type = 'checkbox';
+            check.value = line.id;
+            check.checked = (initial.tick.also_lines ?? []).includes(line.id);
+            item.append(check, document.createTextNode(line.name));
+            strands.append(item);
+          }
+          strands.addEventListener('change', () => {
+            const tick = liveItem(id).tick;
+            if (!tick) return;
+            const picked = [...strands.querySelectorAll<HTMLInputElement>('input:checked')].map((input) => input.value);
+            tick.also_lines = picked.length ? picked : undefined;
+            paint();
+            void persist();
+          });
+          body.push(
+            inspectorField(
+              'Also on strands',
+              strands,
+              'Same year lines and date on these strands too. Drawn as one interchange with a stop on each strand.'
+            )
+          );
+        }
       }
     }
 

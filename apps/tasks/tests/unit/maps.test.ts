@@ -743,6 +743,66 @@ describe('screenshot regressions (Expression gallery, Reasoning olympiad)', () =
     expect(stop.labelX).toBeLessThan(pill.x - pill.w / 2);
   });
 
+  it('draws a competition on several strands as one interchange joined to a stop on each strand', () => {
+    const base = mindWorks2026Map();
+    const map = {
+      ...base,
+      stations: [],
+      ticks: [
+        {
+          ...comp('tk_locke2', 'John Locke Essay', { kind: 'line', line_id: 'line_justice', y: 200, tracks: ['senior'] }, '2026-08-05'),
+          also_lines: ['line_reasoning', 'line_innovation', 'line_expression']
+        }
+      ]
+    };
+    const layout = layoutMap(map);
+    const stops = layout.draw.stops.filter((stop) => stop.tickId === 'tk_locke2');
+    expect(stops).toHaveLength(1);
+    const stop = stops[0]!;
+    // Hosted by the last strand, so its name sits at the end of the rule.
+    expect(stop.lineId).toBe('line_reasoning');
+    expect(stop.cross!.badges.map((badge) => badge.letter)).toEqual(['J', 'I', 'E', 'R']);
+    const seniors = layout.draw.tracks.filter((track) => track.trackId === 'senior');
+    expect(stop.cross!.railDots).toHaveLength(4);
+    for (const dot of stop.cross!.railDots) {
+      expect(seniors.some((track) => Math.abs(track.top.x - dot.x) < 0.5)).toBe(true);
+    }
+    const ring = stop.dots[0]!;
+    const reasoningSenior = seniors.find((track) => track.lineId === 'line_reasoning')!;
+    expect(ring.x).toBeGreaterThan(reasoningSenior.top.x);
+    expect(stop.cross!.rule[0]!.x).toBeCloseTo(Math.min(...stop.cross!.railDots.map((dot) => dot.x)), 5);
+    expect(stop.cross!.rule[1]!.x).toBeCloseTo(ring.x, 5);
+    expect(stop.labelX).toBeGreaterThan(ring.x);
+    const svg = renderTransitSvg(layout);
+    expect(svg.match(/class="tm-badge"/g)).toHaveLength(4);
+    expect(svg.match(/class="tm-cross-stop"/g)).toHaveLength(4);
+  });
+
+  it('stacks same-day events on one line in a shared platform, each name beside its own dot', () => {
+    const base = mindWorks2026Map();
+    const at = { kind: 'line', line_id: 'line_reasoning', y: 200, tracks: ['senior'] } as const;
+    const map = {
+      ...base,
+      stations: [],
+      ticks: [comp('tk_seo', 'Senior Ethics Olympiad', at, '2026-05-27'), comp('tk_ee', 'Ethical Explorations', at, '2026-05-27')]
+    };
+    const layout = layoutMap(map);
+    const a = layout.draw.stops.find((stop) => stop.tickId === 'tk_seo')!;
+    const b = layout.draw.stops.find((stop) => stop.tickId === 'tk_ee')!;
+    expect(a.dots[0]!.x).toBeCloseTo(b.dots[0]!.x, 5);
+    expect(b.y).toBeGreaterThan(a.y);
+    expect(a.labelY).toBeCloseTo(a.y, 5);
+    expect(b.labelY).toBeCloseTo(b.y, 5);
+    expect(a.anchor).toBe(b.anchor);
+    // The date shows once, under the last name.
+    expect(a.sub).toBe('');
+    expect(b.sub).not.toBe('');
+    expect(a.platform).toEqual(b.platform);
+    expect(a.platform!.y0).toBeLessThan(a.y);
+    expect(a.platform!.y1).toBeGreaterThan(b.y);
+    expect(renderTransitSvg(layout).match(/class="tm-platform"/g)).toHaveLength(1);
+  });
+
   it('runs a program on a rail joined to its year line top and bottom, keeping line stops on the line', () => {
     const base = mindWorks2026Map();
     const map = {
