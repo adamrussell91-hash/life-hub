@@ -44,9 +44,9 @@ describe('Problem statement view', () => {
 
   it('shows a short title in a block, not the full answer', () => {
     const view = createProblemStatementView();
-    view.update(run([node('p', 'problem', { title: 'One in four late', text: 'One in four deliveries misses its window.' })]));
+    view.update(run([node('p', 'problem', { title: 'Quarter late', text: 'One in four deliveries misses its window.' })]));
     const shape = view.el.querySelector('[data-node="p"] .ps-statement__shape')!;
-    expect(shape.querySelector('.ps-statement__title')!.textContent).toBe('One in four late');
+    expect(shape.querySelector('.ps-statement__title')!.textContent).toBe('Quarter late');
     expect(shape.textContent).not.toContain('misses its window');
   });
 
