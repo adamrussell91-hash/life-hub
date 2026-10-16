@@ -80,12 +80,35 @@ describe('Problem tree view', () => {
     expect(card(button('e1')).classList.contains('is-open')).toBe(false);
   });
 
+  it('draws one arrow per side: causes into the trunk, trunk into effects', () => {
+    const arrows = (nodes: PsNode[]) => {
+      const view = createProblemTreeView();
+      view.update(run(nodes));
+      return view.el.querySelectorAll('.ps-tree__arrow').length;
+    };
+    expect(arrows([node('t', 'trunk'), node('c1', 'cause:1'), node('c2', 'cause:2'), node('e1', 'effect:1'), node('e2', 'effect:2')])).toBe(2);
+    expect(arrows([node('t', 'trunk'), node('c1', 'cause:1'), node('c2', 'cause:2')])).toBe(1);
+    expect(arrows([node('t', 'trunk'), node('e1', 'effect:1'), node('e2', 'effect:2')])).toBe(1);
+    expect(arrows([node('t', 'trunk')])).toBe(0);
+  });
+
+  it('emphasises the lines of an open card', () => {
+    const view = createProblemTreeView();
+    view.update(run([node('t', 'trunk'), node('c1', 'cause:1'), node('e1', 'effect:1')], [{ from: 'c1', to: 'e1', kind: 'relates' }]));
+    const edge = view.el.querySelector('path.ps-tree__edge')!;
+    expect(edge.classList.contains('is-active')).toBe(false);
+    view.el.querySelector<HTMLButtonElement>('[data-node="c1"] .ps-tree__shape')!.click();
+    expect(edge.classList.contains('is-active')).toBe(true);
+    view.el.querySelector<HTMLButtonElement>('[data-node="c1"] .ps-tree__shape')!.click();
+    expect(edge.classList.contains('is-active')).toBe(false);
+  });
+
   it('draws one line per relationship and ignores edges to missing nodes', () => {
     const view = createProblemTreeView();
     const nodes = [node('t', 'trunk'), node('c1', 'cause:1'), node('e1', 'effect:1')];
     view.update(run(nodes, [{ from: 'c1', to: 'e1', kind: 'relates' }, { from: 'c1', to: 'gone', kind: 'relates' }]));
-    expect(view.el.querySelectorAll('line.ps-tree__edge').length).toBe(1);
+    expect(view.el.querySelectorAll('path.ps-tree__edge').length).toBe(1);
     view.update(run(nodes, [{ from: 'c1', to: 'e1', kind: 'relates' }]));
-    expect(view.el.querySelectorAll('line.ps-tree__edge').length).toBe(1);
+    expect(view.el.querySelectorAll('path.ps-tree__edge').length).toBe(1);
   });
 });
