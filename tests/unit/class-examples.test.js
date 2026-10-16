@@ -239,3 +239,34 @@ test('student writes from another origin are refused', async () => {
   );
   assert.equal(res.status, 403);
 });
+
+test('a student on the plain lesson link can use a code the teacher opened for a class', async () => {
+  const store = seededStore();
+  const { slotId, code } = await addAndOpen(store);
+
+  // The shared lesson link sends no class: it follows the class the teacher is teaching.
+  const unlocked = await student(store, 'unlock', { slot_id: slotId, code });
+  assert.equal(unlocked.status, 200, JSON.stringify(unlocked.json));
+  assert.equal(unlocked.json.data.context, CLASS);
+
+  const saved = await student(store, 'submit', {
+    class: unlocked.json.data.context, slot_id: slotId, token: 'token-for-luke', text: 'Answer'
+  });
+  assert.equal(saved.status, 200, JSON.stringify(saved.json));
+
+  await teacher(store, { action: 'show', context: CLASS, slot_id: slotId });
+  const handler = createPublishedExamplesHandler(deps(store));
+  const res = await handler(req('GET', `/api/published/examples/${LESSON}`), {});
+  const { data } = await res.json();
+  assert.equal(data.slots[0].shown, true);
+  assert.equal(data.slots[0].text, 'Answer');
+});
+
+test('the plain lesson link stops following a class the teacher has not touched for hours', async () => {
+  const store = seededStore();
+  const { slotId, code } = await addAndOpen(store);
+  const later = createPublishedExamplesWriteHandler(deps(store, { nowIso: () => '2026-10-16T01:00:00.000Z' }));
+  const res = await later(req('POST', `/api/published/examples/${LESSON}/unlock`, { slot_id: slotId, code }), {});
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).error.code, 'not_open');
+});

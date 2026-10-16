@@ -7,6 +7,12 @@
  *
  *   class_examples/slots/{lessonId}                      { lesson_id, slots[] }
  *   class_examples/entries/{lessonId}/{context}/{slotId} one answer + its code
+ *   class_examples/live/{lessonId}                       { context, at } the class
+ *                                                        the teacher last acted in
+ *
+ * A class page sends its class. The plain lesson link sends none, so it
+ * follows the class the teacher is working in (for a few hours), otherwise
+ * a code opened for 9A would be refused on the link the teacher shared.
  *
  * One blob per answer so two students saving different slots never race.
  * Every read here is strong: each one feeds a write or a just-written state.
@@ -16,6 +22,8 @@ import { getJSON, setJSON, deleteKey } from './teaching-blobs.mjs';
 
 export const SLOTS_PREFIX = 'class_examples/slots/';
 export const ENTRIES_PREFIX = 'class_examples/entries/';
+export const LIVE_PREFIX = 'class_examples/live/';
+export const LIVE_CONTEXT_HOURS = 12;
 export const DIRECT_CONTEXT = 'direct';
 export const MAX_WRONG_CODES = 10;
 export const MAX_EXAMPLE_LENGTH = 4000;
@@ -42,6 +50,10 @@ export function slotsKey(lessonId) {
 
 export function entryKey(lessonId, context, slotId) {
   return `${ENTRIES_PREFIX}${lessonId}/${context}/${slotId}`;
+}
+
+export function liveKey(lessonId) {
+  return `${LIVE_PREFIX}${lessonId}`;
 }
 
 export function hashToken(token) {
@@ -155,6 +167,25 @@ export async function readTeacherExamples(store, lessonId, context) {
     max_wrong_codes: MAX_WRONG_CODES,
     slots: slots.map(slot => ({ ...slot, entry: teacherEntry(entries[slot.id]) }))
   };
+}
+
+/** The teacher's working class, so the plain lesson link can follow it. */
+export async function markLiveContext(store, lessonId, context, rawDeps) {
+  const deps = defaultDeps(rawDeps);
+  await setJSON(store, liveKey(lessonId), { context, at: deps.nowIso() });
+}
+
+/**
+ * Which answers a student request is about. An explicit class wins; no class
+ * means the plain lesson link, which follows the teacher's recent class.
+ */
+export async function resolveStudentContext(store, lessonId, raw, rawDeps) {
+  if (raw !== undefined && raw !== null && raw !== '') return normaliseContext(raw);
+  const deps = defaultDeps(rawDeps);
+  const live = await getJSON(store, liveKey(lessonId), STRONG);
+  const age = Date.parse(deps.nowIso()) - Date.parse(live?.at ?? '');
+  if (isSafeId(live?.context) && age >= 0 && age < LIVE_CONTEXT_HOURS * 3_600_000) return live.context;
+  return DIRECT_CONTEXT;
 }
 
 /* ── Teacher writes ────────────────────────────────────────────────────── */
@@ -330,7 +361,8 @@ export async function unlockSlot(store, lessonId, context, input, rawDeps) {
     token_hash: hashToken(token),
     unlocked_at: deps.nowIso()
   });
-  return { token };
+  // The page sends this back on save, so a later class switch can't strand it.
+  return { token, context };
 }
 
 /** Saves once, then locks. The teacher decides when the class sees it. */

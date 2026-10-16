@@ -33,6 +33,10 @@ function examples(slots: PublicExamples['slots']): PublicExamples {
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+function openTab(root: HTMLElement, slotId: string): void {
+  root.querySelector<HTMLButtonElement>(`.cx-tab[data-slot-id="${slotId}"]`)!.click();
+}
+
 function setHidden(hidden: boolean): void {
   Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
 }
@@ -94,7 +98,7 @@ describe('student class examples', () => {
     expect(api.fetchPublicExamples).toHaveBeenCalledTimes(3);
   });
 
-  it('puts each box directly under its block and shows only shared answers', async () => {
+  it('puts each block\'s boxes under it as closed tabs, opening one at a time', async () => {
     api.fetchPublicExamples.mockResolvedValue(
       examples([
         { id: 's1', block_id: 'block_q2', label: 'Question 2', shown: true, text: 'Line one\nLine two' },
@@ -108,9 +112,21 @@ describe('student class examples', () => {
     const q2 = root.querySelector('[data-block-id="block_q2"]')!;
     const group = q2.nextElementSibling as HTMLElement;
     expect(group.classList.contains('cx-group')).toBe(true);
-    expect(group.querySelector('.cx-slot--shown .cx-slot__text')?.textContent).toBe('Line one\nLine two');
+    // Closed until picked: just the tab, with a dot saying it is shared.
+    expect(group.querySelector('.cx-slot')).toBeNull();
+    const tab = group.querySelector<HTMLButtonElement>('.cx-tab')!;
+    expect(tab.textContent).toContain('Question 2');
+    expect(tab.getAttribute('aria-expanded')).toBe('false');
+    expect(tab.querySelector('.cx-tab__dot--shown')).not.toBeNull();
 
-    const q1Group = root.querySelector('[data-block-id="block_q1"]')!.nextElementSibling!;
+    openTab(root, 's1');
+    expect(group.querySelector('.cx-slot--shown .cx-slot__text')?.textContent).toBe('Line one\nLine two');
+    expect(group.querySelector('.cx-tab')!.getAttribute('aria-expanded')).toBe('true');
+    openTab(root, 's1');
+    expect(group.querySelector('.cx-slot')).toBeNull();
+
+    const q1Group = root.querySelector('[data-block-id="block_q1"]')!.nextElementSibling as HTMLElement;
+    openTab(root, 's2');
     expect(q1Group.querySelector('.cx-slot--waiting')).not.toBeNull();
     expect(q1Group.textContent).toContain("A classmate's answer will appear here.");
     handle.dispose();
@@ -125,6 +141,7 @@ describe('student class examples', () => {
     const handle = mountStudentClassExamples(root, { lessonId: 'lesson_1', classId: 'class_a' });
     await flush();
 
+    openTab(root, 's1');
     (root.querySelector('.cx-slot__code-btn') as HTMLButtonElement).click();
     const input = root.querySelector<HTMLInputElement>('.cx-unlock__input')!;
     input.value = '472';
@@ -157,6 +174,7 @@ describe('student class examples', () => {
     const root = page();
     const handle = mountStudentClassExamples(root, { lessonId: 'lesson_1' });
     await flush();
+    openTab(root, 's1');
     (root.querySelector('.cx-slot__code-btn') as HTMLButtonElement).click();
     root.querySelector<HTMLInputElement>('.cx-unlock__input')!.value = '111';
     root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
@@ -164,6 +182,52 @@ describe('student class examples', () => {
     const msg = root.querySelector<HTMLElement>('.cx-msg')!;
     expect(msg.hidden).toBe(false);
     expect(msg.textContent).toBe("That code didn't match. 7 tries left.");
+    handle.dispose();
+  });
+
+  it('on the plain lesson link, saves to the class the code was opened in', async () => {
+    api.fetchPublicExamples.mockResolvedValue(
+      examples([{ id: 's1', block_id: 'block_q2', label: 'Question 2', shown: false }])
+    );
+    api.unlockExample.mockResolvedValue({ token: 'tok', context: 'class_a' });
+    api.submitExample.mockResolvedValue({ saved_at: '2026-10-16T09:00:00.000Z' });
+    const root = page();
+    const handle = mountStudentClassExamples(root, { lessonId: 'lesson_1' });
+    await flush();
+    openTab(root, 's1');
+    (root.querySelector('.cx-slot__code-btn') as HTMLButtonElement).click();
+    root.querySelector<HTMLInputElement>('.cx-unlock__input')!.value = '472';
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await flush();
+    expect(api.unlockExample).toHaveBeenCalledWith('lesson_1', { class: undefined, slot_id: 's1', code: '472' });
+
+    const field = root.querySelector<HTMLTextAreaElement>('.cx-write__field')!;
+    field.value = 'My answer';
+    field.dispatchEvent(new Event('input'));
+    root.querySelector<HTMLFormElement>('.cx-write')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await flush();
+    expect(api.submitExample).toHaveBeenCalledWith('lesson_1', {
+      class: 'class_a',
+      slot_id: 's1',
+      token: 'tok',
+      text: 'My answer'
+    });
+    expect(root.querySelector('.cx-slot--sent')).not.toBeNull();
+    handle.dispose();
+  });
+
+  it('reopens the tab a student was writing in after a reload', async () => {
+    sessionStorage.setItem(
+      'class-example:lesson_1:class_a:s1',
+      JSON.stringify({ mode: 'writing', token: 'tok', draft: 'Kept draft', open: true })
+    );
+    api.fetchPublicExamples.mockResolvedValue(
+      examples([{ id: 's1', block_id: 'block_q2', label: 'Question 2', shown: false }])
+    );
+    const root = page();
+    const handle = mountStudentClassExamples(root, { lessonId: 'lesson_1', classId: 'class_a' });
+    await flush();
+    expect(root.querySelector<HTMLTextAreaElement>('.cx-write__field')?.value).toBe('Kept draft');
     handle.dispose();
   });
 });
@@ -227,7 +291,11 @@ describe('teacher boxes on nested blocks', () => {
     const host = inner.nextElementSibling as HTMLElement;
     expect(host.classList.contains('cx-teacher--nested')).toBe(true);
     expect(host.hidden).toBe(false);
-    expect(host.querySelector('.cx-row__label')?.textContent).toBe('Question 3');
+    expect(host.querySelector('.cx-tab[data-slot-id="s1"]')?.textContent).toContain('Question 3');
+    // Nothing needs the teacher yet, so the tab stays closed.
+    expect(host.querySelector('.cx-row')).toBeNull();
+    (host.querySelector('.cx-tab[data-slot-id="s1"]') as HTMLButtonElement).click();
+    expect(host.querySelector('.cx-row')?.textContent).toContain('Open for a student');
     // The section's own panel stays empty: the box belongs to the inner block.
     const rootHost = Array.from(row.children).find((child) => child.classList.contains('cx-teacher')) as HTMLElement;
     expect(rootHost.hidden).toBe(true);
