@@ -31,7 +31,7 @@ describe('program schema', () => {
     expect(parsed.id).toBe('prog_abbmun-abbotsleigh-model-united-nations-conference');
     expect(parsed.name).toBe('ABBMUN (Abbotsleigh Model United Nations Conference)');
     expect(parsed.types).toContain('Event');
-    expect(parsed.subjects).toEqual(expect.arrayContaining(['Humanities', 'Debating']));
+    expect(parsed.subjects).toEqual(['Debating']);
     expect(parsed.month).toBe('March');
     expect(parsed.age_groups).toContain('Year 9');
     expect(parsed.competition_level).toBe('Beginners');
@@ -240,7 +240,13 @@ describe('catalogue dates', () => {
 
 describe('catalogue classification', () => {
   it('defaults the branch fields to empty on an unclassified entry', () => {
-    const parsed = ProgramSchema.parse(catalogPrograms()[0]!);
+    const first = { ...catalogPrograms()[0]! };
+    delete first.format;
+    delete first.provider;
+    delete first.settings;
+    delete first.entry;
+    delete first.entry_route;
+    const parsed = ProgramSchema.parse(first);
     expect(parsed).toMatchObject({ format: null, provider: null, settings: [], entry: null, entry_route: null });
   });
 
