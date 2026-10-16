@@ -52,6 +52,7 @@ import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { parseVideoInput, parseStartTime, videoEmbedSrc } from '@/blocks/video-url';
 import { activeClipAt } from '@/blocks/voice-playback';
+import { renderElementCard, type TechniqueCardPoemSpot } from '@/blocks/technique-card';
 import type {
   AnnotationAttachment,
   AnnotationBlock,
@@ -238,77 +239,22 @@ function closeAnnotationPanel(root: HTMLElement): void {
   });
 }
 
-/**
- * Technique card styled after the Periodic Table of Literary Elements detail
- * pane: element badge, name, family + subgroup chips, then Definition /
- * Effect / Example sections in the family colour.
- */
-export function renderElementCard(
-  technique: LiteraryTechnique,
-  table: LiteraryElementsTable
-): HTMLElement {
-  const family = familyOfTechnique(table, technique);
-  const subgroup = table.subgroups.find((row) => row.id === technique.subgroup);
-  const card = document.createElement('section');
-  card.className = 'block-annotation__element';
-  card.dataset.techniqueId = technique.id;
-  if (family) {
-    card.dataset.family = family.key;
-    card.style.setProperty('--c', family.colour);
-  }
-  card.setAttribute('aria-label', `Technique: ${technique.name}`);
+export { renderElementCard } from '@/blocks/technique-card';
 
-  const head = document.createElement('div');
-  head.className = 'block-annotation__element-head';
-  const badge = document.createElement('span');
-  badge.className = 'block-annotation__element-badge';
-  badge.setAttribute('aria-hidden', 'true');
-  const sym = document.createElement('span');
-  sym.className = 'block-annotation__element-symbol';
-  sym.textContent = technique.symbol;
-  badge.append(sym);
-
-  const titleWrap = document.createElement('div');
-  titleWrap.className = 'block-annotation__element-titles';
-  const name = document.createElement('p');
-  name.className = 'block-annotation__element-name';
-  name.textContent = technique.name;
-  const crumbs = document.createElement('div');
-  crumbs.className = 'block-annotation__element-crumbs';
-  if (family) {
-    const fam = document.createElement('span');
-    fam.className = 'block-annotation__element-chip block-annotation__element-chip--family';
-    fam.textContent = family.name;
-    crumbs.append(fam);
-  }
-  if (subgroup) {
-    const sub = document.createElement('span');
-    sub.className = 'block-annotation__element-chip';
-    sub.textContent = subgroup.name;
-    crumbs.append(sub);
-  }
-  titleWrap.append(name, crumbs);
-  head.append(badge, titleWrap);
-  card.append(head);
-
-  const sections: Array<[string, string, boolean]> = [
-    ['Definition', technique.definition, false],
-    ['Effect', technique.effect, false],
-    ['Example', technique.example, true]
-  ];
-  for (const [label, value, isExample] of sections) {
-    if (!value?.trim()) continue;
-    const sec = document.createElement('div');
-    sec.className = 'block-annotation__element-sec';
-    const h = document.createElement('h4');
-    h.textContent = label;
-    const p = document.createElement('p');
-    if (isExample) p.className = 'block-annotation__element-example';
-    p.textContent = value;
-    sec.append(h, p);
-    card.append(sec);
-  }
-  return card;
+/** Other technique-tagged notes in this poem whose marks are on screen. */
+function poemSpots(
+  root: HTMLElement,
+  annotations: AnnotationItem[],
+  openId: string
+): TechniqueCardPoemSpot[] {
+  return annotations
+    .filter((ann) => ann.id !== openId && ann.technique?.id)
+    .filter((ann) => root.querySelector(`button[data-annotation-id="${CSS.escape(ann.id)}"]`))
+    .map((ann) => ({
+      annotationId: ann.id,
+      quote: (ann.anchor.quote?.exact ?? '').trim().slice(0, 60) || 'this line',
+      techniqueId: ann.technique!.id
+    }));
 }
 
 function fillBody(
@@ -316,7 +262,9 @@ function fillBody(
   annotation: AnnotationItem,
   layer: AnnotationLayer | undefined,
   table: LiteraryElementsTable | null,
-  showLayer: boolean
+  showLayer: boolean,
+  root: HTMLElement,
+  annotations: AnnotationItem[]
 ): void {
   host.replaceChildren();
   if (layer && showLayer) {
@@ -332,7 +280,18 @@ function fillBody(
   host.append(body);
   if (annotation.technique?.id && table) {
     const technique = lookupTechnique(table, annotation.technique.id);
-    if (technique) host.append(renderElementCard(technique, table));
+    if (technique) {
+      host.append(
+        renderElementCard(technique, table, {
+          poemSpots: poemSpots(root, annotations, annotation.id),
+          onOpenNote: (id) => {
+            root
+              .querySelector<HTMLElement>(`button[data-annotation-id="${CSS.escape(id)}"]`)
+              ?.click();
+          }
+        })
+      );
+    }
   }
   const attachments = renderAttachmentList(annotation.body.attachments);
   if (attachments) host.append(attachments);
@@ -357,7 +316,8 @@ function openAnnotation(
   annotation: AnnotationItem,
   layer: AnnotationLayer | undefined,
   anchorEl: HTMLElement,
-  table: LiteraryElementsTable | null
+  table: LiteraryElementsTable | null,
+  annotations: AnnotationItem[] = []
 ): void {
   closeAnnotationPanel(root);
   const heading = noteTitle(annotation, anchorEl);
@@ -390,7 +350,7 @@ function openAnnotation(
     header.append(title, close);
     const body = document.createElement('div');
     body.className = 'block-annotation__sheet-body';
-    fillBody(body, annotation, layer, table, showLayer);
+    fillBody(body, annotation, layer, table, showLayer, root, annotations);
     dialog.append(header, body);
     sheet.append(dialog);
     close.focus();
@@ -420,7 +380,7 @@ function openAnnotation(
   header.append(title, close);
   const body = document.createElement('div');
   body.className = 'block-annotation__panel-body';
-  fillBody(body, annotation, layer, table, showLayer);
+  fillBody(body, annotation, layer, table, showLayer, root, annotations);
   panel.append(header, body);
   close.focus({ preventScroll: true });
   panel.scrollIntoView?.({ block: 'nearest' });
@@ -1149,7 +1109,7 @@ function buildInteractiveView(
       }
       selectNote(item.annotation.id);
       state = { ...state, openAnnotationId: item.annotation.id };
-      openAnnotation(root, item.annotation, item.layer, btn, table);
+      openAnnotation(root, item.annotation, item.layer, btn, table, content.annotations);
     }
 
     function revealMarkerLayer(marker: AnnotationMarker): void {
@@ -1439,7 +1399,8 @@ function buildInteractiveView(
           ann,
           layerById(content.layers, ann.layer_id),
           openBtn,
-          table
+          table,
+          content.annotations
         );
       }
     }

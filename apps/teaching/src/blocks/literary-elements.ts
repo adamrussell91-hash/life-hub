@@ -22,6 +22,18 @@ export type LiteraryTechnique = {
   effect: string;
   example: string;
   related: string[];
+  /** Word origin from the widget's ORIGIN map / inferLang(). */
+  lang?: string;
+  etymology?: string;
+  lineage?: Array<{ word: string; lang: string; meaning: string }>;
+};
+
+export type LiteraryConnectionAxis = 'gradient' | 'subtype' | 'mirror' | 'cross' | 'effect';
+
+export type LiteraryConnection = {
+  from: string;
+  to: string;
+  axis: LiteraryConnectionAxis;
 };
 
 export type LiteraryElementsTable = {
@@ -30,6 +42,8 @@ export type LiteraryElementsTable = {
   synced_at?: string;
   families: LiteraryFamily[];
   subgroups: LiterarySubgroup[];
+  axes?: Array<{ key: LiteraryConnectionAxis; label: string }>;
+  connections?: LiteraryConnection[];
   techniques: LiteraryTechnique[];
 };
 
@@ -122,4 +136,52 @@ export function groupTechniquesByFamily(
       .filter((row) => row.techniques.length > 0);
     return { family, subgroups };
   }).filter((row) => row.subgroups.length > 0);
+}
+
+export type TechniqueLink = {
+  technique: LiteraryTechnique;
+  /** Mapped axis label, or null for a plain "related" entry. */
+  axisLabel: string | null;
+  axis: LiteraryConnectionAxis | null;
+};
+
+/**
+ * Everything a technique card can jump to: the widget's mapped connections
+ * first (with their axis), then the remaining "related" entries.
+ */
+export function linksOfTechnique(
+  table: LiteraryElementsTable,
+  technique: LiteraryTechnique
+): TechniqueLink[] {
+  const seen = new Set<string>([technique.id]);
+  const links: TechniqueLink[] = [];
+  const axisLabel = (axis: LiteraryConnectionAxis) =>
+    table.axes?.find((row) => row.key === axis)?.label ?? null;
+  for (const conn of table.connections ?? []) {
+    const otherId =
+      conn.from === technique.id ? conn.to : conn.to === technique.id ? conn.from : null;
+    if (!otherId || seen.has(otherId)) continue;
+    const other = lookupTechnique(table, otherId);
+    if (!other) continue;
+    seen.add(otherId);
+    links.push({ technique: other, axis: conn.axis, axisLabel: axisLabel(conn.axis) });
+  }
+  for (const id of technique.related) {
+    if (seen.has(id)) continue;
+    const other = lookupTechnique(table, id);
+    if (!other) continue;
+    seen.add(id);
+    links.push({ technique: other, axis: null, axisLabel: null });
+  }
+  return links;
+}
+
+/** Same-subgroup neighbours, used as quiz distractors. */
+export function siblingsOfTechnique(
+  table: LiteraryElementsTable,
+  technique: LiteraryTechnique
+): LiteraryTechnique[] {
+  return table.techniques.filter(
+    (tech) => tech.subgroup === technique.subgroup && tech.id !== technique.id
+  );
 }
