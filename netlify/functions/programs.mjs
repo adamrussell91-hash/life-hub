@@ -1,5 +1,5 @@
 import { createTasksCollectionHandler } from './_shared/tasks-collection.mjs';
-import { pickProgramDates, withCatalogueDates } from './_shared/catalogue-dates.mjs';
+import { pickPrecision, pickProgramDates, withCatalogueDates } from './_shared/catalogue-dates.mjs';
 
 export const config = { path: '/api/programs' };
 
@@ -42,6 +42,11 @@ export function createProgramsHandler(deps = {}) {
           registration_window: typeof body.registration_window === 'string' ? body.registration_window : '',
           starts_on: dated ? picked.starts_on : null,
           ends_on: dated ? picked.ends_on : null,
+          dates_precision: pickPrecision(body.dates_precision, Boolean(dated)),
+          due_on: picked.due_on,
+          due_precision: pickPrecision(body.due_precision, Boolean(picked.due_on)),
+          entries_close_on: picked.entries_close_on,
+          entries_close_precision: pickPrecision(body.entries_close_precision, Boolean(picked.entries_close_on)),
           dates_source_url: picked.dates_source_url,
           dates_checked_on: picked.dates_checked_on,
           not_available_nsw: body.not_available_nsw === true,
