@@ -310,8 +310,10 @@ describe('annotation view', () => {
     expect([...card.querySelectorAll('h4')].map((h) => h.textContent)).toEqual([
       'Definition',
       'Effect',
-      'Example'
+      'Example',
+      'Connections'
     ]);
+    expect(card.querySelector('.block-annotation__element-practice')).not.toBeNull();
     expect(card.querySelector('.block-annotation__element-chip--family')?.textContent).toBe('Descriptive');
     expect(card.querySelector('.block-annotation__element-chip:not(.block-annotation__element-chip--family)')?.textContent).toBe('Imagery');
   });

@@ -101,7 +101,19 @@ function extractTaxonomy(html) {
   // Include T() helper defined just above taxonomyRoot.
   const tFn = html.indexOf('function T(');
   const sliceStart = tFn >= 0 && tFn < start ? tFn : start;
-  const code = `${html.slice(sliceStart, end)}\n;({ FAMILY_ORDER, FAMILY_COLORS, taxonomyRoot });`;
+  // Word-origin map and inferLang() sit between LANG_COLORS and the column build.
+  const langStart = html.indexOf('const LANG_COLORS');
+  const langEnd = html.indexOf('// build columns', langStart);
+  const langCode =
+    langStart >= 0 && langEnd > langStart ? html.slice(langStart, langEnd) : 'function inferLang(){return "";}';
+  const code = `${html.slice(sliceStart, end)}\n${langCode}\n;({
+    FAMILY_ORDER, FAMILY_COLORS, taxonomyRoot,
+    RELATIONS: typeof RELATIONS === 'undefined' ? [] : RELATIONS,
+    AXIS_LABELS: typeof AXIS_LABELS === 'undefined' ? {} : AXIS_LABELS,
+    ETYMOLOGIES: typeof ETYMOLOGIES === 'undefined' ? {} : ETYMOLOGIES,
+    LINEAGE: typeof LINEAGE === 'undefined' ? {} : LINEAGE,
+    inferLang
+  });`;
   const sandbox = { console };
   const result = vm.runInNewContext(code, sandbox, { timeout: 5000 });
   if (!result?.taxonomyRoot || !result?.FAMILY_COLORS) {
@@ -159,6 +171,9 @@ function buildSnapshot(data, previous, sourceLabel, sourceSha) {
         }
 
         nameToId.set(tech.name.toLowerCase(), id);
+        const etymology = data.ETYMOLOGIES?.[tech.name];
+        const lineage = data.LINEAGE?.[tech.name];
+        const lang = data.inferLang?.(tech.name);
         techniques.push({
           id,
           symbol,
@@ -167,6 +182,11 @@ function buildSnapshot(data, previous, sourceLabel, sourceSha) {
           definition: tech.info?.definition ?? '',
           effect: tech.info?.effect ?? '',
           example: tech.info?.example ?? '',
+          ...(lang ? { lang } : {}),
+          ...(etymology ? { etymology } : {}),
+          ...(Array.isArray(lineage) && lineage.length
+            ? { lineage: lineage.map(([word, lang, meaning]) => ({ word, lang, meaning })) }
+            : {}),
           relatedNames: tech.info?.related ?? []
         });
       }
@@ -186,6 +206,15 @@ function buildSnapshot(data, previous, sourceLabel, sourceSha) {
     const { relatedNames: _drop, ...rest } = tech;
     return { ...rest, related };
   });
+
+  // Mapped connections from the widget's relationship graph, by technique id.
+  const connections = [];
+  for (const rel of data.RELATIONS ?? []) {
+    const from = nameToId.get(String(rel.from).toLowerCase());
+    const to = nameToId.get(String(rel.to).toLowerCase());
+    if (from && to && data.AXIS_LABELS?.[rel.axis]) connections.push({ from, to, axis: rel.axis });
+  }
+  const axes = Object.entries(data.AXIS_LABELS ?? {}).map(([key, label]) => ({ key, label }));
 
   const familyCount = families.length;
   const subgroupCount = subgroups.length;
@@ -212,7 +241,7 @@ function buildSnapshot(data, previous, sourceLabel, sourceSha) {
   }
 
   const contentHash = createHash('sha1')
-    .update(JSON.stringify({ families, subgroups, techniques: resolved }))
+    .update(JSON.stringify({ families, subgroups, techniques: resolved, connections }))
     .digest('hex')
     .slice(0, 12);
 
@@ -222,6 +251,8 @@ function buildSnapshot(data, previous, sourceLabel, sourceSha) {
     synced_at: new Date().toISOString(),
     families,
     subgroups,
+    axes,
+    connections,
     techniques: resolved
   };
 

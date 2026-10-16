@@ -4,6 +4,7 @@
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { getApiBaseUrl } from '@/api/config';
 import { pollAiJob } from '@/ai/jobs-client';
+import { createLiveCaptions } from '@/blocks/voice-live-captions';
 import { parseWhisperTimings } from '@/blocks/voice-transcript';
 import type { AnnotationAnchor, AnnotationVoiceTrack } from '@/schemas/block';
 import type { VoiceTap } from '@/blocks/voice-match';
@@ -21,6 +22,8 @@ export type VoiceRecorderHandle = {
 export type MountVoiceRecorderOptions = {
   layerId: string;
   lessonId?: string;
+  /** How long to wait for the Whisper job before using live captions (ms). */
+  transcribeWaitMs?: number;
   /** Prefill kind; title is asked before first Record. */
   defaultKind?: VoiceRecorderKind;
   onTrackReady: (track: AnnotationVoiceTrack) => void;
@@ -103,7 +106,11 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
   const status = document.createElement('p');
   status.className = 'block-editor__hint block-editor__annotation-voice-status';
   status.setAttribute('aria-live', 'polite');
-  status.textContent = 'Pick a kind, then Record. Tap the poem while recording to pin.';
+  const kindHint = (value: VoiceRecorderKind) =>
+    value === 'think_aloud'
+      ? 'Think aloud: talk about the poem, and tap a line each time you move on to it. Each tap starts a clip pinned to that line.'
+      : 'Reading: read the poem aloud. Lines are matched to your voice; tap a line to pin it exactly.';
+  status.textContent = `Pick a kind, then Record. ${kindHint(options.defaultKind ?? 'reading')}`;
 
   const kindRow = document.createElement('div');
   kindRow.className = 'block-editor__annotation-voice-kinds';
@@ -128,6 +135,7 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
       for (const [value, other] of kindButtons) {
         other.setAttribute('aria-pressed', value === kind ? 'true' : 'false');
       }
+      status.textContent = kindHint(kind);
     });
     kindButtons.set(def.value, btn);
     kindRow.append(btn);
@@ -169,7 +177,38 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
   stopBtn.disabled = true;
 
   actions.append(recordBtn, pauseBtn, stopBtn);
-  el.append(header, status, kindRow, meter, elapsedEl, actions);
+
+  const live = document.createElement('div');
+  live.className = 'block-editor__annotation-voice-live';
+  live.hidden = true;
+  const liveLabel = document.createElement('p');
+  liveLabel.className = 'block-editor__annotation-voice-live-label';
+  liveLabel.textContent = 'Live captions';
+  const liveText = document.createElement('p');
+  liveText.className = 'block-editor__annotation-voice-live-text';
+  liveText.setAttribute('aria-live', 'off');
+  const liveFinal = document.createElement('span');
+  const liveInterim = document.createElement('span');
+  liveInterim.className = 'block-editor__annotation-voice-live-interim';
+  liveText.append(liveFinal, liveInterim);
+  live.append(liveLabel, liveText);
+
+  const pinsWrap = document.createElement('div');
+  pinsWrap.className = 'block-editor__annotation-voice-pins';
+  pinsWrap.hidden = true;
+  const pinsLabel = document.createElement('p');
+  pinsLabel.className = 'block-editor__annotation-voice-live-label';
+  const pinsList = document.createElement('ol');
+  pinsList.className = 'block-editor__annotation-voice-pin-list';
+  pinsWrap.append(pinsLabel, pinsList);
+
+  const useLiveBtn = document.createElement('button');
+  useLiveBtn.type = 'button';
+  useLiveBtn.className = 'btn btn--secondary block-editor__annotation-voice-use-live';
+  useLiveBtn.textContent = 'Use live captions now';
+  useLiveBtn.hidden = true;
+
+  el.append(header, status, kindRow, meter, elapsedEl, actions, live, pinsWrap, useLiveBtn);
 
   let disposed = false;
   let title = '';
@@ -186,6 +225,51 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
   let accumulatedMs = 0;
   let pauseStartedAt = 0;
   let elapsedTimer = 0;
+  let skipWait = false;
+
+  const captions = createLiveCaptions({
+    elapsedS: () => elapsedMs() / 1000,
+    onText: (finalText, interim) => {
+      live.hidden = false;
+      // Keep the tail in view: the last ~400 characters.
+      const tail = finalText.length > 400 ? `…${finalText.slice(-400)}` : finalText;
+      liveFinal.textContent = tail ? `${tail} ` : '';
+      liveInterim.textContent = interim;
+    },
+    onUnavailable: (reason) => {
+      live.hidden = false;
+      liveFinal.textContent = '';
+      liveInterim.textContent = reason;
+    }
+  });
+
+  function paintPins(): void {
+    pinsList.replaceChildren();
+    pinsWrap.hidden = taps.length === 0;
+    pinsLabel.textContent = `Pins (${taps.length})`;
+    taps.forEach((tap, index) => {
+      const li = document.createElement('li');
+      li.className = 'block-editor__annotation-voice-pin';
+      const time = document.createElement('span');
+      time.className = 'block-editor__annotation-voice-pin-time';
+      time.textContent = formatElapsed(tap.t * 1000);
+      const quote = document.createElement('span');
+      quote.className = 'block-editor__annotation-voice-pin-quote';
+      const exact = tap.anchor.quote?.exact?.trim() ?? '';
+      quote.textContent = exact.length > 60 ? `${exact.slice(0, 57)}…` : exact || `Line ${tap.anchor.line ?? ''}`;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost block-editor__annotation-voice-pin-remove';
+      remove.textContent = 'Remove';
+      remove.setAttribute('aria-label', `Remove pin at ${time.textContent}`);
+      remove.addEventListener('click', () => {
+        taps.splice(index, 1);
+        paintPins();
+      });
+      li.append(time, quote, remove);
+      pinsList.append(li);
+    });
+  }
 
   function elapsedMs(): number {
     if (!recording && !paused) return accumulatedMs;
@@ -251,7 +335,8 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
     if (!recording && !paused) return;
     const t = elapsedMs() / 1000;
     taps.push({ t, anchor: { ...anchor, quote: { ...anchor.quote } } });
-    status.textContent = `Pinned at ${formatElapsed(elapsedMs())} (${taps.length} tap${taps.length === 1 ? '' : 's'}).`;
+    status.textContent = `Pinned at ${formatElapsed(elapsedMs())}.`;
+    paintPins();
   }
 
   async function ensureTitle(): Promise<string | null> {
@@ -296,6 +381,7 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
 
     chunks = [];
     taps = [];
+    paintPins();
     accumulatedMs = 0;
     try {
       audioContext = new AudioContext();
@@ -327,7 +413,15 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
     pauseBtn.disabled = false;
     stopBtn.disabled = false;
     recordBtn.disabled = true;
-    status.textContent = 'Recording. Tap the poem to pin while you speak.';
+    captions.start();
+    status.textContent =
+      kind === 'think_aloud'
+        ? 'Recording. Tap a line each time you start talking about it.'
+        : 'Recording. Read aloud; tap a line to pin it.';
+    if (!captions.supported) {
+      live.hidden = false;
+      liveInterim.textContent = 'Live captions are not available in this browser. The transcript arrives after you stop.';
+    }
   }
 
   function togglePause(): void {
@@ -338,6 +432,7 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
       pauseStartedAt = Date.now();
       recording = false;
       paused = true;
+      captions.stop();
       stopMeter();
       pauseBtn.textContent = 'Resume';
       status.textContent = 'Paused. Resume or Stop.';
@@ -349,9 +444,10 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
       startedAt = Date.now();
       recording = true;
       paused = false;
+      captions.start();
       if (analyser) tickMeter();
       pauseBtn.textContent = 'Pause';
-      status.textContent = 'Recording. Tap the poem to pin while you speak.';
+      status.textContent = 'Recording. Tap a line to pin it.';
     }
   }
 
@@ -362,6 +458,7 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
       recording = false;
     }
     paused = false;
+    captions.stop();
     if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
     setBusy(true);
     status.textContent = 'Finishing recording…';
@@ -385,7 +482,7 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
     const ext = mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'webm';
     const file = new File([blob], `${trackId}.${ext}`, { type: blob.type });
 
-    status.textContent = 'Transcribing, about a minute';
+    status.textContent = 'Uploading…';
     setBusy(true);
 
     try {
@@ -401,12 +498,23 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
       let words: AnnotationVoiceTrack['transcript']['words'] = [];
       let timing: AnnotationVoiceTrack['transcript']['timing'] = 'estimated';
 
-      const deadline = Date.now() + 90_000;
-      while (Date.now() < deadline && !disposed) {
-        const job = (await pollAiJob(jobId)) as typeof job & {
-          result?: { whisper?: unknown };
-          error?: string;
-        };
+      const liveWords = captions.words();
+      if (liveWords.length > 0) {
+        useLiveBtn.hidden = false;
+        useLiveBtn.disabled = false;
+      }
+      const waitStarted = Date.now();
+      const deadline = waitStarted + (options.transcribeWaitMs ?? 180_000);
+      let note = '';
+      while (Date.now() < deadline && !disposed && !skipWait) {
+        status.textContent = `Transcribing with Whisper… ${formatElapsed(Date.now() - waitStarted)}`;
+        let job: { status: string; result?: { whisper?: unknown }; error?: string };
+        try {
+          job = (await pollAiJob(jobId)) as typeof job;
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          continue;
+        }
         if (job.status === 'done') {
           const parsed = parseWhisperTimings(job.result?.whisper, { duration_s });
           words = parsed.words;
@@ -414,13 +522,21 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
           break;
         }
         if (job.status === 'error') {
-          status.textContent = job.error?.trim() || 'Transcription failed. You can still review the audio.';
+          note = job.error?.trim() || 'Whisper could not transcribe this recording.';
           break;
         }
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
+      useLiveBtn.hidden = true;
 
       if (disposed) return;
+      if (words.length === 0 && liveWords.length > 0) {
+        words = liveWords;
+        timing = 'estimated';
+        note = note ? `${note} Using the live captions instead.` : 'Using the live captions.';
+      } else if (words.length === 0 && !note) {
+        note = 'Whisper is still working on this one.';
+      }
 
       const track: AnnotationVoiceTrack = {
         id: trackId,
@@ -440,8 +556,8 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
       };
       status.textContent =
         words.length > 0
-          ? 'Transcript ready. Opening review…'
-          : 'Audio saved. Open review to pin clips.';
+          ? `${note ? `${note} ` : ''}Opening review…`
+          : `${note ? `${note} ` : ''}Audio saved; your pins become the clips. Opening review…`;
       options.onTrackReady(track);
     } catch (error) {
       status.textContent =
@@ -454,6 +570,10 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
     void beginRecord();
   });
   pauseBtn.addEventListener('click', () => togglePause());
+  useLiveBtn.addEventListener('click', () => {
+    skipWait = true;
+    useLiveBtn.disabled = true;
+  });
   stopBtn.addEventListener('click', () => requestStop());
   closeBtn.addEventListener('click', () => {
     if (recording || paused) {
@@ -476,6 +596,7 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
           // ignore
         }
       }
+      captions.dispose();
       cleanupStream();
       el.remove();
     }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { VoicePin } from '@/blocks/voice-match';
-import { assertClipCoverage, segmentClips } from '@/blocks/voice-segment';
+import { assertClipCoverage, clipsFromTaps, segmentClips } from '@/blocks/voice-segment';
 import type { VoiceWord } from '@/blocks/voice-transcript';
 
 function wordsFrom(tokens: string[], step = 0.5): VoiceWord[] {
@@ -98,5 +98,37 @@ describe('segmentClips', () => {
       const clips = segmentClips({ pins, words, duration });
       expect(assertClipCoverage(clips, duration)).toBe(true);
     }
+  });
+});
+
+describe('clipsFromTaps', () => {
+  const anchor = (line: number) => ({ stanza: 's1', line, quote: { exact: `line ${line}` } }) as never;
+
+  it('each tap starts a clip pinned to its line, covering the whole recording', () => {
+    const clips = clipsFromTaps({
+      taps: [
+        { t: 10, anchor: anchor(2) },
+        { t: 4, anchor: anchor(1) }
+      ],
+      duration: 20
+    });
+    expect(clips.map((c) => [c.source, c.start_s, c.end_s])).toEqual([
+      ['manual', 0, 3.85],
+      ['tap', 3.85, 9.85],
+      ['tap', 9.85, 20]
+    ]);
+    expect(clips[1]!.anchor).toEqual(anchor(1));
+    expect(clips.every((c) => c.approved)).toBe(true);
+    expect(assertClipCoverage(clips, 20)).toBe(true);
+  });
+
+  it('a tap in the first moments absorbs the opening', () => {
+    const clips = clipsFromTaps({ taps: [{ t: 0.5, anchor: anchor(1) }], duration: 8 });
+    expect(clips).toHaveLength(1);
+    expect(clips[0]).toMatchObject({ start_s: 0, end_s: 8, source: 'tap' });
+  });
+
+  it('no taps leaves one general clip', () => {
+    expect(clipsFromTaps({ taps: [], duration: 5 })).toHaveLength(1);
   });
 });

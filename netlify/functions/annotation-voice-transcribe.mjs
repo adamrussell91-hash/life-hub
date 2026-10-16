@@ -3,7 +3,8 @@
  * enqueue AI job kind `annotation_voice_transcribe`.
  *
  * Poll path: GET /api/ai/jobs/:id (ai-job.mjs) until status is `done` or `error`.
- * Scheduled/operator tick (`ai-jobs-tick`) processes queued jobs of this kind by
+ * Straight after enqueueing, this handler kicks the background function
+ * `/api/annotation/voice/transcribe/run` for the new job. The scheduled/operator tick (`ai-jobs-tick`) processes queued jobs of this kind by
  * calling the Knowledge Worker `POST /transcribe` and writing the raw JSON onto
  * the job record (`result.whisper`). Transcript text is never logged.
  */
@@ -41,6 +42,25 @@ async function setBytes(store, key, bytes, contentType) {
     throw new Error('Teaching content store cannot write files.');
   }
   return store.set(key, bytes, { metadata: { contentType } });
+}
+
+export function transcribeRunUrl(request) {
+  return new URL('/api/annotation/voice/transcribe/run', request.url);
+}
+
+/** Fire the background run with the caller's session; a 202 means it started. */
+export async function defaultInvokeTranscribeRun(request, jobId, fetchImpl = fetch) {
+  const response = await fetchImpl(transcribeRunUrl(request), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(request.headers.get('cookie') ? { cookie: request.headers.get('cookie') } : {}),
+      ...(request.headers.get('origin') ? { origin: request.headers.get('origin') } : {})
+    },
+    body: JSON.stringify({ id: jobId }),
+    signal: AbortSignal.timeout(5_000)
+  });
+  return response.status === 202 || response.ok;
 }
 
 export function createAnnotationVoiceTranscribeHandler(deps = {}) {
@@ -144,12 +164,20 @@ export function createAnnotationVoiceTranscribeHandler(deps = {}) {
     await setJSON(store, aiJobKey(jobId), job);
     await writeJobInbox(store, job);
 
+    let started = false;
+    try {
+      started = await (deps.invokeRun ?? defaultInvokeTranscribeRun)(request, jobId);
+    } catch {
+      // The daily tick still picks the job up; the recorder falls back to its live captions.
+    }
+
     return withCors(
       okResponse(202, {
         id: jobId,
         status: 'working',
         phase: 'queued',
         media: record,
+        run_started: started,
         poll: `/api/ai/jobs/${jobId}`
       }),
       request,
