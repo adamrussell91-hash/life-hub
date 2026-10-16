@@ -1,7 +1,7 @@
 // packages/problem-solver/render/problem-tree.ts
 // The Problem tree from the toolkit (p.51), read bottom to top: blue causes feed
 // the red problem, which feeds the yellow effects sitting on a large blue oval.
-// Relationship lines are drawn in an SVG layer behind the cards.
+// Relationship curves are drawn in an SVG layer behind the cards.
 // A shape exists only once its answer is accepted; only new shapes animate.
 import type { Accent } from './details';
 import type { PsEdge, PsNode, PsToolRun } from '../types';
@@ -55,15 +55,37 @@ function shapeButton(doc: Document, node: PsNode, kind: Kind, detailsId: string)
 
 type Box = { x: number; y: number; w: number; h: number };
 
-/** Where the line from a's centre to b's centre leaves a's rectangle. */
-function edgePoint(a: Box, b: Box): { x: number; y: number } {
-  const cx = a.x + a.w / 2;
-  const cy = a.y + a.h / 2;
-  const dx = b.x + b.w / 2 - cx;
-  const dy = b.y + b.h / 2 - cy;
-  if (!dx && !dy) return { x: cx, y: cy };
-  const t = Math.min(dx ? a.w / 2 / Math.abs(dx) : Infinity, dy ? a.h / 2 / Math.abs(dy) : Infinity);
-  return { x: cx + dx * t, y: cy + dy * t };
+const ARROW_LEN = 34;
+
+/** Smooth cubic from the facing edge of one card to the facing edge of the other. */
+function curve(a: Box, b: Box, ka: Kind, kb: Kind): string {
+  const f = (n: number) => Math.round(n * 10) / 10;
+  if (ka !== kb) {
+    // Cause (below the trunk) to effect (above it): bottom of the effect, top of the cause.
+    const [low, high] = ka === 'cause' ? [a, b] : [b, a];
+    const x1 = low.x + low.w / 2;
+    const y1 = low.y;
+    const x2 = high.x + high.w / 2;
+    const y2 = high.y + high.h;
+    const lift = Math.max(40, Math.abs(y1 - y2) * 0.45);
+    const d = `M${f(x1)} ${f(y1)}C${f(x1)} ${f(y1 - lift)} ${f(x2)} ${f(y2 + lift)} ${f(x2)} ${f(y2)}`;
+    return d;
+  }
+  const cy = (r: Box) => r.y + r.h / 2;
+  const apart = a.x + a.w <= b.x || b.x + b.w <= a.x;
+  if (apart && Math.abs(cy(a) - cy(b)) < Math.max(a.h, b.h)) {
+    // Same row: out of the facing sides.
+    const [left, right] = a.x < b.x ? [a, b] : [b, a];
+    const x1 = left.x + left.w;
+    const x2 = right.x;
+    const bow = ka === 'cause' ? 1 : -1; // causes bow downward, effects upward
+    const mid = (x1 + x2) / 2;
+    return `M${f(x1)} ${f(cy(left))}C${f(mid)} ${f(cy(left) + bow * 18)} ${f(mid)} ${f(cy(right) + bow * 18)} ${f(x2)} ${f(cy(right))}`;
+  }
+  // Different rows: arc out of the left edge of both.
+  const x = Math.min(a.x, b.x);
+  const reach = 34;
+  return `M${f(a.x)} ${f(cy(a))}C${f(x - reach)} ${f(cy(a))} ${f(x - reach)} ${f(cy(b))} ${f(b.x)} ${f(cy(b))}`;
 }
 
 function arrowPath(x: number, tipY: number, tailY: number): string {
@@ -105,7 +127,7 @@ export function createProblemTreeView(doc: Document = document): ProblemTreeView
   const group = createDisclosureGroup();
   const items = new Map<string, HTMLElement>();
   const arrows = new Map<string, SVGPathElement>();
-  const links = new Map<string, SVGGElement>();
+  const links = new Map<string, SVGPathElement>();
   const kinds = new Map<string, Kind>();
   let edges: PsEdge[] = [];
   let oval: HTMLElement | null = null;
@@ -120,24 +142,26 @@ export function createProblemTreeView(doc: Document = document): ProblemTreeView
     const trunkId = [...kinds].find(([, kind]) => kind === 'trunk')?.[0];
     const trunk = trunkId ? rect(trunkId) : null;
 
-    // Arrows run from the trunk to the row of cards nearest it.
     const causeIds = [...kinds].filter(([, k]) => k === 'cause').map(([id]) => id);
     const effectIds = [...kinds].filter(([, k]) => k === 'effect').map(([id]) => id);
-    const nearest = (ids: string[], below: boolean) => {
-      const rects = ids.map((id) => [id, rect(id)] as const).filter(([, r]) => r);
-      if (!rects.length) return [];
-      const edge = below ? Math.min(...rects.map(([, r]) => r!.y)) : Math.max(...rects.map(([, r]) => r!.y));
-      return rects.filter(([, r]) => Math.abs(r!.y - edge) < 4);
-    };
+
+    // One arrow from the causes up into the trunk, one from the trunk up into the effects, both centred on the trunk.
     const wanted = new Set<string>();
+    const cx = trunk ? trunk.x + trunk.w / 2 : 0;
     if (trunk) {
-      for (const [id, r] of nearest(causeIds, true)) {
-        wanted.add(id);
-        placeArrow(id, r!.x + r!.w / 2, trunk.y + trunk.h + 3, r!.y - 3);
+      const top = (ids: string[]) => Math.min(...ids.map((id) => rect(id)?.y ?? Infinity));
+      const bottom = (ids: string[]) => Math.max(...ids.map((id) => { const r = rect(id); return r ? r.y + r.h : -Infinity; }));
+      if (causeIds.length) {
+        wanted.add('causes');
+        const from = trunk.y + trunk.h;
+        const gap = top(causeIds) - from;
+        placeArrow('causes', cx, from + gap / 2 + ARROW_LEN / 2, from + gap / 2 - ARROW_LEN / 2);
       }
-      for (const [id, r] of nearest(effectIds, false)) {
-        wanted.add(id);
-        placeArrow(id, r!.x + r!.w / 2, r!.y + r!.h + 3, trunk.y - 3);
+      if (effectIds.length) {
+        wanted.add('effects');
+        const from = bottom(effectIds);
+        const gap = trunk.y - from;
+        placeArrow('effects', cx, from + gap / 2 + ARROW_LEN / 2, from + gap / 2 - ARROW_LEN / 2);
       }
     }
     for (const [id, path] of arrows) {
@@ -147,23 +171,20 @@ export function createProblemTreeView(doc: Document = document): ProblemTreeView
       }
     }
 
-    for (const [key, link] of links) {
+    for (const [key, path] of links) {
       const [from, to] = key.split('\u0000');
       const a = rect(from);
       const b = rect(to);
       if (!a || !b) continue;
-      const start = edgePoint(a, b);
-      const end = edgePoint(b, a);
-      const line = link.querySelector('line')!;
-      line.setAttribute('x1', String(start.x));
-      line.setAttribute('y1', String(start.y));
-      line.setAttribute('x2', String(end.x));
-      line.setAttribute('y2', String(end.y));
-      const dots = link.querySelectorAll('circle');
-      dots[0]?.setAttribute('cx', String(start.x));
-      dots[0]?.setAttribute('cy', String(start.y));
-      dots[1]?.setAttribute('cx', String(end.x));
-      dots[1]?.setAttribute('cy', String(end.y));
+      path.setAttribute('d', curve(a, b, kinds.get(from)!, kinds.get(to)!));
+    }
+  }
+
+  /** Emphasise the lines of any open card. */
+  function refreshActive(): void {
+    for (const [key, path] of links) {
+      const open = key.split('\u0000').some((id) => items.get(id)?.querySelector('.ps-tree__shape')?.getAttribute('aria-expanded') === 'true');
+      path.classList.toggle('is-active', open);
     }
   }
 
@@ -211,6 +232,7 @@ export function createProblemTreeView(doc: Document = document): ProblemTreeView
     card.setAttribute('data-for', node.id);
     region.panel.append(card);
     group.register(card, button);
+    button.addEventListener('click', refreshActive);
     if (kind === 'effect') ensureOval();
     items.set(node.id, item);
     kinds.set(node.id, kind);
@@ -239,23 +261,13 @@ export function createProblemTreeView(doc: Document = document): ProblemTreeView
       const key = `${edge.from}\u0000${edge.to}`;
       keep.add(key);
       if (links.has(key)) continue;
-      const link = svgEl(doc, 'g');
-      link.setAttribute('class', 'ps-tree__link');
-      const line = svgEl(doc, 'line');
+      const line = svgEl(doc, 'path');
       line.setAttribute('class', 'ps-tree__edge');
       line.setAttribute('pathLength', '1');
       line.setAttribute('data-edge', `${edge.from}:${edge.to}`);
-      link.append(line);
-      for (let i = 0; i < 2; i += 1) {
-        const dot = svgEl(doc, 'circle');
-        dot.setAttribute('class', 'ps-tree__dot');
-        dot.setAttribute('r', '3.5');
-        link.append(dot);
-      }
-      overlay.prepend(link);
-      links.set(key, link);
+      overlay.prepend(line);
+      links.set(key, line);
       if (canAnimate(line)) line.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 520, delay: 240, easing: EASE, fill: 'backwards' });
-      if (canAnimate(link)) for (const dot of link.querySelectorAll('circle')) dot.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 600, easing: EASE, fill: 'backwards' });
     }
     for (const [key, link] of links) {
       if (!keep.has(key)) {
@@ -264,6 +276,7 @@ export function createProblemTreeView(doc: Document = document): ProblemTreeView
       }
     }
     layout();
+    refreshActive();
   }
 
   if (typeof ResizeObserver === 'function') new ResizeObserver(() => layout()).observe(root);
