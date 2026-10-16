@@ -251,7 +251,7 @@ describe('year layout', () => {
     expect(long.height).toBe(Math.max(24, dateToY(long.ends_on!, year) - dateToY(long.starts_on!, year)));
   });
 
-  it('runs concurrent programs on parallel rails beside the year line, steps the neighbour aside, then rejoins', () => {
+  it('splits concurrent programs across their year line, steps both neighbours aside, then rejoins', () => {
     const base = mindWorks2026Map();
     const layout = layoutMap({
       ...base,
@@ -265,8 +265,9 @@ describe('year layout', () => {
     const b = layout.stations.find((item) => item.id === 'st_psyops')!.bodies[0]!;
     const line = layout.lines.find((item) => item.id === 'line_reasoning')!;
     const rozelle = line.tracks.find((track) => track.id === 'rozelle')!;
-    expect(Math.abs(a.x - b.x)).toBeCloseTo(TM_LANE_GAP, 5);
-    expect(Math.min(a.x, b.x) - rozelle.x).toBeCloseTo(TM_RAIL_OUT, 5);
+    // One program each side of Rozelle, the first on the inner (left) side.
+    expect(a.x - rozelle.x).toBeCloseTo(-TM_RAIL_OUT, 5);
+    expect(b.x - rozelle.x).toBeCloseTo(TM_RAIL_OUT, 5);
     const draw = layout.draw.tracks.filter((track) => track.lineId === 'line_reasoning');
     const rz = draw.find((track) => track.trackId === 'rozelle')!;
     expect(rz.lanes).toHaveLength(2);
@@ -281,7 +282,7 @@ describe('year layout', () => {
       }
       return NaN;
     };
-    for (const id of ['senior']) {
+    for (const id of ['junior', 'senior']) {
       const track = draw.find((item) => item.trackId === id)!;
       const pts = track.pieces[0]!;
       const away = Math.abs(xAtY(pts, mid) - rz.top.x);
@@ -803,7 +804,7 @@ describe('screenshot regressions (Expression gallery, Reasoning olympiad)', () =
     expect(renderTransitSvg(layout).match(/class="tm-platform"/g)).toHaveLength(1);
   });
 
-  it('runs each concurrent program off the year line on its own rail, not off its neighbour’s', () => {
+  it('puts the first of two concurrent senior programs between Rozelle and Senior, the next outside', () => {
     const base = mindWorks2026Map();
     const map = {
       ...base,
@@ -811,21 +812,30 @@ describe('screenshot regressions (Expression gallery, Reasoning olympiad)', () =
         program('st_pop', 'line_reasoning', 'The Philosophy of Power', '2026-03-02', '2026-04-24', 'senior'),
         program('st_psy', 'line_reasoning', 'PSYOPS', '2026-03-02', '2026-04-24', 'senior')
       ],
-      ticks: []
+      ticks: [comp('tk_bb', 'Brain Bee Challenge', { kind: 'station', station_id: 'st_psy', side: 'right', offset: 0.5 }, '2026-05-05')]
     };
     const layout = layoutMap(map);
-    const senior = layout.draw.tracks.find((track) => track.lineId === 'line_reasoning' && track.trackId === 'senior')!;
+    const tracks = layout.draw.tracks.filter((track) => track.lineId === 'line_reasoning');
+    const senior = tracks.find((track) => track.trackId === 'senior')!;
+    const rozelle = tracks.find((track) => track.trackId === 'rozelle')!;
     const lineX = senior.top.x;
-    const pill = layout.stations.find((station) => station.id === 'st_pop')!.bodies[0]!;
-    expect(pill.x - lineX).toBeCloseTo(TM_RAIL_OUT, 5);
-    const [inner, outer] = [...senior.lanes].sort((a, b) => a[1]!.x - b[1]!.x);
-    // Both rails leave the year line itself, the inner one later (closer to its pill) and rejoin earlier.
-    expect(inner![0]!.x).toBeCloseTo(lineX, 5);
-    expect(outer![0]!.x).toBeCloseTo(lineX, 5);
-    expect(inner![0]!.y).toBeGreaterThan(outer![0]!.y + 10);
-    expect(inner![inner!.length - 1]!.y).toBeLessThan(outer![outer!.length - 1]!.y - 10);
-    // The inner rail reaches its pill without a long stub hanging off the outer rail's bend.
-    expect(pill.y - inner![1]!.y).toBeLessThan(10);
+    const pop = layout.stations.find((station) => station.id === 'st_pop')!.bodies[0]!;
+    const psy = layout.stations.find((station) => station.id === 'st_psy')!.bodies[0]!;
+    expect(pop.x - lineX).toBeCloseTo(-TM_RAIL_OUT, 5);
+    expect(psy.x - lineX).toBeCloseTo(TM_RAIL_OUT, 5);
+    // Rozelle steps aside so the pill sits clear between the two year lines.
+    const mid = pop.y + pop.h / 2;
+    const rozelleX = Math.min(...rozelle.pieces.flat().filter((point) => Math.abs(point.y - mid) < pop.h).map((point) => point.x));
+    expect(pop.x - pop.w / 2 - rozelleX).toBeGreaterThan(10);
+    // Each rail leaves and rejoins the senior line itself.
+    expect(senior.lanes).toHaveLength(2);
+    for (const rail of senior.lanes) {
+      expect(rail[0]!.x).toBeCloseTo(lineX, 5);
+      expect(rail[rail.length - 1]!.x).toBeCloseTo(lineX, 5);
+    }
+    // PSYOPS's competition still leaves from its outer side.
+    const bb = layout.draw.stops.find((stop) => stop.tickId === 'tk_bb')!;
+    expect(bb.dots[0]!.x).toBeGreaterThan(psy.x);
   });
 
   it('keeps a same-week stop visible beside a cross-strand interchange, names apart', () => {

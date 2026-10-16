@@ -391,8 +391,9 @@ type LocalBranch = {
 };
 
 /**
- * Programs overlapping in time on one year line. Each runs on its own rail on the `dir` side of
- * the line; `half` is how far the farthest rail centre sits from the line.
+ * Programs overlapping in time on one side of one year line (concurrent programs split across
+ * both sides, one cluster per side). Each runs on its own rail on the `dir` side of the line;
+ * `half` is how far the farthest rail centre sits from the line.
  */
 type Cluster = {
   track: number;
@@ -565,30 +566,41 @@ function buildClusters(stations: LocalStation[], trackCount: number): Cluster[] 
     const dir = railDir(track, trackCount);
     for (const group of groups) {
       const lanes = [...new Set(group.items.map((item) => item.lane))].sort((a, b) => a - b);
-      const offsets = new Map<string, number>();
-      const rails = new Map<number, { ys: number; ye: number }>();
-      for (const item of group.items) {
-        const off = dir * (TM_RAIL_OUT + lanes.indexOf(item.lane) * TM_LANE_GAP);
-        offsets.set(item.id, off);
-        const ramp = RAIL_PAD + railRamp(off);
-        const rail = rails.get(off);
-        rails.set(off, {
-          ys: Math.min(rail?.ys ?? Infinity, item.y0 - ramp),
-          ye: Math.max(rail?.ye ?? -Infinity, item.y1 + ramp)
+      // Two or more programs at once split across the year line: the first takes the inner side
+      // (toward the neighbouring year line), the next the usual side, and so on outward. Each
+      // still reads as joined to its own year line.
+      const sideOfLane = (lane: number): 1 | -1 => (lanes.length > 1 && lanes.indexOf(lane) % 2 === 0 ? (-dir as 1 | -1) : dir);
+      for (const side of [-dir, dir] as Array<1 | -1>) {
+        const items = group.items.filter((item) => sideOfLane(item.lane) === side);
+        if (!items.length) continue;
+        const own = lanes.filter((lane) => sideOfLane(lane) === side);
+        const offsets = new Map<string, number>();
+        const rails = new Map<number, { ys: number; ye: number }>();
+        for (const item of items) {
+          const off = side * (TM_RAIL_OUT + own.indexOf(item.lane) * TM_LANE_GAP);
+          offsets.set(item.id, off);
+          const ramp = RAIL_PAD + railRamp(off);
+          const rail = rails.get(off);
+          rails.set(off, {
+            ys: Math.min(rail?.ys ?? Infinity, item.y0 - ramp),
+            ye: Math.max(rail?.ye ?? -Infinity, item.y1 + ramp)
+          });
+        }
+        const half = TM_RAIL_OUT + (own.length - 1) * TM_LANE_GAP;
+        const y0 = Math.min(...items.map((item) => item.y0));
+        const y1 = Math.max(...items.map((item) => item.y1));
+        clusters.push({
+          track,
+          y0,
+          y1,
+          offsets,
+          half,
+          dir: side,
+          rails,
+          ys: y0 - RAIL_PAD - railRamp(half),
+          ye: y1 + RAIL_PAD + railRamp(half)
         });
       }
-      const half = TM_RAIL_OUT + (lanes.length - 1) * TM_LANE_GAP;
-      clusters.push({
-        track,
-        y0: group.y0,
-        y1: group.y1,
-        offsets,
-        half,
-        dir,
-        rails,
-        ys: group.y0 - RAIL_PAD - railRamp(half),
-        ye: group.y1 + RAIL_PAD + railRamp(half)
-      });
     }
   }
   return clusters;
