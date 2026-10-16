@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   acceptSuggestion, activeRun, applyCoachTurn, createSession, dismissSuggestion,
-  finishDefine, keepAnyway, say, summaryRow
+  archive, finishDefine, keepAnyway, say, summaryRow
 } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 let counter = 0;
@@ -91,4 +91,32 @@ test('say appends a user turn and queues; summary rows are small', () => {
   assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'id', 'links', 'model', 'phase', 'status', 'title', 'tool', 'updatedAt']);
   assert.equal(row.tool, 'five_whys');
   assert.equal(summaryRow(row), row, 'index rows pass through');
+});
+
+test('limits: text over 12000 chars, title cap, links cap', () => {
+  const big = 'x'.repeat(12001);
+  assert.throws(() => createSession({ text: big }, deps), (err) => err.status === 413 && err.code === 'limit' && err.message === 'That is too long; keep it under 12,000 characters.');
+  const s = createSession({ text: 'ok', links: Array.from({ length: 30 }, (_, i) => ({ kind: 'task', id: `t${i}` })) }, deps);
+  assert.equal(s.links.length, 20);
+  assert.throws(() => say(s, big, deps), (err) => err.status === 413 && err.code === 'limit');
+  assert.equal(createSession({ title: 't'.repeat(300), text: 'ok' }, deps).title.length, 120);
+});
+
+test('archive resets the runner', () => {
+  const s = createSession({ text: 'ok' }, deps);
+  assert.deepEqual(archive(s, deps).runner, { status: 'idle', mode: 'turn', error: null });
+});
+
+test('closing mode forces suggestion null', () => {
+  const s = { ...createSession({ text: 'ok' }, deps), runner: { status: 'running', mode: 'closing', error: null } };
+  const next = applyCoachTurn(s, coach({ suggestion: { kind: 'finish_define', reason: 'r' } }), deps);
+  assert.equal(next.suggestion, null);
+});
+
+test('keepAnyway with a slot that no longer fits is a 409, not illegal_slot', () => {
+  let s = definedFrame();
+  s = applyCoachTurn(s, coach({ verdict: 'challenge', message: 'No.', node: { slot: 'problem', text: 'x' } }), deps);
+  s = applyCoachTurn(s, coach({ node: { slot: 'problem', text: 'y' } }), deps);
+  s = { ...s, pendingKeep: { slot: 'problem', text: 'x', objection: 'o', skills: [], runId: activeRun(s).id } };
+  assert.throws(() => keepAnyway(s, deps), (err) => err.status === 409 && err.code === 'action_not_allowed' && err.message === 'That answer no longer fits here.');
 });

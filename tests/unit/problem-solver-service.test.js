@@ -54,3 +54,40 @@ test('list returns summary rows newest first', async () => {
 test('unknown session is 404', async () => {
   await assert.rejects(service().get('op', '00000000-0000-4000-8000-000000000999'), (err) => err.status === 404);
 });
+
+test('stale running session is treated as failed and can be retried', async () => {
+  let t = Date.parse('2026-10-16T10:00:00.000Z');
+  let n = 0;
+  const store = createMemoryProblemStore();
+  const svc2 = createProblemSolverService({ store, coach: scriptedCoach, now: () => new Date(t).toISOString(), newId: () => `00000000-0000-4000-8000-${String((n += 1)).padStart(12, '0')}` });
+  const s = await svc2.create('op', { text: 'Late rota.' });
+  const { value, etag } = await store.read('op', s.id);
+  await store.write('op', s.id, { ...value, runner: { ...value.runner, status: 'running', leaseUntil: t + 120_000 } }, etag);
+  await assert.rejects(svc2.action('op', { id: s.id, revision: s.revision, action: 'say', text: 'hi' }), (err) => err.code === 'busy');
+  t += 121_000;
+  const got = await svc2.get('op', s.id);
+  assert.equal(got.runner.status, 'failed');
+  assert.equal(got.runner.error, 'The coach timed out, try again.');
+  const retried = await svc2.action('op', { id: s.id, revision: s.revision, action: 'retry' });
+  assert.equal(retried.runner.status, 'queued');
+});
+
+test('run stores a lease while running', async () => {
+  const t = Date.parse('2026-10-16T10:00:00.000Z');
+  let seen;
+  const store = createMemoryProblemStore();
+  const svc = createProblemSolverService({ store, coach: async (v) => { seen = v.runner; return scriptedCoach(v); }, now: () => new Date(t).toISOString(), newId: () => `00000000-0000-4000-8000-${String(Math.floor(Math.random() * 1e11)).padStart(12, '0')}` });
+  const s = await svc.create('op', { text: 'Late rota.' });
+  await svc.run('op', s.id);
+  assert.equal(seen.status, 'running');
+  assert.equal(seen.leaseUntil, t + 120_000);
+});
+
+test('create is idempotent on a UUID requestId', async () => {
+  const svc = service();
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  const a = await svc.create('op', { text: 'Late rota.', requestId });
+  const b = await svc.create('op', { text: 'Late rota.', requestId });
+  assert.equal(a.id, requestId);
+  assert.equal(b.id, requestId);
+});

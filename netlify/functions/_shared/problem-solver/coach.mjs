@@ -1,6 +1,6 @@
 // netlify/functions/_shared/problem-solver/coach.mjs
 import { completeMessage } from '../anthropic-client.mjs';
-import { canPlace } from '../../../../packages/problem-solver/machine.mjs';
+import { canEdge, canPlace, placeNode } from '../../../../packages/problem-solver/machine.mjs';
 import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
 import { activeRun } from './session.mjs';
@@ -30,6 +30,14 @@ function problemWith(session, value) {
   const run = activeRun(session);
   if (session.phase !== 'define' || !run || !value.node) return null;
   if (!canPlace(run, value.node.slot)) return `Slot ${value.node.slot} is not open for ${run.tool}.`;
+  if (value.verdict === 'accept' && value.edges?.length) {
+    const placed = placeNode(run, { id: '__candidate__', slot: value.node.slot, text: value.node.text, state: 'accepted' });
+    for (const edge of value.edges) {
+      const from = placed.nodes.find((node) => node.slot === edge.from)?.id ?? null;
+      const to = placed.nodes.find((node) => node.slot === edge.to)?.id ?? null;
+      if (!canEdge(placed, from, to, edge.kind)) return `Link ${edge.from} to ${edge.to} (${edge.kind}) is not allowed; link only placed slots with a valid kind.`;
+    }
+  }
   return null;
 }
 
