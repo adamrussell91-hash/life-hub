@@ -3,22 +3,25 @@ import type { Block } from '@/schemas/block';
 type Mode = 'teacher' | 'student' | 'print';
 export type CalloutTarget = { block_id: string; question_id?: string };
 type Target = CalloutTarget & { label: string; preview: string };
+// A single pictogram family for block headings and every linked badge.
+// Soft filled silhouettes carry the shape; rounded ink strokes carry the detail.
 const ICONS: Record<string, [string, string]> = {
-  information: ['Information', '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>'],
-  important: ['Important', '<path d="M5 21V3m0 0h14l-3 5 3 5H5"/>'],
-  warning: ['Warning', '<path d="m12 3 10 18H2L12 3Zm0 6v5m0 3v1"/>'],
-  extension: ['Extension', '<path d="M12 21V3m-5 5 5-5 5 5M12 14H5v5m7-5h7v5"/>'],
-  scaffold: ['Scaffold', '<path d="M6 3v18M18 3v18M6 7h12M6 12h12M6 17h12"/>'],
-  example: ['Example', '<path d="M12 5v16m0-16C8 2 3 3 2 4v15c4-2 7-1 10 2 3-3 6-4 10-2V4c-4-2-7-1-10 1Z"/>'],
-  remember: ['Remember', '<path d="M3 10a9 9 0 0 1 16-4l2 3M21 3v6h-6m6 5a9 9 0 0 1-16 4l-2-3m0 6v-6h6"/>'],
-  teacher: ['Teacher', '<path d="m2 8 10-5 10 5-10 5L2 8Zm4 3v6c4 3 8 3 12 0v-6m4-3v9"/>']
+  information: ['Information', '<path class="callout__icon-wash" d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-8l-5 3v-3H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M11 10h1v5h1"/><circle cx="12" cy="7" r=".8" fill="currentColor" stroke="none"/>'],
+  important: ['Important', '<path class="callout__icon-wash" d="m12 2 3 3 4 .5.5 4 2.5 3-2.5 3-.5 4-4 .5-3 2-3-2-4-.5-.5-4L2 12.5 4.5 9l.5-3.5L9 5Z"/><path d="m12 7 1.5 3 3.5.5-2.5 2.5.5 3.5-3-1.5-3 1.5.5-3.5L7 10.5l3.5-.5L12 7Z"/>'],
+  warning: ['Warning', '<path class="callout__icon-wash" d="M10.3 4a2 2 0 0 1 3.4 0l7.5 13a2 2 0 0 1-1.7 3H4.5a2 2 0 0 1-1.7-3L10.3 4Z"/><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".8" fill="currentColor" stroke="none"/>'],
+  extension: ['Extension', '<path class="callout__icon-wash" d="M4 3h6v18H4zM13 3h8v9h-8z"/><path d="M7 20V8m0 7c0-5 10-3 10-9m-3 1 3-3 3 3"/><circle cx="7" cy="19" r="2" fill="var(--paper)"/><path d="M5 4h4"/>'],
+  scaffold: ['Scaffold', '<path class="callout__icon-wash" d="M3 16h6v-6h6V4h6v16H3Z"/><path d="M3 16h6v-6h6V4h6M5 20h16M7 17v3m6-9v9m6-15v15"/>'],
+  example: ['Example', '<rect class="callout__icon-wash" x="4" y="3" width="16" height="18" rx="3"/><path d="M8 7h7M8 11h4m-4 5 2 2 5-5M17 7h.01"/><path d="M17 17h4m-2-2v4"/>'],
+  remember: ['Remember', '<path class="callout__icon-wash" d="M6 3h12v18l-6-3-6 3V3Z"/><path d="M7 12h10m-5-1c-6-1-5-6-2-4l2 4Zm0 0c6-1 5-6 2-4l-2 4Zm0 1-2 4m2-4 2 4"/>'],
+  teacher: ['Teacher', '<path class="callout__icon-wash" d="M3 12c3-2 6-1 9 1 3-2 6-3 9-1v9c-3-2-6-1-9 1-3-2-6-3-9-1v-9Z"/><circle cx="12" cy="6" r="3"/><path d="M3 12c3-2 6-1 9 1 3-2 6-3 9-1m-9 1v9M6 16l3 1m6 0 3-1"/>']
 };
 
 export function calloutIdentity(style: string): HTMLElement {
   const [label, paths] = ICONS[style] ?? ICONS.information!;
   const identity = document.createElement('span');
   identity.className = 'callout__identity';
-  identity.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+  identity.dataset.calloutStyle = ICONS[style] ? style : 'information';
+  identity.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
   identity.append(document.createTextNode(label));
   return identity;
 }
@@ -82,20 +85,25 @@ export function createCalloutTargetPicker(
   return select;
 }
 
-function references(blocks: Block[], mode: Mode): Array<Target & { marker: string }> {
-  const used = new Set(visibleBlocks(blocks, mode).flatMap(block =>
-    block.block_type === 'callout' && block.content.related_to && block.content.related_to.block_id !== block.id
-      ? [key(block.content.related_to)] : []));
-  return calloutTargets(blocks, mode).filter(target => used.has(key(target))).map((target, i) => {
-    // Spreadsheet-style letters keep markers short without a 26-target cap.
-    let number = i + 1, marker = '';
-    while (number) { number--; marker = String.fromCharCode(65 + number % 26) + marker; number = Math.floor(number / 26); }
-    return { ...target, marker };
+type Callout = Extract<Block, { block_type: 'callout' }>;
+type Reference = Target & { callout: Callout };
+
+function references(blocks: Block[], mode: Mode): Reference[] {
+  const targets = new Map(calloutTargets(blocks, mode).map(target => [key(target), target]));
+  return visibleBlocks(blocks, mode).flatMap(block => {
+    if (block.block_type !== 'callout' || !block.content.related_to || block.content.related_to.block_id === block.id) return [];
+    const target = targets.get(key(block.content.related_to));
+    // One reference per callout, even when several share a target or type.
+    return target ? [{ ...target, callout: block }] : [];
   });
 }
 
-function marker(text: string): HTMLSpanElement {
-  const pill = document.createElement('span'); pill.className = 'callout-ref'; pill.textContent = text; return pill;
+function marker(style: string, showLabel = true): HTMLSpanElement {
+  const pill = document.createElement('span'); pill.className = 'callout-ref';
+  const identity = calloutIdentity(style);
+  if (!showLabel) Array.from(identity.childNodes).filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => node.remove());
+  pill.append(identity);
+  return pill;
 }
 
 function tabPath(blocks: Block[], targetId: string): string[] | null {
@@ -150,17 +158,66 @@ function jump(source: HTMLElement, target: Target, blocks: Block[]): boolean {
   return true;
 }
 
+function referencePreview(
+  wrapper: HTMLElement, iconStyle: string, label: string, titleText: string,
+  previewText: string, destination: Target, blocks: Block[], attached: boolean
+): HTMLDetailsElement {
+  const disclosure = document.createElement('details');
+  disclosure.className = `callout-reference${attached ? ' callout-reference--attached' : ''}`;
+  const summary = document.createElement('summary');
+  summary.setAttribute('aria-label', label);
+  summary.title = label;
+  summary.append(marker(iconStyle, attached));
+  if (!attached) summary.append(document.createTextNode(titleText));
+  const preview = document.createElement('div'); preview.className = 'callout-ref__preview';
+  const title = document.createElement('strong'); title.textContent = titleText;
+  const text = document.createElement('p'); text.textContent = previewText;
+  const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn--ghost callout-ref__jump';
+  const typeName = (ICONS[iconStyle] ?? ICONS.information!)[0];
+  button.textContent = attached ? `Jump to ${typeName.toLowerCase()}` : destination.question_id ? 'Jump to question' : 'Jump to activity';
+  const status = document.createElement('p'); status.setAttribute('role', 'status'); status.hidden = true;
+  button.addEventListener('click', () => {
+    if (jump(wrapper, destination, blocks)) disclosure.open = false;
+    else { status.textContent = 'This activity is no longer on the page.'; status.hidden = false; }
+  });
+  disclosure.addEventListener('click', event => event.stopPropagation());
+  disclosure.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { event.stopPropagation(); disclosure.open = false; summary.focus(); }
+  });
+  preview.append(title, text, button, status); disclosure.append(summary, preview);
+  return disclosure;
+}
+
 /** Decorates independent blocks; it never moves or nests a callout. */
 export function decorateCalloutReferences(wrapper: HTMLElement, block: Block, mode: Mode, blocks: Block[]): void {
   const refs = references(blocks, mode);
+  const groups = new Map<HTMLElement, HTMLElement>();
   for (const ref of refs.filter(ref => ref.block_id === block.id)) {
     const target = ref.question_id
       ? Array.from(wrapper.querySelectorAll<HTMLElement>('[data-question-id]')).find(node => node.dataset.questionId === ref.question_id)
       : wrapper;
-    target?.append(marker(ref.marker));
+    if (!target) continue;
+    let group = groups.get(target);
+    if (!group) {
+      group = document.createElement('div'); group.className = 'callout-ref-list';
+      group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'Related callouts');
+      groups.set(target, group);
+      if (target === wrapper) target.prepend(group);
+      else {
+        const prompt = Array.from(target.children).find(child => child.classList.contains('block-question-set__prompt'));
+        if (prompt) prompt.after(group); else target.append(group);
+      }
+    }
+    if (mode === 'print') { group.append(marker(ref.callout.content.style)); continue; }
+    const typeName = (ICONS[ref.callout.content.style] ?? ICONS.information!)[0];
+    const title = ref.callout.content.title?.trim() || typeName;
+    const destination: Target = { block_id: ref.callout.id, label: title, preview: ref.callout.content.body };
+    const badge = referencePreview(wrapper, ref.callout.content.style, `${typeName}: ${title}. Preview related callout`, title, ref.callout.content.body, destination, blocks, true);
+    badge.dataset.calloutId = ref.callout.id;
+    group.append(badge);
   }
   if (block.block_type !== 'callout' || !block.content.related_to) return;
-  const ref = refs.find(ref => key(ref) === key(block.content.related_to!));
+  const ref = refs.find(ref => ref.callout.id === block.id);
   const head = wrapper.querySelector('.callout__head');
   if (!head) return;
   if (!ref) {
@@ -172,31 +229,15 @@ export function decorateCalloutReferences(wrapper: HTMLElement, block: Block, mo
   }
   if (mode === 'print') {
     const label = document.createElement('span'); label.className = 'callout-ref__print';
-    label.textContent = `${ref.marker} · ${ref.label}`; head.append(label); return;
+    label.append(marker(block.content.style, false), document.createTextNode(ref.label)); head.append(label); return;
   }
-  const disclosure = document.createElement('details'); disclosure.className = 'callout-reference';
-  const summary = document.createElement('summary'); summary.setAttribute('aria-label', `Reference ${ref.marker}: ${ref.label}`);
-  summary.append(marker(ref.marker), document.createTextNode(ref.label));
-  const preview = document.createElement('div'); preview.className = 'callout-ref__preview';
-  const title = document.createElement('strong'); title.textContent = ref.label;
-  const text = document.createElement('p'); text.textContent = ref.preview;
-  const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn--ghost callout-ref__jump';
-  button.textContent = ref.question_id ? 'Jump to question' : 'Jump to activity';
-  const status = document.createElement('p'); status.setAttribute('role', 'status'); status.hidden = true;
-  button.addEventListener('click', () => {
-    if (jump(wrapper, ref, blocks)) disclosure.open = false;
-    else { status.textContent = 'This activity is no longer on the page.'; status.hidden = false; }
-  });
-  disclosure.addEventListener('click', event => event.stopPropagation());
-  disclosure.addEventListener('keydown', event => {
-    if (event.key === 'Escape') { event.stopPropagation(); disclosure.open = false; summary.focus(); }
-  });
-  preview.append(title, text, button, status); disclosure.append(summary, preview); head.append(disclosure);
+  const typeName = (ICONS[block.content.style] ?? ICONS.information!)[0];
+  head.append(referencePreview(wrapper, block.content.style, `${typeName} for ${ref.label}`, ref.label, ref.preview, ref, blocks, false));
 }
 
 /** Refresh references after an edit without replacing inputs or their caret. */
 export function refreshCalloutReferences(scope: HTMLElement, blocks: Block[], mode: Mode): void {
-  scope.querySelectorAll('.callout-ref, .callout-reference, .callout-ref__missing, .callout-ref__print').forEach(node => node.remove());
+  scope.querySelectorAll('.callout-ref-list, .callout-reference, .callout-ref__missing, .callout-ref__print').forEach(node => node.remove());
   const byId = new Map(visibleBlocks(blocks, mode).map(block => [block.id, block]));
   scope.querySelectorAll<HTMLElement>('.block[data-block-id]').forEach(wrapper => {
     const block = byId.get(wrapper.dataset.blockId ?? '');
