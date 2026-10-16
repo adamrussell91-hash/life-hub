@@ -47,7 +47,7 @@ describe('5 Whys view', () => {
     const view = createFiveWhysView();
     view.update(run([node('p', 'problem'), node('w1', 'why:1', { state: 'contested', objection: 'That blames a person.' })]));
     const row = view.el.querySelector('[data-node="w1"]')!;
-    expect(row.querySelector('.ps-whys__note')!.textContent).toContain('That blames a person.');
+    expect(row.querySelector('.ps-details__note')!.textContent).toContain('That blames a person.');
     expect(row.querySelector('.ps-whys__why')!.getAttribute('stroke-dasharray')).toBeNull();
   });
 });

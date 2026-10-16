@@ -1,9 +1,16 @@
 // apps/tasks/src/views/problem-solver/canvas.ts
 import { el } from '@/views/hub-kit';
-import { createFiveWhysView, type FiveWhysView } from '../../../../../packages/problem-solver/render/five-whys';
+import { createFiveWhysView } from '../../../../../packages/problem-solver/render/five-whys';
 import { renderOutline } from '../../../../../packages/problem-solver/render/outline';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
-import type { PsSession, PsToolRun } from '../../../../../packages/problem-solver/types';
+import type { PsSession, PsToolId, PsToolRun } from '../../../../../packages/problem-solver/types';
+
+type View = { el: HTMLElement; update(run: PsToolRun): void };
+
+/** Tools that draw their own chart. Anything else falls back to the outline. */
+const RENDERERS: Partial<Record<PsToolId, () => View>> = {
+  five_whys: () => createFiveWhysView()
+};
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string]> = [
   ['goal', 'What is the goal?'],
@@ -27,27 +34,28 @@ function shownRun(session: PsSession): PsToolRun | null {
 }
 
 export function mountCanvas(host: HTMLElement): { update(session: PsSession): void } {
-  let whys: { runId: string; view: FiveWhysView } | null = null;
+  let current: { runId: string; view: View } | null = null;
 
   return {
     update(session) {
       const run = shownRun(session);
       if (!run) {
-        whys = null;
+        current = null;
         host.replaceChildren(frameCard(session));
         return;
       }
       const heading = el('h2', 'ps-canvas__title', TOOLS[run.tool].name);
-      if (run.tool === 'five_whys') {
-        if (!whys || whys.runId !== run.id) whys = { runId: run.id, view: createFiveWhysView() };
-        whys.view.update(run);
-        const outline = renderOutline(run);
-        outline.classList.add('sr-only');
-        host.replaceChildren(heading, whys.view.el, outline);
+      const make = RENDERERS[run.tool];
+      if (!make) {
+        current = null;
+        host.replaceChildren(heading, renderOutline(run));
         return;
       }
-      whys = null;
-      host.replaceChildren(heading, renderOutline(run));
+      if (!current || current.runId !== run.id) current = { runId: run.id, view: make() };
+      current.view.update(run);
+      const outline = renderOutline(run);
+      outline.classList.add('sr-only');
+      host.replaceChildren(heading, current.view.el, outline);
     }
   };
 }
