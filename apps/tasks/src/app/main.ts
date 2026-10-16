@@ -116,6 +116,10 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       return renderGraphView(canvas);
     case 'maps':
       return renderMapsView(canvas);
+    case 'line': {
+      const { renderPersonalLineView } = await import('@/views/personal-line');
+      return renderPersonalLineView(canvas);
+    }
     case 'gantt':
       return renderTimelineView(canvas);
     case 'timeline':

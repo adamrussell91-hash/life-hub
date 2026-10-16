@@ -346,6 +346,13 @@ export const tasksApi = {
   deleteProgram: (id: string) =>
     apiDelete<{ deleted: boolean }>(`/api/programs?id=${encodeURIComponent(id)}`),
 
+  listPersonalLines: () =>
+    apiGet<{ lines: import('@/personal-line/model').PublishedLineSummary[] }>('/api/personal-lines').then((r) => r.lines),
+  publishPersonalLine: (snapshot: import('@/personal-line/model').LineSnapshot) =>
+    apiPost<import('@/personal-line/model').PublishedLineSummary>('/api/personal-lines', snapshot),
+  unpublishPersonalLine: (slug: string) =>
+    apiDelete<{ deleted: boolean }>(`/api/personal-lines?slug=${encodeURIComponent(slug)}`),
+
   listAreas: () => apiGet<{ areas: import('@/schemas/area').Area[] }>('/api/areas').then((r) => r.areas),
   getArea: (id: string) => apiGet<import('@/schemas/area').Area>(`/api/areas?id=${encodeURIComponent(id)}`),
   createArea: (body: unknown) => apiPost<import('@/schemas/area').Area>('/api/areas', body),

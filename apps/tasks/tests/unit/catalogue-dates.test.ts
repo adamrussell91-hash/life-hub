@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { extractCatalogueDates } from '@/domain/catalogue-dates';
+import { classifyCatalogueTiming } from '@/domain/catalogue-timing';
 import { catalogPrograms } from '@/domain/programs-seed';
 
 describe('catalogue date extraction', () => {
@@ -101,25 +102,20 @@ describe('catalogue date extraction', () => {
 });
 
 describe('catalogue fixture dates', () => {
-  it('stores a date only when the entry text states one', () => {
-    const programs = catalogPrograms();
-    let filled = 0;
-    for (const program of programs) {
-      const dates = extractCatalogueDates(program);
-      if (dates) {
-        filled += 1;
-        expect(program.starts_on).toBe(dates.starts_on);
-        expect(program.ends_on).toBe(dates.ends_on);
-        expect(program.ends_on! >= program.starts_on!).toBe(true);
-      } else {
-        expect(program.starts_on).toBeNull();
-        expect(program.ends_on).toBeNull();
-      }
+  it('matches what each entry\'s own text says, unless someone has checked it by hand', () => {
+    const keys = ['starts_on', 'ends_on', 'dates_precision', 'due_on', 'due_precision', 'entries_close_on', 'entries_close_precision'] as const;
+    for (const program of catalogPrograms()) {
+      if (program.dates_checked_on) continue;
+      const timing = classifyCatalogueTiming(program);
+      for (const key of keys) expect(program[key], `${program.name} ${key}`).toBe(timing[key]);
     }
-    expect(filled).toBe(123);
-    const econthon = programs.find((item) => item.name.includes('Econthon'));
-    expect(econthon).toMatchObject({ starts_on: '2026-11-21', ends_on: '2026-11-22' });
-    const abbm = programs.find((item) => item.id.startsWith('prog_abbmun'));
-    expect(abbm).toMatchObject({ starts_on: '2026-03-15', ends_on: '2026-03-15' });
+  });
+
+  it('never stores a date without saying how sure it is', () => {
+    for (const program of catalogPrograms()) {
+      expect(Boolean(program.starts_on), program.name).toBe(Boolean(program.dates_precision));
+      expect(Boolean(program.due_on), program.name).toBe(Boolean(program.due_precision));
+      expect(Boolean(program.entries_close_on), program.name).toBe(Boolean(program.entries_close_precision));
+    }
   });
 });

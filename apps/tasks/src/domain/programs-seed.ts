@@ -6,10 +6,20 @@ export function catalogPrograms(): Program[] {
   return (catalog as Program[]).map((item) => ProgramSchema.parse(item));
 }
 
-const DATE_KEYS = ['starts_on', 'ends_on', 'dates_source_url', 'dates_checked_on'] as const;
+const DATE_KEYS = [
+  'starts_on',
+  'ends_on',
+  'dates_precision',
+  'due_on',
+  'due_precision',
+  'entries_close_on',
+  'entries_close_precision',
+  'dates_source_url',
+  'dates_checked_on'
+] as const;
 const catalogueDates = new Map(
   (catalog as Array<Partial<Program> & { id: string }>)
-    .filter((item) => item.starts_on || item.ends_on)
+    .filter((item) => item.starts_on || item.due_on || item.entries_close_on)
     .map((item) => [item.id, Object.fromEntries(DATE_KEYS.map((key) => [key, item[key] ?? null]))])
 );
 

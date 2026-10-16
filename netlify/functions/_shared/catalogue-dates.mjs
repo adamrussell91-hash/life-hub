@@ -1,10 +1,20 @@
 import catalog from '../../../apps/tasks/fixtures/competitions.json' with { type: 'json' };
 
-const DATE_KEYS = ['starts_on', 'ends_on', 'dates_source_url', 'dates_checked_on'];
+const DATE_KEYS = [
+  'starts_on',
+  'ends_on',
+  'dates_precision',
+  'due_on',
+  'due_precision',
+  'entries_close_on',
+  'entries_close_precision',
+  'dates_source_url',
+  'dates_checked_on'
+];
 
 const catalogueDates = new Map(
   catalog
-    .filter(item => item && (item.starts_on || item.ends_on))
+    .filter(item => item && (item.starts_on || item.due_on || item.entries_close_on))
     .map(item => [item.id, Object.fromEntries(DATE_KEYS.map(key => [key, item[key] ?? null]))])
 );
 
@@ -21,6 +31,13 @@ export function withCatalogueDates(record) {
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const PRECISIONS = new Set(['day', 'part', 'month']);
+
+/** A precision word from a request body, or `day` when a date was typed in by hand. */
+export function pickPrecision(value, hasDate) {
+  if (!hasDate) return null;
+  return typeof value === 'string' && PRECISIONS.has(value) ? value : 'day';
+}
 
 /** Date fields from a request body: ISO dates or null; source URL as a string or null. */
 export function pickProgramDates(body) {
@@ -28,6 +45,8 @@ export function pickProgramDates(body) {
   return {
     starts_on: date(body.starts_on),
     ends_on: date(body.ends_on),
+    due_on: date(body.due_on),
+    entries_close_on: date(body.entries_close_on),
     dates_source_url: typeof body.dates_source_url === 'string' && body.dates_source_url.trim() ? body.dates_source_url.trim() : null,
     dates_checked_on: date(body.dates_checked_on)
   };

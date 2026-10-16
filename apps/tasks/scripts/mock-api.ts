@@ -14,6 +14,7 @@ import { WorkSessionCreateSchema, WorkSessionUpdateSchema } from '../src/schemas
 import { PlanningProfileUpdateSchema } from '../src/schemas/planning-profile';
 import { PlanningDirectionUpdateSchema } from '../src/schemas/planning-direction';
 import { localStubClareJudge } from '../src/ai/clare-proposal-judge';
+import { lineSummary, newLineSlug, sanitizeLineSnapshot } from '../../../netlify/functions/_shared/personal-lines.mjs';
 
 export function createMemoryKv(): KvAdapter & { map: Map<string, unknown> } {
   const map = new Map<string, unknown>();
@@ -139,6 +140,8 @@ export function createMockApi({ seed }: MockApiOptions) {
     return json(500, { ok: false, error: { code: 'seed_failed', message } });
   }
 
+  const personalLines = new Map<string, Record<string, unknown> & { slug: string }>();
+
   async function handle(method: string, urlPath: string, body?: unknown) {
     await ensure();
     const url = new URL(urlPath, 'http://local.test');
@@ -158,6 +161,15 @@ export function createMockApi({ seed }: MockApiOptions) {
     if (path === '/api/logout' && method === 'POST') {
       authenticated = false;
       return json(200, { ok: true, data: { loggedOut: true } });
+    }
+
+    // Published personal lines are public, like the Netlify function.
+    const publishedLine = path.match(/^\/api\/published\/lines\/([^/]+)$/);
+    if (publishedLine && method === 'GET') {
+      const record = personalLines.get(decodeURIComponent(publishedLine[1]!));
+      return record
+        ? json(200, { ok: true, data: record })
+        : json(404, { ok: false, error: { code: 'not_found', message: 'This line is not published.' } });
     }
 
     if (!authenticated && path.startsWith('/api/')) {
@@ -392,6 +404,24 @@ export function createMockApi({ seed }: MockApiOptions) {
       if (method === 'DELETE' && id) {
         await s.deleteMap(id);
         return json(200, { ok: true, data: { deleted: true } });
+      }
+    }
+
+    if (path === '/api/personal-lines') {
+      if (method === 'GET') {
+        return json(200, { ok: true, data: { lines: [...personalLines.values()].map(lineSummary) } });
+      }
+      if (method === 'POST') {
+        const clean = sanitizeLineSnapshot(body);
+        if (clean.error) return json(400, { ok: false, error: { code: 'validation_error', message: clean.error } });
+        const record = { ...clean.snapshot, slug: newLineSlug() };
+        personalLines.set(record.slug, record);
+        return json(201, { ok: true, data: lineSummary(record) });
+      }
+      if (method === 'DELETE') {
+        const slug = url.searchParams.get('slug') ?? '';
+        personalLines.delete(slug);
+        return json(200, { ok: true, data: { slug, deleted: true } });
       }
     }
 
