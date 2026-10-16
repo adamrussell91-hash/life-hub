@@ -228,10 +228,31 @@ describe('teacher boxes on nested blocks', () => {
     expect(host.classList.contains('cx-teacher--nested')).toBe(true);
     expect(host.hidden).toBe(false);
     expect(host.querySelector('.cx-row__label')?.textContent).toBe('Question 3');
+    const toggle = host.querySelector<HTMLButtonElement>('.tk-note__toggle')!;
+    const body = host.querySelector<HTMLElement>('.cx-panel__body')!;
+    expect(toggle.textContent).toBe('Class examples');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(toggle.getAttribute('aria-controls')).toBe(body.id);
+    expect(body.hidden).toBe(true);
+    toggle.click();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(body.hidden).toBe(false);
+    toggle.click();
+    expect(body.hidden).toBe(true);
+
+    // A canvas repaint retains the teacher's choice for this nested block.
+    toggle.click();
+    const replacement = document.createElement('div');
+    replacement.innerHTML = `<div class="block" data-block-id="outer"><div class="block" data-block-id="inner_q">Q3</div></div>`;
+    row.replaceWith(replacement);
+    handle.decorate(replacement, section);
+    const repainted = replacement.querySelector<HTMLButtonElement>('.tk-note__toggle')!;
+    expect(repainted.getAttribute('aria-expanded')).toBe('true');
+    expect(replacement.querySelector<HTMLElement>('.cx-panel__body')!.hidden).toBe(false);
     // The section's own panel stays empty: the box belongs to the inner block.
     const rootHost = Array.from(row.children).find((child) => child.classList.contains('cx-teacher')) as HTMLElement;
     expect(rootHost.hidden).toBe(true);
     handle.dispose();
-    row.remove();
+    replacement.remove();
   });
 });
