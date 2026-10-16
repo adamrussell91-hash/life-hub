@@ -31,6 +31,7 @@ describe('catalogue platforms', () => {
     const classified: Program[] = [
       { ...byName('Mock Trial'), format: 'Simulation' },
       { ...byName('National Latin Exam (NLE)'), format: 'Exam' },
+      // Simpson Prize is classified in the catalogue; blank the format so this fixture still has an unclassified row.
       { ...byName('The Simpson Prize'), format: null }
     ];
     const platforms = cataloguePlatforms(classified, 'format', '2026-01-01');
