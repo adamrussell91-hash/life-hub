@@ -272,6 +272,41 @@ describe('catalogue classification', () => {
     expect(withCatalogueClasses(unknown)).toBe(unknown);
   });
 
+  it('classifies every catalogue entry, keeping Classics and Languages off Justice', () => {
+    // Left without a guess: a professional association, not a student activity.
+    const unclassified = new Set(['prog_world-council-for-gifted-and-talented-children-wcgtc']);
+    // History of Greece and Rome is the subject of these two exams.
+    const classicsOnJustice = new Set([
+      'prog_national-hellenic-civilization-exam-nhce',
+      'prog_national-roman-civilization-exam-nrce'
+    ]);
+    const justiceSubjects = new Set([
+      'Humanities',
+      'History',
+      'Public Speaking',
+      'Legal',
+      'Debating',
+      'Geography',
+      'Leadership',
+      'Civics'
+    ]);
+    for (const program of catalogPrograms()) {
+      if (!unclassified.has(program.id)) {
+        expect(program.format, program.name).toBeTruthy();
+        expect(program.provider, program.name).toBeTruthy();
+        expect(program.settings.length, program.name).toBeGreaterThan(0);
+        expect(program.entry, program.name).toBeTruthy();
+        expect(program.entry_route, program.name).toBeTruthy();
+      }
+      const classical = program.subjects.includes('Classics') || program.subjects.includes('Languages');
+      if (!classical || classicsOnJustice.has(program.id)) continue;
+      expect(
+        program.subjects.filter((subject) => justiceSubjects.has(subject)),
+        program.name
+      ).toEqual([]);
+    }
+  });
+
   it('filters by format', () => {
     const [a, b] = catalogPrograms();
     const programs = [
