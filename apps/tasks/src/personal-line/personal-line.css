@@ -176,3 +176,9 @@
 .pl-published h2 { margin: 0; font: 700 22px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif; }
 .pl-published ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .pl-published li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Branch flags (tracks.ts): the name of each branch, standing on its track. */
+.pl-flag__box { stroke: #fff; stroke-width: 2; }
+.pl-flag__text { font: 700 11px var(--pl-body, 'Public Sans', Arial, sans-serif); letter-spacing: .08em; text-transform: uppercase; }
+.pl-check { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; color: #13233a; min-height: 44px; cursor: pointer; }
+.pl-check input { width: 20px; height: 20px; accent-color: #13233a; }

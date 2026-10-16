@@ -161,14 +161,37 @@ early. Not a branch axis.
 ## Status
 
 - **16 Oct:** fields added to the schema, Civics added on Justice, Classics moved to Expression only.
-- **Next:** Cursor recatalogues all 290 entries:
-  [`docs/proposals/catalogue-classification-cursor-brief.md`](../../proposals/catalogue-classification-cursor-brief.md).
-- **Then:** real counts per line, pick the branch order, set thresholds.
-- **16 Oct, later:** Programs page rebuilt as Platforms (mockup 2, with a next-service board) and
-  Timetable (mockup 3), opening the departure-board card (mockup 1). Year and Subject filters on both.
-  See [`catalogue-restyle/`](catalogue-restyle/README.md).
+- **16 Oct:** Programs page rebuilt as Platforms (with a next-service board) and Timetable, opening the
+  departure-board card. Year and Subject filters on both. See [`catalogue-restyle/`](catalogue-restyle/README.md).
+- **Done:** Cursor recatalogued all 290 entries (287 classified; EAE Awards, CTY and WCGTC stay with no
+  format on purpose: they're an award, a provider and an association, never stops on a line).
+- **17 Oct:** NHCE, NRCE and Toga Day drop History, so every Classics entry is Expression only.
+
+## Real counts after the recatalogue
+
+| Line | Entries | By format |
+| --- | --- | --- |
+| Justice | 94 | Simulation 24, Day event 21, Speaking 11, Program 11, Written entry 10, Project 8, Exam 7 |
+| Innovation | 116 | Exam 45, Project 36, Program 15, Day event 8, Creative work 5, Written entry 4, Simulation 3 |
+| Expression | 159 | Written entry 47, Program 26, Day event 18, Exam 18, Creative work 16, Project 12, Speaking 12, Simulation 10 |
+| Reasoning | 90 | Written entry 22, Simulation 19, Exam 14, Day event 13, Speaking 8, Program 6, Project 6 |
+
+Justice by place: Away 47, Online 40, At school 17 (entries can be in two). Run by: External 87, School 7.
+**Format is the largest differentiator**, so lines branch by format. Run by is too lopsided to split on.
+
+## Branch rules (first version, `apps/tasks/src/personal-line/tracks.ts`)
+
+- Each line splits by format for this student. A branch needs **3 or more** of the student's stops;
+  at most **4** branches per line, largest first. The rest ride an **Other** track.
+- **Civics** is its own Justice branch, whatever the format.
+- A line with nothing big enough to split stays one track.
+- Every track carries a **flag** naming it, at the top and again at each term start where the track is
+  clear. Branches leave their line together at the top, then fan out.
+- The builder has a **Split each line into branches** switch; a published line keeps the choice.
+- Thresholds are a first guess. Adam: "wait and see". Tune them on real students.
 
 ## Open questions
 
-- Which marks on the stop for Individual / Team / Either?
-- Which dimension branches first, and the fold thresholds: decide after the recatalogue counts.
+- Thresholds (3 stops, 4 branches) after trying real students.
+- A busy line still stacks its names in one column (Innovation for a maths student): branches separate
+  the tracks, not the names. If that bothers, the next step is a names column per branch.

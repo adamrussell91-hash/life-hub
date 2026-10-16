@@ -15,23 +15,23 @@ import '@/personal-line/personal-line.css';
 
 const STORAGE_KEY = 'tasks.personal-line.form';
 
-type FormState = { studentYear: number; subjects: string[]; name: string };
+type FormState = { studentYear: number; subjects: string[]; name: string; branches: boolean };
 
 function loadForm(): FormState {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as Partial<FormState> | null;
     if (raw && typeof raw.studentYear === 'number' && Array.isArray(raw.subjects)) {
-      return { studentYear: raw.studentYear, subjects: raw.subjects.filter((s) => s in SUBJECT_LINES), name: '' };
+      return { studentYear: raw.studentYear, subjects: raw.subjects.filter((s) => s in SUBJECT_LINES), name: '', branches: raw.branches !== false };
     }
   } catch {
     /* first visit */
   }
-  return { studentYear: 9, subjects: ['Debating', 'Legal', 'Psychology', 'Philosophy'], name: '' };
+  return { studentYear: 9, subjects: ['Debating', 'Legal', 'Psychology', 'Philosophy'], name: '', branches: true };
 }
 
 function saveForm(state: FormState): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ studentYear: state.studentYear, subjects: state.subjects }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ studentYear: state.studentYear, subjects: state.subjects, branches: state.branches }));
   } catch {
     /* private window */
   }
@@ -139,6 +139,14 @@ export async function renderPersonalLineView(canvas: HTMLElement): Promise<void>
   nameInput.placeholder = 'First name only';
   nameField.append(nameInput);
 
+  const branchField = el('label', 'pl-check');
+  const branchInput = el('input');
+  branchInput.type = 'checkbox';
+  branchInput.id = 'pl-branches';
+  branchInput.checked = state.branches;
+  branchField.append(branchInput, el('span', '', 'Split each line into branches (Exam, Speaking, Civics…)'));
+  branchInput.addEventListener('change', () => build(false));
+
   const actions = el('div', 'pl-actions');
   const buildBtn = el('button', 'pl-btn pl-btn--go', 'Build line');
   buildBtn.type = 'submit';
@@ -147,7 +155,7 @@ export async function renderPersonalLineView(canvas: HTMLElement): Promise<void>
   actions.append(buildBtn, publishBtn);
   const status = el('div', 'pl-status');
   status.setAttribute('role', 'status');
-  form.append(yearsField, subjectsField, nameField, actions, status);
+  form.append(yearsField, subjectsField, nameField, branchField, actions, status);
 
   const preview = el('div', 'pl-preview');
   const published = el('section', 'pl-published');
@@ -158,7 +166,8 @@ export async function renderPersonalLineView(canvas: HTMLElement): Promise<void>
   const readForm = (): FormState => ({
     studentYear: Number((form.querySelector('input[name="pl-year"]:checked') as HTMLInputElement | null)?.value ?? 9),
     subjects: [...form.querySelectorAll<HTMLInputElement>('.pl-group input:checked')].map((input) => input.value),
-    name: nameInput.value
+    name: nameInput.value,
+    branches: branchInput.checked
   });
   const build = (animate: boolean) => {
     const next = readForm();
@@ -170,8 +179,9 @@ export async function renderPersonalLineView(canvas: HTMLElement): Promise<void>
       year,
       terms: lineTerms(year, termYears)
     });
+    snapshot.branches = next.branches;
     handle?.destroy();
-    handle = mountPersonalLine(preview, snapshot, { animate, stamp: 'Preview, not published' });
+    handle = mountPersonalLine(preview, snapshot, { animate, stamp: 'Preview, not published', branches: next.branches });
   };
 
   form.addEventListener('submit', (event) => {

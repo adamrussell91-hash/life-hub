@@ -13,6 +13,7 @@
 import { dateWords, runWords, type DatePrecision } from '@/domain/catalogue-timing';
 import { LINES, yearLineName, type LineKey } from './lines';
 import type { LineItem, LineSnapshot } from './model';
+import { planTracks } from './tracks';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -30,6 +31,8 @@ export type MountOptions = {
   animate?: boolean;
   /** Small text at the right of the title bar, e.g. "Snapshot · 16 Oct 2026". */
   stamp?: string;
+  /** Split each line into named branches by format (default on). */
+  branches?: boolean;
 };
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -96,7 +99,8 @@ function weeks(item: LineItem): number {
 
 function kindText(item: LineItem): string {
   const w = weeks(item);
-  return w > 1 ? `${item.type} · ${w} weeks` : item.type;
+  const kind = item.format || item.type;
+  return w > 1 ? `${kind} · ${w} weeks` : kind;
 }
 
 export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options: MountOptions = {}): PersonalLineHandle {
@@ -104,7 +108,8 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
   const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   const year = snap.year;
   let yearH = 2300;
-  const yOf = (iso: string) => TOP + (Math.min(365, Math.max(0, doy(iso, year))) / 365) * yearH;
+  let topY = TOP;
+  const yOf = (iso: string) => topY + (Math.min(365, Math.max(0, doy(iso, year))) / 365) * yearH;
   let anims: Animation[] = [];
 
   host.replaceChildren();
@@ -122,7 +127,7 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
   const scroller = el('div', 'pl-scroll');
   const line = el('div', 'pl-line');
   scroller.append(line);
-  root.append(top, bar, scroller, buildUndated(snap), buildKey(snap));
+  root.append(top, bar, scroller, buildUndated(snap), buildKey(snap, planTracks(snap.lines, snap.items, options.branches !== false).branched));
   host.append(root);
   const card = createDepartureCard({
     studentYear: snap.student_year,
@@ -139,12 +144,22 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
     line.replaceChildren();
     line.style.height = '';
     line.style.width = '';
-    const chosen = snap.lines;
     const items = snap.items;
-    if (!chosen.length || !items.length) {
-      line.append(el('p', 'pl-empty', chosen.length ? 'Nothing dated for these subjects at this year level yet.' : 'Pick at least one subject.'));
+    if (!snap.lines.length || !items.length) {
+      line.append(el('p', 'pl-empty', snap.lines.length ? 'Nothing dated for these subjects at this year level yet.' : 'Pick at least one subject.'));
       return;
     }
+    // Tracks: one per line, or one per branch when a line splits (see tracks.ts).
+    const plan = planTracks(snap.lines, items, options.branches !== false);
+    const chosen = plan.tracks.map((t) => t.key);
+    const trackOf = new Map(plan.tracks.map((t) => [t.key, t]));
+    const colorOf = (k: string) => LINES[trackOf.get(k)!.line];
+    const on = (it: LineItem) => plan.tracksOf(it);
+    const FLAG_W = 20;
+    const FAN = 6 + RAMP * 2;
+    const flagH = (label: string) => Math.round(label.length * 6.4 + 18);
+    const flagRoom = plan.branched ? Math.max(...plan.tracks.map((t) => flagH(t.label))) + FAN + 14 : 0;
+    topY = TOP + flagRoom;
     const avail = scroller.clientWidth || 360;
     const oneCol = avail < 560;
     const monthsW = oneCol ? 32 : 40;
@@ -158,7 +173,7 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
     const winCol = new Map<string, number>();
     const geo = Object.fromEntries(
       chosen.map((k) => {
-        const pills = items.filter((it) => it.on.includes(k) && kindOf(it) === 'pill');
+        const pills = items.filter((it) => on(it).includes(k) && kindOf(it) === 'pill');
         const clusters: Array<{ a: number; b: number; items: LineItem[]; n: number }> = [];
         for (const it of pills) {
           const a = doy(it.run!.start, year);
@@ -186,7 +201,7 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
           c.n = ends.length;
           c.items.forEach((it) => laneN.set(`${it.id}:${k}`, c.n));
         }
-        const windows = items.filter((it) => it.on.includes(k) && kindOf(it) === 'window');
+        const windows = items.filter((it) => on(it).includes(k) && kindOf(it) === 'window');
         const colEnds: number[] = [];
         for (const it of windows) {
           let col = colEnds.findIndex((end) => end + 3 < doy(it.run!.start, year));
@@ -201,53 +216,66 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
         const bracketW = windows.length ? BRACKET_GAP * (Math.min(colEnds.length, 6) + 1) : 0;
         return [k, { clusters, half, bracketW }];
       })
-    ) as Record<LineKey, { clusters: Array<{ a: number; b: number; items: LineItem[]; n: number }>; half: number; bracketW: number }>;
+    ) as Record<string, { clusters: Array<{ a: number; b: number; items: LineItem[]; n: number }>; half: number; bracketW: number }>;
 
     // Columns: [line 1 names] line 1  line 2 [line 2 names] …  (phone: lines together, one column).
-    const cols = n === 1 || oneCol ? 1 : n;
-    const fixed =
-      monthsW + 12 + chosen.reduce((sum, k) => sum + geo[k].half * 2 + geo[k].bracketW, 0) + (n > 1 ? lineGap : 0) + cols * LABEL_PAD * 2;
+    // A branched line's tracks sit side by side and share their line's names column.
+    const groups = snap.lines
+      .map((l) => chosen.filter((k) => trackOf.get(k)!.line === l))
+      .filter((g) => g.length);
+    const nG = groups.length;
+    const trackGap = oneCol ? 4 : 8;
+    const cols = nG === 1 || oneCol ? 1 : nG;
+    const groupW = (g: string[]) => g.reduce((sum, k) => sum + geo[k]!.half * 2 + geo[k]!.bracketW, 0) + (g.length - 1) * trackGap;
+    const fixed = monthsW + 12 + groups.reduce((sum, g) => sum + groupW(g), 0) + (nG > 1 ? lineGap : 0) + cols * LABEL_PAD * 2;
     const labelW = Math.max(oneCol ? 140 : MIN_LABEL_W, Math.floor((avail - fixed) / cols));
-    const xs: number[] = [];
+    const xs: Record<string, number> = {};
     const side: Record<string, 'left' | 'right'> = {};
     const colBox: Record<string, { side: 'left' | 'right'; x0: number; x1: number }> = {};
+    const groupX: Record<string, number> = {};
     let x = monthsW;
-    chosen.forEach((k, i) => {
-      const leftCol = i === 0 && n > 1 && !oneCol;
-      side[k] = leftCol ? 'left' : 'right';
+    groups.forEach((g, i) => {
+      const leftCol = i === 0 && nG > 1 && !oneCol;
+      let box: { side: 'left' | 'right'; x0: number; x1: number } | null = null;
       if (leftCol) {
-        colBox[k] = { side: 'left', x0: x + LABEL_PAD, x1: x + LABEL_PAD + labelW };
-        x += LABEL_PAD * 2 + labelW + geo[k].bracketW;
+        box = { side: 'left', x0: x + LABEL_PAD, x1: x + LABEL_PAD + labelW };
+        x += LABEL_PAD * 2 + labelW;
       }
       if (i === 1) x += lineGap;
-      x += geo[k].half;
-      xs[i] = x;
-      x += geo[k].half;
-      if (oneCol ? i === n - 1 : i > 0 || n === 1) {
-        if (!leftCol) x += geo[k].bracketW;
-        colBox[k] = { side: 'right', x0: x + LABEL_PAD, x1: x + LABEL_PAD + labelW };
+      g.forEach((k, j) => {
+        side[k] = leftCol ? 'left' : 'right';
+        if (j > 0) x += trackGap;
+        if (leftCol) x += geo[k]!.bracketW;
+        x += geo[k]!.half;
+        xs[k] = x;
+        x += geo[k]!.half;
+        if (!leftCol) x += geo[k]!.bracketW;
+      });
+      const centre = g.reduce((sum, k) => sum + xs[k]!, 0) / g.length;
+      g.forEach((k) => (groupX[k] = centre));
+      if (!leftCol && (!oneCol || i === nG - 1)) {
+        box = { side: 'right', x0: x + LABEL_PAD, x1: x + LABEL_PAD + labelW };
         x += LABEL_PAD * 2 + labelW;
-      } else if (!leftCol) {
-        x += geo[k].bracketW;
       }
+      if (box) g.forEach((k) => (colBox[k] = box!));
     });
-    if (oneCol) chosen.forEach((k) => (colBox[k] = colBox[chosen[n - 1]!]!));
+    if (oneCol) chosen.forEach((k) => (colBox[k] = colBox[chosen[chosen.length - 1]!]!));
     const W = Math.max(avail, x + 12);
     line.style.width = `${W}px`;
-    const xOf = (k: LineKey) => xs[chosen.indexOf(k)]!;
-    const laneOff = (it: LineItem, k: LineKey) => {
+    const xOf = (k: string) => xs[k]!;
+    const laneOff = (it: LineItem, k: string) => {
       const key = `${it.id}:${k}`;
       const count = laneN.get(key) ?? 1;
       return ((lane.get(key) ?? 0) - (count - 1) / 2) * laneW;
     };
-    const bracketX = (it: LineItem, k: LineKey) => {
+    const bracketX = (it: LineItem, k: string) => {
       const dir = side[k] === 'left' ? -1 : 1;
-      return xOf(k) + dir * (geo[k].half + BRACKET_GAP * ((winCol.get(`${it.id}:${k}`) ?? 0) + 1));
+      return xOf(k) + dir * (geo[k]!.half + BRACKET_GAP * ((winCol.get(`${it.id}:${k}`) ?? 0) + 1));
     };
     const anchorDate = (it: LineItem) => it.run?.start ?? it.due!.on;
 
     // Names first, measured, so a busy line gets a taller year.
-    type Label = { it: LineItem; b: HTMLButtonElement; home: LineKey; h: number; top: number };
+    type Label = { it: LineItem; b: HTMLButtonElement; home: string; h: number; top: number };
     const labels: Label[] = [];
     for (const it of items) {
       const b = el('button', `pl-lbl${it.on.length > 1 ? ' is-shared' : ''}`);
@@ -262,28 +290,28 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
       if (it.close) b.append(el('span', 'pl-close', `Entries close ${dateWords(it.close.on, it.close.precision)}`));
       b.addEventListener('click', () => card.open(it, b));
       line.append(b);
-      labels.push({ it, b, home: it.on[0]!, h: 0, top: 0 });
+      labels.push({ it, b, home: on(it)[0]!, h: 0, top: 0 });
     }
     labels.forEach((L) => (L.h = L.b.getBoundingClientRect().height + 6));
     const load: Record<string, number> = {};
-    labels.forEach((L) => L.it.on.forEach((k) => (load[k] = (load[k] ?? 0) + L.h / L.it.on.length)));
+    labels.forEach((L) => on(L.it).forEach((k) => (load[k] = (load[k] ?? 0) + L.h / on(L.it).length)));
     yearH = Math.max(2300, Math.round(Math.max(...Object.values(load)) * (oneCol ? 1.15 : 1.35)));
 
     // Interchanges: single-day stops shared by two or more of the student's lines.
     const bridges = items
-      .filter((it) => it.on.length > 1 && (kindOf(it) === 'stop' || kindOf(it) === 'due'))
+      .filter((it) => on(it).length > 1 && (kindOf(it) === 'stop' || kindOf(it) === 'due'))
       .map((it) => {
         const y = yOf(anchorDate(it));
-        const ends = it.on.map((k) => xOf(k) + laneOff(it, k));
+        const ends = on(it).map((k) => xOf(k) + laneOff(it, k));
         return { it, y, x0: Math.min(...ends), x1: Math.max(...ends) };
       });
-    const blocked = (k: LineKey, y0: number, y1: number) => {
+    const blocked = (k: string, y0: number, y1: number) => {
       const box = colBox[k]!;
       return bridges.find((br) => br.x1 > box.x0 && br.x0 < box.x1 && y0 < br.y + 16 && y1 > br.y - 16);
     };
     const floors = new Map<object, number>();
     for (const L of labels) {
-      const options = L.it.on.map((k) => {
+      const options = on(L.it).map((k) => {
         let topY = Math.max(yOf(anchorDate(L.it)) - 12, floors.get(colBox[k]!) ?? -Infinity);
         for (let guard = 0; guard < 20; guard += 1) {
           const hit = blocked(k, topY, topY + L.h);
@@ -302,7 +330,7 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
       L.b.style.left = `${box.x0}px`;
       L.b.style.top = `${topY}px`;
     }
-    const H = Math.max(TOP + yearH + 40, ...labels.map((L) => L.top + L.h + 30));
+    const H = Math.max(topY + yearH + 40, ...labels.map((L) => L.top + L.h + 30));
     line.style.height = `${H}px`;
 
     const svg = sv('svg', { class: 'pl-net', width: W, height: H, viewBox: `0 0 ${W} ${H}`, 'aria-hidden': 'true' });
@@ -325,12 +353,22 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
     svg.append(leaders);
 
     const paths: Array<{ p: SVGPathElement; a: number; b: number }> = [];
-    const y0 = TOP - 10;
-    const y1 = TOP + yearH + 10;
+    const y0 = topY - 10;
+    const y1 = topY + yearH + 10;
     for (const k of chosen) {
       const cx = xOf(k);
-      const stroke = { fill: 'none', stroke: LINES[k].color, 'stroke-width': 8, 'stroke-linecap': 'round' };
+      const stroke = { fill: 'none', stroke: colorOf(k).color, 'stroke-width': 8, 'stroke-linecap': 'round' };
       let cursor = y0;
+      if (plan.branched) {
+        // Branches leave their line together at the top, then fan out to their own tracks.
+        const gx = groupX[k]!;
+        const p = sv('path', {
+          d: `M ${gx} 6 C ${gx} ${6 + RAMP} ${cx} ${6 + RAMP} ${cx} ${FAN} V ${y0}`,
+          ...stroke
+        }) as SVGPathElement;
+        svg.append(p);
+        paths.push({ p, a: 6, b: y0 });
+      }
       const splits = geo[k].clusters
         .filter((c) => c.n > 1)
         .map((c) => ({
@@ -367,15 +405,15 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
     for (const br of bridges) {
       const g = sv('g');
       g.append(sv('rect', { x: br.x0 - 11, y: br.y - 11, width: br.x1 - br.x0 + 22, height: 22, rx: 11, class: 'pl-bridge' }));
-      for (const k of br.it.on) g.append(sv('circle', { cx: xOf(k) + laneOff(br.it, k), cy: br.y, r: 6.5, class: 'pl-stop' }));
+      for (const k of on(br.it)) g.append(sv('circle', { cx: xOf(k) + laneOff(br.it, k), cy: br.y, r: 6.5, class: 'pl-stop' }));
       addMark(g, br.y);
     }
     const anchors = new Map<LineItem, { x: number; y: number; out: number }>();
     for (const it of items) {
       const kind = kindOf(it);
-      for (const k of it.on) {
+      for (const k of on(it)) {
         const lx = xOf(k) + laneOff(it, k);
-        const color = LINES[k];
+        const color = colorOf(k);
         const g = sv('g');
         let ax = lx;
         let ay = yOf(anchorDate(it));
@@ -393,7 +431,7 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
           ax = bx;
           ay = ys + 2;
           out = 3;
-        } else if (it.on.length === 1) {
+        } else if (on(it).length === 1) {
           g.append(sv('circle', { cx: lx, cy: ay, r: 8, class: 'pl-stop' }));
           if (kind === 'due') g.append(sv('circle', { cx: lx, cy: ay, r: 3, class: 'pl-due-dot' }));
         }
@@ -402,7 +440,47 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
           g.append(sv('line', { x1: xOf(k) - 9, x2: xOf(k) + 9, y1: cy, y2: cy, class: 'pl-close-tick' }));
         }
         if (g.childNodes.length) addMark(g, ay);
-        if (k === it.on[0] || !anchors.has(it)) anchors.set(it, { x: ax, y: ay, out });
+        if (k === on(it)[0] || !anchors.has(it)) anchors.set(it, { x: ax, y: ay, out });
+      }
+    }
+    if (plan.branched) {
+      // Flags name each track: at the top, and again at each later term start if the track is clear there.
+      const busy = (k: string, ya: number, yb: number) =>
+        items.some((it) => {
+          if (!on(it).includes(k)) return false;
+          const a = yOf(anchorDate(it)) - 14;
+          const b = (it.run ? yOf(it.run.end) : yOf(anchorDate(it))) + 14;
+          return a < yb && b > ya;
+        }) || bridges.some((br) => br.x0 - 12 <= xOf(k) && br.x1 + 12 >= xOf(k) && br.y + 14 > ya && br.y - 14 < yb);
+      const flag = (k: string, yTop: number) => {
+        const track = trackOf.get(k)!;
+        const color = colorOf(k);
+        const h = flagH(track.label);
+        const g = sv('g', { class: 'pl-flag' });
+        const title = sv('title');
+        title.textContent = track.branch ? `${color.name} · ${track.label}` : `${color.name} line`;
+        g.append(title);
+        g.append(sv('rect', { x: xOf(k) - FLAG_W / 2, y: yTop, width: FLAG_W, height: h, rx: 5, fill: color.color, class: 'pl-flag__box' }));
+        const t = sv('text', {
+          class: 'pl-flag__text',
+          x: 0,
+          y: 0,
+          fill: color.ink,
+          'text-anchor': 'middle',
+          'dominant-baseline': 'central',
+          transform: `translate(${xOf(k)} ${yTop + h / 2}) rotate(90)`
+        });
+        t.textContent = track.label;
+        g.append(t);
+        addMark(g, yTop);
+      };
+      for (const k of chosen) {
+        flag(k, FAN + 6);
+        const h = flagH(trackOf.get(k)!.label);
+        for (const term of snap.terms.slice(1)) {
+          const yt = yOf(term.start) + 6;
+          if (!busy(k, yt - 4, yt + h + 4)) flag(k, yt);
+        }
       }
     }
     for (const L of labels) {
@@ -494,7 +572,7 @@ function buildUndated(snap: LineSnapshot): HTMLElement {
   return section;
 }
 
-function buildKey(snap: LineSnapshot): HTMLElement {
+function buildKey(snap: LineSnapshot, branched = false): HTMLElement {
   const key = el('div', 'pl-key');
   key.append(el('h3', '', 'Key'));
   const grid = el('div', 'pl-key__grid');
@@ -517,6 +595,12 @@ function buildKey(snap: LineSnapshot): HTMLElement {
   add(`${lane}<path d="M 24 3 H 28 V 23 H 24" class="pl-window" stroke="${color.color}"/>`, 'Around this time (approx.)');
   add(`${lane}<circle cx="12" cy="13" r="7" class="pl-stop"/><circle cx="12" cy="13" r="2.5" class="pl-due-dot"/>`, 'Entries due');
   add(`${lane}<line x1="4" x2="20" y1="13" y2="13" class="pl-close-tick"/>`, 'Entries close');
+  if (branched) {
+    add(
+      `<path d="M 12 0 C 12 8 5 8 5 14 V 26 M 12 0 C 12 8 19 8 19 14 V 26" fill="none" stroke="${color.color}" stroke-width="4"/><rect x="13" y="12" width="10" height="14" rx="3" fill="${color.color}"/>`,
+      'A line splits into branches; each flag names what you do there (Exam, Speaking, Civics…). Other is the rest of that line.'
+    );
+  }
   if (snap.lines.length > 1) {
     const second = LINES[snap.lines[1]!];
     add(
