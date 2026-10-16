@@ -3,9 +3,14 @@ import type { Project } from '@/schemas/project';
 import {
   PROGRAM_AGE_GROUPS,
   PROGRAM_COST_BASES,
+  PROGRAM_ENTRIES,
+  PROGRAM_ENTRY_ROUTES,
+  PROGRAM_FORMATS,
   PROGRAM_LENGTHS,
   PROGRAM_LEVELS,
   PROGRAM_MONTHS,
+  PROGRAM_PROVIDERS,
+  PROGRAM_SETTINGS,
   PROGRAM_SUBJECTS,
   PROGRAM_TYPES
 } from '@/schemas/program';
@@ -105,6 +110,7 @@ function renderToolbar(
     options: Array<{ value: string; label: string }>;
   }> = [
     { key: 'Type', field: 'type', options: optionsFrom(types, 'All types') },
+    { key: 'Format', field: 'format', options: optionsFrom(PROGRAM_FORMATS, 'All formats') },
     { key: 'Subject', field: 'subject', options: optionsFrom(subjects.length ? subjects : PROGRAM_SUBJECTS, 'All subjects') },
     { key: 'Month', field: 'month', options: optionsFrom(months.length ? months : PROGRAM_MONTHS, 'All months') },
     { key: 'Year', field: 'age_group', options: optionsFrom(ages.length ? ages : PROGRAM_AGE_GROUPS, 'All years') },
@@ -174,6 +180,7 @@ function renderToolbar(
     ariaLabel: 'Filters',
     active: Boolean(
       state.filters.type ||
+        state.filters.format ||
         state.filters.subject ||
         state.filters.month ||
         state.filters.age_group ||
@@ -352,6 +359,11 @@ function renderDetail(
     propertyRow('Subjects', program.subjects.join(', ')),
     propertyRow('Level', program.competition_level),
     propertyRow('Length', program.competition_length),
+    propertyRow('Format', program.format),
+    propertyRow('Run by', program.provider),
+    propertyRow('Where', program.settings.join(', ')),
+    propertyRow('Entry', program.entry),
+    propertyRow('How to enter', program.entry_route),
     propertyRow('Cost', [program.cost_basis, program.cost].filter(Boolean).join(' · ')),
     propertyRow('Registration window', program.registration_window),
     propertyRow(
@@ -487,6 +499,11 @@ function renderAddForm(
   const level = selectControl('Level', PROGRAM_LEVELS);
   const length = selectControl('Length', PROGRAM_LENGTHS);
   const costBasis = selectControl('Cost', PROGRAM_COST_BASES);
+  const format = selectControl('Format', PROGRAM_FORMATS);
+  const provider = selectControl('Run by', PROGRAM_PROVIDERS);
+  const entry = selectControl('Entry', PROGRAM_ENTRIES);
+  const entryRoute = selectControl('How to enter', PROGRAM_ENTRY_ROUTES);
+  const settings = chipPicker(PROGRAM_SETTINGS);
   const subjects = chipPicker(PROGRAM_SUBJECTS);
   const ages = chipPicker(PROGRAM_AGE_GROUPS);
   const nsw = document.createElement('input');
@@ -503,6 +520,11 @@ function renderAddForm(
     level.el,
     length.el,
     costBasis.el,
+    format.el,
+    provider.el,
+    entry.el,
+    entryRoute.el,
+    field('Where', settings.el),
     field('Organiser', organiser.el),
     field('Location', location.el),
     field('Cost', cost.el),
@@ -555,6 +577,11 @@ function renderAddForm(
       description: description.input.value.trim(),
       registration_link: link.input.value.trim() || null,
       registration_window: registrationWindow.input.value.trim(),
+      format: (format.getValue() || null) as Program['format'],
+      provider: (provider.getValue() || null) as Program['provider'],
+      settings: settings.get() as Program['settings'],
+      entry: (entry.getValue() || null) as Program['entry'],
+      entry_route: (entryRoute.getValue() || null) as Program['entry_route'],
       not_available_nsw: nsw.checked,
       not_available_reason: reason.input.value.trim(),
       starts_on: dated ? start : null,

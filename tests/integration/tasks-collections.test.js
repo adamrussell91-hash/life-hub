@@ -182,6 +182,27 @@ test('programs and maps use the Life session and share the Tasks store', async (
   assert.equal(invertedProgram.starts_on, null);
   assert.equal(invertedProgram.ends_on, null);
 
+  const classified = await createProgramsHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/programs',
+      body: {
+        name: 'Mock Trial',
+        format: 'Simulation',
+        provider: 'External',
+        settings: ['Away', 'Home', 'Away'],
+        entry: 'Team',
+        entry_route: 'Nope'
+      }
+    })
+  );
+  const classifiedProgram = (await classified.json()).data;
+  assert.equal(classifiedProgram.format, 'Simulation');
+  assert.equal(classifiedProgram.provider, 'External');
+  assert.deepEqual(classifiedProgram.settings, ['Away']);
+  assert.equal(classifiedProgram.entry, 'Team');
+  assert.equal(classifiedProgram.entry_route, null);
+
   const listedPrograms = await createProgramsHandler(deps)(
     request({ url: 'https://api.adam-russell.com/api/programs' })
   );

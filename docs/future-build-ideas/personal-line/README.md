@@ -16,8 +16,8 @@ have a month, year levels and a subject.
 - **Calendar aligned, like the full network map.** Time runs down the page on a real date scale, and
   term bands show the holidays as gaps. A 10-week program is a 10-week pill. Programs running at the
   same time on one line sit on parallel tracks.
-- **Catalogue entries not on the map are included**, drawn with a dashed outline and tagged "Not on
-  map". A builder option turns them off.
+- **Catalogue entries not on the map are included.** ~~Drawn dashed and tagged "Not on map".~~ Dropped
+  16 Oct: the map is redrawn every year, so the tag means nothing by January.
 - **Interests are catalogue subjects**, not the four lines. Each subject belongs to one line (mapping
   below), so the student's lines are whichever lines their chosen subjects fall on.
 - **The public page carries MindWorks branding.**
@@ -48,7 +48,7 @@ have a month, year levels and a subject.
   - Until an entry has dates, it draws as a stop mid-month labelled "long term, dates TBC". It never
     gets an invented length.
 - **Subject → line mapping.** A subject can sit on more than one line. Nothing in the code maps
-  subjects to lines yet. Adam set Economics (I + R), Business (I), Leadership (J + R), Classics (R),
+  subjects to lines yet. Adam set Economics (I + R), Business (I), Leadership (J + R), Classics (E only, 16 Oct),
   Languages (E), Mathematics (I) and Neuroscience (R). The second lines on the rest are a re-scan of which subjects the catalogue tags
   together, still for Adam to confirm:
 
@@ -65,7 +65,8 @@ have a month, year levels and a subject.
   | Website Design, Game Development | I + E | design |
   | English, Creative Writing, Arts, Film, Drama, Music, Languages | E | |
   | Essay Writing | E + R | tagged with Psychology 7×, Philosophy 6× |
-  | Classics | R + E | Adam set R; tagged with Languages 9× |
+  | Classics | E | Adam, 16 Oct: classical language speaking comps, Expression only |
+  | Civics | J | Adam, 16 Oct: parliament, convention and council programs |
   | Psychology, Philosophy, Neuroscience | R | |
 
   An entry is on every line its chosen subjects reach. On two of the student's lines, it's an
