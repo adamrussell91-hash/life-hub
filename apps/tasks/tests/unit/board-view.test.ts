@@ -257,6 +257,55 @@ describe('board view mutations', () => {
     expect(activeTab?.textContent ?? '').not.toMatch(/Done/i);
   });
 
+  it('keeps overview hub-card shells mounted when ticking a task (no remount flash)', async () => {
+    const open = task({ id: 'task_tick', title: 'Tick me', status: 'open', due_date: '2026-08-27' });
+    const done = task({
+      id: 'task_tick',
+      title: 'Tick me',
+      status: 'done',
+      due_date: '2026-08-27',
+      completed_at: new Date().toISOString()
+    });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
+    vi.mocked(tasksApi.updateTask).mockResolvedValue(done);
+    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)' || query === '(max-width: 720px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }) as unknown as MediaQueryList);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderBoardView(canvas);
+
+    const overview = canvas.querySelector<HTMLElement>('.dashboard-overview');
+    const weekTile = canvas.querySelector<HTMLElement>('.dashboard-overview__tile--week');
+    const projectsTile = canvas.querySelector<HTMLElement>('.dashboard-overview__tile--projects');
+    expect(weekTile).not.toBeNull();
+    expect(projectsTile).not.toBeNull();
+    await vi.waitFor(() => {
+      expect(overview?.dataset.hubSettled).toBe('1');
+    });
+
+    const box = canvas.querySelector<HTMLInputElement>('.dashboard-row .task-check input');
+    box!.checked = true;
+    box!.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.column[data-col="done"] [data-id="task_tick"]')).not.toBeNull();
+    });
+
+    expect(canvas.querySelector('.dashboard-overview')).toBe(overview);
+    expect(canvas.querySelector('.dashboard-overview__tile--week')).toBe(weekTile);
+    expect(canvas.querySelector('.dashboard-overview__tile--projects')).toBe(projectsTile);
+    expect(weekTile?.classList.contains('hub-reveal')).toBe(false);
+  });
+
   it('moves every Today tick onto Done even when the follow-up getTask is stale', async () => {
     const first = task({ id: 'task_a', title: 'First tick', status: 'open', due_date: '2026-08-27' });
     const second = task({ id: 'task_b', title: 'Second tick', status: 'open', due_date: '2026-08-27' });
