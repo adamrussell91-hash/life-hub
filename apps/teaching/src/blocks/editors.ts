@@ -1,3 +1,4 @@
+import { createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createAlchemyButton } from '@/alchemy/block-button';
 import {
   createConceptFeaturesEditor,
@@ -362,7 +363,8 @@ export function createHeadingEditor(
 export function createCalloutEditor(
   block: Extract<Block, { block_type: 'callout' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'callout' }>>,
-  getLatest: () => Extract<Block, { block_type: 'callout' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'callout' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -400,6 +402,12 @@ export function createCalloutEditor(
   bodyInput.rows = 4;
   bodyInput.setAttribute('aria-label', 'Callout body');
 
+  let relatedTo = block.content.related_to;
+  const targetSelect = createCalloutTargetPicker(block, context.getLessonBlocks?.() ?? [], target => {
+    relatedTo = target;
+    emitChange();
+  });
+
   const emitChange = () => {
     const title = titleInput.value.trim();
     onChange({
@@ -407,7 +415,8 @@ export function createCalloutEditor(
       content: {
         style: styleSelect.value as typeof block.content.style,
         title: title.length > 0 ? title : undefined,
-        body: bodyInput.value
+        body: bodyInput.value,
+        ...(relatedTo ? { related_to: relatedTo } : {})
       }
     });
   };
@@ -416,7 +425,10 @@ export function createCalloutEditor(
   titleInput.addEventListener('input', emitChange);
   bodyInput.addEventListener('input', emitChange);
 
-  fields.append(styleSelect, titleInput, bodyInput);
+  const targetLabel = document.createElement('label');
+  targetLabel.textContent = 'Related activity or question';
+  targetLabel.append(targetSelect);
+  fields.append(styleSelect, titleInput, bodyInput, targetLabel);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -2757,7 +2769,7 @@ function createBlockEditorFields(
     case 'heading':
       return createHeadingEditor(block, onChange, latest as () => Extract<Block, { block_type: 'heading' }>);
     case 'callout':
-      return createCalloutEditor(block, onChange, latest as () => Extract<Block, { block_type: 'callout' }>);
+      return createCalloutEditor(block, onChange, latest as () => Extract<Block, { block_type: 'callout' }>, context);
     case 'image':
       return createImageEditor(
         block,
