@@ -2338,8 +2338,7 @@
     ],
     "subjects": [
       "Classics",
-      "Languages",
-      "Public Speaking"
+      "Languages"
     ],
     "month": "August",
     "age_groups": [
@@ -2355,6 +2354,13 @@
     "description": "Annual Latin and Greek reading competition for Years 10–11 run by the Classical Association of NSW. Students perform classical texts aloud, judged on pronunciation and expression. The Year 10 Chorus trophy honours Professor Kevin Lee.",
     "registration_link": "https://classics.org.au/events/latin-and-greek-reading-competition",
     "registration_window": "Heats June–July; state finals August",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -2391,6 +2397,13 @@
     "description": "Annual Latin essay competition for Year 12 students run by the CLTA of NSW, established in 1998 in honour of classics teacher Carol Manners. Students respond to essay questions on their prescribed HSC and IB Latin texts; winning essays are published in the journal Classicum.",
     "registration_link": "https://www.cltainc.org/",
     "registration_window": "Submissions due around July",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-07-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -2430,6 +2443,13 @@
     "description": "Global virtual business case competition for high school students run by CaseCatalyst. Teams of 3–4 solve real-world challenges faced by early-stage startups in developing and emerging economies, finishing with a live Pitch Day before founders and judges.",
     "registration_link": "https://studentcompetitions.com/competitions/casecatalyst-2026-virtual-case-competition-for-high-school-students",
     "registration_window": "Entries usually close around April",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
@@ -2470,6 +2490,13 @@
     "description": "International art and photography competition themed around city lights at night — neon, streetlights, high-rise windows and motion in the dark. Hosted by Ten Moir Gallery; open to artists and photographers worldwide.",
     "registration_link": "https://studentcompetitions.com/competitions/city-lights-art-challenge-2026-free-entry-early-bird",
     "registration_window": "Entries usually due late May",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -2491,8 +2518,7 @@
     ],
     "subjects": [
       "Classics",
-      "Languages",
-      "Public Speaking"
+      "Languages"
     ],
     "month": "August",
     "age_groups": [
@@ -2507,6 +2533,13 @@
     "description": "Annual Latin reading competition for Year 9 students run by the CLTA of NSW. Students prepare and perform Latin passages aloud, judged on pronunciation, expression, phrasing and understanding. Complements the CANSW competition for Years 10–11.",
     "registration_link": "https://www.cltainc.org/",
     "registration_window": "Register through CLTA ahead of the August event",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -2543,6 +2576,13 @@
     "description": "Residential Latin and classics camp for Year 8 students run by the CLTA of NSW. Brings together Latin students from many NSW schools for several days of immersive classics activities, language work and social events.",
     "registration_link": "https://www.cltainc.org/",
     "registration_window": "Usually Term 3–4; dates circulated to CLTA member schools",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -2585,6 +2625,13 @@
     "description": "Online coding competition for school students across multiple levels, run by Grok Academy.",
     "registration_link": null,
     "registration_window": "Register via Grok Academy before the event",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -2625,6 +2672,13 @@
     "description": "International open call for photographers submitting works where colour plays a central role, hosted by Grid Photo Gallery.",
     "registration_link": "https://studentcompetitions.com/competitions/color-open-call-2026-grid-photo-gallery",
     "registration_window": "Entries usually due mid-June",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -2668,6 +2722,13 @@
     "description": "National and international problem-solving competition run by the Australian Maths Trust focusing on computational and algorithmic thinking. No coding required.",
     "registration_link": "https://www.amt.edu.au/cat",
     "registration_window": "Register via AMT before the March competition window",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-03-01",
     "ends_on": "2026-03-31",
     "dates_precision": "month",
@@ -2709,6 +2770,13 @@
     "description": "Global innovation competition for students aged 13–18 working in teams of 2–5 to solve real-world problems across categories such as Aerospace & Aviation, Cyber-Technology & Security, Energy & Environment and Health & Nutrition.",
     "registration_link": "https://conradchallenge.org",
     "registration_window": "Register before the entry rounds (usually from August)",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -2746,6 +2814,13 @@
     "description": "Open design challenge to create a cordless lamp for off-grid contexts, hosted by Desall with a leading lighting company. Open to everyone worldwide.",
     "registration_link": "https://studentcompetitions.com/competitions/cordless-lamp-innovation-contest",
     "registration_window": "Entries usually due late June",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -2791,6 +2866,13 @@
     "description": "An original prose competition of up to 2000 words, open to Western Australian school students in Years 1 to 12.",
     "registration_link": "https://www.subiaco.wa.gov.au/see-do/things-to-see-do/community-awards/craig-silvey-award-for-young-writers",
     "registration_window": "Closes mid August",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -2833,6 +2915,13 @@
     "description": "Online competition testing students' cyber security skills and knowledge of digital safety, run by Grok Academy.",
     "registration_link": "https://groklearning.com/",
     "registration_window": "Register via Grok Academy before the event",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -2876,6 +2965,13 @@
     "description": "Academic gala for teams of eight competing across ten disciplines (engineering, mathematics and chess, code breaking, art and poetry, science, English, ideation, creative producers, cartography and legacy). Regional rounds lead to national finals at Knox Grammar.",
     "registration_link": "http://davincidecathlon.com/ events section",
     "registration_window": "Regionals in Term 2; register via host school beforehand",
+    "format": "Exam",
+    "provider": "School",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -2917,6 +3013,13 @@
     "description": "Online conference on the DMUN Discover MUN series simulating regional multilateral bodies: the African Union's Peace and Security Council and Commission, and the Council of the Arab League. Beginner-level committees on African and Middle Eastern crises.",
     "registration_link": "https://mymun.com/conferences/dmun-african-union-and-arab-league-2026",
     "registration_window": "Registrations close shortly before the late-September event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-09-21",
     "ends_on": "2026-09-30",
     "dates_precision": "part",
@@ -2937,7 +3040,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "History",
       "Debating"
     ],
@@ -2959,6 +3061,13 @@
     "description": "Online Model UN on the DMUN circuit themed Action, Mystery, History and Story. Delegates serve on war-council and crisis committees set across historical, present-day and speculative future scenarios. Free and open worldwide.",
     "registration_link": "https://mymun.com/conferences/dmundf-2025",
     "registration_window": "Registrations close shortly before the late-July event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-07-21",
     "ends_on": "2026-07-31",
     "dates_precision": "part",
@@ -2979,7 +3088,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "History",
       "Debating"
     ],
@@ -3001,6 +3109,13 @@
     "description": "Flagship year-end online conference of the DMUN circuit (around 500 delegates). Committees span Asian Parliamentary Debate, UNFCCC, ICJ, UNEP, Lok Sabha, European Parliament, a Historical Crisis Committee and the Council of the Arab League.",
     "registration_link": "https://mymun.com/conferences/dmun-championship-2026",
     "registration_window": "Registrations close shortly before the early-December event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-12-01",
     "ends_on": "2026-12-10",
     "dates_precision": "part",
@@ -3021,7 +3136,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Science",
       "Geography"
     ],
@@ -3043,6 +3157,13 @@
     "description": "Online conference on the DMUN circuit simulating the Conferences of the Parties (COPs) to three major UN environmental treaties: UNFCCC (climate), CBD (biodiversity) and UNCCD (desertification). Three beginner-level committees; around 500 delegates.",
     "registration_link": "https://mymun.com/conferences/dmun-conventions-2025",
     "registration_window": "Registrations close shortly before the September event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-09-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -3063,7 +3184,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "History",
       "Debating"
     ],
@@ -3085,6 +3205,13 @@
     "description": "Online crisis-format MUN on the DMUN circuit with fast-moving committees spanning historical, fictional and contemporary scenarios — from a Historical Crisis Committee and UNSC to zombie-apocalypse and AI-governance crises.",
     "registration_link": "https://mymun.com/conferences/dmun-crisis-2026",
     "registration_window": "Registrations close shortly before the late-October event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-21",
     "ends_on": "2026-10-31",
     "dates_precision": "part",
@@ -3105,7 +3232,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Debating"
     ],
     "month": "January",
@@ -3126,6 +3252,13 @@
     "description": "Online debate competition run by the DMUN Foundation in Asian Parliamentary and British Parliamentary formats. A large global event (around 2,000 delegates) with cash prizes for top performers.",
     "registration_link": "https://mymun.com/conferences/dmun-debate-forum-2026",
     "registration_window": "Registrations close shortly before the late-January event",
+    "format": "Speaking",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-01-21",
     "ends_on": "2026-01-31",
     "dates_precision": "part",
@@ -3149,7 +3282,6 @@
       "Debating",
       "Public Speaking",
       "Leadership",
-      "Humanities",
       "Economics"
     ],
     "month": "July",
@@ -3168,6 +3300,13 @@
     "description": "Online innovation forum run by the DMUN Foundation, held 11 to 12 July 2026 with around 500 delegates from university and school students. Delegates explore creative problem solving, diplomacy and global cooperation, designing solutions for challenges in technology, governance, economics and society. Theme: Innovating for Inclusive and Sustainable Development. Enquiries: enquiries@dmun.org",
     "registration_link": "https://mymun.com/dmun",
     "registration_window": "Chairs: 1 Apr to 5 Jul 2026. Delegates: 5 Apr to 12 Jul 2026. Observers: 14 Aug 2025 to 11 Jul 2026.",
+    "format": "Day event",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-07-11",
     "ends_on": "2026-07-12",
     "dates_precision": "day",
@@ -3190,9 +3329,9 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Legal",
-      "Debating"
+      "Debating",
+      "Civics"
     ],
     "month": "June",
     "age_groups": [
@@ -3209,6 +3348,13 @@
     "description": "Online Model European Union simulation run by the DMUN Foundation. A two-day conference across three chambers (European Parliament, European Commission, European Central Bank) focused on consensus building and negotiation among the 27 member states.",
     "registration_link": "https://mymun.com/conferences/list",
     "registration_window": "Registrations close shortly before the June event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -3247,6 +3393,13 @@
     "description": "Online legal simulation conference on the DMUN circuit focusing on precision argumentation, judicial questioning and case-building under pressure. Three beginner-level committees: UN GA Sixth Committee, International Criminal Court and ITLOS.",
     "registration_link": "https://mymun.com/conferences/dmun-moot-court-2026",
     "registration_window": "Registrations close shortly before the late-August event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-08-21",
     "ends_on": "2026-08-31",
     "dates_precision": "part",
@@ -3267,7 +3420,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Debating",
       "Legal"
     ],
@@ -3286,6 +3438,13 @@
     "description": "Online traditional Model UN run by the DMUN Foundation as a training ground for new and experienced delegates. Two-day forum across eight committees under standard parliamentary procedure on current UN agendas. Over 800 delegates expected.",
     "registration_link": "https://mymun.com/conferences/list",
     "registration_window": "Registrations close shortly before the August event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-08-01",
     "ends_on": "2026-08-31",
     "dates_precision": "month",
@@ -3306,7 +3465,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "Business",
       "Debating",
       "Legal"
@@ -3329,6 +3487,13 @@
     "description": "Online conference on the DMUN circuit with innovation and policy-oriented committees — Startup Parliament, Student Court, Policy Lab Council, SDG Solutions Council, Mental Health Council and Social Media Parliament among them.",
     "registration_link": "https://mymun.com/conferences/dmun-pitch-2026",
     "registration_window": "Registrations close shortly before the mid-October event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-10-11",
     "ends_on": "2026-10-20",
     "dates_precision": "part",
@@ -3349,7 +3514,6 @@
       "Event"
     ],
     "subjects": [
-      "Humanities",
       "History",
       "Debating"
     ],
@@ -3371,6 +3535,13 @@
     "description": "Online Model UN simulating the interwar League of Nations, run by the DMUN Foundation. Delegates debate across nine committees covering peacekeeping, refugees, disarmament, economics, labour, intellectual cooperation and colonial mandates. Around 1,800 delegates expected.",
     "registration_link": "https://mymun.com/conferences/dmunln-2026",
     "registration_window": "Registrations close shortly before the April event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
@@ -3392,8 +3563,8 @@
     ],
     "subjects": [
       "Legal",
-      "Humanities",
-      "Debating"
+      "Debating",
+      "Civics"
     ],
     "month": "June",
     "age_groups": [
@@ -3410,6 +3581,13 @@
     "description": "Online Model Parliament and Congress simulation run by the DMUN Foundation. A two-day legislative simulation across three chambers (UK House of Commons, US Congress, India's Lok Sabha) where delegates debate, negotiate and draft legislation on live policy issues.",
     "registration_link": "https://mymun.com/conferences/list",
     "registration_window": "Registrations close shortly before the June event",
+    "format": "Simulation",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": "2026-06-01",
     "ends_on": "2026-06-30",
     "dates_precision": "month",
@@ -3455,6 +3633,14 @@
     "description": "Annual Australian poetry writing competition open to students from Kindergarten to Year 12 enrolled in Australian education settings, with an awards ceremony later in the year.",
     "registration_link": "https://www.dorotheamackellar.com.au",
     "registration_window": "Entries usually open March, close late June",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3493,6 +3679,13 @@
     "description": "Weekly term drama classes for young performers.",
     "registration_link": null,
     "registration_window": "Wednesdays during term",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3538,6 +3731,13 @@
     "description": "A creative writing competition run by Dymocks Tutoring.",
     "registration_link": "https://beyondwords.dymockstutoring.edu.au",
     "registration_window": "TBA",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3576,6 +3776,13 @@
     "description": "Ethics and philosophy event for secondary students, exploring moral reasoning and ethical questions through discussion and structured activities. Hosted at Rosebank College.",
     "registration_link": null,
     "registration_window": "Register through the host school before the event",
+    "format": "Day event",
+    "provider": "School",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-05-01",
     "ends_on": "2026-05-31",
     "dates_precision": "month",
@@ -3617,6 +3824,13 @@
     "description": "Primary enrichment competition spanning English, science, mathematics and humanities, with Lower Primary (Years 1–3) and Upper Primary (Years 4–6) divisions.",
     "registration_link": null,
     "registration_window": "Register before the competition window",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-07-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -3637,7 +3851,8 @@
       "Competition"
     ],
     "subjects": [
-      "Humanities"
+      "Classics",
+      "Languages"
     ],
     "month": "January",
     "age_groups": [
@@ -3657,6 +3872,14 @@
     "description": "Introductory Latin examination for Years 3–8, run by Excellence Through Classics (a committee of the American Classical League). Two levels with an annual theme, offered on paper or online via Lingco.",
     "registration_link": "https://class.lingco.io/goto/ele_2026",
     "registration_window": "Usually 1 November – 10 February",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2025-11-01",
     "ends_on": "2026-02-10",
     "dates_precision": "part",
@@ -3697,6 +3920,13 @@
     "description": "Umbrella entry for the full family of EAE award categories (27 in total), recognising extracurricular achievement. Open for nominations year round.",
     "registration_link": "https://awards.eae.international",
     "registration_window": "Open for nominations year round. Quarterly review cycles, alternating individual and team entries. Current submission window closes 15 November 2026.",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3739,6 +3969,13 @@
     "description": "A poetry award for poets aged 14 and under, submitting a poem of up to 40 lines on any theme.",
     "registration_link": "https://fawtas.org.au/competitions/",
     "registration_window": "Closes 31 August",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3783,6 +4020,14 @@
     "description": "Large-scale high school robotics competition in which teams build industrial-sized robots each season, competing in alliance-based matches at events with awards and judging. Supported in Australia by FIRST Australia.",
     "registration_link": "https://www.firstaustralia.org/first-robotics-competition",
     "registration_window": "Register before the build season",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3827,6 +4072,14 @@
     "description": "Team-based robotics program in which students design, build and program robots to compete in alliance-based games — a mid-scale step between FIRST LEGO League and FRC. Supported in Australia by FIRST Australia.",
     "registration_link": "https://www.firstaustralia.org/first-tech-challenge",
     "registration_window": "Register before the season begins",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school",
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3866,6 +4119,13 @@
     "description": "Philosophy and critical-thinking forum hosted at Rosebank College. Each school sends up to 10 students (1 speaker, 1 adjudicator, remainder as judges and discussion participants). Speeches are judged on originality, engagement and cogency rather than oration. Community of inquiry discussions follow each group of three speeches. Day concludes with a whole-group ethical dilemma. Limited to 9 schools.",
     "registration_link": null,
     "registration_window": "Book by end of Term 2. Student names, speech topic, teacher details and dietary requirements due Week 3, Term 3.",
+    "format": "Day event",
+    "provider": "School",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Individual",
+    "entry_route": "School enters",
     "starts_on": "2026-09-01",
     "ends_on": "2026-09-30",
     "dates_precision": "month",
@@ -3905,6 +4165,13 @@
     "description": "A monthly flash fiction challenge with a short writing window and a cash prize.",
     "registration_link": "https://www.writerscentre.com.au/furious-fiction/",
     "registration_window": "First weekend of every month",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3941,6 +4208,13 @@
     "description": "A selective online program bringing together high school students from around the world to collaborate with experienced student mentors from top universities. Handpicked fellows identify, brainstorm and solve significant global challenges together.",
     "registration_link": "https://www.learnwithleaders.com/certificate_programs/the-future-changemakers-program-by-harvard-student-agencies-cohort/",
     "registration_window": "Cohorts run periodically; apply via the website",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Selection",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -3987,6 +4261,13 @@
     "description": "International problem-solving program in which students research future-focused topics and apply a structured process. Strands include Global Issues, Community Projects and Scenario/Creative Writing, with an Australian affiliate and an international conference pathway.",
     "registration_link": "https://fpspi.org/",
     "registration_window": "Problem cycles run through the school year",
+    "format": "Program",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Either",
+    "entry_route": "School enters",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4025,6 +4306,13 @@
     "description": "Formal psychology competition on the Future PsychScholars platform, where high school and undergraduate students showcase psychological research and compete in a structured academic context, including submitting research papers.",
     "registration_link": "https://psych-scholars.com/w/competition",
     "registration_window": "See website for competition rounds",
+    "format": "Written entry",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4063,6 +4351,13 @@
     "description": "International psychology open challenge hosted on the Future PsychScholars platform — an accessible entry point offering structured challenges that build knowledge, research skills and competitive experience.",
     "registration_link": "https://psych-scholars.com/w/open-challenge",
     "registration_window": "Rolling challenges; see website for rounds",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4101,6 +4396,13 @@
     "description": "Open design challenge for an innovative snack concept aimed at a young consumer audience, hosted by Desall with a leading food and beverage company. Open globally.",
     "registration_link": "https://studentcompetitions.com/competitions/future-snack-design",
     "registration_window": "Entries usually due mid-September",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4142,6 +4444,13 @@
     "description": "National team competition for high-ability primary students run by GATEWAYS Education (operating since 1994). Teams rotate through four scenario-based rounds with different academic focuses, structured so no single student can complete a round alone.",
     "registration_link": "https://www.gateways.edu.au/the-challenge",
     "registration_window": "Schools register ahead of Term 4 event days",
+    "format": "Exam",
+    "provider": "External",
+    "settings": [
+      "Away"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-10-01",
     "ends_on": "2026-10-31",
     "dates_precision": "month",
@@ -4184,6 +4493,13 @@
     "description": "Team challenge in which students brainstorm and create solutions addressing the UN Sustainable Development Goals, supported by workshops, global mentors and cross-cultural exchange.",
     "registration_link": "https://sdgschallenge.org",
     "registration_window": "Register before the challenge period opens",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Team",
+    "entry_route": "Student applies",
     "starts_on": "2026-04-01",
     "ends_on": "2026-04-30",
     "dates_precision": "month",
@@ -4225,6 +4541,13 @@
     "description": "Competition in which students worldwide investigate a community issue through field research and policy writing. Hosted by Build Learning, with cash prizes and a potential internship.",
     "registration_link": "https://studentcompetitions.com/competitions/global-impact-competition",
     "registration_window": "Entries usually due mid-June",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4268,6 +4591,13 @@
     "description": "Team competition within the Future Problem Solving program: teams of four apply a six-step creative problem-solving process to a global issue scenario. Junior (Years 4–6), Middle (Years 7–9) and Senior (Years 10–12) divisions.",
     "registration_link": null,
     "registration_window": "Register before the mid-year problem cycle",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "At school"
+    ],
+    "entry": "Team",
+    "entry_route": "School enters",
     "starts_on": "2026-07-01",
     "ends_on": "2026-07-31",
     "dates_precision": "month",
@@ -4309,6 +4639,13 @@
     "description": "International challenge for high school and university students interested in quantum physics, in a research-oriented but accessible format. Hosted by Edu.Harbour, with cash prizes in the senior category.",
     "registration_link": "https://studentcompetitions.com/competitions/global-quantum-mechanics-challenge-2026",
     "registration_window": "Entries usually due mid-June",
+    "format": "Project",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4347,6 +4684,13 @@
     "description": "Global call for innovative, not-yet-realised design concepts, hosted by the Taiwan Design Research Institute. Open to students, designers and companies worldwide.",
     "registration_link": "https://studentcompetitions.com/competitions/golden-pin-concept-design-award-2026",
     "registration_window": "Entries usually due mid-June",
+    "format": "Creative work",
+    "provider": "External",
+    "settings": [
+      "Online"
+    ],
+    "entry": "Individual",
+    "entry_route": "Student applies",
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
