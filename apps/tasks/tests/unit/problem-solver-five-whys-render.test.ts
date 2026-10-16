@@ -33,6 +33,16 @@ describe('5 Whys view', () => {
     expect(g.querySelector('.ps-objection')!.getAttribute('title')).toBe('That blames a person.');
   });
 
+  it('positions each node on its own row, separate from the animated body', () => {
+    const view = createFiveWhysView();
+    view.update(run([node('p', 'problem'), node('w1', 'why:1')]));
+    const p = view.el.querySelector('[data-node="p"]')!;
+    const w1 = view.el.querySelector('[data-node="w1"]')!;
+    expect(p.getAttribute('transform')).toBe('translate(0 0)');
+    expect(w1.getAttribute('transform')).toBe('translate(0 70)');
+    expect(w1.querySelector('.ps-whys__body')!.getAttribute('transform')).toBeNull();
+  });
+
   it('grows the viewBox with the chain and draws the root last', () => {
     const view = createFiveWhysView();
     const whys = [1, 2, 3, 4, 5].map((i) => node(`w${i}`, `why:${i}`));

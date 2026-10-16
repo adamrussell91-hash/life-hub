@@ -108,10 +108,16 @@ export function createFiveWhysView(doc: Document = document): FiveWhysView {
       if (!group) {
         group = doc.createElementNS(SVG, 'g') as SVGGElement;
         group.setAttribute('data-node', node.id);
-        group.append(shapeFor(doc, node), labelFor(doc, node), textFor(doc, node, height));
+        // The outer group is positioned with the SVG transform attribute; the inner
+        // group is animated. A running CSS transform would otherwise override the
+        // position and stack every new shape at the top.
+        const body = doc.createElementNS(SVG, 'g') as SVGGElement;
+        body.setAttribute('class', 'ps-whys__body');
+        body.append(shapeFor(doc, node), labelFor(doc, node), textFor(doc, node, height));
+        group.append(body);
         svg.append(group);
         drawn.set(node.id, group);
-        animateIn(group, kind);
+        animateIn(body, kind);
       }
       group.classList.toggle('is-contested', node.state === 'contested');
       group.setAttribute('transform', `translate(0 ${y})`);
