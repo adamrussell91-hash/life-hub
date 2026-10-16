@@ -18,8 +18,9 @@ import { HUB_LIST_ICONS, createHubMenuButton, openHubMenu } from '../../design-k
 /**
  * Teacher side of class examples, drawn inside each lesson block row.
  *
- * A quiet "+" on hover adds a box under the block. Each box gets its own
- * one-use three-digit code. Answers are kept per class, so switching the
+ * A quiet "+" on hover adds a box under the block. A block's boxes sit in a
+ * row of tabs and only the chosen one opens, so the lesson stays compact.
+ * Each box gets its own one-use three-digit code. Answers are kept per class, so switching the
  * class shows that class's answers and a reused lesson starts empty.
  */
 
@@ -119,6 +120,8 @@ export function createTeacherClassExamples(options: TeacherClassExamplesOptions)
   const editing = new Map<string, string>();
   const busy = new Set<string>();
   const fresh = new Set<string>();
+  /** Per block: the open tab's slot id, or null once the teacher closed it. */
+  const openTab = new Map<string, string | null>();
 
   function remembered(): string | null {
     try {
@@ -148,6 +151,7 @@ export function createTeacherClassExamples(options: TeacherClassExamplesOptions)
         const before = data.slots.find((row) => row.id === slot.id)?.entry.status;
         if ((before === 'writing' || before === 'open') && slot.entry.status === 'saved') {
           fresh.add(slot.id);
+          openTab.set(slot.block_id, slot.id);
           showHubToast(`${slot.label}: a student saved their example. Check it, then show it to the class.`, {
             tone: 'success'
           });
@@ -234,7 +238,13 @@ export function createTeacherClassExamples(options: TeacherClassExamplesOptions)
       confirmLabel: 'Add box'
     });
     if (!label || disposed) return;
-    await act({ action: 'add_slot', block_id: block.id, label });
+    const before = new Set(data?.slots.map((slot) => slot.id));
+    const result = await act({ action: 'add_slot', block_id: block.id, label });
+    const added = result?.slots.find((slot) => !before.has(slot.id));
+    if (added) {
+      openTab.set(block.id, added.id);
+      paintAll();
+    }
   }
 
   async function renameSlot(slot: TeacherExampleSlot): Promise<void> {
@@ -390,7 +400,7 @@ export function createTeacherClassExamples(options: TeacherClassExamplesOptions)
 
   function slotRow(slot: TeacherExampleSlot): HTMLElement {
     const { entry } = slot;
-    const row = el('li', 'cx-row');
+    const row = el('div', 'cx-row');
     row.dataset.slotId = slot.id;
     row.dataset.status = entry.shown ? 'shown' : entry.status;
     if (busy.has(slot.id)) row.classList.add('cx-row--busy');
@@ -402,9 +412,7 @@ export function createTeacherClassExamples(options: TeacherClassExamplesOptions)
     if (chip.live) chipEl.append(el('span', 'cx-chip__pulse'));
     chipEl.append(document.createTextNode(chip.text));
     const title = el('div', 'cx-row__title');
-    const name = el('span', 'cx-row__label', slot.label);
-    name.title = slot.label;
-    title.append(name, chipEl);
+    title.append(chipEl);
     top.append(title, slotMenu(slot));
     row.append(top);
 
@@ -477,6 +485,30 @@ export function createTeacherClassExamples(options: TeacherClassExamplesOptions)
     return row;
   }
 
+  /** A box that needs the teacher now: a code on screen, a student writing, a new answer. */
+  function needsTeacher(slot: TeacherExampleSlot): boolean {
+    const { status } = slot.entry;
+    return status === 'open' || status === 'writing' || status === 'locked' || fresh.has(slot.id) || editing.has(slot.id);
+  }
+
+  function tab(block: Block, slot: TeacherExampleSlot, on: boolean): HTMLButtonElement {
+    const chip = chipFor(slot);
+    const btn = button(on ? 'cx-tab cx-tab--on' : 'cx-tab', '', () => {
+      openTab.set(block.id, on ? null : slot.id);
+      paintAll();
+      document.querySelector<HTMLElement>(`.cx-tab[data-slot-id="${slot.id}"]`)?.focus();
+    });
+    btn.dataset.slotId = slot.id;
+    btn.setAttribute('aria-expanded', String(on));
+    btn.setAttribute('aria-controls', `cx-row-${slot.id}`);
+    btn.title = `${slot.label}: ${chip.text}`;
+    btn.append(el('span', 'cx-tab__label', slot.label));
+    const dot = el('span', `cx-tab__dot cx-tab__dot--${chip.tone}${chip.live ? ' cx-tab__dot--live' : ''}`);
+    dot.append(el('span', 'cx-sr', `, ${chip.text}`));
+    btn.append(dot);
+    return btn;
+  }
+
   function paintHost(host: HTMLElement, block: Block): void {
     const slots = data?.slots.filter((slot) => slot.block_id === block.id) ?? [];
     if (!slots.length) {
@@ -487,17 +519,36 @@ export function createTeacherClassExamples(options: TeacherClassExamplesOptions)
     host.hidden = false;
     const focusedSlot = (document.activeElement as HTMLElement | null)?.closest?.('.cx-row')?.getAttribute('data-slot-id');
 
+    // Until the teacher picks a tab, open whichever box needs them.
+    const chosen = openTab.get(block.id);
+    if (chosen === undefined || (chosen && !slots.some((slot) => slot.id === chosen))) {
+      const next = slots.find(needsTeacher)?.id;
+      if (next) openTab.set(block.id, next);
+      else openTab.delete(block.id);
+    }
+    const current = slots.find((slot) => slot.id === openTab.get(block.id)) ?? null;
+
     const panel = el('div', 'cx-panel');
     const head = el('div', 'cx-panel__head');
-    head.append(el('span', 'cx-panel__eyebrow', 'Class examples'), contextControl());
-    const list = el('ol', 'cx-panel__list');
-    for (const slot of slots) list.append(slotRow(slot));
-    const add = button('cx-panel__add', 'Add another', () => void addSlot(block));
-    const icon = el('span', 'cx-panel__add-icon');
-    icon.setAttribute('aria-hidden', 'true');
-    icon.innerHTML = plusIcon();
-    add.prepend(icon);
-    panel.append(head, list, add);
+    const tabs = el('div', 'cx-tabs');
+    tabs.append(el('span', 'cx-tabs__eyebrow', 'Class examples'));
+    const list = el('div', 'cx-tabs__list');
+    for (const slot of slots) list.append(tab(block, slot, slot.id === current?.id));
+    const add = button('cx-tab cx-tab--add', '', () => void addSlot(block));
+    add.setAttribute('aria-label', 'Add another example box');
+    add.title = 'Add another example box';
+    add.innerHTML = plusIcon();
+    list.append(add);
+    tabs.append(list);
+    head.append(tabs, contextControl());
+    panel.append(head);
+    if (current) {
+      const row = slotRow(current);
+      row.id = `cx-row-${current.id}`;
+      const holder = el('div', 'cx-panel__list');
+      holder.append(row);
+      panel.append(holder);
+    }
     // Clicks inside the panel belong to it, not to the block row.
     panel.addEventListener('click', (event) => event.stopPropagation());
     host.replaceChildren(panel);

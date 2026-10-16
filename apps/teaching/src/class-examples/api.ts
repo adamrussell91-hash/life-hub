@@ -80,7 +80,7 @@ export function fetchPublicExamples(lessonId: string, classId?: string): Promise
 export function unlockExample(
   lessonId: string,
   body: { class?: string; slot_id: string; code: string }
-): Promise<{ token: string }> {
+): Promise<{ token: string; context?: string }> {
   return apiPost(`/api/published/examples/${enc(lessonId)}/unlock`, body);
 }
 
