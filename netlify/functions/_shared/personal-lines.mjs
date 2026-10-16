@@ -82,6 +82,7 @@ function item(value) {
     description: str(value.description, 2000),
     link: link(value.link),
     format: nullableStr(value.format, 40),
+    subjects: strings(value.subjects, 12, 40),
     provider: nullableStr(value.provider, 40),
     settings: strings(value.settings, 3, 20),
     entry: nullableStr(value.entry, 40),
@@ -109,6 +110,7 @@ export function sanitizeLineSnapshot(body) {
       subjects: strings(body.subjects, 40, 40),
       lines: lines(body.lines),
       items: items.filter(entry => entry.run || entry.due),
+      branches: body.branches !== false,
       undated,
       terms: Array.isArray(body.terms)
         ? body.terms
