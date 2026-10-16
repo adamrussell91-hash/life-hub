@@ -2,16 +2,22 @@
 import { el } from '@/views/hub-kit';
 import { createFiveWhysView } from '../../../../../packages/problem-solver/render/five-whys';
 import { createGapBasicView } from '../../../../../packages/problem-solver/render/gap-basic';
+import { createGapRadarView } from '../../../../../packages/problem-solver/render/gap-radar';
+import { createSmartView } from '../../../../../packages/problem-solver/render/smart';
 import { renderOutline } from '../../../../../packages/problem-solver/render/outline';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
 import type { PsSession, PsToolId, PsToolRun } from '../../../../../packages/problem-solver/types';
 
-type View = { el: HTMLElement; update(run: PsToolRun): void };
+type Scores = { current: number[]; objective: number[] };
+type View = { el: HTMLElement; update(run: PsToolRun): void; onScore?(cb: (scores: Scores) => void): void };
+export type CanvasHandlers = { onScore?: (scores: Scores) => void };
 
 /** Tools that draw their own chart. Anything else falls back to the outline. */
 const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   five_whys: () => createFiveWhysView(),
-  gap_basic: () => createGapBasicView()
+  gap_basic: () => createGapBasicView(),
+  gap_radar: () => createGapRadarView(),
+  smart: () => createSmartView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string]> = [
@@ -35,7 +41,7 @@ function shownRun(session: PsSession): PsToolRun | null {
   return runs.find((run) => run.status === 'active') ?? runs.at(-1) ?? null;
 }
 
-export function mountCanvas(host: HTMLElement): { update(session: PsSession): void } {
+export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): { update(session: PsSession): void } {
   let current: { runId: string; view: View } | null = null;
 
   return {
@@ -53,7 +59,11 @@ export function mountCanvas(host: HTMLElement): { update(session: PsSession): vo
         host.replaceChildren(heading, renderOutline(run));
         return;
       }
-      if (!current || current.runId !== run.id) current = { runId: run.id, view: make() };
+      if (!current || current.runId !== run.id) {
+        const view = make();
+        view.onScore?.((scores) => handlers.onScore?.(scores));
+        current = { runId: run.id, view };
+      }
       current.view.update(run);
       const outline = renderOutline(run);
       outline.classList.add('sr-only');
