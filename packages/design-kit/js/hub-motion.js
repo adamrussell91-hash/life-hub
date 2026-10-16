@@ -190,6 +190,8 @@ function enhanceCard(el, reduced) {
   // Virtual list windows append or rebuild rows while scrolling. A reveal
   // here fades every visible card out and back in — archive flicker.
   if (el.closest('.list-window, .virtual-list__window')) return;
+  // Settled Tasks overview keeps hub-card shells across ticks — skip reveal flash.
+  if (el.closest('.dashboard-overview[data-hub-settled="1"]')) return;
   if (el.closest(CARD_SKIP) && !el.matches('.sign-in__card')) return;
   el.dataset.hubMotionCard = '1';
 

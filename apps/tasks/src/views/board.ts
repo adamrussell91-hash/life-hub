@@ -221,7 +221,11 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
   let applyTask: (task: Task) => void = () => undefined;
 
   paintOverview = (): void => {
-    const scrollTop = canvas.scrollTop;
+    // Overview refresh can shift layout; restore canvas, hub-canvas, and window scroll.
+    const scrollHost = canvas.closest('.hub-canvas');
+    const canvasTop = canvas.scrollTop;
+    const hostTop = scrollHost instanceof HTMLElement ? scrollHost.scrollTop : 0;
+    const { scrollX, scrollY } = window;
     renderDashboardOverview(overviewHost, {
       tasks,
       projects,
@@ -253,7 +257,9 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
         );
       }
     });
-    canvas.scrollTop = scrollTop;
+    canvas.scrollTop = canvasTop;
+    if (scrollHost instanceof HTMLElement) scrollHost.scrollTop = hostTop;
+    window.scrollTo(scrollX, scrollY);
   };
 
   paintOverview();

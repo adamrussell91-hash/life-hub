@@ -449,6 +449,41 @@ describe('renderDashboardOverview', () => {
     window.location.hash = hashBefore;
   });
 
+  it('refreshes agenda in place without remounting week/projects hub-cards', () => {
+    const host = document.createElement('div');
+    const open = task({ id: 't1', title: 'Mark essays', due_date: '2026-08-27', domain: 'teaching' });
+    const done = task({
+      id: 't1',
+      title: 'Mark essays',
+      due_date: '2026-08-27',
+      domain: 'teaching',
+      status: 'done',
+      completed_at: '2026-08-27T12:00:00.000Z'
+    });
+    renderDashboardOverview(host, {
+      now,
+      tasks: [open],
+      projects: [project({ id: 'p1', title: 'MindWorks' })]
+    });
+    const week = host.querySelector('.dashboard-overview__tile--week');
+    const projects = host.querySelector('.dashboard-overview__tile--projects');
+    const shell = host.querySelector('.dashboard-overview__shell');
+    expect(week?.textContent).toContain('Mark essays');
+
+    renderDashboardOverview(host, {
+      now,
+      tasks: [done],
+      projects: [project({ id: 'p1', title: 'MindWorks' })]
+    });
+
+    expect(host.querySelector('.dashboard-overview__shell')).toBe(shell);
+    expect(host.querySelector('.dashboard-overview__tile--week')).toBe(week);
+    expect(host.querySelector('.dashboard-overview__tile--projects')).toBe(projects);
+    expect(week?.textContent).not.toContain('Mark essays');
+    expect(week?.textContent).toContain('Clear.');
+    expect(host.dataset.hubSettled).toBe('1');
+  });
+
   it('wires start, complete, reschedule, and running-filter actions', () => {
     const onStartTask = vi.fn();
     const onCompleteTask = vi.fn();
