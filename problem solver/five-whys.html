@@ -1,0 +1,60 @@
+<div id="five-whys-bold-labels">
+
+<style>
+#five-whys-bold-labels{--fw-ink:light-dark(#202c33,#edf1f3);--fw-paper:light-dark(#fff,#20252a);--fw-border:light-dark(#dfe3e2,#424b51);color:var(--fw-ink);font-family:system-ui,-apple-system,sans-serif;max-width:540px;margin:auto}
+#five-whys-bold-labels *{box-sizing:border-box}
+#five-whys-bold-labels .fw-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:12px 0 18px;border-bottom:1px solid var(--fw-border)}
+#five-whys-bold-labels h2{font-family:Georgia,serif;font-size:30px;font-weight:400;letter-spacing:-.035em;margin:0}
+#five-whys-bold-labels .fw-tools{display:flex;gap:14px;flex-wrap:wrap}
+#five-whys-bold-labels button{font:400 12px system-ui;min-height:44px;padding:8px 0;background:transparent;color:var(--fw-ink);border:0;border-bottom:1px solid var(--fw-border);border-radius:0}
+#five-whys-bold-labels button:disabled{opacity:.35}
+#five-whys-bold-labels .fw-status{font:400 12px/1.5 system-ui;opacity:.65;padding:14px 0 26px}
+#five-whys-bold-labels .fw-diagram{width:min(100%,300px);margin:auto;padding:0 0 24px}
+#five-whys-bold-labels .fw-stage{display:grid;grid-template-rows:1fr;opacity:1;transform:none;transition:grid-template-rows 800ms cubic-bezier(.22,1,.36,1),opacity 450ms ease,transform 800ms cubic-bezier(.22,1,.36,1)}
+#five-whys-bold-labels .fw-stage.fw-concealed{grid-template-rows:0fr;opacity:0;transform:translateY(-24px) scaleY(.92);pointer-events:none}
+#five-whys-bold-labels .fw-inner{min-height:0;overflow:hidden}
+#five-whys-bold-labels .fw-link{height:6px;background:transparent}
+#five-whys-bold-labels .fw-node{position:relative;isolation:isolate;min-height:172px;padding:16px 0 0;text-align:center;transition:min-height 300ms ease}
+#five-whys-bold-labels .fw-node:before{content:"";position:absolute;inset:0;z-index:-1;background:#edbc2d;clip-path:polygon(0 0,100% 0,50% 100%)}
+#five-whys-bold-labels label{display:block;color:#433719;font:700 20px/1.4 system-ui;letter-spacing:0;margin:0 0 10px}
+#five-whys-bold-labels textarea{display:block;width:48%;margin:0 auto;padding:0;height:26px;min-height:26px;resize:none;overflow:hidden;border:0;border-radius:0;background:transparent;color:#433719;text-align:center;font:400 16px/1.4 system-ui;transition:height 260ms ease}
+#five-whys-bold-labels textarea::placeholder{color:#685622;opacity:.7}
+#five-whys-bold-labels .fw-problem{height:150px;padding-top:67px;min-height:150px}
+#five-whys-bold-labels .fw-problem:before{clip-path:ellipse(50% 100% at 50% 100%);background:#b82e32;border-radius:0}
+#five-whys-bold-labels .fw-root{height:150px;min-height:150px;padding-top:18px}
+#five-whys-bold-labels .fw-root:before{clip-path:ellipse(50% 100% at 50% 0);background:#254f77;border-radius:0}
+#five-whys-bold-labels .fw-problem label,#five-whys-bold-labels .fw-root label{color:#fff}
+#five-whys-bold-labels .fw-problem textarea,#five-whys-bold-labels .fw-root textarea{width:68%;color:#fff}
+#five-whys-bold-labels .fw-problem textarea::placeholder,#five-whys-bold-labels .fw-root textarea::placeholder{color:#fff;opacity:.7}
+#five-whys-bold-labels textarea:focus-visible,#five-whys-bold-labels button:focus-visible{outline:2px solid light-dark(#324e6b,#b0d0ec);outline-offset:4px}
+@media(max-width:400px){#five-whys-bold-labels .fw-tools{gap:12px}#five-whys-bold-labels .fw-diagram{width:min(100%,280px)}#five-whys-bold-labels .fw-node{min-height:172px}#five-whys-bold-labels .fw-problem,#five-whys-bold-labels .fw-root{height:140px;min-height:140px}#five-whys-bold-labels .fw-problem{padding-top:58px}}
+@media(prefers-reduced-motion:reduce){#five-whys-bold-labels *{transition:none!important;animation:none!important}}
+</style>
+<div class="fw-top"><h2>Five Whys</h2><div class="fw-tools"><button class="cursor-interaction" type="button" data-action="back" disabled>Back</button><button class="cursor-interaction" type="button" data-action="replay">Replay</button><button class="fw-next cursor-interaction" type="button" data-action="next">Add why 2</button></div></div>
+<div class="fw-status" role="status" aria-live="polite">Tap a shape to type. 1 of 5 whys revealed.</div>
+<div class="fw-diagram" aria-label="Editable Five Whys diagram">
+<div class="fw-stage"><div class="fw-inner"><div class="fw-node fw-problem"><label for="fw-answer-0">The problem</label><textarea id="fw-answer-0" rows="2" placeholder="Add problem"></textarea></div></div></div>
+<div class="fw-stage"><div class="fw-inner"><div class="fw-link" aria-hidden="true"></div><div class="fw-node"><label for="fw-answer-1">Why 1?</label><textarea id="fw-answer-1" rows="2" placeholder="Add answer"></textarea></div></div></div>
+<div class="fw-stage fw-concealed" inert aria-hidden="true"><div class="fw-inner"><div class="fw-link" aria-hidden="true"></div><div class="fw-node"><label for="fw-answer-2">Why 2?</label><textarea id="fw-answer-2" rows="2" placeholder="Add answer"></textarea></div></div></div>
+<div class="fw-stage fw-concealed" inert aria-hidden="true"><div class="fw-inner"><div class="fw-link" aria-hidden="true"></div><div class="fw-node"><label for="fw-answer-3">Why 3?</label><textarea id="fw-answer-3" rows="2" placeholder="Add answer"></textarea></div></div></div>
+<div class="fw-stage fw-concealed" inert aria-hidden="true"><div class="fw-inner"><div class="fw-link" aria-hidden="true"></div><div class="fw-node"><label for="fw-answer-4">Why 4?</label><textarea id="fw-answer-4" rows="2" placeholder="Add answer"></textarea></div></div></div>
+<div class="fw-stage fw-concealed" inert aria-hidden="true"><div class="fw-inner"><div class="fw-link" aria-hidden="true"></div><div class="fw-node"><label for="fw-answer-5">Why 5?</label><textarea id="fw-answer-5" rows="2" placeholder="Add answer"></textarea></div></div></div>
+<div class="fw-stage fw-concealed" inert aria-hidden="true"><div class="fw-inner"><div class="fw-link" aria-hidden="true"></div><div class="fw-node fw-root"><label for="fw-answer-6">The root cause</label><textarea id="fw-answer-6" rows="2" placeholder="Add cause"></textarea></div></div></div>
+</div>
+</div>
+<script>
+(()=>{
+const root=document.getElementById('five-whys-bold-labels');if(!root||root.dataset.ready)return;root.dataset.ready='true';
+const stages=Array.from(root.querySelectorAll('.fw-stage')),fields=Array.from(root.querySelectorAll('textarea'));
+const next=root.querySelector('[data-action="next"]'),back=root.querySelector('[data-action="back"]'),replay=root.querySelector('[data-action="replay"]'),status=root.querySelector('.fw-status');
+let visible=7,busy=false;
+function draw(n){stages.forEach((s,i)=>{s.classList.toggle('fw-concealed',i>=n);s.inert=i>=n;s.setAttribute('aria-hidden',String(i>=n))});next.disabled=busy||n===7;back.disabled=busy||n<=2;replay.disabled=busy;next.textContent=n===7?'Complete':n===6?'Add root cause':'Add why '+n;status.textContent=n===7?'Select any shape to edit. Replay builds the full diagram.':'Tap a shape to type. '+Math.max(0,n-1)+' of 5 whys revealed.'}
+function fit(field){const old=field.getBoundingClientRect().height;field.style.transition='none';field.style.height='auto';const target=Math.max(26,field.scrollHeight);field.style.height=old+'px';void field.offsetHeight;field.style.transition='';field.style.height=target+'px';const node=field.closest('.fw-node');if(node.classList.contains('fw-problem')||node.classList.contains('fw-root')){node.style.height=Math.max(150,target+105)+'px'}else{node.style.minHeight=Math.max(172,(target+60)*2)+'px'}}
+fields.forEach(f=>f.addEventListener('input',()=>fit(f)));
+next.addEventListener('click',()=>{if(busy||visible===7)return;visible++;draw(visible)});
+back.addEventListener('click',()=>{if(busy||visible<=2)return;visible--;draw(visible)});
+replay.addEventListener('click',async()=>{if(busy)return;busy=true;const target=visible;draw(0);const reduced=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;const wait=ms=>new Promise(r=>setTimeout(r,ms));await wait(reduced?0:180);for(let n=1;n<=target;n++){draw(n);await wait(reduced?0:420)}busy=false;draw(visible)});
+if(typeof ResizeObserver==='function'){let w=0;new ResizeObserver(entries=>{const width=entries[0].contentRect.width;if(Math.abs(width-w)>1){w=width;fields.forEach(fit)}}).observe(root)}
+draw(visible);
+})();
+</script>

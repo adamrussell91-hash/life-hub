@@ -1,0 +1,24 @@
+<div id="problem-statement-diagram-only">
+<style>
+#problem-statement-diagram-only{width:100%;max-width:580px;aspect-ratio:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);margin:0 auto;padding:0;gap:0;font-family:Arial,Helvetica,sans-serif}
+#problem-statement-diagram-only *{box-sizing:border-box}
+#problem-statement-diagram-only .ps-region{position:relative;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;padding:18px;overflow:hidden;color:#fff!important;text-align:center;cursor:text}
+#problem-statement-diagram-only .ps-problem{grid-column:1/-1;background:#df061c}
+#problem-statement-diagram-only .ps-impacts{background:#f4c327}
+#problem-statement-diagram-only .ps-benefits{background:#2b568c}
+#problem-statement-diagram-only .ps-content{width:100%;min-width:0;max-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#problem-statement-diagram-only label{display:block;margin:0;padding:0;color:#ffffff!important;-webkit-text-fill-color:#ffffff!important;font-family:Arial,Helvetica,sans-serif!important;font-size:20px!important;font-weight:700!important;line-height:1.15!important;text-transform:none!important;letter-spacing:0!important;text-align:center;cursor:text}
+#problem-statement-diagram-only label span{display:block;color:#ffffff!important;-webkit-text-fill-color:#ffffff!important}
+#problem-statement-diagram-only textarea{display:block;width:100%;border:0;border-radius:0;margin:0;padding:0;min-height:0;height:0;resize:none;overflow:auto;opacity:0;background:transparent!important;color:#ffffff!important;-webkit-text-fill-color:#ffffff!important;font:400 16px/1.4 Arial,Helvetica,sans-serif;text-align:center;transition:height 300ms cubic-bezier(.22,1,.36,1),margin 300ms ease,opacity 250ms ease}
+#problem-statement-diagram-only .ps-region:focus-within textarea,#problem-statement-diagram-only .ps-filled textarea{height:76px;margin-top:14px;opacity:1}
+#problem-statement-diagram-only textarea:focus-visible{outline:1px solid #ffffff80;outline-offset:4px}
+@media(max-width:380px){#problem-statement-diagram-only .ps-region{padding:12px}#problem-statement-diagram-only .ps-region:focus-within textarea,#problem-statement-diagram-only .ps-filled textarea{height:60px;margin-top:10px}}
+@media(prefers-reduced-motion:reduce){#problem-statement-diagram-only textarea{transition:none}}
+</style>
+<div class="ps-region ps-problem"><div class="ps-content"><label for="ps-only-problem">The problem</label><textarea id="ps-only-problem" rows="2" aria-label="The problem" spellcheck="true"></textarea></div></div>
+<div class="ps-region ps-impacts"><div class="ps-content"><label for="ps-only-impacts">Impacts</label><textarea id="ps-only-impacts" rows="2" aria-label="Impacts" spellcheck="true"></textarea></div></div>
+<div class="ps-region ps-benefits"><div class="ps-content"><label for="ps-only-benefits"><span>Solution</span><span>benefits</span></label><textarea id="ps-only-benefits" rows="2" aria-label="Solution benefits" spellcheck="true"></textarea></div></div>
+</div>
+<script>
+(()=>{const root=document.getElementById('problem-statement-diagram-only');if(!root||root.dataset.ready)return;root.dataset.ready='true';root.querySelectorAll('.ps-region').forEach(region=>{const field=region.querySelector('textarea');region.addEventListener('click',e=>{if(e.target!==field)field.focus()});field.addEventListener('input',()=>region.classList.toggle('ps-filled',field.value.trim().length>0))})})();
+</script>
