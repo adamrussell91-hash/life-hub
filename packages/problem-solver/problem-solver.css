@@ -67,9 +67,9 @@
   font: var(--weight-regular) var(--text-sm) / 1.4 var(--font-ui);
 }
 
-.is-contested > .ps-whys__problem,
-.is-contested > .ps-whys__why,
-.is-contested > .ps-whys__root {
+.is-contested .ps-whys__problem,
+.is-contested .ps-whys__why,
+.is-contested .ps-whys__root {
   fill-opacity: 0.35;
   stroke: var(--ink);
   stroke-width: 1.5;
