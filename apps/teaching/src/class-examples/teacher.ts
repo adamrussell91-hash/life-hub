@@ -116,6 +116,7 @@ export function createTeacherClassExamples(options: TeacherClassExamplesOptions)
   let loadSeq = 0;
 
   const hosts = new Map<string, { host: HTMLElement; block: Block }>();
+  const expanded = new Set<string>();
   const editing = new Map<string, string>();
   const busy = new Set<string>();
   const fresh = new Set<string>();
@@ -234,6 +235,7 @@ export function createTeacherClassExamples(options: TeacherClassExamplesOptions)
       confirmLabel: 'Add box'
     });
     if (!label || disposed) return;
+    expanded.add(block.id);
     await act({ action: 'add_slot', block_id: block.id, label });
   }
 
@@ -489,7 +491,25 @@ export function createTeacherClassExamples(options: TeacherClassExamplesOptions)
 
     const panel = el('div', 'cx-panel');
     const head = el('div', 'cx-panel__head');
-    head.append(el('span', 'cx-panel__eyebrow', 'Class examples'), contextControl());
+    const toggle = el('button', 'tk-note__toggle', 'Class examples');
+    toggle.type = 'button';
+    const bodyId = `cx-panel-${lessonId}-${block.id}`;
+    toggle.setAttribute('aria-controls', bodyId);
+    const body = el('div', 'cx-panel__body');
+    body.id = bodyId;
+    const paintExpanded = () => {
+      const open = expanded.has(block.id);
+      body.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(open));
+      panel.classList.toggle('is-open', open);
+    };
+    toggle.addEventListener('click', () => {
+      if (expanded.has(block.id)) expanded.delete(block.id);
+      else expanded.add(block.id);
+      paintExpanded();
+    });
+    paintExpanded();
+    head.append(toggle, contextControl());
     const list = el('ol', 'cx-panel__list');
     for (const slot of slots) list.append(slotRow(slot));
     const add = button('cx-panel__add', 'Add another', () => void addSlot(block));
@@ -497,7 +517,8 @@ export function createTeacherClassExamples(options: TeacherClassExamplesOptions)
     icon.setAttribute('aria-hidden', 'true');
     icon.innerHTML = plusIcon();
     add.prepend(icon);
-    panel.append(head, list, add);
+    body.append(list, add);
+    panel.append(head, body);
     // Clicks inside the panel belong to it, not to the block row.
     panel.addEventListener('click', (event) => event.stopPropagation());
     host.replaceChildren(panel);
