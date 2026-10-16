@@ -26,6 +26,30 @@ actually does:
 
 That's a keyword guess, not data. It still shows the split: no group is more than a quarter of the line.
 
+## Decisions (Adam, 16 Oct 2026)
+
+- **Justice gets split.** Reclassify first, branch second.
+- **Classics and Languages are Expression, not Justice.** A Latin reading competition is about speaking
+  a classical language, not about justice. Classics and Languages stay as subjects (areas of interest),
+  but no Classics or Languages entry should land on Justice. Today 16 entries carry Classics or
+  Languages; they reach Justice through `Humanities` or `Public Speaking` (the CANSW and CLTA Latin
+  reading competitions are `Classics, Languages, Public Speaking`). The reclassification pass removes
+  those Justice-side subjects from them. Still to confirm: does Classics keep its Reasoning line
+  (set 14 Oct) or go to Expression only?
+- **Format values agreed:** Exam, Written entry, Speaking, Simulation, Project, Creative work, Day event,
+  Program. Mock legal stays in the draft list until the pass shows whether it earns its own value.
+- **Setting is two questions, not one** (see below): who designed it, and where it happens. Some things
+  are at school and online at once.
+- **Entry (Individual / Team / Either) is in.** Adam's idea: show it on the stop itself, for example a
+  solid outline for one and a dashed outline for another. Clash to solve at design time: dashed already
+  means "Not on map" today.
+- **Civics gets its own branch.** There are enough entries: youth parliaments, constitutional
+  conventions, the Youth Advisory Council, Informed Civics, Young Justice, the ALHR human rights forum,
+  DMUN Model Parliament, roughly 10. Civics is a topic, not a format, so it's a new Justice subject
+  (`Civics`), not a `format` value.
+- **Order of work:** reclassify and fill all 290 entries first. Then look at the real counts and
+  branch by the largest differentiator first, like a network map. Thresholds wait until then.
+
 **Root cause worth fixing too.** `Humanities` is on 77 entries and is a catch-all. It puts the Latin,
 Greek and mythology exams on Justice (Medusa, NLE, NGE in the screenshot), because they carry
 `Classics` + `Humanities`. Those belong on Reasoning and Expression via Classics. Either drop
@@ -56,19 +80,29 @@ The main axis. This is what Adam's examples are really about: exams line, essay 
 One value per entry. `Mock legal` is small (3) but is the clearest Justice-only branch, so keep it; the
 layout folds small branches back in (below).
 
-### 2. `setting`: where it happens
+### 2. `provider` and `setting`: who runs it, and where
 
-`location` is free text with 40+ spellings ("Online (global)", "At school (paper or online)",
-"Bond University, Gold Coast QLD"). Normalise to:
+Adam, 16 Oct: the natural split is school-designed vs external, then where it happens, and some
+entries are in more than one place (sat at school, online).
+
+**`provider`** (one value):
+
+| Value | Meaning |
+| --- | --- |
+| `School` | Designed and run by a school: our own programs, a host school's MUN or Toga Day |
+| `External` | Designed by an outside organiser, even if the student sits it at school (NLE, AHC, Mock Trial) |
+
+**`setting`** (one or more values):
 
 | Value | Meaning | Now (rough) |
 | --- | --- | --- |
 | `At school` | Sat or run at the student's school, teacher supervises | 58 |
-| `Online` | From home or anywhere, no venue | 132 |
+| `Online` | Online, from school or home | 132 |
 | `Away` | Student travels to a venue, campus or another school | 99 |
 
-Keep `location` for the card. This gives Adam's "school based" vs "external" split, and a teacher
-filter ("only things we run here").
+"Completely online" is `setting = [Online]` alone. "At school and online" is `[At school, Online]`.
+`location` stays as free text for the card. The rough counts are from today's free-text `location`
+(40+ spellings) and will move once multi-values are allowed.
 
 ### 3. `entry`: who enters
 
@@ -81,7 +115,12 @@ filter ("only things we run here").
 `cost_basis` hints at this (`Per team` on 34) but isn't the same thing. It matters on the card and for
 a teacher building a team.
 
-### 4. `entry_route`: how they get in
+### 4. `topic`: Civics subject
+
+Add `Civics` to the subject list, on Justice only. It takes parliament, convention, council, rule of
+law and human rights entries, which today sit under `Legal` or `Humanities`.
+
+### 5. `entry_route`: how they get in
 
 | Value | Meaning |
 | --- | --- |
@@ -109,19 +148,21 @@ early. Not a branch axis.
 
 ## Slices
 
-0. **Data.** Add the four optional enum fields to `ProgramObject` in
-   `apps/tasks/src/schemas/program.ts` and to the catalogue item editor. Run an extraction pass that
-   proposes values for all 290 entries, for Adam to approve in batches. Fix the `Humanities` over-tag
-   in the same pass.
-1. **Snapshot.** Carry `format`, `setting`, `entry`, `entry_route` on `LineItem` (`personal-line/model.ts`).
+0. **Data first.** Add `format`, `provider`, `setting`, `entry`, `entry_route` as optional fields on
+   `ProgramObject` in `apps/tasks/src/schemas/program.ts`, add `Civics` to `PROGRAM_SUBJECTS`, and set
+   Classics and Languages to Expression only in `personal-line/lines.ts`. Run a reclassification pass
+   that proposes values for all 290 entries, including subject fixes (Classics/Languages off Justice,
+   `Humanities` trimmed where a narrower subject fits, `Civics` added), for Adam to approve in batches.
+0b. **Count, then decide.** Print the real counts per line by format, provider and setting. Branch by
+   the largest differentiator first. Set thresholds from those counts.
+1. **Snapshot.** Carry `format`, `provider`, `setting`, `entry`, `entry_route` on `LineItem` (`personal-line/model.ts`).
    All four are public-safe.
 2. **Branch layout** in `personal-line/render.ts`, behind the builder's Branch by option.
 3. **Card tags** and a Setting filter in the builder.
 
 ## Open questions
 
-- Is `format` the right default branch, or does Adam want `setting` (school vs external) first?
-- Should Classics exams leave Justice entirely, i.e. drop `Humanities` from them?
-- Branch thresholds: fold under 3 stops, max 4 branches per line. Right numbers?
-- Are there Justice-specific branches beyond these (for example a "Civics" branch for parliament and
-  convention programs, split from Model UN)?
+- Classics: Expression only, or Expression and Reasoning?
+- Entry on the stop: which marks for Individual / Team / Either, given dashed already means "Not on map"?
+- Does Mock legal (3 entries) stay its own format or fold into Simulation?
+- Which dimension branches first, and the fold thresholds: decide after the reclassification counts.
