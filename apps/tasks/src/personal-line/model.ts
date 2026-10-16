@@ -28,6 +28,12 @@ export type LineItem = {
   location: string;
   description: string;
   link: string | null;
+  /** Classification (16 Oct 2026). Optional: snapshots published before it don't carry them. */
+  format?: string | null;
+  provider?: string | null;
+  settings?: string[];
+  entry?: string | null;
+  entry_route?: string | null;
 };
 
 export type TermSpan = { id: string; start: string; end: string };
@@ -71,11 +77,8 @@ function overlapsYear(item: LineItem, year: number): boolean {
   return false;
 }
 
-function itemFrom(program: Program, subjects: Set<string>): LineItem | null {
-  const matched = program.subjects.filter((subject) => subjects.has(subject));
-  if (!matched.length) return null;
-  const on = linesForSubjects(matched);
-  if (!on.length) return null;
+/** One catalogue entry as a line item, on every line its own subjects reach (may be none). */
+export function catalogueItem(program: Program, matched: string[] = program.subjects): LineItem {
   const type = program.types.includes('Program')
     ? 'Program'
     : program.types.includes('Competition')
@@ -85,7 +88,7 @@ function itemFrom(program: Program, subjects: Set<string>): LineItem | null {
     id: program.id,
     name: program.name,
     type,
-    on,
+    on: linesForSubjects(matched),
     matched,
     years: yearsOf(program),
     run:
@@ -105,8 +108,20 @@ function itemFrom(program: Program, subjects: Set<string>): LineItem | null {
     organiser: program.organiser,
     location: program.location,
     description: program.description,
-    link: program.registration_link
+    link: program.registration_link,
+    format: program.format,
+    provider: program.provider,
+    settings: [...program.settings],
+    entry: program.entry,
+    entry_route: program.entry_route
   };
+}
+
+function itemFrom(program: Program, subjects: Set<string>): LineItem | null {
+  const matched = program.subjects.filter((subject) => subjects.has(subject));
+  if (!matched.length) return null;
+  const item = catalogueItem(program, matched);
+  return item.on.length ? item : null;
 }
 
 const startOf = (item: LineItem) => item.run?.start ?? item.due?.on ?? '9999';
