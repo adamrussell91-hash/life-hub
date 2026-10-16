@@ -15,6 +15,9 @@ import { PlanningProfileUpdateSchema } from '../src/schemas/planning-profile';
 import { PlanningDirectionUpdateSchema } from '../src/schemas/planning-direction';
 import { localStubClareJudge } from '../src/ai/clare-proposal-judge';
 import { lineSummary, newLineSlug, sanitizeLineSnapshot } from '../../../netlify/functions/_shared/personal-lines.mjs';
+import { createProblemSolverService } from '../../../netlify/functions/_shared/problem-solver/service.mjs';
+import { createMemoryProblemStore } from '../../../netlify/functions/_shared/problem-solver/store.mjs';
+import { scriptedCoach } from '../../../netlify/functions/_shared/problem-solver/scripted-coach.mjs';
 
 export function createMemoryKv(): KvAdapter & { map: Map<string, unknown> } {
   const map = new Map<string, unknown>();
@@ -141,6 +144,7 @@ export function createMockApi({ seed }: MockApiOptions) {
   }
 
   const personalLines = new Map<string, Record<string, unknown> & { slug: string }>();
+  const problemSolver = createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach });
 
   async function handle(method: string, urlPath: string, body?: unknown) {
     await ensure();
@@ -422,6 +426,26 @@ export function createMockApi({ seed }: MockApiOptions) {
         const slug = url.searchParams.get('slug') ?? '';
         personalLines.delete(slug);
         return json(200, { ok: true, data: { slug, deleted: true } });
+      }
+    }
+
+    if (path === '/api/problem-solver') {
+      try {
+        if (method === 'GET') {
+          if (url.searchParams.has('list')) return json(200, { ok: true, data: { sessions: await problemSolver.list('operator') } });
+          return json(200, { ok: true, data: { session: await problemSolver.get('operator', url.searchParams.get('id') ?? '') } });
+        }
+        if (method === 'POST') {
+          const payload = (body ?? {}) as Record<string, unknown>;
+          let session = payload.create
+            ? await problemSolver.create('operator', payload.create as Record<string, unknown>)
+            : await problemSolver.action('operator', payload);
+          if (session.runner.status === 'queued') session = await problemSolver.run('operator', session.id);
+          return json(200, { ok: true, data: { session } });
+        }
+      } catch (error) {
+        const err = error as { status?: number; code?: string; message?: string };
+        return json(err.status ?? 500, { ok: false, error: { code: err.code ?? 'problem_solver_failed', message: err.message ?? 'Failed' } });
       }
     }
 
