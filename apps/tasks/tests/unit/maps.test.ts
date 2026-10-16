@@ -11,6 +11,7 @@ import {
   crossingKind,
   exportMapHtml,
   isOrthogonalPath,
+  foldStrandLinks,
   pickCurrentYearMap,
   segmentCrossings,
   stationLineCuts
@@ -920,5 +921,23 @@ describe('screenshot regressions (Expression gallery, Reasoning olympiad)', () =
     expect(branch.points[0]!.x).toBeCloseTo(pill.x + TM_PILL_W / 2, 5);
     const r1 = layout.draw.stops.find((stop) => stop.tickId === 'tk_r1')!;
     expect(r1.dots[0]!.x).toBeGreaterThan(pill.x + TM_PILL_W / 2);
+  });
+});
+
+describe('strand links fold into Sits on', () => {
+  it('turns an old "also connect to" strand link into one more strand, leaving competition links alone', () => {
+    const base = mindWorks2026Map();
+    const map = {
+      ...base,
+      ticks: base.ticks.map((tick) =>
+        tick.id === 'tk_davinci' && tick.attach.kind === 'line' ? { ...tick, connects_to: 'Reasoning' } : tick
+      )
+    };
+    const folded = foldStrandLinks(map);
+    const davinci = folded.ticks.find((tick) => tick.id === 'tk_davinci')!;
+    expect(davinci.connects_to).toBeNull();
+    expect(davinci.also_lines).toContain('line_reasoning');
+    expect(folded.ticks.find((tick) => tick.id === 'tk_evatt')!.connects_to).toBe('Rotary MUNA');
+    expect(foldStrandLinks(base)).toBe(base);
   });
 });
