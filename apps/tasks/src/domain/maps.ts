@@ -169,5 +169,40 @@ export function stationAt(stations: MapStation[], id: string): MapStation | unde
 
 export function mapsOrSeed(maps: TransitMap[] | null | undefined): TransitMap[] {
   const list = maps && maps.length > 0 ? maps : [mindWorks2026Map()];
-  return list.map((map) => normalizeLineColors(map));
+  return list.map((map) => foldStrandLinks(normalizeLineColors(map)));
+}
+
+/** What a free-text "connects to" names: a competition first, else a strand. */
+export function connectTargetOf(
+  map: TransitMap,
+  connectsTo: string | null
+): { kind: 'event' | 'line'; id: string } | null {
+  if (!connectsTo) return null;
+  const text = connectsTo.toLowerCase();
+  const event = map.ticks.find(
+    (tick) => tick.id.toLowerCase() === text || tick.label.toLowerCase() === text || text.includes(tick.label.toLowerCase())
+  );
+  if (event) return { kind: 'event', id: event.id };
+  const line = map.lines.find((item) => text.includes(item.name.toLowerCase()) || text.includes(item.id.toLowerCase()));
+  return line ? { kind: 'line', id: line.id } : null;
+}
+
+/**
+ * Older cards linked a competition to another strand with "Also connect to". A competition on a
+ * year line now simply sits on several strands, so such a link becomes one more strand.
+ * Returns the same map when nothing changes.
+ */
+export function foldStrandLinks(map: TransitMap): TransitMap {
+  let changed = false;
+  const ticks = map.ticks.map((tick) => {
+    if (tick.attach.kind !== 'line' || tick.all_year) return tick;
+    const target = connectTargetOf(map, tick.connects_to);
+    if (target?.kind !== 'line') return tick;
+    changed = true;
+    const host = tick.attach.line_id;
+    const also = new Set(tick.also_lines ?? []);
+    if (target.id !== host) also.add(target.id);
+    return { ...tick, connects_to: null, ...(also.size ? { also_lines: [...also] } : {}) };
+  });
+  return changed ? { ...map, ticks } : map;
 }
