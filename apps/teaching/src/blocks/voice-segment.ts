@@ -190,3 +190,36 @@ export function assertClipCoverage(clips: SegmentClip[], duration: number): bool
   }
   return true;
 }
+
+/**
+ * No transcript (Whisper unavailable and no live captions): each tap starts a
+ * clip pinned to the tapped line, running to the next tap. Speech before the
+ * first tap becomes an unpinned opening clip.
+ */
+export function clipsFromTaps(input: {
+  taps: Array<{ t: number; anchor: AnnotationAnchor }>;
+  duration: number;
+}): SegmentClip[] {
+  const duration = Math.max(0, input.duration);
+  const taps = input.taps
+    .filter((tap) => tap.t >= 0 && tap.t < duration)
+    .slice()
+    .sort((a, b) => a.t - b.t);
+  const base = { word_range: [0, 0] as [number, number], confidence: 1, approved: true, transcript_text: '' };
+  if (taps.length === 0) {
+    return [{ ...base, id: 'clip_1', start_s: 0, end_s: duration, source: 'manual' }];
+  }
+  const clips: SegmentClip[] = [];
+  const firstStart = Math.max(0, taps[0]!.t - LEAD_IN_S);
+  if (firstStart >= MERGE_GAP_S) {
+    clips.push({ ...base, id: '', start_s: 0, end_s: firstStart, source: 'manual' });
+  }
+  taps.forEach((tap, index) => {
+    const start = index === 0 && firstStart < MERGE_GAP_S ? 0 : Math.max(0, tap.t - LEAD_IN_S);
+    const next = taps[index + 1];
+    const end = next ? Math.max(start, next.t - LEAD_IN_S) : duration;
+    if (end <= start) return;
+    clips.push({ ...base, id: '', start_s: start, end_s: end, anchor: tap.anchor, source: 'tap' });
+  });
+  return clips.map((clip, index) => ({ ...clip, id: `clip_${index + 1}` }));
+}
