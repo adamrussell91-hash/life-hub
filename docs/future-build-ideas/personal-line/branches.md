@@ -164,7 +164,9 @@ early. Not a branch axis.
 - **Next:** Cursor recatalogues all 290 entries:
   [`docs/proposals/catalogue-classification-cursor-brief.md`](../../proposals/catalogue-classification-cursor-brief.md).
 - **Then:** real counts per line, pick the branch order, set thresholds.
-- **Separately:** the catalogue database and card restyle.
+- **16 Oct, later:** Programs page rebuilt as Platforms (mockup 2, with a next-service board) and
+  Timetable (mockup 3), opening the departure-board card (mockup 1). Year and Subject filters on both.
+  See [`catalogue-restyle/`](catalogue-restyle/README.md).
 
 ## Open questions
 
