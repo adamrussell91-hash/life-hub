@@ -27,6 +27,7 @@ import {
   editText,
   ExampleError,
   isSafeId,
+  markLiveContext,
   normaliseContext,
   openSlot,
   readTeacherExamples,
@@ -81,6 +82,9 @@ async function payload(store, lessonId, context) {
   return { ...examples, contexts };
 }
 
+/** Actions on one class's answers; each marks that class as the one being taught. */
+const CONTEXT_ACTIONS = new Set(['open', 'close', 'show', 'hide', 'edit_text', 'clear']);
+
 const ACTIONS = {
   add_slot: (store, id, _ctx, body, deps) => addSlot(store, id, body, deps),
   rename_slot: (store, id, _ctx, body, deps) => renameSlot(store, id, body, deps),
@@ -129,6 +133,7 @@ export function createLessonExamplesHandler(deps = {}) {
 
     try {
       const result = await run(store, lessonId, exampleContext, body, deps);
+      if (CONTEXT_ACTIONS.has(body.action)) await markLiveContext(store, lessonId, exampleContext, deps);
       const data = await payload(store, lessonId, exampleContext);
       return withCors(
         okResponse(200, body.action === 'remove_slot' ? { ...data, removed: result } : data),

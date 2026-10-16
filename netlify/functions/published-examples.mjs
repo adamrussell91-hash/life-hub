@@ -10,7 +10,7 @@ import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
 import { isDeletedRecord } from './_shared/record-liveness.mjs';
 import { draftLessonKey, getJSON, publishedLessonKey } from './_shared/teaching-blobs.mjs';
-import { isSafeId, normaliseContext, readPublicExamples } from './_shared/class-examples.mjs';
+import { isSafeId, readPublicExamples, resolveStudentContext } from './_shared/class-examples.mjs';
 
 export const config = { path: '/api/published/examples/:id' };
 
@@ -40,8 +40,11 @@ export function createPublishedExamplesHandler(deps = {}) {
     }
 
     const lessonId = readLessonId(request, context);
-    const exampleContext = normaliseContext(new URL(request.url).searchParams.get('class'));
-    if (!exampleContext || !(await isLivePublishedLesson(store, lessonId))) {
+    const live = await isLivePublishedLesson(store, lessonId);
+    const exampleContext = live
+      ? await resolveStudentContext(store, lessonId, new URL(request.url).searchParams.get('class'), deps)
+      : null;
+    if (!exampleContext) {
       return withCors(errorResponse(404, 'not_found', 'Lesson is not published', false), request, env);
     }
 
