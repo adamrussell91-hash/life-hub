@@ -31,3 +31,7 @@ test('define prompt lists the tool steps and open slots', () => {
   assert.match(prompt.user, /Open slots: problem/);
   assert.match(prompt.user, /Ask why\?/);
 });
+
+test('rubric says frame answers use "frame", not "node"', () => {
+  assert.ok(RUBRIC.includes('In phase frame, use "frame" for accepted answers instead of "node"; "node" is only for phase define.'));
+});

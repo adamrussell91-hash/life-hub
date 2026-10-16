@@ -32,7 +32,10 @@ export async function defaultInvokeRun(request, id, env, fetchImpl = fetch) {
   return response.status === 202 || response.ok;
 }
 
-const fail = (error, request, env) => withCors(errorResponse(error.status ?? 502, error.code ?? 'problem_solver_failed', error.message ?? 'Problem Solver request failed.', (error.status ?? 502) >= 500), request, env);
+const fail = (error, request, env) => {
+  const status = error.status ?? (error.code === 'illegal_slot' ? 409 : 502);
+  return withCors(errorResponse(status, error.code ?? 'problem_solver_failed', error.message ?? 'Problem Solver request failed.', status >= 500), request, env);
+};
 
 export function createProblemSolverHandler(deps = {}) {
   return createSessionOriginHandler(async (request, context) => {

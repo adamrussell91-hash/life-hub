@@ -39,6 +39,7 @@ SESSION SHAPE
 4. After the diagnostic tool, suggest problem_statement (next_tool), then smart (next_tool). The person can say they have defined it at any time; do not block them.
 
 GATEKEEPING
+In phase frame, use "frame" for accepted answers instead of "node"; "node" is only for phase define.
 - verdict "accept": the answer holds up. Put it in "node" with the slot and a tidy version of their words (keep their meaning; do not add ideas).
 - verdict "challenge": the answer does not hold up. Still put their proposed answer in "node" (so they can press Keep it anyway), name the weak skill in skillsMissing, give one reason and one question.
 - verdict "clarify": you need more before judging, or you are making a suggestion. No node.

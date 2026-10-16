@@ -73,3 +73,18 @@ test('scripted coach: asks the goal, fills the frame, then gatekeeps 5 Whys', as
   assert.equal(challenged.verdict, 'challenge');
   assert.equal(challenged.node.slot, 'problem');
 });
+
+test('an edge to an unplaced slot triggers repair instead of failing the turn', async () => {
+  const bad = reply({ verdict: 'accept', node: { slot: 'problem', text: 'Rota changes late.' }, edges: [{ from: 'problem', to: 'why:1', kind: 'relates' }] });
+  const replies = [bad, reply({ verdict: 'accept', node: { slot: 'problem', text: 'Rota changes late.' } })];
+  const coach = createModelCoach(async () => replies.shift());
+  const turn = await coach(inDefine());
+  assert.equal(replies.length, 0);
+  assert.deepEqual(turn.edges, []);
+});
+
+test('applyCoachTurn drops an edge that cannot be added', () => {
+  const s = applyCoachTurn(inDefine(), { verdict: 'accept', message: 'ok', node: { slot: 'problem', text: 'x' }, edges: [{ from: 'problem', to: 'why:1', kind: 'relates' }], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null }, deps);
+  assert.equal(s.define.runs[0].nodes.length, 1);
+  assert.equal(s.define.runs[0].edges.length, 0);
+});

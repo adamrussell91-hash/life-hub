@@ -1,7 +1,13 @@
 // netlify/functions/_shared/problem-solver/session.mjs
-import { addEdge, isComplete as isRunComplete, newRun, placeNode } from '../../../../packages/problem-solver/machine.mjs';
+import { addEdge, canEdge, canPlace, isComplete as isRunComplete, newRun, placeNode } from '../../../../packages/problem-solver/machine.mjs';
 
 const TITLE_MAX = 120;
+const TEXT_MAX = 12000;
+const LINKS_MAX = 20;
+
+function checkLength(text) {
+  if (text.length > TEXT_MAX) throw Object.assign(new Error('That is too long; keep it under 12,000 characters.'), { status: 413, code: 'limit' });
+}
 
 function touch(session, deps) {
   return { ...session, updatedAt: deps.now() };
@@ -27,6 +33,7 @@ export function createSession({ title = '', text, links = [] }, deps) {
   const at = deps.now();
   const clean = String(text ?? '').trim();
   if (!clean) throw Object.assign(new Error('Describe the problem to start.'), { status: 400, code: 'validation_error' });
+  checkLength(clean);
   return {
     id: deps.newId(),
     title: (String(title).trim() || clean).slice(0, TITLE_MAX),
@@ -35,7 +42,7 @@ export function createSession({ title = '', text, links = [] }, deps) {
     phase: 'frame',
     frame: {},
     model: null,
-    links: links.filter((link) => ['task', 'project', 'goal'].includes(link?.kind) && typeof link.id === 'string').map(({ kind, id }) => ({ kind, id })),
+    links: links.slice(0, LINKS_MAX).filter((link) => ['task', 'project', 'goal'].includes(link?.kind) && typeof link.id === 'string').map(({ kind, id }) => ({ kind, id })),
     define: { runs: [], finishedEarly: false, exitObjection: null },
     turns: [userTurn(clean, deps)],
     summary: '',
@@ -51,6 +58,7 @@ export function createSession({ title = '', text, links = [] }, deps) {
 export function say(session, text, deps) {
   const clean = String(text ?? '').trim();
   if (!clean) throw Object.assign(new Error('Write something first.'), { status: 400, code: 'validation_error' });
+  checkLength(clean);
   return queue(touch({ ...session, turns: [...session.turns, userTurn(clean, deps)] }, deps));
 }
 
@@ -92,7 +100,9 @@ export function applyCoachTurn(session, turn, deps) {
         turnId: coachTurn.id
       });
       for (const edge of turn.edges) {
-        placed = addEdge(placed, { from: slotToId(placed, edge.from), to: slotToId(placed, edge.to), kind: edge.kind });
+        const from = slotToId(placed, edge.from);
+        const to = slotToId(placed, edge.to);
+        if (canEdge(placed, from, to, edge.kind)) placed = addEdge(placed, { from, to, kind: edge.kind });
       }
       next = { ...replaceRun(next, placed), pendingKeep: null };
     } else if (run && turn.node && turn.verdict === 'challenge') {
@@ -103,7 +113,7 @@ export function applyCoachTurn(session, turn, deps) {
   return touch({
     ...next,
     turns: [...next.turns, coachTurn],
-    suggestion: turn.suggestion ?? null,
+    suggestion: session.runner.mode === 'closing' ? null : (turn.suggestion ?? null),
     summary: turn.summary ?? next.summary
   }, deps);
 }
@@ -112,6 +122,7 @@ export function keepAnyway(session, deps) {
   const keep = session.pendingKeep;
   const run = activeRun(session);
   if (!keep || !run || run.id !== keep.runId) throw Object.assign(new Error('Nothing to keep.'), { status: 409, code: 'action_not_allowed' });
+  if (!canPlace(run, keep.slot)) throw Object.assign(new Error('That answer no longer fits here.'), { status: 409, code: 'action_not_allowed' });
   const placed = placeNode(run, { id: deps.newId(), slot: keep.slot, text: keep.text, state: 'contested', objection: keep.objection, skills: keep.skills, turnId: null });
   return touch({ ...replaceRun(session, placed), pendingKeep: null, turns: [...session.turns, userTurn('Keep it anyway.', deps)] }, deps);
 }
@@ -152,7 +163,7 @@ export function rename(session, title, deps) {
 }
 
 export function archive(session, deps) {
-  return touch({ ...session, status: 'archived' }, deps);
+  return touch({ ...session, status: 'archived', runner: { status: 'idle', mode: 'turn', error: null } }, deps);
 }
 
 /** Small list row. Index rows (no turns) pass through unchanged. */

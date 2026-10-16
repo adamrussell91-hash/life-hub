@@ -74,3 +74,14 @@ test('no store configured is 503', async () => {
   const res = await handler(new Request('https://life.example/api/problem-solver?list=1', { headers: { cookie: `life_hub_session=${SESSION}` } }));
   assert.equal(res.status, 503);
 });
+
+test('an unstatused illegal_slot error maps to 409', async () => {
+  const store = { ...createMemoryProblemStore(), read: async () => { throw Object.assign(new Error('Slot x is not open.'), { code: 'illegal_slot' }); } };
+  const handler = createProblemSolverHandler({ env: ENV, now: () => NOW, getStore: async () => store, coach: scriptedCoach, invokeRun: async () => true });
+  const res = await handler(new Request('https://life.example/api/problem-solver', {
+    method: 'POST',
+    headers: { cookie: `life_hub_session=${SESSION}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ id: '11111111-1111-4111-8111-111111111111', action: 'say', text: 'x' })
+  }));
+  assert.equal(res.status, 409);
+});
