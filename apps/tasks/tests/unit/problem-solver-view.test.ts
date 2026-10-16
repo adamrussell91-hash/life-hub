@@ -50,7 +50,7 @@ describe('canvas', () => {
     canvas.update(session({ phase: 'frame', frame: { goal: 'Ship it' }, define: { runs: [], finishedEarly: false, exitObjection: null } }));
     expect(host.querySelector('.ps-frame')!.textContent).toContain('Ship it');
     canvas.update(session());
-    expect(host.querySelector('svg.ps-whys')).not.toBeNull();
+    expect(host.querySelector('.ps-whys')).not.toBeNull();
   });
 
   it('falls back to the outline for tools without a renderer yet', () => {
