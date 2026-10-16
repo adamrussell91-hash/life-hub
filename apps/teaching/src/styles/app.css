@@ -12206,7 +12206,20 @@ button.block-annotation__margin-note.is-collapsed:hover {
   font-weight: var(--weight-semibold);
   color: var(--navy);
 }
-.callout__identity svg { width: 1.25rem; height: 1.25rem; flex: none; }
+/* Pictograms share the kit palette and remain identical at both ends of a link. */
+.callout__identity { --callout-icon-tone: var(--pastel-blue); }
+.callout__identity[data-callout-style="important"],
+.callout__identity[data-callout-style="remember"] { --callout-icon-tone: var(--pastel-gold); }
+.callout__identity[data-callout-style="warning"] { --callout-icon-tone: var(--pastel-peach); }
+.callout__identity[data-callout-style="extension"],
+.callout__identity[data-callout-style="teacher"] { --callout-icon-tone: var(--pastel-lilac); }
+.callout__identity[data-callout-style="scaffold"],
+.callout__identity[data-callout-style="example"] { --callout-icon-tone: var(--pastel-sage); }
+.callout__identity svg { width: var(--space-6); height: var(--space-6); flex: none; }
+.callout__icon-wash { fill: var(--callout-icon-tone); stroke: none; }
+@media (forced-colors: active) {
+  .callout__icon-wash { fill: Canvas; stroke: CanvasText; }
+}
 .callout-reference { position: relative; max-width: 100%; margin-left: auto; }
 .callout-reference > summary {
   display: flex;
@@ -12226,20 +12239,36 @@ button.block-annotation__margin-note.is-collapsed:hover {
   align-items: center;
   justify-content: center;
   flex: none;
-  min-width: 1.75rem;
-  height: 1.75rem;
-  padding: 0 var(--space-1);
-  border: 1px solid var(--navy);
-  border-radius: var(--radius-xs);
+  min-height: 2rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
   background: var(--paper);
   color: var(--navy);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
 }
-.block:has(> .callout-ref), .block-question-set__question:has(> .callout-ref) { position: relative; }
-.block > .callout-ref { position: absolute; top: var(--space-3); right: var(--space-12); }
-.block-question-set__question > .callout-ref { position: absolute; right: 0; top: 0; }
-.block-question-set__question:has(> .callout-ref) > .block-question-set__prompt { padding-right: var(--space-10); }
+.callout-ref-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-bottom: var(--space-2);
+}
+.block-question-set__question > .callout-ref-list {
+  justify-content: flex-start;
+  margin: var(--space-2) 0 var(--space-2) var(--space-8);
+}
+.callout-ref-list > .callout-reference { margin-left: 0; }
+.callout-reference--attached > summary { padding: 0; }
+.callout-reference--attached .callout-ref { min-height: 44px; }
+.callout-reference--attached[open] .callout-ref,
+.callout-reference--attached > summary:hover .callout-ref {
+  background: var(--pastel-blue);
+  border-color: var(--wave);
+}
 .callout-ref__preview {
   position: absolute;
   right: 0;
@@ -12270,6 +12299,8 @@ button.block-annotation__margin-note.is-collapsed:hover {
 }
 @media (max-width: 720px) {
   .callout-reference { margin-left: 0; width: 100%; }
+  .callout-ref-list > .callout-reference { width: auto; }
+  .callout-ref-list .callout-ref__preview { position: fixed; left: var(--space-4); right: var(--space-4); top: 25vh; width: auto; max-width: none; }
   .callout-ref__preview { left: 0; right: auto; width: min(22rem, calc(100vw - 4rem)); }
 }
 @media print {
