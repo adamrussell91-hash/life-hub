@@ -9922,6 +9922,39 @@ body.is-lesson-builder-full-page .hub-utilities {
   gap: var(--space-2);
 }
 
+/* Voice bar under the Text / Annotate switch: Record and the recordings list. */
+.block-editor__annotation-voice-tracks {
+  margin-block: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line, #d7d2c8);
+  border-radius: var(--radius-md, 10px);
+}
+
+.block-editor__annotation-voice-tracks:empty {
+  display: none;
+}
+
+.block-editor__annotation-voice-tracks .block-editor__annotation-voice-toolbar {
+  align-items: center;
+  margin-top: 0;
+}
+
+.block-editor__annotation-voice-track-meta {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.block-editor__annotation-voice-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.block-editor__annotation-voice-delete {
+  min-height: 44px;
+  color: var(--danger, #b3261e);
+}
+
 .block-editor__annotation-section-title {
   margin: 0;
   font-family: var(--font-ui);

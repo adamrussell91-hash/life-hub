@@ -441,3 +441,66 @@ describe('annotation editor voice recorder', () => {
     mount.remove();
   });
 });
+
+describe('annotation editor voice bar', () => {
+  function mountWith(block: typeof dulceAnnotationFixture) {
+    const mount = document.createElement('div');
+    document.body.append(mount);
+    let latest = block;
+    mount.append(
+      createAnnotationEditor(
+        block,
+        (next) => {
+          latest = next as typeof block;
+        },
+        () => latest
+      )
+    );
+    return { mount, latest: () => latest };
+  }
+
+  it('sits above the poem and Record works with no Voice layer yet', () => {
+    const block = structuredClone(dulceAnnotationFixture);
+    block.content.layers = block.content.layers.filter((layer) => layer.kind !== 'voice');
+    const { mount, latest } = mountWith(block);
+    const bar = mount.querySelector<HTMLElement>('.block-editor__annotation-voice-tracks')!;
+    const annotatePane = mount.querySelector<HTMLElement>('.block-editor__annotation-annotate-pane')!;
+    expect(bar.compareDocumentPosition(annotatePane) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    bar.querySelector<HTMLButtonElement>('.btn--primary')!.click();
+    expect(latest().content.layers.some((layer) => layer.kind === 'voice')).toBe(true);
+    expect(mount.querySelector('.block-editor__annotation-voice-recorder')).toBeTruthy();
+    mount.remove();
+  });
+
+  it('deletes a recording after confirming', async () => {
+    const block = structuredClone(dulceAnnotationFixture);
+    block.content.layers.push({ id: 'layer_voice', name: 'Voice', kind: 'voice', colour: 'wave' });
+    block.content.voice_tracks = [
+      {
+        id: 'voice_1',
+        layer_id: 'layer_voice',
+        kind: 'think_aloud',
+        title: 'Think aloud',
+        audio: { url: '/api/media/m/file', duration_s: 29, mime: 'audio/mp4' },
+        transcript: { words: [], timing: 'estimated' },
+        clips: [],
+        status: 'draft'
+      }
+    ];
+    const { mount, latest } = mountWith(block);
+    const row = mount.querySelector<HTMLElement>('[data-track-id="voice_1"]')!;
+    expect(row.textContent).toContain('Think aloud · 0:29 · Draft');
+    row.querySelector<HTMLButtonElement>('.block-editor__annotation-voice-delete')!.click();
+    const confirm = await vi.waitFor(() => {
+      const btn = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+        (b) => b.textContent === 'Delete recording'
+      );
+      if (!btn) throw new Error('no confirm');
+      return btn;
+    });
+    confirm.click();
+    await vi.waitFor(() => expect(latest().content.voice_tracks ?? []).toHaveLength(0));
+    expect(mount.querySelector('[data-track-id="voice_1"]')).toBeNull();
+    mount.remove();
+  });
+});
