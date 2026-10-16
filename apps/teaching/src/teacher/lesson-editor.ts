@@ -58,6 +58,7 @@ import {
 } from '@/teacher/lesson-canvas/builderFullPage';
 import { insertAt, nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { replaceBlockInTree } from '@/ai/block-tree';
+import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import { openNameModal } from '@/teacher/create/name-modal';
 import { createLessonTemplate } from '@/teacher/template-api';
 import { fetchCurriculum } from '@/teacher/nav';
@@ -240,6 +241,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       } else {
         delete lesson.outcome_ids;
       }
+      if (typeof next.feedback_off === 'boolean') lesson.feedback_off = next.feedback_off;
     }
 
     function bumpDraftClock(): void {
@@ -854,6 +856,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     historyHost.className = 'history-panel-host context-bar__history';
     const actions = refs.contextBar.querySelector('.context-bar__actions');
     const studentPath = teacherPreviewUrl('lesson', lesson.id);
+    const feedbackMenuLabel = () =>
+      lesson.feedback_off ? 'Turn on student feedback' : 'Turn off student feedback';
     const optionsMenu = mountPageOptionsMenu(
       [
         {
@@ -878,6 +882,22 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           onSelect: () => {
             if (!lesson.published_at) return;
             window.open(teacherPreviewUrl('lesson', lesson.id), '_blank', 'noopener,noreferrer');
+          }
+        },
+        {
+          label: feedbackMenuLabel(),
+          className: 'context-bar__feedback',
+          onSelect: () => {
+            assignLesson({ ...lesson, feedback_off: lesson.feedback_off !== true });
+            page?.update(lesson);
+            markDirty();
+            const item = optionsMenu.el.querySelector('.context-bar__feedback');
+            if (item) item.textContent = feedbackMenuLabel();
+            showHubToast(
+              lesson.feedback_off
+                ? 'Student feedback is off for this lesson. Publish changes to hide the dots.'
+                : 'Student feedback is on for this lesson. Publish changes to show the dots.'
+            );
           }
         },
         {

@@ -1,6 +1,7 @@
 import { FAILURE } from '@/app/failure';
 import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
+import { mountStudentBlockPulse } from '@/student/block-pulse';
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import { scheduleNeighbors } from '@/schedule/schedule-neighbors';
 import { formatStudentDate } from '@/student/format';
@@ -110,6 +111,11 @@ function renderPublishedLesson(
       })
     );
   }
+  mountStudentBlockPulse(blocks, {
+    lessonId: lesson.lesson_id,
+    blocks: lesson.blocks,
+    feedbackOff: lesson.feedback_off === true
+  });
   content.append(blocks);
 
   if (openNoteId && typeof history !== 'undefined' && history.replaceState) {

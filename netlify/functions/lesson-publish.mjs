@@ -195,7 +195,8 @@ export function createLessonPublishHandler(deps = {}) {
       published_at: publishedAt,
       schema_version: 1,
       ...(draft.cover ? { cover: draft.cover } : {}),
-      ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {})
+      ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+      ...(draft.feedback_off === true ? { feedback_off: true } : {})
     };
 
     await setJSON(store, publishedLessonKey(id), snapshot);
