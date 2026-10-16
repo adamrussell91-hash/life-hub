@@ -40,7 +40,7 @@ import { htmlToPlainText } from '@/blocks/search-text';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { parseStartTime, parseVideoInput } from '@/blocks/video-url';
 import { visitBlocks } from '@/blocks/walk-blocks';
-import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
+import { askConfirmCard, askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
 import {
   mountVoiceRecorder,
   type VoiceRecorderHandle
@@ -709,13 +709,42 @@ export function createAnnotationEditorFields(
     voicePanel.scrollIntoView?.({ block: 'nearest' });
   }
 
+  /** Record makes the Voice layer itself; no detour through Layers first. */
+  function ensureVoiceLayer(): AnnotationLayer {
+    const existing = voiceLayer();
+    if (existing) return existing;
+    const layer: AnnotationLayer = {
+      id: nextId(`${getLatest().id}_layer`),
+      name: 'Voice',
+      kind: 'voice',
+      colour: 'navy'
+    };
+    layers = [...layers, layer];
+    paintDefaultLayerOptions();
+    emitChange();
+    return layer;
+  }
+
+  async function deleteVoiceTrack(trackId: string): Promise<void> {
+    const track = voiceTracks.find((row) => row.id === trackId);
+    if (!track) return;
+    const ok = await askConfirmCard({
+      title: `Delete “${track.title}”?`,
+      supporting:
+        track.status === 'published'
+          ? 'Students will no longer hear it. This cannot be undone.'
+          : 'The recording and its clips are removed from this block. This cannot be undone.',
+      confirmLabel: 'Delete recording',
+      discardLabel: 'Keep it'
+    });
+    if (!ok) return;
+    if (reviewingTrackId === trackId) closeVoiceTools();
+    voiceTracks = voiceTracks.filter((row) => row.id !== trackId);
+    emitChange();
+  }
+
   function openVoiceRecorder(): void {
-    const layer = voiceLayer();
-    if (!layer) {
-      placeHint = 'Add a Voice layer before recording.';
-      placeStatus.textContent = placeHint;
-      return;
-    }
+    const layer = ensureVoiceLayer();
     closeVoiceTools();
     clearPending();
     window.getSelection()?.removeAllRanges();
@@ -767,15 +796,14 @@ export function createAnnotationEditorFields(
       onClose: () => {
         closeVoiceTools();
         paintVoiceTracks();
-      }
+      },
+      onDelete: () => void deleteVoiceTrack(trackId)
     });
     showVoicePanel(voiceReview.el);
   }
 
   function paintVoiceTracks(): void {
     voiceTracksHost.replaceChildren();
-    const layer = voiceLayer();
-    if (!layer) return;
 
     const toolbar = document.createElement('div');
     toolbar.className = 'block-editor__annotation-voice-toolbar';
@@ -793,7 +821,7 @@ export function createAnnotationEditorFields(
     if (voiceTracks.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'block-editor__hint';
-      empty.textContent = 'No recordings yet. Record opens beside the text.';
+      empty.textContent = 'No recordings yet. Record a reading or think-aloud; tap lines as you speak to pin them.';
       voiceTracksHost.append(empty);
       return;
     }
@@ -802,14 +830,28 @@ export function createAnnotationEditorFields(
     list.className = 'block-editor__annotation-voice-track-list';
     for (const track of voiceTracks) {
       const li = document.createElement('li');
+      li.className = 'block-editor__annotation-voice-track';
+      li.dataset.trackId = track.id;
       const meta = document.createElement('span');
-      meta.textContent = `${track.title} · ${track.status} · ${track.kind.replace('_', ' ')}`;
+      meta.className = 'block-editor__annotation-voice-track-meta';
+      const name = document.createElement('strong');
+      name.textContent = track.title;
+      const secs = Math.round(track.audio.duration_s);
+      const detail = document.createElement('span');
+      detail.textContent = ` · ${track.kind === 'think_aloud' ? 'Think aloud' : track.kind === 'reading' ? 'Reading' : 'Feedback'} · ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} · ${track.status === 'published' ? 'Published' : 'Draft'}`;
+      meta.append(name, detail);
       const reviewBtn = document.createElement('button');
       reviewBtn.type = 'button';
       reviewBtn.className = 'btn btn--secondary';
       reviewBtn.textContent = 'Review';
       reviewBtn.addEventListener('click', () => openVoiceReview(track.id));
-      li.append(meta, reviewBtn);
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'btn btn--ghost block-editor__annotation-voice-delete';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.setAttribute('aria-label', `Delete recording ${track.title}`);
+      deleteBtn.addEventListener('click', () => void deleteVoiceTrack(track.id));
+      li.append(meta, reviewBtn, deleteBtn);
       list.append(li);
     }
     voiceTracksHost.append(list);
@@ -1236,7 +1278,7 @@ export function createAnnotationEditorFields(
     if (voiceRecorder?.isCapturing()) {
       voiceRecorder.pushTap(anchor);
       clearPending();
-      flashPinnedLine(selection.lineId);
+      if (selection.lineId) flashPinnedLine(selection.lineId);
       return;
     }
 
@@ -2808,14 +2850,15 @@ export function createAnnotationEditorFields(
     blockConcepts
   );
 
+  // Voice sits with the mode switch, above the poem, so Record is in reach while reading.
   fields.append(
     intro,
     headRow,
     modeRow,
+    voiceTracksHost,
     textPane,
     annotatePane,
     layersDetails,
-    voiceTracksHost,
     settingsDetails
   );
   setMode(mode);
