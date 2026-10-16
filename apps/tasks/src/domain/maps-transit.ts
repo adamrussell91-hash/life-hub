@@ -52,6 +52,15 @@ export const TM_STOP_R = 8.5;
 export const TM_FINAL_R = 11;
 const STOP_RING_W = 2.2;
 const CAPSULE_R = TM_STOP_R + 4.5;
+/** A competition on several strands: its interchange sits this far beside the host year line. */
+const CROSS_OUT = 40;
+const BADGE_W = 24;
+const BADGE_H = 16;
+const BADGE_GAP = 4;
+/** Same-day stops on one line share an upright platform capsule with a small dot per event. */
+const PLATFORM_R = 11;
+const PLATFORM_DOT_R = 5;
+const PLATFORM_STEP = 26;
 export const TM_LABEL_FONT = 17;
 export const TM_SUB_FONT = 13;
 const LABEL_LINE_H = 20;
@@ -95,6 +104,19 @@ export type TransitStopDraw = {
   anchor: 'start' | 'end';
   w: number;
   h: number;
+  /**
+   * A competition on several strands: `dots[0]` is its interchange; a stop on each strand's
+   * year line joins it along a dotted rule, and a badge per strand sits under its name.
+   */
+  cross?: {
+    lineIds: string[];
+    trackId: string;
+    badges: Array<{ letter: string; color: MapColorToken }>;
+    rule: Point[];
+    railDots: Array<Point & { color: MapColorToken }>;
+  };
+  /** Same-day stops on one line: the platform capsule they share (same on every stop in it). */
+  platform?: { x: number; y0: number; y1: number };
 };
 
 /** Name of a program too short to hold it, set beside the pill. */
@@ -345,6 +367,10 @@ type LocalStop = {
   labelY: number;
   /** x relative to the stop dot (set once tracks are placed). */
   dotX: number[];
+  /** Strands (map order) a competition on several strands runs on; this strand hosts it. */
+  cross?: string[];
+  /** Shared platform capsule for same-day stops on one line (y range). */
+  platform?: { y0: number; y1: number };
 };
 
 type LocalBranch = {
@@ -438,9 +464,20 @@ function linksAway(map: TransitMap, tick: MapTick, lineId: string): boolean {
   return map.lines.some((line) => line.id !== lineId && text.includes(line.name.toLowerCase()));
 }
 
+/** Strands a year-line competition runs on, in map order, when it is on more than one. */
+function crossLineIds(map: TransitMap, tick: MapTick): string[] {
+  if (tick.attach.kind !== 'line' || tick.all_year || !tick.also_lines?.length) return [];
+  const wanted = new Set([tick.attach.line_id, ...tick.also_lines]);
+  const ids = map.lines.filter((line) => wanted.has(line.id)).map((line) => line.id);
+  return ids.length > 1 ? ids : [];
+}
+
 function homeLineId(map: TransitMap, tick: MapTick, stations: LocalStation[]): string | undefined {
   const root = rootOf(map, tick);
   const fallback = map.lines[0]?.id;
+  // A competition on several strands is hosted by the last of them, so its name sits at the end of its rule.
+  const cross = crossLineIds(map, root);
+  if (cross.length) return cross[cross.length - 1];
   if (root.attach.kind === 'line') {
     const lineId = root.attach.line_id;
     return map.lines.some((line) => line.id === lineId) ? lineId : fallback;
@@ -671,7 +708,10 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
       continue;
     }
     // Line stop (a competition on one or more year lines, or a round chained off one).
-    const rootAttach = root.attach.kind === 'line' && root.attach.line_id === line.id ? root.attach : null;
+    const rootAttach =
+      root.attach.kind === 'line' && (root.attach.line_id === line.id || crossLineIds(map, root).includes(line.id))
+        ? root.attach
+        : null;
     const picked = resolveLineAttachTracks(attachTracksOf(rootAttach ?? undefined), ids);
     const tracks = picked.map((id) => ids.indexOf(id)).filter((index) => index >= 0).sort((a, b) => a - b);
     const side: 'left' | 'right' = count > 1 && tracks.length === 1 && tracks[0] === 0 ? 'left' : 'right';
@@ -698,6 +738,15 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
       const stop: LocalStop = { tick, tracks: [track], y, side, branch: branch.id, final: false, label, sub, labelY: y, dotX: [] };
       branch.stops.push(stop);
       stops.push(stop);
+      continue;
+    }
+    const cross = tick === root ? crossLineIds(map, root) : [];
+    if (cross.length) {
+      // One interchange beside the host's outermost year line, its name to the right with a badge per strand.
+      const track = tracks.length ? tracks[tracks.length - 1]! : 0;
+      const badges = cross.length * (BADGE_W + BADGE_GAP) - BADGE_GAP;
+      const crossLabel = { ...label, w: Math.max(label.w, badges), h: label.h + BADGE_H + 6 };
+      stops.push({ tick, tracks: [track], y, side: 'right', branch: null, final: false, label: crossLabel, sub, labelY: y, dotX: [], cross });
       continue;
     }
     stops.push({ tick, tracks: tracks.length ? tracks : [0], y, side, branch: null, final: false, label, sub, labelY: y, dotX: [] });
@@ -783,6 +832,11 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
       stop.dotX = [branch.branchDX];
       continue;
     }
+    if (stop.cross) {
+      const rail = laneReach(clusters, stop.tracks[0]!, stop.y, 'right');
+      stop.dotX = [rail ? rail + TM_PILL_W / 2 + 16 : CROSS_OUT];
+      continue;
+    }
     stop.dotX = stop.tracks.map(() => 0);
   }
 
@@ -817,7 +871,7 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
   // A year-line stop whose name would land on a program rail or round branch beside the same line
   // flips to the free side, so its name stays next to its dot.
   for (const stop of stops) {
-    if (stop.branch || stop.onEdge || !stop.tick) continue;
+    if (stop.branch || stop.onEdge || stop.cross || !stop.tick) continue;
     const blocked = (side: 'left' | 'right') => {
       const track = side === 'right' ? Math.max(...stop.tracks) : Math.min(...stop.tracks);
       if (railBeside(clusters, track, side, stop.y - LABEL_LINE_H, stop.y + stop.label.h)) return true;
@@ -834,6 +888,42 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
   // A stop with a link to another strand keeps its label above the link.
   for (const stop of stops) {
     if (stop.tick && linksAway(map, stop.tick, line.id)) stop.labelY = stop.y - 8 - stop.label.h + LABEL_LINE_H / 2;
+  }
+
+  // Two or more events on one line on the same day share an upright platform capsule: a dot each,
+  // stacked so every name sits beside its own dot, with the date once under the last.
+  const platformKey = (stop: LocalStop) => stop.branch ?? `track:${stop.tracks[0]}`;
+  const candidates = stops
+    .filter((stop) => stop.tick && !stop.onEdge && !stop.cross && stop.tracks.length === 1)
+    .sort((a, b) => platformKey(a).localeCompare(platformKey(b)) || a.y - b.y);
+  const groups: LocalStop[][] = [];
+  for (const stop of candidates) {
+    const open = groups[groups.length - 1];
+    if (open && platformKey(open[0]!) === platformKey(stop) && stop.y - open[0]!.y < 4) open.push(stop);
+    else groups.push([stop]);
+  }
+  for (const group of groups) {
+    if (group.length < 2) continue;
+    const order = (stop: LocalStop) => map.ticks.findIndex((item) => item.id === stop.tick!.id);
+    group.sort((a, b) => a.y - b.y || order(a) - order(b));
+    const last = group[group.length - 1]!;
+    for (const stop of group) {
+      if (stop === last) continue;
+      stop.sub = '';
+      stop.label = stopLabel(stop.tick!.label, '');
+    }
+    const steps = group.slice(0, -1).map((stop) => Math.max(PLATFORM_STEP, stop.label.h + 6));
+    const span = steps.reduce((sum, step) => sum + step, 0);
+    let y = group[0]!.y - span / 2;
+    const side = group[0]!.side;
+    const platform = { y0: y - PLATFORM_R, y1: y + span + PLATFORM_R };
+    group.forEach((stop, index) => {
+      stop.y = y;
+      stop.labelY = y;
+      stop.side = side;
+      stop.platform = platform;
+      y += steps[index] ?? 0;
+    });
   }
 
   // Keep labels in one column from overprinting each other: later ones slide down.
@@ -1061,6 +1151,8 @@ function placeStrand(piece: StrandPiece): PlacedStrand {
       labelX = x + (branch.side === 'left' ? -LABEL_DX : LABEL_DX);
     } else {
       dots = stop.tracks.map((track, i) => ({ x: tx(track, stop.y) + (stop.dotX[i] ?? 0), y: stop.y }));
+      // The rule from the host year line to a cross-strand interchange.
+      if (stop.cross) boxes.push({ x0: tx(stop.tracks[0]!, stop.y), x1: dots[0]!.x, y0: stop.y - 4, y1: stop.y + 4 });
       const track = stop.side === 'left' ? Math.min(...stop.tracks) : Math.max(...stop.tracks);
       const dot = Math.abs(stop.dotX[stop.tracks.indexOf(track)] ?? 0);
       const span = labelSpan(stop);
@@ -1099,7 +1191,9 @@ function placeStrand(piece: StrandPiece): PlacedStrand {
       labelY: stop.labelY,
       anchor,
       w: stop.label.w,
-      h: stop.label.h
+      h: stop.label.h,
+      ...(stop.cross ? { cross: { lineIds: stop.cross, trackId: defs[stop.tracks[0]!]?.id ?? '', badges: [], rule: [], railDots: [] } } : {}),
+      ...(stop.platform ? { platform: { x: dots[0]!.x, y0: stop.platform.y0, y1: stop.platform.y1 } } : {})
     });
   }
 
@@ -1132,6 +1226,7 @@ function shiftPlaced(placed: PlacedStrand, dx: number): void {
   for (const stop of placed.stops) {
     stop.dots.forEach(move);
     stop.labelX += dx;
+    if (stop.platform) stop.platform.x += dx;
   }
   for (const flag of placed.flags) flag.labelX += dx;
   placed.header.x += dx;
@@ -1196,6 +1291,25 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
 
   const capTop = MAP_YEAR_TOP - CAP_LIFT;
   const capBottom = MAP_YEAR_BOTTOM + CAP_LIFT;
+
+  // Competitions on several strands: a stop on each strand's year line, joined to the interchange.
+  for (const stop of placedStrands.flatMap((placed) => placed.stops)) {
+    if (!stop.cross) continue;
+    const ring = stop.dots[0]!;
+    for (const lineId of stop.cross.lineIds) {
+      const placed = placedStrands.find((item) => item.piece.line.id === lineId);
+      const index = placed ? placed.piece.defs.findIndex((def) => def.id === stop.cross!.trackId) : -1;
+      if (!placed || index < 0) continue;
+      const line = placed.piece.line;
+      stop.cross.badges.push({ letter: line.letter, color: line.color });
+      stop.cross.railDots.push({ x: xAt(placed.trackLines[index]!, stop.y), y: stop.y, color: line.color });
+    }
+    const left = Math.min(ring.x, ...stop.cross.railDots.map((dot) => dot.x));
+    stop.cross.rule = [
+      { x: left, y: stop.y },
+      { x: ring.x, y: stop.y }
+    ];
+  }
 
   // Compatibility shapes for hit-testing, joining and the index.
   const lines: LaidLine[] = placedStrands.map((placed) => {
@@ -1384,6 +1498,14 @@ export function renderTransitSvg(layout: TransitLayout, options: TransitRenderOp
     );
   }
 
+  // Competitions on several strands: a grey dotted rule under everything, like an underpass.
+  for (const stop of draw.stops) {
+    if (!stop.cross) continue;
+    parts.push(
+      `<path class="tm-cross-rule" d="${roundedPath(stop.cross.rule)}" fill="none" stroke="${STOP_RING}" stroke-width="3" stroke-dasharray="0.1 7" stroke-linecap="round"/>`
+    );
+  }
+
   for (const header of draw.headers) {
     const tone = swatch(header.color);
     const strokeColor = tone.stroke;
@@ -1465,6 +1587,16 @@ export function renderTransitSvg(layout: TransitLayout, options: TransitRenderOp
       }
       parts.push('</g>');
     }
+    const platforms = new Set<string>();
+    for (const stop of draw.stops.filter((item) => item.lineId === header.lineId && item.platform)) {
+      const { x, y0, y1 } = stop.platform!;
+      const key = `${x}:${y0}`;
+      if (platforms.has(key)) continue;
+      platforms.add(key);
+      parts.push(
+        `<rect class="tm-platform" x="${x - PLATFORM_R}" y="${y0}" width="${PLATFORM_R * 2}" height="${y1 - y0}" rx="${PLATFORM_R}" fill="#fff" stroke="${STOP_RING}" stroke-width="${STOP_RING_W}"/>`
+      );
+    }
     for (const stop of draw.stops.filter((item) => item.lineId === header.lineId)) {
       const isSel = selectedId === stop.tickId;
       const tick = layout.ticks.find((item) => item.id === stop.tickId);
@@ -1479,6 +1611,12 @@ export function renderTransitSvg(layout: TransitLayout, options: TransitRenderOp
         for (const dot of stop.dots) {
           parts.push(`<circle class="tm-stop" cx="${dot.x}" cy="${dot.y}" r="${TM_STOP_R}" fill="#fff" stroke="${STOP_RING}" stroke-width="${STOP_RING_W}"/>`);
         }
+      } else if (stop.cross) {
+        const dot = stop.dots[0]!;
+        parts.push(`<circle class="tm-interchange map-tick__mark" cx="${dot.x}" cy="${dot.y}" r="${TM_FINAL_R}" fill="#fff" stroke="${INK}" stroke-width="4.5"/>`);
+      } else if (stop.platform) {
+        const dot = stop.dots[0]!;
+        parts.push(`<circle class="tm-platform-stop map-tick__mark" cx="${dot.x}" cy="${dot.y}" r="${PLATFORM_DOT_R}" fill="${stop.final ? INK : STOP_RING}"/>`);
       } else {
         const dot = stop.dots[0]!;
         parts.push(
@@ -1498,6 +1636,20 @@ export function renderTransitSvg(layout: TransitLayout, options: TransitRenderOp
           `<text class="tm-stop-sub" x="${stop.labelX}" y="${stop.labelY + stop.lines.length * LABEL_LINE_H - 2}" text-anchor="${stop.anchor}" dominant-baseline="central" font-size="${TM_SUB_FONT}">${esc(stop.sub)}</text>`
         );
       }
+      if (stop.cross) {
+        // A route badge per strand, like the line signs at a real interchange.
+        const top = stop.labelY - LABEL_LINE_H / 2 + stop.lines.length * LABEL_LINE_H + (stop.sub ? TM_SUB_FONT + 4 : 0) + 4;
+        const count = stop.cross.badges.length;
+        const width = count * (BADGE_W + BADGE_GAP) - BADGE_GAP;
+        const x0 = stop.anchor === 'start' ? stop.labelX : stop.labelX - width;
+        stop.cross.badges.forEach((badge, index) => {
+          const x = x0 + index * (BADGE_W + BADGE_GAP);
+          parts.push(
+            `<rect class="tm-badge" x="${x}" y="${top}" width="${BADGE_W}" height="${BADGE_H}" rx="4" fill="${swatch(badge.color).disc}"/>` +
+              `<text class="tm-badge-letter" x="${x + BADGE_W / 2}" y="${top + BADGE_H / 2}" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="800" fill="${swatch(badge.color).letter}">${esc(badge.letter)}</text>`
+          );
+        });
+      }
       if (showPorts && tick) {
         for (const port of tick.ports) {
           parts.push(`<circle class="map-port" data-port="${esc(port.id)}" cx="${port.x}" cy="${port.y}" r="4" fill="${PAPER}" stroke="${strokeColor}"/>`);
@@ -1506,6 +1658,14 @@ export function renderTransitSvg(layout: TransitLayout, options: TransitRenderOp
       parts.push('</g>');
     }
     parts.push('</g>');
+  }
+  // A stop on each strand a cross-strand competition runs on, over the year lines.
+  for (const stop of draw.stops) {
+    for (const dot of stop.cross?.railDots ?? []) {
+      parts.push(
+        `<circle class="tm-cross-stop" data-id="${esc(stop.tickId)}" cx="${dot.x}" cy="${dot.y}" r="${TM_STOP_R}" fill="#fff" stroke="${swatch(dot.color).stroke}" stroke-width="3"/>`
+      );
+    }
   }
   void MUTED;
   return `<g class="map-root tm-root" font-family="Inter, ui-sans-serif, system-ui, sans-serif">${parts.join('')}</g>`;

@@ -114,7 +114,12 @@ export const TickSchema = z.object({
   link: MapLinkSchema,
   planning: MapPlanningSchema.default('planned'),
   /** Open all year: this competition and its rounds run on a dotted spur beside the year line. */
-  all_year: z.boolean().default(false)
+  all_year: z.boolean().default(false),
+  /**
+   * Other strands this competition also runs on, at the same year lines and date. Only for a
+   * competition on a year line: it is drawn as one interchange joined to a stop on each strand.
+   */
+  also_lines: z.array(z.string().min(1)).optional()
 });
 
 const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
