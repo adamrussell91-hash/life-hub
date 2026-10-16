@@ -326,6 +326,48 @@ export function moveBlockTo(
   return insertAt(without, parent, destIndex, moving, options);
 }
 
+/**
+ * Sections cannot nest inside tabs, columns or other sections, so dropping one
+ * there unpacks it: its blocks move in at `index`, led by `heading` (the
+ * section title) when given, and the emptied section is removed.
+ */
+export function unpackSectionTo(
+  blocks: Block[],
+  sectionId: string,
+  parent: DropParent,
+  index: number,
+  heading: Block | null = null
+): DropResult {
+  const location = findBlockLocation(blocks, sectionId);
+  const section = findBlockById(blocks, sectionId);
+  if (!location || section?.block_type !== 'section') return { ok: false, message: 'Section not found.' };
+  if (isLinkedSection(section)) {
+    return { ok: false, message: 'Detach this linked section before moving its blocks.' };
+  }
+  const linked = linkedSectionWriteError(blocks, parent);
+  if (linked) return { ok: false, message: linked };
+  const moving = [...(heading ? [heading] : []), ...(section.content.blocks as Block[])];
+  for (const child of moving) {
+    const reason = insertTypeForParent(parent, child.block_type as NewBlockType);
+    if (reason) {
+      const label = child.block_type.replace(/_/g, ' ');
+      return { ok: false, message: `This section holds a ${label} block, which cannot go in a ${parent.kind}.` };
+    }
+  }
+
+  const without = deleteBlocksById(blocks, [sectionId]);
+  const destIndex =
+    sameParent(location.parent, parent) && location.index < index ? index - 1 : index;
+  const next = updateListAtParent(without, parent, (list) => {
+    const at = Math.max(0, Math.min(destIndex, list.length));
+    const copy = [...list];
+    copy.splice(at, 0, ...moving);
+    return copy;
+  });
+  if (!next) return { ok: false, message: 'Parent not found.' };
+  return { ok: true, blocks: next };
+}
+
 export function reorderSiblings(
   blocks: Block[],
   parent: DropParent,

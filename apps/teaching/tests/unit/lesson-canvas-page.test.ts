@@ -407,10 +407,29 @@ describe('mountLessonPage', () => {
     expect(after.content.tabs[0]!.blocks.map((b) => b.id)).toEqual(['r1']);
   });
 
-  it('refuses to drop a block type the tab cannot hold', () => {
-    const { onChange } = mount(
-      makeLesson({ blocks: [createBlock('section', 's1'), createBlock('tabs', 'tabs1')] })
-    );
+  it('unpacks a section dropped on a tab: its title becomes a heading and its blocks move in', () => {
+    const section = createBlock('section', 's1') as Extract<Block, { block_type: 'section' }>;
+    section.content.title = 'Starter';
+    section.content.blocks = [createBlock('rich_text', 'r1'), createBlock('callout', 'c1')] as never;
+    const { onChange } = mount(makeLesson({ blocks: [section, createBlock('tabs', 'tabs1')] }));
+    enterBlockEdit(host, '[data-block-id="tabs1"]');
+
+    const dt = startGripDrag(host.querySelector('[data-block-id="s1"] .lesson-page__grip')!);
+    const panel = host.querySelector('[data-block-id="tabs1"] .block-editor__nested-list')!;
+    dispatchWithDt(panel, 'drop', dt);
+
+    const next = onChange.mock.calls.at(-1)?.[0] as Lesson;
+    expect(next.blocks.map((b) => b.id)).toEqual(['tabs1']);
+    const panelBlocks = (next.blocks[0] as Extract<Block, { block_type: 'tabs' }>).content.tabs[0]!.blocks;
+    expect(panelBlocks.map((b) => b.block_type)).toEqual(['heading', 'rich_text', 'callout']);
+    expect((panelBlocks[0] as Extract<Block, { block_type: 'heading' }>).content.text).toBe('Starter');
+    expect(panelBlocks.slice(1).map((b) => b.id)).toEqual(['r1', 'c1']);
+  });
+
+  it('refuses to unpack a section into a tab when it holds a block the tab cannot take', () => {
+    const section = createBlock('section', 's1') as Extract<Block, { block_type: 'section' }>;
+    section.content.blocks = [createBlock('tabs', 'inner')] as never;
+    const { onChange } = mount(makeLesson({ blocks: [section, createBlock('tabs', 'tabs1')] }));
     enterBlockEdit(host, '[data-block-id="tabs1"]');
     onChange.mockClear();
 

@@ -11,7 +11,13 @@ import {
   openBlockPicker
 } from '@/blocks/block-meta';
 import type { Block } from '@/schemas/block';
-import { moveBlockTo, type DropParent } from '@/teacher/lesson-canvas/drop';
+import { findBlockById } from '@/blocks/find-block';
+import {
+  insertTypeForParent,
+  moveBlockTo,
+  unpackSectionTo,
+  type DropParent
+} from '@/teacher/lesson-canvas/drop';
 import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import { HUB_LIST_ICONS, createHubList } from '../../design-kit/js/hub-list.js';
 
@@ -166,11 +172,27 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     return at < 0 ? rows.length : at;
   }
 
+  function sectionHeading(section: Block): Block | null {
+    if (section.block_type !== 'section' || !section.content.title.trim()) return null;
+    const heading = createFromInsertMenu('heading', nextId());
+    return {
+      ...heading,
+      visibility: section.visibility,
+      content: { text: section.content.title }
+    } as Block;
+  }
+
   function moveInto(blockId: string, index: number): void {
     const parent = options.moveParent?.();
     const lesson = options.context?.getLessonBlocks?.();
     if (!parent || !lesson) return;
-    const result = moveBlockTo(lesson, blockId, parent, index);
+    const moving = findBlockById(lesson, blockId);
+    // A section cannot sit in a tab or column, so its blocks move in instead.
+    const unpack =
+      moving?.block_type === 'section' && insertTypeForParent(parent, 'section') !== null;
+    const result = unpack
+      ? unpackSectionTo(lesson, blockId, parent, index, sectionHeading(moving))
+      : moveBlockTo(lesson, blockId, parent, index);
     if (!result.ok) {
       showHubToast(result.message, { tone: 'danger' });
       return;
