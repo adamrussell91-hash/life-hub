@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   acceptSuggestion, applyCoachTurn, archive, createSession, dismissSuggestion,
-  finishDefine, keepAnyway, rename, say, summaryRow
+  finishDefine, keepAnyway, rename, rescoreRadar, say, summaryRow
 } from './session.mjs';
 
 const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -41,6 +41,7 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
     dismiss_suggestion: (s) => dismissSuggestion(s, deps),
     finish_define: (s) => finishDefine(s, deps),
     rename: (s, body) => rename(s, body.text, deps),
+    rescore_radar: (s, body) => rescoreRadar(s, { current: body.current, objective: body.objective }, deps),
     archive: (s) => archive(s, deps),
     retry: (s) => {
       if (s.runner.status !== 'failed') throw httpError(409, 'action_not_allowed', 'Nothing to retry.');

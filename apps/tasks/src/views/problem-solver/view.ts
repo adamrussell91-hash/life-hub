@@ -67,7 +67,7 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   board.append(canvasHost, coachHost);
   page.append(back, title, board);
   canvas.replaceChildren(page);
-  const diagram = mountCanvas(canvasHost);
+  const diagram = mountCanvas(canvasHost, { onScore: (scores) => void rescore(scores) });
 
   const paint = (next: PsSession) => {
     session = next;
@@ -98,6 +98,18 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
       return;
     }
     if (isBusy(session)) await settle();
+  }
+
+  async function rescore(scores: { current: number[]; objective: number[] }): Promise<void> {
+    try {
+      paint(await problemSolverApi.rescore(session, scores));
+    } catch (err) {
+      if ((err as { code?: string }).code === 'conflict') {
+        paint(await problemSolverApi.get(session.id));
+        return;
+      }
+      coachHost.prepend(el('p', 'ps-coach__status ps-coach__status--failed', errorMessage(err)));
+    }
   }
 
   paint(session);

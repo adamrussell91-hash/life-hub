@@ -1,4 +1,5 @@
 // netlify/functions/_shared/problem-solver/session.mjs
+import { gapRadar } from '../../../../packages/problem-solver/tools/gap-radar.mjs';
 import { addEdge, canEdge, canPlace, isComplete as isRunComplete, newRun, placeNode } from '../../../../packages/problem-solver/machine.mjs';
 
 const TITLE_MAX = 120;
@@ -155,6 +156,23 @@ export function finishDefine(session, deps) {
   if (current) next = replaceRun(next, { ...current, status: 'done' });
   next = { ...next, define: { ...next.define, finishedEarly }, turns: [...next.turns, userTurn("I've defined it.", deps)] };
   return queue(touch(next, deps), 'closing');
+}
+
+/**
+ * Score the topics of the active (or, once defined, the last) Gap analysis (advanced) run.
+ * Appends a snapshot; the radar then morphs to it. Rescoring later tracks progress, so it
+ * is allowed in `define` and `defined`. The coach is not called.
+ */
+export function rescoreRadar(session, payload, deps) {
+  if (!['define', 'defined'].includes(session.phase)) throw Object.assign(new Error('Scoring opens once the problem is being defined.'), { status: 409, code: 'action_not_allowed' });
+  const radarRuns = session.define.runs.filter((run) => run.tool === 'gap_radar');
+  const run = radarRuns.find((item) => item.status === 'active') ?? radarRuns.at(-1);
+  if (!run) throw Object.assign(new Error('There is no radar to score.'), { status: 409, code: 'action_not_allowed' });
+  const scores = { current: payload?.current, objective: payload?.objective };
+  const problem = gapRadar.validateScores(run, scores);
+  if (problem) throw Object.assign(new Error(problem), { status: 400, code: 'validation_error' });
+  const snapshot = { at: deps.now(), current: [...scores.current], objective: [...scores.objective] };
+  return touch(replaceRun(session, { ...run, radar: { snapshots: [...(run.radar?.snapshots ?? []), snapshot] } }), deps);
 }
 
 export function rename(session, title, deps) {

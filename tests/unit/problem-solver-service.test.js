@@ -91,3 +91,19 @@ test('create is idempotent on a UUID requestId', async () => {
   assert.equal(a.id, requestId);
   assert.equal(b.id, requestId);
 });
+
+test('rescore_radar goes through the action endpoint and bumps the revision', async () => {
+  const store = createMemoryProblemStore();
+  let n = 0;
+  const svc = createProblemSolverService({ store, coach: scriptedCoach, now: () => '2026-10-16T10:00:00.000Z', newId: () => `00000000-0000-4000-8000-${String((n += 1)).padStart(12, '0')}` });
+  let s = await svc.run('op', (await svc.create('op', { text: 'Scores to track.', requestId: 'a' })).id);
+  const nodes = [1, 2, 3].map((i) => ({ id: `x${i}`, slot: `axis:${i}`, text: `Topic ${i}`, state: 'accepted', skills: [], turnId: 't' }));
+  const seeded = { ...s, phase: 'define', define: { runs: [{ id: 'run', tool: 'gap_radar', status: 'active', nodes, edges: [], radar: { snapshots: [] } }], finishedEarly: false, exitObjection: null } };
+  const row = await store.read('op', s.id);
+  await store.write('op', s.id, seeded, row.etag);
+  s = await svc.get('op', s.id);
+  const next = await svc.action('op', { id: s.id, revision: s.revision, requestId: 'r1', action: 'rescore_radar', current: [3, 4, 5], objective: [8, 8, 9] });
+  assert.equal(next.revision, s.revision + 1);
+  assert.equal(next.define.runs[0].radar.snapshots.length, 1);
+  await assert.rejects(svc.action('op', { id: s.id, revision: next.revision, requestId: 'r2', action: 'rescore_radar', current: [3, 4], objective: [8, 8, 9] }), (err) => err.status === 400);
+});
