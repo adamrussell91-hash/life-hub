@@ -11,6 +11,7 @@ export const PUBLIC_STUDENT_API_ROUTES = [
   { method: 'GET', pattern: /^\/api\/published\/feedback\/[^/]+$/ },
   { method: 'GET', pattern: /^\/api\/published\/feedback\/[^/]+\/audio$/ },
   { method: 'GET', pattern: /^\/api\/published\/examples\/[^/]+$/ },
+  { method: 'GET', pattern: /^\/api\/published\/lines\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/examples\/[^/]+\/(?:unlock|submit)$/ },
   { method: 'GET', pattern: /^\/api\/media\/[^/]+\/file$/ },
   { method: 'POST', pattern: /^\/api\/html-app-ai$/ }

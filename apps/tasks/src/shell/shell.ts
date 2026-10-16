@@ -41,6 +41,7 @@ export type HubViewId =
   | 'clare'
   | 'graph'
   | 'maps'
+  | 'line'
   | 'gantt'
   | 'timeline'
   | 'orbit'
@@ -117,6 +118,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Tools',
     items: [
       { id: 'maps', label: 'Maps', href: '#/maps' },
+      { id: 'line', label: 'Personal line', href: '#/line' },
       { id: 'search', label: 'Search', href: '#/search' },
       { id: 'properties', label: 'Properties', href: '#/properties' },
       { id: 'term-dates', label: 'Term dates', href: '#/term-dates' }
