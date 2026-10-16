@@ -63,8 +63,8 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      // grove.html is Home's chromeless preview of today's clearing.
-      input: { main: path.resolve(__dirname, 'index.html'), grove: path.resolve(__dirname, 'grove.html'), groveWorldPreview: path.resolve(__dirname, 'grove-world-preview.html') }
+      // grove.html is Home's chromeless preview of today's clearing; line.html is the public personal line.
+      input: { main: path.resolve(__dirname, 'index.html'), grove: path.resolve(__dirname, 'grove.html'), groveWorldPreview: path.resolve(__dirname, 'grove-world-preview.html'), line: path.resolve(__dirname, 'line.html') }
     }
   },
   server: { port: 5175 },
