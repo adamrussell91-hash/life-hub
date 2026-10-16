@@ -19,6 +19,8 @@ import {
 } from '@/blocks/editors';
 import { findBlockById } from '@/blocks/find-block';
 import { renderBlock } from '@/blocks/render';
+import { mapBlockById, setBlockPulseOff } from '@/blocks/block-pulse';
+import { createTeacherBlockPulse } from '@/teacher/block-pulse';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
@@ -923,8 +925,20 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   root.append(coverHost, metaRow, canvasHost);
 
   const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
+  const pulse = createTeacherBlockPulse({
+    lessonId: lesson.id,
+    isLessonOff: () => lesson.feedback_off === true,
+    onSetBlockOff: (blockId, off) => {
+      const blocks = mapBlockById(lesson.blocks, blockId, (block) => setBlockPulseOff(block, off));
+      emitLesson({ ...lesson, blocks });
+      canvas.update(blocks, media);
+    }
+  });
   const canvas = mountBlockCanvas(canvasHost, {
-    decorateRow: classExamples.decorate,
+    decorateRow: (row, block) => {
+      classExamples.decorate(row, block);
+      pulse.decorate(row, block);
+    },
     blocks: lesson.blocks,
     media,
     editorContext: { lessonId: lesson.id },
@@ -993,6 +1007,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     },
     dispose() {
       classExamples.dispose();
+      pulse.dispose();
       canvas.dispose();
       strip?.dispose();
       titleEditor.dispose();

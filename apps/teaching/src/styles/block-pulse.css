@@ -1,0 +1,230 @@
+/* Block pulse: a quiet feedback dot in a block's top-right corner.
+   Students tap it to open five icon buttons; the teacher's dot fills from
+   green through amber to red as taps come in. Tokens only. */
+
+.pulse-host {
+  position: relative;
+}
+
+.pulse {
+  --pulse-idle: color-mix(in oklab, var(--muted) 38%, var(--paper));
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 3;
+}
+
+/* Hit target is a comfortable 28px; the visible mark stays 9px. */
+.pulse__dot {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.pulse__dot-mark {
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border-radius: var(--radius-full);
+  background: var(--pulse-idle);
+  opacity: 0.6;
+  transition: opacity 160ms ease, transform 160ms ease, background-color 160ms ease;
+}
+
+.pulse__dot:hover .pulse__dot-mark,
+.pulse__dot:focus-visible .pulse__dot-mark,
+.pulse--open .pulse__dot-mark {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+.pulse__dot:focus-visible {
+  outline: 2px solid var(--marine);
+  outline-offset: -2px;
+}
+
+/* Student: a tap of their own darkens the dot a little; nothing more. */
+.pulse--used .pulse__dot-mark {
+  background: var(--muted);
+}
+
+/* Teacher: fills with the colour the taps add up to. */
+.pulse--filled .pulse__dot-mark {
+  background: var(--pulse-fill);
+  opacity: 1;
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.pulse--off .pulse__dot-mark {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--pulse-idle);
+  opacity: 0.8;
+}
+
+.pulse--off.pulse--filled .pulse__dot-mark {
+  box-shadow: inset 0 0 0 1.5px var(--pulse-fill);
+}
+
+/* ── Panel ───────────────────────────────────────────────────────────── */
+
+.pulse__panel {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-2);
+  font-family: var(--font-ui);
+  /* Clear the phone bottom bar when scrolled into view. */
+  scroll-margin: var(--space-4) var(--space-4) 5rem;
+}
+
+.pulse__panel[hidden] {
+  display: none;
+}
+
+.pulse__options {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.pulse__option {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  color: var(--ink-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.pulse__option svg,
+.pulse__count-icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.pulse__option:hover,
+.pulse__option:focus-visible {
+  color: var(--marine);
+  background: var(--pastel-blue);
+}
+
+.pulse__option:focus-visible {
+  outline: 2px solid var(--marine);
+  outline-offset: 1px;
+}
+
+.pulse__option[aria-pressed='true'] {
+  color: var(--marine);
+  background: var(--pastel-blue);
+  border-color: color-mix(in oklab, var(--marine) 30%, transparent);
+}
+
+.pulse__caption {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Teacher panel */
+.pulse--teacher .pulse__panel {
+  width: 16rem;
+  padding: var(--space-3);
+}
+
+.pulse__title {
+  margin: 0;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.pulse__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--warning);
+}
+
+.pulse__counts {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pulse__count {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.pulse__count-icon {
+  display: grid;
+  color: var(--ink-muted);
+}
+
+.pulse__count-n {
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse__count--zero {
+  color: var(--ink-muted);
+}
+
+.pulse__count--zero .pulse__count-n {
+  font-weight: var(--weight-regular);
+}
+
+.pulse__meta {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+.pulse__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pulse__actions .btn {
+  font-size: var(--text-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse__dot-mark,
+  .pulse__option {
+    transition: none;
+  }
+}
+
+@media print {
+  .pulse {
+    display: none;
+  }
+}
