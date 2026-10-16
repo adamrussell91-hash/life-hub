@@ -3,6 +3,7 @@ import { isSkillId } from '../../../../packages/problem-solver/skills.mjs';
 import { MODEL_IDS } from '../../../../packages/problem-solver/models.mjs';
 import { TOOL_IDS } from '../../../../packages/problem-solver/tools/index.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
+import { tidyTitle, titleFromText } from '../../../../packages/problem-solver/titles.mjs';
 
 const VERDICTS = ['accept', 'challenge', 'clarify'];
 const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone'];
@@ -57,7 +58,7 @@ export function validateCoachTurn(raw) {
     const nodeText = text(raw.node.text);
     if (!parseSlot(slot)) return fail(`node.slot "${slot}" is not a slot name.`);
     if (!nodeText) return fail('node.text is required.');
-    node = { slot, text: nodeText };
+    node = { slot, text: nodeText, title: tidyTitle(raw.node.title) ?? titleFromText(nodeText) };
   }
 
   const edges = [];

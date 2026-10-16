@@ -47,8 +47,32 @@ describe('5 Whys view', () => {
     const view = createFiveWhysView();
     view.update(run([node('p', 'problem'), node('w1', 'why:1', { state: 'contested', objection: 'That blames a person.' })]));
     const row = view.el.querySelector('[data-node="w1"]')!;
-    expect(row.querySelector('.ps-whys__note')!.textContent).toBe('That blames a person.');
+    expect(row.querySelector('.ps-whys__note')!.textContent).toContain('That blames a person.');
     expect(row.querySelector('.ps-whys__why')!.getAttribute('stroke-dasharray')).toBeNull();
+  });
+});
+
+describe('5 Whys titles and details', () => {
+  it('shows the short title inside the shape, falling back to the answer', () => {
+    const view = createFiveWhysView();
+    view.update(run([node('p', 'problem', { title: 'Late rota' }), node('w1', 'why:1', { text: 'There is no shared calendar.' })]));
+    expect(view.el.querySelector('[data-node="p"] .ps-whys__title')!.textContent).toBe('Late rota');
+    expect(view.el.querySelector('[data-node="w1"] .ps-whys__title')!.textContent).toBe('No shared calendar');
+  });
+
+  it('opens one details card at a time', () => {
+    const view = createFiveWhysView();
+    view.update(run([node('p', 'problem'), node('w1', 'why:1')]));
+    const [p, w1] = ['p', 'w1'].map((id) => view.el.querySelector<HTMLElement>(`[data-node="${id}"]`)!);
+    const button = (item: HTMLElement) => item.querySelector<HTMLButtonElement>('.ps-whys__shape')!;
+    button(p).click();
+    expect(p.classList.contains('is-open')).toBe(true);
+    expect(button(p).getAttribute('aria-expanded')).toBe('true');
+    button(w1).click();
+    expect(p.classList.contains('is-open')).toBe(false);
+    expect(w1.classList.contains('is-open')).toBe(true);
+    button(w1).click();
+    expect(w1.classList.contains('is-open')).toBe(false);
   });
 });
 

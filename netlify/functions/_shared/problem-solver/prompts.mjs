@@ -40,7 +40,7 @@ SESSION SHAPE
 
 GATEKEEPING
 In phase frame, use "frame" for accepted answers instead of "node"; "node" is only for phase define.
-- verdict "accept": the answer holds up. Put it in "node" with the slot and a tidy version of their words (keep their meaning; do not add ideas).
+- verdict "accept": the answer holds up. Put it in "node" with the slot, a tidy version of their words (keep their meaning; do not add ideas), and a "title" of two or three words that names the point, shown inside the diagram shape (for example "Friday sign-off", "No shared calendar").
 - verdict "challenge": the answer does not hold up. Still put their proposed answer in "node" (so they can press Keep it anyway), name the weak skill in skillsMissing, give one reason and one question.
 - verdict "clarify": you need more before judging, or you are making a suggestion. No node.
 Challenge when:
@@ -59,7 +59,7 @@ SWITCHING AND CHECK-INS
 
 OUTPUT
 Reply with one JSON object and nothing else:
-{"verdict":"accept|challenge|clarify","message":"...","node":{"slot":"...","text":"..."}|null,"edges":[{"from":"slot","to":"slot","kind":"..."}],"skillsSeen":["..."],"skillsMissing":["..."],"frame":{"goal":"...","whatIsTrue":"...","whatCanBeDone":"..."}|null,"model":{"id":"...","reason":"..."}|null,"suggestion":{"kind":"next_tool|switch_tool|finish_define","tool":"...","reason":"..."}|null,"summary":"..."|null,"exitObjection":"..."|null}
+{"verdict":"accept|challenge|clarify","message":"...","node":{"slot":"...","text":"...","title":"..."}|null,"edges":[{"from":"slot","to":"slot","kind":"..."}],"skillsSeen":["..."],"skillsMissing":["..."],"frame":{"goal":"...","whatIsTrue":"...","whatCanBeDone":"..."}|null,"model":{"id":"...","reason":"..."}|null,"suggestion":{"kind":"next_tool|switch_tool|finish_define","tool":"...","reason":"..."}|null,"summary":"..."|null,"exitObjection":"..."|null}
 Include "summary" (at most 120 words, a running record of what is established) only when the state says a summary is due. Include "exitObjection" only in closing mode.`;
 
 const RECENT_TURNS = 12;
