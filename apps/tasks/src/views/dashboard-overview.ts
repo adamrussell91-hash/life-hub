@@ -429,36 +429,6 @@ function renderAgendaBody(
   return agenda;
 }
 
-function renderProjectsCard(
-  projects: Project[],
-  tasks: Task[],
-  now: Date,
-  options: DashboardOverviewOptions
-): HTMLElement {
-  const stallIds = new Set(findStallCandidates(projects, tasks, now).map((c) => c.project.id));
-  const mix = projectLifecycleMix(projects, tasks, stallIds, now);
-  const running = runningProjectCount(mix);
-
-  const card = el('section', 'hub-card dashboard-overview__tile dashboard-overview__tile--projects');
-  card.setAttribute('aria-label', 'Projects');
-  const head = el('div', 'dashboard-overview__head');
-  head.append(el('p', 'hub-card__eyebrow', 'Projects'));
-  head.append(viewLink('#/projects', 'Open Projects'));
-  card.append(head);
-
-  const portfolio = el('div', 'dashboard-overview__portfolio');
-  portfolio.append(
-    renderProjectPortfolioChart(mix, {
-      running,
-      compact: true,
-      onActivate: options.onFilterRunning,
-      active: options.runningFilterActive
-    })
-  );
-  card.append(portfolio);
-  return card;
-}
-
 function bindHeatDrop(
   cell: HTMLElement,
   day: DashboardHeatDay,
@@ -483,53 +453,6 @@ function bindHeatDrop(
   });
 }
 
-function renderWeekCard(
-  days: DashboardHeatDay[],
-  selectedKey: string,
-  timeline: DashboardTimelineItem[],
-  options: DashboardOverviewOptions,
-  now: Date,
-  onSelectDay: (dateKey: string) => void
-): HTMLElement {
-  const selected = days.find((day) => day.date_key === selectedKey) ?? days[0];
-  const card = el('section', 'hub-card dashboard-overview__tile dashboard-overview__tile--week');
-  card.setAttribute('aria-label', 'This week');
-  const head = el('div', 'dashboard-overview__head');
-  head.append(el('p', 'hub-card__eyebrow', 'This week'));
-  if (selected) head.append(viewLink(`#/week?date=${selected.date_key}`, 'Open week'));
-  card.append(head);
-
-  const row = el('div', 'dashboard-heat');
-  row.setAttribute('role', 'list');
-  for (const day of days) {
-    const cell = el('button', 'dashboard-heat__cell');
-    cell.type = 'button';
-    cell.dataset.heat = String(day.heat);
-    if (day.isToday) cell.dataset.today = 'true';
-    if (day.date_key === selectedKey) cell.dataset.selected = 'true';
-    cell.setAttribute('role', 'listitem');
-    cell.setAttribute(
-      'aria-label',
-      `${day.count} item${day.count === 1 ? '' : 's'} on ${formatDisplayDate(day.date_key)}`
-    );
-    cell.setAttribute('aria-pressed', day.date_key === selectedKey ? 'true' : 'false');
-    cell.append(
-      el('span', 'dashboard-heat__weekday', day.weekday),
-      el('span', 'dashboard-heat__day', String(day.day)),
-      el('span', day.count ? 'dashboard-heat__count' : 'dashboard-heat__count dashboard-heat__count--empty', day.count ? String(day.count) : '')
-    );
-    cell.addEventListener('click', () => onSelectDay(day.date_key));
-    bindHeatDrop(cell, day, options);
-    row.append(cell);
-  }
-  card.append(row);
-
-  const next = renderNextAction(options, now);
-  if (next) card.append(next);
-  card.append(renderAgendaBody(timeline, options, now, selectedKey));
-  return card;
-}
-
 function overviewPeek(options: DashboardOverviewOptions, now: Date): string {
   const stats = dashboardFocusStats(options.tasks, options.projects, now);
   const parts = [
@@ -551,80 +474,155 @@ function setOverviewOpen(root: HTMLElement, open: boolean): void {
   if (peek) peek.hidden = open;
 }
 
-/** Overview band for the home dashboard — focus, week+agenda, projects. */
-export function renderDashboardOverview(host: HTMLElement, options: DashboardOverviewOptions): void {
-  const now = options.now ?? new Date();
-  const { tasks, projects, onChanged } = options;
-  host.replaceChildren();
-  host.className = 'dashboard-overview';
+function fillWeekCard(
+  card: HTMLElement,
+  days: DashboardHeatDay[],
+  selectedKey: string,
+  timeline: DashboardTimelineItem[],
+  options: DashboardOverviewOptions,
+  now: Date,
+  onSelectDay: (dateKey: string) => void
+): void {
+  const selected = days.find((day) => day.date_key === selectedKey) ?? days[0];
+  let head = card.querySelector<HTMLElement>('.dashboard-overview__head');
+  if (!head) {
+    head = el('div', 'dashboard-overview__head');
+    head.append(el('p', 'hub-card__eyebrow', 'This week'));
+    card.prepend(head);
+  }
+  const openWeek = head.querySelector<HTMLAnchorElement>('a.dashboard-overview__link');
+  if (selected) {
+    const href = `#/week?date=${selected.date_key}`;
+    if (openWeek) openWeek.href = href;
+    else head.append(viewLink(href, 'Open week'));
+  } else {
+    openWeek?.remove();
+  }
 
-  const open = readOverviewOpen();
-  host.dataset.open = open ? 'true' : 'false';
+  for (const child of [...card.children]) {
+    if (child !== head) child.remove();
+  }
 
-  const prefs = preferredDomains(now);
-  const stats = dashboardFocusStats(tasks, projects, now);
-  const todayKey = toDateKey(now);
-  const heatDays = dashboardHeatDays(tasks, projects, now, WEEK_DAYS);
-  const weekKeys = new Set(heatDays.map((day) => day.date_key));
-  const storedDay = readSelectedDay(todayKey);
-  const selectedKey = weekKeys.has(storedDay) ? storedDay : todayKey;
-  const selectDay = (dateKey: string): void => {
-    writeSelectedDay(dateKey);
-    writeOverviewOpen(true);
-    renderDashboardOverview(host, options);
-  };
+  const row = el('div', 'dashboard-heat');
+  row.setAttribute('role', 'list');
+  for (const day of days) {
+    const cell = el('button', 'dashboard-heat__cell');
+    cell.type = 'button';
+    cell.dataset.heat = String(day.heat);
+    if (day.isToday) cell.dataset.today = 'true';
+    if (day.date_key === selectedKey) cell.dataset.selected = 'true';
+    cell.setAttribute('role', 'listitem');
+    cell.setAttribute(
+      'aria-label',
+      `${day.count} item${day.count === 1 ? '' : 's'} on ${formatDisplayDate(day.date_key)}`
+    );
+    cell.setAttribute('aria-pressed', day.date_key === selectedKey ? 'true' : 'false');
+    cell.append(
+      el('span', 'dashboard-heat__weekday', day.weekday),
+      el('span', 'dashboard-heat__day', String(day.day)),
+      el(
+        'span',
+        day.count ? 'dashboard-heat__count' : 'dashboard-heat__count dashboard-heat__count--empty',
+        day.count ? String(day.count) : ''
+      )
+    );
+    cell.addEventListener('click', () => onSelectDay(day.date_key));
+    bindHeatDrop(cell, day, options);
+    row.append(cell);
+  }
+  card.append(row);
 
+  const next = renderNextAction(options, now);
+  if (next) card.append(next);
+  card.append(renderAgendaBody(timeline, options, now, selectedKey));
+}
+
+function fillProjectsCard(
+  card: HTMLElement,
+  projects: Project[],
+  tasks: Task[],
+  now: Date,
+  options: DashboardOverviewOptions
+): void {
+  const stallIds = new Set(findStallCandidates(projects, tasks, now).map((c) => c.project.id));
+  const mix = projectLifecycleMix(projects, tasks, stallIds, now);
+  const running = runningProjectCount(mix);
+
+  let head = card.querySelector<HTMLElement>('.dashboard-overview__head');
+  if (!head) {
+    head = el('div', 'dashboard-overview__head');
+    head.append(el('p', 'hub-card__eyebrow', 'Projects'));
+    head.append(viewLink('#/projects', 'Open Projects'));
+    card.prepend(head);
+  }
+
+  let portfolio = card.querySelector<HTMLElement>('.dashboard-overview__portfolio');
+  if (!portfolio) {
+    portfolio = el('div', 'dashboard-overview__portfolio');
+    card.append(portfolio);
+  }
+  portfolio.replaceChildren(
+    renderProjectPortfolioChart(mix, {
+      running,
+      compact: true,
+      onActivate: options.onFilterRunning,
+      active: options.runningFilterActive
+    })
+  );
+}
+
+/** Direct child by class. Avoid `:scope >` — happy-dom returns null. */
+function childByClass(parent: HTMLElement, className: string): HTMLElement | undefined {
+  return [...parent.children].find(
+    (child): child is HTMLElement =>
+      child instanceof HTMLElement && child.classList.contains(className)
+  );
+}
+
+function paintOverviewChrome(
+  host: HTMLElement,
+  options: DashboardOverviewOptions,
+  now: Date,
+  prefs: string[],
+  stats: ReturnType<typeof dashboardFocusStats>
+): void {
   const strip = renderFocusStrip(stats, options, host);
   if (options.statusHost) {
     options.statusHost.replaceChildren(strip);
   } else {
-    host.append(strip);
+    const existing = childByClass(host, 'dashboard-focus');
+    if (existing) existing.replaceWith(strip);
+    else host.prepend(strip);
   }
 
-  const shell = el('div', 'dashboard-overview__shell');
-  const toggle = el('button', 'dashboard-overview__toggle');
-  toggle.type = 'button';
-  toggle.setAttribute('aria-controls', 'dashboard-overview-panel');
-  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-  toggle.append(
-    el('span', 'dashboard-overview__toggle-label', 'Overview'),
-    el('span', 'dashboard-overview__toggle-icon', '▾')
-  );
-  toggle.addEventListener('click', () => {
-    const next = host.dataset.open !== 'true';
-    writeOverviewOpen(next);
-    setOverviewOpen(host, next);
-  });
+  const lede = host.querySelector('.dashboard-overview__lede');
+  if (lede) lede.textContent = `Focus: ${prefs.join(', ')} · ${formatDisplayDate(now)}`;
 
-  const mq = window.matchMedia(MOBILE_OVERVIEW_QUERY);
-  const syncViewport = (): void => setOverviewOpen(host, readOverviewOpen());
-  mq.addEventListener('change', syncViewport);
+  const peek = host.querySelector('.dashboard-overview__peek');
+  if (peek) peek.textContent = overviewPeek(options, now);
+}
 
-  const peek = el('p', 'dashboard-overview__peek', overviewPeek(options, now));
-  peek.hidden = open;
+function paintOverviewPanel(
+  host: HTMLElement,
+  options: DashboardOverviewOptions,
+  now: Date,
+  heatDays: DashboardHeatDay[],
+  selectedKey: string,
+  timeline: DashboardTimelineItem[],
+  selectDay: (dateKey: string) => void
+): void {
+  const { tasks, projects, onChanged } = options;
+  const panel = host.querySelector<HTMLElement>('#dashboard-overview-panel');
+  if (!panel) return;
 
-  shell.append(
-    toggle,
-    el(
-      'p',
-      'view-lede dashboard-overview__lede',
-      `Focus: ${prefs.join(', ')} · ${formatDisplayDate(now)}`
-    ),
-    peek
-  );
-  host.append(shell);
-
-  const panel = el('div', 'dashboard-overview__panel');
-  panel.id = 'dashboard-overview-panel';
-  panel.hidden = !open;
-
+  panel.querySelector('.dashboard-overview__banner')?.remove();
   const stallIds = new Set(findStallCandidates(projects, tasks, now).map((c) => c.project.id));
   const pulseCards = projects
     .filter((p) => !isProjectArchived(p.status))
     .map((p) => buildProjectPulseCard(p, tasks, stallIds, now));
   const tension = tensionDismissed ? null : findPortfolioTension(pulseCards, tasks, now);
   if (tension) {
-    panel.append(
+    panel.prepend(
       renderTensionBanner(tension.message, () => {
         tensionDismissed = true;
         renderDashboardOverview(host, options);
@@ -632,20 +630,122 @@ export function renderDashboardOverview(host: HTMLElement, options: DashboardOve
     );
   }
 
-  const timeline = dashboardTimeline(tasks, projects, now);
-  const grid = el('div', 'dashboard-overview__grid dashboard-overview__grid--week');
-  grid.append(
-    renderWeekCard(heatDays, selectedKey, timeline, options, now, selectDay),
-    renderProjectsCard(projects, tasks, now, options)
-  );
-  panel.append(grid);
+  let grid = panel.querySelector<HTMLElement>('.dashboard-overview__grid--week');
+  if (!grid) {
+    grid = el('div', 'dashboard-overview__grid dashboard-overview__grid--week');
+    panel.append(grid);
+  }
 
+  let weekCard = grid.querySelector<HTMLElement>('.dashboard-overview__tile--week');
+  if (!weekCard) {
+    weekCard = el('section', 'hub-card dashboard-overview__tile dashboard-overview__tile--week');
+    weekCard.setAttribute('aria-label', 'This week');
+    grid.prepend(weekCard);
+  }
+  fillWeekCard(weekCard, heatDays, selectedKey, timeline, options, now, selectDay);
+
+  let projectsCard = grid.querySelector<HTMLElement>('.dashboard-overview__tile--projects');
+  if (!projectsCard) {
+    projectsCard = el('section', 'hub-card dashboard-overview__tile dashboard-overview__tile--projects');
+    projectsCard.setAttribute('aria-label', 'Projects');
+    grid.append(projectsCard);
+  }
+  fillProjectsCard(projectsCard, projects, tasks, now, options);
+
+  panel.querySelector('.dashboard-overview__pressure')?.remove();
   const pressure = el('div', 'dashboard-overview__pressure');
   renderPressureStrips(pressure, tasks, now, () => onChanged?.(), {
     dueSoon: false,
     emptyClear: false
   });
   if (pressure.childElementCount) panel.append(pressure);
+}
 
-  host.append(panel);
+/**
+ * Overview band for the home dashboard — focus, week+agenda, projects.
+ * Live refreshes keep week/projects hub-card shells mounted so hub-motion
+ * does not replay hub-reveal (opacity 0) on every tick.
+ */
+export function renderDashboardOverview(host: HTMLElement, options: DashboardOverviewOptions): void {
+  const now = options.now ?? new Date();
+  const { tasks, projects } = options;
+  const prefs = preferredDomains(now);
+  const stats = dashboardFocusStats(tasks, projects, now);
+  const heatDays = dashboardHeatDays(tasks, projects, now, WEEK_DAYS);
+  const todayKey = toDateKey(now);
+  const storedDay = readSelectedDay(todayKey);
+  const selectedKey = heatDays.some((day) => day.date_key === storedDay) ? storedDay : todayKey;
+  const selectDay = (dateKey: string): void => {
+    writeSelectedDay(dateKey);
+    writeOverviewOpen(true);
+    renderDashboardOverview(host, options);
+  };
+
+  const mounted = Boolean(childByClass(host, 'dashboard-overview__shell'));
+  if (!mounted) {
+    host.replaceChildren();
+    host.className = 'dashboard-overview';
+    delete host.dataset.hubSettled;
+
+    const open = readOverviewOpen();
+    host.dataset.open = open ? 'true' : 'false';
+
+    paintOverviewChrome(host, options, now, prefs, stats);
+
+    const shell = el('div', 'dashboard-overview__shell');
+    const toggle = el('button', 'dashboard-overview__toggle');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-controls', 'dashboard-overview-panel');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.append(
+      el('span', 'dashboard-overview__toggle-label', 'Overview'),
+      el('span', 'dashboard-overview__toggle-icon', '▾')
+    );
+    toggle.addEventListener('click', () => {
+      const next = host.dataset.open !== 'true';
+      writeOverviewOpen(next);
+      setOverviewOpen(host, next);
+    });
+
+    const mq = window.matchMedia(MOBILE_OVERVIEW_QUERY);
+    mq.addEventListener('change', () => setOverviewOpen(host, readOverviewOpen()));
+
+    const peek = el('p', 'dashboard-overview__peek', overviewPeek(options, now));
+    peek.hidden = open;
+    shell.append(
+      toggle,
+      el(
+        'p',
+        'view-lede dashboard-overview__lede',
+        `Focus: ${prefs.join(', ')} · ${formatDisplayDate(now)}`
+      ),
+      peek
+    );
+    host.append(shell);
+
+    const panel = el('div', 'dashboard-overview__panel');
+    panel.id = 'dashboard-overview-panel';
+    panel.hidden = !open;
+    host.append(panel);
+  } else {
+    paintOverviewChrome(host, options, now, prefs, stats);
+    setOverviewOpen(host, readOverviewOpen());
+  }
+
+  paintOverviewPanel(
+    host,
+    options,
+    now,
+    heatDays,
+    selectedKey,
+    dashboardTimeline(tasks, projects, now),
+    selectDay
+  );
+
+  // First paint: settle after hub-motion's entrance scan. Later ticks: settle now
+  // so a late scan cannot replay hub-reveal on the kept shells.
+  if (mounted) host.dataset.hubSettled = '1';
+  else requestAnimationFrame(() => {
+    host.dataset.hubSettled = '1';
+  });
 }
