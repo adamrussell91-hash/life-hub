@@ -65,7 +65,7 @@ Notion is not a source and nothing reads it. Adam's thinking-skill notes, if use
 ### Visual language
 
 - **Tool emblems:** the book's small stylised circle per tool (5 Whys, Concept Mapping, Problem Tree, Gap Analysis, Problem Statement, SMART), redrawn as SVG. Used on the tool picker, suggestion cards, filmstrip, record and, later, block headers.
-- **Thinking-skill glyphs:** the twelve glyphs from p.13 redrawn as SVG. Shown as chips on coach messages (skill used well), outlined on challenges (skill missing), and in the thinking profile. First pass is an approximation from the scan; Adam will supply a straight high-res photo of p.13 and the glyphs get corrected from it.
+- **Thinking-skill glyphs:** the twelve glyphs from p.13, supplied by Adam as single-colour SVG in `packages/problem-solver/glyphs/skills/`. Shown as chips on coach messages (skill used well), outlined on challenges (skill missing), and in the thinking profile.
 - **Palette:** the book's red, yellow and blue as tokens scoped to the package (`--ps-red`, `--ps-yellow`, `--ps-blue`, plus ink and paper for the record). Everything else uses design-kit tokens.
 
 ### Diagrams (SVG, Web Animations API, reduced-motion respected)
@@ -223,7 +223,7 @@ In v1:
 - Frame, model choice, the whole Define step with all seven tool variants, chaining, switching and finish-early.
 - Gatekeeper coach with keep-anyway and objection notes.
 - Black-and-white record with morph to colour and the Define filmstrip.
-- Skill glyphs and tool emblems (approximations until the p.13 photo arrives).
+- Skill glyphs (supplied) and tool emblems (drawn from the scans).
 - Thinking profile, scoped context with lookup chips, protocol cards with link-back, Problem Solver chips on linked items, proposed tasks via confirm cards.
 
 Not in v1:
@@ -231,7 +231,7 @@ Not in v1:
 - Analyse, Devise, Decide, Implement, Improve, Document (await scans).
 - Tasks and Teaching blocks (phase 2, reusing the package renderers).
 - Student-safe coach mode for Teaching.
-- Griffin badge redraw (separate task once Adam supplies the art: SVG, single flat colour, transparent, legible at 16px; re-composite the eight badged block icons).
+- Toolkit badge swap (separate task): replace the "sad chicken" `badge-griffin.png` with the supplied dragon (`packages/problem-solver/glyphs/brand/dragon.svg`, actually a dragon, not a griffin), bump the toolkit eyebrow to about 22px because the art is too detailed for 16px, and re-composite the eight badged Teaching block icons.
 
 ## Build order
 
