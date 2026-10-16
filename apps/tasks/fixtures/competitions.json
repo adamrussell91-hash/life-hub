@@ -525,7 +525,7 @@
     "description": "Four non-competitive contest papers aligned to the Maths Olympiad schedule, for mainstream and mixed-ability classes in Years 5–6. Resource Kits with sample questions and solutions precede each paper.",
     "registration_link": "https://www.apsmo.edu.au/",
     "registration_window": "Register before Term 2; papers run May to September",
-    "format": "Exam",
+    "format": "Program",
     "provider": "External",
     "settings": [
       "At school"
@@ -616,7 +616,7 @@
     "description": "Online sharemarket simulation run twice yearly by the ASX. Students manage a virtual portfolio, buying and selling shares in ASX-listed companies over a ten-week window, individually or in syndicates of 2–4. Cash prizes at state and national level.",
     "registration_link": "https://www.asx.com.au/investors/investment-tools-and-resources/sharemarket-game",
     "registration_window": "Two game windows per year (~10 weeks each)",
-    "format": "Project",
+    "format": "Simulation",
     "provider": "External",
     "settings": [
       "At school",
@@ -1801,7 +1801,7 @@
     "description": "Programming competition using visual block-based coding, designed for school students and teachers to learn programming concepts in an accessible, beginner-friendly format.",
     "registration_link": "https://groklearning.com/",
     "registration_window": "Register via Grok Academy before the event",
-    "format": "Project",
+    "format": "Exam",
     "provider": "External",
     "settings": [
       "At school",
@@ -2625,7 +2625,7 @@
     "description": "Online coding competition for school students across multiple levels, run by Grok Academy.",
     "registration_link": null,
     "registration_window": "Register via Grok Academy before the event",
-    "format": "Project",
+    "format": "Exam",
     "provider": "External",
     "settings": [
       "Online"
@@ -2814,7 +2814,7 @@
     "description": "Open design challenge to create a cordless lamp for off-grid contexts, hosted by Desall with a leading lighting company. Open to everyone worldwide.",
     "registration_link": "https://studentcompetitions.com/competitions/cordless-lamp-innovation-contest",
     "registration_window": "Entries usually due late June",
-    "format": "Creative work",
+    "format": "Project",
     "provider": "External",
     "settings": [
       "Online"
@@ -2915,7 +2915,7 @@
     "description": "Online competition testing students' cyber security skills and knowledge of digital safety, run by Grok Academy.",
     "registration_link": "https://groklearning.com/",
     "registration_window": "Register via Grok Academy before the event",
-    "format": "Project",
+    "format": "Exam",
     "provider": "External",
     "settings": [
       "Online"
@@ -2965,7 +2965,7 @@
     "description": "Academic gala for teams of eight competing across ten disciplines (engineering, mathematics and chess, code breaking, art and poetry, science, English, ideation, creative producers, cartography and legacy). Regional rounds lead to national finals at Knox Grammar.",
     "registration_link": "http://davincidecathlon.com/ events section",
     "registration_window": "Regionals in Term 2; register via host school beforehand",
-    "format": "Exam",
+    "format": "Day event",
     "provider": "School",
     "settings": [
       "Away"
@@ -3824,7 +3824,7 @@
     "description": "Primary enrichment competition spanning English, science, mathematics and humanities, with Lower Primary (Years 1–3) and Upper Primary (Years 4–6) divisions.",
     "registration_link": null,
     "registration_window": "Register before the competition window",
-    "format": "Exam",
+    "format": "Day event",
     "provider": "External",
     "settings": [
       "At school"
@@ -3920,13 +3920,11 @@
     "description": "Umbrella entry for the full family of EAE award categories (27 in total), recognising extracurricular achievement. Open for nominations year round.",
     "registration_link": "https://awards.eae.international",
     "registration_window": "Open for nominations year round. Quarterly review cycles, alternating individual and team entries. Current submission window closes 15 November 2026.",
-    "format": "Program",
+    "format": null,
     "provider": "External",
-    "settings": [
-      "Online"
-    ],
-    "entry": "Individual",
-    "entry_route": "Selection",
+    "settings": [],
+    "entry": null,
+    "entry_route": null,
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -4396,7 +4394,7 @@
     "description": "Open design challenge for an innovative snack concept aimed at a young consumer audience, hosted by Desall with a leading food and beverage company. Open globally.",
     "registration_link": "https://studentcompetitions.com/competitions/future-snack-design",
     "registration_window": "Entries usually due mid-September",
-    "format": "Creative work",
+    "format": "Project",
     "provider": "External",
     "settings": [
       "Online"
@@ -4444,7 +4442,7 @@
     "description": "National team competition for high-ability primary students run by GATEWAYS Education (operating since 1994). Teams rotate through four scenario-based rounds with different academic focuses, structured so no single student can complete a round alone.",
     "registration_link": "https://www.gateways.edu.au/the-challenge",
     "registration_window": "Schools register ahead of Term 4 event days",
-    "format": "Exam",
+    "format": "Day event",
     "provider": "External",
     "settings": [
       "Away"
@@ -5107,7 +5105,7 @@
     "description": "A storytelling competition for young people in regional, rural and remote Australia, with entries in text, video, audio or photos.",
     "registration_link": "https://www.abc.net.au/heywire/competition",
     "registration_window": "Closes 1 September",
-    "format": "Creative work",
+    "format": "Project",
     "provider": "External",
     "settings": [
       "Online"
@@ -5456,7 +5454,7 @@
     "description": "Primary enrichment competition spanning English, science, mathematics and humanities, with Lower Primary (Years 1–3) and Upper Primary (Years 4–6) divisions.",
     "registration_link": null,
     "registration_window": "Register before the competition window",
-    "format": "Exam",
+    "format": "Day event",
     "provider": "External",
     "settings": [
       "At school"
@@ -5780,7 +5778,7 @@
     "description": "National civics competition run by the Rule of Law Education Centre. Students in Years 7–10 work in pairs to research a civic topic using provided fact sheets, then design an original playing card representing that concept. Judged with prizes awarded by a member of parliament.",
     "registration_link": "https://www.ruleoflaw.org.au/programs-overview-competition",
     "registration_window": "Submissions usually due around February",
-    "format": "Project",
+    "format": "Creative work",
     "provider": "External",
     "settings": [
       "At school"
@@ -6986,14 +6984,11 @@
     "description": "Johns Hopkins University's Center for Talented Youth: above-level testing, online courses and summer programs for academically advanced students worldwide. A reference resource for families seeking international-standard gifted programs.",
     "registration_link": "https://cty.jhu.edu/",
     "registration_window": "Eligibility testing year-round; program intakes per session",
-    "format": "Program",
+    "format": null,
     "provider": "External",
-    "settings": [
-      "Online",
-      "Away"
-    ],
-    "entry": "Individual",
-    "entry_route": "Student applies",
+    "settings": [],
+    "entry": null,
+    "entry_route": null,
     "starts_on": null,
     "ends_on": null,
     "dates_precision": null,
@@ -7831,7 +7826,7 @@
     "description": "Non-competitive problem-solving contest series from APSMO for Years 7–8, aligned to the Maths Olympiad schedule. Mixed-ability friendly, with Resource Kits provided before each paper.",
     "registration_link": "https://www.apsmo.edu.au/",
     "registration_window": "Register before Term 2; papers run May to September",
-    "format": "Exam",
+    "format": "Program",
     "provider": "External",
     "settings": [
       "At school"
@@ -9992,7 +9987,7 @@
     "description": "Two-category contest open to anyone interested in the ocean: short-form video and a goods idea contest (AI tools permitted). Individual entries only. Hosted by the Korea Marine Industry Association.",
     "registration_link": "https://studentcompetitions.com/competitions/2026-ocean-content-contest",
     "registration_window": "Entries usually due mid-June",
-    "format": "Creative work",
+    "format": "Project",
     "provider": "External",
     "settings": [
       "Online"
@@ -10605,7 +10600,7 @@
     "description": "Coding competition for school students to demonstrate Python programming skills, run by Grok Academy.",
     "registration_link": "https://groklearning.com/",
     "registration_window": "Register via Grok Academy before the event",
-    "format": "Project",
+    "format": "Exam",
     "provider": "External",
     "settings": [
       "At school",
@@ -10651,7 +10646,7 @@
     "description": "Open innovation challenge for a hospitality product improving the hotel guest experience, hosted by Radical Innovation. Open globally including Oceania.",
     "registration_link": "https://studentcompetitions.com/competitions/radical-innovation-hospitality-product",
     "registration_window": "Entries usually due early August",
-    "format": "Creative work",
+    "format": "Project",
     "provider": "External",
     "settings": [
       "Online"
@@ -11988,7 +11983,7 @@
     "description": "International team academic competition (teams of three) spanning debate, collaborative writing, a quiz (Scholar's Challenge) and the Scholar's Bowl, across a multi-subject curriculum. Regional rounds lead to a Global Round and the Tournament of Champions.",
     "registration_link": null,
     "registration_window": "Register before the regional round",
-    "format": "Exam",
+    "format": "Day event",
     "provider": "External",
     "settings": [
       "Away"
@@ -12109,7 +12104,8 @@
       "Event"
     ],
     "subjects": [
-      "Classics"
+      "Classics",
+      "History"
     ],
     "month": "August",
     "age_groups": [
@@ -12479,8 +12475,7 @@
       "Competition"
     ],
     "subjects": [
-      "Public Speaking",
-      "Civics"
+      "Public Speaking"
     ],
     "month": "October",
     "age_groups": [
@@ -12729,7 +12724,7 @@
     "description": "Two outreach programs from the UNSW UN Society: DiscoverMUN, an annual one-day on-campus MUN event for high schoolers, and MUNiS, where UNSW students visit schools to teach the UN and run MUN simulations. All skill levels welcome.",
     "registration_link": "https://outreach604.wixsite.com/my-site/projects",
     "registration_window": "DiscoverMUN annual; MUNiS ongoing by arrangement",
-    "format": "Program",
+    "format": "Day event",
     "provider": "External",
     "settings": [
       "At school",
@@ -12918,7 +12913,7 @@
     "description": "Web design competition for school students to showcase web development and design skills, run by Grok Academy.",
     "registration_link": "https://groklearning.com/",
     "registration_window": "Register via Grok Academy before the event",
-    "format": "Project",
+    "format": "Exam",
     "provider": "External",
     "settings": [
       "Online"
