@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Usage: node scripts/problem-solver-preview.mjs <tool> <out-dir> [--open <nodeId>]
+// Usage: node scripts/problem-solver-preview.mjs <tool> <out-dir> [--open <nodeId>] [--next]
+// --next applies SAMPLES['<tool>:next'] after load and shoots <tool>-next-<width>.png (radar morph end state).
 // Bundles a renderer with a synthetic sample run, then screenshots it at 900px and 390px.
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -12,15 +13,21 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RENDERERS = {
   five_whys: ['five-whys', 'createFiveWhysView'],
   problem_tree: ['problem-tree', 'createProblemTreeView'],
-  problem_statement: ['problem-statement', 'createProblemStatementView']
+  problem_statement: ['problem-statement', 'createProblemStatementView'],
+  gap_basic: ['gap-basic', 'createGapBasicView'],
+  gap_radar: ['gap-radar', 'createGapRadarView'],
+  smart: ['smart', 'createSmartView']
 };
 
 const args = process.argv.slice(2);
 const openIndex = args.indexOf('--open');
 const openNode = openIndex >= 0 ? args.splice(openIndex, 2)[1] : null;
+const nextIndex = args.indexOf('--next');
+const applyNext = nextIndex >= 0;
+if (applyNext) args.splice(nextIndex, 1);
 const [tool, outDir] = args;
 if (!tool || !outDir || !RENDERERS[tool] || !SAMPLES[tool]) {
-  console.error(`Usage: problem-solver-preview.mjs <${Object.keys(RENDERERS).join('|')}> <out-dir> [--open <nodeId>]`);
+  console.error(`Usage: problem-solver-preview.mjs <${Object.keys(RENDERERS).join('|')}> <out-dir> [--open <nodeId>] [--next]`);
   process.exit(2);
 }
 mkdirSync(outDir, { recursive: true });
@@ -35,7 +42,7 @@ const rawPlugin = {
 };
 const bundle = await build({
   stdin: {
-    contents: `import { ${factory} as make } from './render/${file}';\nconst run = ${JSON.stringify(SAMPLES[tool])};\nconst view = make(document);\nview.update(run);\ndocument.querySelector('#mount').append(view.el);\nwindow.__view = view;`,
+    contents: `import { ${factory} as make } from './render/${file}';\nconst run = ${JSON.stringify(SAMPLES[tool])};\nconst next = ${JSON.stringify(SAMPLES[tool + ':next'] ?? null)};\nconst view = make(document);\nview.update(run);\ndocument.querySelector('#mount').append(view.el);\nwindow.__view = view;\nwindow.__next = next;`,
     resolveDir: join(root, 'packages/problem-solver'),
     loader: 'ts'
   },
@@ -61,9 +68,13 @@ for (const width of [900, 390]) {
     await tab.click(`[data-node="${openNode}"] button`);
     await tab.waitForTimeout(500);
   }
+  if (applyNext) {
+    await tab.evaluate(() => window.__view.update(window.__next));
+    await tab.waitForTimeout(1200);
+  }
   const overflow = await tab.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   if (overflow > 0) console.warn(`horizontal overflow at ${width}px: ${overflow}px`);
-  await tab.screenshot({ path: join(outDir, `${tool}-${width}.png`), fullPage: true });
+  await tab.screenshot({ path: join(outDir, `${tool}${applyNext ? '-next' : ''}-${width}.png`), fullPage: true });
   await ctx.close();
 }
 await browser.close();
