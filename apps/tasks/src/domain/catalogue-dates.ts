@@ -43,7 +43,7 @@ const CONNECTOR = String.raw`(?:to|–|—|-)`;
 
 type Edge = 'start' | 'end' | 'point';
 
-type Found = {
+export type Found = {
   index: number;
   end: number;
   priority: number;
@@ -61,7 +61,7 @@ function monthNumber(name: string): number {
   return MONTHS[name.toLowerCase()]!;
 }
 
-function lastDay(year: number, month: number): number {
+export function lastDay(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
@@ -69,7 +69,7 @@ function clampDay(year: number, month: number, day: number): number {
   return Math.min(Math.max(1, day), lastDay(year, month));
 }
 
-function fuzzyDay(fuzzy: string | null, edge: Edge, year: number, month: number, explicit: number | null): number {
+export function fuzzyDay(fuzzy: string | null, edge: Edge, year: number, month: number, explicit: number | null): number {
   if (explicit) return clampDay(year, month, explicit);
   const name = fuzzy?.toLowerCase() ?? '';
   if (name === 'early' || name === 'start of' || name === 'beginning of') return 7;
@@ -79,7 +79,7 @@ function fuzzyDay(fuzzy: string | null, edge: Edge, year: number, month: number,
   return edge === 'end' ? lastDay(year, month) : edge === 'point' ? 15 : 1;
 }
 
-function iso(year: number, month: number, day: number): string {
+export function iso(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
@@ -91,7 +91,7 @@ function priority(text: string, index: number): number {
   return 2;
 }
 
-function catalogueMonth(month: string | null | undefined): number | null {
+export function catalogueMonth(month: string | null | undefined): number | null {
   if (!month) return null;
   return MONTHS[month.toLowerCase()] ?? null;
 }
@@ -106,7 +106,7 @@ function dayNum(value: string | undefined): number | null {
   return Number(value.replace(/(?:st|nd|rd|th)$/i, ''));
 }
 
-function collect(text: string): Found[] {
+export function collect(text: string): Found[] {
   const found: Found[] = [];
   const occupied: Array<{ start: number; end: number }> = [];
   const covers = (index: number) => occupied.some((span) => index >= span.start && index < span.end);
@@ -249,7 +249,7 @@ function collect(text: string): Found[] {
   return found;
 }
 
-function yearsFor(item: Found, hint: number | null): { startYear: number; endYear: number } {
+export function yearsFor(item: Found, hint: number | null): { startYear: number; endYear: number } {
   if (item.startYear && item.endYear) return { startYear: item.startYear, endYear: item.endYear };
   if (item.startYear && !item.endYear) {
     const endYear = item.endMonth < item.startMonth ? item.startYear + 1 : item.startYear;
