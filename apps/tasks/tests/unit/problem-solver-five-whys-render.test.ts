@@ -33,23 +33,22 @@ describe('5 Whys view', () => {
     expect(g.querySelector('.ps-objection')!.getAttribute('title')).toBe('That blames a person.');
   });
 
-  it('positions each node on its own row, separate from the animated body', () => {
-    const view = createFiveWhysView();
-    view.update(run([node('p', 'problem'), node('w1', 'why:1')]));
-    const p = view.el.querySelector('[data-node="p"]')!;
-    const w1 = view.el.querySelector('[data-node="w1"]')!;
-    expect(p.getAttribute('transform')).toBe('translate(0 0)');
-    expect(w1.getAttribute('transform')).toBe('translate(0 70)');
-    expect(w1.querySelector('.ps-whys__body')!.getAttribute('transform')).toBeNull();
-  });
-
-  it('grows the viewBox with the chain and draws the root last', () => {
+  it('keeps chain order: problem, whys by index, root last', () => {
     const view = createFiveWhysView();
     const whys = [1, 2, 3, 4, 5].map((i) => node(`w${i}`, `why:${i}`));
-    view.update(run([node('p', 'problem'), ...whys, node('r', 'root')]));
-    const height = Number(view.el.getAttribute('viewBox')!.split(' ')[3]);
-    expect(height).toBe(500); // problem 60 + gap + five whys of 64 + gaps + root 60
+    view.update(run([node('r', 'root'), whys[1], node('p', 'problem'), whys[0], ...whys.slice(2)]));
+    const ids = [...view.el.querySelectorAll('[data-node]')].map((row) => row.getAttribute('data-node'));
+    expect(ids).toEqual(['p', 'w1', 'w2', 'w3', 'w4', 'w5', 'r']);
     expect(view.el.querySelector('[data-node="r"] .ps-whys__root')).not.toBeNull();
+    expect(view.el.querySelector('[data-node="w2"] .ps-whys__meta')!.textContent).toBe('Why 2');
+  });
+
+  it('shows the objection as a note under a contested answer, shape left solid', () => {
+    const view = createFiveWhysView();
+    view.update(run([node('p', 'problem'), node('w1', 'why:1', { state: 'contested', objection: 'That blames a person.' })]));
+    const row = view.el.querySelector('[data-node="w1"]')!;
+    expect(row.querySelector('.ps-whys__note')!.textContent).toBe('That blames a person.');
+    expect(row.querySelector('.ps-whys__why')!.getAttribute('stroke-dasharray')).toBeNull();
   });
 });
 

@@ -34,22 +34,22 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     await answer(page, 'We could change which day it is published');
     await expect(page.locator('.ps-suggestion')).toContainText('5 Whys');
     await page.getByRole('button', { name: 'Start it' }).click();
-    await expect(page.locator('svg.ps-whys')).toBeVisible();
-    await expect(page.locator('svg.ps-whys [data-node]')).toHaveCount(0);
+    await expect(page.locator('.ps-whys')).toBeAttached();
+    await expect(page.locator('.ps-whys [data-node]')).toHaveCount(0);
 
     await answer(page, 'The rota is finalised on Friday afternoon each week');
-    await expect(page.locator('svg.ps-whys [data-node]')).toHaveCount(1);
+    await expect(page.locator('.ps-whys [data-node]')).toHaveCount(1);
 
     await answer(page, 'too short');
-    await expect(page.locator('svg.ps-whys [data-node]')).toHaveCount(1);
+    await expect(page.locator('.ps-whys [data-node]')).toHaveCount(1);
     await page.getByRole('button', { name: 'Keep it anyway' }).click();
-    await expect(page.locator('svg.ps-whys .is-contested')).toHaveCount(1);
+    await expect(page.locator('.ps-whys .is-contested')).toHaveCount(1);
     if (process.env.PS_SHOT_DIR) {
       await page.screenshot({ path: `${process.env.PS_SHOT_DIR}/ps-${viewport.width > 600 ? 'desktop' : 'mobile'}.png`, fullPage: true });
     }
 
     await page.reload();
-    await expect(page.locator('svg.ps-whys [data-node]')).toHaveCount(2, { timeout: 20_000 });
+    await expect(page.locator('.ps-whys [data-node]')).toHaveCount(2, { timeout: 20_000 });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });

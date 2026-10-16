@@ -48,44 +48,111 @@
   opacity: 0.55;
 }
 
-/* 5 Whys */
+/* 5 Whys (toolkit p.47): one rigid column of equal-width flat shapes with even
+   gaps, answers set beside them. Rows are fixed height; a tapped row opens. */
+.ps-scope {
+  --ps-red: #d4282c;
+  --ps-yellow: #f0bc3c;
+  --ps-blue: #2e5ba6;
+}
+
 .ps-whys {
+  --ps-shape-w: 200px;
+  --ps-row-h: calc(var(--ps-shape-w) / 2);
+  display: grid;
+  gap: 10px;
+  max-width: 720px;
+}
+
+.ps-whys__row {
+  display: grid;
+  grid-template-columns: var(--ps-shape-w) minmax(0, 1fr);
+  column-gap: var(--space-6);
+  height: var(--ps-row-h);
+  align-items: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  outline: none;
+}
+
+.ps-whys__row:focus-visible .ps-whys__copy { box-shadow: 0 0 0 2px var(--wave); border-radius: var(--radius-sm); }
+
+.ps-whys__row.is-open { height: auto; min-height: var(--ps-row-h); align-items: start; }
+
+.ps-whys__shape {
+  display: block;
   width: 100%;
   height: auto;
   overflow: visible;
+  transform-origin: 50% 0;
 }
+
+.ps-whys__row--problem .ps-whys__shape { transform-origin: 50% 100%; }
 
 .ps-whys__problem { fill: var(--ps-red); }
 .ps-whys__why { fill: var(--ps-yellow); }
 .ps-whys__root { fill: var(--ps-blue); }
-.ps-whys__label { fill: var(--on-dark); font: var(--weight-semibold) 13px var(--font-ui); }
-.ps-whys__label--dark { fill: var(--ink); }
+
+.ps-whys__label {
+  fill: #fff;
+  font: var(--weight-semibold) 13px var(--font-ui);
+}
+
+.ps-whys__copy { min-width: 0; }
+
+.ps-whys__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 2px;
+  color: var(--muted);
+  font: var(--weight-semibold) var(--text-2xs) / 1.4 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
 
 .ps-whys__text {
+  display: -webkit-box;
   margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
   color: var(--ink);
-  font: var(--weight-regular) var(--text-sm) / 1.4 var(--font-ui);
+  font: var(--weight-regular) var(--text-base) / 1.4 var(--font-ui);
 }
 
-.is-contested .ps-whys__problem,
-.is-contested .ps-whys__why,
-.is-contested .ps-whys__root {
-  fill-opacity: 0.35;
-  stroke: var(--ink);
-  stroke-width: 1.5;
-  stroke-dasharray: 4 3;
+.ps-whys__row--problem .ps-whys__text,
+.ps-whys__row--root .ps-whys__text { font-weight: var(--weight-semibold); }
+
+.ps-whys__note {
+  display: none;
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font: italic var(--weight-regular) var(--text-sm) / 1.4 var(--font-ui);
 }
+
+.ps-whys__row.is-open .ps-whys__text { display: block; -webkit-line-clamp: unset; }
+.ps-whys__row.is-open .ps-whys__note { display: block; }
 
 .ps-objection {
-  display: inline-flex;
-  margin-left: var(--space-1);
-  padding: 0 var(--space-1);
+  padding: 1px var(--space-2);
   border: 0;
-  border-radius: var(--radius-sm);
-  background: var(--pastel-peach);
-  color: var(--pastel-peach-ink);
-  font-size: var(--text-2xs);
+  border-radius: var(--radius-full);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  font: inherit;
+  letter-spacing: inherit;
   cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .ps-whys { --ps-shape-w: 128px; gap: 7px; }
+  .ps-whys__row { column-gap: var(--space-4); }
+  .ps-whys__label { font-size: 17px; }
+  .ps-whys__meta { display: none; }
+  .ps-whys__row.is-open .ps-whys__meta { display: flex; }
+  .ps-whys__text { font-size: var(--text-sm); }
 }
 
 /* Outline (accessible alternative and fallback) */
