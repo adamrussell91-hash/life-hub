@@ -1,0 +1,70 @@
+#!/usr/bin/env node
+// Usage: node scripts/problem-solver-preview.mjs <tool> <out-dir> [--open <nodeId>]
+// Bundles a renderer with a synthetic sample run, then screenshots it at 900px and 390px.
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
+import { chromium } from 'playwright-core';
+import { SAMPLES } from './problem-solver-preview-samples.mjs';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const RENDERERS = {
+  five_whys: ['five-whys', 'createFiveWhysView'],
+  problem_tree: ['problem-tree', 'createProblemTreeView'],
+  problem_statement: ['problem-statement', 'createProblemStatementView']
+};
+
+const args = process.argv.slice(2);
+const openIndex = args.indexOf('--open');
+const openNode = openIndex >= 0 ? args.splice(openIndex, 2)[1] : null;
+const [tool, outDir] = args;
+if (!tool || !outDir || !RENDERERS[tool] || !SAMPLES[tool]) {
+  console.error(`Usage: problem-solver-preview.mjs <${Object.keys(RENDERERS).join('|')}> <out-dir> [--open <nodeId>]`);
+  process.exit(2);
+}
+mkdirSync(outDir, { recursive: true });
+
+const [file, factory] = RENDERERS[tool];
+const rawPlugin = {
+  name: 'raw-svg',
+  setup(b) {
+    b.onResolve({ filter: /\.svg\?raw$/ }, (a) => ({ path: resolve(a.resolveDir, a.path.replace('?raw', '')) }));
+    b.onLoad({ filter: /\.svg$/ }, (a) => ({ contents: readFileSync(a.path, 'utf8'), loader: 'text' }));
+  }
+};
+const bundle = await build({
+  stdin: {
+    contents: `import { ${factory} as make } from './render/${file}';\nconst run = ${JSON.stringify(SAMPLES[tool])};\nconst view = make(document);\nview.update(run);\ndocument.querySelector('#mount').append(view.el);\nwindow.__view = view;`,
+    resolveDir: join(root, 'packages/problem-solver'),
+    loader: 'ts'
+  },
+  bundle: true,
+  write: false,
+  format: 'iife',
+  plugins: [rawPlugin],
+  loader: { '.svg': 'text' }
+});
+const css = ['apps/tasks/design-kit/tokens.css', 'packages/problem-solver/problem-solver.css'].map((p) => readFileSync(join(root, p), 'utf8')).join('\n');
+const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}\nbody{margin:0;background:var(--paper);font-family:var(--font-ui)}.wrap{padding:24px 16px;max-width:720px;margin:0 auto}</style></head><body><div class="ps-scope wrap"><div id="mount"></div></div><script>${bundle.outputFiles[0].text.replace(/<\/script/g, '<\\/script')}</script></body></html>`;
+const page = join(outDir, `${tool}.html`);
+writeFileSync(page, html);
+
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+for (const width of [900, 390]) {
+  const ctx = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 2 });
+  const tab = await ctx.newPage();
+  tab.on('pageerror', (e) => console.error('page error:', e.message));
+  await tab.goto(`file://${page}`);
+  await tab.waitForTimeout(900);
+  if (openNode) {
+    await tab.click(`[data-node="${openNode}"] button`);
+    await tab.waitForTimeout(500);
+  }
+  const overflow = await tab.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  if (overflow > 0) console.warn(`horizontal overflow at ${width}px: ${overflow}px`);
+  await tab.screenshot({ path: join(outDir, `${tool}-${width}.png`), fullPage: true });
+  await ctx.close();
+}
+await browser.close();
+console.log(`wrote ${outDir}/${tool}-900.png and ${tool}-390.png`);

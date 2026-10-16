@@ -9,7 +9,7 @@ import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
 import { slotLabel } from './outline';
-import { skillChip } from '../glyphs';
+import { type Accent, contestedTag, createDisclosureGroup, detailsCard, nextId, reducedMotion } from './details';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -17,17 +17,13 @@ export type FiveWhysView = { el: HTMLDivElement; update(run: PsToolRun): void };
 
 type Kind = 'problem' | 'why' | 'root';
 
+const ACCENT: Record<Kind, Accent> = { problem: 'red', why: 'yellow', root: 'blue' };
+
 const PATHS: Record<Kind, string> = {
   problem: 'M0 100A100 100 0 0 1 200 100Z', // half-disc, flat edge down
   why: 'M0 0H200L100 100Z', // downward triangle, 2:1 like the book
   root: 'M0 0A100 100 0 0 0 200 0Z' // half-disc, flat edge up
 };
-
-let uid = 0;
-
-function reducedMotion(): boolean {
-  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
 
 function kindOf(node: PsNode): Kind {
   const name = parseSlot(node.slot)?.name;
@@ -73,48 +69,11 @@ function shapeButton(doc: Document, node: PsNode, kind: Kind, detailsId: string)
   title.textContent = nodeTitle(node);
   label.append(meta, title);
   if (node.state === 'contested') {
-    const chip = doc.createElement('span');
-    chip.className = 'ps-objection';
-    chip.textContent = 'Contested';
-    chip.title = node.objection ?? '';
-    label.append(chip);
+    label.append(contestedTag(doc, node));
   }
   button.append(shapeSvg(doc, kind), label);
   button.setAttribute('aria-label', `${metaLabel(node, kind)}: ${nodeTitle(node)}${node.state === 'contested' ? ', contested' : ''}. Show details`);
   return button;
-}
-
-function details(doc: Document, node: PsNode, kind: Kind, id: string): HTMLDivElement {
-  const wrap = doc.createElement('div');
-  wrap.className = 'ps-whys__details';
-  wrap.id = id;
-  const inner = doc.createElement('div');
-  inner.className = 'ps-whys__details-inner';
-  const card = doc.createElement('div');
-  card.className = `ps-whys__card ps-whys__card--${kind}`;
-  const text = doc.createElement('p');
-  text.className = 'ps-whys__text';
-  text.textContent = node.text;
-  card.append(text);
-  if (node.skills?.length) {
-    const skills = doc.createElement('div');
-    skills.className = 'ps-whys__skills';
-    skills.append(...node.skills.map((skill) => skillChip(skill, {}, doc)));
-    card.append(skills);
-  }
-  if (node.state === 'contested') {
-    const note = doc.createElement('p');
-    note.className = 'ps-whys__note';
-    const lead = doc.createElement('strong');
-    lead.textContent = 'Coach objected: ';
-    const body = doc.createElement('span');
-    body.textContent = node.objection ?? '';
-    note.append(lead, body);
-    card.append(note);
-  }
-  inner.append(card);
-  wrap.append(inner);
-  return wrap;
 }
 
 function animateIn(item: HTMLElement, kind: Kind): void {
@@ -138,17 +97,7 @@ export function createFiveWhysView(doc: Document = document): FiveWhysView {
   root.setAttribute('role', 'list');
   root.setAttribute('aria-label', '5 Whys');
   const drawn = new Map<string, HTMLDivElement>();
-
-  function setOpen(item: HTMLElement, open: boolean): void {
-    item.classList.toggle('is-open', open);
-    item.querySelector('.ps-whys__shape')?.setAttribute('aria-expanded', String(open));
-  }
-
-  function toggle(item: HTMLElement): void {
-    const open = !item.classList.contains('is-open');
-    for (const other of drawn.values()) if (other !== item) setOpen(other, false);
-    setOpen(item, open);
-  }
+  const group = createDisclosureGroup();
 
   function update(run: PsToolRun): void {
     const nodes = [...run.nodes].sort((a, b) => order(a) - order(b));
@@ -156,16 +105,14 @@ export function createFiveWhysView(doc: Document = document): FiveWhysView {
       const kind = kindOf(node);
       let item = drawn.get(node.id);
       if (!item) {
-        uid += 1;
-        const detailsId = `ps-whys-details-${uid}`;
+        const detailsId = nextId('ps-whys-details');
         item = doc.createElement('div');
         item.className = `ps-whys__item ps-whys__item--${kind}`;
         item.setAttribute('role', 'listitem');
         item.setAttribute('data-node', node.id);
         const button = shapeButton(doc, node, kind, detailsId);
-        const current = item;
-        button.addEventListener('click', () => toggle(current));
-        item.append(button, details(doc, node, kind, detailsId));
+        group.register(item, button);
+        item.append(button, detailsCard(doc, node, ACCENT[kind], detailsId));
         drawn.set(node.id, item);
         root.append(item);
         animateIn(item, kind);
