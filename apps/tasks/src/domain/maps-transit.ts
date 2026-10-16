@@ -391,8 +391,9 @@ type LocalBranch = {
 };
 
 /**
- * Programs overlapping in time on one year line. Each runs on its own rail on the `dir` side of
- * the line; `half` is how far the farthest rail centre sits from the line.
+ * Programs overlapping in time on one side of one year line (concurrent programs split across
+ * both sides, one cluster per side). Each runs on its own rail on the `dir` side of the line;
+ * `half` is how far the farthest rail centre sits from the line.
  */
 type Cluster = {
   track: number;
@@ -403,6 +404,11 @@ type Cluster = {
   ye: number;
   half: number;
   dir: 1 | -1;
+  /**
+   * Where each rail (by offset) leaves and rejoins the year line. An inner rail bends out just
+   * above its own programs, so it never shares the outer rail's bend and reads as its own track.
+   */
+  rails: Map<number, { ys: number; ye: number }>;
 };
 
 /** Height of the bend where a rail leaves or rejoins its year line (kept short so it fits by year end). */
@@ -560,21 +566,41 @@ function buildClusters(stations: LocalStation[], trackCount: number): Cluster[] 
     const dir = railDir(track, trackCount);
     for (const group of groups) {
       const lanes = [...new Set(group.items.map((item) => item.lane))].sort((a, b) => a - b);
-      const offsets = new Map<string, number>();
-      for (const item of group.items) {
-        offsets.set(item.id, dir * (TM_RAIL_OUT + lanes.indexOf(item.lane) * TM_LANE_GAP));
+      // Two or more programs at once split across the year line: the first takes the inner side
+      // (toward the neighbouring year line), the next the usual side, and so on outward. Each
+      // still reads as joined to its own year line.
+      const sideOfLane = (lane: number): 1 | -1 => (lanes.length > 1 && lanes.indexOf(lane) % 2 === 0 ? (-dir as 1 | -1) : dir);
+      for (const side of [-dir, dir] as Array<1 | -1>) {
+        const items = group.items.filter((item) => sideOfLane(item.lane) === side);
+        if (!items.length) continue;
+        const own = lanes.filter((lane) => sideOfLane(lane) === side);
+        const offsets = new Map<string, number>();
+        const rails = new Map<number, { ys: number; ye: number }>();
+        for (const item of items) {
+          const off = side * (TM_RAIL_OUT + own.indexOf(item.lane) * TM_LANE_GAP);
+          offsets.set(item.id, off);
+          const ramp = RAIL_PAD + railRamp(off);
+          const rail = rails.get(off);
+          rails.set(off, {
+            ys: Math.min(rail?.ys ?? Infinity, item.y0 - ramp),
+            ye: Math.max(rail?.ye ?? -Infinity, item.y1 + ramp)
+          });
+        }
+        const half = TM_RAIL_OUT + (own.length - 1) * TM_LANE_GAP;
+        const y0 = Math.min(...items.map((item) => item.y0));
+        const y1 = Math.max(...items.map((item) => item.y1));
+        clusters.push({
+          track,
+          y0,
+          y1,
+          offsets,
+          half,
+          dir: side,
+          rails,
+          ys: y0 - RAIL_PAD - railRamp(half),
+          ye: y1 + RAIL_PAD + railRamp(half)
+        });
       }
-      const half = TM_RAIL_OUT + (lanes.length - 1) * TM_LANE_GAP;
-      clusters.push({
-        track,
-        y0: group.y0,
-        y1: group.y1,
-        offsets,
-        half,
-        dir,
-        ys: group.y0 - RAIL_PAD - railRamp(half),
-        ye: group.y1 + RAIL_PAD + railRamp(half)
-      });
     }
   }
   return clusters;
@@ -638,7 +664,26 @@ function labelSpan(stop: { labelY: number; label: { h: number } }): { y0: number
   return { y0, y1: y0 + stop.label.h + 4 };
 }
 
-function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: number, allStations: LocalStation[]): StrandPiece {
+/** Spans a strand's own stops and platforms take up on one year line (by year id). */
+function dotSpansOn(stops: LocalStop[], defs: Array<{ id: string }>, trackId: string): Interval[] {
+  const index = defs.findIndex((def) => def.id === trackId);
+  if (index < 0) return [];
+  return stops
+    .filter((stop) => stop.tick && !stop.branch && !stop.onEdge && !stop.cross && stop.tracks.includes(index))
+    .map((stop) => (stop.platform ? { ...stop.platform } : { y0: stop.y - TM_FINAL_R, y1: stop.y + TM_FINAL_R }));
+}
+
+/**
+ * `built` holds the strands already laid out (map order). A competition on several strands is
+ * hosted by the last of them, so the others are always built before it.
+ */
+function strandPiece(
+  map: TransitMap,
+  line: TransitMap['lines'][number],
+  year: number,
+  allStations: LocalStation[],
+  built: StrandPiece[] = []
+): StrandPiece {
   const defs = lineTrackDefs(line);
   const count = defs.length;
   const ids = defs.map((def) => def.id);
@@ -926,10 +971,39 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
     });
   }
 
-  // Keep labels in one column from overprinting each other: later ones slide down.
+  // A competition on several strands puts a stop on each strand's year line. Where that stop would
+  // land on another stop or a platform there, the interchange slides to the nearest clear spot.
+  for (const stop of stops) {
+    if (!stop.cross) continue;
+    const trackId = defs[stop.tracks[0]!]?.id ?? '';
+    const busy = stop.cross.flatMap((lineId) => {
+      if (lineId === line.id) return dotSpansOn(stops, defs, trackId);
+      const piece = built.find((item) => item.line.id === lineId);
+      return piece ? dotSpansOn(piece.stops, piece.defs, trackId) : [];
+    });
+    const reach = TM_STOP_R + STOP_RING_W + 8;
+    const clear = (y: number) => busy.every((span) => y + reach <= span.y0 || y - reach >= span.y1);
+    let shift = 0;
+    for (let step = 0; step <= 160; step += 2) {
+      if (clear(stop.y + step)) {
+        shift = step;
+        break;
+      }
+      if (clear(stop.y - step)) {
+        shift = -step;
+        break;
+      }
+    }
+    stop.y += shift;
+    stop.labelY += shift;
+  }
+
+  // Keep labels in one column from overprinting each other: later ones slide down. An interchange
+  // name has its own column further out (set below), so it never shoves a name off its dot.
   const columns = new Map<string, LocalStop[]>();
   for (const stop of stops) {
-    const key = stop.branch ?? `${stop.side}:${stop.side === 'left' ? Math.min(...stop.tracks) : Math.max(...stop.tracks)}`;
+    const edge = stop.side === 'left' ? Math.min(...stop.tracks) : Math.max(...stop.tracks);
+    const key = stop.branch ?? `${stop.cross ? 'cross' : stop.side}:${edge}`;
     const list = columns.get(key) ?? [];
     list.push(stop);
     columns.set(key, list);
@@ -942,6 +1016,33 @@ function strandPiece(map: TransitMap, line: TransitMap['lines'][number], year: n
       stop.labelY = top + LABEL_LINE_H / 2;
       floor = top + stop.label.h + 6;
     }
+  }
+
+  // An interchange and its name sit beyond every other name beside its year line at that height.
+  for (const stop of stops) {
+    if (!stop.cross) continue;
+    const track = stop.tracks[0]!;
+    const own = labelSpan(stop);
+    const band = { y0: Math.min(own.y0, stop.y - TM_FINAL_R), y1: Math.max(own.y1, stop.y + TM_FINAL_R) };
+    let reach = stop.dotX[0] ?? CROSS_OUT;
+    for (const other of stops) {
+      if (other === stop || other.cross || other.side !== 'right') continue;
+      if (!overlap(band, labelSpan(other), 6)) continue;
+      let extent: number;
+      if (other.branch) {
+        const branch = [...branchMap.values()].find((item) => item.id === other.branch);
+        if (!branch || branch.track !== track) continue;
+        extent = Math.abs(branch.branchDX) + LABEL_DX + other.label.w;
+      } else {
+        if (Math.max(...other.tracks) !== track) continue;
+        const dot = Math.abs(other.dotX[other.tracks.indexOf(track)] ?? 0);
+        const span = labelSpan(other);
+        const pills = pillReach(stations, clusters, track, 'right', span.y0, span.y1);
+        extent = labelReach(clusters, track, other.y, 'right', dot, pills) + other.label.w;
+      }
+      reach = Math.max(reach, extent + 12 + TM_FINAL_R);
+    }
+    stop.dotX = [reach];
   }
 
   // Pushes: room for labels and branches beside middle year lines, and even splits.
@@ -1039,15 +1140,16 @@ function placeStrand(piece: StrandPiece): PlacedStrand {
     const pieces: Point[][] = [slicePolyline(full, yTop, yBottom)];
     const lanes: Point[][] = [];
     for (const cluster of own) {
-      const x = tx(index, cluster.ys);
-      const offsets = [...new Set(cluster.offsets.values())].sort((a, b) => a - b);
+      const offsets = [...cluster.rails.keys()].sort((a, b) => a - b);
       for (const off of offsets) {
+        const { ys, ye } = cluster.rails.get(off)!;
         const r = railRamp(off);
+        const x = tx(index, cluster.ys);
         lanes.push([
-          { x, y: cluster.ys },
-          { x: x + off, y: cluster.ys + r },
-          { x: x + off, y: cluster.ye - r },
-          { x, y: cluster.ye }
+          { x, y: ys },
+          { x: x + off, y: ys + r },
+          { x: x + off, y: ye - r },
+          { x, y: ye }
         ]);
       }
     }
@@ -1272,7 +1374,8 @@ export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | 
 
   const allStations: LocalStation[] = map.lines.flatMap((line) => buildStations(map, line, year, lineTrackDefs(line)));
   // Orphan programs (line deleted) are dropped from the drawing.
-  const pieces = map.lines.map((line) => strandPiece(map, line, year, allStations));
+  const pieces: StrandPiece[] = [];
+  for (const line of map.lines) pieces.push(strandPiece(map, line, year, allStations, pieces));
   const placedStrands = pieces.map(placeStrand);
 
   const placedBoxes: Box[] = [];

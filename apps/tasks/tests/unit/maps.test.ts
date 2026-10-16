@@ -11,6 +11,7 @@ import {
   crossingKind,
   exportMapHtml,
   isOrthogonalPath,
+  foldStrandLinks,
   pickCurrentYearMap,
   segmentCrossings,
   stationLineCuts
@@ -51,7 +52,7 @@ import {
   type LaidTrackFork
 } from '@/domain/maps-layout';
 import { mapsOrSeed } from '@/views/maps';
-import { layoutMap, renderTransitSvg, TM_LANE_GAP, TM_PILL_W, TM_RAIL_OUT, TM_TRACK_GAP } from '@/domain/maps-transit';
+import { layoutMap, renderTransitSvg, TM_LANE_GAP, TM_PILL_W, TM_RAIL_OUT, TM_STOP_R, TM_TRACK_GAP } from '@/domain/maps-transit';
 
 function datedProgram(
   id: string,
@@ -251,7 +252,7 @@ describe('year layout', () => {
     expect(long.height).toBe(Math.max(24, dateToY(long.ends_on!, year) - dateToY(long.starts_on!, year)));
   });
 
-  it('runs concurrent programs on parallel rails beside the year line, steps the neighbour aside, then rejoins', () => {
+  it('splits concurrent programs across their year line, steps both neighbours aside, then rejoins', () => {
     const base = mindWorks2026Map();
     const layout = layoutMap({
       ...base,
@@ -265,8 +266,9 @@ describe('year layout', () => {
     const b = layout.stations.find((item) => item.id === 'st_psyops')!.bodies[0]!;
     const line = layout.lines.find((item) => item.id === 'line_reasoning')!;
     const rozelle = line.tracks.find((track) => track.id === 'rozelle')!;
-    expect(Math.abs(a.x - b.x)).toBeCloseTo(TM_LANE_GAP, 5);
-    expect(Math.min(a.x, b.x) - rozelle.x).toBeCloseTo(TM_RAIL_OUT, 5);
+    // One program each side of Rozelle, the first on the inner (left) side.
+    expect(a.x - rozelle.x).toBeCloseTo(-TM_RAIL_OUT, 5);
+    expect(b.x - rozelle.x).toBeCloseTo(TM_RAIL_OUT, 5);
     const draw = layout.draw.tracks.filter((track) => track.lineId === 'line_reasoning');
     const rz = draw.find((track) => track.trackId === 'rozelle')!;
     expect(rz.lanes).toHaveLength(2);
@@ -281,7 +283,7 @@ describe('year layout', () => {
       }
       return NaN;
     };
-    for (const id of ['senior']) {
+    for (const id of ['junior', 'senior']) {
       const track = draw.find((item) => item.trackId === id)!;
       const pts = track.pieces[0]!;
       const away = Math.abs(xAtY(pts, mid) - rz.top.x);
@@ -803,6 +805,84 @@ describe('screenshot regressions (Expression gallery, Reasoning olympiad)', () =
     expect(renderTransitSvg(layout).match(/class="tm-platform"/g)).toHaveLength(1);
   });
 
+  it('puts the first of two concurrent senior programs between Rozelle and Senior, the next outside', () => {
+    const base = mindWorks2026Map();
+    const map = {
+      ...base,
+      stations: [
+        program('st_pop', 'line_reasoning', 'The Philosophy of Power', '2026-03-02', '2026-04-24', 'senior'),
+        program('st_psy', 'line_reasoning', 'PSYOPS', '2026-03-02', '2026-04-24', 'senior')
+      ],
+      ticks: [comp('tk_bb', 'Brain Bee Challenge', { kind: 'station', station_id: 'st_psy', side: 'right', offset: 0.5 }, '2026-05-05')]
+    };
+    const layout = layoutMap(map);
+    const tracks = layout.draw.tracks.filter((track) => track.lineId === 'line_reasoning');
+    const senior = tracks.find((track) => track.trackId === 'senior')!;
+    const rozelle = tracks.find((track) => track.trackId === 'rozelle')!;
+    const lineX = senior.top.x;
+    const pop = layout.stations.find((station) => station.id === 'st_pop')!.bodies[0]!;
+    const psy = layout.stations.find((station) => station.id === 'st_psy')!.bodies[0]!;
+    expect(pop.x - lineX).toBeCloseTo(-TM_RAIL_OUT, 5);
+    expect(psy.x - lineX).toBeCloseTo(TM_RAIL_OUT, 5);
+    // Rozelle steps aside so the pill sits clear between the two year lines.
+    const mid = pop.y + pop.h / 2;
+    const rozelleX = Math.min(...rozelle.pieces.flat().filter((point) => Math.abs(point.y - mid) < pop.h).map((point) => point.x));
+    expect(pop.x - pop.w / 2 - rozelleX).toBeGreaterThan(10);
+    // Each rail leaves and rejoins the senior line itself.
+    expect(senior.lanes).toHaveLength(2);
+    for (const rail of senior.lanes) {
+      expect(rail[0]!.x).toBeCloseTo(lineX, 5);
+      expect(rail[rail.length - 1]!.x).toBeCloseTo(lineX, 5);
+    }
+    // PSYOPS's competition still leaves from its outer side.
+    const bb = layout.draw.stops.find((stop) => stop.tickId === 'tk_bb')!;
+    expect(bb.dots[0]!.x).toBeGreaterThan(psy.x);
+  });
+
+  it('keeps a same-week stop visible beside a cross-strand interchange, names apart', () => {
+    const base = mindWorks2026Map();
+    const at = { kind: 'line', line_id: 'line_reasoning', y: 200, tracks: ['senior'] } as const;
+    const map = {
+      ...base,
+      stations: [],
+      ticks: [
+        comp('tk_seo3', 'Senior Ethics Olympiad', at, '2026-05-27'),
+        comp('tk_ee3', 'Ethical Explorations', at, '2026-05-27'),
+        {
+          ...comp('tk_locke3', 'John Locke Essay Competition', { kind: 'line', line_id: 'line_justice', y: 200, tracks: ['senior'] }, '2026-05-31'),
+          also_lines: ['line_innovation', 'line_expression', 'line_reasoning']
+        }
+      ]
+    };
+    const layout = layoutMap(map);
+    const ee = layout.draw.stops.find((stop) => stop.tickId === 'tk_ee3')!;
+    const seo = layout.draw.stops.find((stop) => stop.tickId === 'tk_seo3')!;
+    const locke = layout.draw.stops.find((stop) => stop.tickId === 'tk_locke3')!;
+    // No interchange stop sits on the platform or on either event's dot.
+    for (const dot of locke.cross!.railDots) {
+      for (const other of [ee, seo]) {
+        if (Math.abs(other.dots[0]!.x - dot.x) > 1) continue;
+        expect(Math.abs(other.dots[0]!.y - dot.y)).toBeGreaterThan(TM_STOP_R * 2);
+        expect(dot.y < other.platform!.y0 || dot.y > other.platform!.y1).toBe(true);
+      }
+    }
+    // Ethical Explorations keeps its name beside its own dot.
+    expect(ee.labelY).toBeCloseTo(ee.y, 5);
+    // The interchange name sits clear of both event names.
+    const box = (stop: typeof ee) => {
+      const x0 = stop.anchor === 'start' ? stop.labelX : stop.labelX - stop.w;
+      const y0 = stop.labelY - 12;
+      return { x0, x1: x0 + stop.w, y0, y1: y0 + stop.h };
+    };
+    const lb = box(locke);
+    for (const other of [ee, seo]) {
+      const ob = box(other);
+      const apart = lb.x1 <= ob.x0 || ob.x1 <= lb.x0 || lb.y1 <= ob.y0 || ob.y1 <= lb.y0;
+      expect(apart).toBe(true);
+    }
+    expect(locke.dots[0]!.x).toBeGreaterThan(Math.max(box(ee).x1, box(seo).x1));
+  });
+
   it('runs a program on a rail joined to its year line top and bottom, keeping line stops on the line', () => {
     const base = mindWorks2026Map();
     const map = {
@@ -841,5 +921,23 @@ describe('screenshot regressions (Expression gallery, Reasoning olympiad)', () =
     expect(branch.points[0]!.x).toBeCloseTo(pill.x + TM_PILL_W / 2, 5);
     const r1 = layout.draw.stops.find((stop) => stop.tickId === 'tk_r1')!;
     expect(r1.dots[0]!.x).toBeGreaterThan(pill.x + TM_PILL_W / 2);
+  });
+});
+
+describe('strand links fold into Sits on', () => {
+  it('turns an old "also connect to" strand link into one more strand, leaving competition links alone', () => {
+    const base = mindWorks2026Map();
+    const map = {
+      ...base,
+      ticks: base.ticks.map((tick) =>
+        tick.id === 'tk_davinci' && tick.attach.kind === 'line' ? { ...tick, connects_to: 'Reasoning' } : tick
+      )
+    };
+    const folded = foldStrandLinks(map);
+    const davinci = folded.ticks.find((tick) => tick.id === 'tk_davinci')!;
+    expect(davinci.connects_to).toBeNull();
+    expect(davinci.also_lines).toContain('line_reasoning');
+    expect(folded.ticks.find((tick) => tick.id === 'tk_evatt')!.connects_to).toBe('Rotary MUNA');
+    expect(foldStrandLinks(base)).toBe(base);
   });
 });

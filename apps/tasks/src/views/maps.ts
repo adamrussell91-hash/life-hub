@@ -11,7 +11,7 @@ import {
 } from '@/domain/maps-planning';
 import { parseHubPrefs, type SchoolYearTerms } from '@/domain/hub-prefs';
 import { tasksApi } from '@/services/client-api';
-import { exportMapHtml, mapsOrSeed, pickCurrentYearMap } from '@/domain/maps';
+import { connectTargetOf, exportMapHtml, mapsOrSeed, pickCurrentYearMap } from '@/domain/maps';
 import { createFilteredPicker, type MapIndexItem, type PickerGroup } from '@/views/map-nav';
 import { mountMapCardIndex, type MapCardModel } from '@/views/map-cards';
 import { createMapToolbar } from '@/views/map-chrome';
@@ -123,6 +123,30 @@ function targetPickerGroups(map: TransitMap, skipId?: string | null): PickerGrou
   ];
 }
 
+/** Programs and other competitions a competition can be part of. */
+function partOfPickerGroups(map: TransitMap, skipId: string): PickerGroup[] {
+  return targetPickerGroups(map, skipId)
+    .filter((group) => group.label !== 'Lines')
+    .map((group) => (group.label === 'Stations' ? { ...group, label: 'Programs' } : group));
+}
+
+function leadsToPickerGroups(map: TransitMap, skipId: string): PickerGroup[] {
+  return targetPickerGroups(map, skipId).filter((group) => group.label === 'Competitions');
+}
+
+/**
+ * Puts a competition on a year line of the given strands (map order): the first hosts it, the
+ * rest are its `also_lines`. Keeps its year lines where the host strand has them.
+ */
+function sitOnStrands(map: TransitMap, previous: MapTick['attach'], lineIds: string[]): MapTick['attach'] {
+  const ordered = map.lines.filter((line) => lineIds.includes(line.id));
+  const host = ordered[0] ?? map.lines[0];
+  const y = previous.kind === 'line' ? previous.y : 200;
+  const kept = previous.kind === 'line' || previous.kind === 'station' ? attachTracksOf(previous) : [];
+  const tracks = host ? resolveLineAttachTracks(kept, lineTrackDefs(host).map((track) => track.id)) : kept;
+  return { kind: 'line', line_id: host?.id ?? '', y, ...(tracks.length ? { tracks } : {}) };
+}
+
 function buildMapIndexItems(
   map: TransitMap,
   layout: MapCanvasLayout
@@ -229,18 +253,6 @@ function attachSelectValue(tick: MapTick): string {
   return `line:${tick.attach.line_id}`;
 }
 
-function connectSelectValue(map: TransitMap, connectsTo: string | null): string {
-  if (!connectsTo) return '';
-  const text = connectsTo.toLowerCase();
-  const event = map.ticks.find(
-    (tick) => tick.id.toLowerCase() === text || tick.label.toLowerCase() === text || text.includes(tick.label.toLowerCase())
-  );
-  if (event) return `event:${event.id}`;
-  const line = map.lines.find(
-    (item) => text.includes(item.name.toLowerCase()) || text.includes(item.id.toLowerCase())
-  );
-  return line ? `line:${line.id}` : '';
-}
 
 function parseAttachValue(
   value: string,
@@ -614,7 +626,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
   let current = pickCurrentYearMap(maps, yearNow) ?? maps[0]!;
   for (const map of maps) {
     const raw = listed.find((item) => item.id === map.id);
-    if (!raw || !lineColorsNeedWriteback(raw, map)) continue;
+    const linksFolded = raw ? raw.ticks.some((tick, index) => tick.connects_to !== map.ticks[index]?.connects_to) : false;
+    if (!raw || (!lineColorsNeedWriteback(raw, map) && !linksFolded)) continue;
     void tasksApi
       .updateMap(map.id, { title: map.title, year: map.year, lines: map.lines, stations: map.stations, ticks: map.ticks })
       .then((saved) => {
@@ -1485,66 +1498,83 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     }
 
     if (initial.tick) {
-      const attachPicker = createFilteredPicker(
-        targetPickerGroups(current, id),
-        attachSelectValue(initial.tick),
-        { ariaLabel: 'Attach to', placeholder: 'Search lines, programs…' }
-      );
-      const alsoPicker = createFilteredPicker(
-        targetPickerGroups(current, id),
-        connectSelectValue(current, initial.tick.connects_to),
-        { ariaLabel: 'Also connect to', blankLabel: 'No extra connection', placeholder: 'Search connections…' }
-      );
-      let lastAttach = attachPicker.getValue();
-      let lastAlso = alsoPicker.getValue();
-      const applyAttach = () => {
-        const tick = liveItem(id).tick;
-        if (!tick) return;
-        const attachValue = attachPicker.getValue();
-        const alsoValue = alsoPicker.getValue();
-        if (attachValue === lastAttach && alsoValue === lastAlso) return;
-        lastAttach = attachValue;
-        lastAlso = alsoValue;
-        tick.attach = parseAttachValue(
-          attachValue,
-          current.lines[0]?.id ?? '',
-          tick.attach.kind === 'line' ? tick.attach.y : 200,
-          tick.attach
-        );
-        // Keep year lines the new host still offers; otherwise fall back.
-        const next = tick.attach;
-        if (next.kind === 'line' || next.kind === 'station') {
-          let allowed: readonly string[] = [];
-          if (next.kind === 'line') {
-            const host = findLine(current, next.line_id);
-            allowed = host ? lineTrackDefs(host).map((track) => track.id) : [];
-          } else {
-            allowed = current.stations.find((item) => item.id === next.station_id)?.tracks ?? [];
+      const attach = initial.tick.attach;
+      const onStrands = attach.kind === 'line';
+
+      // Sits on: the strands a competition runs on. Two or more draw one interchange.
+      if (onStrands) {
+        const picked = new Set([attach.line_id, ...(initial.tick.also_lines ?? [])]);
+        const strands = el('div', 'map-tracks');
+        for (const line of current.lines) {
+          const item = el('label', 'map-tracks__item');
+          const check = document.createElement('input');
+          check.type = 'checkbox';
+          check.value = line.id;
+          check.checked = picked.has(line.id);
+          item.append(check, document.createTextNode(line.name));
+          strands.append(item);
+        }
+        strands.addEventListener('change', (event) => {
+          const tick = liveItem(id).tick;
+          if (!tick || tick.attach.kind !== 'line') return;
+          const ids = [...strands.querySelectorAll<HTMLInputElement>('input:checked')].map((input) => input.value);
+          if (!ids.length) {
+            // Always on at least one strand.
+            (event.target as HTMLInputElement).checked = true;
+            return;
           }
+          tick.attach = sitOnStrands(current, tick.attach, ids);
+          tick.also_lines = ids.length > 1 ? ids.slice(1) : undefined;
+          tick.attach = applyDateToTickAttach(tick, year).attach;
+          paint();
+          void persist();
+        });
+        body.push(
+          inspectorField('Sits on', strands, 'Tick every strand it runs on. Two or more draw one interchange with a stop on each.')
+        );
+      }
+
+      // Part of: inside a program, or a later round of another competition.
+      const partOf = createFilteredPicker(
+        partOfPickerGroups(current, id),
+        onStrands ? '' : attachSelectValue(initial.tick),
+        { ariaLabel: 'Part of', blankLabel: 'Nothing (sits on its strands)', placeholder: 'Search programs, competitions…' }
+      );
+      let lastPartOf = partOf.getValue();
+      partOf.root.addEventListener('click', () => {
+        const tick = liveItem(id).tick;
+        const value = partOf.getValue();
+        if (!tick || value === lastPartOf) return;
+        lastPartOf = value;
+        if (value) {
+          tick.attach = parseAttachValue(value, current.lines[0]?.id ?? '', 200, tick.attach);
+          tick.also_lines = undefined;
+        } else {
+          const home = lineForTick(current, tick) ?? current.lines[0];
+          tick.attach = sitOnStrands(current, tick.attach, home ? [home.id] : []);
+        }
+        const next = tick.attach;
+        if (next.kind === 'station') {
+          const allowed = current.stations.find((item) => item.id === next.station_id)?.tracks ?? [];
           const tracks = resolveLineAttachTracks(attachTracksOf(next), allowed);
           if (tracks.length) {
             const { track: _legacy, ...rest } = next;
             tick.attach = { ...rest, tracks };
           }
         }
-        tick.connects_to = parseConnectValue(alsoValue, current);
         tick.attach = applyDateToTickAttach(tick, year).attach;
         paint();
         void persist();
-      };
-      attachPicker.root.addEventListener('click', applyAttach);
-      alsoPicker.root.addEventListener('click', applyAttach);
-      // Attach → year line → also-connect: year lines sit next to the host, not under the fold.
-      body.push(inspectorField('Attach to', attachPicker.root));
+      });
+      body.push(inspectorField('Part of', partOf.root, 'A program it belongs to, or the round before it.'));
 
-      const attach = initial.tick.attach;
       let yearDefs: TrackDef[] | null = null;
       let yearHint = '';
       if (attach.kind === 'line') {
         const host = findLine(current, attach.line_id) ?? current.lines[0];
         if (host) {
           yearDefs = lineTrackDefs(host);
-          yearHint = 'Which year lines on this strand the competition sits on.';
+          yearHint = 'Which year lines it sits on (the same on every strand).';
         }
       } else if (attach.kind === 'station') {
         const host = current.stations.find((item) => item.id === attach.station_id);
@@ -1552,7 +1582,7 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         if (host && hostLine) {
           const filtered = lineTrackDefs(hostLine).filter((track) => host.tracks.includes(track.id));
           yearDefs = filtered.length ? filtered : lineTrackDefs(hostLine);
-          yearHint = 'Which year lines on this program the competition sits on.';
+          yearHint = 'Which year lines on this program it sits on.';
         }
       }
       if (yearDefs && (attach.kind === 'line' || attach.kind === 'station')) {
@@ -1574,10 +1604,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         body.push(inspectorField('Year lines', tracks.root, yearHint));
       }
 
-      body.push(inspectorField('Also connect to', alsoPicker.root));
-
       // Open all year only applies to a competition on a year line (rounds chained to it follow).
-      if (attach.kind === 'line') {
+      if (onStrands) {
         const allYear = el('label', 'map-tracks__item');
         const box = document.createElement('input');
         box.type = 'checkbox';
@@ -1595,38 +1623,26 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         body.push(
           inspectorField('Runs', row, 'Draws this competition and the rounds chained to it on a dotted line beside the year line.')
         );
-
-        // The same competition on other strands' year lines: one interchange, a stop on each strand.
-        const hostId = attach.line_id;
-        const others = current.lines.filter((line) => line.id !== hostId);
-        if (others.length) {
-          const strands = el('div', 'map-tracks');
-          for (const line of others) {
-            const item = el('label', 'map-tracks__item');
-            const check = document.createElement('input');
-            check.type = 'checkbox';
-            check.value = line.id;
-            check.checked = (initial.tick.also_lines ?? []).includes(line.id);
-            item.append(check, document.createTextNode(line.name));
-            strands.append(item);
-          }
-          strands.addEventListener('change', () => {
-            const tick = liveItem(id).tick;
-            if (!tick) return;
-            const picked = [...strands.querySelectorAll<HTMLInputElement>('input:checked')].map((input) => input.value);
-            tick.also_lines = picked.length ? picked : undefined;
-            paint();
-            void persist();
-          });
-          body.push(
-            inspectorField(
-              'Also on strands',
-              strands,
-              'Same year lines and date on these strands too. Drawn as one interchange with a stop on each strand.'
-            )
-          );
-        }
       }
+
+      // Leads to: another competition this one feeds into (drawn as a thin dashed link).
+      const linked = connectTargetOf(current, initial.tick.connects_to);
+      const leadsTo = createFilteredPicker(
+        leadsToPickerGroups(current, id),
+        linked?.kind === 'event' ? `event:${linked.id}` : '',
+        { ariaLabel: 'Leads to', blankLabel: 'Nothing', placeholder: 'Search competitions…' }
+      );
+      let lastLeadsTo = leadsTo.getValue();
+      leadsTo.root.addEventListener('click', () => {
+        const tick = liveItem(id).tick;
+        const value = leadsTo.getValue();
+        if (!tick || value === lastLeadsTo) return;
+        lastLeadsTo = value;
+        tick.connects_to = parseConnectValue(value, current);
+        paint();
+        void persist();
+      });
+      body.push(inspectorField('Leads to', leadsTo.root, 'A competition this one feeds into, such as a final.'));
     }
 
     const actions = el('div', 'map-inspector__actions');
@@ -1796,15 +1812,19 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
 
   let saveChain: Promise<void> = Promise.resolve();
   let saveTimer: number | undefined;
+  /** Bumped on every edit, so a save's reply never replaces edits made while it was in flight. */
+  let editRev = 0;
 
   /** Quiet save while typing: no redraw, so the field keeps focus. */
   function schedulePersist(): void {
+    editRev += 1;
     window.clearTimeout(saveTimer);
     saveTimer = window.setTimeout(() => void persist(), 500);
   }
 
   /** Saves run one at a time so an older reply never lands over a newer edit. */
   function persist(): Promise<void> {
+    editRev += 1;
     window.clearTimeout(saveTimer);
     saveChain = saveChain.then(saveNow);
     return saveChain;
@@ -1812,6 +1832,7 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
 
   async function saveNow(): Promise<void> {
     const target = current;
+    const rev = editRev;
     try {
       const saved = await tasksApi.updateMap(target.id, {
         title: target.title,
@@ -1821,9 +1842,13 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
         stations: target.stations,
         ticks: target.ticks
       });
-      const idx = maps.findIndex((m) => m.id === saved.id);
-      if (idx >= 0) maps[idx] = saved;
-      if (current.id === saved.id) current = saved;
+      // Edits made while this save was in flight (another strand ticked, say) stay on screen;
+      // the save already queued behind this one sends them.
+      if (rev === editRev) {
+        const idx = maps.findIndex((m) => m.id === saved.id);
+        if (idx >= 0) maps[idx] = saved;
+        if (current.id === saved.id) current = saved;
+      }
       toast = '';
     } catch {
       toast = 'Could not save — last good map is still on screen.';
