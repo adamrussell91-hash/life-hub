@@ -392,6 +392,20 @@ test('thin search and lesson publish stay behind the Life session', async () => 
   assert.equal(snapshot.blocks[0].id, 's');
   assert.doesNotMatch(snapshot.blocks[0].content.html, /script/i);
   assert.equal((await store.get('lessons/lesson_1', { type: 'json' })).published_at, snapshot.published_at);
+  assert.equal(snapshot.feedback_off, undefined);
+
+  // The lesson-wide student feedback switch rides along on the snapshot.
+  const draft = await store.get('lessons/lesson_1', { type: 'json' });
+  await store.setJSON('lessons/lesson_1', { ...draft, feedback_off: true });
+  const republished = await createLessonPublishHandler(deps)(
+    request({
+      method: 'POST',
+      origin: 'https://teaching-hub.adam-russell.com',
+      url: 'https://api.adam-russell.com/api/lessons/lesson_1/publish'
+    })
+  );
+  assert.equal(republished.status, 200);
+  assert.equal((await store.get('published/lessons/lesson_1', { type: 'json' })).feedback_off, true);
 
   const anon = await createSearchHandler(deps)(
     request({ cookie: false, url: 'https://api.adam-russell.com/api/search?q=memory' })

@@ -14,7 +14,8 @@ export const PublishedLessonSchema = z.object({
   published_at: IsoDateSchema,
   schema_version: z.literal(1),
   cover: CoverSchema.optional(),
-  outcome_ids: z.array(z.string().min(1)).max(24).optional()
+  outcome_ids: z.array(z.string().min(1)).max(24).optional(),
+  feedback_off: z.boolean().optional()
 });
 
 export type PublishedLesson = z.infer<typeof PublishedLessonSchema>;
@@ -34,7 +35,8 @@ export function toPublishedLesson(
     ...(lesson.cover ? { cover: lesson.cover } : {}),
     ...(attachedOutcomeIds(lesson).length > 0
       ? { outcome_ids: attachedOutcomeIds(lesson) }
-      : {})
+      : {}),
+    ...(lesson.feedback_off === true ? { feedback_off: true } : {})
   });
 }
 
