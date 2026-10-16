@@ -3,14 +3,32 @@ import type { Project } from '@/schemas/project';
 import {
   PROGRAM_AGE_GROUPS,
   PROGRAM_COST_BASES,
+  PROGRAM_ENTRIES,
+  PROGRAM_ENTRY_ROUTES,
+  PROGRAM_FORMATS,
   PROGRAM_LENGTHS,
   PROGRAM_LEVELS,
   PROGRAM_MONTHS,
+  PROGRAM_PROVIDERS,
+  PROGRAM_SETTINGS,
   PROGRAM_SUBJECTS,
   PROGRAM_TYPES
 } from '@/schemas/program';
 import { tasksApi } from '@/services/client-api';
-import { programTimingRows } from '@/domain/catalogue-timing';
+import { parseHubPrefs, type SchoolYearTerms } from '@/domain/hub-prefs';
+import {
+  cataloguePlatforms,
+  catalogueTimetable,
+  itemStart,
+  type PlatformGroup,
+  type TimetableRows
+} from '@/domain/catalogue-network';
+import { catalogueItem, type LineItem } from '@/personal-line/model';
+import { createDepartureCard } from '@/personal-line/render';
+import { renderPlatforms, renderTimetable } from '@/views/programs-network';
+import { lineTerms } from '@/views/personal-line';
+import '@/personal-line/personal-line.css';
+import '@/views/programs-network.css';
 import {
   queryPrograms,
   uniqueSorted,
@@ -42,13 +60,21 @@ const SORT_OPTIONS: Array<{ value: ProgramSort; label: string }> = [
 import { createPlusButton } from '@/views/plus-add';
 import { createViewOnMap, isMappablePlace } from '../../design-kit/js/view-on-map.js';
 
-type CatalogView = 'cards' | 'table';
+type CatalogView = 'platforms' | 'timetable' | 'table';
 
 interface CatalogState {
   programs: Program[];
   filters: ProgramFilters;
   sort: ProgramSort;
   view: CatalogView;
+  group: PlatformGroup;
+  rowsBy: TimetableRows;
+}
+
+/** The year level picked in the Year filter, as a number ("Year 10" → 10). */
+function chosenYear(state: CatalogState): number | null {
+  const year = Number((state.filters.age_group ?? '').replace(/^Year\s+/i, ''));
+  return Number.isFinite(year) && year > 0 ? year : null;
 }
 
 function allOption(label: string): { value: string; label: string } {
@@ -69,7 +95,7 @@ function visiblePrograms(state: CatalogState): Program[] {
 
 function renderToolbar(
   state: CatalogState,
-  onChange: () => void,
+  onChange: (rebuildToolbar?: boolean) => void,
   onAdd: () => void
 ): HTMLElement {
   const wrap = el('div', 'catalog-toolbar');
@@ -105,9 +131,8 @@ function renderToolbar(
     options: Array<{ value: string; label: string }>;
   }> = [
     { key: 'Type', field: 'type', options: optionsFrom(types, 'All types') },
-    { key: 'Subject', field: 'subject', options: optionsFrom(subjects.length ? subjects : PROGRAM_SUBJECTS, 'All subjects') },
+    { key: 'Format', field: 'format', options: optionsFrom(PROGRAM_FORMATS, 'All formats') },
     { key: 'Month', field: 'month', options: optionsFrom(months.length ? months : PROGRAM_MONTHS, 'All months') },
-    { key: 'Year', field: 'age_group', options: optionsFrom(ages.length ? ages : PROGRAM_AGE_GROUPS, 'All years') },
     { key: 'Level', field: 'level', options: optionsFrom(levels.length ? levels : PROGRAM_LEVELS, 'All levels') },
     { key: 'Length', field: 'length', options: optionsFrom(lengths.length ? lengths : PROGRAM_LENGTHS, 'All lengths') },
     { key: 'Cost', field: 'cost_basis', options: optionsFrom(costs.length ? costs : PROGRAM_COST_BASES, 'All costs') },
@@ -122,8 +147,8 @@ function renderToolbar(
     }
   ];
 
-  for (const spec of specs) {
-    const filter = createHubFilter({
+  const makeFilter = (spec: (typeof specs)[number]) =>
+    createHubFilter({
       key: spec.key,
       label: spec.key,
       defaultValue: '',
@@ -138,8 +163,12 @@ function renderToolbar(
         onChange();
       }
     });
-    filters.append(filter.el);
-  }
+  for (const spec of specs) filters.append(makeFilter(spec).el);
+  const visible = el('div', 'catalog-toolbar__visible');
+  visible.append(
+    makeFilter({ key: 'Year', field: 'age_group', options: optionsFrom(ages.length ? ages : PROGRAM_AGE_GROUPS, 'All years') }).el,
+    makeFilter({ key: 'Subject', field: 'subject', options: optionsFrom(subjects.length ? subjects : PROGRAM_SUBJECTS, 'All subjects') }).el
+  );
 
   const sortBy = createHubFilter({
     key: 'Sort by',
@@ -153,19 +182,54 @@ function renderToolbar(
     }
   });
 
-  const viewPills = createHubPills({
+  const viewPills = createHubPills<CatalogView>({
     label: 'View',
     role: 'tablist',
     items: [
-      { id: 'cards', label: 'Cards' },
+      { id: 'platforms', label: 'Platforms' },
+      { id: 'timetable', label: 'Timetable' },
       { id: 'table', label: 'Table' }
     ],
     value: state.view,
     onSelect: (id) => {
       state.view = id;
-      onChange();
+      onChange(true);
     }
   });
+
+  const groupBy =
+    state.view === 'platforms'
+      ? createHubFilter({
+          key: 'Group by',
+          label: 'Group by',
+          defaultValue: 'line',
+          options: [
+            { value: 'line', label: 'Line' },
+            { value: 'format', label: 'Format' }
+          ],
+          value: state.group,
+          onChange: (value) => {
+            state.group = value === 'format' ? 'format' : 'line';
+            onChange();
+          }
+        }).el
+      : state.view === 'timetable'
+        ? createHubFilter({
+            key: 'Rows by',
+            label: 'Rows by',
+            defaultValue: 'format',
+            options: [
+              { value: 'format', label: 'Format' },
+              { value: 'line', label: 'Line' },
+              { value: 'none', label: 'None' }
+            ],
+            value: state.rowsBy,
+            onChange: (value) => {
+              state.rowsBy = value === 'line' || value === 'none' ? value : 'format';
+              onChange();
+            }
+          }).el
+        : null;
 
   const add = createPlusButton('Add a program', onAdd);
 
@@ -174,9 +238,8 @@ function renderToolbar(
     ariaLabel: 'Filters',
     active: Boolean(
       state.filters.type ||
-        state.filters.subject ||
+        state.filters.format ||
         state.filters.month ||
-        state.filters.age_group ||
         state.filters.level ||
         state.filters.length ||
         state.filters.cost_basis ||
@@ -186,42 +249,12 @@ function renderToolbar(
   collapsed.panel.append(filters);
   const searchRow = el('div', 'catalog-toolbar__row');
   searchRow.append(search.el, collapsed.root);
-  const controls = el('div', 'catalog-toolbar__row');
-  controls.append(sortBy.el, viewPills, add);
+  const controls = el('div', 'catalog-toolbar__row catalog-toolbar__row--controls');
+  controls.append(viewPills, ...visible.childNodes);
+  if (groupBy) controls.append(groupBy);
+  controls.append(sortBy.el, add);
   wrap.append(searchRow, controls);
   return wrap;
-}
-
-function renderMeta(program: Program): HTMLElement {
-  const meta = el('div', 'task-row__meta');
-  for (const type of program.types) meta.append(chip(type));
-  if (program.month) meta.append(chip(program.month, 'chip--muted'));
-  if (program.cost_basis) meta.append(chip(program.cost_basis, 'chip--muted'));
-  if (program.competition_level) meta.append(chip(program.competition_level, 'chip--muted'));
-  if (program.not_available_nsw) meta.append(chip('Not available NSW', 'chip--muted'));
-  return meta;
-}
-
-function renderCard(program: Program, onOpen: () => void): HTMLElement {
-  const card = el('article', 'task-row catalog-card');
-  card.tabIndex = 0;
-  card.setAttribute('role', 'button');
-  card.setAttribute('aria-label', program.name);
-  card.append(el('h3', 'task-row__title', program.name));
-  if (program.organiser) card.append(el('p', 'task-row__desc', program.organiser));
-  else if (program.description) {
-    card.append(el('p', 'task-row__desc', program.description));
-  }
-  card.append(renderMeta(program));
-  const open = () => onOpen();
-  card.addEventListener('click', open);
-  card.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      open();
-    }
-  });
-  return card;
 }
 
 function renderTable(programs: Program[], onOpen: (program: Program) => void): HTMLElement {
@@ -255,19 +288,6 @@ function renderTable(programs: Program[], onOpen: (program: Program) => void): H
   }
   table.append(head, body);
   return table;
-}
-
-function propertyRow(label: string, value: string | HTMLElement | null | undefined): HTMLElement | null {
-  if (!value || (typeof value === 'string' && !value.trim())) return null;
-  const row = el('div', 'catalog-detail__row');
-  row.append(el('dt', 'catalog-detail__key', label));
-  if (typeof value === 'string') row.append(el('dd', 'catalog-detail__value', value));
-  else {
-    const dd = el('dd', 'catalog-detail__value');
-    dd.append(value);
-    row.append(dd);
-  }
-  return row;
 }
 
 function renderLinkedExcursions(
@@ -324,80 +344,30 @@ function renderLinkedExcursions(
   return host;
 }
 
-function renderDetail(
+/** Hub-only extras under the departure card: linked excursions, map, delete. */
+function cardExtras(
   program: Program,
   excursions: Project[],
-  overlay: HTMLElement,
-  onClose: () => void,
+  close: () => void,
   onDelete: () => void,
   onLinkChange: (patch: { excursionId: string; linked: boolean }) => void
-): HTMLElement {
-  // Opaque sheet (kit morph-dialog pattern) — do not reuse .task-row glass here;
-  // nested backdrop-filter over the frosted scrim lets the catalogue bleed through.
-  const card = el('section', 'catalog-overlay__card');
-  card.setAttribute('role', 'dialog');
-  card.setAttribute('aria-modal', 'true');
-  card.setAttribute('aria-label', program.name);
-  card.append(el('p', 'page-header__eyebrow', program.types[0] || 'Program'));
-  card.append(el('h2', 'page-header__title', program.name));
-  if (program.description) card.append(el('p', 'page-header__supporting', program.description));
-
-  const dl = el('dl', 'catalog-detail');
-  const rows = [
-    propertyRow('Organiser', program.organiser),
-    propertyRow('Location', program.location),
-    propertyRow('Month', program.month),
-    ...programTimingRows(program).map(([label, value]) => propertyRow(label, value)),
-    propertyRow('Age group', program.age_groups.join(', ')),
-    propertyRow('Subjects', program.subjects.join(', ')),
-    propertyRow('Level', program.competition_level),
-    propertyRow('Length', program.competition_length),
-    propertyRow('Cost', [program.cost_basis, program.cost].filter(Boolean).join(' · ')),
-    propertyRow('Registration window', program.registration_window),
-    propertyRow(
-      'NSW',
-      program.not_available_nsw
-        ? program.not_available_reason
-          ? `Not available — ${program.not_available_reason}`
-          : 'Not available'
-        : 'Available'
-    )
-  ].filter((row): row is HTMLElement => Boolean(row));
-  for (const row of rows) dl.append(row);
-  card.append(dl);
-  card.append(renderLinkedExcursions(program, excursions, onLinkChange));
-
+): HTMLElement[] {
+  const extra = el('div', 'pl-card__extra');
+  extra.append(renderLinkedExcursions(program, excursions, onLinkChange));
   if (isMappablePlace(program.location)) {
-    const map = createViewOnMap({
-      locationName: program.location,
-      address: program.location
-    });
-    if (map) card.append(map.el);
+    const map = createViewOnMap({ locationName: program.location, address: program.location });
+    if (map) extra.append(map.el);
   }
-
-  const actions = el('div', 'catalog-detail__actions');
-  if (program.registration_link) {
-    const link = document.createElement('a');
-    link.className = 'btn btn--primary';
-    link.href = program.registration_link;
-    link.target = '_blank';
-    link.rel = 'noreferrer';
-    link.textContent = 'Registration';
-    actions.append(link);
-  }
-  const close = el('button', 'btn btn--ghost', 'Close');
-  close.type = 'button';
-  close.addEventListener('click', onClose);
-  const del = el('button', 'btn btn--decisive', 'Delete');
+  const actions = el('div', 'pl-card__foot');
+  const del = el('button', 'pl-btn', 'Delete');
   del.type = 'button';
-  del.addEventListener('click', onDelete);
-  actions.append(close, del);
-  card.append(actions);
-
-  overlay.addEventListener('click', (event) => {
-    if (event.target === overlay) onClose();
+  del.addEventListener('click', () => {
+    close();
+    onDelete();
   });
-  return card;
+  actions.append(del);
+  extra.append(actions);
+  return [extra];
 }
 
 function field(label: string, control: HTMLElement): HTMLElement {
@@ -487,6 +457,11 @@ function renderAddForm(
   const level = selectControl('Level', PROGRAM_LEVELS);
   const length = selectControl('Length', PROGRAM_LENGTHS);
   const costBasis = selectControl('Cost', PROGRAM_COST_BASES);
+  const format = selectControl('Format', PROGRAM_FORMATS);
+  const provider = selectControl('Run by', PROGRAM_PROVIDERS);
+  const entry = selectControl('Entry', PROGRAM_ENTRIES);
+  const entryRoute = selectControl('How to enter', PROGRAM_ENTRY_ROUTES);
+  const settings = chipPicker(PROGRAM_SETTINGS);
   const subjects = chipPicker(PROGRAM_SUBJECTS);
   const ages = chipPicker(PROGRAM_AGE_GROUPS);
   const nsw = document.createElement('input');
@@ -503,6 +478,11 @@ function renderAddForm(
     level.el,
     length.el,
     costBasis.el,
+    format.el,
+    provider.el,
+    entry.el,
+    entryRoute.el,
+    field('Where', settings.el),
     field('Organiser', organiser.el),
     field('Location', location.el),
     field('Cost', cost.el),
@@ -555,6 +535,11 @@ function renderAddForm(
       description: description.input.value.trim(),
       registration_link: link.input.value.trim() || null,
       registration_window: registrationWindow.input.value.trim(),
+      format: (format.getValue() || null) as Program['format'],
+      provider: (provider.getValue() || null) as Program['provider'],
+      settings: settings.get() as Program['settings'],
+      entry: (entry.getValue() || null) as Program['entry'],
+      entry_route: (entryRoute.getValue() || null) as Program['entry_route'],
       not_available_nsw: nsw.checked,
       not_available_reason: reason.input.value.trim(),
       starts_on: dated ? start : null,
@@ -584,110 +569,118 @@ async function applyLinkChange(
   reload();
 }
 
+type CardHandle = ReturnType<typeof createDepartureCard>;
+
 function paintList(
   host: HTMLElement,
   state: CatalogState,
-  excursions: Project[],
-  overlay: HTMLElement,
-  confirmHost: HTMLElement,
-  reload: () => void
+  context: { card: CardHandle; terms: (year: number) => ReturnType<typeof lineTerms> }
 ): void {
   host.replaceChildren();
   const items = visiblePrograms(state);
-  if (!items.length) {
-    host.append(el('p', 'empty-state', 'No programs match those filters.'));
-    return;
-  }
-  const open = (program: Program) => {
-    const card = renderDetail(
-      program,
-      excursions,
-      overlay,
-      () => session.close(),
-      () => {
-        session.close();
-        showConfirmWrite(
-          confirmHost,
-          `Delete ${program.name}`,
-          'Removes this catalogue entry. Tasks and excursions are untouched.',
-          async () => {
-            await tasksApi.deleteProgram(program.id);
-            reload();
-          },
-          'Delete'
-        );
-      },
-      (patch) => void applyLinkChange(program, patch, reload)
-    );
-    const session = openOverlay(overlay, card);
-  };
+  const studentYear = chosenYear(state);
+  const onOpen = (item: LineItem, from: HTMLElement) => context.card.open(item, from);
+  const today = new Date().toISOString().slice(0, 10);
   if (state.view === 'table') {
-    host.append(renderTable(items, open));
+    if (!items.length) {
+      host.append(el('p', 'empty-state', 'No programs match those filters.'));
+      return;
+    }
+    host.append(renderTable(items, (program) => context.card.open(catalogueItem(program))));
     return;
   }
-  const grid = el('div', 'catalog-grid');
-  for (const program of items) grid.append(renderCard(program, () => open(program)));
-  host.append(grid);
+  if (state.view === 'timetable') {
+    const year = new Date().getFullYear();
+    renderTimetable(host, catalogueTimetable(items, state.rowsBy, year), {
+      studentYear,
+      onOpen,
+      year,
+      terms: context.terms(year),
+      today
+    });
+    return;
+  }
+  renderPlatforms(host, cataloguePlatforms(items, state.group, today), { studentYear, onOpen });
 }
 
 export async function renderProgramsView(canvas: HTMLElement): Promise<void> {
   canvas.replaceChildren();
-  const [programs, projects] = await Promise.all([
+  const [programs, projects, prefs] = await Promise.all([
     tasksApi.listPrograms(),
-    tasksApi.listProjects().catch(() => [] as Project[])
+    tasksApi.listProjects().catch(() => [] as Project[]),
+    tasksApi.getHubPrefs().then(parseHubPrefs).catch(() => null)
   ]);
+  const termYears: readonly SchoolYearTerms[] | null = prefs?.school_terms ?? null;
   const excursions = projects.filter((item) => item.type === 'excursion');
   const state: CatalogState = {
     programs,
     filters: {},
     sort: 'name',
-    view: 'cards'
+    view: 'platforms',
+    group: 'line',
+    rowsBy: 'format'
   };
   const overlay = el('div', 'catalog-overlay');
   overlay.setAttribute('aria-hidden', 'true');
   const confirmHost = el('div', 'catalog-confirm');
   const list = el('div', 'catalog-list');
   const status = el('p', 'view-lede');
+  const reload = () => void renderProgramsView(canvas);
+  const byId = new Map(programs.map((program) => [program.id, program]));
 
-  const paint = () => {
+  const card = createDepartureCard({
+    studentYear: null,
+    nextTitle: 'Next on this line',
+    following: (it) => {
+      const line = it.on[0];
+      const start = itemStart(it) ?? '';
+      return visiblePrograms(state)
+        .map((program) => catalogueItem(program))
+        .filter((other) => other.id !== it.id && (line ? other.on.includes(line) : !other.on.length))
+        .filter((other) => (itemStart(other) ?? '') > start)
+        .sort((x, y) => (itemStart(x) ?? '').localeCompare(itemStart(y) ?? ''))
+        .slice(0, 2);
+    },
+    extras: (it, close) => {
+      const program = byId.get(it.id);
+      if (!program) return [];
+      return cardExtras(
+        program,
+        excursions,
+        close,
+        () =>
+          showConfirmWrite(
+            confirmHost,
+            `Delete ${program.name}`,
+            'Removes this catalogue entry. Tasks and excursions are untouched.',
+            async () => {
+              await tasksApi.deleteProgram(program.id);
+              reload();
+            },
+            'Delete'
+          ),
+        (patch) => void applyLinkChange(program, patch, reload)
+      );
+    }
+  });
+
+  let toolbar: HTMLElement;
+  const paint = (rebuildToolbar = false) => {
+    if (rebuildToolbar) {
+      const next = renderToolbar(state, paint, onAdd);
+      toolbar.replaceWith(next);
+      toolbar = next;
+    }
     const items = visiblePrograms(state);
     status.textContent = `${items.length} of ${state.programs.length} in the catalogue.`;
-    paintList(list, state, excursions, overlay, confirmHost, () => void renderProgramsView(canvas));
+    paintList(list, state, { card, terms: (year) => lineTerms(year, termYears) });
   };
-
-  const toolbar = renderToolbar(
-    state,
-    paint,
-    () => renderAddForm(overlay, confirmHost, () => void renderProgramsView(canvas))
-  );
-  canvas.append(status, toolbar, confirmHost, list, overlay);
+  const onAdd = () => renderAddForm(overlay, confirmHost, reload);
+  toolbar = renderToolbar(state, paint, onAdd);
+  canvas.append(status, toolbar, confirmHost, list, overlay, card.scrim);
   paint();
 
   const deepLink = hashQuery().get('id');
-  if (deepLink) {
-    const match = programs.find((item) => item.id === deepLink);
-    if (match) {
-      const card = renderDetail(
-        match,
-        excursions,
-        overlay,
-        () => session.close(),
-        () => {
-          session.close();
-          showConfirmWrite(
-            confirmHost,
-            `Delete ${match.name}`,
-            'Removes this catalogue entry. Tasks and excursions are untouched.',
-            async () => {
-              await tasksApi.deleteProgram(match.id);
-              void renderProgramsView(canvas);
-            },
-            'Delete'
-          );
-        },
-        (patch) => void applyLinkChange(match, patch, () => void renderProgramsView(canvas))
-      );
-      const session = openOverlay(overlay, card);
-    }
-  }
+  const match = deepLink ? byId.get(deepLink) : undefined;
+  if (match) card.open(catalogueItem(match));
 }

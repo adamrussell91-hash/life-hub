@@ -41,7 +41,7 @@ describe('personal line', () => {
     const snap = buildLineSnapshot(catalogPrograms(), { studentYear: 10, subjects: ['Economics'], year: 2026, terms });
     const keys = Object.keys(snap.items[0]!).sort();
     expect(keys).toEqual(
-      ['basis', 'close', 'cost', 'description', 'due', 'id', 'length', 'level', 'link', 'location', 'matched', 'name', 'on', 'organiser', 'run', 'type', 'window', 'years'].sort()
+      ['basis', 'close', 'cost', 'description', 'due', 'entry', 'entry_route', 'format', 'id', 'length', 'level', 'link', 'location', 'matched', 'name', 'on', 'organiser', 'provider', 'run', 'settings', 'type', 'window', 'years'].sort()
     );
     expect(terms.map((term) => term.id)).toEqual(['T1', 'T2', 'T3', 'T4']);
   });

@@ -51,3 +51,47 @@ export function pickProgramDates(body) {
     dates_checked_on: date(body.dates_checked_on)
   };
 }
+
+const CLASS_KEYS = ['format', 'provider', 'settings', 'entry', 'entry_route', 'subjects'];
+
+const catalogueClasses = new Map(
+  catalog
+    .filter(item => item && item.format)
+    .map(item => [item.id, Object.fromEntries(CLASS_KEYS.map(key => [key, item[key] ?? null]))])
+);
+
+/**
+ * Stored programs were seeded before the catalogue was classified. A stored record with no `format`
+ * key takes the catalogue's classification, and its subjects with it; once `format` is saved on the
+ * record, even as null, the record wins. Same rule as `withCatalogueClasses` in the Tasks app.
+ */
+export function withCatalogueClasses(record) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return record;
+  if ('format' in record) return record;
+  const classes = typeof record.id === 'string' ? catalogueClasses.get(record.id) : undefined;
+  if (!classes) return record;
+  const next = { ...record, ...classes };
+  if (!Array.isArray(next.settings)) next.settings = [];
+  if (!Array.isArray(next.subjects)) next.subjects = record.subjects;
+  return next;
+}
+
+const PICKS = {
+  format: ['Exam', 'Written entry', 'Speaking', 'Simulation', 'Project', 'Creative work', 'Day event', 'Program'],
+  provider: ['School', 'External'],
+  entry: ['Individual', 'Team', 'Either'],
+  entry_route: ['School enters', 'Student applies', 'Selection']
+};
+const SETTINGS = ['At school', 'Online', 'Away'];
+
+/** Classification fields from a request body: known values or null, settings as a known-value list. */
+export function pickProgramClasses(body) {
+  const picked = {};
+  for (const [key, values] of Object.entries(PICKS)) {
+    picked[key] = typeof body[key] === 'string' && values.includes(body[key]) ? body[key] : null;
+  }
+  picked.settings = Array.isArray(body.settings)
+    ? [...new Set(body.settings.filter(value => SETTINGS.includes(value)))]
+    : [];
+  return picked;
+}

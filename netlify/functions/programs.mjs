@@ -1,5 +1,11 @@
 import { createTasksCollectionHandler } from './_shared/tasks-collection.mjs';
-import { pickPrecision, pickProgramDates, withCatalogueDates } from './_shared/catalogue-dates.mjs';
+import {
+  pickPrecision,
+  pickProgramClasses,
+  pickProgramDates,
+  withCatalogueClasses,
+  withCatalogueDates
+} from './_shared/catalogue-dates.mjs';
 
 export const config = { path: '/api/programs' };
 
@@ -14,7 +20,7 @@ export function createProgramsHandler(deps = {}) {
     listKey: 'programs',
     idPrefix: 'prog',
     notFound: 'Program not found',
-    onRead: record => withCatalogueDates(record),
+    onRead: record => withCatalogueClasses(withCatalogueDates(record)),
     create(body, id, timestamp) {
       const name = typeof body.name === 'string' ? body.name.trim() : '';
       if (!name) {
@@ -40,6 +46,7 @@ export function createProgramsHandler(deps = {}) {
           description: typeof body.description === 'string' ? body.description : '',
           registration_link: typeof body.registration_link === 'string' ? body.registration_link : null,
           registration_window: typeof body.registration_window === 'string' ? body.registration_window : '',
+          ...pickProgramClasses(body),
           starts_on: dated ? picked.starts_on : null,
           ends_on: dated ? picked.ends_on : null,
           dates_precision: pickPrecision(body.dates_precision, Boolean(dated)),

@@ -34,15 +34,15 @@ That's a keyword guess, not data. It still shows the split: no group is more tha
   but no Classics or Languages entry should land on Justice. Today 16 entries carry Classics or
   Languages; they reach Justice through `Humanities` or `Public Speaking` (the CANSW and CLTA Latin
   reading competitions are `Classics, Languages, Public Speaking`). The reclassification pass removes
-  those Justice-side subjects from them. Still to confirm: does Classics keep its Reasoning line
-  (set 14 Oct) or go to Expression only?
+  those Justice-side subjects from them. Classics is **Expression only** (Adam, 16 Oct: they're all
+  speaking comps), so it also leaves Reasoning.
 - **Format values agreed:** Exam, Written entry, Speaking, Simulation, Project, Creative work, Day event,
-  Program. Mock legal stays in the draft list until the pass shows whether it earns its own value.
+  Program. Mock legal (moot, Mock Trial, Mock Mediation) is **Simulation**.
 - **Setting is two questions, not one** (see below): who designed it, and where it happens. Some things
   are at school and online at once.
 - **Entry (Individual / Team / Either) is in.** Adam's idea: show it on the stop itself, for example a
-  solid outline for one and a dashed outline for another. Clash to solve at design time: dashed already
-  means "Not on map" today.
+  solid outline for one and a dashed outline for another. No clash: the "Not on map" tag is dropped
+  (Adam, 16 Oct: it's irrelevant again at the start of every year).
 - **Civics gets its own branch.** There are enough entries: youth parliaments, constitutional
   conventions, the Youth Advisory Council, Informed Civics, Young Justice, the ALHR human rights forum,
   DMUN Model Parliament, roughly 10. Civics is a topic, not a format, so it's a new Justice subject
@@ -70,15 +70,13 @@ The main axis. This is what Adam's examples are really about: exams line, essay 
 | `Exam` | Exams, olympiads, academic marathons, sat tests (NLE, AHC, Geothon, ICAS-style) |
 | `Written entry` | Essays, research papers, short stories, poetry submitted by a due date |
 | `Speaking` | Debating, public speaking, philosothons, reading competitions |
-| `Simulation` | Model UN, youth parliament, constitutional conventions, negotiation |
-| `Mock legal` | Mock trial, moot, mediation |
+| `Simulation` | Model UN, youth parliament, constitutional conventions, negotiation, mock trial, moot, mediation |
 | `Project` | Team challenges, problem solving, design, build, pitch, research projects |
 | `Creative work` | Art, film, photography, drama and music performance |
 | `Day event` | Conferences, forums, summits, one-day workshops |
 | `Program` | Courses, leadership and civic programs, camps, councils over weeks or a year |
 
-One value per entry. `Mock legal` is small (3) but is the clearest Justice-only branch, so keep it; the
-layout folds small branches back in (below).
+One value per entry.
 
 ### 2. `provider` and `setting`: who runs it, and where
 
@@ -160,9 +158,17 @@ early. Not a branch axis.
 2. **Branch layout** in `personal-line/render.ts`, behind the builder's Branch by option.
 3. **Card tags** and a Setting filter in the builder.
 
+## Status
+
+- **16 Oct:** fields added to the schema, Civics added on Justice, Classics moved to Expression only.
+- **Next:** Cursor recatalogues all 290 entries:
+  [`docs/proposals/catalogue-classification-cursor-brief.md`](../../proposals/catalogue-classification-cursor-brief.md).
+- **Then:** real counts per line, pick the branch order, set thresholds.
+- **16 Oct, later:** Programs page rebuilt as Platforms (mockup 2, with a next-service board) and
+  Timetable (mockup 3), opening the departure-board card (mockup 1). Year and Subject filters on both.
+  See [`catalogue-restyle/`](catalogue-restyle/README.md).
+
 ## Open questions
 
-- Classics: Expression only, or Expression and Reasoning?
-- Entry on the stop: which marks for Individual / Team / Either, given dashed already means "Not on map"?
-- Does Mock legal (3 entries) stay its own format or fold into Simulation?
-- Which dimension branches first, and the fold thresholds: decide after the reclassification counts.
+- Which marks on the stop for Individual / Team / Either?
+- Which dimension branches first, and the fold thresholds: decide after the recatalogue counts.

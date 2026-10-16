@@ -10,7 +10,10 @@ export const LINES: Record<LineKey, { name: string; color: string; fill: string;
   R: { name: 'Reasoning', color: '#6b2d8e', fill: '#edd6fa', ink: '#ffffff' }
 };
 
-/** Adam's mapping, 14 Oct 2026. The first line is where the subject is listed in the builder. */
+/**
+ * Adam's mapping, 14 Oct 2026; Classics to Expression only and Civics added, 16 Oct 2026.
+ * The first line is where the subject is listed in the builder.
+ */
 export const SUBJECT_LINES: Record<string, LineKey[]> = {
   Legal: ['J'],
   Debating: ['J', 'R'],
@@ -19,6 +22,7 @@ export const SUBJECT_LINES: Record<string, LineKey[]> = {
   History: ['J'],
   Geography: ['J', 'I'],
   Leadership: ['J', 'R'],
+  Civics: ['J'],
   STEM: ['I'],
   Science: ['I'],
   Engineering: ['I'],
@@ -42,7 +46,7 @@ export const SUBJECT_LINES: Record<string, LineKey[]> = {
   Drama: ['E'],
   Music: ['E'],
   Languages: ['E'],
-  Classics: ['R', 'E'],
+  Classics: ['E'],
   Psychology: ['R'],
   Philosophy: ['R'],
   Neuroscience: ['R']

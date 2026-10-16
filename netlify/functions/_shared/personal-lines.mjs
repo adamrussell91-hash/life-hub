@@ -80,7 +80,12 @@ function item(value) {
     organiser: str(value.organiser, 200),
     location: str(value.location, 200),
     description: str(value.description, 2000),
-    link: link(value.link)
+    link: link(value.link),
+    format: nullableStr(value.format, 40),
+    provider: nullableStr(value.provider, 40),
+    settings: strings(value.settings, 3, 20),
+    entry: nullableStr(value.entry, 40),
+    entry_route: nullableStr(value.entry_route, 40)
   };
 }
 
