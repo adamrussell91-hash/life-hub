@@ -9,15 +9,17 @@ import {
 } from '@/class-examples/api';
 
 /**
- * Student side of class examples. Each box sits directly under the block it
- * belongs to. The page checks for newly shared examples about once a minute,
- * and only while the tab is visible and the lesson has at least one box.
+ * Student side of class examples. A block's boxes sit under it as a row of
+ * tabs; only the box a student picks opens, so the lesson stays compact.
+ * The page checks for newly shared examples about once a minute, and only
+ * while the tab is visible and the lesson has at least one box.
  */
 
 type LocalState =
   | { mode: 'idle' }
   | { mode: 'code' }
-  | { mode: 'writing'; token: string; draft: string; open: boolean }
+  /** `context` is the class the box was opened in, sent back on save. */
+  | { mode: 'writing'; token: string; draft: string; open: boolean; context?: string }
   | { mode: 'saved'; text: string };
 
 export interface StudentClassExamplesHandle {
@@ -107,7 +109,12 @@ export function mountStudentClassExamples(
   let inFlight = false;
 
   const local = new Map<string, LocalState>();
-  const views = new Map<string, { el: HTMLElement; sig: string }>();
+  /** Per block: the open tab's slot id, or null once the student closed it. */
+  const selected = new Map<string, string | null>();
+  const groups = new Map<
+    string,
+    { group: HTMLElement; strip: HTMLElement | null; stripSig: string; panel: HTMLElement | null; panelSig: string }
+  >();
 
   const storageKey = (slotId: string) => `class-example:${lessonId}:${context}:${slotId}`;
 
@@ -130,6 +137,19 @@ export function mountStudentClassExamples(
     return [slot.label, slot.shown, slot.text ?? '', state.mode, state.mode === 'writing' ? state.open : ''].join('\u0000');
   }
 
+  function isBusy(slot: PublicExampleSlot): boolean {
+    const state = stateFor(slot.id);
+    return state.mode === 'code' || (state.mode === 'writing' && state.open);
+  }
+
+  /** Something of this student's own is in the box, so open its tab unasked. */
+  function isMine(slot: PublicExampleSlot): boolean {
+    const state = stateFor(slot.id);
+    return state.mode === 'code' || state.mode === 'writing' || (state.mode === 'saved' && !slot.shown);
+  }
+
+  const panelId = (slotId: string) => `cx-panel-${slotId}`;
+
   function blockElement(blockId: string): HTMLElement | null {
     return root.querySelector<HTMLElement>(`.block[data-block-id="${blockId}"]`);
   }
@@ -149,12 +169,10 @@ export function mountStudentClassExamples(
 
   /* ── Views ─────────────────────────────────────────────────────────── */
 
-  function header(slot: PublicExampleSlot, extra?: HTMLElement): HTMLElement {
+  /** The tab already names the box, so the panel head only carries the status. */
+  function header(extra: HTMLElement): HTMLElement {
     const head = el('div', 'cx-slot__head');
-    const titles = el('div', 'cx-slot__titles');
-    titles.append(el('span', 'cx-slot__eyebrow', 'Class example'), el('span', 'cx-slot__label', slot.label));
-    head.append(titles);
-    if (extra) head.append(extra);
+    head.append(extra);
     return head;
   }
 
@@ -228,9 +246,9 @@ export function mountStudentClassExamples(
       unlock.disabled = true;
       unlock.textContent = 'Checking…';
       void unlockExample(lessonId, { class: classParam, slot_id: slot.id, code })
-        .then(({ token }) => {
+        .then(({ token, context: openedIn }) => {
           if (disposed) return;
-          setState(slot.id, { mode: 'writing', token, draft: '', open: true });
+          setState(slot.id, { mode: 'writing', token, draft: '', open: true, context: openedIn });
           paint(slot, { focus: true });
         })
         .catch((error: unknown) => {
@@ -293,7 +311,7 @@ export function mountStudentClassExamples(
       if (!text || !state.token) return;
       save.disabled = true;
       save.textContent = 'Saving…';
-      void submitExample(lessonId, { class: classParam, slot_id: slot.id, token: state.token, text })
+      void submitExample(lessonId, { class: state.context ?? classParam, slot_id: slot.id, token: state.token, text })
         .then(() => {
           if (disposed) return;
           setState(slot.id, { mode: 'saved', text });
@@ -319,23 +337,24 @@ export function mountStudentClassExamples(
   function renderSlot(slot: PublicExampleSlot): HTMLElement {
     const state = stateFor(slot.id);
     const section = el('section', 'cx-slot');
+    section.id = panelId(slot.id);
     section.dataset.slotId = slot.id;
     section.setAttribute('aria-label', `Class example: ${slot.label}`);
 
     if (state.mode === 'code') {
       section.classList.add('cx-slot--active');
-      section.append(header(slot), unlockForm(slot));
+      section.append(unlockForm(slot));
       return section;
     }
     if (state.mode === 'writing' && state.open) {
       section.classList.add('cx-slot--active');
-      section.append(header(slot), writeForm(slot, state));
+      section.append(writeForm(slot, state));
       return section;
     }
     if (state.mode === 'saved' && !slot.shown) {
       section.classList.add('cx-slot--sent');
       section.append(
-        header(slot, el('span', 'cx-chip', 'Sent to your teacher')),
+        header(el('span', 'cx-chip', 'Sent to your teacher')),
         el('p', 'cx-slot__text', state.text),
         el('p', 'cx-slot__hint', 'It appears here for everyone once your teacher shares it.')
       );
@@ -343,45 +362,135 @@ export function mountStudentClassExamples(
     }
     if (slot.shown) {
       section.classList.add('cx-slot--shown');
-      section.append(header(slot), el('p', 'cx-slot__text', slot.text ?? ''));
+      section.append(el('p', 'cx-slot__text', slot.text ?? ''));
       const foot = el('div', 'cx-slot__foot');
       foot.append(codeButton(slot));
       section.append(foot);
       return section;
     }
     section.classList.add('cx-slot--waiting');
-    section.append(header(slot, codeButton(slot)));
-    section.append(el('p', 'cx-slot__hint', "A classmate's answer will appear here."));
+    const head = header(codeButton(slot));
+    head.prepend(el('p', 'cx-slot__hint', "A classmate's answer will appear here."));
+    section.append(head);
     return section;
   }
 
-  function paint(slot: PublicExampleSlot, opts: { focus?: boolean } = {}): void {
-    const group = groupFor(slot.block_id);
+  function tabDot(slot: PublicExampleSlot): HTMLElement | null {
+    const state = stateFor(slot.id);
+    const [tone, said] = slot.shown
+      ? ['shown', 'shared']
+      : state.mode === 'saved'
+        ? ['sent', 'sent to your teacher']
+        : state.mode === 'writing'
+          ? ['active', 'in progress']
+          : ['', ''];
+    if (!tone) return null;
+    const dot = el('span', `cx-tab__dot cx-tab__dot--${tone}`);
+    dot.append(el('span', 'cx-sr', `, ${said}`));
+    return dot;
+  }
+
+  function tabStrip(blockId: string, blockSlots: PublicExampleSlot[], current: string | null): HTMLElement {
+    const strip = el('div', 'cx-tabs');
+    strip.append(el('span', 'cx-tabs__eyebrow', 'Class examples'));
+    const list = el('div', 'cx-tabs__list');
+    for (const slot of blockSlots) {
+      const on = slot.id === current;
+      const tab = el('button', on ? 'cx-tab cx-tab--on' : 'cx-tab');
+      tab.type = 'button';
+      tab.dataset.slotId = slot.id;
+      tab.setAttribute('aria-expanded', String(on));
+      tab.setAttribute('aria-controls', panelId(slot.id));
+      tab.append(el('span', 'cx-tab__label', slot.label));
+      const dot = tabDot(slot);
+      if (dot) tab.append(dot);
+      tab.addEventListener('click', () => {
+        selected.set(blockId, on ? null : slot.id);
+        paintGroup(blockId, { force: true });
+        root.querySelector<HTMLElement>(`.cx-tab[data-slot-id="${slot.id}"]`)?.focus();
+      });
+      list.append(tab);
+    }
+    strip.append(list);
+    return strip;
+  }
+
+  function existingGroup(blockId: string): HTMLElement | null {
+    const next = blockElement(blockId)?.nextElementSibling;
+    return next instanceof HTMLElement && next.classList.contains('cx-group') && next.dataset.for === blockId
+      ? next
+      : null;
+  }
+
+  /**
+   * Redraws one block's tabs and its open box. Without `force`, an open box
+   * the student is typing in is left alone so a refresh never wipes it.
+   */
+  function paintGroup(blockId: string, opts: { force?: boolean; focus?: boolean } = {}): void {
+    const blockSlots = slots.filter((slot) => slot.block_id === blockId);
+    if (!blockSlots.length) {
+      existingGroup(blockId)?.remove();
+      groups.delete(blockId);
+      return;
+    }
+    const group = groupFor(blockId);
     if (!group) return;
-    const next = renderSlot(slot);
-    const current = views.get(slot.id);
-    if (current?.el.isConnected && current.el.parentElement === group) current.el.replaceWith(next);
-    else group.append(next);
-    views.set(slot.id, { el: next, sig: signature(slot) });
-    if (opts.focus) next.querySelector<HTMLElement>('input, textarea')?.focus();
+
+    if (!selected.has(blockId)) {
+      const mine = blockSlots.find(isMine);
+      if (mine) selected.set(blockId, mine.id);
+    }
+    const current = blockSlots.find((slot) => slot.id === selected.get(blockId)) ?? null;
+
+    let view = groups.get(blockId);
+    if (!view || view.group !== group) {
+      view = { group, strip: null, stripSig: '', panel: null, panelSig: '' };
+      groups.set(blockId, view);
+    }
+
+    const stripSig = [current?.id ?? '', ...blockSlots.map((slot) => `${slot.id}\u0002${signature(slot)}`)].join('\u0001');
+    if (opts.force || stripSig !== view.stripSig || !view.strip?.isConnected) {
+      const strip = tabStrip(blockId, blockSlots, current?.id ?? null);
+      if (view.strip?.isConnected) view.strip.replaceWith(strip);
+      else group.prepend(strip);
+      view.strip = strip;
+      view.stripSig = stripSig;
+    }
+
+    if (!current) {
+      view.panel?.remove();
+      view.panel = null;
+      view.panelSig = '';
+      return;
+    }
+    const panelSig = `${current.id}\u0002${signature(current)}`;
+    const sameBox = view.panel?.isConnected && view.panel.dataset.slotId === current.id;
+    const keep = sameBox && (panelSig === view.panelSig || isBusy(current));
+    if (opts.force || !keep) {
+      const panel = renderSlot(current);
+      if (view.panel?.isConnected) view.panel.replaceWith(panel);
+      else group.append(panel);
+      view.panel = panel;
+      view.panelSig = panelSig;
+    }
+    if (opts.focus) view.panel?.querySelector<HTMLElement>('input, textarea')?.focus();
+  }
+
+  function paint(slot: PublicExampleSlot, opts: { focus?: boolean } = {}): void {
+    selected.set(slot.block_id, slot.id);
+    paintGroup(slot.block_id, { force: true, focus: opts.focus });
   }
 
   function sync(): void {
-    const live = new Set(slots.map((slot) => slot.id));
-    for (const [id, view] of views) {
-      if (live.has(id)) continue;
-      view.el.remove();
-      views.delete(id);
-    }
     for (const slot of slots) {
-      const state = stateFor(slot.id);
       // A shared example replaces the "sent" note for the student who wrote it.
-      if (slot.shown && state.mode === 'saved') setState(slot.id, { mode: 'idle' });
-      const view = views.get(slot.id);
-      const busy = state.mode === 'code' || (state.mode === 'writing' && state.open);
-      if (view?.el.isConnected && (busy || view.sig === signature(slot))) continue;
-      paint(slot);
+      if (slot.shown && stateFor(slot.id).mode === 'saved') setState(slot.id, { mode: 'idle' });
     }
+    const blocks = new Set(slots.map((slot) => slot.block_id));
+    for (const blockId of groups.keys()) {
+      if (!blocks.has(blockId)) paintGroup(blockId);
+    }
+    for (const blockId of blocks) paintGroup(blockId);
     root.querySelectorAll('.cx-group').forEach((group) => {
       if (!group.childElementCount) group.remove();
     });

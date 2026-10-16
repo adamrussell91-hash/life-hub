@@ -19,7 +19,7 @@ import {
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
 import {
   ExampleError,
-  normaliseContext,
+  resolveStudentContext,
   submitExample,
   unlockSlot
 } from './_shared/class-examples.mjs';
@@ -54,8 +54,9 @@ export function createPublishedExamplesWriteHandler(deps = {}) {
 
     const { lessonId, step } = readRoute(request, context);
     const body = await request.json().catch(() => ({}));
-    const exampleContext = normaliseContext(body?.class);
-    if (!step || !exampleContext || !(await isLivePublishedLesson(store, lessonId))) {
+    const live = await isLivePublishedLesson(store, lessonId);
+    const exampleContext = live ? await resolveStudentContext(store, lessonId, body?.class, deps) : null;
+    if (!step || !exampleContext) {
       return withCors(errorResponse(404, 'not_found', 'Lesson is not published', false), request, env);
     }
 
