@@ -91,6 +91,9 @@
 
 **R6 · Bottom sheet opens under the fixed tab bar.** **Seen:** Tideline item card at 390 (30/09/26): the card was `position:fixed; bottom:12px` with the same `z-index` as `.hub-mobile-nav`, so only its title row showed above the tab bar. **Rule:** A phone sheet that isn't full-screen sits above the bottom bar: `bottom: calc(4.65rem + env(safe-area-inset-bottom) + gap)` with a higher `z-index`, and a `max-height` in `dvh` that leaves room for it. **Check:** at 390 with the sheet open, its `getBoundingClientRect().bottom` is ≤ the tab bar's `top`.
 
+
+**V8 · Linked supports collapse to one opaque marker.** **Seen:** Teaching callouts (16/10/26): an Extension and Example attached to the same question became one letter A, concealing both their type and multiplicity. **Rule:** Render one discoverable, labelled type badge per linked callout using the exact same SVG as that callout’s header. Never deduplicate by destination or style. Put badges in a wrapping flow row, not overlapping absolute positions. Each badge opens its own preview and jump action; teacher-only callouts stay out of student badges. **Check:** attach Extension, Example and another Extension to one question; three badges appear, each opens the correct content, and repeated refreshes neither lose nor duplicate badges (`callout-reference.test.ts`).
+
 ## D: Data shown truthfully
 
 **D1 · Made-up precision.** **Seen:** Medical v2 "to book" MRCP shown as 26/09/26 and month-precision colonoscopy as 01/02/27. **Rule:** Render what the data knows: a day, a month ("Feb 2027"), "To book", or "~22/10/26" for an estimate. Never substitute today or the 1st of the month. **Check:** a fixture per precision level asserts the rendered label.

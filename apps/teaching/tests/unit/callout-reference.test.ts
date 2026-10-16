@@ -7,6 +7,40 @@ const callout = { id: 'extension', type: 'block', block_type: 'callout', visibil
 afterEach(() => document.body.replaceChildren());
 
 describe('callout references', () => {
+  it('shows every attached callout type and jumps to each independent block', () => {
+    const example = { ...callout, id: 'example', content: { ...callout.content, style: 'example', title: 'Worked response', body: 'A concrete response.' } } as Block;
+    const extra = { ...callout, id: 'extension2', content: { ...callout.content, title: 'Another challenge' } } as Block;
+    const privateNote = { ...callout, id: 'private', visibility: 'teacher_only', content: { ...callout.content, style: 'teacher' } } as Block;
+    const blocks = [activity, callout, example, extra, privateNote];
+    const scope = document.createElement('div'); scope.className = 'lesson-blocks';
+    scope.innerHTML = '<div class="block" data-block-id="activity"><p data-question-id="q2">Why?</p></div><div class="block" data-block-id="extension"></div><div class="block" data-block-id="example"></div><div class="block" data-block-id="extension2"></div>';
+    document.body.append(scope);
+    const target = scope.firstElementChild as HTMLElement;
+    decorateCalloutReferences(target, activity, 'student', blocks);
+    const badges = target.querySelectorAll<HTMLElement>('.callout-ref-list > .callout-reference');
+    expect(badges).toHaveLength(3);
+    expect(Array.from(badges).map(badge => badge.querySelector('summary')?.textContent)).toEqual(['Extension', 'Example', 'Extension']);
+    expect(badges[1]!.textContent).toContain('A concrete response.');
+    const destination = scope.querySelector<HTMLElement>('[data-block-id="example"]')!;
+    destination.scrollIntoView = vi.fn();
+    (badges[1]!.querySelector('.callout-ref__jump') as HTMLButtonElement).click();
+    expect(document.activeElement).toBe(destination);
+    expect(destination.scrollIntoView).toHaveBeenCalled();
+    expect(badges[0]!.querySelector('svg')?.innerHTML).toBe(calloutIdentity('extension').querySelector('svg')?.innerHTML);
+    expect(badges[1]!.querySelector('svg')?.innerHTML).toBe(calloutIdentity('example').querySelector('svg')?.innerHTML);
+    expect(target.textContent).not.toContain('Teacher');
+  });
+  it('wraps multiple callouts attached to a whole block in one flow container', () => {
+    const first = { ...callout, content: { ...callout.content, related_to: {block_id:'activity'} } } as Block;
+    const second = { ...first, id:'example', content:{...first.content,style:'example'} } as Block;
+    const wrapper = document.createElement('div'); wrapper.className = 'block'; wrapper.dataset.blockId = 'activity';
+    wrapper.innerHTML = '<h2>Activity</h2>';
+    document.body.append(wrapper);
+    decorateCalloutReferences(wrapper, activity, 'teacher', [activity, first, second]);
+    expect(Array.from(wrapper.children).filter(child => child.classList.contains('callout-ref-list'))).toHaveLength(1);
+    expect(wrapper.querySelectorAll('.callout-ref-list > .callout-reference')).toHaveLength(2);
+    expect(wrapper.querySelector('h2')?.textContent).toBe('Activity');
+  });
   it('lets the teacher choose a question, preserves the chosen target, and can clear it', () => {
     const change = vi.fn();
     const picker = createCalloutTargetPicker(callout as Extract<Block, {block_type:'callout'}>, [activity, callout], change);
@@ -41,8 +75,8 @@ describe('callout references', () => {
     decorateCalloutReferences(target, activity, 'student', blocks);
     decorateCalloutReferences(source, callout, 'student', blocks);
     expect(target.querySelector('[data-question-id="q1"] .callout-ref')).toBeNull();
-    expect(target.querySelector('[data-question-id="q2"] .callout-ref')?.textContent).toBe('A');
-    expect(source.querySelector('summary')?.textContent).toContain('A');
+    expect(target.querySelector('[data-question-id="q2"] .callout-ref')?.textContent).toBe('Extension');
+    expect(source.querySelector('summary')?.getAttribute('aria-label')).toContain('Extension');
     expect(source.textContent).toContain('Why does habit change perception?');
     const question = target.querySelector<HTMLElement>('[data-question-id="q2"]')!;
     question.scrollIntoView = vi.fn();
@@ -109,13 +143,13 @@ describe('callout references', () => {
     scope.innerHTML = '<input aria-label="Editing"><div class="block" data-block-id="activity"><p data-question-id="q1">First?</p><p data-question-id="q2">Why?</p></div><div class="block" data-block-id="extension"><aside class="callout"><div class="callout__head"></div></aside></div>';
     const input = scope.querySelector('input');
     refreshCalloutReferences(scope, [activity, callout], 'teacher');
-    expect(scope.querySelector('[data-question-id="q2"] .callout-ref')?.textContent).toBe('A');
+    expect(scope.querySelector('[data-question-id="q2"] .callout-ref')?.textContent).toBe('Extension');
     const moved = {...callout, content:{...callout.content,related_to:{block_id:'activity',question_id:'q1'}}} as Block;
     refreshCalloutReferences(scope, [activity, moved], 'teacher');
     expect(scope.querySelector('[data-question-id="q2"] .callout-ref')).toBeNull();
-    expect(scope.querySelector('[data-question-id="q1"] .callout-ref')?.textContent).toBe('A');
+    expect(scope.querySelector('[data-question-id="q1"] .callout-ref')?.textContent).toBe('Extension');
     refreshCalloutReferences(scope, [activity, {...callout,content:{style:'extension',body:'No link'}} as Block], 'teacher');
-    expect(scope.querySelectorAll('.callout-ref')).toHaveLength(0);
+    expect(scope.querySelectorAll('.callout-ref, .callout-ref-list')).toHaveLength(0);
     expect(scope.querySelector('input')).toBe(input);
   });
 });
