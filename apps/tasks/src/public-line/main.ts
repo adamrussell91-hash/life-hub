@@ -31,7 +31,7 @@ async function load(): Promise<void> {
     const snap = await apiGet<LineSnapshot>(`/api/published/lines/${encodeURIComponent(code)}`);
     document.title = snap.student_name ? `${snap.student_name}’s line · MindWorks Pathways` : 'MindWorks Pathways';
     const when = published(snap.created_at);
-    mountPersonalLine(host, snap, { animate: true, stamp: when ? `Published ${when}` : String(snap.year) });
+    mountPersonalLine(host, snap, { animate: true, branches: snap.branches !== false, stamp: when ? `Published ${when}` : String(snap.year) });
   } catch {
     status('This line isn’t published any more, or the link is wrong. Ask for a new link.');
   }

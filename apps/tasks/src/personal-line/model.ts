@@ -30,6 +30,8 @@ export type LineItem = {
   link: string | null;
   /** Classification (16 Oct 2026). Optional: snapshots published before it don't carry them. */
   format?: string | null;
+  /** All the entry's subjects (`matched` is only the student's). Drives the Civics branch. */
+  subjects?: string[];
   provider?: string | null;
   settings?: string[];
   entry?: string | null;
@@ -60,6 +62,8 @@ export type LineSnapshot = {
   /** Entries for this student with no month or date at all. */
   undated: LineItem[];
   terms: TermSpan[];
+  /** False draws each line as one track; missing or true splits lines into branches. */
+  branches?: boolean;
   created_at: string;
 };
 
@@ -110,6 +114,7 @@ export function catalogueItem(program: Program, matched: string[] = program.subj
     description: program.description,
     link: program.registration_link,
     format: program.format,
+    subjects: [...program.subjects],
     provider: program.provider,
     settings: [...program.settings],
     entry: program.entry,

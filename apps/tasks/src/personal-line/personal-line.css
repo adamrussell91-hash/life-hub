@@ -176,3 +176,21 @@
 .pl-published h2 { margin: 0; font: 700 22px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif; }
 .pl-published ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .pl-published li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Branch flags (tracks.ts): the name of each branch, standing on its track. */
+.pl-flag__box { stroke: #fff; stroke-width: 2; }
+.pl-flag__text { font: 700 11px var(--pl-body, 'Public Sans', Arial, sans-serif); letter-spacing: .08em; text-transform: uppercase; }
+.pl-check { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; color: #13233a; min-height: 44px; cursor: pointer; }
+.pl-check input { width: 20px; height: 20px; accent-color: #13233a; }
+
+/* Names blocks: one per date per track; a platform stacks same-day names, date once under the last. */
+.pl-block { position: absolute; display: grid; justify-items: start; }
+.pl-block.is-left { justify-items: end; }
+.pl-block .pl-lbl { position: static; margin-left: 0; }
+.pl-block.is-left .pl-lbl { text-align: right; justify-items: end; }
+.pl-block.is-left .pl-sub { justify-content: flex-end; }
+.pl-block.is-platform { border-left: 3px solid var(--pl-rule); padding-left: 2px; }
+.pl-block.is-platform.is-left { border-left: 0; border-right: 3px solid var(--pl-rule); padding: 0 2px 0 0; }
+.pl-block.is-platform .pl-lbl { padding-top: 0; padding-bottom: 0; }
+.pl-lbl.is-also .pl-name { font-weight: 500; color: var(--pl-muted); }
+.pl-stop.is-interchange { stroke: var(--pl-ink); stroke-width: 4; }
