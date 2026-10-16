@@ -139,7 +139,11 @@ export const CalloutBlockSchema = z.object({
   content: z.object({
     style: CalloutStyleSchema,
     title: z.string().optional(),
-    body: z.string()
+    body: z.string(),
+    related_to: z.object({
+      block_id: z.string().min(1),
+      question_id: z.string().min(1).optional()
+    }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
