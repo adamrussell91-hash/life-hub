@@ -84,7 +84,7 @@ export const SAMPLES = {
   smart: run('smart', [
     node('problem', 'problem', 'One in four deliveries misses its window, costing about 3,000 a month.', 'Quarter of deliveries late'),
     node('s', 's', 'Dispatch team, all warehouse orders, two runs a day.', 'Two daily runs'),
-    node('m', 'm', 'Late share falls from 25 to 10 percent.', 'Late share to 10%', { state: 'contested', objection: 'Which baseline month?' }),
+    node('m', 'm', 'Late share falls from 25 to 10 percent.', 'Late share', { state: 'contested', objection: 'Which baseline month?' }),
     node('a', 'a', 'Within current courier contracts and staffing.', 'Within contracts')
   ])
 };

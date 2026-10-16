@@ -240,6 +240,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-10-17 | `gap-radar` | Problem Solver Gap analysis (advanced): red disc, white rings 1 to 10, one spoke per topic, yellow current-state polygon over blue objective. New snapshot morphs the polygons over 600ms (skipped under reduced motion). 3 to 8 topics. |
 | 2026-10-11 | `creatine-elastic` | Date/time inspection distinguishes saved meal/dose receipts from forecast. Hover, tap, arrow keys and the daily-intake receipt expose exact logged doses; unknown times remain unknown. |
 | 2026-10-10 | `creatine-elastic` | Life Nutrition card below Macros by day: exact half page width desktop/full phone. Model history and uncertainty range, open recent dose potential, dashed forecast. No exact absorption countdown or measured saturation claim. Token ink, centered target label, finite entrance/data transition and ResizeObserver cleanup. |
 | 2026-10-08 | `money-flow`, `diverging-bars`, `equity-wedge` | New for Life → Property. Money flow is a fixed-order Sankey (the d3 `sankey` reorders nodes). Diverging bars show the tax result as recorded vs corrected. Equity wedge is the Time machine chart. Classes `prop-*` in `apps/life/css/property.css`, tokens only. |
