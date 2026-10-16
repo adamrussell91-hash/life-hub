@@ -55,7 +55,20 @@ describe('canvas', () => {
 
   it('falls back to the outline for tools without a renderer yet', () => {
     const host = document.createElement('div');
-    mountCanvas(host).update(session({ define: { runs: [{ id: 'r2', tool: 'smart', status: 'active', nodes: [{ id: 'n', slot: 'problem', text: 'x', state: 'accepted', skills: [], turnId: 't' }], edges: [] }], finishedEarly: false, exitObjection: null } }));
-    expect(host.querySelector('.ps-outline')).not.toBeNull();
+    mountCanvas(host).update(session({ define: { runs: [{ id: 'r2', tool: 'concept_map', status: 'active', nodes: [{ id: 'n', slot: 'theme', text: 'x', state: 'accepted', skills: [], turnId: 't' }], edges: [] }], finishedEarly: false, exitObjection: null } }));
+    expect(host.querySelector('.ps-outline:not(.sr-only)')).not.toBeNull();
+  });
+
+  it.each([
+    ['five_whys', 'problem', '.ps-whys'],
+    ['problem_tree', 'trunk', '.ps-tree'],
+    ['problem_statement', 'problem', '.ps-statement'],
+    ['gap_basic', 'current', '.ps-gap'],
+    ['gap_radar', 'current', '.ps-radar'],
+    ['smart', 'problem', '.ps-smart']
+  ] as const)('draws %s with its own chart', (tool, slot, selector) => {
+    const host = document.createElement('div');
+    mountCanvas(host).update(session({ define: { runs: [{ id: `r-${tool}`, tool, status: 'active', nodes: [{ id: 'n', slot, text: 'Something specific', state: 'accepted', skills: [], turnId: 't' }], edges: [], ...(tool === 'gap_radar' ? { radar: { snapshots: [] } } : {}) }], finishedEarly: false, exitObjection: null } }));
+    expect(host.querySelector(selector)).not.toBeNull();
   });
 });

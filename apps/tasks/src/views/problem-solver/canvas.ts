@@ -4,6 +4,8 @@ import { createFiveWhysView } from '../../../../../packages/problem-solver/rende
 import { createGapBasicView } from '../../../../../packages/problem-solver/render/gap-basic';
 import { createGapRadarView } from '../../../../../packages/problem-solver/render/gap-radar';
 import { createSmartView } from '../../../../../packages/problem-solver/render/smart';
+import { createProblemTreeView } from '../../../../../packages/problem-solver/render/problem-tree';
+import { createProblemStatementView } from '../../../../../packages/problem-solver/render/problem-statement';
 import { renderOutline } from '../../../../../packages/problem-solver/render/outline';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
 import type { PsSession, PsToolId, PsToolRun } from '../../../../../packages/problem-solver/types';
@@ -15,6 +17,8 @@ export type CanvasHandlers = { onScore?: (scores: Scores) => void };
 /** Tools that draw their own chart. Anything else falls back to the outline. */
 const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   five_whys: () => createFiveWhysView(),
+  problem_tree: () => createProblemTreeView(),
+  problem_statement: () => createProblemStatementView(),
   gap_basic: () => createGapBasicView(),
   gap_radar: () => createGapRadarView(),
   smart: () => createSmartView()
