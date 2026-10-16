@@ -821,14 +821,14 @@ export function createAnnotationEditorFields(
 
     // A recording that never reached the block is still on this device: say so up front.
     void listVoiceDrafts().then((drafts) => {
-      if (drafts.length === 0 || voiceTracksHost.querySelector('.block-editor__annotation-voice-unsaved')) return;
+      if (drafts.length === 0 || toolbar.querySelector('.block-editor__annotation-voice-unsaved')) return;
       const unsaved = document.createElement('button');
       unsaved.type = 'button';
       unsaved.className = 'btn btn--secondary block-editor__annotation-voice-unsaved';
       unsaved.textContent =
         drafts.length === 1
-          ? '1 unsaved recording on this device. Open to upload or download'
-          : `${drafts.length} unsaved recordings on this device. Open to upload or download`;
+          ? '1 unsaved recording on this device: open to upload or download'
+          : `${drafts.length} unsaved recordings on this device: open to upload or download`;
       unsaved.addEventListener('click', () => openVoiceRecorder());
       toolbar.append(unsaved);
     });
