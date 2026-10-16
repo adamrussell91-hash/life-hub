@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   acceptSuggestion, activeRun, applyCoachTurn, createSession, dismissSuggestion,
-  archive, finishDefine, keepAnyway, say, summaryRow
+  archive, finishDefine, keepAnyway, rescoreRadar, say, summaryRow
 } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 let counter = 0;
@@ -119,4 +119,35 @@ test('keepAnyway with a slot that no longer fits is a 409, not illegal_slot', ()
   s = applyCoachTurn(s, coach({ node: { slot: 'problem', text: 'y' } }), deps);
   s = { ...s, pendingKeep: { slot: 'problem', text: 'x', objection: 'o', skills: [], runId: activeRun(s).id } };
   assert.throws(() => keepAnyway(s, deps), (err) => err.status === 409 && err.code === 'action_not_allowed' && err.message === 'That answer no longer fits here.');
+});
+
+function radarSession(phase = 'define', status = 'active') {
+  const nodes = [1, 2, 3].map((i) => ({ id: `x${i}`, slot: `axis:${i}`, text: `Topic ${i}`, state: 'accepted', skills: [], turnId: 't' }));
+  const base = createSession({ title: 'Radar', text: 'Scores to track.' }, deps);
+  return { ...base, phase, status: phase === 'defined' ? 'defined' : 'active', runner: { status: 'idle', mode: 'turn', error: null }, define: { runs: [{ id: 'run', tool: 'gap_radar', status, nodes, edges: [], radar: { snapshots: [] } }], finishedEarly: false, exitObjection: null } };
+}
+
+test('rescore_radar appends a timestamped snapshot to the active radar run', () => {
+  const s = rescoreRadar(radarSession(), { current: [3, 4, 5], objective: [8, 8, 9] }, deps);
+  const run = s.define.runs[0];
+  assert.deepEqual(run.radar.snapshots, [{ at: '2026-10-16T10:00:00.000Z', current: [3, 4, 5], objective: [8, 8, 9] }]);
+  assert.equal(s.runner.status, 'idle', 'rescoring does not call the coach');
+  const again = rescoreRadar(s, { current: [4, 5, 6], objective: [8, 8, 9] }, deps);
+  assert.equal(again.define.runs[0].radar.snapshots.length, 2);
+});
+
+test('rescore_radar still works once the problem is defined (tracking progress)', () => {
+  const s = rescoreRadar(radarSession('defined', 'done'), { current: [3, 4, 5], objective: [8, 8, 9] }, deps);
+  assert.equal(s.define.runs[0].radar.snapshots.length, 1);
+});
+
+test('rescore_radar rejects bad scores with a 400 and the validator message', () => {
+  assert.throws(() => rescoreRadar(radarSession(), { current: [3, 4], objective: [8, 8, 9] }, deps), (err) => err.status === 400 && /one score per topic/.test(err.message));
+  assert.throws(() => rescoreRadar(radarSession(), { current: [3, 4, 11], objective: [8, 8, 9] }, deps), (err) => err.status === 400 && /1 to 10/.test(err.message));
+});
+
+test('rescore_radar needs a radar run and a define phase', () => {
+  const none = { ...radarSession(), define: { runs: [], finishedEarly: false, exitObjection: null } };
+  assert.throws(() => rescoreRadar(none, { current: [3, 4, 5], objective: [8, 8, 9] }, deps), (err) => err.status === 409);
+  assert.throws(() => rescoreRadar(radarSession('frame'), { current: [3, 4, 5], objective: [8, 8, 9] }, deps), (err) => err.status === 409);
 });

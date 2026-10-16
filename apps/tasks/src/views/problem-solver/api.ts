@@ -7,7 +7,10 @@ export const problemSolverApi = {
   create: (body: { text: string; title?: string; links?: PsSession['links'] }) =>
     apiPost<{ session: PsSession }>('/api/problem-solver', { create: { ...body, requestId: crypto.randomUUID() } }).then((r) => r.session),
   act: (session: PsSession, action: PsAction, text?: string) =>
-    apiPost<{ session: PsSession }>('/api/problem-solver', { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action, ...(text ? { text } : {}) }).then((r) => r.session)
+    apiPost<{ session: PsSession }>('/api/problem-solver', { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action, ...(text ? { text } : {}) }).then((r) => r.session),
+  /** Score the topics of the Gap analysis (advanced) radar; one 1 to 10 score per topic for each overlay. */
+  rescore: (session: PsSession, payload: { current: number[]; objective: number[] }) =>
+    apiPost<{ session: PsSession }>('/api/problem-solver', { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action: 'rescore_radar', current: payload.current, objective: payload.objective }).then((r) => r.session)
 };
 
 export function isBusy(session: PsSession): boolean {
