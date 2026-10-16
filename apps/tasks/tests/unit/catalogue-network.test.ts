@@ -31,7 +31,7 @@ describe('catalogue platforms', () => {
     const classified: Program[] = [
       { ...byName('Mock Trial'), format: 'Simulation' },
       { ...byName('National Latin Exam (NLE)'), format: 'Exam' },
-      byName('The Simpson Prize')
+      { ...byName('The Simpson Prize'), format: null }
     ];
     const platforms = cataloguePlatforms(classified, 'format', '2026-01-01');
     expect(platforms.map((platform) => [platform.title, platform.items.length])).toEqual([
