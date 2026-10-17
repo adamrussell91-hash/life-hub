@@ -37,13 +37,8 @@ export function createFoodJournalApi(fetchImpl) {
         body: JSON.stringify({ journal, if_version: version }),
       }),
     async assist(body) {
+      // The API starts the background run itself; see food-journal-assist.
       const { id } = await post("/api/food-journal-assist", body);
-      const started = await fetchImpl("/api/food-journal-run", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      if (!started.ok) throw new Error("Research did not start. Try again.");
       for (let attempt = 0; attempt < 150; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         const job = await request(

@@ -106,7 +106,36 @@ export function createFoodJournalAssistHandler(deps = {}) {
       cookie: request.headers.get("cookie") || "",
       origin: request.headers.get("origin") || "",
     });
+    const started = await (deps.invokeRun ?? defaultInvokeFoodJournalRun)(
+      request,
+      id,
+    ).catch(() => false);
+    if (!started)
+      return errorResponse(
+        502,
+        "upstream_error",
+        "Research did not start. Try again.",
+        true,
+        PRIVATE,
+      );
     return okResponse(202, { id }, PRIVATE);
   }, deps);
+}
+// The browser cannot start the background function itself: its preflight
+// answers 202 with no CORS headers, so Safari reports "Load failed". Start it
+// from here, on the same API host, the way chat starts chat-run.
+export async function defaultInvokeFoodJournalRun(request, id, fetchImpl = fetch) {
+  const cookie = request.headers.get("cookie"),
+    origin = request.headers.get("origin");
+  const response = await fetchImpl(new URL("/api/food-journal-run", request.url), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(cookie ? { cookie } : {}),
+      ...(origin ? { origin } : {}),
+    },
+    body: JSON.stringify({ id }),
+  });
+  return response.status === 202 || response.ok;
 }
 export default createFoodJournalAssistHandler();

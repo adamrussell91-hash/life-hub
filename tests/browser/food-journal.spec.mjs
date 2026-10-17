@@ -209,9 +209,31 @@ async function pageFor(width = 1440, { editorial = false } = {}) {
     signPut: async ({ key }) => "https://food-media.test/" + key,
     signGet: async ({ key }) => "https://food-media.test/" + key,
   };
+  // Production starts the background run from the assist function; do the
+  // same here so the test fails if the browser ever calls the run directly.
+  const runner = createFoodJournalRunHandler(deps);
+  deps.invokeRun = async (request, id) => {
+    const response = await runner(
+      new Request(new URL("/api/food-journal-run", request.url), {
+        method: "POST",
+        headers: Object.fromEntries(
+          [
+            ["content-type", "application/json"],
+            ["cookie", request.headers.get("cookie")],
+            ["origin", request.headers.get("origin")],
+          ].filter(([, value]) => value),
+        ),
+        body: JSON.stringify({ id }),
+      }),
+    );
+    return response.status === 202 || response.ok;
+  };
   for (const [pattern, fn] of [
     ["**/api/food-journal-assist**", createFoodJournalAssistHandler(deps)],
-    ["**/api/food-journal-run", createFoodJournalRunHandler(deps)],
+    [
+      "**/api/food-journal-run",
+      async () => new Response("browser must not call the run", { status: 500 }),
+    ],
     ["**/api/food-journal-media", createFoodJournalMediaHandler(deps)],
   ])
     await page.route(pattern, async (route) => {
