@@ -344,19 +344,78 @@
   cursor: default;
 }
 
-.tk-chip--skill {
+button.tk-chip {
+  font: inherit;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: box-shadow 160ms ease;
+}
+
+button.tk-chip:hover,
+button.tk-chip[aria-expanded='true'] {
+  box-shadow: 0 0 0 2px var(--wave);
+}
+
+button.tk-chip:focus-visible {
+  outline: 2px solid var(--marine);
+  outline-offset: 2px;
+}
+
+.tk-links__detail {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--wave);
+  border-radius: var(--radius-sm);
+}
+
+.tk-links__detail[hidden] {
+  display: none;
+}
+
+.tk-links__detail-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: var(--weight-bold);
+  color: var(--navy);
+}
+
+.tk-links__detail-text {
+  margin: 0;
+  color: var(--ink);
+}
+
+.tk-links__detail-steps {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--ink);
+}
+
+.tk-links__detail-steps strong {
+  color: var(--navy);
+}
+
+.tk-chip--skill,
+.tk-chip--skill:hover {
   color: var(--navy);
   background: #fff;
   border: 1px solid var(--line);
 }
 
-.tk-chip--tool {
+.tk-chip--tool,
+.tk-chip--tool:hover {
   color: #fff;
   background: var(--depth);
   border-color: var(--depth);
 }
 
-.tk-chip--value {
+.tk-chip--value,
+.tk-chip--value:hover {
   color: var(--depth);
   background: var(--high-sea);
   border-color: var(--high-sea);
@@ -1663,7 +1722,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .tk-reveal__body,
-  .tk-note__body {
+  .tk-note__body,
+  button.tk-chip {
     transition: none;
     animation: none;
   }
@@ -1671,7 +1731,8 @@
 
 @media print {
   .tk-note,
-  .tk-reveal {
+  .tk-reveal,
+  .tk-links__detail {
     display: none;
   }
 }

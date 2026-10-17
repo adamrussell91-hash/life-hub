@@ -202,7 +202,11 @@ export function decorateCalloutReferences(wrapper: HTMLElement, block: Block, mo
       group = document.createElement('div'); group.className = 'callout-ref-list';
       group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'Related callouts');
       groups.set(target, group);
-      if (target === wrapper) target.prepend(group);
+      if (target === wrapper) {
+        // Sits in the block's top-right corner, left of the feedback dot, so it never adds a row above the content.
+        if (mode !== 'print') { group.classList.add('callout-ref-list--corner'); wrapper.classList.add('callout-ref-host'); }
+        target.prepend(group);
+      }
       else {
         const prompt = Array.from(target.children).find(child => child.classList.contains('block-question-set__prompt'));
         if (prompt) prompt.after(group); else target.append(group);
