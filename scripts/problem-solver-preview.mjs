@@ -13,10 +13,15 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RENDERERS = {
   five_whys: ['five-whys', 'createFiveWhysView'],
   problem_tree: ['problem-tree', 'createProblemTreeView'],
+  concept_map: ['concept-map', 'createConceptMapView'],
   problem_statement: ['problem-statement', 'createProblemStatementView'],
   gap_basic: ['gap-basic', 'createGapBasicView'],
   gap_radar: ['gap-radar', 'createGapRadarView'],
-  smart: ['smart', 'createSmartView']
+  smart: ['smart', 'createSmartView'],
+  // The record takes a whole session, not a run.
+  record: ['record', 'createRecordView'],
+  record_polya: ['record', 'createRecordView'],
+  record_triz: ['record', 'createRecordView']
 };
 
 const args = process.argv.slice(2);
@@ -52,7 +57,7 @@ const bundle = await build({
   plugins: [rawPlugin],
   loader: { '.svg': 'text' }
 });
-const css = ['apps/tasks/design-kit/tokens.css', 'packages/problem-solver/problem-solver.css'].map((p) => readFileSync(join(root, p), 'utf8')).join('\n');
+const css = ['apps/tasks/design-kit/tokens.css', 'packages/graph-blocks/graph-blocks.css', 'packages/problem-solver/problem-solver.css'].map((p) => readFileSync(join(root, p), 'utf8')).join('\n');
 const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}\nbody{margin:0;background:var(--paper);font-family:var(--font-ui)}.wrap{padding:24px 16px;max-width:720px;margin:0 auto}</style></head><body><div class="ps-scope wrap"><div id="mount"></div></div><script>${bundle.outputFiles[0].text.replace(/<\/script/g, '<\\/script')}</script></body></html>`;
 const page = join(outDir, `${tool}.html`);
 writeFileSync(page, html);

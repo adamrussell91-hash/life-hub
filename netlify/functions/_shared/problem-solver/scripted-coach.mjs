@@ -3,7 +3,10 @@ import { nextSlots } from '../../../../packages/problem-solver/machine.mjs';
 import { TOOLS } from '../../../../packages/problem-solver/tools/index.mjs';
 import { activeRun } from './session.mjs';
 
-/** Deterministic coach for local dev and tests. Short answers (under six words) are challenged. */
+/**
+ * Deterministic coach for local dev and tests. Short answers (under six words) are challenged.
+ * An answer starting `switch:` suggests switching to Problem tree (the browser walk uses it).
+ */
 const FRAME = [
   ['goal', 'What is the goal, as an ideal state rather than a fix? Say what good looks like.'],
   ['whatIsTrue', 'Good, that is a clear aim. Now, what is actually true here? Separate the facts and data from what you believe or feel.'],
@@ -33,6 +36,9 @@ export async function scriptedCoach(session) {
   if (!last) {
     const first = TOOLS[run.tool].steps[0];
     return { ...base, verdict: 'clarify', message: `Let's start the ${TOOLS[run.tool].name}. ${first.title}: ${first.prompt}` };
+  }
+  if (/^switch:/i.test(last) && run.tool !== 'problem_tree') {
+    return { ...base, verdict: 'clarify', suggestion: { kind: 'switch_tool', tool: 'problem_tree', reason: last.replace(/^switch:\s*/i, '') || 'The causes branch.' }, message: 'Then a single chain will not hold it. A problem tree lets the causes branch; shall we switch?' };
   }
   const slot = nextSlots(run).find((s) => s !== 'root') ?? 'root';
   if (last.split(/\s+/).filter(Boolean).length < 6) {
