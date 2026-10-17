@@ -76,6 +76,11 @@ function extractBlock(block: Block, parts: string[]): void {
       push(parts, c.title);
       push(parts, htmlToPlainText(String(c.html ?? '')));
       break;
+    case 'peer_feedback':
+      push(parts, c.prompt);
+      push(parts, c.strength_prompt);
+      push(parts, c.suggestion_prompt);
+      break;
     case 'question_set':
     case 'flashcards':
     case 'self_check':

@@ -1,0 +1,27 @@
+name: PR check
+
+# Runs the mandatory pre-PR gate on every PR so the main ruleset can require
+# it and auto-merge has something to wait for. No paths filter: a required
+# check that skips leaves PRs waiting forever.
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: pr-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pre-pr-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - run: npm ci --ignore-scripts --prefix apps/professional
+      - run: npm run pre-pr-check
