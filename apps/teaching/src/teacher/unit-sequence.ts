@@ -123,7 +123,8 @@ function buildLessonRow(
   entry: SequenceScheduledLesson,
   index: number,
   lessonTitles: Map<string, string>,
-  root: HTMLElement
+  root: HTMLElement,
+  session?: { part: number; total: number }
 ): HTMLElement {
   // Row is a div so reorder buttons are valid siblings of the lesson link.
   const row = document.createElement('div');
@@ -143,7 +144,14 @@ function buildLessonRow(
 
   const title = document.createElement('span');
   title.className = 'seq__lesson-title';
-  title.textContent = lessonTitles.get(entry.lesson_id) ?? entry.lesson_id;
+  title.textContent = lessonTitles.get(entry.lesson_id) ?? 'Untitled lesson';
+  if (session) {
+    row.classList.add('seq__row--part');
+    const part = document.createElement('span');
+    part.className = 'seq__lesson-part';
+    part.textContent = ` · part ${session.part} of ${session.total}`;
+    title.append(part);
+  }
 
   const date = document.createElement('span');
   date.className = 'seq__lesson-date';
@@ -225,7 +233,8 @@ function buildUnitDetails(
 
   const meta = document.createElement('span');
   meta.className = 'seq__unit-meta';
-  const lessonCount = unitLessons.length;
+  // A lesson taught over several slots counts once.
+  const lessonCount = new Set(unitLessons.map((entry) => entry.lesson_id)).size;
   const lessonLabel = `${lessonCount} ${lessonCount === 1 ? 'lesson' : 'lessons'}`;
   const span = unitDateSpan(unit, options.scheduled);
   const rangeLabel = span ? formatDateRange(span.start, span.end) : 'Not scheduled';
@@ -251,9 +260,17 @@ function buildUnitDetails(
   const list = document.createElement('div');
   list.className = 'seq__lessons';
   const ordered = [...unitLessons].sort(compareScheduled);
-  ordered.forEach((entry, index) => {
-    list.append(buildLessonRow(entry, index + 1, options.lessonTitles, root));
-  });
+  const numbers = new Map<string, number>();
+  const parts = new Map<string, number>();
+  const totals = new Map<string, number>();
+  for (const entry of ordered) totals.set(entry.lesson_id, (totals.get(entry.lesson_id) ?? 0) + 1);
+  for (const entry of ordered) {
+    if (!numbers.has(entry.lesson_id)) numbers.set(entry.lesson_id, numbers.size + 1);
+    const part = (parts.get(entry.lesson_id) ?? 0) + 1;
+    parts.set(entry.lesson_id, part);
+    const total = totals.get(entry.lesson_id) ?? 1;
+    list.append(buildLessonRow(entry, numbers.get(entry.lesson_id)!, options.lessonTitles, root, total > 1 ? { part, total } : undefined));
+  }
   details.append(list);
 
   details.addEventListener('toggle', () => {
