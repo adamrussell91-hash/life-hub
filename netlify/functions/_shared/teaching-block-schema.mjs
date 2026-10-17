@@ -237,6 +237,7 @@ var BlockTypeSchema = z3.enum([
   "attachment",
   "accordion",
   "table",
+  "peer_feedback",
   "question_set",
   "flashcards",
   "cloze",
@@ -572,6 +573,20 @@ var QuestionItemSchema = z3.object({
   kind: QuestionKindSchema,
   options: z3.array(z3.string()).optional(),
   response_space: ResponseSpaceSchema.optional()
+});
+var PeerFeedbackBlockSchema = z3.object({
+  id: z3.string().min(1),
+  type: z3.literal("block"),
+  block_type: z3.literal("peer_feedback"),
+  variant: z3.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z3.object({
+    prompt: z3.string().max(4e3),
+    strength_prompt: z3.string().max(300).default("One thing that works well\u2026"),
+    suggestion_prompt: z3.string().max(300).default("One suggestion or question\u2026")
+  }),
+  ...blockLayout,
+  ...blockTimestamps
 });
 var QuestionSetBlockSchema = z3.object({
   id: z3.string().min(1),
@@ -1214,6 +1229,7 @@ var leafBlockSchemas = [
   AttachmentBlockSchema,
   AccordionBlockSchema,
   TableBlockSchema,
+  PeerFeedbackBlockSchema,
   QuestionSetBlockSchema,
   FlashcardsBlockSchema,
   ClozeBlockSchema,
@@ -1445,6 +1461,7 @@ export {
   MediaSizeVariantSchema,
   MindMapBlockSchema,
   OutcomesBlockSchema,
+  PeerFeedbackBlockSchema,
   QuestionItemSchema,
   QuestionKindSchema,
   QuestionQuadrantBlockSchema,

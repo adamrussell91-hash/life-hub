@@ -231,6 +231,7 @@ describe('createBlock learning activities', () => {
 
     const learning = BLOCK_GROUPS.find((g) => g.label === 'Learning');
     expect(learning?.types).toEqual([
+      'peer_feedback',
       'question_set',
       'flashcards',
       'cloze',

@@ -1,3 +1,4 @@
+import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createAlchemyButton } from '@/alchemy/block-button';
 import {
@@ -2812,6 +2813,8 @@ function createBlockEditorFields(
       return createGalleryEditor(block, onChange, latest as () => Extract<Block, { block_type: 'gallery' }>);
     case 'table':
       return createTableEditor(block, onChange, latest as () => Extract<Block, { block_type: 'table' }>);
+    case 'peer_feedback':
+      return createPeerFeedbackEditor(block, onChange, context?.lessonId);
     case 'question_set':
       return createQuestionSetEditor(block, onChange, latest as () => Extract<Block, { block_type: 'question_set' }>);
     case 'timeline':
