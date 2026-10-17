@@ -14,18 +14,22 @@
  * Without --write: dry-run match report only.
  */
 import { randomUUID } from "node:crypto";
-import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
   rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, extname, join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
+import {
+  MAX_BYTES,
+  indexPhotos,
+  matchPhoto,
+  toJpeg,
+} from "./lib/dayone-photos.mjs";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { validateFoodJournal } from "../netlify/functions/_shared/food-journal-schema.mjs";
 import {
@@ -33,7 +37,6 @@ import {
   knowledgeR2ClientOptions,
 } from "../netlify/functions/_shared/knowledge-r2.mjs";
 
-const MAX_BYTES = 4 * 1024 * 1024;
 const args = parseArgs(process.argv.slice(2));
 if (!args.photos || !args.journal) {
   console.error(
@@ -127,7 +130,7 @@ let uploaded = 0,
 try {
   for (const item of plan) {
     try {
-      const body = prepareJpeg(item.file, work);
+      const { body } = toJpeg(item.file, work);
       if (body.length > MAX_BYTES) {
         failed += 1;
         console.error(`too large after compress: ${basename(item.file)}`);
@@ -180,64 +183,4 @@ function parseArgs(argv) {
     throw new Error(`Unknown argument: ${arg}`);
   }
   return result;
-}
-
-function indexPhotos(dir) {
-  // Day One names files {md5}.jpeg — index stems/names only; no full-file hash of a multi-GB folder.
-  const map = new Map();
-  const stack = [dir];
-  while (stack.length) {
-    const current = stack.pop();
-    for (const name of readdirSync(current)) {
-      const full = join(current, name);
-      const st = statSync(full);
-      if (st.isDirectory()) {
-        stack.push(full);
-        continue;
-      }
-      if (!/\.(jpe?g|heic|heif|png|webp)$/i.test(name)) continue;
-      const stem = basename(name, extname(name)).toLowerCase();
-      map.set(stem, full);
-      map.set(name.toLowerCase(), full);
-    }
-  }
-  return map;
-}
-
-function matchPhoto(index, ref) {
-  for (const key of [
-    ref.md5,
-    ref.identifier,
-    ref.filename,
-    ref.filename && basename(ref.filename, extname(ref.filename)),
-  ]) {
-    if (!key) continue;
-    const hit = index.get(String(key).toLowerCase());
-    if (hit) return hit;
-  }
-  return null;
-}
-
-function prepareJpeg(sourcePath, workDir) {
-  const raw = readFileSync(sourcePath);
-  const lower = sourcePath.toLowerCase();
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
-    if (raw.length <= MAX_BYTES) return raw;
-  }
-  // ponytail: use macOS sips when present; otherwise require already-small JPEGs
-  const out = join(workDir, `${randomUUID()}.jpg`);
-  const sips = spawnSync(
-    "sips",
-    ["-s", "format", "jpeg", "-Z", "1600", sourcePath, "--out", out],
-    { encoding: "utf8" },
-  );
-  if (sips.status !== 0 || !existsSync(out)) {
-    if (raw.length <= MAX_BYTES && (lower.endsWith(".jpg") || lower.endsWith(".jpeg")))
-      return raw;
-    throw new Error(
-      sips.stderr?.trim() ||
-        "Need JPEG ≤4MB, or macOS sips to compress larger/HEIC photos.",
-    );
-  }
-  return readFileSync(out);
 }
