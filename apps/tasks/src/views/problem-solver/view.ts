@@ -5,6 +5,7 @@ import { el } from '@/views/hub-kit';
 import { hashQuery } from '@/shell/shell';
 import { errorMessage, renderLoadError } from '@/views/feedback';
 import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
+import { toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
 import type { PsAction, PsSession } from '../../../../../packages/problem-solver/types';
 import { isBusy, pollUntilSettled, problemSolverApi } from './api';
@@ -48,6 +49,7 @@ async function renderList(canvas: HTMLElement): Promise<void> {
     const link = el('a', 'ps-list__link', row.title) as HTMLAnchorElement;
     link.href = `#/problem-solver?id=${row.id}`;
     const meta = [PHASE_LABEL[row.phase], row.tool ? TOOLS[row.tool].name : null, formatDisplayDate(row.updatedAt.slice(0, 10))].filter(Boolean).join(' · ');
+    if (row.tool) item.append(toolEmblem(row.tool));
     item.append(link, el('span', 'ps-list__meta', meta));
     list.append(item);
   }

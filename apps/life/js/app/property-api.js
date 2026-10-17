@@ -23,6 +23,13 @@ export function createPropertyApi(fetchImpl = fetch) {
     async addEntry(entry) {
       return post({ action: 'add', entry });
     },
+    async addEntries(entries) {
+      return (await post({ action: 'add-many', entries }))?.record ?? null;
+    },
+    /** Read one statement or bill. `file` is { name, type, data } with base64 data. Saves nothing. */
+    async readDocument(file) {
+      return post({ action: 'read', file });
+    },
     async removeEntry(id) {
       return (await post({ action: 'remove', id }))?.record ?? null;
     },

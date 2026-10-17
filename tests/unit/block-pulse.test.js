@@ -42,8 +42,11 @@ const BLOCKS = [
   }
 ];
 
-function memoryStore(seed = {}) {
+function memoryStore(seed = {}, { staleList = false } = {}) {
   const map = new Map(Object.entries(seed));
+  // Netlify Blobs `list` is eventually consistent: a key deleted moments ago
+  // can still be listed. `staleList` keeps every key ever written in the list.
+  const listed = new Set(map.keys());
   return {
     map,
     async get(key) {
@@ -51,29 +54,33 @@ function memoryStore(seed = {}) {
     },
     async setJSON(key, value) {
       map.set(key, structuredClone(value));
+      listed.add(key);
     },
     async delete(key) {
       map.delete(key);
     },
     async list({ prefix } = {}) {
-      return { blobs: [...map.keys()].filter(key => key.startsWith(prefix ?? '')).map(key => ({ key })) };
+      const keys = staleList ? [...listed] : [...map.keys()];
+      return { blobs: keys.filter(key => key.startsWith(prefix ?? '')).map(key => ({ key })) };
     }
   };
 }
 
-function seededStore(snapshot = {}) {
+function seededStore(snapshot = {}, options = {}) {
   return memoryStore({
     [`lessons/${LESSON}`]: { id: LESSON, title: 'Hamlet 3', status: 'active' },
     [`published/lessons/${LESSON}`]: { lesson_id: LESSON, blocks: BLOCKS, ...snapshot }
-  });
+  }, options);
 }
+
+let clockIso = '2026-10-16T03:00:00.000Z';
 
 function deps(store) {
   return {
     getContentStore: async () => store,
     verifySessionToken: () => ({ valid: true }),
     env: { SITE_ORIGIN: ORIGIN, SESSION_SECRET: 'x'.repeat(32), LIFE_HUB_PASSPHRASE_HASH: 'y' },
-    nowIso: () => '2026-10-16T03:00:00.000Z'
+    nowIso: () => clockIso
   };
 }
 
@@ -196,9 +203,39 @@ test('reset archives the counts with a date and clears only that block', async (
   assert.ok(store.map.has(pulseResetsKey(LESSON)));
 
   // The same device can tap again after a reset.
-  await tap(store, { block_id: 'b_q1', option: 'confused', device_id: DEVICE_A });
+  clockIso = '2026-10-16T03:05:00.000Z';
+  try {
+    await tap(store, { block_id: 'b_q1', option: 'confused', device_id: DEVICE_A });
+  } finally {
+    clockIso = '2026-10-16T03:00:00.000Z';
+  }
   const after = await teacherGet(store);
   assert.equal(after.json.data.blocks.b_q1.counts.confused, 1);
+});
+
+test('reset sticks even while the blob list still shows the deleted taps', async () => {
+  const store = seededStore({}, { staleList: true });
+  await tap(store, { block_id: 'b_q1', option: 'confused', device_id: DEVICE_A });
+  await tap(store, { block_id: 'b_q1', option: 'flat', device_id: DEVICE_B });
+
+  const reset = await teacherReset(store, 'b_q1');
+  assert.equal(reset.json.data.blocks.b_q1.total, 0);
+  assert.equal(reset.json.data.blocks.b_q1.resets[0].total, 2);
+  assert.equal((await teacherGet(store)).json.data.blocks.b_q1.total, 0);
+
+  // A second reset archives nothing new, and a fresh tap still counts.
+  clockIso = '2026-10-16T03:05:00.000Z';
+  try {
+    await tap(store, { block_id: 'b_q1', option: 'worked', device_id: DEVICE_A });
+    const after = (await teacherGet(store)).json.data.blocks.b_q1;
+    assert.equal(after.total, 1);
+    assert.equal(after.counts.worked, 1);
+    const again = (await teacherReset(store, 'b_q1')).json.data.blocks.b_q1;
+    assert.equal(again.total, 0);
+    assert.deepEqual(again.resets[0].counts, { confused: 0, stuck: 0, example: 0, flat: 0, worked: 1 });
+  } finally {
+    clockIso = '2026-10-16T03:00:00.000Z';
+  }
 });
 
 test('teacher pulse route needs a live lesson and a known action', async () => {

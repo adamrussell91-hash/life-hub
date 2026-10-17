@@ -89,7 +89,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
   top.className = 'top';
   const crumb = document.createElement('p');
   crumb.className = 'crumb';
-  crumb.innerHTML = 'Life › Future map › <b>Travel</b>';
+  crumb.innerHTML = 'Life › <b>Travel</b>';
   const titleBlock = document.createElement('div');
   const h1 = document.createElement('h1');
   h1.textContent = trip.title;

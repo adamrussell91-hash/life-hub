@@ -8,7 +8,8 @@
  *   split it into even parallel tracks
  * - a run known only to a part of a month or a month is a soft bracket beside the line
  * - a due date is a stop with a dot; an entries close is a short tick across the line
- * - a single-day stop on two of the student's lines is an interchange capsule bridging them
+ * - a stop on two of the student's lines is named on the first (its home) and is a plain interchange
+ *   stop on the other, so a shared stop doesn't fill two names columns
  */
 import { dateWords, runWords, type DatePrecision } from '@/domain/catalogue-timing';
 import { LINES, yearLineName, type LineKey } from './lines';
@@ -157,10 +158,10 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
     const laneW = oneCol ? 15 : 30;
     const lineGap = oneCol ? 34 : 40;
     const trackGap = oneCol ? 4 : 10;
-    /** A name may sit this far below its date before it moves to a spur. */
-    const DRIFT = 56;
-    /** Names columns per branch: the branch's own, plus up to three spurs. */
-    const MAX_COLS = oneCol ? 1 : 4;
+    /** A name may sit this far below its date (about two names) before it moves to a spur. */
+    const DRIFT = 96;
+    /** Names columns per track: its own, plus one spur. More spurs read as legs, not a network. */
+    const MAX_COLS = oneCol ? 1 : 2;
 
     // Tracks: one per line, or one per branch when a line splits (tracks.ts). Busy branches add spurs below.
     // A phone has no room for branches: each line stays one track and names carry the format.
@@ -177,8 +178,8 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
     const anchorDate = (it: LineItem) => it.run?.start ?? it.due!.on;
     const endDate = (it: LineItem) => it.run?.end ?? it.due!.on;
 
-    // One appearance per item per track it stands on. The first is its main name; the others repeat
-    // the name lighter, so each line reads on its own. On a phone only the main name is written.
+    // One appearance per item per track it stands on. Only the first (its home line) is named; the
+    // others are interchange stops, so a line that only shares stops needs no names column.
     type App = { it: LineItem; main: string; k: string; primary: boolean };
     const apps: App[] = [];
     for (const it of items) plan.tracksOf(it).forEach((k, i) => apps.push({ it, main: k, k, primary: i === 0 }));
@@ -221,7 +222,10 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
         c.n = ends.length;
         c.items.forEach((it) => laneN.set(`${it.id}:${k}`, c.n));
       }
-      const windows = on.filter((it) => kindOf(it) === 'window');
+      // A soft window is bracketed only where it's named; elsewhere it's an interchange stop.
+      const windows = appsOn(k)
+        .filter((a) => a.primary && kindOf(a.it) === 'window')
+        .map((a) => a.it);
       const colEnds: number[] = [];
       for (const it of windows) {
         let col = colEnds.findIndex((end) => end + 3 < doy(it.run!.start, year));
@@ -272,7 +276,7 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
     const blocks: Block[] = [];
     for (const k of mains) {
       const mine = apps
-        .filter((a) => a.main === k && (a.primary || !oneCol))
+        .filter((a) => a.main === k && a.primary)
         .sort((a, b) => anchorDate(a.it).localeCompare(anchorDate(b.it)) || a.it.name.localeCompare(b.it.name));
       const byDay = new Map<string, App[]>();
       for (const a of mine) {
@@ -284,7 +288,7 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
         block.style.width = `${labelW}px`;
         group.forEach((a, index) => {
           const last = index === group.length - 1;
-          const b = el('button', `pl-lbl${a.it.on.length > 1 ? ' is-shared' : ''}${a.primary ? '' : ' is-also'}`);
+          const b = el('button', `pl-lbl${a.it.on.length > 1 ? ' is-shared' : ''}`);
           b.type = 'button';
           b.append(el('span', 'pl-name', a.it.name));
           if (last) {
@@ -306,19 +310,21 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
     }
     blocks.forEach((B) => (B.h = B.el.getBoundingClientRect().height + 6));
 
-    // Columns: each block takes the first column (branch, then spur 1, 2, 3) where it sits within
-    // DRIFT of its date. If even the last spur is too full, the year gets taller and we try again.
+    // Columns: each block takes the first column (its track, then the spur) where it sits within
+    // DRIFT of its date. If even the spur is too full, the year gets taller and we try again.
+    const maxCols: Record<string, number> = {};
     const assign = () => {
       let worst = 0;
-      for (const k of mains) {
+      // On a phone every track writes into the one shared names column, so they stack together.
+      for (const k of oneCol ? ['all'] : mains) {
         const floors: number[] = [];
-        const mine = blocks.filter((B) => B.main === k);
+        const mine = blocks.filter((B) => oneCol || B.main === k);
         mine.forEach((B) => (B.y = yOf(anchorDate(B.apps[0]!.it))));
         mine.sort((a, b) => a.y - b.y);
         for (const B of mine) {
           let pick = 0;
           let pickTop = Infinity;
-          for (let c = 0; c < MAX_COLS; c += 1) {
+          for (let c = 0; c < (maxCols[k] ?? MAX_COLS); c += 1) {
             const t = Math.max(B.y - 12, floors[c] ?? -Infinity);
             if (t - (B.y - 12) <= DRIFT) {
               pick = c;
@@ -339,13 +345,18 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
       return worst;
     };
     if (oneCol) {
-      const load: Record<string, number> = {};
-      blocks.forEach((B) => (load[B.main] = (load[B.main] ?? 0) + B.h));
-      yearH = Math.max(2300, Math.round(Math.max(...Object.values(load)) * 1.15));
+      const load = blocks.reduce((sum, B) => sum + B.h, 0);
+      yearH = Math.max(2300, Math.round(load * 1.15));
       assign();
     } else {
       yearH = 2300;
       for (let tries = 0; tries < 6 && assign() > DRIFT * 3; tries += 1) yearH = Math.round(yearH * 1.2);
+      // A spur for one name is a leg, not a branch: that name stacks under its neighbours instead.
+      const lone = mains.filter((k) => blocks.filter((B) => B.main === k && B.col > 0).length === 1);
+      if (lone.length) {
+        lone.forEach((k) => (maxCols[k] = 1));
+        assign();
+      }
     }
 
     // Spurs: a busy branch forks sideways for the months its extra names cover.
@@ -365,7 +376,9 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
     if (!oneCol) {
       [...mains, ...Object.keys(spurSpan)].forEach(measureGeo);
       // [line 1 names] line 1 | line 2 [names] spur [names] … : every branch and spur has its own names
-      // column on the side away from line 1, so a busy line spreads sideways, not down the page.
+      // column on the side away from line 1, so a busy line spreads sideways, not down the page. A
+      // track with no names of its own (it only shares stops) runs close beside the one before.
+      const named = new Set(blocks.map((B) => B.apps[0]!.k));
       groups.forEach((g, i) => {
         const left = i === 0 && nG > 1;
         if (i > 0) x += lineGap;
@@ -374,7 +387,11 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
           const units = [k, ...(spursOf[k] ?? [])];
           for (const u of left ? [...units].reverse() : units) {
             side[u] = left ? 'left' : 'right';
-            if (left) {
+            if (!named.has(u)) {
+              x += geo[u]!.half + (left ? geo[u]!.bracketW : 0);
+              xs[u] = x;
+              x += geo[u]!.half + (left ? 0 : geo[u]!.bracketW);
+            } else if (left) {
               colBox[u] = { side: 'left', x0: x + LABEL_PAD, x1: x + LABEL_PAD + labelW };
               x += LABEL_PAD * 2 + labelW + geo[u]!.bracketW + geo[u]!.half;
               xs[u] = x;
@@ -509,7 +526,7 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
     };
     for (const a of apps) {
       const { it, k } = a;
-      const kind = kindOf(it);
+      const kind = !a.primary && kindOf(it) === 'window' ? 'stop' : kindOf(it);
       const lx = xOf(k) + laneOff(it, k);
       const color = colorOf(k);
       const g = sv('g');
@@ -526,6 +543,11 @@ export function mountPersonalLine(host: HTMLElement, snap: LineSnapshot, options
       } else {
         // A stop shared with another of the student's lines wears an interchange ring on each.
         g.append(sv('circle', { cx: lx, cy: ay, r: 8, class: `pl-stop${it.on.length > 1 ? ' is-interchange' : ''}` }));
+        if (!a.primary) {
+          const title = sv('title');
+          title.textContent = `${it.name} · ${itemWhen(it)}`;
+          g.append(title);
+        }
         if (kind === 'due') g.append(sv('circle', { cx: lx, cy: ay, r: 3, class: 'pl-due-dot' }));
       }
       if (it.close && it.run) {
@@ -694,7 +716,7 @@ function buildKey(snap: LineSnapshot, branched = false): HTMLElement {
     const second = LINES[snap.lines[1]!];
     add(
       `<line x1="12" y1="0" x2="12" y2="26" stroke="${color.color}" stroke-width="6"/><line x1="34" y1="0" x2="34" y2="26" stroke="${second.color}" stroke-width="6"/><circle cx="12" cy="13" r="6" class="pl-stop is-interchange"/><circle cx="34" cy="13" r="6" class="pl-stop is-interchange"/>`,
-      'On two of your lines (the name shows on both, lighter on the second)'
+      'On two of your lines (named on the first, a plain stop on the second)'
     );
   }
   key.append(grid);
