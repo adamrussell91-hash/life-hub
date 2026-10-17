@@ -18,7 +18,13 @@ export function createTextToolsRunHandler(deps = {}) {
     if (!isTextToolKey(body?.key)) {
       return withCors(errorResponse(400, 'validation_error', 'key is required', false), request, env);
     }
-    const job = await runTextToolJob({ store, env, key: body.key, completeMessage: deps.completeMessage });
+    const job = await runTextToolJob({
+      store,
+      env,
+      key: body.key,
+      completeMessage: deps.completeMessage,
+      requestTechniqueScan: deps.requestTechniqueScan
+    });
     if (!job) return withCors(errorResponse(404, 'not_found', 'Job not found', false), request, env);
     return withCors(okResponse(200, { key: body.key, status: job.status }), request, env);
   }, deps);

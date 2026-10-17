@@ -1,3 +1,5 @@
+import { studentTechniqueScan } from './technique-scan.mjs';
+
 export function attachedOutcomeIds(record = {}) {
   if (Array.isArray(record.outcome_ids) && record.outcome_ids.length > 0) {
     return record.outcome_ids.filter(id => typeof id === 'string' && id);
@@ -122,6 +124,7 @@ function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
   return blocks
     // Teacher note blocks are always teacher-only, whatever visibility a draft carries.
     .filter(block => block?.visibility === 'student_teacher' && block?.block_type !== 'teacher_note')
+    .map(studentTechniqueScan)
     .map(block => {
       if (TOOLKIT_TEACHER_FIELD_TYPES.has(block.block_type)) {
         const { teacher_note: _note, teacher_jots: _jots, ...content } = block.content ?? {};
