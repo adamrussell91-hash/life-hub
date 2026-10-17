@@ -474,6 +474,20 @@ test("capture, private upload, menu text, backup and restore work through the re
   await page.locator(".food-sheet").waitFor({ state: "detached" });
   assert.equal(read().visits.length, 2);
   assert.equal(read().visits[1].dishes[0].photos.length, 1);
+  const photoState = await page.evaluate(() => {
+    const node = document.querySelector(".food-grid .food-photo");
+    const card = node?.closest(".food-visit");
+    return {
+      loading: node?.getAttribute("loading") ?? null,
+      src: node?.getAttribute("src") ?? "",
+      naturalWidth: node?.naturalWidth ?? 0,
+      blur: card ? getComputedStyle(card).backdropFilter : null,
+    };
+  });
+  assert.notEqual(photoState.loading, "lazy");
+  assert.equal(photoState.blur, "none");
+  assert.match(photoState.src, /^(blob:|https:\/\/food-media\.test\/)/);
+  assert.ok(photoState.naturalWidth > 0, JSON.stringify(photoState));
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Backup", exact: true }).click(),

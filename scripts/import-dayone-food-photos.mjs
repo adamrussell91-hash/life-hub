@@ -28,7 +28,10 @@ import { tmpdir } from "node:os";
 import { basename, extname, join, resolve } from "node:path";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { validateFoodJournal } from "../netlify/functions/_shared/food-journal-schema.mjs";
-import { knowledgeR2Config } from "../netlify/functions/_shared/knowledge-r2.mjs";
+import {
+  knowledgeR2Config,
+  knowledgeR2ClientOptions,
+} from "../netlify/functions/_shared/knowledge-r2.mjs";
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const args = parseArgs(process.argv.slice(2));
@@ -116,14 +119,7 @@ if (!config) {
   process.exit(1);
 }
 
-const client = new S3Client({
-  region: "auto",
-  endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: config.accessKeyId,
-    secretAccessKey: config.secretAccessKey,
-  },
-});
+const client = new S3Client(knowledgeR2ClientOptions(config));
 
 const work = mkdtempSync(join(tmpdir(), "food-photos-"));
 let uploaded = 0,

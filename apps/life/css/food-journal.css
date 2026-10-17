@@ -24,6 +24,13 @@
   padding: 0;
   overflow: hidden;
 }
+/* iOS paints an img black when its card blurs the backdrop. These cards
+   already have a solid glass fill, so drop the blur on the photo cards. */
+html[data-hub="life"] .hub-card.food-visit,
+html[data-hub="life"] .hub-card.food-dish {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 .food-card__body {
   padding: var(--space-4);
   display: grid;
