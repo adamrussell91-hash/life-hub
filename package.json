@@ -23,6 +23,7 @@
     "import:mind": "node scripts/import-mind-notion.mjs",
     "import:dayone-food": "node scripts/import-dayone-food-journal.mjs",
     "import:dayone-photos": "node scripts/import-dayone-food-photos.mjs",
+    "repair:dayone-photos": "node scripts/repair-dayone-food-photos.mjs",
     "import:professional-people": "node scripts/import-professional-people.mjs",
     "chadwick-voice": "bash tools/voice-lab/launch.sh --no-open",
     "build:travel": "node scripts/build-spa.mjs travel"
