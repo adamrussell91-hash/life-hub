@@ -93,20 +93,22 @@ test('parseDictionaryResult keeps real, unique words and normalises kinds', () =
   assert.throws(() => parseDictionaryResult('no json here', text), /could not be read/);
 });
 
-test('parseFryResult returns clean HTML or a decline reason', () => {
+test('parseFryResult returns clean HTML and has no decline path', () => {
   const html = parseFryResult('<explainer>\n<p class="x">Just do it.</p>\n<h2>Title</h2><p onclick="y()">Which <b>sounds</b> stronger?</p>\n</explainer>');
-  assert.deepEqual(html, { declined: false, html: '<p>Just do it.</p>Title<p>Which sounds stronger?</p>' });
-  assert.deepEqual(parseFryResult('<declined>This is a procedure.</declined>'), { declined: true, reason: 'This is a procedure.' });
+  assert.deepEqual(html, { html: '<p>Just do it.</p>Title<p>Which sounds stronger?</p>' });
   assert.throws(() => parseFryResult('<explainer></explainer>'), /came back empty/);
+  assert.throws(() => parseFryResult('<declined>Not a topic.</declined>'), /came back empty/);
   assert.equal(cleanFryHtml('<blockquote><p>A</p></blockquote><br/>'), '<blockquote><p>A</p></blockquote><br>');
 });
 
 test('the Fry framework is copied in full and never names its old home', () => {
   const system = buildFryExplainerSystem();
-  for (const marker of ['Step 0', '### 8. Push past the obvious', '## Interleaving rule', '## Done criteria', '<declined>']) {
+  for (const marker of ['Step 0', '### 8. Push past the obvious', '## Interleaving rule', '## Done criteria', '<explainer>']) {
     assert.ok(system.includes(marker), marker);
   }
   assert.doesNotMatch(system, /notion/i);
+  assert.match(system, /Always write the rewrite\. The teacher pressed the button on purpose, so never refuse/);
+  assert.doesNotMatch(system, /<declined>|Decline and say why/);
 });
 
 test('the Fry rewrite keeps roughly the source length', () => {
