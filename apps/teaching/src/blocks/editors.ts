@@ -1,6 +1,8 @@
 import { createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createAlchemyButton } from '@/alchemy/block-button';
 import {
+  createAnalogyLadderEditor,
+  createAnalogyLevelEditor,
   createConceptFeaturesEditor,
   createQuestionQuadrantEditor,
   createTeacherNoteBlockEditor,
@@ -2907,6 +2909,10 @@ function createBlockEditorFields(
         onChange,
         latest as () => Extract<Block, { block_type: 'thinking_reflection' }>
       );
+    case 'analogy_level':
+      return createAnalogyLevelEditor(block, onChange, latest as () => Extract<Block, { block_type: 'analogy_level' }>);
+    case 'analogy_ladder':
+      return createAnalogyLadderEditor(block, onChange, latest as () => Extract<Block, { block_type: 'analogy_ladder' }>);
     case 'teacher_note':
       return createTeacherNoteBlockEditor(block, onChange, latest as () => Extract<Block, { block_type: 'teacher_note' }>);
   }

@@ -199,6 +199,41 @@ var ThinkingReflectionContentSchema = z2.object({
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
+var AnalogyLevelContentSchema = z2.object({
+  level: z2.string().min(1),
+  label: z2.string(),
+  definition: z2.string(),
+  /** Student instruction shown at the top of the block. */
+  guide: z2.string().default(""),
+  /** The text, character or idea students work with. */
+  focus: z2.string().default(""),
+  frame: z2.string().default(""),
+  example: z2.string().default(""),
+  helps: z2.string().default(""),
+  show_check: z2.boolean().default(true),
+  checks: z2.array(z2.string()).max(8).default([]),
+  show_next: z2.boolean().default(true),
+  /** Show the prompt-card name for classes using the printed deck. */
+  show_card: z2.boolean().default(false),
+  teacher_note: TkTeacherNoteSchema.optional(),
+  teacher_jots: TkJotsSchema.optional()
+});
+var AnalogyLadderContentSchema = z2.object({
+  /** Student instruction shown at the top of the block. */
+  guide: z2.string().default(""),
+  focus: z2.string().default(""),
+  /** Levels marked "This lesson". */
+  levels: z2.array(z2.string().min(1)).max(7).default([]),
+  show_contrast: z2.boolean().default(true),
+  weak: z2.string().default(""),
+  strong: z2.string().default(""),
+  why: z2.string().default(""),
+  process: z2.array(z2.string()).max(8).default([]),
+  show_check: z2.boolean().default(true),
+  checks: z2.array(z2.string()).max(8).default([]),
+  teacher_note: TkTeacherNoteSchema.optional(),
+  teacher_jots: TkJotsSchema.optional()
+});
 var TeacherNoteBlockContentSchema = z2.object({
   title: z2.string().default("Teacher note"),
   html: z2.string().default("")
@@ -265,6 +300,8 @@ var BlockTypeSchema = z3.enum([
   "concept_features",
   "thinking_intentions",
   "thinking_reflection",
+  "analogy_level",
+  "analogy_ladder",
   "teacher_note"
 ]);
 var ColumnPresetSchema = z3.enum(["50-50", "33-67", "67-33", "33-33-33", "custom"]);
@@ -1186,6 +1223,8 @@ var ThinkingReflectionBlockSchema = toolkitBlockSchema(
   "thinking_reflection",
   ThinkingReflectionContentSchema
 );
+var AnalogyLevelBlockSchema = toolkitBlockSchema("analogy_level", AnalogyLevelContentSchema);
+var AnalogyLadderBlockSchema = toolkitBlockSchema("analogy_ladder", AnalogyLadderContentSchema);
 var TeacherNoteBlockSchema = z3.object({
   id: z3.string().min(1),
   type: z3.literal("block"),
@@ -1235,6 +1274,8 @@ var leafBlockSchemas = [
   ConceptFeaturesBlockSchema,
   ThinkingIntentionsBlockSchema,
   ThinkingReflectionBlockSchema,
+  AnalogyLevelBlockSchema,
+  AnalogyLadderBlockSchema,
   TeacherNoteBlockSchema
 ];
 var SpacerBlockSchema = z3.object({
@@ -1368,6 +1409,8 @@ var BlockSchema = z3.lazy(
 export {
   AccordionBlockSchema,
   AccordionItemSchema,
+  AnalogyLadderBlockSchema,
+  AnalogyLevelBlockSchema,
   AnnotationAnchorSchema,
   AnnotationAttachmentSchema,
   AnnotationBlockObjectSchema,

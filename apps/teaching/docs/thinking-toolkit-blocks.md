@@ -44,3 +44,31 @@ Library text is copied into a block when it is inserted; each block can be reset
 ## Icons
 
 `public/assets/blocks/`: 256px line art in the house stroke, with an orange griffin badge baked in (the picker takes one image). The handbook scans were too low resolution to trace the crest, so the griffin is redrawn as a simple vector in the same pose (wings raised, striped torse). Replace `badge-griffin.png` and re-bake the eight icons if a cleaner crest file is available. Check College brand guidance before any student page is made public.
+
+## Analogous Thinking blocks
+
+The seven levels of fluid analogising from the 2025 ETA NSW workshop *Stretch Without Stress*, as lesson blocks. They sit in their own picker group, **Analogous Thinking**, after the Thinking Toolkit. They use the toolkit frame (What to do, reveals, teacher note, My notes) in marine, with no griffin: they are not part of the Newington framework.
+
+| Level | Name | Operation |
+|---|---|---|
+| 1 | Analogical Close Reading | Basic relational mapping |
+| 2 | Pattern Translation | Cross-domain structure recognition |
+| 3 | Reverse Analogising | Evaluative monitoring |
+| 4 | Analogical Problem Solving | Cross-domain solution transfer |
+| 5 | Metaphorical Analysis | Conceptual mapping and implication tracing |
+| 6 | Conceptual Transfer | Rule-based generalisation |
+| 7 | Analogical Chains | Multi-step relational integration |
+
+The seven operations **are** the levels. Each prompt card is printed "Level 1" because the deck has one card per operation, not because each operation has hidden higher levels.
+
+| Block | What it does |
+|---|---|
+| Analogy ladder | All seven levels as a rising ladder, a weak and a strong analogy, the five-step process and "How to check your analogy". The teacher marks the levels in play this lesson. For introducing the levels |
+| Analogy level | One level. Shows where it sits on the seven steps, what it means, what to do, an optional "Working with" focus, the sentence starter, a worked example to reveal, "This helps you", the check, and a pointer to the next level |
+
+- **Wording.** Student text is the *Seven Ways to Build Strong Analogies* lesson. "Use the short card wording" swaps in the prompt card's one-line task for on-the-spot or early-finisher use. Teacher notes come from the prompt-card teacher guide and the Fluid Analogising protocol: the operation and research, the quick version, questions to ask, what to watch for and how to push further.
+- **No right answers.** There is no right analogy, only more and less productive ones. Nothing in these blocks marks an answer; the check questions ask students to judge their own.
+- **Changing level** keeps the focus, an edited "What to do", the check settings, My notes and an edited teacher note; everything else takes the new level's wording.
+- **Card names** (Leaflink, Sparkweave, Mindmirror, Ironroute, Glimmsprite, Flowstride, Scalepath) show only when "Show the prompt-card name" is ticked, for classes using the printed deck.
+- **Teacher content** is stripped exactly like the toolkit's: `analogy_level` and `analogy_ladder` are in the teacher-field sets in `src/blocks/visibility.ts` and `netlify/functions/_shared/teaching-student.mjs`, and in the shared fixture.
+- Library: `src/toolkit/analogy.ts`.

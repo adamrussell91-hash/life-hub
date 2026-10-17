@@ -53,6 +53,15 @@ import {
   libraryValue,
   type ToolkitKind
 } from '@/toolkit/library';
+import {
+  ANALOGY_GUIDE,
+  ANALOGY_LEVELS,
+  analogyLadderContent,
+  analogyLevel,
+  analogyLevelContent,
+  type AnalogyLadderBlock,
+  type AnalogyLevelBlock
+} from '@/toolkit/analogy';
 import { createVisibilitySelect } from '@/blocks/editors';
 
 type Change<T extends Block> = (block: T) => void;
@@ -1362,6 +1371,190 @@ export function createThinkingReflectionEditor(
           api.emit();
         }, { placeholder: 'e.g. responsibility' }),
         el('p', 'tk-ed__hint', 'The tools, values and community skills used on this page fill in by themselves.')
+      ),
+      ...noteNodes(api, getLatest)
+    ];
+  });
+}
+
+// ─── Analogous Thinking ─────────────────────────────────────────────────────
+
+/** The seven levels as one row of buttons, lowest first. */
+function levelPicker(current: string, onPick: (id: string) => void): HTMLElement {
+  const row = el('div', 'hub-pills hub-pills--loose tk-ed__pills an-ed__levels');
+  row.setAttribute('role', 'group');
+  row.setAttribute('aria-label', 'Level');
+  for (const level of ANALOGY_LEVELS) {
+    const button = el('button', 'hub-pills__btn', `${level.level}. ${level.label}`);
+    button.type = 'button';
+    button.dataset.level = level.id;
+    button.title = level.definition;
+    button.setAttribute('aria-pressed', level.id === current ? 'true' : 'false');
+    button.addEventListener('click', () => onPick(level.id));
+    row.append(button);
+  }
+  return row;
+}
+
+export function createAnalogyLevelEditor(
+  block: AnalogyLevelBlock,
+  onChange: Change<AnalogyLevelBlock>,
+  getLatest: () => AnalogyLevelBlock = () => block
+): HTMLElement {
+  return makeEditor(block, onChange, getLatest, (api) => {
+    const c = api.content;
+    const level = analogyLevel(c.level);
+    return [
+      section(
+        '',
+        el('span', 'tk-ed__label', 'Level'),
+        levelPicker(c.level, (id) => {
+          if (id === c.level) return;
+          const fresh = analogyLevelContent(id);
+          const libraryGuides = [level?.guide, level?.card_prompt];
+          const keepGuide = c.guide.trim() && !libraryGuides.includes(c.guide);
+          api.content = {
+            ...fresh,
+            guide: keepGuide ? c.guide : fresh.guide,
+            focus: c.focus,
+            show_check: c.show_check,
+            checks: c.checks,
+            show_next: c.show_next,
+            show_card: c.show_card,
+            teacher_note: c.teacher_note?.edited ? c.teacher_note : fresh.teacher_note,
+            teacher_jots: c.teacher_jots
+          };
+          api.emit();
+          api.rebuild();
+        }),
+        ...cardFields(api),
+        field('Working with (optional)', c.focus, (value) => {
+          c.focus = value;
+          api.emit();
+        }, { multiline: true, rows: 2, placeholder: 'e.g. Macbeth’s ambition, or a line from the text' }),
+        guideField(c, api.emit, level?.guide ?? ''),
+        level
+          ? actionButton('Use the short card wording', () => {
+              c.guide = level.card_prompt;
+              api.emit();
+              api.rebuild();
+            })
+          : null,
+        field('Sentence starter', c.frame, (value) => {
+          c.frame = value;
+          api.emit();
+        }, { multiline: true, rows: 2 }),
+        field('Example (students reveal it)', c.example, (value) => {
+          c.example = value;
+          api.emit();
+        }, { multiline: true, rows: 4 })
+      ),
+      more(
+        'More options',
+        field('This helps you …', c.helps, (value) => {
+          c.helps = value;
+          api.emit();
+        }),
+        checkbox('Show “Check your analogy”', c.show_check, (checked) => {
+          c.show_check = checked;
+          api.emit();
+        }),
+        stringList({ label: 'Check questions', noun: 'question', items: c.checks, max: 8, onChange: (items) => {
+          c.checks = items;
+          api.emit();
+        } }),
+        checkbox('Point to the next level', c.show_next, (checked) => {
+          c.show_next = checked;
+          api.emit();
+        }),
+        checkbox('Show the prompt-card name (for the printed deck)', c.show_card, (checked) => {
+          c.show_card = checked;
+          api.emit();
+        }),
+        resetButton('Reset to the library wording', () => {
+          const fresh = analogyLevelContent(c.level);
+          api.content = { ...fresh, focus: c.focus, teacher_note: c.teacher_note, teacher_jots: c.teacher_jots };
+          api.emit();
+          api.rebuild();
+        })
+      ),
+      ...noteNodes(api, getLatest)
+    ];
+  });
+}
+
+export function createAnalogyLadderEditor(
+  block: AnalogyLadderBlock,
+  onChange: Change<AnalogyLadderBlock>,
+  getLatest: () => AnalogyLadderBlock = () => block
+): HTMLElement {
+  return makeEditor(block, onChange, getLatest, (api) => {
+    const c = api.content;
+    const marks = el('div', 'an-ed__marks');
+    for (const level of ANALOGY_LEVELS) {
+      marks.append(
+        checkbox(`${level.level}. ${level.label}`, c.levels.includes(level.id), (checked) => {
+          const next = new Set(c.levels);
+          if (checked) next.add(level.id);
+          else next.delete(level.id);
+          c.levels = ANALOGY_LEVELS.filter((item) => next.has(item.id)).map((item) => item.id);
+          api.emit();
+        })
+      );
+    }
+    return [
+      section(
+        '',
+        guideField(c, api.emit, ANALOGY_GUIDE.ladder),
+        field('Working with (optional)', c.focus, (value) => {
+          c.focus = value;
+          api.emit();
+        }, { multiline: true, rows: 2, placeholder: 'e.g. the text the class is reading' }),
+        el('span', 'tk-ed__label', 'Mark the levels for this lesson'),
+        marks
+      ),
+      more(
+        'More options',
+        checkbox('Show a weak and a strong analogy', c.show_contrast, (checked) => {
+          c.show_contrast = checked;
+          api.emit();
+        }),
+        field('A weak analogy', c.weak, (value) => {
+          c.weak = value;
+          api.emit();
+        }, { multiline: true, rows: 2 }),
+        field('A strong analogy', c.strong, (value) => {
+          c.strong = value;
+          api.emit();
+        }, { multiline: true, rows: 2 }),
+        field('Why the second is stronger', c.why, (value) => {
+          c.why = value;
+          api.emit();
+        }, { multiline: true, rows: 2 }),
+        stringList({ label: 'Process steps', noun: 'step', items: c.process, max: 8, multiline: true, onChange: (items) => {
+          c.process = items;
+          api.emit();
+        } }),
+        checkbox('Show “How to check your analogy”', c.show_check, (checked) => {
+          c.show_check = checked;
+          api.emit();
+        }),
+        stringList({ label: 'Check questions', noun: 'question', items: c.checks, max: 8, onChange: (items) => {
+          c.checks = items;
+          api.emit();
+        } }),
+        resetButton('Reset to the library wording', () => {
+          const fresh = analogyLadderContent();
+          api.content = {
+            ...fresh,
+            focus: c.focus,
+            levels: c.levels,
+            teacher_note: c.teacher_note,
+            teacher_jots: c.teacher_jots
+          };
+          api.emit();
+          api.rebuild();
+        })
       ),
       ...noteNodes(api, getLatest)
     ];

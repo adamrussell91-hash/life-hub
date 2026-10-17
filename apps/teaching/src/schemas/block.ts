@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { IsoDateSchema } from './common';
 import {
+  AnalogyLadderContentSchema,
+  AnalogyLevelContentSchema,
   ConceptFeaturesContentSchema,
   QuestionQuadrantContentSchema,
   TeacherNoteBlockContentSchema,
@@ -59,6 +61,8 @@ export const BlockTypeSchema = z.enum([
   'concept_features',
   'thinking_intentions',
   'thinking_reflection',
+  'analogy_level',
+  'analogy_ladder',
   'teacher_note'
 ]);
 
@@ -1117,6 +1121,9 @@ export const ThinkingReflectionBlockSchema = toolkitBlockSchema(
   ThinkingReflectionContentSchema
 );
 
+export const AnalogyLevelBlockSchema = toolkitBlockSchema('analogy_level', AnalogyLevelContentSchema);
+export const AnalogyLadderBlockSchema = toolkitBlockSchema('analogy_ladder', AnalogyLadderContentSchema);
+
 /** Always teacher-only: any stored visibility is read back as `teacher_only`. */
 export const TeacherNoteBlockSchema = z.object({
   id: z.string().min(1),
@@ -1168,6 +1175,8 @@ const leafBlockSchemas = [
   ConceptFeaturesBlockSchema,
   ThinkingIntentionsBlockSchema,
   ThinkingReflectionBlockSchema,
+  AnalogyLevelBlockSchema,
+  AnalogyLadderBlockSchema,
   TeacherNoteBlockSchema
 ] as const;
 

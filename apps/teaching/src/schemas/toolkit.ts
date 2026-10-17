@@ -221,6 +221,45 @@ export const ThinkingReflectionContentSchema = z.object({
   teacher_jots: TkJotsSchema.optional()
 });
 
+/** Analogous Thinking: one of the seven levels of fluid analogising. */
+export const AnalogyLevelContentSchema = z.object({
+  level: z.string().min(1),
+  label: z.string(),
+  definition: z.string(),
+  /** Student instruction shown at the top of the block. */
+  guide: z.string().default(''),
+  /** The text, character or idea students work with. */
+  focus: z.string().default(''),
+  frame: z.string().default(''),
+  example: z.string().default(''),
+  helps: z.string().default(''),
+  show_check: z.boolean().default(true),
+  checks: z.array(z.string()).max(8).default([]),
+  show_next: z.boolean().default(true),
+  /** Show the prompt-card name for classes using the printed deck. */
+  show_card: z.boolean().default(false),
+  teacher_note: TkTeacherNoteSchema.optional(),
+  teacher_jots: TkJotsSchema.optional()
+});
+
+/** Analogous Thinking: all seven levels, the process and the check. */
+export const AnalogyLadderContentSchema = z.object({
+  /** Student instruction shown at the top of the block. */
+  guide: z.string().default(''),
+  focus: z.string().default(''),
+  /** Levels marked "This lesson". */
+  levels: z.array(z.string().min(1)).max(7).default([]),
+  show_contrast: z.boolean().default(true),
+  weak: z.string().default(''),
+  strong: z.string().default(''),
+  why: z.string().default(''),
+  process: z.array(z.string()).max(8).default([]),
+  show_check: z.boolean().default(true),
+  checks: z.array(z.string()).max(8).default([]),
+  teacher_note: TkTeacherNoteSchema.optional(),
+  teacher_jots: TkJotsSchema.optional()
+});
+
 export const TeacherNoteBlockContentSchema = z.object({
   title: z.string().default('Teacher note'),
   html: z.string().default('')
@@ -253,3 +292,6 @@ export const TOOLKIT_BLOCK_TYPES = [
 ] as const;
 
 export type ToolkitBlockType = (typeof TOOLKIT_BLOCK_TYPES)[number];
+
+/** Analogous Thinking blocks: teacher note and class notes like the toolkit, no griffin. */
+export const ANALOGY_BLOCK_TYPES = ['analogy_ladder', 'analogy_level'] as const;
