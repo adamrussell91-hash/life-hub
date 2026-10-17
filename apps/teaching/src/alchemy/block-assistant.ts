@@ -23,16 +23,26 @@ export function mountBlockAssistant(options:Options) {
   const proposals=new Map<string,AlchemyProposal>(), localContexts=new Map<string,string>();
   const request=options.request??((body,signal)=>apiPost<AlchemyResult>('/api/alchemy-blocks',body,{signal}));
   const entityRevision=()=>canonical(contextSnapshot(options.getEntity()))+'|'+unitRevision;
+  // A row's suggestion can land on any block inside it (one question in a tabbed set).
+  function rowIds(rowId:string):Set<string>{
+    const ids=new Set<string>();const row=(options.getEntity().blocks||[]).find(b=>b.id===rowId);
+    if(row)visitBlocks([row],b=>{ids.add(b.id);});
+    return ids;
+  }
+  function rowProposal(rowId:string):AlchemyProposal|undefined{
+    const ids=rowIds(rowId);const context=entityRevision();
+    for(const p of proposals.values())if(ids.has(p.blockId)&&localContexts.get(p.blockId)===context)return p;
+    return undefined;
+  }
   function paint(){
-    host.querySelectorAll<HTMLElement>('.block[data-block-id]').forEach(block=>{
-      if(!Array.from(block.children).some(child=>child.classList.contains('alchemy-block-button'))){
-        const id=block.dataset.blockId!;let exists=false;visitBlocks(options.getEntity().blocks||[],b=>{if(b.id===id)exists=true;});
-        if(exists)block.append(createAlchemyButton(id));
-      }
+    // One quiet button per top-level row, never one per nested block.
+    host.querySelectorAll<HTMLElement>('.lesson-page__block[data-block-id]').forEach(row=>{
+      if(row.querySelector(':scope > .alchemy-block-button'))return;
+      const id=row.dataset.blockId!;
+      if((options.getEntity().blocks||[]).some(b=>b.id===id))row.append(createAlchemyButton(id));
     });
     host.querySelectorAll<HTMLButtonElement>('[data-alchemy-block]').forEach(button=>{
-      const p=proposals.get(button.dataset.alchemyBlock!);
-      const valid=Boolean(p&&localContexts.get(p.blockId)===entityRevision());
+      const valid=Boolean(rowProposal(button.dataset.alchemyBlock!));
       const badge=button.querySelector<HTMLElement>('.alchemy-block-button__badge');if(badge)badge.hidden=!valid;
       button.classList.toggle('has-suggestion',valid);button.setAttribute('aria-label',valid?'Ann has a suggestion for this block. Open Alchemy Lab.':'Ask Ann about this block in Alchemy Lab');
     });
@@ -100,7 +110,7 @@ export function mountBlockAssistant(options:Options) {
       setWorking(true);error.textContent='';if(!current)body.textContent='Ann is checking the block and its context…';
       try {if(entityRevision()!==startContext)throw new Error('The lesson or unit changed. Close this review and ask Ann again.');
         const previous=current;const result=await analyze([blockId],'manual',conversation.map(t=>t.role+': '+t.text).join('\n').slice(-1800)||instruction,previous);
-        if(dialog!==review)return;current=result.proposals.find(p=>p.blockId===blockId);paintProposal();scheduler.suppress([blockId]);
+        if(dialog!==review)return;const ids=rowIds(blockId);current=result.proposals.find(p=>ids.has(p.blockId));paintProposal();scheduler.suppress([blockId]);
       }catch(e){error.textContent=e instanceof Error?e.message:'Ann could not finish this check.';}finally{setWorking(false);}
     }
     form.addEventListener('submit',event=>{event.preventDefault();if(working||!input.value.trim())return;conversation.push({role:'user',text:input.value.trim()});input.value='';void ask();});
@@ -110,13 +120,13 @@ export function mountBlockAssistant(options:Options) {
         if(disposed||dialog!==review)return;
         if(entityRevision()!==startContext)throw new Error('The lesson or unit changed. Ask Ann again before applying.');
         const before=structuredClone(options.getEntity());const next=applyAlchemyProposal(before,current!);await options.apply(next);
-        const accepted=current!;const afterRevision=blockRevision(accepted.replacement);proposals.delete(blockId);scheduler.suppress([blockId]);paint();close();
-        offerTimedUndo({message:'Ann’s suggestion applied.',onUndo:()=>{if(disposed)return;const entity=options.getEntity();const inverse={...accepted,original:afterRevision,replacement:findOriginal(before,blockId)};try{void options.apply(applyAlchemyProposal(entity,inverse)).catch(()=>{});}catch{/* Newer teacher work takes precedence. */}}});
+        const accepted=current!;const afterRevision=blockRevision(accepted.replacement);proposals.delete(accepted.blockId);scheduler.suppress([blockId]);paint();close();
+        offerTimedUndo({message:'Ann’s suggestion applied.',onUndo:()=>{if(disposed)return;const entity=options.getEntity();const inverse={...accepted,original:afterRevision,replacement:findOriginal(before,accepted.blockId)};try{void options.apply(applyAlchemyProposal(entity,inverse)).catch(()=>{});}catch{/* Newer teacher work takes precedence. */}}});
       }catch(e){error.textContent=e instanceof Error?e.message:'The change could not be saved.';}finally{setWorking(false);}
     })();});
-    discard.addEventListener('click',()=>{proposals.delete(blockId);scheduler.suppress([blockId]);paint();close();});hide.addEventListener('click',close);review.addEventListener('cancel',close);
-    current=proposals.get(blockId);
-    if(current&&localContexts.get(blockId)===startContext){
+    discard.addEventListener('click',()=>{if(current)proposals.delete(current.blockId);scheduler.suppress([blockId]);paint();close();});hide.addEventListener('click',close);review.addEventListener('cancel',close);
+    current=rowProposal(blockId);
+    if(current){
       setWorking(true);body.textContent='Ann is checking the suggestion is still current…';
       try{if(await checkContext(current))paintProposal();else{current=undefined;await ask();}}catch(e){error.textContent=e instanceof Error?e.message:'This suggestion could not be checked.';}finally{setWorking(false);}
     }else{current=undefined;void ask();}

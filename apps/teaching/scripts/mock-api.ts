@@ -495,6 +495,14 @@ function buildClearedSessionCookie(): string {
 
 const DEFAULT_SCHEDULE_ANCHOR_DATE = '2026-08-12';
 
+type MockUnitNote={id:string;title:string;why:string;excerpt?:string};
+const mockUnitNotes=new Map<string,{notes:MockUnitNote[];removed:string[]}>();
+function mockUnitNotesAdd(unitId:string,entries:MockUnitNote[]):MockUnitNote[]{
+  const state=mockUnitNotes.get(unitId)??{notes:[],removed:[]};
+  for(const e of entries)if(!state.removed.includes(e.id)&&!state.notes.some(n=>n.id===e.id))state.notes.push(e);
+  mockUnitNotes.set(unitId,state);return state.notes;
+}
+
 export function createMockApi(options: CreateMockApiOptions): MockApi {
   const passphrase = options.passphrase ?? DEFAULT_PASSPHRASE;
   const sessionSecret = options.sessionSecret ?? DEFAULT_SESSION_SECRET;
@@ -3428,16 +3436,34 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       const unit=query.kind==='lesson'?store.getJSON<Unit>(unitKey((entity as Lesson).unit_id)):null;
       const contextRevision=canonical({entity:contextSnapshot(entity),unit:unit?contextSnapshot(unit):null});
       if(query.validateOnly)return okResponse(200,{valid:query.contextRevision===contextRevision});
-      const proposals=query.blocks.flatMap(id=>{
-        const block=findAlchemyBlock(entity.blocks||[],id);
-        if(!block)return [];
+      // Row-level asks target the first editable text inside the row, as Ann may pick a nested block.
+      const textTarget=(b:any):any=>{if(['heading','rich_text'].includes(b.block_type))return b;const lists=b.block_type==='section'?[b.content.blocks]:b.block_type==='columns'?b.content.columns.map((c:any)=>c.blocks):b.block_type==='tabs'?b.content.tabs.map((t:any)=>t.blocks):[];for(const list of lists)for(const child of list||[]){const hit=textTarget(child);if(hit)return hit;}return null;};
+      const unitId=query.kind==='lesson'?(entity as Lesson).unit_id:query.id;
+      const proposals=query.blocks.flatMap(rowId=>{
+        const row=findAlchemyBlock(entity.blocks||[],rowId);
+        const block=row?textTarget(row):null;
+        if(!block)return [];const id=block.id;
         const replacement=structuredClone(block);
         if(replacement.block_type==='heading')replacement.content.text=(query.instruction?.trim()?'Model together, then try independently: ':'Start with a worked example: ')+replacement.content.text;
         else if(replacement.block_type==='rich_text')replacement.content.html='<p>First, model the process together. Then try independently.</p>'+replacement.content.html;
         else return [];
         return [{blockId:id,original:blockRevision(block),contextRevision,rationale:'Make the modelling step explicit before independent practice.',replacement,sources:[{id:'note_caesar',title:'Worked examples and scaffolding',excerpt:'Local fixture: model the process before independent practice.'}]}];
       });
+      if(unitId&&proposals.length)mockUnitNotesAdd(unitId,[{id:'note_caesar',title:'Worked examples and scaffolding',why:'Model the process before independent practice.'}]);
       return okResponse(200,{proposals,assessed:query.blocks,contextRevision,mode:'local'});
+    }
+
+    if (path === '/api/alchemy-unit-notes') {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      if (method === 'GET') {
+        const unitId=new URLSearchParams(pathWithQuery.split('?')[1]||'').get('unit')||'';
+        return okResponse(200,{notes:mockUnitNotes.get(unitId)?.notes??[]});
+      }
+      const req=(body||{}) as {unit?:string;remove?:string;action?:string};
+      if(!req.unit)return errorResponse(400,'validation_error','Choose a unit.');
+      if(req.remove){const state=mockUnitNotes.get(req.unit)??{notes:[],removed:[]};state.notes=state.notes.filter(n=>n.id!==req.remove);state.removed.push(req.remove);mockUnitNotes.set(req.unit,state);return okResponse(200,{notes:state.notes});}
+      if(req.action==='gather'){const notes=mockUnitNotesAdd(req.unit,[{id:'note_caesar',title:'Worked examples and scaffolding',why:'Shows how to model analysis before students try it.'},{id:'note_questions',title:'Question design for close reading',why:'Moves questions from identifying techniques to explaining effect.'}]);return okResponse(200,{notes,added:2});}
+      return errorResponse(400,'validation_error','Unknown unit notes action.');
     }
 
     if (method === 'POST' && path === '/api/alchemy-lab') {
