@@ -575,7 +575,7 @@ export function createBlock(type: NewBlockType, id: string): Block {
       };
     case 'peer_feedback':
       return { ...shared, block_type: 'peer_feedback', variant: 'medium', content: {
-        prompt: '', strength_prompt: 'One thing that works well…', suggestion_prompt: 'One suggestion or question…'
+        prompt: '', mode: 'comments', strength_prompt: 'One thing that works well…', suggestion_prompt: 'One suggestion or question…'
       } };
     case 'question_drop':
       return { ...shared, block_type: 'question_drop', variant: 'medium', content: {
