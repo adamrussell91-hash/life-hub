@@ -5,6 +5,7 @@ import {
 } from '@/blocks/annotation-anchor';
 import {
   drawAnnotationInk,
+  marginPanelOf,
   MARGIN_LABEL_MIN_WIDTH,
   type InkMark
 } from '@/blocks/annotation-ink';
@@ -221,6 +222,9 @@ function renderAttachmentList(attachments: AnnotationAttachment[]): HTMLElement 
   return any ? host : null;
 }
 
+/** The margin stack closes the gap a closed note leaves. */
+const PANEL_CLOSED_EVENT = 'annotation-panel-closed';
+
 function closeAnnotationPanel(root: HTMLElement): void {
   const panel = root.querySelector<HTMLElement>('.block-annotation__panel');
   if (panel) {
@@ -237,6 +241,7 @@ function closeAnnotationPanel(root: HTMLElement): void {
     el.classList.remove('is-open');
     el.setAttribute('aria-expanded', 'false');
   });
+  root.dispatchEvent(new CustomEvent(PANEL_CLOSED_EVENT));
 }
 
 export { renderElementCard } from '@/blocks/technique-card';
@@ -359,10 +364,18 @@ function openAnnotation(
 
   const panel = root.querySelector<HTMLElement>('.block-annotation__panel');
   if (!panel) return;
-  // Sit the note directly under the stanza it belongs to, not at the foot of the poem.
+  // Wide: the note sits in the right-hand column beside its line, stacked with
+  // the margin notes in line order. Too narrow for a column: under its stanza.
+  const poem = anchorEl.closest<HTMLElement>('.block-annotation__poem');
+  const inMargin = Boolean(poem && poem.getBoundingClientRect().width >= MARGIN_LABEL_MIN_WIDTH);
   const stanza = anchorEl.closest('.block-annotation__stanza');
-  if (stanza) stanza.after(panel);
-  panel.className = `block-annotation__panel block-annotation__panel--${layer?.colour ?? 'wave'}`;
+  if (inMargin && poem) poem.append(panel);
+  else if (stanza) stanza.after(panel);
+  const colour = layer?.colour ?? 'wave';
+  panel.className = `block-annotation__panel block-annotation__panel--${colour}`;
+  panel.dataset.annotationId = annotation.id;
+  panel.dataset.colour = colour;
+  panel.style.removeProperty('top');
   panel.hidden = false;
   const header = document.createElement('div');
   header.className = 'block-annotation__panel-header';
@@ -383,7 +396,9 @@ function openAnnotation(
   fillBody(body, annotation, layer, table, showLayer, root, annotations);
   panel.append(header, body);
   close.focus({ preventScroll: true });
-  panel.scrollIntoView?.({ block: 'nearest' });
+  // A margin card is placed by the next ink pass; scroll once it has its spot.
+  if (inMargin) requestAnimationFrame(() => panel.scrollIntoView?.({ block: 'nearest' }));
+  else panel.scrollIntoView?.({ block: 'nearest' });
 }
 
 function wrapAnchor(
@@ -786,11 +801,12 @@ function buildInteractiveView(
     inkFrame = requestAnimationFrame(() => {
       inkFrame = 0;
       if (!inkHost || !inkHost.isConnected) return;
+      const wide = inkHost.getBoundingClientRect().width >= MARGIN_LABEL_MIN_WIDTH;
+      const hasPanel = wide && Boolean(marginPanelOf(inkHost));
       const wantsMargin =
-        inkStyle === 'fineliner' &&
-        inkMarks.some((mark) => mark.label) &&
-        inkHost.getBoundingClientRect().width >= MARGIN_LABEL_MIN_WIDTH;
+        wide && (hasPanel || (inkStyle === 'fineliner' && inkMarks.some((mark) => mark.label)));
       inkHost.classList.toggle('block-annotation__poem--margin', wantsMargin);
+      inkHost.classList.toggle('block-annotation__poem--panel', hasPanel);
       const fresh = new Set(
         inkMarks.map((mark) => mark.annotationId).filter((id) => animate && !inkedIds.has(id))
       );
@@ -809,6 +825,8 @@ function buildInteractiveView(
       }
     });
   }
+
+  root.addEventListener(PANEL_CLOSED_EVENT, () => scheduleInk(false));
 
   function syncActiveAnchors(): void {
     root
