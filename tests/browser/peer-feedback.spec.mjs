@@ -51,12 +51,10 @@ try {
   assert.match(code, /^\d{6}$/);
   console.log('Teacher started activity');
 
-  for (const [page, identity, text] of [[a, 'Blue star', 'First argument with evidence.'], [b, 'Green star', 'Second argument with reasoning.']]) {
+  for (const [page, text] of [[a, 'First argument with evidence.'], [b, 'Second argument with reasoning.']]) {
     await page.goto(`${origin}/peer-check`);
-    const codeBox = page.getByLabel('1. Type the code on the board');
+    const codeBox = page.getByLabel('Type the code on the board');
     const join = page.getByRole('button', { name: 'Join', exact: true });
-    if (page === b) await expectDisabled(page.getByRole('radio', { name: 'Blue star', exact: true }));
-    await page.getByRole('radio', { name: identity, exact: true }).click();
     assert.equal(await join.isDisabled(), true, 'Join waits for a full code');
     if (page === a) {
       await codeBox.fill('000000');
@@ -67,8 +65,10 @@ try {
     }
     await codeBox.fill(`${code.slice(0, 3)} ${code.slice(3)}`);
     await join.click();
-    await page.getByText(`You’re ${identity}`).waitFor();
     const answer = page.getByLabel('Your answer', { exact: true });
+    await answer.waitFor();
+    assert.equal(await page.locator('.pf-corner').isHidden(), true, 'no symbol on screen by default');
+    assert.equal(await page.evaluate(() => JSON.stringify(localStorage).includes('"symbol"') || /\d-\d/.test(Object.values(localStorage).join(' '))), false, 'the device never stores its symbol');
     await answer.fill(text);
     await page.reload();
     assert.equal(await answer.inputValue(), text, 'draft survives reload');
@@ -82,8 +82,17 @@ try {
     }
     await page.getByRole('button', { name: 'Hand it in', exact: true }).click();
     await page.getByText('Handed in.', { exact: true }).waitFor();
-    console.log(`${identity} handed in`);
+    console.log('Student handed in');
   }
+
+  await t.getByLabel('Show student symbols').check();
+  await a.locator('.pf-corner [role="img"]').waitFor();
+  const shown = await a.locator('.pf-corner [role="img"]').getAttribute('aria-label');
+  assert.match(shown, /^Your symbol: \w+ \w+$/);
+  await shot(a, 'phone-symbol');
+  await t.getByLabel('Show student symbols').uncheck();
+  await a.locator('.pf-corner').waitFor({ state: 'hidden' });
+  console.log('Show student symbols toggles the corner symbol');
 
   await t.getByText('2 of 2 handed in.').waitFor();
   await shot(t, 'teacher-write');
@@ -93,7 +102,7 @@ try {
     const theirs = await page.locator('.pf-paper__text').textContent();
     assert.equal(theirs, page === a ? 'Second argument with reasoning.' : 'First argument with evidence.', 'never your own answer');
     await page.getByLabel('One thing that works well…').fill(page === a ? 'Clear argument' : 'Strong opening');
-    await page.getByLabel('One suggestion or question…').fill(page === a ? 'Explain the evidence' : 'Add an example');
+    await page.getByLabel('One suggestion or question…').fill(page === a ? 'Explain the evidence' : 'this is st*pid and so are you, sh1t');
     if (page === a) { await shot(page, 'phone-review'); await noSideScroll(page); }
     if (page === b) await shot(page, 'desktop-review');
     await page.getByRole('button', { name: 'Send feedback', exact: true }).click();
@@ -101,11 +110,18 @@ try {
   }
   console.log('Both students sent feedback');
 
-  await t.getByText('2 of 2 have sent feedback.').waitFor();
+  await t.getByText(/2 of 2 have sent feedback\. 1 held for you to check\./).waitFor();
+  await shot(t, 'teacher-held');
   await t.getByRole('button', { name: 'Hand feedback back', exact: true }).click();
-  await a.getByText('Add an example', { exact: true }).waitFor();
   await b.getByText('Explain the evidence', { exact: true }).waitFor();
-  await noSideScroll(a);
+  await a.getByText('No feedback has come back yet.', { exact: true }).waitFor();
+  assert.equal(await a.getByText(/sh1t/).count(), 0, 'held feedback never reaches the writer');
+  await t.getByRole('button', { name: 'Remove', exact: true }).click();
+  await t.getByText(/was removed\. The writer won’t see it\./).waitFor();
+  assert.equal(await a.getByText(/sh1t/).count(), 0);
+  console.log('Flagged feedback held, then removed');
+  await noSideScroll(b);
+  await shot(b, 'desktop-results');
   await shot(a, 'phone-results');
   await shot(t, 'teacher-results');
   await t.setViewportSize({ width: 390, height: 844 });
