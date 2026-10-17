@@ -163,6 +163,11 @@ describe('teacher home dashboard', () => {
     expect(
       canvas.querySelector('[data-home-hero-clock], .home-dashboard__hero-time')
     ).not.toBeNull();
+    // Clock and create control overlay the cover instead of a row beneath it.
+    const banner = canvas.querySelector('.home-dashboard__banner');
+    expect(banner?.querySelector('[data-home-hero-clock]')).not.toBeNull();
+    expect(banner?.querySelector('[data-create-host]')).not.toBeNull();
+    expect(canvas.querySelector('.home-dashboard__toolbar')).toBeNull();
     expect(canvas.querySelector('[data-home-panel="signals"]')).toBeNull();
     expect(canvas.querySelector('.home-today')).toBeNull();
     await vi.waitFor(() => {

@@ -3654,18 +3654,55 @@ a:hover {
 }
 
 .home-dashboard__banner {
+  position: relative;
   min-width: 0;
 }
 
-.home-dashboard__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+/* Shorter than the class-page 16:5 hero: the cover now frames the clock.
+   width pins it full-bleed; the banner's inline 16:5 ratio would else size width from height. */
+.home-dashboard__banner .entity-banner {
+  width: 100%;
+  height: clamp(11rem, 20vw, 16rem);
 }
 
 .home-dashboard__clock {
+  position: absolute;
+  left: var(--space-5);
+  bottom: var(--space-4);
   margin: 0;
+  pointer-events: none;
+  text-shadow: 0 1px 12px rgba(10, 21, 54, 0.45);
+}
+
+.home-dashboard__clock .home-dashboard__hero-time {
+  color: var(--on-dark);
+}
+
+.home-dashboard__clock .home-dashboard__hero-date {
+  color: var(--on-dark-muted);
+}
+
+.home-dashboard__banner > .home-dashboard__create {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 2;
+}
+
+.home-dashboard__banner > .home-dashboard__create .icon-plus-btn {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.home-dashboard__banner > .home-dashboard__create .icon-plus-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.home-dashboard__banner > .home-dashboard__create .create-control__menu {
+  right: 0;
 }
 
 .home-dashboard__heading-row {
@@ -6772,17 +6809,13 @@ input.scope-timeline__note-title:focus-visible {
     display: none;
   }
 
-  .home-dashboard__toolbar {
-    flex-wrap: wrap;
-    align-items: flex-start;
-  }
-
   .home-dashboard__hero-time {
     font-size: var(--font-size-page);
   }
 
-  .home-dashboard__create {
-    margin-left: auto;
+  .home-dashboard__clock {
+    left: var(--space-4);
+    bottom: var(--space-3);
   }
 
   .class-page__body {
