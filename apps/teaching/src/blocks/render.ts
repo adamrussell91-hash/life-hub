@@ -2245,7 +2245,7 @@ function renderBlockContent(
     case 'table':
       return renderTableBlock(block, mode);
     case 'peer_feedback':
-      return renderPeerFeedback(block, mode, ctx);
+      return wrapBlock(renderPeerFeedback(block, mode, ctx), block, mode);
     case 'question_set':
       return renderQuestionSetBlock(block, mode);
     case 'flashcards':

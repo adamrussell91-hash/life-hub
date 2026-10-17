@@ -13,7 +13,7 @@ export function createPeerFeedbackHandler(deps = {}) {
       const result = await peerAction(store, match?.[1], match?.[2], await request.json(), true);
       return withCors(okResponse(200, result, { 'cache-control': 'no-store' }), request, env);
     } catch (e) {
-      if (e instanceof PeerError || e instanceof SyntaxError) return withCors(errorResponse(e.status ?? 400, 'peer_feedback', e.message, false), request, env);
+      if (e instanceof PeerError || e instanceof SyntaxError) return withCors(errorResponse(e.status ?? 400, e.code ?? 'bad_request', e instanceof SyntaxError ? 'Invalid request.' : e.message, false), request, env);
       throw e;
     }
   }, deps);

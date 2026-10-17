@@ -2827,7 +2827,7 @@ function createBlockEditorFields(
     case 'table':
       return createTableEditor(block, onChange, latest as () => Extract<Block, { block_type: 'table' }>);
     case 'peer_feedback':
-      return createPeerFeedbackEditor(block, onChange, context?.lessonId);
+      return createPeerFeedbackEditor(block, onChange);
     case 'question_set':
       return createQuestionSetEditor(block, onChange, latest as () => Extract<Block, { block_type: 'question_set' }>);
     case 'timeline':

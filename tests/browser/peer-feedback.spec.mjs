@@ -14,7 +14,7 @@ const store = {
 const origin = 'http://127.0.0.1:5188';
 const deps = { getContentStore: async () => store, verifySessionToken: () => ({ valid: true }), env: { SITE_ORIGIN: origin, SESSION_SECRET: 'x'.repeat(32), LIFE_HUB_PASSPHRASE_HASH: 'y' } };
 const teacherHandler = createPeerFeedbackHandler(deps), studentHandler = createPublishedPeerFeedbackHandler(deps);
-const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/design-kit/tokens.css"><link rel="stylesheet" href="/design-kit/actions.css"><style>body{font-family:var(--font-ui);color:var(--ink);background:var(--paper);margin:24px}main{max-width:760px;margin:auto}</style></head><body><main></main><script type="module">import {renderPeerFeedback,createPeerFeedbackEditor} from '/src/blocks/peer-feedback.ts';const block=${JSON.stringify(block)};document.querySelector('main').append(location.search.includes('teacher')?createPeerFeedbackEditor(block,()=>{},'lesson1'):renderPeerFeedback(block,'student',{lessonId:'lesson1'}));</script></body></html>`;
+const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/design-kit/tokens.css"><link rel="stylesheet" href="/design-kit/actions.css"><style>body{font-family:var(--font-ui);color:var(--ink);background:var(--paper);margin:24px 16px}main{max-width:900px;margin:auto}</style></head><body><main></main><script type="module">import {renderPeerFeedback} from '/src/blocks/peer-feedback.ts';const block=${JSON.stringify(block)};document.querySelector('main').append(renderPeerFeedback(block,location.search.includes('teacher')?'teacher':'student',{lessonId:'lesson1'}));</script></body></html>`;
 const server = await createServer({
   configFile: false, root: path.resolve('apps/teaching'),
   resolve: { alias: { '@': path.resolve('apps/teaching/src') } }, optimizeDeps: { noDiscovery: true, include: [] },
@@ -25,9 +25,13 @@ const server = await createServer({
 });
 await server.listen();
 console.log('Browser fixture listening');
+async function expectDisabled(locator) {
+  for (let i = 0; i < 40; i++) { if (await locator.isDisabled()) return; await new Promise(r => setTimeout(r, 250)); }
+  throw new Error('expected the taken symbol to be disabled');
+}
 let browser;
 try {
-  browser = await chromium.launch({ headless: true, channel: 'chromium', args: ['--no-sandbox'] });
+  browser = await chromium.launch({ headless: true, args: ['--no-sandbox'], ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : { channel: 'chromium' }) });
   const contexts = await Promise.all([{ width: 1440, height: 900 }, { width: 390, height: 844 }, { width: 1440, height: 900 }].map(viewport => browser.newContext({ viewport })));
   for (const context of contexts) await context.route(`${origin}/api/**`, async route => {
     const req = route.request();
@@ -37,65 +41,91 @@ try {
     await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
   });
   const [t, a, b] = await Promise.all(contexts.map(c => c.newPage()));
-  for (const page of [t, a, b]) { page.setDefaultTimeout(15000); page.on('pageerror', e => console.error('pageerror', e.message)); }
+  for (const page of [t, a, b]) { page.setDefaultTimeout(20000); page.on('pageerror', e => { throw e; }); }
+  const shot = (page, name) => page.screenshot({ path: `/tmp/peer-feedback-${name}.png`, fullPage: true });
+  const noSideScroll = async page => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+
   await t.goto(`${origin}/peer-check?teacher`);
-  await t.locator('.peer-feedback').waitFor();
-  await t.getByRole('button', { name: 'Start new activity', exact: true }).click();
-  await t.getByText(/Activity code:/).waitFor();
-  const code = (await t.getByText(/Activity code:/).textContent()).match(/\d{6}/)[0];
+  await t.getByRole('button', { name: 'Start activity', exact: true }).click();
+  const code = (await t.locator('.pf-code__value').textContent()).replace(/\D/g, '');
+  assert.match(code, /^\d{6}$/);
   console.log('Teacher started activity');
-  for (const [page, identity, text] of [[a, 'Blue Star', 'First argument with evidence.'], [b, 'Green Star', 'Second argument with reasoning.']]) {
+
+  for (const [page, text] of [[a, 'First argument with evidence.'], [b, 'Second argument with reasoning.']]) {
     await page.goto(`${origin}/peer-check`);
-    await page.getByLabel('Activity code').fill(code);
-    if (page === a) await page.screenshot({ path: '/tmp/peer-feedback-phone-picker.png', fullPage: true });
-    if (page === b) assert.equal(await page.getByRole('button', { name: '★ Blue Star', exact: true }).count(), 0);
+    const codeBox = page.getByLabel('Type the code on the board');
+    const join = page.getByRole('button', { name: 'Join', exact: true });
+    assert.equal(await join.isDisabled(), true, 'Join waits for a full code');
     if (page === a) {
-      await page.getByLabel('Activity code').fill('000000');
-      await page.getByRole('button', { name: `★ ${identity}`, exact: true }).click();
-      await page.getByRole('status').filter({ hasText: 'Check the activity code.' }).waitFor();
-      await page.getByLabel('Activity code').fill(code);
+      await codeBox.fill('000000');
+      await join.click();
+      await page.getByRole('alert').filter({ hasText: 'didn’t match' }).waitFor();
+      await shot(page, 'phone-join');
+      await noSideScroll(page);
     }
-    await page.getByRole('button', { name: `★ ${identity}`, exact: true }).click();
-    await page.getByLabel('Your writing', { exact: true }).fill(text);
+    await codeBox.fill(`${code.slice(0, 3)} ${code.slice(3)}`);
+    await join.click();
+    const answer = page.getByLabel('Your answer', { exact: true });
+    await answer.waitFor();
+    assert.equal(await page.locator('.pf-corner').isHidden(), true, 'no symbol on screen by default');
+    assert.equal(await page.evaluate(() => JSON.stringify(localStorage).includes('"symbol"') || /\d-\d/.test(Object.values(localStorage).join(' '))), false, 'the device never stores its symbol');
+    await answer.fill(text);
     await page.reload();
-    assert.equal(await page.getByLabel('Your writing', { exact: true }).inputValue(), text);
+    assert.equal(await answer.inputValue(), text, 'draft survives reload');
     if (page === a) {
+      assert.ok(await answer.evaluate(e => parseFloat(getComputedStyle(e).fontSize) >= 16), 'no iOS zoom on focus');
+      await shot(page, 'phone-write');
       await page.route(`${origin}/api/published/peer-feedback/lesson1/peer1`, route => route.abort('failed'), { times: 1 });
-      await page.getByRole('button', { name: 'Submit writing', exact: true }).click();
-      await page.getByRole('status').filter({ hasText: /fetch|network/i }).waitFor();
-      assert.equal(await page.getByLabel('Your writing', { exact: true }).inputValue(), text);
-      await page.reload();
-      assert.equal(await page.getByLabel('Your writing', { exact: true }).inputValue(), text);
+      await page.getByRole('button', { name: 'Hand it in', exact: true }).click();
+      await page.getByRole('alert').filter({ hasText: /Couldn’t reach the server/ }).waitFor();
+      assert.equal(await answer.inputValue(), text, 'draft survives a failed send');
     }
-    await page.getByRole('button', { name: 'Submit writing', exact: true }).click();
-    await page.getByText('Writing submitted.', { exact: false }).waitFor();
-    console.log(`${identity} submitted`);
+    await page.getByRole('button', { name: 'Hand it in', exact: true }).click();
+    await page.getByText('Handed in.', { exact: true }).waitFor();
+    console.log('Student handed in');
   }
-  await t.getByRole('button', { name: 'Refresh activity', exact: true }).click();
-  await t.getByText(/2 joined · 2 submitted/).waitFor();
-  await t.getByRole('button', { name: 'Start feedback round', exact: true }).click();
+
+  await t.getByLabel('Show student symbols').check();
+  await a.locator('.pf-corner [role="img"]').waitFor();
+  const shown = await a.locator('.pf-corner [role="img"]').getAttribute('aria-label');
+  assert.match(shown, /^Your symbol: \w+ \w+$/);
+  await shot(a, 'phone-symbol');
+  await t.getByLabel('Show student symbols').uncheck();
+  await a.locator('.pf-corner').waitFor({ state: 'hidden' });
+  console.log('Show student symbols toggles the corner symbol');
+
+  await t.getByText('2 of 2 handed in.').waitFor();
+  await shot(t, 'teacher-write');
+  await t.getByRole('button', { name: 'Start the swap', exact: true }).click();
   for (const page of [a, b]) {
-    await page.getByRole('button', { name: 'Refresh activity', exact: true }).click();
-    await page.getByRole('heading', { name: 'Writing to review', exact: true }).waitFor();
-    await page.getByLabel('One thing that works well…').fill('Clear argument');
-    await page.getByLabel('One suggestion or question…').fill('Explain the evidence');
-    const send = page.getByRole('button', { name: 'Send feedback', exact: true });
-    await send.scrollIntoViewIfNeeded();
-    const rect = await send.boundingBox(); assert.ok(rect.height >= 44); assert.ok(rect.y + rect.height <= page.viewportSize().height);
-    if (page === a) {
-      assert.ok(await page.getByLabel('One suggestion or question…').evaluate(e => parseFloat(getComputedStyle(e).fontSize) >= 16));
-      await page.screenshot({ path: '/tmp/peer-feedback-phone-review.png', fullPage: true });
-    }
-    await send.click(); await page.getByText('Feedback sent.', { exact: false }).waitFor();
+    await page.getByText('Someone’s answer', { exact: true }).waitFor();
+    const theirs = await page.locator('.pf-paper__text').textContent();
+    assert.equal(theirs, page === a ? 'Second argument with reasoning.' : 'First argument with evidence.', 'never your own answer');
+    await page.getByLabel('One thing that works well…').fill(page === a ? 'Clear argument' : 'Strong opening');
+    await page.getByLabel('One suggestion or question…').fill(page === a ? 'Explain the evidence' : 'this is st*pid and so are you, sh1t');
+    if (page === a) { await shot(page, 'phone-review'); await noSideScroll(page); }
+    if (page === b) await shot(page, 'desktop-review');
+    await page.getByRole('button', { name: 'Send feedback', exact: true }).click();
+    await page.getByText('Feedback sent.', { exact: true }).waitFor();
   }
   console.log('Both students sent feedback');
-  await t.getByRole('button', { name: 'Return feedback to writers', exact: true }).click();
-  for (const page of [a, b]) {
-    await page.getByRole('button', { name: 'Refresh activity', exact: true }).click();
-    await page.getByText('Explain the evidence', { exact: true }).waitFor();
-  }
-  assert.equal(await a.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  await a.screenshot({ path: '/tmp/peer-feedback-phone-results.png', fullPage: true });
-  await t.screenshot({ path: '/tmp/peer-feedback-teacher.png', fullPage: true });
-  console.log('PASS: real production entry points + teacher + two account-free students; draft recovery, exchanged writing, returned feedback, 390px controls/overflow.');
+
+  await t.getByText(/2 of 2 have sent feedback\. 1 held for you to check\./).waitFor();
+  await shot(t, 'teacher-held');
+  await t.getByRole('button', { name: 'Hand feedback back', exact: true }).click();
+  await b.getByText('Explain the evidence', { exact: true }).waitFor();
+  await a.getByText('No feedback has come back yet.', { exact: true }).waitFor();
+  assert.equal(await a.getByText(/sh1t/).count(), 0, 'held feedback never reaches the writer');
+  await t.getByRole('button', { name: 'Remove', exact: true }).click();
+  await t.getByText(/was removed\. The writer won’t see it\./).waitFor();
+  assert.equal(await a.getByText(/sh1t/).count(), 0);
+  console.log('Flagged feedback held, then removed');
+  await noSideScroll(b);
+  await shot(b, 'desktop-results');
+  await shot(a, 'phone-results');
+  await shot(t, 'teacher-results');
+  await t.setViewportSize({ width: 390, height: 844 });
+  await noSideScroll(t);
+  await shot(t, 'teacher-phone-results');
+  console.log('PASS: teacher + two account-free students through the production handlers; wrong code, draft reload, failed send, swap, feedback returned, 390px.');
 } finally { await browser?.close(); await server.close(); }
