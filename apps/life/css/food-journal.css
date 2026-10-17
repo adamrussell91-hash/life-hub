@@ -349,6 +349,17 @@ html[data-hub="life"] .hub-card.food-dish {
 .fj-stars__off {
   opacity: 0.3;
 }
+/* Half a star: the left half in ink, the right half faded like the off stars. */
+.fj-stars__half {
+  background: linear-gradient(
+    90deg,
+    currentColor 50%,
+    color-mix(in srgb, currentColor 30%, transparent) 50%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 .fj-leader {
   flex: 1;
   min-width: var(--space-4);
@@ -1087,6 +1098,16 @@ html[data-hub="life"] .hub-card.food-dish {
 }
 .fj-rate__star.is-on {
   color: var(--pastel-peach-ink);
+}
+.fj-rate__star.is-half {
+  background: linear-gradient(
+    90deg,
+    var(--pastel-peach-ink) 50%,
+    color-mix(in srgb, var(--pastel-peach-ink) 25%, transparent) 50%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 .fj-dish__actions {
   display: flex;
