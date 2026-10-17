@@ -1,0 +1,533 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Classroom Tools Block</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* Layout: one lesson column, mockup-annotated. Tools open inside the gap they live in. */
+  :root {
+    --paper: #fbf8f2; --cotton: #f5f1e9; --shore: #eae7da; --ink: #13233a; --muted: #5f6b7d;
+    --marine: #142b51; --wave: #376fb7; --wave-soft: rgba(55, 111, 183, 0.12);
+    --line: rgba(23, 55, 94, 0.12); --line-strong: rgba(23, 55, 94, 0.22);
+    --sage: #dfe9e1; --sage-ink: #2f6a47; --peach: #f2dfd0; --peach-ink: #94501a;
+    --gold: #f1e2b6; --gold-ink: #6c581f; --lilac: #e8e0f1; --lilac-ink: #5d4e70;
+    --danger: #9b2c2c; --on-accent: #ffffff; --shadow: 0 8px 24px rgba(20, 43, 81, 0.10);
+    --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #10161f; --cotton: #172030; --shore: #1f2a3c; --ink: #e7ecf3; --muted: #9aa6b8;
+      --marine: #c9d8f0; --wave: #7eaaea; --wave-soft: rgba(126, 170, 234, 0.16);
+      --line: rgba(200, 215, 240, 0.12); --line-strong: rgba(200, 215, 240, 0.24);
+      --sage: #1f3328; --sage-ink: #9fd3b2; --peach: #3a2a1e; --peach-ink: #f0b98a;
+      --gold: #3a3220; --gold-ink: #e6cf8a; --lilac: #2c2538; --lilac-ink: #cbb8e6;
+      --danger: #f08a8a; --on-accent: #0d1626; --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #10161f; --cotton: #172030; --shore: #1f2a3c; --ink: #e7ecf3; --muted: #9aa6b8;
+    --marine: #c9d8f0; --wave: #7eaaea; --wave-soft: rgba(126, 170, 234, 0.16);
+    --line: rgba(200, 215, 240, 0.12); --line-strong: rgba(200, 215, 240, 0.24);
+    --sage: #1f3328; --sage-ink: #9fd3b2; --peach: #3a2a1e; --peach-ink: #f0b98a;
+    --gold: #3a3220; --gold-ink: #e6cf8a; --lilac: #2c2538; --lilac-ink: #cbb8e6;
+    --danger: #f08a8a; --on-accent: #0d1626; --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: var(--font); color: var(--ink); background: var(--paper); line-height: 1.5;
+    padding-block: 28px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 28px; }
+  header h1 { margin: 0 0 6px; font-size: 1.5rem; text-wrap: balance; }
+  header p { margin: 0; color: var(--muted); max-width: 62ch; }
+  .eyebrow { font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 8px; }
+  .note { font-size: 0.82rem; color: var(--muted); border-left: 2px solid var(--line-strong); padding-left: 10px; margin: 0; max-width: 62ch; }
+
+  /* Lesson page */
+  .lesson { background: var(--cotton); border: 1px solid var(--line); border-radius: 20px; padding: 22px; display: grid; gap: 4px; }
+  .lesson__title { margin: 0 0 12px; font-size: 1.15rem; }
+  .blk { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .blk h3 { margin: 0 0 4px; font-size: 0.95rem; }
+  .blk p { margin: 0; font-size: 0.92rem; color: var(--muted); }
+  .blk--tools { padding: 10px 12px; }
+
+  /* Divider with tool host */
+  .div { position: relative; padding: 10px 0; }
+  .div__row { display: flex; align-items: center; gap: 8px; min-height: 30px; }
+  .div__rule { flex: 1; height: 1px; background: var(--line-strong); }
+
+  /* Toolbox trigger + tray */
+  .host__bar { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+  .trigger {
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid transparent; background: transparent;
+    color: var(--muted); display: grid; place-items: center; cursor: pointer; opacity: 0.45;
+    transition: opacity 160ms, background-color 160ms, transform 240ms;
+  }
+  .trigger svg { width: 17px; height: 17px; }
+  .host:hover .trigger, .trigger:focus-visible, .host.is-open .trigger { opacity: 1; }
+  .trigger:hover { background: var(--wave-soft); color: var(--wave); }
+  .host.is-open .trigger { transform: rotate(60deg); color: var(--wave); }
+  .tray {
+    display: flex; gap: 4px; overflow: hidden; max-width: 0; opacity: 0;
+    transition: max-width 320ms cubic-bezier(.2,.8,.2,1), opacity 200ms;
+  }
+  .host.tray-out .tray { max-width: 560px; opacity: 1; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font: 500 0.8rem var(--font);
+    padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--paper);
+    color: var(--ink); cursor: pointer;
+  }
+  .chip svg { width: 14px; height: 14px; }
+  .chip:hover { border-color: var(--wave); color: var(--wave); }
+  .chip[aria-pressed="true"] { background: var(--wave); color: var(--on-accent); border-color: var(--wave); }
+  button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+
+  /* Panel that opens in the gap */
+  .panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 340ms cubic-bezier(.2,.8,.2,1); }
+  .host.is-open .panel { grid-template-rows: 1fr; }
+  .panel__inner { overflow: hidden; min-height: 0; }
+  .panel__card {
+    margin: 10px 0 4px; background: var(--paper); border: 1px solid var(--line-strong); border-radius: 16px;
+    box-shadow: var(--shadow); padding: 16px; display: grid; gap: 14px;
+  }
+  .blk--tools .panel__card { margin: 8px 0 2px; box-shadow: none; }
+  .panel__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .panel__head strong { font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .icon-btn { border: 0; background: transparent; color: var(--muted); cursor: pointer; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; }
+  .icon-btn:hover { background: var(--wave-soft); color: var(--ink); }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  .btn { font: 600 0.85rem var(--font); border-radius: 10px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--line-strong); background: var(--cotton); color: var(--ink); }
+  .btn:hover { border-color: var(--wave); }
+  .btn--go { background: var(--wave); color: var(--on-accent); border-color: var(--wave); }
+  .btn--sm { padding: 5px 10px; font-size: 0.78rem; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row--center { justify-content: center; }
+  label.inl { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+  input[type="number"], input[type="text"], textarea {
+    font: 500 0.9rem var(--font); color: var(--ink); background: var(--cotton); border: 1px solid var(--line-strong);
+    border-radius: 8px; padding: 6px 8px;
+  }
+  input[type="number"] { width: 72px; font-variant-numeric: tabular-nums; }
+  textarea { width: 100%; min-height: 88px; resize: vertical; line-height: 1.4; }
+
+  /* Big readouts */
+  .big { font-family: var(--mono); font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; line-height: 1; color: var(--marine); }
+  .big--time { font-size: clamp(3.2rem, 14vw, 5.5rem); }
+  .big--num { font-size: clamp(3.6rem, 16vw, 6.5rem); }
+  .big--name { font-family: var(--font); font-size: clamp(2rem, 9vw, 3.4rem); letter-spacing: -0.01em; min-height: 1.2em; }
+  .big.rolling { color: var(--muted); }
+  .sub { text-align: center; font-size: 0.9rem; color: var(--muted); margin: 0; }
+  .sub b { color: var(--ink); }
+
+  /* Timer stack */
+  .stack { display: grid; gap: 6px; }
+  .seg {
+    display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 8px; align-items: center;
+    padding: 6px 8px; border-radius: 10px; background: var(--cotton); border: 1px solid var(--line);
+  }
+  .seg.is-now { border-color: var(--wave); background: var(--wave-soft); }
+  .seg.is-done { opacity: 0.55; }
+  .seg__dot { width: 12px; height: 12px; border-radius: 50%; background: var(--sc); justify-self: center; }
+  .seg input[type="text"] { width: 100%; min-width: 0; background: transparent; border-color: transparent; padding: 4px 6px; }
+  .seg input[type="text"]:hover { border-color: var(--line-strong); }
+  .seg input[type="number"] { width: 58px; }
+  .bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--shore); gap: 2px; }
+  .bar__seg { position: relative; background: color-mix(in srgb, var(--sc) 30%, var(--shore)); }
+  .bar__fill { position: absolute; inset: 0 auto 0 0; background: var(--sc); width: 0; }
+  .t-ink { color: var(--ink); }
+  .flash { animation: flash 900ms ease 2; }
+  @keyframes flash { 50% { background: var(--gold); } }
+
+  /* Names */
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 14px; }
+  .picked { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 0.78rem; padding: 3px 9px; border-radius: 999px; background: var(--sage); color: var(--sage-ink); }
+  .groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .group { border-radius: 12px; padding: 10px; background: var(--gc); color: var(--gi); }
+  .group b { display: block; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+  .group span { display: block; font-size: 0.88rem; }
+
+  /* Dice */
+  .dice { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+  .die { width: 72px; height: 72px; border-radius: 16px; background: var(--cotton); border: 1px solid var(--line-strong); display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 10px; }
+  .die i { width: 12px; height: 12px; border-radius: 50%; background: var(--marine); place-self: center; visibility: hidden; }
+  .die i.on { visibility: visible; }
+  .die.shake { animation: shake 420ms ease; }
+  @keyframes shake { 25% { transform: rotate(-12deg); } 60% { transform: rotate(10deg); } }
+
+  .history { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); text-align: center; margin: 0; overflow-wrap: anywhere; }
+
+  .legend { display: grid; gap: 10px; }
+  .legend ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.9rem; max-width: 62ch; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Teaching Hub · block idea · mockup</p>
+    <h1>Classroom tools</h1>
+    <p>A small toolbox that lives on a divider, or as its own block. Tap the faint gear on the divider below, pick a tool, and it opens in the gap between the two blocks. Everything here works.</p>
+  </header>
+
+  <section class="lesson" aria-label="Sample lesson page">
+    <h2 class="lesson__title">Year 9 · Narrative openings</h2>
+
+    <div class="blk"><h3>Read the extract</h3><p>The opening of <i>The Lottery</i>. Note every detail that feels ordinary.</p></div>
+
+    <div class="div host" data-mount="divider" data-start="timer"></div>
+
+    <div class="blk"><h3>Write your opening</h3><p>150 words. Start somewhere ordinary and let one detail feel wrong.</p></div>
+
+    <div class="div host" data-mount="divider"></div>
+
+    <div class="blk"><h3>Share</h3><p>Two volunteers read aloud. The class names the detail that felt wrong.</p></div>
+
+    <div class="blk blk--tools host" data-mount="block" data-start="names"></div>
+  </section>
+
+  <section class="legend">
+    <p class="eyebrow">What the mockup shows</p>
+    <ul>
+      <li><b>Divider host.</b> The gear sits at the end of the rule at low opacity. Hover or focus lifts it; tapping slides the tool chips out along the line. The first divider opens on the timer so you can see the stack.</li>
+      <li><b>Tools block.</b> Same toolbox, but it takes a block's slot. The last block on the page opens on the name picker.</li>
+      <li><b>Stacked timers.</b> Reading 5:00 then Writing 10:00. Each segment has its own colour on the bar, it rolls straight into the next one, and it chimes at each change.</li>
+      <li><b>Names, numbers, groups and dice</b> share one sample class list. Picked names can drop out so nobody is called twice.</li>
+    </ul>
+    <p class="note">Sample class list only. In a real build the list would come from the class roster, and nothing about who was picked would be saved unless you choose to.</p>
+  </section>
+</div>
+
+<script>
+(() => {
+  const SAMPLE = ['Ava', 'Noah', 'Mia', 'Leo', 'Isla', 'Kai', 'Zara', 'Eli', 'Ruby', 'Finn', 'Maya', 'Arlo', 'Ivy', 'Jack', 'Nina', 'Theo', 'Lola', 'Sami', 'Ella', 'Hugo', 'Aria', 'Oscar', 'Pia', 'Toby'];
+  let classList = SAMPLE.slice();
+
+  const ICON = {
+    gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+    timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg>',
+    names: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6 6 0 0 0-3.5-5.5"/></svg>',
+    number: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 3 7 21M17 3l-2 18M4 8.5h17M3 15.5h17"/></svg>',
+    groups: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>',
+    dice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+    expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>'
+  };
+  const TOOLS = [
+    { id: 'timer', label: 'Timer' }, { id: 'names', label: 'Names' }, { id: 'number', label: 'Number' },
+    { id: 'groups', label: 'Groups' }, { id: 'dice', label: 'Dice' }
+  ];
+  const SEG_COLOURS = ['var(--wave)', 'var(--peach-ink)', 'var(--sage-ink)', 'var(--lilac-ink)', 'var(--gold-ink)'];
+  const GROUP_COLOURS = [['var(--sage)', 'var(--sage-ink)'], ['var(--peach)', 'var(--peach-ink)'], ['var(--lilac)', 'var(--lilac-ink)'], ['var(--gold)', 'var(--gold-ink)']];
+
+  const el = (tag, attrs = {}, html = '') => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (html) n.innerHTML = html;
+    return n;
+  };
+  const rand = (n) => Math.floor(Math.random() * n);
+  const shuffle = (a) => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = rand(i + 1); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+  const fmt = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  let audio;
+  function chime(times = 1) {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      for (let i = 0; i < times; i++) {
+        const t = audio.currentTime + i * 0.28;
+        const o = audio.createOscillator(); const g = audio.createGain();
+        o.type = 'sine'; o.frequency.value = i === times - 1 ? 880 : 660;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+        o.connect(g).connect(audio.destination); o.start(t); o.stop(t + 0.55);
+      }
+    } catch (e) { /* sound is optional */ }
+  }
+
+  /* ---------- Timer stack ---------- */
+  function timerTool(root) {
+    const st = { segs: [{ label: 'Reading time', min: 5 }, { label: 'Writing time', min: 10 }], i: 0, left: 300, running: false, last: 0, raf: 0, done: false };
+    root.innerHTML = `
+      <p class="sub" data-r="now"></p>
+      <div class="big big--time" data-r="clock">5:00</div>
+      <div class="bar" data-r="bar" aria-hidden="true"></div>
+      <div class="row row--center">
+        <button class="btn btn--go" data-a="go">Start</button>
+        <button class="btn" data-a="skip">Next</button>
+        <button class="btn" data-a="reset">Reset</button>
+        <button class="btn" data-a="plus">+1 min</button>
+      </div>
+      <div class="stack" data-r="stack"></div>
+      <div class="row"><button class="btn btn--sm" data-a="add">+ Add a timer to the stack</button>
+      <span class="sub" data-r="total" style="margin-left:auto"></span></div>`;
+    const $ = (r) => root.querySelector(`[data-r="${r}"]`);
+    const total = () => st.segs.reduce((a, s) => a + s.min * 60, 0);
+
+    function renderStack() {
+      const stack = $('stack'); stack.innerHTML = '';
+      st.segs.forEach((s, i) => {
+        const row = el('div', { class: 'seg' + (i === st.i && !st.done ? ' is-now' : '') + (i < st.i || st.done ? ' is-done' : ''), style: `--sc:${SEG_COLOURS[i % SEG_COLOURS.length]}` });
+        row.innerHTML = `<span class="seg__dot"></span>
+          <input type="text" id="seg-l-${root.dataset.uid}-${i}" value="${esc(s.label)}" aria-label="Timer ${i + 1} name">
+          <label class="inl"><input type="number" id="seg-m-${root.dataset.uid}-${i}" min="0.5" max="120" step="0.5" value="${s.min}" aria-label="Minutes"> min</label>
+          <button class="icon-btn" aria-label="Remove timer" ${st.segs.length < 2 ? 'disabled' : ''}>${ICON.trash}</button>`;
+        row.querySelector('input[type="text"]').addEventListener('input', (e) => { s.label = e.target.value; renderNow(); });
+        row.querySelector('input[type="number"]').addEventListener('change', (e) => {
+          s.min = Math.max(0.5, Number(e.target.value) || 1); if (i === st.i && !st.running) st.left = s.min * 60; renderAll();
+        });
+        row.querySelector('button').addEventListener('click', () => {
+          st.segs.splice(i, 1); if (st.i >= st.segs.length) st.i = st.segs.length - 1; if (!st.running) st.left = st.segs[st.i].min * 60; renderAll();
+        });
+        stack.append(row);
+      });
+      $('total').textContent = `${st.segs.length} timers · ${fmt(total())} total`;
+    }
+    function renderBar() {
+      const bar = $('bar'); bar.innerHTML = '';
+      st.segs.forEach((s, i) => {
+        const seg = el('div', { class: 'bar__seg', style: `flex:${s.min};--sc:${SEG_COLOURS[i % SEG_COLOURS.length]}` });
+        const fill = el('div', { class: 'bar__fill' });
+        const p = st.done || i < st.i ? 1 : i > st.i ? 0 : 1 - st.left / (s.min * 60);
+        fill.style.width = `${Math.min(1, Math.max(0, p)) * 100}%`;
+        seg.append(fill); bar.append(seg);
+      });
+    }
+    function renderNow() {
+      const s = st.segs[st.i];
+      const next = st.segs[st.i + 1];
+      $('now').innerHTML = st.done ? '<b>All done</b>' : `<b>${esc(s.label || 'Timer')}</b>${next ? ` · then ${esc(next.label || 'next')}` : ''}`;
+      $('clock').textContent = st.done ? '0:00' : fmt(st.left);
+      root.querySelector('[data-a="go"]').textContent = st.running ? 'Pause' : st.done ? 'Again' : 'Start';
+    }
+    function renderAll() { renderStack(); renderBar(); renderNow(); }
+
+    function tick(t) {
+      if (!st.running) return;
+      const dt = (t - st.last) / 1000; st.last = t; st.left -= dt;
+      if (st.left <= 0) {
+        if (st.i < st.segs.length - 1) { st.i++; st.left += st.segs[st.i].min * 60; chime(2); root.classList.remove('flash'); void root.offsetWidth; root.classList.add('flash'); renderStack(); }
+        else { st.running = false; st.done = true; st.left = 0; chime(3); renderAll(); return; }
+      }
+      renderBar(); $('clock').textContent = fmt(st.left);
+      st.raf = requestAnimationFrame(tick);
+    }
+    root.addEventListener('click', (e) => {
+      const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+      if (a === 'go') {
+        if (st.done) { st.done = false; st.i = 0; st.left = st.segs[0].min * 60; }
+        st.running = !st.running;
+        if (st.running) { st.last = performance.now(); st.raf = requestAnimationFrame(tick); try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); } catch (err) {} }
+        else cancelAnimationFrame(st.raf);
+        renderAll();
+      }
+      if (a === 'skip') { if (st.i < st.segs.length - 1) { st.i++; st.left = st.segs[st.i].min * 60; } else { st.done = true; st.running = false; } renderAll(); }
+      if (a === 'reset') { cancelAnimationFrame(st.raf); st.running = false; st.done = false; st.i = 0; st.left = st.segs[0].min * 60; renderAll(); }
+      if (a === 'plus') { if (!st.done) st.left += 60; renderNow(); renderBar(); }
+      if (a === 'add') { st.segs.push({ label: ['Share time', 'Pack up', 'Think time'][(st.segs.length - 2) % 3] || 'Timer', min: 3 }); renderAll(); }
+    });
+    st.left = st.segs[0].min * 60;
+    renderAll();
+    return () => { cancelAnimationFrame(st.raf); st.running = false; };
+  }
+
+  /* ---------- Name picker ---------- */
+  function namesTool(root) {
+    let pool = classList.slice(); const picked = [];
+    root.innerHTML = `
+      <div class="big big--name" data-r="out" aria-live="polite">Ready</div>
+      <p class="sub" data-r="left"></p>
+      <div class="row row--center">
+        <button class="btn btn--go" data-a="pick">Pick a name</button>
+        <button class="btn" data-a="reset">Put everyone back</button>
+        <label class="inl"><input type="checkbox" id="names-drop-${root.dataset.uid}" checked> Don't pick the same person twice</label>
+      </div>
+      <div class="picked" data-r="picked"></div>
+      <details><summary class="sub" style="text-align:left;cursor:pointer">Class list (sample)</summary>
+        <textarea id="names-list-${root.dataset.uid}" aria-label="Class list, one name per line">${classList.join('\n')}</textarea></details>`;
+    const $ = (r) => root.querySelector(`[data-r="${r}"]`);
+    const drop = root.querySelector('input[type="checkbox"]');
+    const render = () => {
+      $('left').textContent = drop.checked ? `${pool.length} of ${classList.length} still to go` : `${classList.length} in the class`;
+      $('picked').innerHTML = picked.map((n) => `<span class="tag">${esc(n)}</span>`).join('');
+    };
+    root.querySelector('textarea').addEventListener('change', (e) => {
+      classList = e.target.value.split('\n').map((s) => s.trim()).filter(Boolean); pool = classList.slice(); picked.length = 0; render();
+    });
+    root.addEventListener('click', (e) => {
+      const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+      if (a === 'reset') { pool = classList.slice(); picked.length = 0; $('out').textContent = 'Ready'; render(); }
+      if (a === 'pick') {
+        const src = drop.checked ? pool : classList;
+        if (!src.length) { $('out').textContent = 'Everyone’s had a go'; return; }
+        const out = $('out'); out.classList.add('rolling');
+        const winner = src[rand(src.length)];
+        let k = 0; const steps = 16;
+        const spin = () => {
+          out.textContent = src[rand(src.length)];
+          if (++k < steps) setTimeout(spin, 40 + k * k * 1.6);
+          else {
+            out.textContent = winner; out.classList.remove('rolling'); chime(1);
+            if (drop.checked) pool.splice(pool.indexOf(winner), 1);
+            picked.push(winner); render();
+          }
+        };
+        spin();
+      }
+    });
+    render();
+  }
+
+  /* ---------- Number ---------- */
+  function numberTool(root) {
+    let used = new Set(); const hist = [];
+    root.innerHTML = `
+      <div class="big big--num" data-r="out" aria-live="polite">?</div>
+      <div class="row row--center">
+        <label class="inl">From <input type="number" id="num-min-${root.dataset.uid}" value="1"></label>
+        <label class="inl">to <input type="number" id="num-max-${root.dataset.uid}" value="30"></label>
+        <button class="btn btn--go" data-a="roll">Roll</button>
+      </div>
+      <div class="row row--center"><label class="inl"><input type="checkbox" id="num-norep-${root.dataset.uid}"> No repeats</label>
+        <button class="btn btn--sm" data-a="clear">Clear</button></div>
+      <p class="history" data-r="hist">History appears here</p>`;
+    const $ = (r) => root.querySelector(`[data-r="${r}"]`);
+    const [minI, maxI] = root.querySelectorAll('input[type="number"]');
+    const norep = root.querySelector('input[type="checkbox"]');
+    root.addEventListener('click', (e) => {
+      const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+      if (a === 'clear') { used = new Set(); hist.length = 0; $('hist').textContent = 'History appears here'; $('out').textContent = '?'; return; }
+      let lo = Math.round(Number(minI.value)), hi = Math.round(Number(maxI.value));
+      if (lo > hi) [lo, hi] = [hi, lo];
+      const opts = []; for (let n = lo; n <= hi && opts.length < 10001; n++) if (!norep.checked || !used.has(n)) opts.push(n);
+      if (!opts.length) { $('out').textContent = '—'; $('hist').textContent = 'Every number has come up. Clear to start again.'; return; }
+      const winner = opts[rand(opts.length)]; const out = $('out'); out.classList.add('rolling');
+      let k = 0;
+      const spin = () => {
+        out.textContent = lo + rand(hi - lo + 1);
+        if (++k < 14) setTimeout(spin, 35 + k * k * 1.5);
+        else { out.textContent = winner; out.classList.remove('rolling'); used.add(winner); hist.unshift(winner); $('hist').textContent = hist.slice(0, 20).join('  ·  '); chime(1); }
+      };
+      spin();
+    });
+  }
+
+  /* ---------- Groups ---------- */
+  function groupsTool(root) {
+    root.innerHTML = `
+      <div class="row row--center">
+        <label class="inl">Groups of <input type="number" id="grp-size-${root.dataset.uid}" min="2" max="8" value="4"></label>
+        <button class="btn btn--go" data-a="make">Make groups</button>
+      </div>
+      <p class="sub" data-r="info"></p>
+      <div class="groups" data-r="out"></div>`;
+    const $ = (r) => root.querySelector(`[data-r="${r}"]`);
+    const make = () => {
+      const size = Math.min(8, Math.max(2, Number(root.querySelector('input').value) || 4));
+      const s = shuffle(classList); const n = Math.max(1, Math.round(s.length / size)); const gs = Array.from({ length: n }, () => []);
+      s.forEach((name, i) => gs[i % n].push(name));
+      $('info').textContent = `${classList.length} students · ${n} groups`;
+      $('out').innerHTML = gs.map((g, i) => { const [c, ink] = GROUP_COLOURS[i % GROUP_COLOURS.length]; return `<div class="group" style="--gc:${c};--gi:${ink}"><b>Group ${i + 1}</b>${g.map((x) => `<span>${esc(x)}</span>`).join('')}</div>`; }).join('');
+    };
+    root.addEventListener('click', (e) => { if (e.target.closest('[data-a="make"]')) make(); });
+    make();
+  }
+
+  /* ---------- Dice ---------- */
+  function diceTool(root) {
+    const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+    root.innerHTML = `
+      <div class="dice" data-r="dice"></div>
+      <p class="sub" data-r="sum"></p>
+      <div class="row row--center">
+        <label class="inl">Dice <input type="number" id="dice-n-${root.dataset.uid}" min="1" max="4" value="2"></label>
+        <button class="btn btn--go" data-a="roll">Roll</button>
+      </div>`;
+    const $ = (r) => root.querySelector(`[data-r="${r}"]`);
+    const draw = (vals, shake) => {
+      $('dice').innerHTML = vals.map((v) => `<div class="die${shake ? ' shake' : ''}" aria-label="${v}">${Array.from({ length: 9 }, (_, i) => `<i class="${PIPS[v].includes(i) ? 'on' : ''}"></i>`).join('')}</div>`).join('');
+      $('sum').innerHTML = vals.length > 1 ? `Total <b>${vals.reduce((a, b) => a + b, 0)}</b>` : '&nbsp;';
+    };
+    root.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-a="roll"]')) return;
+      const n = Math.min(4, Math.max(1, Number(root.querySelector('input').value) || 1));
+      draw(Array.from({ length: n }, () => 1 + rand(6)), true); chime(1);
+    });
+    draw([3, 5], false);
+  }
+
+  const BUILDERS = { timer: timerTool, names: namesTool, number: numberTool, groups: groupsTool, dice: diceTool };
+
+  /* ---------- Host: divider or block ---------- */
+  let uid = 0;
+  function mount(host) {
+    const kind = host.dataset.mount;
+    host.innerHTML = '';
+    const bar = el('div', { class: 'host__bar' });
+    const tray = el('div', { class: 'tray', role: 'toolbar', 'aria-label': 'Classroom tools' });
+    TOOLS.forEach((t) => {
+      const c = el('button', { class: 'chip', 'data-tool': t.id, 'aria-pressed': 'false', tabindex: '-1' }, `${ICON[t.id]}${t.label}`);
+      tray.append(c);
+    });
+    const trig = el('button', { class: 'trigger', 'aria-label': 'Open classroom tools', 'aria-expanded': 'false' }, ICON.gear);
+
+    if (kind === 'divider') {
+      const row = el('div', { class: 'div__row' });
+      row.append(el('div', { class: 'div__rule' }), tray, trig);
+      host.append(row);
+    } else {
+      const label = el('span', { class: 'sub', style: 'margin-right:auto;text-align:left' }, '<b>Tools</b> block');
+      bar.append(label, tray, trig); host.append(bar);
+    }
+
+    const panel = el('div', { class: 'panel' });
+    const inner = el('div', { class: 'panel__inner' });
+    const card = el('div', { class: 'panel__card' });
+    inner.append(card); panel.append(inner); host.append(panel);
+
+    let current = null; let stop = null;
+    const setTray = (out) => {
+      host.classList.toggle('tray-out', out);
+      trig.setAttribute('aria-expanded', String(out));
+      tray.querySelectorAll('.chip').forEach((c) => c.tabIndex = out ? 0 : -1);
+    };
+    const close = () => { if (stop) stop(); stop = null; current = null; host.classList.remove('is-open'); tray.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', 'false')); };
+    const open = (id) => {
+      if (stop) stop(); stop = null;
+      current = id;
+      tray.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.tool === id)));
+      const t = TOOLS.find((x) => x.id === id);
+      card.innerHTML = `<div class="panel__head"><strong>${t.label}</strong><span class="row" style="gap:2px">
+        <button class="icon-btn" data-h="full" aria-label="Show full screen">${ICON.expand}</button>
+        <button class="icon-btn" data-h="close" aria-label="Close tool">${ICON.close}</button></span></div>`;
+      const body = el('div', { style: 'display:grid;gap:14px', 'data-uid': String(++uid) });
+      card.append(body);
+      stop = BUILDERS[id](body) || null;
+      card.querySelector('[data-h="close"]').onclick = () => { close(); setTray(false); trig.focus(); };
+      card.querySelector('[data-h="full"]').onclick = () => { try { card.requestFullscreen && card.requestFullscreen().catch(() => {}); } catch (e) {} };
+      host.classList.add('is-open');
+    };
+
+    trig.addEventListener('click', () => {
+      const out = !host.classList.contains('tray-out');
+      setTray(out);
+      if (!out) close();
+    });
+    tray.addEventListener('click', (e) => {
+      const c = e.target.closest('.chip'); if (!c) return;
+      if (current === c.dataset.tool) close(); else open(c.dataset.tool);
+    });
+
+    if (host.dataset.start) { setTray(true); open(host.dataset.start); }
+  }
+  document.querySelectorAll('[data-mount]').forEach(mount);
+})();
+</script>

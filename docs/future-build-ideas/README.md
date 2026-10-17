@@ -90,8 +90,11 @@ This split is an **Open question** for the next round, not a decision.
 | Notion → GitHub gap map | Future build inventory | [notion-github-gap-map.md](notion-github-gap-map.md) |
 | Peer annotation: feedback as two annotation layers | Concept and mockup | [peer-annotation.md](peer-annotation.md) |
 | Peer-built weekly review: quiz lessons fed by student questions | Built | [peer-built-quiz.md](peer-built-quiz.md) |
+| Classroom tools: timers, name picker and more on a divider or block | Concept and mockup | [classroom-tools.md](classroom-tools.md) |
 
 ## History
+
+- **2026-10-17:** Indexed classroom tools (a toolbox on a divider or block: stacked timers, name picker, random number, groups, dice).
 
 - **2026-10-17:** Indexed the peer-built weekly review (quiz lesson kind fed by a question drop block, teacher approval tray).
 
