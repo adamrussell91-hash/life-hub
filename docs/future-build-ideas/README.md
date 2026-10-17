@@ -88,8 +88,11 @@ This split is an **Open question** for the next round, not a decision.
 | Metropolis: the ground (Adam to fill in) | Brief | [life-city-ground.md](life-city-ground.md) |
 | Life City asset inventory | Inventory | [life-city-assets.md](life-city-assets.md) |
 | Notion → GitHub gap map | Future build inventory | [notion-github-gap-map.md](notion-github-gap-map.md) |
+| Peer annotation: feedback as two annotation layers | Concept and mockup | [peer-annotation.md](peer-annotation.md) |
 
 ## History
+
+- **2026-10-17:** Indexed peer annotation (peer feedback as annotation layers, with teacher-set resources on each feedback button).
 
 - **2026-10-10:** Indexed the terrain, water and tree-growth research pack beside the Life City resource catalogue.
 
