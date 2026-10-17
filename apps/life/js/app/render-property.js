@@ -674,10 +674,13 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
 
   async function onRecord() {
     const entry = entryFromForm(state.recordKind, q('rec-fields'));
+    const fy = model?.summary.fy;
+    const outsideYear = fy && entry.kind === 'interest' && entry.date && (entry.date < fy.start || entry.date > fy.end);
     const ok = await mutate(async () => {
       const data = await api.addEntry(entry);
       return data?.record;
-    }, `Recorded: ${KIND_LABELS[state.recordKind].toLowerCase()}`);
+    }, outsideYear ? null : `Recorded: ${KIND_LABELS[state.recordKind].toLowerCase()}`);
+    if (ok && outsideYear) showHubToast(`Recorded on ${formatDisplayDate(entry.date)}, outside the ${fy.label} return. Use the date the bank charged it to count it there.`);
     if (ok) closeSheet('record');
     else {
       q('rec-error').hidden = false;
@@ -1050,13 +1053,16 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
     q('next-step').innerHTML = next ? `<div class="confirm-card" role="group" aria-label="${escapeHtml(next.title)}">
         <div class="confirm-card__head"><p class="confirm-card__title">${escapeHtml(next.title)}</p><span class="confirm-card__meta">Next step</span></div>
         <p class="confirm-card__body">${escapeHtml(next.body)}</p>
-        <div class="prop-cc-foot"><button class="btn btn--ghost" type="button" data-prop="next-dismiss">Not now</button><button class="btn btn--primary" type="button" data-prop-open="${next.open}" data-prop-kind="${next.kind ?? ''}">${escapeHtml(next.action)}</button></div>
+        <div class="prop-cc-foot"><button class="btn btn--ghost" type="button" data-prop="next-dismiss">Not now</button><button class="btn btn--primary" type="button" data-prop-open="${next.open}" data-prop-kind="${next.kind ?? ''}" data-prop-date="${next.date ?? ''}">${escapeHtml(next.action)}</button></div>
       </div>` : '';
   }
 
   function nextStep(summary) {
     if (summary.missingMonths.length) {
-      return { title: `Record ${summary.missingMonths.length} month${summary.missingMonths.length === 1 ? '' : 's'} of loan interest`, body: 'Each loan statement has an interest line. Record them one at a time and the estimate on this page turns into the real figure.', action: 'Record interest', open: 'record', kind: 'interest' };
+      // Start on the last day of the first missing month, not today, so the charge lands in this return.
+      const first = summary.missingMonths[0];
+      const date = addDays(`${addDays(`${first}-01`, 31).slice(0, 7)}-01`, -1);
+      return { title: `Record ${summary.missingMonths.length} month${summary.missingMonths.length === 1 ? '' : 's'} of loan interest`, body: 'Each loan statement has an interest line. Record them one at a time with the date the bank charged it, and the estimate on this page turns into the real figure.', action: 'Record interest', open: 'record', kind: 'interest', date };
     }
     const insurance = summary.checklist.find(item => item.key === 'insurance');
     if (insurance?.status === 'missing') return { title: 'Record your landlord insurance', body: 'Add the yearly premium in Details, or record each payment as an expense.', action: 'Open details', open: 'settings' };

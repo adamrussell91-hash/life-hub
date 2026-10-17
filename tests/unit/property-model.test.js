@@ -176,6 +176,26 @@ test('interest that straddles the tenancy start is apportioned', () => {
   assert.equal(summary.missingMonths[0], '2026-02');
 });
 
+test('a month-end charge that posts early next month covers the month before', () => {
+  const record = fixture();
+  // Month-end interest slips to the next business day when the 28th–31st is a weekend.
+  const charges = ['2026-01-30', '2026-03-02', '2026-03-30', '2026-04-30', '2026-06-01', '2026-06-30'];
+  const next = charges.reduce((current, date, index) => addEntry(current, { kind: 'interest', date, amount: 2400 }, { id: `i${index}`, today: '2026-10-08' }).record, record);
+  const summary = taxYearSummary(next, '2026-10-08');
+  assert.deepEqual(summary.missingMonths, []);
+  assert.equal(summary.interestEstimate, 0);
+  assert.equal(summary.checklist.find(item => item.key === 'interest').status, 'done');
+});
+
+test('missing interest months that are not consecutive are listed, not ranged', () => {
+  const record = fixture();
+  const charges = ['2026-01-30', '2026-03-30', '2026-04-30', '2026-06-30'];
+  const next = charges.reduce((current, date, index) => addEntry(current, { kind: 'interest', date, amount: 2400 }, { id: `i${index}`, today: '2026-10-08' }).record, record);
+  const summary = taxYearSummary(next, '2026-10-08');
+  assert.deepEqual(summary.missingMonths, ['2026-02', '2026-05']);
+  assert.equal(summary.checklist.find(item => item.key === 'interest').label, 'Loan interest, Feb and May');
+});
+
 test('expenses already on an agent statement are never counted twice', () => {
   const record = fixture();
   const { record: next } = addEntry(record, { kind: 'expense', date: '2026-02-12', amount: 150, category: 'repairs', inStatement: true }, { id: 'mow', today: '2026-10-08' });
