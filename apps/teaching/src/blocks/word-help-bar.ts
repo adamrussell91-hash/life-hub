@@ -28,7 +28,7 @@ export function createStudentWordHelpBar(options: {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'word-help-bar__btn';
-  button.innerHTML = `${DICTIONARY_ICON}<span>Dictionary scan</span>`;
+  button.innerHTML = `${DICTIONARY_ICON}<span class="word-help-bar__label">Dictionary scan</span>`;
 
   const status = document.createElement('p');
   status.className = 'word-help-bar__status';
