@@ -276,24 +276,45 @@ function chipFor(id: string, label: string | undefined, at: (t: number) => Pt): 
   return { id, label: text, missing, at, w: Math.ceil(textWidth(text, 12, 500) + 18), h: 22, x: 0, y: 0 };
 }
 
-/** Labels try positions along their curve until one clears the boxes and earlier labels. */
+const CHIP_TS = [0.5, 0.4, 0.6, 0.32, 0.68, 0.25, 0.75];
+const CHIP_TS_FINE = Array.from({ length: 17 }, (_, i) => 0.1 + i * 0.05).filter((t) => !CHIP_TS.some((c) => Math.abs(c - t) < 0.01));
+
+/**
+ * Labels try positions along their curve until one clears the boxes and earlier labels. Boxes are
+ * hard obstacles: a label may overlap another label as a last resort, never a box.
+ */
 function placeChips(chips: Chip[], obstacles: Rect[]): void {
   const placed: Rect[] = [];
   const hit = (a: Rect, b: Rect) => Math.abs(a.x - b.x) * 2 < a.w + b.w + 6 && Math.abs(a.y - b.y) * 2 < a.h + b.h + 4;
+  const clear = (r: Rect, others: Rect[]) => !others.some((o) => hit(r, o));
   for (const chip of chips) {
-    let best: Rect | null = null;
-    for (const t of [0.5, 0.4, 0.6, 0.32, 0.68, 0.25, 0.75]) {
+    const tries = [...CHIP_TS, ...CHIP_TS_FINE].map((t) => {
       const at = chip.at(t);
-      const r = { x: at.x, y: at.y, w: chip.w, h: chip.h };
-      if (![...obstacles, ...placed].some((o) => hit(r, o))) {
-        best = r;
-        break;
+      return { x: at.x, y: at.y, w: chip.w, h: chip.h };
+    });
+    const coarse = tries.slice(0, CHIP_TS.length);
+    let best =
+      coarse.find((r) => clear(r, obstacles) && clear(r, placed)) ??
+      (clear(tries[0]!, obstacles) ? tries[0] : undefined) ??
+      tries.find((r) => clear(r, obstacles) && clear(r, placed)) ??
+      tries.find((r) => clear(r, obstacles));
+    if (!best) {
+      /* Every spot on the curve touches a box: step outwards from the middle until one is clear. */
+      const mid = tries[0]!;
+      for (let step = 1; step <= 40 && !best; step++) {
+        for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+          const r = { ...mid, x: mid.x + dx * step * 6, y: mid.y + dy * step * 4 };
+          if (clear(r, obstacles)) {
+            best = r;
+            break;
+          }
+        }
       }
-      best ||= r;
     }
-    chip.x = best!.x;
-    chip.y = best!.y;
-    placed.push(best!);
+    best ||= tries[0]!;
+    chip.x = best.x;
+    chip.y = best.y;
+    placed.push(best);
   }
 }
 
@@ -577,7 +598,17 @@ function conceptPlaced(content: GraphContent, box: Box, extraW = 0): Map<string,
 const liveEdges = (content: GraphContent, ids: Map<string, unknown>) =>
   content.edges.filter((e) => ids.has(e.from) && ids.has(e.to) && e.from !== e.to);
 
-export function layeredPositions(content: GraphContent, compact = false): Map<string, Pt> {
+/** A long edge's path through one intermediate layer: a vertical run at x from the row's top to its bottom. */
+type Lane = { x: number; top: number; bottom: number };
+
+const LANE_W = 8;
+
+/**
+ * Sugiyama layering: an edge spanning more than one layer gets a dummy slot in each layer between,
+ * ordered with the boxes, so its path can run down a gap instead of through a box. Lanes are listed
+ * from the edge's source to its target.
+ */
+function layeredLayout(content: GraphContent, compact: boolean): { at: Map<string, Pt>; lanes: Map<string, Lane[]> } {
   const nodes = conceptPlaced(content, CONCEPT_BOX);
   const edges = liveEdges(content, nodes);
   const out = new Map<string, GraphEdge[]>([...nodes.keys()].map((id) => [id, []]));
@@ -597,8 +628,30 @@ export function layeredPositions(content: GraphContent, compact = false): Map<st
   const dag = edges.map((e) => (reversed.has(e.id) ? { ...e, from: e.to, to: e.from } : e));
   const layer = new Map([...nodes.keys()].map((id) => [id, 0]));
   for (let i = 0; i < nodes.size; i++) for (const e of dag) layer.set(e.to, Math.max(layer.get(e.to)!, layer.get(e.from)! + 1));
-  const layers: Placed[][] = [];
+  type Slot = { id: string; w: number; h: number };
+  const layers: Slot[][] = [];
   nodes.forEach((n) => (layers[layer.get(n.id)!] ||= []).push(n));
+  const segs: Array<{ from: string; to: string }> = [];
+  const dummies = new Map<string, string[]>();
+  for (const e of dag) {
+    const a = layer.get(e.from)!;
+    const b = layer.get(e.to)!;
+    if (b - a < 2) {
+      segs.push(e);
+      continue;
+    }
+    const chain: string[] = [];
+    let prev = e.from;
+    for (let l = a + 1; l < b; l++) {
+      const id = `\u0000${e.id}\u0000${l}`;
+      layers[l]!.push({ id, w: LANE_W, h: 0 });
+      segs.push({ from: prev, to: id });
+      chain.push(id);
+      prev = id;
+    }
+    segs.push({ from: prev, to: e.to });
+    dummies.set(e.id, reversed.has(e.id) ? chain.reverse() : chain);
+  }
   const rows = layers.filter(Boolean);
   const pos = new Map<string, number>();
   const reindex = () => rows.forEach((l) => l.forEach((n, i) => pos.set(n.id, i)));
@@ -609,7 +662,7 @@ export function layeredPositions(content: GraphContent, compact = false): Map<st
     const order = down ? rows.slice(1) : rows.slice(0, -1).reverse();
     for (const l of order) {
       for (const n of l) {
-        const nb = dag.filter((e) => (down ? e.to === n.id : e.from === n.id)).map((e) => pos.get(down ? e.from : e.to)!);
+        const nb = segs.filter((e) => (down ? e.to === n.id : e.from === n.id)).map((e) => pos.get(down ? e.from : e.to)!);
         bc.set(n.id, nb.length ? nb.reduce((a, b) => a + b, 0) / nb.length : pos.get(n.id)!);
       }
       l.sort((a, b) => bc.get(a.id)! - bc.get(b.id)!);
@@ -618,39 +671,61 @@ export function layeredPositions(content: GraphContent, compact = false): Map<st
   }
   const colGap = compact ? 18 : 40;
   const rowGap = compact ? 78 : 86;
-  const result = new Map<string, Pt>();
+  const at = new Map<string, Pt>();
+  const lane = new Map<string, Lane>();
   let y = 0;
   for (const l of rows) {
     const rowH = Math.max(...l.map((n) => n.h));
     const width = l.reduce((s, n) => s + n.w, 0) + colGap * (l.length - 1);
     let x = -width / 2;
     for (const n of l) {
-      result.set(n.id, { x: x + n.w / 2, y: y + rowH / 2 });
+      if (nodes.has(n.id)) at.set(n.id, { x: x + n.w / 2, y: y + rowH / 2 });
+      else lane.set(n.id, { x: x + n.w / 2, top: y, bottom: y + rowH });
       x += n.w + colGap;
     }
     y += rowH + rowGap;
   }
-  return result;
+  const lanes = new Map([...dummies].map(([id, chain]) => [id, chain.map((d) => lane.get(d)!)]));
+  return { at, lanes };
+}
+
+export function layeredPositions(content: GraphContent, compact = false): Map<string, Pt> {
+  return layeredLayout(content, compact).at;
+}
+
+/** A point at fraction t of the way along a polyline, by length. */
+function alongAt(pts: Pt[], t: number): Pt {
+  const lens = pts.slice(1).map((p, i) => Math.hypot(p.x - pts[i]!.x, p.y - pts[i]!.y));
+  let left = lens.reduce((a, b) => a + b, 0) * t;
+  for (let i = 0; i < lens.length; i++) {
+    if (left <= lens[i]! || i === lens.length - 1) {
+      const k = lens[i]! ? Math.min(1, left / lens[i]!) : 0;
+      return { x: pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * k, y: pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * k };
+    }
+    left -= lens[i]!;
+  }
+  return pts[pts.length - 1]!;
 }
 
 export function drawConceptLayered(content: GraphContent, compact: boolean, state: DrawState = {}): Scene {
   const nodes = conceptPlaced(content, CONCEPT_BOX);
-  const at = layeredPositions(content, compact);
+  const { at, lanes } = layeredLayout(content, compact);
   nodes.forEach((n) => Object.assign(n, at.get(n.id)));
   const { id: marker, defs } = arrowDefs();
-  type Geo = { e: GraphEdge; s: Placed; t: Placed; dir: number; sdx: number; tdx: number };
-  const attach = new Map<string, Array<{ g: Geo; end: 's' | 't'; other: Placed }>>();
+  type Geo = { e: GraphEdge; s: Placed; t: Placed; dir: number; sdx: number; tdx: number; via: Lane[] };
+  const attach = new Map<string, Array<{ g: Geo; end: 's' | 't'; other: { x: number } }>>();
   const geo: Geo[] = liveEdges(content, nodes).map((e) => {
     const s = nodes.get(e.from)!;
     const t = nodes.get(e.to)!;
     const dir = t.y > s.y + 1 ? 1 : -1;
-    const g: Geo = { e, s, t, dir, sdx: 0, tdx: 0 };
+    const via = lanes.get(e.id) ?? [];
+    const g: Geo = { e, s, t, dir, sdx: 0, tdx: 0, via };
     const sk = `${s.id}\u0000${dir > 0 ? 'b' : 't'}`;
     const tk = `${t.id}\u0000${dir > 0 ? 't' : 'b'}`;
     if (!attach.has(sk)) attach.set(sk, []);
     if (!attach.has(tk)) attach.set(tk, []);
-    attach.get(sk)!.push({ g, end: 's', other: t });
-    attach.get(tk)!.push({ g, end: 't', other: s });
+    attach.get(sk)!.push({ g, end: 's', other: via[0] ?? t });
+    attach.get(tk)!.push({ g, end: 't', other: via[via.length - 1] ?? s });
     return g;
   });
   for (const [key, list] of attach) {
@@ -665,15 +740,36 @@ export function drawConceptLayered(content: GraphContent, compact: boolean, stat
   }
   let paths = '';
   const chips: Chip[] = [];
+  const lanePts: Rect[] = [];
   for (const g of geo) {
     const x0 = g.s.x + g.sdx;
     const y0 = g.s.y + (g.dir * g.s.h) / 2;
     const x3 = g.t.x + g.tdx;
     const y3 = g.t.y - (g.dir * g.t.h) / 2 - g.dir * 3;
-    const dy = Math.max(28, Math.abs(y3 - y0) * 0.45) * g.dir;
-    const pts = [{ x: x0, y: y0 }, { x: x0, y: y0 + dy }, { x: x3, y: y3 - dy }, { x: x3, y: y3 }];
-    const chip = chipFor(g.e.id, g.e.label, (t) => cubicAt(pts, t));
-    paths += `<path d="M${fmt(x0)} ${fmt(y0)} C${fmt(x0)} ${fmt(y0 + dy)} ${fmt(x3)} ${fmt(y3 - dy)} ${fmt(x3)} ${fmt(y3)}" style="fill:none;stroke:var(--orca)" stroke-width="1.5"${chip.missing ? ' stroke-dasharray="4 4"' : ''} marker-end="url(#${marker})" opacity="0.85"/>`;
+    /* Hops between rows are S-curves; inside a row a long edge runs straight down its lane. */
+    const stops: Array<[Pt, Pt]> = g.via.map((l) => {
+      const near = g.dir > 0 ? l.top : l.bottom;
+      const far = g.dir > 0 ? l.bottom : l.top;
+      return [{ x: l.x, y: near }, { x: l.x, y: far }];
+    });
+    const hops: Pt[][] = [];
+    let from: Pt = { x: x0, y: y0 };
+    for (const [a, b] of [...stops, [{ x: x3, y: y3 }, null] as [Pt, null]]) {
+      const dy = Math.max(28, Math.abs(a.y - from.y) * 0.45) * g.dir;
+      hops.push([from, { x: from.x, y: from.y + dy }, { x: a.x, y: a.y - dy }, a]);
+      if (b) {
+        lanePts.push({ ...a, w: 0, h: 0 }, { ...b, w: 0, h: 0 });
+        hops.push([a, b]);
+        from = b;
+      }
+    }
+    const d =
+      `M${fmt(x0)} ${fmt(y0)}` +
+      hops.map((h) => (h.length === 2 ? ` L${fmt(h[1]!.x)} ${fmt(h[1]!.y)}` : ` C${h.slice(1).map((p) => `${fmt(p.x)} ${fmt(p.y)}`).join(' ')}`)).join('');
+    const pts = hops[0]!;
+    const line = [pts[0]!, ...hops.flatMap((h) => (h.length === 2 ? [h[1]!] : Array.from({ length: 12 }, (_, k) => cubicAt(h, (k + 1) / 12))))];
+    const chip = chipFor(g.e.id, g.e.label, g.via.length ? (t) => alongAt(line, t) : (t) => cubicAt(pts, t));
+    paths += `<path d="${d}" style="fill:none;stroke:var(--orca)" stroke-width="1.5"${chip.missing ? ' stroke-dasharray="4 4"' : ''} marker-end="url(#${marker})" opacity="0.85"/>`;
     chips.push(chip);
   }
   placeChips(chips, [...nodes.values()]);
@@ -689,7 +785,7 @@ export function drawConceptLayered(content: GraphContent, compact: boolean, stat
     )
     .join('');
   const chipMarkup = chips.map((c) => chipSvg(c, false, false)).join('');
-  return { markup: defs + paths + boxes + chipMarkup, bounds: boundsOf([...nodes.values(), ...chips], 8), nodes, chips };
+  return { markup: defs + paths + boxes + chipMarkup, bounds: boundsOf([...nodes.values(), ...chips, ...lanePts], 8), nodes, chips };
 }
 
 /* ── Concept map, canvas mode: cards where the user put them, links with a draggable port ── */
