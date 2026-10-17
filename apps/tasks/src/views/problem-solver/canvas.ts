@@ -7,6 +7,7 @@ import { createGapRadarView } from '../../../../../packages/problem-solver/rende
 import { createSmartView } from '../../../../../packages/problem-solver/render/smart';
 import { createProblemTreeView } from '../../../../../packages/problem-solver/render/problem-tree';
 import { createProblemStatementView } from '../../../../../packages/problem-solver/render/problem-statement';
+import { toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { renderOutline } from '../../../../../packages/problem-solver/render/outline';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
 import type { PsSession, PsToolId, PsToolRun } from '../../../../../packages/problem-solver/types';
@@ -59,6 +60,7 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
         return;
       }
       const heading = el('h2', 'ps-canvas__title', TOOLS[run.tool].name);
+      heading.prepend(toolEmblem(run.tool));
       const make = RENDERERS[run.tool];
       if (!make) {
         current = null;
