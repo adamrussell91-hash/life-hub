@@ -1,7 +1,6 @@
 import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createKaplanEditor } from '@/blocks/kaplan-editor';
 import { createCalloutTargetPicker } from '@/blocks/callout-reference';
-import { createAlchemyButton } from '@/alchemy/block-button';
 import { createRichTextTools } from '@/blocks/rich-text-tools';
 import {
   createAnalogyTypesEditor,
@@ -2933,8 +2932,5 @@ function createBlockEditorFields(
 }
 
 export function createBlockEditor(block: Block, onChange: BlockChangeHandler, getLatest?: () => Block, context: BlockEditorContext = {}): HTMLElement {
-  const editor = createBlockEditorFields(block, onChange, getLatest, context);
-  editor.classList.add('alchemy-editor-block');
-  editor.append(createAlchemyButton(block.id));
-  return editor;
+  return createBlockEditorFields(block, onChange, getLatest, context);
 }

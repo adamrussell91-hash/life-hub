@@ -4,7 +4,8 @@ import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { errorResponse, okResponse, methodNotAllowed, withCors } from './_shared/http.mjs';
 import { isDeletedRecord } from './_shared/record-liveness.mjs';
 import { createAlchemyBudget, alchemyError } from './_shared/alchemy-budget.mjs';
-import { boundedJson, retrieveAlchemySources, buildAlchemyPrompt, completeAlchemy, parseAlchemyProposals, alchemyQueryText } from './_shared/alchemy-analysis.mjs';
+import { boundedJson, buildAlchemyPrompt, completeAlchemy, parseAlchemyProposals, parseUnitNotes, alchemyQueryText } from './_shared/alchemy-analysis.mjs';
+import { unitAwareSources, addUnitNotes, contextQueryText } from './_shared/alchemy-unit-notes.mjs';
 import { canonical, contextSnapshot, findAlchemyBlock, blockRevision } from '../../packages/alchemy/revisions.js';
 
 export const config={path:'/api/alchemy-blocks',timeout:26};
@@ -66,29 +67,43 @@ export function createAlchemyBlocksHandler(deps={}) {
         if(String(url).startsWith('https://api.github.com/'))return new Response(JSON.stringify(await boundedJson(response,2000000)),{status:response.status,headers:response.headers});
         return response;
       };
-      const query=alchemyQueryText(blocks)+' scaffolding differentiation learning outcomes';
+      const unitId=body.kind==='lesson'?entity.unit_id:entity.id;
+      // Rank candidates against what the block is for (its lesson and unit), not only the words it shares.
+      const query=alchemyQueryText(blocks)+' '+contextQueryText(entity,unit);
+      const retrieve=deps.retrieve??unitAwareSources;
       let sources;
       if(body.mode==='manual'){
         // The live function limit is 10s: Knowledge search gets a slice of it, and Ann answers without it rather than not at all.
         const retrieval=new AbortController();const stop=()=>retrieval.abort();signal.addEventListener('abort',stop);let retrievalTimer;
         try {
           sources=await Promise.race([
-            (deps.retrieve??retrieveAlchemySources)({store,env,fetchImpl,query,signal:retrieval.signal}),
+            retrieve({store,env,fetchImpl,query,unitId,signal:retrieval.signal}),
             new Promise(resolve=>{retrievalTimer=setTimeout(()=>{retrieval.abort();resolve([]);},deps.retrievalMs??Math.min(3000,Math.floor(deadlineMs*0.35)));})
           ]);
         }catch{sources=[];}
         finally{clearTimeout(retrievalTimer);signal.removeEventListener('abort',stop);}
-      }else sources=await (deps.retrieve??retrieveAlchemySources)({store,env,fetchImpl,query,signal});
+      }else sources=await retrieve({store,env,fetchImpl,query,unitId,signal});
       signal.throwIfAborted();
       let raw={proposals:[]},mode='empty';
       if(sources.length||body.mode==='manual'){
         // Full context is cached by revision; a deterministic compact view bounds prompts.
         const compact=e=>({title:e.title,description:String(e.description||'').slice(0,400),outcome_ids:e.outcome_ids??e.syllabus_outcomes,pedagogical_mode:e.pedagogical_mode,outline:(e.blocks||[]).slice(0,12).map(b=>({id:b.id,type:b.block_type,text:JSON.stringify(b.content).slice(0,60)}))});
-        const prompt=buildAlchemyPrompt({context:{entity:compact(entity),unit:unit?compact(unit):null},blocks,sources:sources.slice(0,6),instruction:body.instruction,previous:body.previous,mode:body.mode});
+        const prompt=buildAlchemyPrompt({context:{entity:compact(entity),unit:unit?compact(unit):null},blocks,sources:sources.slice(0,24),instruction:body.instruction,previous:body.previous,mode:body.mode});
         raw=await (deps.complete??completeAlchemy)({prompt,env:{...env,ALCHEMY_PASSIVE_MODEL:model},fetchImpl,signal}); signal.throwIfAborted(); mode='synthesis';
       }
-      const result={proposals:parseAlchemyProposals(raw,blocks,sources,contextRevision,{allowUncited:body.mode==='manual'}),assessed:blocks.map(b=>b.id),contextRevision,mode};
+      const parsed=parseAlchemyProposals(raw,blocks,sources,contextRevision,{allowUncited:body.mode==='manual'});
+      // Candidates come from a 15-minute index: re-read each cited note so a just-deleted one never becomes a suggestion.
+      const citedIds=[...new Set(parsed.flatMap(p=>p.sources.map(s=>s.id)))];
+      const liveIds=new Set((await Promise.all(citedIds.map(async id=>{const page=await (deps.getSource??getKnowledgePage)(id,{env,fetchImpl});return page&&!isDeletedRecord(page)?id:null;}))).filter(Boolean));
       signal.throwIfAborted();
+      const proposals=parsed.filter(p=>p.sources.every(s=>liveIds.has(s.id)));
+      const result={proposals,assessed:blocks.map(b=>b.id),contextRevision,mode};
+      if(unitId){
+        const why=new Map(proposals.flatMap(p=>p.sources.map(s=>[s.id,p.rationale])));
+        const keep=[...proposals.flatMap(p=>p.sources).map(s=>({...s,why:why.get(s.id)})),...parseUnitNotes(raw,sources)];
+        await addUnitNotes(store,unitId,keep).catch(()=>{});
+        signal.throwIfAborted();
+      }
       if(!body.instruction && !body.previous)for(const block of blocks){
         await budget.remember(individualKey(block),{...result,proposals:result.proposals.filter(p=>p.blockId===block.id),assessed:[block.id]});
         signal.throwIfAborted();

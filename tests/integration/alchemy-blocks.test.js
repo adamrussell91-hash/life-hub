@@ -76,3 +76,14 @@ test('a timeout pauses Ann for a minute, not the escalating lockout',async()=>{
  const {handler,req,store}=setup({deadlineMs:35,complete:async()=>new Promise(()=>{})});assert.equal((await handler(req())).status,504);
  const state=store.rows.get('alchemy/v1/operator-budget').data;assert.ok(state.cooldown-Date.now()<=60000);assert.equal(state.failures||0,0);
 });
+test('cited notes accumulate on the unit shelf and a deleted citation never becomes a suggestion',async()=>{
+ const {handler,req,store}=setup();assert.equal((await handler(req({mode:'manual'}))).status,200);
+ assert.deepEqual(store.rows.get('alchemy/v1/unit-notes/u').data.notes.map(n=>n.id),['p']);
+ const gone=setup({getSource:async()=>({id:'p',status:'trashed'})});const r=await gone.handler(gone.req({mode:'manual',instruction:'tighten it'}));assert.equal(r.status,200);assert.deepEqual((await r.json()).data.proposals,[]);
+});
+test('Ann can target one question inside a tabbed row',async()=>{
+ const {handler,req,store}=setup({complete:async()=>({proposals:[{blockId:'q',rationale:'Ask for effect, not device.',content:{text:'How does the frost imagery shape the tone?'},sourceIds:['p']}]})});
+ const q={id:'q',type:'block',schema_version:1,block_type:'heading',visibility:'student_teacher',variant:'section',order:0,created_at:'2026-10-13T00:00:00Z',updated_at:'2026-10-13T00:00:00Z',content:{text:'What device is used?'}};
+ store.rows.get('lessons/l').data.blocks.push({id:'t',type:'block',block_type:'tabs',visibility:'student_teacher',variant:'medium',created_at:'2026-10-13T00:00:00Z',updated_at:'2026-10-13T00:00:00Z',content:{tabs:[{id:'t1',label:'Practice 1',blocks:[q]},{id:'t2',label:'Practice 2',blocks:[]}]}});
+ const r=await handler(req({mode:'manual',blocks:['t']}));assert.equal(r.status,200);const p=(await r.json()).data.proposals[0];assert.equal(p.blockId,'q');assert.equal(p.replacement.content.text,'How does the frost imagery shape the tone?');
+});
