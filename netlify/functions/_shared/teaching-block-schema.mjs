@@ -884,6 +884,8 @@ var PeerFeedbackBlockSchema = z5.object({
   visibility: VisibilitySchema,
   content: z5.object({
     prompt: z5.string().max(4e3),
+    /** comments: two feedback boxes, one reader. annotate: notes on the text, two readers. */
+    mode: z5.enum(["comments", "annotate"]).default("comments"),
     strength_prompt: z5.string().max(300).default("One thing that works well\u2026"),
     suggestion_prompt: z5.string().max(300).default("One suggestion or question\u2026")
   }),

@@ -2,7 +2,7 @@
 
 A stripped-back version of the annotation block for peer feedback. Every student hands in a short piece of writing. They then annotate two classmates' pieces, one simple layer each, using the teacher's feedback buttons. In return they get their own writing back in an annotation view with two layers, one per reviewer.
 
-It is a concept doc, not a build brief. Nothing builds from it until Adam names a slice. Mockup: [peer-annotation/mockup.html](peer-annotation/mockup.html).
+**Built 17/10/26** as the block's **Notes on the text** mode; see [docs/features/peer-feedback.md](../features/peer-feedback.md). This doc keeps the reasoning. Mockup: [peer-annotation/mockup.html](peer-annotation/mockup.html).
 
 ## Adam's asks
 
@@ -68,13 +68,16 @@ Students can only press buttons and type into the boxes the button asks for. The
 - **2026-10-17:** **The teacher sees everything, by symbol.** In the block's teacher view Adam can pick a symbol (or flick between them) to see that student's writing, both layers on it, and every note that student gave on other pieces.
 - **2026-10-17:** **"Show student symbols" switch** in the block's teacher options, for behaviour issues. When it's on, every student's screen shows their own symbol small in the top right of the block, within one refresh (a few seconds). It's for everyone, which is fine. Adam can then walk the room, or ask a student to scroll back to the block, and match a symbol to a student. Turning it off hides them again. Example: Blue diamond writes something abusive in a note. Adam sees it in the teacher view under Blue diamond, turns the switch on, walks around and finds Blue diamond.
 
+- **2026-10-17:** **Adam can remove any single note by hand**, flagged or not, before or after hand-back.
+- **2026-10-17:** **Small groups:** with only two pieces in the swap, each gets one reviewer.
+
 ## Open questions
 
-- **Moderation for unflagged notes:** flagged notes are held automatically. Should Adam also be able to remove any single note by hand before hand-back?
-- **Small groups:** with only two pieces in the swap, each student can only get one reviewer. Fall back to one each.
+None.
 
 ## History
 
+- **2026-10-17:** Built. Answered the last two questions (remove any note; one reviewer each with two pieces).
 - **2026-10-17:** Confirmed the 20-per-reviewer cap and added the word check. Hidden symbols, the show-symbols switch and the word check are now built into the simple block (PR 896), so annotate mode inherits them.
 - **2026-10-17:** Recorded Adam's answers: one button bank, prose only, plain comments allowed, swap only includes those who hand in, 20-note cap, no teacher layer, symbols hidden from students with a teacher "Show student symbols" switch. Moved the resolved open questions into Decided.
 - **2026-10-17:** Created from Adam's idea while reviewing the peer feedback block (PR 896). Resources-by-teacher decision recorded.
