@@ -1,8 +1,9 @@
 /**
- * Life → Garage & Home. Cars, the home we rent, and investments, kept current
+ * Life → Management. Cars, the home we rent, and investments, kept current
  * by the Mailroom: Gmail is read for anything about each place, and every
  * email waits for a one-tap approve, move or ignore (routine kinds can file
- * themselves). Investments hand off to the Property page for the money.
+ * themselves). The Property tab hands its panel to the Property view for the
+ * investment money.
  */
 import { formatDisplayDate } from '../../../../packages/design-kit/js/format-display-date.js';
 import { showHubToast } from '../../../../packages/design-kit/js/hub-feedback.js';
@@ -22,7 +23,8 @@ const TABS = [
   ['driveway', 'Driveway'],
   ['mailroom', 'Mailroom'],
   ['garage', 'Garage'],
-  ['homes', 'Homes']
+  ['homes', 'Homes'],
+  ['property', 'Property']
 ];
 const FILTERS = [['waiting', 'Waiting'], ['filed', 'Filed'], ['ignored', 'Ignored'], ['all', 'All']];
 const AUTO_LABELS = {
@@ -55,7 +57,7 @@ function statusPill(status) {
 }
 
 const SHELL = `
-<div class="gh-bar" role="toolbar" aria-label="Garage and Home view">
+<div class="gh-bar" role="toolbar" aria-label="Management view">
   <div class="gh-seg" role="tablist" aria-label="Section" data-gh="tabs"></div>
   <div class="gh-bar__actions">
     <button class="btn btn--ghost" type="button" data-gh-open="places">Places</button>
@@ -99,7 +101,7 @@ const SHELL = `
 </dialog>
 `;
 
-export function createGarageHomeView({ root, api, now = () => new Date(), openSection = () => {}, setTitle = () => {} }) {
+export function createGarageHomeView({ root, api, now = () => new Date(), propertyPanel = null, setTitle = () => {} }) {
   const host = () => root.querySelector('#garage-home-dashboard');
   const q = name => host()?.querySelector(`[data-gh="${name}"]`);
   const state = {
@@ -249,8 +251,7 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
   }
 
   function onGo(target) {
-    if (target === 'mailroom' || target === 'garage' || target === 'homes' || target === 'driveway') return setTab(target);
-    if (target === 'property') return openSection('property');
+    if (TABS.some(([id]) => id === target)) return setTab(target);
     const place = placeById(target);
     if (!place) return undefined;
     if (place.type === 'car') {
@@ -509,6 +510,12 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
     paintTabs();
     const body = q('body');
     if (!body) return;
+    // The Property tab is its own view mounted beside this body; only one shows.
+    const onProperty = state.tab === 'property';
+    body.hidden = onProperty;
+    if (onProperty) propertyPanel?.show?.();
+    else propertyPanel?.hide?.();
+    if (onProperty) return;
     if (!state.loaded) {
       body.innerHTML = '<p class="gh-muted">Loading…</p>';
       return;
@@ -548,11 +555,19 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
     if (!tabs) return;
     const waiting = model?.mail.waiting.length ?? 0;
     tabs.innerHTML = TABS.map(([id, label]) => `<button type="button" role="tab" data-gh-tab="${id}" aria-selected="${state.tab === id}">${label}${id === 'mailroom' && waiting ? ` <span class="gh-count">${waiting}</span>` : ''}</button>`).join('');
+    // On a phone the strip scrolls sideways; keep the selected tab in view.
+    const on = tabs.querySelector('[aria-selected="true"]');
+    if (on && tabs.scrollWidth > tabs.clientWidth) {
+      const strip = tabs.getBoundingClientRect();
+      const tab = on.getBoundingClientRect();
+      if (tab.right > strip.right) tabs.scrollLeft += tab.right - strip.right;
+      else if (tab.left < strip.left) tabs.scrollLeft -= strip.left - tab.left;
+    }
   }
 
   function emptyState() {
     return `<article class="gh-tile gh-empty">
-      <p class="gh-kicker">Garage &amp; Home</p>
+      <p class="gh-kicker">Management</p>
       <h2 class="gh-h">Add your places and the inbox starts filing for you</h2>
       <p class="gh-sub">A car, the home you rent and any investment. Give each a few match words (a street name, the car's model) and the Mailroom catches every email about it: bookings, rent receipts, agent statements, inspections.</p>
       <div class="gh-inline-actions"><button class="btn btn--primary" type="button" data-gh-open="places">Add places</button></div>
@@ -625,7 +640,7 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
       <span class="gh-kicker">${escapeHtml(PLACE_TYPE_LABELS.investment)}</span>
       <span class="gh-card__title">${escapeHtml(p.name)}</span>
       <span class="gh-card__stats"><span><b>${inv.packCount}</b> in the FY ${escapeHtml(inv.fy.label)} pack</span>${inv.latestStatement ? `<span>Statement ${inv.latestStatement.facts.number ? `#${inv.latestStatement.facts.number}` : ''} · ${day(inv.latestStatement.date)}</span>` : ''}</span>
-      <span class="gh-sub">Money, loan and tax year live on the Property page.</span>
+      <span class="gh-sub">Money, loan and tax year live in the Property tab.</span>
     </button>`;
   }
 
@@ -836,10 +851,10 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
       ? `<ul class="gh-checklist gh-checklist--dark">${inv.stillNeeded.map(entry => `<li><button type="button" class="gh-check-row" role="checkbox" aria-checked="${entry.done}" data-gh-act="needed" data-gh-place="${escapeHtml(p.id)}" data-gh-item="${escapeHtml(entry.item)}"><i aria-hidden="true"></i>${escapeHtml(entry.item)}</button></li>`).join('')}</ul>`
       : '<p class="gh-sub gh-on-dark-muted">Add the paperwork your accountant still needs in Places.</p>';
     return `<section class="gh-place-section">
-      <div class="gh-section-head"><div><p class="gh-kicker">${escapeHtml(PLACE_TYPE_LABELS.investment)}</p><h2>${escapeHtml(p.name)}</h2></div><button class="btn btn--ghost" type="button" data-gh-go="property">Open the Property page</button></div>
+      <div class="gh-section-head"><div><p class="gh-kicker">${escapeHtml(PLACE_TYPE_LABELS.investment)}</p><h2>${escapeHtml(p.name)}</h2></div><button class="btn btn--ghost" type="button" data-gh-go="property">Open the Property tab</button></div>
       <div class="gh-grid gh-grid--home">
         <article class="gh-tile gh-pack">
-          <div class="gh-pack__head"><div><p class="gh-kicker">Tax-time pack · FY ${escapeHtml(inv.fy.label)}</p><p class="gh-sub">Built from filed mail. The Property page keeps the money; this keeps the paperwork.</p></div>
+          <div class="gh-pack__head"><div><p class="gh-kicker">Tax-time pack · FY ${escapeHtml(inv.fy.label)}</p><p class="gh-sub">Built from filed mail. The Property tab keeps the money; this keeps the paperwork.</p></div>
           <p class="gh-ring gh-ring--light"><b>${Math.round(inv.yearProgress * 100)}%</b><small>of the year</small></p></div>
           ${pack}
         </article>
@@ -849,9 +864,10 @@ export function createGarageHomeView({ root, api, now = () => new Date(), openSe
   }
 
   return {
-    async show() {
+    async show({ tab } = {}) {
       build();
-      setTitle('Garage & Home');
+      if (tab) state.tab = TABS.some(([id]) => id === tab) ? tab : state.tab;
+      setTitle('Management');
       if (!state.loaded) update();
       await run(() => api.load());
     },
