@@ -1,4 +1,5 @@
 import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
+import { createKaplanEditor } from '@/blocks/kaplan-editor';
 import { createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createAlchemyButton } from '@/alchemy/block-button';
 import {
@@ -224,7 +225,13 @@ export function editorShell<T extends Block>(
   shell.className = 'block-editor';
   shell.dataset.blockId = block.id;
   shell.dataset.blockType = block.block_type;
-  shell.append(createVisibilitySelect(block, onChange, getLatest), fields);
+  const visibility = createVisibilitySelect(block, onChange, getLatest);
+  shell.addEventListener('kaplan-setup-toggle', (event) => {
+    const open = (event as CustomEvent<{ open: boolean }>).detail.open;
+    fields.hidden = open;
+    visibility.hidden = open;
+  });
+  shell.append(visibility, createKaplanEditor({ getBlock: getLatest, onChange }), fields);
   return shell;
 }
 
