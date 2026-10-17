@@ -58,20 +58,26 @@ Each open tool has a full-screen button for the projector, and a close button th
 | Coin flip | Heads or tails, with a running tally | Teacher and students |
 | Team scoreboard | Two to six named teams, +1, +5 and −1, with the leader starred | Teacher |
 | Timer presets | One tap loads a saved stack: Read, Write; Think, Pair, Share; Plan, Draft, Edit; Silent reading 15 | Teacher |
-| Countdown header | Not a toolbox tool. A header-style block for the **assessment page**: task name, due date and time, school days left, and a tick bar of days gone | Everyone who opens the assessment page |
+| Countdown header | Not a toolbox tool. A header-style block for the **assessment page**: task name, due date and time, days left, and a tick bar of days gone. Counts every day, including weekends, holidays and pupil-free days | Everyone who opens the assessment page |
 
 Student toolbox: timer, stopwatch, technique spinner, coin and dice.
 
 Not chosen for now: wait-time, traffic light, sentence starter spinner, writing prompt, who's next queue, seat shuffle.
 
+## Technique scan
+
+- **Source:** the Passage Scanner from the Periodic Table widget. It uses the OpenAI API, which is fine.
+- **Teacher checks first.** Adam reviews and ticks the scan's list before students get anything. Unreviewed hits and the model's explanations never reach students.
+- **Plumbing built:** job and poll on `/api/text-tools` (`tool: 'techniques'`), reply parser, save on `settings.technique_scan`, approval, spinner list and the student filter. Tests cover each part.
+- **Left for ChatGPT:** the scan call itself, the teacher review screen and the spinner hook-up. See [classroom-tools/technique-scan-todo.md](classroom-tools/technique-scan-todo.md).
+
 ## Open questions
 
-- **Which scan does the technique spinner use?** Adam says a scan-text function already exists. The Periodic Table widget has a Scanner pane (`widgets` repo). The Teaching Hub's own text scan today is the Dictionary scan for word help (`blocks/text-tools-client.ts`), which finds words, not techniques. Confirm which one, and whether its results are saved on the block (like `settings.word_help`) so the spinner does not re-scan every lesson.
-- **Who reviews the scan?** The annotation-block doc says AI technique suggestions are teacher-side only until accepted. The spinner should probably follow the same rule: the teacher accepts the found list once, then students spin through it.
-- **Countdown school days:** weekends are left out. Should it also leave out school holidays and pupil-free days from the term calendar?
+- None open. The next step is building the classroom tools block itself.
 
 ## History
 
+- **2026-10-17:** The technique scan uses the widget's Passage Scanner, and Adam checks the list before students see it. Plumbing built, with a to-do list for ChatGPT. The countdown counts every day, including weekends, holidays and pupil-free days.
 - **2026-10-17:** Adam chose the technique spinner (scan first, relevant techniques only), stopwatch, coin flip, team scoreboard, timer presets, and a countdown header block for the assessment page. Skip applies to the name picker only. No preferred-name field. Mockup updated.
 - **2026-10-17:** Skip in picker lives only in the class Students section, students get their own timer copy, mute switch added. Suggested a list of further tools. Mockup updated.
 - **2026-10-17:** Adam settled four questions: divider and block both, names on the class, timer stacks saved with the lesson, students get timer and dice only. Mockup gains a Teacher/Student view switch.
