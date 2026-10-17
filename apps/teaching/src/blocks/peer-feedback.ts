@@ -56,23 +56,24 @@ function mountExchange(block: PeerBlock, lessonId: string, teacher: boolean): HT
   let identity = load<Identity | null>(`${storage}:identity`, null);
   let state: State = { phase: 'idle' }; let previous = ''; let busy = false; let joinCode = '';
   const excluded = new Set<string>();
-  async function request(action = 'status', extra: Record<string, unknown> = {}) {
+  async function request(action = 'status', extra: Record<string, unknown> = {}, preserveError = false) {
     if (busy) return;
     busy = true;
+    root.querySelectorAll('button').forEach(b => { b.disabled = true; });
     try {
       const next = await apiPost<State>(endpoint, { ...identity, action, ...extra });
       state = next;
       if (identity && state.session && identity.session !== state.session) { identity = null; localStorage.removeItem(`${storage}:identity`); }
       const signature = JSON.stringify(next);
       if (signature !== previous || action !== 'status') { previous = signature; paint(); }
-      status.textContent = '';
+      if (!preserveError) status.textContent = '';
     } catch (e) {
       status.textContent = e instanceof Error ? e.message : 'Unable to load activity. Try again.';
       if (identity && e instanceof Error && /identity|activity code|Join again/.test(e.message)) {
         identity = null; localStorage.removeItem(`${storage}:identity`); previous = '';
-        window.setTimeout(() => { void request(); }, 0);
+        window.setTimeout(() => { void request('status', {}, true); }, 0);
       }
-    } finally { busy = false; }
+    } finally { busy = false; root.querySelectorAll('button').forEach(b => { b.disabled = false; }); }
   }
   function draftKey(field: string) { return `${storage}:${state.session}:${identity?.identity ?? 'draft'}:${field}`; }
   function textField(title: string, field: string, max: number, host: HTMLElement = body) {
@@ -104,7 +105,7 @@ function mountExchange(block: PeerBlock, lessonId: string, teacher: boolean): HT
           const include = el('label'); const check = el('input'); check.type = 'checkbox'; check.checked = !excluded.has(row.id);
           check.addEventListener('change', () => { if (check.checked) excluded.delete(row.id); else excluded.add(row.id); }); include.append(check, document.createTextNode(' Include in peer review')); card.append(include);
         }
-        if (row.review) card.append(el('p', row.review.strength), el('p', row.review.suggestion));
+        if (row.review) card.append(el('h5', 'Feedback given'), el('p', row.review.strength), el('p', row.review.suggestion));
         body.append(card);
       }
       return;
@@ -155,6 +156,6 @@ function mountExchange(block: PeerBlock, lessonId: string, teacher: boolean): HT
   }
   root.append(button('Refresh activity', () => { void request(); }));
   void request();
-  const poll = () => { window.setTimeout(() => { if (!root.isConnected) return; void request().finally(poll); }, 8000); }; poll();
+  const poll = () => { window.setTimeout(() => { if (!root.isConnected) return; void request('status', {}, true).finally(poll); }, 8000); }; poll();
   return root;
 }
