@@ -29,6 +29,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   attachment: 'Link a downloadable file such as a PDF or worksheet.',
   accordion: 'Collapse and expand sections to reduce visual clutter.',
   table: 'Present rows and columns of structured data.',
+  peer_feedback: 'Write, exchange anonymous peer feedback, and reflect together.',
   question_set: 'Add multiple-choice or short-answer questions.',
   flashcards: 'Flip cards for vocabulary or quick recall practice.',
   cloze: 'Fill-in-the-blank sentences for guided retrieval.',

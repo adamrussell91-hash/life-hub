@@ -1,5 +1,7 @@
 # Life Hub
 
+**Cleanup audit (17 October 2026):** [`CLEANUP-AUDIT.md`](CLEANUP-AUDIT.md) — what is still in use across the Life Hub repos and websites, and what looks leftover. Nothing has been deleted.
+
 Private personal dashboard and conversational logging application.
 
 **Hub consolidation (Claude Code overseer):** [`docs/consolidation/OVERSEER.md`](docs/consolidation/OVERSEER.md) — role, scope, and checkpoint prompts. Claude Code also loads root [`CLAUDE.md`](CLAUDE.md) when opened in this repo.
