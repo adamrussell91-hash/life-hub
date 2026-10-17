@@ -17,7 +17,11 @@ const RENDERERS = {
   problem_statement: ['problem-statement', 'createProblemStatementView'],
   gap_basic: ['gap-basic', 'createGapBasicView'],
   gap_radar: ['gap-radar', 'createGapRadarView'],
-  smart: ['smart', 'createSmartView']
+  smart: ['smart', 'createSmartView'],
+  // The record takes a whole session, not a run.
+  record: ['record', 'createRecordView'],
+  record_polya: ['record', 'createRecordView'],
+  record_triz: ['record', 'createRecordView']
 };
 
 const args = process.argv.slice(2);

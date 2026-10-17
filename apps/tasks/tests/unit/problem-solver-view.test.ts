@@ -69,3 +69,49 @@ describe('canvas', () => {
     expect(host.querySelector('.ps-canvas__title .ps-emblem svg')).not.toBeNull();
   });
 });
+
+describe('canvas record', () => {
+  const runs = (status: 'active' | 'done'): PsSession['define'] => ({
+    runs: [
+      { id: 'r1', tool: 'five_whys', status: 'switched', switchReason: 'Branches', nodes: [{ id: 'n', slot: 'problem', text: 'Late rota', state: 'accepted', skills: [], turnId: 't' }], edges: [] },
+      { id: 'r2', tool: 'problem_tree', status, nodes: [{ id: 'n', slot: 'trunk', text: 'Late rota', state: 'accepted', skills: [], turnId: 't' }], edges: [] }
+    ],
+    finishedEarly: false,
+    exitObjection: null
+  });
+
+  it('opens on the record once defined and shows the chart from the define step', () => {
+    const host = document.createElement('div');
+    const canvas = mountCanvas(host);
+    canvas.update(session({ phase: 'defined', status: 'defined', define: runs('done') }));
+    expect(host.querySelector('[data-step="define"]')!.getAttribute('data-state')).toBe('done');
+    expect(host.querySelector('.ps-tree')).toBeNull();
+    host.querySelector<HTMLButtonElement>('[data-step="define"] button')!.click();
+    expect(host.querySelector('.ps-tree')).not.toBeNull();
+    host.querySelector<HTMLButtonElement>('.ps-canvas__toggle')!.click();
+    expect(host.querySelector('.ps-record')).not.toBeNull();
+  });
+
+  it('opens a switched run from its filmstrip card', () => {
+    const host = document.createElement('div');
+    const canvas = mountCanvas(host);
+    canvas.update(session({ phase: 'defined', status: 'defined', define: runs('done') }));
+    host.querySelector<HTMLButtonElement>('[data-run="r1"] button')!.click();
+    expect(host.querySelector('.ps-whys')).not.toBeNull();
+    expect(host.querySelector('.ps-canvas__toggle')!.textContent).toBe('Back to record');
+  });
+
+  it('shows the active chart during define with a Record toggle, and switches to the record when defined', () => {
+    const host = document.createElement('div');
+    const canvas = mountCanvas(host);
+    canvas.update(session({ define: runs('active') }));
+    expect(host.querySelector('.ps-tree')).not.toBeNull();
+    expect(host.querySelector('.ps-canvas__toggle')!.textContent).toBe('Record');
+    host.querySelector<HTMLButtonElement>('.ps-canvas__toggle')!.click();
+    expect(host.querySelector('[data-step="define"]')!.getAttribute('data-state')).toBe('current');
+    canvas.update(session({ define: runs('active') }));
+    expect(host.querySelector('.ps-record')).not.toBeNull();
+    canvas.update(session({ phase: 'defined', status: 'defined', define: runs('done') }));
+    expect(host.querySelector('[data-step="define"]')!.getAttribute('data-state')).toBe('done');
+  });
+});
