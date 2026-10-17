@@ -798,7 +798,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
   return {
     root,
     update() {
-      if (tab === 'settings') paint();
+      // Settings controls already show what the teacher typed; repainting them would steal focus.
       if (tab === 'tray' && !editing) paint();
     },
     dispose() {

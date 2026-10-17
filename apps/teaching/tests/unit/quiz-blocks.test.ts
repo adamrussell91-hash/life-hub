@@ -112,3 +112,18 @@ describe('question player', () => {
     expect(onChange).toHaveBeenCalledWith({ selected: [expect.any(String)] });
   });
 });
+
+describe('marked view without the answer', () => {
+  it('colours a right pick green even when the answer is held back', () => {
+    const { question, key } = splitQuestion({ id: 'q', kind: 'true_false', prompt: 'Sky is blue', marks: 1, answer: true });
+    const mark = markResponse(key, { value: true });
+    const view = mountQuestionPlayer({ question, response: { value: true }, result: { mark, key: null } });
+    const trueBtn = [...view.querySelectorAll<HTMLButtonElement>('.qz-toggle')].find((b) => b.textContent === 'True')!;
+    expect(trueBtn.dataset.state).toBe('right');
+    const mc = splitQuestion({ id: 'm', kind: 'multiple_choice', prompt: 'Pick', marks: 1, options: [{ id: 'a', text: 'Yes' }, { id: 'b', text: 'No' }], correct: ['a'] });
+    const yes = mc.question.kind === 'multiple_choice' ? mc.question.options.find((o) => o.text === 'Yes')!.id : '';
+    const mcView = mountQuestionPlayer({ question: mc.question, response: { selected: [yes] }, result: { mark: markResponse(mc.key, { selected: [yes] }), key: null } });
+    expect([...mcView.querySelectorAll<HTMLButtonElement>('.qz-choice')].find((b) => b.textContent?.includes('Yes'))!.dataset.state).toBe('right');
+    expect(mcView.textContent).not.toContain('Answer:');
+  });
+});

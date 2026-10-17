@@ -3,7 +3,10 @@
  *
  *   quiz/{lesson}/current                            { version }
  *   quiz/{lesson}/keys/{version}                     { order, questions: { id: { question, key } }, settings }
- *   quiz/{lesson}/attempts/{device}/{n}              one attempt (server writes only)
+ *   quiz/{lesson}/attempts/{device}/{n}              an attempt's start: version, deadline
+ *   quiz/{lesson}/hints/{device}/{n}/{question}      a hint opened (create-only)
+ *   quiz/{lesson}/checked/{device}/{n}/{question}    an answer checked in instant mode (create-only)
+ *   quiz/{lesson}/results/{device}/{n}               the hand-in (create-only)
  *   quiz/{lesson}/marks/{device}~{n}                 { question id: marks } teacher marking
  *   quiz/{lesson}/release                            { released } when feedback waits for the teacher
  *   quiz/{lesson}/live/active                        live round (teacher writes only)
@@ -47,6 +50,11 @@ const keys = (lesson) => ({
   version: (v) => `quiz/${lesson}/keys/${v}`,
   attempts: (device) => `quiz/${lesson}/attempts/${device}/`,
   attempt: (device, n) => `quiz/${lesson}/attempts/${device}/${n}`,
+  hints: (device, n) => `quiz/${lesson}/hints/${device}/${n}/`,
+  hint: (device, n, id) => `quiz/${lesson}/hints/${device}/${n}/${id}`,
+  checked: (device, n) => `quiz/${lesson}/checked/${device}/${n}/`,
+  check: (device, n, id) => `quiz/${lesson}/checked/${device}/${n}/${id}`,
+  result: (device, n) => `quiz/${lesson}/results/${device}/${n}`,
   marks: (device, n) => `quiz/${lesson}/marks/${device}~${n}`,
   release: `quiz/${lesson}/release`,
   live: `quiz/${lesson}/live/active`,
@@ -165,17 +173,26 @@ function shownKey(key) {
 
 /* ── Marking an attempt ────────────────────────────────────────────── */
 
-/** Marks every question in an attempt, applying hint costs and any teacher marks. */
-function scoreAttempt(record, attempt, teacherMarks, hintCost) {
+/** A question in a record, ignoring inherited names like `__proto__`. */
+function entryFor(record, id) {
+  return typeof id === 'string' && Object.hasOwn(record.questions, id) ? record.questions[id] : null;
+}
+
+/** Students' copy of a record's questions, in quiz order. */
+const publicQuestions = (record) => record.order.map((id) => record.questions[id].question);
+
+/** Marks every question in a handed-in attempt, applying hint costs and any teacher marks. */
+function scoreAttempt(record, result, teacherMarks) {
+  const hintCost = resolveQuizSettings(record.settings).hint_cost;
   const rows = record.order.map((id) => {
     const entry = record.questions[id];
-    const given = attempt.responses?.[id] ?? null;
-    const mark = attempt.marks?.[id] ?? markResponse(entry.key, given);
-    const hinted = !!attempt.hints?.[id];
+    const given = result.responses?.[id] ?? null;
+    const mark = result.marks?.[id] ?? markResponse(entry.key, given);
+    const hinted = !!result.hints?.[id];
     const override = teacherMarks?.[id];
     let awarded = mark.score === null ? null : afterHint(mark.score, mark.max, hinted, hintCost);
     if (typeof override === 'number') awarded = Math.max(0, Math.min(mark.max, roundMarks(override)));
-    return { id, mark, awarded, hinted, response: given, confidence: attempt.confidence?.[id] ?? null };
+    return { id, mark, awarded, hinted, response: given, confidence: result.confidence?.[id] ?? null };
   });
   const max = rows.reduce((s, r) => s + r.mark.max, 0);
   const score = rows.reduce((s, r) => s + (r.awarded ?? 0), 0);
@@ -188,10 +205,32 @@ const ATTEMPT_ID = /^([a-f0-9]{24})~(\d{1,2})$/;
 
 /* ── Students ──────────────────────────────────────────────────────── */
 
+/**
+ * One attempt, assembled from create-only pieces so two requests at once can
+ * never undo each other: the start, one blob per hint opened, one per
+ * checked answer, and the hand-in.
+ */
+async function loadAttempt(store, k, device, start) {
+  const [hintKeys, answerKeys, result] = await Promise.all([
+    listBlobKeys(store, k.hints(device, start.n)),
+    listBlobKeys(store, k.checked(device, start.n)),
+    read(store, k.result(device, start.n))
+  ]);
+  const answers = {};
+  await Promise.all(
+    answerKeys.map(async (key) => {
+      const a = await read(store, key);
+      if (a) answers[key.slice(key.lastIndexOf('/') + 1)] = a;
+    })
+  );
+  const hints = Object.fromEntries(hintKeys.map((key) => [key.slice(key.lastIndexOf('/') + 1), true]));
+  return { ...start, hints, answers, result };
+}
+
 async function deviceAttempts(store, k, device) {
   const list = await listBlobKeys(store, k.attempts(device));
-  const rows = await Promise.all(list.map((key) => read(store, key)));
-  return rows.filter(Boolean).sort((a, b) => a.n - b.n);
+  const starts = (await Promise.all(list.map((key) => read(store, key)))).filter(Boolean).sort((a, b) => a.n - b.n);
+  return Promise.all(starts.map((start) => loadAttempt(store, k, device, start)));
 }
 
 export async function quizAction(store, lessonId, body) {
@@ -200,14 +239,17 @@ export async function quizAction(store, lessonId, body) {
   if (action.startsWith('live_')) return liveStudent(store, lessonId, body, action);
   if (!['status', 'start', 'hint', 'check', 'submit'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const { record, settings, k } = await loadQuiz(store, lessonId);
+  const now = Date.now();
   const closesAt = Date.parse(settings.closes_at ?? '');
-  const closed = Number.isFinite(closesAt) && closesAt < Date.now();
+  const closed = Number.isFinite(closesAt) && closesAt < now;
   const live = await read(store, k.live);
   const shared = {
     version: record.version,
     open: !closed,
     attempts_allowed: settings.attempts,
-    live: !!live && live.expires > Date.now() && live.phase !== 'done'
+    settings: { ...publicSettings(record.settings), version: record.version, question_count: record.order.length, total_marks: record.order.reduce((sum, id) => sum + record.questions[id].key.marks, 0) },
+    questions: publicQuestions(record),
+    live: !!live && live.expires > now && live.phase !== 'done'
   };
   if (!body.token) {
     if (action !== 'status') reject(400, 'no_device', 'This browser needs to allow saving to take the quiz.');
@@ -215,67 +257,63 @@ export async function quizAction(store, lessonId, body) {
   }
   if (!validToken(body.token)) reject(400, 'no_device', 'This browser needs to allow saving to take the quiz.');
   const device = deviceHash(body.token);
-  const attempts = await deviceAttempts(store, k, device);
-  let current = attempts.find((a) => !a.submitted_at) ?? null;
-  const now = Date.now();
+  let attempts = await deviceAttempts(store, k, device);
+  let current = attempts.find((a) => !a.result) ?? null;
   let reply = null;
 
-  const save = (attempt) => store.setJSON(k.attempt(device, attempt.n), attempt);
+  // An open attempt is always marked against the version it started on, so a
+  // republish mid-quiz never loses or mis-marks anyone's answers.
+  const attemptRecord = current ? await recordFor(store, lessonId, current.version, record) : record;
+  const attemptSettings = resolveQuizSettings(attemptRecord.settings);
+  const deadline = Date.parse(current?.deadline ?? '');
+  const pastDeadline = Number.isFinite(deadline) && now > deadline + GRACE_MS;
   const needCurrent = () => {
     if (!current) reject(409, 'no_attempt', 'Start the quiz first.');
-    if (current.version !== record.version) reject(409, 'republished', 'Your teacher updated this quiz. Start again.');
   };
+  const needTime = () => {
+    if (closed) reject(409, 'closed', 'This quiz has closed. Hand in what you have.');
+    if (pastDeadline && attemptSettings.timer_hard) reject(409, 'time_up', 'Time’s up. Hand in what you have.');
+  };
+  const lastAttempt = (a) => a.n + 1 >= attemptSettings.attempts;
 
   if (action === 'start' && !current) {
     if (closed) reject(409, 'closed', 'This quiz has closed.');
-    const used = attempts.filter((a) => !a.abandoned).length;
-    if (used >= settings.attempts) reject(409, 'no_attempts', settings.attempts === 1 ? 'You’ve already done this quiz.' : 'You’ve used all your attempts.');
-    current = {
+    if (attempts.length >= settings.attempts) reject(409, 'no_attempts', settings.attempts === 1 ? 'You’ve already done this quiz.' : 'You’ve used all your attempts.');
+    const start = {
       n: attempts.reduce((top, a) => Math.max(top, a.n + 1), 0),
       version: record.version,
       started_at: new Date(now).toISOString(),
-      deadline: settings.timer_minutes ? new Date(now + settings.timer_minutes * 60_000).toISOString() : null,
-      hints: {},
-      answers: {}
+      deadline: settings.timer_minutes ? new Date(now + settings.timer_minutes * 60_000).toISOString() : null
     };
-    const created = await store.setJSON(k.attempt(device, current.n), current, { onlyIfNew: true });
-    if (created?.modified === false) current = await read(store, k.attempt(device, current.n));
-  }
-  if (current && current.version !== record.version && action === 'start') {
-    // The quiz changed under an unfinished attempt: close it out so the student can start fresh.
-    current = { ...current, submitted_at: new Date(now).toISOString(), abandoned: true };
-    await save(current);
-    reject(409, 'republished', 'Your teacher updated this quiz. Press Start again.');
+    await store.setJSON(k.attempt(device, start.n), start, { onlyIfNew: true });
+    attempts = await deviceAttempts(store, k, device);
+    current = attempts.find((a) => !a.result) ?? null;
   }
 
   if (action === 'hint') {
     needCurrent();
-    const entry = record.questions[body.question_id];
+    needTime();
+    const entry = entryFor(attemptRecord, body.question_id);
     if (!entry?.key.hint) reject(404, 'no_hint', 'There’s no hint for this question.');
-    if (!current.hints[body.question_id]) {
-      current = { ...current, hints: { ...current.hints, [body.question_id]: true } };
-      await save(current);
-    }
+    await store.setJSON(k.hint(device, current.n, body.question_id), { at: new Date(now).toISOString() }, { onlyIfNew: true });
+    current.hints[body.question_id] = true;
     reply = { hint: entry.key.hint };
   }
 
   if (action === 'check') {
     needCurrent();
-    if (settings.feedback !== 'instant') reject(409, 'not_instant', 'Answers are marked at the end of this quiz.');
-    const entry = record.questions[body.question_id];
+    needTime();
+    if (attemptSettings.feedback !== 'instant') reject(409, 'not_instant', 'Answers are marked at the end of this quiz.');
+    const entry = entryFor(attemptRecord, body.question_id);
     if (!entry) reject(404, 'not_found', 'Unknown question.');
-    if (current.answers[body.question_id]) reject(409, 'answered', 'You’ve already answered this one.');
     const response = cleanResponse(entry.key.kind, body.response);
     const mark = markResponse(entry.key, response);
-    current = {
-      ...current,
-      answers: {
-        ...current.answers,
-        [body.question_id]: { response, mark, confidence: confidenceOf(body.confidence), at: new Date(now).toISOString() }
-      }
-    };
-    await save(current);
-    reply = { mark, key: shownKey(entry.key) };
+    const answer = { response, mark, confidence: confidenceOf(body.confidence), at: new Date(now).toISOString() };
+    const written = await store.setJSON(k.check(device, current.n, body.question_id), answer, { onlyIfNew: true });
+    if (written?.modified === false || current.answers[body.question_id]) reject(409, 'answered', 'You’ve already answered this one.');
+    current.answers[body.question_id] = answer;
+    // The right answer only shows on the last go, so it can't be carried into the next attempt.
+    reply = { mark, key: lastAttempt(current) ? shownKey(entry.key) : null };
   }
 
   if (action === 'submit') {
@@ -284,8 +322,8 @@ export async function quizAction(store, lessonId, body) {
     const confidence = {};
     const marks = {};
     const given = body.responses && typeof body.responses === 'object' ? body.responses : {};
-    for (const id of record.order) {
-      const entry = record.questions[id];
+    for (const id of attemptRecord.order) {
+      const entry = attemptRecord.questions[id];
       const instant = current.answers[id];
       if (instant) {
         responses[id] = instant.response;
@@ -293,31 +331,35 @@ export async function quizAction(store, lessonId, body) {
         if (instant.confidence) confidence[id] = instant.confidence;
         continue;
       }
-      const response = cleanResponse(entry.key.kind, given[id]);
+      const response = cleanResponse(entry.key.kind, Object.hasOwn(given, id) ? given[id] : null);
       if (response && hasAnswer(response)) responses[id] = response;
       marks[id] = markResponse(entry.key, response);
       const c = confidenceOf(body.confidence?.[id]);
       if (c) confidence[id] = c;
     }
-    const deadline = Date.parse(current.deadline ?? '');
-    current = {
-      ...current,
+    const result = {
       responses,
       confidence,
       marks,
+      hints: current.hints,
       submitted_at: new Date(now).toISOString(),
-      overtime: Number.isFinite(deadline) && now > deadline + GRACE_MS
+      overtime: pastDeadline || closed
     };
-    await save(current);
+    await store.setJSON(k.result(device, current.n), result, { onlyIfNew: true });
+    attempts = await deviceAttempts(store, k, device);
+    current = null;
   }
 
   const released = settings.feedback !== 'released' || !!(await read(store, k.release))?.released;
-  const done = (await deviceAttempts(store, k, device)).filter((a) => a.submitted_at && !a.abandoned);
+  const done = attempts.filter((a) => a.result);
+  const used = attempts.length;
+  // Right answers wait until no attempts are left or the quiz has closed.
+  const revealKeys = closed || used >= settings.attempts;
   const results = await Promise.all(
     done.map(async (a) => {
       const rec = await recordFor(store, lessonId, a.version, record);
-      const scored = scoreAttempt(rec, a, await read(store, k.marks(device, a.n)), settings.hint_cost);
-      const base = { n: a.n, submitted_at: a.submitted_at, released };
+      const scored = scoreAttempt(rec, a.result, await read(store, k.marks(device, a.n)));
+      const base = { n: a.n, submitted_at: a.result.submitted_at, released };
       if (!released) return base;
       return {
         ...base,
@@ -325,32 +367,39 @@ export async function quizAction(store, lessonId, body) {
         max: scored.max,
         pending: scored.pending,
         same_version: a.version === record.version,
+        keys_shown: revealKeys,
         rows: scored.rows.map((r) => ({
           id: r.id,
+          question: rec.questions[r.id].question,
           mark: r.mark,
           awarded: r.awarded,
           hinted: r.hinted,
           response: r.response,
-          key: shownKey(rec.questions[r.id].key)
+          key: revealKeys ? shownKey(rec.questions[r.id].key) : null
         }))
       };
     })
   );
 
-  const openAttempt = current && !current.submitted_at && current.version === record.version ? current : null;
+  const open = current && !current.result ? current : null;
   return {
     ...shared,
     ...(reply ?? {}),
-    attempts_used: done.length + (openAttempt ? 1 : 0),
+    attempts_used: used,
     now: new Date(now).toISOString(),
-    current: openAttempt
+    current: open
       ? {
-          n: openAttempt.n,
-          started_at: openAttempt.started_at,
-          deadline: openAttempt.deadline,
-          hints: Object.fromEntries(Object.keys(openAttempt.hints ?? {}).map((id) => [id, record.questions[id]?.key.hint ?? ''])),
+          n: open.n,
+          version: open.version,
+          started_at: open.started_at,
+          deadline: open.deadline,
+          settings: { ...publicSettings(attemptRecord.settings), version: attemptRecord.version },
+          questions: publicQuestions(attemptRecord),
+          hints: Object.fromEntries(Object.keys(open.hints).filter((id) => entryFor(attemptRecord, id)).map((id) => [id, attemptRecord.questions[id].key.hint ?? ''])),
           answers: Object.fromEntries(
-            Object.entries(openAttempt.answers ?? {}).map(([id, a]) => [id, { response: a.response, mark: a.mark, key: shownKey(record.questions[id].key) }])
+            Object.entries(open.answers)
+              .filter(([id]) => entryFor(attemptRecord, id))
+              .map(([id, a]) => [id, { response: a.response, mark: a.mark, key: lastAttempt(open) ? shownKey(attemptRecord.questions[id].key) : null }])
           )
         }
       : null,
@@ -389,15 +438,20 @@ export async function quizTeacherAction(store, lessonId, body) {
     await store.setJSON(k.release, { released: body.released === true, at: new Date().toISOString() });
   }
 
-  if (action === 'mark') {
+  const handedIn = async () => {
     const match = ATTEMPT_ID.exec(String(body.attempt_id ?? ''));
     if (!match) reject(400, 'bad_request', 'Unknown attempt.');
-    const attempt = await read(store, k.attempt(match[1], Number(match[2])));
-    if (!attempt?.submitted_at) reject(404, 'not_found', 'That attempt is gone.');
-    const rec = await recordFor(store, lessonId, attempt.version, record);
-    const entry = rec.questions[body.question_id];
+    const [device, n] = [match[1], Number(match[2])];
+    const [start, result] = await Promise.all([read(store, k.attempt(device, n)), read(store, k.result(device, n))]);
+    if (!start || !result) reject(404, 'not_found', 'That attempt is gone.');
+    return { device, n, start, result, rec: await recordFor(store, lessonId, start.version, record) };
+  };
+
+  if (action === 'mark') {
+    const { device, n, rec } = await handedIn();
+    const entry = entryFor(rec, body.question_id);
     if (!entry) reject(404, 'not_found', 'Unknown question.');
-    const existing = (await read(store, k.marks(match[1], Number(match[2])))) ?? {};
+    const existing = (await read(store, k.marks(device, n))) ?? {};
     const next = { ...existing };
     if (body.score === null) delete next[body.question_id];
     else {
@@ -405,53 +459,51 @@ export async function quizTeacherAction(store, lessonId, body) {
       if (!Number.isFinite(score) || score < 0 || score > entry.key.marks) reject(400, 'bad_marks', `Give between 0 and ${entry.key.marks} marks.`);
       next[body.question_id] = roundMarks(score);
     }
-    await store.setJSON(k.marks(match[1], Number(match[2])), next);
+    await store.setJSON(k.marks(device, n), next);
   }
 
   if (action === 'attempt' || action === 'mark') {
-    const match = ATTEMPT_ID.exec(String(body.attempt_id ?? ''));
-    if (!match) reject(400, 'bad_request', 'Unknown attempt.');
-    const attempt = await read(store, k.attempt(match[1], Number(match[2])));
-    if (!attempt?.submitted_at) reject(404, 'not_found', 'That attempt is gone.');
-    const rec = await recordFor(store, lessonId, attempt.version, record);
-    const scored = scoreAttempt(rec, attempt, await read(store, k.marks(match[1], Number(match[2]))), settings.hint_cost);
+    const { device, n, start, result, rec } = await handedIn();
+    const scored = scoreAttempt(rec, result, await read(store, k.marks(device, n)));
     return {
       published: true,
       attempt: {
-        id: attemptId(match[1], Number(match[2])),
-        device: match[1].slice(0, 6),
-        n: attempt.n,
-        submitted_at: attempt.submitted_at,
-        overtime: !!attempt.overtime,
+        id: attemptId(device, n),
+        device: device.slice(0, 6),
+        n,
+        submitted_at: result.submitted_at,
+        overtime: !!result.overtime,
         score: scored.score,
         max: scored.max,
         pending: scored.pending,
+        current: start.version === record.version,
         rows: scored.rows.map((r) => ({ ...r, question: rec.questions[r.id].question, key: rec.questions[r.id].key }))
       }
     };
   }
 
   // results
-  const attemptKeys = await listBlobKeys(store, `quiz/${lessonId}/attempts/`);
-  const attempts = (await Promise.all(attemptKeys.map((key) => read(store, key)))).map((a, i) => (a ? { a, key: attemptKeys[i] } : null)).filter(Boolean);
+  const resultKeys = await listBlobKeys(store, `quiz/${lessonId}/results/`);
   const stats = new Map(record.order.map((id) => [id, { answered: 0, total: 0, full: 0, pending: 0, hinted: 0, confidence: { 1: [0, 0], 2: [0, 0], 3: [0, 0] }, picks: {} }]));
   const rows = [];
-  for (const { a, key } of attempts) {
-    if (!a.submitted_at || a.abandoned) continue;
-    const device = key.split('/')[3];
-    const rec = await recordFor(store, lessonId, a.version, record);
-    const scored = scoreAttempt(rec, a, await read(store, k.marks(device, a.n)), settings.hint_cost);
+  for (const key of resultKeys) {
+    const [, , , device, nText] = key.split('/');
+    const n = Number(nText);
+    const [start, result] = await Promise.all([read(store, k.attempt(device, n)), read(store, key)]);
+    if (!start || !result) continue;
+    const rec = await recordFor(store, lessonId, start.version, record);
+    const scored = scoreAttempt(rec, result, await read(store, k.marks(device, n)));
     rows.push({
-      id: attemptId(device, a.n),
+      id: attemptId(device, n),
       device: device.slice(0, 6),
-      n: a.n,
-      started_at: a.started_at,
-      submitted_at: a.submitted_at,
-      overtime: !!a.overtime,
+      n,
+      started_at: start.started_at,
+      submitted_at: result.submitted_at,
+      overtime: !!result.overtime,
       score: scored.score,
       max: scored.max,
       pending: scored.pending,
-      current: a.version === record.version
+      current: start.version === record.version
     });
     for (const r of scored.rows) {
       const s = stats.get(r.id);
@@ -465,7 +517,7 @@ export async function quizTeacherAction(store, lessonId, body) {
         s.confidence[r.confidence][0] += 1;
         if (r.awarded !== null && r.awarded >= r.mark.max) s.confidence[r.confidence][1] += 1;
       }
-      if (a.version === record.version && r.response?.selected) for (const id of r.response.selected) s.picks[id] = (s.picks[id] ?? 0) + 1;
+      if (start.version === record.version && r.response?.selected) for (const id of r.response.selected) s.picks[id] = (s.picks[id] ?? 0) + 1;
     }
   }
   rows.sort((x, y) => String(y.submitted_at).localeCompare(String(x.submitted_at)));
