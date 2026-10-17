@@ -177,10 +177,28 @@ function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
     });
 }
 
-export function filterBlocksForStudent(blocks) {
+/**
+ * Quiz questions carry their answers, so they never reach students as they
+ * are. Lesson publish keeps them (`keepQuizQuestions`) only to split the
+ * answers off; every other student surface drops them.
+ */
+export function filterBlocksForStudent(blocks, { keepQuizQuestions = false } = {}) {
   if (!Array.isArray(blocks)) return [];
   const teacherOnlyIds = collectTeacherOnlyIds(blocks);
-  return filterBlocksForStudentInner(blocks, teacherOnlyIds);
+  const filtered = filterBlocksForStudentInner(blocks, teacherOnlyIds);
+  return keepQuizQuestions ? filtered : withoutQuizQuestions(filtered);
+}
+
+function withoutQuizQuestions(blocks) {
+  return blocks
+    .filter(block => block?.block_type !== 'quiz_question')
+    .map(block => {
+      const c = block.content;
+      if (Array.isArray(c?.blocks)) return { ...block, content: { ...c, blocks: withoutQuizQuestions(c.blocks) } };
+      if (Array.isArray(c?.columns)) return { ...block, content: { ...c, columns: c.columns.map(col => ({ ...col, blocks: withoutQuizQuestions(col.blocks ?? []) })) } };
+      if (Array.isArray(c?.tabs)) return { ...block, content: { ...c, tabs: c.tabs.map(tab => ({ ...tab, blocks: withoutQuizQuestions(tab.blocks ?? []) })) } };
+      return block;
+    });
 }
 
 export function sanitizeRichTextHtml(html) {

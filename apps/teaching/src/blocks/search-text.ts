@@ -81,6 +81,16 @@ function extractBlock(block: Block, parts: string[]): void {
       push(parts, c.strength_prompt);
       push(parts, c.suggestion_prompt);
       break;
+    case 'question_drop':
+      push(parts, c.prompt);
+      break;
+    case 'quiz_question': {
+      const q = (c.question ?? {}) as Record<string, unknown>;
+      push(parts, q.prompt);
+      push(parts, q.quote);
+      push(parts, q.passage);
+      break;
+    }
     case 'question_set':
     case 'flashcards':
     case 'self_check':

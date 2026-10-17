@@ -30,6 +30,8 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   accordion: 'Collapse and expand sections to reduce visual clutter.',
   table: 'Present rows and columns of structured data.',
   peer_feedback: 'Write, exchange anonymous peer feedback, and reflect together.',
+  question_drop: 'Students write a question for a quiz lesson in this unit. You approve each one.',
+  quiz_question: 'One question in a quiz lesson: choice, gaps, matching, ordering and more.',
   question_set: 'Add multiple-choice or short-answer questions.',
   flashcards: 'Flip cards for vocabulary or quick recall practice.',
   cloze: 'Fill-in-the-blank sentences for guided retrieval.',

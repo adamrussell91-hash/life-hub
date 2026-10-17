@@ -1,4 +1,6 @@
 import { renderPeerFeedback } from '@/blocks/peer-feedback';
+import { renderQuestionDrop } from '@/blocks/question-drop';
+import { renderQuizQuestion } from '@/blocks/quiz-question';
 import { renderKaplanQualifiers } from '@/blocks/kaplan-view';
 import { calloutIdentity, decorateCalloutReferences } from '@/blocks/callout-reference';
 import { FAILURE } from '@/app/failure';
@@ -2246,6 +2248,10 @@ function renderBlockContent(
       return renderTableBlock(block, mode);
     case 'peer_feedback':
       return wrapBlock(renderPeerFeedback(block, mode, ctx), block, mode);
+    case 'question_drop':
+      return wrapBlock(renderQuestionDrop(block, mode, ctx), block, mode);
+    case 'quiz_question':
+      return wrapBlock(renderQuizQuestion(block, mode, ctx), block, mode);
     case 'question_set':
       return renderQuestionSetBlock(block, mode);
     case 'flashcards':

@@ -92,6 +92,10 @@ import { scheduleTimetable } from '../../../netlify/functions/_shared/teaching-t
 import { createLessonExamplesHandler } from '../../../netlify/functions/lesson-examples.mjs';
 import { createPublishedExamplesHandler } from '../../../netlify/functions/published-examples.mjs';
 import { createPublishedExamplesWriteHandler } from '../../../netlify/functions/published-examples-write.mjs';
+import { createQuizHandler } from '../../../netlify/functions/quiz.mjs';
+import { createPublishedQuizHandler } from '../../../netlify/functions/published-quiz.mjs';
+import { createPublishedQuestionDropHandler } from '../../../netlify/functions/published-question-drop.mjs';
+import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
@@ -1026,9 +1030,16 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const fullSnapshot = toPublishedLesson(lessonForPublish, publishedAt);
     const studentBlocks = sanitizeBlocksDeep(filterBlocksForStudent(fullSnapshot.blocks));
 
+    // Quiz answers are split off and stored apart, exactly as the real publish does.
+    const quizPublish = prepareQuizPublish(parsed.data, studentBlocks);
+    if (quizPublish.problems.length > 0) {
+      return errorResponse(400, 'validation_error', `A quiz question isn’t finished: ${quizPublish.problems[0]}`);
+    }
+    if (quizPublish.quiz) await storeQuizKey(functionBlobStore(), id, quizPublish.quiz);
     const studentSnapshot = PublishedLessonSchema.parse({
       ...fullSnapshot,
-      blocks: studentBlocks
+      blocks: quizPublish.blocks,
+      ...(quizPublish.quiz ? { pedagogical_mode: 'quiz', quiz: quizPublish.quiz.snapshot } : {})
     });
 
     try {
@@ -3337,6 +3348,55 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return done;
   }
 
+  /** The mock store shaped like a Netlify Blobs store, for running real Functions. */
+  function functionBlobStore() {
+    return {
+      async get(key: string) {
+        return store.getJSON(key) ?? null;
+      },
+      async setJSON(key: string, value: unknown, options?: { onlyIfNew?: boolean }) {
+        if (options?.onlyIfNew && store.getJSON(key) != null) return { modified: false };
+        store.setJSON(key, value);
+        return { modified: true };
+      },
+      async delete(key: string) {
+        store.delete(key);
+      },
+      async list({ prefix = '' }: { prefix?: string } = {}) {
+        return { blobs: store.listKeys(prefix).map((key) => ({ key })) };
+      }
+    };
+  }
+
+  /** Quiz lessons and Question drop run the real Functions against the mock store. */
+  async function handleQuiz(
+    method: string,
+    pathWithQuery: string,
+    cookie: string | null | undefined,
+    body: unknown
+  ): Promise<MockResponse> {
+    const deps = {
+      env: { LIFE_HUB_PASSPHRASE_HASH: 'mock', SESSION_SECRET: 'mock-session-secret-0123456789abcdef' },
+      getContentStore: async () => functionBlobStore(),
+      verifySessionToken: () => ({ valid: getSession(cookie).authenticated })
+    };
+    const path = pathWithQuery.split('?')[0]!;
+    const handler = path.startsWith('/api/lessons/')
+      ? createQuizHandler(deps)
+      : path.startsWith('/api/published/quiz/')
+        ? createPublishedQuizHandler(deps)
+        : createPublishedQuestionDropHandler(deps);
+    const response: Response = await handler(
+      new Request(`http://mock.local${pathWithQuery}`, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body ?? {})
+      }),
+      {}
+    );
+    return jsonResponse(response.status, await response.json());
+  }
+
   async function handleClassExamples(
     method: string,
     pathWithQuery: string,
@@ -3397,6 +3457,13 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/examples\/[^/]+(?:\/(?:unlock|submit))?$/.test(path)
     ) {
       return handleClassExamples(method, pathWithQuery, cookie, body);
+    }
+    if (
+      /^\/api\/lessons\/[^/]+\/quiz$/.test(path) ||
+      /^\/api\/published\/quiz\/[^/]+$/.test(path) ||
+      /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path)
+    ) {
+      return handleQuiz(method, pathWithQuery, cookie, body);
     }
 
     if (method === 'GET' && path === '/api/session') return handleSession(cookie);

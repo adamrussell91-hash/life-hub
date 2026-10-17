@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { PedagogicalModeSchema } from '../curriculum/pedagogical-mode';
 import { CommonFields, IsoDateSchema, TrashFields } from './common';
 import { BlockSchema } from './block';
+import { QuizSettingsSchema } from '../quiz/core';
+import { visitBlocks } from '../blocks/walk-blocks';
 import { CoverSchema } from './cover';
 import {
   formatPublishBlockIssue,
@@ -32,7 +34,9 @@ export const LessonSchema = z.object({
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
-  feedback_off: z.boolean().optional()
+  feedback_off: z.boolean().optional(),
+  /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
+  quiz: QuizSettingsSchema.optional()
 });
 
 export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
@@ -42,6 +46,19 @@ export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) =>
       message: 'Title is required to publish',
       path: ['title']
     });
+  }
+  if (lesson.pedagogical_mode !== 'quiz') {
+    let stray = false;
+    visitBlocks(lesson.blocks, (block) => {
+      if (block.block_type === 'quiz_question') stray = true;
+    });
+    if (stray) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Quiz questions only work in a lesson set to Quiz. Change the lesson type or remove them.',
+        path: ['blocks']
+      });
+    }
   }
   for (const issue of listPublishBlockIssues(lesson.blocks)) {
     ctx.addIssue({

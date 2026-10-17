@@ -5,6 +5,7 @@ import { CoverSchema } from './cover';
 import { sanitizeBlocksDeep } from '../blocks/sanitize-blocks';
 import { PublishableLessonSchema, type Lesson } from './lesson';
 import { attachedOutcomeIds } from '../curriculum/outcome-ids';
+import { QuizSettingsSchema } from '../quiz/core';
 
 export const PublishedLessonSchema = z.object({
   lesson_id: z.string().min(1),
@@ -15,7 +16,14 @@ export const PublishedLessonSchema = z.object({
   schema_version: z.literal(1),
   cover: CoverSchema.optional(),
   outcome_ids: z.array(z.string().min(1)).max(24).optional(),
-  feedback_off: z.boolean().optional()
+  feedback_off: z.boolean().optional(),
+  /** Quiz lessons: the settings students may see, with the published version. */
+  pedagogical_mode: z.literal('quiz').optional(),
+  quiz: QuizSettingsSchema.extend({
+    version: z.string(),
+    question_count: z.number().int(),
+    total_marks: z.number()
+  }).optional()
 });
 
 export type PublishedLesson = z.infer<typeof PublishedLessonSchema>;
