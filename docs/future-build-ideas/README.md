@@ -89,8 +89,11 @@ This split is an **Open question** for the next round, not a decision.
 | Life City asset inventory | Inventory | [life-city-assets.md](life-city-assets.md) |
 | Notion → GitHub gap map | Future build inventory | [notion-github-gap-map.md](notion-github-gap-map.md) |
 | Peer annotation: feedback as two annotation layers | Concept and mockup | [peer-annotation.md](peer-annotation.md) |
+| Peer-built weekly review: quiz lessons fed by student questions | Concept | [peer-built-quiz.md](peer-built-quiz.md) |
 
 ## History
+
+- **2026-10-17:** Indexed the peer-built weekly review (quiz lesson kind fed by a question drop block, teacher approval tray).
 
 - **2026-10-17:** Indexed peer annotation (peer feedback as annotation layers, with teacher-set resources on each feedback button).
 
