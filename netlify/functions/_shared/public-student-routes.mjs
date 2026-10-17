@@ -4,6 +4,7 @@
  * so they never share Adam's operator session gate.
  */
 export const PUBLIC_STUDENT_API_ROUTES = [
+  { method: 'POST', pattern: /^\/api\/published\/peer-feedback\/[^/]+\/[^/]+$/ },
   { method: 'GET', pattern: /^\/\.netlify\/functions\/published-lesson(?:\/|$)/ },
   { method: 'GET', pattern: /^\/api\/published\/lessons\/[^/]+$/ },
   { method: 'GET', pattern: /^\/api\/published\/units\/[^/]+$/ },

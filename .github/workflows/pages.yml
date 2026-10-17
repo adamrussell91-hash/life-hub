@@ -10,9 +10,12 @@ permissions:
   pages: write
   id-token: write
 
+# Queue deploys instead of cancelling a running one when another merge lands.
+# A newer pending run still replaces an older pending one, and it deploys
+# main as it stands, so every merge reaches the site.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
