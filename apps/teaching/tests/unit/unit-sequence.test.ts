@@ -327,4 +327,27 @@ describe('renderUnitSequence', () => {
     expect(stopSpy).toHaveBeenCalled();
     expect(details.open).toBe(false);
   });
+  it('numbers a lesson taught over two slots once and marks each part', () => {
+    ({ dispose } = renderUnitSequence(host, {
+      units: [unit({ id: 'unit_poems', title: 'Poems' })],
+      scheduled: [
+        scheduled({ id: 'thu', lesson_id: 'poem', unit_id: 'unit_poems', date: '2026-10-16', schedule_order: 1, delivery_status: 'delivered' }),
+        scheduled({ id: 'fri', lesson_id: 'poem', unit_id: 'unit_poems', date: '2026-10-17', schedule_order: 2, delivery_status: 'planned' }),
+        scheduled({ id: 'mon', lesson_id: 'next', unit_id: 'unit_poems', date: '2026-10-20', schedule_order: 3, delivery_status: 'planned' })
+      ],
+      lessonTitles: new Map([['poem', 'The Remedy of Butterflies'], ['next', 'Next Poem']]),
+      currentUnitId: 'unit_poems',
+      classId: CLASS_ID,
+      today: '2026-10-17'
+    }));
+    const markers = [...host.querySelectorAll('.seq__marker')].map((el) => el.textContent);
+    const titles = [...host.querySelectorAll('.seq__lesson-title')].map((el) => el.textContent);
+    expect(markers).toEqual(['✓', '1', '2']);
+    expect(titles).toEqual([
+      'The Remedy of Butterflies · part 1 of 2',
+      'The Remedy of Butterflies · part 2 of 2',
+      'Next Poem'
+    ]);
+    expect(host.querySelector('.seq__unit-meta')?.textContent).toContain('2 lessons');
+  });
 });

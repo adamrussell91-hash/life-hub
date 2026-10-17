@@ -338,6 +338,11 @@ export function itemPatchRequest(item, patch) {
     return { path: `/api/work-blocks?id=${encodeURIComponent(id)}`, method: 'PATCH', body };
   }
   if (type === 'scheduled_lesson') {
+    // Same lesson as another slot (or, with null, a fresh lesson of its own again).
+    if (patch && 'link_lesson' in patch) {
+      const lessonId = typeof patch.link_lesson === 'string' && patch.link_lesson ? patch.link_lesson : null;
+      return { path: `/api/scheduled-lessons/${encodeURIComponent(id)}/link`, method: 'POST', body: { lesson_id: lessonId } };
+    }
     if (date) body.date = date;
     if (time !== undefined) body.start_time = time;
     if (!Object.keys(body).length) return null;
