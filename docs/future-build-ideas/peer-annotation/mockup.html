@@ -53,6 +53,8 @@
   .layers { display: flex; flex-wrap: wrap; gap: 8px; }
   .layer { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
   .layer[aria-pressed="false"] { opacity: .45; }
+  .layer { padding-left: 12px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
   .summary { margin: 0; font-size: 0.85rem; color: var(--ink); }
   .card { display: grid; gap: 8px; padding: 14px; background: var(--paper); border: 1px solid var(--line); border-left: 4px solid var(--m); border-radius: 12px; }
   .card[hidden] { display: none; }
@@ -74,14 +76,14 @@
 </head>
 <body>
 <h1>Peer annotation</h1>
-<p class="lede">Left: giving feedback (one layer, your buttons). Right: getting it back (two layers, one per reviewer). Below: the teacher setup that decides what each button links to. Tap things; it's live.</p>
+<p class="lede">Left: giving feedback (one layer, your buttons). Right: getting it back (two layers, Reviewer 1 and Reviewer 2; students never see symbols unless the teacher turns on "Show student symbols"). Below: the teacher setup that decides what each button links to. Tap things; it's live.</p>
 
 <div class="stage">
   <section class="col">
     <h2>Giving feedback · 1 of 2</h2>
     <div class="phone">
       <div class="top">
-        <div class="you"><span class="tok" style="--c:var(--wave)"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/></svg></span>You're Blue star</div>
+        <div class="you">Someone's answer</div>
         <span class="count">Piece 1 of 2</span>
       </div>
       <p class="hint">Tap a sentence, then pick what you want to say about it.</p>
@@ -105,7 +107,7 @@
     <h2>Getting it back</h2>
     <div class="phone">
       <div class="top">
-        <div class="you"><span class="tok" style="--c:var(--danger)"><svg viewBox="0 0 24 24"><path d="M12 19.5s-7-4.3-7-9.2A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.3c0 4.9-7 9.2-7 9.2z"/></svg></span>Feedback on your answer</div>
+        <div class="you">Feedback on your answer</div>
       </div>
       <div class="layers" id="layers"></div>
       <p class="summary" id="summary"></p>
@@ -194,8 +196,8 @@ document.getElementById('send').addEventListener('click', e => { e.target.textCo
 
 /* ── Getting back ── */
 const REVIEWERS = [
-  { id: 'r1', name: 'Blue star', colour: 'var(--wave)', shape: 'star', on: true },
-  { id: 'r2', name: 'Green diamond', colour: 'var(--success)', shape: 'diamond', on: true }
+  { id: 'r1', name: 'Reviewer 1', colour: 'var(--wave)', on: true },
+  { id: 'r2', name: 'Reviewer 2', colour: 'var(--success)', on: true }
 ];
 const RECEIVED = [
   { r: 'r1', k: 'a', code: 'tech', answer: 'metaphor', comment: 'No "like" or "as", so it\'s a metaphor.' },
@@ -210,7 +212,7 @@ function paintLayers() {
   const host = document.getElementById('layers'); host.innerHTML = '';
   for (const r of REVIEWERS) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'layer';
-    b.setAttribute('aria-pressed', String(r.on)); b.innerHTML = `${tok(r.colour, r.shape, true)}${r.name}`;
+    b.setAttribute('aria-pressed', String(r.on)); b.innerHTML = `<span class="dot" style="--c:${r.colour}"></span>${r.name}`;
     b.addEventListener('click', () => { r.on = !r.on; card.hidden = true; paintLayers(); });
     host.append(b);
   }
@@ -231,7 +233,7 @@ getText.addEventListener('click', e => {
   for (const n of here) {
     const r = REVIEWERS.find(x => x.id === n.r), c = code(n.code);
     const part = document.createElement('div'); part.style.display = 'grid'; part.style.gap = '8px';
-    let html = `<div class="card__head">${tok(r.colour, r.shape, true)}${r.name}</div><div class="card__code">${c.label}${n.answer ? ': ' + n.answer : ''}</div>`;
+    let html = `<div class="card__head"><span class="dot" style="--c:${r.colour}"></span>${r.name}</div><div class="card__code">${c.label}${n.answer ? ': ' + n.answer : ''}</div>`;
     if (n.comment) html += `<p class="card__answer">${n.comment}</p>`;
     if (c.resource?.kind === 'technique' && TECH[n.answer?.toLowerCase()]) {
       const t = TECH[n.answer.toLowerCase()];
