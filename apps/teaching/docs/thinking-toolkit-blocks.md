@@ -45,30 +45,40 @@ Library text is copied into a block when it is inserted; each block can be reset
 
 `public/assets/blocks/`: 256px line art in the house stroke, with an orange griffin badge baked in (the picker takes one image). The handbook scans were too low resolution to trace the crest, so the griffin is redrawn as a simple vector in the same pose (wings raised, striped torse). Replace `badge-griffin.png` and re-bake the eight icons if a cleaner crest file is available. Check College brand guidance before any student page is made public.
 
-## Analogous Thinking blocks
+## Fluid analogy blocks
 
-The seven levels of fluid analogising from the 2025 ETA NSW workshop *Stretch Without Stress*, as lesson blocks. They sit in their own picker group, **Analogous Thinking**, after the Thinking Toolkit. They use the toolkit frame (What to do, reveals, teacher note, My notes) in marine, with no griffin: they are not part of the Newington framework.
+Fluid analogising from the 2025 ETA NSW workshop *Stretch Without Stress*: seven types of analogy, each at three levels, as lesson blocks. They sit in their own picker group, **Analogous Thinking**, after the Thinking Toolkit. They use the toolkit frame (What to do, reveals, teacher note, My notes) in marine, with no griffin: they are not part of the Newington framework.
 
-| Level | Name | Operation |
+| # | Type | Operation | Deck card |
+|---|---|---|---|
+| 1 | Analogical Close Reading | Basic relational mapping | Leaflink |
+| 2 | Pattern Translation | Cross-domain structure recognition | Sparkweave |
+| 3 | Reverse Analogising | Evaluative monitoring | Mindmirror |
+| 4 | Analogical Problem Solving | Cross-domain solution transfer | Ironroute |
+| 5 | Metaphorical Analysis | Conceptual mapping and implication tracing | Glimmsprite |
+| 6 | Conceptual Transfer | Rule-based generalisation | Flowstride |
+| 7 | Analogical Chains | Multi-step relational integration | Scalepath |
+
+### The three levels
+
+The prompt-card deck was designed with three levels per card; only Level 1 was printed. Levels 2 and 3 are written here from the teacher guide's ways to differentiate (depth of mapping, distance of the comparison, evaluating the limit, use in formal writing) and its rubric.
+
+| Level | Name | Asks for |
 |---|---|---|
-| 1 | Analogical Close Reading | Basic relational mapping |
-| 2 | Pattern Translation | Cross-domain structure recognition |
-| 3 | Reverse Analogising | Evaluative monitoring |
-| 4 | Analogical Problem Solving | Cross-domain solution transfer |
-| 5 | Metaphorical Analysis | Conceptual mapping and implication tracing |
-| 6 | Conceptual Transfer | Rule-based generalisation |
-| 7 | Analogical Chains | Multi-step relational integration |
+| 1 | Make it | One comparison and one reason. The card's own task |
+| 2 | Explain it | How the two work alike (at least two links), where the comparison stops, and what that shows. The *Seven Ways to Build Strong Analogies* lesson |
+| 3 | Use it | A more distant comparison turned into a point about the text, with its limit weighed. Examples are the extended responses in the Fluid Analogising protocol |
 
-The seven operations **are** the levels. Each prompt card is printed "Level 1" because the deck has one card per operation, not because each operation has hidden higher levels.
+### The blocks
 
 | Block | What it does |
 |---|---|
-| Analogy ladder | All seven levels as a rising ladder, a weak and a strong analogy, the five-step process and "How to check your analogy". The teacher marks the levels in play this lesson. For introducing the levels |
-| Analogy level | One level. Shows where it sits on the seven steps, what it means, what to do, an optional "Working with" focus, the sentence starter, a worked example to reveal, "This helps you", the check, and a pointer to the next level |
+| Fluid analogy | One type. A level switch (Level 1 · Make it, Level 2 · Explain it, Level 3 · Use it), then the level's task, two or three numbered steps each with its sentence frame, and two buttons: **Show an example** and **Check your analogy**. Optional "Working with" focus. About half a printed page |
+| Analogy types | The seven types, the three levels, a weak and a strong analogy, the five-step process and the check. The teacher marks the types in play this lesson. For introducing fluid analogising |
 
-- **Wording.** Student text is the *Seven Ways to Build Strong Analogies* lesson. "Use the short card wording" swaps in the prompt card's one-line task for on-the-spot or early-finisher use. Teacher notes come from the prompt-card teacher guide and the Fluid Analogising protocol: the operation and research, the quick version, questions to ask, what to watch for and how to push further.
-- **No right answers.** There is no right analogy, only more and less productive ones. Nothing in these blocks marks an answer; the check questions ask students to judge their own.
-- **Changing level** keeps the focus, an edited "What to do", the check settings, My notes and an edited teacher note; everything else takes the new level's wording.
-- **Card names** (Leaflink, Sparkweave, Mindmirror, Ironroute, Glimmsprite, Flowstride, Scalepath) show only when "Show the prompt-card name" is ticked, for classes using the printed deck.
-- **Teacher content** is stripped exactly like the toolkit's: `analogy_level` and `analogy_ladder` are in the teacher-field sets in `src/blocks/visibility.ts` and `netlify/functions/_shared/teaching-student.mjs`, and in the shared fixture.
+- **Levels.** The teacher sets the starting level. By default students can move between levels themselves (same task, different depth); untick "Students can move between levels" to lock it. A student's choice is remembered on their device. Print shows the starting level only.
+- **Editing.** "Wording for each level" edits one level at a time. Changing type keeps the focus, level settings, check settings, My notes and an edited teacher note; the three levels take the new type's wording.
+- **No right answers.** There is no right analogy, only more and less productive ones. Nothing in these blocks marks an answer; the check asks students to judge their own.
+- **Card names** show only when "Show the prompt-card name" is ticked, for classes using the printed deck.
+- **Teacher content** is stripped exactly like the toolkit's: `fluid_analogy` and `analogy_types` are in the teacher-field sets in `src/blocks/visibility.ts` and `netlify/functions/_shared/teaching-student.mjs`, and in the shared fixture.
 - Library: `src/toolkit/analogy.ts`.

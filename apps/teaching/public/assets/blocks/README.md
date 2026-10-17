@@ -66,9 +66,9 @@ Drawn for Teaching Hub as 256px line art in the same stroke as the set above. Ea
 
 ## Analogous Thinking
 
-Drawn in-repo as 256px line art in the same stroke (#272A2D, 12px, round caps), rendered from SVG. No griffin badge: the seven levels of analogy are not part of the Newington framework.
+Drawn in-repo as 256px line art in the same stroke (#272A2D, 12px, round caps), rendered from SVG. No griffin badge: fluid analogising is not part of the Newington framework.
 
 | Palette file | Shows |
 | --- | --- |
-| `analogy_level.png` | A square mapped onto a circle: different surface, same centre |
-| `analogy_ladder.png` | Seven rising steps |
+| `fluid_analogy.png` | A square mapped onto a circle: different surface, same centre |
+| `analogy_types.png` | Seven rising steps |

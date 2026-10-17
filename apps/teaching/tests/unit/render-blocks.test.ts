@@ -352,8 +352,7 @@ describe('blockRegistry', () => {
   it('maps every block_type to render and editor helpers', () => {
     expect(Object.keys(blockRegistry).sort()).toEqual([
       'accordion',
-      'analogy_ladder',
-      'analogy_level',
+      'analogy_types',
       'annotation',
       'anthology',
       'attachment',
@@ -373,6 +372,7 @@ describe('blockRegistry', () => {
       'embed',
       'equation',
       'flashcards',
+      'fluid_analogy',
       'gallery',
       'heading',
       'html',

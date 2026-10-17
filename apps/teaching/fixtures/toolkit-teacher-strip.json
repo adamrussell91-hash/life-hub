@@ -8,8 +8,8 @@
     "tk_move",
     "tabs",
     "tk_refl",
-    "an_level",
-    "an_ladder"
+    "an_fluid",
+    "an_types"
   ],
   "dropped_block_ids": [
     "tk_note",
@@ -306,13 +306,31 @@
       "settings": {},
       "type": "block",
       "variant": "medium",
-      "id": "an_level",
-      "block_type": "analogy_level",
+      "id": "an_fluid",
+      "block_type": "fluid_analogy",
       "visibility": "student_teacher",
       "content": {
-        "level": "analogy:reverse",
+        "kind": "analogy:reverse",
         "label": "Reverse Analogising",
         "definition": "d",
+        "level": 2,
+        "tiers": [
+          {
+            "task": "t",
+            "steps": [],
+            "example": ""
+          },
+          {
+            "task": "t",
+            "steps": [],
+            "example": ""
+          },
+          {
+            "task": "t",
+            "steps": [],
+            "example": ""
+          }
+        ],
         "teacher_note": {
           "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",
           "run": [
@@ -344,11 +362,11 @@
       "settings": {},
       "type": "block",
       "variant": "medium",
-      "id": "an_ladder",
-      "block_type": "analogy_ladder",
+      "id": "an_types",
+      "block_type": "analogy_types",
       "visibility": "student_teacher",
       "content": {
-        "levels": [
+        "types": [
           "analogy:chains"
         ],
         "teacher_note": {

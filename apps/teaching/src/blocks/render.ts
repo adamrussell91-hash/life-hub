@@ -2277,8 +2277,8 @@ function renderBlockContent(
     case 'concept_features':
     case 'thinking_intentions':
     case 'thinking_reflection':
-    case 'analogy_level':
-    case 'analogy_ladder':
+    case 'fluid_analogy':
+    case 'analogy_types':
     case 'teacher_note':
       return wrapBlock(renderToolkitContent(block, mode, ctx)!, block, mode);
     }

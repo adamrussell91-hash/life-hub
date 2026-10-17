@@ -608,8 +608,8 @@ export function libraryNoteFor(block: Block): TkTeacherNote | null {
       return conceptNote(block.content.game.kind);
     case 'thinking_reflection':
       return reflectionNote();
-    case 'analogy_level':
-    case 'analogy_ladder':
+    case 'fluid_analogy':
+    case 'analogy_types':
       return analogyNoteFor(block);
     default:
       return null;
