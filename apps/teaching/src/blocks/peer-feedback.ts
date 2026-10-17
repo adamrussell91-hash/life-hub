@@ -1,5 +1,8 @@
 import type { Block } from '@/schemas/block';
 import { apiPost, ApiClientError } from '@/api/client';
+import { button, el, errorText, field, identityName, readJSON, token, writeJSON } from '@/blocks/peer-feedback-ui';
+import { giveView, receivedView as annotatedView, teacherLayers, type Code, type Piece, type ReceivedLayer, type TeacherLayer } from '@/blocks/peer-annotate';
+import { mountBankEditor } from '@/blocks/peer-annotate-bank';
 import type { RenderMode, RenderContext } from '@/blocks/render';
 import './peer-feedback.css';
 
@@ -14,6 +17,9 @@ import './peer-feedback.css';
  * student's own symbol in the corner of the block so the teacher can match a
  * symbol to a student. Drafts are kept on the device so a reload or a dropped
  * connection loses nothing. State lives on the server; this file paints it.
+ *
+ * In annotate mode (peer-annotate.ts) feedback is notes on the text instead of
+ * two boxes, and each answer goes to two readers.
  */
 
 type PeerBlock = Extract<Block, { block_type: 'peer_feedback' }>;
@@ -26,11 +32,23 @@ type TeacherRow = {
   text: string;
   flagged: boolean;
   included: boolean;
-  gave: boolean;
-  reviewer: string | null;
-  received: Received | null;
+  /** Comments: sent or not. Annotate: how many pieces annotated, out of `to_give`. */
+  gave: boolean | number;
+  reviewer?: string | null;
+  received?: Received | null;
+  to_give?: number;
+  layers?: TeacherLayer[];
 };
-type TeacherState = { phase: Phase; session?: string; code?: string; show_symbols?: boolean; rows?: TeacherRow[] };
+type Mode = 'comments' | 'annotate';
+type TeacherState = {
+  phase: Phase;
+  session?: string;
+  code?: string;
+  mode?: Mode;
+  show_symbols?: boolean;
+  codes?: Code[];
+  rows?: TeacherRow[];
+};
 type StudentState = {
   phase: Phase;
   session?: string;
@@ -42,6 +60,10 @@ type StudentState = {
   reviewed?: boolean;
   assigned_text?: string;
   received?: Feedback | null;
+  mode?: Mode;
+  codes?: Code[];
+  pieces?: Piece[];
+  layers?: ReceivedLayer[];
 };
 /** What a device keeps: the round it joined and its secret token. Never its symbol. */
 type Device = { session: string; token: string };
@@ -50,106 +72,7 @@ const POLL_MS = 5000;
 const MAX_WRITING = 8000;
 const MAX_FEEDBACK = 2000;
 
-/* ── Identities: six colours by six shapes, drawn rather than typed ──── */
-
-const COLOURS = [
-  { name: 'Blue', fill: 'var(--wave)' },
-  { name: 'Green', fill: 'var(--success)' },
-  { name: 'Orange', fill: 'var(--high-sea-ink)' },
-  { name: 'Gold', fill: 'var(--pastel-gold-ink)' },
-  { name: 'Purple', fill: 'var(--pastel-lilac-ink)' },
-  { name: 'Red', fill: 'var(--danger)' }
-] as const;
-
-const SHAPES = [
-  { name: 'star', path: 'M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z' },
-  { name: 'circle', path: 'M12 5.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13z' },
-  { name: 'square', path: 'M6.5 6.5h11v11h-11z' },
-  { name: 'diamond', path: 'M12 4l8 8-8 8-8-8z' },
-  { name: 'triangle', path: 'M12 5l8 14H4z' },
-  { name: 'heart', path: 'M12 19.5s-7-4.3-7-9.2A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.3c0 4.9-7 9.2-7 9.2z' }
-] as const;
-
-
-function parts(id: string): [number, number] {
-  const [c, s] = id.split('-').map(Number);
-  return [c ?? 0, s ?? 0];
-}
-
-export function identityName(id: string): string {
-  const [c, s] = parts(id);
-  return `${COLOURS[c]?.name ?? ''} ${SHAPES[s]?.name ?? ''}`.trim();
-}
-
-function token(id: string, size: 'sm' | 'md' | 'lg' = 'md'): HTMLElement {
-  const [c, s] = parts(id);
-  const node = el('span', `pf-token pf-token--${size}`);
-  node.style.setProperty('--pf-token', COLOURS[c]?.fill ?? 'var(--orca)');
-  node.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${SHAPES[s]?.path ?? ''}"/></svg>`;
-  return node;
-}
-
-/* ── Small DOM helpers ─────────────────────────────────────────────── */
-
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-function button(
-  text: string,
-  kind: 'primary' | 'secondary' | 'ghost',
-  onClick: (this: HTMLButtonElement) => void
-): HTMLButtonElement {
-  const node = el('button', `btn btn--${kind}`, text);
-  node.type = 'button';
-  node.addEventListener('click', onClick);
-  return node;
-}
-
-let fieldSeq = 0;
-function field(label: string, hint?: string): { wrap: HTMLElement; input: HTMLTextAreaElement } {
-  const id = `pf-field-${++fieldSeq}`;
-  const wrap = el('div', 'pf-field');
-  const lab = el('label', 'pf-field__label', label);
-  lab.htmlFor = id;
-  const input = el('textarea', 'pf-field__input');
-  input.id = id;
-  wrap.append(lab);
-  if (hint) wrap.append(el('p', 'pf-field__hint', hint));
-  wrap.append(input);
-  return { wrap, input };
-}
-
-function readJSON<T>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Returns false when the device won't store anything (private mode, full). */
-function writeJSON(key: string, value: unknown): boolean {
-  try {
-    if (value === null) localStorage.removeItem(key);
-    else localStorage.setItem(key, JSON.stringify(value));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function errorText(error: unknown): string {
-  if (error instanceof ApiClientError) {
-    if (error.code === 'network_error') return 'Couldn’t reach the server. Check your connection and try again. Your writing is still here.';
-    if (error.message) return error.message;
-  }
-  return 'Something went wrong. Try again.';
-}
+export { identityName };
 
 const STEPS: Array<{ phase: Exclude<Phase, 'idle'>; label: string }> = [
   { phase: 'write', label: 'Write' },
@@ -176,6 +99,11 @@ const lastState = new Map<string, unknown>();
 
 /* ── Entry points ──────────────────────────────────────────────────── */
 
+const MODES: Array<{ mode: Mode; label: string }> = [
+  { mode: 'comments', label: 'Two feedback boxes' },
+  { mode: 'annotate', label: 'Notes on the text' }
+];
+
 export function createPeerFeedbackEditor(block: PeerBlock, onChange: (b: PeerBlock) => void): HTMLElement {
   const root = el('div', 'peer-feedback peer-feedback--editor');
   let current = block;
@@ -184,7 +112,7 @@ export function createPeerFeedbackEditor(block: PeerBlock, onChange: (b: PeerBlo
     { key: 'strength_prompt', label: 'First feedback box', hint: 'Usually what works well.', max: 300, rows: 1 },
     { key: 'suggestion_prompt', label: 'Second feedback box', hint: 'Usually one thing to improve, or a question.', max: 300, rows: 1 }
   ] as const;
-  for (const f of fields) {
+  const textField = (f: (typeof fields)[number]) => {
     const { wrap, input } = field(f.label, f.hint);
     input.value = current.content[f.key];
     input.rows = f.rows;
@@ -193,8 +121,43 @@ export function createPeerFeedbackEditor(block: PeerBlock, onChange: (b: PeerBlo
       current = { ...current, content: { ...current.content, [f.key]: input.value } };
       onChange(current);
     });
-    root.append(wrap);
+    return wrap;
+  };
+
+  const modeWrap = el('div', 'pf-field');
+  modeWrap.append(el('span', 'pf-field__label', 'How students give feedback'));
+  const modes = el('div', 'pa-mode');
+  modes.setAttribute('role', 'group');
+  modes.setAttribute('aria-label', 'How students give feedback');
+  modeWrap.append(modes);
+  const modeHint = el('p', 'pf-field__hint');
+  modeWrap.append(modeHint);
+  const perMode = el('div', 'pf-run');
+
+  function paintMode(): void {
+    const mode = current.content.mode ?? 'comments';
+    modes.replaceChildren(
+      ...MODES.map((m) => {
+        const b = button(m.label, 'ghost', () => {
+          if (mode === m.mode) return;
+          current = { ...current, content: { ...current.content, mode: m.mode } };
+          onChange(current);
+          paintMode();
+        });
+        b.className = 'pa-mode__option';
+        b.setAttribute('aria-pressed', String(mode === m.mode));
+        return b;
+      })
+    );
+    modeHint.textContent =
+      mode === 'annotate'
+        ? 'Each answer goes to two classmates. They highlight parts of it and press your feedback buttons; the writer gets it back as two layers.'
+        : 'Each answer goes to one classmate, who fills in your two boxes.';
+    perMode.replaceChildren(...(mode === 'annotate' ? [mountBankEditor()] : [textField(fields[1]), textField(fields[2])]));
   }
+
+  root.append(textField(fields[0]), modeWrap, perMode);
+  paintMode();
   root.append(
     el('p', 'pf-note', 'To run it, publish the lesson, close this editor and press Start activity on the block.')
   );
@@ -211,7 +174,11 @@ export function renderPeerFeedback(block: PeerBlock, mode: RenderMode, ctx: Rend
 
   if (mode === 'print') {
     const sheet = el('div', 'pf-print');
-    for (const label of ['Your answer', block.content.strength_prompt, block.content.suggestion_prompt]) {
+    const labels =
+      block.content.mode === 'annotate'
+        ? ['Your answer', 'Notes on a classmate’s answer: underline a part, then write what you’d say about it']
+        : ['Your answer', block.content.strength_prompt, block.content.suggestion_prompt];
+    for (const label of labels) {
       sheet.append(el('p', 'pf-print__label', label), el('div', 'pf-print__lines'));
     }
     root.append(sheet);
@@ -269,6 +236,8 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
   const excluded = new Set<string>();
   /** Flagged answers start out of the swap once; after that the tickbox is the teacher's. */
   const autoExcluded = new Set<string>();
+  /** Annotate mode: one student's piece and every note they gave, or everyone. */
+  let focus: string | null = null;
 
   async function send(action: string, extra: Record<string, unknown> = {}, pressed?: HTMLButtonElement): Promise<void> {
     if (busy) return;
@@ -300,6 +269,7 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
   function freshRound(): void {
     excluded.clear();
     autoExcluded.clear();
+    focus = null;
   }
 
   function paint(): void {
@@ -315,7 +285,7 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
         }
       }
     }
-    const signature = JSON.stringify([state, [...excluded]]);
+    const signature = JSON.stringify([state, [...excluded], focus]);
     if (signature === painted) return;
     painted = signature;
     body.replaceChildren(state.phase === 'idle' ? idleView() : liveView(state));
@@ -356,10 +326,13 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
     bar.append(code, stepper(s.phase), tools);
     wrap.append(bar);
 
+    const annotate = s.mode === 'annotate';
     const handedIn = rows.filter((r) => r.text);
     const writing = rows.filter((r) => !r.text);
     const inSwap = handedIn.filter((r) => !excluded.has(r.id));
-    const held = rows.filter((r) => r.received?.status === 'held').length;
+    const held = annotate
+      ? rows.reduce((n, r) => n + (r.layers ?? []).reduce((m, l) => m + l.notes.filter((x) => x.status === 'held').length, 0), 0)
+      : rows.filter((r) => r.received?.status === 'held').length;
 
     const next = el('div', 'pf-next');
     const summary = el('p', 'pf-next__text');
@@ -373,9 +346,10 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
       primary.disabled = inSwap.length < 2;
     } else if (s.phase === 'review') {
       const swapped = rows.filter((r) => r.included);
-      const sent = swapped.filter((r) => r.gave).length;
-      summary.textContent = `${sent} of ${swapped.length} have sent feedback.`;
-      primary = button(sent < swapped.length ? 'Hand back what’s in' : 'Hand feedback back', 'primary', function () {
+      const due = annotate ? swapped.reduce((n, r) => n + (r.to_give ?? 0), 0) : swapped.length;
+      const sent = annotate ? swapped.reduce((n, r) => n + Number(r.gave), 0) : swapped.filter((r) => r.gave).length;
+      summary.textContent = annotate ? `${sent} of ${due} pieces annotated.` : `${sent} of ${swapped.length} have sent feedback.`;
+      primary = button(sent < due ? 'Hand back what’s in' : 'Hand feedback back', 'primary', function () {
         void send('results', {}, this);
       });
     } else {
@@ -409,15 +383,39 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
       wrap.append(still);
     }
 
-    if (handedIn.length) {
+    if (annotate && s.phase !== 'write' && handedIn.length > 1) wrap.append(focusChips(handedIn));
+    const shown = focus ? handedIn.filter((r) => r.id === focus || r.layers?.some((l) => l.reviewer === focus)) : handedIn;
+    if (shown.length) {
       const list = el('ul', 'pf-list');
-      for (const r of handedIn) list.append(teacherRow(s.phase, r));
+      for (const r of shown) list.append(teacherRow(s, r));
       wrap.append(list);
     }
     return wrap;
   }
 
-  function teacherRow(phase: Phase, r: TeacherRow): HTMLElement {
+  /** Pick a student to see their piece and every note they gave elsewhere. */
+  function focusChips(rows: TeacherRow[]): HTMLElement {
+    const bar = el('div', 'pa-focus');
+    bar.setAttribute('role', 'group');
+    bar.setAttribute('aria-label', 'Show one student');
+    bar.append(el('span', 'pa-focus__label', 'Show:'));
+    const chip = (id: string | null) => {
+      const b = button(id ? identityName(id) : 'Everyone', 'ghost', () => {
+        focus = focus === id ? null : id;
+        paint();
+      });
+      b.className = 'pa-focus__chip';
+      if (id) b.prepend(token(id, 'sm'));
+      b.setAttribute('aria-pressed', String(focus === id));
+      return b;
+    };
+    bar.append(chip(null), ...rows.map((r) => chip(r.id)));
+    return bar;
+  }
+
+  function teacherRow(s: TeacherState, r: TeacherRow): HTMLElement {
+    const phase = s.phase;
+    const annotate = s.mode === 'annotate';
     const item = el('li', 'pf-row');
     const out = phase === 'write' ? excluded.has(r.id) : !r.included;
     item.classList.toggle('pf-row--out', out);
@@ -444,13 +442,32 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
       head.append(toggle);
     } else if (!r.included) {
       head.append(el('span', 'pf-chip', 'Left out'));
+    } else if (phase === 'review' && annotate) {
+      const done = Number(r.gave) >= (r.to_give ?? 0);
+      head.append(el('span', `pf-chip ${done ? 'pf-chip--done' : ''}`, `Annotated ${Number(r.gave)} of ${r.to_give ?? 0}`));
     } else if (phase === 'review') {
       head.append(el('span', `pf-chip ${r.gave ? 'pf-chip--done' : ''}`, r.gave ? 'Feedback sent' : 'Writing feedback'));
+    }
+
+    if (annotate && phase !== 'write' && r.included) {
+      item.append(
+        head,
+        teacherLayers({
+          text: r.text,
+          layers: r.layers ?? [],
+          codes: s.codes ?? [],
+          only: focus && focus !== r.id ? focus : null,
+          who: (id) => reviewerTag(id),
+          onRelease: (reviewer, note, pressed) => void send('release_note', { reviewer, writer: r.id, note }, pressed),
+          onRemove: (reviewer, note, pressed) => void send('remove_note', { reviewer, writer: r.id, note }, pressed)
+        })
+      );
+      return item;
     }
     item.append(head, el('p', 'pf-row__text', r.text));
 
     // Feedback shows as it arrives, so anything held can be dealt with before hand-back.
-    if (r.received) item.append(receivedView(r.received, r.reviewer));
+    if (r.received) item.append(receivedView(r.received, r.reviewer ?? null));
     else if (phase === 'results' && r.included) item.append(el('p', 'pf-note', 'No feedback came back for this one.'));
     return item;
   }
@@ -615,7 +632,8 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
   function viewKey(s: StudentState): string {
     if (s.phase === 'idle') return 'idle';
     if (!device || !s.joined) return s.phase === 'write' ? 'join' : 'closed';
-    return [s.phase, s.submitted, s.included, s.reviewed, !!s.received].join(':');
+    const annotate = [(s.pieces ?? []).map((p) => p.sent).join(','), JSON.stringify(s.layers ?? [])];
+    return [s.phase, s.submitted, s.included, s.reviewed, !!s.received, ...annotate].join(':');
   }
 
   function paintCorner(symbol: string | null | undefined): void {
@@ -752,6 +770,18 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
         stage.append(waitPanel('Feedback sent.', 'Your teacher will hand everyone’s feedback back soon.'));
         return stage;
       }
+      if (s.mode === 'annotate') {
+        stage.append(
+          giveView({
+            pieces: s.pieces ?? [],
+            codes: s.codes ?? [],
+            draftKey: (piece) => draftKey(`notes-${piece}`),
+            onSend: (piece, notes, pressed) => send('annotate', { piece, notes }, pressed),
+            onError: showError
+          })
+        );
+        return stage;
+      }
       const pair = el('div', 'pf-review');
       const theirs = el('article', 'pf-paper');
       theirs.append(el('p', 'pf-paper__label', 'Someone’s answer'), el('p', 'pf-paper__text', s.assigned_text ?? ''));
@@ -773,7 +803,18 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
     }
 
     // results
-    if (s.received) {
+    if (s.mode === 'annotate' && s.layers?.length) {
+      stage.append(el('h4', 'pf-stage__title', 'Feedback on your answer'), annotatedView(s.text ?? '', s.layers, s.codes ?? []));
+      return stage;
+    }
+    if (s.mode === 'annotate') {
+      stage.append(
+        waitPanel(
+          s.included ? 'No notes have come back yet.' : 'Your answer wasn’t in this swap.',
+          s.included ? 'This page updates by itself. If nothing arrives, ask your teacher.' : 'Ask your teacher if you’d like someone to read it.'
+        )
+      );
+    } else if (s.received) {
       stage.append(el('h4', 'pf-stage__title', 'Feedback on your answer'), feedbackPair(block, s.received));
     } else {
       stage.append(
