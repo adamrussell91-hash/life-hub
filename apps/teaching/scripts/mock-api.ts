@@ -496,6 +496,7 @@ function buildClearedSessionCookie(): string {
 const DEFAULT_SCHEDULE_ANCHOR_DATE = '2026-08-12';
 
 type MockUnitNote={id:string;title:string;why:string;excerpt?:string};
+const mockJobs=new Map<string,{status:string;result:unknown;polls:number}>();let mockJobSerial=0;
 const mockUnitNotes=new Map<string,{notes:MockUnitNote[];removed:string[]}>();
 function mockUnitNotesAdd(unitId:string,entries:MockUnitNote[]):MockUnitNote[]{
   const state=mockUnitNotes.get(unitId)??{notes:[],removed:[]};
@@ -3450,7 +3451,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         return [{blockId:id,original:blockRevision(block),contextRevision,rationale:'Make the modelling step explicit before independent practice.',replacement,sources:[{id:'note_caesar',title:'Worked examples and scaffolding',excerpt:'Local fixture: model the process before independent practice.'}]}];
       });
       if(unitId&&proposals.length)mockUnitNotesAdd(unitId,[{id:'note_caesar',title:'Worked examples and scaffolding',why:'Model the process before independent practice.'}]);
-      return okResponse(200,{proposals,assessed:query.blocks,contextRevision,mode:'local'});
+      const data={proposals,assessed:query.blocks,contextRevision,mode:'local'};
+      // Like production, a teacher's ask comes back as a job the page polls.
+      if((body as {mode?:string}).mode==='manual'){const job=`00000000-0000-4000-8000-${String(++mockJobSerial).padStart(12,'0')}`;mockJobs.set(job,{status:'working',result:data,polls:0});return okResponse(202,{job,status:'working'});}
+      return okResponse(200,data);
+    }
+
+    if (method === 'GET' && path === '/api/alchemy-blocks') {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      const id=new URLSearchParams(pathWithQuery.split('?')[1]||'').get('job')||'';const job=mockJobs.get(id);
+      if(!job)return errorResponse(404,'not_found','That check is no longer available.');
+      if(++job.polls>=2)job.status='done';
+      return okResponse(200,{job:id,status:job.status,result:job.status==='done'?job.result:undefined});
     }
 
     if (path === '/api/alchemy-unit-notes') {
