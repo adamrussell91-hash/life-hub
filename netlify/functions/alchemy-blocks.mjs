@@ -4,7 +4,7 @@ import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { errorResponse, okResponse, methodNotAllowed, withCors } from './_shared/http.mjs';
 import { isDeletedRecord } from './_shared/record-liveness.mjs';
 import { createAlchemyBudget, alchemyError } from './_shared/alchemy-budget.mjs';
-import { boundedJson, retrieveAlchemySources, buildAlchemyPrompt, completeAlchemy, parseAlchemyProposals } from './_shared/alchemy-analysis.mjs';
+import { boundedJson, retrieveAlchemySources, buildAlchemyPrompt, completeAlchemy, parseAlchemyProposals, alchemyQueryText } from './_shared/alchemy-analysis.mjs';
 import { canonical, contextSnapshot, findAlchemyBlock, blockRevision } from '../../packages/alchemy/revisions.js';
 
 export const config={path:'/api/alchemy-blocks',timeout:26};
@@ -16,7 +16,7 @@ export function createAlchemyBlocksHandler(deps={}) {
     const model=env.ALCHEMY_PASSIVE_MODEL||'claude-haiku-4-5-20251001';
     const configuredLimit=Number(env.ALCHEMY_FUNCTION_LIMIT_MS)||10000;
     const deadlineMs=deps.deadlineMs??Math.max(1000,Math.min(20000,configuredLimit-2000));
-    const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(alchemyError(504,'alchemy_timeout','Ann’s check took too long. Try again later.',300000));},deadlineMs-15);});
+    const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(alchemyError(504,'alchemy_timeout','Ann’s check took too long. Try again in a minute.',60000));},deadlineMs-15);});
     let budget,ticket;
     async function run() {
       const signal=controller.signal;
@@ -36,12 +36,14 @@ export function createAlchemyBlocksHandler(deps={}) {
         for(const id of body.sourceIds){signal.throwIfAborted();const source=await (deps.getSource??getKnowledgePage)(id,{env,fetchImpl:async(url,options={})=>(deps.fetchImpl??fetch)(url,{...options,signal})});if(!source||isDeletedRecord(source))valid=false;}
         return {valid};
       }
-      const key=createHash('sha256').update(canonical({v:1,kind:body.kind,id:body.id,model,context,blocks,instruction:body.instruction||'',previous:body.previous||null})).digest('hex');
+      const key=createHash('sha256').update(canonical({v:2,kind:body.kind,id:body.id,model,context,blocks,instruction:body.instruction||'',previous:body.previous||null})).digest('hex');
       budget=createAlchemyBudget(store,{now:deps.now,configuration:createHash('sha256').update(String(env.ANTHROPIC_API_KEY||'')+model).digest('hex')});
-      const individualKey=b=>canonical({v:1,kind:body.kind,id:body.id,model,contextRevision,block:blockRevision(b)});
-      let cached=await budget.cached(key);
+      const individualKey=b=>canonical({v:2,kind:body.kind,id:body.id,model,contextRevision,block:blockRevision(b)});
+      // A background scan with no Knowledge match never asked Ann, so it cannot answer a teacher's click.
+      const usable=r=>r&&(body.mode!=='manual'||r.mode!=='empty')?r:null;
+      let cached=usable(await budget.cached(key));
       if(!cached && !body.instruction && !body.previous){
-        const entries=await Promise.all(blocks.map(b=>budget.cached(individualKey(b))));
+        const entries=(await Promise.all(blocks.map(b=>budget.cached(individualKey(b))))).map(usable);
         if(entries.every(Boolean))cached={proposals:entries.flatMap(r=>r.proposals),assessed:blocks.map(b=>b.id),contextRevision,mode:entries.some(r=>r.mode==='synthesis')?'synthesis':'empty'};
       }
       if(cached){
@@ -57,23 +59,35 @@ export function createAlchemyBlocksHandler(deps={}) {
       // Reserve before retrieval as well: an outage cannot cause unbounded archive requests.
       signal.throwIfAborted(); ticket=await budget.reserve({key,mode:body.mode}); signal.throwIfAborted();
       // The cache may have completed while this request waited for its lease.
-      const completed=await budget.cached(key);
+      const completed=usable(await budget.cached(key));
       if(completed){await budget.finish(ticket,{usage:{input:0,output:0}});ticket=null;return completed;}
       const fetchImpl=async(url,options={})=>{
         signal.throwIfAborted(); const response=await (deps.fetchImpl??fetch)(url,{...options,signal});
         if(String(url).startsWith('https://api.github.com/'))return new Response(JSON.stringify(await boundedJson(response,2000000)),{status:response.status,headers:response.headers});
         return response;
       };
-      const sources=await (deps.retrieve??retrieveAlchemySources)({store,env,fetchImpl,query:JSON.stringify(blocks)+' scaffolding differentiation learning outcomes',signal});
+      const query=alchemyQueryText(blocks)+' scaffolding differentiation learning outcomes';
+      let sources;
+      if(body.mode==='manual'){
+        // The live function limit is 10s: Knowledge search gets a slice of it, and Ann answers without it rather than not at all.
+        const retrieval=new AbortController();const stop=()=>retrieval.abort();signal.addEventListener('abort',stop);let retrievalTimer;
+        try {
+          sources=await Promise.race([
+            (deps.retrieve??retrieveAlchemySources)({store,env,fetchImpl,query,signal:retrieval.signal}),
+            new Promise(resolve=>{retrievalTimer=setTimeout(()=>{retrieval.abort();resolve([]);},deps.retrievalMs??Math.min(3000,Math.floor(deadlineMs*0.35)));})
+          ]);
+        }catch{sources=[];}
+        finally{clearTimeout(retrievalTimer);signal.removeEventListener('abort',stop);}
+      }else sources=await (deps.retrieve??retrieveAlchemySources)({store,env,fetchImpl,query,signal});
       signal.throwIfAborted();
       let raw={proposals:[]},mode='empty';
-      if(sources.length){
+      if(sources.length||body.mode==='manual'){
         // Full context is cached by revision; a deterministic compact view bounds prompts.
         const compact=e=>({title:e.title,description:String(e.description||'').slice(0,400),outcome_ids:e.outcome_ids??e.syllabus_outcomes,pedagogical_mode:e.pedagogical_mode,outline:(e.blocks||[]).slice(0,12).map(b=>({id:b.id,type:b.block_type,text:JSON.stringify(b.content).slice(0,60)}))});
-        const prompt=buildAlchemyPrompt({context:{entity:compact(entity),unit:unit?compact(unit):null},blocks,sources:sources.slice(0,6),instruction:body.instruction,previous:body.previous});
+        const prompt=buildAlchemyPrompt({context:{entity:compact(entity),unit:unit?compact(unit):null},blocks,sources:sources.slice(0,6),instruction:body.instruction,previous:body.previous,mode:body.mode});
         raw=await (deps.complete??completeAlchemy)({prompt,env:{...env,ALCHEMY_PASSIVE_MODEL:model},fetchImpl,signal}); signal.throwIfAborted(); mode='synthesis';
       }
-      const result={proposals:parseAlchemyProposals(raw,blocks,sources,contextRevision),assessed:blocks.map(b=>b.id),contextRevision,mode};
+      const result={proposals:parseAlchemyProposals(raw,blocks,sources,contextRevision,{allowUncited:body.mode==='manual'}),assessed:blocks.map(b=>b.id),contextRevision,mode};
       signal.throwIfAborted();
       if(!body.instruction && !body.previous)for(const block of blocks){
         await budget.remember(individualKey(block),{...result,proposals:result.proposals.filter(p=>p.blockId===block.id),assessed:[block.id]});
