@@ -18,10 +18,16 @@ jobs:
   pre-pr-check:
     runs-on: ubuntu-latest
     steps:
+      # Depth 2 keeps the PR merge commit's first parent, the base branch tip,
+      # so the gate can run only the Tasks tests this PR reaches.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm ci --ignore-scripts
       - run: npm ci --ignore-scripts --prefix apps/professional
       - run: npm run pre-pr-check
+        env:
+          PRE_PR_BASE: HEAD^1
