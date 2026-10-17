@@ -20,7 +20,7 @@ import { sanitizeRichTextHtml } from './teaching-student.mjs';
 export const TEXT_TOOLS = ['dictionary', 'fry'];
 export const TEXT_TOOL_PREFIX = 'text_tools/';
 /** Bump when a prompt changes so old cached results are not served. */
-export const TEXT_TOOL_VERSION = 1;
+export const TEXT_TOOL_VERSION = 2;
 export const MAX_TEXT_TOOL_CHARS = 12_000;
 export const MAX_DICTIONARY_WORDS = 40;
 /** A job still "working" after this long is treated as dead and may restart. */
@@ -85,7 +85,7 @@ export function textToolInputError(tool, text) {
   if (text.length > MAX_TEXT_TOOL_CHARS) {
     return `This block is too long for one pass (${text.length} characters, limit ${MAX_TEXT_TOOL_CHARS}). Split it into smaller blocks.`;
   }
-  if (tool === 'fry' && text.split(/\s+/).length < 25) {
+  if (tool === 'fry' && countWords(text) < 25) {
     return 'There is not enough here to build an explainer from. Write the key ideas first, at least a few sentences.';
   }
   return null;
@@ -277,11 +277,32 @@ export class TextToolError extends Error {
   }
 }
 
+export function countWords(text) {
+  return String(text ?? '').split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * The rewrite keeps roughly the source's length. Very short blocks get a
+ * little headroom, since the moves need a sentence each to exist at all.
+ */
+export function fryLengthBudget(text) {
+  const words = countWords(text);
+  return {
+    words,
+    min: Math.round(words * 0.85),
+    max: Math.max(Math.round(words * 1.25), words + 100)
+  };
+}
+
 export function buildTextToolRequest(tool, text) {
   if (tool === 'fry') {
+    const budget = fryLengthBudget(text);
     return {
       system: buildFryExplainerSystem(),
-      messages: [{ role: 'user', content: `Here is the text block to rewrite.\n\n<block>\n${text}\n</block>` }]
+      messages: [{
+        role: 'user',
+        content: `Here is the text block to rewrite. It is ${budget.words} words. Aim for about ${budget.words} words and stay between ${budget.min} and ${budget.max}.\n\n<block>\n${text}\n</block>`
+      }]
     };
   }
   return {

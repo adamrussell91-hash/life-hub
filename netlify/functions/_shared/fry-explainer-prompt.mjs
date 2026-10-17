@@ -202,7 +202,8 @@ A teacher has pressed the Fry Explainer button on a text block in a lesson. Rewr
 
 - Keep every fact, example and teaching point the block already makes. Do not add claims you are not sure are true. You may add the opening moment, the predictions, the push, the boundary and the transfer, since the framework needs them.
 - The readers are secondary school students unless the text clearly says otherwise. Pitch the vocabulary to them.
-- Length follows the framework, 800 to 1400 words. If the source block is short, aim for the low end rather than padding.
+- Keep roughly the length of the source block. This overrides the 800 to 1400 words in the Length section above, which is for a standalone explainer written from scratch. You are given the block's word count and a target range. Stay inside it.
+- A shorter budget compresses the structure, it does not drop it. Keep every move from recognition to transfer, but give each one a sentence or two instead of a paragraph. Use the cut order from the Length section. Shrink consolidation (step 5) and the boundary (step 10) first, fold consolidation into a single line, and keep one prediction where there would be three. Never cut the push.
 - Run step 0 first. If the topic fails both tests, or the block is instructions, a procedure, reference notes, assessment material or a convention, do not force it. Decline and say why in one or two plain sentences.
 
 ## Output format

@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildTextToolRequest,
   cleanFryHtml,
+  fryLengthBudget,
   parseDictionaryResult,
   parseFryResult,
   richTextToPlain,
@@ -105,6 +107,16 @@ test('the Fry framework is copied in full and never names its old home', () => {
     assert.ok(system.includes(marker), marker);
   }
   assert.doesNotMatch(system, /notion/i);
+});
+
+test('the Fry rewrite keeps roughly the source length', () => {
+  const words400 = Array.from({ length: 400 }, () => 'word').join(' ');
+  assert.deepEqual(fryLengthBudget(words400), { words: 400, min: 340, max: 500 });
+  assert.deepEqual(fryLengthBudget(Array.from({ length: 40 }, () => 'w').join(' ')), { words: 40, min: 34, max: 140 });
+  const { system, messages } = buildTextToolRequest('fry', words400);
+  assert.match(messages[0].content, /It is 400 words\. Aim for about 400 words and stay between 340 and 500\./);
+  assert.match(system, /Keep roughly the length of the source block/);
+  assert.match(system, /Never cut the push/);
 });
 
 test('textToolInputError refuses empty, oversized and too-short Fry input', () => {
