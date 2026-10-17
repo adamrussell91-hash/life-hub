@@ -183,9 +183,15 @@
     <p class="eyebrow">Teaching Hub · block idea · mockup</p>
     <h1>Classroom tools</h1>
     <p>A small toolbox that lives on a divider, or as its own block. Tap the faint gear on the divider below, pick a tool, and it opens in the gap between the two blocks. Everything here works.</p>
+    <div class="row" style="margin-top:14px" role="group" aria-label="View as">
+      <span class="inl">View as</span>
+      <button class="chip" data-view="teacher" aria-pressed="true">Teacher</button>
+      <button class="chip" data-view="student" aria-pressed="false">Student</button>
+      <span class="sub" data-r="view-note" style="text-align:left">Students get the timer and dice only.</span>
+    </div>
   </header>
 
-  <section class="classes" aria-label="Class students">
+  <section class="classes" aria-label="Class students" data-teacher-only>
     <div class="classes__head">
       <div><p class="eyebrow" style="margin:0 0 2px">Class settings · Students</p><h2>Enter each class list once</h2></div>
       <span class="count" data-r="class-count"></span>
@@ -313,6 +319,7 @@
         <button class="btn" data-a="plus">+1 min</button>
       </div>
       <div class="stack" data-r="stack"></div>
+      <p class="sub" style="text-align:left">Saved with this lesson. It is ready to start when the lesson opens.</p>
       <div class="row"><button class="btn btn--sm" data-a="add">+ Add a timer to the stack</button>
       <span class="sub" data-r="total" style="margin-left:auto"></span></div>`;
     const $ = (r) => root.querySelector(`[data-r="${r}"]`);
@@ -520,10 +527,12 @@
   let uid = 0;
   function mount(host) {
     const kind = host.dataset.mount;
+    if (host._close) host._close();
+    host.classList.remove('is-open', 'tray-out');
     host.innerHTML = '';
     const bar = el('div', { class: 'host__bar' });
     const tray = el('div', { class: 'tray', role: 'toolbar', 'aria-label': 'Classroom tools' });
-    TOOLS.forEach((t) => {
+    TOOLS.filter((t) => allowed(t.id)).forEach((t) => {
       const c = el('button', { class: 'chip', 'data-tool': t.id, 'aria-pressed': 'false', tabindex: '-1' }, `${ICON[t.id]}${t.label}`);
       tray.append(c);
     });
@@ -550,6 +559,7 @@
       tray.querySelectorAll('.chip').forEach((c) => c.tabIndex = out ? 0 : -1);
     };
     const close = () => { if (stop) stop(); stop = null; current = null; host.classList.remove('is-open'); tray.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', 'false')); };
+    host._close = close;
     const open = (id) => {
       if (stop) stop(); stop = null;
       current = id;
@@ -576,8 +586,20 @@
       if (current === c.dataset.tool) close(); else open(c.dataset.tool);
     });
 
-    if (host.dataset.start) { setTray(true); open(host.dataset.start); }
+    const start = allowed(host.dataset.start) ? host.dataset.start : (host.dataset.start ? 'dice' : null);
+    if (start) { setTray(true); open(start); }
   }
-  document.querySelectorAll('[data-mount]').forEach(mount);
+  let view = 'teacher';
+  const STUDENT_TOOLS = ['timer', 'dice'];
+  function allowed(id) { return !!id && (view === 'teacher' || STUDENT_TOOLS.includes(id)); }
+  function mountAll() { document.querySelectorAll('[data-mount]').forEach(mount); }
+  document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {
+    if (view === b.dataset.view) return;
+    view = b.dataset.view;
+    document.querySelectorAll('[data-view]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.view === view)));
+    document.querySelectorAll('[data-teacher-only]').forEach((x) => { x.hidden = view === 'student'; });
+    mountAll();
+  }));
+  mountAll();
 })();
 </script>
