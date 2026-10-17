@@ -47,9 +47,13 @@ export function shoreLoops(triangles:Float32Array):readonly (readonly ShorePoint
  }return loops;
 }
 export function pointInTriangle(x:number,z:number,a:ShorePoint,b:ShorePoint,c:ShorePoint):boolean{
- const cross=(p:ShorePoint,q:ShorePoint)=>(q.x-p.x)*(z-p.z)-(q.z-p.z)*(x-p.x);
- const v=[cross(a,b),cross(b,c),cross(c,a)],area=(b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x);
- return Math.abs(area)>1e-8&&(v.every(n=>n>=-1e-5)||v.every(n=>n<=1e-5));
+ return pointInTriangleXZ(x,z,a.x,a.z,b.x,b.z,c.x,c.z);
+}
+/** Allocation-free form for hot geography loops; identical arithmetic and tolerances. */
+export function pointInTriangleXZ(x:number,z:number,ax:number,az:number,bx:number,bz:number,cx:number,cz:number):boolean{
+ const area=(bx-ax)*(cz-az)-(bz-az)*(cx-ax);if(!(Math.abs(area)>1e-8))return false;
+ const u=(bx-ax)*(z-az)-(bz-az)*(x-ax),v=(cx-bx)*(z-bz)-(cz-bz)*(x-bx),w=(ax-cx)*(z-cz)-(az-cz)*(x-cx);
+ return u>=-1e-5&&v>=-1e-5&&w>=-1e-5||u<=1e-5&&v<=1e-5&&w<=1e-5;
 }
 /** Clip a continuous ribbon against the same bed faces as the terrain. */
 export function channelGeometry(g:WorldGrid,bed:Float32Array,points:readonly ChannelPoint[]):Float32Array{

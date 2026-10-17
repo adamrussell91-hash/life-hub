@@ -1,7 +1,8 @@
 import {describe,it,expect} from 'vitest';
 import {buildAnnualRoamingRoutes,type RoamingEncounter} from '@/domain/grove/annual-roaming';
 import type {AnnualGrovePlan} from '@/domain/grove/annual-plan';
-import {generateAnnualWorld,type AnnualWorld} from '@/domain/grove/world';
+import type {AnnualWorld} from '@/domain/grove/world';
+import {annualWorld} from '../helpers/grove-annual';
 import {worldKeyForYear} from '@/domain/grove/world-key';
 import {isAnnualLandPathSafe,isSwimPathSafe} from '@/domain/grove/annual-wildlife';
 function fixture(rects:number[][]=[],size=9):AnnualWorld {
@@ -110,27 +111,24 @@ describe('annual roaming routes',()=>{
  it('never opens a region from a completion dated outside its weekly ownership',async()=>{
   const p=plan([0]);p.contextTrees[0]!.dayKey='2026-01-09';expect(await buildAnnualRoamingRoutes(fixture(),p,[animal()])).toEqual([]);
  });
- // Full earned shoreline catches water owner=-1 being treated as locked forever.
- it('prepares real 2026 swimmers beyond the former small local loop',async()=>{
-  const w=generateAnnualWorld(worldKeyForYear(2026)),p=plan();p.to=p.today='2026-12-31';
-  p.contextTrees=w.regions!.weeks.map(r=>({...p.contextTrees[0]!,x:r.anchor.x,z:r.anchor.z,regionId:r.id,dayKey:r.from}));
-  const start=performance.now(),[r]=await buildAnnualRoamingRoutes(w,p,[animal('otter','mallard',true)]);
-  expect(r).toBeDefined();expect(r!.regionIds.length).toBeGreaterThan(1);expect(length(r!.points)).toBeGreaterThan(20);expect(isSwimPathSafe(w,r!.points)).toBe(true);
-  console.info('Real 2026 water preparation',JSON.stringify({milliseconds:Math.round(performance.now()-start),regions:r!.regionIds.length,points:r!.points.length,length:Math.round(length(r!.points))}));
- },30000);
- it('prepares the shared population around 10000 actual current trees and cancels replacements',async()=>{
-  const w=generateAnnualWorld(worldKeyForYear(2026)),p=plan();p.to=p.today='2026-12-31';
+ // One full-size 2026 preparation. Every week is earned, so its swimmers also catch
+ // water owner=-1 being treated as locked forever (the former small local loop).
+ it('prepares the shared population around 10000 actual current trees, real swimmers included, and cancels replacements',async()=>{
+  const w=annualWorld(2026),p=plan();p.to=p.today='2026-12-31';
   p.contextTrees=w.regions!.weeks.flatMap(r=>r.sites.slice(0,Math.ceil(10000/w.regions!.weeks.length)).map(site=>({...p.contextTrees[0]!,id:r.id+':'+site.index,x:site.x,z:site.z,regionId:r.id,dayKey:r.from}))).slice(0,10000);
   const encounters=[animal('fox'),animal('deer','deer'),animal('hare','hare'),animal('chipmunk','squirrel'),animal('robin','robin'),animal('owl','owl'),animal('mallard','mallard',true),animal('otter','mallard',true),animal('wolf'),animal('moose','deer'),animal('rabbit','hare')];
   const start=performance.now(),routes=await buildAnnualRoamingRoutes(w,p,encounters);
   expect(routes).toHaveLength(11);for(const r of routes)expect(length(r.points)).toBeGreaterThan(0);
-  const milliseconds=Math.round(performance.now()-start),controller=new AbortController();let abortedAt=0;
+  const milliseconds=Math.round(performance.now()-start);
+  for(const id of ['mallard','otter']){const r=routes.find(r=>r.id===id);expect(r).toBeDefined();expect(r!.mode).toBe('water');
+   expect(r!.regionIds.length).toBeGreaterThan(1);expect(length(r!.points)).toBeGreaterThan(20);expect(isSwimPathSafe(w,r!.points)).toBe(true);}
+  const controller=new AbortController();let abortedAt=0;
   const pending=buildAnnualRoamingRoutes(w,p,encounters,controller.signal);setTimeout(()=>{abortedAt=performance.now();controller.abort();},0);
   await expect(pending).rejects.toMatchObject({name:'AbortError'});
   console.info('Dense 2026 preparation',JSON.stringify({trees:p.contextTrees.length,milliseconds,cancellationMilliseconds:Math.round(performance.now()-abortedAt),routes:routes.map(r=>({id:r.id,regions:r.regionIds.length,points:r.points.length,length:Math.round(length(r.points))}))}));
  },30000);
  it('finds safe multi-region routes in real annual geography',async()=>{
-  const w=generateAnnualWorld(worldKeyForYear(2026)),p=plan();p.contextTrees=w.regions!.weeks.slice(0,4).map(r=>({...p.contextTrees[0]!,x:r.anchor.x,z:r.anchor.z,regionId:r.id,dayKey:r.from}));
+  const w=annualWorld(2026),p=plan();p.contextTrees=w.regions!.weeks.slice(0,4).map(r=>({...p.contextTrees[0]!,x:r.anchor.x,z:r.anchor.z,regionId:r.id,dayKey:r.from}));
   const [r]=await buildAnnualRoamingRoutes(w,p,[animal()]);expect(r).toBeDefined();expect(r!.regionIds.length).toBeGreaterThan(1);expect(isAnnualLandPathSafe(w,r!.points,p.contextTrees)).toBe(true);
  },30000);
 });

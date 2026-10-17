@@ -16,7 +16,8 @@ function freezeDeepMetadata(value:unknown):void{
 /** Recipient owns every typed buffer; metadata is immutable. */
 export function freezeAnnualWorld(world:AnnualWorld):AnnualWorld{freezeDeepMetadata(world);return world;}
 export function validGeography(h:Hydrology):boolean{return h.quality.substantialLakes>=1&&h.quality.channelLength>=50&&h.quality.dryFraction>.7;}
-export function generateAnnualWorld(requested:WorldKey):AnnualWorld{
+/** Terrain and solved water only; weekly regions derive from this and nothing else. */
+export function generateAnnualGeography(requested:WorldKey):AnnualWorld{
  const key=makeWorldKey(requested.year,requested.generatorVersion);
  let field:ReturnType<typeof generateHeightfield>|undefined,hydrology:Hydrology|undefined,attempt=0,fallback=false;
  for(;attempt<3;attempt++){
@@ -24,7 +25,10 @@ export function generateAnnualWorld(requested:WorldKey):AnnualWorld{
  }
  if(!field||!hydrology){fallback=true;field=generateHeightfield(makeWorldKey(2026,1));hydrology=generateHydrology(field);if(!validGeography(hydrology)||!hasDryReserves(field,hydrology))throw Error('Annual geography fallback failed validation');}
  let minHeight=Infinity,maxHeight=-Infinity;for(const height of field.bed){minHeight=Math.min(minHeight,height);maxHeight=Math.max(maxHeight,height);}
- const world:AnnualWorld={key,identity:worldIdentity(key),...field,hydrology,generation:{attempt,fallback,hydrologyVersion:1},summary:{minHeight,maxHeight,bedBytes:field.bed.byteLength}};
+ return freezeAnnualWorld({key,identity:worldIdentity(key),...field,hydrology,generation:{attempt,fallback,hydrologyVersion:1},summary:{minHeight,maxHeight,bedBytes:field.bed.byteLength}});
+}
+export function generateAnnualWorld(requested:WorldKey):AnnualWorld{
+ const world=generateAnnualGeography(requested);
  return freezeAnnualWorld({...world,regions:generateRegions(world)});
 }
 export function sampleBedGrid(grid:WorldGrid,bed:Float32Array,x:number,z:number):number{

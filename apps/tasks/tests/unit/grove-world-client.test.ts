@@ -2,12 +2,15 @@ import {describe,it,expect,vi,afterEach} from 'vitest';
 // Let the test worker flush progress between CPU-bound annual fixtures.
 afterEach(()=>new Promise<void>(resolve=>setTimeout(resolve,0)));
 import {AnnualWorldClient,type WorldWorkerPort} from '@/domain/grove/world-client';
-import {generateAnnualWorld} from '@/domain/grove/world';
 import {worldKeyForYear} from '@/domain/grove/world-key';
-import {buildWorldMeshes} from '@/domain/grove/world-meshes';
+import {buildWorldMeshes,type WorldMeshes} from '@/domain/grove/world-meshes';
 import {buildWorldResponse,worldTransferBuffers} from '@/domain/grove/world-protocol';
-// Full annual terrain, regions and receipt validation run for these transport fixtures.
+import {annualWorld} from '../helpers/grove-annual';
+// The protocol test generates for real; lifecycle fixtures share one frozen world per year.
+// Receipt validation still runs in full on every delivery.
 vi.setConfig({testTimeout:30000});
+const meshes=new Map<number,WorldMeshes>();
+const meshesFor=(year:number)=>{let m=meshes.get(year);if(!m){m=buildWorldMeshes(annualWorld(year));meshes.set(year,m);}return m;};
 
 class Transport implements WorldWorkerPort {
  onmessage:WorldWorkerPort['onmessage']=null;onerror:WorldWorkerPort['onerror']=null;onmessageerror:WorldWorkerPort['onmessageerror']=null;
@@ -15,7 +18,7 @@ class Transport implements WorldWorkerPort {
  postMessage(value:any){this.request=value;if(value.type==='validate'&&this.autoValidate)this.reply(buildWorldResponse(value).message);}
  terminate(){this.terminated=true;}
  reply(value:unknown){this.onmessage?.({data:value} as MessageEvent);}
- success(){const world=generateAnnualWorld(this.request.key);this.reply({type:'success',id:this.request.id,world,meshes:buildWorldMeshes(world),generationMs:12});}
+ success(){const year=this.request.key.year;this.reply({type:'success',id:this.request.id,world:annualWorld(year),meshes:meshesFor(year),generationMs:12});}
 }
 function setup(){const ports:Transport[]=[];const client=new AnnualWorldClient(()=>{const port=new Transport();ports.push(port);return port;});return {client,ports};}
 
@@ -56,7 +59,7 @@ describe('annual generation lifecycle',()=>{
   const {client,ports}=setup(),first=client.generate(2026);const rejected=expect(first).rejects.toMatchObject({name:'AbortError'});
   const stale=ports[0]!.onmessage!,second=client.generate(2027);
   expect(ports[0]!.terminated).toBe(true);
-  stale({data:{type:'success',id:1,world:generateAnnualWorld(worldKeyForYear(2026)),generationMs:1}} as MessageEvent);
+  stale({data:{type:'success',id:1,world:annualWorld(2026),generationMs:1}} as MessageEvent);
   ports[1]!.success();expect((await second).world.key.year).toBe(2027);await rejected;client.dispose();
  });
  it('ignores messages for a different request number',async()=>{
@@ -64,8 +67,9 @@ describe('annual generation lifecycle',()=>{
   ports[0]!.reply({type:'failure',id:999,error:'stale'});ports[0]!.success();expect((await pending).world.key.year).toBe(2026);client.dispose();
  });
  it.each(['wrong-key','invalid-bed','invalid-summary','invalid-hydrology','cyclic-hydrology','invalid-channel-height','missing-regions','invalid-region-owner','invalid-region-capacity','invalid-region-site','missing-meshes','corrupt-mesh','unknown-type'])('rejects malformed %s output and releases resources',async(kind)=>{
-  const {client,ports}=setup(),pending=client.generate(2026),world=generateAnnualWorld(worldKeyForYear(kind==='wrong-key'?2027:2026));
-  let response:any={type:'success',id:ports[0]!.request.id,world:structuredClone(world),meshes:buildWorldMeshes(world),generationMs:1};
+  const {client,ports}=setup(),pending=client.generate(2026),year=kind==='wrong-key'?2027:2026;
+  // Each case corrupts its own copy; the shared fixtures stay intact.
+  let response:any={type:'success',id:ports[0]!.request.id,world:structuredClone(annualWorld(year)),meshes:structuredClone(meshesFor(year)),generationMs:1};
   if(kind==='invalid-bed')response.world.bed[0]=NaN;
   if(kind==='invalid-summary')response.world.summary.bedBytes=0;
   if(kind==='invalid-hydrology')response.world.hydrology.level[0]=NaN;
@@ -81,7 +85,7 @@ describe('annual generation lifecycle',()=>{
   ports[0]!.reply(response);await expect(pending).rejects.toThrow(/invalid/i);expect(ports[0]!.terminated).toBe(true);client.dispose();
  });
  it.each(['lake','channel'])('rejects missing %s triangles',async(kind)=>{
-  const {client,ports}=setup(),pending=client.generate(2026),world=structuredClone(generateAnnualWorld(worldKeyForYear(2026)));
+  const {client,ports}=setup(),pending=client.generate(2026),world=structuredClone(annualWorld(2026));
   const descriptors=kind==='lake'?world.hydrology.lakes:world.hydrology.channels;
   descriptors.find(c=>c.triangles.length>=9)!.triangles=new Float32Array();
   ports[0]!.reply({type:'success',id:ports[0]!.request.id,world,generationMs:1});
