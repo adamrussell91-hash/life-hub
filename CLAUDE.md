@@ -6,6 +6,8 @@
 
 Run and pass `npm run pre-pr-check` (or `node scripts/pre-pr-check.mjs`) from the repo root before opening or updating any life-hub PR. Exit 0 required. See root `AGENTS.md` and Project store `docs/mandatory-pre-pr-check.md`.
 
+**Ready, then auto-merge.** Open life-hub PRs as ready for review, not draft, unless Adam asks for a draft. Once `pre-pr-check` passes and the PR is pushed, enable auto-merge (merge commit). If auto-merge stalls on a merge conflict, merge `main` in, regenerate generated files (e.g. `node scripts/generate-alchemy-schema.mjs`), rerun the gate and push.
+
 **Exception: idea docs.** Edits that only touch `docs/future-build-ideas/` skip this gate and may be committed straight to `main` with no PR. These are concept docs for the what if rounds between Claude Code, Cursor and Codex; nothing builds from them. Pull `main` first, commit, push. If a change touches any file outside that folder, the gate applies as normal.
 
 ## Product stress test
