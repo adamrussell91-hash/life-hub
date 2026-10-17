@@ -1,6 +1,8 @@
-/* Life → Garage & Home. Kit tokens only (tokens.css + life overlay).
+/* Life → Management (Garage & Home tabs). Kit tokens only (tokens.css + life overlay).
    Pastel roles: gold = car, sage = home we rent, lilac = investment. */
 
+/* Management holds this view and the Property tab; never let a child widen the page. */
+#management-dashboard { grid-template-columns: minmax(0, 1fr); }
 #garage-home-dashboard { display: block; }
 #garage-home-dashboard [hidden] { display: none !important; }
 #garage-home-dashboard[data-state="loading"] [data-gh="body"] { opacity: 0.6; transition: opacity 0.2s; }
@@ -220,8 +222,10 @@ button.gh-timeline__row:hover, .gh-timeline__row.is-on { background: var(--glass
 @media (max-width: 720px) {
   .gh-bar__actions { width: 100%; margin-left: 0; }
   .gh-bar__actions .btn { flex: 1; }
-  .gh-seg { width: 100%; }
-  .gh-seg button { flex: 1; padding: 0 var(--space-2); }
+  /* Five tabs outgrow a phone: keep labels on one line and let the strip scroll. */
+  .gh-seg { width: 100%; min-width: 0; max-width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .gh-seg::-webkit-scrollbar { display: none; }
+  .gh-seg button { flex: 1 0 auto; padding: 0 var(--space-3); white-space: nowrap; }
   .gh-banner { padding: var(--space-5); }
   .gh-banner__line { font-size: var(--text-lg); }
   .gh-stats { grid-template-columns: minmax(0, 1fr); }
