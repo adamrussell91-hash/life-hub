@@ -168,6 +168,13 @@
   .classes__head h2 { margin: 0; font-size: 1.05rem; }
   .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
   .classes textarea { min-height: 120px; background: var(--paper); }
+  .roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+  .roster label { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 10px; background: var(--paper); border: 1px solid var(--line); font-size: 0.86rem; cursor: pointer; }
+  .roster label span { min-width: 0; overflow-wrap: anywhere; }
+  .roster label small { color: var(--muted); font-size: 0.72rem; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+  .roster label.is-skip { background: var(--cotton); border-style: dashed; }
+  .roster label.is-skip span { color: var(--muted); }
+  .icon-btn[aria-pressed="true"] { color: var(--danger); }
   .count { font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
   select { font: 600 0.85rem var(--font); color: var(--ink); background: var(--cotton); border: 1px solid var(--line-strong); border-radius: 8px; padding: 6px 8px; }
   select:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
@@ -199,6 +206,9 @@
     <div class="tabs" role="tablist" aria-label="Classes" data-r="class-tabs"></div>
     <textarea id="class-students" aria-label="Students in this class, one per line"></textarea>
     <p class="note">One name per line, or paste a column from a spreadsheet. The name picker and groups tool read straight from here. Sample names only.</p>
+    <p class="eyebrow" style="margin:6px 0 0">Skip in picker</p>
+    <div class="roster" data-r="roster"></div>
+    <p class="note">Only you see this, and only here. A skipped student is quietly left out of the name picker. Nothing on the lesson page or the board shows that anyone is skipped.</p>
   </section>
 
   <section class="lesson" aria-label="Sample lesson page">
@@ -224,6 +234,9 @@
       <li><b>Tools block.</b> Same toolbox, but it takes a block's slot. The last block on the page opens on the name picker.</li>
       <li><b>Stacked timers.</b> Reading 5:00 then Writing 10:00. Each segment has its own colour on the bar, it rolls straight into the next one, and it chimes at each change.</li>
       <li><b>Class lists.</b> Each class gets a Students section. Type or paste the list once. The name picker and groups tool open on this lesson's class, and a dropdown switches to any other class. Edits to a list show up in the picker straight away.</li>
+      <li><b>Skip in picker.</b> Set only in the class's Students section. The picker quietly leaves that student out and never shows a total that would give it away. Try skipping a name, then picking.</li>
+      <li><b>Sound.</b> Chime is on by default. The speaker button on any open tool mutes every tool.</li>
+      <li><b>Student view.</b> Students run their own copy of the saved timer stack. Your copy is the one on the board.</li>
       <li><b>Names, numbers, groups and dice.</b> Picked names can drop out so nobody is called twice.</li>
     </ul>
     <p class="note">Sample names only. Who was picked is not saved anywhere. It resets when you close the tool.</p>
@@ -238,6 +251,8 @@
     '10ENG1': ['Grace', 'Liam', 'Chloe', 'Ethan', 'Sienna', 'Max', 'Harper', 'Lucas', 'Matilda', 'Archie', 'Evie', 'Jasper', 'Willow', 'Ned', 'Georgia', 'Felix', 'Stella', 'Ollie'],
     '7ENG3': ['Ruby', 'Alfie', 'Poppy', 'Charlie', 'Frankie', 'Henry', 'Daisy', 'Billy', 'Rosie', 'Sam', 'Lily', 'Ari', 'Molly', 'Zac', 'Esme', 'Jai', 'Tilly', 'Rafa', 'Bea', 'Remy', 'Nell', 'Otis']
   };
+  const SKIP = { '9ENG2': new Set(['Eli']), '10ENG1': new Set(), '7ENG3': new Set() };
+  const pickable = (c) => CLASSES[c].filter((n) => !SKIP[c].has(n));
   const listeners = new Set();
   const onClassesChange = (fn) => listeners.add(fn);
   const classOptions = (sel) => Object.keys(CLASSES).map((c) => `<option value="${c}"${c === sel ? ' selected' : ''}>${c}${c === LESSON_CLASS ? ' (this lesson)' : ''}</option>`).join('');
@@ -247,16 +262,28 @@
     const tabs = document.querySelector('[data-r="class-tabs"]');
     const ta = document.getElementById('class-students');
     const count = document.querySelector('[data-r="class-count"]');
+    const roster = document.querySelector('[data-r="roster"]');
     let cur = LESSON_CLASS;
+    const drawRoster = () => {
+      roster.innerHTML = CLASSES[cur].map((n, i) => `<label class="${SKIP[cur].has(n) ? 'is-skip' : ''}"><span>${n.replace(/[&<>"]/g, '')}</span><small><input type="checkbox" id="skip-${cur}-${i}" data-n="${n.replace(/"/g, '')}"${SKIP[cur].has(n) ? ' checked' : ''}> Skip</small></label>`).join('');
+    };
+    roster.addEventListener('change', (e) => {
+      const n = e.target.dataset.n; if (n == null) return;
+      if (e.target.checked) SKIP[cur].add(n); else SKIP[cur].delete(n);
+      e.target.closest('label').classList.toggle('is-skip', e.target.checked);
+      listeners.forEach((fn) => fn(cur));
+    });
     const draw = () => {
       tabs.innerHTML = Object.keys(CLASSES).map((c) => `<button class="chip" role="tab" aria-selected="${c === cur}" aria-pressed="${c === cur}" data-c="${c}">${c}</button>`).join('');
       ta.value = CLASSES[cur].join('\n');
       count.textContent = `${CLASSES[cur].length} students in ${cur}`;
+      drawRoster();
     };
     tabs.addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (b) { cur = b.dataset.c; draw(); } });
     ta.addEventListener('input', () => {
       CLASSES[cur] = ta.value.split(/[\n\t,]/).map((x) => x.trim()).filter(Boolean);
       count.textContent = `${CLASSES[cur].length} students in ${cur}`;
+      drawRoster();
       listeners.forEach((fn) => fn(cur));
     });
     draw();
@@ -270,6 +297,8 @@
     groups: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>',
     dice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+    sound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+    muted: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>',
     expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
     trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>'
   };
@@ -292,7 +321,9 @@
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   let audio;
+  let muted = false;
   function chime(times = 1) {
+    if (muted) return;
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
       for (let i = 0; i < times; i++) {
@@ -394,7 +425,7 @@
 
   /* ---------- Name picker ---------- */
   function namesTool(root) {
-    let cls = LESSON_CLASS; let pool = CLASSES[cls].slice(); const picked = [];
+    let cls = LESSON_CLASS; let pool = pickable(cls); const picked = [];
     root.innerHTML = `
       <div class="row row--center"><label class="inl">Class <select id="names-class-${root.dataset.uid}">${classOptions(cls)}</select></label></div>
       <div class="big big--name" data-r="out" aria-live="polite">Ready</div>
@@ -408,20 +439,19 @@
     const $ = (r) => root.querySelector(`[data-r="${r}"]`);
     const drop = root.querySelector('input[type="checkbox"]');
     const render = () => {
-      const all = CLASSES[cls];
-      $('left').textContent = drop.checked ? `${pool.length} of ${all.length} still to go` : `${all.length} in ${cls}`;
+      $('left').textContent = drop.checked ? `${pool.length} still to go` : `${cls}`;
       $('picked').innerHTML = picked.map((n) => `<span class="tag">${esc(n)}</span>`).join('');
     };
-    const restart = () => { pool = CLASSES[cls].slice(); picked.length = 0; $('out').textContent = 'Ready'; render(); };
+    const restart = () => { pool = pickable(cls); picked.length = 0; $('out').textContent = 'Ready'; render(); };
     root.querySelector('select').addEventListener('change', (e) => { cls = e.target.value; restart(); });
     drop.addEventListener('change', render);
-    onClassesChange((c) => { if (c === cls) { pool = pool.filter((n) => CLASSES[cls].includes(n)); render(); } });
+    onClassesChange((c) => { if (c === cls) { const ok = pickable(cls); pool = pool.filter((n) => ok.includes(n)); render(); } });
     root.addEventListener('click', (e) => {
       const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
       if (a === 'reset') restart();
       if (a === 'pick') {
-        const src = drop.checked ? pool : CLASSES[cls];
-        if (!src.length) { $('out').textContent = CLASSES[cls].length ? 'Everyone’s had a go' : 'No students yet'; return; }
+        const src = drop.checked ? pool : pickable(cls);
+        if (!src.length) { $('out').textContent = pickable(cls).length ? 'Everyone’s had a go' : 'No students yet'; return; }
         const out = $('out'); out.classList.add('rolling');
         const winner = src[rand(src.length)];
         let k = 0; const steps = 16;
@@ -566,12 +596,17 @@
       tray.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.tool === id)));
       const t = TOOLS.find((x) => x.id === id);
       card.innerHTML = `<div class="panel__head"><strong>${t.label}</strong><span class="row" style="gap:2px">
+        <button class="icon-btn" data-h="mute" aria-pressed="${muted}" aria-label="${muted ? 'Turn sound on' : 'Mute'}">${muted ? ICON.muted : ICON.sound}</button>
         <button class="icon-btn" data-h="full" aria-label="Show full screen">${ICON.expand}</button>
         <button class="icon-btn" data-h="close" aria-label="Close tool">${ICON.close}</button></span></div>`;
       const body = el('div', { style: 'display:grid;gap:14px', 'data-uid': String(++uid) });
       card.append(body);
       stop = BUILDERS[id](body) || null;
       card.querySelector('[data-h="close"]').onclick = () => { close(); setTray(false); trig.focus(); };
+      card.querySelector('[data-h="mute"]').onclick = () => {
+        muted = !muted;
+        document.querySelectorAll('[data-h="mute"]').forEach((m) => { m.setAttribute('aria-pressed', String(muted)); m.setAttribute('aria-label', muted ? 'Turn sound on' : 'Mute'); m.innerHTML = muted ? ICON.muted : ICON.sound; });
+      };
       card.querySelector('[data-h="full"]').onclick = () => { try { card.requestFullscreen && card.requestFullscreen().catch(() => {}); } catch (e) {} };
       host.classList.add('is-open');
     };

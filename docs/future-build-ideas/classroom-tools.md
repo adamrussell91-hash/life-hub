@@ -42,15 +42,36 @@ Each open tool has a full-screen button for the projector, and a close button th
 - **Timer stacks are saved with the lesson.** The author presets the stack (for example Reading 5, Writing 10) and it is ready when the lesson opens.
 - **Students see the timer and dice only.** Names, groups and the number picker are teacher-only. The Students section is teacher-only too. The mockup's "View as" switch shows both views.
 
+- **Skip in picker lives only in the class's Students section.** It is never set, shown or hinted at on the lesson page or the board, so no student can see the flag or be singled out by it. The picker quietly leaves that student out and never shows a class total (such as "18 of 24") that would give it away.
+- **Students run their own copy of the timer stack.** The teacher's copy is the one on the board.
+- **Sound:** the chime is on by default, with a mute switch on every open tool that mutes them all.
+
+## Suggested tools (not yet chosen)
+
+| Tool | What it does | Who sees it |
+|---|---|---|
+| Stopwatch | Counts up. Useful for timing a read-aloud or a speech | Teacher and students |
+| Wait-time | A silent 5 to 10 second ring after a question, before hands go up | Teacher |
+| Traffic light | Work, whisper, silent. A big signal on the board | Teacher |
+| Coin flip | Heads or tails, for debate sides or first turn | Teacher and students |
+| Technique spinner | Lands on a technique from the Periodic Table of Literary Elements, with its card. "Find one in the extract" | Teacher and students |
+| Sentence starter spinner | Lands on a stem the teacher has written, for example "The writer suggests…" | Teacher and students |
+| Writing prompt | A random image or opening line from a set the teacher keeps | Teacher and students |
+| Team scoreboard | Points for two to six teams, for quiz games | Teacher |
+| Countdown to a date | "9 school days until the essay is due" | Teacher and students |
+| Who's next queue | Hands-up order, so the teacher calls on people fairly | Teacher (uses names) |
+| Seat shuffle | A random seating plan from the class list, honouring skip in picker | Teacher (uses names) |
+| Timer presets | Saved stacks such as Think, Pair, Share (1, 2, 3 minutes) | Teacher |
+
 ## Open questions
 
-- **Just names, or more?** A student list could later hold a preferred name or a "skip in picker" flag (for example, a student away for the term).
-- **Student timer:** does a student run their own copy of the saved stack, or follow the teacher's running timer live?
-- **Which other tools?** Candidates: traffic light (work, quiet, stop), think-pair-share prompt, coin flip, noise meter (needs the microphone), seating shuffle, "who's next" queue.
-- **Sound:** chime on by default, with a mute switch?
+- **Preferred names:** should the Students section also hold a preferred name, used everywhere the picker shows a name?
+- **Groups and skipped students:** should skip in picker also leave a student out of groups, or does it apply to the name picker only?
+- **Which suggested tools to add?**
 
 ## History
 
+- **2026-10-17:** Skip in picker lives only in the class Students section, students get their own timer copy, mute switch added. Suggested a list of further tools. Mockup updated.
 - **2026-10-17:** Adam settled four questions: divider and block both, names on the class, timer stacks saved with the lesson, students get timer and dice only. Mockup gains a Teacher/Student view switch.
 - **2026-10-17:** Class lists move onto the class: a Students section per class, and the name picker and groups tool choose a class from a dropdown.
 - **2026-10-17:** First draft and working mockup: divider and block hosts, stacked timers, names, number, groups, dice.
