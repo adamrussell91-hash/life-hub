@@ -7,7 +7,8 @@
  * - phrase  → a straight underline (fineliner) or a flat band (highlighter)
  * - line    → a square bracket in the line margin
  * - stanza  → a tall square bracket with a centre tick
- * - margin  → short notes in the right margin (fineliner, wide only). When the
+ * - margin  → short notes in the right margin (fineliner, wide only). An opened
+ *              note's card joins the same column at its line, any ink style. When the
  *             notes crowd each other they fold to one-line previews; the
  *             selected note opens in full and the other marks fade back.
  */
@@ -90,6 +91,20 @@ export const MARGIN_LABEL_MIN_WIDTH = 640;
 const MARGIN_NOTE_MIN_WIDTH = 208;
 const MARGIN_NOTE_MAX_WIDTH = 320;
 
+/** An opened note joins the margin stack as a wider card. */
+const MARGIN_PANEL_MIN_WIDTH = 288;
+const MARGIN_PANEL_MAX_WIDTH = 400;
+
+/** The open note's card, when the view has parked it in this poem's margin. */
+export function marginPanelOf(host: HTMLElement): HTMLElement | null {
+  for (const child of Array.from(host.children)) {
+    if (child instanceof HTMLElement && child.classList.contains('block-annotation__panel') && !child.hidden) {
+      return child;
+    }
+  }
+  return null;
+}
+
 /**
  * Draw ink for `marks` into `host` (position: relative). Returns the ids drawn
  * so the caller can animate only marks that are new since the last paint.
@@ -104,6 +119,8 @@ export function drawAnnotationInk(
   );
   host.classList.remove('has-active-note');
   const drawn = new Set<string>();
+  const panel = marginPanelOf(host);
+  const panelId = panel?.dataset.annotationId;
   const base = host.getBoundingClientRect();
   if (base.width === 0 || marks.length === 0) return drawn;
   const activeId = options.activeId ?? null;
@@ -170,10 +187,17 @@ export function drawAnnotationInk(
         else add(underlinePath(r), mark, 'stroke');
       }
     }
-    if (mark.label) labels.push({ mark, y: rects[0]!.y });
+    if (mark.label && mark.annotationId !== panelId) labels.push({ mark, y: rects[0]!.y });
   }
 
-  if (options.style === 'fineliner' && base.width >= MARGIN_LABEL_MIN_WIDTH && labels.length > 0) {
+  const showLabels = options.style === 'fineliner' && labels.length > 0;
+  if (!showLabels) labels.length = 0;
+  const openAnchor = panel
+    ? host.querySelector<HTMLElement>('.block-annotation__anchor.is-open')
+    : null;
+  const panelY = openAnchor ? rel(openAnchor.getBoundingClientRect(), base).y : 0;
+
+  if (base.width >= MARGIN_LABEL_MIN_WIDTH && (labels.length > 0 || panel)) {
     const notes = labels.map(({ mark }) => {
       const opens = Boolean(mark.onOpen);
       const note = document.createElement(opens ? 'button' : 'span');
@@ -201,18 +225,27 @@ export function drawAnnotationInk(
         textRight = Math.max(textRight, r.right - base.left);
       }
     });
-    const minWidth = MARGIN_NOTE_MIN_WIDTH;
-    const left = Math.max(0, Math.min(textRight + 40, base.width - minWidth));
-    const width = Math.max(minWidth, Math.min(MARGIN_NOTE_MAX_WIDTH, base.width - left - 8));
+    const minWidth = panel ? MARGIN_PANEL_MIN_WIDTH : MARGIN_NOTE_MIN_WIDTH;
+    const left = Math.max(0, Math.min(textRight + 40, base.width - minWidth - 8));
+    const width = Math.max(MARGIN_NOTE_MIN_WIDTH, Math.min(MARGIN_NOTE_MAX_WIDTH, base.width - left - 8));
     notes.forEach((note) => {
       note.style.width = `${width}px`;
       note.style.maxWidth = `${width}px`;
     });
-    const stack = () =>
-      stackLabels(labels.map((row, i) => ({ y: row.y, h: notes[i]!.offsetHeight || 20 })));
+    if (panel) {
+      const panelWidth = Math.max(minWidth, Math.min(MARGIN_PANEL_MAX_WIDTH, base.width - left - 8));
+      panel.style.width = `${panelWidth}px`;
+      panel.style.left = `${left}px`;
+    }
+    // The open note takes its place in line order; the notes below it move down.
+    const stack = () => {
+      const rows = labels.map((row, i) => ({ y: row.y, h: notes[i]!.offsetHeight || 20 }));
+      if (panel) rows.push({ y: panelY, h: panel.offsetHeight || 120 });
+      return stackLabels(rows);
+    };
     let tops = stack();
     // Crowded notes run together: fold all but the selected one to a single line.
-    const crowded = tops.some((top, i) => top > labels[i]!.y + 2);
+    const crowded = labels.some((row, i) => tops[i]! > row.y + 2);
     if (crowded) {
       notes.forEach((note) => {
         if (!note.classList.contains('is-active')) note.classList.add('is-collapsed');
@@ -237,7 +270,17 @@ export function drawAnnotationInk(
       if (labels[i]!.mark.annotationId === activeId) lead.classList.add('is-active');
       svg.append(lead);
     });
-    const lowest = Math.max(...notes.map((note, i) => tops[i]! + note.offsetHeight));
+    let lowest = Math.max(0, ...notes.map((note, i) => tops[i]! + note.offsetHeight));
+    if (panel) {
+      const top = tops[labels.length]!;
+      panel.style.top = `${top}px`;
+      const lead = document.createElementNS(SVG_NS, 'path');
+      const y = snap(top + 18);
+      lead.setAttribute('d', `M${snap(left - 18)} ${y} H${snap(left - 6)}`);
+      lead.setAttribute('class', `block-annotation__ink-lead block-annotation__ink--${panel.dataset.colour ?? 'wave'} is-active`);
+      svg.append(lead);
+      lowest = Math.max(lowest, top + (panel.offsetHeight || 120));
+    }
     fitMarginNotes(host, lowest);
   } else {
     fitMarginNotes(host, 0);
