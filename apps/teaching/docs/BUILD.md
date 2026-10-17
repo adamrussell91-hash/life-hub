@@ -33,6 +33,7 @@ Suggested order for continuing builder / teaching-page work (adjust as needed):
 
 | Date | Slice | Outcome |
 |------|--------|---------|
+| 2026-10-17 | **Rich text: Dictionary scan + Fry explainer** | Dictionary scan lights challenging words with a card (definition, pronunciation, origin, example); teacher pre-scan saves on `settings.word_help` and ships to students, students can also scan a published block. Fry explainer (teacher only) rewrites a block, preview then Replace with undo. Both run as background jobs cached by text hash (`/api/text-tools`, `/api/published/word-help`) |
 | 2026-08-15 | **Phase 15 v1 (predictable failure + skip links)** | Skip to content on teacher/student; video/image/embed/block fallbacks; AI retry vs stop copy |
 | 2026-08-15 | **GitHub content backup** | Trash **Backup to GitHub** plus weekly scheduled snapshot to `content_backup/` (env token/repo; not after every edit; no secrets/media bytes) |
 | 2026-08-15 | **AI composition fill** | Quick actions + chat phrasing fill Reading Comprehension / Vocabulary Study / Source Analysis skeletons (library title match when present); Ann chat injects structure, does not invent layout |

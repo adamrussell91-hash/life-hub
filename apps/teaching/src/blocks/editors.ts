@@ -1,6 +1,7 @@
 import { createKaplanEditor } from '@/blocks/kaplan-editor';
 import { createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createAlchemyButton } from '@/alchemy/block-button';
+import { createRichTextTools } from '@/blocks/rich-text-tools';
 import {
   createConceptFeaturesEditor,
   createQuestionQuadrantEditor,
@@ -314,7 +315,10 @@ export function createRichTextEditor(
     publish(html);
   });
 
-  fields.append(toolbar, tiptap.host, source);
+  const textTools = createRichTextTools({ tiptap, getLatest, onChange });
+  toolbar.append(...textTools.buttons);
+
+  fields.append(toolbar, textTools.status, tiptap.host, textTools.strip, source);
   const shell = editorShell(block, onChange, fields, getLatest);
   shell.addEventListener(
     'remove',

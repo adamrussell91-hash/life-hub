@@ -1,0 +1,436 @@
+/* Dictionary scan and Fry explainer on rich text blocks. Tokens only.
+   Words glow a quiet blue; a tap opens a paper card. The sweep runs only
+   while a scan is working, and the reveal shimmer plays once then settles. */
+
+/* ---- highlighted words ---------------------------------------------- */
+
+.word-help-term {
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--wave);
+  background:
+    linear-gradient(
+      100deg,
+      transparent 0%,
+      transparent 40%,
+      color-mix(in oklab, var(--paper) 80%, transparent) 50%,
+      transparent 60%,
+      transparent 100%
+    )
+    no-repeat,
+    color-mix(in oklab, var(--pastel-blue) 70%, transparent);
+  background-size: 250% 100%, 100% 100%;
+  background-position: 120% 0, 0 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--wave) 45%, transparent);
+  border-radius: var(--space-1);
+  padding: 0 var(--space-px);
+  margin: 0;
+  cursor: pointer;
+  text-shadow: 0 0 0.6em color-mix(in oklab, var(--wave) 22%, transparent);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.word-help-term:hover,
+.word-help-term[aria-expanded='true'] {
+  color: var(--navy);
+  background-color: var(--pastel-blue);
+}
+
+.word-help-term:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.word-help-revealed .word-help-term {
+  animation: word-help-shimmer 900ms ease-out both;
+  animation-delay: calc(var(--word-help-i, 0) * 60ms);
+}
+
+@keyframes word-help-shimmer {
+  from {
+    background-position: 120% 0, 0 0;
+    color: var(--ink);
+  }
+  to {
+    background-position: -20% 0, 0 0;
+    color: var(--wave);
+  }
+}
+
+/* ---- scan sweep -------------------------------------------------------- */
+
+.block-rich-text,
+.block-editor__rich-host {
+  position: relative;
+}
+
+.word-help-scanning::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: var(--radius-xs);
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in oklab, var(--pastel-blue) 75%, transparent) 48%,
+    color-mix(in oklab, var(--wave) 30%, transparent) 50%,
+    color-mix(in oklab, var(--pastel-blue) 75%, transparent) 52%,
+    transparent 100%
+  );
+  background-size: 100% 300%;
+  animation: word-help-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes word-help-sweep {
+  from {
+    background-position: 0 100%;
+  }
+  to {
+    background-position: 0 0%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-help-revealed .word-help-term {
+    animation: none;
+  }
+  .word-help-scanning::after {
+    animation: none;
+    background: color-mix(in oklab, var(--pastel-blue) 35%, transparent);
+  }
+}
+
+/* ---- dictionary card --------------------------------------------------- */
+
+.word-card {
+  z-index: 60;
+  width: min(22rem, calc(100vw - 2 * var(--space-4)));
+  box-sizing: border-box;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  background: var(--paper);
+  backdrop-filter: none;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--wave);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-3);
+  font-family: var(--font-ui);
+  animation: word-card-in 160ms ease-out;
+}
+
+.word-card:focus {
+  outline: none;
+}
+
+@keyframes word-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-card {
+    animation: none;
+  }
+}
+
+.word-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.word-card__word {
+  margin: 0;
+  font-family: Newsreader, Georgia, serif;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+
+.word-card__say {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  letter-spacing: var(--tracking-wide);
+}
+
+.word-card__close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--muted);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.word-card__close:hover,
+.word-card__close:focus-visible {
+  background: var(--cotton);
+  color: var(--ink);
+}
+
+.word-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.word-card__tag {
+  padding: var(--space-px) var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--cotton);
+  color: var(--orca);
+  font-size: var(--text-xs);
+  font-style: italic;
+  white-space: nowrap;
+}
+
+.word-card__tag--technical {
+  background: var(--pastel-blue);
+  color: var(--pastel-blue-ink);
+  font-style: normal;
+}
+.word-card__tag--uncommon {
+  background: var(--pastel-lilac);
+  color: var(--pastel-lilac-ink);
+  font-style: normal;
+}
+.word-card__tag--foreign {
+  background: var(--pastel-peach);
+  color: var(--pastel-peach-ink);
+  font-style: normal;
+}
+.word-card__tag--archaic {
+  background: var(--pastel-gold);
+  color: var(--pastel-gold-ink);
+  font-style: normal;
+}
+.word-card__tag--long,
+.word-card__tag--idiom {
+  background: var(--pastel-sage);
+  color: var(--pastel-sage-ink);
+  font-style: normal;
+}
+
+.word-card__definition {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+}
+
+.word-card__example,
+.word-card__origin {
+  display: grid;
+  gap: var(--space-px);
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+.word-card__example-text {
+  font-style: italic;
+}
+
+.word-card__label {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---- student button ---------------------------------------------------- */
+
+.word-help-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.word-help-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--paper);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.word-help-bar__btn:hover,
+.word-help-bar__btn:focus-visible {
+  color: var(--wave);
+  border-color: color-mix(in oklab, var(--wave) 40%, transparent);
+}
+
+.word-help-bar__btn.is-on {
+  color: var(--pastel-blue-ink);
+  background: var(--pastel-blue);
+  border-color: transparent;
+}
+
+.word-help-bar__btn:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.word-help-bar__status {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.word-help-bar__status:empty {
+  display: none;
+}
+
+/* ---- teacher editor ---------------------------------------------------- */
+
+.text-tools-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.text-tools-status {
+  margin: var(--space-1) 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.text-tools-status[hidden],
+.word-help-strip[hidden] {
+  display: none;
+}
+
+.text-tools-status--error {
+  color: var(--danger);
+}
+
+.word-help-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--pastel-blue) 35%, var(--paper));
+}
+
+.word-help-strip__label {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--pastel-blue-ink);
+}
+
+.word-help-strip__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.word-help-strip__clear {
+  min-height: 2.75rem;
+}
+
+/* ---- Fry review dialog ------------------------------------------------- */
+
+.text-tools-review {
+  padding: var(--space-4);
+  width: min(42rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  box-sizing: border-box;
+  background: var(--paper);
+  backdrop-filter: none;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev-3);
+}
+
+.text-tools-review[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.text-tools-review::backdrop {
+  background: color-mix(in oklab, var(--depth) 30%, transparent);
+}
+
+.text-tools-review h2 {
+  flex-shrink: 0;
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg);
+}
+
+.text-tools-review__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.text-tools-review__preview {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.text-tools-review__actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.text-tools-review__actions .btn {
+  flex: 1;
+  min-height: 2.75rem;
+}
+
+@media (max-width: 720px) {
+  .text-tools-review {
+    width: calc(100vw - 1rem);
+    max-height: calc(var(--vv-height, 100dvh) - 1rem);
+    padding: var(--space-3);
+  }
+}
+
+@media print {
+  .word-help-bar,
+  .word-card,
+  .text-tools-review {
+    display: none !important;
+  }
+}
