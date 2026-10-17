@@ -467,6 +467,11 @@ export function createFoodJournalView({
     button,
     openEntry,
     setMode,
+    openTag(key) {
+      journalQuery = `#${key}`;
+      setMode("timeline");
+      host?.scrollIntoView?.({ block: "start" });
+    },
     editVisit,
     deleteVisit,
     openRecipe,

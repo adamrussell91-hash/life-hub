@@ -962,6 +962,38 @@ html[data-hub="life"] .hub-card.food-dish {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.fj-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+/* A hashtag reads as a word in the line but opens every entry with that tag. */
+.fj-tag {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--pastel-peach-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+.fj-tags .fj-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.fj-tag:hover {
+  text-decoration-thickness: 2px;
+}
+.fj-tag:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
 .fj-prose__label {
   margin: var(--space-4) 0 calc(-1 * var(--space-2));
   font-family: var(--font-ui);
