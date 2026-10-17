@@ -181,8 +181,8 @@ Justice by place: Away 47, Online 40, At school 17 (entries can be in two). Run 
 
 ## Branch rules (first version, `apps/tasks/src/personal-line/tracks.ts`)
 
-- Each line splits by format for this student. A branch needs **3 or more** of the student's stops;
-  at most **4** branches per line, largest first. The rest ride an **Other** track.
+- Each line splits by format for this student, **only when it's busy** (17 Oct, below). The rest ride
+  an **Other** track.
 - **Civics** is its own Justice branch, whatever the format.
 - A line with nothing big enough to split stays one track.
 - Every track carries a **flag** naming it, at the top and again at each term start where the track is
@@ -193,11 +193,44 @@ Justice by place: Away 47, Online 40, At school 17 (entries can be in two). Run 
 - **Spurs:** when a name would sit more than about two lines below its date, it moves to a spur that
   forks sideways off its branch for those months, with its own names column (up to three spurs). Forks
   leave and rejoin where the names columns they cross are clear.
-- An entry on two of the student's lines has a stop and a name on each (lighter on the second) instead
-  of one long capsule across the page.
+- An entry on two of the student's lines is named once, on the first (its home line), and is a plain
+  interchange stop on the other (17 Oct, below).
 - **Phone:** no room for branches, so each line stays one track and names carry the format.
 - The builder has a **Split each line into branches** switch; a published line keeps the choice.
 - Thresholds are a first guess. Adam: "wait and see". Tune them on real students.
+
+## Compression pass (17 Oct 2026)
+
+Adam: a student with one or two interests got a ton of vertical lines, some with one stop, "like four
+four-legged octopuses". Two causes, both measured on the fixture catalogue:
+
+1. **Shared stops were drawn twice.** Humanities is on Justice and Expression, so a Humanities only
+   Year 10 drew two identical sets of four branches: 8 tracks for 16 stops. Debating (Justice and
+   Reasoning) drew 7.
+2. **A fixed bar of 3 stops per branch** split a 16 stop line into four thin tracks, plus an Other with one.
+
+New rules (`apps/tasks/src/personal-line/tracks.ts`, `render.ts`):
+
+- A stop belongs to the **first** of the student's lines it's on. It is named there and only there. On
+  its other lines it's a plain interchange stop (hover for the name), and approx. windows there draw as
+  a stop, not a bracket. A line that only shares stops has no names column and runs close beside.
+- Only a line's **own** stops decide whether it splits. It gets one track per **8** own stops
+  (`TRACK_STOPS`), so a line under 16 stays one track. At most **3** branches plus Other.
+- A branch needs **4** stops and **20%** of the line's own stops (`BRANCH_MIN`, `BRANCH_SHARE`).
+- An **Other** smaller than a branch is folded back: the smallest branch rejoins it, or the line stays whole.
+- **Spurs:** a name can sit about two names below its date (96px, was 56) before it spurs, at most
+  **one** spur per track (was three), and a spur that would hold one name isn't drawn; that name stacks.
+- **Phone:** every track shares one names column, so names now stack together (they used to overlap).
+
+| Year 10 student | Tracks before | Tracks after | Width before | After |
+| --- | --- | --- | --- | --- |
+| Humanities | 8 | 3 | 2228px | ~700px of lines |
+| Debating | 7 | 3 | 2502px | ~1000px |
+| Debating + Legal | 8 | 4 | 2782px | ~1250px |
+| Debating + English | 11 | 5 | 3866px | ~1900px |
+| Mathematics + Science | 4 | 3 | 1930px | ~1700px |
+
+Tune `TRACK_STOPS` first if lines now feel too crowded (lower it) or still too sprawling (raise it).
 
 ## Open questions
 
