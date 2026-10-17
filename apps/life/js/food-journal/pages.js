@@ -510,8 +510,9 @@ export function paintEntry(ctx, host, visit) {
       el("p", "fj-meta", visit.venue.address || ""),
     );
     if (visit.venue.address) {
+      // Search the venue in its suburb, not the suburb alone.
       const map = createViewOnMap({
-        address: visit.venue.address,
+        address: unique([visit.venue.name, visit.venue.address]).join(", "),
         locationName: visit.venue.name,
       });
       if (map) place.append(map.el);
