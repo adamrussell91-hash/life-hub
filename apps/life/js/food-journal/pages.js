@@ -43,10 +43,14 @@ const standfirst = (visit) =>
 
 function stars(value) {
   const span = el("span", "fj-stars");
-  const n = Math.round(value);
+  const halves = Math.round(value * 2),
+    full = Math.floor(halves / 2),
+    half = halves % 2;
   span.setAttribute("role", "img");
   span.setAttribute("aria-label", `${value} out of 5`);
-  span.append("★".repeat(n), el("span", "fj-stars__off", "★".repeat(5 - n)));
+  span.append("★".repeat(full));
+  if (half) span.append(el("span", "fj-stars__half", "★"));
+  span.append(el("span", "fj-stars__off", "★".repeat(5 - full - half)));
   return span;
 }
 // Whole-card click target that stays a real button inside the heading.
@@ -594,7 +598,8 @@ function menuDish(ctx, visit, dish) {
   rate.setAttribute("role", "group");
   rate.setAttribute("aria-label", `Rate ${dish.title}`);
   for (let n = 1; n <= 5; n++) {
-    const b = el("button", `fj-rate__star${dish.rating != null && n <= dish.rating ? " is-on" : ""}`, "★");
+    const fill = dish.rating == null ? "" : n <= dish.rating ? " is-on" : n - 0.5 === dish.rating ? " is-half" : "";
+    const b = el("button", `fj-rate__star${fill}`, "★");
     b.type = "button";
     b.setAttribute("aria-label", `${n} out of 5`);
     b.setAttribute("aria-pressed", String(dish.rating === n));

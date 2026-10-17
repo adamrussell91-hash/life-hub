@@ -94,9 +94,9 @@ export function validateFoodJournal(j) {
         bad("Meal type is invalid.");
       if (
         d.rating != null &&
-        (!Number.isInteger(d.rating) || d.rating < 1 || d.rating > 5)
+        (!Number.isInteger(d.rating * 2) || d.rating < 1 || d.rating > 5)
       )
-        bad("Rating must be 1 to 5.");
+        bad("Rating must be 1 to 5, in half steps.");
       if (
         !Array.isArray(d.tags) ||
         d.tags.length > 40 ||
