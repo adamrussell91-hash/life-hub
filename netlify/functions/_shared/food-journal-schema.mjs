@@ -43,6 +43,15 @@ export function validateFoodJournal(j) {
     if (v.source_id != null) text(v.source_id, "Source identifier", 200);
     text(v.notes, "Notes");
     text(v.menu_text, "Menu", 100000);
+    if (v.reviewed != null && typeof v.reviewed !== "boolean")
+      bad("Review state is invalid.");
+    if (v.editorial != null) {
+      if (typeof v.editorial !== "object") bad("Editorial is invalid.");
+      text(v.editorial.headline, "Headline", 200);
+      text(v.editorial.standfirst, "Standfirst", 600);
+      text(v.editorial.pull_quote, "Pull quote", 600);
+      text(v.editorial.basis, "Editorial basis", 64);
+    }
     if (
       !/^\d{4}-\d{2}-\d{2}$/.test(v.date) ||
       Number.isNaN(Date.parse(v.date)) ||
