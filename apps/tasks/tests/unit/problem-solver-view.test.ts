@@ -32,6 +32,7 @@ describe('coach panel', () => {
   it('shows a suggestion card and disables the composer while thinking', () => {
     const panel = renderCoachPanel(session({ pendingKeep: null, suggestion: { kind: 'switch_tool', tool: 'problem_tree', reason: 'Causes branch.' }, runner: { status: 'running', mode: 'turn', error: null } }), noop);
     expect(panel.querySelector('.ps-suggestion')!.textContent).toContain('Problem tree');
+    expect(panel.querySelector('.ps-suggestion__title .ps-emblem')).not.toBeNull();
     expect(panel.querySelector('[data-action="accept_suggestion"]')).not.toBeNull();
     expect((panel.querySelector('textarea') as HTMLTextAreaElement).disabled).toBe(true);
     expect(panel.textContent).toContain('Coach is thinking');
@@ -53,15 +54,10 @@ describe('canvas', () => {
     expect(host.querySelector('.ps-whys')).not.toBeNull();
   });
 
-  it('falls back to the outline for tools without a renderer yet', () => {
-    const host = document.createElement('div');
-    mountCanvas(host).update(session({ define: { runs: [{ id: 'r2', tool: 'concept_map', status: 'active', nodes: [{ id: 'n', slot: 'theme', text: 'x', state: 'accepted', skills: [], turnId: 't' }], edges: [] }], finishedEarly: false, exitObjection: null } }));
-    expect(host.querySelector('.ps-outline:not(.sr-only)')).not.toBeNull();
-  });
-
   it.each([
     ['five_whys', 'problem', '.ps-whys'],
     ['problem_tree', 'trunk', '.ps-tree'],
+    ['concept_map', 'theme', '.ps-cmap'],
     ['problem_statement', 'problem', '.ps-statement'],
     ['gap_basic', 'current', '.ps-gap'],
     ['gap_radar', 'current', '.ps-radar'],
@@ -70,5 +66,6 @@ describe('canvas', () => {
     const host = document.createElement('div');
     mountCanvas(host).update(session({ define: { runs: [{ id: `r-${tool}`, tool, status: 'active', nodes: [{ id: 'n', slot, text: 'Something specific', state: 'accepted', skills: [], turnId: 't' }], edges: [], ...(tool === 'gap_radar' ? { radar: { snapshots: [] } } : {}) }], finishedEarly: false, exitObjection: null } }));
     expect(host.querySelector(selector)).not.toBeNull();
+    expect(host.querySelector('.ps-canvas__title .ps-emblem svg')).not.toBeNull();
   });
 });
