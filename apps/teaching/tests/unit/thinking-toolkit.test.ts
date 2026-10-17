@@ -316,6 +316,31 @@ describe('rendering', () => {
   });
 });
 
+describe('link chips', () => {
+  it('open what a linked tool is, one at a time, and close on a second click', () => {
+    const el = renderBlock(createBlock('toolkit_skill', 'skill_1'), 'student');
+    const chips = [...el.querySelectorAll<HTMLButtonElement>('button.tk-chip')];
+    expect(chips.length).toBeGreaterThan(1);
+    const panel = el.querySelector<HTMLElement>('.tk-links__detail')!;
+    expect(panel.hidden).toBe(true);
+    expect(chips[0]!.getAttribute('aria-controls')).toBe(panel.id);
+
+    chips[0]!.click();
+    expect(chips[0]!.getAttribute('aria-expanded')).toBe('true');
+    expect(panel.hidden).toBe(false);
+    expect(panel.querySelector('.tk-links__detail-title')?.textContent).toBe(chips[0]!.textContent);
+    expect(panel.querySelector('.tk-links__detail-text')?.textContent?.trim()).not.toBe('');
+
+    chips[1]!.click();
+    expect(chips[0]!.getAttribute('aria-expanded')).toBe('false');
+    expect(panel.querySelector('.tk-links__detail-title')?.textContent).toBe(chips[1]!.textContent);
+
+    chips[1]!.click();
+    expect(panel.hidden).toBe(true);
+    expect(chips[1]!.getAttribute('aria-expanded')).toBe('false');
+  });
+});
+
 describe('Thinking reflection (I3)', () => {
   it('fills chips from the page toolkit blocks', () => {
     const page = [createBlock('toolkit_tool', 'a'), createBlock('toolkit_value', 'b'), createBlock('thinking_reflection', 'c')];

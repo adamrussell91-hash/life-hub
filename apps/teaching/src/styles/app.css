@@ -8356,7 +8356,8 @@ body.is-lesson-builder-full-page .hub-utilities {
   border-radius: 0;
 }
 
-.lesson-palette__family-icon svg {
+.lesson-palette__family-icon svg,
+.lesson-palette__family-griffin {
   width: 17px;
   height: 17px;
 }
@@ -12302,6 +12303,26 @@ button.block-annotation__margin-note.is-collapsed:hover {
   margin: var(--space-2) 0 var(--space-2) var(--space-8);
 }
 .callout-ref-list > .callout-reference { margin-left: 0; }
+/* Block-level badges float in the top-right corner instead of taking a row.
+   The feedback dot owns the last 1.75rem, so the badges sit just left of it. */
+.callout-ref-host { position: relative; }
+.callout-ref-list--corner {
+  position: absolute;
+  top: -0.5rem;
+  right: 0;
+  z-index: 2;
+  max-width: 60%;
+  margin: 0;
+}
+/* A slimmer pill centred on the dot; the summary keeps the 44px hit target. */
+.callout-ref-list--corner .callout-reference .callout-ref {
+  min-height: 1.75rem;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+.callout-ref-list--corner .callout__identity { gap: var(--space-1); }
+.callout-ref-list--corner .callout__identity svg { width: 1.125rem; height: 1.125rem; }
+.pulse-host > .callout-ref-list--corner { right: 2rem; }
 .callout-reference--attached > summary { padding: 0; }
 .callout-reference--attached .callout-ref { min-height: 44px; }
 .callout-reference--attached[open] .callout-ref,

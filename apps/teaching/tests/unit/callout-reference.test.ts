@@ -40,6 +40,15 @@ describe('callout references', () => {
     expect(Array.from(wrapper.children).filter(child => child.classList.contains('callout-ref-list'))).toHaveLength(1);
     expect(wrapper.querySelectorAll('.callout-ref-list > .callout-reference')).toHaveLength(2);
     expect(wrapper.querySelector('h2')?.textContent).toBe('Activity');
+    // Corner badges sit beside the feedback dot rather than adding a row above the content.
+    expect(wrapper.querySelector('.callout-ref-list')?.classList.contains('callout-ref-list--corner')).toBe(true);
+    expect(wrapper.classList.contains('callout-ref-host')).toBe(true);
+  });
+  it('keeps whole-block badges in the flow when printing', () => {
+    const first = { ...callout, content: { ...callout.content, related_to: {block_id:'activity'} } } as Block;
+    const wrapper = document.createElement('div'); wrapper.className = 'block'; wrapper.dataset.blockId = 'activity';
+    decorateCalloutReferences(wrapper, activity, 'print', [activity, first]);
+    expect(wrapper.querySelector('.callout-ref-list--corner')).toBeNull();
   });
   it('lets the teacher choose a question, preserves the chosen target, and can clear it', () => {
     const change = vi.fn();
