@@ -1227,6 +1227,281 @@
   margin: 0;
 }
 
+/* Analogous Thinking ------------------------------------------------------- */
+/* Seven levels of fluid analogising. Same frame as the toolkit, marine instead
+   of the Newington orange, so the two sets read as neighbours, not one deck. */
+
+.an-eyebrow {
+  color: var(--marine);
+}
+
+.an-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+/* Seven rising steps: filled up to the current level. */
+.an-steps {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.an-steps__step {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 20px;
+  height: calc(10px + var(--an-step, 1) * 4px);
+  padding-bottom: 1px;
+  border: 1.5px solid var(--shallow);
+  border-radius: 3px 3px 0 0;
+  background: #fff;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  color: var(--muted);
+}
+
+.an-steps__step.is-reached {
+  border-color: var(--marine);
+  background: color-mix(in srgb, var(--marine) 18%, #fff);
+  color: var(--navy);
+}
+
+.an-steps__step[aria-current='step'] {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: #fff;
+}
+
+.tk-card--analogy {
+  position: relative;
+  padding-left: calc(var(--space-4) + 4px);
+  border: 1px solid var(--line);
+}
+
+.tk-card--analogy::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  background: var(--marine);
+}
+
+.an-tag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wave) 14%, #fff);
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  vertical-align: middle;
+  color: var(--navy);
+}
+
+.an-card-name {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.an-focus {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.an-focus__label,
+.an-next__label,
+.an-contrast__label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.an-focus__text {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: 1.4;
+  color: var(--depth);
+  overflow-wrap: anywhere;
+}
+
+.an-helps,
+.an-next,
+.an-contrast__text,
+.an-contrast__why,
+.an-ladder__text {
+  margin: 0;
+  font-family: var(--font-ui);
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.an-helps strong {
+  color: var(--navy);
+}
+
+.an-check,
+.an-process-box {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.an-check .an-checks,
+.an-process {
+  margin: 0;
+  padding-left: 1.4rem;
+  font-family: var(--font-ui);
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.an-next {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  font-size: var(--text-sm);
+}
+
+.an-next__label {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.an-next strong {
+  color: var(--navy);
+}
+
+/* Weak and strong analogy, side by side. */
+.an-contrast {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.an-contrast__side {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.an-contrast__side--strong {
+  border-color: var(--marine);
+  background: color-mix(in srgb, var(--wave) 8%, #fff);
+}
+
+.an-contrast__text {
+  font-style: italic;
+}
+
+/* The ladder: each rung steps in a little, Level 1 at the top. */
+.an-ladder {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.an-ladder__rung {
+  display: grid;
+  gap: 2px;
+  margin-left: calc((var(--an-step, 1) - 1) * 10px);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-left: 4px solid color-mix(in srgb, var(--marine) calc(30% + var(--an-step, 1) * 10%), #fff);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.an-ladder__rung.is-chosen {
+  border-color: var(--marine);
+  border-left-color: var(--navy);
+  background: color-mix(in srgb, var(--wave) 8%, #fff);
+}
+
+.an-ladder__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-2);
+  margin: 0;
+  font-family: var(--font-ui);
+}
+
+.an-ladder__num {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--navy);
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  color: #fff;
+}
+
+.an-ladder__name {
+  font-weight: var(--weight-bold);
+  color: var(--navy);
+}
+
+.an-ladder__head .an-tag {
+  margin-left: 0;
+}
+
+.an-ladder__chosen {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--marine);
+}
+
+.an-ladder__text {
+  font-size: var(--text-sm);
+}
+
+.an-ed__levels .hub-pills__btn {
+  white-space: normal;
+  text-align: left;
+}
+
+.an-ed__marks {
+  display: grid;
+  gap: 4px;
+}
+
 /* Phone ---------------------------------------------------------------------- */
 
 @media (max-width: 720px) {
@@ -1276,6 +1551,14 @@
 
   .tk-game__columns {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .an-contrast {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .an-ladder__rung {
+    margin-left: calc((var(--an-step, 1) - 1) * 4px);
   }
 
   .tk-sentence--compact,

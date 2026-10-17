@@ -58,6 +58,8 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   concept_features: 'Test a concept as central, contestable and common, then explore it.',
   thinking_intentions: "Set the lesson's content, thinking and collaborative intentions.",
   thinking_reflection: 'Close with reflection on progress (thinking) and process (community).',
+  analogy_ladder: 'All seven levels of analogy, with the process and the check, for introducing them.',
+  analogy_level: 'One level of analogous thinking, from close reading up to analogical chains.',
   'embed:google_maps': 'Embed an interactive Google Map at a location.',
   'embed:google_slides': 'Embed a Google Slides presentation inline.',
   'embed:google_docs': 'Embed a Google Document for reading in place.',
