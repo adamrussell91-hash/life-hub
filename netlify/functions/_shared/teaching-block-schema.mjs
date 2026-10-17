@@ -247,6 +247,33 @@ var FluidAnalogyContentSchema = z3.object({
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
+var AnalogySlotSchema = z3.object({
+  key: z3.string().min(1),
+  label: z3.string().default(""),
+  frame: z3.string().default(""),
+  example: z3.string().default("")
+});
+var AnalogyStageSchema = z3.object({
+  task: z3.string().default(""),
+  slots: z3.array(AnalogySlotSchema).max(12).default([])
+});
+var AnalogyMoveContentSchema = z3.object({
+  label: z3.string(),
+  definition: z3.string(),
+  /** The text, character or idea students work with. */
+  focus: z3.string().default(""),
+  /** The level students start at. */
+  level: z3.number().int().min(1).max(3).default(1),
+  /** Students can step between levels themselves. */
+  student_choice: z3.boolean().default(true),
+  levels: z3.array(AnalogyStageSchema).length(3),
+  show_check: z3.boolean().default(true),
+  checks: z3.array(z3.string()).max(8).default([]),
+  /** Show the prompt-card name for classes using the printed deck. */
+  show_card: z3.boolean().default(false),
+  teacher_note: TkTeacherNoteSchema.optional(),
+  teacher_jots: TkJotsSchema.optional()
+});
 var AnalogyTypesContentSchema = z3.object({
   /** Student instruction shown at the top of the block. */
   guide: z3.string().default(""),
@@ -332,6 +359,13 @@ var BlockTypeSchema = z4.enum([
   "thinking_reflection",
   "fluid_analogy",
   "analogy_types",
+  "analogy_close_reading",
+  "analogy_pattern",
+  "analogy_reverse",
+  "analogy_problem",
+  "analogy_metaphor",
+  "analogy_transfer",
+  "analogy_chains",
   "teacher_note"
 ]);
 var ColumnPresetSchema = z4.enum(["50-50", "33-67", "67-33", "33-33-33", "custom"]);
@@ -1270,6 +1304,13 @@ var ThinkingReflectionBlockSchema = toolkitBlockSchema(
 );
 var FluidAnalogyBlockSchema = toolkitBlockSchema("fluid_analogy", FluidAnalogyContentSchema);
 var AnalogyTypesBlockSchema = toolkitBlockSchema("analogy_types", AnalogyTypesContentSchema);
+var AnalogyCloseReadingBlockSchema = toolkitBlockSchema("analogy_close_reading", AnalogyMoveContentSchema);
+var AnalogyPatternBlockSchema = toolkitBlockSchema("analogy_pattern", AnalogyMoveContentSchema);
+var AnalogyReverseBlockSchema = toolkitBlockSchema("analogy_reverse", AnalogyMoveContentSchema);
+var AnalogyProblemBlockSchema = toolkitBlockSchema("analogy_problem", AnalogyMoveContentSchema);
+var AnalogyMetaphorBlockSchema = toolkitBlockSchema("analogy_metaphor", AnalogyMoveContentSchema);
+var AnalogyTransferBlockSchema = toolkitBlockSchema("analogy_transfer", AnalogyMoveContentSchema);
+var AnalogyChainsBlockSchema = toolkitBlockSchema("analogy_chains", AnalogyMoveContentSchema);
 var TeacherNoteBlockSchema = z4.object({
   id: z4.string().min(1),
   type: z4.literal("block"),
@@ -1322,6 +1363,13 @@ var leafBlockSchemas = [
   ThinkingReflectionBlockSchema,
   FluidAnalogyBlockSchema,
   AnalogyTypesBlockSchema,
+  AnalogyCloseReadingBlockSchema,
+  AnalogyPatternBlockSchema,
+  AnalogyReverseBlockSchema,
+  AnalogyProblemBlockSchema,
+  AnalogyMetaphorBlockSchema,
+  AnalogyTransferBlockSchema,
+  AnalogyChainsBlockSchema,
   TeacherNoteBlockSchema
 ];
 var SpacerBlockSchema = z4.object({
@@ -1455,6 +1503,13 @@ var BlockSchema = z4.lazy(
 export {
   AccordionBlockSchema,
   AccordionItemSchema,
+  AnalogyChainsBlockSchema,
+  AnalogyCloseReadingBlockSchema,
+  AnalogyMetaphorBlockSchema,
+  AnalogyPatternBlockSchema,
+  AnalogyProblemBlockSchema,
+  AnalogyReverseBlockSchema,
+  AnalogyTransferBlockSchema,
   AnalogyTypesBlockSchema,
   AnnotationAnchorSchema,
   AnnotationAttachmentSchema,

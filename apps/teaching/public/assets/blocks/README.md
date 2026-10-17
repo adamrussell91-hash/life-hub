@@ -66,9 +66,16 @@ Drawn for Teaching Hub as 256px line art in the same stroke as the set above. Ea
 
 ## Analogous Thinking
 
-Drawn in-repo as 256px line art in the same stroke (#272A2D, 12px, round caps), rendered from SVG. No griffin badge: fluid analogising is not part of the Newington framework.
+Drawn in-repo as 256px line art in the same stroke (#272A2D, 12px, round caps), rendered from SVG. The seven type icons are drawn from `src/toolkit/analogy-icons.ts`, which the blocks also draw inline. No griffin badge: fluid analogising is not part of the Newington framework.
 
 | Palette file | Shows |
 | --- | --- |
-| `fluid_analogy.png` | A square mapped onto a circle: different surface, same centre |
+| `analogy_close_reading.png` | A bridge: arch and deck between two piers |
+| `analogy_pattern.png` | Three chevrons, repeated lower in dots |
+| `analogy_reverse.png` | A tick and a cross either side of a line |
+| `analogy_problem.png` | A route out from a square and back |
+| `analogy_metaphor.png` | A point with ripples, the outermost dotted |
+| `analogy_transfer.png` | A rule branching into three boxes |
+| `analogy_chains.png` | Three chain links |
+| `fluid_analogy.png` | A square mapped onto a circle (earlier one-block version, kept for saved lessons) |
 | `analogy_types.png` | Seven rising steps |

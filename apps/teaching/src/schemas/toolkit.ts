@@ -248,6 +248,42 @@ export const FluidAnalogyContentSchema = z.object({
   teacher_jots: TkJotsSchema.optional()
 });
 
+/** One box in an analogy organiser. The key places it; students see the frame, then the example. */
+export const AnalogySlotSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().default(''),
+  frame: z.string().default(''),
+  example: z.string().default('')
+});
+
+/** One level of an analogy block: the task and the organiser's boxes. */
+export const AnalogyStageSchema = z.object({
+  task: z.string().default(''),
+  slots: z.array(AnalogySlotSchema).max(12).default([])
+});
+
+/**
+ * One type of analogy (Close Reading … Chains) as its own block. The block type
+ * decides the organiser's shape; the content is the same for all seven.
+ */
+export const AnalogyMoveContentSchema = z.object({
+  label: z.string(),
+  definition: z.string(),
+  /** The text, character or idea students work with. */
+  focus: z.string().default(''),
+  /** The level students start at. */
+  level: z.number().int().min(1).max(3).default(1),
+  /** Students can step between levels themselves. */
+  student_choice: z.boolean().default(true),
+  levels: z.array(AnalogyStageSchema).length(3),
+  show_check: z.boolean().default(true),
+  checks: z.array(z.string()).max(8).default([]),
+  /** Show the prompt-card name for classes using the printed deck. */
+  show_card: z.boolean().default(false),
+  teacher_note: TkTeacherNoteSchema.optional(),
+  teacher_jots: TkJotsSchema.optional()
+});
+
 /** Analogy types: all seven, the three levels, the process and the check. */
 export const AnalogyTypesContentSchema = z.object({
   /** Student instruction shown at the top of the block. */
@@ -300,4 +336,14 @@ export const TOOLKIT_BLOCK_TYPES = [
 export type ToolkitBlockType = (typeof TOOLKIT_BLOCK_TYPES)[number];
 
 /** Analogous Thinking blocks: teacher note and class notes like the toolkit, no griffin. */
-export const ANALOGY_BLOCK_TYPES = ['analogy_types', 'fluid_analogy'] as const;
+export const ANALOGY_BLOCK_TYPES = [
+  'analogy_types',
+  'analogy_close_reading',
+  'analogy_pattern',
+  'analogy_reverse',
+  'analogy_problem',
+  'analogy_metaphor',
+  'analogy_transfer',
+  'analogy_chains',
+  'fluid_analogy'
+] as const;

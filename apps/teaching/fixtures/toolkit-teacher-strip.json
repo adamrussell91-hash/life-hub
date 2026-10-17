@@ -9,7 +9,14 @@
     "tabs",
     "tk_refl",
     "an_fluid",
-    "an_types"
+    "an_types",
+    "an_close_reading",
+    "an_pattern",
+    "an_reverse",
+    "an_problem",
+    "an_metaphor",
+    "an_transfer",
+    "an_chains"
   ],
   "dropped_block_ids": [
     "tk_note",
@@ -368,6 +375,517 @@
       "content": {
         "types": [
           "analogy:chains"
+        ],
+        "teacher_note": {
+          "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+          "run": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "say": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "watch": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "extra_label": "",
+          "extra": [],
+          "time": "",
+          "source": "",
+          "edited": true
+        },
+        "teacher_jots": {
+          "": "TOOLKIT_TEACHER_SENTINEL_7f3a"
+        }
+      }
+    },
+    {
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1,
+      "layout": {},
+      "print": {},
+      "settings": {},
+      "type": "block",
+      "variant": "medium",
+      "id": "an_close_reading",
+      "block_type": "analogy_close_reading",
+      "visibility": "student_teacher",
+      "content": {
+        "label": "l",
+        "definition": "d",
+        "level": 1,
+        "levels": [
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          }
+        ],
+        "teacher_note": {
+          "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+          "run": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "say": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "watch": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "extra_label": "",
+          "extra": [],
+          "time": "",
+          "source": "",
+          "edited": true
+        },
+        "teacher_jots": {
+          "": "TOOLKIT_TEACHER_SENTINEL_7f3a"
+        }
+      }
+    },
+    {
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1,
+      "layout": {},
+      "print": {},
+      "settings": {},
+      "type": "block",
+      "variant": "medium",
+      "id": "an_pattern",
+      "block_type": "analogy_pattern",
+      "visibility": "student_teacher",
+      "content": {
+        "label": "l",
+        "definition": "d",
+        "level": 1,
+        "levels": [
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          }
+        ],
+        "teacher_note": {
+          "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+          "run": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "say": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "watch": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "extra_label": "",
+          "extra": [],
+          "time": "",
+          "source": "",
+          "edited": true
+        },
+        "teacher_jots": {
+          "": "TOOLKIT_TEACHER_SENTINEL_7f3a"
+        }
+      }
+    },
+    {
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1,
+      "layout": {},
+      "print": {},
+      "settings": {},
+      "type": "block",
+      "variant": "medium",
+      "id": "an_reverse",
+      "block_type": "analogy_reverse",
+      "visibility": "student_teacher",
+      "content": {
+        "label": "l",
+        "definition": "d",
+        "level": 1,
+        "levels": [
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          }
+        ],
+        "teacher_note": {
+          "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+          "run": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "say": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "watch": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "extra_label": "",
+          "extra": [],
+          "time": "",
+          "source": "",
+          "edited": true
+        },
+        "teacher_jots": {
+          "": "TOOLKIT_TEACHER_SENTINEL_7f3a"
+        }
+      }
+    },
+    {
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1,
+      "layout": {},
+      "print": {},
+      "settings": {},
+      "type": "block",
+      "variant": "medium",
+      "id": "an_problem",
+      "block_type": "analogy_problem",
+      "visibility": "student_teacher",
+      "content": {
+        "label": "l",
+        "definition": "d",
+        "level": 1,
+        "levels": [
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          }
+        ],
+        "teacher_note": {
+          "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+          "run": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "say": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "watch": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "extra_label": "",
+          "extra": [],
+          "time": "",
+          "source": "",
+          "edited": true
+        },
+        "teacher_jots": {
+          "": "TOOLKIT_TEACHER_SENTINEL_7f3a"
+        }
+      }
+    },
+    {
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1,
+      "layout": {},
+      "print": {},
+      "settings": {},
+      "type": "block",
+      "variant": "medium",
+      "id": "an_metaphor",
+      "block_type": "analogy_metaphor",
+      "visibility": "student_teacher",
+      "content": {
+        "label": "l",
+        "definition": "d",
+        "level": 1,
+        "levels": [
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          }
+        ],
+        "teacher_note": {
+          "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+          "run": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "say": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "watch": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "extra_label": "",
+          "extra": [],
+          "time": "",
+          "source": "",
+          "edited": true
+        },
+        "teacher_jots": {
+          "": "TOOLKIT_TEACHER_SENTINEL_7f3a"
+        }
+      }
+    },
+    {
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1,
+      "layout": {},
+      "print": {},
+      "settings": {},
+      "type": "block",
+      "variant": "medium",
+      "id": "an_transfer",
+      "block_type": "analogy_transfer",
+      "visibility": "student_teacher",
+      "content": {
+        "label": "l",
+        "definition": "d",
+        "level": 1,
+        "levels": [
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          }
+        ],
+        "teacher_note": {
+          "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",
+          "run": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "say": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "watch": [
+            "TOOLKIT_TEACHER_SENTINEL_7f3a"
+          ],
+          "extra_label": "",
+          "extra": [],
+          "time": "",
+          "source": "",
+          "edited": true
+        },
+        "teacher_jots": {
+          "": "TOOLKIT_TEACHER_SENTINEL_7f3a"
+        }
+      }
+    },
+    {
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1,
+      "layout": {},
+      "print": {},
+      "settings": {},
+      "type": "block",
+      "variant": "medium",
+      "id": "an_chains",
+      "block_type": "analogy_chains",
+      "visibility": "student_teacher",
+      "content": {
+        "label": "l",
+        "definition": "d",
+        "level": 1,
+        "levels": [
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          },
+          {
+            "task": "t",
+            "slots": [
+              {
+                "key": "text",
+                "label": "",
+                "frame": "f",
+                "example": ""
+              }
+            ]
+          }
         ],
         "teacher_note": {
           "what": "TOOLKIT_TEACHER_SENTINEL_7f3a",

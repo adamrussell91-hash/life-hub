@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { IsoDateSchema } from './common';
 import { KaplanQualifiersSchema } from './kaplan';
 import {
+  AnalogyMoveContentSchema,
   AnalogyTypesContentSchema,
   ConceptFeaturesContentSchema,
   FluidAnalogyContentSchema,
@@ -65,6 +66,13 @@ export const BlockTypeSchema = z.enum([
   'thinking_reflection',
   'fluid_analogy',
   'analogy_types',
+  'analogy_close_reading',
+  'analogy_pattern',
+  'analogy_reverse',
+  'analogy_problem',
+  'analogy_metaphor',
+  'analogy_transfer',
+  'analogy_chains',
   'teacher_note'
 ]);
 
@@ -1137,6 +1145,13 @@ export const ThinkingReflectionBlockSchema = toolkitBlockSchema(
 
 export const FluidAnalogyBlockSchema = toolkitBlockSchema('fluid_analogy', FluidAnalogyContentSchema);
 export const AnalogyTypesBlockSchema = toolkitBlockSchema('analogy_types', AnalogyTypesContentSchema);
+export const AnalogyCloseReadingBlockSchema = toolkitBlockSchema('analogy_close_reading', AnalogyMoveContentSchema);
+export const AnalogyPatternBlockSchema = toolkitBlockSchema('analogy_pattern', AnalogyMoveContentSchema);
+export const AnalogyReverseBlockSchema = toolkitBlockSchema('analogy_reverse', AnalogyMoveContentSchema);
+export const AnalogyProblemBlockSchema = toolkitBlockSchema('analogy_problem', AnalogyMoveContentSchema);
+export const AnalogyMetaphorBlockSchema = toolkitBlockSchema('analogy_metaphor', AnalogyMoveContentSchema);
+export const AnalogyTransferBlockSchema = toolkitBlockSchema('analogy_transfer', AnalogyMoveContentSchema);
+export const AnalogyChainsBlockSchema = toolkitBlockSchema('analogy_chains', AnalogyMoveContentSchema);
 
 /** Always teacher-only: any stored visibility is read back as `teacher_only`. */
 export const TeacherNoteBlockSchema = z.object({
@@ -1192,6 +1207,13 @@ const leafBlockSchemas = [
   ThinkingReflectionBlockSchema,
   FluidAnalogyBlockSchema,
   AnalogyTypesBlockSchema,
+  AnalogyCloseReadingBlockSchema,
+  AnalogyPatternBlockSchema,
+  AnalogyReverseBlockSchema,
+  AnalogyProblemBlockSchema,
+  AnalogyMetaphorBlockSchema,
+  AnalogyTransferBlockSchema,
+  AnalogyChainsBlockSchema,
   TeacherNoteBlockSchema
 ] as const;
 

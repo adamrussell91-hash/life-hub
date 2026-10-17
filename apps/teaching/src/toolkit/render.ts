@@ -12,6 +12,8 @@ import {
   type AnalogyTypesBlock,
   type FluidAnalogyBlock
 } from '@/toolkit/analogy';
+import { analogyMove, type AnalogyMoveBlock, type AnalogyMoveType } from '@/toolkit/analogy-moves';
+import { analogyIconSvg } from '@/toolkit/analogy-icons';
 import { classLabel } from '@/toolkit/class-context';
 import {
   CONCEPT_CRITERIA,
@@ -54,6 +56,7 @@ type ToolkitBlock =
   | ThinkingReflectionBlock
   | FluidAnalogyBlock
   | AnalogyTypesBlock
+  | AnalogyMoveBlock
   | TeacherNoteBlock;
 
 // ─── Small DOM helpers ──────────────────────────────────────────────────────
@@ -1398,6 +1401,304 @@ function renderAnalogyTypes(block: AnalogyTypesBlock, mode: TkRenderMode): HTMLE
   return wrap;
 }
 
+// ─── The seven analogy blocks ───────────────────────────────────────────────
+// One block per type. The organiser is drawn in the shape of the move; each
+// box shows its prompt, and the level's example fills the same boxes.
+
+type Stage = AnalogyMoveBlock['content']['levels'][number];
+type Slot = Stage['slots'][number];
+
+function hasSlot(slot: Slot | undefined): slot is Slot {
+  return Boolean(slot && (slot.label.trim() || slot.frame.trim() || slot.example.trim()));
+}
+
+/** Slots by key, in order, skipping any the teacher cleared. */
+function slotsOf(stage: Stage): Map<string, Slot> {
+  return new Map(stage.slots.filter(hasSlot).map((slot) => [slot.key, slot]));
+}
+
+/** One organiser box: its heading, the prompt, and the example that fills it. */
+function box(slot: Slot | undefined, className = ''): HTMLElement | null {
+  if (!hasSlot(slot)) return null;
+  const node = el('div', `an-box ${className}`.trim());
+  node.dataset.slot = slot.key;
+  if (slot.label.trim()) node.append(el('span', 'an-box__label', slot.label.trim()));
+  node.append(el('span', 'an-box__frame', slot.frame.trim() || ' '));
+  node.append(el('span', 'an-box__example', slot.example.trim() || slot.frame.trim() || ' '));
+  return node;
+}
+
+function boxes(slots: Map<string, Slot>, keys: string[], className = ''): HTMLElement[] {
+  return keys.map((key) => box(slots.get(key), className)).filter((node): node is HTMLElement => node !== null);
+}
+
+function group(className: string, label: string | null, ...nodes: Array<Node | null>): HTMLElement | null {
+  const kept = nodes.filter((node): node is Node => node !== null);
+  if (!kept.length) return null;
+  const wrap = el('div', className);
+  if (label) wrap.append(el('p', 'an-org__caption', label));
+  wrap.append(...kept);
+  return wrap;
+}
+
+/** Close Reading: two piers (the text, the thing outside it), links as planks, the limit as a broken plank. */
+function bridgeOrganiser(slots: Map<string, Slot>): HTMLElement {
+  const org = el('div', 'an-org an-bridge');
+  const outside = boxes(slots, ['outside', 'concrete', 'abstract', 'discipline'], 'an-bridge__option');
+  const span = el('div', 'an-bridge__span');
+  span.setAttribute('aria-hidden', 'true');
+  appendIf(
+    org,
+    group('an-bridge__piers', null, box(slots.get('text'), 'an-bridge__pier'), span, group('an-bridge__pier-stack', null, ...outside)),
+    group('an-bridge__deck', null, ...boxes(slots, ['link1', 'link2'], 'an-plank')),
+    box(slots.get('limit'), 'an-plank an-plank--broken'),
+    ...boxes(slots, ['insight', 'use'], 'an-so')
+  );
+  return org;
+}
+
+/** Pattern Translation: the pattern as a strip of steps, then where it turns up again. */
+function patternOrganiser(slots: Map<string, Slot>): HTMLElement {
+  const org = el('div', 'an-org an-pattern');
+  const beats = boxes(slots, ['beat1', 'beat2', 'beat3'], 'an-beat');
+  const strip = group('an-pattern__strip', 'The pattern', ...beats);
+  strip?.style.setProperty('--beats', String(beats.length));
+  const sightings = boxes(slots, ['field1', 'field2'], 'an-sighting');
+  const found = group('an-pattern__found', 'Found again', ...sightings);
+  found?.style.setProperty('--found', String(sightings.length));
+  appendIf(
+    org,
+    strip,
+    found,
+    box(slots.get('holds'), 'an-condition'),
+    box(slots.get('use'), 'an-so')
+  );
+  return org;
+}
+
+const VERDICTS = ['Keep', 'Qualify', 'Drop'] as const;
+
+/** Reverse Analogising: the analogy on the bench, what holds against what breaks, then the verdict. */
+function benchOrganiser(slots: Map<string, Slot>): HTMLElement {
+  const org = el('div', 'an-org an-bench');
+  const verdict = slots.get('verdict');
+  let verdictNode: HTMLElement | null = null;
+  if (hasSlot(verdict)) {
+    verdictNode = el('div', 'an-verdict');
+    const chips = el('div', 'an-verdict__chips');
+    // The example's first word ("Qualify it: …") lights the matching chip.
+    const picked = VERDICTS.find((word) => verdict.example.trim().toLowerCase().startsWith(word.toLowerCase()));
+    for (const word of VERDICTS) {
+      const chip = el('span', 'an-verdict__chip', word);
+      if (word === picked) chip.classList.add('is-example');
+      chips.append(chip);
+    }
+    verdictNode.append(chips, box(verdict, 'an-verdict__box')!);
+  }
+  appendIf(
+    org,
+    box(slots.get('analogy'), 'an-bench__analogy'),
+    group('an-bench__sides', null, box(slots.get('holds'), 'an-side an-side--holds'), box(slots.get('breaks'), 'an-side an-side--breaks')),
+    ...boxes(slots, ['reveals', 'challenge'], 'an-so'),
+    verdictNode
+  );
+  return org;
+}
+
+/** Problem Solving: a route out of the text to another field, and back. */
+function routeOrganiser(slots: Map<string, Slot>): HTMLElement {
+  const org = el('div', 'an-org an-route');
+  const stops = boxes(slots, ['problem', 'field', 'method', 'back'], 'an-stop');
+  const route = el('ol', 'an-route__stops');
+  route.style.setProperty('--stops', String(stops.length));
+  for (const stop of stops) {
+    const item = el('li', 'an-route__item');
+    item.dataset.slot = stop.dataset.slot;
+    item.append(stop);
+    route.append(item);
+  }
+  org.append(route);
+  return org;
+}
+
+/** Metaphorical Analysis: the metaphor at the centre, its implications rippling out, what it hides. */
+function rippleOrganiser(slots: Map<string, Slot>): HTMLElement {
+  const org = el('div', 'an-org an-ripple');
+  const idea = box(slots.get('idea'), 'an-ripple__idea');
+  const vehicle = box(slots.get('vehicle'), 'an-ripple__vehicle');
+  const core = group('an-ripple__core', null, idea, idea && vehicle ? el('span', 'an-ripple__is', 'is') : null, vehicle);
+  const rings = boxes(slots, ['imp1', 'imp2', 'imp3'], 'an-ring');
+  rings.forEach((ring, index) => ring.style.setProperty('--ring', String(index)));
+  appendIf(
+    org,
+    core,
+    group('an-ripple__rings', null, ...rings),
+    box(slots.get('hidden'), 'an-shadow'),
+    group('an-ripple__rival', null, box(slots.get('rival'), 'an-rival')),
+    box(slots.get('compare'), 'an-so')
+  );
+  return org;
+}
+
+/** Conceptual Transfer: the idea as a rule at the top, tested in new places, up to its edge. */
+function transferOrganiser(slots: Map<string, Slot>): HTMLElement {
+  const org = el('div', 'an-org an-transfer');
+  const tests = boxes(slots, ['ctx1', 'ctx2', 'ctx3'], 'an-test');
+  const grid = group('an-transfer__tests', null, ...tests);
+  grid?.style.setProperty('--tests', String(tests.length));
+  appendIf(org, box(slots.get('concept'), 'an-rule'), grid, box(slots.get('edge'), 'an-edge'));
+  return org;
+}
+
+/** Analogical Chains: idea, link, idea, link …, then the first joined to the last. */
+function chainOrganiser(slots: Map<string, Slot>): HTMLElement {
+  const org = el('div', 'an-org an-chain');
+  const list = el('ol', 'an-chain__links');
+  for (let index = 1; index <= 5; index += 1) {
+    const node = box(slots.get(`n${index}`), 'an-node');
+    if (!node) continue;
+    const item = el('li', 'an-chain__node');
+    item.append(node);
+    list.append(item);
+    const because = box(slots.get(`b${index}`), 'an-link');
+    if (because && slots.has(`n${index + 1}`)) {
+      const link = el('li', 'an-chain__link');
+      link.append(because);
+      list.append(link);
+    }
+  }
+  appendIf(org, list.childElementCount ? list : null, box(slots.get('ends'), 'an-ends'), box(slots.get('use'), 'an-so'));
+  return org;
+}
+
+const ORGANISERS: Record<AnalogyMoveType, (slots: Map<string, Slot>) => HTMLElement> = {
+  analogy_close_reading: bridgeOrganiser,
+  analogy_pattern: patternOrganiser,
+  analogy_reverse: benchOrganiser,
+  analogy_problem: routeOrganiser,
+  analogy_metaphor: rippleOrganiser,
+  analogy_transfer: transferOrganiser,
+  analogy_chains: chainOrganiser
+};
+
+function moveIcon(type: AnalogyMoveType): HTMLElement {
+  const icon = el('span', 'an-move__icon');
+  icon.setAttribute('aria-hidden', 'true');
+  // Static markup from analogy-icons.ts, never user content.
+  icon.innerHTML = analogyIconSvg(type);
+  return icon;
+}
+
+/** One level: the task, the organiser, and the example toggle that fills it. */
+function stagePanel(
+  block: AnalogyMoveBlock,
+  stage: Stage,
+  level: number,
+  shape: string,
+  mode: TkRenderMode,
+  ctx: TkRenderContext
+): HTMLElement {
+  const panel = el('div', 'an-tier an-stage');
+  panel.dataset.level = String(level);
+  appendIf(panel, guideLine(stage.task));
+  const slots = slotsOf(stage);
+  const organiser = ORGANISERS[block.block_type](slots);
+  organiser.setAttribute('aria-label', shape);
+  organiser.setAttribute('role', 'group');
+  const head = el('div', 'an-stage__head');
+  head.append(el('p', 'an-stage__shape', shape));
+  const hasExample = [...slots.values()].some((slot) => slot.example.trim());
+  if (mode !== 'print' && hasExample) {
+    const key = activityKey(ctx, block.id, `example-${level}`);
+    let shown = loadActivityState<{ open?: unknown }>(key)?.open === true;
+    const button = el('button', 'btn block-self-check__btn an-stage__toggle');
+    button.type = 'button';
+    const paint = () => {
+      organiser.classList.toggle('is-example', shown);
+      button.setAttribute('aria-pressed', shown ? 'true' : 'false');
+      button.textContent = shown ? 'Hide the example' : 'Show an example';
+    };
+    button.addEventListener('click', () => {
+      shown = !shown;
+      saveActivityState(key, { open: shown });
+      paint();
+    });
+    head.append(button);
+    paint();
+  }
+  panel.append(head, organiser);
+  return panel;
+}
+
+function renderAnalogyMove(block: AnalogyMoveBlock, mode: TkRenderMode, ctx: TkRenderContext): HTMLElement {
+  const c = block.content;
+  const move = analogyMove(block.block_type);
+  const type = move.library;
+  const wrap = root(block.block_type);
+  wrap.classList.add('an-move', `an-move--${block.block_type.replace('analogy_', '')}`);
+  const card = analogyCard(
+    c.label.trim() || type.label,
+    type.tag,
+    c.definition,
+    c.show_card ? `Card ${type.order} · ${type.card}` : null
+  );
+  card.classList.add('an-move__card');
+  card.prepend(moveIcon(block.block_type));
+  wrap.append(analogyEyebrow(`Analogous Thinking · Type ${type.order} of ${ANALOGY_TYPES.length}`), card);
+  appendIf(wrap, analogyFocus(c.focus));
+
+  const choose = c.student_choice && mode !== 'print';
+  const key = activityKey(ctx, block.id, 'level');
+  const saved = choose ? loadActivityState<{ level?: unknown }>(key)?.level : undefined;
+  let current = typeof saved === 'number' && saved >= 1 && saved <= 3 ? saved : c.level;
+  const panels = c.levels.map((stage, index) => stagePanel(block, stage, index + 1, move.shape, mode, ctx));
+
+  if (!choose) {
+    wrap.append(el('p', 'an-level-badge', `Level ${c.level} · ${levelName(c.level)}`), panels[c.level - 1]!);
+  } else {
+    const switcher = el('div', 'an-levels');
+    switcher.setAttribute('role', 'group');
+    switcher.setAttribute('aria-label', 'Level');
+    const buttons: HTMLButtonElement[] = [];
+    const paint = () => {
+      buttons.forEach((button, index) => button.setAttribute('aria-pressed', index + 1 === current ? 'true' : 'false'));
+      panels.forEach((panel, index) => {
+        panel.hidden = index + 1 !== current;
+      });
+    };
+    ANALOGY_LEVELS.forEach(({ level, name }) => {
+      const button = el('button', 'an-levels__btn');
+      button.type = 'button';
+      button.append(el('span', 'an-levels__num', `Level ${level}`), el('span', 'an-levels__name', name));
+      button.addEventListener('click', () => {
+        current = level;
+        saveActivityState(key, { level });
+        paint();
+      });
+      buttons.push(button);
+      switcher.append(button);
+    });
+    wrap.append(switcher, ...panels);
+    paint();
+  }
+
+  const checks = c.checks.filter((line) => line.trim());
+  if (c.show_check && checks.length) {
+    if (mode === 'print') {
+      const boxNode = el('div', 'an-check');
+      boxNode.append(el('p', 'tk-subhead', 'Check your analogy'), analogyCheckList(checks));
+      wrap.append(boxNode);
+    } else {
+      appendIf(
+        wrap,
+        reveal({ ctx, mode, blockId: block.id, part: 'check', label: 'Check your analogy', fixedLabel: true, body: () => analogyCheckList(checks) })
+      );
+    }
+  }
+  if (mode === 'teacher') wrap.append(teacherNote(block.id, c.teacher_note, c.teacher_jots));
+  return wrap;
+}
+
 // ─── Standalone Teacher note ────────────────────────────────────────────────
 
 function renderTeacherNoteBlock(block: TeacherNoteBlock, mode: TkRenderMode): HTMLElement {
@@ -1440,6 +1741,14 @@ export function renderToolkitContent(block: Block, mode: TkRenderMode, ctx: TkRe
       return renderFluidAnalogy(b, mode, ctx);
     case 'analogy_types':
       return renderAnalogyTypes(b, mode);
+    case 'analogy_close_reading':
+    case 'analogy_pattern':
+    case 'analogy_reverse':
+    case 'analogy_problem':
+    case 'analogy_metaphor':
+    case 'analogy_transfer':
+    case 'analogy_chains':
+      return renderAnalogyMove(b, mode, ctx);
     case 'teacher_note':
       return renderTeacherNoteBlock(b, mode);
     default:
