@@ -59,3 +59,20 @@ test('a delayed duplicate cache miss cannot dispatch after the first result comp
 test('hanging Knowledge retrieval terminates without any provider call',async()=>{
  const {handler,req,calls}=setup({deadlineMs:35,retrieve:async()=>new Promise(()=>{})});assert.equal((await handler(req())).status,504);assert.equal(calls(),0);
 });
+test('a teacher click with no Knowledge match still asks Ann and accepts an uncited suggestion',async()=>{
+ let prompt;const {handler,req,calls}=setup({retrieve:async()=>[],complete:async(args)=>{prompt=args.prompt;return {proposals:[{blockId:'b',rationale:'Name the skill.',content:{text:'Find the main idea, then justify it'},sourceIds:[]}]};}});
+ const r=await handler(req({mode:'manual'}));assert.equal(r.status,200);const d=(await r.json()).data;assert.equal(d.proposals.length,1);assert.deepEqual(d.proposals[0].sources,[]);assert.match(prompt.system,/own teaching expertise/);assert.equal(calls(),0);
+});
+test('a background no-match result is not replayed to a teacher click',async()=>{
+ let asked=0;const {handler,req}=setup({retrieve:async()=>[],complete:async()=>{asked++;return {proposals:[]};}});
+ assert.equal((await handler(req())).status,200);assert.equal(asked,0);
+ assert.equal((await handler(req({mode:'manual'}))).status,200);assert.equal(asked,1);
+});
+test('a slow Knowledge search does not stop a teacher click reaching Ann',async()=>{
+ let asked=0;const {handler,req}=setup({retrievalMs:20,retrieve:async()=>new Promise(()=>{}),complete:async()=>{asked++;return {proposals:[]};}});
+ assert.equal((await handler(req({mode:'manual'}))).status,200);assert.equal(asked,1);
+});
+test('a timeout pauses Ann for a minute, not the escalating lockout',async()=>{
+ const {handler,req,store}=setup({deadlineMs:35,complete:async()=>new Promise(()=>{})});assert.equal((await handler(req())).status,504);
+ const state=store.rows.get('alchemy/v1/operator-budget').data;assert.ok(state.cooldown-Date.now()<=60000);assert.equal(state.failures||0,0);
+});

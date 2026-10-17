@@ -91,7 +91,7 @@ export function mountBlockAssistant(options:Options) {
     function paintProposal(){
       body.replaceChildren();for(const turn of conversation){const text=document.createElement('p');text.textContent=(turn.role==='user'?'You: ':'Ann: ')+turn.text;body.append(text);}
       accept.hidden=!current;
-      if(!current){const empty=document.createElement('p');empty.textContent='No useful Knowledge Hub improvement found for this block.';body.append(empty);return;}
+      if(!current){const empty=document.createElement('p');empty.textContent='Ann has no change to suggest for this block. Tell her what you want below.';body.append(empty);return;}
       const rationale=document.createElement('p');rationale.className='alchemy-review__rationale';rationale.textContent=current.rationale;body.append(rationale);
       const preview=document.createElement('div');preview.className='alchemy-review__preview';preview.append(renderBlock(current.replacement,'student'));body.append(preview);
       for(const source of current.sources){const link=document.createElement('a');link.href=knowledgeHubPageUrl(knowledgeHubOrigin(),source.id);link.target='_blank';link.rel='noopener noreferrer';link.textContent=source.title;body.append(link);const excerpt=document.createElement('p');excerpt.textContent=source.excerpt;body.append(excerpt);}
