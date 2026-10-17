@@ -5,7 +5,7 @@
 **Hubs:** Life, Teaching, Knowledge, Tasks, Professional, Travel
 **Author:** source inventory of every routed surface against this design kit
 
-This file is the element catalogue. It records what each hub actually mounts for the same job, so a mismatch can be seen without opening six codebases. It does not restyle anything.
+This file is the control catalogue. It records what each hub mounts for the same job. Paint — colour, type, heading size, pills, buttons, radius, shadow, spacing, layers, and motion — is logged rule by rule in `2026-10-17-0527-screen-audit.md` (17 October 2026, 05:27 UTC).
 
 The 5 September 2026 note at `docs/design-kit-compliance.md` scored shared chrome (rail, sign-in, header, buttons, dates) and marked those four original hubs as passing. That score still describes chrome. It does not describe filters, menus, deletion, cards, empty states, motion, type, or where actions sit. Those are the gaps below.
 
