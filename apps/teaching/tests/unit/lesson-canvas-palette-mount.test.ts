@@ -48,6 +48,16 @@ describe('mountLessonPalette', () => {
     expect(host.querySelector('[data-family="Compositions"]')).not.toBeNull();
   });
 
+  it('gives the toolkit families their own icons, the griffin for Thinking Toolkit', () => {
+    mountLessonPalette(host, { families: lessonPaletteFamilies([]), onInsert: vi.fn() });
+
+    const toolkit = host.querySelector('[data-family="Thinking Toolkit"] .lesson-palette__family-icon')!;
+    expect(toolkit.querySelector('img')?.getAttribute('src')).toContain('badge-griffin.png');
+    const analogy = host.querySelector('[data-family="Analogous Thinking"] .lesson-palette__family-icon svg')!;
+    expect(analogy.querySelector('rect')).not.toBeNull();
+    expect(analogy.innerHTML).not.toBe('<circle cx="10" cy="10" r="3"></circle>');
+  });
+
   it('collapses the rail from a visible control and reopens from the tab', () => {
     const onShelved = vi.fn();
     mountLessonPalette(host, {

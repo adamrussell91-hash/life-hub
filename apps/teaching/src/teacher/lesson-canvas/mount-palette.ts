@@ -1,8 +1,19 @@
+import { withAppBase } from '@/app/base-path';
 import type { InsertMenuValue } from '@/blocks/create-block';
 import type { PaletteCard, PaletteFamily } from '@/teacher/lesson-canvas/palette-catalog';
 import { readBuilderChromePrefs, writeBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
 
-function familyIcon(familyId: string): SVGSVGElement {
+function familyIcon(familyId: string): Element {
+  // The Newington griffin marks the Thinking Toolkit, as on its block eyebrows.
+  if (familyId === 'Thinking Toolkit') {
+    const img = document.createElement('img');
+    img.className = 'lesson-palette__family-griffin';
+    img.src = withAppBase('/assets/blocks/badge-griffin.png');
+    img.alt = '';
+    img.width = 17;
+    img.height = 17;
+    return img;
+  }
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 20 20');
   svg.setAttribute('aria-hidden', 'true');
@@ -22,6 +33,9 @@ function familyIcon(familyId: string): SVGSVGElement {
       '<path d="M10 3a5 5 0 0 0-3 9v2h6v-2a5 5 0 0 0-3-9Z"/><path d="M8 16.5h4"/>',
     Visualisation:
       '<path d="M4 16V9M9 16V4M14 16v-6"/>',
+    // A familiar shape carried across a bridge to a different one.
+    'Analogous Thinking':
+      '<circle cx="5" cy="14.2" r="3"/><rect x="12" y="11.2" width="6" height="6" rx="1.4"/><path d="M5 11.2C5 4.2 15 4.2 15 9.4"/><path d="m12.9 7.6 2.1 2 1.9-2.2"/>',
     Layout:
       '<rect x="3" y="3" width="14" height="14" rx="1.3"/><path d="M8.3 3v14"/>',
     Compositions:
