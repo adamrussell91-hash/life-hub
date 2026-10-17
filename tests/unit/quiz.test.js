@@ -199,15 +199,25 @@ test('instant feedback marks each answer once; held feedback waits for release; 
   await quizTeacherAction(held, 'quiz1', { action: 'release', released: true });
   assert.equal((await quizAction(held, 'quiz1', you)).results[0].max, 7);
 
-  const again = baseStore({ quizSettings: { attempts: 1 } });
-  await publishQuiz(again);
+  const again = baseStore({ quizSettings: { attempts: 2 } });
+  const first = await publishQuiz(again);
   const them = { token: token(6) };
   await quizAction(again, 'quiz1', { ...them, action: 'start' });
   await publishQuiz(again);
-  assert.equal((await quizAction(again, 'quiz1', them)).current, null, 'an attempt from an old version is not resumed');
-  await assert.rejects(quizAction(again, 'quiz1', { ...them, action: 'start' }), /updated this quiz/);
-  const fresh = await quizAction(again, 'quiz1', { ...them, action: 'start' });
-  assert.equal(fresh.current.n, 1, 'the abandoned attempt does not use up the only attempt');
+  const resumed = await quizAction(again, 'quiz1', them);
+  assert.equal(resumed.current.n, 0, 'an open attempt survives a republish');
+  assert.equal(resumed.current.version, first.quiz.version, 'and keeps the version it started on');
+  const oldRight = first.quiz.record.questions.qa.question.options.find(o => o.text === 'Metaphor').id;
+  assert.ok(resumed.current.questions.find(q => q.id === 'qa').options.some(o => o.id === oldRight), 'the student is served the questions their attempt was started on');
+  const handed = await quizAction(again, 'quiz1', { ...them, action: 'submit', responses: { qa: { selected: [oldRight] } } });
+  assert.equal(handed.results[0].rows.find(r => r.id === 'qa').awarded, 2, 'marked against its own version');
+  assert.equal(handed.results[0].rows[0].key, null, 'right answers wait while a go is left');
+  assert.equal(handed.results[0].rows[0].question.id, 'qa');
+  const second = await quizAction(again, 'quiz1', { ...them, action: 'start' });
+  assert.equal(second.current.n, 1);
+  assert.notEqual(second.current.version, first.quiz.version, 'a new attempt uses the new version');
+  const last = await quizAction(again, 'quiz1', { ...them, action: 'submit', responses: {} });
+  assert.ok(last.results[1].rows[0].key, 'right answers show once no goes are left');
 });
 
 test('timers and closing: deadlines are set, late work is flagged, closed quizzes refuse to start', async () => {
@@ -284,4 +294,35 @@ test('every other student surface drops quiz questions and their answers', async
   const nested = [{ id: 'sec', block_type: 'section', visibility: 'student_teacher', content: { blocks: [qBlock('qa', mc), image] } }];
   assert.ok(!JSON.stringify(filterBlocksForStudent(nested)).includes('Metaphor'));
   assert.ok(JSON.stringify(filterBlocksForStudent(nested, { keepQuizQuestions: true })).includes('Metaphor'));
+});
+
+test('hard timers and closing stop hints and checks; odd question ids are refused', async () => {
+  const store = baseStore({ quizSettings: { timer_minutes: 5, timer_hard: true, feedback: 'instant' } });
+  await publishQuiz(store);
+  const me = { token: token(11) };
+  await quizAction(store, 'quiz1', { ...me, action: 'start' });
+  await assert.rejects(quizAction(store, 'quiz1', { ...me, action: 'hint', question_id: '__proto__' }), /no hint/);
+  await assert.rejects(quizAction(store, 'quiz1', { ...me, action: 'check', question_id: 'constructor', response: {} }), /Unknown question/);
+  const key = [...store.data.keys()].find(k => k.startsWith('quiz/quiz1/attempts/'));
+  store.data.set(key, { ...store.data.get(key), deadline: new Date(Date.now() - 5 * 60_000).toISOString() });
+  await assert.rejects(quizAction(store, 'quiz1', { ...me, action: 'hint', question_id: 'qa' }), /Time’s up/);
+  await assert.rejects(quizAction(store, 'quiz1', { ...me, action: 'check', question_id: 'qa', response: { selected: ['x'] } }), /Time’s up/);
+  const late = await quizAction(store, 'quiz1', { ...me, action: 'submit', responses: {} });
+  assert.equal(late.results.length, 1, 'late work is still handed in, and flagged');
+});
+
+test('two checks at once can never undo each other', async () => {
+  const store = baseStore({ quizSettings: { feedback: 'instant', attempts: 2 } });
+  await publishQuiz(store);
+  const me = { token: token(12) };
+  await quizAction(store, 'quiz1', { ...me, action: 'start' });
+  const [a, b] = await Promise.all([
+    quizAction(store, 'quiz1', { ...me, action: 'check', question_id: 'qa', response: { selected: ['x'] } }),
+    quizAction(store, 'quiz1', { ...me, action: 'check', question_id: 'qb', response: { text: 'nope' } })
+  ]);
+  assert.equal(a.key, null, 'no right answer while another go is left');
+  assert.equal(b.mark.correct, false);
+  await assert.rejects(quizAction(store, 'quiz1', { ...me, action: 'check', question_id: 'qa', response: { selected: ['y'] } }), /already answered/);
+  const status = await quizAction(store, 'quiz1', me);
+  assert.deepEqual(Object.keys(status.current.answers).sort(), ['qa', 'qb']);
 });

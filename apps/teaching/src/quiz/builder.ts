@@ -423,14 +423,19 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
     const chips = el('div', 'qz-gap-chips');
     const altHost = el('div', 'qz-gap-alts');
     text.addEventListener('input', () => {
-      // Keep blanks on words that are still there, in order.
+      // Keep blanks, and their other accepted answers, on words that are still there.
       const gapped = new Set(tokens.filter((t) => t.gap).map((t) => t.text));
+      const altsByWord = new Map([...alternates].map(([i, alts]) => [tokens[i]?.text ?? '', alts]));
       tokens = text.value.split(/(\s+)/).filter(Boolean).map((piece) => ({
         text: piece,
         space: /^\s+$/.test(piece),
         gap: !/^\s+$/.test(piece) && gapped.has(piece)
       }));
       alternates = new Map();
+      tokens.forEach((t, i) => {
+        const runStart = t.gap && !(tokens[i - 2]?.gap && tokens[i - 1]?.space);
+        if (runStart && altsByWord.has(t.text)) alternates.set(i, altsByWord.get(t.text) as string[]);
+      });
       paintChips();
       write();
     });

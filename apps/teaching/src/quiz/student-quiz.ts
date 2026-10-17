@@ -15,27 +15,32 @@ import './quiz.css';
  */
 
 type Settings = NonNullable<PublishedLesson['quiz']>;
-type ResultRow = { id: string; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; key: QuestionKey };
-type Result = { n: number; submitted_at: string; released: boolean; score?: number; max?: number; pending?: number; same_version?: boolean; rows?: ResultRow[] };
+type ResultRow = { id: string; question: PublicQuestion; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; key: QuestionKey | null };
+type Result = { n: number; submitted_at: string; released: boolean; score?: number; max?: number; pending?: number; same_version?: boolean; keys_shown?: boolean; rows?: ResultRow[] };
 type Current = {
   n: number;
+  version: string;
+  settings: Settings;
+  questions: PublicQuestion[];
   started_at: string;
   deadline: string | null;
   hints: Record<string, string>;
-  answers: Record<string, { response: QuizResponse | null; mark: MarkResult; key: QuestionKey }>;
+  answers: Record<string, { response: QuizResponse | null; mark: MarkResult; key: QuestionKey | null }>;
 };
 type Status = {
   version: string;
   open: boolean;
   attempts_allowed: number;
   attempts_used: number;
+  settings: Settings;
+  questions: PublicQuestion[];
   live: boolean;
   now?: string;
   current: Current | null;
   results: Result[];
   hint?: string;
   mark?: MarkResult;
-  key?: QuestionKey;
+  key?: QuestionKey | null;
 };
 type Draft = { order: string[]; index: number; responses: Record<string, QuizResponse>; confidence: Record<string, 1 | 2 | 3>; spent: Record<string, number> };
 type LiveView = {
@@ -58,11 +63,19 @@ const FEEDBACK_TEXT = {
 } as const;
 
 export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
-  const settings = lesson.quiz as Settings;
+  // The page's copy is only a first paint. The server sends the questions and
+  // settings for each attempt, so a republish never leaves a student answering
+  // against ids the marker no longer knows.
+  let settings = lesson.quiz as Settings;
   const lessonId = lesson.lesson_id;
   const endpoint = `/api/published/quiz/${encodeURIComponent(lessonId)}`;
-  const questions = collectQuestions(lesson.blocks);
-  const byId = new Map(questions.map((q) => [q.id, q]));
+  let questions = collectQuestions(lesson.blocks);
+  let byId = new Map(questions.map((q) => [q.id, q]));
+  const useQuestions = (list: PublicQuestion[], next: Settings) => {
+    questions = list;
+    byId = new Map(list.map((q) => [q.id, q]));
+    settings = next;
+  };
   const token = deviceToken(`quiz:${lessonId}`);
 
   const root = el('section', 'qz-quiz');
@@ -79,7 +92,8 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
   let clockOffset = 0;
   let tick: number | undefined;
   let questionStarted = Date.now();
-  let checking: Record<string, { mark: MarkResult; key: QuestionKey }> = {};
+  let checking: Record<string, { mark: MarkResult; key: QuestionKey | null }> = {};
+  let autoSubmitted = -1;
   let view: 'landing' | 'quiz' | 'review' | 'result' = 'landing';
   let resultIndex = -1;
   let submitting = false;
@@ -94,20 +108,23 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
       const next = await apiPost<Status>(endpoint, { action, ...(token ? { token } : {}), ...extra });
       if (next.now) clockOffset = Date.parse(next.now) - Date.now();
       status = next;
+      if (next.current) useQuestions(next.current.questions, next.current.settings);
+      else if (next.questions) useQuestions(next.questions, next.settings);
       alert.hidden = true;
       return next;
     } catch (error) {
-      if (error instanceof ApiClientError && error.code === 'republished') {
-        draft = null;
-        view = 'landing';
-        await call('status');
-      }
       showError(errorText(error));
+      if (error instanceof ApiClientError && action !== 'status') {
+        // Whatever went wrong, show the server's view of things rather than a stale one.
+        const message = alert.textContent ?? '';
+        await call('status');
+        showError(message);
+      }
       return null;
     }
   }
 
-  const draftKey = (n: number) => `quiz:${lessonId}:${settings.version}:${n}`;
+  const draftKey = (n: number) => `quiz:${lessonId}:${status?.current?.version ?? settings.version}:${n}`;
   function loadDraft(current: Current): Draft {
     const saved = readJSON<Draft>(draftKey(current.n));
     if (saved && saved.order?.length === questions.length && saved.order.every((id) => byId.has(id))) return saved;
@@ -154,6 +171,7 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
     if (settings.question_seconds) fact(`${settings.question_seconds} seconds a question`);
     fact(settings.attempts === 1 ? 'One go' : `${settings.attempts} goes, ${Math.max(0, s.attempts_allowed - s.attempts_used)} left`);
     fact(FEEDBACK_TEXT[settings.feedback ?? 'end']);
+    if ((settings.attempts ?? 1) > 1 && settings.feedback !== 'released') fact('Right answers show after your last go.');
     if (settings.closes_at) fact(`Closes ${new Date(settings.closes_at).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}`);
     wrap.append(facts);
 
@@ -312,7 +330,7 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
           this.disabled = true;
           leaveQuestion();
           const res = await call('check', { question_id: id, response: d.responses[id], confidence: d.confidence[id] });
-          if (res?.mark && res.key) checking = { ...checking, [id]: { mark: res.mark, key: res.key } };
+          if (res?.mark) checking = { ...checking, [id]: { mark: res.mark, key: res.key ?? null } };
           paint();
         })
       );
@@ -344,7 +362,8 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
       if (left !== null) {
         quizClock.textContent = left > 0 ? `${formatClock(left)} left` : 'Time’s up';
         quizClock.dataset.state = left <= 0 ? 'over' : left < 60_000 ? 'low' : '';
-        if (left <= 0 && settings.timer_hard && !submitting) {
+        if (left <= 0 && settings.timer_hard && !submitting && autoSubmitted !== current.n) {
+          autoSubmitted = current.n;
           void submit(true);
           return;
         }
@@ -357,7 +376,8 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
         if (qLeft <= 0 && settings.timer_hard && !player.dataset.locked) {
           player.dataset.locked = 'true';
           player.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement>('button, input, select, textarea').forEach((x) => (x.disabled = true));
-          if (timeUp() && !last) window.setTimeout(() => go(d.index + 1), 800);
+          const at = d.index;
+          if (timeUp() && !last) window.setTimeout(() => draft?.index === at && go(at + 1), 800);
         }
       }
     };
@@ -406,8 +426,23 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
       }
       wrap.append(list);
     } else wrap.append(el('p', 'qz-note', 'Every question has an answer.'));
-    const left = remainingMs(current);
-    if (left !== null) wrap.append(el('p', 'qz-note', left > 0 ? `${formatClock(left)} left.` : 'Time’s up: hand it in now.'));
+    const clock = el('p', 'qz-note');
+    const paintClock = () => {
+      const left = remainingMs(current);
+      clock.hidden = left === null;
+      if (left === null) return;
+      clock.textContent = left > 0 ? `${formatClock(left)} left.` : 'Time’s up: hand it in now.';
+      if (left <= 0 && settings.timer_hard && !submitting && autoSubmitted !== current.n) {
+        autoSubmitted = current.n;
+        void submit(true);
+      }
+    };
+    paintClock();
+    wrap.append(clock);
+    tick = window.setInterval(() => {
+      if (!wrap.isConnected) return window.clearInterval(tick);
+      paintClock();
+    }, 500);
     const actions = el('div', 'qz-actions');
     actions.append(
       button('Back to the questions', 'ghost', () => {
@@ -458,9 +493,9 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
       wrap.append(top);
       if (r.same_version === false) wrap.append(el('p', 'qz-note', 'Your teacher has changed the quiz since, so some questions may look different now.'));
       const list = el('ol', 'qz-result-list');
+      if (r.keys_shown === false) wrap.append(el('p', 'qz-note', 'Right answers show after your last go.'));
       (r.rows ?? []).forEach((row, i) => {
-        const q = byId.get(row.id);
-        if (!q) return;
+        const q = row.question;
         const li = el('li');
         li.append(mountQuestionPlayer({ question: q, number: i + 1, response: row.response, result: { mark: row.mark, key: row.key, hinted: row.hinted, awarded: row.awarded } }));
         list.append(li);

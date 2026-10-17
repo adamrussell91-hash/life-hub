@@ -104,7 +104,7 @@ export function mountQuestionPlayer(options: PlayerOptions): HTMLElement {
         b.disabled = locked;
         b.setAttribute('aria-pressed', String(value === v));
         if (key?.answer.type === 'boolean' && key.answer.value === v) b.dataset.state = 'right';
-        else if (result && value === v) b.dataset.state = 'wrong';
+        else if (result && value === v) b.dataset.state = !key && result.mark.correct ? 'right' : 'wrong';
         b.addEventListener('click', () => {
           row.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
           emit({ value: v });
@@ -313,10 +313,13 @@ export function mountQuestionPlayer(options: PlayerOptions): HTMLElement {
       b.disabled = locked;
       b.setAttribute('aria-pressed', String(picked.has(option.id)));
       b.append(el('span', 'qz-choice__mark', ''), el('span', 'qz-choice__text', option.text));
-      if (result) {
+      if (result && key) {
         if (keyIds.has(option.id)) b.dataset.state = 'right';
         else if (picked.has(option.id)) b.dataset.state = 'wrong';
-        else if (option.id in parts) b.dataset.state = parts[option.id] ? 'right' : 'wrong';
+      } else if (result && picked.has(option.id)) {
+        // Without the answer, only say whether each pick was right.
+        const ok = option.id in parts ? parts[option.id] : result.mark.correct === true;
+        b.dataset.state = ok ? 'right' : 'wrong';
       }
       b.addEventListener('click', () => {
         if (many) {
