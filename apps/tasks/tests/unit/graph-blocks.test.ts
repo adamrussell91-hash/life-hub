@@ -4,7 +4,7 @@ import { createBlockEditor } from '@/blocks/editors';
 import { renderBlock } from '@/blocks/render';
 import { BlockSchema } from '@/schemas/block';
 import type { Block } from '@/schemas/block';
-import { buildTree, colourOf, modeOf, withParents, type GraphContent } from '../../../../packages/graph-blocks/graph';
+import { buildTree, colourOf, drawConceptLayered, modeOf, withParents, type GraphContent } from '../../../../packages/graph-blocks/graph';
 
 type MindBlock = Extract<Block, { block_type: 'mind_map' }>;
 type ConceptBlock = Extract<Block, { block_type: 'concept_map' }>;
@@ -145,6 +145,77 @@ describe('mind map outline', () => {
     const { host } = mountEditor(mindBlock());
     const first = host.querySelector<HTMLInputElement>('.graph-outline__input')!;
     expect(key(first, 'Tab')).toBe(true);
+  });
+});
+
+/** Points along an SVG path made of M, L and C commands. */
+function pathPoints(d: string): Array<{ x: number; y: number }> {
+  const out: Array<{ x: number; y: number }> = [];
+  let at = { x: 0, y: 0 };
+  for (const [, cmd, args] of d.matchAll(/([MLC])([^MLC]*)/g)) {
+    const n = args!.trim().split(/[\s,]+/).map(Number);
+    if (cmd === 'C') {
+      const p = [at, { x: n[0]!, y: n[1]! }, { x: n[2]!, y: n[3]! }, { x: n[4]!, y: n[5]! }];
+      for (let i = 1; i <= 40; i++) {
+        const t = i / 40;
+        const u = 1 - t;
+        const w = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+        out.push({ x: p.reduce((s, q, k) => s + q.x * w[k]!, 0), y: p.reduce((s, q, k) => s + q.y * w[k]!, 0) });
+      }
+    } else out.push({ x: n[0]!, y: n[1]! });
+    at = out[out.length - 1]!;
+  }
+  return out;
+}
+
+describe('concept map layered layout', () => {
+  /* Pests sit on the top layer and link two layers down, past the row holding No rotation. */
+  const content: GraphContent = {
+    nodes: [
+      { id: 'theme', label: 'Falling yields' },
+      { id: 'c1', label: 'Compacted soil' },
+      { id: 'c2', label: 'Irregular watering' },
+      { id: 'c3', label: 'No rotation' },
+      { id: 'c4', label: 'Overwintering pests' },
+      { id: 'c5', label: 'Low nutrients' }
+    ],
+    edges: [
+      { id: 'e1', from: 'theme', to: 'c1' },
+      { id: 'e2', from: 'theme', to: 'c3' },
+      { id: 'e3', from: 'c3', to: 'c5' },
+      { id: 'e4', from: 'c1', to: 'c2', label: 'relates to' },
+      { id: 'e5', from: 'c4', to: 'c5', label: 'links across' }
+    ]
+  };
+
+  it.each([false, true])('routes a long edge around the boxes in the layers between (compact %s)', (compact) => {
+    const scene = drawConceptLayered(content, compact);
+    const host = document.createElement('div');
+    host.innerHTML = `<svg>${scene.markup}</svg>`;
+    const paths = [...host.querySelectorAll('path[marker-end]')].map((p) => p.getAttribute('d')!);
+    expect(paths).toHaveLength(5);
+    const long = pathPoints(paths[4]!);
+    const pests = scene.nodes.get('c4')!;
+    const nutrients = scene.nodes.get('c5')!;
+    const between = [...scene.nodes.values()].filter((n) => n.y > pests.y + 1 && n.y < nutrients.y - 1);
+    expect(between.map((n) => n.id).sort()).toEqual(['c1', 'c3']);
+    for (const box of between) {
+      const inside = long.filter((p) => Math.abs(p.x - box.x) < box.w / 2 && Math.abs(p.y - box.y) < box.h / 2);
+      expect(inside, `long edge crosses ${box.label}`).toEqual([]);
+    }
+    for (const chip of scene.chips) {
+      for (const box of scene.nodes.values()) {
+        const overlaps = Math.abs(chip.x - box.x) * 2 < chip.w + box.w && Math.abs(chip.y - box.y) * 2 < chip.h + box.h;
+        expect(overlaps, `${chip.label} covers ${box.label}`).toBe(false);
+      }
+    }
+  });
+
+  it('keeps edges between neighbouring layers as one curve', () => {
+    const scene = drawConceptLayered({ ...content, edges: content.edges.slice(0, 4) }, true);
+    const host = document.createElement('div');
+    host.innerHTML = `<svg>${scene.markup}</svg>`;
+    for (const p of host.querySelectorAll('path[marker-end]')) expect(p.getAttribute('d')).toMatch(/^M[^MLC]+ C[^MLC]+$/);
   });
 });
 

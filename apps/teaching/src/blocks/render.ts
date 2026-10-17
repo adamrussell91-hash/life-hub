@@ -1,3 +1,4 @@
+import { renderKaplanQualifiers } from '@/blocks/kaplan-view';
 import { calloutIdentity, decorateCalloutReferences } from '@/blocks/callout-reference';
 import { FAILURE } from '@/app/failure';
 import katex from 'katex';
@@ -2293,5 +2294,18 @@ function renderBlockContent(
 export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
   const wrapper = renderBlockContent(block, mode, ctx);
   decorateCalloutReferences(wrapper, block, mode, ctx.pageBlocks ?? []);
+  if (block.qualifiers?.length) {
+    const qualifiers = renderKaplanQualifiers(block.qualifiers, {
+      mode, blockId: block.id, lessonId: ctx.lessonId
+    });
+    // A question keeps its process next to its prompt, before the response space.
+    // Other blocks carry the same optional attachment beneath their content.
+    const question = block.block_type === 'question_set' && block.content.questions.length === 1
+      ? wrapper.querySelector('.block-question-set__question') : null;
+    const response = question?.querySelector('.block-question-set__answer-label, .block-question-set__response-lines');
+    if (response) question!.insertBefore(qualifiers, response);
+    else if (question) question.append(qualifiers);
+    else wrapper.append(qualifiers);
+  }
   return wrapper;
 }
