@@ -219,11 +219,43 @@ export function visitRating(visit) {
     10
   );
 }
+// Day One exports Markdown: headings, rules, backslash escapes and
+// dayone-moment image links. Turn it into headings and paragraphs for display;
+// the stored notes keep the original text.
+export function noteBlocks(text, { title = "" } = {}) {
+  const blocks = [];
+  let lines = [];
+  const flush = () => {
+    const joined = lines.join(" ").replace(/\s+/g, " ").trim();
+    if (joined) blocks.push({ kind: "para", text: joined });
+    lines = [];
+  };
+  const source = String(text || "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\\([\\`*_{}[\]()#+\-.!|>~])/g, "$1");
+  for (const raw of source.split(/\r?\n/)) {
+    const line = raw.trim();
+    const heading = line.match(/^#{1,6}\s+(.*)$/);
+    if (!line || /^([-*_])\1{2,}$/.test(line)) flush();
+    else if (heading) {
+      flush();
+      if (heading[1].trim()) blocks.push({ kind: "heading", text: heading[1].trim() });
+    } else lines.push(line);
+  }
+  flush();
+  const name = String(title || "").trim().toLowerCase();
+  if (blocks[0]?.kind === "heading" && name && blocks[0].text.toLowerCase() === name)
+    blocks.shift();
+  return blocks;
+}
+export function plainNotes(text) {
+  return noteBlocks(text)
+    .filter((b) => b.kind === "para")
+    .map((b) => b.text)
+    .join(" ");
+}
 export function firstSentence(text, max = 220) {
-  const clean = String(text || "")
-    .replace(/^#+\s*/gm, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const clean = plainNotes(text);
   const match = clean.match(/^.+?[.!?](?=\s|$)/);
   const sentence = match ? match[0] : clean;
   return sentence.length > max

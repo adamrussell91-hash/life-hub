@@ -16,6 +16,8 @@ import {
   fixupQueue,
   applyFixup,
   firstSentence,
+  noteBlocks,
+  plainNotes,
 } from "../../apps/life/js/food-journal/model.js";
 import {
   mergeCapture,
@@ -291,6 +293,20 @@ test("media reads require a live journal reference and uploads use food namespac
     (await h(req("POST", { action: "read", key: "food/photos/photo_1.jpg" })))
       .status,
     200,
+  );
+  const batch = await h(
+    req("POST", {
+      action: "read",
+      keys: ["food/photos/photo_1.jpg", "food/photos/other.jpg"],
+    }),
+  );
+  assert.equal(batch.status, 200);
+  assert.deepEqual((await batch.json()).data.urls, {
+    "food/photos/photo_1.jpg": "https://r2.test/get",
+  });
+  assert.equal(
+    (await h(req("POST", { action: "read", keys: ["../secret.jpg"] }))).status,
+    400,
   );
   assert.equal(
     (await h(req("POST", { action: "upload", mime: "image/jpeg", size: 20 })))
@@ -616,7 +632,38 @@ test("editorial basis changes with the words, not the rating, and unfixed import
   assert.equal(needsEditorial(imported), false);
   assert.deepEqual(fixupQueue({ ...emptyJournal(), visits: [imported, v] }).map((x) => x.title), ["Import"]);
   assert.equal(needsEditorial({ ...imported, reviewed: true }), true);
-  assert.equal(firstSentence("## Title\nFirst line here. Second."), "Title First line here.");
+  assert.equal(firstSentence("## Title\nFirst line here. Second."), "First line here.");
+});
+
+test("Day One Markdown reads as headings and paragraphs, not raw symbols", () => {
+  const notes = [
+    "## Toastie",
+    "",
+    "---",
+    "",
+    "###### Description",
+    "Ham, cheese, mustard",
+    "",
+    "---",
+    "",
+    "###### Rating and recommendation",
+    "4\\.5/5 a good one\\! Would order again\\.",
+    "#Lunch",
+    "",
+    "![](dayone-moment://ABC123)",
+  ].join("\n");
+  assert.deepEqual(noteBlocks(notes, { title: "Toastie" }), [
+    { kind: "heading", text: "Description" },
+    { kind: "para", text: "Ham, cheese, mustard" },
+    { kind: "heading", text: "Rating and recommendation" },
+    { kind: "para", text: "4.5/5 a good one! Would order again. #Lunch" },
+  ]);
+  assert.equal(firstSentence(notes), "Ham, cheese, mustard 4.5/5 a good one!");
+  assert.doesNotMatch(plainNotes(notes), /#{2,}|---|\\|dayone-moment/);
+  assert.deepEqual(noteBlocks("Plain words.\n\nMore words."), [
+    { kind: "para", text: "Plain words." },
+    { kind: "para", text: "More words." },
+  ]);
 });
 
 test("fix-up splits dishes, keeps the original text, photos and tags, and never sets ratings", () => {
