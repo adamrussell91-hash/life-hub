@@ -1,8 +1,8 @@
 .alchemy-block-button { display: none; }
 /* Rows keep 2.75rem clear for the ⋯ menu; the beaker needs one more button's width so text never runs under it. */
 [data-alchemy-assistant] .lesson-page__block { padding-right: calc(2.75rem + var(--space-8)); }
-/* Sits just left of the row's ⋯ menu and matches it: muted, quiet, only present when the row is in use. */
-[data-alchemy-assistant] .lesson-page__block > .alchemy-block-button { display: inline-grid; place-items: center; position: absolute; top: var(--space-2); right: calc(var(--space-2) + var(--space-8) + 2px); z-index: 2; width: var(--space-8); height: var(--space-8); margin: 0; padding: 0; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--muted); cursor: pointer; opacity: 0; -webkit-tap-highlight-color: transparent; transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease; }
+/* Sits just left of the row's ⋯ menu and matches it: same top line as the ⋯ and the feedback dot, muted, quiet, only present when the row is in use. */
+[data-alchemy-assistant] .lesson-page__block > .alchemy-block-button { display: inline-grid; place-items: center; position: absolute; top: var(--space-4); right: calc(var(--space-2) + var(--space-8) + 2px); z-index: 2; width: var(--space-8); height: var(--space-8); margin: 0; padding: 0; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--muted); cursor: pointer; opacity: 0; -webkit-tap-highlight-color: transparent; transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease; }
 /* No hover on touch: keep it findable but faint. */
 @media (hover: none) { [data-alchemy-assistant] .lesson-page__block > .alchemy-block-button { opacity: .45; } }
 .lesson-page__block:hover > .alchemy-block-button, .lesson-page__block:focus-within > .alchemy-block-button, .lesson-page__block--selected > .alchemy-block-button, .alchemy-block-button.has-suggestion { opacity: 1; }
