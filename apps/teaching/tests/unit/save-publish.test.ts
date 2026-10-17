@@ -14,6 +14,7 @@ import { apiPut, apiPost, ApiClientError } from '@/api/client';
 import {
   SaveController,
   formatPublishIssues,
+  hasUnpublishedChanges,
   mountSavePublishControls,
   SAVE_STATE_LABEL
 } from '@/teacher/save-publish';
@@ -80,6 +81,22 @@ describe('formatPublishIssues', () => {
   });
 });
 
+describe('hasUnpublishedChanges', () => {
+  it('is false for a lesson that was never published', () => {
+    expect(hasUnpublishedChanges(makeLesson())).toBe(false);
+  });
+
+  it('is false when the draft was last written by publish', () => {
+    expect(hasUnpublishedChanges(makeLesson({ published_at: ISO, updated_at: ISO }))).toBe(false);
+  });
+
+  it('is true when the draft was saved after publishing', () => {
+    expect(
+      hasUnpublishedChanges(makeLesson({ published_at: ISO, updated_at: '2026-01-02T09:30:00.000Z' }))
+    ).toBe(true);
+  });
+});
+
 describe('SaveController', () => {
   let lesson: Lesson;
 
@@ -101,6 +118,16 @@ describe('SaveController', () => {
       hasPublishedVersion: false
     });
     expect(controller.getState()).toBe('saved');
+  });
+
+  it('starts in "unpublished_changes" when the draft changed after the last publish', () => {
+    const controller = new SaveController({
+      lessonId: lesson.id,
+      getLesson: () => lesson,
+      hasPublishedVersion: true,
+      hasUnpublishedChanges: true
+    });
+    expect(controller.getState()).toBe('unpublished_changes');
   });
 
   it('starts in "published" when a published version already exists', () => {

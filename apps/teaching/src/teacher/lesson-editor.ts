@@ -63,7 +63,12 @@ import { openNameModal } from '@/teacher/create/name-modal';
 import { createLessonTemplate } from '@/teacher/template-api';
 import { fetchCurriculum } from '@/teacher/nav';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
-import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
+import {
+  hasUnpublishedChanges,
+  mountSavePublishControls,
+  SaveController,
+  type SavePublishHandle
+} from '@/teacher/save-publish';
 import { confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { mountTagAnythingSection } from '@/teacher/entity-tagger';
@@ -828,6 +833,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     saveController = new SaveController({
       lessonId: lesson.id,
       hasPublishedVersion: Boolean(lesson.published_at),
+      hasUnpublishedChanges: hasUnpublishedChanges(lesson),
       debounceMs: 600,
       getLesson: () => lesson
     });
